@@ -534,18 +534,13 @@ Initial shape:
 
 ```text
 client/
-  Vite React application
+  Vite Vue application
 
 server/
   HTTP API
   background workers
   service modules
   integration adapters
-
-shared/
-  shared schemas
-  shared API contracts
-  shared constants
 
 database/
   migrations
@@ -562,45 +557,51 @@ This should be a single repository and a single Docker image for the standard de
 
 ### Frontend Stack
 
-Recommended frontend stack:
+Recommended frontend stack, matching Classifarr where practical:
 
 - Vite
-- React
-- TypeScript
-- React Router
-- TanStack Query
-- CSS Modules or scoped plain CSS
-- lucide-react icons
+- Vue 3
+- Vue Router
+- Pinia
+- Axios
+- Tailwind CSS
+- Heroicons Vue
+- Socket.IO client
 - Vitest and Testing Library
-- Playwright for browser smoke tests
 
 Vite should be used as the frontend build tool. In development, Vite can serve the client with hot reload and proxy API calls to the backend. In production, the backend should serve the compiled static assets from the Docker image.
 
 The first frontend should be a client-rendered SPA. Server-side rendering is not needed for v1 because the app is authenticated, operational, and dashboard-oriented rather than public content-oriented.
 
+Vue is the best compatibility choice if Harmoniarr should stay close to Classifarr. It lets us reuse operational patterns, CI shape, linting strategy, component conventions, and developer context from Classifarr rather than maintaining a parallel React stack.
+
 Frontend principles:
 
 - Use URL state for filters, selected views, and review context where useful.
-- Use TanStack Query for server state, caching, invalidation, polling, and mutations.
+- Use Pinia for shared client state that is genuinely application-wide.
 - Use local component state for UI-only state.
-- Avoid Redux unless the app proves it needs global client-side state beyond server data.
+- Keep API access behind client service modules instead of calling Axios directly from large views.
 - Prefer feature folders over global component sprawl.
 - Keep dense table and review experiences fast and keyboard-friendly.
 
 ### Backend Stack
 
-Recommended backend stack:
+Recommended backend stack, matching Classifarr where practical:
 
-- Node.js LTS
-- TypeScript
-- Fastify as the HTTP server
-- Zod for runtime validation and shared schema definitions
-- OpenAPI generation from route/schema definitions
+- Node.js 24 LTS
+- Express 5 as the HTTP server
+- Helmet, CORS, cookie-parser, JSON Web Token, and rate-limit middleware
+- Swagger UI for API documentation
 - PostgreSQL through `pg`
-- Kysely or small repository modules for typed SQL access
+- Small repository modules around explicit SQL
+- Morgan or structured request logging
+- Axios or native fetch for external HTTP clients
+- Socket.IO for realtime operational updates when polling is not enough
 - Postgres-backed background jobs
 
-Fastify is a good first backend choice because it is lightweight, plugin-friendly, schema-oriented, and works well for a REST API without imposing a large application framework. The route layer should stay thin so the domain services remain independent from Fastify.
+Express is the better first backend choice for compatibility with Classifarr. It is already proven in the sibling project, keeps middleware and auth patterns familiar, and reduces the amount of stack-specific work needed when sharing operational ideas between the two applications.
+
+The route layer should still stay thin. Express should own HTTP mechanics, not domain behavior. Harmoniarr's Soulseek discovery, candidate scoring, transfer reconciliation, and import validation should live in focused services that can be tested without Express.
 
 The backend should own:
 
@@ -650,9 +651,9 @@ The app should publish `/api/openapi.json` and eventually a simple API docs view
 
 The app needs live-ish updates for searches, transfers, imports, and worker activity.
 
-V1 can use polling through TanStack Query for most views. This is simpler and reliable.
+V1 can use ordinary polling for most views. This is simple and reliable.
 
-Later, add a server event stream for high-churn activity:
+For high-churn activity, use Socket.IO because that matches Classifarr's existing stack:
 
 - Search job progress
 - Candidate generation
@@ -660,7 +661,7 @@ Later, add a server event stream for high-churn activity:
 - Import validation progress
 - System notices
 
-Server-Sent Events are probably enough for v1/v2 because the app mostly needs server-to-client updates. WebSockets can be added later if bidirectional realtime interaction becomes necessary.
+Socket.IO should not become the primary data API. It should publish status changes and operational events while REST remains the source of truth.
 
 ### Background Jobs
 
@@ -686,29 +687,26 @@ Avoid Redis-backed queues like BullMQ for the default deployment unless we later
 
 ### Build And Package Model
 
-The Docker build should be multi-stage:
+The Docker build should follow the Classifarr multi-stage Alpine pattern:
 
-1. Install dependencies.
-2. Build shared TypeScript.
-3. Build the Vite client.
-4. Build the server.
-5. Copy compiled assets into the final Alpine runtime image.
-6. Install only runtime dependencies and required Alpine packages.
-7. Start embedded Postgres, run migrations, then start the app.
+1. Build the Vite client in a Node Alpine builder stage.
+2. Install production server dependencies in a Node Alpine builder stage.
+3. Copy server source, production `node_modules`, built client assets, database files, and the entrypoint into the final runtime image.
+4. Install runtime Alpine packages, including embedded PostgreSQL 18 packages.
+5. Start embedded Postgres, run migrations, then start the app.
 
 Production runtime should not require the Vite dev server. Vite is a build-time and local development tool only.
 
 ### Package Manager
 
-Use npm workspaces unless there is a strong reason to add another package manager.
+Use npm and the same root-orchestrated script style as Classifarr unless there is a strong reason to add another package manager.
 
-This keeps setup simple for contributors and avoids requiring users to understand pnpm/yarn-specific behavior. The repo can still be structured as workspaces:
+This keeps setup simple for contributors and avoids requiring users to understand pnpm/yarn-specific behavior. The repo can still keep separate package files:
 
 ```text
 package.json
 client/package.json
 server/package.json
-shared/package.json
 ```
 
 Scripts should be root-level where practical:
@@ -728,25 +726,23 @@ The package set should stay practical and conservative. Add dependencies when th
 Root workspace development packages:
 
 ```text
-typescript
-tsx
 eslint
-typescript-eslint
-prettier
-rimraf
-npm-run-all2
+glob
+markdownlint-cli2
 ```
 
-`tsx` is useful for local TypeScript scripts, migration helpers, and development entrypoints. `npm-run-all2` is useful if root scripts need to run client/server checks consistently across platforms.
+The root package should stay mostly orchestration-focused, like Classifarr. Root scripts should call into `client`, `server`, and `scripts` rather than accumulating application runtime dependencies.
 
 Client runtime packages:
 
 ```text
-react
-react-dom
-react-router
-@tanstack/react-query
-lucide-react
+vue
+vue-router
+pinia
+axios
+@heroicons/vue
+@vueuse/core
+socket.io-client
 clsx
 date-fns
 ```
@@ -754,53 +750,53 @@ date-fns
 Client conditional packages:
 
 ```text
-@tanstack/react-table
-@tanstack/react-virtual
-react-hook-form
-@hookform/resolvers
-zod
+virtual-scroller or table virtualization package
+form validation helper if settings forms become complex
 ```
 
-Use TanStack Table and Virtual only when candidate/wanted/download tables become large enough to need serious table behavior and virtualization. Use React Hook Form only for settings and add/edit flows that become too complex for simple controlled components.
+Add table virtualization only when candidate, wanted, download, or import views become large enough to need it. Start with clear Vue components and extract shared table behavior after the first real screens prove the shape.
 
 Client build packages:
 
 ```text
 vite
-@vitejs/plugin-react
-typescript
+@vitejs/plugin-vue
+tailwindcss
+@tailwindcss/postcss
+postcss
 ```
 
 Server runtime packages:
 
 ```text
-fastify
-@fastify/static
-@fastify/cookie
-@fastify/session
-@fastify/swagger
-@fastify/swagger-ui
-@fastify/sensible
-zod
-fastify-type-provider-zod
+express
+helmet
+cors
+cookie-parser
+express-rate-limit
+jsonwebtoken
+swagger-ui-express
 pg
-kysely
-pino
-undici
+socket.io
+node-cron
+axios
+dotenv
+morgan
 bottleneck
 p-retry
+js-yaml
 ```
 
 Notes:
 
-- `fastify` owns HTTP routing.
-- `@fastify/static` serves the built Vite UI in production.
-- `@fastify/swagger` and `@fastify/swagger-ui` expose API docs.
-- `zod` validates runtime inputs and can support shared API schemas.
+- `express` owns HTTP routing and static serving.
+- `helmet`, `cors`, rate limiting, cookie parsing, and JWT handling should mirror Classifarr patterns where applicable.
+- `swagger-ui-express` exposes API documentation.
 - `pg` is the PostgreSQL driver.
-- `kysely` gives typed SQL without hiding Postgres behavior behind a heavy ORM.
-- `pino` gives structured logs and aligns with Fastify defaults.
-- `undici` can be used for explicit HTTP clients, though native `fetch` may be enough.
+- Small repository modules should keep SQL explicit instead of introducing a heavy ORM early.
+- `socket.io` supports operational updates for transfers, imports, and worker state.
+- `node-cron` is acceptable for simple scheduled maintenance, metadata refresh, and reconciliation jobs.
+- `axios` keeps parity with Classifarr and is fine for slskd, MusicBrainz, AcoustID, and Classifarr calls.
 - `bottleneck` and `p-retry` are useful for MusicBrainz, AcoustID, and slskd retry/rate-limit behavior.
 
 Server conditional packages:
@@ -812,6 +808,7 @@ file-type
 fast-glob
 sanitize-filename
 proper-lockfile
+bcrypt
 ```
 
 Use `pg-boss` only if the internal jobs table becomes too limited. Start with our own simple job records if that keeps the first implementation clearer.
@@ -823,43 +820,43 @@ Use audio/file packages when the import validator needs them:
 - `fast-glob` for library/import scans.
 - `sanitize-filename` for safe rename/move operations.
 - `proper-lockfile` if import operations need cross-process file locking.
-
-Shared package dependencies:
-
-```text
-zod
-```
-
-The shared workspace should stay small. It should contain schemas, inferred types, constants, and API contracts. It should not depend on server-only or client-only libraries.
+- `bcrypt` if local user accounts/password auth are included instead of API-key-only access.
 
 Testing packages:
 
 ```text
+jest
+supertest
+pg-mem
+testcontainers
+@testcontainers/postgresql
 vitest
 @vitest/coverage-v8
 jsdom
-@testing-library/react
-@testing-library/jest-dom
-@testing-library/user-event
-msw
-@playwright/test
+@testing-library/vue
+@vue/test-utils
 ```
 
 Testing roles:
 
-- `vitest`: unit and service tests.
+- `jest`: server unit and integration tests, matching Classifarr.
+- `supertest`: Express route tests.
+- `pg-mem`: fast database-adjacent unit tests where a real Postgres instance is not required.
+- `testcontainers` and `@testcontainers/postgresql`: database-backed integration tests.
+- `vitest`: client unit/component tests.
 - `@vitest/coverage-v8`: coverage reports and ratchet support.
-- `jsdom`: React component tests.
-- Testing Library packages: user-focused UI tests.
-- `msw`: mock HTTP APIs for client tests.
-- `@playwright/test`: browser smoke and workflow tests.
+- `jsdom`: Vue component tests.
+- Vue Testing Library and Vue Test Utils: user-focused UI tests and lower-level component testing where needed.
 
-The server can use Fastify's built-in injection testing for route tests instead of adding a separate HTTP test client at first.
+Playwright can be added later for browser smoke and workflow tests once there is a stable UI to exercise.
 
 Packages to avoid initially:
 
 ```text
 redux
+react
+fastify
+tanstack query
 apollo/graphql
 typeorm
 prisma
@@ -872,7 +869,7 @@ electron
 
 Avoid these until there is a concrete need:
 
-- Redux is unnecessary while TanStack Query handles server state.
+- React/Fastify are good tools, but they would diverge from Classifarr and reduce compatibility.
 - GraphQL adds complexity before we need it.
 - Heavy ORMs may fight the explicit SQL and migration model.
 - BullMQ requires Redis, which conflicts with the simple embedded Postgres deployment.
@@ -2241,13 +2238,14 @@ Integration tests should cover:
 - Docker-facing health checks
 - API route behavior with real database state
 
-The test stack should be similar in shape to Classifarr:
+The test stack should match Classifarr's shape:
 
-- Jest or equivalent for server tests.
-- Supertest or equivalent for HTTP route tests.
-- Testcontainers or an equivalent containerized Postgres harness for database-backed integration tests.
-- Vitest or equivalent for client tests.
-- Testing Library style component tests for frontend behavior.
+- Jest for server tests.
+- Supertest for Express route tests.
+- Testcontainers and `@testcontainers/postgresql` for database-backed integration tests.
+- `pg-mem` for fast database-adjacent unit tests where appropriate.
+- Vitest for client tests.
+- Vue Testing Library and Vue Test Utils for frontend behavior.
 - Coverage reports for both server and client.
 
 Coverage should use a ratchet model. The baseline should be committed to the repository, and CI should fail when server or client coverage drops below the committed baseline beyond a small tolerance. Intentional decreases should require updating the baseline in the same change.
@@ -2469,6 +2467,7 @@ It should avoid a marketing-style layout. The first screen should be the actual 
 - Project name: Harmoniarr.
 - License: GPL-3.0-or-later, matching Classifarr.
 - Use a Classifarr-style GitHub Action to check copyright/license headers on source files.
+- Use the Classifarr-compatible stack as the default implementation baseline: Node 24, npm, Express 5, Vue 3, Vite, Pinia, Tailwind CSS, Socket.IO, Jest, Vitest, Testcontainers, Docker Alpine, and explicit PostgreSQL access through `pg`.
 - Use Postgres by default.
 - Target PostgreSQL 18 for the embedded database.
 - Pin the standard image to a stable Alpine branch, starting with Alpine 3.23 unless implementation testing shows a blocker.
