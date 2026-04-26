@@ -7,3 +7,6 @@ The current repository contains planning documents while product, architecture, 
 - [Planning document](docs/harmoniarr.md)
 - [Release checklist](release.md)
 
+## License
+
+Harmoniarr is licensed under GPL-3.0-or-later. See [LICENSE](LICENSE) and [COPYRIGHT.md](COPYRIGHT.md).

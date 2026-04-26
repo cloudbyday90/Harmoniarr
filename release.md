@@ -15,6 +15,7 @@
 - Client tests pass.
 - Integration tests pass.
 - Coverage ratchet passes.
+- Copyright compliance check passes.
 - No failing CI jobs or unresolved release-blocking review tasks.
 - Database migrations are reviewed, idempotent, and safe for existing installs.
 - Schema snapshot is refreshed when migrations changed.
@@ -28,6 +29,7 @@ Run these before cutting a release:
 
 ```bash
 npm run lint
+npm run check-copyright
 npm run migration:check
 npm run test:ci
 npm run test:integration

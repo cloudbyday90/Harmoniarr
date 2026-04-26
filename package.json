@@ -1,0 +1,15 @@
+{
+  "name": "harmoniarr",
+  "version": "0.1.0-beta",
+  "private": true,
+  "description": "Soulseek-native music library manager inspired by Lidarr",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "check-copyright": "node scripts/check-copyright.js",
+    "update-copyright": "node scripts/update-copyright.js",
+    "add-copyright-headers": "node scripts/add-copyright-headers.js"
+  },
+  "devDependencies": {
+    "glob": "^13.0.6"
+  }
+}

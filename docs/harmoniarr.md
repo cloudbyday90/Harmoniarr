@@ -2256,6 +2256,7 @@ Quality gates should include:
 
 - ESLint for server code.
 - ESLint for client code.
+- Copyright/license header compliance using the same style as Classifarr.
 - Security-focused lint rules for backend code where practical.
 - Test linting to catch bad test patterns.
 - Migration filename validation.
@@ -2466,6 +2467,8 @@ It should avoid a marketing-style layout. The first screen should be the actual 
 ## Decided
 
 - Project name: Harmoniarr.
+- License: GPL-3.0-or-later, matching Classifarr.
+- Use a Classifarr-style GitHub Action to check copyright/license headers on source files.
 - Use Postgres by default.
 - Target PostgreSQL 18 for the embedded database.
 - Pin the standard image to a stable Alpine branch, starting with Alpine 3.23 unless implementation testing shows a blocker.
