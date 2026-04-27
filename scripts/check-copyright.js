@@ -7,8 +7,8 @@
  * See LICENSE file for details.
  */
 
-const fs = require('fs');
-const glob = require('glob');
+import fs from 'node:fs';
+import { globSync } from 'glob';
 
 const START_YEAR = 2026;
 const CURRENT_YEAR = new Date().getFullYear();
@@ -47,7 +47,7 @@ function checkFile(filePath) {
 
 function main() {
   const files = FILE_PATTERNS.flatMap(pattern =>
-    glob.sync(pattern, { nodir: true, ignore: IGNORE_PATTERNS })
+    globSync(pattern, { nodir: true, ignore: IGNORE_PATTERNS })
   );
   const errors = [];
 

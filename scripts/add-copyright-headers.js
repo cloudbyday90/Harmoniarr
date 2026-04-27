@@ -7,8 +7,8 @@
  * See LICENSE file for details.
  */
 
-const fs = require('fs');
-const glob = require('glob');
+import fs from 'node:fs';
+import { globSync } from 'glob';
 
 const START_YEAR = 2026;
 const CURRENT_YEAR = new Date().getFullYear();
@@ -102,7 +102,7 @@ function addHeader(filePath) {
 function main() {
   console.log('\nAdding copyright headers to files without them...\n');
 
-  const files = FILE_PATTERNS.flatMap(pattern => glob.sync(pattern)).filter(f => fs.statSync(f).isFile());
+  const files = FILE_PATTERNS.flatMap(pattern => globSync(pattern)).filter(f => fs.statSync(f).isFile());
   let added = 0;
 
   files.forEach(file => {

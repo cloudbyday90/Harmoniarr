@@ -2,6 +2,7 @@
   "name": "harmoniarr",
   "version": "0.1.0-beta",
   "private": true,
+  "type": "module",
   "description": "Soulseek-native music library manager inspired by Lidarr",
   "license": "GPL-3.0-or-later",
   "scripts": {

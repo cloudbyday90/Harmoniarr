@@ -346,6 +346,267 @@ Each metadata record should track:
 
 This fits the broader time-based design and lets the app explain which metadata version was used for a search or import decision.
 
+## Release Monitoring And Detection
+
+Harmoniarr should include a service that monitors known artists for newly published releases and turns relevant discoveries into wanted state.
+
+This should cover:
+
+- Albums.
+- EPs.
+- Singles.
+- Live releases.
+- Compilations.
+- Remixes.
+- Soundtracks or split releases where the monitored artist is relevant.
+- Future-dated releases that should become wanted when they are released.
+
+The service should not directly search Soulseek every time metadata changes. Its job is to detect new or changed music metadata, explain the decision, and update monitored or wanted state. Discovery scheduling should still decide when Soulseek searches are allowed to run.
+
+### Monitoring Model
+
+Release monitoring starts from a monitored artist.
+
+Each monitored artist should have monitoring rules:
+
+- Release types to watch, such as albums, EPs, singles, live releases, and compilations.
+- Release statuses to include, such as official releases only by default.
+- Whether future releases should be tracked before release date.
+- Whether newly detected releases should become wanted automatically.
+- Whether singles should be monitored by default or only shown for review.
+- Country, format, and edition preferences for choosing a default release.
+- Optional ignore rules for known noisy release groups, bootlegs, reissues, karaoke, tribute releases, or unrelated compilations.
+
+Defaults should be conservative:
+
+- Albums and EPs are monitored by default for monitored artists.
+- Singles are detected but can require review unless the user enables automatic single monitoring.
+- Compilations, live releases, remixes, and unofficial releases should be opt-in or review-first.
+- Future releases should be visible, but should not trigger Soulseek search until the release date or a configured early-search window.
+
+### Release Detector
+
+The release detector is the comparison layer between provider metadata and Harmoniarr's known local state.
+
+It should answer:
+
+- Is this release group new for a monitored artist?
+- Is this a new release or edition under an existing release group?
+- Did the release type, status, date, title, artist credit, or tracklist change?
+- Is this release relevant to the monitored artist, or only an incidental appearance?
+- Is this a duplicate, merge, redirect, or provider correction for something already known?
+- Should the discovery create a wanted item, update existing metadata, or only create a review event?
+
+The detector should emit durable detection events rather than silently changing state.
+
+Example event types:
+
+- `release_group_detected`
+- `release_detected`
+- `release_changed`
+- `release_date_changed`
+- `tracklist_changed`
+- `release_merged`
+- `release_removed_or_unavailable`
+- `release_reclassified`
+- `release_ignored_by_policy`
+- `release_needs_review`
+
+This "detector" layer is intentionally separate from metadata fetching. Fetching asks providers what exists. Detection decides what changed and what that change means for this library.
+
+### Detection Flow
+
+Suggested flow:
+
+```text
+Scheduled artist metadata refresh
+  -> fetch release groups for monitored artist
+  -> normalize provider payloads
+  -> compare with local metadata snapshot
+  -> emit release detection events
+  -> apply monitoring policy
+  -> create or update release records
+  -> reconcile wanted state
+  -> schedule discovery only when eligible
+```
+
+The detector should use local snapshots and source identifiers. It should avoid making decisions from live provider responses that are not stored, because every detection should be explainable later.
+
+### Wanted State Integration
+
+Detected releases should flow into wanted reconciliation.
+
+Rules:
+
+- If a new monitored album or EP is detected and the library does not satisfy it, create a wanted album/release item.
+- If a single is detected and single monitoring is disabled, create a review event but no wanted item.
+- If a future-dated release is detected, create known metadata and pending monitored state, but hold search eligibility until policy allows it.
+- If a release is reclassified from single to album or EP, re-run monitoring policy and wanted reconciliation.
+- If a tracklist changes, update matching metadata and flag existing candidates, downloads, or imports that used the old tracklist.
+- If a release is merged or redirected by MusicBrainz, preserve historical IDs and map them to the surviving canonical record.
+
+The user should be able to see why something became wanted:
+
+```text
+Detected new official album for monitored artist
+  -> album monitoring enabled
+  -> not present in library
+  -> wanted item created
+```
+
+### Scheduling And Rate Limits
+
+Release monitoring should respect provider rate limits, especially MusicBrainz.
+
+Initial cadence:
+
+- Refresh newly added artists immediately.
+- Refresh monitored artists on a staggered daily or weekly schedule.
+- Refresh artists with recent or future releases more frequently.
+- Refresh inactive artists less frequently after their catalog is stable.
+- Allow manual refresh from the artist page.
+
+The app should avoid synchronized refresh spikes after container restart. Scheduled checks should be jittered and persisted.
+
+Release monitoring should not create unbounded search traffic. New wanted items should enter the same discovery eligibility, cooldown, and rate-limit system as manually added wanted items.
+
+### UI Surface
+
+Release monitoring should appear in the UI as part of artist, wanted, and activity views.
+
+Expected UI elements:
+
+- Artist page section for recently detected releases.
+- Monitoring settings for albums, EPs, singles, live releases, compilations, and future releases.
+- Detection history showing provider, timestamp, detected change, policy decision, and resulting wanted state.
+- Review queue for detected releases that need user confirmation.
+- Badges for future releases, newly detected releases, ignored releases, and review-required releases.
+- Manual refresh action on artist pages.
+
+The UI should make detection explainable. A user should not see a surprise wanted item without being able to trace it back to a release detection event and monitoring rule.
+
+### Suggested Records
+
+Release monitoring may need records such as:
+
+- `artist_monitoring_rules`
+- `metadata_provider_snapshots`
+- `release_detection_runs`
+- `release_detection_events`
+- `release_monitoring_decisions`
+- `release_redirects`
+- `future_release_holds`
+
+These records should preserve enough raw and normalized data to explain provider changes without depending on current live provider state.
+
+## Dependency Heartbeat And Provider Limits
+
+Harmoniarr should include a dependency heartbeat service that tracks the health, availability, and rate-limit state of external and local dependencies.
+
+This service should support:
+
+- `slskd` API availability and authentication.
+- MusicBrainz API availability, rate limiting, and User-Agent configuration.
+- Cover Art Archive availability.
+- AcoustID availability and fingerprint lookup health.
+- Optional ClamAV availability and signature freshness when antivirus scanning is enabled.
+- Local Postgres health.
+- Background worker health.
+- Library and download path read/write checks.
+- Local media tools such as `ffmpeg`, `ffprobe`, and Chromaprint tooling.
+- Socket.IO or realtime update health if the app exposes a realtime status channel.
+
+Heartbeat should not mean "spam every dependency every few seconds." The service should use dependency-appropriate checks. Local services can tolerate more frequent checks, while public metadata providers should rely mostly on passive health from real requests plus low-frequency probes.
+
+### Heartbeat Responsibilities
+
+The heartbeat service should:
+
+- Record the last successful check per dependency.
+- Record the last failure per dependency with status code, error class, and timestamp.
+- Track current dependency state, such as `healthy`, `degraded`, `rate_limited`, `unreachable`, `misconfigured`, or `disabled`.
+- Expose dependency state to the scheduler so blocked jobs do not keep retrying aggressively.
+- Expose dependency state to the UI so users can see why searches, metadata refreshes, imports, or fingerprinting are paused.
+- Emit operational events when dependencies recover or degrade.
+- Apply backoff and circuit-breaker behavior for repeated failures.
+
+The heartbeat service should not own domain decisions. For example, it can say MusicBrainz is rate limited or unavailable, but metadata refresh policy should decide when to retry a specific artist.
+
+### MusicBrainz API Limits
+
+MusicBrainz must be treated as a rate-limited public dependency.
+
+Official guidance currently requires:
+
+- No more than one request per second from the client application.
+- A meaningful User-Agent header that includes application identity and contact information.
+- Avoiding synchronized background jobs that wake up at fixed times across installations.
+- Avoiding frequent polling just to check whether metadata changed.
+
+Harmoniarr should implement this as adapter-level policy:
+
+- A MusicBrainz-specific rate limiter with a default ceiling of one request per second.
+- A configured User-Agent such as `Harmoniarr/<version> (<project-url-or-contact>)`.
+- Persistent request queues for metadata refresh and release monitoring.
+- Randomized jitter for scheduled metadata refreshes.
+- Aggressive local caching of MusicBrainz responses and normalized projections.
+- Conditional refresh policy based on artist activity, recent release dates, stale metadata age, and user action.
+- Backoff on HTTP 503 and other throttling or temporary service errors.
+- No heartbeat probe that consumes MusicBrainz quota more often than necessary.
+
+Manual user actions may be prioritized, but they still must respect the MusicBrainz adapter rate limiter.
+
+### Provider Rate-Limit Model
+
+Each external provider adapter should define its own limits and retry behavior.
+
+Provider configuration should include:
+
+- Requests per second or minimum interval.
+- Burst behavior, if any.
+- Required headers.
+- Authentication requirements.
+- Retryable status codes.
+- Backoff schedule.
+- Cache TTL rules.
+- Whether health should be active, passive, or both.
+
+This keeps MusicBrainz-specific rules out of generic heartbeat code while still letting the heartbeat service report provider health consistently.
+
+### Scheduler Integration
+
+Schedulers should consult dependency state before creating work.
+
+Examples:
+
+- Do not dispatch metadata refresh jobs while MusicBrainz is rate limited or unreachable.
+- Do not dispatch Soulseek searches while `slskd` is unreachable or unauthenticated.
+- Do not create fingerprint lookup jobs while AcoustID is unavailable.
+- Do not start import jobs if the library root is not writable.
+- Do not start transcode jobs if `ffmpeg` or the temporary transcode path is unavailable.
+
+Blocked work should remain durable and explainable. The UI should be able to show:
+
+```text
+Metadata refresh paused
+Reason: MusicBrainz rate limited
+Next retry: 2026-04-26 14:25:00
+```
+
+### Suggested Records
+
+Dependency heartbeat may need records such as:
+
+- `dependency_checks`
+- `dependency_status`
+- `dependency_events`
+- `provider_rate_limit_state`
+- `provider_request_log`
+- `worker_heartbeats`
+- `path_health_checks`
+
+The current status tables can be compact projections, but historical check and event records should be retained long enough to debug recurring service problems.
+
 ## Architecture Principle
 
 Soulseek compatibility should drive the architecture.
@@ -401,12 +662,16 @@ integrations/
   cover-art-archive/
 
 workers/
+  dependency-heartbeat/
   search-dispatcher/
   candidate-builder/
   folder-browser/
   transfer-reconciler/
   import-validator/
   metadata-refresher/
+  release-detector/
+  quality-upgrade-detector/
+  wanted-reconciler/
 ```
 
 Each domain area should prefer several focused files over a single large module.
@@ -512,6 +777,27 @@ client/features/candidates/
   useCandidateActions
 ```
 
+Shared frontend infrastructure should include:
+
+```text
+client/composables/useSWR
+client/constants/cacheKeys
+client/api/*
+```
+
+Feature composables should wrap SWR rather than making large page files own fetch logic directly.
+
+Examples:
+
+```text
+useDashboardData
+useMissingItems
+useActivityQueue
+useManualSearchSession
+useSystemHealth
+useErrorLogs
+```
+
 The goal is to make future changes local. If matching changes, we should know where to look. If slskd changes, the adapter should absorb it. If candidate review UI changes, it should not require editing unrelated library or import screens.
 
 ## Codebase And Runtime Stack Direction
@@ -527,6 +813,30 @@ The app should follow the operational shape that makes Sonarr/Radarr successful 
 - Docker-first deployment.
 
 The technology should be modern, but the runtime should stay boring. The app should be easy to run on a NAS, home server, mini PC, VM, or Docker host without requiring a complex platform.
+
+### JavaScript Module Format
+
+The project should use ES modules as the default JavaScript module format.
+
+The root `package.json` should declare:
+
+```json
+{
+  "type": "module"
+}
+```
+
+With this setting, normal `.js` files are interpreted as ES modules by Node. Project scripts and application code should therefore use `.js` or `.ts` with `import` and `export` syntax.
+
+Extension policy:
+
+- Use `.js` for normal JavaScript source in this ESM package.
+- Use `.ts` for normal TypeScript source when TypeScript is introduced.
+- Reserve `.cjs` for rare CommonJS compatibility files.
+- Reserve `.mjs` for rare cases where a file must be explicitly ESM outside the package scope or a tool specifically requires the extension.
+- Reserve `.cts` and `.mts` only for TypeScript files that need explicit per-file CommonJS or ESM behavior.
+
+This keeps the codebase consistent while still leaving escape hatches for future tooling, package publishing, or interoperability needs.
 
 ### Proposed Repository Shape
 
@@ -566,6 +876,7 @@ Recommended frontend stack, matching Classifarr where practical:
 - Axios
 - Tailwind CSS
 - Heroicons Vue
+- VueUse, primarily for browser state helpers such as online/offline state
 - Socket.IO client
 - Vitest and Testing Library
 
@@ -581,6 +892,7 @@ Frontend principles:
 - Use Pinia for shared client state that is genuinely application-wide.
 - Use local component state for UI-only state.
 - Keep API access behind client service modules instead of calling Axios directly from large views.
+- Use the Harmoniarr SWR composable for service-backed page/module data.
 - Prefer feature folders over global component sprawl.
 - Keep dense table and review experiences fast and keyboard-friendly.
 
@@ -662,6 +974,108 @@ For high-churn activity, use Socket.IO because that matches Classifarr's existin
 - System notices
 
 Socket.IO should not become the primary data API. It should publish status changes and operational events while REST remains the source of truth.
+
+### SWR Data Refresh Strategy
+
+Harmoniarr should use a Classifarr-style Vue SWR composable for service-backed UI data.
+
+Classifarr currently uses a custom `useSWR` composable rather than the React SWR package. The pattern is:
+
+- Hydrate visible UI immediately from `localStorage` cache when the cached value is still inside its TTL.
+- Mark cached data as stale while fetching fresh data in the background.
+- Keep stale data visible during revalidation instead of clearing the screen.
+- Retry transient network, `429`, and `5xx` failures with bounded backoff.
+- Treat ordinary `4xx` failures as non-retryable.
+- Pause interval polling when the browser tab is hidden.
+- Revalidate when the browser comes back online.
+- Sync cache updates across tabs with the `storage` event.
+- Expose `data`, `isLoading`, `isStale`, `error`, `refresh`, `isOffline`, `retryCount`, and `cacheTimestamp`.
+
+Harmoniarr should adapt that composable with a Harmoniarr cache prefix:
+
+```text
+harmoniarr:v1:swr:
+```
+
+The cache key format should be stable and explicit:
+
+```text
+domain:resource:identifier-or-filter-hash
+```
+
+Examples:
+
+```text
+dashboard:main
+dashboard:activity-summary
+system:health
+library:artists:list
+artist:detail:{artistId}
+album:detail:{albumId}
+missing:list:{filterHash}
+activity:queue:{filterHash}
+activity:downloads
+activity:imports
+activity:users
+search:manual:{searchSessionId}
+logs:unresolved
+notifications:unread
+```
+
+Recommended TTL presets:
+
+```text
+SHORT = 30000      # 30 seconds, frequent activity and queues
+MEDIUM = 60000     # 60 seconds, dashboard and summary data
+LONG = 300000      # 5 minutes, user/account/settings data
+VERY_LONG = 900000 # 15 minutes, static-ish metadata/config
+```
+
+Recommended polling intervals:
+
+```text
+FAST = 5000     # downloads, imports, queue counts, active jobs
+NORMAL = 30000  # dashboard, missing summaries, notifications
+SLOW = 60000    # settings, health summaries, background stats
+```
+
+Use SWR by default for:
+
+- Dashboard artist list and summary panels.
+- Missing page list and counts.
+- Activity queue, candidates, downloads, imports, history, source users, blocklist, and failed jobs.
+- Header health, unread notifications, and active task indicators.
+- Settings health/status pages.
+- Logs and unresolved error summaries.
+
+Use Socket.IO to trigger SWR revalidation, not to replace REST state.
+
+Examples:
+
+- `download.progress` event -> refresh `activity:downloads`.
+- `import.review.created` event -> refresh `activity:imports` and dashboard urgent reviews.
+- `wanted.changed` event -> refresh `missing:list:*` and dashboard missing summary.
+- `dependency.changed` event -> refresh `system:health`.
+
+User actions should call `refresh` or mutate the relevant cache after success:
+
+- Search/retry wanted item.
+- Download candidate.
+- Accept or reject import.
+- Resolve error log.
+- Trust, block, or annotate source user.
+- Change monitoring or quality profile settings.
+
+Optimistic cache mutation is acceptable for low-risk UI state, such as marking a notification read. For high-impact domain changes, prefer server response first, then revalidate.
+
+The UI should expose freshness without being noisy:
+
+- Show a subtle updating indicator while `isStale` is true.
+- Show last updated time from `cacheTimestamp` on operational modules.
+- Keep manual refresh controls where users expect them.
+- Do not show full-page loading when stale data is available.
+
+SWR cache must not store secrets. Authentication tokens, API keys, slskd credentials, and decrypted secrets must never be written to SWR localStorage.
 
 ### Background Jobs
 
@@ -1357,13 +1771,14 @@ Primary request flow:
 1. User adds or monitors an artist.
 2. App imports artist metadata.
 3. App creates release groups, releases, tracks, and monitoring records.
-4. App derives wanted items from monitoring rules and existing library state.
-5. App creates discovery requests for wanted items that are eligible to search.
-6. Scheduler turns eligible discovery requests into search jobs.
-7. Search jobs create candidate records.
-8. Candidate review or automation creates download jobs.
-9. Transfer reconciliation creates import reviews.
-10. Import approval creates library files and updates wanted state.
+4. Release detection compares provider metadata against known local state.
+5. App derives wanted items from monitoring rules, detection decisions, and existing library state.
+6. App creates discovery requests for wanted items that are eligible to search.
+7. Scheduler turns eligible discovery requests into search jobs.
+8. Search jobs create candidate records.
+9. Candidate review or automation creates download jobs.
+10. Transfer reconciliation creates import reviews.
+11. Import approval creates library files and updates wanted state.
 
 The important distinction is that adding an artist does not directly mean "search Soulseek now for everything." Adding an artist means "create and maintain wanted state." Search timing is controlled by eligibility rules, rate limits, user intent, and automation settings.
 
@@ -1388,8 +1803,11 @@ Scheduled work should maintain the library without overwhelming Soulseek or the 
 
 Suggested schedules:
 
+- Dependency heartbeat: periodic and passive checks for external services, local tools, worker health, and path readiness.
 - Metadata refresh: periodic artist and release metadata updates.
+- Release detection: compare refreshed artist metadata against known local state and emit release detection events.
 - Wanted reconciliation: periodic recalculation of missing, monitored, and upgradeable music.
+- Quality upgrade detection: periodic comparison of library files against quality profiles and upgrade policy.
 - Search queue dispatch: frequent but rate-limited search job creation.
 - Candidate refresh: occasional re-search for wanted items with no good candidates.
 - Transfer reconciliation: frequent polling of active slskd downloads.
@@ -1403,7 +1821,12 @@ Search cadence should be conservative by default. A practical starting point is 
 
 Some work should happen as a direct consequence of state changes:
 
+- Dependency degraded -> pause or back off affected schedulers.
+- Dependency recovered -> re-evaluate blocked jobs.
 - Artist metadata imported -> recalculate monitored releases.
+- Artist metadata refreshed -> run release detection.
+- New relevant release detected -> apply monitoring policy and reconcile wanted state.
+- Future release date reached -> recalculate search eligibility.
 - Wanted item created -> mark as search eligible if monitored and missing.
 - Search job completed -> build candidates.
 - Candidate built -> browse promising folders.
@@ -1413,6 +1836,7 @@ Some work should happen as a direct consequence of state changes:
 - Transfer state changed -> append transfer event.
 - Transfer completed -> create import review.
 - Import accepted -> move or link files into the library.
+- Library file added or rescanned -> inspect quality and recalculate upgrade eligibility.
 - Import completed -> mark wanted item satisfied or partially satisfied.
 - Import rejected -> preserve reason and decide whether retry is allowed.
 
@@ -1517,6 +1941,546 @@ Import states:
 - Imported
 - Rejected
 - Failed
+
+## Planned Antivirus Scanning
+
+Harmoniarr should plan for optional antivirus scanning of completed downloads before import.
+
+This is a future security feature, not a v1 blocker. The first implementation should focus on safe staging, strict file-type handling, import validation, and not executing downloaded content. Antivirus scanning can then be added as a defense-in-depth layer.
+
+The likely integration should use ClamAV rather than a custom antivirus engine.
+
+Preferred model:
+
+```text
+slskd download completed
+  -> keep file in staging
+  -> scan with ClamAV
+  -> clean: continue import validation
+  -> infected or suspicious: quarantine and block import
+  -> scan failed: hold for review based on policy
+```
+
+Recommended deployment shape:
+
+- Optional separate ClamAV Docker service running `clamd`.
+- `freshclam` updates signatures.
+- Harmoniarr connects to `clamd` over TCP or a Unix socket.
+- Harmoniarr records scan results per file.
+- Scan results appear in import review.
+- Infected or suspicious files are quarantined and cannot be imported unless an explicit future override policy exists.
+
+Settings should eventually include:
+
+- Enable or disable antivirus scanning.
+- ClamAV host, port, or socket path.
+- Whether to scan audio files.
+- Whether to scan extra files such as images, logs, playlists, cue sheets, archives, and text files.
+- Quarantine path and retention behavior.
+- Import policy when the scanner is unavailable: fail closed, hold for review, or fail open.
+- Signature age warning threshold.
+
+Antivirus scanning should not be treated as proof that a file is safe. It can catch known malware, but it cannot guarantee safety. Harmoniarr should still:
+
+- Avoid executing downloaded files.
+- Avoid auto-extracting archives by default.
+- Use an allowlist for importable file types.
+- Keep downloads in staging until scan and import validation pass.
+- Show scan failures clearly.
+
+Planned records may include:
+
+- `antivirus_scan_runs`
+- `antivirus_scan_results`
+- `antivirus_quarantine_items`
+- `antivirus_signature_status`
+
+The dependency heartbeat service should eventually track ClamAV availability and signature freshness when antivirus scanning is enabled.
+
+## Security Benchmark Planning
+
+The security benchmark planning document lives in `docs/SECURITY_BENCHMARKS.md`.
+
+It is adapted from Classifarr's security benchmark structure, but it should be treated as a Harmoniarr planning baseline until implementation exists. As Dockerfiles, API routes, authentication, worker jobs, and CI gates are added, the benchmark document should be updated with concrete file references and verified status.
+
+The benchmark should track:
+
+- Container hardening.
+- API authentication and authorization.
+- REST security practices.
+- Download and import safety.
+- Path traversal prevention.
+- Integration and provider safety.
+- Secret handling.
+- Worker and queue abuse resistance.
+- Optional future antivirus scanning.
+- Security CI gates.
+
+## Media Management Settings
+
+Media management should be one of the first settings areas because it controls how Harmoniarr turns accepted downloads into an organized library.
+
+This section should cover file organization, naming conventions, import behavior, and safe rename previews. Audio transcoding should be designed separately, but the media management model should leave room for it.
+
+### Bundled Media Tooling
+
+The standard Harmoniarr image should include local media tooling needed for inspection and future conversion workflows.
+
+`ffmpeg` is the correct baseline tool to include because it can inspect, decode, and convert audio formats locally without depending on an external service. It is also useful for technical validation, such as checking whether a downloaded file can be decoded.
+
+`ffprobe` should also be available for metadata and stream inspection. The app should use structured probe output where possible instead of parsing human-readable command output.
+
+For this design section, `ffmpeg` should be treated as the local media engine for inspection, validation, and transcoding. Harmoniarr should own the policy, job state, profiles, validation, and UI. `ffmpeg` should execute the actual media operation.
+
+### Media Management Scope
+
+The first media management settings should include:
+
+- Root music folders.
+- Artist folder naming.
+- Album folder naming.
+- Song file naming.
+- Multi-disc naming behavior.
+- Character replacement and filename sanitization.
+- Import move, copy, or hardlink behavior.
+- Whether to rename files during import.
+- Whether to preserve extra files such as artwork, logs, cue sheets, playlists, and notes.
+- Whether existing library files can be renamed in bulk.
+- Preview and approval behavior for rename plans.
+- File and folder permission behavior for imported media.
+
+These settings should apply during import first. Existing-library cleanup should use the same naming rules, but it should be a separate user-initiated action with a preview.
+
+### Naming Template Model
+
+Naming should be template-based and previewable.
+
+The app should provide defaults that work for most music libraries while allowing advanced users to customize them.
+
+Default artist folder:
+
+```text
+{ArtistName}
+```
+
+Default album folder:
+
+```text
+{AlbumTitle} ({ReleaseYear})
+```
+
+Default song filename:
+
+```text
+{TrackNumber:00} - {SongTitle}
+```
+
+Default multi-disc song filename:
+
+```text
+{DiscNumber}-{TrackNumber:00} - {SongTitle}
+```
+
+Optional richer album folder:
+
+```text
+{AlbumTitle} ({ReleaseYear}) [{Quality}]
+```
+
+Potential template tokens:
+
+- `{ArtistName}`
+- `{AlbumArtistName}`
+- `{AlbumTitle}`
+- `{ReleaseTitle}`
+- `{ReleaseYear}`
+- `{ReleaseDate}`
+- `{ReleaseCountry}`
+- `{ReleaseFormat}`
+- `{Edition}`
+- `{DiscNumber}`
+- `{DiscCount}`
+- `{TrackNumber}`
+- `{TrackNumber:00}`
+- `{SongTitle}`
+- `{Quality}`
+- `{AudioCodec}`
+- `{AudioChannels}`
+- `{Bitrate}`
+- `{SampleRate}`
+- `{MusicBrainzArtistId}`
+- `{MusicBrainzReleaseGroupId}`
+- `{MusicBrainzReleaseId}`
+- `{MusicBrainzRecordingId}`
+
+The UI should show live examples for the selected artist, album, and song so the user can see exactly what a template will produce.
+
+### Filename Safety
+
+Naming rules must be safe across common mounted filesystems.
+
+The app should handle:
+
+- Invalid filename characters.
+- Reserved Windows names.
+- Leading and trailing dots or spaces.
+- Repeated whitespace.
+- Path length limits.
+- Case-only renames.
+- Duplicate destination paths.
+- Unicode normalization differences.
+- Slash-like punctuation in artist, album, and song names.
+
+Character replacement should be configurable, but the default should be conservative and readable. For example, path separators in titles should become hyphens instead of creating accidental subfolders.
+
+The app should never silently overwrite an existing library file. Collisions should create an import review problem that the user can resolve.
+
+### Import Organization
+
+Accepted imports should be organized through a planned operation.
+
+The import planner should calculate:
+
+- Source file path.
+- Destination artist folder.
+- Destination album folder.
+- Destination filename.
+- Final destination path.
+- Import operation type: move, copy, or hardlink.
+- Extra files to include or ignore.
+- Conflicts, warnings, and required user decisions.
+
+The user should be able to preview the import plan before applying it, especially while automatic import is disabled.
+
+Recommended v1 posture:
+
+- Rename and move accepted files into the library.
+- Do not modify existing library files without explicit user action.
+- Do not overwrite files.
+- Do not transcode during import yet.
+- Preserve downloaded files only when the configured import mode calls for copy or hardlink.
+- Keep import history so every file move or rename can be explained later.
+
+### Existing Library Rename And Cleanup
+
+The library scanner may discover files that are already present but do not match the configured naming convention.
+
+These should not be renamed automatically during scan. Instead, Harmoniarr should offer a separate rename preview:
+
+```text
+Scan existing library
+  -> identify files outside naming convention
+  -> build rename plan
+  -> show before/after paths
+  -> require user approval
+  -> apply safe operations
+  -> record history
+```
+
+Bulk rename should support filtering by artist, album, status, and confidence. Ambiguous or unmatched files should be excluded from automatic rename plans until the user resolves them.
+
+### Extra Files
+
+Soulseek album folders often contain useful non-audio files.
+
+Media management should define which extra files are imported with an album:
+
+- Cover images: `.jpg`, `.jpeg`, `.png`, `.webp`
+- Cue sheets: `.cue`
+- Logs: `.log`
+- Playlists: `.m3u`, `.m3u8`
+- Notes: `.txt`, `.nfo`
+- Spectrograms or checksums later if useful
+
+The app should avoid importing unrelated junk by default. Extra files should be included only when they are in the selected candidate folder and pass configured extension rules.
+
+### File Permissions
+
+Media management should include file and folder permission settings for imported files.
+
+The Docker image should support `PUID`, `PGID`, and `UMASK` style configuration where practical, but the application should also expose clear media permission settings so users can understand what will happen during import.
+
+Recommended defaults:
+
+```text
+Folder mode: 755
+File mode: 644
+```
+
+This means imported folders are readable and traversable by other users, while imported files are readable but only writable by the owner. Users with shared-library setups can relax or tighten this based on their environment.
+
+Settings should include:
+
+- Folder permission mode.
+- File permission mode.
+- Whether to apply permissions to imported files.
+- Whether to apply permissions to imported extra files.
+- Whether to apply permissions to newly created artist and album folders.
+- Whether existing library files can be permission-fixed in bulk.
+- Optional owner and group behavior when the container has permission to apply it.
+
+Permission handling should be conservative:
+
+- Apply configured permissions to newly imported files and newly created folders.
+- Do not recursively change existing library permissions during scan.
+- Offer a separate previewed permission-fix action for existing library files.
+- Report permission failures clearly instead of hiding them.
+- Validate that target paths are writable before import starts.
+
+The app should show effective permission behavior in the UI, including how `UMASK` affects the configured mode if the runtime environment applies one.
+
+### Settings Page Placement
+
+The `Settings` area should include a `Media Management` section with tabs or subsections for:
+
+- Root folders.
+- Naming.
+- Import behavior.
+- Permissions.
+- Extra files.
+- Existing library cleanup.
+- Future transcoding settings.
+
+The naming screen should be practical: template inputs, token insertion, live previews, and validation warnings. It should not require the user to import files before seeing whether a naming rule works.
+
+## Transcoding Settings
+
+Transcoding should be a first-class settings area, but it should be conservative by default.
+
+The first supported direction should be:
+
+```text
+Lossless source
+  -> lossy derivative
+```
+
+This supports common library needs such as keeping a lossless archive while creating MP3, AAC, Opus, or Ogg Vorbis copies for compatibility, mobile storage, or remote playback.
+
+Transcoding should not be required for normal import. A downloaded FLAC album should be importable as FLAC. Transcoding should run only when a profile, manual action, or later automation rule asks for it.
+
+### Transcoding Engine
+
+FFmpeg should be the default and bundled transcoding engine.
+
+Reasons:
+
+- It can read and write a broad set of audio containers and codecs.
+- It can inspect media through `ffprobe`.
+- It supports bitrate, quality, sample rate, channel, filter, metadata, and artwork operations.
+- It is available in Alpine packages and works well inside Docker.
+- It avoids requiring a separate external transcoding service.
+
+Codec-specific tools may still be useful as implementation details later, but they should not be the primary user-facing integration. The app should expose stable transcoding profiles and generate the correct local command behind the scenes.
+
+Important licensing note: the standard image should avoid nonfree encoder builds. If optional codecs require special licensing or nonfree FFmpeg builds, those should be opt-in and clearly documented rather than silently included.
+
+### Transcoding Profiles
+
+Transcoding settings should be profile-based.
+
+A profile should define:
+
+- Profile name.
+- Source eligibility.
+- Target format.
+- Target codec.
+- Container extension.
+- Bitrate or quality mode.
+- Sample rate behavior.
+- Channel behavior.
+- Bit depth or sample format behavior where applicable.
+- Metadata and artwork behavior.
+- Output location.
+- Replacement behavior.
+- Validation behavior.
+
+Default presets should include:
+
+```text
+MP3 320
+  Target format: mp3
+  Codec: libmp3lame
+  Mode: CBR
+  Bitrate: 320 kbps
+  Sample rate: preserve or 44.1 kHz
+  Channels: preserve stereo/downmix multichannel to stereo
+
+MP3 V0
+  Target format: mp3
+  Codec: libmp3lame
+  Mode: VBR
+  Quality: V0
+
+Opus 160
+  Target format: opus
+  Codec: libopus
+  Mode: VBR
+  Bitrate: 160 kbps
+
+AAC 256
+  Target format: m4a
+  Codec: aac
+  Mode: CBR or constrained VBR if supported
+  Bitrate: 256 kbps
+
+Ogg Vorbis Q6
+  Target format: ogg
+  Codec: libvorbis
+  Mode: VBR
+  Quality: q6
+```
+
+The app should ship with these presets as starting points and allow custom profiles later. Presets should be editable or duplicable rather than hard-coded as the only allowed profiles.
+
+### Source Eligibility
+
+The first version should only transcode from lossless sources by default.
+
+Lossless source formats may include:
+
+- FLAC
+- ALAC
+- WAV
+- AIFF
+- WavPack
+
+The app should avoid lossy-to-lossy transcoding by default because it compounds quality loss. Users can enable it manually, but it should require a clear warning and explicit confirmation.
+
+The app should also warn on lossy-to-lossless transcoding. This is technically possible but practically misleading because it cannot restore information already lost in the original lossy file. A lossy-to-lossless output may be larger, but it is not a quality upgrade.
+
+Eligibility rules should include:
+
+- Source codec is lossless.
+- Source file validates successfully.
+- Source file is already imported or approved for import.
+- Target file does not already exist unless replacement is explicitly allowed.
+- Target profile is enabled.
+- The file is not currently being written, imported, or scanned.
+- Lossy-to-lossy and lossy-to-lossless operations require explicit user approval if enabled.
+
+### Bitrate, Quality, And Bit Depth
+
+The settings UI should distinguish audio concepts clearly.
+
+For lossy outputs, the main controls are:
+
+- Codec.
+- Container.
+- Bitrate.
+- Constant bitrate, variable bitrate, or quality mode.
+- Sample rate.
+- Channel count or layout.
+
+Bit depth is not usually a meaningful user-facing target for MP3, AAC, Opus, or Vorbis in the same way it is for PCM or lossless audio. The app can expose sample format only in advanced settings if needed.
+
+Avoid using video-style labels such as `10-bit` for audio transcoding. For audio, the relevant terms are usually:
+
+- 16-bit PCM
+- 24-bit PCM
+- 32-bit float
+- Sample format, such as `s16`, `s32`, or `fltp`
+- Sample rate, such as 44.1 kHz, 48 kHz, 96 kHz, or preserve source
+
+For v1, bit depth/sample format should be advanced and usually set to `auto` or `preserve when applicable`.
+
+### Output Behavior
+
+The user should choose what transcoded files are for.
+
+Output modes:
+
+- Replace import output with the transcoded file.
+- Keep original and create a lossy derivative beside it.
+- Write derivatives to a separate root folder.
+- Write derivatives to a device/sync-oriented folder later.
+
+Recommended v1 posture:
+
+- Keep the original lossless file.
+- Create lossy derivatives only when explicitly requested.
+- Do not delete or replace source files automatically.
+- Do not transcode directly over an existing file.
+- Write to a temporary path first, then atomically move into place when validation succeeds.
+
+Naming for derivatives should reuse media management templates, with optional tokens such as `{TranscodeProfile}` or `{Quality}`.
+
+### Metadata, Artwork, And ReplayGain
+
+Transcoding should preserve useful metadata where possible.
+
+Settings should include:
+
+- Copy tags from source.
+- Normalize or rewrite tags from Harmoniarr metadata.
+- Embed cover art when supported by the target container.
+- Preserve MusicBrainz identifiers.
+- Preserve ReplayGain tags if present.
+- Calculate ReplayGain or loudness tags later as a separate option.
+
+The app should not apply loudness normalization to audio samples by default. If loudness normalization is added later, it should be explicit because it changes the audio data.
+
+### Job Control And Safety
+
+Transcoding can be CPU-heavy, so it should be a queued background workflow.
+
+Settings should include:
+
+- Enable or disable transcoding globally.
+- Maximum concurrent transcodes.
+- CPU priority or nice level where supported.
+- Temporary transcode directory.
+- Retry behavior.
+- Failure retention.
+- Whether transcoding can run during import.
+- Whether transcoding can run as a later library maintenance job.
+
+Each transcode job should record:
+
+- Source file id.
+- Source path.
+- Target path.
+- Profile id.
+- FFmpeg version.
+- Generated command or normalized command plan.
+- Start and finish timestamps.
+- Exit code.
+- stderr summary.
+- Output validation result.
+- Resulting codec, bitrate, sample rate, channels, duration, and file size.
+
+The UI should show progress, current file, profile, output target, and failure reason.
+
+### Validation
+
+A transcode should only be considered successful after validation.
+
+Validation should check:
+
+- Output file exists.
+- Output file is non-empty.
+- `ffprobe` can read it.
+- Duration is close to source duration.
+- Expected audio stream exists.
+- Codec and container match the selected profile.
+- File size is plausible.
+- Tags and artwork were handled as expected where configured.
+
+If validation fails, the source file should remain untouched and the failed output should be quarantined or removed according to settings.
+
+### Settings Page Placement
+
+The `Settings` area should include a `Transcoding` section with:
+
+- Enable/disable.
+- Profiles.
+- Source eligibility.
+- Output behavior.
+- Metadata and artwork.
+- Job limits.
+- Validation behavior.
+- Advanced FFmpeg options.
+
+Advanced FFmpeg options should be treated carefully. The app may allow expert users to add extra arguments, but built-in profiles should generate commands from structured settings so the behavior remains explainable and testable.
 
 ## AcoustID Role
 
@@ -1669,6 +2633,220 @@ Container implications:
 
 For v1, AcoustID can be optional but the data model should leave room for it. A practical first implementation can validate by filename, tags, duration, and track count first, then add fingerprinting as an import-confidence upgrade.
 
+## Quality Upgrade Detection
+
+Harmoniarr should include a service that detects when existing library items are below the user's preferred quality and creates upgrade intent when policy allows it.
+
+This is separate from missing-music detection. A track or album can be present but still upgradeable.
+
+Example upgrade goals:
+
+- Replace low-bitrate MP3 with higher-bitrate MP3.
+- Replace lossy files with lossless files.
+- Prefer direct CD rips where possible.
+- Prefer complete album folders over scattered track files.
+- Prefer candidates with cue/log/artwork evidence.
+- Prefer trusted users with a history of clean imports.
+
+The service should not blindly assume every FLAC is better than every MP3. It should score upgrade candidates using technical evidence, metadata evidence, source-user history, and import validation.
+
+### Quality Profile Model
+
+Quality profiles should define what counts as acceptable, preferred, and upgradeable.
+
+Profile dimensions may include:
+
+- Whether upgrades are enabled globally.
+- Whether upgrades are enabled per artist, album, or song.
+- Allowed codecs.
+- Preferred codecs.
+- Minimum bitrate for lossy formats.
+- Upgrade floor: the lowest current quality that should be considered eligible for upgrade.
+- Upgrade ceiling: the target quality where Harmoniarr should stop searching for a better copy.
+- Whether lossless is preferred over lossy.
+- Whether CD-quality lossless is preferred.
+- Whether high-resolution audio is allowed, preferred, or ignored.
+- Whether lossy-sourced lossless files should be rejected or sent to review.
+- Whether cue sheets, rip logs, and artwork increase confidence.
+- Whether upgrades are allowed automatically or only manually.
+
+Suggested initial quality ladder:
+
+```text
+Rejected
+  -> Low-quality lossy
+  -> Acceptable lossy
+  -> Preferred lossy
+  -> Lossless
+  -> Verified or high-confidence CD rip
+```
+
+This ladder should be configurable. Some users may prefer compact lossy libraries, while others may want lossless-first acquisition.
+
+The upgrade floor and ceiling should be explicit settings:
+
+```text
+Upgrade floor: anything below Acceptable lossy
+Upgrade ceiling: Lossless
+```
+
+With those settings, Harmoniarr would try to upgrade low-quality lossy files until it finds a lossless copy, then stop treating the item as upgradeable. A different user might set the floor to `Any lossy` and the ceiling to `Verified or high-confidence CD rip`, or disable upgrades entirely.
+
+The ceiling should prevent endless upgrade churn. Once an album or song satisfies the selected ceiling, it should not keep searching for marginally better copies unless the user changes the profile, manually requests a search, or a stronger direct-CD-rip policy is enabled.
+
+Quality profile settings should be available in `Settings` and overridable at narrower scopes:
+
+- Global default profile.
+- Root-folder profile.
+- Artist override.
+- Album override.
+- Song override when needed.
+
+Narrower overrides should be visible in the UI so the user can tell why one artist or album is being upgraded differently from the global default.
+
+### Upgrade Detector
+
+The quality upgrade detector should compare current library state against the selected quality profile.
+
+It should answer:
+
+- Is this album or song present?
+- Does the existing file satisfy the selected quality profile?
+- Is the existing file below the preferred cutoff?
+- Is the existing file below the configured upgrade ceiling?
+- Is the existing file at or above the configured upgrade floor?
+- Is the item eligible for upgrade search?
+- Is there already a better candidate, active download, or import review?
+- Has the user blocked upgrades for this artist, album, song, format, or source?
+- Would replacing or adding the better file create duplicates or path conflicts?
+
+The detector should emit explainable upgrade decisions, not only mutate wanted state.
+
+Example decision:
+
+```text
+Existing file: MP3 192 kbps
+Profile target: lossless preferred
+Library state: present but below preferred quality
+Decision: mark song upgradeable and create wanted upgrade intent
+```
+
+### Direct CD Rip Confidence
+
+"Direct CD rip" should be treated as a confidence claim, not a binary fact unless strong evidence exists.
+
+Strong positive signals:
+
+- Lossless codec such as FLAC, ALAC, WAV, AIFF, or WavPack.
+- CD-compatible audio properties, usually 16-bit / 44.1 kHz stereo.
+- Complete album folder matching the expected tracklist.
+- Cue sheet matching the album structure.
+- EAC, XLD, CUETools, or similar rip log.
+- AccurateRip or CUETools verification in the log.
+- Consistent track durations with the selected release.
+- No suspiciously small file sizes.
+- Source user has prior successful lossless imports.
+
+Weak or ambiguous signals:
+
+- Filename says `CD`, `FLAC`, `EAC`, `log`, or `100%`.
+- Folder contains artwork only.
+- Tags claim lossless but no technical or rip-log evidence exists.
+- High sample rate or bit depth without release context.
+
+Negative signals:
+
+- Lossless container with spectral evidence suggesting lossy source.
+- Missing or inconsistent tracks.
+- Durations differ significantly from expected tracks.
+- Rip log does not match files in the folder.
+- Cue sheet references missing files.
+- File cannot be decoded cleanly.
+- Known bad or blocked source user.
+
+The app should call this something like `rip confidence` or `source quality confidence`, not a guaranteed CD-rip flag unless the evidence supports that.
+
+### Fingerprinting Role
+
+Music fingerprinting belongs in this workflow, but it solves identity more than quality.
+
+Fingerprinting can help answer:
+
+- Is this upgraded file the same recording as the existing file?
+- Does the candidate match the expected MusicBrainz recording?
+- Did the candidate folder contain a wrong track despite good-looking filenames?
+- Would importing this upgrade replace the right song?
+
+Fingerprinting generally cannot prove:
+
+- That a file came directly from a CD.
+- That a FLAC was not transcoded from MP3.
+- That a rip is bit-perfect.
+- That a specific physical edition was used.
+
+For direct CD-rip confidence, rip logs, cue sheets, technical audio inspection, AccurateRip/CUETools evidence, and decode validation are more relevant than AcoustID alone. AcoustID should still be valuable because it prevents the app from upgrading to the wrong recording.
+
+### Lossy-Source Detection
+
+Harmoniarr may eventually add lossy-source detection for files stored in lossless containers.
+
+Possible signals:
+
+- Spectral cutoff patterns.
+- Codec/container mismatch.
+- Implausible bitrate or file size.
+- Known encoder tags.
+- Inconsistent sample rate or bit depth claims.
+
+This should be treated as heuristic evidence. Spectral analysis can identify obvious suspicious files, but it should not be the only reason to reject a candidate in v1.
+
+### Upgrade Flow
+
+Suggested flow:
+
+```text
+Library scan or import completed
+  -> inspect technical audio properties
+  -> compare current files to quality profile
+  -> mark albums or songs as satisfied, acceptable, or upgradeable
+  -> create wanted upgrade intent when policy allows
+  -> search for better candidates through normal discovery
+  -> score candidates with quality and rip-confidence factors
+  -> download selected upgrade candidate
+  -> validate identity and quality during import review
+  -> replace, keep beside, or reject according to media management policy
+```
+
+Upgrade searches should use the same Soulseek discovery pipeline as missing music, but with different scoring priorities. A lossless candidate with weak identity evidence should not outrank a slightly lower-quality candidate that clearly matches the target release.
+
+### Upgrade Import Policy
+
+Upgrades need careful import behavior because a library file already exists.
+
+Initial posture:
+
+- Do not delete or replace existing files automatically.
+- Show a before/after comparison during import review.
+- Let the user choose replace, keep both, reject, or defer.
+- Preserve the old file until the new file validates and the import operation succeeds.
+- Record upgrade history so the user can see what changed and why.
+
+For v1, upgrade automation should be review-first. Later automation can allow trusted high-confidence upgrades according to quality profile settings.
+
+### Suggested Records
+
+Quality upgrade detection may need records such as:
+
+- `quality_profiles`
+- `library_quality_snapshots`
+- `quality_upgrade_runs`
+- `quality_upgrade_decisions`
+- `rip_confidence_factors`
+- `upgrade_wanted_items`
+- `upgrade_import_reviews`
+
+These should preserve the evidence used at the time of the decision, because quality classifications may change as the app gains better inspection tools.
+
 ## Library Model
 
 Initial core entities:
@@ -1719,13 +2897,22 @@ Local Classifarr probe observations:
 
 - The running `classifarr` container uses image `ghcr.io/cloudbyday90/classifarr:latest`.
 - The public HTTP port is `21324`.
+- Docker publishes only `21324/tcp`; PostgreSQL `5432` is not exposed to the host.
 - `/health` returns a simple readiness payload with `status`, `database`, and `timestamp`.
 - The mounted app data volume maps to `/app/data`.
 - The embedded Postgres data directory is `/app/data/postgres`.
-- Postgres listens on the local container socket/port and reports ready before the app finishes startup.
+- Inside the container, Postgres listens on loopback, `127.0.0.1:5432` and `::1:5432`, plus the local socket directory.
+- `/app/data/postgres` is owned by `classifarr:classifarr` with `0700` permissions inside the container.
+- `/run/postgresql` and `/var/run/postgresql` are owned by `classifarr:classifarr` with `0770` permissions inside the container.
+- The app process runs as UID/GID `1000:1000` in the current local container.
+- Postgres reports ready before the app finishes startup.
 - Startup logs report the migration result, for example `142 total, 0 newly applied`.
 - The live `schema_migrations` table contains timestamped migration filenames such as `20260425_121000_fix_image_embedding_defaults.sql`.
 - Authenticated operational endpoints, such as `/api/migration/status`, return `401` without credentials.
+
+Initial schema planning lives in [DATABASE_MODEL.md](DATABASE_MODEL.md). That document should be treated as the working Postgres baseline while the product model is still being refined.
+
+The schema should use local surrogate UUID primary keys for entity, workflow, and event tables. Provider identifiers and natural identifiers, such as MusicBrainz IDs, Soulseek usernames, `slskd` IDs, file paths, and metadata source keys, should be stored as ordinary columns with unique indexes where needed. Foreign keys should reference the local surrogate `id` columns so provider changes, redirects, and correlation overrides do not destabilize internal relationships.
 
 The storage design should be time-based wherever the domain benefits from history, reconciliation, and auditability. This matters because Soulseek state changes over time and the app needs to explain how it reached a decision.
 
@@ -2086,21 +3273,135 @@ Later, if multi-instance deployments become a goal, migrations should be moved t
 
 ## Trust Model
 
-The app should remember Soulseek user outcomes.
+The app should build its own local Soulseek source-user trust model.
+
+Soulseek should not be treated as having a reliable global reputation system. Harmoniarr should instead derive source reliability from observed local outcomes, current availability, and user decisions.
+
+This score should influence candidate ranking, but it should not override identity matching. A trusted user with the wrong album is still a bad candidate.
+
+### Source Signals
 
 Per-user data may include:
 
-- Preferred user
-- Blocked user
-- Successful downloads
-- Failed downloads
-- Average speed
-- Queue behavior
-- Common quality
-- Notes
-- Last seen
+- Preferred, trusted, ignored, or blocked state.
+- User notes.
+- First seen and last seen.
+- Current presence when available.
+- Free upload slot availability.
+- Queue length and queue position over time.
+- Upload slot count when available.
+- Browse success or failure.
+- Successful downloads.
+- Failed downloads.
+- Stalled downloads.
+- Cancelled or retried downloads.
+- Average speed.
+- Average wait time.
+- Transfer completion rate.
+- Import acceptance rate.
+- Import rejection rate.
+- Wrong-track or wrong-album history.
+- Complete-album-folder rate.
+- Common quality, such as MP3, FLAC, cue/log presence, and artwork.
+- Direct CD-rip confidence history.
+- Antivirus quarantine events when antivirus scanning exists.
 
-This allows the app to become better over time without needing perfect metadata.
+The app should record both current projections and historical events. Current trust state is useful for ranking, but history is needed to explain why the app trusts or avoids a user.
+
+### Source Labels
+
+The UI should avoid pretending there is a universal Soulseek reputation score.
+
+Suggested labels:
+
+- `Trusted`
+- `Reliable`
+- `New`
+- `Slow`
+- `Risky`
+- `Ignored`
+- `Blocked`
+- `Known good source`
+- `Needs review`
+
+Labels should be explainable. A user should be able to see why a source is marked reliable or risky.
+
+### Source Score Factors
+
+Candidate scoring should include a source score with positive and negative factors.
+
+Positive factors:
+
+- Prior successful imports from this user.
+- High transfer completion rate.
+- Good average speed.
+- Low or reasonable queue length.
+- Free upload slot available.
+- Browse succeeds.
+- Complete folder structure.
+- Repeated high-quality files.
+- Prior accepted lossless or CD-rip-confidence imports.
+- User explicitly marked trusted.
+
+Negative factors:
+
+- Repeated failed or stalled transfers.
+- Very slow average speed.
+- Long queue or unavailable slots.
+- Browse repeatedly fails.
+- Prior wrong-album or wrong-track imports.
+- Prior rejected imports.
+- Suspicious files, bad tags, or corrupted files.
+- Antivirus quarantine event when scanning exists.
+- User explicitly ignored or blocked.
+
+Example explanation:
+
+```text
+Source score: 82
+  + prior successful imports
+  + has free upload slot
+  + complete album folder
+  + FLAC with log/cue history
+  - long queue
+  - one previous stalled download
+```
+
+### Source Decision Rules
+
+Source reliability should affect ordering and automation eligibility:
+
+- Blocked users should not be selected automatically and should be hidden by default.
+- Ignored users should be de-prioritized or hidden depending on filters.
+- Trusted users can raise confidence for otherwise similar candidates.
+- New users should be allowed, but require normal review.
+- Risky users should require review even if metadata matching looks good.
+- Source trust should never make a bad identity match acceptable.
+
+The ranking priority should be:
+
+```text
+Identity match
+  -> completeness
+  -> quality/rip confidence
+  -> source reliability
+  -> queue/download practicality
+```
+
+### Suggested Records
+
+Source trust may need records such as:
+
+- `soulseek_users`
+- `soulseek_user_events`
+- `soulseek_user_outcomes`
+- `soulseek_user_trust_decisions`
+- `soulseek_user_score_snapshots`
+- `soulseek_user_notes`
+
+Events should include enough context to explain future decisions, such as wanted item, candidate, transfer, import review, quality outcome, and user action.
+
+This allows the app to become better over time without needing perfect metadata or a global Soulseek reputation system.
 
 ## Automation Strategy
 
@@ -2345,10 +3646,209 @@ Early versions should not try to:
 - Clone Lidarr's UI exactly
 - Support every metadata edge case
 - Hide uncertainty from the user
+- Require antivirus scanning before the core acquisition and import workflow is usable
 
 ## UI Location Model
 
 The app needs an initial answer for where the user goes to perform core actions. This section is intentionally high-level; detailed screen design can come later.
+
+### Library Hierarchy
+
+The user-facing library should be organized artist-first.
+
+The practical hierarchy should be:
+
+```text
+Artist
+  -> Albums
+      -> Songs
+```
+
+This matches how most users think about a music collection. A user should be able to add an artist, see that artist's albums, open an album, and see the songs that belong to it.
+
+Internally, the app should still preserve the more precise MusicBrainz model:
+
+```text
+Artist
+  -> Release Group
+      -> Release
+          -> Medium
+              -> Track
+                  -> Recording
+```
+
+The UI does not need to expose all of those terms by default. In normal screens:
+
+- `Artist` is the top-level managed library entity.
+- `Album` represents the broad release-group concept users recognize.
+- `Edition` or `Release` can appear only when the user needs to choose or inspect a specific version.
+- `Song` is the user-facing track row under an album.
+
+This gives the app a familiar shape while keeping enough metadata precision for matching, imports, and future automation.
+
+### Acquisition Unit
+
+Harmoniarr should be artist-organized but album-first for acquisition.
+
+The normal v1 workflow should be:
+
+```text
+Add artist
+  -> choose monitored albums
+  -> create wanted album/release items
+  -> search for album candidates
+  -> download a selected candidate
+  -> validate songs during import
+```
+
+This keeps v1 focused on the strongest Soulseek workflow: finding complete album folders from users. Track-level acquisition should exist as a supported model, but it should be secondary at first.
+
+Practical rules:
+
+- Adding an artist creates a durable artist record and known album records.
+- Albums under the artist can be monitored, unmonitored, missing, complete, failed, or upgradeable.
+- Songs under an album inherit album intent by default.
+- A song can become individually wanted when it is missing, failed, rejected during import, or needed for gap filling.
+- Full album search should be the default discovery mode.
+- Missing-song fill should be a fallback mode after album-level discovery or import review shows gaps.
+
+This separates navigation from acquisition:
+
+```text
+Navigation hierarchy: Artist -> Album -> Song
+Primary acquisition unit: Album/Release
+Secondary acquisition unit: Song/Track
+```
+
+The database and workers should preserve both levels from the beginning so that later gap filling does not require a redesign.
+
+### Existing Library Scan
+
+Harmoniarr should be able to scan an existing music library and use that scan to determine what is already present, what is missing, and what may need attention.
+
+This is a core onboarding mechanism. A new user may already have a large music collection. The app should not assume every monitored album is missing until it has inspected the configured library folders.
+
+The scan should answer:
+
+- Which artists already exist in the library?
+- Which albums appear to exist under each artist?
+- Which songs/files are present for each album?
+- Which expected songs are missing?
+- Which albums are complete?
+- Which albums are partial?
+- Which files are unmatched or ambiguous?
+- Which existing files are below the desired quality profile?
+
+The first scan does not need to be perfect, but it must be explainable. The app should show why a folder or file was matched to an artist, album, release, or song.
+
+Practical scan flow:
+
+```text
+Read configured library roots
+  -> discover audio files
+  -> read path, filename, size, extension, and modified time
+  -> read audio tags when possible
+  -> group files into likely albums
+  -> match groups to known or discovered artists/albums
+  -> compare files against expected song lists
+  -> create or update library state
+  -> recalculate wanted and missing state
+```
+
+The scan should use multiple signals:
+
+- Folder structure.
+- Filenames.
+- Embedded tags.
+- Track numbers.
+- Disc numbers.
+- Durations.
+- Audio format and bitrate.
+- Existing MusicBrainz tags when present.
+- AcoustID fingerprints later, when available.
+
+Library scanning should create durable records for observed files and scan runs. It should not only update a final current-state table. Users need to understand what changed between scans, why an album became complete, or why a file became unmatched.
+
+Initial scan states should include:
+
+- `matched`: file confidently maps to an expected song.
+- `partial`: album has some expected songs but is incomplete.
+- `ambiguous`: file or folder could match more than one artist, album, release, or song.
+- `unmatched`: file is in the library but not mapped to managed metadata.
+- `ignored`: user has chosen not to manage this file or folder.
+- `duplicate`: more than one file appears to satisfy the same song.
+- `upgradeable`: file is present but below the desired quality threshold.
+
+The library scan should feed wanted state directly:
+
+- Complete albums should not create wanted items.
+- Partial albums should create wanted song state for missing tracks.
+- Missing monitored albums should create wanted album/release state.
+- Upgradeable albums or songs should become wanted only if the selected quality profile allows upgrades.
+- Ambiguous and unmatched files should require review rather than being treated as missing automatically.
+
+For v1, library scanning can be conservative:
+
+- Prefer matching by existing tags and clear folder structure.
+- Avoid destructive changes.
+- Do not retag or move existing files during scan.
+- Let the user review ambiguous matches.
+- Treat scan results as evidence for wanted reconciliation, not as irreversible truth.
+
+This scan mechanism is what lets onboarding become practical: the app can inspect the user's current collection first, then show the user a meaningful library, missing list, and next actions.
+
+### First-Run Onboarding
+
+The first-run experience should guide the user through the minimum setup needed for Harmoniarr to understand the library and safely use Soulseek.
+
+The onboarding flow should be:
+
+```text
+Create admin user
+  -> configure slskd connection
+  -> configure library and download paths
+  -> validate permissions and path mapping
+  -> scan existing library
+  -> review scan summary
+  -> add or confirm artists
+  -> choose monitoring defaults
+  -> show wanted and missing state
+```
+
+The app should strongly encourage an existing library scan, but it should not require one for an empty library. Users starting fresh should be able to skip directly to adding artists.
+
+Onboarding should validate:
+
+- Harmoniarr can reach `slskd`.
+- `slskd` authentication works.
+- Library paths are readable.
+- Import target paths are writable.
+- Download paths are visible to both Harmoniarr and `slskd`.
+- Metadata lookup works.
+- The database and background workers are healthy.
+
+After the scan, the user should see a practical summary:
+
+- Artists found.
+- Albums found.
+- Complete albums.
+- Partial albums.
+- Missing monitored albums.
+- Missing songs.
+- Unmatched files.
+- Ambiguous matches needing review.
+- Upgradeable files if quality rules are configured.
+
+The goal is not to overwhelm the user with every file. The goal is to explain the current state and give direct next actions:
+
+- Review ambiguous matches.
+- Add or confirm artists.
+- Monitor missing albums.
+- Search for missing albums.
+- Search for missing songs in partial albums.
+- Ignore folders or files that should not be managed.
+
+Onboarding should end in the real application, not a separate success page. The first post-onboarding screen should show the library state, wanted state, active setup issues, and the next useful actions.
 
 The UI should make the user's acquisition path obvious:
 
@@ -2363,22 +3863,21 @@ Add music intent
 
 Primary navigation areas:
 
-- `Library`: known artists, albums, tracks, and imported files.
-- `Wanted`: missing, monitored, upgradeable, and failed items.
-- `Search`: manual Soulseek search and discovery runs.
-- `Candidates`: ranked Soulseek matches waiting for review.
-- `Downloads`: active, queued, failed, and completed transfers.
-- `Imports`: completed downloads waiting for validation or user action.
-- `Users`: Soulseek user trust, block, history, and notes.
-- `Settings`: slskd connection, metadata, quality profiles, paths, automation, and system status.
+- `Dashboard`: home and artist/library workspace with all artists, library state, priority summaries, urgent reviews, recent activity, and a compact search launcher.
+- `Missing`: focused view of missing albums, missing songs, partial albums, future release holds, failed search gaps, and upgradeable items.
+- `Activity`: operational workbench for current queues, wanted items, candidates, downloads, imports, detected releases, history, blocklist, failed jobs, source-user trust, and future quarantine views.
+- `Search`: manual Soulseek search page for direct queries, large result sets, grouped results, folder browsing, and creating managed candidates or wanted items from manual results.
+- `Settings`: slskd connection, metadata, media management, transcoding, quality profiles, paths, automation, and system status.
+
+The sidebar should stay focused. `Library` lives primarily through the dashboard and artist/album pages. `Missing` is first-class because finding absent music is a core workflow. `Wanted`, `Candidates`, `Downloads`, `Imports`, `Users`, `History`, and `Blocklist` belong in `Activity` as tabs or saved views, with urgent summaries surfaced on the dashboard. `Search` remains top-level because direct Soulseek queries can produce large result sets that need dedicated filtering and review space.
 
 ### Where To Add Artists
 
-The main place to add an artist should be the `Library` area.
+The main place to add an artist should be the `Dashboard`, because the dashboard is also the main artist library view.
 
 Expected flow:
 
-1. User opens `Library`.
+1. User opens `Dashboard`.
 2. User selects `Add Artist`.
 3. User searches metadata sources for the artist.
 4. User chooses the correct artist.
@@ -2389,6 +3888,7 @@ Expected flow:
 The artist page should show enough state to answer:
 
 - Which albums/releases are known?
+- Which songs belong to each album?
 - Which items are monitored?
 - Which items are missing?
 - Which items already exist in the library?
@@ -2397,43 +3897,133 @@ The artist page should show enough state to answer:
 
 Adding an artist should not hide the acquisition work in the background. The user should be able to see what became wanted and why.
 
+### Artist, Album, And Song Pages
+
+The main library views should follow the same hierarchy as the data model.
+
+The artist page should be the primary management page for a known artist. It should show:
+
+- Artist identity and metadata source.
+- Monitored state.
+- Albums grouped by status.
+- Missing, monitored, complete, failed, and upgradeable album counts.
+- Active searches, downloads, candidate reviews, and imports for that artist.
+- Actions to monitor albums, search selected albums, or add a specific album.
+
+The album page should be the primary acquisition page. It should show:
+
+- Album metadata and selected release/edition.
+- Song list with track numbers, titles, durations, and file status.
+- Wanted status.
+- Candidate search history.
+- Ranked Soulseek candidates.
+- Active or historical downloads.
+- Import reviews and rejected files.
+- Actions to search, retry, download a candidate, or fill missing songs.
+
+Song rows should stay lightweight in v1. A song should show whether it is missing, present, downloading, imported, rejected, or individually wanted. Detailed song-level acquisition can come after album matching and import review are reliable.
+
 ### Other Entry Points
 
 Artist add is not the only way to create intent.
 
 The UI should also allow:
 
-- Add a specific album from `Wanted`, `Library`, or global search.
-- Add a one-off track from `Search` or `Wanted`.
+- Add a specific album from `Missing`, the artist page, or global search.
+- Add a one-off track from `Missing` or the `Search` page.
 - Start manual search from an artist page.
 - Start manual search from an album/release page.
-- Retry failed wanted items from `Wanted`.
+- Search for a missing item directly from `Missing`.
+- Open manual search from `Missing` with artist, album, song, release year, and quality target prefilled.
+- Retry failed wanted items from `Activity`.
 - Search again from a candidate review page.
 - Create a wanted item from a completed manual Soulseek result.
+- Correlate a manual Soulseek search result to a known artist, album, or song.
+- Override an existing automated association when the user knows a result belongs to a different artist, album, or song.
 
 This matters because not every user action begins with a clean artist import. Sometimes the user already knows the album, sometimes they only know a track, and sometimes they find something while browsing Soulseek that should become part of the managed library.
+
+### Manual Search Correlation
+
+The `Search` page should allow the user to correlate raw Soulseek results to managed library entities.
+
+Because manual Soulseek search can return many rows, the result table should support:
+
+- Multi-select by checkbox.
+- Shift/range-select across the current sorted and filtered result order.
+- Add/remove selection with keyboard modifiers where supported.
+- Sort by user, folder, filename, size, extension, quality, bitrate, queue, speed, and match confidence.
+- Filter by text, user, folder, extension, quality, bitrate, size, queue, availability, trust state, ignored state, and blocked state.
+- Bulk actions for correlation, candidate creation, selected download, ignore, block, trust, copy paths, and export/debug metadata.
+
+Bulk actions should always show the selected row count and preview high-impact changes before applying them.
+
+Supported correlation targets:
+
+- Known artist.
+- Known album or release.
+- Known song or track.
+- New wanted artist, album, or song intent.
+- Not-this-item exclusion for incorrect automated matches.
+
+Manual correlation can override current automated state when needed. For example, the user may decide that a folder belongs to a specific album despite weak filename matching, or that a loose file should satisfy a missing song. The app should treat this as high-priority user evidence, but it should not erase the previous automated match.
+
+Override requirements:
+
+- Preserve the previous association.
+- Record who made the override, when it happened, and why if a reason was provided.
+- Show override badges in candidate and import review.
+- Allow the user to clear or replace an override later.
+- Require import review if the override conflicts with metadata, duration, fingerprint, or quality evidence.
+
+This lets manual Soulseek exploration feed the managed workflow without forcing every result through automatic matching first.
+
+### Missing Page
+
+The `Missing` page should show the library gaps Harmoniarr can act on.
+
+Missing item types:
+
+- Missing album.
+- Missing song.
+- Partial album.
+- Future release hold.
+- Quality upgrade.
+- Failed search retry.
+- Manual wanted item.
+
+The page should support filters for artist, album, type, monitored state, quality profile, last search age, status, and failure reason.
+
+Each missing item should expose two primary acquisition actions:
+
+- `Search`: create or retry managed discovery for that missing item.
+- `Manual`: open the `Search` page with artist, album, song, release year, and quality target prefilled.
+
+When `Manual` opens the `Search` page, the missing item should remain attached as the correlation target. Selected search results can then be correlated back to the missing album or song without the user re-entering context.
+
+Other actions should include:
+
+- Ignore the missing item.
+- Unmonitor the artist, album, or song.
+- Mark satisfied when the user knows the library already contains it.
+- Open artist or album detail.
+- View prior searches and failures.
 
 ### Initial Screen Priority
 
 The first useful screen after login should probably be operational rather than decorative.
 
-Candidate starting points:
-
-- `Wanted`: best if the app is focused on missing music.
-- `Library`: best if the app is focused on collection management.
-- `Activity`: best if the app is focused on current searches, downloads, and imports.
-
-Initial decision: start with a practical dashboard that surfaces wanted items, active downloads, candidate reviews, and import reviews, with clear navigation to `Add Artist` in the `Library` area.
+Initial decision: start with a practical dashboard that shows all artists as the primary table, plus a compact search launcher, priority summaries, urgent candidate/import reviews, setup health, detected releases, and recent activity. The dashboard should be the main library page, while `Activity` should be the operational queue and history page.
 
 ### UI Principle
 
 The UI should separate intent from activity:
 
-- Intent lives in `Library` and `Wanted`.
-- Discovery lives in `Search` and `Candidates`.
-- Execution lives in `Downloads`.
-- Validation lives in `Imports`.
-- Memory lives in `Users` and historical detail views.
+- Intent starts on `Dashboard` through artists, albums, wanted summaries, and monitoring state.
+- Missing acquisition intent lives in `Missing`.
+- Operational queues live in `Activity` for wanted items, candidates, downloads, imports, detected releases, source users, blocklist, failed jobs, and history.
+- Manual discovery lives in `Search`, with compact launchers and contextual search actions available from the dashboard, artist pages, and album pages.
+- Configuration and health live in `Settings`.
 
 This separation should prevent the app from feeling like one giant search page while still keeping Soulseek acquisition central.
 
@@ -2453,12 +4043,215 @@ The UI should prioritize:
 
 It should avoid a marketing-style layout. The first screen should be the actual application experience.
 
+### UI Skill Usage
+
+UI planning and implementation should use the available UI-focused Codex skills when the task calls for them.
+
+Expected usage:
+
+- Use `figma-generate-design` when turning Harmoniarr screen plans, flows, or existing app pages into Figma screens.
+- Use `figma-implement-design` when implementing production UI from Figma designs, components, or design specs.
+- Use `imagegen` when Harmoniarr needs bitmap visual assets such as artwork placeholders, mockups, textures, or other raster UI imagery.
+
+These skills should support the existing product direction rather than override it. Harmoniarr should remain a dense, operational, power-user application for library management and Soulseek acquisition, not a marketing site or decorative prototype.
+
+During planning, these skills should be referenced when defining screen flows, design assets, and implementation handoff expectations. They should not be treated as a requirement to generate final UI before the product flows, data model, and user decisions are understood.
+
+### UI Element Rough Inventory
+
+This section is a rough reusable element inventory, not a final component spec. The goal is to name the common UI building blocks Harmoniarr will likely need so future screen planning can stay consistent.
+
+#### Navigation Elements
+
+The app should use predictable operational navigation:
+
+- Primary sidebar with `Dashboard`, `Missing`, `Activity`, `Search`, and `Settings`.
+- Top bar with global search, system health summary, active task indicators, and user menu.
+- Breadcrumbs on deeper pages, such as `Dashboard / Artist / Album`.
+- Context tabs on entity pages for views such as overview, releases, candidates, downloads, imports, history, and settings.
+- Dashboard summaries and quick actions for adding artists, adding albums, launching manual search, and jumping into urgent Activity work.
+
+Navigation should keep the user oriented around what they are managing:
+
+```text
+Home and library intent: Dashboard
+Missing acquisition intent: Missing
+Queues, history, blocklist, and source users: Activity
+Manual Soulseek discovery: Search
+Configuration: Settings
+```
+
+#### Data View Elements
+
+Most core screens should be built around dense, scan-friendly data views.
+
+Expected data elements:
+
+- Sortable tables for wanted items, candidates, downloads, imports, users, library files, and history.
+- Filter bars with status, artist, album, quality, source user, age, and confidence filters.
+- Saved views for common work queues, such as missing albums, stalled downloads, import problems, and unresolved candidates.
+- Expandable rows for details that do not require leaving the current queue.
+- Split views where a list selection opens a detail panel.
+- Empty states that point to the next real action, such as add artist, scan library, configure slskd, or search wanted item.
+- Bulk selection with scoped actions and confirmation for destructive or high-impact operations.
+
+Tables should prefer useful columns over decorative layout. Column density is acceptable because the target user is managing a library and reviewing acquisition evidence.
+
+#### Status Elements
+
+Harmoniarr needs a consistent status language.
+
+Common status badges:
+
+- `Missing`
+- `Partial`
+- `Complete`
+- `Wanted`
+- `Unmonitored`
+- `Searching`
+- `Candidate Found`
+- `Needs Review`
+- `Queued`
+- `Downloading`
+- `Completed`
+- `Import Ready`
+- `Imported`
+- `Rejected`
+- `Failed`
+- `Blocked`
+- `Ignored`
+- `Upgradeable`
+
+Operational health indicators:
+
+- `slskd` connection status.
+- Metadata provider status.
+- Provider rate-limit status.
+- Database status.
+- Worker status.
+- Library path read/write status.
+- Download path mapping status.
+- Queue depth and active job count.
+
+Confidence indicators should be compact but explainable. A candidate or import should be able to show both a simple confidence level and the factors behind it.
+
+#### Music Library Elements
+
+Music-specific UI elements should appear across library, wanted, candidate, and import screens.
+
+Expected elements:
+
+- Artist header with metadata source, monitored state, and library summary.
+- Album header with selected release or edition, year, type, cover art, and monitored state.
+- Release or edition selector when multiple MusicBrainz releases could satisfy the album.
+- Track list rows with disc number, track number, title, duration, file state, and wanted state.
+- Cover art thumbnail with fallback state.
+- Metadata source badge, usually MusicBrainz in v1.
+- Quality summary, such as codec, bitrate, sample rate, channels, and file size.
+- Missing track markers.
+- Duplicate and upgradeable indicators.
+- Existing library file link or path preview.
+
+The UI should show MusicBrainz precision only when useful. Normal users should see artists, albums, editions, and songs; deeper release-group, release, medium, track, and recording identifiers can live in details panels.
+
+#### Soulseek Elements
+
+Soulseek-specific elements are central to the product and should be designed as first-class UI elements rather than hidden technical details.
+
+Expected elements:
+
+- Candidate comparison table.
+- Candidate score breakdown.
+- Source user row with trust status, notes, queue information, availability, and history.
+- Folder path preview.
+- File list preview grouped by observed folder.
+- Browse-user result panel.
+- Search run timeline showing queries attempted and observations found.
+- Queue length and transfer availability indicators.
+- Trusted, blocked, ignored, and manually noted user markers.
+- Retry search action with visible query strategy.
+
+The candidate UI should make it clear that Soulseek results are observations, not guaranteed releases. The user should be able to understand why a folder appears to match or not match the requested album.
+
+#### Review Elements
+
+Review workflows should be explicit and evidence-based.
+
+Candidate review should include:
+
+- Expected album/release summary.
+- Observed source folder summary.
+- Side-by-side expected track list and observed files.
+- Match confidence and score factors.
+- Missing, extra, duplicate, and suspicious file markers.
+- Source user reliability summary.
+- Actions to download, reject, ignore source, block user, trust user, browse folder, or search again.
+
+Import review should include:
+
+- Downloaded file list.
+- Proposed track matches.
+- Tag and filename evidence.
+- Audio validation results.
+- Rename and destination preview.
+- Extra file handling.
+- Conflicts and warnings.
+- Actions to import, reject, rematch, rename manually, ignore extras, or quarantine files.
+
+Review screens should preserve the explanation trail. A user should be able to see why Harmoniarr recommended a candidate or blocked an import.
+
+#### Control Elements
+
+Controls should be familiar, compact, and consistent.
+
+Expected control patterns:
+
+- Icon buttons with tooltips for repeated actions such as search, retry, refresh, download, import, reject, ignore, trust, block, edit, and view details.
+- Text buttons for primary workflow actions when the label matters, such as `Add Artist`, `Download Candidate`, or `Import Selected`.
+- Segmented controls for view modes, such as album candidates versus track candidates.
+- Toggles for monitored state, automation settings, provider enablement, and safe import options.
+- Select menus for quality profiles, root folders, metadata releases, import behavior, and saved views.
+- Sliders or numeric inputs for thresholds, concurrency limits, retry counts, and scoring weights.
+- Confirmation dialogs for destructive, irreversible, or broad bulk actions.
+- Drawers or side panels for secondary detail where the user should keep their place in a queue.
+
+Controls should avoid hiding uncertainty. If an action depends on confidence, permissions, path mapping, or external service health, the UI should show the blocker or warning before the user acts.
+
+#### First Screens To Detail
+
+The first UI element work should focus on the screens most likely to define the reusable vocabulary:
+
+1. Dashboard.
+2. Artist page.
+3. Album page.
+4. Missing page.
+5. Activity queue view.
+6. Activity wanted view.
+7. Activity candidate review view.
+8. Activity downloads view.
+9. Activity import review view.
+10. Activity users, blocklist, and history views.
+11. Search page.
+12. Settings pages for system health, `slskd`, paths, media management, and transcoding.
+13. Quality profile settings for upgrade enablement, floor, ceiling, and override scope.
+
+These screens cover the core product loop:
+
+```text
+Know what is missing
+  -> find candidates
+  -> choose a source
+  -> download
+  -> validate
+  -> import
+  -> update library state
+```
+
 ## Open Decisions
 
-- Should the primary wanted unit be album/release, track, or both?
 - Should metadata start with MusicBrainz only, or support multiple sources from the beginning?
 - Should `slskd` be managed externally, bundled in Compose, or optionally launched by the app?
-- Should imports modify tags in v1, or only rename/move files first?
+- Should imports modify tags in v1, or only rename and move files first?
 - How much of Lidarr's quality profile model should be reused conceptually?
 - Should the app support multiple Soulseek backends eventually, or only preserve the abstraction?
 
@@ -2468,7 +4261,9 @@ It should avoid a marketing-style layout. The first screen should be the actual 
 - License: GPL-3.0-or-later, matching Classifarr.
 - Use a Classifarr-style GitHub Action to check copyright/license headers on source files.
 - Use the Classifarr-compatible stack as the default implementation baseline: Node 24, npm, Express 5, Vue 3, Vite, Pinia, Tailwind CSS, Socket.IO, Jest, Vitest, Testcontainers, Docker Alpine, and explicit PostgreSQL access through `pg`.
+- Use ES modules for JavaScript and TypeScript code; avoid CommonJS for project scripts and application code.
 - Use Postgres by default.
+- Use local surrogate UUID primary keys for domain, workflow, and event tables; keep natural/provider identifiers as indexed columns instead of primary keys.
 - Target PostgreSQL 18 for the embedded database.
 - Pin the standard image to a stable Alpine branch, starting with Alpine 3.23 unless implementation testing shows a blocker.
 - Use a Classifarr-style embedded Postgres pattern inside the standard application container.
@@ -2477,6 +4272,20 @@ It should avoid a marketing-style layout. The first screen should be the actual 
 - Do not use a separate graph database for v1; model relationships explicitly in Postgres.
 - Use timestamped migrations with explicit migration status tracking.
 - Prefer time-based historical records for searches, scoring, transfers, imports, trust changes, and operational events.
+- Include a dependency heartbeat service for external providers, `slskd`, local tools, workers, database health, path readiness, and provider rate-limit state.
+- Enforce MusicBrainz public API constraints in the adapter, including a meaningful User-Agent, local caching, jittered refreshes, and a default limit of no more than one request per second.
+- Organize the library artist-first, with albums under artists and songs under albums.
+- Make album/release the primary v1 acquisition unit, while preserving song/track-level wanted state for missing-song fill and future workflows.
+- Include release monitoring for known artists, with a separate release detector that emits durable events before wanted state changes.
+- Include quality upgrade detection for present-but-below-profile albums and songs, with direct CD rip confidence treated as explainable evidence rather than a guaranteed binary flag.
+- Include local `ffmpeg` tooling in the standard image for media inspection, validation, and future transcoding support.
+- Provide media management settings for root folders, naming templates, import behavior, extra files, and safe rename previews.
+- Use FFmpeg as the bundled local transcoding engine, with Harmoniarr owning profiles, job state, validation, and policy.
+- Support lossless-to-lossy transcoding as the first transcoding direction.
+- Keep original lossless files by default; do not replace or delete source files automatically after transcoding.
+- Ship default transcoding presets for MP3 320, MP3 V0, Opus 160, AAC 256, and Ogg Vorbis Q6.
+- Allow lossy-to-lossy transcoding only with explicit warning and confirmation.
+- Warn on lossy-to-lossless transcoding because it cannot restore lost audio information and should not be treated as an upgrade.
 
 ## Implementation Plan Placeholder
 

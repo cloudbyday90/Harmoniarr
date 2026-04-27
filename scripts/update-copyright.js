@@ -7,8 +7,8 @@
  * See LICENSE file for details.
  */
 
-const fs = require('fs');
-const glob = require('glob');
+import fs from 'node:fs';
+import { globSync } from 'glob';
 
 const START_YEAR = 2026;
 const CURRENT_YEAR = new Date().getFullYear();
@@ -105,7 +105,7 @@ function main() {
   console.log(`\nUpdating copyright headers to ${COPYRIGHT_YEAR}...\n`);
 
   const files = FILE_PATTERNS.flatMap(pattern =>
-    glob.sync(pattern, { nodir: true, ignore: IGNORE_PATTERNS })
+    globSync(pattern, { nodir: true, ignore: IGNORE_PATTERNS })
   );
 
   let added = 0;
