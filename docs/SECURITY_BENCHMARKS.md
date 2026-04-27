@@ -11,6 +11,8 @@
 
 This document maps Harmoniarr's intended security posture against practical security benchmarks.
 
+For the primary policy definition, see `docs/SECURITY_POLICY.md`.
+
 Harmoniarr is still in planning, so most entries describe target controls rather than verified implementation. Once code, Dockerfiles, Compose files, and CI exist, each item should be updated with concrete file references and actual compliance status.
 
 ### Benchmark Sources

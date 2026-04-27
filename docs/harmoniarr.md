@@ -6,6 +6,41 @@ This is a living planning document for Harmoniarr, a standalone Docker-hosted mu
 
 The goal is to keep early product, architecture, and implementation decisions in one place before code is written. This document should be updated as assumptions are validated, design decisions are made, and implementation details become concrete.
 
+### Documentation Maintenance And Decision-Record Policy
+
+This document should remain the planning source of truth until implementation becomes concrete enough to justify narrower ownership in code, runbooks, or dedicated policy documents.
+
+Documentation requirements:
+
+- update planning docs when a meaningful product, architecture, security, operational, or compatibility decision changes, not weeks later as cleanup
+- keep one clear source of truth for each topic; when a dedicated document becomes authoritative, this document should point to it explicitly instead of drifting into a conflicting duplicate
+- record decisions in terms of behavior, boundary, rationale, and consequence rather than leaving future readers to infer intent from scattered edits
+- prefer explicit deltas to silent rewrites when a previous assumption has been invalidated; the change should make it obvious that a decision moved, narrowed, or was superseded
+- keep planning text implementation-aware but not falsely definitive; unknowns, review-first areas, and future-policy items should stay marked as such
+
+Decision-record rules:
+
+- major decisions should be reflected close to the section they govern and summarized in the document's higher-level decisions when they materially change the baseline
+- cross-cutting changes should update related documents in the same change when the behavior spans security, backup, schema, diagnostics, release, or operational posture
+- code, migrations, tests, Docker changes, and release behavior should not become the de facto source of truth while docs still state something else
+- when an older assumption is retained only for historical context, it should be clearly superseded rather than left as an apparently current rule
+
+Patterns to avoid:
+
+- multiple documents making different claims about the same runtime, auth, backup, or import behavior
+- updating examples or snippets while leaving the surrounding policy text stale
+- burying major design reversals in unrelated wording changes without making the new baseline obvious
+- letting README, main planning docs, and specialized policy docs drift into separate product definitions
+
+## Operational Posture
+
+Harmoniarr is planned as a self-hosted FOSS application.
+
+- There is no service-level agreement.
+- There is no uptime, support, or response-time warranty.
+- Planning documents should define product behavior, safety boundaries, and operator-facing guidance, not hosted-service guarantees.
+- Operational guidance may describe expected behavior and reasonable defaults, but it should not read like a contractual support commitment.
+
 ## Working Concept
 
 Build Harmoniarr as a self-hosted application that combines music library management, metadata, Soulseek search, candidate scoring, download orchestration, and import review.
@@ -573,6 +608,34 @@ Provider configuration should include:
 
 This keeps MusicBrainz-specific rules out of generic heartbeat code while still letting the heartbeat service report provider health consistently.
 
+### External Integration Contract Policy
+
+External integrations should follow a shared contract so adapters for `slskd`, MusicBrainz, AcoustID, Cover Art Archive, and local media tools do not each invent their own validation, timeout, and failure semantics.
+
+Contract requirements:
+
+- validate outbound configuration before the first live call, including base URLs, credentials, required headers, rate-limit settings, and local binary availability where relevant
+- normalize inbound responses into app-owned shapes before domain services depend on them
+- keep raw payload capture intentional and bounded; preserve enough for diagnostics without turning every adapter into a raw archive layer
+- assign explicit timeout, retry, and backoff policy per integration instead of relying on library defaults
+- distinguish retryable failure, non-retryable failure, misconfiguration, rate-limit state, and dependency unavailability with normalized internal codes
+- expose enough metadata for diagnostics, such as dependency name, operation type, response class, and canonical request context, without leaking secrets or excessive raw payload detail
+- keep adapter modules responsible for transport and normalization, not for domain scoring, wanted-state decisions, or import policy
+
+Integration rules:
+
+- `slskd` normalization should absorb API-version quirks so the rest of the app sees stable search, browse, transfer, and enqueue shapes
+- MusicBrainz and other public metadata adapters should enforce rate limits, headers, caching, and polite retry behavior at the adapter boundary
+- local tool adapters such as `ffmpeg`, `ffprobe`, or Chromaprint should treat missing binaries, non-zero exits, and malformed output as first-class normalized outcomes rather than ad hoc thrown strings
+- adapters should return operator-safe normalized errors upward and send richer debug context to logs or diagnostics only when safe
+
+Patterns to avoid:
+
+- domain services parsing provider-specific raw response shapes directly
+- per-call timeout or retry rules scattered across feature code instead of centralized in the adapter
+- treating every non-200 or non-zero exit as the same generic failure class
+- allowing one adapter to return booleans, another to throw strings, and another to return raw library errors without normalization
+
 ### Scheduler Integration
 
 Schedulers should consult dependency state before creating work.
@@ -606,6 +669,111 @@ Dependency heartbeat may need records such as:
 - `path_health_checks`
 
 The current status tables can be compact projections, but historical check and event records should be retained long enough to debug recurring service problems.
+
+### Data Retention And Raw Payload Policy
+
+Raw payload capture, provider snapshots, fixtures, and diagnostics data should be retained intentionally. The app should preserve enough evidence to explain behavior without turning every integration boundary into indefinite blob storage.
+
+Retention requirements:
+
+- store normalized projections as the primary app-facing representation and treat raw payloads as secondary diagnostic evidence
+- keep raw payload capture bounded by purpose, size, and retention policy rather than storing every response forever
+- preserve enough source context to explain normalization, matching, scoring, and failure behavior when the live dependency has changed or is unavailable
+- separate production diagnostics retention from test fixtures; fixtures should be curated and stable rather than accidental copies of arbitrary runtime state
+- redact or avoid storing secret-bearing fields, session material, or credential-like values even in diagnostic snapshots
+
+Recommended retention posture:
+
+- normalized provider projections, score factors, and workflow state should outlive raw payloads when they are the real source of operator decisions
+- raw provider payloads and browse/search snapshots should be retained only long enough to debug normalization drift, matching regressions, or provider contract changes
+- large transient data such as search-result floods, stale browse payloads, and failed raw snapshots should be pruned explicitly and oldest-first
+- fixture updates should be intentional and reviewed when provider or adapter behavior changes materially
+
+Patterns to avoid:
+
+- keeping raw payloads indefinitely because storage was cheap at first
+- relying on raw payload archives as the only explanation for a decision that should have been captured in normalized state or score factors
+- mixing test fixtures, production snapshots, and debug dumps into one undifferentiated storage bucket
+- storing copied raw payloads that contain secret-bearing config, tokens, or user-sensitive material merely for convenience
+
+### Privacy And Data Minimization Policy
+
+Harmoniarr is self-hosted, but that does not remove the need for restraint. The app should collect, persist, expose, and export only the data needed to make acquisition, diagnostics, and operator decisions work reliably.
+
+Data minimization requirements:
+
+- keep only the fields needed for matching, import review, operator diagnostics, auditability, and configured workflow behavior
+- prefer normalized summaries, stable identifiers, and bounded evidence over indefinite storage of raw payloads, full request bodies, or verbose user-originated data
+- treat usernames, filesystem paths, user notes, provider payload details, and exportable evidence as potentially sensitive operational data even in a self-hosted deployment
+- redact, omit, or bound secret-bearing, credential-like, and session-related values before they reach logs, diagnostics, notifications, or exported artifacts
+- make retention and export behavior explicit for notes, diagnostics, history, and evidence bundles instead of letting convenience dictate storage forever
+
+Disclosure rules:
+
+- operator-facing UI should show enough context to explain a decision without defaulting to full raw payload disclosure
+- exports, diagnostics bundles, and support-oriented artifacts should exclude unnecessary sensitive fields by default and require deliberate operator choice to include more detail
+- internal history should preserve decision meaning while avoiding duplicated copies of sensitive raw data across multiple tables or logs
+- user-provided notes, override reasons, and annotations should be stored narrowly and surfaced only where operationally relevant
+
+Patterns to avoid:
+
+- treating self-hosted deployment as justification for storing every payload, path, or note forever
+- copying the same sensitive context into logs, notifications, audit records, and raw snapshots without a clear need
+- exposing full provider payloads, filesystem layouts, or secret-adjacent settings in ordinary UI flows when a summary would suffice
+- making diagnostic export the accidental source of the most sensitive retained data in the system
+
+### Cache And Derived-State Policy
+
+Caches, summaries, and derived projections should exist to improve responsiveness and explainability, but they should stay visibly separate from canonical records and durable workflow history.
+
+Derived-state requirements:
+
+- define which tables or stores are canonical and which are cache, projection, summary, or recomputable derived state
+- make cache invalidation and refresh triggers explicit for provider projections, browse caches, fingerprint caches, heartbeat summaries, UI list caches, and other read-optimized views
+- keep derived state reproducible from canonical records or documented external refresh flows wherever practical
+- record freshness metadata such as source timestamp, derived-at time, TTL, or version when stale data affects operator decisions
+- prefer rebuilding or recalculating corrupted cache state over silently trusting stale projections indefinitely
+
+Cache rules:
+
+- cached provider or Soulseek data should accelerate decisions, not replace the normalized canonical records that explain those decisions later
+- current-status tables and UI-facing summaries should be treated as projections of durable history, not as the only source of truth for workflow transitions
+- client-side caches should be allowed to improve responsiveness, but high-impact actions should still revalidate against server state before claiming success
+- cache keys, summary identifiers, and projection schemas should be stable enough to survive routine refactors without hidden breakage across tabs, workers, or UI modules
+
+Patterns to avoid:
+
+- letting product logic depend on cache-only fields that are not recoverable from canonical state
+- mutating canonical workflow meaning through a UI cache update without a durable server-side state change
+- keeping multiple projections for the same concept without a clear ownership and refresh rule
+- treating stale derived state as authoritative after dependency outages, migration changes, or settings changes that should invalidate it
+
+### Performance And Scale Guardrails
+
+Performance planning should set guardrails early so Harmoniarr stays explainable and responsive as libraries, candidate sets, downloads, and history grow. The goal is not premature optimization; it is avoiding designs that scale unpredictably.
+
+Performance requirements:
+
+- define practical ceilings and batching rules for searches, browse payloads, candidate lists, imports, notifications, and history views before implementation hard-codes unbounded behavior
+- treat pagination, filtering, sorting, cache TTLs, and queue sizes as product-level behavior, not incidental UI or database details
+- keep long-running workflows durable and resumable so large operations do not depend on one process staying alive for a long uninterrupted window
+- prefer incremental recalculation, targeted refresh, and bounded scans over whole-system recomputation when only one artist, album, path, or dependency changed
+- make expensive operations visible through progress, phase state, and backpressure rather than letting them stall silently
+
+Scale rules:
+
+- operational list endpoints and screens should assume candidate, wanted, download, import, and history tables can become large enough to require pagination or virtualization
+- queue dispatch should respect explicit concurrency limits, cooldowns, and dependency backpressure rather than creating unbounded bursts of work
+- adapter calls, provider refreshes, and filesystem scans should be bounded by timeout, concurrency, and retry policy that match the environment they run in
+- cache TTL choices should reflect data volatility and cost of recomputation, not arbitrary convenience defaults
+- bulky diagnostics, exports, and evidence bundles should be generated intentionally and asynchronously when the data size warrants it
+
+Patterns to avoid:
+
+- unbounded list queries or UI tables that assume the whole result set can always be loaded and rendered at once
+- whole-library rescans or full-history recomputation triggered by small local changes with no clear need
+- background jobs that accumulate work faster than the system can surface or recover from it
+- picking cache durations, queue sizes, or concurrency limits with no documented operational rationale
 
 ## Architecture Principle
 
@@ -746,6 +914,32 @@ wanted eligibility
 
 This keeps each piece testable and lets us improve Soulseek behavior without rewriting large files.
 
+### Job Dispatch And Worker Ownership Policy
+
+Schedulers and workers should have explicit ownership boundaries so the app can explain who created work, who currently owns it, and why a retry or shutdown decision was made.
+
+Worker ownership requirements:
+
+- scheduler code should decide when work becomes eligible, while worker code should execute a claimed unit of work rather than re-deriving broad dispatch policy ad hoc
+- each claimed job should have a visible owner record or lease concept so duplicate runners, abandoned work, and stale retries can be detected
+- workers should renew or release ownership intentionally; crashed or expired ownership should be recoverable without manual database surgery
+- shutdown behavior should stop new claims first, then allow in-flight work to finish or return to a retryable state according to the job type
+- retries should be scheduled by explicit retry policy with attempt counters, backoff, and terminal-failure rules rather than by blind looped re-execution
+
+Dispatch rules:
+
+- dispatch should prefer small, claimable work units with stable identifiers over huge opaque batches
+- workers should emit durable progress and outcome records for long-running jobs so operator views do not depend on transient process memory
+- heartbeat and worker-health signals should distinguish idle, healthy, degraded, stuck, and stopped workers
+- maintenance operations such as restore, migration, or recovery should have authority to pause dispatch and prevent new claims where concurrent mutation would be unsafe
+
+Patterns to avoid:
+
+- one worker both selecting arbitrary work from the database and executing it without a clear claim boundary
+- retries that start before the prior lease or ownership window has clearly ended
+- shutdown paths that abandon claimed work without marking whether it is resumable, failed, or returned to queue
+- worker status derived only from logs when durable heartbeat or lease state should exist
+
 ### Frontend Organization
 
 The frontend should follow the same principle.
@@ -837,6 +1031,261 @@ Extension policy:
 - Reserve `.cts` and `.mts` only for TypeScript files that need explicit per-file CommonJS or ESM behavior.
 
 This keeps the codebase consistent while still leaving escape hatches for future tooling, package publishing, or interoperability needs.
+
+### Implementation Quality And Defensive Coding Requirements
+
+The project should set explicit implementation rules early so the codebase does not drift into weak patterns that are easy to generate quickly but expensive to maintain.
+
+Current external best-practice sources on Node.js API design and AI-generated code risk converge on the same baseline: validate at the boundary, keep layers small, fail loudly and consistently, log with correlation, review generated code skeptically, and test unhappy paths instead of trusting code that merely appears to work.
+
+Implementation requirements:
+
+- Keep route handlers thin. They should parse HTTP concerns, invoke services, and format responses. Domain decisions belong in services; persistence belongs in repository modules.
+- Validate all external input at the boundary. Request bodies, params, query strings, env vars, webhook payloads, and third-party API responses should be schema-checked before deeper use.
+- Fail closed on auth, authorization, path safety, and import safety decisions. Missing or ambiguous validation should stop the action rather than quietly continuing.
+- Use one centralized error-shaping approach. Avoid ad hoc `try/catch` blocks that swallow context, return partial success, or map unrelated failures to the same generic branch.
+- Treat `unhandledRejection` and `uncaughtException` as fatal process states. Log enough context for diagnosis, stop accepting new work, and shut down cleanly.
+- Use structured logs with correlation IDs or equivalent request-scoped identifiers so one operator action can be traced across routes, services, workers, and database effects.
+- Put explicit timeouts and cancellation around outbound I/O. External HTTP, `slskd` calls, metadata fetches, subprocesses, and filesystem operations should not wait forever.
+- Retry only when the operation is known to be retry-safe. Retries should be explicit, bounded, and jittered rather than hidden inside low-level helper code.
+- Prefer platform-native capabilities when they are sufficient. For server-side outbound HTTP, native `fetch` should be the default unless a concrete requirement justifies another client.
+- Keep mutable global state minimal. Hidden singletons, ambient caches, and cross-module side effects should not become the default coordination model.
+- Make dangerous operations explicit. Filesystem mutation, delete flows, import moves, rename operations, and restore actions should have obvious call sites and clear invariants.
+
+ESM-specific requirements:
+
+- Use native `import` and `export` syntax throughout project code and scripts.
+- Use explicit file extensions in relative imports where the Node ESM runtime requires them.
+- Do not mix CommonJS patterns such as `require`, `module.exports`, or `__dirname` into normal app code; use ESM-compatible utilities when path resolution is needed.
+- Avoid path alias setups that work only in one tool unless runtime, tests, and build all resolve them the same way.
+- Keep interop boundaries obvious when a dependency is still CommonJS-only rather than hiding module-format quirks across the codebase.
+
+Requirements for AI-assisted or "vibe coded" changes:
+
+- Do not accept large generated code blocks just because they run once. Review them with the same or higher scrutiny as handwritten code.
+- Assume generated code is optimized for the happy path unless proven otherwise. Add explicit checks for invalid input, missing auth, partial state, timeout, retry, and cleanup behavior.
+- Watch for the recurring weak patterns common in AI-generated code: missing boundary validation, permissive auth checks, hardcoded secrets or fallback credentials, swallowed errors, duplicate near-copy modules, and unnecessary dependencies.
+- Reject cargo-cult abstractions. If a generated helper or base class does not remove real duplication or clarify invariants, do not keep it.
+- Reject fake resilience. Silent fallbacks, broad catch-all success responses, auto-healing branches without auditability, and hidden default values should be treated as suspect until justified.
+- Require generated tests to cover failure paths and invariants, not just snapshots or happy-path assertions.
+- Prefer smaller, reviewable generated changes over one-shot file dumps. Large generated rewrites should be broken into understandable slices.
+
+Code review and testing expectations:
+
+- Every new route should be reviewed for boundary validation, authz, rate-limit posture, normalized error behavior, and logging context.
+- Every new filesystem or subprocess path should be reviewed for path-boundary enforcement, cleanup behavior, timeout handling, and partial-failure behavior.
+- Every external integration change should be reviewed for timeout, retry, schema validation, and degraded-mode behavior.
+- Tests should cover unhappy paths intentionally: invalid requests, auth failures, dependency timeouts, malformed third-party responses, lock conflicts, and cleanup after partial failure.
+- If TypeScript is introduced, enable strict mode and avoid weakening types to accommodate uncertain design. `any` should be rare and justified.
+- Dependency additions should require a concrete reason. Do not add packages for trivial helpers that the platform or existing stack already covers.
+
+Preferred server patterns:
+
+- Route modules should own HTTP-only concerns: parse validated input, call one service entrypoint, map the service result to the response, and attach request-scoped metadata such as correlation IDs.
+- Validator modules should define reusable schemas for route input, config input, and external payload normalization. Validation should happen before domain logic, not halfway through it.
+- Service modules should own domain rules, orchestration, transaction boundaries, and side-effect sequencing. They should be testable without Express.
+- Repository modules should own SQL and persistence translation only. They should not silently add domain policy, retries, or hidden fallback behavior.
+- Adapter modules should normalize external systems such as `slskd`, MusicBrainz, AcoustID, and local media tools into Harmoniarr-shaped results before the rest of the app depends on them.
+- Job modules should be resumable and idempotent where practical. They should emit durable state, not rely on in-memory progress as the only source of truth.
+- Error helpers should produce normalized internal codes and operator-safe messages. They should not bury the original cause so deeply that logs become useless.
+
+Preferred server flow shape:
+
+```text
+HTTP route
+  -> boundary validation
+  -> service entrypoint
+  -> repository or adapter calls
+  -> normalized result or normalized error
+  -> response mapping and structured log
+```
+
+Preferred normalized result and error shapes:
+
+- Service-layer success results should carry enough structure for the route and diagnostics layers to make good decisions without reinterpreting ambiguous booleans.
+- Service-layer failures should preserve a normalized internal code, operator-safe message, and relevant context instead of relying on free-form thrown strings.
+- Routes should map normalized service results into HTTP responses consistently rather than inventing a new envelope per handler.
+
+Example service success shape:
+
+```text
+{
+  ok: true,
+  status: 'completed' | 'accepted' | 'blocked' | 'degraded',
+  code: 'UPGRADE_PREFLIGHT_BLOCKED' | null,
+  data: { ... },
+  warnings: [ ... ],
+  nextActions: [ ... ]
+}
+```
+
+Example service failure shape:
+
+```text
+{
+  ok: false,
+  status: 'invalid' | 'unauthorized' | 'forbidden' | 'conflict' | 'failed',
+  code: 'BACKUP_LOCK_CONFLICT',
+  message: 'Restore cannot start while another maintenance lock is active.',
+  details: { ...safe_context }
+}
+```
+
+Shape rules:
+
+- do not use raw booleans such as `true` or `false` as the only service return signal when callers need warnings, normalized codes, or next actions
+- do not throw plain strings for expected domain outcomes such as validation failure, lock conflict, or blocked preflight
+- normalized codes should be stable enough for tests, logs, audit details, and UI mapping, even if human-readable messages evolve
+- `details` should contain machine-usable, safe context only; stack traces, secrets, tokens, or raw provider payloads belong elsewhere
+- route handlers should translate one normalized service result into one response contract rather than partially duplicating service logic
+
+### API And Route Contract Policy
+
+HTTP routes should expose stable contracts that reflect product intent clearly. The API should not make callers reverse-engineer behavior from inconsistent envelopes, ad hoc pagination, or one-off async patterns.
+
+Route contract requirements:
+
+- keep route naming and resource grouping predictable; similar resources should use the same list, detail, action, and history patterns
+- use consistent response envelopes for list, detail, and action routes so the UI and tests do not need route-specific parsing rules
+- distinguish synchronous completion from accepted background work explicitly rather than overloading `200` responses for everything
+- make pagination, sorting, filtering, and search parameters consistent across operational tables such as wanted items, candidates, downloads, imports, users, and history
+- return normalized internal codes and operator-safe messages for expected failures so UI mapping does not depend on brittle free-form text
+- include canonical identifiers for the affected entity or operation when the response starts, blocks, or resumes background work
+
+API behavior rules:
+
+- list endpoints should define one default sort, explicit page or cursor semantics, and stable filter names for common concepts such as status, artist, album, source user, confidence, age, and failure reason
+- action endpoints should return whether the result is `completed`, `accepted`, `blocked`, or `failed`, and should include `nextActions` or warnings when the user needs to do something else
+- long-running workflows should expose durable operation status through follow-up endpoints or existing entity state, not by requiring clients to infer completion from missing activity
+- route-level validation errors, auth failures, conflicts, and blocked operations should map to predictable HTTP status classes and normalized response shapes
+- bulk-action endpoints should report total requested count, accepted count, rejected count, and per-item failures when partial success is intentionally allowed
+
+Patterns to avoid:
+
+- returning raw arrays from one list route and wrapped objects from another without a clear reason
+- inventing unique filter names for the same concept on different routes
+- treating background job creation as success-without-context instead of returning the canonical job or operation identifier
+- mixing UI-oriented display strings into contract fields that should be stable for tests and automation
+
+### Defensive Configuration And Startup Validation
+
+Configuration handling should be defensive by default. Weak config parsing is one of the fastest ways for otherwise clean codebases to become unreliable and hard to diagnose.
+
+Configuration requirements:
+
+- Validate environment variables, file-based config, and persisted settings through explicit schemas before the app starts using them.
+- Treat missing required config as a startup failure unless the product intentionally supports a documented default.
+- Treat ambiguous config as invalid. Do not guess between conflicting paths, duplicate settings, or overlapping roots.
+- Parse configuration once into a typed or normalized config object rather than re-reading `process.env` throughout the codebase.
+- Keep secret config separate from ordinary app settings where possible, and never log raw secret values.
+- Prefer explicit defaults that are documented in one place. Avoid hidden fallback chains spread across modules.
+- Validate dangerous path settings, URL settings, concurrency limits, retry counts, and size thresholds at startup and on settings save.
+
+Startup validation requirements:
+
+- Startup should verify critical prerequisites such as readable and writable app data paths, database compatibility, required secrets or session keys, and basic external dependency posture where the app cannot function safely without them.
+- Startup failure should be loud and specific in logs, but still avoid leaking secrets.
+- Health endpoints may report degraded dependencies after startup, but hard blockers should fail startup instead of leaving the app half-initialized.
+- If the app supports optional integrations, validate and report them separately from required startup prerequisites.
+
+Patterns to avoid in configuration code:
+
+- reading `process.env` directly from arbitrary feature modules
+- silently coercing invalid strings to numbers, booleans, paths, or URLs
+- shipping insecure development defaults into normal runtime code paths
+- using one fallback secret or token value when the real config is missing
+- continuing startup after a required path, database state, or session secret is invalid
+
+### Configuration Mutation And Settings-Save Policy
+
+Runtime configuration changes should follow a stricter contract than ordinary CRUD because bad settings can break paths, sessions, provider integrations, imports, or background work immediately.
+
+Settings-save requirements:
+
+- validate proposed settings through the same schemas and boundary rules used at startup before persisting any change
+- classify settings by effect, such as immediate-safe, requires revalidation, requires worker restart, or requires full process restart
+- persist settings changes atomically so one partially valid save does not leave the app between two configurations
+- mask, redact, or preserve existing secret values intentionally; editing one field should not accidentally blank or expose unrelated secrets
+- record enough audit context for sensitive settings changes, especially auth, paths, provider credentials, backup behavior, and media-management rules
+
+Mutation rules:
+
+- path, provider, and integration settings should run targeted validation or connectivity checks before the save is accepted when safe to do so
+- restart-required settings should return explicit status and next action instead of pretending the new behavior is already live
+- failed validation should return field-level, operator-safe errors without persisting partial config changes
+- settings that invalidate caches, projections, path translations, or dependency summaries should trigger explicit refresh or invalidation behavior
+- secret-bearing settings should support intentional keep-existing behavior so masked values in the UI are not treated as literal new secrets
+
+Patterns to avoid:
+
+- applying half of a configuration update before the rest has been validated
+- interpreting placeholder mask values as real secrets during save
+- silently accepting a save that actually needs restart, migration, or path revalidation before it is safe
+- scattering settings-write behavior across feature routes instead of owning it through a narrow settings service boundary
+
+### Security-Sensitive Coding Patterns
+
+Some parts of the codebase need a stricter bar than ordinary feature work because mistakes there turn directly into security defects or unsafe local behavior.
+
+Security-sensitive areas include:
+
+- authentication and session handling
+- secret loading, masking, rotation, and persistence
+- filesystem path resolution and mutation
+- subprocess execution for media inspection, fingerprinting, or transcoding
+- backup, restore, migration, and recovery flows
+- admin-only operational routes and diagnostics
+
+Requirements:
+
+- keep auth and session code explicit; avoid hidden middleware side effects that make it hard to see where identity is established, refreshed, or revoked
+- treat secrets as write-only or masked wherever practical; normal application flows should not need to read back plaintext secret values after initial input
+- validate and normalize filesystem paths before use, then enforce configured root boundaries again at the mutation point
+- prefer argument-array subprocess APIs over shell-string composition; do not rely on shell interpolation for paths, filenames, or user-controlled values
+- make destructive operations require explicit intent and clear call sites; delete, overwrite, restore, revoke, and rename behavior should never hide behind generic helper names
+- keep security-sensitive state transitions auditable through normalized codes, durable records, or explicit logs without leaking secret material
+
+Patterns to avoid:
+
+- helper functions that both authorize and mutate state in one opaque step
+- path joins or shell commands built from unchecked user input, provider input, or raw external paths
+- storing plaintext secrets, fallback credentials, or debug copies of secret-bearing payloads for convenience
+- security-sensitive toggles that change behavior implicitly based on environment without clear startup reporting
+- broad admin or bypass branches added only because they were convenient during development or AI-assisted scaffolding
+
+Patterns to avoid:
+
+- fat route files that mix parsing, authorization, SQL, third-party API calls, and response shaping in one handler
+- repository helpers that mutate business rules implicitly because "it was convenient"
+- utility modules that become a dumping ground for unrelated logic
+- base classes or generic frameworks introduced before the codebase has repeated a real pattern enough times to justify them
+- boolean-return helpers for operations that actually need rich result objects, normalized codes, or warnings
+
+### Concurrency And Locking Policy
+
+Long-running jobs and state-mutating workflows should follow shared concurrency rules so retries, background workers, imports, and restore operations do not race each other unpredictably.
+
+Concurrency requirements:
+
+- prefer durable single-flight or lock-backed coordination for workflows that mutate the same logical entity or operational surface
+- make idempotency explicit for retryable jobs; rerunning a job should not create duplicate side effects just because the previous attempt timed out or crashed mid-flight
+- keep lock ownership narrow and time-bounded; acquire as late as practical and release as soon as the critical section is complete
+- distinguish entity-level coordination from global maintenance locking instead of using one broad lock for every case
+- record enough state to explain why work is queued, running, blocked, skipped, or superseded
+
+Expected uses:
+
+- restore, recovery, and similar maintenance operations may require global or maintenance-style locking
+- import and rename flows may require per-item, per-path, or cross-process file locking
+- search dispatch, candidate building, transfer reconciliation, and metadata refresh should prefer idempotent job design and entity-scoped single-flight behavior over coarse global locks
+- repeated scheduler triggers should detect in-progress equivalent work and avoid spawning duplicate runners blindly
+
+Patterns to avoid:
+
+- in-memory-only locks for workflows that may run across restarts, multiple processes, or long job windows
+- hidden locking inside low-level helpers where callers cannot reason about contention or lock scope
+- broad catch-and-retry loops that ignore whether a prior attempt still owns the work
+- using lock timeouts as a substitute for clear workflow status and diagnostics
 
 ### Proposed Repository Shape
 
@@ -1858,6 +2307,33 @@ A wanted item should become eligible for discovery only when all required condit
 
 Eligibility should be recalculated rather than guessed. The app can store a current `wanted_items.status`, but the scheduler should be able to explain why an item is or is not eligible at a given time.
 
+### Workflow State Machine And Transition Policy
+
+Workflow state should be modeled as explicit allowed transitions, not as loose status labels that any code path can rewrite opportunistically. This matters most for wanted items, candidates, downloads, imports, recovery flows, and other operator-visible work.
+
+Transition requirements:
+
+- each workflow-owned status should have a defined meaning, allowed predecessors, and expected successor states
+- state transitions should be triggered by durable events or validated service decisions, not by incidental UI assumptions or log-only observations
+- terminal states and retryable states should be distinct so the scheduler, UI, and diagnostics can make the same decision from the same record
+- one layer should own transition validation for a workflow so route handlers, workers, and background jobs do not each invent their own transition rules
+- when a transition is rejected, preserve the normalized reason instead of silently leaving the record unchanged
+
+Transition rules:
+
+- wanted items should summarize intent and major workflow position, while search jobs, candidate runs, download jobs, and import reviews keep their own detailed statuses
+- candidate, download, and import transitions should be monotonic within a single attempt unless an explicit retry, reset, or operator override creates a new attempt boundary
+- retries should append history and either create a new attempt record or a clearly versioned retry state rather than erasing the previous failure
+- blocked, superseded, canceled, and satisfied states should be explicit because they have different operational meaning even when all of them stop current work
+- partial success should be represented directly when an album, transfer set, or import batch can complete only in part
+
+Patterns to avoid:
+
+- free-form status strings created ad hoc by different services
+- jumping directly from an early state to a late state without recording the intermediate reason or attempt history when that history matters operationally
+- reusing one generic `failed` state for validation issues, dependency outages, user decisions, and policy blocks that need different recovery behavior
+- letting UI filters or route handlers infer transition validity instead of enforcing it in workflow logic
+
 ### Suggested Wanted Statuses
 
 Wanted item states should represent product intent, not low-level job execution.
@@ -2001,6 +2477,8 @@ The dependency heartbeat service should eventually track ClamAV availability and
 
 The security benchmark planning document lives in `docs/SECURITY_BENCHMARKS.md`.
 
+The dedicated security policy and posture document lives in `docs/SECURITY_POLICY.md`.
+
 It is adapted from Classifarr's security benchmark structure, but it should be treated as a Harmoniarr planning baseline until implementation exists. As Dockerfiles, API routes, authentication, worker jobs, and CI gates are added, the benchmark document should be updated with concrete file references and verified status.
 
 The benchmark should track:
@@ -2015,6 +2493,157 @@ The benchmark should track:
 - Worker and queue abuse resistance.
 - Optional future antivirus scanning.
 - Security CI gates.
+
+## Authentication And Access Model
+
+Harmoniarr should use a Classifarr-style authentication model for v1.
+
+The v1 goal is not broad multi-user collaboration. The goal is to protect a self-hosted operational application with a secure local account model, durable browser sessions, and clear separation between browser access and integration access.
+
+### Account Model
+
+The first-run experience should create the initial local admin account.
+
+Initial v1 policy:
+
+- Require creation of a local admin account before normal app use.
+- Treat `setupRequired` as true when no local users exist.
+- Force the UI into setup-account flow until the first admin exists.
+- Support one or more local accounts in the schema, but treat single-admin operation as the normal v1 posture.
+- Reserve a non-admin `user` role for future expansion, even if most v1 flows remain admin-only.
+- Do not depend on external auth providers, SSO, OAuth, OIDC, or reverse-proxy identity for v1.
+
+The setup flow should be consistent with the normal login flow. Initial admin creation should issue the same browser session cookies and CSRF state that a normal successful login would issue.
+
+### Browser Authentication Model
+
+The browser UI should use cookie-based session authentication, following the current Classifarr posture.
+
+Recommended v1 session model:
+
+- Short-lived httpOnly access token cookie for normal API access.
+- httpOnly refresh token cookie for session renewal.
+- Access token lifetime of about 15 minutes.
+- Non-persistent session lifetime of about 48 hours.
+- `remember me` session lifetime of about 30 days with sliding refresh behavior.
+- `SameSite=Lax` cookies by default.
+- `Secure` cookie behavior controlled by deployment/runtime policy so local HTTP installs do not self-lock.
+
+The frontend should treat authentication as server-managed state. Tokens should not be written to localStorage or sessionStorage.
+
+### Refresh And Session Behavior
+
+The client should use the shared API client for all authenticated requests so session refresh behavior is consistent.
+
+Policy:
+
+- If an access token expires, the client may attempt a silent refresh.
+- Refresh should use the refresh-token cookie rather than exposing refresh tokens to client code.
+- If refresh succeeds, retry the original request once.
+- If refresh fails, redirect to login.
+- Support explicit logout and logout-all-devices behavior.
+- Keep session listing and session revocation as first-class account-security features.
+
+### Password Policy
+
+The local password policy should mirror the Classifarr baseline unless implementation testing reveals a reason to tighten it.
+
+Minimum v1 requirements:
+
+- At least 8 characters.
+- At least one uppercase letter.
+- At least one lowercase letter.
+- At least one number.
+- At least one special character.
+- Store password hashes with bcrypt.
+- Enforce account lockout or temporary backoff after repeated failed login attempts.
+
+Password reset-by-email is not required for v1. Self-hosted operator recovery can remain an admin/database recovery flow until a later milestone.
+
+### Route Protection Model
+
+The backend should use explicit route tiers, not ad hoc per-handler checks.
+
+Required tiers:
+
+- Public setup routes: setup status, initial admin creation, and other pre-auth bootstrap endpoints only.
+- Public login/session-establishment routes: login and token refresh endpoints.
+- Authenticated browser routes: ordinary logged-in operations.
+- Admin-only routes: settings, credentials, paths, system operations, migrations, and other sensitive controls.
+- Integration routes: explicitly designed for API key or webhook access.
+
+Server policy:
+
+- Admin-only routes require authenticated user context plus `requireAdmin`-style role checks.
+- Authenticated routes require authenticated user context.
+- Public routes must be intentionally registered and kept minimal.
+- Route inventory tests should prove every route is either protected or intentionally public.
+
+### CSRF Policy
+
+If browser auth uses cookies, mutating browser requests should require CSRF protection.
+
+Recommended v1 posture:
+
+- Require CSRF token headers for browser `POST`, `PUT`, `PATCH`, and `DELETE` requests that rely on cookie auth.
+- Exempt safe methods.
+- Exempt setup/bootstrap routes and token refresh routes where required to avoid deadlocks in session recovery.
+- Exempt API-key-authenticated requests and bearer-header requests that do not rely on browser cookies.
+- Issue CSRF cookie state automatically when a valid browser session exists.
+
+### API Keys And Integrations
+
+API keys should exist for automation and external integrations, not for normal browser administration.
+
+v1 policy:
+
+- Browser UI uses cookie-based session auth.
+- External tools use API keys.
+- API keys should support explicit permissions such as `read_only` and `read_write`.
+- Admin-only user operations should not be available via ordinary API keys in v1.
+- If a future need for privileged integration keys appears, it should be modeled explicitly rather than letting API keys silently impersonate admins.
+
+This keeps admin operations tied to user identity, audit trails, and interactive login.
+
+### Audit And Account Security
+
+Authentication and account security events should be durable and explainable.
+
+Record at minimum:
+
+- Setup completion.
+- Login success and failure.
+- Logout and logout-all.
+- Password changes.
+- Session revocation.
+- Account lockouts.
+- Token refresh events.
+- Suspected token replay or session compromise handling.
+
+The app should expose enough session/account information for the user to understand active sessions and terminate them when needed.
+
+### Reverse Proxy And Deployment Posture
+
+Harmoniarr should support reverse-proxy deployments, but v1 authentication should remain application-owned.
+
+Policy:
+
+- Reverse proxies may terminate TLS.
+- Harmoniarr remains responsible for login, session, CSRF, and route authorization.
+- Reverse-proxy identity headers should not become the primary auth mechanism in v1.
+- Runtime settings should control cookie security, CORS, and related browser security behavior.
+
+### Initial Decision
+
+For v1, Harmoniarr should adopt the following explicit stance:
+
+- Local account auth only.
+- First-run admin account required.
+- Cookie-based browser auth with refresh-token rotation.
+- CSRF protection for cookie-authenticated writes.
+- API keys only for integrations and automation.
+- Explicit admin-route protection on the server.
+- Session management, audit logging, and failed-login protections included in the security baseline.
 
 ## Media Management Settings
 
@@ -2161,6 +2790,33 @@ Recommended v1 posture:
 - Preserve downloaded files only when the configured import mode calls for copy or hardlink.
 - Keep import history so every file move or rename can be explained later.
 
+### Filesystem Mutation And Media-Operation Policy
+
+Filesystem mutation should be treated as a high-risk operation. Copy, move, hardlink, rename, quarantine, cleanup, and delete behavior should follow one defensive model so import and media-management code cannot drift into unsafe shortcuts.
+
+Mutation requirements:
+
+- every filesystem mutation should begin from a validated plan that names the source, destination, operation type, and expected invariants before the write happens
+- keep source files untouched until validation, destination planning, and any required review gates have passed
+- prefer staging or temporary destinations for multi-step media operations, then finalize with an atomic move or equivalent safe handoff where the filesystem permits it
+- treat hardlink, move, and copy as distinct operator-visible behaviors; fallback from one mode to another should be explicit, not silent
+- record durable outcome history for file mutations, including conflicts, skipped files, quarantine decisions, and partial-failure cleanup
+- destructive cleanup such as deleting source files, replacing outputs, or pruning quarantine items should require explicit policy and clear operator visibility
+
+Media-operation rules:
+
+- rename, tagging, transcoding, and final library placement should remain separate decision points even when they share one workflow
+- case-only renames, cross-device moves, permission failures, and duplicate-destination conflicts should be treated as first-class planned outcomes rather than unexpected exceptions
+- failed media operations should leave the current trusted library state intact and either retain, quarantine, or clean up intermediate outputs according to explicit policy
+- bulk rename and cleanup flows should always support preview, conflict explanation, and a narrow execution scope instead of mutating the whole library opportunistically
+
+Patterns to avoid:
+
+- mutating files directly from loosely assembled path strings without a durable operation plan
+- silently downgrading a requested hardlink or move into a different mutation mode without telling the operator
+- deleting source or intermediate files before the destination is fully validated and durable
+- hiding partial-failure cleanup rules inside low-level helpers where review and tests cannot reason about them
+
 ### Existing Library Rename And Cleanup
 
 The library scanner may discover files that are already present but do not match the configured naming convention.
@@ -2242,6 +2898,217 @@ The `Settings` area should include a `Media Management` section with tabs or sub
 - Future transcoding settings.
 
 The naming screen should be practical: template inputs, token insertion, live previews, and validation warnings. It should not require the user to import files before seeing whether a naming rule works.
+
+## Path Mapping And Staging Contract
+
+Harmoniarr needs an explicit path contract between itself, `slskd`, Docker volumes, and the user's library. This should be treated as a core v1 policy, not an implementation detail hidden in settings.
+
+### Why This Needs A Contract
+
+The app will receive download and transfer paths from `slskd`, but those paths may not match the filesystem view seen by Harmoniarr.
+
+Common cases:
+
+- `slskd` and Harmoniarr run in separate containers with different mount points.
+- The host path differs from the in-container path.
+- Windows, NAS, and Linux path formats differ.
+- Completed downloads and incomplete downloads live under different roots.
+
+If the app guesses at path translation, imports become unsafe.
+
+### Required Path Types
+
+Harmoniarr should model these path roles explicitly:
+
+- `download_incomplete_root`: where in-progress downloads live.
+- `download_complete_root`: where completed downloads become visible for import processing.
+- `staging_root`: the path Harmoniarr uses for import review, antivirus scanning, validation, and temporary work.
+- `library_root`: one or more final managed music roots.
+- `transcode_temp_root`: optional temporary workspace for future transcoding jobs.
+
+The first implementation can keep some of these under the same parent path, but the roles should stay explicit in the model.
+
+### Mapping Model
+
+Harmoniarr should store path mappings as configured translations between the path namespace used by `slskd` and the path namespace used by Harmoniarr.
+
+The app should not assume that a raw `slskd` path is directly readable by Harmoniarr.
+
+Minimum mapping requirements:
+
+- Support one or more configured download path mappings.
+- Map from `slskd`-visible path prefix to Harmoniarr-visible path prefix.
+- Normalize separators and casing according to platform rules.
+- Reject ambiguous or overlapping mappings unless the precedence rules are obvious and validated.
+- Preserve the original remote path for history and debugging.
+- Store the translated local path separately from the raw `slskd` path.
+
+Example shape:
+
+```text
+slskd path:      /downloads/completed/Artist/Album/01 - Track.flac
+harmoniarr path: /data/downloads/completed/Artist/Album/01 - Track.flac
+```
+
+### Example Mapping Matrix
+
+The settings UI and documentation should give operators concrete examples for the common deployment shapes.
+
+#### Example 1: Same Compose Stack, Different Container Mount Points
+
+```text
+Host path:        /srv/media/downloads/completed
+slskd path:       /downloads/completed
+harmoniarr path:  /data/downloads/completed
+library root:     /data/music
+```
+
+Mapping record:
+
+```text
+slskd prefix:     /downloads/completed
+harmoniarr prefix: /data/downloads/completed
+```
+
+Translated file:
+
+```text
+slskd file:       /downloads/completed/Artist/Album/01 - Track.flac
+harmoniarr file:  /data/downloads/completed/Artist/Album/01 - Track.flac
+```
+
+#### Example 2: Separate Docker Containers With Shared Host Volume
+
+```text
+Host path:        /mnt/storage/slskd/complete
+slskd path:       /app/downloads/complete
+harmoniarr path:  /downloads/complete
+staging root:     /downloads/staging
+library root:     /music
+```
+
+Mapping record:
+
+```text
+slskd prefix:     /app/downloads/complete
+harmoniarr prefix: /downloads/complete
+```
+
+This is still a valid configuration even though the host path is different from both in-container paths. Harmoniarr only needs a correct translation into its own namespace.
+
+#### Example 3: Windows Host With Linux Containers
+
+```text
+Host path:        D:\Media\Soulseek\Complete
+slskd path:       /downloads/complete
+harmoniarr path:  /data/downloads/complete
+library root:     /data/music
+```
+
+Mapping record:
+
+```text
+slskd prefix:     /downloads/complete
+harmoniarr prefix: /data/downloads/complete
+```
+
+The host's Windows path should not leak into normal app logic once the containers are mounted correctly. The app should reason about the path namespaces it actually sees.
+
+#### Example 4: NAS Share Mounted Differently By Each Container
+
+```text
+NAS share:        \\nas\media\downloads
+slskd path:       /shares/downloads
+harmoniarr path:  /mnt/downloads
+library root:     /mnt/music
+```
+
+Mapping record:
+
+```text
+slskd prefix:     /shares/downloads
+harmoniarr prefix: /mnt/downloads
+```
+
+This is the kind of layout where explicit path translation matters most. A raw `slskd` path may be valid in one container and meaningless in the other.
+
+#### Invalid Example: Ambiguous Overlapping Prefixes
+
+```text
+mapping A: /downloads        -> /data/downloads
+mapping B: /downloads/complete -> /archive/downloads/complete
+```
+
+This should be rejected unless the app has explicit, validated precedence rules and can prove the translation result is deterministic.
+
+### Import Boundary Rules
+
+Imports should only operate on files that resolve inside configured and validated download or staging roots.
+
+Rules:
+
+- Never import from an unconfigured arbitrary path.
+- Never trust a raw path returned by `slskd` until it is translated and validated.
+- Never allow translated paths to escape the configured completed-download or staging roots.
+- Never write final library files outside configured library roots.
+- Keep import planning, validation, antivirus scanning, and final move or hardlink operations inside known path boundaries.
+
+### Staging Posture
+
+Staging should be the default posture for all completed Soulseek content.
+
+Flow:
+
+```text
+slskd completed download
+  -> resolve local path through configured mapping
+  -> validate path is inside completed-download root
+  -> create import review record
+  -> inspect/scan in staging posture
+  -> build import plan
+  -> write into final library root only after approval/policy allows it
+```
+
+The important rule is that a completed download is not yet trusted library content.
+
+### Validation Requirements
+
+Path mapping validation should happen during onboarding, settings save, and health checks.
+
+Harmoniarr should validate:
+
+- The configured `slskd` download roots exist from `slskd`'s perspective where testability is available.
+- The translated Harmoniarr-visible roots exist locally.
+- Harmoniarr can read completed download paths.
+- Harmoniarr can write to staging and target library paths.
+- Path translation examples resolve as expected.
+- The configured mappings do not create collisions or ambiguous translations.
+
+Validation should be non-destructive. The app should avoid modifying real media files just to prove a mapping works.
+
+### UI Surface
+
+Path mapping should have its own explicit settings and status surface.
+
+The UI should show:
+
+- Raw `slskd` path prefix.
+- Harmoniarr-local translated prefix.
+- Mapping health status.
+- Last validation result.
+- Example translated path.
+- Warnings when a download path is visible to `slskd` but not to Harmoniarr.
+- Warnings when a translated path escapes the allowed roots.
+
+### Initial Decision
+
+For v1, Harmoniarr should adopt this explicit path contract:
+
+- Treat `slskd` paths and Harmoniarr paths as separate namespaces.
+- Require explicit configured mappings when the namespaces differ.
+- Require completed downloads to resolve inside a validated completed-download root before import review begins.
+- Treat staging and library roots as separate security boundaries even when they share a parent volume.
+- Refuse imports when translation or boundary validation fails.
 
 ## Transcoding Settings
 
@@ -3271,7 +4138,362 @@ The repository should include migration helper scripts:
 
 Later, if multi-instance deployments become a goal, migrations should be moved to a single-run job or leader-controlled process.
 
+### Migration And Database Change Policy
+
+Schema and data changes should be held to the same defensive standard as application code because migration mistakes are harder to roll back than route or UI defects.
+
+Migration requirements:
+
+- every migration should be explicit about whether it is schema-only, data-backfilling, cleanup-oriented, or destructive
+- prefer forward-only, additive migrations in normal development; renames, drops, and destructive reshapes should happen only after a compatibility or transition window when practical
+- keep one migration focused on one coherent change set rather than bundling unrelated schema work into a large batch
+- make backfills resumable or chunked when the work could be large enough to create long locks or unpredictable startup time
+- validate migration filenames, checksums, and schema snapshot freshness in CI
+- test migrations against real database state, not just empty schemas, when the change affects existing data or upgrade behavior
+
+Database change rules:
+
+- new columns, constraints, and indexes should be justified by concrete behavior, query patterns, or safety invariants, not speculative future convenience
+- destructive changes should require an explicit operator-facing recovery or rollback story before they are accepted
+- application code and migrations should be compatible for the intended deployment sequence; avoid changes that require a perfectly synchronized one-step deploy unless the deployment model explicitly guarantees it
+- backfills, cleanup jobs, and data repair routines should emit observable progress or durable status when they may take meaningful time
+- schema changes that affect backup, restore, migration status, or operational diagnostics should update the related docs and checks in the same change
+
+Patterns to avoid in database changes:
+
+- migrations that silently rewrite or drop high-value data without operator-visible recovery context
+- combining DDL, large data movement, and unrelated cleanup in one hard-to-review migration
+- relying on application startup as an unbounded backfill window with no visibility into progress or lock impact
+- using the database as a hidden dumping ground for raw debug state that should instead be summarized or retained intentionally
+
+## Backup, Restore, And Upgrade Operations
+
+Detailed implementation planning for this area lives in `docs/BACKUP_RESTORE_DESIGN.md`.
+
+Harmoniarr should have an explicit operator-facing backup and recovery model.
+
+This should not be treated as a vague future maintenance feature. The app will own embedded Postgres state, local accounts, provider credentials, path mappings, monitoring rules, and import decisions. Operators need a clear recovery story before the platform is trustworthy.
+
+### Recovery Model
+
+Harmoniarr should support two different recovery layers:
+
+- Logical app backup: a portable app-managed backup of selected Harmoniarr state.
+- Operator-managed volume backup: filesystem or snapshot backup of app data, Postgres data, downloads, and library roots where the operator chooses to protect them.
+
+The app should not pretend that a logical config backup is a complete disaster-recovery image.
+
+### What A Logical Backup Should Include
+
+The logical backup should focus on portable, high-value application state.
+
+Expected v1 scopes:
+
+- Local users and account metadata needed for controlled restore.
+- Runtime settings and app configuration.
+- slskd connection settings.
+- Metadata/provider configuration.
+- Path mappings.
+- Root folders and media management settings.
+- Quality profiles.
+- Artist monitoring rules.
+- Wanted state.
+- Source-user trust, block, ignore, notes, and overrides.
+- Manual correlations and operator decisions where they change future behavior.
+
+The app may later support optional backup scopes for selected historical data, but the default should stay focused on recoverable configuration and intent.
+
+### What A Logical Backup Should Exclude
+
+The logical backup should avoid transient, fragile, or misleading restore targets.
+
+Default exclusions:
+
+- Access tokens, refresh tokens, and active sessions.
+- Transient background job queue state.
+- Active transfers.
+- Volatile caches.
+- Raw download staging files.
+- Final media library files.
+- Embedded Postgres physical cluster files.
+- Large raw search-result snapshots unless the operator explicitly chooses diagnostic export behavior later.
+
+This avoids common mistakes where a backup looks complete but restores stale runtime state or impossible-to-validate transient state.
+
+### Backup Storage Model
+
+The app-managed logical backup should be written to a dedicated backup directory under app data, but operators should be encouraged to copy or sync those artifacts elsewhere.
+
+Recommended posture:
+
+- Encrypted backups by default.
+- Plaintext backups only as an explicit expert choice with a warning.
+- Dedicated backup directory such as `/app/data/backups`.
+- Support download/export of backup files.
+- Encourage secondary off-box or immutable storage outside the app's control.
+
+The app should not claim that storing backups only beside the primary app data is sufficient protection from host failure, operator error, or ransomware.
+
+### Backup Manifest And Preview
+
+Restore should begin with manifest inspection, not immediate apply.
+
+Each logical backup should include metadata such as:
+
+- Backup format version.
+- Exported timestamp.
+- Application version.
+- Schema or migration level.
+- Included scopes.
+- Item counts.
+- Encryption state.
+- Optional checksums or integrity metadata.
+
+The UI should support preview before restore. Preview should show the operator what the backup contains and what the restore is likely to affect.
+
+### Restore Preflight
+
+Before restore, Harmoniarr should run explicit compatibility and safety checks.
+
+Preflight should validate:
+
+- Backup format version is supported.
+- Backup schema/migration level is compatible enough to interpret.
+- Required restore scopes are present.
+- Encrypted backups have valid password input.
+- The app can enter maintenance mode.
+- The target environment has a valid writable backup and data path posture.
+- Replace vs merge mode is understood and permitted.
+
+Restore should fail closed if compatibility is uncertain.
+
+### Restore Modes
+
+Harmoniarr should support at least two restore modes:
+
+- `replace`: clear selected logical tables and restore from backup.
+- `merge`: keep current records and upsert/import compatible backup state.
+
+Replace mode should be the safest operator-visible "authoritative restore" flow. Merge mode should exist for advanced recovery and migration cases, but it should be clearly described as more complex and more likely to produce conflicts.
+
+### Restore Mechanics
+
+The restore path should be a coordinated operation, not a series of ad hoc writes.
+
+Suggested flow:
+
+```text
+Select backup
+  -> preview manifest and item counts
+  -> run compatibility preflight
+  -> confirm restore mode and warnings
+  -> enter maintenance lock
+  -> load and normalize full backup payload
+  -> build restore plan
+  -> open DB transaction
+  -> clear/merge restore scopes in dependency order
+  -> remap IDs where needed
+  -> rotate or invalidate sensitive runtime state
+  -> enqueue post-restore reconciliation
+  -> commit
+  -> release maintenance lock
+  -> show result, warnings, and next actions
+```
+
+### Maintenance Lock
+
+Restore should acquire a maintenance lock before mutating state.
+
+While the lock is active, Harmoniarr should:
+
+- Stop new scheduler dispatch.
+- Pause workers where practical.
+- Reject or defer mutating admin actions.
+- Prevent new imports and search jobs.
+- Surface restore-in-progress status in the UI.
+
+This avoids a common restore failure mode where workers keep mutating the same rows the restore is trying to replace.
+
+### Transaction And Ordering
+
+Restore should run inside a database transaction whenever the selected scopes make that practical.
+
+The restore planner should:
+
+- Apply records in dependency order.
+- Use whitelisted columns rather than blindly trusting backup payload keys.
+- Use stable natural keys or canonical IDs for merge/upsert behavior where possible.
+- Build ID maps when local surrogate IDs differ from source backup IDs.
+
+This is especially important because Harmoniarr uses local surrogate UUIDs while also preserving provider identifiers.
+
+### Post-Restore Security Actions
+
+After restore, Harmoniarr should treat runtime security state as suspect unless it was explicitly regenerated.
+
+Recommended v1 actions:
+
+- Invalidate all active browser sessions.
+- Do not restore stale access or refresh tokens.
+- Rotate or regenerate app-managed integration keys where required by policy.
+- Ensure at least one local admin path remains usable.
+- Re-run dependency checks, path mapping validation, and relevant reconciliations.
+
+### Upgrade Safety Flow
+
+Upgrade behavior should remain separate from ordinary restore, but use the same safety principles.
+
+Recommended startup or maintenance preflight:
+
+- Inspect current app version.
+- Inspect schema migration level.
+- Inspect embedded Postgres cluster major version.
+- Detect incompatible major-version combinations.
+- Refuse unsafe startup when the on-disk cluster is incompatible.
+- Recommend or auto-create a fresh logical backup before risky upgrade operations.
+
+For v1, major PostgreSQL upgrades should still fail safely rather than run automatically.
+
+### Common Mistakes To Avoid
+
+Recent backup and disaster-recovery guidance is very consistent on a few failure patterns. Harmoniarr should avoid these explicitly:
+
+- Treating a successful backup write as proof that restore works.
+- Treating a single local backup copy as sufficient disaster recovery.
+- Backing up transient runtime state that should be recreated instead of restored.
+- Restoring without preview or compatibility checks.
+- Restoring secrets and live sessions without rotation or invalidation.
+- Letting workers continue to mutate state during restore.
+- Confusing logical app backup with full media-library backup.
+- Skipping restore drills and recovery-time measurements.
+
+### Suggested Functions
+
+The implementation should center around a small set of explicit operations rather than one oversized service method.
+
+Suggested interfaces:
+
+```ts
+async function createBackup(options): Promise<BackupCreateResult>
+async function readBackupManifest(backupRef): Promise<BackupManifest>
+async function previewBackup(backupRef, options): Promise<BackupPreview>
+async function validateBackupCompatibility(manifest, options): Promise<CompatibilityResult>
+async function restoreBackup(backupRef, options): Promise<RestoreResult>
+async function buildRestorePlan(backup, options): Promise<RestorePlan>
+async function applyRestorePlan(tx, plan, options): Promise<void>
+async function runPostRestoreSecurityActions(tx, options): Promise<void>
+async function enqueuePostRestoreReconciliation(tx, plan): Promise<void>
+async function performUpgradePreflight(): Promise<UpgradePreflightResult>
+```
+
+Core restore shape:
+
+```ts
+async function restoreBackup(
+  backupRef,
+  {
+    password,
+    mode,
+    scopes,
+    dryRun,
+    preserveCurrentAdmin,
+    invalidateSessions,
+  }
+) {
+  const manifest = await readBackupManifest(backupRef)
+  const compatibility = await validateBackupCompatibility(manifest, {
+    mode,
+    scopes,
+  })
+
+  if (!compatibility.ok) {
+    throw new RestoreCompatibilityError(compatibility.errors)
+  }
+
+  const preview = await buildRestorePlanFromManifest(manifest, {
+    mode,
+    scopes,
+  })
+
+  if (dryRun) {
+    return {
+      success: true,
+      dryRun: true,
+      preview,
+      warnings: preview.warnings,
+    }
+  }
+
+  await acquireMaintenanceLock('restore')
+
+  try {
+    const backup = await readFullBackupPayload(backupRef, password)
+    const plan = await buildRestorePlan(backup, {
+      mode,
+      scopes,
+      preserveCurrentAdmin,
+    })
+
+    return await db.transaction(async tx => {
+      await applyRestorePlan(tx, plan, { mode })
+      await runPostRestoreSecurityActions(tx, {
+        invalidateSessions,
+      })
+      await enqueuePostRestoreReconciliation(tx, plan)
+
+      return {
+        success: true,
+        mode,
+        restoredScopes: plan.scopes,
+        stats: plan.stats,
+        warnings: plan.warnings,
+        nextActions: plan.nextActions,
+      }
+    })
+  } finally {
+    await releaseMaintenanceLock('restore')
+  }
+}
+```
+
+### Initial Decision
+
+For v1, Harmoniarr should adopt this recovery posture:
+
+- Provide encrypted logical app backups by default.
+- Keep restore preview and compatibility preflight mandatory.
+- Use maintenance locking and transactional restore behavior.
+- Invalidate sessions and avoid restoring live auth state.
+- Treat media files and full-volume disaster recovery as operator-managed outside the logical backup feature.
+- Fail closed on incompatible major-version upgrade paths.
+
 ## Trust Model
+
+### Manual Override And Operator Action Policy
+
+Manual overrides are necessary for a self-hosted acquisition tool, but they should be explicit, auditable, and narrow. Operator actions should correct or guide automation, not become invisible exceptions that future behavior cannot explain.
+
+Override requirements:
+
+- every override should record who initiated it, what scope it affects, why it was applied when a reason is available, and whether it is one-time or persistent
+- narrower overrides should win over broader defaults; song-specific or album-specific decisions should not require mutating global policy to achieve a local exception
+- manual actions that change future behavior, such as trust, block, ignore, prefer, correlation override, or quality override, should produce durable records rather than UI-only state
+- forced or bypass-style actions should still pass safety boundaries for auth, path validation, and destructive-operation review unless the product explicitly defines a stronger admin override path
+- operator-facing responses should make the downstream effect of the action clear, including what will be retried, suppressed, re-ranked, or exempted next
+
+Operator action rules:
+
+- retry actions should preserve prior failure history and start a new attempt boundary instead of erasing evidence
+- forced import, forced retry, or manual candidate selection should remain visible in history so later automated outcomes can be understood in context
+- trust and block actions should affect ranking and eligibility through the normal policy layers rather than by silently mutating unrelated score data
+- manual correlation and metadata override actions should preserve both the old association and the new operator decision where future debugging depends on that history
+
+Patterns to avoid:
+
+- one-click override flows that bypass auditability because they were convenient in the UI
+- hidden persistent exceptions that change future automation without any visible record or management surface
+- using manual overrides to paper over broken validation, poor matching, or missing state-machine rules that should be fixed in normal workflow logic
+- broad "force" actions that silently skip multiple safety checks without clearly telling the operator what was bypassed
 
 The app should build its own local Soulseek source-user trust model.
 
@@ -3464,6 +4686,38 @@ External Postgres can be supported later, but the default path should be a compl
 
 The embedded Postgres data directory must live in a persistent volume. Container rebuilds and upgrades must not destroy database state.
 
+### Release, Packaging, And Artifact Policy
+
+Release outputs should follow an explicit policy so Docker images, version metadata, upgrade notes, and operator-facing artifacts remain coherent across builds.
+
+Release requirements:
+
+- each release should identify the application version, supported runtime baseline, database compatibility expectations, and any operator-relevant upgrade notes
+- Docker images should be tagged intentionally with stable release identifiers and not rely only on mutable tags for traceability
+- build artifacts should carry enough metadata to tie a running container back to a source revision, release version, and compatibility baseline
+- packaging changes that affect startup, migrations, backup compatibility, or bundled media tools should be treated as release-significant even when app code changed little
+- release validation should cover the built image, not just source-level tests, because packaging is part of the product behavior
+
+Artifact rules:
+
+- the standard Docker image should remain the primary supported artifact for v1, with embedded Postgres, runtime tooling, and the compiled UI included
+- release artifacts should expose version information consistently in the UI, API diagnostics, logs, and backup metadata where appropriate
+- backup manifests, restore preflight, and compatibility checks should understand release and schema compatibility as first-class artifact properties
+- lockfiles, schema snapshots, migration files, and release notes should be reviewed as part of release readiness when they changed
+
+Release-note expectations:
+
+- call out breaking or operator-visible changes in auth, paths, import behavior, media tooling, migrations, runtime baselines, or backup compatibility
+- note when a release requires restart, migration review, manual operator action, or extra care during upgrade
+- distinguish routine fixes from support-matrix changes such as new Node, Alpine, PostgreSQL, or `slskd` expectations
+
+Patterns to avoid:
+
+- treating the Docker image as an opaque byproduct instead of a reviewed deliverable
+- shipping mutable version metadata that cannot explain what code or compatibility baseline is running
+- changing runtime packages, bundled tools, or migration behavior without reflecting that in release notes or compatibility guidance
+- assuming source-level success means the packaged artifact is safe to release without image-level validation
+
 ## Compatibility Strategy
 
 Compatibility with Soulseek behavior should be validated early.
@@ -3480,11 +4734,85 @@ The project should maintain recorded or synthetic examples of real `slskd` API r
 
 These fixtures should be used to test normalization, matching, scoring, transfer reconciliation, and retry logic.
 
+### Compatibility And Upgrade Policy
+
+Compatibility should be treated as an explicit support contract, not as an accidental outcome of whatever currently happens to build. Harmoniarr needs clear expectations for runtime versions, dependency boundaries, and how upgrades are introduced.
+
+Compatibility requirements:
+
+- define one primary supported baseline for the standard deployment, including Node, Alpine, PostgreSQL, `slskd`, bundled media tools, and browser expectations
+- treat compatibility-sensitive boundaries such as `slskd` API behavior, Alpine musl/native modules, PostgreSQL major versions, and browser session behavior as first-class test targets
+- fail closed when a major-version mismatch or incompatible runtime condition would risk silent corruption, broken imports, or unsafe startup
+- isolate compatibility quirks in adapters, startup checks, and environment validation rather than leaking them across feature code
+- keep human-readable support expectations current in docs whenever the implementation baseline changes
+
+Upgrade rules:
+
+- runtime upgrades should be introduced deliberately and tested as a planned compatibility change, not folded invisibly into unrelated work
+- major upgrades for PostgreSQL, Alpine, Node, or `slskd` should require explicit validation notes, migration or rollout expectations, and an operator-visible recovery story where relevant
+- minor and patch upgrades should still pass compatibility checks for ESM behavior, native modules, media tooling, migrations, and adapter contracts before they are treated as routine
+- deprecation of an older baseline should happen with a documented transition window or at least a clearly stated supported target, rather than by silent drift in CI or Dockerfiles
+- browser-facing changes should preserve the practical support baseline for the operational UI and call out features that depend on specific browser capabilities
+
+Compatibility surfaces to track:
+
+- Node 24 ESM runtime behavior and package compatibility
+- Alpine branch support, musl-native module behavior, and packaged media tooling availability
+- PostgreSQL 18 cluster compatibility, migration expectations, and restore preflight behavior
+- `slskd` API response compatibility and adapter normalization guarantees
+- browser support for the authenticated operational UI, realtime updates, and local cache behavior
+
+Patterns to avoid:
+
+- silently broadening or narrowing the support matrix just because a dependency updated underneath the project
+- relying on undocumented version folklore instead of startup checks, adapter tests, or explicit docs
+- coupling compatibility fixes to feature modules when the real issue belongs at an environment or adapter boundary
+- assuming patch-level upgrades are always safe when native packages, musl builds, or third-party API quirks are involved
+
 ## Testing And Quality Strategy
 
 The project should use a Classifarr-style split between client, server, integration, and operational quality checks.
 
 The root project should orchestrate quality commands across the workspace instead of requiring contributors to remember separate commands for each package.
+
+Preferred test patterns:
+
+- Write tests around invariants and failure modes, not just current implementation details.
+- Favor table-driven or fixture-driven tests when the same rule must hold across many input variations.
+- Test idempotency for jobs, retries, import decisions, reconciliation passes, and startup checks where repeated execution is realistic.
+- Test partial-failure cleanup explicitly for filesystem mutation, download handling, restore work, and subprocess-backed media operations.
+- Test boundary validation with malformed, missing, ambiguous, and unauthorized inputs rather than assuming schema usage alone proves safety.
+- Test degraded dependency behavior, including timeout, rate limit, malformed payload, unavailable dependency, and retry exhaustion paths.
+- Test that normalized internal codes remain stable for expected failure classes because the UI, logs, and diagnostics will depend on them.
+- Prefer integration tests for contract boundaries that are easy to get subtly wrong, such as migrations, auth/session flows, route contracts, and database-backed workflow state.
+- Keep test fixtures realistic enough to catch normalization drift, especially for `slskd`, provider payloads, and music-file validation.
+- Avoid brittle snapshot-heavy tests where a smaller assertion on behavior, invariant, or normalized shape would be clearer.
+
+### Testing Fixture And Scenario Policy
+
+Fixtures and scenario cases should be curated like product assets, not treated as disposable blobs. They are part of how Harmoniarr proves compatibility, workflow safety, and regression resistance.
+
+Fixture requirements:
+
+- keep fixtures scoped by purpose, such as adapter normalization, workflow-state transitions, import/media validation, or failure classification
+- prefer realistic but sanitized examples over hand-wavy minimal objects when real structure is what the code depends on
+- preserve the scenario meaning in fixture names and metadata so contributors can tell what behavior a case is protecting
+- keep secrets, tokens, real hostnames, user-identifying data, and unsafe raw credentials out of fixtures entirely
+- update fixtures intentionally when upstream behavior changes, and pair those updates with assertions that explain what changed
+
+Scenario rules:
+
+- cover both happy paths and operationally important edge cases, including malformed provider payloads, partial transfers, retry exhaustion, blocked imports, path collisions, and degraded dependencies
+- keep at least one representative scenario for each compatibility-sensitive boundary such as `slskd` search responses, browse payloads, transfer state changes, provider errors, and media-file inspection
+- use scenario-driven tests to preserve workflow history meaning, not just one-step function output
+- prefer small composed scenario sets over one giant golden snapshot that becomes impossible to review
+
+Patterns to avoid:
+
+- fixture files that are copied from production or local environments without sanitization and curation
+- replacing a realistic scenario with an over-minimized object that no longer exercises the real normalization or validation path
+- updating fixtures without checking whether the change reflects intended upstream behavior or a regression in Harmoniarr
+- using snapshot-only approval as the main guard for complex workflow or adapter behavior when explicit assertions would show intent more clearly
 
 Expected command groups:
 
@@ -3567,6 +4895,77 @@ Quality gates should include:
 - Secret scanning.
 - Container vulnerability scanning.
 - CodeQL or equivalent static analysis once the repository is hosted.
+
+### Dependency And Supply-Chain Policy
+
+Dependency choices should be conservative and explicit. Fast scaffolding and AI-assisted coding both tend to introduce unnecessary packages, stale examples, and weak supply-chain assumptions unless the project pushes back on them deliberately.
+
+Dependency requirements:
+
+- Add a dependency only when it removes meaningful complexity or risk; do not add packages for trivial wrappers around built-in platform behavior.
+- Prefer mature, actively maintained packages with clear ownership, recent releases, and a narrow purpose.
+- Prefer fewer dependencies with explicit usage over broad utility packages that become ambient project infrastructure.
+- Keep runtime and development dependencies separated clearly.
+- Commit lockfiles and treat them as part of the reviewed change, not incidental generated output.
+- Pin or constrain versions intentionally based on the project's update policy rather than accepting drift by default.
+- Reevaluate AI-suggested packages before adoption; many generated suggestions are stale, overpowered for the use case, or unnecessary in modern Node.
+
+Supply-chain safeguards:
+
+- Run dependency vulnerability scanning in CI and treat high-severity findings as blockers unless there is documented review and justification.
+- Run secret scanning and keep credential-shaped strings out of source, tests, examples, fixtures, and generated code.
+- Prefer official or well-established packages for auth, schema validation, logging, and test infrastructure rather than obscure one-off libraries.
+- Avoid copying install commands or package recommendations from generated output without checking current maintenance status and compatibility with Node 24, ESM, and Alpine.
+- Review transitive-risk-heavy additions carefully, especially packages that execute install scripts, compile native code, or pull in large trees for minor convenience.
+- Keep builder-stage-only dependencies out of the runtime image whenever possible.
+
+Patterns to avoid in dependency management:
+
+- adding both a platform-native capability and a third-party package for the same job without a clear reason
+- adopting abandoned packages because they appear in old blog posts, AI output, or example repos
+- pulling in broad utility libraries when a small local helper would be clearer and safer
+- accepting dependency updates or lockfile churn without understanding what changed
+- allowing example credentials, test tokens, or fallback secrets to live in sample config or fixture files
+
+### Observability And Diagnostics Coding Policy
+
+Observability should be treated as part of implementation quality, not as an optional afterthought added only when something breaks.
+
+Observability requirements:
+
+- emit structured logs with stable field names so request, job, and operation context can be queried consistently
+- carry correlation identifiers or canonical operation identifiers through route, service, job, and adapter boundaries when an action spans multiple layers
+- log meaningful lifecycle transitions for long-running work such as search dispatch, candidate generation, download reconciliation, import review, migration startup, and restore-related operations
+- keep health and diagnostics surfaces explicit about readiness, degraded dependencies, and migration or database state rather than collapsing everything into a single generic `ok` flag
+- prefer high-signal logs and metrics over verbose noise; logs should help explain decisions, failures, retries, and degraded state without becoming a raw payload dump
+- redact or omit secret-bearing values from logs and diagnostics by default
+
+Diagnostics coding rules:
+
+- diagnostics endpoints and views should consume normalized internal codes and canonical identifiers instead of reverse-engineering behavior from ad hoc strings
+- metrics, logs, and health endpoints should agree on core concepts such as dependency state, retry exhaustion, blocked operations, and migration status
+- debug-only detail should not leak into normal operator-facing responses just because it was convenient during implementation
+- do not make log scraping the only way to understand important workflow state when durable status already belongs in the database or API
+
+Patterns to avoid in observability code:
+
+- free-form log strings with inconsistent field names for the same event type
+- logging whole request or provider payloads when a redacted summary would explain the issue
+- "catch and log" branches that suppress failure propagation without a clear degraded-state design
+- health endpoints that report success while critical startup checks, migrations, or required dependencies are actually broken
+
+Pull request review checklist:
+
+- Confirm module-format consistency: ESM imports, explicit relative import extensions where needed, and no accidental CommonJS patterns in normal app code.
+- Confirm boundary validation exists for every new external input surface.
+- Confirm authn/authz checks are explicit and fail closed for sensitive actions.
+- Confirm error handling preserves normalized internal codes, operator-safe responses, and structured logs with correlation context.
+- Confirm timeouts, retry rules, and cleanup behavior are explicit for external I/O, subprocesses, and filesystem mutation.
+- Confirm paths, filenames, and import or restore operations respect configured boundaries and do not rely on unchecked string manipulation.
+- Confirm tests cover at least one unhappy path or invariant for the new behavior, not just the happy path.
+- Confirm new dependencies are justified and not duplicating built-in platform capabilities or existing project libraries.
+- Confirm AI-assisted or generated code was reviewed for copy-paste abstractions, silent fallbacks, hidden globals, missing validation, and low-value tests.
+- Confirm docs, migration checks, and operational notes stay aligned when the change affects routes, schema, jobs, or external integrations.
 
 The initial CI model should include:
 
@@ -4200,6 +5599,32 @@ Import review should include:
 
 Review screens should preserve the explanation trail. A user should be able to see why Harmoniarr recommended a candidate or blocked an import.
 
+### Notification And Operator Feedback Policy
+
+Operator feedback should be consistent across API responses, UI status surfaces, logs, and durable notifications. The app should help the user understand what happened, what is still happening, and what action is needed next.
+
+Feedback requirements:
+
+- distinguish ephemeral feedback from durable operational state; a toast is not a substitute for a persisted blocked status, failed job record, or warning banner
+- use normalized internal codes and stable status labels behind user-facing messages so the same condition maps consistently across UI, logs, and diagnostics
+- make blocked, degraded, retrying, and waiting states explicit when work is not proceeding normally
+- include next actions when the user can resolve the issue, such as retry, review import, fix path mapping, reauthenticate `slskd`, or clear an override
+- keep success feedback concise, but keep warnings and failures explanatory enough that the user does not need to inspect raw logs for ordinary operational problems
+
+Feedback surface rules:
+
+- inline warnings should appear close to the action or record they affect when the issue is local, such as import conflicts, path validation problems, or candidate mismatches
+- durable notifications or activity records should capture longer-lived issues such as repeated worker failure, degraded dependencies, blocked imports, recovery warnings, or settings changes that require restart
+- long-running operations should expose progress, current phase, and terminal outcome without forcing the user to infer status from a spinner disappearing
+- bulk actions should summarize total requested, succeeded, blocked, failed, and next-step counts rather than only showing a generic success message
+
+Patterns to avoid:
+
+- success toasts for operations that actually completed only partially or queued background work instead of finishing
+- forcing the user to open logs to understand ordinary validation, conflict, or dependency problems
+- showing the same issue as unrelated wording in different screens because messages were composed ad hoc
+- using warnings so frequently that truly important blocked or destructive-operation feedback becomes visually ignorable
+
 #### Control Elements
 
 Controls should be familiar, compact, and consistent.
@@ -4261,7 +5686,9 @@ Know what is missing
 - License: GPL-3.0-or-later, matching Classifarr.
 - Use a Classifarr-style GitHub Action to check copyright/license headers on source files.
 - Use the Classifarr-compatible stack as the default implementation baseline: Node 24, npm, Express 5, Vue 3, Vite, Pinia, Tailwind CSS, Socket.IO, Jest, Vitest, Testcontainers, Docker Alpine, and explicit PostgreSQL access through `pg`.
+- Use a Classifarr-style local authentication model for v1: first-run admin setup, cookie-based browser auth, refresh-token-backed sessions, CSRF protection for cookie-authenticated writes, API keys for integrations, and explicit admin-only route protection.
 - Use ES modules for JavaScript and TypeScript code; avoid CommonJS for project scripts and application code.
+- Treat defensive coding as a baseline requirement: thin routes, schema validation at boundaries, centralized error handling, structured logging with correlation, explicit timeout and retry policy, and skeptical review of AI-generated code.
 - Use Postgres by default.
 - Use local surrogate UUID primary keys for domain, workflow, and event tables; keep natural/provider identifiers as indexed columns instead of primary keys.
 - Target PostgreSQL 18 for the embedded database.

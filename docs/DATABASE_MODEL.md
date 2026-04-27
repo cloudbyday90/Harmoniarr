@@ -1175,6 +1175,10 @@ Columns:
 - `password_hash text not null`
 - `role text not null`
 - `is_disabled boolean not null default false`
+- `must_change_password boolean not null default false`
+- `failed_login_count integer not null default 0`
+- `locked_until timestamptz null`
+- `password_changed_at timestamptz null`
 - `last_login_at timestamptz null`
 - `created_at timestamptz not null`
 - `updated_at timestamptz not null`
@@ -1185,6 +1189,39 @@ Initial roles:
 admin
 user
 ```
+
+Notes:
+
+- `must_change_password` supports future forced-reset and high-risk recovery flows.
+- `failed_login_count` and `locked_until` support local lockout policy without relying on ephemeral memory state.
+
+### `refresh_tokens`
+
+Refresh-token-backed browser session state.
+
+Columns:
+
+- `id uuid primary key`
+- `app_user_id uuid not null references app_users(id) on delete cascade`
+- `token_hash text not null unique`
+- `token_family_id uuid not null`
+- `parent_refresh_token_id uuid null references refresh_tokens(id)`
+- `issued_at timestamptz not null`
+- `last_used_at timestamptz null`
+- `expires_at timestamptz not null`
+- `remember_me boolean not null default false`
+- `is_revoked boolean not null default false`
+- `revoked_at timestamptz null`
+- `revoked_reason text null`
+- `issued_ip inet null`
+- `issued_user_agent text null`
+- `replaced_by_refresh_token_id uuid null references refresh_tokens(id)`
+- `created_at timestamptz not null`
+
+Notes:
+
+- Store hashes, never plaintext refresh tokens.
+- Bootstrap-admin recovery and backup restore should revoke active rows rather than attempt to preserve them.
 
 ### `api_keys`
 
@@ -1245,6 +1282,46 @@ Columns:
 - `ip_address inet null`
 - `user_agent text null`
 - `created_at timestamptz not null`
+
+Representative `event_type` values should include at minimum:
+
+```text
+login_succeeded
+login_failed
+logout_succeeded
+session_revoked
+refresh_token_replay_detected
+bootstrap_admin_recovery_armed
+bootstrap_admin_recovery_completed
+bootstrap_admin_recovery_cancelled
+bootstrap_admin_recovery_expired
+bootstrap_admin_recovery_invalidated
+sessions_revoked_after_recovery
+backup_export_started
+backup_export_completed
+backup_export_failed
+backup_delete_completed
+backup_delete_failed
+backup_download_completed
+backup_download_failed
+backup_restore_previewed
+backup_restore_started
+backup_restore_completed
+backup_restore_failed
+upgrade_preflight_passed
+upgrade_preflight_blocked
+upgrade_preflight_failed
+```
+
+Recovery audit rows should use structured `details` values that identify the recovery run and result without storing recovery codes, passwords, raw refresh tokens, or other secret material.
+
+Restore audit rows should use structured `details` values that identify the restore operation, chosen mode and scope, and normalized outcome without storing backup passwords, decrypted secret fields, or copied backup payload content.
+
+Control-plane audit rows should include the canonical persisted run identifier for the relevant operation family, such as `operationRunId` for backup preview or restore, recovery `runId` for bootstrap-admin recovery, or preflight `runId` for upgrade checks.
+
+Where practical, control-plane `details` values should use shared camelCase keys such as `operationRunId`, `runId`, `status`, `normalizedCode`, `warningCount`, and operation-specific keys like `backupRef`, `requestedScopes`, `requiresBackup`, or `blockingIssues`.
+
+Control-plane `event_type` values should use stable snake_case names with explicit operation-family prefixes so export, delete, download, restore, upgrade-preflight, and recovery events remain distinguishable in audit queries.
 
 ### `app_log`
 
@@ -1585,6 +1662,79 @@ Columns:
 - `error_class text null`
 - `error_message text null`
 - `created_at timestamptz not null`
+
+### `maintenance_locks`
+
+Explicit maintenance and exclusive-operation locks.
+
+Columns:
+
+- `id uuid primary key`
+- `lock_type text not null`
+- `status text not null`
+- `owner_instance_id text null`
+- `reason text null`
+- `acquired_by_user_id uuid null references app_users(id)`
+- `acquired_at timestamptz not null`
+- `expires_at timestamptz null`
+- `released_at timestamptz null`
+- `created_at timestamptz not null`
+
+Examples:
+
+```text
+restore
+upgrade
+admin_recovery
+```
+
+Rules:
+
+- Only one active lock of a given `lock_type` should exist at a time.
+- Recovery completion should refuse to run when conflicting active locks exist.
+
+### `admin_recovery_runs`
+
+Emergency bootstrap-admin recovery arming and completion state.
+
+Columns:
+
+- `id uuid primary key`
+- `status text not null`
+- `recovery_code_hash text not null`
+- `armed_via text not null`
+- `armed_at timestamptz not null`
+- `expires_at timestamptz not null`
+- `invalid_attempt_count integer not null default 0`
+- `max_attempts integer not null default 5`
+- `completed_at timestamptz null`
+- `cancelled_at timestamptz null`
+- `created_admin_user_id uuid null references app_users(id)`
+- `completed_from_ip inet null`
+- `completed_user_agent text null`
+- `details jsonb null`
+- `created_at timestamptz not null`
+
+Examples:
+
+```text
+status: armed, completed, expired, cancelled, invalidated
+armed_via: harmoniarrctl
+```
+
+Rules:
+
+- Never store the plaintext recovery code.
+- Only one active armed recovery run should exist at a time.
+- Expired or exhausted runs should remain for audit and incident review rather than being silently deleted.
+
+Suggested status meaning:
+
+- `armed` = active and completable
+- `completed` = successful terminal state
+- `cancelled` = operator-cancelled terminal state
+- `expired` = timed-out terminal state
+- `invalidated` = security-stopped terminal state, such as too many invalid attempts
 
 ## Metadata Tables
 
