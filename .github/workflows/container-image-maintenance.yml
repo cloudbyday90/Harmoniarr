@@ -1,0 +1,116 @@
+name: Container Image Maintenance
+
+on:
+  schedule:
+    - cron: '37 4 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Preview Docker Hub tag cleanup without deleting tags. GHCR cleanup is skipped during dry runs.
+        required: true
+        default: true
+        type: boolean
+      dockerhub_keep_tags:
+        description: Number of newest non-latest Docker Hub tags to keep.
+        required: true
+        default: '5'
+        type: string
+      ghcr_keep_untagged:
+        description: Number of newest untagged GHCR package versions to keep.
+        required: true
+        default: '10'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup-ghcr-untagged:
+    name: Clean Up GHCR Untagged Versions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Resolve image registries
+        id: registries
+        env:
+          HARMONIARR_DOCKERHUB_NAMESPACE: ${{ vars['DOCKERHUB_NAMESPACE'] }}
+          HARMONIARR_DOCKERHUB_REPOSITORY: ${{ vars['DOCKERHUB_REPOSITORY'] }}
+          HARMONIARR_ENABLE_DOCKERHUB: ${{ secrets['DOCKERHUB_USERNAME'] != '' && secrets['DOCKERHUB_TOKEN'] != '' }}
+          HARMONIARR_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          HARMONIARR_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: node scripts/write-image-registry-config.js
+
+      - name: Preview GHCR untagged cleanup
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        env:
+          HARMONIARR_SUMMARY_KEEP_COUNT: ${{ inputs.ghcr_keep_untagged }}
+          HARMONIARR_SUMMARY_PACKAGE_NAME: ${{ steps.registries.outputs.ghcr_package_name }}
+        run: node scripts/container-maintenance-summary.js ghcr-preview
+
+      - name: Delete stale GHCR untagged versions
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          owner: ${{ github.repository_owner }}
+          package-name: ${{ steps.registries.outputs.ghcr_package_name }}
+          package-type: container
+          min-versions-to-keep: ${{ github.event_name == 'workflow_dispatch' && inputs.ghcr_keep_untagged || '10' }}
+          delete-only-untagged-versions: 'true'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish GHCR cleanup summary
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        env:
+          HARMONIARR_SUMMARY_KEEP_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.ghcr_keep_untagged || '10' }}
+          HARMONIARR_SUMMARY_PACKAGE_NAME: ${{ steps.registries.outputs.ghcr_package_name }}
+        run: node scripts/container-maintenance-summary.js ghcr-active
+
+  cleanup-dockerhub:
+    name: Clean Up Docker Hub Tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Resolve image registries
+        id: registries
+        env:
+          HARMONIARR_DOCKERHUB_NAMESPACE: ${{ vars['DOCKERHUB_NAMESPACE'] }}
+          HARMONIARR_DOCKERHUB_REPOSITORY: ${{ vars['DOCKERHUB_REPOSITORY'] }}
+          HARMONIARR_ENABLE_DOCKERHUB: ${{ secrets['DOCKERHUB_USERNAME'] != '' && secrets['DOCKERHUB_TOKEN'] != '' }}
+          HARMONIARR_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          HARMONIARR_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: node scripts/write-image-registry-config.js
+
+      - name: Skip Docker Hub cleanup when credentials are not configured
+        if: ${{ steps.registries.outputs.dockerhub_enabled != 'true' }}
+        run: node scripts/container-maintenance-summary.js dockerhub-skip
+
+      - name: Delete outdated Docker Hub tags
+        if: ${{ steps.registries.outputs.dockerhub_enabled == 'true' }}
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets['DOCKERHUB_TOKEN'] }}
+          DOCKERHUB_USERNAME: ${{ secrets['DOCKERHUB_USERNAME'] }}
+          HARMONIARR_DOCKERHUB_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          HARMONIARR_DOCKERHUB_KEEP_TAGS: ${{ github.event_name == 'workflow_dispatch' && inputs.dockerhub_keep_tags || '5' }}
+          HARMONIARR_DOCKERHUB_NAMESPACE: ${{ steps.registries.outputs.dockerhub_namespace }}
+          HARMONIARR_DOCKERHUB_PROTECTED_TAGS: latest
+          HARMONIARR_DOCKERHUB_REPOSITORY: ${{ steps.registries.outputs.dockerhub_repository }}
+        run: node scripts/docker-hub-tag-maintenance.js

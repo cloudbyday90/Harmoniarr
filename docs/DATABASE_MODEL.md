@@ -239,6 +239,13 @@ Examples:
 
 This supports explainability without making every screen recompute from raw events.
 
+Current implementation note:
+
+- Canonical metadata monitoring now starts with `metadata_artist_monitoring`, a current-state table keyed to `metadata_artists`.
+- The implemented baseline stores `is_monitored` plus conservative `monitored_release_group_types` defaults of `album` and `ep`.
+- `wanted_items`, `missing_items`, and the older `managed_*` monitoring references in this document remain planning-only until wanted reconciliation is implemented against the canonical metadata model.
+- Discovery intent now also starts with `library_discovery_requests`, a current-state projection keyed to canonical metadata releases and rebuilt from `library_wanted_releases`.
+
 ## SQL Mutation Contracts
 
 This section defines the initial SQL statement patterns and database function contracts for creating, updating, and removing records.
@@ -1917,6 +1924,116 @@ Columns:
 - `fetched_at timestamptz not null`
 - `created_at timestamptz not null`
 
+### `artwork_assets`
+
+Filesystem-backed artwork asset inventory.
+
+Columns:
+
+- `id uuid primary key`
+- `storage_namespace text not null`
+- `relative_path text not null`
+- `sha256 text not null`
+- `mime_type text not null`
+- `file_size_bytes bigint not null`
+- `width integer null`
+- `height integer null`
+- `storage_class text not null`
+- `source_provider text null`
+- `source_url text null`
+- `payload_checksum text null`
+- `fetched_at timestamptz null`
+- `last_verified_at timestamptz null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+Unique:
+
+- `(storage_namespace, relative_path)`
+- `sha256`
+
+Notes:
+
+- Artwork binaries should live under app-owned storage such as `/app/data/artwork`; the database stores descriptors, provenance, and dedupe keys rather than image blobs.
+- `storage_class` distinguishes provider cache, extracted embedded art, imported folder extras, and generated derivatives.
+- `sha256` is sufficient for v1 dedupe and content-addressed storage; if future algorithm agility is needed, add an additional checksum field or a versioned storage namespace rather than weakening the current key.
+
+### `artwork_assignments`
+
+Assignment of artwork assets to metadata, import, and library entities.
+
+Columns:
+
+- `id uuid primary key`
+- `artwork_asset_id uuid not null references artwork_assets(id)`
+- `owner_type text not null`
+- `owner_id uuid not null`
+- `artwork_role text not null`
+- `source_provider text null`
+- `source_reference text null`
+- `is_preferred boolean not null default false`
+- `priority integer not null default 100`
+- `observed_at timestamptz null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+Unique:
+
+- `(owner_type, owner_id, artwork_role, artwork_asset_id)`
+
+Rules:
+
+- `owner_type` may point at entities such as `metadata_artist`, `metadata_release_group`, `metadata_release`, `library_file`, or `import_review_file`.
+- Only one preferred assignment should exist per `(owner_type, owner_id, artwork_role)`.
+- The same asset may be assigned to multiple owners when the image is intentionally reused.
+
+### `artwork_operation_runs`
+
+Background artwork worker run history.
+
+Columns:
+
+- `id uuid primary key`
+- `operation_type text not null`
+- `status text not null`
+- `artwork_asset_id uuid null references artwork_assets(id)`
+- `owner_type text null`
+- `owner_id uuid null`
+- `trigger_source text not null`
+- `started_at timestamptz not null`
+- `finished_at timestamptz null`
+- `summary jsonb null`
+- `error_message text null`
+- `created_at timestamptz not null`
+
+Operation types may include:
+
+```text
+refresh
+generate_derivative
+cleanup
+extract_embedded
+capture_folder_art
+```
+
+### `artwork_operation_events`
+
+Operator-facing event stream for artwork worker progress.
+
+Columns:
+
+- `id uuid primary key`
+- `artwork_operation_run_id uuid not null references artwork_operation_runs(id)`
+- `event_type text not null`
+- `message text not null`
+- `details jsonb null`
+- `created_at timestamptz not null`
+
+Rules:
+
+- `artwork_operation_runs.status` remains the canonical run outcome; event rows explain progress and intermediate decisions.
+- Cleanup of artwork-event history should follow explicit retention policy, not normal successful completion.
+
 ### `metadata_refresh_runs`
 
 Metadata refresh job history.
@@ -2090,30 +2207,160 @@ Columns:
 - `updated_at timestamptz not null`
 - `deleted_at timestamptz null`
 
-### `library_file_matches`
+Rules:
 
-Current mapping between files and managed tracks.
+- `tag_payload` is the current normalized tag summary for fast reads, not the canonical metadata source for artist, release, or track identity.
+- Embedded or sidecar artwork associated with a file should be represented through `artwork_assignments` in addition to any low-level tag summary.
+
+### `file_tag_snapshots`
+
+Observed extracted tags for persisted library files.
 
 Columns:
 
 - `id uuid primary key`
 - `library_file_id uuid not null references library_files(id)`
-- `managed_artist_id uuid null references managed_artists(id)`
-- `managed_album_id uuid null references managed_albums(id)`
-- `managed_track_id uuid null references managed_tracks(id)`
+- `extractor text not null`
+- `extractor_version text null`
+- `tag_format text null`
+- `status text not null`
+- `embedded_artwork_count integer null`
+- `raw_tags jsonb null`
+- `normalized_tags jsonb null`
+- `extracted_at timestamptz not null`
+- `created_at timestamptz not null`
+
+Rules:
+
+- Each row captures observed file claims at extraction time and should remain explainable even if later rescans produce a different result.
+- `normalized_tags` should be the app-owned read model used by matching and UI code; `raw_tags` remains bounded diagnostic evidence.
+- The current implemented baseline is intentionally scoped to `library_file_id`; import-review snapshots can extend this table or add a companion relation once the import-review file foundation exists in schema and code.
+
+### `library_file_matches`
+
+Current mapping between persisted library files and canonical metadata tracks.
+
+Columns:
+
+- `id uuid primary key`
+- `library_file_id uuid not null references library_files(id)`
+- `metadata_artist_id uuid null references metadata_artists(id)`
+- `metadata_release_group_id uuid null references metadata_release_groups(id)`
+- `metadata_release_id uuid null references metadata_releases(id)`
+- `metadata_medium_id uuid null references metadata_media(id)`
+- `metadata_track_id uuid null references metadata_tracks(id)`
+- `metadata_recording_id uuid null references metadata_recordings(id)`
 - `match_status text not null`
 - `confidence text not null`
-- `score numeric(6,2) null`
 - `matched_by text not null`
 - `evidence jsonb null`
+- `matched_at timestamptz not null`
 - `created_at timestamptz not null`
 - `updated_at timestamptz not null`
 
 Unique:
 
-- `(library_file_id, managed_track_id)` where `managed_track_id` is not null
+- `(library_file_id)`
+
+Rules:
+
+- The current implemented baseline prefers exact MusicBrainz recording tags first, then a single release-local title and track-position candidate before writing `matched`.
+- When more than one canonical candidate remains, the row must stay `ambiguous` with evidence instead of choosing a winner.
+- This table is a current-state projection; append-only scan and tag evidence still lives in `operation_runs` and `file_tag_snapshots`.
+
+### `library_release_reconciliations`
+
+Current release-level coverage projection derived from matched library files and canonical metadata tracks.
+
+Columns:
+
+- `id uuid primary key`
+- `metadata_artist_id uuid not null references metadata_artists(id)`
+- `metadata_release_group_id uuid not null references metadata_release_groups(id)`
+- `metadata_release_id uuid not null references metadata_releases(id)`
+- `reconciliation_status text not null`
+- `expected_track_count integer not null`
+- `matched_track_count integer not null`
+- `missing_track_count integer not null`
+- `matched_file_count integer not null`
+- `duplicate_track_count integer not null`
+- `evidence jsonb null`
+- `last_reconciled_at timestamptz not null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+Unique:
+
+- `(metadata_release_id)`
+
+Rules:
+
+- The current implemented baseline derives release coverage from current `library_file_matches` rows joined to non-deleted `library_files` rows.
+- `complete` means every expected canonical track currently has one matched file and no duplicate tracks were detected.
+- `partial` means at least one expected canonical track is still missing.
+- `duplicate` means one or more canonical tracks currently map to more than one matched library file.
+- This table is a current-state projection for release coverage; richer per-scan delta evidence still belongs in dedicated history tables rather than here.
 
 ## Missing And Wanted Tables
+
+### `library_wanted_releases`
+
+Current implemented release-level wanted projection derived from canonical monitoring and library coverage.
+
+Columns:
+
+- `id uuid primary key`
+- `metadata_artist_id uuid not null references metadata_artists(id)`
+- `metadata_release_group_id uuid not null references metadata_release_groups(id)`
+- `metadata_release_id uuid not null references metadata_releases(id)`
+- `wanted_status text not null`
+- `expected_track_count integer not null`
+- `matched_track_count integer not null`
+- `missing_track_count integer not null`
+- `release_date date null`
+- `release_status text null`
+- `evidence jsonb not null`
+- `last_reconciled_at timestamptz not null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+Rules:
+
+- This table is currently keyed to canonical metadata releases, not the older planning-only `managed_*` model.
+- The initial implementation only projects monitored album and EP releases whose current library coverage is `missing` or `partial`.
+- `complete` and `duplicate` library reconciliation states do not produce wanted rows in this first slice.
+- The projection is rebuilt from canonical metadata monitoring plus `library_release_reconciliations` and should be treated as current-state output, not durable event history.
+
+### `library_discovery_requests`
+
+Current implemented discovery-intent projection derived from `library_wanted_releases`.
+
+Columns:
+
+- `id uuid primary key`
+- `metadata_artist_id uuid not null references metadata_artists(id)`
+- `metadata_release_group_id uuid not null references metadata_release_groups(id)`
+- `metadata_release_id uuid not null references metadata_releases(id)`
+- `wanted_status text not null`
+- `search_mode text not null`
+- `request_status text not null`
+- `blocked_reason text null`
+- `release_date date null`
+- `last_search_at timestamptz null`
+- `next_search_after timestamptz null`
+- `manual_requested_at timestamptz null`
+- `evidence jsonb not null`
+- `last_evaluated_at timestamptz not null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+Rules:
+
+- This table is a current-state search-eligibility queue, not the final scheduler or search-history record.
+- Automatic requests are rebuilt from `library_wanted_releases` and gated by release date and cooldown state.
+- Manual requests bypass automatic blocking and remain the future override seam for operator-initiated search.
+- The current implementation surfaces `ready`, `cooldown`, and `blocked` states so later scheduler work can dispatch without re-deriving policy from raw metadata joins.
+- Search attempts now also mutate this table at runtime by updating `last_search_at`, `next_search_after`, and dispatch evidence after a ready automatic request is claimed for slskd search.
 
 ### `wanted_items`
 
@@ -2139,6 +2386,11 @@ Columns:
 - `created_at timestamptz not null`
 - `updated_at timestamptz not null`
 - `deleted_at timestamptz null`
+
+Implementation note:
+
+- `wanted_items` remains future work for broader acquisition intent, search cadence, and upgrade policy.
+- The currently implemented baseline is `library_wanted_releases`, which intentionally stays narrower and library-facing until the generic wanted model is ready.
 
 Wanted types:
 
@@ -2425,6 +2677,23 @@ Columns:
 
 ## Download And Transfer Tables
 
+### Current implemented import-candidate workflow note
+
+The current runtime also persists operator-reviewed import candidates in an `import_candidates` table with a guarded `status` workflow.
+
+Implemented statuses are:
+
+- `pending`
+- `held`
+- `rejected`
+- `selected`
+- `downloading`
+- `import_pending`
+- `applied`
+- `failed`
+
+`downloading` is the durable bridge between queue acceptance and terminal transfer reconciliation. `import_pending` indicates the download completed and the candidate is now waiting for the later import/apply slice.
+
 ### `download_jobs`
 
 Download request created from a selected candidate.
@@ -2555,19 +2824,55 @@ Columns:
 
 Applied move/copy/hardlink operations.
 
+Current implementation note:
+
+- This table now records durable apply-stage file outcomes for `import_pending` candidates, keyed by both apply run and candidate-file identity.
+- Guarded collision review can now also persist `skipped` outcomes when an operator saves a per-file skip decision instead of allowing any overwrite behavior.
+
 Columns:
 
 - `id uuid primary key`
-- `import_review_id uuid not null references import_reviews(id)`
+- `operation_run_id uuid not null references operation_runs(id)`
+- `import_candidate_id uuid not null references import_candidates(id)`
+- `import_candidate_file_id uuid not null references import_candidate_files(id)`
+- `position integer not null`
+- `step_type text not null`
 - `operation_type text not null`
+- `transport text null`
 - `source_path text not null`
 - `destination_path text not null`
 - `status text not null`
-- `started_at timestamptz null`
-- `finished_at timestamptz null`
+- `started_at timestamptz not null`
+- `finished_at timestamptz not null`
 - `error_message text null`
 - `created_at timestamptz not null`
 - `updated_at timestamptz not null`
+
+Notes:
+
+- Current runtime usage records one row per guarded apply step, so a candidate file may emit `stage` and `finalize` rows within the same apply run.
+- Current statuses are `applied`, `failed`, `not_attempted`, and `skipped`.
+- Current step types are `stage` and `finalize`.
+
+### `import_candidate_file_decisions`
+
+Current operator decisions for individual import-candidate files.
+
+Columns:
+
+- `id uuid primary key`
+- `import_candidate_id uuid not null references import_candidates(id)`
+- `import_candidate_file_id uuid not null references import_candidate_files(id)`
+- `decision_type text not null`
+- `reason text null`
+- `actor_user_id uuid null references app_users(id)`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+Notes:
+
+- Current runtime usage supports only the explicit `skip` decision type for library-target collisions discovered during apply preview.
+- The table stores current decision state, while append-only `import_candidate_events` and audit rows preserve operator evidence.
 
 ## Audio Identity And Quality Tables
 

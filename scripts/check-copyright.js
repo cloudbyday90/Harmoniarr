@@ -7,66 +7,44 @@
  * See LICENSE file for details.
  */
 
-import fs from 'node:fs';
-import { globSync } from 'glob';
+import { runDirectScriptTask } from './script-runtime.js';
+import {
+  checkCopyrightHeader,
+  listCopyrightManagedFiles,
+} from './copyright-maintenance.js';
 
-const START_YEAR = 2026;
-const CURRENT_YEAR = new Date().getFullYear();
-const EXPECTED_PATTERN = START_YEAR === CURRENT_YEAR ? `${START_YEAR}` : `${START_YEAR}-${CURRENT_YEAR}`;
-const OWNER = 'Harmoniarr Contributors';
-const COPYRIGHT_PATTERN = /Copyright \(C\) (\d{4}|\d{4}-\d{4}) (cloudbyday90|Harmoniarr Contributors)/g;
-
-const FILE_PATTERNS = [
-  'server/**/*.{js,jsx,ts,tsx}',
-  'client/src/**/*.{js,jsx,ts,tsx}',
-  'database/migrations/**/*.sql',
-  'scripts/**/*.js'
-];
-
-const IGNORE_PATTERNS = ['**/node_modules/**', '**/dist/**', '**/build/**', '**/coverage/**'];
-
-function checkFile(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const firstLines = content.split('\n').slice(0, 12).join('\n');
-
-  const match = firstLines.match(COPYRIGHT_PATTERN);
-  if (!match) {
-    return { valid: false, reason: 'No copyright header found' };
-  }
-
-  if (!firstLines.includes(EXPECTED_PATTERN)) {
-    return { valid: false, reason: `Expected ${EXPECTED_PATTERN}, found ${match[0]}` };
-  }
-
-  if (!firstLines.includes(OWNER)) {
-    return { valid: false, reason: `Expected owner "${OWNER}"` };
-  }
-
-  return { valid: true };
-}
-
-function main() {
-  const files = FILE_PATTERNS.flatMap(pattern =>
-    globSync(pattern, { nodir: true, ignore: IGNORE_PATTERNS })
-  );
+async function checkCopyrightCompliance() {
+  const files = listCopyrightManagedFiles();
   const errors = [];
 
-  files.forEach(file => {
-    const result = checkFile(file);
+  files.forEach((file) => {
+    const result = checkCopyrightHeader(file);
     if (!result.valid) {
       errors.push(`${file}: ${result.reason}`);
     }
   });
 
   if (errors.length > 0) {
-    console.error('\nCopyright compliance check FAILED\n');
-    console.error(`Found ${errors.length} file(s) with outdated/missing copyright headers:\n`);
-    errors.forEach(err => console.error(`  - ${err}`));
-    console.error('\nRun: npm run update-copyright\n');
-    process.exit(1);
+    throw new Error([
+      'Copyright compliance check FAILED',
+      '',
+      `Found ${errors.length} file(s) with outdated/missing copyright headers:`,
+      '',
+      ...errors.map((error) => `  - ${error}`),
+      '',
+      'Run: npm run update-copyright',
+    ].join('\n'));
   }
 
-  console.log(`Copyright compliance check PASSED (${files.length} files checked)`);
+  return {
+    checkedFileCount: files.length,
+  };
 }
 
-main();
+await runDirectScriptTask(import.meta, {
+  prefix: 'harmoniarr-check-copyright',
+  renderSuccessMessage: ({ checkedFileCount }) => {
+    return `Copyright compliance check passed (${checkedFileCount} files checked)`;
+  },
+  run: checkCopyrightCompliance,
+});

@@ -1,7 +1,7 @@
 # Harmoniarr Security Benchmarks
 
 - **Version:** Planning baseline
-- **Last Updated:** 2026-04-26
+- **Last Updated:** 2026-05-01
 - **Scope:** Harmoniarr API, UI, container, embedded Postgres, slskd integration, metadata providers, media import pipeline, and future optional services
 - **Source:** Adapted from Classifarr's `docs/SECURITY_BENCHMARKS.md`
 
@@ -43,6 +43,7 @@ Harmoniarr is still in planning, so most entries describe target controls rather
 | OWASP REST Security | Planned | Requires Express middleware implementation |
 | SANS/CWE Top 25 | Planned | Requires code and test gates |
 | Node.js Security | Planned | Requires package, lint, and runtime setup |
+| OpenSSF Supply Chain | Implemented baseline | SPDX SBOM, dependency snapshot submission, artifact attestations, GHCR release publication as the canonical trust boundary, optional Docker Hub digest-parity mirroring by default, optional ORAS-backed trusted-mirror promotion when explicitly enabled, and image-retention maintenance now exist in CI/docs |
 | NIST CSF | Planned | Requires security docs, release workflow, and incident process |
 
 ### High-Risk Areas For Harmoniarr
@@ -89,19 +90,20 @@ These controls are especially important because the app will manage untrusted do
 |---------|-------------------|--------|
 | Use trusted base image | Use official Node 24 Alpine image, pinned to stable Alpine branch | Planned |
 | Minimize packages | Install only runtime dependencies: Node, Postgres runtime, media tools, health tooling | Planned |
-| Non-root app process | Support `PUID`, `PGID`, `UMASK`; drop privileges before Node runs | Planned |
+| Non-root app process | Run as a non-root image user by default; allow Compose-level `PUID` and `PGID` selection via `user:` instead of runtime privilege dropping | Implemented baseline |
+| Dependency and base-image update automation | Use Dependabot to raise reviewable update PRs for npm, Dockerfile bases, Compose image tags, and pinned GitHub Actions | Implemented baseline |
 | Remove setuid/setgid where practical | Strip setuid/setgid bits unless required by runtime tooling | Planned |
 | Healthcheck | Provide `/health` and Docker `HEALTHCHECK` | Planned |
-| Vulnerability scanning | Add npm audit, OSV, Trivy, and secret scanning in CI | Planned |
+| Vulnerability scanning | Run npm audit, OSV, Trivy config scanning, and secret scanning in CI | Implemented baseline |
 
 ### Runtime Targets
 
 | Control | Harmoniarr Target | Status |
 |---------|-------------------|--------|
 | No privileged container | Compose must not use `privileged: true` | Planned |
-| Drop capabilities | Drop all capabilities by default; add only those required for file ownership setup | Planned |
-| `no-new-privileges` | Enable where compatible with startup model | Planned |
-| Read-only root filesystem | Preferred; writable paths via volumes/tmpfs if compatible with embedded Postgres | Planned |
+| Drop capabilities | Drop all capabilities by default; the default startup path must not require extra capabilities for ownership setup | Implemented baseline |
+| `no-new-privileges` | Enable on the default Compose path | Implemented baseline |
+| Read-only root filesystem | Enable `read_only: true` on the default Compose path and keep writable paths limited to explicit bind mounts and tmpfs | Implemented baseline |
 | Limit exposed ports | Expose only Harmoniarr HTTP port by default | Planned |
 | Avoid host networking | Use bridge/custom network by default | Planned |
 | Resource limits | Document memory, CPU, and PID limits | Planned |

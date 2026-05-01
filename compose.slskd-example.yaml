@@ -1,0 +1,57 @@
+# Harmoniarr + slskd example stack
+#
+# This example keeps the download path aligned at /data/downloads in both
+# containers. Adjust slskd-specific settings for the exact image version and
+# configuration model you run, but keep the shared download mount identical.
+
+name: harmoniarr-slskd
+
+services:
+  harmoniarr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: "${HARMONIARR_IMAGE:-ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta}"
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    depends_on:
+      - slskd
+    environment:
+      TZ: ${TZ:-UTC}
+      UMASK: ${UMASK:-0022}
+      APP_PORT: ${APP_PORT:-3000}
+      HARMONIARR_BASE_URL: ${HARMONIARR_BASE_URL:-}
+      HARMONIARR_CONTACT_URL: ${HARMONIARR_CONTACT_URL:-https://github.com/cloudbyday90/harmoniarr}
+      HARMONIARR_CONTACT_EMAIL: ${HARMONIARR_CONTACT_EMAIL:-}
+      HARMONIARR_LOG_LEVEL: ${HARMONIARR_LOG_LEVEL:-info}
+      SLSKD_BASE_URL: ${SLSKD_BASE_URL:-http://slskd:5030}
+    ports:
+      - "${HARMONIARR_PORT:-47956}:${APP_PORT:-3000}"
+    volumes:
+      - "${HARMONIARR_APPDATA:-/srv/harmoniarr}:/app/data"
+      - "${HARMONIARR_DOWNLOADS:-/srv/slskd/downloads}:/data/downloads"
+      - "${HARMONIARR_MUSIC:-/srv/media/music}:/data/music"
+      - "${HARMONIARR_STAGING:-/srv/harmoniarr/staging}:/data/staging"
+      - "${HARMONIARR_TRANSCODE_TEMP:-/srv/harmoniarr/transcode-temp}:/data/transcode-temp"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /run/postgresql:size=32m,mode=0770,uid=${PUID:-1000},gid=${PGID:-1000}
+
+  slskd:
+    image: slskd/slskd:0.25.1
+    restart: unless-stopped
+    ports:
+      - "${SLSKD_WEB_PORT:-5030}:5030"
+    volumes:
+      - "${SLSKD_APPDATA:-/srv/slskd/config}:/app"
+      - "${HARMONIARR_DOWNLOADS:-/srv/slskd/downloads}:/data/downloads"
+
+# Keep /data/downloads the same in both containers.
+# Harmoniarr should read completed downloads from /data/downloads/completed.

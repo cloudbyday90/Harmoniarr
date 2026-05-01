@@ -1,0 +1,46 @@
+# Harmoniarr Docker Compose baseline
+#
+# This is the planned default deployment shape for v1.
+# The Docker build scaffold now boots a minimal Vue plus Express runtime
+# with embedded PostgreSQL and tracked startup migrations, but it is still
+# an early bootstrap slice rather than a supported application stack.
+
+name: harmoniarr
+
+services:
+  harmoniarr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: "${HARMONIARR_IMAGE:-ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta}"
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    environment:
+      TZ: ${TZ:-UTC}
+      UMASK: ${UMASK:-0022}
+      APP_PORT: ${APP_PORT:-3000}
+      HARMONIARR_BASE_URL: ${HARMONIARR_BASE_URL:-}
+      HARMONIARR_CONTACT_URL: ${HARMONIARR_CONTACT_URL:-https://github.com/cloudbyday90/harmoniarr}
+      HARMONIARR_CONTACT_EMAIL: ${HARMONIARR_CONTACT_EMAIL:-}
+      HARMONIARR_LOG_LEVEL: ${HARMONIARR_LOG_LEVEL:-info}
+    ports:
+      - "${HARMONIARR_PORT:-47956}:${APP_PORT:-3000}"
+    volumes:
+      - "${HARMONIARR_APPDATA:-/srv/harmoniarr}:/app/data"
+      - "${HARMONIARR_DOWNLOADS:-/srv/slskd/downloads}:/data/downloads"
+      - "${HARMONIARR_MUSIC:-/srv/media/music}:/data/music"
+      - "${HARMONIARR_STAGING:-/srv/harmoniarr/staging}:/data/staging"
+      - "${HARMONIARR_TRANSCODE_TEMP:-/srv/harmoniarr/transcode-temp}:/data/transcode-temp"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /run/postgresql:size=32m,mode=0770,uid=${PUID:-1000},gid=${PGID:-1000}
+
+# Embedded Postgres stays inside the Harmoniarr container.
+# Do not publish 5432 in the default deployment.

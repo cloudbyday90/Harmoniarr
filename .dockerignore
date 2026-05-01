@@ -1,0 +1,11 @@
+.external
+.git
+.github
+coverage
+dist
+docs
+node_modules
+.env
+.env.*
+*.log
+release.md

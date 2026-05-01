@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+
+import {
+  renderPublishedImageVerificationSummaryLines,
+  renderReleaseContractVerificationSummaryLines,
+  renderReleaseImageSummaryLines,
+  writeReleaseWorkflowSummary,
+} from '../../scripts/release-workflow-summary.js';
+
+test('renderReleaseImageSummaryLines formats release assets and tags', () => {
+  assert.deepEqual(renderReleaseImageSummaryLines({
+    composeAssetName: 'harmoniarr-release-compose.override.yaml',
+    dockerHubImageName: 'cloudbyday90/harmoniarr',
+    imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+    metadataAssetName: 'harmoniarr-release-metadata.json',
+    releaseTag: 'v0.1.0-beta',
+    sbomAssetName: 'harmoniarr-release.spdx.json',
+    tags: ['ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta', 'cloudbyday90/harmoniarr:0.1.0-beta'],
+    verificationAssetName: 'harmoniarr-release-verification.txt',
+  }), [
+    '## Release Image',
+    '',
+    '- Release tag: v0.1.0-beta',
+    '- Immutable image reference: ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+    '- Docker Hub mirror: cloudbyday90/harmoniarr',
+    '- Tags:',
+    '- ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta\n- cloudbyday90/harmoniarr:0.1.0-beta',
+    '- SBOM artifact: harmoniarr-release.spdx.json',
+    '- Compose override: harmoniarr-release-compose.override.yaml',
+    '- Verification note: harmoniarr-release-verification.txt',
+    '- Release manifest: harmoniarr-release-metadata.json',
+    '',
+  ]);
+});
+
+test('renderPublishedImageVerificationSummaryLines formats the smoke summary', () => {
+  assert.deepEqual(renderPublishedImageVerificationSummaryLines({
+    imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+  }), [
+    '## Published Image Verification',
+    '',
+    '- Verified image: ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+    '- Smoke contract: fresh install bootstrap plus existing-data restart',
+    '',
+  ]);
+});
+
+test('renderReleaseContractVerificationSummaryLines formats the contract summary', () => {
+  assert.deepEqual(renderReleaseContractVerificationSummaryLines({
+    attestationVerificationStatus: 'passed',
+    dockerHubMirrorStatus: 'passed',
+    releaseTag: 'v0.1.0-beta',
+    trustedMirrorProbeStatus: 'passed via v1.1-referrers-api',
+    trustedMirrorReferrerStatus: 'passed',
+  }), [
+    '## Release Contract Verification',
+    '',
+    '- Release tag: v0.1.0-beta',
+    '- Release manifest checked against GitHub release assets',
+    '- Compose override asset checked against the immutable image reference',
+    '- Docker Hub mirror verification: passed',
+    '- Docker Hub trusted mirror capability probe: passed via v1.1-referrers-api',
+    '- Docker Hub trusted mirror referrer verification: passed',
+    '- Image attestation verification: passed',
+    '',
+  ]);
+});
+
+test('writeReleaseWorkflowSummary accepts CLI overrides for publish-image summaries', async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), 'harmoniarr-release-summary-'));
+  const summaryPath = join(tempDirectory, 'summary.md');
+
+  try {
+    await writeReleaseWorkflowSummary('publish-image', {
+      args: [
+        'publish-image',
+        '--summary-path', summaryPath,
+        '--compose-asset-name', 'harmoniarr-release-compose.override.yaml',
+        '--dockerhub-image-name', 'cloudbyday90/harmoniarr',
+        '--image-ref', 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+        '--metadata-asset-name', 'harmoniarr-release-metadata.json',
+        '--release-tag', 'v0.1.0-beta',
+        '--sbom-asset-name', 'harmoniarr-release.spdx.json',
+        '--tag', 'ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta',
+        '--tag', 'cloudbyday90/harmoniarr:0.1.0-beta',
+        '--verification-asset-name', 'harmoniarr-release-verification.txt',
+      ],
+      env: {},
+    });
+
+    const summary = await readFile(summaryPath, 'utf8');
+    assert.match(summary, /## Release Image/);
+    assert.match(summary, /Docker Hub mirror: cloudbyday90\/harmoniarr/);
+    assert.match(summary, /Release manifest: harmoniarr-release-metadata.json/);
+  } finally {
+    await rm(tempDirectory, { force: true, recursive: true });
+  }
+});

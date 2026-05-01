@@ -1,0 +1,574 @@
+<!--
+  Harmoniarr - Soulseek-native music library management
+  Copyright (C) 2026 Harmoniarr Contributors
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<script setup>
+const props = defineProps({
+  actionError: {
+    type: String,
+    default: '',
+  },
+  actionReason: {
+    type: String,
+    default: '',
+  },
+  applyPreview: {
+    type: Object,
+    default: null,
+  },
+  applyPreviewError: {
+    type: String,
+    default: '',
+  },
+  fileDecisionError: {
+    type: String,
+    default: '',
+  },
+  candidate: {
+    type: Object,
+    default: null,
+  },
+  detailError: {
+    type: String,
+    default: '',
+  },
+  isLoadingCandidate: {
+    type: Boolean,
+    default: false,
+  },
+  isLoadingApplyPreview: {
+    type: Boolean,
+    default: false,
+  },
+  isLoadingPreview: {
+    type: Boolean,
+    default: false,
+  },
+  isUpdatingFileDecision: {
+    type: Boolean,
+    default: false,
+  },
+  isTransitionPending: {
+    type: Boolean,
+    default: false,
+  },
+  pendingFileDecisionId: {
+    type: String,
+    default: '',
+  },
+  preview: {
+    type: Object,
+    default: null,
+  },
+  previewError: {
+    type: String,
+    default: '',
+  },
+});
+
+const emit = defineEmits([
+  'hold',
+  'reject',
+  'reopen',
+  'clear-file-decision',
+  'select',
+  'skip-file',
+  'update:action-reason',
+]);
+
+function updateActionReason(event) {
+  emit('update:action-reason', event.target.value);
+}
+
+function canHold(candidate) {
+  return candidate?.status === 'pending';
+}
+
+function canSelect(candidate) {
+  return candidate?.status === 'pending' || candidate?.status === 'held';
+}
+
+function canReject(candidate) {
+  return candidate?.status === 'pending'
+    || candidate?.status === 'held'
+    || candidate?.status === 'selected';
+}
+
+function canReopen(candidate) {
+  return candidate?.status === 'held'
+    || candidate?.status === 'rejected'
+    || candidate?.status === 'failed'
+    || candidate?.status === 'selected';
+}
+
+function formatBytes(value) {
+  if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
+    return 'Unknown size';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = value;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatTimestamp(value) {
+  if (!value) {
+    return 'Unknown';
+  }
+
+  const timestamp = new Date(value);
+  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
+}
+
+function statusLabel(status) {
+  switch (status) {
+    case 'held':
+      return 'Held';
+    case 'rejected':
+      return 'Rejected';
+    case 'selected':
+      return 'Selected';
+    case 'downloading':
+      return 'Downloading';
+    case 'import_pending':
+      return 'Import pending';
+    case 'applied':
+      return 'Applied';
+    case 'failed':
+      return 'Failed';
+    default:
+      return 'Pending';
+  }
+}
+
+function formatDuration(value) {
+  if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
+    return 'Unknown';
+  }
+
+  const minutes = Math.floor(value / 60);
+  const seconds = String(value % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+function formatPath(value) {
+  return value || 'Unavailable';
+}
+
+function formatTokenLabel(value) {
+  return String(value || 'unknown').replaceAll(/[_-]+/g, ' ');
+}
+
+function applyFileStatusClass(code) {
+  switch (code) {
+    case 'blocked':
+    case 'collision':
+      return 'review-status-failed';
+    case 'skipped':
+      return 'review-status-held';
+    default:
+      return 'review-status-import_pending';
+  }
+}
+
+function applyFileStatusLabel(code) {
+  switch (code) {
+    case 'blocked':
+      return 'Missing source';
+    case 'collision':
+      return 'Collision';
+    case 'skipped':
+      return 'Skipped';
+    default:
+      return 'Ready';
+  }
+}
+
+function canSkipApplyFile(filePreview) {
+  return filePreview?.status?.code === 'collision';
+}
+
+function canClearApplyFileDecision(filePreview) {
+  return filePreview?.decision?.decisionType === 'skip';
+}
+
+function fileDecisionButtonLabel(filePreview) {
+  if (props.isUpdatingFileDecision && props.pendingFileDecisionId === filePreview?.fileId) {
+    return 'Saving...';
+  }
+
+  return canClearApplyFileDecision(filePreview) ? 'Clear skip' : 'Skip file';
+}
+</script>
+
+<template>
+  <article class="panel-light review-panel">
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Candidate detail</p>
+        <h3>Review state and files</h3>
+      </div>
+      <span
+        v-if="candidate"
+        class="review-status-pill"
+        :class="`review-status-${candidate.status}`"
+      >
+        {{ statusLabel(candidate.status) }}
+      </span>
+    </div>
+
+    <article class="panel-light error-panel" v-if="detailError">
+      <h3>Candidate detail unavailable</h3>
+      <p>{{ detailError }}</p>
+    </article>
+
+    <article class="panel-light review-empty-state" v-else-if="isLoadingCandidate && !candidate">
+      <h3>Loading candidate detail</h3>
+      <p>Resolving the stored file list and candidate metadata.</p>
+    </article>
+
+    <article class="panel-light review-empty-state" v-else-if="!candidate">
+      <h3>Select a candidate</h3>
+      <p>Choose a persisted import candidate to inspect its files and review actions.</p>
+    </article>
+
+    <template v-else>
+      <div class="review-detail-header">
+        <div>
+          <p class="eyebrow">{{ candidate.username }}</p>
+          <h3>{{ candidate.folderPath || 'Root-level files' }}</h3>
+          <p class="metadata-card-copy">{{ candidate.sourceProvider }} search {{ candidate.sourceSearchId || 'unknown' }}</p>
+        </div>
+      </div>
+
+      <dl class="review-meta-grid review-meta-grid-wide">
+        <div>
+          <dt>Files</dt>
+          <dd>{{ candidate.fileCount }}</dd>
+        </div>
+        <div>
+          <dt>Locked files</dt>
+          <dd>{{ candidate.lockedFileCount }}</dd>
+        </div>
+        <div>
+          <dt>Total size</dt>
+          <dd>{{ formatBytes(candidate.totalSizeBytes) }}</dd>
+        </div>
+        <div>
+          <dt>Discovered</dt>
+          <dd>{{ formatTimestamp(candidate.discoveredAt) }}</dd>
+        </div>
+      </dl>
+
+      <article class="review-action-panel">
+        <label>
+          Review note
+          <textarea
+            rows="3"
+            :value="actionReason"
+            placeholder="Capture why the candidate is being held, selected, rejected, or reopened"
+            @input="updateActionReason"
+          />
+        </label>
+
+        <div class="review-action-row">
+          <button
+            v-if="canSelect(candidate)"
+            type="button"
+            :disabled="isTransitionPending"
+            @click="$emit('select')"
+          >
+            {{ isTransitionPending ? 'Saving...' : 'Select' }}
+          </button>
+          <button
+            v-if="canHold(candidate)"
+            type="button"
+            class="secondary-button"
+            :disabled="isTransitionPending"
+            @click="$emit('hold')"
+          >
+            {{ isTransitionPending ? 'Saving...' : 'Hold' }}
+          </button>
+          <button
+            v-if="canReject(candidate)"
+            type="button"
+            class="danger-button"
+            :disabled="isTransitionPending"
+            @click="$emit('reject')"
+          >
+            {{ isTransitionPending ? 'Saving...' : 'Reject' }}
+          </button>
+          <button
+            v-if="canReopen(candidate)"
+            type="button"
+            :disabled="isTransitionPending"
+            @click="$emit('reopen')"
+          >
+            {{ isTransitionPending ? 'Saving...' : 'Reopen' }}
+          </button>
+        </div>
+
+        <p class="error-copy" v-if="actionError">{{ actionError }}</p>
+      </article>
+
+      <article class="panel-light review-preview-panel">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Planning preview</p>
+            <h3>Path, staging, and naming</h3>
+          </div>
+        </div>
+
+        <article class="panel-light review-empty-state" v-if="isLoadingPreview && !preview">
+          <h3>Loading preview</h3>
+          <p>Resolving source, staging, and library preview paths from the current candidate and path settings.</p>
+        </article>
+
+        <article class="panel-light error-panel" v-else-if="previewError">
+          <h3>Preview unavailable</h3>
+          <p>{{ previewError }}</p>
+        </article>
+
+        <template v-else-if="preview">
+          <div class="review-warning-stack" v-if="preview.validation.warnings?.length || preview.validation.blockers?.length">
+            <article class="review-warning-card" v-for="warning in preview.validation.warnings || []" :key="warning.code">
+              <p>Warning</p>
+              <strong>{{ warning.message }}</strong>
+            </article>
+            <article class="review-warning-card is-blocker" v-for="blocker in preview.validation.blockers || []" :key="blocker.code">
+              <p>Blocker</p>
+              <strong>{{ blocker.message }}</strong>
+            </article>
+          </div>
+
+          <div class="metadata-card-grid review-preview-grid">
+            <article class="path-card">
+              <p>slskd source</p>
+              <strong>{{ formatPath(preview.source.sourceFolderPath) }}</strong>
+              <span>{{ formatTokenLabel(preview.source.resolutionStrategy) }}</span>
+            </article>
+            <article class="path-card">
+              <p>Translated local folder</p>
+              <strong>{{ formatPath(preview.source.resolvedFolderPath) }}</strong>
+              <span v-if="preview.source.mapping">{{ preview.source.mapping.slskdPrefix }} -> {{ preview.source.mapping.harmoniarrPrefix }}</span>
+              <span v-else>{{ formatPath(preview.source.downloadsRoot) }}</span>
+            </article>
+            <article class="path-card">
+              <p>Staging target</p>
+              <strong>{{ formatPath(preview.staging.previewFolderPath) }}</strong>
+              <span>Root {{ formatPath(preview.staging.root) }}</span>
+            </article>
+            <article class="path-card">
+              <p>Library preview</p>
+              <strong>{{ formatPath(preview.library.previewFolderPath) }}</strong>
+              <span>{{ formatTokenLabel(preview.library.rootFolderPolicy) }}</span>
+            </article>
+          </div>
+
+          <div class="review-preview-file-list" v-if="preview.naming.filePreviews?.length">
+            <article class="review-preview-file-item" v-for="filePreview in preview.naming.filePreviews" :key="filePreview.fileId">
+              <div class="review-file-header">
+                <div>
+                  <strong>{{ filePreview.filename }}</strong>
+                  <p class="metadata-card-copy">{{ formatTokenLabel(preview.naming.strategy) }}</p>
+                </div>
+              </div>
+
+              <dl class="review-meta-grid review-meta-grid-wide">
+                <div>
+                  <dt>Raw source</dt>
+                  <dd>{{ formatPath(filePreview.rawSourcePath) }}</dd>
+                </div>
+                <div>
+                  <dt>Source file</dt>
+                  <dd>{{ formatPath(filePreview.sourcePath) }}</dd>
+                </div>
+                <div>
+                  <dt>Staging file</dt>
+                  <dd>{{ formatPath(filePreview.stagingPath) }}</dd>
+                </div>
+                <div>
+                  <dt>Library file</dt>
+                  <dd>{{ formatPath(filePreview.libraryPath) }}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+          <article class="panel-light review-empty-state" v-else>
+            <h3>No preview file rows</h3>
+            <p>The selected candidate does not currently expose previewable file rows.</p>
+          </article>
+        </template>
+
+        <article class="panel-light review-empty-state" v-else>
+          <h3>Preview not loaded</h3>
+          <p>Select a candidate to resolve source, staging, and library preview paths.</p>
+        </article>
+      </article>
+
+      <article class="panel-light review-preview-panel" v-if="candidate.status === 'import_pending'">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Import apply preview</p>
+            <h3>Filesystem safety and collisions</h3>
+          </div>
+        </div>
+
+        <article class="panel-light review-empty-state" v-if="isLoadingApplyPreview && !applyPreview">
+          <h3>Loading apply preview</h3>
+          <p>Checking source availability, staging presence, and library collisions for import-ready files.</p>
+        </article>
+
+        <article class="panel-light error-panel" v-else-if="applyPreviewError">
+          <h3>Apply preview unavailable</h3>
+          <p>{{ applyPreviewError }}</p>
+        </article>
+
+        <template v-else-if="applyPreview">
+          <p class="review-summary-copy">{{ applyPreview.summary?.message }}</p>
+          <p class="error-copy" v-if="fileDecisionError">{{ fileDecisionError }}</p>
+
+          <div class="pill-row" v-if="applyPreview.counts">
+            <div class="pill">
+              <span>Files</span>
+              <strong>{{ applyPreview.counts.totalFiles }}</strong>
+            </div>
+            <div class="pill">
+              <span>Ready</span>
+              <strong>{{ applyPreview.counts.readyCount }}</strong>
+            </div>
+            <div class="pill">
+              <span>Collisions</span>
+              <strong>{{ applyPreview.counts.collisionCount }}</strong>
+            </div>
+            <div class="pill">
+              <span>Skipped</span>
+              <strong>{{ applyPreview.counts.skippedCount || 0 }}</strong>
+            </div>
+            <div class="pill">
+              <span>Missing source</span>
+              <strong>{{ applyPreview.counts.missingSourceCount }}</strong>
+            </div>
+          </div>
+
+          <div class="review-preview-file-list" v-if="applyPreview.files?.length">
+            <article class="review-preview-file-item" v-for="filePreview in applyPreview.files" :key="filePreview.fileId || filePreview.filename">
+              <div class="review-file-header">
+                <div>
+                  <strong>{{ filePreview.filename }}</strong>
+                  <p class="metadata-card-copy">{{ filePreview.status.message }}</p>
+                </div>
+                <span class="review-status-pill" :class="applyFileStatusClass(filePreview.status.code)">
+                  {{ applyFileStatusLabel(filePreview.status.code) }}
+                </span>
+              </div>
+
+              <p class="review-summary-copy" v-if="filePreview.decision?.decisionType === 'skip'">
+                Saved decision: skip{{ filePreview.decision.reason ? ` - ${filePreview.decision.reason}` : '' }}
+              </p>
+
+              <dl class="review-meta-grid review-meta-grid-wide">
+                <div>
+                  <dt>Source file</dt>
+                  <dd>{{ formatPath(filePreview.sourceFile?.path) }}</dd>
+                </div>
+                <div>
+                  <dt>Staging file</dt>
+                  <dd>{{ formatPath(filePreview.stagingTarget?.path) }}</dd>
+                </div>
+                <div>
+                  <dt>Library target</dt>
+                  <dd>{{ formatPath(filePreview.libraryTarget?.path) }}</dd>
+                </div>
+                <div>
+                  <dt>Target exists</dt>
+                  <dd>{{ filePreview.libraryTarget?.exists ? 'Yes' : 'No' }}</dd>
+                </div>
+              </dl>
+
+              <div class="review-file-actions" v-if="canSkipApplyFile(filePreview) || canClearApplyFileDecision(filePreview)">
+                <button
+                  v-if="canSkipApplyFile(filePreview)"
+                  type="button"
+                  class="secondary-button"
+                  :disabled="isUpdatingFileDecision || isTransitionPending"
+                  @click="$emit('skip-file', filePreview.fileId)"
+                >
+                  {{ fileDecisionButtonLabel(filePreview) }}
+                </button>
+                <button
+                  v-if="canClearApplyFileDecision(filePreview)"
+                  type="button"
+                  :disabled="isUpdatingFileDecision || isTransitionPending"
+                  @click="$emit('clear-file-decision', filePreview.fileId)"
+                >
+                  {{ fileDecisionButtonLabel(filePreview) }}
+                </button>
+              </div>
+            </article>
+          </div>
+          <article class="panel-light review-empty-state" v-else>
+            <h3>No apply preview file rows</h3>
+            <p>The selected import-pending candidate does not currently expose previewable apply rows.</p>
+          </article>
+        </template>
+      </article>
+
+      <div class="review-file-list" v-if="candidate.files?.length">
+        <article class="review-file-item" v-for="file in candidate.files" :key="file.id">
+          <div class="review-file-header">
+            <div>
+              <strong>{{ file.filename }}</strong>
+              <p class="metadata-card-copy">{{ file.folderPath || candidate.folderPath || 'Root-level file' }}</p>
+            </div>
+            <span class="review-file-lock" v-if="file.isLocked">Locked</span>
+          </div>
+
+          <dl class="review-meta-grid review-file-meta-grid">
+            <div>
+              <dt>Format</dt>
+              <dd>{{ file.extension || 'Unknown' }}</dd>
+            </div>
+            <div>
+              <dt>Size</dt>
+              <dd>{{ formatBytes(file.sizeBytes) }}</dd>
+            </div>
+            <div>
+              <dt>Length</dt>
+              <dd>{{ formatDuration(file.lengthSeconds) }}</dd>
+            </div>
+            <div>
+              <dt>Bitrate</dt>
+              <dd>{{ file.bitRateKbps ? `${file.bitRateKbps} kbps` : 'Unknown' }}</dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+      <article class="panel-light review-empty-state" v-else>
+        <h3>No file rows are stored yet</h3>
+        <p>The selected candidate exists, but its persisted file list is currently empty.</p>
+      </article>
+    </template>
+  </article>
+</template>

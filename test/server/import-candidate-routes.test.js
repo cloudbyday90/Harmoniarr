@@ -1,0 +1,1279 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { registerImportCandidateRoutes } from '../../src/server/routes/import-candidate-routes.js';
+import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
+
+function createImportCandidateRouteTestApp(overrides = {}) {
+  return createJsonTestApp((app) => {
+    registerImportCandidateRoutes(app, {
+      buildImportCandidateApplySummary: async () => ({
+        activeRun: null,
+        checkedAt: '2026-04-30T21:00:00.000Z',
+        currentRun: null,
+        latestRun: null,
+        summary: {
+          status: 'not_started',
+          message: 'No import apply run has been recorded yet.',
+        },
+      }),
+      buildImportCandidateExecutionSummary: async () => ({
+        activeRun: null,
+        checkedAt: '2026-04-30T20:30:00.000Z',
+        currentRun: null,
+        latestRun: null,
+        summary: {
+          status: 'not_started',
+          message: 'No import execution planning run has been recorded yet.',
+        },
+      }),
+      buildImportPendingCandidateSummary: async () => ({
+        checkedAt: '2026-04-30T20:45:00.000Z',
+        counts: {
+          blocked: 0,
+          ready: 1,
+          readyWithWarnings: 0,
+          totalImportPending: 1,
+        },
+        importPendingCandidates: [{
+          id: 'candidate-1',
+          username: 'source-user',
+          folderPath: 'Autechre\\Amber',
+          importPendingAt: '2026-04-30T20:40:00.000Z',
+          importStatus: {
+            code: 'ready',
+            message: 'Completed download paths are resolved and ready for import review.',
+          },
+          planning: {
+            blockerCount: 0,
+            canPreview: true,
+            libraryFolderPath: '/data/music/Autechre/Amber',
+            primaryBlocker: null,
+            primaryWarning: null,
+            resolutionStrategy: 'downloads_root_relative',
+            sourceFolderPath: '/data/downloads/Autechre/Amber',
+            stagingFolderPath: '/data/staging/import-candidates/candidate-1/Autechre/Amber',
+            warningCount: 0,
+          },
+          sourceProvider: 'slskd',
+          sourceSearchId: 'search-1',
+          fileCount: 1,
+          lockedFileCount: 0,
+          totalSizeBytes: 1024,
+        }],
+        pagination: {
+          limit: 25,
+          offset: 0,
+          total: 1,
+        },
+        summary: {
+          status: 'ready',
+          message: '1 completed download candidate is ready for import review.',
+        },
+      }),
+      buildSelectedImportCandidateSummary: async () => ({
+        checkedAt: '2026-04-30T20:00:00.000Z',
+        counts: {
+          blocked: 0,
+          ready: 1,
+          readyWithWarnings: 0,
+          totalSelected: 1,
+        },
+        pagination: {
+          limit: 25,
+          offset: 0,
+          total: 1,
+        },
+        selectedCandidates: [{
+          id: 'candidate-1',
+          username: 'source-user',
+          folderPath: 'Autechre\\Amber',
+          executionStatus: {
+            code: 'ready',
+            message: 'Planning data is resolved and ready for the next execution slice.',
+          },
+          planning: {
+            blockerCount: 0,
+            canPreview: true,
+            libraryFolderPath: '/data/music/Autechre/Amber',
+            primaryBlocker: null,
+            primaryWarning: null,
+            resolutionStrategy: 'downloads_root_relative',
+            sourceFolderPath: '/data/downloads/Autechre/Amber',
+            stagingFolderPath: '/data/staging/import-candidates/candidate-1/Autechre/Amber',
+            warningCount: 0,
+          },
+          selectedAt: '2026-04-30T20:00:00.000Z',
+          sourceProvider: 'slskd',
+          sourceSearchId: 'search-1',
+          fileCount: 1,
+          lockedFileCount: 0,
+          totalSizeBytes: 1024,
+        }],
+        summary: {
+          status: 'ready',
+          message: '1 selected candidate is ready for the next execution slice.',
+        },
+      }),
+      getRequestMetadata: (request) => ({
+        ipAddress: request.headers['x-forwarded-for'] ?? '127.0.0.1',
+        userAgent: request.headers['user-agent'] ?? null,
+      }),
+      getImportCandidate: async ({ importCandidateId }) => ({
+        id: importCandidateId,
+        username: 'source-user',
+        folderPath: 'Autechre\\Amber',
+        status: 'pending',
+        files: [{
+          id: 'file-1',
+          filename: '01 Foil.flac',
+        }],
+      }),
+      holdImportCandidate: async ({ importCandidateId, actorUserId, reason, requestMetadata }) => ({
+        candidate: {
+          id: importCandidateId,
+          status: 'held',
+        },
+        event: {
+          eventType: 'import_candidate_held',
+          previousStatus: 'pending',
+          newStatus: 'held',
+          reason,
+        },
+        source: {
+          actorUserId,
+          requestMetadata,
+        },
+      }),
+      ingestSlskdSearchResponses: async ({ searchId, actorUserId, requestMetadata }) => ({
+        sourceProvider: 'slskd',
+        sourceSearchId: searchId,
+        candidateCount: 1,
+        fileCount: 1,
+        source: {
+          actorUserId,
+          requestMetadata,
+        },
+        candidates: [{
+          id: 'candidate-1',
+          username: 'source-user',
+          folderPath: 'Autechre\\Amber',
+          status: 'pending',
+          fileCount: 1,
+          files: [{
+            id: 'file-1',
+            filename: '01 Foil.flac',
+          }],
+        }],
+      }),
+      listImportCandidates: async ({ folderPath, limit, offset, sourceSearchId, status, username }) => ({
+        candidates: [{
+          id: 'candidate-1',
+          username: 'source-user',
+          folderPath: 'Autechre\\Amber',
+          status: 'pending',
+        }],
+        filters: {
+          folderPath,
+          sourceSearchId,
+          status,
+          username,
+        },
+        pagination: {
+          limit,
+          offset,
+          total: 1,
+        },
+      }),
+      clearImportCandidateFileDecision: async ({ actorUserId, importCandidateFileId, importCandidateId, reason, requestMetadata }) => ({
+        candidate: {
+          id: importCandidateId,
+          status: 'import_pending',
+        },
+        clearedDecision: {
+          decisionType: 'skip',
+          importCandidateFileId,
+        },
+        file: {
+          id: importCandidateFileId,
+        },
+        source: {
+          actorUserId,
+          requestMetadata,
+          reason,
+        },
+      }),
+      previewImportCandidate: async ({ importCandidateId }) => ({
+        candidate: {
+          id: importCandidateId,
+          status: 'selected',
+          username: 'source-user',
+          folderPath: 'Autechre\\Amber',
+          fileCount: 1,
+        },
+        source: {
+          downloadsRoot: '/data/downloads',
+          rawFolderPath: 'Autechre\\Amber',
+          relativeFolderPath: 'Autechre/Amber',
+          resolutionStrategy: 'downloads_root_relative',
+          resolvedFolderPath: '/data/downloads/Autechre/Amber',
+        },
+        staging: {
+          root: '/data/staging',
+          previewFolderPath: '/data/staging/import-candidates/candidate-1/Autechre/Amber',
+        },
+        library: {
+          root: '/data/music',
+          rootFolderPolicy: 'single_root',
+          previewFolderPath: '/data/music/Autechre/Amber',
+        },
+        naming: {
+          strategy: 'mirror_candidate_path',
+          filePreviews: [{
+            fileId: 'file-1',
+            filename: '01 Foil.flac',
+            sourcePath: '/data/downloads/Autechre/Amber/01 Foil.flac',
+            stagingPath: '/data/staging/import-candidates/candidate-1/Autechre/Amber/01 Foil.flac',
+            libraryPath: '/data/music/Autechre/Amber/01 Foil.flac',
+          }],
+        },
+        validation: {
+          canPreview: true,
+          blockers: [],
+          warnings: [{
+            code: 'path_mapping_assumption',
+            message: 'Preview currently assumes Harmoniarr reads candidate paths from the configured downloads root until explicit slskd path mappings are added.',
+          }],
+        },
+      }),
+      previewImportCandidateApply: async ({ importCandidateId }) => ({
+        counts: {
+          collisionCount: 1,
+          missingSourceCount: 0,
+          readyCount: 0,
+          stagingPresentCount: 1,
+          totalFiles: 1,
+        },
+        files: [{
+          fileId: 'file-1',
+          filename: '01 Foil.flac',
+          libraryTarget: {
+            exists: true,
+            path: '/data/music/Autechre/Amber/01 Foil.flac',
+            type: 'file',
+          },
+          sourceFile: {
+            exists: true,
+            path: '/data/downloads/Autechre/Amber/01 Foil.flac',
+            type: 'file',
+          },
+          stagingTarget: {
+            exists: true,
+            path: '/data/staging/import-candidates/candidate-1/Autechre/Amber/01 Foil.flac',
+            type: 'file',
+          },
+          status: {
+            code: 'collision',
+            message: 'The target library path already exists and would require an operator decision before import apply.',
+          },
+        }],
+        preview: {
+          candidate: { id: importCandidateId },
+        },
+        summary: {
+          status: 'blocked',
+          message: '1 target file already exists in the library and requires collision review before import apply.',
+        },
+      }),
+      reconcileImportCandidateExecutionState: async ({ actorUserId, requestMetadata }) => ({
+        currentRunId: 'run-1',
+        summary: {
+          transitioned: 1,
+        },
+        source: {
+          actorUserId,
+          requestMetadata,
+        },
+        transitions: [{
+          fromStatus: 'downloading',
+          importCandidateId: 'candidate-1',
+          liveTransferStatus: 'completed',
+          toStatus: 'import_pending',
+        }],
+      }),
+      setImportCandidateFileSkipDecision: async ({ actorUserId, importCandidateFileId, importCandidateId, reason, requestMetadata }) => ({
+        candidate: {
+          id: importCandidateId,
+          status: 'import_pending',
+        },
+        decision: {
+          decisionType: 'skip',
+          importCandidateFileId,
+        },
+        file: {
+          id: importCandidateFileId,
+        },
+        source: {
+          actorUserId,
+          requestMetadata,
+          reason,
+        },
+      }),
+      selectImportCandidate: async ({ importCandidateId, actorUserId, reason, requestMetadata }) => ({
+        candidate: {
+          id: importCandidateId,
+          status: 'selected',
+        },
+        event: {
+          eventType: 'import_candidate_selected',
+          previousStatus: 'pending',
+          newStatus: 'selected',
+          reason,
+        },
+        source: {
+          actorUserId,
+          requestMetadata,
+        },
+      }),
+      rejectImportCandidate: async ({ importCandidateId, actorUserId, reason, requestMetadata }) => ({
+        candidate: {
+          id: importCandidateId,
+          status: 'rejected',
+        },
+        event: {
+          eventType: 'import_candidate_rejected',
+          previousStatus: 'held',
+          newStatus: 'rejected',
+          reason,
+        },
+        source: {
+          actorUserId,
+          requestMetadata,
+        },
+      }),
+      requireCsrf: () => {},
+      requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
+      reopenImportCandidate: async ({ importCandidateId, actorUserId, reason, requestMetadata }) => ({
+        candidate: {
+          id: importCandidateId,
+          status: 'pending',
+        },
+        event: {
+          eventType: 'import_candidate_reopened',
+          previousStatus: 'rejected',
+          newStatus: 'pending',
+          reason,
+        },
+        source: {
+          actorUserId,
+          requestMetadata,
+        },
+      }),
+      startImportCandidateApplyRun: async ({ triggeredByUserId, requestMetadata }) => ({
+        accepted: true,
+        run: {
+          id: 'apply-run-1',
+          status: 'pending',
+        },
+        source: {
+          triggeredByUserId,
+          requestMetadata,
+        },
+      }),
+      startImportCandidateExecutionRun: async ({ triggeredByUserId, requestMetadata }) => ({
+        accepted: true,
+        run: {
+          id: 'run-1',
+          status: 'pending',
+        },
+        source: {
+          triggeredByUserId,
+          requestMetadata,
+        },
+      }),
+      ...overrides,
+    });
+  });
+}
+
+test('import candidate list route returns filtered review queue results', async (t) => {
+  const listImportCandidates = t.mock.fn(async ({ folderPath, limit, offset, sourceSearchId, status, username }) => ({
+    candidates: [{
+      id: 'candidate-1',
+      username: 'source-user',
+      folderPath: 'Autechre\\Amber',
+      status: 'pending',
+    }],
+    filters: {
+      folderPath,
+      sourceSearchId,
+      status,
+      username,
+    },
+    pagination: {
+      limit,
+      offset,
+      total: 1,
+    },
+  }));
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-8' }));
+  const app = createImportCandidateRouteTestApp({
+    listImportCandidates,
+    requireSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates?status=pending&sourceSearchId=search-1&username=source&folderPath=Amber&limit=10&offset=5`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.deepEqual(listImportCandidates.mock.calls[0].arguments, [{
+      folderPath: 'Amber',
+      limit: '10',
+      offset: '5',
+      sourceSearchId: 'search-1',
+      status: 'pending',
+      username: 'source',
+    }]);
+    assert.deepEqual(payload, {
+      ok: true,
+      importCandidates: {
+        candidates: [{
+          id: 'candidate-1',
+          username: 'source-user',
+          folderPath: 'Autechre\\Amber',
+          status: 'pending',
+        }],
+        filters: {
+          folderPath: 'Amber',
+          sourceSearchId: 'search-1',
+          status: 'pending',
+          username: 'source',
+        },
+        pagination: {
+          limit: '10',
+          offset: '5',
+          total: 1,
+        },
+      },
+    });
+  });
+});
+
+test('import candidate detail route returns candidate files', async (t) => {
+  const getImportCandidate = t.mock.fn(async ({ importCandidateId }) => ({
+    id: importCandidateId,
+    username: 'source-user',
+    folderPath: 'Autechre\\Amber',
+    status: 'pending',
+    files: [{
+      id: 'file-1',
+      filename: '01 Foil.flac',
+    }],
+  }));
+  const app = createImportCandidateRouteTestApp({ getImportCandidate });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(getImportCandidate.mock.calls[0].arguments, [{
+      importCandidateId: 'candidate-1',
+    }]);
+    assert.deepEqual(payload, {
+      ok: true,
+      importCandidate: {
+        id: 'candidate-1',
+        username: 'source-user',
+        folderPath: 'Autechre\\Amber',
+        status: 'pending',
+        files: [{
+          id: 'file-1',
+          filename: '01 Foil.flac',
+        }],
+      },
+    });
+  });
+});
+
+test('import candidate selected summary route returns operator-facing execution readiness', async (t) => {
+  const buildSelectedImportCandidateSummary = t.mock.fn(async ({ limit }) => ({
+    checkedAt: '2026-04-30T20:00:00.000Z',
+    counts: {
+      blocked: 1,
+      ready: 0,
+      readyWithWarnings: 0,
+      totalSelected: 1,
+    },
+    pagination: {
+      limit: Number.parseInt(limit, 10),
+      offset: 0,
+      total: 1,
+    },
+    selectedCandidates: [{
+      id: 'candidate-1',
+      executionStatus: {
+        code: 'blocked',
+        message: 'Explicit path mapping is still required.',
+      },
+      planning: {
+        blockerCount: 1,
+        warningCount: 0,
+      },
+    }],
+    summary: {
+      status: 'blocked',
+      message: '1 selected candidate is blocked and needs operator attention before execution behavior lands.',
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildSelectedImportCandidateSummary });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/selected-summary?limit=10`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(buildSelectedImportCandidateSummary.mock.calls[0].arguments, [{ limit: '10' }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.selectedImportCandidates.counts.blocked, 1);
+    assert.equal(payload.selectedImportCandidates.selectedCandidates[0].executionStatus.code, 'blocked');
+  });
+});
+
+test('import candidate import-pending summary route returns completed-download import readiness', async (t) => {
+  const buildImportPendingCandidateSummary = t.mock.fn(async ({ limit }) => ({
+    checkedAt: '2026-04-30T20:45:00.000Z',
+    counts: {
+      blocked: 0,
+      ready: 1,
+      readyWithWarnings: 0,
+      totalImportPending: 1,
+    },
+    importPendingCandidates: [{
+      id: 'candidate-1',
+      importStatus: {
+        code: 'ready',
+        message: 'Completed download paths are resolved and ready for import review.',
+      },
+    }],
+    pagination: {
+      limit: Number.parseInt(limit, 10),
+      offset: 0,
+      total: 1,
+    },
+    summary: {
+      status: 'ready',
+      message: '1 completed download candidate is ready for import review.',
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildImportPendingCandidateSummary });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/import-pending-summary?limit=10`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{ limit: '10' }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.importPendingCandidates.counts.totalImportPending, 1);
+    assert.equal(payload.importPendingCandidates.importPendingCandidates[0].importStatus.code, 'ready');
+  });
+});
+
+test('import candidate execution summary route returns latest durable planning state', async (t) => {
+  const buildImportCandidateExecutionSummary = t.mock.fn(async () => ({
+    activeRun: null,
+    checkedAt: '2026-04-30T20:30:00.000Z',
+    currentRun: {
+      id: 'run-1',
+      status: 'completed',
+      items: [{ id: 'item-1', itemStatus: 'ready' }],
+    },
+    latestRun: {
+      id: 'run-1',
+      status: 'completed',
+    },
+    summary: {
+      status: 'ready',
+      message: '1 planned import candidate is ready for the next execution slice.',
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildImportCandidateExecutionSummary });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(buildImportCandidateExecutionSummary.mock.callCount(), 1);
+    assert.equal(payload.importCandidateExecution.currentRun.id, 'run-1');
+    assert.equal(payload.importCandidateExecution.summary.status, 'ready');
+  });
+});
+
+test('import candidate apply summary route returns latest durable apply state', async (t) => {
+  const buildImportCandidateApplySummary = t.mock.fn(async () => ({
+    activeRun: null,
+    checkedAt: '2026-04-30T21:00:00.000Z',
+    currentRun: {
+      id: 'apply-run-1',
+      items: [{ id: 'item-1', itemStatus: 'applied' }],
+      status: 'completed',
+    },
+    latestRun: {
+      id: 'apply-run-1',
+      status: 'completed',
+    },
+    summary: {
+      message: '1 candidate was applied into the library.',
+      status: 'ready',
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildImportCandidateApplySummary });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/apply-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(buildImportCandidateApplySummary.mock.callCount(), 1);
+    assert.equal(payload.importCandidateApply.currentRun.id, 'apply-run-1');
+    assert.equal(payload.importCandidateApply.summary.status, 'ready');
+  });
+});
+
+test('import candidate execution start route enforces csrf and returns accepted run state', async (t) => {
+  const startImportCandidateExecutionRun = t.mock.fn(async ({ triggeredByUserId, requestMetadata }) => ({
+    accepted: true,
+    run: {
+      id: 'run-1',
+      status: 'pending',
+    },
+    source: {
+      triggeredByUserId,
+      requestMetadata,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const app = createImportCandidateRouteTestApp({ requireCsrf, startImportCandidateExecutionRun });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-runs`, {
+      method: 'POST',
+      headers: {
+        'x-forwarded-for': '203.0.113.20',
+        'user-agent': 'HarmoniarrExecutionTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(startImportCandidateExecutionRun.mock.callCount(), 1);
+    assert.deepEqual(startImportCandidateExecutionRun.mock.calls[0].arguments, [{
+      requestMetadata: {
+        ipAddress: '203.0.113.20',
+        userAgent: 'HarmoniarrExecutionTest/1.0',
+      },
+      triggeredByUserId: 'user-1',
+    }]);
+    assert.equal(payload.accepted, true);
+    assert.equal(payload.run.id, 'run-1');
+  });
+});
+
+test('import candidate apply start route enforces csrf and returns accepted run state', async (t) => {
+  const startImportCandidateApplyRun = t.mock.fn(async ({ triggeredByUserId, requestMetadata }) => ({
+    accepted: true,
+    run: {
+      id: 'apply-run-1',
+      status: 'pending',
+    },
+    source: {
+      triggeredByUserId,
+      requestMetadata,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const app = createImportCandidateRouteTestApp({ requireCsrf, startImportCandidateApplyRun });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/apply-runs`, {
+      method: 'POST',
+      headers: {
+        'x-forwarded-for': '203.0.113.30',
+        'user-agent': 'HarmoniarrApplyTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(startImportCandidateApplyRun.mock.callCount(), 1);
+    assert.deepEqual(startImportCandidateApplyRun.mock.calls[0].arguments, [{
+      requestMetadata: {
+        ipAddress: '203.0.113.30',
+        userAgent: 'HarmoniarrApplyTest/1.0',
+      },
+      triggeredByUserId: 'user-1',
+    }]);
+    assert.equal(payload.accepted, true);
+    assert.equal(payload.run.id, 'apply-run-1');
+  });
+});
+
+test('import candidate execution reconcile route enforces csrf and returns persisted transitions', async (t) => {
+  const reconcileImportCandidateExecutionState = t.mock.fn(async ({ actorUserId, requestMetadata }) => ({
+    currentRunId: 'run-1',
+    summary: {
+      transitioned: 1,
+    },
+    source: {
+      actorUserId,
+      requestMetadata,
+    },
+    transitions: [{
+      fromStatus: 'downloading',
+      importCandidateId: 'candidate-1',
+      liveTransferStatus: 'completed',
+      toStatus: 'import_pending',
+    }],
+  }));
+  const requireCsrf = t.mock.fn();
+  const app = createImportCandidateRouteTestApp({ requireCsrf, reconcileImportCandidateExecutionState });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-reconcile`, {
+      method: 'POST',
+      headers: {
+        'x-forwarded-for': '203.0.113.21',
+        'user-agent': 'HarmoniarrExecutionTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(reconcileImportCandidateExecutionState.mock.callCount(), 1);
+    assert.deepEqual(reconcileImportCandidateExecutionState.mock.calls[0].arguments, [{
+      actorUserId: 'user-1',
+      requestMetadata: {
+        ipAddress: '203.0.113.21',
+        userAgent: 'HarmoniarrExecutionTest/1.0',
+      },
+    }]);
+    assert.equal(payload.reconciliation.summary.transitioned, 1);
+  });
+});
+
+test('import candidate preview route returns read-only planning preview data', async (t) => {
+  const previewImportCandidate = t.mock.fn(async ({ importCandidateId }) => ({
+    candidate: {
+      id: importCandidateId,
+      status: 'selected',
+      username: 'source-user',
+      folderPath: 'Autechre\\Amber',
+      fileCount: 1,
+    },
+    source: {
+      downloadsRoot: '/data/downloads',
+      rawFolderPath: 'Autechre\\Amber',
+      relativeFolderPath: 'Autechre/Amber',
+      resolutionStrategy: 'downloads_root_relative',
+      resolvedFolderPath: '/data/downloads/Autechre/Amber',
+    },
+    staging: {
+      root: '/data/staging',
+      previewFolderPath: '/data/staging/import-candidates/candidate-1/Autechre/Amber',
+    },
+    library: {
+      root: '/data/music',
+      rootFolderPolicy: 'single_root',
+      previewFolderPath: '/data/music/Autechre/Amber',
+    },
+    naming: {
+      strategy: 'mirror_candidate_path',
+      filePreviews: [{
+        fileId: 'file-1',
+        filename: '01 Foil.flac',
+        sourcePath: '/data/downloads/Autechre/Amber/01 Foil.flac',
+        stagingPath: '/data/staging/import-candidates/candidate-1/Autechre/Amber/01 Foil.flac',
+        libraryPath: '/data/music/Autechre/Amber/01 Foil.flac',
+      }],
+    },
+    validation: {
+      canPreview: true,
+      blockers: [],
+      warnings: [],
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ previewImportCandidate });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/preview`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(previewImportCandidate.mock.calls[0].arguments, [{
+      importCandidateId: 'candidate-1',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.importCandidatePreview.candidate.id, 'candidate-1');
+    assert.equal(payload.importCandidatePreview.source.resolvedFolderPath, '/data/downloads/Autechre/Amber');
+    assert.equal(payload.importCandidatePreview.naming.filePreviews[0].libraryPath, '/data/music/Autechre/Amber/01 Foil.flac');
+  });
+});
+
+test('import candidate apply preview route returns file-level import apply safety data', async (t) => {
+  const previewImportCandidateApply = t.mock.fn(async ({ importCandidateId }) => ({
+    counts: {
+      collisionCount: 1,
+      missingSourceCount: 0,
+      readyCount: 0,
+      stagingPresentCount: 1,
+      totalFiles: 1,
+    },
+    files: [{
+      fileId: 'file-1',
+      status: {
+        code: 'collision',
+        message: 'The target library path already exists and would require an operator decision before import apply.',
+      },
+    }],
+    preview: {
+      candidate: { id: importCandidateId },
+    },
+    summary: {
+      status: 'blocked',
+      message: '1 target file already exists in the library and requires collision review before import apply.',
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ previewImportCandidateApply });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/apply-preview`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(previewImportCandidateApply.mock.calls[0].arguments, [{
+      importCandidateId: 'candidate-1',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.importCandidateApplyPreview.summary.status, 'blocked');
+    assert.equal(payload.importCandidateApplyPreview.files[0].status.code, 'collision');
+  });
+});
+
+test('import candidate file skip route enforces csrf and persists the decision', async (t) => {
+  const setImportCandidateFileSkipDecision = t.mock.fn(async ({ actorUserId, importCandidateFileId, importCandidateId, reason, requestMetadata }) => ({
+    candidate: {
+      id: importCandidateId,
+      status: 'import_pending',
+    },
+    decision: {
+      decisionType: 'skip',
+      importCandidateFileId,
+    },
+    source: {
+      actorUserId,
+      requestMetadata,
+      reason,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-11', csrfToken: 'csrf-token' }));
+  const app = createImportCandidateRouteTestApp({
+    requireCsrf,
+    requireSession,
+    setImportCandidateFileSkipDecision,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/files/file-1/skip`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.24',
+        'user-agent': 'HarmoniarrReviewRouteTest/1.0',
+      },
+      body: JSON.stringify({ reason: 'Keep the existing library file' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(setImportCandidateFileSkipDecision.mock.calls[0].arguments, [{
+      actorUserId: 'user-11',
+      importCandidateFileId: 'file-1',
+      importCandidateId: 'candidate-1',
+      reason: 'Keep the existing library file',
+      requestMetadata: {
+        ipAddress: '198.51.100.24',
+        userAgent: 'HarmoniarrReviewRouteTest/1.0',
+      },
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.importCandidateFileDecision.decision.decisionType, 'skip');
+  });
+});
+
+test('import candidate file decision clear route enforces csrf and clears the decision', async (t) => {
+  const clearImportCandidateFileDecision = t.mock.fn(async ({ actorUserId, importCandidateFileId, importCandidateId, reason, requestMetadata }) => ({
+    candidate: {
+      id: importCandidateId,
+      status: 'import_pending',
+    },
+    clearedDecision: {
+      decisionType: 'skip',
+      importCandidateFileId,
+    },
+    source: {
+      actorUserId,
+      requestMetadata,
+      reason,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-12', csrfToken: 'csrf-token' }));
+  const app = createImportCandidateRouteTestApp({
+    clearImportCandidateFileDecision,
+    requireCsrf,
+    requireSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/files/file-1/clear-decision`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.25',
+        'user-agent': 'HarmoniarrReviewRouteTest/1.0',
+      },
+      body: JSON.stringify({ reason: 'Retry the file on the next apply run' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(clearImportCandidateFileDecision.mock.calls[0].arguments, [{
+      actorUserId: 'user-12',
+      importCandidateFileId: 'file-1',
+      importCandidateId: 'candidate-1',
+      reason: 'Retry the file on the next apply run',
+      requestMetadata: {
+        ipAddress: '198.51.100.25',
+        userAgent: 'HarmoniarrReviewRouteTest/1.0',
+      },
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.importCandidateFileDecision.clearedDecision.decisionType, 'skip');
+  });
+});
+
+test('import candidate detail route preserves shared not-found errors', async () => {
+  const app = createImportCandidateRouteTestApp({
+    getImportCandidate: async () => {
+      const error = new Error('Import candidate not found');
+      error.status = 404;
+      error.code = 'import_candidate_not_found';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/missing-candidate`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'import_candidate_not_found',
+        message: 'Import candidate not found',
+      },
+    });
+  });
+});
+
+test('import candidate hold route enforces csrf and returns transition evidence', async (t) => {
+  const holdImportCandidate = t.mock.fn(async ({ importCandidateId, actorUserId, reason, requestMetadata }) => ({
+    candidate: {
+      id: importCandidateId,
+      status: 'held',
+    },
+    event: {
+      eventType: 'import_candidate_held',
+      previousStatus: 'pending',
+      newStatus: 'held',
+      reason,
+    },
+    source: {
+      actorUserId,
+      requestMetadata,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-10', csrfToken: 'csrf-token' }));
+  const app = createImportCandidateRouteTestApp({
+    holdImportCandidate,
+    requireCsrf,
+    requireSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/hold`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.23',
+        'user-agent': 'HarmoniarrReviewRouteTest/1.0',
+      },
+      body: JSON.stringify({ reason: 'Needs review' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.calls[0].arguments[0].headers['x-csrf-token'], 'csrf-token');
+    assert.deepEqual(holdImportCandidate.mock.calls[0].arguments, [{
+      importCandidateId: 'candidate-1',
+      reason: 'Needs review',
+      actorUserId: 'user-10',
+      requestMetadata: {
+        ipAddress: '198.51.100.23',
+        userAgent: 'HarmoniarrReviewRouteTest/1.0',
+      },
+    }]);
+    assert.deepEqual(payload, {
+      ok: true,
+      review: {
+        candidate: {
+          id: 'candidate-1',
+          status: 'held',
+        },
+        event: {
+          eventType: 'import_candidate_held',
+          previousStatus: 'pending',
+          newStatus: 'held',
+          reason: 'Needs review',
+        },
+        source: {
+          actorUserId: 'user-10',
+          requestMetadata: {
+            ipAddress: '198.51.100.23',
+            userAgent: 'HarmoniarrReviewRouteTest/1.0',
+          },
+        },
+      },
+    });
+  });
+});
+
+test('import candidate select reject and reopen routes delegate to shared transition services', async (t) => {
+  const selectImportCandidate = t.mock.fn(async ({ importCandidateId, reason }) => ({
+    candidate: { id: importCandidateId, status: 'selected' },
+    event: { eventType: 'import_candidate_selected', reason },
+  }));
+  const rejectImportCandidate = t.mock.fn(async ({ importCandidateId, reason }) => ({
+    candidate: { id: importCandidateId, status: 'rejected' },
+    event: { eventType: 'import_candidate_rejected', reason },
+  }));
+  const reopenImportCandidate = t.mock.fn(async ({ importCandidateId, reason }) => ({
+    candidate: { id: importCandidateId, status: 'pending' },
+    event: { eventType: 'import_candidate_reopened', reason },
+  }));
+  const app = createImportCandidateRouteTestApp({
+    selectImportCandidate,
+    rejectImportCandidate,
+    reopenImportCandidate,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const selectResponse = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/select`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({ reason: 'Download this release' }),
+    });
+    const rejectResponse = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/reject`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({ reason: 'Wrong album' }),
+    });
+    const reopenResponse = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/reopen`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({ reason: 'Retry review' }),
+    });
+
+    assert.equal(selectResponse.status, 200);
+    assert.equal(rejectResponse.status, 200);
+    assert.equal(reopenResponse.status, 200);
+    assert.equal(selectImportCandidate.mock.calls[0].arguments[0].reason, 'Download this release');
+    assert.equal(rejectImportCandidate.mock.calls[0].arguments[0].reason, 'Wrong album');
+    assert.equal(reopenImportCandidate.mock.calls[0].arguments[0].reason, 'Retry review');
+  });
+});
+
+test('import candidate review routes preserve stale transition conflicts', async () => {
+  const app = createImportCandidateRouteTestApp({
+    holdImportCandidate: async () => {
+      const error = new Error('Import candidate cannot transition from rejected to held');
+      error.status = 409;
+      error.code = 'import_candidate_status_conflict';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/hold`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({ reason: 'Needs review' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'import_candidate_status_conflict',
+        message: 'Import candidate cannot transition from rejected to held',
+      },
+    });
+  });
+});
+
+test('import candidate slskd ingestion route enforces csrf and returns stored candidates', async (t) => {
+  const ingestSlskdSearchResponses = t.mock.fn(async ({ searchId, actorUserId, requestMetadata }) => ({
+    sourceProvider: 'slskd',
+    sourceSearchId: searchId,
+    candidateCount: 1,
+    fileCount: 1,
+    source: {
+      actorUserId,
+      requestMetadata,
+    },
+    candidates: [{
+      id: 'candidate-1',
+      username: 'source-user',
+      folderPath: 'Autechre\\Amber',
+      status: 'pending',
+      fileCount: 1,
+      files: [{
+        id: 'file-1',
+        filename: '01 Foil.flac',
+      }],
+    }],
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-9', csrfToken: 'csrf-token' }));
+  const app = createImportCandidateRouteTestApp({
+    ingestSlskdSearchResponses,
+    requireCsrf,
+    requireSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/slskd/searches/search-1`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.22',
+        'user-agent': 'HarmoniarrImportCandidateTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.calls[0].arguments[0].headers['x-csrf-token'], 'csrf-token');
+    assert.deepEqual(requireCsrf.mock.calls[0].arguments[1], {
+      appUserId: 'user-9',
+      csrfToken: 'csrf-token',
+    });
+    assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments, [{
+      searchId: 'search-1',
+      actorUserId: 'user-9',
+      requestMetadata: {
+        ipAddress: '198.51.100.22',
+        userAgent: 'HarmoniarrImportCandidateTest/1.0',
+      },
+    }]);
+    assert.deepEqual(payload, {
+      ok: true,
+      importCandidates: {
+        sourceProvider: 'slskd',
+        sourceSearchId: 'search-1',
+        candidateCount: 1,
+        fileCount: 1,
+        source: {
+          actorUserId: 'user-9',
+          requestMetadata: {
+            ipAddress: '198.51.100.22',
+            userAgent: 'HarmoniarrImportCandidateTest/1.0',
+          },
+        },
+        candidates: [{
+          id: 'candidate-1',
+          username: 'source-user',
+          folderPath: 'Autechre\\Amber',
+          status: 'pending',
+          fileCount: 1,
+          files: [{
+            id: 'file-1',
+            filename: '01 Foil.flac',
+          }],
+        }],
+      },
+    });
+  });
+});
+
+test('import candidate slskd ingestion route normalizes provider failures', async () => {
+  const app = createImportCandidateRouteTestApp({
+    ingestSlskdSearchResponses: async () => {
+      const error = new Error('slskd search responses request failed with status 503');
+      error.code = 'slskd_unavailable';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/slskd/searches/search-1`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_unavailable',
+        message: 'slskd is temporarily unavailable',
+      },
+    });
+  });
+});

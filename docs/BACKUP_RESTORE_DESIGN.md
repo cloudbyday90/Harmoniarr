@@ -63,9 +63,17 @@ It should not capture:
 - refresh tokens
 - active jobs or transfers
 - temporary caches
+- artwork derivatives and temporary artwork workspace
 - staged downloads
 - final media files
 - embedded Postgres physical cluster files
+
+Artwork backup stance:
+
+- logical backups should exclude artwork binaries by default, including provider-fetched originals, extracted image copies, and generated derivatives
+- artwork descriptor and assignment rows may remain in logical backup scope when they are needed to explain presentation preference or future refetch intent
+- restore should tolerate missing artwork files by marking those assets stale or missing and scheduling refetch or derivative regeneration instead of failing the full restore
+- operator-managed volume backups of `/app/data` remain the correct mechanism when the operator wants to preserve the local artwork cache itself
 
 ### v1 Authentication Recovery Decision
 

@@ -1,0 +1,87 @@
+name: Supply Chain
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'docs/**'
+      - 'logo/**'
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'docs/**'
+      - 'logo/**'
+  release:
+    types: [ published ]
+  schedule:
+    - cron: '45 12 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-sbom-and-provenance:
+    name: Build, SBOM, And Provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release artifacts
+        run: npm run build
+
+      - name: Prepare supply-chain workspace
+        run: mkdir -p supply-chain
+
+      - name: Create checksum manifest for built artifacts
+        run: |
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > supply-chain/dist.sha256
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: harmoniarr.spdx.json
+          output-file: supply-chain/harmoniarr.spdx.json
+          upload-artifact: false
+          dependency-snapshot: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: harmoniarr.spdx.json
+          path: supply-chain/harmoniarr.spdx.json
+          if-no-files-found: error
+
+      - name: Attest build provenance
+        if: ${{ !github.event.repository.private && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb # v4
+        with:
+          subject-checksums: supply-chain/dist.sha256
+
+      - name: Attest SBOM artifact provenance
+        if: ${{ !github.event.repository.private && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb # v4
+        with:
+          subject-path: supply-chain/harmoniarr.spdx.json

@@ -381,6 +381,158 @@ Each metadata record should track:
 
 This fits the broader time-based design and lets the app explain which metadata version was used for a search or import decision.
 
+### Artwork, File Metadata, And Track-Info Storage
+
+Harmoniarr should treat canonical music metadata, observed file metadata, and artwork binaries as separate storage concerns.
+
+Storage layers:
+
+- Canonical identity and tracklist data belong in structured metadata tables such as `metadata_artists`, `metadata_release_groups`, `metadata_releases`, `metadata_media`, `metadata_tracks`, and `metadata_recordings`.
+- Current implemented monitoring state belongs in `metadata_artist_monitoring`, keyed directly to `metadata_artists`.
+- Older `managed_artists`, `managed_albums`, and `managed_tracks` references remain planning-only and should not be treated as the current runtime model.
+- Observed file facts belong in library and import records, tag snapshots, probe results, and fingerprint results. These records are evidence about a file, not a replacement for canonical metadata.
+- Artwork binaries should live on disk under app-owned storage such as `/app/data/artwork`, not as large Postgres blobs by default.
+
+This separation matters because the app will often know three different things at once:
+
+- what MusicBrainz says the release should be
+- what the downloaded or library file claims in its tags
+- what image assets are currently available for display or import
+
+Those layers should be comparable, but they should not overwrite each other silently.
+
+Canonical track-info policy:
+
+- `metadata_tracks` and `metadata_recordings` represent provider-backed expected track identity.
+- `managed_tracks` represent Harmoniarr's library-facing and workflow-facing track rows.
+- File tags, FFprobe output, folder names, filenames, and AcoustID results are observed evidence used for matching, validation, and repair.
+- Matching and import code should compare observed evidence against canonical metadata instead of rewriting canonical metadata from whichever file happened to be scanned most recently.
+
+Artwork storage policy:
+
+- Store original or fetched artwork files in app-owned storage with content hashes, dimensions, mime type, fetch time, and provenance recorded in the database.
+- Deduplicate artwork by checksum so the same image can be reused across release, release-group, artist, import-review, and library-file contexts.
+- Track artwork role explicitly, such as `front`, `back`, `booklet`, `disc`, `artist_photo`, `embedded`, `folder_extra`, or `generated_thumbnail`.
+- Treat provider-fetched artwork, extracted embedded artwork, and imported folder artwork as different provenance classes even when the pixels are identical.
+- Missing artwork must never block discovery, download, import review, or library satisfaction.
+
+Artwork filesystem layout policy:
+
+- Harmoniarr should keep app-owned artwork under `/app/data/artwork`.
+- The filesystem contract should separate durable originals from disposable derivatives and temporary processing workspace.
+- Database rows should store stable relative paths under that subtree rather than absolute host paths.
+
+Recommended v1 layout:
+
+```text
+/app/data/artwork/
+  originals/
+    sha256/ab/cd/<full-sha>.jpg
+  derivatives/
+    sha256/ab/cd/<full-sha>/thumb-256.webp
+    sha256/ab/cd/<full-sha>/card-512.webp
+  extracted/
+    import-review/<importReviewFileId>/<full-sha>.jpg
+    library-file/<libraryFileId>/<full-sha>.jpg
+  tmp/
+    <operationRunId>/...
+```
+
+Directory-role rules:
+
+- `originals/` holds checksum-addressed source images fetched from providers or preserved from local media.
+- `derivatives/` holds generated thumbnails and resized variants that can always be rebuilt from a surviving original.
+- `extracted/` holds durable extracted copies from embedded tags or candidate folders when Harmoniarr chooses to preserve them as first-class assets.
+- `tmp/` is scratch space for in-progress extraction, resize, conversion, and validation work and must never be treated as durable inventory.
+
+Path and naming rules:
+
+- Use SHA-256 fan-out directories to avoid oversized single directories and to keep dedupe-addressed storage predictable.
+- SHA-256 is sufficient for v1 artwork dedupe and content addressing; the operational collision risk at Harmoniarr-scale artwork volumes is negligible.
+- The stored extension should reflect the actual mime type written on disk, not the source URL suffix alone.
+- Artwork ownership, preference, and role must come from the database, not from one directory name implying canonical meaning.
+
+Artwork pruning and retention rules:
+
+- `tmp/` contents should be removed immediately on successful completion and pruned oldest-first when abandoned or failed.
+- `derivatives/` are cache data and may be deleted and regenerated at any time while the source asset still exists.
+- `originals/` and durable `extracted/` files should be pruned only when they are unassigned, older than the configured retention window, and not referenced by any active import-review, library-file, or metadata artwork assignment.
+- Cleanup should mark missing asset files as degraded and refetchable or regenerable rather than silently erasing the higher-level assignment meaning.
+
+Recommended default retention posture:
+
+- `tmp/`: remove on success immediately; prune leftovers older than 24 hours.
+- `derivatives/`: prune oldest-first when a configured size cap is exceeded or when derivatives are older than 30 days since last access.
+- unassigned `originals/` and unassigned durable `extracted/`: prune only after at least 90 days and only when the file is not the current preferred artwork for any owner.
+
+Backup and restore stance:
+
+- Logical app backups should exclude artwork binaries by default because they are cacheable, potentially large, and secondary to higher-value configuration and intent state.
+- Logical backups may still preserve artwork descriptors and assignments when those records explain preferred presentation or refetch intent.
+- Operator-managed volume backups of `/app/data` may include artwork files, but restore should treat missing artwork files as recoverable cache loss rather than full restore failure.
+
+### Artwork Settings And Worker Behavior
+
+Artwork handling should be operator-configurable, but it should remain asynchronous and non-blocking for normal metadata, search, import, and library workflows.
+
+Recommended artwork settings:
+
+- Enable or disable external artwork fetching globally.
+- Preferred provider order for release, release-group, and artist artwork.
+- Whether embedded artwork extracted from imported files is eligible to become a durable asset.
+- Whether candidate-folder artwork is eligible to become a durable asset.
+- Which derivative sizes and formats should be generated for UI use.
+- Maximum original-image size or dimension policy before downscale or reject rules apply.
+- Cleanup thresholds for derivative cache size, derivative age, and unassigned-original retention.
+- Whether artwork refresh should occur automatically after metadata refresh, import acceptance, or library rescan.
+- Whether missing artwork should be refetched automatically or only on user action.
+
+Worker model:
+
+- `artwork-refresh` worker: fetches or refetches preferred artwork from allowed providers, records provenance, and updates assignments without blocking the owning metadata workflow.
+- `artwork-derivative` worker: creates thumbnails and UI-targeted resized variants from durable originals and can rebuild them whenever cache files are missing.
+- `artwork-cleanup` worker: prunes `tmp/`, evicts stale derivatives, and deletes only deletion-eligible unassigned originals or extracted assets according to retention policy.
+
+Worker rules:
+
+- Artwork fetch, derivative generation, and cleanup should run as resumable background jobs rather than inline request work whenever the operation is not trivially local and immediate.
+- Metadata refresh may enqueue artwork refresh, but artwork failures must degrade gracefully and should not invalidate otherwise successful metadata refresh results.
+- Import review may enqueue embedded-art extraction or folder-art capture, but import completion should not wait on derivative generation.
+- Cleanup must operate from database ownership and retention rules first, not from blind filesystem walking alone.
+- Derivative generation must be idempotent: if the requested original asset and derivative profile already exist and validate, the worker should no-op.
+- Provider-backed refresh must respect provider rate limits and avoid repeatedly refetching known-missing artwork inside a short cooldown window.
+
+Suggested records for worker visibility:
+
+- `artwork_operation_runs`
+- `artwork_operation_events`
+
+Operational posture:
+
+- The UI should remain usable with missing thumbnails by falling back to placeholder state while background artwork work continues.
+- Operators should be able to force refresh, regenerate derivatives, or run cleanup explicitly without needing to touch the underlying filesystem.
+
+Observed media-metadata policy:
+
+- Keep current lightweight summaries on hot tables such as `library_files`, but preserve richer extraction history in dedicated snapshot or run tables.
+- Store normalized tag observations separately from raw extracted tags so the UI and matchers do not depend on parser-specific output shapes.
+- Preserve enough evidence to explain why a file matched a track, failed validation, or was considered a quality upgrade candidate.
+- Retain raw tag and provider payloads intentionally and with bounds; they are diagnostic evidence, not the primary product-facing source of truth.
+
+Recommended records for this split:
+
+- `artwork_assets`
+- `artwork_assignments`
+- `file_tag_snapshots`
+- `audio_fingerprints`
+- `acoustid_lookup_results`
+
+Operational rules:
+
+- Filesystem-backed artwork should use stable relative paths under app-owned storage so caches can be rebuilt or pruned without changing canonical music identity.
+- Library imports may preserve embedded artwork or import selected folder artwork, but the chosen library artwork should still be represented as an app-owned asset assignment rather than only as an opaque file side effect.
+- Background refresh can replace stale cached artwork assignments without mutating canonical release identity or track matching state.
+
 ## Release Monitoring And Detection
 
 Harmoniarr should include a service that monitors known artists for newly published releases and turns relevant discoveries into wanted state.
@@ -418,6 +570,12 @@ Defaults should be conservative:
 - Singles are detected but can require review unless the user enables automatic single monitoring.
 - Compilations, live releases, remixes, and unofficial releases should be opt-in or review-first.
 - Future releases should be visible, but should not trigger Soulseek search until the release date or a configured early-search window.
+
+Current implementation baseline:
+
+- Harmoniarr now persists artist monitoring in `metadata_artist_monitoring` keyed to canonical artists.
+- The first implemented monitoring controls are `is_monitored` and `monitored_release_group_types`, with conservative defaults of albums and EPs.
+- Richer monitoring rules for singles, release status, future releases, and auto-wanted behavior remain future work that should build on this canonical monitoring baseline instead of a separate managed-artist layer.
 
 ### Release Detector
 
@@ -479,6 +637,12 @@ Rules:
 - If a release is reclassified from single to album or EP, re-run monitoring policy and wanted reconciliation.
 - If a tracklist changes, update matching metadata and flag existing candidates, downloads, or imports that used the old tracklist.
 - If a release is merged or redirected by MusicBrainz, preserve historical IDs and map them to the surviving canonical record.
+
+Current implementation baseline:
+
+- Harmoniarr now materializes this first step as `library_wanted_releases`, a release-level projection derived from monitored canonical artists plus current library reconciliation.
+- The implemented baseline only projects monitored albums and EPs with `missing` or `partial` coverage.
+- Generic `wanted_items` and richer search eligibility state remain future work and should build on this projection instead of bypassing it.
 
 The user should be able to see why something became wanted:
 
@@ -1007,6 +1171,21 @@ The app should follow the operational shape that makes Sonarr/Radarr successful 
 - Docker-first deployment.
 
 The technology should be modern, but the runtime should stay boring. The app should be easy to run on a NAS, home server, mini PC, VM, or Docker host without requiring a complex platform.
+
+### Runtime Architecture Support
+
+Harmoniarr should be a 64-bit application.
+
+Initial supported CPU architectures:
+
+- `amd64`
+- `arm64`
+
+Rules:
+
+- 32-bit targets should be unsupported.
+- Docker build and runtime bootstrap should fail closed on unsupported CPU architectures rather than attempting an untested degraded path.
+- Documentation and release artifacts should describe the supported 64-bit targets explicitly so operators do not infer accidental 32-bit support from generic base images.
 
 ### JavaScript Module Format
 
@@ -1559,6 +1738,103 @@ The Docker build should follow the Classifarr multi-stage Alpine pattern:
 5. Start embedded Postgres, run migrations, then start the app.
 
 Production runtime should not require the Vite dev server. Vite is a build-time and local development tool only.
+
+### Compose And Runtime Configuration Baseline
+
+The default container deployment should use:
+
+- `compose.yaml` as the canonical Compose file name.
+- `.env` beside `compose.yaml` for host-specific runtime values.
+- `.env.example` committed to the repo as the documented template.
+
+V1 should not depend on a separate mounted application config file such as `config.yml`, `config.json`, or `settings.xml`.
+
+Configuration should be split like this:
+
+- Docker and runtime bootstrap values come from `compose.yaml` plus `.env`.
+- Persistent application settings live in the app database under `/app/data` after bootstrap.
+- Generated runtime files, embedded Postgres state, backups, logs, and similar app-owned state also live under `/app/data`.
+
+This avoids two competing sources of truth for normal application settings.
+
+### Compose Environment Variables
+
+Use the common LinuxServer-style variables for container identity and default file creation, with UID and GID selection applied at the Compose boundary:
+
+- `PUID`
+- `PGID`
+- `UMASK`
+- `TZ`
+
+Do not introduce `PGUID` as a separate variable. The standard pair should be `PUID` and `PGID`.
+
+Recommended defaults for the first compose template:
+
+```text
+TZ=UTC
+PUID=1000
+PGID=1000
+UMASK=0022
+HARMONIARR_PORT=47956
+APP_PORT=3000
+HARMONIARR_APPDATA=/srv/harmoniarr
+HARMONIARR_DOWNLOADS=/srv/downloads/slskd
+HARMONIARR_MUSIC=/srv/media/music
+HARMONIARR_STAGING=/srv/harmoniarr-staging
+HARMONIARR_TRANSCODE_TEMP=/srv/harmoniarr-transcode
+```
+
+Notes:
+
+- `47956` is a generated high host port chosen to avoid the common media-app defaults. It is a planning default, not a reserved security boundary.
+- The container should listen on a fixed internal HTTP port such as `3000`; the randomized value should be the host-side published port.
+- `PUID=1000` and `PGID=1000` should remain the documented defaults because they match the most common first non-root user on Linux hosts and align with the Compose-level runtime user contract.
+- `UMASK=0022` fits the earlier documented default file and folder modes of `644` and `755`.
+
+### Recommended Default Compose Mapping
+
+The first compose example should expose only the Harmoniarr web port and should mount explicit path roles rather than one vague shared media path.
+
+Recommended baseline shape:
+
+```yaml
+ports:
+  - "${HARMONIARR_PORT:-47956}:${APP_PORT:-3000}"
+
+volumes:
+  - "${HARMONIARR_APPDATA}:/app/data"
+  - "${HARMONIARR_DOWNLOADS}:/data/downloads"
+  - "${HARMONIARR_MUSIC}:/data/music"
+  - "${HARMONIARR_STAGING}:/data/staging"
+  - "${HARMONIARR_TRANSCODE_TEMP}:/data/transcode-temp"
+```
+
+Directory-role guidance:
+
+- `/app/data`: embedded Postgres, generated secrets, logs, backups, cache, and other app-owned persistent state.
+- `/data/downloads`: the download tree Harmoniarr sees from `slskd`, ideally with `completed` and `incomplete` subpaths under one shared mount.
+- `/data/music`: final managed library root.
+- `/data/staging`: import review, validation, quarantine, and temporary pre-import workspace.
+- `/data/transcode-temp`: optional scratch space for future transcoding and media processing jobs.
+
+### Mount-Path Policy
+
+The compose example should strongly prefer the same in-container download path convention between `slskd` and Harmoniarr, for example both services seeing completed downloads under `/data/downloads`.
+
+That keeps path mapping simple and reduces the number of operator translation rules required.
+
+If operators cannot align container paths, Harmoniarr must support explicit path-prefix translation as already described in the path-mapping section below.
+
+### Port And Exposure Policy
+
+The default compose file should:
+
+- publish only the Harmoniarr HTTP port
+- not publish embedded Postgres `5432`
+- rely on reverse proxying for HTTPS when operators want a standard external `443` entrypoint
+- treat the randomized host port as collision avoidance and obscurity reduction, not as a replacement for auth or TLS
+
+Detailed Compose defaults, host-path examples, and Dockerfile assumptions live in `docs/DOCKER_DEPLOYMENT.md`.
 
 ### Package Manager
 
@@ -2255,7 +2531,7 @@ Suggested schedules:
 - Dependency heartbeat: periodic and passive checks for external services, local tools, worker health, and path readiness.
 - Metadata refresh: periodic artist and release metadata updates.
 - Release detection: compare refreshed artist metadata against known local state and emit release detection events.
-- Wanted reconciliation: periodic recalculation of missing, monitored, and upgradeable music.
+- Wanted reconciliation: periodic recalculation of monitored release gaps, with the current implementation materializing `library_wanted_releases` before broader generic wanted state exists.
 - Quality upgrade detection: periodic comparison of library files against quality profiles and upgrade policy.
 - Search queue dispatch: frequent but rate-limited search job creation.
 - Candidate refresh: occasional re-search for wanted items with no good candidates.
@@ -2265,6 +2541,16 @@ Suggested schedules:
 - Cleanup: remove stale slskd search handles, old raw payloads beyond retention, and expired browse cache entries.
 
 Search cadence should be conservative by default. A practical starting point is immediate dispatch for manual actions, then scheduled automatic searches with per-wanted-item cooldowns.
+
+Current implementation baseline:
+
+- Harmoniarr now materializes this first scheduling step as `library_discovery_requests`, a release-level discovery projection derived from `library_wanted_releases`.
+- The implemented baseline exposes `ready`, `cooldown`, and `blocked` states using `next_search_after`, release-date gating, and preserved request state.
+- Ready automatic requests are now claimed by the library worker after reconciliation, dispatched through the shared slskd search boundary, and ingested into the existing import-candidate review queue.
+- A protected discovery-run trigger now also reuses the same queue, reconciliation, and dispatch services so operators can run discovery independently of a full filesystem scan.
+- Server startup now also runs a conservative in-process heartbeat that periodically invokes the shared discovery-run service when the queue is due for reevaluation or dispatch.
+- The heartbeat cadence now comes from a shared environment-backed config helper and is surfaced through discovery and system-summary read models so automatic background behavior remains observable.
+- Full standalone multi-process scheduler coordination and long-lived search history remain future work, but discovery execution is now decoupled from filesystem scans without introducing a separate scheduler subsystem.
 
 ### Event-Driven Triggers
 
@@ -2854,7 +3140,7 @@ The app should avoid importing unrelated junk by default. Extra files should be 
 
 Media management should include file and folder permission settings for imported files.
 
-The Docker image should support `PUID`, `PGID`, and `UMASK` style configuration where practical, but the application should also expose clear media permission settings so users can understand what will happen during import.
+The deployment baseline should support `PUID`, `PGID`, and `UMASK` style configuration where practical, with `PUID` and `PGID` selecting the Compose runtime user rather than relying on in-container privilege dropping, and the application should also expose clear media permission settings so users can understand what will happen during import.
 
 Recommended defaults:
 
@@ -4653,7 +4939,7 @@ Alpine container requirements:
 - Use an Alpine base image for the main application container.
 - Install Postgres runtime packages inside the application image.
 - Keep the container capable of running as a non-root user.
-- Support `PUID`, `PGID`, `TZ`, and `UMASK` style environment configuration where practical.
+- Support `PUID`, `PGID`, `TZ`, and `UMASK` style deployment configuration where practical, preferring Compose-level user selection over runtime privilege-drop helpers.
 - Ensure the embedded Postgres runtime, app process, logs, and data directory work correctly with mounted volumes.
 - Include startup checks for Postgres data-directory version compatibility.
 - Keep package choices explicit so Postgres, media tooling, and future audio/tagging dependencies are reproducible.
@@ -4827,6 +5113,7 @@ Expected command groups:
 - `test:ci`
 - `coverage:ratchet:check`
 - `coverage:ratchet:update`
+- `check:esm`
 - `migration:check`
 - `migration:create`
 - `db:dump-schema`
@@ -5168,12 +5455,22 @@ The scan should use multiple signals:
 
 Library scanning should create durable records for observed files and scan runs. It should not only update a final current-state table. Users need to understand what changed between scans, why an album became complete, or why a file became unmatched.
 
+Current baseline:
+
+- The implemented baseline now persists configured library roots and current observed files as durable catalog state.
+- The implemented baseline now also persists append-only library-file tag snapshots and updates a current tag read model on `library_files`.
+- The implemented baseline now also writes a conservative current match projection keyed to canonical metadata tracks, preferring exact MusicBrainz IDs before release-local title and track-position fallback.
+- The implemented baseline now also writes a release-level coverage projection so canonical releases can be marked `complete`, `partial`, or `duplicate` from current matched files.
+- The implemented baseline now also exposes a protected read-only reconciliation summary surface so the dashboard can show current file and release coverage counts without coupling that read model to system overview.
+- The runtime-facing dashboard summary can continue to use generic operation-run history for start, in-progress, completed, and failed scan visibility.
+- Richer per-scan file-delta evidence and upgradeability decisions should be layered on after the current catalog, tag, match, and release-rollup baselines are in place.
+
 Initial scan states should include:
 
 - `matched`: file confidently maps to an expected song.
 - `partial`: album has some expected songs but is incomplete.
 - `ambiguous`: file or folder could match more than one artist, album, release, or song.
-- `unmatched`: file is in the library but not mapped to managed metadata.
+- `unmatched`: file is in the library but not mapped to canonical metadata.
 - `ignored`: user has chosen not to manage this file or folder.
 - `duplicate`: more than one file appears to satisfy the same song.
 - `upgradeable`: file is present but below the desired quality threshold.
@@ -5189,6 +5486,9 @@ The library scan should feed wanted state directly:
 For v1, library scanning can be conservative:
 
 - Prefer matching by existing tags and clear folder structure.
+- Start by recording filesystem evidence such as canonical path, relative path, extension, size, modified time, and whether the file looks like managed audio before adding deeper metadata extraction.
+- Prefer exact MusicBrainz release and recording tags when they exist; only fall back to release-local title and track-position matching when that candidate set is unique.
+- Derive release completeness from canonical expected-track coverage and preserve duplicate-track conditions explicitly instead of silently choosing one file.
 - Avoid destructive changes.
 - Do not retag or move existing files during scan.
 - Let the user review ambiguous matches.
@@ -5714,20 +6014,321 @@ Know what is missing
 - Allow lossy-to-lossy transcoding only with explicit warning and confirmation.
 - Warn on lossy-to-lossless transcoding because it cannot restore lost audio information and should not be treated as an upgrade.
 
-## Implementation Plan Placeholder
+## Implementation Plan
 
-This section will be expanded after the initial product and architecture direction is agreed.
+## Status: Draft - planning approved enough to sequence initial implementation, but task-list granularity and release targeting still need to be split into follow-up execution docs
 
-Expected future sections:
+### Current State Snapshot
 
-- Milestones
-- Technical stack
-- Service boundaries
-- Database schema
-- API routes
-- Background jobs
-- Import pipeline
-- Frontend views
-- Testing strategy
-- Docker Compose layout
-- V1 completion criteria
+The product direction, operational posture, security model, backup and restore design, admin recovery behavior, database direction, and defensive coding requirements are now documented in this file and the linked supporting docs.
+
+What is still missing is the execution structure that turns those requirements into a safe implementation order. The initial V1 build needs a phased plan that keeps the highest-risk foundations first: runtime/bootstrap, authentication, configuration validation, schema and migration safety, importer boundaries, durable workflow state, and operator-visible recovery paths.
+
+This section is the implementation source of truth for initial Harmoniarr delivery. The execution checklist companion lives in `docs/IMPLEMENTATION_TASK_LIST.md`.
+
+## 1. Implementation Summary
+
+Harmoniarr V1 should be delivered as a staged, self-hosted music automation platform with the following execution priorities:
+
+1. Establish a stable runtime shell, Docker packaging baseline, configuration system, and first-run bootstrap flow before broader feature work.
+2. Land authentication, session, CSRF, API contract, and audit foundations before exposing non-readonly operator actions.
+3. Build canonical metadata, import review, path mapping, and workflow-state foundations before any destructive or filesystem-mutating automation.
+4. Add background jobs, review queues, notifications, and transcoding/media operations only after canonical state and locking rules are in place.
+5. Close with recovery, backup/restore, observability, upgrade, validation, and release documentation so V1 is operable as a real self-hosted system rather than a demo.
+
+## 2. Scope Of Initial Delivery
+
+### In Scope For V1
+
+- First-run setup flow with bootstrap admin creation and fail-closed auth defaults.
+- Browser session auth with refresh-token rotation, CSRF protection, operator audit trails, and integration API keys.
+- Core settings surfaces for storage paths, import policy, metadata providers, Soulseek/slskd connectivity, and notification configuration.
+- Canonical release/artist/track identity model centered on MusicBrainz with explicit external-id provenance.
+- Import discovery pipeline with review-first operator approval, path mapping, staging, and deterministic workflow state.
+- Background job execution with database-backed queues, lease/ownership rules, and resumable operation tracking.
+- Filesystem-safe import, rename, organization, and optional transcoding workflows under explicit operator policy.
+- Operator-facing control-plane surfaces for dashboard status, queues, review items, job history, diagnostics, and recovery actions.
+- Backup/export, restore preview/apply, maintenance locking, and admin recovery flows described earlier in this document set.
+- Packaging and release artifacts for self-hosted Docker-first deployment.
+
+### Explicitly Out Of Scope For Initial Delivery
+
+- Multi-node/distributed worker deployment.
+- Hosted SaaS semantics, tenant isolation, or externally managed control plane.
+- Fully autonomous destructive media actions without operator review gates.
+- Broad plugin ecosystems or arbitrary third-party execution hooks.
+- Mobile-native clients.
+
+## 3. Technical Baseline Locked For Implementation
+
+- Runtime: Node.js 24 LTS, ESM-only application code.
+- Backend: Express 5 with thin route handlers and explicit validator/service/repository boundaries.
+- Frontend: Vue 3, Vite, Pinia, and shared typed API contracts at the boundary.
+- Database: PostgreSQL 18 as the canonical state store, with timestamped migrations and fail-closed startup validation.
+- Packaging: Docker on Alpine 3.23, standard image includes embedded Postgres and local FFmpeg tooling.
+- Jobs: PostgreSQL-backed durable queue/work-lease model; no in-memory-only job ownership.
+- Auth: local browser auth via cookie session + refresh token, CSRF on cookie-authenticated writes, API keys for integrations only.
+- Metadata and music identity: MusicBrainz as canonical identity source; secondary enrichers are advisory and must not silently replace canonical IDs.
+- Soulseek backend: slskd behind an adapter boundary; all backend-specific behavior is normalized before reaching domain services.
+
+## 4. Execution Readiness And Governance
+
+Definition of ready for implementation start:
+
+- This implementation plan remains aligned with the policy decisions already captured in this document.
+- Supporting docs remain authoritative for their domains:
+  - security posture
+  - backup and restore design
+  - admin recovery runbook
+  - database model
+- Phase ordering, acceptance gates, and no-go conditions are locked before code work begins.
+- Migration naming, route contract rules, logging rules, and workflow-state semantics are agreed before Phase 1 closes.
+- Any scope change affecting auth, workflow states, destructive filesystem behavior, restore semantics, or migration safety must update this section in the same change.
+
+Critical path:
+
+1. Phase 0 must lock execution contracts and bootstrap defaults.
+2. Phase 1 must establish runtime, packaging, schema scaffolding, and configuration safety.
+3. Phase 2 must complete auth/session/settings foundations before protected operator actions expand.
+4. Phase 3 must establish canonical ingest/import/review state before media mutation or background automation broadens.
+5. Phase 4 and Phase 5 can overlap only after workflow-state, locking, and audit contracts stabilize.
+6. Phase 6 closes release, validation, recovery, and rollout readiness.
+
+Parallelization policy:
+
+- Frontend shell work can start during late Phase 1 once route and settings contract shapes are stable.
+- Backup/restore UI work must not begin before maintenance-lock and operation-run schemas are stable.
+- Documentation updates can happen throughout, but no release/readme closure is final until Phase 6 gates pass.
+
+## 5. Phase Plan
+
+## Phase 0 - Alignment, Contract Freeze, And Execution Gates
+
+Deliverables:
+
+- This implementation plan is accepted as the architecture and sequencing source of truth.
+- Initial V1 boundaries are locked: what ships in V1, what is deferred, and what requires operator confirmation.
+- Database migration rules, route contract rules, error/result normalization, and workflow-state semantics are frozen.
+- Default runtime/configuration assumptions are captured for Docker, embedded Postgres, FFmpeg, and slskd integration.
+
+Acceptance criteria:
+
+- No unresolved architectural question blocks Phase 1 bootstrap work.
+- Destructive behaviors remain explicitly gated and never implied by automation defaults.
+- Each high-risk subsystem has a named source-of-truth doc and no contradictory requirements remain.
+
+## Phase 1 - Platform Bootstrap, Runtime Shell, And Persistence Foundation
+
+Backend/platform:
+
+- Create application bootstrap with fail-closed startup validation for env, directories, database reachability, and required secrets.
+- Establish server module layout: config, logger, HTTP app, route registration, services, repositories, jobs, adapters.
+- Implement base database connectivity, migration runner, and schema initialization workflow.
+- Add canonical tables for users, refresh tokens, app settings/config, audit events, maintenance locks, operation runs, and job leases.
+- Stand up structured logging, correlation IDs, normalized error envelopes, and health/readiness endpoints.
+
+Packaging:
+
+- Build the initial Docker image and compose layout for Harmoniarr, embedded Postgres, persistent volumes, and startup ordering.
+- Ensure FFmpeg and any required media inspection binaries are present in the standard image.
+
+Frontend:
+
+- Create the Vue shell, router, app layout, shared API client, auth bootstrap state, and basic settings/dashboard navigation.
+
+Acceptance criteria:
+
+- A fresh install can boot to a guarded first-run setup state without partially initialized behavior.
+- Startup fails closed on invalid configuration instead of silently downgrading features.
+- Schema bootstrap, health endpoints, and structured logs are working before feature-specific services are added.
+
+## Phase 2 - Authentication, Authorization, Settings, And Control-Plane Basics
+
+Backend:
+
+- Implement bootstrap-admin flow, password hashing, login/logout, refresh-token rotation, session invalidation, and CSRF protection.
+- Add route-tier enforcement for anonymous, authenticated, privileged, maintenance-locked, and integration-key surfaces.
+- Implement settings read/write services with validation, masking/redaction rules, and audit logging.
+- Add API key creation/rotation/revocation for integrations, separate from browser auth.
+
+Frontend:
+
+- Build login, first-run bootstrap, session-expiry handling, and settings pages for core system configuration.
+- Add operator-visible feedback for save success, validation errors, redacted secret fields, and session expiry.
+
+Acceptance criteria:
+
+- All mutating routes are protected by auth, CSRF, and role checks.
+- Secrets never round-trip in plaintext after initial entry.
+- Admin recovery and bootstrap assumptions remain compatible with the dedicated runbook and schema design.
+
+## Phase 3 - Canonical Music Model, Import Discovery, And Review-First Workflow State
+
+Domain model:
+
+- Implement canonical entities for artists, releases, release groups, tracks, files, import candidates, review decisions, and external identities.
+- Normalize MusicBrainz-derived identity and store provenance for non-canonical enrichers.
+
+Ingest/import:
+
+- Implement slskd adapter boundaries and search/download observation contracts.
+- Build discovery/import candidate ingestion that separates raw external payloads from normalized domain state.
+- Add review queue state machine for candidate evaluation, operator decisions, hold/reject states, and idempotent reprocessing.
+- Implement path mapping, staging resolution, root-folder policy, and naming-preview generation without mutating media yet.
+
+Frontend:
+
+- Baseline delivered: a protected review-queue screen now consumes the shared candidate list, detail, preview, and review-transition routes through shared client composables and normalized route state.
+- The current surface supports queue filtering, candidate detail loading, path/naming preview inspection, hold/select/reject/reopen transitions, and visible queue-refresh freshness.
+- Baseline delivered: selected candidates now also feed a durable execution-run surface that snapshots readiness, enqueues eligible files into slskd downloads, and persists per-candidate enqueue outcomes through protected start/read routes.
+- Baseline delivered: the execution summary now also reconciles those persisted enqueue outcomes against live slskd transfer status so the review workflow can show queueing and coarse progress without a separate downloads screen yet.
+- Staging execution and final apply behavior remain future work.
+
+Acceptance criteria:
+
+- Harmoniarr can ingest candidate items into durable review state without mutating the library.
+- Canonical IDs, review state, and decision audit history are durable and resumable.
+- Import decisions are deterministic and replay-safe.
+
+## Phase 4 - Background Jobs, Media Operations, And Notification Surfaces
+
+Jobs and workers:
+
+- Implement durable job dispatch, worker lease ownership, heartbeat/timeout semantics, retry policy, and operator cancellation.
+- Add execution paths for metadata refresh, import apply, rename/organize, artwork/media inspection, and notification fan-out.
+
+Filesystem and media operations:
+
+- Implement guarded file copy/move/link behavior, rename previews, collision handling, rollback-aware temporary staging, and post-action verification.
+- Add FFmpeg-backed inspection and initial transcoding job orchestration with operator confirmation rules.
+- Keep original source retention policy as documented; never auto-delete originals by default.
+
+Notifications:
+
+- Add in-app notifications and operator feedback for queued work, failures, recoveries, manual intervention needs, and completed actions.
+
+Acceptance criteria:
+
+- Every background action has durable ownership, audit visibility, and retry/cancel semantics.
+- Filesystem mutations are explicit, logged, and guarded against partial-write ambiguity.
+- Transcoding remains policy-driven and review-aware rather than fire-and-forget automation.
+
+## Phase 5 - Recovery, Backup/Restore, Diagnostics, And Operational Hardening
+
+Operational flows:
+
+- Implement backup/export manifests, restore preview/apply, maintenance lock entry/exit, and operation-run/event history.
+- Implement bootstrap-admin recovery issuance, verification, consumption, cancellation, and audit evidence paths.
+- Add diagnostic surfaces for service health, queue health, failed jobs, maintenance state, recent operator actions, and redacted configuration insight.
+
+Security and reliability:
+
+- Enforce redaction policy for logs, diagnostics exports, and operator-visible event payloads.
+- Add startup checks, runtime invariants, and failure classification for external dependencies like slskd and metadata providers.
+- Add lock-aware handling so restore/recovery/upgrade windows pause unsafe operations predictably.
+
+Acceptance criteria:
+
+- Recovery and restore flows are operable through documented control-plane behavior, not shell-only tribal knowledge.
+- Maintenance locks stop unsafe writes and background work consistently.
+- Diagnostics are actionable without leaking secrets or raw sensitive payloads.
+
+## Phase 6 - Testing, Packaging, Upgrade Safety, And V1 Release Closure
+
+Validation:
+
+- Add unit, integration, route-contract, migration, job-behavior, and end-to-end UI coverage for the V1 critical path.
+- Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and recovery/restore scenarios.
+- Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
+
+Release closure:
+
+- Finalize Docker images, environment reference, compose examples, README/document index updates, and operator setup guidance.
+- Record V1 completion criteria, no-go conditions, release smoke tests, and rollback expectations.
+
+Acceptance criteria:
+
+- Critical-path tests pass for bootstrap, auth, settings, import review, job execution, filesystem mutation, and recovery flows.
+- Fresh install, upgrade, and restore validation all pass before V1 is considered ready.
+- Docs, packaging, and runtime behavior are synchronized.
+
+## 6. Initial Service Boundary Plan
+
+Expected backend ownership slices:
+
+- auth/session service
+- settings/config service
+- audit and diagnostics service
+- music metadata and identity service
+- import discovery and review service
+- filesystem/media-operation service
+- transcoding service
+- notification service
+- backup/restore and maintenance service
+- admin recovery service
+- job scheduler/worker service
+- external adapters for slskd, MusicBrainz, and optional enrichers
+
+Expected frontend ownership slices:
+
+- app shell and auth bootstrap
+- dashboard/control plane
+- settings and secrets management
+- review/import queue
+- jobs/history/diagnostics
+- backup/restore and recovery surfaces
+
+## 7. API And Data Contract Worklist
+
+The initial implementation must explicitly define and keep synchronized:
+
+- auth/session routes
+- bootstrap and admin recovery routes
+- settings/config routes
+- health/readiness/diagnostic routes
+- import candidate/review decision routes
+- job queue/history/cancel/retry routes
+- filesystem preview/apply routes
+- backup/export/restore preview/apply routes
+- notification and operator-attention surfaces
+
+Every route group must publish:
+
+- request validation rules
+- normalized success payloads
+- normalized error codes
+- audit expectations
+- permission requirements
+- idempotency expectations for mutating actions
+
+## 8. V1 Completion Criteria
+
+Harmoniarr V1 should not be considered complete until all of the following are true:
+
+1. A new user can deploy Harmoniarr via the standard Docker path, complete bootstrap admin setup, configure core settings, and reach a stable authenticated dashboard.
+2. The system can discover/import music candidates into a review-first workflow with canonical metadata, operator approvals, and durable job/event history.
+3. Filesystem mutation and transcoding actions are previewable, policy-driven, auditable, and safe against partial failure ambiguity.
+4. Backup, restore preview/apply, maintenance locks, and admin recovery flows are implemented and documented coherently.
+5. Structured logging, diagnostics, health surfaces, and notification/operator-feedback paths are usable for real self-hosted operations.
+6. Fresh install, upgrade, restore, and regression validation pass on the supported Docker deployment path.
+7. Documentation, packaging, and runtime behavior match the shipped product instead of aspirational design.
+
+## 9. Dependencies
+
+1. Phase 1 depends on Phase 0.
+2. Phase 2 depends on Phase 1.
+3. Phase 3 depends on Phases 1 and 2.
+4. Phase 4 depends on Phase 3 for canonical workflow state and path-mapping correctness.
+5. Phase 5 depends on Phases 2 through 4 for lock-aware operational behavior.
+6. Phase 6 depends on Phases 1 through 5.
+
+## 10. Recommended Follow-Up Planning Docs
+
+After this section is accepted, split execution into dedicated companion docs:
+
+- implementation task list by phase (`docs/IMPLEMENTATION_TASK_LIST.md`)
+- schema and migration package plan (`docs/SCHEMA_MIGRATION_TASK_LIST.md`)
+- route and API contract checklist (`docs/API_ROUTE_CONTRACT_TASK_LIST.md`)
+- frontend screen and navigation checklist (`docs/FRONTEND_SCREEN_NAV_TASK_LIST.md`)
+- release runbook and validation pack (`docs/RELEASE_VALIDATION_TASK_LIST.md`)
+- deferred V1.1/backlog feature inventory (`docs/DEFERRED_V1_1_TASK_LIST.md`)

@@ -1,0 +1,386 @@
+name: Release Image
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to publish, for example v0.1.0-beta
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish-image:
+    name: Publish Release Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    outputs:
+      compose_asset_name: ${{ steps.metadata.outputs.compose_asset_name }}
+      digest: ${{ steps.build.outputs.digest }}
+      dockerhub_enabled: ${{ steps.release.outputs.dockerhub_enabled }}
+      dockerhub_image_name: ${{ steps.release.outputs.dockerhub_image_name }}
+      image_name: ${{ steps.release.outputs.image_name }}
+      image_ref: ${{ steps.metadata.outputs.image_ref }}
+      metadata_asset_name: ${{ steps.metadata.outputs.metadata_asset_name }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      sbom_asset_name: harmoniarr-release.spdx.json
+      trusted_dockerhub_mirror_enabled: ${{ steps.release.outputs.trusted_dockerhub_mirror_enabled }}
+      verification_asset_name: ${{ steps.metadata.outputs.verification_asset_name }}
+      version: ${{ steps.release.outputs.version }}
+    permissions:
+      actions: read
+      artifact-metadata: write
+      attestations: write
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Resolve release publish plan
+        id: release
+        env:
+          HARMONIARR_DOCKERHUB_NAMESPACE: ${{ vars['DOCKERHUB_NAMESPACE'] }}
+          HARMONIARR_DOCKERHUB_REPOSITORY: ${{ vars['DOCKERHUB_REPOSITORY'] }}
+          HARMONIARR_ENABLE_DOCKERHUB: ${{ secrets['DOCKERHUB_USERNAME'] != '' && secrets['DOCKERHUB_TOKEN'] != '' }}
+          HARMONIARR_ENABLE_TRUSTED_DOCKERHUB_MIRROR: ${{ vars['DOCKERHUB_TRUSTED_MIRROR'] == 'true' }}
+          HARMONIARR_RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.release.tag_name }}
+          HARMONIARR_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          HARMONIARR_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: node scripts/write-image-registry-config.js
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: ${{ steps.release.outputs.dockerhub_enabled == 'true' }}
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets['DOCKERHUB_USERNAME'] }}
+          password: ${{ secrets['DOCKERHUB_TOKEN'] }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
+        with:
+          images: ${{ steps.release.outputs.docker_metadata_images }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=${{ steps.release.outputs.version }}
+            type=raw,value=${{ steps.release.outputs.release_tag }}
+            type=raw,value=latest,enable=${{ steps.release.outputs.is_prerelease != 'true' }}
+          labels: |
+            org.opencontainers.image.title=Harmoniarr
+            org.opencontainers.image.description=Soulseek-native music library manager inspired by Lidarr
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.release.outputs.release_tag }}
+            org.opencontainers.image.licenses=GPL-3.0-or-later
+
+      - name: Build and push multi-arch image
+        id: build
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          pull: true
+          push: true
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Prepare supply-chain workspace
+        run: mkdir -p supply-chain
+
+      - name: Generate release SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: harmoniarr-release.spdx.json
+          output-file: supply-chain/harmoniarr-release.spdx.json
+          upload-artifact: true
+          upload-release-assets: false
+
+      - name: Publish SBOM release asset
+        if: github.event_name == 'release'
+        uses: anchore/sbom-action/publish-sbom@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          sbom-artifact-match: ^harmoniarr-release\.spdx\.json$
+
+      - name: Write release metadata assets
+        id: metadata
+        shell: bash
+        env:
+          HARMONIARR_RELEASE_DOCKERHUB_IMAGE_NAME: ${{ steps.release.outputs.dockerhub_image_name }}
+          HARMONIARR_RELEASE_DOCKERHUB_TRUST_MODE: ${{ steps.release.outputs.trusted_dockerhub_mirror_enabled == 'true' && 'trusted' || 'runtime_only' }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          HARMONIARR_RELEASE_ASSET_DIR: supply-chain
+          HARMONIARR_RELEASE_DIGEST: ${{ steps.build.outputs.digest }}
+          HARMONIARR_RELEASE_IMAGE_NAME: ${{ steps.release.outputs.image_name }}
+          HARMONIARR_RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          HARMONIARR_RELEASE_TAGS: ${{ steps.meta.outputs.tags }}
+          HARMONIARR_RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          node scripts/write-release-metadata.js
+          image_ref="${{ steps.release.outputs.image_name }}@${{ steps.build.outputs.digest }}"
+          echo "compose_asset_name=harmoniarr-release-compose.override.yaml" >> "$GITHUB_OUTPUT"
+          echo "image_ref=${image_ref}" >> "$GITHUB_OUTPUT"
+          echo "metadata_asset_name=harmoniarr-release-metadata.json" >> "$GITHUB_OUTPUT"
+          echo "verification_asset_name=harmoniarr-release-verification.txt" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Compose override artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: harmoniarr-release-compose.override.yaml
+          path: supply-chain/harmoniarr-release-compose.override.yaml
+          if-no-files-found: error
+
+      - name: Upload verification note artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: harmoniarr-release-verification.txt
+          path: supply-chain/harmoniarr-release-verification.txt
+          if-no-files-found: error
+
+      - name: Upload release metadata artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: harmoniarr-release-metadata.json
+          path: supply-chain/harmoniarr-release-metadata.json
+          if-no-files-found: error
+
+      - name: Upload verification note to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload "${{ steps.release.outputs.release_tag }}" supply-chain/harmoniarr-release-verification.txt --clobber
+
+      - name: Upload release metadata to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload "${{ steps.release.outputs.release_tag }}" supply-chain/harmoniarr-release-metadata.json --clobber
+
+      - name: Upload Compose override to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload "${{ steps.release.outputs.release_tag }}" supply-chain/harmoniarr-release-compose.override.yaml --clobber
+
+      - name: Attest container image provenance
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb # v4
+        with:
+          subject-name: ${{ steps.release.outputs.image_name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-version: ${{ steps.release.outputs.version }}
+          push-to-registry: true
+
+      - name: Publish workflow summary
+        env:
+          HARMONIARR_SUMMARY_COMPOSE_ASSET_NAME: harmoniarr-release-compose.override.yaml
+          HARMONIARR_SUMMARY_DOCKERHUB_IMAGE_NAME: ${{ steps.release.outputs.dockerhub_image_name }}
+          HARMONIARR_SUMMARY_IMAGE_REF: ${{ steps.metadata.outputs.image_ref }}
+          HARMONIARR_SUMMARY_METADATA_ASSET_NAME: harmoniarr-release-metadata.json
+          HARMONIARR_SUMMARY_RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          HARMONIARR_SUMMARY_SBOM_ASSET_NAME: harmoniarr-release.spdx.json
+          HARMONIARR_SUMMARY_TAGS: ${{ steps.meta.outputs.tags }}
+          HARMONIARR_SUMMARY_VERIFICATION_ASSET_NAME: harmoniarr-release-verification.txt
+        run: node scripts/release-workflow-summary.js publish-image
+
+  verify-published-image:
+    name: Verify Published Image
+    needs: publish-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull published immutable image
+        run: docker pull "${{ needs.publish-image.outputs.image_ref }}"
+
+      - name: Validate published image fresh and existing-data startup
+        env:
+          HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
+        run: npm run validate:docker-released-image
+
+      - name: Publish verification summary
+        env:
+          HARMONIARR_SUMMARY_IMAGE_REF: ${{ needs.publish-image.outputs.image_ref }}
+        run: node scripts/release-workflow-summary.js verify-published-image
+
+  verify-release-contract:
+    if: github.event_name == 'release'
+    name: Verify Release Contract
+    needs:
+      - publish-image
+      - verify-published-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      attestations: read
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Prepare verification workspace
+        run: mkdir -p supply-chain
+
+      - name: Capture release asset inventory
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${{ needs.publish-image.outputs.release_tag }}" --repo "${{ github.repository }}" --json assets,tagName,isImmutable > supply-chain/release-view.json
+
+      - name: Download release contract assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ needs.publish-image.outputs.release_tag }}" --repo "${{ github.repository }}" -p "${{ needs.publish-image.outputs.metadata_asset_name }}" -p "${{ needs.publish-image.outputs.compose_asset_name }}" -D supply-chain --clobber
+
+      - name: Verify release metadata and Compose override assets
+        env:
+          HARMONIARR_RELEASE_COMPOSE_OVERRIDE_PATH: supply-chain/${{ needs.publish-image.outputs.compose_asset_name }}
+          HARMONIARR_RELEASE_EXPECTED_DIGEST: ${{ needs.publish-image.outputs.digest }}
+          HARMONIARR_RELEASE_EXPECTED_DOCKERHUB_IMAGE_NAME: ${{ needs.publish-image.outputs.dockerhub_image_name }}
+          HARMONIARR_RELEASE_EXPECTED_DOCKERHUB_TRUST_MODE: ${{ needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' && 'trusted' || 'runtime_only' }}
+          HARMONIARR_RELEASE_EXPECTED_IMAGE_NAME: ${{ needs.publish-image.outputs.image_name }}
+          HARMONIARR_RELEASE_EXPECTED_REPOSITORY: ${{ github.repository }}
+          HARMONIARR_RELEASE_EXPECTED_TAG: ${{ needs.publish-image.outputs.release_tag }}
+          HARMONIARR_RELEASE_EXPECTED_VERSION: ${{ needs.publish-image.outputs.version }}
+          HARMONIARR_RELEASE_METADATA_PATH: supply-chain/${{ needs.publish-image.outputs.metadata_asset_name }}
+          HARMONIARR_RELEASE_VIEW_PATH: supply-chain/release-view.json
+        run: npm run validate:release-contract
+
+      - name: Log in to Docker Hub
+        if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' }}
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets['DOCKERHUB_USERNAME'] }}
+          password: ${{ secrets['DOCKERHUB_TOKEN'] }}
+
+      - name: Set up ORAS
+        if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' }}
+        uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1
+
+      - name: Probe Docker Hub trusted mirror capabilities
+        if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' }}
+        id: probe_trusted_mirror
+        env: &trusted_dockerhub_release_env
+          DOCKERHUB_TOKEN: ${{ secrets['DOCKERHUB_TOKEN'] }}
+          DOCKERHUB_USERNAME: ${{ secrets['DOCKERHUB_USERNAME'] }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HARMONIARR_DOCKERHUB_NAMESPACE: ${{ vars['DOCKERHUB_NAMESPACE'] }}
+          HARMONIARR_DOCKERHUB_REPOSITORY: ${{ vars['DOCKERHUB_REPOSITORY'] }}
+          HARMONIARR_ENABLE_DOCKERHUB: ${{ needs.publish-image.outputs.dockerhub_enabled }}
+          HARMONIARR_ENABLE_TRUSTED_DOCKERHUB_MIRROR: ${{ needs.publish-image.outputs.trusted_dockerhub_mirror_enabled }}
+          HARMONIARR_RELEASE_EXPECTED_DIGEST: ${{ needs.publish-image.outputs.digest }}
+          HARMONIARR_RELEASE_METADATA_PATH: supply-chain/${{ needs.publish-image.outputs.metadata_asset_name }}
+          HARMONIARR_RELEASE_MIRROR_KEY: dockerHub
+          HARMONIARR_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          HARMONIARR_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: npm run probe:release-mirror-capabilities
+
+      - name: Promote Docker Hub trusted mirror referrers
+        if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' }}
+        env: *trusted_dockerhub_release_env
+        run: npm run promote:release-mirror-trust
+
+      - name: Verify Docker Hub mirror references
+        if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' }}
+        env:
+          HARMONIARR_RELEASE_EXPECTED_DIGEST: ${{ needs.publish-image.outputs.digest }}
+          HARMONIARR_RELEASE_METADATA_PATH: supply-chain/${{ needs.publish-image.outputs.metadata_asset_name }}
+          HARMONIARR_RELEASE_MIRROR_KEY: dockerHub
+        run: node scripts/verify-release-mirror.js
+
+      - name: Verify Docker Hub trusted mirror referrers
+        if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' }}
+        env: *trusted_dockerhub_release_env
+        run: npm run validate:release-mirror-referrers
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify published image attestation
+        if: ${{ !github.event.repository.private }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh attestation verify "oci://${{ needs.publish-image.outputs.image_ref }}" --repo "${{ github.repository }}" --format json > supply-chain/image-attestation.json
+
+      - name: Upload attestation verification artifact
+        if: ${{ !github.event.repository.private }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: harmoniarr-image-attestation.json
+          path: supply-chain/image-attestation.json
+          if-no-files-found: error
+
+      - name: Publish release-contract summary
+        env:
+          HARMONIARR_SUMMARY_ATTESTATION_STATUS: ${{ github.event.repository.private && 'skipped for private repository' || 'passed' }}
+          HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && 'passed' || 'skipped' }}
+          HARMONIARR_SUMMARY_RELEASE_TAG: ${{ needs.publish-image.outputs.release_tag }}
+          HARMONIARR_SUMMARY_TRUSTED_MIRROR_PROBE_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' && format('passed via {0}', steps.probe_trusted_mirror.outputs.target_distribution_spec) || 'skipped' }}
+          HARMONIARR_SUMMARY_TRUSTED_MIRROR_REFERRER_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' && 'passed' || 'skipped' }}
+        run: node scripts/release-workflow-summary.js verify-release-contract

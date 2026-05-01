@@ -2,15 +2,67 @@
   "name": "harmoniarr",
   "version": "0.1.0-beta",
   "private": true,
+  "packageManager": "npm@11.12.1",
   "type": "module",
   "description": "Soulseek-native music library manager inspired by Lidarr",
   "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": "24.x",
+    "npm": "11.x"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.x",
+      "onFail": "warn"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": "11.x",
+      "onFail": "warn"
+    }
+  },
   "scripts": {
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build --config vite.config.js",
+    "build:server": "node scripts/build-server.js",
     "check-copyright": "node scripts/check-copyright.js",
+    "check:esm": "node scripts/check-esm-consistency.js",
+    "check:image-tags": "node scripts/check-compose-image-tags.js",
+    "check:migrations": "node dist/server/check-migrations.js",
+    "check:schema-snapshot": "node scripts/check-schema-snapshot.js",
+    "migration:check": "node scripts/check-migration-filenames.js",
+    "migration:create": "node scripts/create-migration.js",
+    "migrate": "node dist/server/migrate.js",
+    "prepare:database": "node dist/server/prepare-database.js",
+    "probe:release-mirror-capabilities": "node scripts/probe-release-mirror-capabilities.js",
+    "promote:release-mirror-trust": "node scripts/promote-release-mirror-trust.js",
+    "start": "node dist/server/index.js",
+    "test": "node --test",
+    "update:schema-snapshot": "node scripts/update-schema-snapshot.js",
+    "validate": "npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:esm && npm run check:image-tags && npm test && npm run build",
+    "validate:docker-fresh-install": "node scripts/validate-docker-fresh-install.js",
+    "validate:docker-released-image": "node scripts/validate-docker-released-image.js",
+    "validate:release-contract": "node scripts/verify-release-contract.js",
+    "validate:release-mirror-referrers": "node scripts/verify-release-mirror-referrers.js",
+    "validate:schema-bootstrap": "node scripts/validate-schema-bootstrap.js",
+    "validate:security": "npm run check:image-tags && npm run validate:security:npm",
+    "validate:security:npm": "node scripts/check-npm-audit.js",
+    "wait:database": "node scripts/wait-for-postgres.js",
+    "validate:database": "npm run wait:database && npm run build:server && npm run prepare:database && npm run validate:schema-bootstrap",
     "update-copyright": "node scripts/update-copyright.js",
     "add-copyright-headers": "node scripts/add-copyright-headers.js"
   },
   "devDependencies": {
-    "glob": "^13.0.6"
+    "@vitejs/plugin-vue": "^6.0.6",
+    "glob": "^13.0.6",
+    "vite": "^8.0.10"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "music-metadata": "^11.12.3",
+    "pg": "^8.20.0",
+    "vue": "^3.5.33",
+    "vue-router": "^5.0.6"
   }
 }
