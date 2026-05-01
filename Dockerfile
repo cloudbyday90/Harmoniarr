@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG NODE_IMAGE=node:24-alpine
+ARG NODE_IMAGE=node:25.4.0-alpine
 ARG RUNTIME_IMAGE=alpine:3.23
 
 FROM ${NODE_IMAGE} AS client-builder

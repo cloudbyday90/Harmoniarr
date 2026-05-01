@@ -10,8 +10,10 @@ Database model source: `docs/DATABASE_MODEL.md`
 
 - Initial implementation planning exists in `docs/harmoniarr.md`.
 - Execution phases are defined, but no phase is complete yet.
+- The repo-level `npm run validate` contract currently passes end to end on Node 25.4.0, and the supported local baseline now tracks the Node 25.4 line through `.nvmrc`, `engines`, `devEngines`, and the Docker builder image.
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
 - Embedded PostgreSQL startup, tracked timestamped migrations, bootstrap-admin creation, login/logout/session routes, and allowlisted settings persistence are now implemented.
+- The client now includes first-run bootstrap-admin, login, and protected settings views backed by shared auth and settings API modules.
 - Canonical MusicBrainz metadata foundation now exists for artists, release groups, releases, media, recordings, tracks, and provider snapshots with timestamped migrations.
 - The metadata workspace now uses shared client API modules, composables, and static Vue SFCs for provider search/import plus local reopen flows.
 - The server bootstrap now composes metadata read/search/catalog/import capabilities through a shared native ESM metadata module instead of hand-wiring that service graph directly in the app composition root.
@@ -85,7 +87,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 - CI validation now also replays the built migration CLI against a disposable PostgreSQL service through a shared `npm run validate:database` contract, and the shared database env boundary now honors standard password env so the same native ESM runtime can connect safely in CI and future external-Postgres deployments.
 - PostgreSQL-backed validation now also waits for a real authenticated query through a shared `npm run wait:database` script before replaying migrations, avoiding the transient init-server readiness window that can satisfy weaker socket-only probes before the final TCP listener is actually usable.
 - Migration lineage now also generates a deterministic executable schema snapshot at `src/server/schema-snapshot.sql` through shared migration-manifest and schema-snapshot helpers, and validation now blocks stale snapshots in the same local/CI contract that already enforces filenames, ESM, tests, and builds.
-- Repo runtime policy is now explicit through `packageManager`, `engines`, `devEngines`, and `.nvmrc`, so local development and GitHub Actions share a single Node 24 plus npm 11 expectation instead of relying on whatever host toolchain happens to be installed.
+- Repo runtime policy is now explicit through `packageManager`, `engines`, `devEngines`, and `.nvmrc`, so local development and GitHub Actions share a single Node 25.4 plus npm 11 expectation instead of relying on whatever host toolchain happens to be installed.
 - Fresh-install startup can now detect an empty public schema, load the checked-in snapshot through a shared schema-bootstrap helper, and then fall through to the existing migration verifier so bootstrap and upgrade paths stay on the same lineage contract instead of diverging.
 - Database validation now also proves the snapshot consumption path by creating a disposable database, loading the checked-in snapshot, and asserting that no migrations remain pending, all through the same shared `npm run validate:database` contract already used by CI.
 - Docker fresh-install parity now reuses a shared database-preparation service and passes an executable Compose smoke test, and the default Compose baseline now carries the non-root `PUID`/`PGID` contract through `user:` instead of relying on runtime privilege dropping.
@@ -181,9 +183,9 @@ Parallelizable after contract stabilization:
 
 ## Phase 1 - Bootstrap, Packaging, And Schema Foundation
 
-- [ ] Create server bootstrap skeleton with config loading, startup validation, logger wiring, and HTTP app construction.
+- [x] Create server bootstrap skeleton with config loading, startup validation, logger wiring, and HTTP app construction.
 - [ ] Add fail-closed startup checks for required directories, secrets, database reachability, and invalid configuration combinations.
-- [ ] Create base repository/module structure for routes, validators, services, repositories, jobs, adapters, and shared utilities.
+- [x] Create base repository/module structure for routes, validators, services, repositories, jobs, adapters, and shared utilities.
 - [x] Add initial database connection layer and migration runner.
 - [x] Create first migration package for users, refresh tokens, settings/config, audit events, maintenance locks, operation runs, and job leases.
 - [x] Add health and readiness endpoints with structured status payloads.
@@ -195,20 +197,24 @@ Parallelizable after contract stabilization:
 ## Phase 2 - Auth, Sessions, And Settings Contracts
 
 - [x] Implement bootstrap-admin creation flow for first-run setup.
-- [ ] Implement password hashing, login, logout, refresh-token rotation, session invalidation, and forced re-auth behavior.
+- [x] Implement password hashing, login, logout, and refresh-token rotation.
+- [ ] Implement session invalidation and forced re-auth behavior.
 - [x] Add CSRF protection for cookie-authenticated write routes.
 - [ ] Implement route-tier enforcement for anonymous, authenticated, privileged, maintenance-locked, and integration-key contexts.
-- [ ] Implement settings/config service with allowlisted keys, validation, normalization, masking, and audit logging.
+- [x] Implement settings/config service with allowlisted keys, validation, normalization, path validation feedback, and audit logging.
+- [ ] Add masking, preservation, and clear semantics for secret-bearing settings values.
 - [ ] Extend allowlisted settings with artwork-fetch, extraction, derivative, and cleanup controls needed before artwork workers ship.
 - [ ] Implement API key create/rotate/revoke flows for integrations.
-- [ ] Add frontend login, bootstrap-admin, and session-expiry flows.
-- [ ] Add frontend settings surfaces for core system config, secret entry, and validation feedback.
+- [x] Add frontend login and bootstrap-admin flows.
+- [ ] Add frontend session-expiry flows.
+- [x] Add frontend settings surfaces for core system config and validation feedback.
+- [ ] Add frontend secret entry, masking, and clear UX for protected settings fields.
 - [ ] Verify secrets never round-trip in plaintext after initial write.
 - [ ] Verify admin recovery assumptions remain compatible with `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 - Canonical Model And Import Review
 
-- [ ] Create canonical artist, release, release group, track, file, external-identity, import-candidate, and review-decision data models.
+- [x] Create canonical artist, release, release group, track, file, external-identity, import-candidate, and review-decision data models.
 - [ ] Add artwork asset, artwork assignment, and observed file-tag tables as part of the first canonical metadata expansion beyond the auth/platform foundation.
 - [x] Implement MusicBrainz-first identity normalization and provenance storage for canonical metadata imports.
 - [x] Add local metadata read and search surfaces for imported artists, release groups, and releases so imported entities can be reopened without provider-first search.
@@ -245,10 +251,10 @@ Parallelizable after contract stabilization:
 
 ## Phase 6 - Validation, Release, And Closure
 
-- [ ] Add unit tests for validators, service rules, workflow-state logic, and normalization helpers.
-- [ ] Add integration tests for auth/session flows, settings contracts, import review, job ownership, and recovery operations.
-- [ ] Add route-contract tests for normalized success/error payloads and permission enforcement.
-- [ ] Keep ESM-only enforcement active in validation and CI so new CommonJS patterns do not regress into runtime code or scripts.
+- [x] Add unit tests for validators, service rules, workflow-state logic, and normalization helpers.
+- [x] Add integration tests for auth/session flows, settings contracts, import review, job ownership, and recovery operations.
+- [x] Add route-contract tests for normalized success/error payloads and permission enforcement.
+- [x] Keep ESM-only enforcement active in validation and CI so new CommonJS patterns do not regress into runtime code or scripts.
 - [x] Add migration replay and schema snapshot validation.
 - [ ] Add end-to-end UI coverage for bootstrap, login, settings, review queue, job feedback, and recovery-sensitive flows where practical.
 - [ ] Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and restore/recovery scenarios.
