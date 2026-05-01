@@ -5042,7 +5042,7 @@ Upgrade rules:
 
 Compatibility surfaces to track:
 
-- Node 24 ESM runtime behavior and package compatibility
+- Node 25.4 ESM runtime behavior and package compatibility
 - Alpine branch support, musl-native module behavior, and packaged media tooling availability
 - PostgreSQL 18 cluster compatibility, migration expectations, and restore preflight behavior
 - `slskd` API response compatibility and adapter normalization guarantees
@@ -5202,7 +5202,7 @@ Supply-chain safeguards:
 - Run dependency vulnerability scanning in CI and treat high-severity findings as blockers unless there is documented review and justification.
 - Run secret scanning and keep credential-shaped strings out of source, tests, examples, fixtures, and generated code.
 - Prefer official or well-established packages for auth, schema validation, logging, and test infrastructure rather than obscure one-off libraries.
-- Avoid copying install commands or package recommendations from generated output without checking current maintenance status and compatibility with Node 24, ESM, and Alpine.
+- Avoid copying install commands or package recommendations from generated output without checking current maintenance status and compatibility with Node 25.4, ESM, and Alpine.
 - Review transitive-risk-heavy additions carefully, especially packages that execute install scripts, compile native code, or pull in large trees for minor convenience.
 - Keep builder-stage-only dependencies out of the runtime image whenever possible.
 
@@ -5985,7 +5985,7 @@ Know what is missing
 - Project name: Harmoniarr.
 - License: GPL-3.0-or-later, matching Classifarr.
 - Use a Classifarr-style GitHub Action to check copyright/license headers on source files.
-- Use the Classifarr-compatible stack as the default implementation baseline: Node 24, npm, Express 5, Vue 3, Vite, Pinia, Tailwind CSS, Socket.IO, Jest, Vitest, Testcontainers, Docker Alpine, and explicit PostgreSQL access through `pg`.
+- Use the Classifarr-compatible stack as the default implementation baseline: Node 25.4, npm, Express 5, Vue 3, Vite, Pinia, Tailwind CSS, Socket.IO, Jest, Vitest, Testcontainers, Docker Alpine, and explicit PostgreSQL access through `pg`.
 - Use a Classifarr-style local authentication model for v1: first-run admin setup, cookie-based browser auth, refresh-token-backed sessions, CSRF protection for cookie-authenticated writes, API keys for integrations, and explicit admin-only route protection.
 - Use ES modules for JavaScript and TypeScript code; avoid CommonJS for project scripts and application code.
 - Treat defensive coding as a baseline requirement: thin routes, schema validation at boundaries, centralized error handling, structured logging with correlation, explicit timeout and retry policy, and skeptical review of AI-generated code.

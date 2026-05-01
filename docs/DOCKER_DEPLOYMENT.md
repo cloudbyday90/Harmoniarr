@@ -321,7 +321,7 @@ The future standard Docker image should follow these assumptions.
 ### Base And Stages
 
 - multi-stage build
-- Node 24 on Alpine 3.23 for builder stages
+- Node 25.4 Alpine image for builder stages
 - Alpine 3.23 runtime image
 - Vite client built in a builder stage
 - production server dependencies prepared in a builder stage
