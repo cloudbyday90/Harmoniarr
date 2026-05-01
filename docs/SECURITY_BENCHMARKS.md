@@ -88,7 +88,7 @@ These controls are especially important because the app will manage untrusted do
 
 | Control | Harmoniarr Target | Status |
 |---------|-------------------|--------|
-| Use trusted base image | Use official Node 24 Alpine image, pinned to stable Alpine branch | Planned |
+| Use trusted base image | Use official Node 25.4 Alpine image for builder stages and pin the runtime image separately | Planned |
 | Minimize packages | Install only runtime dependencies: Node, Postgres runtime, media tools, health tooling | Planned |
 | Non-root app process | Run as a non-root image user by default; allow Compose-level `PUID` and `PGID` selection via `user:` instead of runtime privilege dropping | Implemented baseline |
 | Dependency and base-image update automation | Use Dependabot to raise reviewable update PRs for npm, Dockerfile bases, Compose image tags, and pinned GitHub Actions | Implemented baseline |
@@ -286,7 +286,7 @@ Status: Planned.
 
 | Practice | Target |
 |----------|--------|
-| Stable runtime | Node 24 baseline |
+| Stable runtime | Node 25.4 baseline |
 | ESM | Use ES modules for app/scripts |
 | Express security | Helmet, body limits, centralized errors |
 | Dependency auditing | npm audit, Dependabot, OSV |
