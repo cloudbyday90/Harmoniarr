@@ -118,7 +118,7 @@ jobs:
         run: mkdir -p supply-chain
 
       - name: Generate release SBOM
-        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: .
           format: spdx-json
@@ -129,7 +129,7 @@ jobs:
 
       - name: Publish SBOM release asset
         if: github.event_name == 'release'
-        uses: anchore/sbom-action/publish-sbom@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        uses: anchore/sbom-action/publish-sbom@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           sbom-artifact-match: ^harmoniarr-release\.spdx\.json$
 
