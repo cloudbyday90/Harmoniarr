@@ -17,23 +17,85 @@
  */
 
 import { createRequestAuthDependencies } from '../auth-module.js';
+import { createApiError } from '../auth.js';
+import { hasAppUserPermission } from '../app-user-permission-service.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
 export function registerLibraryRoutes(app, {
+  buildLibraryDiscoveryRunDetail,
   buildLibraryDiscoverySummary,
+  buildLibraryOrganizePreview,
+  buildMediaRequestSummary,
   buildLibraryReconciliationSummary,
+  buildLibraryScanRunDetail,
   buildLibraryWantedSummary,
+  createMediaRequest,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
+  limitLibraryDiscoveryRun = skipRateLimitMiddleware,
+  limitLibraryOrganizeApplyRun = skipRateLimitMiddleware,
+  limitLibraryScanRun = skipRateLimitMiddleware,
+  listMediaRequests,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  startLibraryOrganizeApplyRun,
   startLibraryDiscoveryRun,
   startLibraryScan,
 }) {
+  function resolveMediaRequestScope(session, requestedScope) {
+    if (session?.user?.role === 'admin') {
+      return requestedScope === 'mine' ? 'mine' : 'all';
+    }
+
+    return 'mine';
+  }
+
+  function ensureMediaRequestPermission(session, permission, message) {
+    if (!hasAppUserPermission(session?.user, permission)) {
+      throw createApiError(403, 'forbidden', message);
+    }
+  }
+
   app.get('/api/v1/library/discovery-summary', asyncRoute(async (request, response) => {
     await requireSession(request);
     response.json(await buildLibraryDiscoverySummary());
+  }));
+
+  app.get('/api/v1/library/media-request-summary', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    const scope = resolveMediaRequestScope(session, request.query.scope);
+    response.json({
+      ok: true,
+      scope,
+      ...(await buildMediaRequestSummary({
+        requestedByUserId: scope === 'mine' ? session.appUserId : null,
+      })),
+    });
+  }));
+
+  app.get('/api/v1/library/media-requests', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    const scope = resolveMediaRequestScope(session, request.query.scope);
+    response.json({
+      mediaRequests: await listMediaRequests({
+        requestedByUserId: scope === 'mine' ? session.appUserId : null,
+      }),
+      ok: true,
+      scope,
+    });
+  }));
+
+  app.get('/api/v1/library/discovery-runs/:runId', asyncRoute(async (request, response) => {
+    await requireSession(request);
+    response.json({
+      ok: true,
+      libraryDiscoveryRun: await buildLibraryDiscoveryRunDetail({
+        runId: request.params.runId,
+      }),
+    });
   }));
 
   app.get('/api/v1/library/reconciliation-summary', asyncRoute(async (request, response) => {
@@ -41,13 +103,49 @@ export function registerLibraryRoutes(app, {
     response.json(await buildLibraryReconciliationSummary());
   }));
 
+  app.get('/api/v1/library/organize-preview', asyncRoute(async (request, response) => {
+    await requireSession(request);
+    response.json(await buildLibraryOrganizePreview());
+  }));
+
   app.get('/api/v1/library/wanted-summary', asyncRoute(async (request, response) => {
     await requireSession(request);
     response.json(await buildLibraryWantedSummary());
   }));
 
-  app.post('/api/v1/library/discovery-runs', asyncRoute(async (request, response) => {
+  app.post('/api/v1/library/media-requests', asyncRoute(async (request, response) => {
     const session = await requireSession(request);
+    requireCsrf(request, session);
+    ensureMediaRequestPermission(session, 'media.request', 'The current user cannot create music requests');
+
+    if (request.body?.requestKind === 'external_url') {
+      ensureMediaRequestPermission(session, 'playlist.submit', 'The current user cannot submit playlist or collection URLs');
+    }
+
+    const mediaRequest = await createMediaRequest({
+      actorUserId: session.appUserId,
+      payload: request.body,
+      requestMetadata: getRequestMetadata(request),
+    });
+
+    response.status(201).json({
+      mediaRequest,
+      ok: true,
+    });
+  }));
+
+  app.get('/api/v1/library/scan-runs/:runId', asyncRoute(async (request, response) => {
+    await requireSession(request);
+    response.json({
+      ok: true,
+      libraryScanRun: await buildLibraryScanRunDetail({
+        runId: request.params.runId,
+      }),
+    });
+  }));
+
+  app.post('/api/v1/library/discovery-runs', limitLibraryDiscoveryRun, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
     const result = await startLibraryDiscoveryRun({
@@ -61,8 +159,23 @@ export function registerLibraryRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/library/scan-runs', asyncRoute(async (request, response) => {
-    const session = await requireSession(request);
+  app.post('/api/v1/library/organize-runs', limitLibraryOrganizeApplyRun, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await startLibraryOrganizeApplyRun({
+      requestMetadata: getRequestMetadata(request),
+      triggeredByUserId: session.appUserId,
+    });
+
+    response.status(202).json({
+      ok: true,
+      ...result,
+    });
+  }));
+
+  app.post('/api/v1/library/scan-runs', limitLibraryScanRun, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
     const result = await startLibraryScan({

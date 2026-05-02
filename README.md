@@ -20,8 +20,8 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 The current planning baseline includes a few explicit v1 decisions:
 
 - Local first-run admin setup with Classifarr-style cookie-based browser auth.
-- Refresh-token-backed sessions with CSRF protection for cookie-authenticated writes.
-- API keys reserved for integrations and automation rather than normal browser administration.
+- Refresh-token-backed sessions with default-on CSRF protection for cookie-authenticated writes, plus an explicit deployment-level opt-out for tightly trusted local-only installs.
+- Optional lightweight integration tokens may be added for local automation if a real use case appears, but normal browser administration remains session-based.
 - Explicit path-mapping and staging boundaries between `slskd`, Harmoniarr, and final library roots.
 - Staging-first treatment of completed Soulseek downloads before import into the library.
 
@@ -63,6 +63,7 @@ APP_PORT=3000
 HARMONIARR_PORT=47956
 HARMONIARR_CONTACT_URL=https://github.com/cloudbyday90/harmoniarr
 HARMONIARR_CONTACT_EMAIL=
+HARMONIARR_CSRF_PROTECTION=required
 HARMONIARR_APPDATA=/srv/harmoniarr
 HARMONIARR_DOWNLOADS=/srv/slskd/downloads
 HARMONIARR_MUSIC=/srv/media/music
@@ -72,6 +73,8 @@ SLSKD_BASE_URL=http://slskd:5030
 SLSKD_WEB_PORT=5030
 SLSKD_APPDATA=/srv/slskd/config
 ```
+
+`HARMONIARR_CSRF_PROTECTION` defaults to `required`. Set it to `disabled` only for tightly trusted local-only or separately network-restricted deployments where you are intentionally accepting the CSRF tradeoff. A reverse proxy can reduce exposure and enforce network boundaries, but it is not a general substitute for CSRF protection by itself.
 
 `PUID` and `PGID` now select the container user through Compose itself. Ensure the bound host paths are writable by that UID/GID pair; the default runtime path no longer tries to `chown` host mounts during startup.
 

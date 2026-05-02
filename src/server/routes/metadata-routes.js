@@ -19,6 +19,7 @@
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies({
   getRequestMetadata,
@@ -60,6 +61,7 @@ export function registerMetadataRoutes(app, {
   getRequestMetadata: getRequestMetadataFn = defaultRequestAuthDependencies.getRequestMetadata,
   getMusicBrainzReleaseGroupReleases,
   getMetadataArtist,
+  getMetadataArtistDetectionEvents,
   getMetadataArtistByMusicBrainzId,
   getMetadataRelease,
   getMetadataReleaseByMusicBrainzId,
@@ -68,8 +70,11 @@ export function registerMetadataRoutes(app, {
   importMusicBrainzArtist,
   importMusicBrainzReleaseGroup,
   importMusicBrainzRelease,
+  limitMetadataArtistRefreshRun = skipRateLimitMiddleware,
+  startMetadataArtistRefresh,
   updateMetadataArtistMonitoring,
   requireCsrf: requireCsrfFn = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshAdminSession: requireFreshAdminSessionFn = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession: requireSessionFn = defaultRequestAuthDependencies.requireSession,
   searchLocalMetadataArtists,
   searchLocalMetadataReleaseGroups,
@@ -89,7 +94,7 @@ export function registerMetadataRoutes(app, {
 
   function registerImportRoute(path, importEntity, buildImportRequest, buildImportedBody) {
     app.post(path, metadataRoute(async (request, response) => {
-      const session = await requireSessionFn(request);
+      const session = await requireFreshAdminSessionFn(request);
       requireCsrfFn(request, session);
 
       const imported = await importEntity(buildImportRequest(request, session));
@@ -133,9 +138,27 @@ export function registerMetadataRoutes(app, {
     return {
       artist: result.artist,
       aliases: result.aliases,
+      detectionEvents: result.detectionEvents ?? [],
+      detectionEventsPageInfo: result.detectionEventsPageInfo ?? {
+        hasMore: false,
+        nextCursor: null,
+      },
       monitoring: result.monitoring,
       releaseGroups: result.releaseGroups,
       releases: result.releases,
+    };
+  });
+
+  registerSessionGetJsonRoute('/api/v1/metadata/artists/:artistId/detection-events', async (request) => {
+    const result = await getMetadataArtistDetectionEvents({
+      artistId: request.params.artistId,
+      before: request.query.before,
+      limit: request.query.limit,
+    });
+
+    return {
+      detectionEvents: result.entries,
+      pageInfo: result.pageInfo,
     };
   });
 
@@ -147,6 +170,11 @@ export function registerMetadataRoutes(app, {
     return {
       artist: result.artist,
       aliases: result.aliases,
+      detectionEvents: result.detectionEvents ?? [],
+      detectionEventsPageInfo: result.detectionEventsPageInfo ?? {
+        hasMore: false,
+        nextCursor: null,
+      },
       monitoring: result.monitoring,
       releaseGroups: result.releaseGroups,
       releases: result.releases,
@@ -154,7 +182,7 @@ export function registerMetadataRoutes(app, {
   });
 
   app.put('/api/v1/metadata/artists/:artistId/monitoring', metadataRoute(async (request, response) => {
-    const session = await requireSessionFn(request);
+    const session = await requireFreshAdminSessionFn(request);
     requireCsrfFn(request, session);
 
     const updated = await updateMetadataArtistMonitoring({
@@ -166,6 +194,22 @@ export function registerMetadataRoutes(app, {
       ok: true,
       artistId: updated.artistId,
       monitoring: updated.monitoring,
+    });
+  }));
+
+  app.post('/api/v1/metadata/artists/:artistId/refresh', limitMetadataArtistRefreshRun, metadataRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
+    requireCsrfFn(request, session);
+
+    const result = await startMetadataArtistRefresh({
+      metadataArtistId: request.params.artistId,
+      requestMetadata: getRequestMetadataFn(request),
+      triggeredByUserId: session.appUserId,
+    });
+
+    response.status(202).json({
+      ok: true,
+      ...result,
     });
   }));
 

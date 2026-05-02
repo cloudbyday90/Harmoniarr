@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from './auth.js';
 import { createSettingsService } from './settings-service.js';
 import { createLibraryScanRunStore } from './library/library-scan-run-store.js';
 import { buildLibraryScanContext } from './library/library-scan-readiness.js';
@@ -72,6 +73,19 @@ export function createLibraryScanSummaryService({
   libraryScanRunStore = createLibraryScanRunStore(),
   settingsService = createSettingsService(),
 } = {}) {
+  async function buildLibraryScanRunDetail({ runId }) {
+    const run = await libraryScanRunStore.getRunById(runId);
+
+    if (!run) {
+      throw createApiError(404, 'library_scan_run_not_found', 'Library scan run not found');
+    }
+
+    return {
+      checkedAt: new Date().toISOString(),
+      run,
+    };
+  }
+
   async function buildLibraryScanSummary() {
     const checkedAt = new Date().toISOString();
     const settingsPayload = await settingsService.buildSettingsPayload();
@@ -94,6 +108,7 @@ export function createLibraryScanSummaryService({
   }
 
   return {
+    buildLibraryScanRunDetail,
     buildLibraryScanSummary,
   };
 }

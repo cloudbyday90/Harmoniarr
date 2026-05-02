@@ -18,7 +18,16 @@
 
 import { createLibraryScanSummaryService } from '../library-scan-summary-service.js';
 import { createSettingsService } from '../settings-service.js';
+import { createProviderClientResolverService } from '../integrations/providers/provider-client-resolver-service.js';
 import { createLibraryCatalogStore } from './library-catalog-store.js';
+import { createLibraryExternalIntakeRunStore } from './library-external-intake-run-store.js';
+import { createLibraryExternalIntakeService } from './library-external-intake-service.js';
+import { createLibraryExternalIntakeWorker } from './library-external-intake-worker.js';
+import { createLibraryProviderIngestExecutionRunStore } from './library-provider-ingest-execution-run-store.js';
+import { createLibraryProviderIngestExecutionService } from './library-provider-ingest-execution-service.js';
+import { createLibraryProviderIngestExecutionWorker } from './library-provider-ingest-execution-worker.js';
+import { createLibraryProviderIngestPlanningService } from './library-provider-ingest-planning-service.js';
+import { createLibraryProviderIngestRequestStore } from './library-provider-ingest-request-store.js';
 import { createLibraryDiscoveryRequestService } from './library-discovery-request-service.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 import { createLibraryDiscoveryDispatchService } from './library-discovery-dispatch-service.js';
@@ -28,14 +37,24 @@ import { createLibraryDiscoverySummaryService } from './library-discovery-summar
 import { createLibraryDiscoverySummaryStore } from './library-discovery-summary-store.js';
 import { createLibraryDiscoveryHeartbeatState } from './library-discovery-heartbeat-state.js';
 import { createLibraryDiscoveryWorker } from './library-discovery-worker.js';
+import { createLibraryEmbeddedArtworkService } from './library-embedded-artwork-service.js';
 import { createLibraryFileMatcherService } from './library-file-matcher-service.js';
 import { createLibraryFileMatchStore } from './library-file-match-store.js';
+import { createLibraryMediaRequestService } from './library-media-request-service.js';
+import { createLibraryMediaRequestStore } from './library-media-request-store.js';
+import { createLibraryOrganizeApplyRunStore } from './library-organize-apply-run-store.js';
+import { createLibraryOrganizeApplyService } from './library-organize-apply-service.js';
+import { createLibraryOrganizeApplyWorker } from './library-organize-apply-worker.js';
+import { createLibraryOrganizePreviewService } from './library-organize-preview-service.js';
+import { createLibraryOrganizePreviewStore } from './library-organize-preview-store.js';
+import { createLibraryReleaseAvailabilityStore } from './library-release-availability-store.js';
 import { createLibraryReconciliationSummaryService } from './library-reconciliation-summary-service.js';
 import { createLibraryReconciliationSummaryStore } from './library-reconciliation-summary-store.js';
 import { createLibraryReleaseReconciliationService } from './library-release-reconciliation-service.js';
 import { createLibraryReleaseReconciliationStore } from './library-release-reconciliation-store.js';
 import { createLibraryScanRunStore } from './library-scan-run-store.js';
 import { createLibraryScanService } from './library-scan-service.js';
+import { createLibrarySidecarArtworkService } from './library-sidecar-artwork-service.js';
 import { createLibraryTagExtractionService } from './library-tag-extraction-service.js';
 import { createLibraryTagSnapshotStore } from './library-tag-snapshot-store.js';
 import { createLibraryWantedReleaseService } from './library-wanted-release-service.js';
@@ -43,8 +62,11 @@ import { createLibraryWantedReleaseStore } from './library-wanted-release-store.
 import { createLibraryWantedSummaryService } from './library-wanted-summary-service.js';
 import { createLibraryWantedSummaryStore } from './library-wanted-summary-store.js';
 import { createLibraryScanWorker } from './library-scan-worker.js';
+import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
 
 export function createLibraryModule({
+  artworkAssignmentService = null,
+  artworkIngestionService = null,
   importCandidateService = null,
   settingsService = createSettingsService(),
   slskdService = null,
@@ -57,6 +79,80 @@ export function createLibraryModule({
     importCandidateService,
     libraryDiscoveryRequestStore,
     slskdService,
+  }),
+  libraryReleaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
+  libraryMediaRequestStore = createLibraryMediaRequestStore(),
+  providerClientResolverService = createProviderClientResolverService(),
+  libraryProviderIngestRequestStore = createLibraryProviderIngestRequestStore(),
+  libraryExternalIntakeRunStore = createLibraryExternalIntakeRunStore(),
+  libraryProviderIngestPlanningService = createLibraryProviderIngestPlanningService({
+    mediaRequestStore: libraryMediaRequestStore,
+    providerIngestRequestStore: libraryProviderIngestRequestStore,
+  }),
+  libraryExternalIntakeService = createLibraryExternalIntakeService({
+    createOperationRun: libraryExternalIntakeRunStore.createOperationRun,
+    getActiveRunByMediaRequestId: libraryExternalIntakeRunStore.getActiveRunByMediaRequestId,
+    mediaRequestStore: libraryMediaRequestStore,
+  }),
+  libraryProviderIngestExecutionRunStore = createLibraryProviderIngestExecutionRunStore(),
+  libraryProviderIngestExecutionService = createLibraryProviderIngestExecutionService({
+    executionRunStore: libraryProviderIngestExecutionRunStore,
+    mediaRequestStore: libraryMediaRequestStore,
+    providerIngestRequestStore: libraryProviderIngestRequestStore,
+    resolveProviderClients: providerClientResolverService.resolveProviderClients,
+  }),
+  libraryProviderIngestExecutionWorker = createLibraryProviderIngestExecutionWorker({
+    acquireLease: libraryProviderIngestExecutionRunStore.acquireLease,
+    executeProviderIngestRequests: libraryProviderIngestExecutionService.executeProviderIngestRequests,
+    isCancellationRequested: libraryProviderIngestExecutionRunStore.isCancellationRequested,
+    markRunCancelled: libraryProviderIngestExecutionRunStore.markRunCancelled,
+    markRunCompleted: libraryProviderIngestExecutionRunStore.markRunCompleted,
+    markRunFailed: libraryProviderIngestExecutionRunStore.markRunFailed,
+    markRunStarted: libraryProviderIngestExecutionRunStore.markRunStarted,
+    releaseLease: libraryProviderIngestExecutionRunStore.releaseLease,
+    renewLease: libraryProviderIngestExecutionRunStore.renewLease,
+  }),
+  libraryExternalIntakeWorker = createLibraryExternalIntakeWorker({
+    acquireLease: libraryExternalIntakeRunStore.acquireLease,
+    isCancellationRequested: libraryExternalIntakeRunStore.isCancellationRequested,
+    markRunCancelled: libraryExternalIntakeRunStore.markRunCancelled,
+    markRunCompleted: libraryExternalIntakeRunStore.markRunCompleted,
+    markRunFailed: libraryExternalIntakeRunStore.markRunFailed,
+    markRunStarted: libraryExternalIntakeRunStore.markRunStarted,
+    planExternalMediaRequest: libraryProviderIngestPlanningService.planExternalMediaRequest,
+    queueExternalMediaRequestExecution: libraryProviderIngestExecutionService.queueExternalMediaRequestExecution,
+    releaseLease: libraryExternalIntakeRunStore.releaseLease,
+    renewLease: libraryExternalIntakeRunStore.renewLease,
+  }),
+  libraryMediaRequestService = createLibraryMediaRequestService({
+    externalIntakeService: libraryExternalIntakeService,
+    mediaRequestStore: libraryMediaRequestStore,
+    releaseAvailabilityStore: libraryReleaseAvailabilityStore,
+  }),
+  mediaFilesystemService = createMediaFilesystemService(),
+  libraryOrganizePreviewStore = createLibraryOrganizePreviewStore(),
+  libraryOrganizePreviewService = createLibraryOrganizePreviewService({
+    libraryOrganizePreviewStore,
+  }),
+  libraryOrganizeApplyRunStore = createLibraryOrganizeApplyRunStore(),
+  libraryOrganizeApplyService = createLibraryOrganizeApplyService({
+    buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
+    createOperationRun: libraryOrganizeApplyRunStore.createOperationRun,
+    getActiveRun: libraryOrganizeApplyRunStore.getActiveRun,
+  }),
+  libraryOrganizeApplyWorker = createLibraryOrganizeApplyWorker({
+    acquireLease: libraryOrganizeApplyRunStore.acquireLease,
+    applyExclusiveFileMutationPlan: mediaFilesystemService.applyExclusiveFileMutationPlan,
+    buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
+    createExclusiveFileMutationPlan: mediaFilesystemService.createExclusiveFileMutationPlan,
+    isCancellationRequested: libraryOrganizeApplyRunStore.isCancellationRequested,
+    markRunCancelled: libraryOrganizeApplyRunStore.markRunCancelled,
+    markRunCompleted: libraryOrganizeApplyRunStore.markRunCompleted,
+    markRunFailed: libraryOrganizeApplyRunStore.markRunFailed,
+    markRunStarted: libraryOrganizeApplyRunStore.markRunStarted,
+    releaseLease: libraryOrganizeApplyRunStore.releaseLease,
+    renewLease: libraryOrganizeApplyRunStore.renewLease,
+    updateLibraryFileCanonicalPath: libraryCatalogStore.updateLibraryFileCanonicalPath,
   }),
   libraryFileMatchStore = createLibraryFileMatchStore(),
   libraryFileMatcherService = createLibraryFileMatcherService({
@@ -79,17 +175,19 @@ export function createLibraryModule({
   libraryDiscoveryWorker = createLibraryDiscoveryWorker({
     acquireLease: libraryDiscoveryRunStore.acquireLease,
     dispatchDiscoveryRequests: libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests,
+    isCancellationRequested: libraryDiscoveryRunStore.isCancellationRequested,
+    markRunCancelled: libraryDiscoveryRunStore.markRunCancelled,
     markRunCompleted: libraryDiscoveryRunStore.markRunCompleted,
     markRunFailed: libraryDiscoveryRunStore.markRunFailed,
     markRunStarted: libraryDiscoveryRunStore.markRunStarted,
     reconcileDiscoveryRequests: libraryDiscoveryRequestService.reconcileDiscoveryRequests,
     reconcileWantedReleases: libraryWantedReleaseService.reconcileWantedReleases,
     releaseLease: libraryDiscoveryRunStore.releaseLease,
+    renewLease: libraryDiscoveryRunStore.renewLease,
   }),
   libraryDiscoveryRunService = createLibraryDiscoveryRunService({
     createOperationRun: libraryDiscoveryRunStore.createOperationRun,
     getActiveRun: libraryDiscoveryRunStore.getActiveRun,
-    startWorkerRun: libraryDiscoveryWorker.startWorkerRun,
   }),
   libraryDiscoverySummaryStore = createLibraryDiscoverySummaryStore(),
   libraryDiscoverySummaryService = createLibraryDiscoverySummaryService({
@@ -103,12 +201,24 @@ export function createLibraryModule({
   }),
   libraryScanRunStore = createLibraryScanRunStore(),
   libraryTagSnapshotStore = createLibraryTagSnapshotStore(),
+  libraryEmbeddedArtworkService = createLibraryEmbeddedArtworkService({
+    artworkAssignmentService,
+    artworkIngestionService,
+  }),
+  librarySidecarArtworkService = createLibrarySidecarArtworkService({
+    artworkAssignmentService,
+    artworkIngestionService,
+  }),
   libraryTagExtractionService = createLibraryTagExtractionService({
+    libraryEmbeddedArtworkService,
     libraryTagSnapshotStore,
   }),
   libraryScanWorker = createLibraryScanWorker({
     acquireLease: libraryScanRunStore.acquireLease,
+    captureLibrarySidecarArtwork: librarySidecarArtworkService.captureSidecarArtwork,
     extractLibraryFileTags: libraryTagExtractionService.extractLibraryFileTags,
+    isCancellationRequested: libraryScanRunStore.isCancellationRequested,
+    markRunCancelled: libraryScanRunStore.markRunCancelled,
     matchLibraryFiles: libraryFileMatcherService.matchLibraryFiles,
     reconcileDiscoveryRequests: libraryDiscoveryRequestService.reconcileDiscoveryRequests,
     reconcileLibraryReleases: libraryReleaseReconciliationService.reconcileLibraryReleases,
@@ -118,12 +228,12 @@ export function createLibraryModule({
     markRunStarted: libraryScanRunStore.markRunStarted,
     recordLibraryFiles: libraryCatalogStore.recordLibraryFiles,
     releaseLease: libraryScanRunStore.releaseLease,
+    renewLease: libraryScanRunStore.renewLease,
   }),
   libraryScanService = createLibraryScanService({
     createOperationRun: libraryScanRunStore.createOperationRun,
     getActiveRun: libraryScanRunStore.getActiveRun,
     settingsService,
-    startWorkerRun: libraryScanWorker.startWorkerRun,
   }),
   libraryScanSummaryService = createLibraryScanSummaryService({
     libraryScanRunStore,
@@ -141,8 +251,26 @@ export function createLibraryModule({
     libraryDiscoverySummaryService,
     libraryDiscoverySummaryStore,
     libraryDiscoveryWorker,
+    libraryEmbeddedArtworkService,
     libraryFileMatcherService,
     libraryFileMatchStore,
+    libraryExternalIntakeRunStore,
+    libraryExternalIntakeService,
+    libraryExternalIntakeWorker,
+    libraryMediaRequestService,
+    libraryMediaRequestStore,
+    libraryOrganizeApplyRunStore,
+    libraryOrganizeApplyService,
+    libraryOrganizeApplyWorker,
+    libraryOrganizePreviewService,
+    libraryOrganizePreviewStore,
+    providerClientResolverService,
+    libraryProviderIngestExecutionRunStore,
+    libraryProviderIngestExecutionService,
+    libraryProviderIngestExecutionWorker,
+    libraryProviderIngestPlanningService,
+    libraryProviderIngestRequestStore,
+    libraryReleaseAvailabilityStore,
     libraryReconciliationSummaryService,
     libraryReconciliationSummaryStore,
     libraryReleaseReconciliationService,
@@ -150,6 +278,7 @@ export function createLibraryModule({
     libraryScanRunStore,
     libraryScanService,
     libraryScanSummaryService,
+    librarySidecarArtworkService,
     libraryTagExtractionService,
     libraryTagSnapshotStore,
     libraryWantedReleaseService,
@@ -158,9 +287,16 @@ export function createLibraryModule({
     libraryWantedSummaryStore,
     libraryScanWorker,
     routeDependencies: {
+      buildLibraryDiscoveryRunDetail: libraryDiscoverySummaryService.buildLibraryDiscoveryRunDetail,
       buildLibraryDiscoverySummary: libraryDiscoverySummaryService.buildLibraryDiscoverySummary,
+      buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
+      buildMediaRequestSummary: libraryMediaRequestService.buildMediaRequestSummary,
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,
+      buildLibraryScanRunDetail: libraryScanSummaryService.buildLibraryScanRunDetail,
       buildLibraryWantedSummary: libraryWantedSummaryService.buildLibraryWantedSummary,
+      createMediaRequest: libraryMediaRequestService.createMediaRequest,
+      listMediaRequests: libraryMediaRequestService.listMediaRequests,
+      startLibraryOrganizeApplyRun: libraryOrganizeApplyService.startLibraryOrganizeApplyRun,
       startLibraryDiscoveryRun: libraryDiscoveryRunService.startLibraryDiscoveryRun,
       startLibraryScan: libraryScanService.startLibraryScan,
     },

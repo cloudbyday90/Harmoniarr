@@ -17,7 +17,9 @@
  */
 
 import { ref } from 'vue';
+import { isAbortError } from '../lib/abort-error.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { createLatestRequestGate } from '../lib/latest-request-gate.js';
 import {
   fetchMetadataRelease,
   fetchMetadataReleaseGroup,
@@ -49,8 +51,10 @@ export function useMetadataReleaseWorkflow({
   const isOpeningLocalReleaseGroup = ref(false);
   const isImportingRelease = ref(false);
   const isOpeningLocalRelease = ref(false);
+  const releaseSelectionRequestGate = createLatestRequestGate();
 
   function resetReleaseSelection() {
+    releaseSelectionRequestGate.invalidate();
     providerReleases.value = [];
     localReleaseGroup.value = null;
     localRelease.value = null;
@@ -59,6 +63,7 @@ export function useMetadataReleaseWorkflow({
   }
 
   async function loadReleaseGroupWorkspace(releaseGroup, { preserveRelease = false } = {}) {
+    const request = releaseSelectionRequestGate.begin();
     releaseGroupActionError.value = '';
     if (!preserveRelease) {
       localRelease.value = null;
@@ -68,18 +73,30 @@ export function useMetadataReleaseWorkflow({
 
     try {
       const [localPayload, providerPayload] = await Promise.all([
-        resolveReleaseGroupLocal(releaseGroup.id),
-        fetchReleaseGroupReleases(releaseGroup.id),
+        resolveReleaseGroupLocal(releaseGroup.id, { signal: request.signal }),
+        fetchReleaseGroupReleases(releaseGroup.id, { signal: request.signal }),
       ]);
+
+      if (!request.isCurrent()) {
+        return;
+      }
 
       localReleaseGroup.value = localPayload;
       providerReleases.value = providerPayload.releases?.results ?? [];
     } catch (error) {
-      localReleaseGroup.value = null;
-      providerReleases.value = [];
-      releaseGroupActionError.value = getErrorMessage(error, 'Loading release group failed');
+      if (isAbortError(error)) {
+        return;
+      }
+
+      if (request.isCurrent()) {
+        localReleaseGroup.value = null;
+        providerReleases.value = [];
+        releaseGroupActionError.value = getErrorMessage(error, 'Loading release group failed');
+      }
     } finally {
-      isLoadingReleaseGroup.value = false;
+      if (request.isCurrent()) {
+        isLoadingReleaseGroup.value = false;
+      }
     }
   }
 
@@ -103,18 +120,32 @@ export function useMetadataReleaseWorkflow({
   }
 
   async function openLocalReleaseGroup(releaseGroup) {
+    const request = releaseSelectionRequestGate.begin();
     releaseGroupActionError.value = '';
     releaseActionError.value = '';
     localRelease.value = null;
     isOpeningLocalReleaseGroup.value = true;
 
     try {
-      localReleaseGroup.value = await fetchReleaseGroup(releaseGroup.id);
+      const releaseGroupPayload = await fetchReleaseGroup(releaseGroup.id, { signal: request.signal });
+      if (!request.isCurrent()) {
+        return;
+      }
+
+      localReleaseGroup.value = releaseGroupPayload;
       providerReleases.value = [];
     } catch (error) {
-      releaseGroupActionError.value = getErrorMessage(error, 'Opening local release group failed');
+      if (isAbortError(error)) {
+        return;
+      }
+
+      if (request.isCurrent()) {
+        releaseGroupActionError.value = getErrorMessage(error, 'Opening local release group failed');
+      }
     } finally {
-      isOpeningLocalReleaseGroup.value = false;
+      if (request.isCurrent()) {
+        isOpeningLocalReleaseGroup.value = false;
+      }
     }
   }
 
@@ -143,22 +174,35 @@ export function useMetadataReleaseWorkflow({
   }
 
   async function openLocalRelease(release) {
+    const request = releaseSelectionRequestGate.begin();
     releaseActionError.value = '';
     isOpeningLocalRelease.value = true;
 
     try {
       const [releasePayload, releaseGroupPayload] = await Promise.all([
-        fetchRelease(release.id),
-        fetchReleaseGroup(release.releaseGroupId),
+        fetchRelease(release.id, { signal: request.signal }),
+        fetchReleaseGroup(release.releaseGroupId, { signal: request.signal }),
       ]);
+
+      if (!request.isCurrent()) {
+        return;
+      }
 
       localRelease.value = releasePayload;
       localReleaseGroup.value = releaseGroupPayload;
       providerReleases.value = [];
     } catch (error) {
-      releaseActionError.value = getErrorMessage(error, 'Opening local release failed');
+      if (isAbortError(error)) {
+        return;
+      }
+
+      if (request.isCurrent()) {
+        releaseActionError.value = getErrorMessage(error, 'Opening local release failed');
+      }
     } finally {
-      isOpeningLocalRelease.value = false;
+      if (request.isCurrent()) {
+        isOpeningLocalRelease.value = false;
+      }
     }
   }
 

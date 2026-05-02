@@ -91,6 +91,10 @@ Supported deployment variables:
 - `HARMONIARR_CONTACT_URL`
 - `HARMONIARR_CONTACT_EMAIL`
 - `HARMONIARR_LOG_LEVEL`
+- `HARMONIARR_CSRF_PROTECTION`
+- `HARMONIARR_ENFORCE_HTTPS`
+- `HARMONIARR_ENABLE_STRICT_TRANSPORT_SECURITY`
+- `HARMONIARR_SECURE_COOKIES`
 - `HARMONIARR_APPDATA`
 - `HARMONIARR_DOWNLOADS`
 - `HARMONIARR_MUSIC`
@@ -115,6 +119,10 @@ HARMONIARR_BASE_URL=
 HARMONIARR_CONTACT_URL=https://github.com/cloudbyday90/harmoniarr
 HARMONIARR_CONTACT_EMAIL=
 HARMONIARR_LOG_LEVEL=info
+HARMONIARR_CSRF_PROTECTION=disabled
+HARMONIARR_ENFORCE_HTTPS=false
+HARMONIARR_ENABLE_STRICT_TRANSPORT_SECURITY=false
+HARMONIARR_SECURE_COOKIES=false
 HARMONIARR_APPDATA=/srv/harmoniarr
 HARMONIARR_DOWNLOADS=/srv/slskd/downloads
 HARMONIARR_MUSIC=/srv/media/music
@@ -132,6 +140,21 @@ Rationale:
 - `APP_PORT=3000` is the fixed internal HTTP port.
 - `HARMONIARR_PORT=47956` is the chosen high, uncommon host port to avoid the common media-app defaults.
 - `HARMONIARR_CONTACT_URL` defaults to the project URL so MusicBrainz-backed startup does not fail before operators customize their deployment metadata.
+- Deployment security is now settings-driven and opt-in by default for local HTTP installs. These environment variables remain available as bootstrap fallbacks before an operator saves settings in the UI.
+- `HARMONIARR_CSRF_PROTECTION=disabled` keeps local-only installs friction-free by default; set it to `required` when browser writes should carry CSRF tokens.
+- `HARMONIARR_SECURE_COOKIES=true`, `HARMONIARR_ENFORCE_HTTPS=true`, and `HARMONIARR_ENABLE_STRICT_TRANSPORT_SECURITY=true` should only be enabled when Harmoniarr is actually served behind HTTPS, typically through a reverse proxy or TLS terminator.
+
+CSRF policy guidance:
+
+- Keep `security.csrfProtectionMode=required` for normal browser-administered deployments.
+- Only use `disabled` when the app is not exposed beyond a tightly trusted operator boundary and you are intentionally accepting the residual CSRF risk.
+- A reverse proxy can reduce exposure and enforce network boundaries, but it does not automatically replace CSRF protections for cookie-authenticated browser sessions.
+
+HTTPS and cookie policy guidance:
+
+- Keep `security.secureCookies`, `security.enforceHttps`, and `security.strictTransportSecurity` disabled for direct local HTTP use.
+- Enable all three together when the app is published behind HTTPS so cookies are not sent over plain HTTP, safe browser requests redirect to HTTPS, and browsers remember the HTTPS-only transport rule.
+- When `security.enforceHttps` is enabled, safe requests are redirected to `https://...` and unsafe writes over plain HTTP are rejected.
 
 Bind-mount rule:
 

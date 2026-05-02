@@ -19,9 +19,8 @@
 import { getPool } from './database.js';
 import { getDefaultSettings, normalizeSettingsPatch } from './validators/settings-validator.js';
 
-export async function loadSettings() {
-  const pool = getPool();
-  const result = await pool.query(
+export async function loadSettings(queryable = getPool()) {
+  const result = await queryable.query(
     'SELECT namespace, setting_key, setting_value FROM app_settings ORDER BY namespace ASC, setting_key ASC',
   );
 
@@ -35,11 +34,9 @@ export async function loadSettings() {
   return settings;
 }
 
-export async function persistSettings(updates, updatedByUserId = null) {
-  const pool = getPool();
-
+export async function persistSettings(updates, updatedByUserId = null, queryable = getPool()) {
   for (const update of updates) {
-    await pool.query(
+    await queryable.query(
       `
         INSERT INTO app_settings (
           namespace,
@@ -58,5 +55,5 @@ export async function persistSettings(updates, updatedByUserId = null) {
     );
   }
 
-  return loadSettings();
+  return loadSettings(queryable);
 }

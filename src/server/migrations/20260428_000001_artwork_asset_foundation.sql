@@ -22,7 +22,7 @@ SET path = EXCLUDED.path,
     description = EXCLUDED.description;
 
 CREATE TABLE IF NOT EXISTS artwork_assets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   storage_namespace TEXT NOT NULL,
   relative_path TEXT NOT NULL,
   sha256 TEXT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS artwork_assets (
 );
 
 CREATE TABLE IF NOT EXISTS artwork_assignments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   artwork_asset_id UUID NOT NULL REFERENCES artwork_assets(id) ON DELETE CASCADE,
   owner_type TEXT NOT NULL,
   owner_id UUID NOT NULL,

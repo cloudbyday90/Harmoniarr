@@ -1,0 +1,177 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createAppUserService } from '../../src/server/app-user-service.js';
+
+test('createAppUserService lists users with resolved permission sets', async (t) => {
+  const getPoolFn = t.mock.fn(() => ({
+    query: t.mock.fn(async () => ({
+      rows: [{
+        auth_provider: 'local',
+        auth_subject: null,
+        created_at: '2026-05-02T15:00:00.000Z',
+        id: 'user-1',
+        is_disabled: false,
+        last_login_at: null,
+        managed_library_relative_root: 'listeners/listener',
+        must_change_password: true,
+        role: 'requester',
+        updated_at: '2026-05-02T15:00:00.000Z',
+        username: 'listener',
+      }],
+    })),
+  }));
+  const service = createAppUserService({ getPoolFn });
+
+  const users = await service.listAppUsers();
+
+  assert.deepEqual(users, [{
+    authProvider: 'local',
+    authSubject: null,
+    createdAt: '2026-05-02T15:00:00.000Z',
+    id: 'user-1',
+    isDisabled: false,
+    lastLoginAt: null,
+    managedLibraryRelativeRoot: 'listeners/listener',
+    mustChangePassword: true,
+    permissions: ['import.preview.self', 'media.request', 'playlist.submit'],
+    role: 'requester',
+    updatedAt: '2026-05-02T15:00:00.000Z',
+    username: 'listener',
+  }]);
+});
+
+test('createAppUserService creates a user with the requested role and audit evidence', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      auth_provider: 'local',
+      auth_subject: null,
+      created_at: '2026-05-02T15:05:00.000Z',
+      id: 'user-2',
+      is_disabled: false,
+      last_login_at: null,
+      managed_library_relative_root: 'owned/curator',
+      must_change_password: true,
+      role: 'operator',
+      updated_at: '2026-05-02T15:05:00.000Z',
+      username: 'curator',
+    }],
+  }));
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createAppUserService({
+    getPoolFn: () => ({ query }),
+    hashPasswordFn: t.mock.fn(async () => 'hashed-password'),
+    recordAuditEventFn,
+  });
+
+  const user = await service.createAppUser({
+    actorUserId: 'admin-1',
+    managedLibraryRelativeRoot: 'owned/curator',
+    password: 'password-1234',
+    requestMetadata: {
+      ipAddress: '203.0.113.9',
+      userAgent: 'HarmoniarrTest/1.0',
+    },
+    role: 'operator',
+    username: 'Curator',
+  });
+
+  assert.equal(query.mock.callCount(), 1);
+  assert.deepEqual(query.mock.calls[0].arguments, [
+    `
+          INSERT INTO app_users (
+            username,
+            password_hash,
+            role,
+            managed_library_relative_root,
+            must_change_password,
+            password_changed_at
+          )
+          VALUES ($1, $2, $3, $4, TRUE, NOW())
+          RETURNING *
+        `,
+    ['curator', 'hashed-password', 'operator', 'owned/curator'],
+  ]);
+  assert.deepEqual(user, {
+    authProvider: 'local',
+    authSubject: null,
+    createdAt: '2026-05-02T15:05:00.000Z',
+    id: 'user-2',
+    isDisabled: false,
+    lastLoginAt: null,
+    managedLibraryRelativeRoot: 'owned/curator',
+    mustChangePassword: true,
+    permissions: ['import.execute', 'import.review', 'library.discovery', 'library.scan', 'media.request', 'playlist.submit'],
+    role: 'operator',
+    updatedAt: '2026-05-02T15:05:00.000Z',
+    username: 'curator',
+  });
+  assert.equal(recordAuditEventFn.mock.callCount(), 1);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].eventType, 'app_user_created');
+});
+
+test('createAppUserService updates user role and disabled state', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rowCount: 1,
+    rows: [{
+      auth_provider: 'local',
+      auth_subject: null,
+      created_at: '2026-05-02T15:05:00.000Z',
+      id: 'user-2',
+      is_disabled: true,
+      last_login_at: null,
+      managed_library_relative_root: 'owned/listener',
+      must_change_password: true,
+      role: 'requester',
+      updated_at: '2026-05-02T16:00:00.000Z',
+      username: 'curator',
+    }],
+  }));
+  const service = createAppUserService({
+    getPoolFn: () => ({ query }),
+    recordAuditEventFn: t.mock.fn(async () => {}),
+  });
+
+  const user = await service.updateAppUser({
+    actorUserId: 'admin-1',
+    isDisabled: true,
+    managedLibraryRelativeRoot: 'owned/listener',
+    requestMetadata: { ipAddress: '203.0.113.9', userAgent: 'HarmoniarrTest/1.0' },
+    role: 'requester',
+    userId: 'user-2',
+  });
+
+  assert.equal(query.mock.callCount(), 1);
+  assert.equal(user.authProvider, 'local');
+  assert.equal(user.isDisabled, true);
+  assert.equal(user.managedLibraryRelativeRoot, 'owned/listener');
+  assert.equal(user.role, 'requester');
+  assert.deepEqual(user.permissions, ['import.preview.self', 'media.request', 'playlist.submit']);
+});
+
+test('createAppUserService resolves users by id for import target ownership lookups', async (t) => {
+  const service = createAppUserService({
+    getPoolFn: () => ({
+      query: t.mock.fn(async () => ({
+        rowCount: 1,
+        rows: [{
+          auth_provider: 'local',
+          auth_subject: null,
+          created_at: '2026-05-02T15:00:00.000Z',
+          id: 'user-1',
+          is_disabled: false,
+          last_login_at: null,
+          managed_library_relative_root: 'listeners/listener',
+          must_change_password: true,
+          role: 'requester',
+          updated_at: '2026-05-02T15:00:00.000Z',
+          username: 'listener',
+        }],
+      })),
+    }),
+  });
+
+  const user = await service.getAppUserById({ userId: 'user-1' });
+
+  assert.equal(user.id, 'user-1');
+  assert.equal(user.managedLibraryRelativeRoot, 'listeners/listener');
+});

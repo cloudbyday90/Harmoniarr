@@ -18,6 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createImportCandidateApplyService({
   buildImportPendingCandidateSummary = async () => ({
@@ -32,10 +33,9 @@ export function createImportCandidateApplyService({
   },
   getActiveRun = async () => null,
   recordAuditEventFn = recordAuditEvent,
-  startWorkerRun = async () => {
-    throw new Error('startWorkerRun dependency is required');
-  },
 } = {}) {
+  const operationDescriptor = operationRunRegistry.importCandidateApply;
+
   async function startImportCandidateApplyRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
     const activeRun = await getActiveRun();
     if (activeRun) {
@@ -56,6 +56,7 @@ export function createImportCandidateApplyService({
     }
 
     const run = await createOperationRun({
+      executableCandidateCount,
       executionMode: 'move',
       requestedCandidateCount,
       status: 'pending',
@@ -73,16 +74,10 @@ export function createImportCandidateApplyService({
       },
       entityId: run.id,
       entityType: 'operation_run',
-      eventType: 'import_candidate_apply_started',
+      eventType: operationDescriptor.startedEventType,
       ipAddress: requestMetadata?.ipAddress ?? null,
       summary: 'Import candidate library apply started',
       userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    await startWorkerRun({
-      executableCandidateCount,
-      requestedCandidateCount,
-      runId: run.id,
     });
 
     return {

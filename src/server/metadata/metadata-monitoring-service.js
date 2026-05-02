@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
+import { createMetadataRefreshSchedulerService } from './metadata-refresh-scheduler-service.js';
 
 const allowedReleaseGroupTypes = new Set(['album', 'ep']);
 
@@ -67,6 +68,7 @@ function normalizeArtistMonitoringPatch({ isMonitored, monitoredReleaseGroupType
 export function createMetadataMonitoringService({
   getPoolFn = getPool,
   metadataMonitoringStore = createMetadataMonitoringStore(),
+  metadataRefreshSchedulerService = createMetadataRefreshSchedulerService({ metadataMonitoringStore }),
 } = {}) {
   async function ensureArtistExists(metadataArtistId) {
     const pool = getPoolFn();
@@ -93,6 +95,12 @@ export function createMetadataMonitoringService({
       ...normalizedPatch,
       metadataArtistId,
     });
+
+    if (normalizedPatch.isMonitored) {
+      await metadataRefreshSchedulerService.ensureArtistRefreshScheduled({ metadataArtistId });
+    } else {
+      await metadataRefreshSchedulerService.clearArtistRefreshSchedule({ metadataArtistId });
+    }
 
     return {
       artistId: metadataArtistId,

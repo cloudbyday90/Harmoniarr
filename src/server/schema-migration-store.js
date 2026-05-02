@@ -16,9 +16,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  schemaIdDefaultExpression,
+  schemaIdFunctionSql,
+  schemaIdPgcryptoSql,
+} from './schema-id-function.js';
+
 export const schemaMigrationsTableSql = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT ${schemaIdDefaultExpression},
   migration_key TEXT NOT NULL UNIQUE,
   filename TEXT NOT NULL UNIQUE,
   description TEXT NULL,
@@ -35,7 +41,8 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 `.trim();
 
 export async function ensureSchemaTable(client) {
-  await client.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+  await client.query(schemaIdPgcryptoSql);
+  await client.query(schemaIdFunctionSql);
   await client.query(schemaMigrationsTableSql);
 }
 
@@ -44,4 +51,11 @@ export async function getAppliedMigrationFilenames(client) {
     "SELECT filename FROM schema_migrations WHERE status = 'applied' ORDER BY filename ASC",
   );
   return new Set(result.rows.map((row) => row.filename));
+}
+
+export async function getAppliedMigrationChecksums(client) {
+  const result = await client.query(
+    "SELECT filename, checksum FROM schema_migrations WHERE status = 'applied' ORDER BY filename ASC",
+  );
+  return result.rows.map((row) => ({ filename: row.filename, storedChecksum: row.checksum }));
 }

@@ -1,0 +1,227 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  buildSettingsUpdatePayload,
+  normalizeDownloadMappings,
+  normalizeUserMusicRoots,
+} from '../../src/client/lib/settings-form.js';
+
+function createArtworkForm() {
+  return {
+    captureEmbedded: true,
+    captureFolderArtwork: true,
+    derivativeCacheSizeMb: 1024,
+    derivativeFormat: 'webp',
+    derivativeRetentionDays: 30,
+    derivativeSizesText: '256, 512',
+    fetchEnabled: true,
+    maxOriginalDimensionPixels: 4000,
+    maxOriginalFileSizeBytes: 20971520,
+    providerOrderText: 'coverArtArchive',
+    refetchMissingAutomatically: false,
+    refreshAfterImport: true,
+    refreshAfterLibraryScan: false,
+    refreshAfterMetadataRefresh: true,
+    unassignedRetentionDays: 90,
+  };
+}
+
+test('buildSettingsUpdatePayload preserves the existing slskd api key when the field is left blank', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [{ slskdPrefix: '/downloads/completed', harmoniarrPrefix: '/data/downloads/completed' }],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [{ userId: 'user-1', relativeRoot: 'family/alice' }],
+    },
+    slskd: {
+      apiKey: '   ',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload, {
+    artwork: {
+      captureEmbedded: true,
+      captureFolderArtwork: true,
+      derivativeCacheSizeMb: 1024,
+      derivativeFormat: 'webp',
+      derivativeRetentionDays: 30,
+      derivativeSizes: [256, 512],
+      fetchEnabled: true,
+      maxOriginalDimensionPixels: 4000,
+      maxOriginalFileSizeBytes: 20971520,
+      providerOrder: ['coverArtArchive'],
+      refetchMissingAutomatically: false,
+      refreshAfterImport: true,
+      refreshAfterLibraryScan: false,
+      refreshAfterMetadataRefresh: true,
+      unassignedRetentionDays: 90,
+    },
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [{ slskdPrefix: '/downloads/completed', harmoniarrPrefix: '/data/downloads/completed' }],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [{ userId: 'user-1', relativeRoot: 'family/alice' }],
+    },
+    slskd: {
+      baseUrl: 'http://slskd.internal:5030',
+      requestTimeoutMs: 15000,
+    },
+  });
+});
+
+test('buildSettingsUpdatePayload includes slskd api key updates and explicit clear requests', () => {
+  const withSecret = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    security: {
+      csrfProtectionMode: 'required',
+      enforceHttps: true,
+      secureCookies: true,
+      strictTransportSecurity: true,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: ' next-api-key ',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+  const cleared = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    security: {
+      csrfProtectionMode: 'required',
+      enforceHttps: true,
+      secureCookies: true,
+      strictTransportSecurity: true,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: true,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.equal(withSecret.slskd.apiKey, 'next-api-key');
+  assert.equal(cleared.slskd.clearApiKey, true);
+  assert.equal(withSecret.security.csrfProtectionMode, 'required');
+  assert.equal(withSecret.security.enforceHttps, true);
+});
+
+test('normalizeDownloadMappings keeps only string mapping values', () => {
+  assert.deepEqual(normalizeDownloadMappings([{ slskdPrefix: '/downloads', harmoniarrPrefix: 42 }]), [{
+    slskdPrefix: '/downloads',
+    harmoniarrPrefix: '',
+  }]);
+});
+
+test('normalizeUserMusicRoots keeps only string mapping values', () => {
+  assert.deepEqual(normalizeUserMusicRoots([{ userId: 'user-1', relativeRoot: 42 }]), [{
+    relativeRoot: '',
+    userId: 'user-1',
+  }]);
+});
+
+test('buildSettingsUpdatePayload includes provider intake settings and secret mutations when present', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    security: {
+      csrfProtectionMode: 'required',
+      enforceHttps: true,
+      secureCookies: true,
+      strictTransportSecurity: true,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    providers: {
+      appleMusicEnabled: true,
+      appleMusicKeyId: 'apple-key',
+      appleMusicPrivateKey: ' apple-private-key ',
+      appleMusicStorefront: 'us',
+      appleMusicTeamId: 'apple-team',
+      clearAppleMusicPrivateKey: false,
+      clearSpotifyClientSecret: false,
+      clearYoutubeApiKey: true,
+      clearYoutubeClientSecret: false,
+      playlistExpansionPolicy: 'artist_discovery',
+      requestTimeoutMs: 12000,
+      spotifyClientId: 'spotify-client',
+      spotifyClientSecret: ' spotify-secret ',
+      spotifyEnabled: true,
+      youtubeApiKey: '',
+      youtubeClientId: 'youtube-client',
+      youtubeClientSecret: ' youtube-secret ',
+      youtubeEnabled: true,
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.providers, {
+    appleMusicEnabled: true,
+    appleMusicKeyId: 'apple-key',
+    appleMusicPrivateKey: 'apple-private-key',
+    appleMusicStorefront: 'us',
+    appleMusicTeamId: 'apple-team',
+    clearYoutubeApiKey: true,
+    playlistExpansionPolicy: 'artist_discovery',
+    requestTimeoutMs: 12000,
+    spotifyClientId: 'spotify-client',
+    spotifyClientSecret: 'spotify-secret',
+    spotifyEnabled: true,
+    youtubeClientId: 'youtube-client',
+    youtubeClientSecret: 'youtube-secret',
+    youtubeEnabled: true,
+  });
+});

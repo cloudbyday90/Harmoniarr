@@ -16,54 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { constants } from 'node:fs';
-import { copyFile, mkdir, rm } from 'node:fs/promises';
-import { posix, win32 } from 'node:path';
+import { copyFile, link, mkdir, rm, stat } from 'node:fs/promises';
+import { posix as path } from 'node:path';
+import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
 import { recordImportOperation } from './import-candidate-operation-repository.js';
-
-function selectPathModule(...pathValues) {
-  return pathValues.some((value) => typeof value === 'string' && /^[A-Za-z]:[\\/]/.test(value))
-    ? win32
-    : posix;
-}
-
-function normalizePath(pathValue, pathModule) {
-  if (typeof pathValue !== 'string') {
-    return '';
-  }
-
-  return pathModule === win32
-    ? pathValue.replaceAll('/', '\\')
-    : pathValue.replaceAll('\\', '/');
-}
-
-function isPathInsideRoot(pathValue, rootPath) {
-  const pathModule = selectPathModule(pathValue, rootPath);
-  const resolvedPath = pathModule.resolve(normalizePath(pathValue, pathModule));
-  const resolvedRoot = pathModule.resolve(normalizePath(rootPath, pathModule));
-  const relative = pathModule.relative(resolvedRoot, resolvedPath);
-
-  return relative === '' || (!relative.startsWith('..') && !pathModule.isAbsolute(relative));
-}
-
-function assertPathInsideRoot({ label, pathValue, rootPath }) {
-  if (!rootPath || !isPathInsideRoot(pathValue, rootPath)) {
-    const error = new Error(`${label} must remain inside the configured root boundary.`);
-    error.code = 'import_candidate_apply_boundary_violation';
-    throw error;
-  }
-}
-
-async function moveFileExclusively({ copyFileFn, destinationPath, mkdirFn, removeFileFn, sourcePath }) {
-  const pathModule = selectPathModule(sourcePath, destinationPath);
-  await mkdirFn(pathModule.dirname(normalizePath(destinationPath, pathModule)), { recursive: true });
-  await copyFileFn(sourcePath, destinationPath, constants.COPYFILE_EXCL);
-  await removeFileFn(sourcePath);
-
-  return {
-    transport: 'copy_then_remove',
-  };
-}
 
 function buildBlockedError(message) {
   const error = new Error(message);
@@ -81,6 +37,11 @@ function buildNotAttemptedOperation(file) {
     stagingPath: file.stagingTarget?.path ?? null,
     status: 'not_attempted',
     steps: [],
+    transcodeExecution: {
+      mode: 'preflight_only',
+      status: 'not_attempted',
+      warnings: [],
+    },
   };
 }
 
@@ -94,6 +55,11 @@ function buildSkippedOperation(file) {
     stagingPath: file.stagingTarget?.path ?? null,
     status: 'skipped',
     steps: [],
+    transcodeExecution: {
+      mode: 'preflight_only',
+      status: 'not_required',
+      warnings: [],
+    },
   };
 }
 
@@ -113,12 +79,95 @@ function resolvePendingStep(file) {
   };
 }
 
+function normalizePathInput(value) {
+  return typeof value === 'string' ? value.trim().replaceAll('\\', '/') : '';
+}
+
+function isPathWithinRoot(pathValue, rootPath) {
+  const normalizedPath = normalizePathInput(pathValue);
+  const normalizedRoot = normalizePathInput(rootPath).replace(/\/+$/, '');
+  if (!normalizedPath || !normalizedRoot) {
+    return false;
+  }
+
+  return normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`);
+}
+
+function resolveRelativePathWithinRoot(pathValue, rootPath) {
+  const normalizedPath = normalizePathInput(pathValue);
+  const normalizedRoot = normalizePathInput(rootPath).replace(/\/+$/, '');
+  if (!isPathWithinRoot(normalizedPath, normalizedRoot)) {
+    return null;
+  }
+
+  if (normalizedPath === normalizedRoot) {
+    return null;
+  }
+
+  return normalizedPath.slice(normalizedRoot.length).replace(/^\/+/, '');
+}
+
+function collectReusableCandidatePaths({
+  destinationPath,
+  libraryRoot,
+  sourcePath,
+  stagingPath,
+  targetUserRootPath,
+  configuredUserRootPaths = [],
+}) {
+  const normalizedDestinationPath = normalizePathInput(destinationPath);
+  const normalizedLibraryRoot = normalizePathInput(libraryRoot);
+  const normalizedTargetUserRootPath = normalizePathInput(targetUserRootPath);
+  const normalizedConfiguredUserRootPaths = configuredUserRootPaths
+    .map((entry) => normalizePathInput(entry))
+    .filter(Boolean);
+  const searchableRoots = [...new Set([
+    normalizedLibraryRoot,
+    ...normalizedConfiguredUserRootPaths,
+  ].filter(Boolean))];
+  const activeDestinationRoot = normalizedTargetUserRootPath
+    || searchableRoots.find((rootPath) => isPathWithinRoot(normalizedDestinationPath, rootPath))
+    || normalizedLibraryRoot;
+
+  const relativePath = resolveRelativePathWithinRoot(
+    normalizedDestinationPath,
+    activeDestinationRoot,
+  );
+  if (!relativePath) {
+    return [];
+  }
+
+  const ignoredPaths = new Set([
+    normalizePathInput(sourcePath),
+    normalizePathInput(stagingPath),
+    normalizePathInput(destinationPath),
+  ].filter(Boolean));
+
+  return searchableRoots
+    .filter((rootPath) => normalizePathInput(rootPath) !== normalizePathInput(activeDestinationRoot))
+    .map((rootPath) => path.join(rootPath, relativePath))
+    .map((candidatePath) => normalizePathInput(candidatePath))
+    .filter((candidatePath) => !ignoredPaths.has(candidatePath));
+}
+
 export function createImportCandidateApplyOperationService({
   copyFileFn = copyFile,
+  linkFn = link,
   mkdirFn = mkdir,
+  mediaFilesystemService = null,
+  mediaTranscodeExecutionService = null,
   recordImportOperationFn = recordImportOperation,
   removeFileFn = rm,
+  statFn = stat,
 } = {}) {
+  const resolvedMediaFilesystemService = mediaFilesystemService ?? createMediaFilesystemService({
+    copyFileFn,
+    linkFn,
+    mkdirFn,
+    removeFileFn,
+    statFn,
+  });
+
   async function applyImportCandidatePreview({
     applyPreview,
     executionMode = 'move',
@@ -138,11 +187,49 @@ export function createImportCandidateApplyOperationService({
       appliedFileCount: 0,
       failedFileCount: 0,
       notAttemptedCount: 0,
+      reusedExistingLosslessCount: 0,
       skippedFileCount: 0,
       stagedFromSourceCount: 0,
       totalFiles: applyPreview.files.length,
+      transcodePreflightBypassedCount: 0,
+      transcodePreflightFailedCount: 0,
+      transcodePreflightPassedCount: 0,
+      transcodePreflightUnavailableCount: 0,
     };
     let operationPosition = 0;
+    const preferHardlink = applyPreview?.preview?.library?.reusePolicy?.sameVolumeLinkMode === 'prefer_hardlink';
+    const duplicateLosslessPolicy = applyPreview?.preview?.library?.reusePolicy?.duplicateLosslessPolicy;
+    const canReuseExistingLossless = duplicateLosslessPolicy === 'reuse_existing_lossless_by_default';
+
+    async function resolveReusableSourcePath(file) {
+      if (!canReuseExistingLossless) {
+        return null;
+      }
+
+      const candidatePaths = collectReusableCandidatePaths({
+        configuredUserRootPaths: applyPreview?.preview?.library?.configuredUserRootPaths,
+        destinationPath: file?.libraryTarget?.path,
+        libraryRoot: applyPreview?.preview?.library?.root,
+        sourcePath: file?.sourceFile?.path,
+        stagingPath: file?.stagingTarget?.path,
+        targetUserRootPath: applyPreview?.preview?.library?.targetUser?.userRootPath,
+      });
+
+      for (const candidatePath of candidatePaths) {
+        try {
+          await statFn(candidatePath);
+          return candidatePath;
+        } catch (error) {
+          if (error?.code === 'ENOENT') {
+            continue;
+          }
+
+          throw error;
+        }
+      }
+
+      return null;
+    }
 
     async function persistOperation({
       destinationPath,
@@ -212,87 +299,154 @@ export function createImportCandidateApplyOperationService({
         stagingPath: file.stagingTarget?.path ?? null,
         status: 'pending',
         steps: [],
+        transcodeExecution: {
+          mode: 'preflight_only',
+          status: 'not_required',
+          warnings: [],
+        },
       };
       let currentStep = null;
 
       try {
-        if (!file.stagingTarget?.exists) {
-          currentStep = {
-            destinationPath: file.stagingTarget?.path ?? null,
-            sourcePath: file.sourceFile?.path ?? null,
-            startedAt: new Date().toISOString(),
-            stepType: 'stage',
-          };
-          assertPathInsideRoot({
-            label: 'Import source path',
-            pathValue: file.sourceFile?.path,
-            rootPath: applyPreview?.preview?.source?.resolvedFolderPath,
-          });
-          assertPathInsideRoot({
-            label: 'Staging destination path',
-            pathValue: file.stagingTarget?.path,
-            rootPath: applyPreview?.preview?.staging?.root,
+        if (typeof mediaTranscodeExecutionService?.executeCandidate === 'function') {
+          operation.transcodeExecution = await mediaTranscodeExecutionService.executeCandidate({
+            sourcePath: file.sourceFile.path,
+            transcodePlan: file.transcodePlan,
           });
 
-          const stageMove = await moveFileExclusively({
-            copyFileFn,
-            destinationPath: file.stagingTarget.path,
-            mkdirFn,
-            removeFileFn,
-            sourcePath: file.sourceFile.path,
-          });
-          const finishedAt = new Date().toISOString();
-          summary.stagedFromSourceCount += 1;
-          operation.steps.push({
-            destinationPath: file.stagingTarget.path,
-            sourcePath: file.sourceFile.path,
-            status: 'applied',
-            stepType: 'stage',
-            transport: stageMove.transport,
-          });
-          await persistOperation({
-            destinationPath: file.stagingTarget.path,
-            file,
-            finishedAt,
-            sourcePath: file.sourceFile.path,
-            startedAt: currentStep.startedAt,
-            status: 'applied',
-            stepType: 'stage',
-            transport: stageMove.transport,
-          });
+          if (operation.transcodeExecution.status === 'preflight_passed') {
+            summary.transcodePreflightPassedCount += 1;
+          } else if (operation.transcodeExecution.status === 'preflight_failed') {
+            summary.transcodePreflightFailedCount += 1;
+          } else if (operation.transcodeExecution.status === 'tooling_unavailable') {
+            summary.transcodePreflightUnavailableCount += 1;
+          } else {
+            summary.transcodePreflightBypassedCount += 1;
+          }
+        }
+
+        let finalizeSourcePath = file.stagingTarget?.path ?? null;
+        let finalizeSourceRoot = applyPreview?.preview?.staging?.root;
+        let finalizeRemovesSource = true;
+
+        if (!file.stagingTarget?.exists) {
+          const reusableSourcePath = await resolveReusableSourcePath(file);
+
+          if (reusableSourcePath) {
+            currentStep = {
+              destinationPath: file.stagingTarget?.path ?? null,
+              sourcePath: reusableSourcePath,
+              startedAt: new Date().toISOString(),
+              stepType: 'stage',
+            };
+            const finishedAt = new Date().toISOString();
+            summary.reusedExistingLosslessCount += 1;
+            operation.steps.push({
+              appliedMode: 'reuse',
+              destinationPath: file.stagingTarget.path,
+              fallbackFromMode: null,
+              fallbackReason: null,
+              requestedMode: 'reuse',
+              sourcePath: reusableSourcePath,
+              status: 'applied',
+              stepType: 'stage',
+              transport: 'reuse_existing_lossless',
+              verification: {
+                destinationExists: false,
+                destinationSizeBytes: 0,
+                hardlinkSharedInode: null,
+                sourceExistsAfterSuccess: true,
+                sourceRemoved: false,
+                sourceSizeBytes: 0,
+              },
+            });
+            await persistOperation({
+              destinationPath: file.stagingTarget.path,
+              file,
+              finishedAt,
+              sourcePath: reusableSourcePath,
+              startedAt: currentStep.startedAt,
+              status: 'applied',
+              stepType: 'stage',
+              transport: 'reuse_existing_lossless',
+            });
+
+            finalizeSourcePath = reusableSourcePath;
+            finalizeSourceRoot = applyPreview?.preview?.library?.root;
+            finalizeRemovesSource = false;
+          } else {
+            currentStep = {
+              destinationPath: file.stagingTarget?.path ?? null,
+              sourcePath: file.sourceFile?.path ?? null,
+              startedAt: new Date().toISOString(),
+              stepType: 'stage',
+            };
+            const stageMove = await resolvedMediaFilesystemService.applyExclusiveFileMutationPlan(
+              resolvedMediaFilesystemService.createExclusiveFileMutationPlan({
+                destinationPath: file.stagingTarget.path,
+                destinationRoot: applyPreview?.preview?.staging?.root,
+                removeSourceAfterSuccess: true,
+                requestedMode: 'move',
+                sourcePath: file.sourceFile.path,
+                sourceRoot: applyPreview?.preview?.source?.resolvedFolderPath,
+              }),
+            );
+            const finishedAt = new Date().toISOString();
+            summary.stagedFromSourceCount += 1;
+            operation.steps.push({
+              appliedMode: stageMove.appliedMode,
+              destinationPath: file.stagingTarget.path,
+              fallbackFromMode: stageMove.fallbackFromMode,
+              fallbackReason: stageMove.fallbackReason,
+              requestedMode: stageMove.requestedMode,
+              sourcePath: file.sourceFile.path,
+              status: 'applied',
+              stepType: 'stage',
+              transport: stageMove.transport,
+              verification: stageMove.verification,
+            });
+            await persistOperation({
+              destinationPath: file.stagingTarget.path,
+              file,
+              finishedAt,
+              sourcePath: file.sourceFile.path,
+              startedAt: currentStep.startedAt,
+              status: 'applied',
+              stepType: 'stage',
+              transport: stageMove.transport,
+            });
+          }
         }
 
         currentStep = {
           destinationPath: file.libraryTarget?.path ?? null,
-          sourcePath: file.stagingTarget?.path ?? null,
+          sourcePath: finalizeSourcePath,
           startedAt: new Date().toISOString(),
           stepType: 'finalize',
         };
-        assertPathInsideRoot({
-          label: 'Staging source path',
-          pathValue: file.stagingTarget?.path,
-          rootPath: applyPreview?.preview?.staging?.root,
-        });
-        assertPathInsideRoot({
-          label: 'Library destination path',
-          pathValue: file.libraryTarget?.path,
-          rootPath: applyPreview?.preview?.library?.root,
-        });
-
-        const finalizeMove = await moveFileExclusively({
-          copyFileFn,
-          destinationPath: file.libraryTarget.path,
-          mkdirFn,
-          removeFileFn,
-          sourcePath: file.stagingTarget.path,
-        });
+        const finalizeMove = await resolvedMediaFilesystemService.applyExclusiveFileMutationPlan(
+          resolvedMediaFilesystemService.createExclusiveFileMutationPlan({
+            destinationPath: file.libraryTarget.path,
+            destinationRoot: applyPreview?.preview?.library?.root,
+            fallbackMode: preferHardlink ? (finalizeRemovesSource ? 'move' : 'copy') : null,
+            removeSourceAfterSuccess: finalizeRemovesSource,
+            requestedMode: preferHardlink ? 'hardlink' : (finalizeRemovesSource ? 'move' : 'copy'),
+            sourcePath: finalizeSourcePath,
+            sourceRoot: finalizeSourceRoot,
+          }),
+        );
         const finishedAt = new Date().toISOString();
         operation.steps.push({
+          appliedMode: finalizeMove.appliedMode,
           destinationPath: file.libraryTarget.path,
-          sourcePath: file.stagingTarget.path,
+          fallbackFromMode: finalizeMove.fallbackFromMode,
+          fallbackReason: finalizeMove.fallbackReason,
+          requestedMode: finalizeMove.requestedMode,
+          sourcePath: finalizeSourcePath,
           status: 'applied',
           stepType: 'finalize',
           transport: finalizeMove.transport,
+          verification: finalizeMove.verification,
         });
         operation.status = 'applied';
         operation.transport = finalizeMove.transport;
@@ -301,7 +455,7 @@ export function createImportCandidateApplyOperationService({
           destinationPath: file.libraryTarget.path,
           file,
           finishedAt,
-          sourcePath: file.stagingTarget.path,
+          sourcePath: finalizeSourcePath,
           startedAt: currentStep.startedAt,
           status: 'applied',
           stepType: 'finalize',

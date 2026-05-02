@@ -1,0 +1,92 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { buildAuditActivityLinkTarget } from '../../src/client/lib/audit-activity-links.js';
+
+test('buildAuditActivityLinkTarget links artwork cleanup audit events into the dashboard run detail state', () => {
+  assert.deepEqual(buildAuditActivityLinkTarget({
+    entityId: 'run-22',
+    entityType: 'operation_run',
+    eventType: 'artwork_cleanup_started',
+  }), {
+    label: 'Open artwork cleanup run',
+    to: {
+      hash: '#artwork-maintenance-panel',
+      name: 'dashboard',
+      query: {
+        artworkRunId: 'run-22',
+      },
+    },
+  });
+});
+
+test('buildAuditActivityLinkTarget links import execution and apply audit events into import review run detail state', () => {
+  assert.deepEqual(buildAuditActivityLinkTarget({
+    entityId: 'execution-run-22',
+    entityType: 'operation_run',
+    eventType: 'import_candidate_execution_started',
+  }), {
+    label: 'Open import execution run',
+    to: {
+      hash: '#import-execution-run-panel',
+      name: 'review-queue',
+      query: {
+        executionRunId: 'execution-run-22',
+      },
+    },
+  });
+
+  assert.deepEqual(buildAuditActivityLinkTarget({
+    entityId: 'apply-run-9',
+    entityType: 'operation_run',
+    eventType: 'import_candidate_apply_started',
+  }), {
+    label: 'Open import apply run',
+    to: {
+      hash: '#import-apply-run-panel',
+      name: 'review-queue',
+      query: {
+        applyRunId: 'apply-run-9',
+      },
+    },
+  });
+});
+
+test('buildAuditActivityLinkTarget links library scan and discovery audit events into dashboard run detail state', () => {
+  assert.deepEqual(buildAuditActivityLinkTarget({
+    entityId: 'scan-run-8',
+    entityType: 'operation_run',
+    eventType: 'library_scan_started',
+  }), {
+    label: 'Open library scan run',
+    to: {
+      hash: '#library-scan-panel',
+      name: 'dashboard',
+      query: {
+        libraryScanRunId: 'scan-run-8',
+      },
+    },
+  });
+
+  assert.deepEqual(buildAuditActivityLinkTarget({
+    entityId: 'discovery-run-5',
+    entityType: 'operation_run',
+    eventType: 'library_discovery_dispatch_started',
+  }), {
+    label: 'Open library discovery run',
+    to: {
+      hash: '#library-discovery-panel',
+      name: 'dashboard',
+      query: {
+        libraryDiscoveryRunId: 'discovery-run-5',
+      },
+    },
+  });
+});
+
+test('buildAuditActivityLinkTarget ignores unsupported audit events', () => {
+  assert.equal(buildAuditActivityLinkTarget({
+    entityId: 'run-9',
+    entityType: 'operation_run',
+    eventType: 'library_reconciliation_started',
+  }), null);
+});

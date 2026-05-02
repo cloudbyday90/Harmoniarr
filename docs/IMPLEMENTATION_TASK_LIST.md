@@ -6,7 +6,7 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current Status (2026-05-01)
+## Current Status (2026-05-02)
 
 - Initial implementation planning exists in `docs/harmoniarr.md`.
 - Execution phases are defined, but no phase is complete yet.
@@ -14,16 +14,39 @@ Database model source: `docs/DATABASE_MODEL.md`
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
 - Embedded PostgreSQL startup, tracked timestamped migrations, bootstrap-admin creation, login/logout/session routes, and allowlisted settings persistence are now implemented.
 - The client now includes first-run bootstrap-admin, login, and protected settings views backed by shared auth and settings API modules.
+- The shared client API layer now also clears local auth state and redirects back to login when protected routes fail with `401 auth_required`, so expired browser sessions no longer leave the authenticated shell stranded on stale state.
+- Planning and implementation posture now explicitly targets a self-hosted companion app similar to Radarr/Sonarr, so security and automation scope should stay proportional to a trusted operator-run Docker deployment rather than drifting toward enterprise control-plane features.
 - Canonical MusicBrainz metadata foundation now exists for artists, release groups, releases, media, recordings, tracks, and provider snapshots with timestamped migrations.
 - The metadata workspace now uses shared client API modules, composables, and static Vue SFCs for provider search/import plus local reopen flows.
+- Metadata drill-through now also normalizes provider release-group selections onto local canonical route ids, and shared client helper coverage now locks metadata route hydration and activity-feed link-target mapping to the same route-owned behavior.
 - The server bootstrap now composes metadata read/search/catalog/import capabilities through a shared native ESM metadata module instead of hand-wiring that service graph directly in the app composition root.
 - The server bootstrap now also composes system overview and settings route dependencies through a shared native ESM system module, keeping the control-plane wiring out of the app composition root.
 - The server bootstrap now also composes auth route dependencies through a shared native ESM auth module, and auth route registration accepts injected dependencies for native contract testing without module-mocking hacks.
 - The app composition root now accepts injected module factories and route registrars for direct native contract testing, while preserving static ESM imports and the existing API plus SPA fallback behavior.
+- The server bootstrap now also owns a shared HTTP hardening boundary for browser-facing security headers, JSON body-size enforcement, API `Accept` and `Content-Type` contract checks, and normalized invalid-JSON and oversized-payload failures instead of leaving those controls to ad hoc route behavior.
+- The shared HTTP hardening boundary now also applies `Cache-Control: no-store` across browser-consumed API responses, so auth and control-plane state do not drift into browser caches through route-local omissions.
+- The app composition root now also owns a shared in-memory abuse limiter service for bootstrap, login, refresh, and control-plane run-trigger routes, so abuse-prone entrypoints reuse the same native ESM rate-limit boundary and emit observable 429 behavior without route-local state.
+- Shared outbound base-URL normalization now also routes through a native ESM outbound URL policy used by slskd settings/runtime config and MusicBrainz client construction, with exact-host and suffix allowlisting support plus redirect denial to reduce SSRF-style validation bypasses.
+- A shared server route inventory manifest now lives in code and is validated against the actual registrar output in native tests, so new routes cannot drift in without explicit method/path/access classification.
 - Native auth route coverage now exercises bootstrap-admin, login, refresh, logout, and session contracts against the injected auth boundary with native fetch and node:test.
 - System route registration now accepts injected auth helper dependencies like the metadata route layer, and native control-plane route coverage now exercises health, settings read/update, and system overview contracts.
 - Shared request-auth helper defaults now live behind a native ESM auth-module surface reused by auth, metadata, and system route layers instead of being hand-wired separately in each route file.
 - Auth and system route contract coverage now also proves shared JSON error behavior for injected auth-required, CSRF, and invalid-credential failures without introducing module-mocking or non-native test tooling.
+- The auth boundary now also owns a shared account-security service for password change, active-session listing, and per-session revocation, and forced re-auth now routes authenticated users to a dedicated account-security flow instead of trapping them in a login loop.
+- The shared settings allowlist now also exposes artwork fetch, extraction, derivative, retention, and automatic refresh controls through the existing settings service and operator UI, so artwork workers can reuse one normalized configuration boundary instead of inventing ad hoc runtime flags.
+- A shared artwork module now also converts that allowlisted settings contract into one runtime policy surface for storage paths, fetch behavior, derivative profiles, cleanup thresholds, and automatic refresh posture, and system overview can expose that policy without future workers re-reading raw settings independently.
+- The shared artwork module now also owns a sharp-backed ingestion service that allowlists safe raster formats, enforces configured size and dimension ceilings, rewrites images before storage, writes them under the app-owned artwork tree, and persists deduplicated asset descriptors through the shared repository instead of leaving each future worker to parse and store image data differently.
+- Library tag extraction now also routes embedded cover art through shared library and artwork services, selecting one preferred embedded cover from `music-metadata`, ingesting it through the shared artwork safety boundary, and assigning it to the scanned `library_file` without letting missing or invalid artwork block library scans.
+- Library scans now also route folder and sidecar artwork through shared library and artwork services, selecting one preferred folder candidate per scanned directory, ingesting it once through the shared artwork safety boundary, and reconciling it against existing embedded or sidecar assignments without letting invalid artwork block scans.
+- The shared artwork assignment service now also reconciles source-scoped preferred assignments by priority and can clear stale embedded or sidecar sources so the next-best remaining assignment is promoted instead of leaving library-file artwork stuck on stale sources.
+- The shared artwork boundary now also tracks `unassigned_at` state for durable assets and exposes an explicit cleanup service that prunes retention-eligible unassigned originals or extracted files from database-owned candidates instead of guessing cleanup age from ingest time or blind filesystem scans.
+- The artwork boundary now also exposes a dedicated admin summary and cleanup-run API surface through shared run-store, worker, and route seams, so retention cleanup follows the same operation-run and fresh-session control-plane model already used by other maintenance workflows.
+- The authenticated dashboard now also consumes that dedicated artwork summary and cleanup-run surface through shared client API and composable modules, giving operators a retention-aware maintenance panel without mixing artwork cleanup controls into unrelated dashboard sections.
+- The artwork maintenance surface now also exposes recent cleanup-run history plus persisted per-asset failure details through the shared operation-run seam, so operators can diagnose failed cleanup attempts without leaving the dashboard or depending on ad hoc log inspection.
+- The artwork maintenance surface now also exposes a dedicated single-run detail read path and only polls while cleanup is still pending or running, so operators get current failure and completion data without turning the dashboard into a constant background refresh client.
+- The protected system overview now also consumes a compact artwork-maintenance diagnostic from the shared artwork summary boundary, so cross-cutting runtime status can surface cleanup pressure and recent failures without duplicating artwork ownership inside the system route layer.
+- The dashboard now also keeps artwork cleanup run selection in URL state and lets the system-overview artwork card jump directly into the dedicated artwork maintenance panel, so specific cleanup runs remain linkable without moving run-detail ownership out of the shared artwork boundary.
+- The authenticated account-security surface now also consumes a shared recent-audit-events read boundary, and artwork cleanup audit entries can deep-link back into the existing dashboard run-detail state instead of creating a separate audit-only operation viewer.
 - Settings validation now throws normalized API-style 400 errors from the shared validator boundary, and native service plus route coverage proves malformed settings patches do not leak as generic 500 responses.
 - Metadata route coverage now also proves MusicBrainz provider failure normalization for unavailable, misconfigured, and upstream request-failed cases, preserving shared JSON 503 and 502 contracts through the Express layer.
 - MusicBrainz client coverage now proves retry behavior, throttling `Retry-After` handling, exhausted retry details, and non-retryable upstream failure classification at the provider boundary.
@@ -34,12 +57,14 @@ Database model source: `docs/DATABASE_MODEL.md`
 - The slskd adapter boundary now has static ESM client, service, and module layers with API-key request support, normalized search/connection contracts, provider-health observation hooks, and safe dependency-health classification for unavailable, unauthorized, misconfigured, and request-failed outcomes.
 - The app composition root now wires the static ESM slskd module into the shared provider-health recorder and authenticated system overview dependency checks, while `/healthz` remains a lightweight local health summary without live provider probing.
 - Authenticated slskd discovery routes now expose connection status, search start, search polling, and normalized search responses through the shared slskd service/module boundary with CSRF enforcement on mutating search starts.
+- The mutating slskd search-dispatch route now also requires a fresh admin session, keeping operator-triggered discovery execution aligned with the same re-auth posture already used by other privileged mutation paths.
 - Import candidate ingestion now persists normalized slskd search responses into durable review-ready candidate and candidate-file tables, keeping queryable domain fields separate from raw provider JSONB payloads.
 - Import candidate read-side services and routes now expose authenticated list/detail review queue contracts with status, slskd search, username, and folder filters over the persisted candidate state.
 - Import candidate review transitions now support hold, select, reject, and reopen actions with optimistic status guards, append-only candidate events, audit evidence, and CSRF-protected route contracts.
 - The authenticated frontend now includes a persisted import review queue surface with shared ESM API/composable modules, URL-backed filter and selected-candidate state, candidate detail inspection, and operator hold/select/reject/reopen actions over the review routes.
 - The import review workspace now routes queue, detail, preview, and transition refresh orchestration through a shared route-aware composable, and the queue shows the last successful refresh time so operators can see when the review read model was last reloaded.
 - The import review detail surface now also exposes a read-only planning preview for current downloads-root resolution, staging targets, mirrored library naming, and explicit warnings where full slskd path mappings do not exist yet.
+- Import planning preview now also routes discovery-linked candidates through a shared canonical naming boundary that applies the documented artist/album/track default templates with Windows-safe filename sanitization, while preserving an explicit mirrored-path fallback when canonical release context or track counts are not trustworthy enough to rename.
 - The import workflow now also exposes a dedicated selected-candidate readiness summary through a protected read model and shared client composable, so operators can see which selected items are ready, warning-bearing, or blocked before download or apply behavior exists.
 - The import workflow now also persists planning-only execution runs for selected candidates through the shared operation-run model, with protected start/read routes and an operator-facing run panel that snapshots per-candidate readiness without starting downloads.
 - Import execution runs now also enqueue unlocked files to slskd for operator-selected candidates, while persisting queued, queued-with-warnings, blocked, and enqueue-failed outcomes through the shared execution-run surface.
@@ -54,7 +79,9 @@ Database model source: `docs/DATABASE_MODEL.md`
 - The import workflow now also exposes a dedicated `import_pending` summary route and shared read model, so completed downloads can be reviewed as a distinct import-ready stage with the same staging and path-preview evidence reused from the existing preview service.
 - Import-pending candidates now also expose a dedicated apply-preview service and protected detail route, reusing shared planning preview output to surface missing-source files, target collisions, and guarded import-readiness evidence before any filesystem mutation exists.
 - The import workflow now also persists durable import-apply runs for `import_pending` candidates, using a guarded shared mutation service plus protected start/read routes to stage exclusive file moves, preserve per-file outcomes, and only transition candidates to `applied` after successful library finalize steps.
+- Import apply now also routes filesystem mutation through a dedicated shared media-filesystem boundary that owns root containment, exclusive destination checks, verified hardlink/copy outcomes, and explicit hardlink fallback reporting instead of leaving guarded file operations embedded inside one workflow service.
 - The import workflow now also persists durable `import_operations` history for each apply-stage filesystem step, keyed to apply runs plus candidate-file identities so stage/finalize, failed, and not-attempted outcomes remain auditable beyond run snapshots.
+- Import review now also keeps exact execution and apply run selection in URL state, backed by dedicated protected run-detail reads, so audit activity can reopen a specific durable import run instead of collapsing operators back onto whichever run happens to be current or latest.
 - Import-pending collision review now also persists explicit per-file skip decisions keyed to candidate-file identity, reusing the apply-preview seam to convert reviewed collisions into warning-level skips and durable `skipped` apply history without allowing overwrite behavior.
 - Server startup now also owns a small in-process import execution reconciliation heartbeat that periodically reuses the shared execution summary plus reconciliation service to persist `downloading`, `failed`, and `import_pending` transitions without requiring a manual route trigger.
 - Settings now allow explicit slskd-to-Harmoniarr download path mappings, and the import planning preview resolves candidate paths through that shared mapping service before falling back to legacy downloads-root assumptions.
@@ -65,15 +92,19 @@ Database model source: `docs/DATABASE_MODEL.md`
 - A dedicated native ESM library module now owns library-scan run persistence, a thin background worker entrypoint, protected scan-start route wiring, and the dashboard start/rescan action so the existing-library status surface now launches real scan work instead of remaining passive.
 - The library boundary now also exposes a shared reconciliation summary read service and protected route, and the dashboard consumes that dedicated summary through a separate composable and panel instead of folding release-coverage state into the system overview surface.
 - The metadata boundary now also owns a canonical artist-monitoring baseline through a shared monitoring store/service, protected artist monitoring route, and metadata workspace toggle, establishing the prerequisite state needed before wanted reconciliation can be implemented safely.
+- Shared observability history now exposes bounded cursor-paged activity-feed and metadata detection-event APIs with client drill-through into dashboard, jobs, and metadata route state instead of keeping those timelines as fixed embedded snapshots.
 - The library boundary now also recalculates a release-level wanted projection for monitored album and EP releases after library reconciliation, and the dashboard exposes that shared wanted summary through a dedicated route, composable, and panel.
 - The library boundary now also recalculates a durable discovery-intent projection from wanted releases, exposing release-date and cooldown eligibility through a shared summary route and dashboard panel before real search dispatch exists.
 - The library boundary now also dispatches ready automatic discovery requests through shared slskd and import-candidate services at the end of library scan reconciliation, recording search attempts and cooldown state without introducing a second search workflow surface.
 - The library boundary now also exposes a dedicated discovery-run worker and protected manual trigger backed by shared operation-run storage, so discovery dispatch can be started independently of a full library scan while keeping the same queue and import seams.
 - Server startup now also owns a small in-process discovery heartbeat that periodically starts the shared discovery-run service, so dispatch cadence is no longer tied to the library scan worker.
+- The dashboard now also keeps library scan and discovery run selection in URL state, backed by dedicated protected run-detail reads, so audit activity can reopen a specific durable library run inside the existing dashboard panels instead of collapsing operators onto whichever run is latest.
 - Discovery heartbeat cadence now comes from a shared environment-backed config helper and is surfaced through both the discovery summary payload and protected system overview, so automatic execution is visible to operators instead of remaining implicit startup behavior.
+- The library boundary now also exposes a dedicated existing-library organize preview route backed by shared scan-root metadata, canonical naming helpers, and duplicate-target blocking, so matched files can show before/after rename plans without introducing lazy-loaded or mutation-coupled media logic.
 - Startup-owned discovery and import-execution heartbeats now also share a small interval-runner utility for `setInterval` lifecycle, `unref()`, and no-overlap guards, while keeping each heartbeat's due-check and outcome-recording logic inside its own module.
 - Startup-owned discovery and import-execution heartbeats now also share a small heartbeat-state helper for common outcome timestamps, skip/error metadata, and last-triggered tracking, while heartbeat-specific state such as transition counts remains an explicit module-level extension.
 - Startup-owned discovery and import-execution heartbeats now also share a small interval-config helper for environment-backed cadence parsing and human-readable interval labels, while each heartbeat module still owns its env var name and default cadence.
+- Media tooling and inspection now also share a dedicated `media-command-service.js` execution boundary for allowlisted binaries, timeout and buffer caps, and no-shell process execution defaults, so ffmpeg and ffprobe command policy does not drift across services.
 - Process startup now also uses a small shared service supervisor to register long-lived background services, start them in one place, and own graceful signal-driven shutdown ordering instead of wiring each startup-owned service directly inside `index.js`.
 - Process startup now also uses a dedicated startup-runtime helper so the real server composition path, service registration, listen callback, and graceful shutdown behavior can be tested without turning `index.js` into an orchestration blob.
 - Process-owned server entrypoints now also share a small prefixed runtime reporter for stdout/stderr lines and unknown-error formatting, while each caller still owns its domain-specific message text.
@@ -179,12 +210,15 @@ Parallelizable after contract stabilization:
 - [ ] Confirm authoritative docs and ownership boundaries for security, backup/restore, admin recovery, and database model.
 - [ ] Lock initial Docker-first deployment assumptions for embedded Postgres, persistent volumes, FFmpeg presence, and slskd dependency shape.
 - [ ] Confirm no route group will ship without validation, normalized errors, audit rules, and permission requirements.
+- [x] Lock API exposure rules for public vs privileged routes, request size/content-type limits, browser security headers, rate limits, and outbound host controls.
+- [x] Add a code-level route inventory manifest and validation so registered routes cannot drift without explicit method/path/access classification.
 - [ ] Confirm no filesystem mutation path bypasses preview, logging, and operator confirmation rules.
 
 ## Phase 1 - Bootstrap, Packaging, And Schema Foundation
 
 - [x] Create server bootstrap skeleton with config loading, startup validation, logger wiring, and HTTP app construction.
 - [ ] Add fail-closed startup checks for required directories, secrets, database reachability, and invalid configuration combinations.
+- [x] Add fail-closed HTTP perimeter defaults for body-size limits, supported content types, safe browser-facing security headers, and generic error/not-found behavior.
 - [x] Create base repository/module structure for routes, validators, services, repositories, jobs, adapters, and shared utilities.
 - [x] Add initial database connection layer and migration runner.
 - [x] Create first migration package for users, refresh tokens, settings/config, audit events, maintenance locks, operation runs, and job leases.
@@ -192,35 +226,72 @@ Parallelizable after contract stabilization:
 - [x] Create initial Vue app shell, router, API client, and guarded bootstrap state.
 - [x] Add initial Docker image/build files and compose layout for app container, embedded Postgres persistence, and startup ordering.
 - [ ] Verify FFmpeg and required media inspection tooling are present in the standard image.
+  - A shared `media-tooling-status-service.js` now probes `ffmpeg -version` and `ffprobe -version` and publishes safe availability flags (`ffmpegAvailable`, `ffprobeAvailable`) through the existing dependency-health surface.
+  - App composition now includes a `media_tooling` dependency check alongside `slskd`, so system overview and diagnostics can expose tooling readiness before media inspection/transcoding execution paths are enabled.
 - [x] Update schema snapshot/documentation once the initial migration package is stable.
 
 ## Phase 2 - Auth, Sessions, And Settings Contracts
 
 - [x] Implement bootstrap-admin creation flow for first-run setup.
 - [x] Implement password hashing, login, logout, and refresh-token rotation.
-- [ ] Implement session invalidation and forced re-auth behavior.
-- [x] Add CSRF protection for cookie-authenticated write routes.
-- [ ] Implement route-tier enforcement for anonymous, authenticated, privileged, maintenance-locked, and integration-key contexts.
+- [x] Complete forced re-auth behavior, including password-change and active-session management resolution flows reachable without fresh-admin session requirements.
+- [x] Add CSRF protection for cookie-authenticated write routes, with an explicit deployment-level opt-out for tightly trusted local-only installs.
+- [ ] Extend route-tier enforcement beyond the now-admin-gated settings, system, and slskd operational routes to the remaining privileged, maintenance-locked, and import/library mutation contexts; metadata, import, and library mutations now require fresh admin sessions.
+- [x] Add explicit API perimeter hardening for auth/bootstrap/control-plane surfaces, including rate limits, method/content-type enforcement, and abuse logging for repeated contract failures.
 - [x] Implement settings/config service with allowlisted keys, validation, normalization, path validation feedback, and audit logging.
-- [ ] Add masking, preservation, and clear semantics for secret-bearing settings values.
-- [ ] Extend allowlisted settings with artwork-fetch, extraction, derivative, and cleanup controls needed before artwork workers ship.
-- [ ] Implement API key create/rotate/revoke flows for integrations.
+- [x] Add masking, preservation, and clear semantics for the first secret-bearing settings surface (`slskd.apiKey`) with encrypted-at-rest persistence and environment fallback.
+- [x] Extend allowlisted settings with artwork-fetch, extraction, derivative, and cleanup controls needed before artwork workers ship.
+- [ ] If non-browser automation is actually needed, implement lightweight personal/integration token create-revoke-expire flows for local companion-app use without turning Harmoniarr into a production-style API key platform.
+- [ ] Add outbound-request hardening for configurable integrations, including SSRF-aware host validation, redirect posture, and deployable egress restrictions; base-URL validation, redirect denial, and host allowlisting now exist, but deployable egress restrictions and DNS/network-layer containment are still missing.
 - [x] Add frontend login and bootstrap-admin flows.
-- [ ] Add frontend session-expiry flows.
+- [x] Add frontend session-expiry flows.
 - [x] Add frontend settings surfaces for core system config and validation feedback.
-- [ ] Add frontend secret entry, masking, and clear UX for protected settings fields.
-- [ ] Verify secrets never round-trip in plaintext after initial write.
+- [x] Add frontend secret entry, masking, and clear UX for the initial protected settings field (`slskd.apiKey`).
+- [x] Verify the first protected settings field does not round-trip in plaintext after initial write.
+- [x] Add an admin-managed local user directory with shared role-permission presets and protected create/update flows as the durable identity baseline for non-bootstrap accounts.
+- [ ] Implement provider-linked onboarding for Plex users using server-side Plex PIN auth, shared-server user import or claim flows, and explicit role mapping without ever collecting Plex passwords locally.
 - [ ] Verify admin recovery assumptions remain compatible with `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 - Canonical Model And Import Review
 
 - [x] Create canonical artist, release, release group, track, file, external-identity, import-candidate, and review-decision data models.
-- [ ] Add artwork asset, artwork assignment, and observed file-tag tables as part of the first canonical metadata expansion beyond the auth/platform foundation.
+- [x] Add artwork asset, artwork assignment, and observed file-tag tables as part of the first canonical metadata expansion beyond the auth/platform foundation.
 - [x] Implement MusicBrainz-first identity normalization and provenance storage for canonical metadata imports.
 - [x] Add local metadata read and search surfaces for imported artists, release groups, and releases so imported entities can be reopened without provider-first search.
 - [x] Implement slskd adapter boundary with normalized request/result/error contracts.
 - [x] Add authenticated slskd discovery routes for search start, polling, and response reads.
 - [x] Add discovery/import candidate ingestion that stores normalized domain state separately from raw provider payloads.
+- [x] Add external playlist and collection URL intake for Spotify, YouTube, Apple Music, and similar sources, normalizing provider URLs into canonical IDs and paged artist, album, and track ingest requests before review-candidate generation.
+  - Canonical URL normalization now runs through a shared `normalizeExternalMediaSource` parser that parses Spotify, YouTube, and Apple Music URLs into provider-agnostic resource descriptors with type, identifier, storefront, and canonical URL fields.
+  - Supported `external_url` requests now auto-dispatch a durable `library_external_intake_planning` operation run via the shared queue and operation-run-descriptor model.
+  - The planning worker materializes normalized `provider_ingest_requests` rows from a durable `buildProviderIngestPlan` call, patches `evidence.providerRequest` and `evidence.providerAutomation` on the request row, and records audit events through the shared boundary.
+  - Duplicate planning runs are prevented by an idempotency check in `library-external-intake-service.js` before any run is created.
+  - Migration `20260502_000007_provider_ingest_request_intents.sql` adds the `provider_ingest_requests` table with provider, resource type, ingest target, identifier, canonical URL, pagination state, status, and evidence columns.
+- [x] Model playlist import expansion policy so operators can keep selection bounded to playlist albums or opt into additional album discovery for artists referenced by the playlist.
+- [x] Add a dedicated Request Music dashboard and persisted user-owned media request inbox for release, track, and provider URL submissions, with requester-scoped history and admin all-request visibility separate from import review.
+- [x] Move per-user import destination ownership toward `app_users` by storing managed library subdirectories on user records and preferring them during preview planning, while keeping `paths.userMusicRoots` as a compatibility fallback during the transition.
+- [x] Add an explicit admin provisioning flow for managed library directories so user-owned subdirectory assignments can be materialized under the shared music root without relying on settings-era path creation behavior.
+- [x] Add a user-owned folder-access model and provisioning flow so admin-created or Plex-onboarded users can claim or generate managed library subdirectories without relying on settings-only mappings long term.
+  - Added a self-service authenticated route `POST /api/v1/users/me/claim-managed-library-root` that claims a managed root for the current user and provisions the directory in one shared flow.
+  - Claiming now runs through `app-user-provisioning-service.js` so root ownership and provisioning behavior stay centralized, with generated defaults (`listeners/<username-slug>`) when no explicit root is supplied.
+  - Existing admin provisioning remains available at `POST /api/v1/users/:userId/provision-managed-library-root`, while route inventory and server tests now cover both admin and self-service flows.
+- [x] Extend the self-service request boundary so release-backed `needs_fetch` requests that resolve to canonical metadata releases feed discovery reconciliation and dispatch instead of stopping at request classification alone.
+- [x] Extend provider-URL request handling so external playlist and collection requests dispatch into provider fetch and import automation instead of remaining classified-only.
+  - `library-media-request-service.js` now calls `externalIntakeService.queueExternalMediaRequestPlanning` inline after persisting a supported `external_url` request, making dispatch synchronous with request creation rather than deferred.
+  - The planning operation type `library_external_intake_planning` is registered in the shared `operationRunRegistry` and dispatched by the shared `operation-queue-dispatcher` poll loop alongside existing operation types.
+  - Live provider fetch execution now runs as a second durable operation type `library_external_intake_execution` dispatched automatically after planning completes. Spotify, YouTube, and Apple Music API clients call the appropriate provider endpoint for each planned `provider_ingest_requests` row, persist response evidence, and derive child rows for playlist pages, artist albums, and artist discovery targets.
+  - Provider credentials are stored as AES-256-GCM encrypted secrets via the shared `provider-credentials-service.js` boundary, with per-provider settings namespaces (`spotify`, `youtube`, `appleMusic`) including `requestTimeoutMs` and `playlistExpansionPolicy` validated through the shared settings boundary.
+  - Playlist expansion policy now routes through a shared native ESM policy service with explicit bounded and artist-discovery modes, provider-client resolution is centralized for Spotify, YouTube, and Apple Music execution, and the protected settings UI exposes provider credentials plus the playlist expansion policy without returning stored secrets to the browser.
+  - Spotify provider intake now also supports an admin-started Authorization Code with PKCE linking flow, stores refreshable user tokens through the encrypted-secret boundary, and has provider-client resolution prefer linked user access tokens before falling back to client credentials so current Spotify playlist access restrictions can be handled without moving OAuth logic into workers.
+  - YouTube provider intake now mirrors the same admin-started OAuth shape for private/account-scoped playlist reads, using Google server-side OAuth with PKCE, offline refresh tokens, encrypted pending-state/token storage, and provider-client resolution that prefers linked Bearer tokens before falling back to API-key requests.
+  - Apple Music auth remains a split model: catalog access stays server-side through signed developer tokens, while personal iCloud Music Library access should be handled as a later MusicKit/Music User Token browser authorization slice rather than forcing it through the server OAuth callback model.
+  - OAuth PKCE infrastructure now runs through a shared `oauth-helpers.js` pure utility layer and a shared `oauth-pkce-service.js` configurable factory, so Spotify and YouTube OAuth services are thin provider-specific wrappers (~50 lines each) that inject provider URLs, scopes, credential resolvers, and optional token-revocation hooks instead of duplicating the full PKCE lifecycle independently.
+  - YouTube OAuth now also revokes tokens at `https://oauth2.googleapis.com/revoke` during authorization clear before removing local encrypted state, while Spotify has no equivalent revocation endpoint.
+  - A shared `apple-music-status-service.js` now checks whether Apple Music developer-token credentials (team ID, key ID, private key) are configured through the encrypted-secret boundary, providing a non-OAuth credential health read path for unified provider status.
+  - A new authenticated `GET /api/v1/providers/status` route now returns unified `{ spotify, youtube, appleMusic }` provider status, wired through the shared provider module and registered in the code-level route inventory manifest.
+  - The protected system overview now includes a `providers` section with Spotify/YouTube OAuth linked state and Apple Music credential configuration state, consumed through a `providerStatus` computed property on the shared `useSystemOverview` composable.
+  - A shared `ProviderStatusPanel.vue` component now renders provider authorization state on the authenticated dashboard using the same `panel-light`/`dependency-grid`/`dependency-card` visual pattern as the existing `DependencyStatusPanel`, surfaced through the `useSystemOverview` composable's `providerStatus` computed property.
+- [x] Add per-user import destinations that map reviewed media into user-owned subdirectories while keeping canonical media reuse available across users.
 - [x] Implement the import review state baseline with durable pending, held, selected, rejected, and reopen transitions, while reserving apply/download execution semantics for later slices.
 - [x] Implement path mapping, staging resolution, root-folder policy, and naming-preview generation for the read-only import planning preview.
 - [x] Build an initial frontend metadata workspace for provider search/import, local reopen, and local search over canonical metadata.
@@ -229,19 +300,59 @@ Parallelizable after contract stabilization:
 
 ## Phase 4 - Jobs, Media Operations, And Notifications
 
-- [ ] Implement durable job queue, worker lease ownership, heartbeats, timeouts, cancellation, and retry contracts.
-- [ ] Add execution paths for metadata refresh, import apply, rename/organize, media inspection, and notification fan-out.
-- [ ] Implement guarded filesystem copy/move/link behavior with collision handling and post-action verification.
-- [ ] Implement previewable rename and organize flows before apply operations.
-- [ ] Add FFmpeg-backed inspection and initial transcoding orchestration with policy checks and explicit warnings.
-- [ ] Enforce default retention of original lossless files and explicit warning flows for lossy-to-lossy or lossy-to-lossless cases.
-- [ ] Add in-app operator notifications for queued work, failures, recoveries, and manual-intervention needs.
-- [ ] Add job-history and job-detail UI surfaces with audit-friendly event views.
+- Shared server lease handling now runs through a dedicated `job-lease-store` boundary that centralizes lease keying, owner identity, heartbeat renewal, expiry-state normalization, and Jobs diagnostics payloads for operation runs, while durable queue claiming now runs separately through shared `operation_runs` queue metadata so lease renewal and queue dispatch stay decoupled.
+- Current artwork, import, and library operation workers now also share an operation-run lease heartbeat helper built on the existing interval runner, so active worker leases renew through one modular ESM boundary instead of each worker owning its own timer lifecycle.
+- Operation runs now also carry durable cancel-request state plus queue and retry metadata through a shared queue store, startup-owned dispatcher, guarded admin cancel and retry routes, worker cancellation checkpoints, automatic retry backoff, timeout-driven stranded-run recovery, and Jobs view controls, while a shared static ESM operation descriptor registry now centralizes operation keys, started-event types, titles, and cancel/retry capability rules across server and client consumers.
+- Operation-oriented client surfaces now share one status label/class helper for durable run states, and metadata artist pages can now queue a first shared `metadata_artist_refresh` operation that refreshes MusicBrainz artist and release-group catalog state through the startup-owned queue, worker lease, retry, and recovery path before triggering wanted-release reconciliation.
+- Monitored artists now persist `last_refreshed_at` and `next_refresh_at` scheduling state, with a startup-owned metadata refresh heartbeat selecting due artists and enqueueing the same shared `metadata_artist_refresh` operation through a jittered refresh scheduling policy instead of a separate cron-only execution path.
+- Scheduled metadata refresh dispatch now also consults shared MusicBrainz dependency health before enqueueing new work, records explicit paused reason and next-retry timing in heartbeat state, and exposes that scheduler status through the protected system overview and dashboard instead of silently skipping due work.
+- Metadata refresh cadence now also uses monitored release-group timing to shorten refresh intervals for recent or upcoming releases and back off stable catalogs, while the protected dashboard consumes a shared heartbeat-summary surface for discovery, import reconciliation, and metadata refresh instead of another metadata-only status card.
+- [x] Implement automatic retry backoff and timeout-driven stranded-run recovery on top of the shared queue and lease contracts.
+- [x] Add execution paths for metadata refresh, import apply, rename/organize, media inspection, and notification fan-out.
+  - Added shared queued `library_organize_apply` execution with guarded admin start route (`POST /api/v1/library/organize-runs`), startup queue-dispatch wiring, lease heartbeat/cancellation handling, and filesystem-safe move application through `media-filesystem-service.js`.
+  - Added shared queued `operator_notification_fanout` execution with guarded admin start route (`POST /api/v1/system/operator-notification-fanout-runs`), startup queue-dispatch wiring, and durable operation-run summary output for actionable notification fan-out attempts.
+  - Added shared queued `import_candidate_media_inspection` execution with guarded admin start route (`POST /api/v1/import-candidates/media-inspection-runs`), startup queue-dispatch wiring, lease heartbeat/cancellation handling, and durable warning/unavailable-count summaries derived from apply-preview inspection payloads.
+  - Metadata refresh and import apply execution paths were already wired via shared queue handlers and worker boundaries.
+- [x] Implement guarded filesystem copy/move/link behavior with collision handling, same-volume hardlink reuse across user subdirectories when media already exists, and post-action verification.
+  - Import apply now checks for existing same-relative-path lossless files across configured user roots and shared library root when per-user reuse policy is enabled, then finalizes from that existing source instead of restaging duplicates.
+  - Reuse finalization keeps the source file intact (`hardlink_only` or `copy_only_after_hardlink_fallback`) while preserving the existing guarded destination collision checks, root-boundary enforcement, and post-action verification in `media-filesystem-service.js`.
+  - Apply operation history now records explicit reuse-stage transport (`reuse_existing_lossless`) and tracks reuse counts in summary output for operator/audit visibility.
+- [x] Implement previewable rename and organize flows before apply operations.
+- [x] Add FFmpeg-backed inspection and initial transcoding orchestration with policy checks and explicit warnings.
+  - Added a shared `media-inspection-service.js` boundary that runs `ffprobe` with static ESM process execution, parses JSON metadata, and emits explicit inspection warnings (`media_inspection_unavailable`, `media_inspection_probe_failed`, `media_inspection_no_audio_stream`, `media_inspection_duration_exceeds_policy`) without mutating media.
+  - `import-candidate-apply-preview-service.js` now composes that shared inspection boundary and surfaces per-file inspection metadata plus warnings in apply preview responses, including an attention-level summary state when inspection policy warnings are present.
+  - App composition now injects the shared `media_tooling` readiness check into import-candidate inspection wiring, preserving one modular health/inspection source instead of route-local probing.
+  - Added a shared `media-transcode-planning-service.js` boundary that consumes inspection metadata and emits planning-only transcode recommendations (`keep_original`, `transcode_candidate`) with explicit warnings (`media_transcode_inspection_unavailable`, `media_transcode_no_audio_stream`, `media_transcode_lossy_source_detected`, `media_transcode_unknown_codec_family`) while keeping mutation and encode execution disabled.
+  - `import-candidate-apply-preview-service.js` now composes transcode planning next to inspection and returns per-file `transcodePlan` plus aggregate `transcodeWarnings` for operator-visible policy review before any transcoding path is enabled.
+  - Added a shared `media-transcode-execution-service.js` boundary for ffmpeg-backed preflight orchestration (decode/encode-to-null validation only), routed through the shared `media-command-service.js` policy seam and media-tooling readiness checks.
+  - Import apply execution now records per-file `transcodeExecution` preflight outcomes plus aggregate summary counts (`transcodePreflightPassedCount`, `transcodePreflightFailedCount`, `transcodePreflightUnavailableCount`), and auto-upgrades candidate apply status to warning-level when transcode preflight fails or tooling is unavailable.
+  - Added shared queued `import_candidate_transcode_orchestration` execution with guarded admin start route (`POST /api/v1/import-candidates/transcode-runs`), startup queue-dispatch wiring, lease heartbeat/cancellation handling, and per-file transcode-preflight aggregation for selected candidate files with `transcode_candidate` recommendations.
+- [x] Add hostile file and path input controls for media operations, including filename normalization, archive/path traversal guards, decompression limits, and parser-safe staging rules.
+  - Added a shared `media-staging-safety-service.js` boundary that classifies candidate files before staging, blocks traversal-style source filenames, blocks unsupported control characters, and marks archive payload extensions as non-stageable until guarded extraction rules exist.
+  - Import preview now consumes that shared staging-safety boundary and surfaces deterministic validation blockers (`unsafe_source_filename_traversal`, `archive_payload_unsupported`) so apply execution fails closed before any filesystem mutation is attempted.
+  - Existing naming sanitization remains in the shared `library-naming-service.js`, and import apply keeps all mutation paths behind `media-filesystem-service.js` root-boundary checks and exclusive destination enforcement.
+- [x] Enforce default retention of original lossless files, avoid duplicate lossless copies across user libraries, and require explicit warning flows when an operator chooses a lossy derivative instead of the shared canonical source.
+  - Added a shared `media-lossless-retention-policy-service.js` boundary that evaluates transcode recommendations against explicit per-file decisions and emits policy warnings for both required and acknowledged lossy-derivative paths.
+  - `import-candidate-apply-preview-service.js` now blocks apply preview readiness for lossy transcode candidates until an explicit `allow_lossy_derivative` decision is recorded, while preserving warning-level visibility after acknowledgment.
+  - Added a guarded admin route (`/api/v1/import-candidates/:importCandidateId/files/:importCandidateFileId/allow-lossy-derivative`) and file-decision service path for explicit operator acknowledgement, with event and audit evidence through existing modular decision boundaries.
+- [x] Add in-app operator notifications for queued work, failures, recoveries, and manual-intervention needs.
+  - Added a shared `operator-notification-service.js` boundary that derives deduplicated actionable notifications from durable operation-run state (`pending`, `failed`/`cancelled`, retry-based recovery) plus heartbeat pause/error state.
+  - Added a protected admin route (`GET /api/v1/system/operator-notifications`) through the shared system module and route dependencies, keeping notification composition out of route handlers.
+  - The dashboard now consumes this dedicated notification surface through the shared `useSystemOverview` composable and `OperatorNotificationsPanel.vue`, with drill-through links to the existing run-detail and dashboard workflows.
+- [x] Add job-history and job-detail UI surfaces with audit-friendly event views.
+- [x] Add bounded activity-feed and metadata detection-history pagination plus client drill-through from those observability surfaces.
 
 ## Phase 5 - Recovery, Restore, And Diagnostics
 
-- [ ] Implement backup/export manifests and artifact metadata per `docs/BACKUP_RESTORE_DESIGN.md`.
+- [x] Implement backup/export manifests and artifact metadata per `docs/BACKUP_RESTORE_DESIGN.md`.
+  - Added shared recovery boundaries (`backup-manifest-service.js`, `backup-artifact-repository.js`, `backup-export-service.js`) for manifest generation, artifact metadata persistence, and export orchestration using static ESM imports.
+  - Added durable `backup_artifacts` metadata storage via migration `20260502_000008_backup_artifact_metadata.sql`, including scope metadata, payload digest, file size, storage path, and actor linkage.
+  - Added guarded backup export/list/inspect routes through system route wiring (`POST /api/v1/recovery/backups`, `GET /api/v1/recovery/backups`, `GET /api/v1/recovery/backups/:backupArtifactId`) with CSRF and fresh-admin enforcement on export create.
 - [ ] Implement restore preview, restore apply, maintenance lock entry/exit, and restore operation-run/event history.
+  - Added shared `maintenance-lock-service.js` plus `backup-restore-preview-service.js` boundaries and a guarded restore-preview route (`GET /api/v1/recovery/backups/:backupArtifactId/restore-preview`) that evaluates artifact integrity, schema compatibility, and active maintenance-lock conflicts.
+  - Added shared `backup-restore-apply-service.js` orchestration with operation-run lifecycle integration, restore lock acquire/release mutation, and `backup_restore_started|completed|failed` audit/event evidence.
+  - Added guarded restore-apply route (`POST /api/v1/recovery/backups/:backupArtifactId/restore-apply`) with fresh-admin and CSRF enforcement wired through the system module shared dependencies.
+  - Remaining work is to broaden apply scope beyond settings-only payload handling and finish end-to-end recovery UI flows.
 - [ ] Implement bootstrap-admin recovery issuance, verification, use, cancellation, and audit evidence handling.
 - [ ] Add control-plane diagnostics for health, queue state, failed jobs, maintenance state, and recent privileged actions.
 - [ ] Enforce redaction rules for logs, diagnostics, exported evidence, and operator-visible payloads.
@@ -256,6 +367,7 @@ Parallelizable after contract stabilization:
 - [x] Add route-contract tests for normalized success/error payloads and permission enforcement.
 - [x] Keep ESM-only enforcement active in validation and CI so new CommonJS patterns do not regress into runtime code or scripts.
 - [x] Add migration replay and schema snapshot validation.
+  - Applied-migration checksum drift is now detected at startup via `assertNoMigrationChecksumDrift`, which compares the stored checksums for previously-applied migrations against the current file checksums and aborts startup if any mismatch is found, preventing silent schema divergence from in-place migration edits.
 - [ ] Add end-to-end UI coverage for bootstrap, login, settings, review queue, job feedback, and recovery-sensitive flows where practical.
 - [ ] Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and restore/recovery scenarios.
 - [ ] Validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior.

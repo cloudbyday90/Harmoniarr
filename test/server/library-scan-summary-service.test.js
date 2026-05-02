@@ -90,3 +90,30 @@ test('createLibraryScanSummaryService reports the latest completed scan run when
   });
   assert.equal(summary.nextAction, null);
 });
+
+test('createLibraryScanSummaryService returns exact historical run detail when requested', async (t) => {
+  const libraryScanRunStore = {
+    getRunById: t.mock.fn(async () => ({
+      errorMessage: null,
+      filesMatched: 15,
+      filesSeen: 18,
+      filesUnmatched: 3,
+      finishedAt: '2026-04-30T20:05:00.000Z',
+      id: 'run-44',
+      startedAt: '2026-04-30T20:00:00.000Z',
+      status: 'failed',
+    })),
+  };
+  const service = createLibraryScanSummaryService({
+    libraryScanRunStore,
+    settingsService: {
+      buildSettingsPayload: async () => ({ settings: { paths: {} }, pathValidation: { summary: { status: 'healthy' } } }),
+    },
+  });
+
+  const payload = await service.buildLibraryScanRunDetail({ runId: 'run-44' });
+
+  assert.equal(libraryScanRunStore.getRunById.mock.callCount(), 1);
+  assert.equal(payload.run.id, 'run-44');
+  assert.equal(payload.run.filesSeen, 18);
+});

@@ -51,12 +51,13 @@ export function registerSlskdRoutes(app, {
   getConnectionStatus,
   getSearchResponses,
   getSearchState,
+  requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
+  requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
-  requireSession = defaultRequestAuthDependencies.requireSession,
   startSearch,
 }) {
   app.get('/api/v1/slskd/status', slskdRoute(async (request, response) => {
-    await requireSession(request);
+    await requireAdminSession(request);
     response.json({
       ok: true,
       provider: 'slskd',
@@ -65,7 +66,7 @@ export function registerSlskdRoutes(app, {
   }));
 
   app.post('/api/v1/slskd/searches', slskdRoute(async (request, response) => {
-    const session = await requireSession(request);
+    const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
     response.status(202).json({
@@ -82,7 +83,7 @@ export function registerSlskdRoutes(app, {
   }));
 
   app.get('/api/v1/slskd/searches/:searchId', slskdRoute(async (request, response) => {
-    await requireSession(request);
+    await requireAdminSession(request);
     response.json({
       ok: true,
       provider: 'slskd',
@@ -94,7 +95,7 @@ export function registerSlskdRoutes(app, {
   }));
 
   app.get('/api/v1/slskd/searches/:searchId/responses', slskdRoute(async (request, response) => {
-    await requireSession(request);
+    await requireAdminSession(request);
     const result = await getSearchResponses({
       searchId: request.params.searchId,
     });

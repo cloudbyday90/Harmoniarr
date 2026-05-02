@@ -17,13 +17,17 @@
  */
 
 import { ref } from 'vue';
+import { isAbortError } from '../lib/abort-error.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { createLatestRequestGate } from '../lib/latest-request-gate.js';
 import {
   browseMusicBrainzArtistReleaseGroups,
   fetchMetadataArtist,
+  fetchMetadataArtistDetectionEvents as defaultFetchMetadataArtistDetectionEvents,
   importMusicBrainzArtist,
   resolveMusicBrainzArtistLocal,
   searchMusicBrainzArtists,
+  startMetadataArtistRefresh as defaultStartMetadataArtistRefresh,
   updateMetadataArtistMonitoring as defaultUpdateMetadataArtistMonitoring,
 } from '../lib/metadata-api.js';
 import { useMetadataLocalSearchWorkflow } from './useMetadataLocalSearchWorkflow.js';
@@ -32,9 +36,11 @@ import { useMetadataReleaseWorkflow } from './useMetadataReleaseWorkflow.js';
 export function useMetadataArtistWorkflow({
   browseArtistReleaseGroups = browseMusicBrainzArtistReleaseGroups,
   fetchArtist = fetchMetadataArtist,
+  fetchArtistDetectionEvents = defaultFetchMetadataArtistDetectionEvents,
   importArtistById = importMusicBrainzArtist,
   resolveArtistLocal = resolveMusicBrainzArtistLocal,
   searchArtists = searchMusicBrainzArtists,
+  startMetadataArtistRefreshRequest = defaultStartMetadataArtistRefresh,
   updateArtistMonitoringRequest = defaultUpdateMetadataArtistMonitoring,
   createLocalSearchWorkflow = useMetadataLocalSearchWorkflow,
   createReleaseWorkflow = useMetadataReleaseWorkflow,
@@ -44,27 +50,43 @@ export function useMetadataArtistWorkflow({
   const selectedArtist = ref(null);
   const localArtist = ref(null);
   const providerReleaseGroups = ref([]);
+  const detectionEventsPageInfo = ref({ hasMore: false, nextCursor: null });
   const searchError = ref('');
   const artistActionError = ref('');
+  const detectionEventsErrorMessage = ref('');
+  const queuedRefreshRun = ref(null);
   const isSearching = ref(false);
   const isImportingArtist = ref(false);
   const isLoadingArtist = ref(false);
+  const isLoadingMoreDetectionEvents = ref(false);
+  const isRefreshingArtist = ref(false);
   const isUpdatingArtistMonitoring = ref(false);
+  const artistWorkspaceRequestGate = createLatestRequestGate();
 
   const localSearchWorkflow = createLocalSearchWorkflow();
 
-  async function refreshArtistWorkspace(artist) {
+  async function refreshArtistWorkspace(artist, request = artistWorkspaceRequestGate.begin()) {
     const [localPayload, browsePayload] = await Promise.all([
-      resolveArtistLocal(artist.id),
+      resolveArtistLocal(artist.id, { signal: request.signal }),
       browseArtistReleaseGroups({
         artistId: artist.id,
         limit: 12,
         releaseGroupStatus: 'website-default',
+        signal: request.signal,
       }),
     ]);
 
+    if (!request.isCurrent()) {
+      return false;
+    }
+
     localArtist.value = localPayload;
+    detectionEventsPageInfo.value = localPayload.detectionEventsPageInfo ?? {
+      hasMore: false,
+      nextCursor: null,
+    };
     providerReleaseGroups.value = browsePayload.browse?.results ?? [];
+    return true;
   }
 
   const releaseWorkflow = createReleaseWorkflow({
@@ -95,67 +117,109 @@ export function useMetadataArtistWorkflow({
   }
 
   async function loadArtistWorkspace(artist, { resetSelection = true } = {}) {
+    const request = artistWorkspaceRequestGate.begin();
     selectedArtist.value = artist;
     artistActionError.value = '';
+    queuedRefreshRun.value = null;
     if (resetSelection) {
       releaseWorkflow.resetReleaseSelection();
     }
     isLoadingArtist.value = true;
 
     try {
-      await refreshArtistWorkspace(artist);
+      await refreshArtistWorkspace(artist, request);
     } catch (error) {
-      localArtist.value = null;
-      providerReleaseGroups.value = [];
-      artistActionError.value = getErrorMessage(error, 'Loading imported artist failed');
+      if (isAbortError(error)) {
+        return;
+      }
+
+      if (request.isCurrent()) {
+        localArtist.value = null;
+        providerReleaseGroups.value = [];
+        artistActionError.value = getErrorMessage(error, 'Loading imported artist failed');
+      }
     } finally {
-      isLoadingArtist.value = false;
+      if (request.isCurrent()) {
+        isLoadingArtist.value = false;
+      }
     }
   }
 
   async function importArtist(artist) {
+    const request = artistWorkspaceRequestGate.begin();
     selectedArtist.value = artist;
     artistActionError.value = '';
+    queuedRefreshRun.value = null;
     releaseWorkflow.resetReleaseSelection();
     isImportingArtist.value = true;
 
     try {
       await importArtistById(artist.id);
-      await loadArtistWorkspace(artist);
+      if (!request.isCurrent()) {
+        return;
+      }
+
+      await refreshArtistWorkspace(artist, request);
     } catch (error) {
-      artistActionError.value = getErrorMessage(error, 'Artist import failed');
+      if (isAbortError(error)) {
+        return;
+      }
+
+      if (request.isCurrent()) {
+        artistActionError.value = getErrorMessage(error, 'Artist import failed');
+      }
     } finally {
-      isImportingArtist.value = false;
+      if (request.isCurrent()) {
+        isImportingArtist.value = false;
+      }
     }
   }
 
   async function openLocalArtist(artist) {
-    const musicBrainzArtistId = artist.source?.musicbrainzArtistId ?? null;
+    const request = artistWorkspaceRequestGate.begin();
+    const initialMusicBrainzArtistId = artist.source?.musicbrainzArtistId ?? null;
 
-    selectedArtist.value = musicBrainzArtistId
-      ? { id: musicBrainzArtistId, name: artist.name }
+    selectedArtist.value = initialMusicBrainzArtistId
+      ? { id: initialMusicBrainzArtistId, name: artist.name }
       : null;
     artistActionError.value = '';
+    detectionEventsErrorMessage.value = '';
+    queuedRefreshRun.value = null;
     releaseWorkflow.resetReleaseSelection();
     isLoadingArtist.value = true;
 
     try {
-      const [localPayload, providerBrowseResult] = await Promise.allSettled([
-        fetchArtist(artist.id),
-        musicBrainzArtistId
-          ? browseArtistReleaseGroups({
+      const localPayload = await fetchArtist(artist.id, { signal: request.signal });
+      if (!request.isCurrent()) {
+        return;
+      }
+
+      const musicBrainzArtistId = initialMusicBrainzArtistId
+        ?? localPayload.artist?.source?.musicbrainzArtistId
+        ?? null;
+      const [providerBrowseResult] = musicBrainzArtistId
+        ? await Promise.allSettled([
+            browseArtistReleaseGroups({
               artistId: musicBrainzArtistId,
               limit: 12,
               releaseGroupStatus: 'website-default',
-            })
-          : Promise.resolve({ browse: { results: [] } }),
-      ]);
+              signal: request.signal,
+            }),
+          ])
+        : [{ status: 'fulfilled', value: { browse: { results: [] } } }];
 
-      if (localPayload.status !== 'fulfilled') {
-        throw localPayload.reason;
+      if (!request.isCurrent()) {
+        return;
       }
 
-      localArtist.value = localPayload.value;
+      localArtist.value = localPayload;
+      detectionEventsPageInfo.value = localPayload.detectionEventsPageInfo ?? {
+        hasMore: false,
+        nextCursor: null,
+      };
+      selectedArtist.value = musicBrainzArtistId
+        ? { id: musicBrainzArtistId, name: localPayload.artist?.name ?? artist.name }
+        : null;
       providerReleaseGroups.value = providerBrowseResult.status === 'fulfilled'
         ? (providerBrowseResult.value.browse?.results ?? [])
         : [];
@@ -167,11 +231,51 @@ export function useMetadataArtistWorkflow({
         );
       }
     } catch (error) {
-      localArtist.value = null;
-      providerReleaseGroups.value = [];
-      artistActionError.value = getErrorMessage(error, 'Opening local artist failed');
+      if (isAbortError(error)) {
+        return;
+      }
+
+      if (request.isCurrent()) {
+        localArtist.value = null;
+        detectionEventsPageInfo.value = { hasMore: false, nextCursor: null };
+        providerReleaseGroups.value = [];
+        artistActionError.value = getErrorMessage(error, 'Opening local artist failed');
+      }
     } finally {
-      isLoadingArtist.value = false;
+      if (request.isCurrent()) {
+        isLoadingArtist.value = false;
+      }
+    }
+  }
+
+  async function loadMoreDetectionEvents() {
+    if (!localArtist.value?.artist?.id || !detectionEventsPageInfo.value?.hasMore || isLoadingMoreDetectionEvents.value) {
+      return;
+    }
+
+    isLoadingMoreDetectionEvents.value = true;
+    detectionEventsErrorMessage.value = '';
+
+    try {
+      const result = await fetchArtistDetectionEvents(localArtist.value.artist.id, {
+        before: detectionEventsPageInfo.value.nextCursor,
+      });
+
+      localArtist.value = {
+        ...localArtist.value,
+        detectionEvents: [
+          ...(localArtist.value.detectionEvents ?? []),
+          ...(result.detectionEvents ?? []),
+        ],
+      };
+      detectionEventsPageInfo.value = result.pageInfo ?? {
+        hasMore: false,
+        nextCursor: null,
+      };
+    } catch (error) {
+      detectionEventsErrorMessage.value = getErrorMessage(error, 'Loading more detection history failed');
+    } finally {
+      isLoadingMoreDetectionEvents.value = false;
     }
   }
 
@@ -196,16 +300,43 @@ export function useMetadataArtistWorkflow({
     }
   }
 
+  async function refreshArtistMetadata() {
+    if (!localArtist.value?.artist?.id) {
+      return null;
+    }
+
+    artistActionError.value = '';
+    isRefreshingArtist.value = true;
+
+    try {
+      const result = await startMetadataArtistRefreshRequest(localArtist.value.artist.id);
+      queuedRefreshRun.value = result.run ?? null;
+      return result.run ?? null;
+    } catch (error) {
+      artistActionError.value = getErrorMessage(error, 'Starting metadata refresh failed');
+      return null;
+    } finally {
+      isRefreshingArtist.value = false;
+    }
+  }
+
   return {
     artistActionError,
+    detectionEventsErrorMessage,
+    detectionEventsPageInfo,
     importArtist,
     isImportingArtist,
     isLoadingArtist,
+    isLoadingMoreDetectionEvents,
+    isRefreshingArtist,
     isSearching,
     isUpdatingArtistMonitoring,
     localArtist,
+    loadMoreDetectionEvents,
     openLocalArtist,
     providerReleaseGroups,
+    queuedRefreshRun,
+    refreshArtistMetadata,
     runArtistSearch,
     searchError,
     searchQuery,

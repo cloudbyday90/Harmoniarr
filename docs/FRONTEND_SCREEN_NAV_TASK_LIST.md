@@ -36,6 +36,7 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 - The dashboard now also surfaces a read-only discovery summary panel backed by the dedicated library discovery route, so operators can see which monitored releases are immediately search-eligible versus delayed by cooldown or release-date policy.
 - The dashboard discovery panel now also exposes a protected manual dispatch action and latest-run status, so operators can trigger discovery work without rerunning the full library scan.
 - The dashboard now also surfaces automatic discovery heartbeat cadence through both the discovery panel and overview status pills, so the background dispatch interval is visible without opening server configuration directly.
+- The auth shell now also redirects forced re-authentication failures back to login with a distinct reason, so privileged mutation denials and refresh failures reuse the same fallback path as ordinary session expiry without inventing a separate dead-end screen before password-management flows exist.
 
 ## Global UI Rules
 
@@ -46,29 +47,32 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 
 ## Screen Group 1 - Bootstrap And Auth
 
-- [ ] Create first-run bootstrap-admin setup screen.
-- [ ] Create login screen and session-expiry handling.
-- [ ] Create forced re-auth and invalid-session fallback flows.
+- [x] Create first-run bootstrap-admin setup screen.
+- [x] Create login screen.
+- [x] Create session-expiry handling.
+- [x] Create forced re-auth and invalid-session fallback flows.
 - [ ] Ensure auth UI stays compatible with CSRF and cookie-session behavior.
 
 ## Screen Group 2 - App Shell, Dashboard, And Global Navigation
 
-- [ ] Create the base app shell with authenticated layout and navigation.
-- [ ] Create default dashboard/control-plane landing view.
+- [x] Create the base app shell with authenticated layout and navigation.
+- [x] Create default dashboard/control-plane landing view.
 - [ ] Add global status surfaces for health, maintenance mode, and privileged-action feedback.
 - [ ] Add account/session management entry points.
 
 ## Screen Group 3 - Settings And Secrets Management
 
-- [ ] Create settings screens for storage paths, import policy, metadata providers, slskd connectivity, notifications, and media/transcoding policy.
-- [ ] Add masked secret-entry behavior and safe save/clear UX.
-- [ ] Add validation and audit-friendly operator feedback for settings changes.
+- [x] Create settings screens for storage paths and current system-path validation feedback.
+- [ ] Extend settings screens for import policy, metadata providers, notifications, and media/transcoding policy.
+- [x] Add the initial slskd connectivity settings surface, including encrypted API-key status and safe save/clear UX.
+- [x] Add validation and audit-friendly operator feedback for settings changes.
 
 ## Screen Group 4 - Import Review And Canonical Metadata
 
 - [x] Create import candidate list, filters, and detail view.
-- [ ] Create review decision actions with confirm states and stale-action handling.
-- [ ] Create metadata detail panes for canonical IDs, provenance, path mapping preview, and staging context.
+- [x] Create review decision actions with stale-action handling.
+- [ ] Add confirm states where a review action should require explicit operator confirmation.
+- [x] Create metadata detail panes for canonical IDs, provenance, path mapping preview, and staging context.
 - [ ] Ensure review surfaces clearly distinguish preview state from applied library changes.
 
 ## Screen Group 5 - Jobs, History, And Notifications

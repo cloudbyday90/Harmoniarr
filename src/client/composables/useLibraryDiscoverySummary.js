@@ -19,11 +19,13 @@
 import { computed, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
+  fetchLibraryDiscoveryRunDetail as defaultFetchLibraryDiscoveryRunDetail,
   fetchLibraryDiscoverySummary as defaultFetchLibraryDiscoverySummary,
   startLibraryDiscoveryRun as defaultStartLibraryDiscoveryRun,
 } from '../lib/library-api.js';
 
 export function useLibraryDiscoverySummary({
+  fetchLibraryDiscoveryRunDetail = defaultFetchLibraryDiscoveryRunDetail,
   fetchLibraryDiscoverySummary = defaultFetchLibraryDiscoverySummary,
   startLibraryDiscoveryRun = defaultStartLibraryDiscoveryRun,
 } = {}) {
@@ -32,18 +34,50 @@ export function useLibraryDiscoverySummary({
   const errorMessage = ref('');
   const isLoading = ref(true);
   const isStarting = ref(false);
+  const runDetailErrorMessage = ref('');
+  const selectedRunDetail = ref(null);
+  const selectedRunId = ref(null);
 
+  const currentRun = computed(() => selectedRunDetail.value?.run ?? libraryDiscoverySummary.value?.latestRun ?? null);
   const latestRun = computed(() => libraryDiscoverySummary.value?.latestRun ?? null);
   const requestCounts = computed(() => libraryDiscoverySummary.value?.requestCounts ?? null);
   const summary = computed(() => libraryDiscoverySummary.value?.summary ?? null);
 
-  async function loadLibraryDiscoverySummary() {
+  async function loadSelectedLibraryDiscoveryRun({ runId }) {
+    selectedRunId.value = runId;
+
+    if (!runId) {
+      runDetailErrorMessage.value = '';
+      selectedRunDetail.value = null;
+      return;
+    }
+
+    runDetailErrorMessage.value = '';
+
+    try {
+      selectedRunDetail.value = (await fetchLibraryDiscoveryRunDetail(runId)).libraryDiscoveryRun ?? null;
+    } catch (error) {
+      selectedRunDetail.value = null;
+      runDetailErrorMessage.value = getErrorMessage(error, 'Library discovery run details failed');
+    }
+  }
+
+  async function loadLibraryDiscoverySummary({ preferredRunId = selectedRunId.value } = {}) {
     isLoading.value = true;
     errorMessage.value = '';
     try {
       libraryDiscoverySummary.value = await fetchLibraryDiscoverySummary();
+
+      if (preferredRunId && preferredRunId !== libraryDiscoverySummary.value?.latestRun?.id) {
+        await loadSelectedLibraryDiscoveryRun({ runId: preferredRunId });
+      } else {
+        await loadSelectedLibraryDiscoveryRun({ runId: null });
+      }
     } catch (error) {
       libraryDiscoverySummary.value = null;
+      runDetailErrorMessage.value = '';
+      selectedRunDetail.value = null;
+      selectedRunId.value = null;
       errorMessage.value = getErrorMessage(error, 'Library discovery summary failed');
     } finally {
       isLoading.value = false;
@@ -56,7 +90,7 @@ export function useLibraryDiscoverySummary({
 
     try {
       await startLibraryDiscoveryRun();
-      await loadLibraryDiscoverySummary();
+      await loadLibraryDiscoverySummary({ preferredRunId: null });
     } catch (error) {
       actionErrorMessage.value = getErrorMessage(error, 'Library discovery dispatch failed');
     } finally {
@@ -66,13 +100,18 @@ export function useLibraryDiscoverySummary({
 
   return {
     actionErrorMessage,
+    currentRun,
     errorMessage,
     isLoading,
     isStarting,
     latestRun,
     libraryDiscoverySummary,
+    loadSelectedLibraryDiscoveryRun,
     loadLibraryDiscoverySummary,
     requestCounts,
+    runDetailErrorMessage,
+    selectedRunDetail,
+    selectedRunId,
     startDiscoveryRun,
     summary,
   };

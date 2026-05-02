@@ -16,6 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
+import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+
 function normalizeRemoteFilename(file) {
   const rawFilename = typeof file?.rawPayload?.filename === 'string'
     ? file.rawPayload.filename.trim()
@@ -60,17 +63,21 @@ export function createImportCandidateExecutionWorker({
     },
     selectedCandidates: [],
   }),
+  createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
   enqueueDownloads = async () => ({
     enqueued: [],
     failed: [],
   }),
   getImportCandidate = async () => null,
+  isCancellationRequested,
   markImportCandidateDownloadFailed = async () => null,
   markImportCandidateDownloading = async () => null,
   markRunCompleted,
+  markRunCancelled,
   markRunFailed,
   markRunStarted,
   releaseLease,
+  renewLease,
   replaceImportExecutionRunItems = async () => [],
   updateImportExecutionRunItem = async () => null,
 } = {}) {
@@ -101,9 +108,15 @@ export function createImportCandidateExecutionWorker({
 
   async function runExecution({ requestedCandidateCount, runId }) {
     let finalLeaseStatus = 'completed';
+    let leaseHeartbeat = null;
 
     try {
       await acquireLease({ runId });
+      if (renewLease) {
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat.start();
+      }
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
       await markRunStarted({
         runId,
         summary: {
@@ -125,6 +138,7 @@ export function createImportCandidateExecutionWorker({
       };
 
       for (const summaryCandidate of selectedSummary.selectedCandidates ?? []) {
+        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
         const baseSnapshot = {
           candidate: {
             fileCount: summaryCandidate.fileCount,
@@ -265,6 +279,19 @@ export function createImportCandidateExecutionWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunCancellationError(error)) {
+        finalLeaseStatus = 'cancelled';
+        await markRunCancelled({
+          runId,
+          summary: {
+            currentStep: 'Download enqueue cancelled',
+            executionMode: 'download_enqueue',
+            requestedCandidateCount,
+          },
+        });
+        return;
+      }
+
       finalLeaseStatus = 'failed';
       await markRunFailed({
         errorMessage: error.message,
@@ -276,6 +303,7 @@ export function createImportCandidateExecutionWorker({
         },
       });
     } finally {
+      leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
       await releaseLease({ runId, status: finalLeaseStatus });
     }

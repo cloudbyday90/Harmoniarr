@@ -18,6 +18,8 @@
 
 const safeDetailKeys = new Set([
   'attempts',
+  'ffmpegAvailable',
+  'ffprobeAvailable',
   'maxRetries',
   'isConnected',
   'isLoggedIn',
@@ -220,8 +222,14 @@ export function createProviderHealthRecorder({ now = () => new Date() } = {}) {
 }
 
 export function createDependencyHealthService({ checks = [], recorder = null } = {}) {
-  async function getDependencyHealth() {
-    const checkResults = await Promise.all(checks.map(async ({ provider, check }) => {
+  async function getDependencyHealth({ providers = null } = {}) {
+    const selectedProviders = Array.isArray(providers) && providers.length > 0
+      ? new Set(providers)
+      : null;
+    const selectedChecks = selectedProviders
+      ? checks.filter(({ provider }) => selectedProviders.has(provider))
+      : checks;
+    const checkResults = await Promise.all(selectedChecks.map(async ({ provider, check }) => {
       try {
         return normalizeDependencyStatus(provider, await check());
       } catch (error) {
@@ -231,6 +239,10 @@ export function createDependencyHealthService({ checks = [], recorder = null } =
 
     const statusesByProvider = new Map();
     for (const status of recorder?.getSnapshots?.() ?? []) {
+      if (selectedProviders && !selectedProviders.has(status.provider)) {
+        continue;
+      }
+
       statusesByProvider.set(status.provider, status);
     }
     for (const status of checkResults) {

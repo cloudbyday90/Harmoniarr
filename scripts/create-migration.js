@@ -53,7 +53,12 @@ async function createMigrationFile() {
   const handle = await open(filePath, 'wx');
 
   try {
-    await handle.writeFile('-- forward-only migration\nBEGIN;\n\nCOMMIT;\n');
+    await handle.writeFile(
+      '-- forward-only migration\n'
+      + 'BEGIN;\n\n'
+      + '-- Use DEFAULT harmoniarr_generate_uuid() for UUID surrogate primary keys.\n\n'
+      + 'COMMIT;\n',
+    );
   } finally {
     await handle.close();
   }

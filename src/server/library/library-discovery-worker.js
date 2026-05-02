@@ -16,8 +16,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
+import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+
 export function createLibraryDiscoveryWorker({
   acquireLease,
+  createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
   dispatchDiscoveryRequests = async () => ({
     attemptedCount: 0,
     candidateCount: 0,
@@ -26,11 +30,14 @@ export function createLibraryDiscoveryWorker({
     fileCount: 0,
   }),
   markRunCompleted,
+  markRunCancelled,
   markRunFailed,
   markRunStarted,
+  isCancellationRequested,
   reconcileDiscoveryRequests = null,
   reconcileWantedReleases = null,
   releaseLease,
+  renewLease,
 } = {}) {
   const activeRunIds = new Set();
 
@@ -41,9 +48,15 @@ export function createLibraryDiscoveryWorker({
     triggeredByUserId = null,
   }) {
     let finalLeaseStatus = 'completed';
+    let leaseHeartbeat = null;
 
     try {
       await acquireLease({ runId });
+      if (renewLease) {
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat.start();
+      }
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
       await markRunStarted({
         runId,
         summary: {
@@ -59,6 +72,8 @@ export function createLibraryDiscoveryWorker({
         await reconcileDiscoveryRequests();
       }
 
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+
       const summary = await dispatchDiscoveryRequests({
         actorUserId: triggeredByUserId,
         requestMetadata,
@@ -72,6 +87,18 @@ export function createLibraryDiscoveryWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunCancellationError(error)) {
+        finalLeaseStatus = 'cancelled';
+        await markRunCancelled({
+          runId,
+          summary: {
+            currentStep: 'Library discovery cancelled',
+            triggerSource,
+          },
+        });
+        return;
+      }
+
       finalLeaseStatus = 'failed';
       await markRunFailed({
         errorMessage: error.message,
@@ -81,6 +108,7 @@ export function createLibraryDiscoveryWorker({
         },
       });
     } finally {
+      leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
       await releaseLease({ runId, status: finalLeaseStatus });
     }

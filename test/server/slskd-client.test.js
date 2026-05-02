@@ -20,6 +20,7 @@ test('createSlskdClient sends API-key authenticated requests to the v0 API base'
     },
   }));
   const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
     apiKey: 'test-slskd-api-key',
     baseUrl: 'http://slskd.test:5030',
     fetchImpl,
@@ -34,6 +35,7 @@ test('createSlskdClient sends API-key authenticated requests to the v0 API base'
   assert.equal(options.method, 'GET');
   assert.equal(options.headers.Accept, 'application/json');
   assert.equal(options.headers['X-API-Key'], 'test-slskd-api-key');
+  assert.equal(options.redirect, 'error');
   assert.deepEqual(payload, {
     server: {
       state: 'Connected, LoggedIn',
@@ -51,6 +53,7 @@ test('createSlskdClient starts searches with normalized slskd request fields', a
     isComplete: true,
   }));
   const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
     apiKey: 'test-slskd-api-key',
     baseUrl: 'http://slskd.test:5030/api/v0',
     fetchImpl,
@@ -69,6 +72,7 @@ test('createSlskdClient starts searches with normalized slskd request fields', a
   assert.equal(url.toString(), 'http://slskd.test:5030/api/v0/searches');
   assert.equal(options.method, 'POST');
   assert.equal(options.headers['Content-Type'], 'application/json');
+  assert.equal(options.redirect, 'error');
   assert.deepEqual(JSON.parse(options.body), {
     id: null,
     searchText: 'autechre amber',
@@ -87,6 +91,7 @@ test('createSlskdClient classifies authentication failures', async (t) => {
     status: 401,
   }));
   const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
     apiKey: 'bad-api-key',
     baseUrl: 'http://slskd.test:5030',
     fetchImpl,
@@ -111,6 +116,7 @@ test('createSlskdClient classifies unavailable responses', async (t) => {
     status: 503,
   }));
   const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
     baseUrl: 'http://slskd.test:5030',
     fetchImpl,
     requestTimeoutMs: 1000,
@@ -142,6 +148,7 @@ test('createSlskdClient enqueues downloads through the transfers API', async (t)
     status: 201,
   }));
   const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
     baseUrl: 'http://slskd.test:5030',
     fetchImpl,
     requestTimeoutMs: 1000,
@@ -158,6 +165,7 @@ test('createSlskdClient enqueues downloads through the transfers API', async (t)
   const [url, options] = fetchImpl.mock.calls[0].arguments;
   assert.equal(url.toString(), 'http://slskd.test:5030/api/v0/transfers/downloads/source-user');
   assert.equal(options.method, 'POST');
+  assert.equal(options.redirect, 'error');
   assert.deepEqual(JSON.parse(options.body), [{
     filename: 'Autechre\\Amber\\01 Foil.flac',
     size: 123456,

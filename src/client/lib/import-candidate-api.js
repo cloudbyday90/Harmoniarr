@@ -65,6 +65,10 @@ export function skipImportCandidateFile(importCandidateId, importCandidateFileId
   return updateImportCandidateFileDecision(importCandidateId, importCandidateFileId, 'skip', reason);
 }
 
+export function allowImportCandidateFileLossyDerivative(importCandidateId, importCandidateFileId, reason) {
+  return updateImportCandidateFileDecision(importCandidateId, importCandidateFileId, 'allow-lossy-derivative', reason);
+}
+
 export function clearImportCandidateFileDecision(importCandidateId, importCandidateFileId, reason) {
   return updateImportCandidateFileDecision(importCandidateId, importCandidateFileId, 'clear-decision', reason);
 }
@@ -85,8 +89,16 @@ export function fetchImportCandidateExecutionSummary() {
   return apiRequest('/api/v1/import-candidates/execution-summary');
 }
 
+export function fetchImportCandidateExecutionRunDetail(runId) {
+  return apiRequest(`/api/v1/import-candidates/execution-runs/${encodeURIComponent(runId)}`);
+}
+
 export function fetchImportCandidateApplySummary() {
   return apiRequest('/api/v1/import-candidates/apply-summary');
+}
+
+export function fetchImportCandidateApplyRunDetail(runId) {
+  return apiRequest(`/api/v1/import-candidates/apply-runs/${encodeURIComponent(runId)}`);
 }
 
 export function startImportCandidateExecutionRun() {

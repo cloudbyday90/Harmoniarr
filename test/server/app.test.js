@@ -9,16 +9,36 @@ import { withServer } from '../../testing/server/http-test-helpers.js';
 test('createApp composes shared modules and preserves api and spa fallbacks', async (t) => {
   const clientDistDir = await mkdtemp(join(tmpdir(), 'harmoniarr-app-test-'));
   const startedAt = new Date('2026-04-28T12:00:00.000Z');
+  const artworkModule = {
+    artworkAssignmentService: { assignPreferredArtwork: () => ({}) },
+    routeDependencies: { artwork: 'deps' },
+    artworkIngestionService: { ingestArtworkBuffer: () => ({}) },
+    artworkPolicyService: { buildArtworkOverviewFromSettingsPayload: () => ({}) },
+    artworkSummaryService: { buildArtworkSummary: () => ({}) },
+  };
   const authModule = { routeDependencies: { auth: 'deps' } };
   const importCandidateModule = { routeDependencies: { importCandidates: 'deps' } };
   const libraryModule = {
+    libraryWantedReleaseService: {
+      reconcileWantedReleases: t.mock.fn(async () => {}),
+    },
     libraryScanSummaryService: { buildLibraryScanSummary: () => ({}) },
     routeDependencies: { library: 'deps' },
+  };
+  const operationsModule = {
+    operationHistoryService: { listRecentOperationRuns: t.mock.fn(async () => []) },
+    routeDependencies: { operations: 'deps' },
+  };
+  const providerModule = {
+    routeDependencies: { providers: 'deps' },
+    spotifyOAuthService: { resolveAccessToken: async () => null },
+    youtubeOAuthService: { resolveAccessToken: async () => null },
   };
   const metadataModule = {
     musicBrainzSearchService: { checkProviderHealth: t.mock.fn(async () => ({ status: 'healthy' })) },
     routeDependencies: { metadata: 'deps' },
   };
+  const slskdConfigService = { buildRuntimeConfig: t.mock.fn(async () => ({ })) };
   const settingsService = { buildSettingsPayload: () => {}, updateSettings: () => {} };
   const slskdTransferSnapshotService = {
     buildTransferSnapshot: () => {},
@@ -39,17 +59,53 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
     slskdTransferSnapshotService,
   };
   const systemModule = { routeDependencies: { system: 'deps' } };
+  const createArtworkModule = t.mock.fn(() => artworkModule);
   const createAuthModule = t.mock.fn(() => authModule);
+  const deploymentSecurityPolicy = {
+    csrfProtectionMode: 'disabled',
+    enforceHttps: false,
+    secureCookies: false,
+    strictTransportSecurity: false,
+  };
+  const deploymentSecurityService = {
+    applySettings: t.mock.fn(() => deploymentSecurityPolicy),
+    getCachedPolicy: t.mock.fn(() => deploymentSecurityPolicy),
+    getPolicy: t.mock.fn(async () => deploymentSecurityPolicy),
+  };
+  const createDeploymentSecurityService = t.mock.fn(() => deploymentSecurityService);
   const createImportCandidateModule = t.mock.fn(() => importCandidateModule);
+  const mediaToolingStatusService = {
+    getStatus: t.mock.fn(async () => ({
+      status: 'healthy',
+      details: {
+        ffmpegAvailable: true,
+        ffprobeAvailable: true,
+      },
+    })),
+  };
+  const createMediaToolingStatusService = t.mock.fn(() => mediaToolingStatusService);
   const createLibraryModule = t.mock.fn(() => libraryModule);
   const createMetadataModule = t.mock.fn(() => metadataModule);
+  const createOperationsModule = t.mock.fn(() => operationsModule);
+  const createProviderModule = t.mock.fn(() => providerModule);
   const createSettingsService = t.mock.fn(() => settingsService);
+  const createSlskdConfigService = t.mock.fn(() => slskdConfigService);
   const createSlskdModule = t.mock.fn(() => slskdModule);
   const createSystemModule = t.mock.fn(() => systemModule);
-  const registerAuthRoutes = t.mock.fn();
+  const registerAuthRoutes = t.mock.fn((testApp) => {
+    testApp.get('/api/v1/test/ping', (_request, response) => {
+      response.json({ ok: true, pong: true });
+    });
+    testApp.post('/api/v1/test/ping', (_request, response) => {
+      response.json({ ok: true, pong: true });
+    });
+  });
+  const registerArtworkRoutes = t.mock.fn();
   const registerImportCandidateRoutes = t.mock.fn();
   const registerLibraryRoutes = t.mock.fn();
   const registerMetadataRoutes = t.mock.fn();
+  const registerOperationsRoutes = t.mock.fn();
+  const registerProviderRoutes = t.mock.fn();
   const registerSlskdRoutes = t.mock.fn();
   const registerSystemRoutes = t.mock.fn();
 
@@ -64,30 +120,46 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
     clientDistDir,
     packageJsonPath: 'C:/virtual/package.json',
     startedAt,
+    createArtworkModule,
     createAuthModule,
+    createDeploymentSecurityService,
     createImportCandidateModule,
     createLibraryModule,
+    createMediaToolingStatusService,
     createMetadataModule,
+    createOperationsModule,
+    createProviderModule,
     createSettingsService,
+    createSlskdConfigService,
     createSlskdModule,
     createSystemModule,
+    registerArtworkRoutes,
     registerAuthRoutes,
     registerImportCandidateRoutes,
     registerLibraryRoutes,
     registerMetadataRoutes,
+    registerOperationsRoutes,
+    registerProviderRoutes,
     registerSlskdRoutes,
     registerSystemRoutes,
   });
 
   assert.equal(appPort, 4510);
   assert.equal(composedImportCandidateModule, importCandidateModule);
+  assert.equal(createArtworkModule.mock.callCount(), 1);
   assert.equal(createAuthModule.mock.callCount(), 1);
+  assert.equal(createDeploymentSecurityService.mock.callCount(), 1);
   assert.equal(createImportCandidateModule.mock.callCount(), 1);
+  assert.equal(createMediaToolingStatusService.mock.callCount(), 1);
   assert.equal(createLibraryModule.mock.callCount(), 1);
   assert.equal(createMetadataModule.mock.callCount(), 1);
+  assert.equal(createOperationsModule.mock.callCount(), 1);
+  assert.equal(createProviderModule.mock.callCount(), 1);
   assert.equal(createSettingsService.mock.callCount(), 1);
+  assert.equal(createSlskdConfigService.mock.callCount(), 1);
   assert.equal(createSlskdModule.mock.callCount(), 1);
   assert.equal(createSystemModule.mock.callCount(), 1);
+  const artworkModuleArgs = createArtworkModule.mock.calls[0].arguments[0];
   const authModuleArgs = createAuthModule.mock.calls[0].arguments[0];
   const metadataModuleArgs = createMetadataModule.mock.calls[0].arguments[0];
   const importCandidateModuleArgs = createImportCandidateModule.mock.calls[0].arguments[0];
@@ -95,17 +167,29 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
   const slskdModuleArgs = createSlskdModule.mock.calls[0].arguments[0];
   const systemModuleArgs = createSystemModule.mock.calls[0].arguments[0];
 
+  assert.equal(artworkModuleArgs.settingsService, settingsService);
   assert.equal(authModuleArgs.settingsService, settingsService);
+  assert.equal(createSettingsService.mock.calls[0].arguments[0].deploymentSecurityService, deploymentSecurityService);
+  assert.equal(createSettingsService.mock.calls[0].arguments[0].slskdConfigService, slskdConfigService);
+  assert.equal(createSettingsService.mock.calls[0].arguments[0].spotifyOAuthService, providerModule.spotifyOAuthService);
+  assert.equal(createSettingsService.mock.calls[0].arguments[0].youtubeOAuthService, providerModule.youtubeOAuthService);
   assert.equal(typeof metadataModuleArgs.providerHealthRecorder.recordError, 'function');
   assert.equal(typeof metadataModuleArgs.providerHealthRecorder.recordSuccess, 'function');
   assert.equal(slskdModuleArgs.providerHealthRecorder, metadataModuleArgs.providerHealthRecorder);
+  assert.equal(slskdModuleArgs.slskdConfigService, slskdConfigService);
   assert.equal(importCandidateModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(importCandidateModuleArgs.slskdTransferSnapshotService, slskdTransferSnapshotService);
+  assert.equal(importCandidateModuleArgs.getMediaToolingStatus, mediaToolingStatusService.getStatus);
+  assert.equal(libraryModuleArgs.artworkAssignmentService, artworkModule.artworkAssignmentService);
+  assert.equal(libraryModuleArgs.artworkIngestionService, artworkModule.artworkIngestionService);
   assert.equal(libraryModuleArgs.importCandidateService, importCandidateModule.importCandidateService);
+  assert.equal(typeof libraryModuleArgs.providerClientResolverService.resolveProviderClients, 'function');
   assert.equal(libraryModuleArgs.settingsService, settingsService);
   assert.equal(libraryModuleArgs.slskdService, slskdModule.slskdService);
+  assert.equal(systemModuleArgs.artworkPolicyService, artworkModule.artworkPolicyService);
   assert.equal(typeof systemModuleArgs.dependencyHealthService.getDependencyHealth, 'function');
   assert.equal(systemModuleArgs.libraryScanSummaryService, libraryModule.libraryScanSummaryService);
+  assert.equal(systemModuleArgs.operationHistoryService, operationsModule.operationHistoryService);
   assert.equal(systemModuleArgs.settingsService, settingsService);
   assert.equal(systemModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(systemModuleArgs.musicBrainzSearchService, metadataModule.musicBrainzSearchService);
@@ -119,8 +203,10 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
   };
   metadataModuleArgs.providerHealthRecorder.recordError('musicbrainz', providerError);
   const dependencyHealth = await systemModuleArgs.dependencyHealthService.getDependencyHealth();
-  assert.equal(dependencyHealth.length, 2);
+  assert.equal(dependencyHealth.length, 3);
+  assert.equal(mediaToolingStatusService.getStatus.mock.callCount(), 1);
   assert.equal(slskdModule.slskdService.getConnectionStatus.mock.callCount(), 1);
+  const mediaToolingHealth = dependencyHealth.find((dependency) => dependency.provider === 'media_tooling');
   const musicBrainzHealth = dependencyHealth.find((dependency) => dependency.provider === 'musicbrainz');
   const slskdHealth = dependencyHealth.find((dependency) => dependency.provider === 'slskd');
 
@@ -151,45 +237,248 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
       isTransitioning: false,
     },
   });
+  assert.deepEqual(mediaToolingHealth, {
+    provider: 'media_tooling',
+    status: 'healthy',
+    details: {
+      ffmpegAvailable: true,
+      ffprobeAvailable: true,
+    },
+  });
 
   assert.deepEqual(systemModuleArgs, {
     appPort: 4510,
+    appleMusicStatusService: providerModule.appleMusicStatusService,
+    artworkPolicyService: artworkModule.artworkPolicyService,
+    artworkSummaryService: artworkModule.artworkSummaryService,
     dependencyHealthService: systemModuleArgs.dependencyHealthService,
+    importCandidateExecutionHeartbeatConfig: undefined,
+    importCandidateExecutionHeartbeatState: undefined,
+    libraryDiscoveryHeartbeatState: undefined,
     libraryScanSummaryService: libraryModule.libraryScanSummaryService,
+    metadataRefreshHeartbeatConfig: undefined,
+    metadataRefreshHeartbeatState: undefined,
     musicBrainzSearchService: metadataModule.musicBrainzSearchService,
+    operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: 'C:/virtual/package.json',
     settingsService,
     slskdService: slskdModule.slskdService,
+    spotifyOAuthService: providerModule.spotifyOAuthService,
     startedAt,
+    youtubeOAuthService: providerModule.youtubeOAuthService,
   });
   assert.equal(registerAuthRoutes.mock.callCount(), 1);
+  assert.equal(registerArtworkRoutes.mock.callCount(), 1);
   assert.equal(registerImportCandidateRoutes.mock.callCount(), 1);
   assert.equal(registerLibraryRoutes.mock.callCount(), 1);
   assert.equal(registerMetadataRoutes.mock.callCount(), 1);
+  assert.equal(registerOperationsRoutes.mock.callCount(), 1);
+  assert.equal(registerProviderRoutes.mock.callCount(), 1);
   assert.equal(registerSlskdRoutes.mock.callCount(), 1);
   assert.equal(registerSystemRoutes.mock.callCount(), 1);
   assert.equal(registerAuthRoutes.mock.calls[0].arguments[0], app);
-  assert.deepEqual(registerAuthRoutes.mock.calls[0].arguments[1], authModule.routeDependencies);
+  assert.equal(registerAuthRoutes.mock.calls[0].arguments[1].auth, 'deps');
+  assert.equal(typeof registerAuthRoutes.mock.calls[0].arguments[1].limitBootstrapAdmin, 'function');
+  assert.equal(typeof registerAuthRoutes.mock.calls[0].arguments[1].limitLogin, 'function');
+  assert.equal(typeof registerAuthRoutes.mock.calls[0].arguments[1].limitRefresh, 'function');
+  assert.equal(registerArtworkRoutes.mock.calls[0].arguments[0], app);
+  assert.equal(typeof registerArtworkRoutes.mock.calls[0].arguments[1].limitArtworkCleanupRun, 'function');
+  assert.equal(registerArtworkRoutes.mock.calls[0].arguments[1].artwork, 'deps');
   assert.equal(registerImportCandidateRoutes.mock.calls[0].arguments[0], app);
-  assert.deepEqual(registerImportCandidateRoutes.mock.calls[0].arguments[1], importCandidateModule.routeDependencies);
+  assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateExecutionRun, 'function');
+  assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateApplyRun, 'function');
+  assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateMediaInspectionRun, 'function');
+  assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateTranscodeRun, 'function');
+  assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateExecutionReconcile, 'function');
+  assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateSlskdIngest, 'function');
+  assert.equal(registerImportCandidateRoutes.mock.calls[0].arguments[1].startImportCandidateExecutionRun, importCandidateModule.routeDependencies.startImportCandidateExecutionRun);
   assert.equal(registerLibraryRoutes.mock.calls[0].arguments[0], app);
-  assert.deepEqual(registerLibraryRoutes.mock.calls[0].arguments[1], libraryModule.routeDependencies);
+  assert.equal(typeof registerLibraryRoutes.mock.calls[0].arguments[1].limitLibraryDiscoveryRun, 'function');
+  assert.equal(typeof registerLibraryRoutes.mock.calls[0].arguments[1].limitLibraryOrganizeApplyRun, 'function');
+  assert.equal(typeof registerLibraryRoutes.mock.calls[0].arguments[1].limitLibraryScanRun, 'function');
+  assert.equal(registerLibraryRoutes.mock.calls[0].arguments[1].startLibraryDiscoveryRun, libraryModule.routeDependencies.startLibraryDiscoveryRun);
   assert.equal(registerMetadataRoutes.mock.calls[0].arguments[0], app);
-  assert.deepEqual(registerMetadataRoutes.mock.calls[0].arguments[1], metadataModule.routeDependencies);
+  assert.equal(registerMetadataRoutes.mock.calls[0].arguments[1].metadata, metadataModule.routeDependencies.metadata);
+  assert.equal(typeof registerMetadataRoutes.mock.calls[0].arguments[1].limitMetadataArtistRefreshRun, 'function');
+  assert.equal(registerOperationsRoutes.mock.calls[0].arguments[0], app);
+  assert.deepEqual(registerOperationsRoutes.mock.calls[0].arguments[1], operationsModule.routeDependencies);
+  assert.equal(registerProviderRoutes.mock.calls[0].arguments[0], app);
+  assert.deepEqual(registerProviderRoutes.mock.calls[0].arguments[1], providerModule.routeDependencies);
   assert.equal(registerSlskdRoutes.mock.calls[0].arguments[0], app);
   assert.deepEqual(registerSlskdRoutes.mock.calls[0].arguments[1], slskdModule.routeDependencies);
   assert.equal(registerSystemRoutes.mock.calls[0].arguments[0], app);
-  assert.deepEqual(registerSystemRoutes.mock.calls[0].arguments[1], systemModule.routeDependencies);
+  assert.equal(registerSystemRoutes.mock.calls[0].arguments[1].system, systemModule.routeDependencies.system);
+  assert.equal(typeof registerSystemRoutes.mock.calls[0].arguments[1].limitBackupExport, 'function');
+  assert.equal(typeof registerSystemRoutes.mock.calls[0].arguments[1].limitOperatorNotificationFanoutRun, 'function');
 
   await withServer(app, async (baseUrl) => {
     const apiResponse = await fetch(`${baseUrl}/api/does-not-exist`);
     const apiPayload = await apiResponse.json();
+    const protectedApiResponse = await fetch(`${baseUrl}/api/v1/test/ping`, {
+      headers: {
+        accept: 'application/json',
+      },
+    });
+    const invalidAcceptResponse = await fetch(`${baseUrl}/api/v1/test/ping`, {
+      headers: {
+        accept: 'text/html',
+      },
+    });
+    const invalidAcceptPayload = await invalidAcceptResponse.json();
+    const invalidContentTypeResponse = await fetch(`${baseUrl}/api/v1/test/ping`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'text/plain',
+      },
+      body: 'not-json',
+    });
+    const invalidContentTypePayload = await invalidContentTypeResponse.json();
+    const invalidJsonResponse = await fetch(`${baseUrl}/api/v1/test/ping`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: '{',
+    });
+    const invalidJsonPayload = await invalidJsonResponse.json();
     const spaResponse = await fetch(`${baseUrl}/metadata/workspace`);
     const spaHtml = await spaResponse.text();
 
     assert.equal(apiResponse.status, 404);
     assert.deepEqual(apiPayload, { ok: false, error: 'not_found' });
+    assert.equal(protectedApiResponse.headers.get('cache-control'), 'no-store');
+    assert.equal(protectedApiResponse.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(protectedApiResponse.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(protectedApiResponse.headers.get('x-frame-options'), 'DENY');
+    assert.equal(protectedApiResponse.headers.get('cross-origin-opener-policy'), 'same-origin');
+    assert.match(protectedApiResponse.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+    assert.equal(protectedApiResponse.headers.get('strict-transport-security'), null);
+    assert.equal(invalidAcceptResponse.status, 406);
+    assert.deepEqual(invalidAcceptPayload, {
+      ok: false,
+      error: {
+        code: 'not_acceptable',
+        message: 'API responses are only available as application/json',
+      },
+    });
+    assert.equal(invalidContentTypeResponse.status, 415);
+    assert.deepEqual(invalidContentTypePayload, {
+      ok: false,
+      error: {
+        code: 'unsupported_media_type',
+        message: 'API requests with a body must use application/json',
+      },
+    });
+    assert.equal(invalidJsonResponse.status, 400);
+    assert.deepEqual(invalidJsonPayload, {
+      ok: false,
+      error: {
+        code: 'invalid_json',
+        message: 'Request body must contain valid JSON',
+      },
+    });
     assert.equal(spaResponse.status, 200);
+    assert.equal(spaResponse.headers.get('x-content-type-options'), 'nosniff');
     assert.match(spaHtml, /Harmoniarr App Shell/);
+  });
+});
+
+test('createApp enforces opt-in https and hsts from the shared deployment security service', async (t) => {
+  const clientDistDir = await mkdtemp(join(tmpdir(), 'harmoniarr-app-security-test-'));
+  const deploymentSecurityPolicy = {
+    csrfProtectionMode: 'required',
+    enforceHttps: true,
+    secureCookies: true,
+    strictTransportSecurity: true,
+  };
+
+  t.after(async () => {
+    await rm(clientDistDir, { recursive: true, force: true });
+  });
+
+  await writeFile(join(clientDistDir, 'index.html'), '<!doctype html><html><body>Harmoniarr App Shell</body></html>');
+
+  const { app } = createApp({
+    clientDistDir,
+    createAuthModule: () => ({ routeDependencies: {} }),
+    createDeploymentSecurityService: () => ({
+      applySettings: t.mock.fn(() => deploymentSecurityPolicy),
+      getCachedPolicy: t.mock.fn(() => deploymentSecurityPolicy),
+      getPolicy: t.mock.fn(async () => deploymentSecurityPolicy),
+    }),
+    createImportCandidateModule: () => ({ routeDependencies: {} }),
+    createLibraryModule: () => ({
+      libraryWantedReleaseService: {
+        reconcileWantedReleases: async () => {},
+      },
+      libraryScanSummaryService: { buildLibraryScanSummary: () => ({}) },
+      routeDependencies: {},
+    }),
+    createMetadataModule: () => ({
+      musicBrainzSearchService: { checkProviderHealth: async () => ({ status: 'healthy' }) },
+      routeDependencies: {},
+    }),
+    createOperationsModule: () => ({
+      operationHistoryService: { listRecentOperationRuns: async () => [] },
+      routeDependencies: {},
+    }),
+    createSettingsService: () => ({ buildSettingsPayload: async () => ({}), updateSettings: async () => ({}) }),
+    createSlskdConfigService: () => ({ buildRuntimeConfig: async () => ({}) }),
+    createSlskdModule: () => ({
+      routeDependencies: {},
+      slskdService: { getConnectionStatus: async () => ({ provider: 'slskd', status: 'healthy', details: {} }) },
+      slskdTransferSnapshotService: {},
+    }),
+    createSystemModule: () => ({ routeDependencies: {} }),
+    registerAuthRoutes(testApp) {
+      testApp.get('/api/v1/test/ping', (_request, response) => {
+        response.json({ ok: true });
+      });
+      testApp.post('/api/v1/test/ping', (_request, response) => {
+        response.json({ ok: true });
+      });
+    },
+    registerImportCandidateRoutes: () => {},
+    registerLibraryRoutes: () => {},
+    registerMetadataRoutes: () => {},
+    registerSlskdRoutes: () => {},
+    registerSystemRoutes: () => {},
+    registerArtworkRoutes: () => {},
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const redirectResponse = await fetch(`${baseUrl}/api/v1/test/ping`, {
+      headers: {
+        'x-forwarded-proto': 'http',
+      },
+      redirect: 'manual',
+    });
+    const writeResponse = await fetch(`${baseUrl}/api/v1/test/ping`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'x-forwarded-proto': 'http',
+      },
+      body: JSON.stringify({ ok: true }),
+    });
+    const writePayload = await writeResponse.json();
+    const secureResponse = await fetch(`${baseUrl}/api/v1/test/ping`, {
+      headers: {
+        'x-forwarded-proto': 'https',
+      },
+    });
+
+    assert.equal(redirectResponse.status, 307);
+    assert.match(redirectResponse.headers.get('location') ?? '', /^https:\/\//);
+    assert.equal(writeResponse.status, 426);
+    assert.deepEqual(writePayload, {
+      ok: false,
+      error: {
+        code: 'https_required',
+        message: 'HTTPS is required',
+      },
+    });
+    assert.equal(secureResponse.headers.get('strict-transport-security'), 'max-age=15552000; includeSubDomains');
   });
 });

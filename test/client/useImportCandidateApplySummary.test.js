@@ -70,3 +70,40 @@ test('useImportCandidateApplySummary starts an apply run and reloads summary', a
   assert.equal(workflow.currentRun.value.id, 'apply-run-2');
   assert.equal(workflow.actionErrorMessage.value, '');
 });
+
+test('useImportCandidateApplySummary can load an exact historical apply run detail independently of the latest summary run', async () => {
+  const workflow = useImportCandidateApplySummary({
+    fetchImportCandidateApplyRunDetail: async (runId) => ({
+      importCandidateApplyRun: {
+        checkedAt: '2026-05-01T18:05:00.000Z',
+        run: {
+          id: runId,
+          items: [{ id: 'item-older-1' }],
+          status: 'failed',
+        },
+      },
+    }),
+    fetchImportCandidateApplySummary: async () => ({
+      importCandidateApply: {
+        currentRun: {
+          id: 'apply-run-latest',
+          status: 'completed',
+        },
+        latestRun: {
+          id: 'apply-run-latest',
+          status: 'completed',
+        },
+        summary: {
+          status: 'ready',
+          message: 'Latest apply run completed.',
+        },
+      },
+    }),
+  });
+
+  await workflow.loadImportCandidateApplySummary({ preferredRunId: 'apply-run-older-12' });
+
+  assert.equal(workflow.selectedRunId.value, 'apply-run-older-12');
+  assert.equal(workflow.currentRun.value.id, 'apply-run-older-12');
+  assert.equal(workflow.runDetailErrorMessage.value, '');
+});

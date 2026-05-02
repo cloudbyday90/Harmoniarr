@@ -80,3 +80,39 @@ test('useLibraryScanSummary starts a scan run and reloads the shared summary pay
   assert.equal(workflow.summary.value.status, 'pending');
   assert.equal(workflow.latestRun.value.status, 'pending');
 });
+
+test('useLibraryScanSummary can load an exact historical scan run independently of the latest summary run', async () => {
+  const workflow = useLibraryScanSummary({
+    fetchLibraryScanRunDetail: async (runId) => ({
+      libraryScanRun: {
+        checkedAt: '2026-05-01T01:00:00.000Z',
+        run: {
+          id: runId,
+          status: 'failed',
+          filesSeen: 18,
+        },
+      },
+    }),
+    fetchLibraryScanSummary: async () => ({
+      latestRun: {
+        id: 'scan-run-latest',
+        status: 'completed',
+      },
+      nextAction: null,
+      readiness: {
+        status: 'ready',
+        message: 'Ready',
+      },
+      summary: {
+        status: 'completed',
+        message: 'Latest scan completed.',
+      },
+    }),
+  });
+
+  await workflow.loadLibraryScanSummary({ preferredRunId: 'scan-run-older-2' });
+
+  assert.equal(workflow.selectedRunId.value, 'scan-run-older-2');
+  assert.equal(workflow.currentRun.value.id, 'scan-run-older-2');
+  assert.equal(workflow.runDetailErrorMessage.value, '');
+});

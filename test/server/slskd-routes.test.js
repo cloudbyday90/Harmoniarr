@@ -26,8 +26,9 @@ function createSlskdRouteTestApp(overrides = {}) {
         isComplete: includeResponses === 'true',
         responses: [],
       }),
+      requireAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
+      requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
       requireCsrf: () => {},
-      requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
       startSearch: async ({ query, fileLimit, filterResponses, responseLimit, searchTimeoutMs }) => ({
         id: 'search-1',
         query,
@@ -44,8 +45,8 @@ function createSlskdRouteTestApp(overrides = {}) {
   });
 }
 
-test('slskd status route returns shared connection status for authenticated sessions', async (t) => {
-  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-20' }));
+test('slskd status route returns shared connection status for authenticated admin sessions', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'user-20' }));
   const getConnectionStatus = t.mock.fn(async () => ({
     provider: 'slskd',
     status: 'degraded',
@@ -56,14 +57,14 @@ test('slskd status route returns shared connection status for authenticated sess
       isTransitioning: false,
     },
   }));
-  const app = createSlskdRouteTestApp({ getConnectionStatus, requireSession });
+  const app = createSlskdRouteTestApp({ getConnectionStatus, requireAdminSession });
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/slskd/status`);
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
     assert.equal(getConnectionStatus.mock.callCount(), 1);
     assert.deepEqual(payload, {
       ok: true,
@@ -84,7 +85,7 @@ test('slskd status route returns shared connection status for authenticated sess
 
 test('slskd search start route enforces csrf and delegates to the shared service', async (t) => {
   const requireCsrf = t.mock.fn();
-  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-21', csrfToken: 'csrf-token' }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-21', csrfToken: 'csrf-token' }));
   const startSearch = t.mock.fn(async ({ query, fileLimit, filterResponses, responseLimit, searchTimeoutMs }) => ({
     id: 'search-1',
     query,
@@ -97,8 +98,8 @@ test('slskd search start route enforces csrf and delegates to the shared service
     responses: [],
   }));
   const app = createSlskdRouteTestApp({
+    requireFreshAdminSession,
     requireCsrf,
-    requireSession,
     startSearch,
   });
 
@@ -120,7 +121,7 @@ test('slskd search start route enforces csrf and delegates to the shared service
     const payload = await response.json();
 
     assert.equal(response.status, 202);
-    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.calls[0].arguments[0].headers['x-csrf-token'], 'csrf-token');
     assert.deepEqual(requireCsrf.mock.calls[0].arguments[1], {
@@ -149,6 +150,25 @@ test('slskd search start route enforces csrf and delegates to the shared service
         responses: [],
       },
     });
+  });
+});
+
+test('slskd search state route enforces admin sessions before querying provider state', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'user-22' }));
+  const getSearchState = t.mock.fn(async ({ searchId, includeResponses }) => ({
+    id: searchId,
+    query: 'Autechre Amber',
+    state: includeResponses === 'true' ? 'Completed' : 'InProgress',
+    isComplete: includeResponses === 'true',
+    responses: [],
+  }));
+  const app = createSlskdRouteTestApp({ getSearchState, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/slskd/searches/search-1?includeResponses=true`);
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
   });
 });
 

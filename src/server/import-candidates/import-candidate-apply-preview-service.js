@@ -17,6 +17,7 @@
  */
 
 import { stat } from 'node:fs/promises';
+import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
 
 function mapDecisionsByFileId(decisions) {
   return decisions.reduce((mapped, decision) => {
@@ -50,7 +51,7 @@ async function inspectPath(pathValue, statFn) {
   }
 }
 
-function buildFileStatus({ decision, libraryTarget, sourceFile }) {
+function buildFileStatus({ decision, libraryTarget, losslessPolicy, sourceFile }) {
   if (!sourceFile.exists) {
     return {
       code: 'blocked',
@@ -69,6 +70,13 @@ function buildFileStatus({ decision, libraryTarget, sourceFile }) {
     return {
       code: 'collision',
       message: 'The target library path already exists and would require an operator decision before import apply.',
+    };
+  }
+
+  if (losslessPolicy.requiresLossyAcknowledgement && !losslessPolicy.lossyDerivativeAcknowledged) {
+    return {
+      code: 'blocked',
+      message: 'This lossy transcode candidate requires an explicit allow-lossy-derivative decision before import apply can continue.',
     };
   }
 
@@ -100,9 +108,37 @@ function buildSummary(counts, preview) {
     };
   }
 
+  if (counts.lossyDecisionRequiredCount > 0) {
+    return {
+      message: `${counts.lossyDecisionRequiredCount} lossy transcode candidate file${counts.lossyDecisionRequiredCount === 1 ? ' requires' : 's require'} an explicit allow-lossy-derivative decision before import apply.`,
+      status: 'blocked',
+    };
+  }
+
   if (counts.skippedCount > 0) {
     return {
       message: `${counts.skippedCount} colliding file${counts.skippedCount === 1 ? '' : 's'} will be skipped during import apply by saved operator decision.`,
+      status: 'attention',
+    };
+  }
+
+  if (counts.inspectionWarningCount > 0) {
+    return {
+      message: `${counts.inspectionWarningCount} media inspection warning${counts.inspectionWarningCount === 1 ? ' is' : 's are'} present in apply preview.`,
+      status: 'attention',
+    };
+  }
+
+  if (counts.transcodeWarningCount > 0) {
+    return {
+      message: `${counts.transcodeWarningCount} transcode planning warning${counts.transcodeWarningCount === 1 ? ' is' : 's are'} present in apply preview.`,
+      status: 'attention',
+    };
+  }
+
+  if (counts.losslessPolicyWarningCount > 0) {
+    return {
+      message: `${counts.losslessPolicyWarningCount} lossless-retention policy warning${counts.losslessPolicyWarningCount === 1 ? ' is' : 's are'} present in apply preview.`,
       status: 'attention',
     };
   }
@@ -122,6 +158,9 @@ function buildSummary(counts, preview) {
 
 export function createImportCandidateApplyPreviewService({
   listImportCandidateFileDecisions = async () => [],
+  mediaLosslessRetentionPolicyService = createMediaLosslessRetentionPolicyService(),
+  mediaInspectionService = null,
+  mediaTranscodePlanningService = null,
   previewImportCandidate = null,
   statFn = stat,
 } = {}) {
@@ -129,10 +168,13 @@ export function createImportCandidateApplyPreviewService({
     throw new Error('createImportCandidateApplyPreviewService requires previewImportCandidate');
   }
 
-  async function previewImportCandidateApply({ importCandidateId }) {
-    const preview = await previewImportCandidate({ importCandidateId });
+  async function previewImportCandidateApply({ importCandidateId, targetUser = null }) {
+    const preview = await previewImportCandidate({ importCandidateId, targetUser });
     const filePreviews = Array.isArray(preview?.naming?.filePreviews) ? preview.naming.filePreviews : [];
     const decisions = mapDecisionsByFileId(await listImportCandidateFileDecisions({ importCandidateId }));
+    const hasMediaLosslessRetentionPolicy = typeof mediaLosslessRetentionPolicyService?.evaluateCandidatePolicy === 'function';
+    const hasMediaInspection = typeof mediaInspectionService?.inspectSourceFile === 'function';
+    const hasMediaTranscodePlanning = typeof mediaTranscodePlanningService?.planInspection === 'function';
 
     const files = await Promise.all(filePreviews.map(async (filePreview) => {
       const [libraryTarget, sourceFile, stagingTarget] = await Promise.all([
@@ -141,24 +183,66 @@ export function createImportCandidateApplyPreviewService({
         inspectPath(filePreview.stagingPath, statFn),
       ]);
       const decision = decisions.get(filePreview.fileId) ?? null;
+      const inspection = hasMediaInspection && sourceFile.exists
+        ? await mediaInspectionService.inspectSourceFile({ sourcePath: filePreview.sourcePath })
+        : {
+          metadata: null,
+          warnings: [],
+        };
+      const transcodePlan = hasMediaTranscodePlanning && sourceFile.exists
+        ? mediaTranscodePlanningService.planInspection({
+          inspection,
+        })
+        : {
+          mode: 'planning_only',
+          rationale: 'transcode_planning_not_configured',
+          recommendedAction: 'keep_original',
+          target: null,
+          warnings: [],
+        };
+      const losslessPolicy = hasMediaLosslessRetentionPolicy
+        ? mediaLosslessRetentionPolicyService.evaluateCandidatePolicy({
+          decision,
+          transcodePlan,
+        })
+        : {
+          lossyDerivativeAcknowledged: false,
+          requiresLossyAcknowledgement: false,
+          warnings: [],
+        };
 
       return {
         decision,
         fileId: filePreview.fileId,
         filename: filePreview.filename,
+        inspection,
         libraryTarget,
+        losslessPolicy,
         sourceFile,
         stagingTarget,
-        status: buildFileStatus({ decision, libraryTarget, sourceFile }),
+        status: buildFileStatus({
+          decision,
+          libraryTarget,
+          losslessPolicy,
+          sourceFile,
+        }),
+        transcodePlan,
       };
     }));
 
     const counts = files.reduce((summary, file) => {
       summary.totalFiles += 1;
+      summary.inspectionWarningCount += file.inspection.warnings.length;
+      summary.losslessPolicyWarningCount += file.losslessPolicy.warnings.length;
+      summary.transcodeWarningCount += file.transcodePlan.warnings.length;
       if (file.status.code === 'collision') {
         summary.collisionCount += 1;
       } else if (file.status.code === 'blocked') {
-        summary.missingSourceCount += 1;
+        if (file.losslessPolicy.requiresLossyAcknowledgement && !file.losslessPolicy.lossyDerivativeAcknowledged) {
+          summary.lossyDecisionRequiredCount += 1;
+        } else {
+          summary.missingSourceCount += 1;
+        }
       } else if (file.status.code === 'skipped') {
         summary.skippedCount += 1;
       } else {
@@ -172,18 +256,41 @@ export function createImportCandidateApplyPreviewService({
       return summary;
     }, {
       collisionCount: 0,
+      inspectionWarningCount: 0,
+      losslessPolicyWarningCount: 0,
+      lossyDecisionRequiredCount: 0,
       missingSourceCount: 0,
       readyCount: 0,
       skippedCount: 0,
       stagingPresentCount: 0,
       totalFiles: 0,
+      transcodeWarningCount: 0,
     });
+
+    const inspectionWarnings = files.flatMap((file) => file.inspection.warnings.map((warning) => ({
+      ...warning,
+      fileId: file.fileId,
+      filename: file.filename,
+    })));
+    const transcodeWarnings = files.flatMap((file) => file.transcodePlan.warnings.map((warning) => ({
+      ...warning,
+      fileId: file.fileId,
+      filename: file.filename,
+    })));
+    const losslessPolicyWarnings = files.flatMap((file) => file.losslessPolicy.warnings.map((warning) => ({
+      ...warning,
+      fileId: file.fileId,
+      filename: file.filename,
+    })));
 
     return {
       counts,
       files,
+      inspectionWarnings,
+      losslessPolicyWarnings,
       preview,
       summary: buildSummary(counts, preview),
+      transcodeWarnings,
     };
   }
 

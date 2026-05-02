@@ -102,7 +102,7 @@ export function createImportCandidateSelectionSummaryService({
   }),
   previewImportCandidate = async () => null,
 } = {}) {
-  async function buildSelectedImportCandidateSummary({ limit } = {}) {
+  async function buildSelectedImportCandidateSummary({ limit, targetUser = null } = {}) {
     const normalizedLimit = normalizeStageSummaryLimit(limit);
     const selectedQueue = await listImportCandidates({
       limit: normalizedLimit,
@@ -115,7 +115,7 @@ export function createImportCandidateSelectionSummaryService({
     }
 
     const selectedCandidates = await Promise.all(selectedQueue.candidates.map(async (candidate) => {
-      const preview = await previewImportCandidate({ importCandidateId: candidate.id });
+      const preview = await previewImportCandidate({ importCandidateId: candidate.id, targetUser });
       const executionStatus = resolveExecutionStatus(preview);
 
       return {

@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createAccountSecurityService } from './account-security-service.js';
 import {
   buildSessionPayload,
   clearAuthCookies,
@@ -25,24 +26,34 @@ import {
   isBootstrapRequired,
   loginUser,
   logoutSession,
+  requireAdminSession,
   requireCsrf,
+  requireFreshAdminSession,
+  requireFreshSession,
   requireSession,
   rotateSession,
   setAuthCookies,
 } from './auth.js';
-import { createBootstrapStatusService } from './bootstrap-status-service.js';
 import {
+  createActiveSessionsResponse,
   createAuthenticatedResponse,
   createBootstrapStatusResponse,
   createLogoutResponse,
+  createPasswordChangedResponse,
+  createRecentActivityResponse,
   createRefreshResponse,
   createSessionResponse,
+  createSessionRevokedResponse,
 } from './auth-response.js';
+import { createBootstrapStatusService } from './bootstrap-status-service.js';
 
 export function createRequestAuthDependencies(overrides = {}) {
   return {
     getRequestMetadata,
     getSessionFromRequest,
+    requireAdminSession,
+    requireFreshAdminSession,
+    requireFreshSession,
     requireCsrf,
     requireSession,
     ...overrides,
@@ -50,10 +61,13 @@ export function createRequestAuthDependencies(overrides = {}) {
 }
 
 export function createAuthModule({
+  accountSecurityService,
   bootstrapStatusService,
   settingsService,
   ...overrides
 } = {}) {
+  const resolvedAccountSecurityService = accountSecurityService
+    ?? createAccountSecurityService();
   const resolvedBootstrapStatusService = bootstrapStatusService
     ?? createBootstrapStatusService({ settingsService });
 
@@ -61,16 +75,24 @@ export function createAuthModule({
     routeDependencies: {
       buildSessionPayload,
       buildBootstrapStatusPayload: resolvedBootstrapStatusService.buildBootstrapStatusPayload,
+      changePassword: resolvedAccountSecurityService.changePassword,
       clearAuthCookies,
+      createActiveSessionsResponse,
       createAuthenticatedResponse,
       createBootstrapAdmin,
       createBootstrapStatusResponse,
       createLogoutResponse,
+      createPasswordChangedResponse,
+      createRecentActivityResponse,
       createRefreshResponse,
       createSessionResponse,
+      createSessionRevokedResponse,
       isBootstrapRequired,
+      listActiveSessions: resolvedAccountSecurityService.listActiveSessions,
+      listRecentActivity: resolvedAccountSecurityService.listRecentActivity,
       loginUser,
       logoutSession,
+      revokeSession: resolvedAccountSecurityService.revokeSession,
       rotateSession,
       setAuthCookies,
       ...createRequestAuthDependencies(),

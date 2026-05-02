@@ -19,6 +19,12 @@
 import { randomUUID } from 'node:crypto';
 import { getPool } from './database.js';
 import {
+  csrfProtectionModeEnvVar,
+  csrfProtectionModes,
+  resolveCsrfProtectionMode,
+  resolveSecureCookiesEnabled,
+} from './deployment-security-service.js';
+import {
   hashPassword,
   hashToken,
   createOpaqueToken,
@@ -26,6 +32,12 @@ import {
   serializeCookie,
   verifyPassword,
 } from './security.js';
+
+export {
+  csrfProtectionModeEnvVar,
+  csrfProtectionModes,
+  resolveCsrfProtectionMode,
+} from './deployment-security-service.js';
 import { recordAuditEvent } from './audit.js';
 import { normalizeUsername, validatePassword } from './validators/auth-validator.js';
 
@@ -82,6 +94,9 @@ export async function getSessionFromRequest(request) {
         refresh_tokens.token_family_id,
         refresh_tokens.csrf_token_hash,
         refresh_tokens.expires_at,
+        refresh_tokens.is_revoked,
+        refresh_tokens.revoked_reason,
+        refresh_tokens.replaced_by_refresh_token_id,
         app_users.id,
         app_users.username,
         app_users.role,
@@ -91,28 +106,17 @@ export async function getSessionFromRequest(request) {
       FROM refresh_tokens
       JOIN app_users ON app_users.id = refresh_tokens.app_user_id
       WHERE refresh_tokens.token_hash = $1
-        AND refresh_tokens.is_revoked = FALSE
-        AND refresh_tokens.expires_at > NOW()
       LIMIT 1
     `,
     [hashToken(refreshToken)],
   );
 
-  const row = result.rows[0];
-  if (!row || row.is_disabled) {
-    return null;
-  }
-
-  return {
-    refreshTokenId: row.refresh_token_id,
-    appUserId: row.app_user_id,
-    tokenFamilyId: row.token_family_id,
-    csrfTokenHash: row.csrf_token_hash,
-    expiresAt: row.expires_at,
-    user: toSessionUser(row),
+  return resolveSessionFromRefreshTokenLookup({
+    row: result.rows[0] ?? null,
     refreshToken,
     csrfToken: cookies[csrfCookieName] ?? null,
-  };
+    requestMetadata: getRequestMetadata(request),
+  });
 }
 
 export async function requireSession(request) {
@@ -124,7 +128,33 @@ export async function requireSession(request) {
   return session;
 }
 
-export function requireCsrf(request, session) {
+export async function requireAdminSession(request, requireSessionFn = requireSession) {
+  const session = await requireSessionFn(request);
+  if (session.user?.role !== 'admin') {
+    throw createApiError(403, 'admin_required', 'Administrator access is required');
+  }
+
+  return session;
+}
+
+export async function requireFreshSession(request, requireSessionFn = requireSession) {
+  const session = await requireSessionFn(request);
+  if (session.user?.mustChangePassword) {
+    throw createApiError(403, 'reauth_required', 'Re-authentication is required before continuing');
+  }
+
+  return session;
+}
+
+export async function requireFreshAdminSession(
+  request,
+  requireAdminSessionFn = requireAdminSession,
+  requireFreshSessionFn = requireFreshSession,
+) {
+  return requireAdminSessionFn(request, requireFreshSessionFn);
+}
+
+function enforceCsrf(request, session) {
   const headerToken = request.headers['x-csrf-token'];
   if (typeof headerToken !== 'string' || !session.csrfToken) {
     throw createApiError(403, 'csrf_required', 'CSRF token is required');
@@ -134,6 +164,25 @@ export function requireCsrf(request, session) {
     throw createApiError(403, 'csrf_invalid', 'CSRF token is invalid');
   }
 }
+
+export function createRequireCsrf({ mode = null, modeResolver = null } = {}) {
+  return function configuredRequireCsrf(request, session) {
+    const effectiveMode = mode ?? modeResolver?.(request, session) ?? resolveCsrfProtectionMode();
+    if (effectiveMode === csrfProtectionModes.disabled) {
+      return;
+    }
+
+    enforceCsrf(request, session);
+  };
+}
+
+export const requireCsrf = createRequireCsrf({
+  modeResolver(request) {
+    return request?.deploymentSecurityPolicy?.csrfProtectionMode
+      ?? request?.res?.locals?.deploymentSecurityPolicy?.csrfProtectionMode
+      ?? resolveCsrfProtectionMode();
+  },
+});
 
 export async function revokeRefreshToken(refreshTokenId, revokedReason) {
   await getPool().query(
@@ -146,6 +195,77 @@ export async function revokeRefreshToken(refreshTokenId, revokedReason) {
     `,
     [refreshTokenId, revokedReason],
   );
+}
+
+export async function revokeRefreshTokenFamily(tokenFamilyId, revokedReason) {
+  const result = await getPool().query(
+    `
+      UPDATE refresh_tokens
+      SET is_revoked = TRUE,
+          revoked_at = NOW(),
+          revoked_reason = $2
+      WHERE token_family_id = $1
+        AND is_revoked = FALSE
+    `,
+    [tokenFamilyId, revokedReason],
+  );
+
+  return result.rowCount ?? 0;
+}
+
+export async function resolveSessionFromRefreshTokenLookup({
+  row,
+  refreshToken,
+  csrfToken,
+  requestMetadata,
+  now = () => Date.now(),
+  revokeRefreshTokenFamilyFn = revokeRefreshTokenFamily,
+  recordAuditEventFn = recordAuditEvent,
+}) {
+  if (!row || row.is_disabled) {
+    return null;
+  }
+
+  const expiresAt = row.expires_at ? new Date(row.expires_at) : null;
+  if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= now()) {
+    return null;
+  }
+
+  if (row.is_revoked) {
+    if (row.replaced_by_refresh_token_id) {
+      const revokedSessions = await revokeRefreshTokenFamilyFn(row.token_family_id, 'reuse_detected');
+
+      if (revokedSessions > 0) {
+        await recordAuditEventFn({
+          actorUserId: row.app_user_id,
+          actorType: 'user',
+          eventType: 'refresh_token_reuse_detected',
+          summary: 'Refresh token reuse detected; active session family revoked',
+          entityType: 'refresh_token',
+          entityId: row.refresh_token_id,
+          details: {
+            tokenFamilyId: row.token_family_id,
+            previousRevokedReason: row.revoked_reason,
+          },
+          ipAddress: requestMetadata?.ipAddress ?? null,
+          userAgent: requestMetadata?.userAgent ?? null,
+        });
+      }
+    }
+
+    return null;
+  }
+
+  return {
+    refreshTokenId: row.refresh_token_id,
+    appUserId: row.app_user_id,
+    tokenFamilyId: row.token_family_id,
+    csrfTokenHash: row.csrf_token_hash,
+    expiresAt: row.expires_at,
+    user: toSessionUser(row),
+    refreshToken,
+    csrfToken,
+  };
 }
 
 export async function issueSession({ userId, parentRefreshTokenId = null, tokenFamilyId = null, requestMetadata }) {
@@ -365,36 +485,42 @@ export async function logoutSession(session, requestMetadata) {
 }
 
 export function setAuthCookies(response, refreshToken, csrfToken, maxAgeSeconds = refreshTokenMaxAgeSeconds) {
+  const secureCookies = response?.locals?.deploymentSecurityPolicy?.secureCookies
+    ?? resolveSecureCookiesEnabled();
+
   response.setHeader('Set-Cookie', [
     serializeCookie(refreshCookieName, refreshToken, {
       path: '/',
       httpOnly: true,
       sameSite: 'Strict',
-      secure: process.env.HARMONIARR_SECURE_COOKIES === 'true',
+      secure: secureCookies,
       maxAge: maxAgeSeconds,
     }),
     serializeCookie(csrfCookieName, csrfToken, {
       path: '/',
       sameSite: 'Strict',
-      secure: process.env.HARMONIARR_SECURE_COOKIES === 'true',
+      secure: secureCookies,
       maxAge: maxAgeSeconds,
     }),
   ]);
 }
 
 export function clearAuthCookies(response) {
+  const secureCookies = response?.locals?.deploymentSecurityPolicy?.secureCookies
+    ?? resolveSecureCookiesEnabled();
+
   response.setHeader('Set-Cookie', [
     serializeCookie(refreshCookieName, '', {
       path: '/',
       httpOnly: true,
       sameSite: 'Strict',
-      secure: process.env.HARMONIARR_SECURE_COOKIES === 'true',
+      secure: secureCookies,
       maxAge: 0,
     }),
     serializeCookie(csrfCookieName, '', {
       path: '/',
       sameSite: 'Strict',
-      secure: process.env.HARMONIARR_SECURE_COOKIES === 'true',
+      secure: secureCookies,
       maxAge: 0,
     }),
   ]);

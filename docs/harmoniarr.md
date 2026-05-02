@@ -40,6 +40,8 @@ Harmoniarr is planned as a self-hosted FOSS application.
 - There is no uptime, support, or response-time warranty.
 - Planning documents should define product behavior, safety boundaries, and operator-facing guidance, not hosted-service guarantees.
 - Operational guidance may describe expected behavior and reasonable defaults, but it should not read like a contractual support commitment.
+- Harmoniarr should be designed like a self-hosted companion app in the Radarr/Sonarr class, not like a hosted business platform.
+- Security and operability work should be proportionate to that deployment model: strong local auth, safe defaults, import and filesystem guardrails, and clear operator visibility matter more than enterprise IAM, SaaS-style control planes, or best-in-class compliance posture.
 
 ## Working Concept
 
@@ -6173,6 +6175,10 @@ Ingest/import:
 
 - Implement slskd adapter boundaries and search/download observation contracts.
 - Build discovery/import candidate ingestion that separates raw external payloads from normalized domain state.
+- Add provider-playlist URL intake for Spotify, YouTube, Apple Music, and similar sources as a separate intent-ingest boundary that parses playlist or collection URLs into durable artist, album, and track ingest requests before Soulseek candidate generation begins.
+- Provider-playlist intake should normalize canonical external IDs, respect provider-specific paging and auth constraints, keep provider policy-sensitive assets and metadata bounded to what is needed for import intent, and degrade gracefully when a source exposes only partial or user-authorized playlist data.
+- Playlist ingest should preserve enough structure for operators to keep import scope bounded to playlist albums or expand into additional albums for artists surfaced by the playlist, without collapsing that policy choice into the provider-ingest layer.
+- Import planning should also carry the target user context so reviewed media lands in a user-owned subdirectory while still referencing shared canonical media state.
 - Add review queue state machine for candidate evaluation, operator decisions, hold/reject states, and idempotent reprocessing.
 - Implement path mapping, staging resolution, root-folder policy, and naming-preview generation without mutating media yet.
 
@@ -6200,8 +6206,10 @@ Jobs and workers:
 Filesystem and media operations:
 
 - Implement guarded file copy/move/link behavior, rename previews, collision handling, rollback-aware temporary staging, and post-action verification.
+- Prefer same-volume hardlinks when an approved album or track already exists for another user, and treat cross-volume cases as an explicit fallback that must not silently duplicate canonical lossless media.
 - Add FFmpeg-backed inspection and initial transcoding job orchestration with operator confirmation rules.
 - Keep original source retention policy as documented; never auto-delete originals by default.
+- Avoid duplicate lossless copies across per-user libraries by default, but allow operators to request a lossy derivative when a user explicitly needs a different format than the shared canonical source.
 
 Notifications:
 

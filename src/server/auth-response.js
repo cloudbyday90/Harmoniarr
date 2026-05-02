@@ -43,6 +43,36 @@ export function createRefreshResponse(sessionUser, issuedSession) {
   };
 }
 
+export function createActiveSessionsResponse(payload) {
+  return {
+    ok: true,
+    ...payload,
+  };
+}
+
+export function createRecentActivityResponse(payload) {
+  return {
+    ok: true,
+    ...payload,
+  };
+}
+
+export function createPasswordChangedResponse(user, issuedSession) {
+  return {
+    ok: true,
+    bootstrapRequired: false,
+    user: user ? toSessionUser(user) : null,
+    csrfToken: issuedSession.csrfToken,
+  };
+}
+
+export function createSessionRevokedResponse(payload) {
+  return {
+    ok: true,
+    ...payload,
+  };
+}
+
 export function createLogoutResponse() {
   return {
     ok: true,

@@ -18,11 +18,19 @@
 
 <script setup>
 import { RouterLink } from 'vue-router';
+import {
+  getOperationRunStatusClass,
+  getOperationRunStatusLabel,
+} from '../lib/operation-run-status.js';
 
 const props = defineProps({
   actionErrorMessage: {
     type: String,
     default: '',
+  },
+  currentRun: {
+    type: Object,
+    default: null,
   },
   errorMessage: {
     type: String,
@@ -40,6 +48,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  runDetailErrorMessage: {
+    type: String,
+    default: '',
+  },
   scanSummary: {
     type: Object,
     default: null,
@@ -56,38 +68,6 @@ function readinessClass(status) {
   return status === 'ready'
     ? 'review-status-selected'
     : 'review-status-held';
-}
-
-function runStatusLabel(status) {
-  switch (status) {
-    case 'completed':
-      return 'Completed';
-    case 'running':
-      return 'Running';
-    case 'pending':
-      return 'Queued';
-    case 'cancelled':
-      return 'Cancelled';
-    case 'failed':
-      return 'Failed';
-    default:
-      return 'Not started';
-  }
-}
-
-function runStatusClass(status) {
-  switch (status) {
-    case 'completed':
-      return 'review-status-selected';
-    case 'running':
-    case 'pending':
-      return 'review-status-pending';
-    case 'cancelled':
-    case 'failed':
-      return 'review-status-failed';
-    default:
-      return 'review-status-held';
-  }
 }
 
 function canStartScan(scanSummary) {
@@ -126,6 +106,7 @@ function startLabel(scanSummary) {
     </div>
 
     <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
+    <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
 
     <article class="error-panel panel-light" v-if="errorMessage">
       <h3>Library scan summary unavailable</h3>
@@ -141,8 +122,8 @@ function startLabel(scanSummary) {
           <strong>{{ readinessLabel(scanSummary.readiness.status) }}</strong>
         </div>
         <div class="pill">
-          <span>Latest run</span>
-          <strong>{{ runStatusLabel(scanSummary.latestRun?.status) }}</strong>
+          <span>Displayed run</span>
+          <strong>{{ getOperationRunStatusLabel(currentRun?.status) }}</strong>
         </div>
       </div>
 
@@ -179,29 +160,29 @@ function startLabel(scanSummary) {
         <article class="onboarding-step-card">
           <div class="review-detail-header">
             <div>
-              <p>Latest recorded run</p>
+              <p>Displayed recorded run</p>
               <strong>{{ scanSummary.summary.message }}</strong>
             </div>
-            <span class="review-status-pill" :class="runStatusClass(scanSummary.latestRun?.status)">
-              {{ runStatusLabel(scanSummary.latestRun?.status) }}
+            <span class="review-status-pill" :class="getOperationRunStatusClass(currentRun?.status)">
+              {{ getOperationRunStatusLabel(currentRun?.status) }}
             </span>
           </div>
           <dl class="review-meta-grid onboarding-meta-grid">
             <div>
               <dt>Started</dt>
-              <dd>{{ scanSummary.latestRun?.startedAt ?? 'Not yet recorded' }}</dd>
+              <dd>{{ currentRun?.startedAt ?? 'Not yet recorded' }}</dd>
             </div>
             <div>
               <dt>Finished</dt>
-              <dd>{{ scanSummary.latestRun?.finishedAt ?? 'Not yet recorded' }}</dd>
+              <dd>{{ currentRun?.finishedAt ?? 'Not yet recorded' }}</dd>
             </div>
             <div>
               <dt>Files seen</dt>
-              <dd>{{ scanSummary.latestRun?.filesSeen ?? 'Unavailable' }}</dd>
+              <dd>{{ currentRun?.filesSeen ?? 'Unavailable' }}</dd>
             </div>
             <div>
               <dt>Files matched</dt>
-              <dd>{{ scanSummary.latestRun?.filesMatched ?? 'Unavailable' }}</dd>
+              <dd>{{ currentRun?.filesMatched ?? 'Unavailable' }}</dd>
             </div>
           </dl>
         </article>

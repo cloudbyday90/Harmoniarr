@@ -172,3 +172,61 @@ test('reconcileDiscoveryRequests preserves manual override readiness', async (t)
     }],
   });
 });
+
+test('reconcileDiscoveryRequests includes request-driven release matches in discovery reconciliation', async (t) => {
+  const replaceLibraryDiscoveryRequests = t.mock.fn(async () => {});
+  const now = new Date('2026-05-02T15:00:00.000Z');
+  const service = createLibraryDiscoveryRequestService({
+    getNow: () => now,
+    getPoolFn: () => ({
+      query: async () => ({
+        rows: [{
+          blocked_reason: null,
+          last_search_at: null,
+          manual_requested_at: null,
+          metadata_artist_id: 'artist-7',
+          metadata_release_group_id: 'release-group-7',
+          metadata_release_id: 'release-7',
+          release_date: '2026-05-01',
+          search_mode: 'automatic',
+          source_media_request_id: 'request-7',
+          source_request_kind: 'release',
+          source_requested_by_user_id: 'user-7',
+          wanted_status: 'missing',
+          wanted_strategy: 'media_request_intake',
+        }],
+      }),
+    }),
+    libraryDiscoveryRequestStore: {
+      replaceLibraryDiscoveryRequests,
+    },
+  });
+
+  await service.reconcileDiscoveryRequests();
+
+  assert.deepEqual(replaceLibraryDiscoveryRequests.mock.calls[0].arguments[0], {
+    discoveryRequests: [{
+      blockedReason: null,
+      evidence: {
+        automaticCooldownMs: 21600000,
+        cooldownDeadline: null,
+        releaseDateGate: '2026-05-01T00:00:00.000Z',
+        sourceMediaRequestId: 'request-7',
+        sourceRequestKind: 'release',
+        sourceRequestedByUserId: 'user-7',
+        strategy: 'eligible_now',
+        wantedStrategy: 'media_request_intake',
+      },
+      lastSearchAt: null,
+      manualRequestedAt: null,
+      metadataArtistId: 'artist-7',
+      metadataReleaseGroupId: 'release-group-7',
+      metadataReleaseId: 'release-7',
+      nextSearchAfter: '2026-05-02T15:00:00.000Z',
+      releaseDate: '2026-05-01',
+      requestStatus: 'ready',
+      searchMode: 'automatic',
+      wantedStatus: 'missing',
+    }],
+  });
+});

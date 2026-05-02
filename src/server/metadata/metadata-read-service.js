@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
+import { createMetadataReleaseDetectionService } from './metadata-release-detection-service.js';
 import {
   getMetadataArtistById,
   getMetadataArtistByMusicBrainzArtistId,
@@ -162,6 +163,7 @@ function mapTrack(row) {
 
 export function createMetadataReadService({
   pool = getPool(),
+  metadataReleaseDetectionService = createMetadataReleaseDetectionService(),
   metadataMonitoringStore = createMetadataMonitoringStore({ getPoolFn: () => pool }),
 } = {}) {
   async function buildArtistPayload(artist) {
@@ -169,8 +171,9 @@ export function createMetadataReadService({
       throw createMetadataNotFoundError('artist', 'unknown');
     }
 
-    const [aliases, monitoring, releaseGroups, releases] = await Promise.all([
+    const [aliases, detectionEventsPage, monitoring, releaseGroups, releases] = await Promise.all([
       listMetadataArtistAliases(artist.id, pool),
+      metadataReleaseDetectionService.listDetectionEventsPageForArtist({ metadataArtistId: artist.id }),
       metadataMonitoringStore.getArtistMonitoring(artist.id),
       listMetadataReleaseGroupsByArtistId(artist.id, pool),
       listMetadataReleasesByArtistId(artist.id, pool),
@@ -179,6 +182,8 @@ export function createMetadataReadService({
     return {
       artist: mapArtist(artist),
       aliases: aliases.map(mapAlias),
+      detectionEvents: detectionEventsPage.entries,
+      detectionEventsPageInfo: detectionEventsPage.pageInfo,
       monitoring,
       releaseGroups: releaseGroups.map(mapReleaseGroup),
       releases: releases.map(mapRelease),
@@ -201,6 +206,19 @@ export function createMetadataReadService({
     }
 
     return buildArtistPayload(artist);
+  }
+
+  async function getArtistDetectionEvents({ artistId, before = null, limit = 10 } = {}) {
+    const artist = await getMetadataArtistById(artistId, pool);
+    if (!artist) {
+      throw createMetadataNotFoundError('artist', artistId);
+    }
+
+    return metadataReleaseDetectionService.listDetectionEventsPageForArtist({
+      before,
+      limit,
+      metadataArtistId: artist.id,
+    });
   }
 
   async function buildReleaseGroupPayload(releaseGroup) {
@@ -302,6 +320,7 @@ export function createMetadataReadService({
   }
 
   return {
+    getArtistDetectionEvents,
     getArtist,
     getArtistByMusicBrainzId,
     getReleaseGroup,

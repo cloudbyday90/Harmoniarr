@@ -29,6 +29,7 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 - The protected `POST /api/v1/library/scan-runs` route now creates a durable pending library-scan run, enforces shared readiness and CSRF/session guards, and hands execution off to the shared library worker boundary.
 - The protected `PUT /api/v1/metadata/artists/:artistId/monitoring` route now updates canonical artist monitoring state through the shared metadata monitoring service and returns the current artist monitoring payload used by local metadata reads.
 - The system overview route now also returns a lightweight path-validation summary derived from the shared settings payload for authenticated dashboard consumers.
+- The protected `POST /api/v1/auth/refresh` route and privileged admin mutation routes now return a normalized `reauth_required` error when the authenticated session is flagged for forced re-authentication, while read-side routes remain accessible until password-management and session-management routes are defined.
 
 ## Global Contract Rules
 
@@ -40,25 +41,30 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 
 ## Route Family 1 - Bootstrap, Auth, And Session Routes
 
-- [ ] Define first-run bootstrap-admin routes and no-longer-available behavior after bootstrap completes.
-- [ ] Define login, logout, refresh, session introspection, and forced re-auth routes.
-- [ ] Define CSRF token issuance/refresh behavior for cookie-authenticated writes.
-- [ ] Define lockout, password-change, and session revocation error semantics.
+- [x] Define first-run bootstrap-admin routes and no-longer-available behavior after bootstrap completes.
+- [x] Define login, logout, refresh, and session introspection routes.
+- [ ] Define forced re-auth routes.
+- [x] Define CSRF token issuance/refresh behavior for cookie-authenticated writes.
+- [x] Define rotated refresh-token replay semantics that revoke the active browser session family.
+- [ ] Define lockout, password-change, and forced re-auth error semantics.
 
 ## Route Family 2 - Settings, Secrets, And Integration API Keys
 
-- [ ] Define settings read/write routes with allowlisted keys and partial-update safety.
+- [x] Define settings read/write routes with allowlisted keys and partial-update safety.
+- [x] Define admin-only enforcement for settings and system-management routes.
+- [x] Define admin-only enforcement for slskd operational routes.
 - [ ] Define artwork settings keys and mutation rules for provider order, extraction eligibility, derivative profiles, cleanup thresholds, and force-refresh behavior.
-- [ ] Define secret masking, preservation, clearing, and validation behavior.
+- [x] Define initial secret masking, preservation, clearing, and validation behavior for `slskd.apiKey` without plaintext response round-trips.
 - [ ] Define integration API key create, rotate, revoke, and list routes.
-- [ ] Define audit expectations for every settings or credential mutation.
+- [x] Define audit expectations for settings mutation routes.
+- [x] Define audit expectations for the first credential mutation route family (`slskd.apiKey` via settings).
 
 ## Route Family 3 - Health, Readiness, And Diagnostics
 
-- [ ] Define anonymous vs authenticated health surfaces.
+- [x] Define anonymous vs authenticated health surfaces.
 - [ ] Define authenticated diagnostics routes for queue state, maintenance locks, recent failures, and privileged action history.
 - [ ] Define redaction rules for diagnostics exports and operator-visible payloads.
-- [ ] Define dependency-health classification for slskd and metadata provider failures.
+- [x] Define dependency-health classification for slskd and metadata provider failures.
 - [x] Define authenticated slskd discovery route contracts for status, search start, search state, and search response reads with normalized provider errors.
 
 ## Route Family 4 - Import Review And Canonical Metadata
@@ -69,8 +75,8 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 - [x] Define import-candidate hold, select, reject, and reopen route contracts with stale-state conflict behavior.
 - [x] Define import-candidate per-file skip and clear-decision route contracts for collision handling inside apply preview.
 - [ ] Define review decision routes for approve, reject, hold, retry, and reopen actions as applicable.
-- [ ] Define canonical metadata lookup/detail routes needed by the review UI.
-- [ ] Define replay-safe behavior and conflict responses for duplicate or stale operator actions.
+- [x] Define canonical metadata lookup/detail routes needed by the review UI.
+- [x] Define replay-safe behavior and conflict responses for duplicate or stale operator actions.
 
 ## Route Family 5 - Job Control, Filesystem Preview, And Media Operations
 
@@ -83,7 +89,10 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 ## Route Family 6 - Backup, Restore, Maintenance, And Admin Recovery
 
 - [ ] Define backup/export create, list, inspect, download, and delete routes.
+	- Added guarded create, list, and inspect routes for backup artifacts via `POST /api/v1/recovery/backups`, `GET /api/v1/recovery/backups`, and `GET /api/v1/recovery/backups/:backupArtifactId`; download and delete routes remain pending.
 - [ ] Define restore preview and restore apply routes with maintenance-lock gating.
+	- Added guarded restore-preview read route `GET /api/v1/recovery/backups/:backupArtifactId/restore-preview` backed by backup artifact integrity checks and maintenance-lock readiness signaling.
+	- Added guarded restore-apply mutation route `POST /api/v1/recovery/backups/:backupArtifactId/restore-apply` with fresh-admin + CSRF enforcement and checksum-aware apply orchestration.
 - [ ] Define maintenance-lock status, enter, and release routes if exposed directly.
 - [ ] Define admin recovery issuance, verification, use, cancel, and audit lookup routes.
 - [ ] Ensure all recovery-sensitive routes align with `docs/BACKUP_RESTORE_DESIGN.md` and `docs/ADMIN_RECOVERY_RUNBOOK.md`.
@@ -96,11 +105,12 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 
 ## Contract Verification Checklist
 
-- [ ] Add route-contract tests for happy paths and permission failures.
+- [x] Add route-contract tests for happy paths and permission failures.
 - [x] Add native route-contract tests for slskd discovery happy paths, CSRF-protected search starts, and provider error normalization.
 - [x] Add native route-contract tests for CSRF-protected slskd import-candidate ingestion and provider error normalization.
 - [x] Add native route-contract tests for import-candidate preview plus CSRF-protected hold, select, reject, reopen, and stale-state conflict behavior.
-- [ ] Add validation tests for malformed input and unknown keys.
+- [x] Add validation tests for malformed settings input and unknown keys.
+- [ ] Add validation tests for malformed input across the remaining route families.
 - [ ] Add tests for idempotent retries on privileged actions where required.
 - [ ] Add tests for redaction and audit logging on secret-bearing routes.
 - [ ] Add tests for maintenance-lock denial behavior on protected route families.

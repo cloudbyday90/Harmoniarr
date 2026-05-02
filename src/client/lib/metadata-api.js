@@ -18,8 +18,15 @@
 
 import { apiRequest, buildQueryString } from './api.js';
 
-export function fetchMetadataArtist(artistId) {
-  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}`);
+export function fetchMetadataArtist(artistId, { signal } = {}) {
+  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}`, { signal });
+}
+
+export function fetchMetadataArtistDetectionEvents(artistId, { before, limit, signal } = {}) {
+  return apiRequest(
+    `/api/v1/metadata/artists/${encodeURIComponent(artistId)}/detection-events${buildQueryString({ before, limit })}`,
+    { signal },
+  );
 }
 
 export function searchLocalMetadataArtists({ query, limit } = {}) {
@@ -34,24 +41,24 @@ export function searchLocalMetadataReleases({ query, limit } = {}) {
   return apiRequest(`/api/v1/metadata/releases/search${buildQueryString({ q: query, limit })}`);
 }
 
-export function fetchMetadataReleaseGroup(releaseGroupId) {
-  return apiRequest(`/api/v1/metadata/release-groups/${encodeURIComponent(releaseGroupId)}`);
+export function fetchMetadataReleaseGroup(releaseGroupId, { signal } = {}) {
+  return apiRequest(`/api/v1/metadata/release-groups/${encodeURIComponent(releaseGroupId)}`, { signal });
 }
 
-export function fetchMetadataRelease(releaseId) {
-  return apiRequest(`/api/v1/metadata/releases/${encodeURIComponent(releaseId)}`);
+export function fetchMetadataRelease(releaseId, { signal } = {}) {
+  return apiRequest(`/api/v1/metadata/releases/${encodeURIComponent(releaseId)}`, { signal });
 }
 
-export function resolveMusicBrainzArtistLocal(artistId) {
-  return apiRequest(`/api/v1/metadata/musicbrainz/artists/${encodeURIComponent(artistId)}/local`);
+export function resolveMusicBrainzArtistLocal(artistId, { signal } = {}) {
+  return apiRequest(`/api/v1/metadata/musicbrainz/artists/${encodeURIComponent(artistId)}/local`, { signal });
 }
 
-export function resolveMusicBrainzReleaseGroupLocal(releaseGroupId) {
-  return apiRequest(`/api/v1/metadata/musicbrainz/release-groups/${encodeURIComponent(releaseGroupId)}/local`);
+export function resolveMusicBrainzReleaseGroupLocal(releaseGroupId, { signal } = {}) {
+  return apiRequest(`/api/v1/metadata/musicbrainz/release-groups/${encodeURIComponent(releaseGroupId)}/local`, { signal });
 }
 
-export function resolveMusicBrainzReleaseLocal(releaseId) {
-  return apiRequest(`/api/v1/metadata/musicbrainz/releases/${encodeURIComponent(releaseId)}/local`);
+export function resolveMusicBrainzReleaseLocal(releaseId, { signal } = {}) {
+  return apiRequest(`/api/v1/metadata/musicbrainz/releases/${encodeURIComponent(releaseId)}/local`, { signal });
 }
 
 export function searchMusicBrainzArtists({ query, limit } = {}) {
@@ -62,7 +69,7 @@ export function searchMusicBrainzReleases({ artist, release, limit } = {}) {
   return apiRequest(`/api/v1/metadata/musicbrainz/releases/search${buildQueryString({ artist, release, limit })}`);
 }
 
-export function browseMusicBrainzArtistReleaseGroups({ artistId, limit, offset, type, releaseGroupStatus } = {}) {
+export function browseMusicBrainzArtistReleaseGroups({ artistId, limit, offset, type, releaseGroupStatus, signal } = {}) {
   return apiRequest(
     `/api/v1/metadata/musicbrainz/artists/${encodeURIComponent(artistId)}/release-groups${buildQueryString({
       limit,
@@ -70,11 +77,12 @@ export function browseMusicBrainzArtistReleaseGroups({ artistId, limit, offset, 
       type,
       releaseGroupStatus,
     })}`,
+    { signal },
   );
 }
 
-export function fetchMusicBrainzReleaseGroupReleases(releaseGroupId) {
-  return apiRequest(`/api/v1/metadata/musicbrainz/release-groups/${encodeURIComponent(releaseGroupId)}/releases`);
+export function fetchMusicBrainzReleaseGroupReleases(releaseGroupId, { signal } = {}) {
+  return apiRequest(`/api/v1/metadata/musicbrainz/release-groups/${encodeURIComponent(releaseGroupId)}/releases`, { signal });
 }
 
 export function importMusicBrainzArtist(artistId) {
@@ -89,6 +97,13 @@ export function updateMetadataArtistMonitoring(artistId, patch) {
     method: 'PUT',
     includeCsrf: true,
     body: patch,
+  });
+}
+
+export function startMetadataArtistRefresh(artistId) {
+  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/refresh`, {
+    method: 'POST',
+    includeCsrf: true,
   });
 }
 

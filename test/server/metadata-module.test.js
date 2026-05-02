@@ -3,6 +3,14 @@ import test from 'node:test';
 import { createMetadataModule } from '../../src/server/metadata/metadata-module.js';
 
 test('createMetadataModule exposes shared route dependencies from injected services', () => {
+  const metadataArtistRefreshRunStore = {};
+  const metadataArtistRefreshService = {
+    startMetadataArtistRefresh: () => {},
+  };
+  const metadataArtistRefreshWorker = {};
+  const metadataRefreshDispatchPolicyService = {
+    resolveDispatchReadiness: () => ({ allowed: true }),
+  };
   const metadataMonitoringService = {
     updateArtistMonitoring: () => {},
   };
@@ -10,6 +18,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const metadataReadService = {
     getArtist: () => {},
     getArtistByMusicBrainzId: () => {},
+    getArtistDetectionEvents: () => {},
     getRelease: () => {},
     getReleaseByMusicBrainzId: () => {},
     getReleaseGroup: () => {},
@@ -33,15 +42,23 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     searchArtists: () => {},
     searchReleases: () => {},
   };
+  const metadataRefreshService = {
+    refreshArtistCatalogById: () => {},
+  };
   const providerHealthRecorder = {
     recordError: () => {},
     recordSuccess: () => {},
   };
 
   const metadataModule = createMetadataModule({
+    metadataArtistRefreshRunStore,
+    metadataArtistRefreshService,
+    metadataArtistRefreshWorker,
+    metadataRefreshDispatchPolicyService,
     metadataMonitoringService,
     metadataMonitoringStore,
     metadataReadService,
+    metadataRefreshService,
     metadataSearchService,
     providerHealthRecorder,
     musicBrainzCatalogService,
@@ -49,9 +66,14 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     musicBrainzSearchService,
   });
 
+  assert.equal(metadataModule.metadataArtistRefreshRunStore, metadataArtistRefreshRunStore);
+  assert.equal(metadataModule.metadataArtistRefreshService, metadataArtistRefreshService);
+  assert.equal(metadataModule.metadataArtistRefreshWorker, metadataArtistRefreshWorker);
+  assert.equal(metadataModule.metadataRefreshDispatchPolicyService, metadataRefreshDispatchPolicyService);
   assert.equal(metadataModule.metadataReadService, metadataReadService);
   assert.equal(metadataModule.metadataMonitoringService, metadataMonitoringService);
   assert.equal(metadataModule.metadataMonitoringStore, metadataMonitoringStore);
+  assert.equal(metadataModule.metadataRefreshService, metadataRefreshService);
   assert.equal(metadataModule.metadataSearchService, metadataSearchService);
   assert.equal(metadataModule.providerHealthRecorder, providerHealthRecorder);
   assert.equal(metadataModule.musicBrainzCatalogService, musicBrainzCatalogService);
@@ -62,10 +84,12 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getMusicBrainzReleaseGroupReleases: musicBrainzCatalogService.getReleaseGroupReleases,
     getMetadataArtist: metadataReadService.getArtist,
     getMetadataArtistByMusicBrainzId: metadataReadService.getArtistByMusicBrainzId,
+    getMetadataArtistDetectionEvents: metadataReadService.getArtistDetectionEvents,
     getMetadataRelease: metadataReadService.getRelease,
     getMetadataReleaseByMusicBrainzId: metadataReadService.getReleaseByMusicBrainzId,
     getMetadataReleaseGroup: metadataReadService.getReleaseGroup,
     getMetadataReleaseGroupByMusicBrainzId: metadataReadService.getReleaseGroupByMusicBrainzId,
+    startMetadataArtistRefresh: metadataArtistRefreshService.startMetadataArtistRefresh,
     updateMetadataArtistMonitoring: metadataMonitoringService.updateArtistMonitoring,
     importMusicBrainzArtist: musicBrainzImportService.importArtistById,
     importMusicBrainzReleaseGroup: musicBrainzImportService.importReleaseGroupById,

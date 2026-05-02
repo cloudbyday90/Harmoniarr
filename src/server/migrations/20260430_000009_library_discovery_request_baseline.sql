@@ -15,7 +15,7 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS library_discovery_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   metadata_release_group_id UUID NOT NULL REFERENCES metadata_release_groups(id) ON DELETE CASCADE,
   metadata_release_id UUID NOT NULL REFERENCES metadata_releases(id) ON DELETE CASCADE,

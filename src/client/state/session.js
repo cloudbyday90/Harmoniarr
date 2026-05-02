@@ -42,6 +42,14 @@ function applySessionPayload(payload) {
   state.ready = true;
 }
 
+function clearSession() {
+  applySessionPayload({
+    bootstrapRequired: state.bootstrapRequired,
+    user: null,
+    csrfToken: '',
+  });
+}
+
 async function refreshSession() {
   state.loading = true;
   try {
@@ -69,12 +77,14 @@ async function logout() {
   try {
     await logoutRequest();
   } finally {
-    applySessionPayload({ bootstrapRequired: false, user: null, csrfToken: '' });
+    clearSession();
   }
 }
 
 export const sessionStore = {
+  applySessionPayload,
   state,
+  clearSession,
   refreshSession,
   bootstrapAdmin,
   login,

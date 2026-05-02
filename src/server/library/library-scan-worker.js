@@ -17,28 +17,41 @@
  */
 
 import { executeLibraryScan } from './library-scan-executor.js';
+import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
+import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
 
 export function createLibraryScanWorker({
   acquireLease,
+  captureLibrarySidecarArtwork = null,
+  createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
   executeScan = executeLibraryScan,
   extractLibraryFileTags = null,
   matchLibraryFiles = null,
   markRunCompleted,
+  markRunCancelled,
   markRunFailed,
   markRunStarted,
+  isCancellationRequested,
   reconcileDiscoveryRequests = null,
   reconcileLibraryReleases = null,
   reconcileWantedReleases = null,
   recordLibraryFiles = null,
   releaseLease,
+  renewLease,
 } = {}) {
   const activeRunIds = new Set();
 
   async function runScan({ libraryRoot, runId }) {
     let finalLeaseStatus = 'completed';
+    let leaseHeartbeat = null;
 
     try {
       await acquireLease({ runId });
+      if (renewLease) {
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat.start();
+      }
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
       await markRunStarted({
         runId,
         summary: {
@@ -48,10 +61,12 @@ export function createLibraryScanWorker({
 
       const observedFiles = [];
       const summary = await executeScan({
+        isCancellationRequested,
         libraryRoot,
         onFile: async (file) => {
           observedFiles.push(file);
         },
+        runId,
       });
 
       let catalogResult = null;
@@ -64,13 +79,23 @@ export function createLibraryScanWorker({
 
       if (extractLibraryFileTags && catalogResult?.files?.length) {
         await extractLibraryFileTags({
-          files: catalogResult.files,
+          files: catalogResult.files.filter((file) => file.fileState === 'observed'),
         });
+      }
+
+      if (captureLibrarySidecarArtwork && catalogResult?.files?.length) {
+        try {
+          await captureLibrarySidecarArtwork({
+            files: catalogResult.files,
+          });
+        } catch {
+          // Sidecar artwork capture is best-effort and must not fail the scan.
+        }
       }
 
       if (matchLibraryFiles && catalogResult?.files?.length) {
         await matchLibraryFiles({
-          files: catalogResult.files,
+          files: catalogResult.files.filter((file) => file.fileState === 'observed'),
         });
       }
 
@@ -88,6 +113,18 @@ export function createLibraryScanWorker({
 
       await markRunCompleted({ runId, summary });
     } catch (error) {
+      if (isOperationRunCancellationError(error)) {
+        finalLeaseStatus = 'cancelled';
+        await markRunCancelled({
+          runId,
+          summary: {
+            currentStep: 'Library scan cancelled',
+            libraryRoot,
+          },
+        });
+        return;
+      }
+
       finalLeaseStatus = 'failed';
       await markRunFailed({
         runId,
@@ -97,6 +134,7 @@ export function createLibraryScanWorker({
         },
       });
     } finally {
+      leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
       await releaseLease({ runId, status: finalLeaseStatus });
     }

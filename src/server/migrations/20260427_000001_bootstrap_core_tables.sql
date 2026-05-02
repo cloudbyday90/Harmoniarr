@@ -16,6 +16,24 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+CREATE OR REPLACE FUNCTION harmoniarr_generate_uuid()
+RETURNS UUID
+LANGUAGE plpgsql
+VOLATILE
+AS $$
+DECLARE
+  generated_id UUID;
+BEGIN
+  BEGIN
+    EXECUTE 'SELECT uuidv7()' INTO generated_id;
+    RETURN generated_id;
+  EXCEPTION
+    WHEN undefined_function THEN
+      RETURN gen_random_uuid();
+  END;
+END;
+$$;
+
 CREATE TABLE IF NOT EXISTS app_runtime_state (
   key TEXT PRIMARY KEY,
   value JSONB NOT NULL,
@@ -41,7 +59,7 @@ SET path = EXCLUDED.path,
     description = EXCLUDED.description;
 
 CREATE TABLE IF NOT EXISTS app_users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL,
@@ -56,7 +74,7 @@ CREATE TABLE IF NOT EXISTS app_users (
 );
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   app_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   token_family_id UUID NOT NULL,
@@ -76,7 +94,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 
 CREATE TABLE IF NOT EXISTS api_keys (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   name TEXT NOT NULL,
   key_hash TEXT NOT NULL UNIQUE,
   encrypted_key_preview TEXT NULL,
@@ -90,7 +108,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 
 CREATE TABLE IF NOT EXISTS encrypted_secrets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   secret_type TEXT NOT NULL,
   name TEXT NOT NULL,
   encrypted_value BYTEA NOT NULL,
@@ -101,7 +119,7 @@ CREATE TABLE IF NOT EXISTS encrypted_secrets (
 );
 
 CREATE TABLE IF NOT EXISTS audit_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   occurred_at TIMESTAMPTZ NOT NULL,
   actor_user_id UUID NULL REFERENCES app_users(id),
   actor_type TEXT NOT NULL,
@@ -116,7 +134,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
 );
 
 CREATE TABLE IF NOT EXISTS app_settings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   namespace TEXT NOT NULL,
   setting_key TEXT NOT NULL,
   setting_value JSONB NOT NULL,
@@ -127,7 +145,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 CREATE TABLE IF NOT EXISTS maintenance_locks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   lock_type TEXT NOT NULL,
   status TEXT NOT NULL,
   owner_instance_id TEXT NULL,
@@ -140,7 +158,7 @@ CREATE TABLE IF NOT EXISTS maintenance_locks (
 );
 
 CREATE TABLE IF NOT EXISTS admin_recovery_runs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   status TEXT NOT NULL,
   recovery_code_hash TEXT NOT NULL,
   armed_via TEXT NOT NULL,
@@ -158,7 +176,7 @@ CREATE TABLE IF NOT EXISTS admin_recovery_runs (
 );
 
 CREATE TABLE IF NOT EXISTS operation_runs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   operation_type TEXT NOT NULL,
   status TEXT NOT NULL,
   started_at TIMESTAMPTZ NOT NULL,
@@ -171,7 +189,7 @@ CREATE TABLE IF NOT EXISTS operation_runs (
 );
 
 CREATE TABLE IF NOT EXISTS job_leases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   job_type TEXT NOT NULL,
   lease_key TEXT NOT NULL UNIQUE,
   owner_instance_id TEXT NOT NULL,

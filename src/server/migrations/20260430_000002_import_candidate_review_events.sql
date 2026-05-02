@@ -15,7 +15,7 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_candidate_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL,
   previous_status TEXT NULL,

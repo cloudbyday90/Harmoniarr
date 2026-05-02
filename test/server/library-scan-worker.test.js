@@ -17,11 +17,24 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   const markRunFailed = t.mock.fn(async () => {});
   const releaseLease = t.mock.fn(async () => {});
   const acquireLease = t.mock.fn(async () => {});
+  const renewLease = t.mock.fn(async () => {});
+  const startLeaseHeartbeat = t.mock.fn(() => {});
+  const stopLeaseHeartbeat = t.mock.fn(() => {});
+  const createOperationRunLeaseHeartbeatFn = t.mock.fn(() => ({
+    start: startLeaseHeartbeat,
+    stop: stopLeaseHeartbeat,
+  }));
   const recordLibraryFiles = t.mock.fn(async () => ({
     files: [{
+      canonicalPath: join(rootDir, 'Artist', 'cover.jpg'),
+      fileState: 'ignored',
+      id: 'file-image-1',
+      relativePath: 'Artist/cover.jpg',
+    }, {
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',
       id: 'file-1',
+      relativePath: 'Artist/track-01.flac',
       tagPayload: {
         title: 'Foil',
       },
@@ -29,6 +42,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     libraryRootId: 'root-1',
     observedFileCount: 2,
   }));
+  const captureLibrarySidecarArtwork = t.mock.fn(async () => {});
   const extractLibraryFileTags = t.mock.fn(async () => {});
   const matchLibraryFiles = t.mock.fn(async () => {});
   const reconcileDiscoveryRequests = t.mock.fn(async () => {});
@@ -36,6 +50,8 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   const reconcileWantedReleases = t.mock.fn(async () => {});
   const worker = createLibraryScanWorker({
     acquireLease,
+    captureLibrarySidecarArtwork,
+    createOperationRunLeaseHeartbeatFn,
     extractLibraryFileTags,
     matchLibraryFiles,
     markRunCompleted,
@@ -46,6 +62,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     reconcileWantedReleases,
     recordLibraryFiles,
     releaseLease,
+    renewLease,
   });
 
   const completion = new Promise((resolve) => {
@@ -68,6 +85,11 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   const releasedLeaseArgs = await leaseReleased;
 
   assert.equal(acquireLease.mock.callCount(), 1);
+  assert.deepEqual(createOperationRunLeaseHeartbeatFn.mock.calls[0].arguments, [{
+    renewLease,
+    runId: 'run-1',
+  }]);
+  assert.equal(startLeaseHeartbeat.mock.callCount(), 1);
   assert.deepEqual(markRunStarted.mock.calls[0].arguments, [{
     runId: 'run-1',
     summary: {
@@ -84,6 +106,24 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',
       id: 'file-1',
+      relativePath: 'Artist/track-01.flac',
+      tagPayload: {
+        title: 'Foil',
+      },
+    }],
+  });
+  assert.equal(captureLibrarySidecarArtwork.mock.callCount(), 1);
+  assert.deepEqual(captureLibrarySidecarArtwork.mock.calls[0].arguments[0], {
+    files: [{
+      canonicalPath: join(rootDir, 'Artist', 'cover.jpg'),
+      fileState: 'ignored',
+      id: 'file-image-1',
+      relativePath: 'Artist/cover.jpg',
+    }, {
+      canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
+      fileState: 'observed',
+      id: 'file-1',
+      relativePath: 'Artist/track-01.flac',
       tagPayload: {
         title: 'Foil',
       },
@@ -95,6 +135,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',
       id: 'file-1',
+      relativePath: 'Artist/track-01.flac',
       tagPayload: {
         title: 'Foil',
       },
@@ -130,8 +171,71 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   assert.equal(completionArgs.summary.filesUnmatched, 1);
   assert.equal(completionArgs.summary.libraryRoot, rootDir);
   assert.equal(releaseLease.mock.callCount(), 1);
+  assert.equal(stopLeaseHeartbeat.mock.callCount(), 1);
   assert.deepEqual(releasedLeaseArgs, {
     runId: 'run-1',
     status: 'completed',
   });
+});
+
+test('createLibraryScanWorker ignores sidecar artwork failures and still completes the scan', async (t) => {
+  const executeScan = t.mock.fn(async () => ({
+    filesMatched: 1,
+    filesSeen: 2,
+    filesUnmatched: 1,
+    libraryRoot: '/library',
+  }));
+  const markRunStarted = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const acquireLease = t.mock.fn(async () => {});
+  const recordLibraryFiles = t.mock.fn(async () => ({
+    files: [{
+      canonicalPath: '/library/Artist/cover.jpg',
+      fileState: 'ignored',
+      id: 'file-image-1',
+      relativePath: 'Artist/cover.jpg',
+    }, {
+      canonicalPath: '/library/Artist/track-01.flac',
+      fileState: 'observed',
+      id: 'file-1',
+      relativePath: 'Artist/track-01.flac',
+    }],
+    libraryRootId: 'root-1',
+    observedFileCount: 2,
+  }));
+  const captureLibrarySidecarArtwork = t.mock.fn(async () => {
+    throw new Error('invalid sidecar');
+  });
+
+  const worker = createLibraryScanWorker({
+    acquireLease,
+    captureLibrarySidecarArtwork,
+    executeScan,
+    extractLibraryFileTags: t.mock.fn(async () => {}),
+    markRunCompleted,
+    markRunFailed,
+    markRunStarted,
+    matchLibraryFiles: t.mock.fn(async () => {}),
+    recordLibraryFiles,
+    releaseLease,
+  });
+
+  const completion = new Promise((resolve) => {
+    markRunCompleted.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({
+    libraryRoot: '/library',
+    runId: 'run-2',
+  });
+
+  const completionArgs = await completion;
+
+  assert.equal(captureLibrarySidecarArtwork.mock.callCount(), 1);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.equal(completionArgs.runId, 'run-2');
 });

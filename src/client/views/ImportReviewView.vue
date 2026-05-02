@@ -17,17 +17,26 @@
 -->
 
 <script setup>
-import { watch } from 'vue';
+import { nextTick, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import ImportCandidateApplyPanel from '../components/ImportCandidateApplyPanel.vue';
 import ImportCandidateExecutionPanel from '../components/ImportCandidateExecutionPanel.vue';
 import ImportCandidateDetailPanel from '../components/ImportCandidateDetailPanel.vue';
 import ImportCandidateFilters from '../components/ImportCandidateFilters.vue';
 import ImportCandidateQueueList from '../components/ImportCandidateQueueList.vue';
 import ImportPendingCandidateStatusPanel from '../components/ImportPendingCandidateStatusPanel.vue';
+import {
+  buildImportReviewRouteQuery,
+  getImportReviewRouteStateKey,
+  normalizeImportReviewRouteState,
+} from '../lib/import-review-route-state.js';
 import { useImportCandidateApplySummary } from '../composables/useImportCandidateApplySummary.js';
 import SelectedImportCandidateStatusPanel from '../components/SelectedImportCandidateStatusPanel.vue';
 import { useImportCandidateExecutionSummary } from '../composables/useImportCandidateExecutionSummary.js';
 import { useImportReviewWorkspace } from '../composables/useImportReviewWorkspace.js';
+
+const route = useRoute();
+const router = useRouter();
 
 const {
   actionError,
@@ -86,6 +95,9 @@ const {
   isLoading: isLoadingApplySummary,
   isStarting: isStartingApplyRun,
   loadImportCandidateApplySummary,
+  loadSelectedImportCandidateApplyRun,
+  runDetailErrorMessage: applyRunDetailErrorMessage,
+  selectedRunId: selectedApplyRunId,
   startApplyRun,
   summary: applyRunSummary,
 } = useImportCandidateApplySummary();
@@ -98,22 +110,82 @@ const {
   isReconciling: isReconcilingExecutionState,
   isStarting: isStartingExecutionRun,
   loadImportCandidateExecutionSummary,
+  loadSelectedImportCandidateExecutionRun,
   reconcileExecutionState,
+  runDetailErrorMessage: executionRunDetailErrorMessage,
+  selectedRunId: selectedExecutionRunId,
   startExecutionRun,
   summary: executionSummary,
 } = useImportCandidateExecutionSummary();
 
+function importReviewRouteState() {
+  return normalizeImportReviewRouteState(route.query);
+}
+
+function buildMergedImportReviewRouteQuery(nextState) {
+  const query = { ...route.query };
+  delete query.applyRunId;
+  delete query.candidate;
+  delete query.executionRunId;
+  delete query.folderPath;
+  delete query.sourceSearchId;
+  delete query.status;
+  delete query.username;
+
+  return {
+    ...query,
+    ...buildImportReviewRouteQuery({
+      ...importReviewRouteState(),
+      ...nextState,
+    }),
+  };
+}
+
+async function replaceImportReviewRouteState(nextState, { hash = route.hash } = {}) {
+  const normalizedCurrentState = importReviewRouteState();
+  const normalizedNextState = normalizeImportReviewRouteState({
+    ...normalizedCurrentState,
+    ...nextState,
+  });
+
+  if (
+    getImportReviewRouteStateKey(normalizedCurrentState) === getImportReviewRouteStateKey(normalizedNextState)
+    && hash === route.hash
+  ) {
+    return;
+  }
+
+  await router.replace({
+    hash,
+    query: buildMergedImportReviewRouteQuery(normalizedNextState),
+  });
+}
+
+function scrollPanelIntoView(panelId) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.getElementById(panelId)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  });
+}
+
 async function handleStartExecutionRun() {
+  await replaceImportReviewRouteState({ executionRunId: '' }, { hash: '#import-execution-run-panel' });
   await startExecutionRun();
   await refreshQueue({ preserveSelection: true });
 }
 
 async function handleReconcileExecutionState() {
+  await replaceImportReviewRouteState({ executionRunId: '' }, { hash: '#import-execution-run-panel' });
   await reconcileExecutionState();
   await refreshQueue({ preserveSelection: true });
 }
 
 async function handleStartApplyRun() {
+  await replaceImportReviewRouteState({ applyRunId: '' }, { hash: '#import-apply-run-panel' });
   await startApplyRun();
   await refreshQueue({ preserveSelection: true });
 }
@@ -132,6 +204,44 @@ watch(
     void loadImportCandidateApplySummary();
   },
   { immediate: true },
+);
+
+watch(
+  () => importReviewRouteState().executionRunId,
+  (nextRunId, previousRunId) => {
+    if (nextRunId === previousRunId) {
+      return;
+    }
+
+    if (!nextRunId) {
+      if (selectedExecutionRunId.value !== null) {
+        void loadImportCandidateExecutionSummary({ preferredRunId: null });
+      }
+      return;
+    }
+
+    void loadImportCandidateExecutionSummary({ preferredRunId: nextRunId });
+    void nextTick().then(() => scrollPanelIntoView('import-execution-run-panel'));
+  },
+);
+
+watch(
+  () => importReviewRouteState().applyRunId,
+  (nextRunId, previousRunId) => {
+    if (nextRunId === previousRunId) {
+      return;
+    }
+
+    if (!nextRunId) {
+      if (selectedApplyRunId.value !== null) {
+        void loadImportCandidateApplySummary({ preferredRunId: null });
+      }
+      return;
+    }
+
+    void loadImportCandidateApplySummary({ preferredRunId: nextRunId });
+    void nextTick().then(() => scrollPanelIntoView('import-apply-run-panel'));
+  },
 );
 </script>
 
@@ -211,12 +321,14 @@ watch(
     />
 
     <ImportCandidateExecutionPanel
+      id="import-execution-run-panel"
       :action-error-message="executionActionErrorMessage"
       :current-run="currentRun"
       :error-message="executionErrorMessage"
       :is-loading="isLoadingExecutionSummary"
       :is-reconciling="isReconcilingExecutionState"
       :is-starting="isStartingExecutionRun"
+      :run-detail-error-message="executionRunDetailErrorMessage"
       :selected-candidate-count="selectedSummaryCounts.totalSelected"
       :summary="executionSummary"
       @reconcile="handleReconcileExecutionState"
@@ -225,12 +337,14 @@ watch(
     />
 
     <ImportCandidateApplyPanel
+      id="import-apply-run-panel"
       :action-error-message="applyActionErrorMessage"
       :current-run="currentApplyRun"
       :error-message="applyErrorMessage"
       :import-pending-candidate-count="importPendingSummaryCounts.totalImportPending"
       :is-loading="isLoadingApplySummary"
       :is-starting="isStartingApplyRun"
+      :run-detail-error-message="applyRunDetailErrorMessage"
       :summary="applyRunSummary"
       @refresh="loadImportCandidateApplySummary"
       @start="handleStartApplyRun"

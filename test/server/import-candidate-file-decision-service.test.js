@@ -87,3 +87,81 @@ test('setImportCandidateFileSkipDecision rejects non-collision files', async () 
     (error) => error.code === 'import_candidate_file_skip_not_available',
   );
 });
+
+test('setImportCandidateFileAllowLossyDerivativeDecision persists a lossy derivative decision for transcode candidates', async (t) => {
+  const upsertImportCandidateFileDecisionFn = t.mock.fn(async () => ({
+    decisionType: 'allow_lossy_derivative',
+    id: 'decision-2',
+    importCandidateFileId: 'file-2',
+    importCandidateId: 'candidate-1',
+    reason: 'Allow lossy derivative for this source.',
+  }));
+  const insertImportCandidateEventFn = t.mock.fn(async () => ({
+    eventType: 'import_candidate_file_allow_lossy_derivative_set',
+  }));
+  const recordAuditEventFn = t.mock.fn(async () => ({}));
+  const service = createImportCandidateFileDecisionService({
+    getImportCandidateByIdFn: async () => ({
+      folderPath: 'Autechre/Amber',
+      id: 'candidate-1',
+      sourceProvider: 'slskd',
+      sourceSearchId: 'search-1',
+      status: 'import_pending',
+    }),
+    insertImportCandidateEventFn,
+    listImportCandidateFilesFn: async () => ([{
+      filename: '02 Lossy.mp3',
+      id: 'file-2',
+    }]),
+    pool: createMockPool(),
+    previewImportCandidateApply: async () => ({
+      files: [{
+        fileId: 'file-2',
+        transcodePlan: {
+          recommendedAction: 'transcode_candidate',
+        },
+      }],
+    }),
+    recordAuditEventFn,
+    upsertImportCandidateFileDecisionFn,
+  });
+
+  const result = await service.setImportCandidateFileAllowLossyDerivativeDecision({
+    actorUserId: 'user-2',
+    importCandidateFileId: 'file-2',
+    importCandidateId: 'candidate-1',
+    reason: 'Allow lossy derivative for this source.',
+    requestMetadata: {
+      ipAddress: '198.51.100.21',
+      userAgent: 'DecisionServiceTest/1.0',
+    },
+  });
+
+  assert.equal(result.decision.id, 'decision-2');
+  assert.equal(result.decision.decisionType, 'allow_lossy_derivative');
+  assert.equal(upsertImportCandidateFileDecisionFn.mock.callCount(), 1);
+  assert.equal(insertImportCandidateEventFn.mock.callCount(), 1);
+  assert.equal(recordAuditEventFn.mock.callCount(), 1);
+});
+
+test('setImportCandidateFileAllowLossyDerivativeDecision rejects non-transcode files', async () => {
+  const service = createImportCandidateFileDecisionService({
+    pool: createMockPool(),
+    previewImportCandidateApply: async () => ({
+      files: [{
+        fileId: 'file-1',
+        transcodePlan: {
+          recommendedAction: 'keep_original',
+        },
+      }],
+    }),
+  });
+
+  await assert.rejects(
+    () => service.setImportCandidateFileAllowLossyDerivativeDecision({
+      importCandidateFileId: 'file-1',
+      importCandidateId: 'candidate-1',
+    }),
+    (error) => error.code === 'import_candidate_file_lossy_decision_not_available',
+  );
+});

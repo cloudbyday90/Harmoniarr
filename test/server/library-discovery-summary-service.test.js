@@ -119,3 +119,42 @@ test('buildLibraryDiscoverySummary reports cooldown state before date-blocked st
   assert.equal(summary.summary.status, 'cooldown');
   assert.equal(summary.summary.message, '1 discovery request is waiting for automatic cooldown expiry.');
 });
+
+test('buildLibraryDiscoverySummary returns exact historical run detail when requested', async (t) => {
+  const service = createLibraryDiscoverySummaryService({
+    libraryDiscoveryHeartbeatConfig: {
+      intervalLabel: '15 minutes',
+      intervalMs: 900000,
+      mode: 'automatic',
+      source: 'default',
+    },
+    libraryDiscoveryHeartbeatState: createLibraryDiscoveryHeartbeatState(),
+    libraryDiscoveryRunStore: {
+      getRunById: t.mock.fn(async () => ({
+        candidateCount: 7,
+        dispatchedCount: 3,
+        id: 'run-12',
+        status: 'failed',
+        triggerSource: 'manual',
+      })),
+    },
+    libraryDiscoverySummaryStore: {
+      getLibraryDiscoverySnapshot: async () => ({
+        lastEvaluatedAt: null,
+        nextEligibleAt: null,
+        requestCounts: {
+          blocked: 0,
+          cooldown: 0,
+          ready: 0,
+          totalRequests: 0,
+        },
+      }),
+    },
+  });
+
+  const payload = await service.buildLibraryDiscoveryRunDetail({ runId: 'run-12' });
+
+  assert.equal(payload.run.id, 'run-12');
+  assert.equal(payload.run.dispatchedCount, 3);
+  assert.equal(payload.run.triggerSource, 'manual');
+});

@@ -42,6 +42,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  runDetailErrorMessage: {
+    type: String,
+    default: '',
+  },
   summary: {
     type: Object,
     default: null,
@@ -158,9 +162,33 @@ function operationStepLabel(stepType) {
   }
 }
 
+function formatMutationMode(mode) {
+  switch (mode) {
+    case 'hardlink':
+      return 'hardlink';
+    case 'copy':
+      return 'copy';
+    default:
+      return 'move';
+  }
+}
+
+function formatFallbackReason(reason) {
+  switch (reason) {
+    case 'cross_device':
+      return 'the source and destination were on different filesystem devices';
+    default:
+      return reason || 'the filesystem could not honor the requested mutation mode';
+  }
+}
+
 function describeOperation(operation) {
   if (operation?.errorMessage) {
     return operation.errorMessage;
+  }
+
+  if (operation?.fallbackFromMode) {
+    return `${operationStepLabel(operation?.stepType)} ${operation?.status || 'pending'} via ${formatMutationMode(operation.fallbackFromMode)} fallback to ${formatMutationMode(operation?.appliedMode)} because ${formatFallbackReason(operation?.fallbackReason)}`;
   }
 
   return `${operationStepLabel(operation?.stepType)} ${operation?.status || 'pending'} via ${operation?.transport || 'planned apply'}`;
@@ -215,6 +243,7 @@ function canStartRun(currentRun, importPendingCandidateCount) {
       <p>{{ errorMessage }}</p>
     </article>
 
+    <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
     <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !currentRun">

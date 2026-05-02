@@ -27,6 +27,18 @@ const form = reactive({ username: '', password: '' });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
 
+function infoMessage() {
+  if (route.query.reason === 'session-expired') {
+    return 'Your session expired. Sign in again to continue.';
+  }
+
+  if (route.query.reason === 'reauth-required') {
+    return 'A privileged action requires you to re-authenticate before continuing.';
+  }
+
+  return '';
+}
+
 async function submit() {
   errorMessage.value = '';
   isSubmitting.value = true;
@@ -54,6 +66,7 @@ async function submit() {
 
     <article class="form-card panel-light">
       <h2>Login</h2>
+      <p class="metadata-card-copy" v-if="infoMessage()">{{ infoMessage() }}</p>
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username

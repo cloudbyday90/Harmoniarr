@@ -293,6 +293,61 @@ test('createDependencyHealthService preserves safe slskd connection details from
   }]);
 });
 
+test('createDependencyHealthService can scope checks to specific providers', async () => {
+  const service = createDependencyHealthService({
+    checks: [{
+      provider: 'slskd',
+      check: async () => ({
+        status: 'healthy',
+      }),
+    }],
+    recorder: {
+      getSnapshots: () => [{
+        provider: 'musicbrainz',
+        status: 'degraded',
+        code: 'musicbrainz_unavailable',
+        details: {
+          retryAfterMs: 5000,
+        },
+      }],
+    },
+  });
+
+  assert.deepEqual(await service.getDependencyHealth({ providers: ['musicbrainz'] }), [{
+    provider: 'musicbrainz',
+    status: 'degraded',
+    code: 'musicbrainz_unavailable',
+    details: {
+      retryAfterMs: 5000,
+    },
+  }]);
+});
+
+test('createDependencyHealthService preserves safe media tooling flags and strips unsafe details', async () => {
+  const service = createDependencyHealthService({
+    checks: [{
+      provider: 'media_tooling',
+      check: async () => ({
+        status: 'healthy',
+        details: {
+          ffmpegAvailable: true,
+          ffprobeAvailable: true,
+          version: 'ffmpeg 7.0',
+        },
+      }),
+    }],
+  });
+
+  assert.deepEqual(await service.getDependencyHealth(), [{
+    provider: 'media_tooling',
+    status: 'healthy',
+    details: {
+      ffmpegAvailable: true,
+      ffprobeAvailable: true,
+    },
+  }]);
+});
+
 test('classifySlskdDependencyError maps authentication failures to safe misconfigured status', () => {
   const error = new Error('slskd session validation request was not authorized');
   error.code = 'slskd_unauthorized';

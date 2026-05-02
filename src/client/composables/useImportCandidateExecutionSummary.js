@@ -17,6 +17,7 @@
  */
 
 import {
+  fetchImportCandidateExecutionRunDetail as defaultFetchImportCandidateExecutionRunDetail,
   fetchImportCandidateExecutionSummary as defaultFetchImportCandidateExecutionSummary,
   reconcileImportCandidateExecutionState as defaultReconcileImportCandidateExecutionState,
   startImportCandidateExecutionRun as defaultStartImportCandidateExecutionRun,
@@ -24,11 +25,13 @@ import {
 import { useImportCandidateRunSummary } from './useImportCandidateRunSummary.js';
 
 export function useImportCandidateExecutionSummary({
+  fetchImportCandidateExecutionRunDetail = defaultFetchImportCandidateExecutionRunDetail,
   fetchImportCandidateExecutionSummary = defaultFetchImportCandidateExecutionSummary,
   reconcileImportCandidateExecutionState = defaultReconcileImportCandidateExecutionState,
   startImportCandidateExecutionRun = defaultStartImportCandidateExecutionRun,
 } = {}) {
   const workflow = useImportCandidateRunSummary({
+    fetchRunDetail: async (runId) => (await fetchImportCandidateExecutionRunDetail(runId)).importCandidateExecutionRun ?? null,
     fetchSummary: fetchImportCandidateExecutionSummary,
     loadErrorMessage: 'Import execution summary failed',
     secondaryAction: reconcileImportCandidateExecutionState,
@@ -49,7 +52,10 @@ export function useImportCandidateExecutionSummary({
     isStarting: workflow.isStarting,
     latestRun: workflow.latestRun,
     loadImportCandidateExecutionSummary: workflow.loadRunSummary,
+    loadSelectedImportCandidateExecutionRun: workflow.loadSelectedRunDetail,
     reconcileExecutionState: workflow.runSecondaryAction,
+    runDetailErrorMessage: workflow.runDetailErrorMessage,
+    selectedRunId: workflow.selectedRunId,
     startExecutionRun: workflow.startRunAction,
     summary: workflow.summary,
   };

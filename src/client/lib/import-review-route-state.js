@@ -41,9 +41,15 @@ function normalizeStatusToken(value) {
   }
 }
 
+function normalizeRunId(value) {
+  return normalizeRouteValue(value);
+}
+
 export function normalizeImportReviewRouteState(query = {}) {
   return {
+    applyRunId: normalizeRunId(query.applyRunId),
     candidateId: normalizeRouteValue(query.candidate),
+    executionRunId: normalizeRunId(query.executionRunId),
     folderPath: normalizeRouteValue(query.folderPath),
     sourceSearchId: normalizeRouteValue(query.sourceSearchId),
     status: normalizeStatusToken(query.status),
@@ -52,7 +58,9 @@ export function normalizeImportReviewRouteState(query = {}) {
 }
 
 export function buildImportReviewRouteQuery(state = {}) {
+  const applyRunId = normalizeRunId(state.applyRunId);
   const candidateId = normalizeRouteValue(state.candidateId);
+  const executionRunId = normalizeRunId(state.executionRunId);
   const folderPath = normalizeRouteValue(state.folderPath);
   const sourceSearchId = normalizeRouteValue(state.sourceSearchId);
   const status = typeof state.status === 'string'
@@ -61,8 +69,16 @@ export function buildImportReviewRouteQuery(state = {}) {
   const username = normalizeRouteValue(state.username);
   const query = {};
 
+  if (applyRunId) {
+    query.applyRunId = applyRunId;
+  }
+
   if (candidateId) {
     query.candidate = candidateId;
+  }
+
+  if (executionRunId) {
+    query.executionRunId = executionRunId;
   }
 
   if (folderPath) {
@@ -88,7 +104,9 @@ export function buildImportReviewRouteQuery(state = {}) {
 
 export function getImportReviewRouteStateKey(state) {
   const normalized = normalizeImportReviewRouteState({
+    applyRunId: state?.applyRunId,
     candidate: state?.candidateId,
+    executionRunId: state?.executionRunId,
     folderPath: state?.folderPath,
     sourceSearchId: state?.sourceSearchId,
     status: state?.status === '' ? 'all' : state?.status,
@@ -96,10 +114,32 @@ export function getImportReviewRouteStateKey(state) {
   });
 
   return JSON.stringify([
+    normalized.applyRunId,
     normalized.candidateId,
+    normalized.executionRunId,
     normalized.folderPath,
     normalized.sourceSearchId,
     normalized.status,
     normalized.username,
   ]);
+}
+
+export function buildImportReviewExecutionRunLocation(runId) {
+  return {
+    hash: '#import-execution-run-panel',
+    name: 'review-queue',
+    query: buildImportReviewRouteQuery({
+      executionRunId: runId,
+    }),
+  };
+}
+
+export function buildImportReviewApplyRunLocation(runId) {
+  return {
+    hash: '#import-apply-run-panel',
+    name: 'review-queue',
+    query: buildImportReviewRouteQuery({
+      applyRunId: runId,
+    }),
+  };
 }

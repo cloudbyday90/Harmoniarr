@@ -27,10 +27,11 @@ This component does not define route payloads or screen behavior except where sc
 ## Start Gate
 
 - [ ] Review `docs/DATABASE_MODEL.md` end to end.
-- [ ] Confirm UUID strategy, version-specific Postgres data directory assumptions, and startup guards remain accepted.
+- [x] Confirm UUID strategy, version-specific Postgres data directory assumptions, and startup guards remain accepted.
 - [ ] Confirm the first migration package includes only V1-required tables, constraints, and indexes.
 - [ ] Confirm restore, maintenance-lock, and admin-recovery tables align with the current recovery docs.
 - [ ] Lock timestamp-style migration naming and schema snapshot update rules.
+- [x] Lock surrogate-key default policy on the shared `harmoniarr_generate_uuid()` helper so migration replay and fresh-install snapshots do not drift between `uuidv7()` and fallback UUID generation.
 
 ## Migration Package 1 - Platform And Auth Foundation
 

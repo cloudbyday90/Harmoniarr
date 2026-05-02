@@ -15,11 +15,23 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     startImportCandidateApplyRun: () => {},
   };
   const importCandidateApplySummaryService = {
+    buildImportCandidateApplyRunDetail: () => {},
     buildImportCandidateApplySummary: () => {},
   };
   const importCandidateApplyWorker = {};
+  const importCandidateMediaInspectionRunStore = {};
+  const importCandidateMediaInspectionService = {
+    startImportCandidateMediaInspectionRun: () => {},
+  };
+  const importCandidateMediaInspectionWorker = {};
+  const importCandidateTranscodeRunStore = {};
+  const importCandidateTranscodeService = {
+    startImportCandidateTranscodeRun: () => {},
+  };
+  const importCandidateTranscodeWorker = {};
   const importCandidateFileDecisionService = {
     clearImportCandidateFileDecision: () => {},
+    setImportCandidateFileAllowLossyDerivativeDecision: () => {},
     setImportCandidateFileSkipDecision: () => {},
   };
   const importCandidateExecutionService = {
@@ -38,6 +50,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     reconcileImportCandidateExecutionState: () => {},
   };
   const importCandidateExecutionSummaryService = {
+    buildImportCandidateExecutionRunDetail: () => {},
     buildImportCandidateExecutionSummary: () => {},
   };
   const importCandidateApplyPreviewService = {
@@ -71,6 +84,12 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     importCandidateApplyService,
     importCandidateApplySummaryService,
     importCandidateApplyWorker,
+    importCandidateMediaInspectionRunStore,
+    importCandidateMediaInspectionService,
+    importCandidateMediaInspectionWorker,
+    importCandidateTranscodeRunStore,
+    importCandidateTranscodeService,
+    importCandidateTranscodeWorker,
     importCandidateFileDecisionService,
     importCandidateExecutionRunStore,
     importCandidateExecutionReconciliationService,
@@ -92,6 +111,12 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   assert.equal(importCandidateModule.importCandidateApplyService, importCandidateApplyService);
   assert.equal(importCandidateModule.importCandidateApplySummaryService, importCandidateApplySummaryService);
   assert.equal(importCandidateModule.importCandidateApplyWorker, importCandidateApplyWorker);
+  assert.equal(importCandidateModule.importCandidateMediaInspectionRunStore, importCandidateMediaInspectionRunStore);
+  assert.equal(importCandidateModule.importCandidateMediaInspectionService, importCandidateMediaInspectionService);
+  assert.equal(importCandidateModule.importCandidateMediaInspectionWorker, importCandidateMediaInspectionWorker);
+  assert.equal(importCandidateModule.importCandidateTranscodeRunStore, importCandidateTranscodeRunStore);
+  assert.equal(importCandidateModule.importCandidateTranscodeService, importCandidateTranscodeService);
+  assert.equal(importCandidateModule.importCandidateTranscodeWorker, importCandidateTranscodeWorker);
   assert.equal(importCandidateModule.importCandidateFileDecisionService, importCandidateFileDecisionService);
   assert.equal(importCandidateModule.importCandidateExecutionRunStore, importCandidateExecutionRunStore);
   assert.equal(importCandidateModule.importCandidateExecutionReconciliationService, importCandidateExecutionReconciliationService);
@@ -107,7 +132,9 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   assert.equal(importCandidateModule.importCandidateSelectionSummaryService, importCandidateSelectionSummaryService);
   assert.equal(importCandidateModule.slskdService, slskdService);
   assert.deepEqual(importCandidateModule.routeDependencies, {
+    buildImportCandidateApplyRunDetail: importCandidateApplySummaryService.buildImportCandidateApplyRunDetail,
     buildImportCandidateApplySummary: importCandidateApplySummaryService.buildImportCandidateApplySummary,
+    buildImportCandidateExecutionRunDetail: importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail,
     buildImportCandidateExecutionSummary: importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
@@ -121,8 +148,11 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     reconcileImportCandidateExecutionState: importCandidateExecutionReconciliationService.reconcileImportCandidateExecutionState,
     rejectImportCandidate: importCandidateService.rejectImportCandidate,
     reopenImportCandidate: importCandidateService.reopenImportCandidate,
+    setImportCandidateFileAllowLossyDerivativeDecision: importCandidateFileDecisionService.setImportCandidateFileAllowLossyDerivativeDecision,
     setImportCandidateFileSkipDecision: importCandidateFileDecisionService.setImportCandidateFileSkipDecision,
     startImportCandidateApplyRun: importCandidateApplyService.startImportCandidateApplyRun,
+    startImportCandidateMediaInspectionRun: importCandidateMediaInspectionService.startImportCandidateMediaInspectionRun,
+    startImportCandidateTranscodeRun: importCandidateTranscodeService.startImportCandidateTranscodeRun,
     selectImportCandidate: importCandidateService.selectImportCandidate,
     startImportCandidateExecutionRun: importCandidateExecutionService.startImportCandidateExecutionRun,
   });

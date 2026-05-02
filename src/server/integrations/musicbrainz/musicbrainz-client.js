@@ -16,6 +16,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  normalizeOutboundBaseUrl,
+  resolveAllowedOutboundHosts,
+  resolveAllowedOutboundHostSuffixes,
+} from '../../outbound-url-policy.js';
+
 function parsePositiveInteger(value, fallback) {
   if (value == null || value === '') {
     return fallback;
@@ -61,19 +67,22 @@ function createMusicBrainzError(code, message, details = {}) {
   return error;
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value, { allowedHosts, allowedHostSuffixes }) {
   const candidate = value ?? 'https://musicbrainz.org/ws/2';
 
   try {
-    const normalized = new URL(candidate);
-    const pathname = normalized.pathname.endsWith('/')
-      ? normalized.pathname
-      : `${normalized.pathname}/`;
-
-    normalized.pathname = pathname === '/'
-      ? '/ws/2/'
-      : pathname;
-    return normalized;
+    return normalizeOutboundBaseUrl(candidate, {
+      allowHttp: false,
+      allowedHosts,
+      allowedHostSuffixes,
+      allowHttps: true,
+      allowLocalhost: false,
+      allowPrivateHosts: false,
+      defaultPathname: '/ws/2/',
+      fieldName: 'MUSICBRAINZ_BASE_URL',
+      protocolErrorCode: 'musicbrainz_misconfigured',
+      validationErrorCode: 'musicbrainz_misconfigured',
+    });
   } catch {
     throw createMusicBrainzError(
       'musicbrainz_misconfigured',
@@ -150,6 +159,14 @@ function buildFailureDetails({
 }
 
 export function createMusicBrainzClient({
+  allowedHosts = process.env.MUSICBRAINZ_ALLOWED_HOSTS == null
+    ? ['musicbrainz.org']
+    : resolveAllowedOutboundHosts(process.env.MUSICBRAINZ_ALLOWED_HOSTS, {
+      envName: 'MUSICBRAINZ_ALLOWED_HOSTS',
+    }),
+  allowedHostSuffixes = resolveAllowedOutboundHostSuffixes(process.env.MUSICBRAINZ_ALLOWED_HOST_SUFFIXES, {
+    envName: 'MUSICBRAINZ_ALLOWED_HOST_SUFFIXES',
+  }),
   baseUrl = process.env.MUSICBRAINZ_BASE_URL,
   applicationName = 'Harmoniarr',
   applicationVersion = process.env.HARMONIARR_VERSION ?? '0.1.0-beta',
@@ -161,7 +178,7 @@ export function createMusicBrainzClient({
   fetchImpl = fetch,
   sleepImpl = defaultSleep,
 } = {}) {
-  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl, { allowedHosts, allowedHostSuffixes });
   const effectiveMinIntervalMs = Math.max(parsePositiveInteger(minIntervalMs, 1100), 1000);
   const effectiveRequestTimeoutMs = parsePositiveInteger(requestTimeoutMs, 10000);
   const effectiveMaxRetries = parseNonNegativeInteger(maxRetries, 2);
@@ -212,6 +229,7 @@ export function createMusicBrainzClient({
               Accept: 'application/json',
               'User-Agent': userAgent,
             },
+            redirect: 'error',
             signal: AbortSignal.timeout(effectiveRequestTimeoutMs),
           });
         } catch (error) {

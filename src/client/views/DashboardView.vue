@@ -17,14 +17,26 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import ArtworkSummaryPanel from '../components/ArtworkSummaryPanel.vue';
+import ActivityFeedPanel from '../components/ActivityFeedPanel.vue';
 import DependencyStatusPanel from '../components/DependencyStatusPanel.vue';
+import HeartbeatSummaryPanel from '../components/HeartbeatSummaryPanel.vue';
+import OperatorNotificationsPanel from '../components/OperatorNotificationsPanel.vue';
+import ProviderStatusPanel from '../components/ProviderStatusPanel.vue';
+import {
+  buildDashboardRouteQuery,
+  getDashboardRouteStateKey,
+  normalizeDashboardRouteState,
+} from '../lib/dashboard-route-state.js';
+import { getArtworkMaintenanceStatusClass, getArtworkMaintenanceStatusLabel } from '../lib/artwork-maintenance-status.js';
 import LibraryDiscoverySummaryPanel from '../components/LibraryDiscoverySummaryPanel.vue';
 import LibraryReconciliationSummaryPanel from '../components/LibraryReconciliationSummaryPanel.vue';
 import LibraryScanSummaryPanel from '../components/LibraryScanSummaryPanel.vue';
 import LibraryWantedSummaryPanel from '../components/LibraryWantedSummaryPanel.vue';
 import OnboardingSummaryPanel from '../components/OnboardingSummaryPanel.vue';
+import { useArtworkSummary } from '../composables/useArtworkSummary.js';
 import { useLibraryDiscoverySummary } from '../composables/useLibraryDiscoverySummary.js';
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
 import { useLibraryScanSummary } from '../composables/useLibraryScanSummary.js';
@@ -34,33 +46,73 @@ import { useSystemOverview } from '../composables/useSystemOverview.js';
 
 const route = useRoute();
 const router = useRouter();
+const artworkMaintenancePanelHash = '#artwork-maintenance-panel';
+const libraryDiscoveryPanelHash = '#library-discovery-panel';
+const libraryScanPanelHash = '#library-scan-panel';
 
 const {
+  actionErrorMessage: artworkActionErrorMessage,
+  artworkCleanupHistory,
+  artworkSummary,
+  errorMessage: artworkErrorMessage,
+  inventory: artworkInventory,
+  isLoading: isLoadingArtwork,
+  isLoadingRunDetail: isLoadingArtworkRunDetail,
+  isStarting: isStartingArtworkCleanup,
+  latestRun: latestArtworkRun,
+  loadArtworkSummary,
+  recentRuns,
+  runDetailErrorMessage: artworkRunDetailErrorMessage,
+  selectArtworkCleanupRun,
+  selectedRunDetail,
+  selectedRunId,
+  startArtworkCleanup,
+  summary: artworkMaintenanceSummary,
+} = useArtworkSummary();
+const {
+  artworkMaintenanceSummary: overviewArtworkMaintenanceSummary,
+  activityFeedCheckedAt,
+  activityFeedErrorMessage,
+  activityFeedEntries,
+  hasMoreActivityFeedEntries,
   dependencyStatuses,
   errorMessage,
+  heartbeatSummaries,
   isLoading,
+  isLoadingMoreActivityFeed,
+  operatorNotificationCheckedAt,
+  operatorNotificationCounts,
+  operatorNotifications,
+  loadMoreActivityFeed,
   loadOverview,
   overview,
   pathCards,
   pathValidationSummary,
+  providerStatus,
   statusPills,
 } = useSystemOverview();
 const {
   actionErrorMessage: libraryDiscoveryActionErrorMessage,
+  currentRun: currentLibraryDiscoveryRun,
   errorMessage: libraryDiscoveryErrorMessage,
   isLoading: isLoadingLibraryDiscovery,
   isStarting: isStartingLibraryDiscovery,
   libraryDiscoverySummary,
   loadLibraryDiscoverySummary,
+  runDetailErrorMessage: libraryDiscoveryRunDetailErrorMessage,
+  selectedRunId: selectedLibraryDiscoveryRunId,
   startDiscoveryRun,
 } = useLibraryDiscoverySummary();
 const {
   actionErrorMessage,
+  currentRun: currentLibraryScanRun,
   errorMessage: libraryScanErrorMessage,
   isLoading: isLoadingLibraryScan,
   isStarting: isStartingLibraryScan,
   libraryScanSummary,
   loadLibraryScanSummary,
+  runDetailErrorMessage: libraryScanRunDetailErrorMessage,
+  selectedRunId: selectedLibraryScanRunId,
   startLibraryScan,
 } = useLibraryScanSummary();
 const {
@@ -84,7 +136,8 @@ const {
   loadLibraryWantedSummary,
 } = useLibraryWantedSummary();
 
-const isSetupMode = computed(() => route.query.onboarding === 'setup');
+const dashboardRouteState = computed(() => normalizeDashboardRouteState(route.query));
+const isSetupMode = computed(() => dashboardRouteState.value.onboardingMode === 'setup');
 const showOnboardingSummary = computed(() => (
   isSetupMode.value || (summary.value?.issueCount ?? 0) > 0
 ));
@@ -112,6 +165,19 @@ const showLibraryWantedSummary = computed(() => (
   || libraryWantedErrorMessage.value.length > 0
   || (libraryWantedSummary.value?.monitoredArtistCount ?? 0) > 0
 ));
+const showArtworkSummary = computed(() => (
+  isSetupMode.value
+  || isLoadingArtwork.value
+  || artworkErrorMessage.value.length > 0
+  || (artworkInventory.value?.unassignedAssetCount ?? 0) > 0
+  || latestArtworkRun.value !== null
+  || recentRuns.value.length > 0
+  || artworkMaintenanceSummary.value?.status === 'ready'
+));
+const showOverviewArtworkMaintenance = computed(() => (
+  Boolean(overviewArtworkMaintenanceSummary.value)
+  && (isSetupMode.value || overviewArtworkMaintenanceSummary.value.status !== 'empty')
+));
 
 function statusLabel(status) {
   switch (status) {
@@ -135,20 +201,161 @@ function statusClass(status) {
   }
 }
 
+function buildMergedDashboardRouteQuery(nextState) {
+  const query = { ...route.query };
+  delete query.artworkRunId;
+  delete query.libraryDiscoveryRunId;
+  delete query.libraryScanRunId;
+  delete query.onboarding;
+
+  return {
+    ...query,
+    ...buildDashboardRouteQuery({
+      ...dashboardRouteState.value,
+      ...nextState,
+    }),
+  };
+}
+
+async function replaceDashboardRouteState(nextState, { hash = route.hash } = {}) {
+  const normalizedNextState = normalizeDashboardRouteState({
+    ...dashboardRouteState.value,
+    ...nextState,
+  });
+
+  if (
+    getDashboardRouteStateKey(normalizedNextState) === getDashboardRouteStateKey(dashboardRouteState.value)
+    && hash === route.hash
+  ) {
+    return;
+  }
+
+  await router.replace({
+    hash,
+    query: buildMergedDashboardRouteQuery(normalizedNextState),
+  });
+}
+
+function scrollPanelIntoView(panelId) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.getElementById(panelId)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  });
+}
+
 async function dismissSetupMode() {
-  const nextQuery = { ...route.query };
-  delete nextQuery.onboarding;
-  await router.replace({ query: nextQuery });
+  await replaceDashboardRouteState({ onboardingMode: '' });
+}
+
+async function handleSelectArtworkCleanupRun(runId, { focus = true } = {}) {
+  await selectArtworkCleanupRun(runId);
+  await replaceDashboardRouteState(
+    { artworkRunId: runId ?? '' },
+    { hash: focus ? artworkMaintenancePanelHash : route.hash },
+  );
+
+  if (focus) {
+    await nextTick();
+    scrollPanelIntoView('artwork-maintenance-panel');
+  }
+}
+
+async function handleStartLibraryScan() {
+  await replaceDashboardRouteState({ libraryScanRunId: '' }, { hash: libraryScanPanelHash });
+  await startLibraryScan();
+}
+
+async function handleStartLibraryDiscoveryRun() {
+  await replaceDashboardRouteState({ libraryDiscoveryRunId: '' }, { hash: libraryDiscoveryPanelHash });
+  await startDiscoveryRun();
+}
+
+async function openArtworkMaintenanceFromOverview() {
+  const runId = overviewArtworkMaintenanceSummary.value?.latestRunId ?? selectedRunId.value ?? '';
+
+  if (runId) {
+    await handleSelectArtworkCleanupRun(runId, { focus: true });
+    return;
+  }
+
+  await replaceDashboardRouteState({}, { hash: artworkMaintenancePanelHash });
+  await nextTick();
+  scrollPanelIntoView('artwork-maintenance-panel');
 }
 
 onMounted(() => {
+  void loadArtworkSummary({ preferredRunId: dashboardRouteState.value.artworkRunId || null });
   void loadOverview();
-  void loadLibraryDiscoverySummary();
-  void loadLibraryScanSummary();
+  void loadLibraryDiscoverySummary({ preferredRunId: dashboardRouteState.value.libraryDiscoveryRunId || null });
+  void loadLibraryScanSummary({ preferredRunId: dashboardRouteState.value.libraryScanRunId || null });
   void loadLibraryReconciliationSummary();
   void loadLibraryWantedSummary();
   void loadOnboardingSummary();
 });
+
+watch(
+  () => dashboardRouteState.value.artworkRunId,
+  (nextRunId, previousRunId) => {
+    if (nextRunId === previousRunId) {
+      return;
+    }
+
+    if (!nextRunId) {
+      if (selectedRunId.value !== null) {
+        void loadArtworkSummary({ preferredRunId: null });
+      }
+      return;
+    }
+
+    if (nextRunId !== selectedRunId.value) {
+      void selectArtworkCleanupRun(nextRunId);
+    }
+
+    void nextTick().then(() => scrollPanelIntoView('artwork-maintenance-panel'));
+  },
+);
+
+watch(
+  () => dashboardRouteState.value.libraryScanRunId,
+  (nextRunId, previousRunId) => {
+    if (nextRunId === previousRunId) {
+      return;
+    }
+
+    if (!nextRunId) {
+      if (selectedLibraryScanRunId.value !== null) {
+        void loadLibraryScanSummary({ preferredRunId: null });
+      }
+      return;
+    }
+
+    void loadLibraryScanSummary({ preferredRunId: nextRunId });
+    void nextTick().then(() => scrollPanelIntoView('library-scan-panel'));
+  },
+);
+
+watch(
+  () => dashboardRouteState.value.libraryDiscoveryRunId,
+  (nextRunId, previousRunId) => {
+    if (nextRunId === previousRunId) {
+      return;
+    }
+
+    if (!nextRunId) {
+      if (selectedLibraryDiscoveryRunId.value !== null) {
+        void loadLibraryDiscoverySummary({ preferredRunId: null });
+      }
+      return;
+    }
+
+    void loadLibraryDiscoverySummary({ preferredRunId: nextRunId });
+    void nextTick().then(() => scrollPanelIntoView('library-discovery-panel'));
+  },
+);
 </script>
 
 <template>
@@ -166,15 +373,18 @@ onMounted(() => {
     />
 
     <LibraryScanSummaryPanel
+      id="library-scan-panel"
       v-if="showLibraryScanSummary"
       :action-error-message="actionErrorMessage"
+      :current-run="currentLibraryScanRun"
       :error-message="libraryScanErrorMessage"
       :is-loading="isLoadingLibraryScan"
       :is-setup-mode="isSetupMode"
       :is-starting="isStartingLibraryScan"
+      :run-detail-error-message="libraryScanRunDetailErrorMessage"
       :scan-summary="libraryScanSummary"
       @refresh="loadLibraryScanSummary"
-      @start="startLibraryScan"
+      @start="handleStartLibraryScan"
     />
 
     <LibraryReconciliationSummaryPanel
@@ -186,14 +396,17 @@ onMounted(() => {
     />
 
     <LibraryDiscoverySummaryPanel
+      id="library-discovery-panel"
       :action-error-message="libraryDiscoveryActionErrorMessage"
+      :current-run="currentLibraryDiscoveryRun"
       v-if="showLibraryDiscoverySummary"
       :error-message="libraryDiscoveryErrorMessage"
       :is-loading="isLoadingLibraryDiscovery"
       :is-starting="isStartingLibraryDiscovery"
+      :run-detail-error-message="libraryDiscoveryRunDetailErrorMessage"
       :summary-payload="libraryDiscoverySummary"
       @refresh="loadLibraryDiscoverySummary"
-      @start="startDiscoveryRun"
+      @start="handleStartLibraryDiscoveryRun"
     />
 
     <LibraryWantedSummaryPanel
@@ -202,6 +415,24 @@ onMounted(() => {
       :is-loading="isLoadingLibraryWanted"
       :summary-payload="libraryWantedSummary"
       @refresh="loadLibraryWantedSummary"
+    />
+
+    <ArtworkSummaryPanel
+      id="artwork-maintenance-panel"
+      v-if="showArtworkSummary"
+      :action-error-message="artworkActionErrorMessage"
+      :error-message="artworkErrorMessage"
+      :is-loading="isLoadingArtwork"
+      :is-loading-run-detail="isLoadingArtworkRunDetail"
+      :is-starting="isStartingArtworkCleanup"
+      :run-detail-error-message="artworkRunDetailErrorMessage"
+      :run-history-payload="artworkCleanupHistory"
+      :selected-run-detail-payload="selectedRunDetail"
+      :selected-run-id="selectedRunId"
+      :summary-payload="artworkSummary"
+      @refresh="loadArtworkSummary"
+      @select-run="handleSelectArtworkCleanupRun"
+      @start="startArtworkCleanup"
     />
 
     <article class="panel-dark hero-card compact">
@@ -263,7 +494,57 @@ onMounted(() => {
             <div><dt>Checked</dt><dd>{{ pathValidationSummary.checkedAt ?? 'Not yet recorded' }}</dd></div>
           </dl>
         </article>
+        <article class="panel-light" v-if="showOverviewArtworkMaintenance">
+          <div class="section-header">
+            <div>
+              <h3>Artwork maintenance</h3>
+              <p class="metadata-card-copy">{{ overviewArtworkMaintenanceSummary.message }}</p>
+            </div>
+            <span class="review-status-pill" :class="getArtworkMaintenanceStatusClass(overviewArtworkMaintenanceSummary.status)">
+              {{ getArtworkMaintenanceStatusLabel(overviewArtworkMaintenanceSummary.status) }}
+            </span>
+          </div>
+          <dl>
+            <div><dt>Eligible now</dt><dd>{{ overviewArtworkMaintenanceSummary.eligibleAssetCount }}</dd></div>
+            <div><dt>Unassigned assets</dt><dd>{{ overviewArtworkMaintenanceSummary.unassignedAssetCount }}</dd></div>
+            <div><dt>Latest run</dt><dd>{{ overviewArtworkMaintenanceSummary.latestRunStatus ?? 'Not yet recorded' }}</dd></div>
+            <div><dt>Checked</dt><dd>{{ overviewArtworkMaintenanceSummary.checkedAt ?? 'Not yet recorded' }}</dd></div>
+          </dl>
+          <div class="library-scan-actions">
+            <button type="button" class="review-reset-button" @click="openArtworkMaintenanceFromOverview">
+              {{ overviewArtworkMaintenanceSummary.latestRunId ? 'Open latest run' : 'Open artwork maintenance' }}
+            </button>
+          </div>
+        </article>
       </section>
+
+      <HeartbeatSummaryPanel
+        :heartbeats="heartbeatSummaries"
+        @refresh="loadOverview"
+      />
+
+      <OperatorNotificationsPanel
+        :checked-at="operatorNotificationCheckedAt"
+        :counts="operatorNotificationCounts"
+        :notifications="operatorNotifications"
+        @refresh="loadOverview"
+      />
+
+      <ActivityFeedPanel
+        :checked-at="activityFeedCheckedAt"
+        :entries="activityFeedEntries"
+        :error-message="activityFeedErrorMessage"
+        :has-more="hasMoreActivityFeedEntries"
+        :is-loading-more="isLoadingMoreActivityFeed"
+        @load-more="loadMoreActivityFeed"
+        @refresh="loadOverview"
+      />
+
+      <ProviderStatusPanel
+        v-if="providerStatus"
+        :provider-status="providerStatus"
+        @refresh="loadOverview"
+      />
 
       <DependencyStatusPanel
         :dependencies="dependencyStatuses"

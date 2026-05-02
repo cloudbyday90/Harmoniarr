@@ -147,7 +147,27 @@ export function createLibraryCatalogStore({
     }
   }
 
+  async function updateLibraryFileCanonicalPath({ canonicalPath, fileId, filename, relativePath }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        UPDATE library_files
+        SET canonical_path = $2,
+            relative_path = $3,
+            filename = $4,
+            updated_at = NOW()
+        WHERE id = $1
+          AND deleted_at IS NULL
+        RETURNING id, canonical_path, relative_path, filename
+      `,
+      [fileId, canonicalPath, relativePath, filename],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
   return {
     recordLibraryFiles,
+    updateLibraryFileCanonicalPath,
   };
 }

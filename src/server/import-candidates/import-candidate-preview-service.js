@@ -18,17 +18,15 @@
 
 import { posix as path } from 'node:path';
 import { createApiError } from '../auth.js';
+import { createImportCandidateCanonicalNamingService } from './import-candidate-canonical-naming-service.js';
+import { createLibraryNamingService } from '../library/library-naming-service.js';
+import { createMediaStagingSafetyService } from '../media/media-staging-safety-service.js';
 import { resolveDownloadCandidateFolder } from '../paths/download-path-mapping-service.js';
 import { loadSettings } from '../settings.js';
+import { createImportCandidateMediaPlacementPlanner } from './import-candidate-media-placement-planner.js';
 
 function normalizePathInput(value) {
   return typeof value === 'string' ? value.trim().replaceAll('\\', '/') : '';
-}
-
-function sanitizeFilename(value, fallback) {
-  const normalized = normalizePathInput(value);
-  const basename = normalized.split('/').filter(Boolean).at(-1) ?? fallback;
-  return basename.replace(/[\\/]/g, '_').trim() || fallback;
 }
 
 function buildPathWarning(code, message) {
@@ -48,31 +46,59 @@ function resolveCandidateFolderPath(candidate) {
   return normalizePathInput(candidate.files?.find((file) => normalizePathInput(file.folderPath))?.folderPath);
 }
 
-function buildFilePreview({ candidateId, file, relativeFolderPath, resolvedFolderPath, sourceFolderPath, stagingRoot, musicRoot }) {
-  const filename = sanitizeFilename(file.filename, `candidate-${candidateId}-file`);
+function sanitizeRelativeFolderPath(relativeFolderPath, libraryNamingService, fallbackSegment) {
+  const segments = normalizePathInput(relativeFolderPath).split('/').filter(Boolean);
+  if (!segments.length) {
+    return fallbackSegment;
+  }
+
+  return path.join(...segments.map((segment) => libraryNamingService.sanitizeLibraryPathSegment(segment, {
+    fallback: fallbackSegment,
+  })));
+}
+
+function buildFilePreview({
+  candidateId,
+  file,
+  libraryFolderPath,
+  relativeFolderPath,
+  resolvedFolderPath,
+  sourceFilename,
+  sourceFolderPath,
+  stagingRoot,
+  targetFilename,
+}) {
   const relativeSegments = relativeFolderPath ? relativeFolderPath.split('/').filter(Boolean) : [];
-  const stagingSegments = [stagingRoot, 'import-candidates', candidateId, ...relativeSegments, filename];
-  const librarySegments = [musicRoot, ...(relativeSegments.length ? relativeSegments : [candidateId]), filename];
+  const stagingSegments = [stagingRoot, 'import-candidates', candidateId, ...relativeSegments, targetFilename];
 
   return {
     fileId: file.id,
-    filename,
-    rawSourcePath: sourceFolderPath ? path.join(sourceFolderPath, filename) : null,
-    sourcePath: resolvedFolderPath ? path.join(resolvedFolderPath, filename) : null,
+    filename: targetFilename,
+    rawSourcePath: sourceFolderPath ? path.join(sourceFolderPath, sourceFilename) : null,
+    sourcePath: resolvedFolderPath ? path.join(resolvedFolderPath, sourceFilename) : null,
     stagingPath: path.join(...stagingSegments),
-    libraryPath: path.join(...librarySegments),
+    libraryPath: path.join(libraryFolderPath, targetFilename),
   };
 }
 
 export function createImportCandidatePreviewService({
+  canonicalImportNamingService = createImportCandidateCanonicalNamingService(),
   getImportCandidate,
+  getAppUserById = null,
+  libraryNamingService = createLibraryNamingService(),
   loadSettingsFn = loadSettings,
+  mediaStagingSafetyService = createMediaStagingSafetyService(),
+  mediaPlacementPlanner = createImportCandidateMediaPlacementPlanner(),
 } = {}) {
   if (typeof getImportCandidate !== 'function') {
     throw new Error('createImportCandidatePreviewService requires getImportCandidate');
   }
 
-  async function previewImportCandidate({ importCandidateId }) {
+  if (typeof mediaPlacementPlanner?.planCandidateLibraryPlacement !== 'function') {
+    throw new Error('createImportCandidatePreviewService requires mediaPlacementPlanner.planCandidateLibraryPlacement');
+  }
+
+  async function previewImportCandidate({ importCandidateId, targetUser = null }) {
     const candidate = await getImportCandidate({ importCandidateId });
     if (!candidate) {
       throw createApiError(404, 'import_candidate_not_found', 'Import candidate not found');
@@ -83,29 +109,87 @@ export function createImportCandidatePreviewService({
     const downloadMappings = settings.paths?.downloadMappings ?? [];
     const stagingRoot = settings.paths?.staging;
     const musicRoot = settings.paths?.music;
+    const userMusicRoots = settings.paths?.userMusicRoots ?? [];
     const resolvedFolderPath = resolveCandidateFolderPath(candidate);
     const sourceResolution = resolveDownloadCandidateFolder({
       candidateFolderPath: resolvedFolderPath,
       downloadMappings,
       downloadsRoot,
     });
+    const appUser = targetUser && typeof getAppUserById === 'function'
+      ? await getAppUserById({ userId: targetUser.id })
+      : null;
+    const canonicalNamingPlan = typeof canonicalImportNamingService?.resolveCanonicalImportNaming === 'function'
+      ? await canonicalImportNamingService.resolveCanonicalImportNaming({ candidate })
+      : null;
     const warnings = [
       ...sourceResolution.warnings,
-      buildPathWarning(
-        'naming_preview_mirrors_candidate',
-        'Naming preview currently mirrors the candidate-relative folder and file structure until canonical naming rules are implemented.',
-      ),
     ];
     const blockers = [...sourceResolution.blockers];
-    const filePreviews = candidate.files.map((file) => buildFilePreview({
-      candidateId: candidate.id,
-      file,
-      relativeFolderPath: sourceResolution.relativeFolderPath,
-      resolvedFolderPath: sourceResolution.resolvedFolderPath,
-      sourceFolderPath: sourceResolution.rawSourceFolderPath,
-      stagingRoot,
+    const relativeFolderPath = canonicalNamingPlan?.canApply
+      ? canonicalNamingPlan.relativeFolderPath
+      : sanitizeRelativeFolderPath(
+        sourceResolution.relativeFolderPath || candidate.id,
+        libraryNamingService,
+        candidate.id,
+      );
+    if (canonicalNamingPlan?.warnings?.length) {
+      warnings.push(...canonicalNamingPlan.warnings);
+    }
+    if (!canonicalNamingPlan?.canApply) {
+      warnings.push(buildPathWarning(
+        'naming_preview_mirrors_candidate',
+        'Naming preview mirrors the candidate-relative folder and filename structure when no canonical release naming plan is available.',
+      ));
+    }
+    const libraryPlacement = mediaPlacementPlanner.planCandidateLibraryPlacement({
+      appUsers: appUser ? [appUser] : [],
       musicRoot,
-    }));
+      relativeFolderPath,
+      targetUser,
+      userMusicRoots,
+    });
+    if (targetUser && !libraryPlacement.targetUser?.configured) {
+      warnings.push(buildPathWarning(
+        'per_user_destination_unconfigured',
+        'No configured per-user destination exists for the active app user, so preview falls back to the shared library root until a per-user path is configured in settings.',
+      ));
+    } else if (libraryPlacement.targetUser?.configuredBy === 'settings') {
+      warnings.push(buildPathWarning(
+        'per_user_destination_legacy_settings_fallback',
+        'The active app user is still using the legacy settings-backed destination mapping. Move this root onto the user record to keep provisioning, permissions, and future Plex onboarding in one boundary.',
+      ));
+    }
+    const filePreviews = candidate.files.map((file) => {
+      const safetyAssessment = mediaStagingSafetyService.assessCandidateFile({
+        candidateId: candidate.id,
+        file,
+      });
+      if (safetyAssessment.blockers.length > 0) {
+        blockers.push(...safetyAssessment.blockers);
+      }
+
+      return buildFilePreview({
+        candidateId: candidate.id,
+        file,
+        libraryFolderPath: libraryPlacement.previewFolderPath,
+        relativeFolderPath,
+        resolvedFolderPath: sourceResolution.resolvedFolderPath,
+        sourceFilename: safetyAssessment.sourceFilename,
+        sourceFolderPath: sourceResolution.rawSourceFolderPath,
+        stagingRoot,
+        targetFilename: canonicalNamingPlan?.canApply
+          ? (canonicalNamingPlan.fileNamesById.get(file.id)
+            ?? libraryNamingService.sanitizeLibraryFilename(file.filename, {
+              extension: file.extension,
+              fallback: `candidate-${candidate.id}-file`,
+            }))
+          : libraryNamingService.sanitizeLibraryFilename(file.filename, {
+            extension: file.extension,
+            fallback: `candidate-${candidate.id}-file`,
+          }),
+      });
+    });
 
     return {
       candidate: {
@@ -126,15 +210,19 @@ export function createImportCandidatePreviewService({
       },
       staging: {
         root: stagingRoot,
-        previewFolderPath: path.join(stagingRoot, 'import-candidates', candidate.id, sourceResolution.relativeFolderPath),
+        previewFolderPath: path.join(stagingRoot, 'import-candidates', candidate.id, relativeFolderPath),
       },
       library: {
+        configuredUserRootPaths: libraryPlacement.configuredUserRootPaths,
         root: musicRoot,
-        rootFolderPolicy: 'single_root',
-        previewFolderPath: path.join(musicRoot, sourceResolution.relativeFolderPath || candidate.id),
+        rootFolderPolicy: libraryPlacement.rootFolderPolicy,
+        previewFolderPath: libraryPlacement.previewFolderPath,
+        reusePolicy: libraryPlacement.reusePolicy,
+        targetUser: libraryPlacement.targetUser,
+        userRootPath: libraryPlacement.userRootPath,
       },
       naming: {
-        strategy: 'mirror_candidate_path',
+        strategy: canonicalNamingPlan?.canApply ? canonicalNamingPlan.strategy : 'mirror_candidate_path',
         filePreviews,
       },
       validation: {

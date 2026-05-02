@@ -18,7 +18,12 @@
 
 import { createApp } from 'vue';
 import App from './App.vue';
+import { createAuthFailureHandler } from './lib/auth-failure-handler.js';
+import { setAuthFailureHandler } from './lib/api.js';
 import router from './router.js';
+import { sessionStore } from './state/session.js';
 import './styles.css';
+
+setAuthFailureHandler(createAuthFailureHandler({ router, sessionStore }));
 
 createApp(App).use(router).mount('#app');

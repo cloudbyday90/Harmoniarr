@@ -15,7 +15,7 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS library_file_matches (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   library_file_id UUID NOT NULL REFERENCES library_files(id) ON DELETE CASCADE,
   metadata_artist_id UUID NULL REFERENCES metadata_artists(id) ON DELETE SET NULL,
   metadata_release_group_id UUID NULL REFERENCES metadata_release_groups(id) ON DELETE SET NULL,

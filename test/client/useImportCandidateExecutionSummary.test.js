@@ -100,3 +100,40 @@ test('useImportCandidateExecutionSummary reconciles transfer state and reloads s
   assert.equal(workflow.currentRun.value.id, 'run-3');
   assert.equal(workflow.actionErrorMessage.value, '');
 });
+
+test('useImportCandidateExecutionSummary can load an exact historical run detail independently of the latest summary run', async () => {
+  const workflow = useImportCandidateExecutionSummary({
+    fetchImportCandidateExecutionRunDetail: async (runId) => ({
+      importCandidateExecutionRun: {
+        checkedAt: '2026-05-01T18:00:00.000Z',
+        run: {
+          id: runId,
+          items: [{ id: 'item-older-1' }],
+          status: 'failed',
+        },
+      },
+    }),
+    fetchImportCandidateExecutionSummary: async () => ({
+      importCandidateExecution: {
+        currentRun: {
+          id: 'run-latest',
+          status: 'completed',
+        },
+        latestRun: {
+          id: 'run-latest',
+          status: 'completed',
+        },
+        summary: {
+          status: 'ready',
+          message: 'Latest execution run completed.',
+        },
+      },
+    }),
+  });
+
+  await workflow.loadImportCandidateExecutionSummary({ preferredRunId: 'run-older-44' });
+
+  assert.equal(workflow.selectedRunId.value, 'run-older-44');
+  assert.equal(workflow.currentRun.value.id, 'run-older-44');
+  assert.equal(workflow.runDetailErrorMessage.value, '');
+});

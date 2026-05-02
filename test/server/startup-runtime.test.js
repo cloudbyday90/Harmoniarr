@@ -30,6 +30,31 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       callOrder.push('stop:import');
     },
   };
+  const metadataRefreshHeartbeat = {
+    start() {
+      callOrder.push('start:metadata');
+    },
+    async stop() {
+      callOrder.push('stop:metadata');
+    },
+  };
+  const operationQueueDispatcher = {
+    start() {
+      callOrder.push('start:queue');
+    },
+    async stop() {
+      callOrder.push('stop:queue');
+    },
+  };
+  const operationStrandedRunRecoveryService = {
+    recoverStrandedRuns: async () => ({
+      activeLeaseCount: 0,
+      failedCount: 0,
+      retriedCount: 0,
+      scannedCount: 0,
+      skipped: true,
+    }),
+  };
 
   const server = {
     close(callback) {
@@ -62,7 +87,15 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
       },
       appPort: 4123,
+      artworkModule: {
+        artworkCleanupWorker: {
+          startWorkerRun: async () => {},
+        },
+      },
       importCandidateModule: {
+        importCandidateApplyWorker: {
+          startWorkerRun: async () => {},
+        },
         importCandidateExecutionHeartbeatConfig: {
           intervalMs: 60000,
         },
@@ -72,6 +105,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
         importCandidateExecutionSummaryService: {
           buildImportCandidateExecutionSummary: async () => ({}),
+        },
+        importCandidateExecutionWorker: {
+          startWorkerRun: async () => {},
         },
       },
       libraryModule: {
@@ -85,6 +121,30 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         libraryDiscoverySummaryStore: {
           getLibraryDiscoverySnapshot: async () => null,
         },
+        libraryDiscoveryWorker: {
+          startWorkerRun: async () => {},
+        },
+        libraryScanWorker: {
+          startWorkerRun: async () => {},
+        },
+      },
+      metadataModule: {
+        metadataArtistRefreshService: {
+          startMetadataArtistRefresh: async () => ({ accepted: true }),
+        },
+        metadataRefreshDispatchPolicyService: {
+          resolveDispatchReadiness: () => ({ allowed: true }),
+        },
+        metadataRefreshHeartbeatConfig: {
+          intervalMs: 900000,
+        },
+        metadataRefreshHeartbeatState: { kind: 'metadata-refresh-state' },
+        metadataRefreshSchedulerService: {
+          getNextDueArtist: async () => null,
+        },
+        metadataArtistRefreshWorker: {
+          startWorkerRun: async () => {},
+        },
       },
     }),
     createImportCandidateExecutionHeartbeat: (options) => {
@@ -96,6 +156,43 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       assert.equal(options.intervalMs, 900000);
       assert.equal(typeof options.onError, 'function');
       return libraryDiscoveryHeartbeat;
+    },
+    createMetadataRefreshHeartbeat: (options) => {
+      assert.equal(typeof options.getDependencyHealth, 'function');
+      assert.equal(options.intervalMs, 900000);
+      assert.equal(typeof options.onError, 'function');
+      assert.equal(typeof options.metadataRefreshDispatchPolicyService.resolveDispatchReadiness, 'function');
+      assert.equal(typeof options.metadataRefreshSchedulerService.getNextDueArtist, 'function');
+      assert.equal(typeof options.startMetadataArtistRefresh, 'function');
+      return metadataRefreshHeartbeat;
+    },
+    createOperationQueueDispatcher: ({
+      handlers,
+      onError,
+      operationQueueStore,
+      operationStrandedRunRecoveryService: injectedRecoveryService,
+    }) => {
+      assert.equal(typeof onError, 'function');
+      assert.equal(typeof handlers.artwork_cleanup, 'function');
+      assert.equal(typeof handlers.library_scan, 'function');
+      assert.equal(typeof operationQueueStore.claimNextRunnableRun, 'function');
+      assert.equal(injectedRecoveryService, operationStrandedRunRecoveryService);
+      return operationQueueDispatcher;
+    },
+    createOperationQueueHandlers: ({ artworkModule, importCandidateModule, libraryModule, metadataModule }) => {
+      assert.equal(typeof artworkModule.artworkCleanupWorker.startWorkerRun, 'function');
+      assert.equal(typeof importCandidateModule.importCandidateApplyWorker.startWorkerRun, 'function');
+      assert.equal(typeof libraryModule.libraryScanWorker.startWorkerRun, 'function');
+      assert.equal(typeof metadataModule.metadataArtistRefreshWorker.startWorkerRun, 'function');
+      return {
+        artwork_cleanup: async () => {},
+        library_scan: async () => {},
+        metadata_artist_refresh: async () => {},
+      };
+    },
+    createOperationStrandedRunRecoveryService: ({ operationQueueStore }) => {
+      assert.equal(typeof operationQueueStore.claimNextRunnableRun, 'function');
+      return operationStrandedRunRecoveryService;
     },
     createStartupServiceSupervisor: ({ processEmitter: injectedProcessEmitter }) => {
       assert.equal(injectedProcessEmitter, processEmitter);
@@ -147,15 +244,19 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   });
 
   assert.equal(runtime.server, server);
+  assert.equal(runtime.operationQueueDispatcher, operationQueueDispatcher);
   assert.equal(runtime.libraryDiscoveryHeartbeat, libraryDiscoveryHeartbeat);
   assert.equal(runtime.importExecutionHeartbeat, importExecutionHeartbeat);
-  assert.deepEqual(registeredServices, [libraryDiscoveryHeartbeat, importExecutionHeartbeat]);
+  assert.equal(runtime.metadataRefreshHeartbeat, metadataRefreshHeartbeat);
+  assert.deepEqual(registeredServices, [operationQueueDispatcher, metadataRefreshHeartbeat, libraryDiscoveryHeartbeat, importExecutionHeartbeat]);
   assert.deepEqual(callOrder, [
     'bootstrapSchema',
     'migrations',
     'query:SELECT 1',
     'listen:0.0.0.0:4123',
     'startAll',
+    'start:queue',
+    'start:metadata',
     'start:library',
     'start:import',
   ]);
@@ -173,11 +274,15 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'query:SELECT 1',
     'listen:0.0.0.0:4123',
     'startAll',
+    'start:queue',
+    'start:metadata',
     'start:library',
     'start:import',
     'shutdown',
     'stop:import',
     'stop:library',
+    'stop:metadata',
+    'stop:queue',
     'server.close',
     'closePool',
   ]);
@@ -211,7 +316,15 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         },
       },
       appPort: 4123,
+      artworkModule: {
+        artworkCleanupWorker: {
+          startWorkerRun: async () => {},
+        },
+      },
       importCandidateModule: {
+        importCandidateApplyWorker: {
+          startWorkerRun: async () => {},
+        },
         importCandidateExecutionHeartbeatConfig: {
           intervalMs: 60000,
         },
@@ -221,6 +334,9 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         },
         importCandidateExecutionSummaryService: {
           buildImportCandidateExecutionSummary: async () => ({}),
+        },
+        importCandidateExecutionWorker: {
+          startWorkerRun: async () => {},
         },
       },
       libraryModule: {
@@ -234,6 +350,30 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         libraryDiscoverySummaryStore: {
           getLibraryDiscoverySnapshot: async () => null,
         },
+        libraryDiscoveryWorker: {
+          startWorkerRun: async () => {},
+        },
+        libraryScanWorker: {
+          startWorkerRun: async () => {},
+        },
+      },
+      metadataModule: {
+        metadataArtistRefreshService: {
+          startMetadataArtistRefresh: async () => ({ accepted: true }),
+        },
+        metadataRefreshDispatchPolicyService: {
+          resolveDispatchReadiness: () => ({ allowed: true }),
+        },
+        metadataRefreshHeartbeatConfig: {
+          intervalMs: 900000,
+        },
+        metadataRefreshHeartbeatState: {},
+        metadataRefreshSchedulerService: {
+          getNextDueArtist: async () => null,
+        },
+        metadataArtistRefreshWorker: {
+          startWorkerRun: async () => {},
+        },
       },
     }),
     createImportCandidateExecutionHeartbeat: () => ({
@@ -243,6 +383,20 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
     createLibraryDiscoveryHeartbeat: () => ({
       start() {},
       async stop() {},
+    }),
+    createMetadataRefreshHeartbeat: () => ({
+      start() {},
+      async stop() {},
+    }),
+    createOperationQueueDispatcher: () => ({
+      start() {},
+      async stop() {},
+    }),
+    createOperationQueueHandlers: () => ({
+      artwork_cleanup: async () => {},
+    }),
+    createOperationStrandedRunRecoveryService: () => ({
+      recoverStrandedRuns: async () => ({ skipped: true }),
     }),
     createStartupServiceSupervisor: ({ processEmitter: injectedProcessEmitter }) => ({
       registerService() {},

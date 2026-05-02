@@ -17,16 +17,19 @@
  */
 
 import {
+  fetchImportCandidateApplyRunDetail as defaultFetchImportCandidateApplyRunDetail,
   fetchImportCandidateApplySummary as defaultFetchImportCandidateApplySummary,
   startImportCandidateApplyRun as defaultStartImportCandidateApplyRun,
 } from '../lib/import-candidate-api.js';
 import { useImportCandidateRunSummary } from './useImportCandidateRunSummary.js';
 
 export function useImportCandidateApplySummary({
+  fetchImportCandidateApplyRunDetail = defaultFetchImportCandidateApplyRunDetail,
   fetchImportCandidateApplySummary = defaultFetchImportCandidateApplySummary,
   startImportCandidateApplyRun = defaultStartImportCandidateApplyRun,
 } = {}) {
   const workflow = useImportCandidateRunSummary({
+    fetchRunDetail: async (runId) => (await fetchImportCandidateApplyRunDetail(runId)).importCandidateApplyRun ?? null,
     fetchSummary: fetchImportCandidateApplySummary,
     loadErrorMessage: 'Import apply summary failed',
     startRun: startImportCandidateApplyRun,
@@ -44,6 +47,9 @@ export function useImportCandidateApplySummary({
     isStarting: workflow.isStarting,
     latestRun: workflow.latestRun,
     loadImportCandidateApplySummary: workflow.loadRunSummary,
+    loadSelectedImportCandidateApplyRun: workflow.loadSelectedRunDetail,
+    runDetailErrorMessage: workflow.runDetailErrorMessage,
+    selectedRunId: workflow.selectedRunId,
     startApplyRun: workflow.startRunAction,
     summary: workflow.summary,
   };

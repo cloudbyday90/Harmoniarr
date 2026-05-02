@@ -262,13 +262,20 @@ function normalizeSearchState(payload) {
 }
 
 export function createSlskdService({
+  createSlskdClientFn = createSlskdClient,
+  getClientConfig = async () => ({}),
   providerHealthRecorder = null,
-  slskdClient = createSlskdClient(),
+  slskdClient = null,
 } = {}) {
+  async function withClient(operation) {
+    const client = slskdClient ?? createSlskdClientFn(await getClientConfig());
+    return operation(client);
+  }
+
   async function getConnectionStatus() {
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => slskdClient.getApplicationState(),
+      () => withClient((client) => client.getApplicationState()),
     );
 
     return normalizeServerState(payload);
@@ -277,7 +284,7 @@ export function createSlskdService({
   async function validateAuthentication() {
     const isValid = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => slskdClient.isAuthenticationValid(),
+      () => withClient((client) => client.isAuthenticationValid()),
     );
 
     return {
@@ -316,13 +323,13 @@ export function createSlskdService({
 
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => slskdClient.startSearch({
+      () => withClient((client) => client.startSearch({
         query: normalizedQuery,
         fileLimit: normalizedFileLimit,
         filterResponses: normalizedFilterResponses,
         responseLimit: normalizedResponseLimit,
         searchTimeoutMs: normalizedSearchTimeoutMs,
-      }),
+      })),
     );
 
     return normalizeSearchState(payload);
@@ -333,10 +340,10 @@ export function createSlskdService({
     const normalizedIncludeResponses = normalizeBoolean(includeResponses, false);
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => slskdClient.getSearchState({
+      () => withClient((client) => client.getSearchState({
         searchId: normalizedSearchId,
         includeResponses: normalizedIncludeResponses,
-      }),
+      })),
     );
 
     return normalizeSearchState(payload);
@@ -346,7 +353,7 @@ export function createSlskdService({
     const normalizedSearchId = normalizeSearchId(searchId);
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => slskdClient.getSearchResponses({ searchId: normalizedSearchId }),
+      () => withClient((client) => client.getSearchResponses({ searchId: normalizedSearchId })),
     );
 
     return {
@@ -369,10 +376,10 @@ export function createSlskdService({
 
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => slskdClient.enqueueDownloads({
+      () => withClient((client) => client.enqueueDownloads({
         files: normalizedFiles,
         username: normalizedUsername,
-      }),
+      })),
     );
 
     return normalizeEnqueueResult(payload);
@@ -384,10 +391,10 @@ export function createSlskdService({
       : normalizeSearchId(username);
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => slskdClient.getDownloads({
+      () => withClient((client) => client.getDownloads({
         includeRemoved: normalizeBoolean(includeRemoved, false),
         username: normalizedUsername,
-      }),
+      })),
     );
 
     if (normalizedUsername) {
@@ -405,10 +412,10 @@ export function createSlskdService({
     const normalizedId = normalizeSearchId(id);
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => slskdClient.getDownload({
+      () => withClient((client) => client.getDownload({
         id: normalizedId,
         username: normalizedUsername,
-      }),
+      })),
     );
 
     return normalizeTransfer(payload);

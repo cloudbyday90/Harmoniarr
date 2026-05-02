@@ -18,24 +18,10 @@
 
 import { opendir, realpath, stat } from 'node:fs/promises';
 import { extname, join, relative, sep } from 'node:path';
+import { throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import { isAudioFileExtension } from './library-file-type-policy.js';
 
-const audioExtensions = new Set([
-  '.aac',
-  '.aiff',
-  '.alac',
-  '.ape',
-  '.flac',
-  '.m4a',
-  '.mp3',
-  '.mpc',
-  '.oga',
-  '.ogg',
-  '.opus',
-  '.wav',
-  '.wv',
-]);
-
-export async function executeLibraryScan({ libraryRoot, onFile = null }) {
+export async function executeLibraryScan({ isCancellationRequested = null, libraryRoot, onFile = null, runId = null }) {
   const resolvedRoot = await realpath(libraryRoot);
   const summary = {
     completedAt: new Date().toISOString(),
@@ -53,6 +39,7 @@ export async function executeLibraryScan({ libraryRoot, onFile = null }) {
 
     const directory = await opendir(directoryPath);
     for await (const entry of directory) {
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
       const entryPath = join(directoryPath, entry.name);
 
       if (entry.isDirectory()) {
@@ -73,7 +60,7 @@ export async function executeLibraryScan({ libraryRoot, onFile = null }) {
 
       const entryStats = await stat(entryPath);
       const normalizedExtension = extname(entry.name).toLowerCase();
-      const isAudioFile = audioExtensions.has(normalizedExtension);
+      const isAudioFile = isAudioFileExtension(normalizedExtension);
       summary.totalBytes += Number(entryStats.size ?? 0);
 
       if (isAudioFile) {

@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../auth.js';
 import { listImportExecutionRunItems } from './import-candidate-execution-repository.js';
 import { resolveImportCandidateExecutionHeartbeatConfig } from './import-candidate-execution-heartbeat-config.js';
 import { resolveImportCandidateExecutionMissingTransferConfig } from './import-candidate-execution-missing-transfer-config.js';
@@ -320,7 +321,21 @@ export function createImportCandidateExecutionSummaryService({
     };
   }
 
+  async function buildImportCandidateExecutionRunDetail({ runId }) {
+    const run = await importCandidateExecutionRunStore.getRunById(runId);
+
+    if (!run) {
+      throw createApiError(404, 'import_candidate_execution_run_not_found', 'Import execution run not found');
+    }
+
+    return {
+      checkedAt: new Date().toISOString(),
+      run: await buildRunWithItems(run),
+    };
+  }
+
   return {
+    buildImportCandidateExecutionRunDetail,
     buildImportCandidateExecutionSummary,
   };
 }

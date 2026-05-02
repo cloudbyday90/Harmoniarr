@@ -19,6 +19,7 @@
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies({
   getRequestMetadata,
@@ -52,7 +53,9 @@ function importCandidateRoute(handler) {
 }
 
 export function registerImportCandidateRoutes(app, {
+  buildImportCandidateApplyRunDetail,
   buildImportCandidateApplySummary,
+  buildImportCandidateExecutionRunDetail,
   buildImportCandidateExecutionSummary,
   buildImportPendingCandidateSummary,
   buildSelectedImportCandidateSummary,
@@ -61,17 +64,27 @@ export function registerImportCandidateRoutes(app, {
   getImportCandidate,
   holdImportCandidate,
   ingestSlskdSearchResponses,
+  limitImportCandidateApplyRun = skipRateLimitMiddleware,
+  limitImportCandidateMediaInspectionRun = skipRateLimitMiddleware,
+  limitImportCandidateTranscodeRun = skipRateLimitMiddleware,
+  limitImportCandidateExecutionReconcile = skipRateLimitMiddleware,
+  limitImportCandidateExecutionRun = skipRateLimitMiddleware,
+  limitImportCandidateSlskdIngest = skipRateLimitMiddleware,
   listImportCandidates,
   previewImportCandidateApply,
   previewImportCandidate,
   reconcileImportCandidateExecutionState,
   rejectImportCandidate,
   requireCsrf: requireCsrfFn = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshAdminSession: requireFreshAdminSessionFn = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession: requireSessionFn = defaultRequestAuthDependencies.requireSession,
   reopenImportCandidate,
+  setImportCandidateFileAllowLossyDerivativeDecision,
   setImportCandidateFileSkipDecision,
   selectImportCandidate,
   startImportCandidateApplyRun,
+  startImportCandidateMediaInspectionRun,
+  startImportCandidateTranscodeRun,
   startImportCandidateExecutionRun,
 }) {
   app.get('/api/v1/import-candidates', importCandidateRoute(async (request, response) => {
@@ -99,6 +112,17 @@ export function registerImportCandidateRoutes(app, {
     });
   }));
 
+  app.get('/api/v1/import-candidates/execution-runs/:runId', importCandidateRoute(async (request, response) => {
+    await requireSessionFn(request);
+
+    response.json({
+      ok: true,
+      importCandidateExecutionRun: await buildImportCandidateExecutionRunDetail({
+        runId: request.params.runId,
+      }),
+    });
+  }));
+
   app.get('/api/v1/import-candidates/apply-summary', importCandidateRoute(async (request, response) => {
     await requireSessionFn(request);
 
@@ -108,8 +132,19 @@ export function registerImportCandidateRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/import-candidates/execution-runs', importCandidateRoute(async (request, response) => {
-    const session = await requireSessionFn(request);
+  app.get('/api/v1/import-candidates/apply-runs/:runId', importCandidateRoute(async (request, response) => {
+    await requireSessionFn(request);
+
+    response.json({
+      ok: true,
+      importCandidateApplyRun: await buildImportCandidateApplyRunDetail({
+        runId: request.params.runId,
+      }),
+    });
+  }));
+
+  app.post('/api/v1/import-candidates/execution-runs', limitImportCandidateExecutionRun, importCandidateRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
     requireCsrfFn(request, session);
 
     response.status(202).json({
@@ -121,8 +156,8 @@ export function registerImportCandidateRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/import-candidates/apply-runs', importCandidateRoute(async (request, response) => {
-    const session = await requireSessionFn(request);
+  app.post('/api/v1/import-candidates/apply-runs', limitImportCandidateApplyRun, importCandidateRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
     requireCsrfFn(request, session);
 
     response.status(202).json({
@@ -134,8 +169,34 @@ export function registerImportCandidateRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/import-candidates/execution-reconcile', importCandidateRoute(async (request, response) => {
-    const session = await requireSessionFn(request);
+  app.post('/api/v1/import-candidates/media-inspection-runs', limitImportCandidateMediaInspectionRun, importCandidateRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
+    requireCsrfFn(request, session);
+
+    response.status(202).json({
+      ok: true,
+      ...await startImportCandidateMediaInspectionRun({
+        requestMetadata: getRequestMetadataFn(request),
+        triggeredByUserId: session.appUserId,
+      }),
+    });
+  }));
+
+  app.post('/api/v1/import-candidates/transcode-runs', limitImportCandidateTranscodeRun, importCandidateRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
+    requireCsrfFn(request, session);
+
+    response.status(202).json({
+      ok: true,
+      ...await startImportCandidateTranscodeRun({
+        requestMetadata: getRequestMetadataFn(request),
+        triggeredByUserId: session.appUserId,
+      }),
+    });
+  }));
+
+  app.post('/api/v1/import-candidates/execution-reconcile', limitImportCandidateExecutionReconcile, importCandidateRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
     requireCsrfFn(request, session);
 
     response.json({
@@ -148,23 +209,25 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/selected-summary', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    const session = await requireSessionFn(request);
 
     response.json({
       ok: true,
       selectedImportCandidates: await buildSelectedImportCandidateSummary({
         limit: request.query.limit,
+        targetUser: { id: session.appUserId },
       }),
     });
   }));
 
   app.get('/api/v1/import-candidates/import-pending-summary', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    const session = await requireSessionFn(request);
 
     response.json({
       ok: true,
       importPendingCandidates: await buildImportPendingCandidateSummary({
         limit: request.query.limit,
+        targetUser: { id: session.appUserId },
       }),
     });
   }));
@@ -181,30 +244,32 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/:importCandidateId/preview', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    const session = await requireSessionFn(request);
 
     response.json({
       ok: true,
       importCandidatePreview: await previewImportCandidate({
         importCandidateId: request.params.importCandidateId,
+        targetUser: { id: session.appUserId },
       }),
     });
   }));
 
   app.get('/api/v1/import-candidates/:importCandidateId/apply-preview', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    const session = await requireSessionFn(request);
 
     response.json({
       ok: true,
       importCandidateApplyPreview: await previewImportCandidateApply({
         importCandidateId: request.params.importCandidateId,
+        targetUser: { id: session.appUserId },
       }),
     });
   }));
 
   function registerFileDecisionRoute(path, decisionHandler, responseKey) {
     app.post(path, importCandidateRoute(async (request, response) => {
-      const session = await requireSessionFn(request);
+      const session = await requireFreshAdminSessionFn(request);
       requireCsrfFn(request, session);
 
       response.json({
@@ -226,6 +291,11 @@ export function registerImportCandidateRoutes(app, {
     'importCandidateFileDecision',
   );
   registerFileDecisionRoute(
+    '/api/v1/import-candidates/:importCandidateId/files/:importCandidateFileId/allow-lossy-derivative',
+    setImportCandidateFileAllowLossyDerivativeDecision,
+    'importCandidateFileDecision',
+  );
+  registerFileDecisionRoute(
     '/api/v1/import-candidates/:importCandidateId/files/:importCandidateFileId/clear-decision',
     clearImportCandidateFileDecision,
     'importCandidateFileDecision',
@@ -233,7 +303,7 @@ export function registerImportCandidateRoutes(app, {
 
   function registerReviewTransition(path, transitionCandidate) {
     app.post(path, importCandidateRoute(async (request, response) => {
-      const session = await requireSessionFn(request);
+      const session = await requireFreshAdminSessionFn(request);
       requireCsrfFn(request, session);
 
       response.json({
@@ -253,8 +323,8 @@ export function registerImportCandidateRoutes(app, {
   registerReviewTransition('/api/v1/import-candidates/:importCandidateId/reject', rejectImportCandidate);
   registerReviewTransition('/api/v1/import-candidates/:importCandidateId/reopen', reopenImportCandidate);
 
-  app.post('/api/v1/import-candidates/slskd/searches/:searchId', importCandidateRoute(async (request, response) => {
-    const session = await requireSessionFn(request);
+  app.post('/api/v1/import-candidates/slskd/searches/:searchId', limitImportCandidateSlskdIngest, importCandidateRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
     requireCsrfFn(request, session);
 
     const result = await ingestSlskdSearchResponses({

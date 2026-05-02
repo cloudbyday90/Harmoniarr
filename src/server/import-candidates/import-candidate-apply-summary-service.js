@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../auth.js';
 import { listImportApplyRunItems } from './import-candidate-apply-repository.js';
 import { listImportOperations } from './import-candidate-operation-repository.js';
 import { createImportCandidateApplyRunStore } from './import-candidate-apply-run-store.js';
@@ -127,7 +128,21 @@ export function createImportCandidateApplySummaryService({
     };
   }
 
+  async function buildImportCandidateApplyRunDetail({ runId }) {
+    const run = await importCandidateApplyRunStore.getRunById(runId);
+
+    if (!run) {
+      throw createApiError(404, 'import_candidate_apply_run_not_found', 'Import apply run not found');
+    }
+
+    return {
+      checkedAt: new Date().toISOString(),
+      run: await buildRunWithItems(run),
+    };
+  }
+
   return {
+    buildImportCandidateApplyRunDetail,
     buildImportCandidateApplySummary,
   };
 }

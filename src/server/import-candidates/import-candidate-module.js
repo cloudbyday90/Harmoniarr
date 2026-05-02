@@ -23,6 +23,12 @@ import { createImportCandidateApplyRunStore } from './import-candidate-apply-run
 import { createImportCandidateApplyService } from './import-candidate-apply-service.js';
 import { createImportCandidateApplySummaryService } from './import-candidate-apply-summary-service.js';
 import { createImportCandidateApplyWorker } from './import-candidate-apply-worker.js';
+import { createImportCandidateMediaInspectionRunStore } from './import-candidate-media-inspection-run-store.js';
+import { createImportCandidateMediaInspectionService } from './import-candidate-media-inspection-service.js';
+import { createImportCandidateMediaInspectionWorker } from './import-candidate-media-inspection-worker.js';
+import { createImportCandidateTranscodeRunStore } from './import-candidate-transcode-run-store.js';
+import { createImportCandidateTranscodeService } from './import-candidate-transcode-service.js';
+import { createImportCandidateTranscodeWorker } from './import-candidate-transcode-worker.js';
 import { createImportCandidateFileDecisionService } from './import-candidate-file-decision-service.js';
 import { createImportCandidateExecutionRunStore } from './import-candidate-execution-run-store.js';
 import { resolveImportCandidateExecutionHeartbeatConfig } from './import-candidate-execution-heartbeat-config.js';
@@ -37,19 +43,45 @@ import { replaceImportExecutionRunItems, updateImportExecutionRunItem } from './
 import { createImportCandidateService } from './import-candidate-service.js';
 import { createImportCandidatePreviewService } from './import-candidate-preview-service.js';
 import { createImportCandidateSelectionSummaryService } from './import-candidate-selection-summary-service.js';
+import { createMediaInspectionService } from '../media/media-inspection-service.js';
+import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
+import { createMediaTranscodeExecutionService } from '../media/media-transcode-execution-service.js';
+import { createMediaTranscodePlanningService } from '../media/media-transcode-planning-service.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
 
 export function createImportCandidateModule({
+  getMediaToolingStatus = async () => ({
+    details: {
+      ffmpegAvailable: true,
+      ffprobeAvailable: true,
+    },
+    status: 'healthy',
+  }),
+  getAppUserById = null,
   slskdService,
+  mediaInspectionService = createMediaInspectionService({
+    getMediaToolingStatus,
+  }),
+  mediaTranscodeExecutionService = createMediaTranscodeExecutionService({
+    getMediaToolingStatus,
+  }),
+  mediaLosslessRetentionPolicyService = createMediaLosslessRetentionPolicyService(),
+  mediaTranscodePlanningService = createMediaTranscodePlanningService(),
   importCandidateService = createImportCandidateService({ slskdService }),
   importCandidatePreviewService = createImportCandidatePreviewService({
     getImportCandidate: importCandidateService.getImportCandidate,
+    getAppUserById,
   }),
   importCandidateApplyPreviewService = createImportCandidateApplyPreviewService({
     listImportCandidateFileDecisions,
+    mediaInspectionService,
+    mediaLosslessRetentionPolicyService,
+    mediaTranscodePlanningService,
     previewImportCandidate: importCandidatePreviewService.previewImportCandidate,
   }),
-  importCandidateApplyOperationService = createImportCandidateApplyOperationService(),
+  importCandidateApplyOperationService = createImportCandidateApplyOperationService({
+    mediaTranscodeExecutionService,
+  }),
   importCandidateSelectionSummaryService = createImportCandidateSelectionSummaryService({
     listImportCandidates: importCandidateService.listImportCandidates,
     previewImportCandidate: importCandidatePreviewService.previewImportCandidate,
@@ -63,6 +95,8 @@ export function createImportCandidateModule({
   slskdTransferSnapshotService = createSlskdTransferSnapshotService({
     getDownloads: slskdService.getDownloads,
   }),
+  importCandidateMediaInspectionRunStore = createImportCandidateMediaInspectionRunStore(),
+  importCandidateTranscodeRunStore = createImportCandidateTranscodeRunStore(),
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
   importCandidateFileDecisionService = createImportCandidateFileDecisionService({
@@ -73,12 +107,15 @@ export function createImportCandidateModule({
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     enqueueDownloads: slskdService.enqueueDownloads,
     getImportCandidate: importCandidateService.getImportCandidate,
+    isCancellationRequested: importCandidateExecutionRunStore.isCancellationRequested,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
     markImportCandidateDownloading: importCandidateService.markImportCandidateDownloading,
+    markRunCancelled: importCandidateExecutionRunStore.markRunCancelled,
     markRunCompleted: importCandidateExecutionRunStore.markRunCompleted,
     markRunFailed: importCandidateExecutionRunStore.markRunFailed,
     markRunStarted: importCandidateExecutionRunStore.markRunStarted,
     releaseLease: importCandidateExecutionRunStore.releaseLease,
+    renewLease: importCandidateExecutionRunStore.renewLease,
     replaceImportExecutionRunItems,
     updateImportExecutionRunItem,
   }),
@@ -86,26 +123,63 @@ export function createImportCandidateModule({
     acquireLease: importCandidateApplyRunStore.acquireLease,
     applyImportCandidatePreview: importCandidateApplyOperationService.applyImportCandidatePreview,
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
+    isCancellationRequested: importCandidateApplyRunStore.isCancellationRequested,
     markImportCandidateApplied: importCandidateService.markImportCandidateApplied,
+    markRunCancelled: importCandidateApplyRunStore.markRunCancelled,
     markRunCompleted: importCandidateApplyRunStore.markRunCompleted,
     markRunFailed: importCandidateApplyRunStore.markRunFailed,
     markRunStarted: importCandidateApplyRunStore.markRunStarted,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     releaseLease: importCandidateApplyRunStore.releaseLease,
+    renewLease: importCandidateApplyRunStore.renewLease,
     replaceImportApplyRunItems,
     updateImportApplyRunItem,
+  }),
+  importCandidateMediaInspectionWorker = createImportCandidateMediaInspectionWorker({
+    acquireLease: importCandidateMediaInspectionRunStore.acquireLease,
+    buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
+    isCancellationRequested: importCandidateMediaInspectionRunStore.isCancellationRequested,
+    markRunCancelled: importCandidateMediaInspectionRunStore.markRunCancelled,
+    markRunCompleted: importCandidateMediaInspectionRunStore.markRunCompleted,
+    markRunFailed: importCandidateMediaInspectionRunStore.markRunFailed,
+    markRunStarted: importCandidateMediaInspectionRunStore.markRunStarted,
+    previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
+    releaseLease: importCandidateMediaInspectionRunStore.releaseLease,
+    renewLease: importCandidateMediaInspectionRunStore.renewLease,
+  }),
+  importCandidateTranscodeWorker = createImportCandidateTranscodeWorker({
+    acquireLease: importCandidateTranscodeRunStore.acquireLease,
+    buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
+    executeTranscodeCandidate: mediaTranscodeExecutionService.executeCandidate,
+    isCancellationRequested: importCandidateTranscodeRunStore.isCancellationRequested,
+    markRunCancelled: importCandidateTranscodeRunStore.markRunCancelled,
+    markRunCompleted: importCandidateTranscodeRunStore.markRunCompleted,
+    markRunFailed: importCandidateTranscodeRunStore.markRunFailed,
+    markRunStarted: importCandidateTranscodeRunStore.markRunStarted,
+    previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
+    releaseLease: importCandidateTranscodeRunStore.releaseLease,
+    renewLease: importCandidateTranscodeRunStore.renewLease,
   }),
   importCandidateExecutionService = createImportCandidateExecutionService({
     createOperationRun: importCandidateExecutionRunStore.createOperationRun,
     getActiveRun: importCandidateExecutionRunStore.getActiveRun,
     listImportCandidates: importCandidateService.listImportCandidates,
-    startWorkerRun: importCandidateExecutionWorker.startWorkerRun,
   }),
   importCandidateApplyService = createImportCandidateApplyService({
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
     createOperationRun: importCandidateApplyRunStore.createOperationRun,
     getActiveRun: importCandidateApplyRunStore.getActiveRun,
-    startWorkerRun: importCandidateApplyWorker.startWorkerRun,
+  }),
+  importCandidateMediaInspectionService = createImportCandidateMediaInspectionService({
+    createOperationRun: importCandidateMediaInspectionRunStore.createOperationRun,
+    getActiveRun: importCandidateMediaInspectionRunStore.getActiveRun,
+    listImportCandidates: importCandidateService.listImportCandidates,
+  }),
+  importCandidateTranscodeService = createImportCandidateTranscodeService({
+    buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
+    createOperationRun: importCandidateTranscodeRunStore.createOperationRun,
+    getActiveRun: importCandidateTranscodeRunStore.getActiveRun,
+    previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
   }),
   importCandidateExecutionSummaryService = createImportCandidateExecutionSummaryService({
     buildTransferSnapshot: slskdTransferSnapshotService.buildTransferSnapshot,
@@ -127,6 +201,12 @@ export function createImportCandidateModule({
 } = {}) {
   return {
     importCandidateApplyOperationService,
+    importCandidateMediaInspectionRunStore,
+    importCandidateMediaInspectionService,
+    importCandidateMediaInspectionWorker,
+    importCandidateTranscodeRunStore,
+    importCandidateTranscodeService,
+    importCandidateTranscodeWorker,
     importCandidateApplyRunStore,
     importCandidateApplyService,
     importCandidateApplySummaryService,
@@ -145,7 +225,9 @@ export function createImportCandidateModule({
     importCandidateSelectionSummaryService,
     importCandidateService,
     routeDependencies: {
+      buildImportCandidateApplyRunDetail: importCandidateApplySummaryService.buildImportCandidateApplyRunDetail,
       buildImportCandidateApplySummary: importCandidateApplySummaryService.buildImportCandidateApplySummary,
+      buildImportCandidateExecutionRunDetail: importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail,
       buildImportCandidateExecutionSummary: importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
       buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
       buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
@@ -159,8 +241,11 @@ export function createImportCandidateModule({
       reconcileImportCandidateExecutionState: importCandidateExecutionReconciliationService.reconcileImportCandidateExecutionState,
       rejectImportCandidate: importCandidateService.rejectImportCandidate,
       reopenImportCandidate: importCandidateService.reopenImportCandidate,
+      setImportCandidateFileAllowLossyDerivativeDecision: importCandidateFileDecisionService.setImportCandidateFileAllowLossyDerivativeDecision,
       setImportCandidateFileSkipDecision: importCandidateFileDecisionService.setImportCandidateFileSkipDecision,
       startImportCandidateApplyRun: importCandidateApplyService.startImportCandidateApplyRun,
+      startImportCandidateMediaInspectionRun: importCandidateMediaInspectionService.startImportCandidateMediaInspectionRun,
+      startImportCandidateTranscodeRun: importCandidateTranscodeService.startImportCandidateTranscodeRun,
       selectImportCandidate: importCandidateService.selectImportCandidate,
       startImportCandidateExecutionRun: importCandidateExecutionService.startImportCandidateExecutionRun,
     },

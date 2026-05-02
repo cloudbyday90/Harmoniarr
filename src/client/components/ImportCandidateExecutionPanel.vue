@@ -42,6 +42,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  runDetailErrorMessage: {
+    type: String,
+    default: '',
+  },
   selectedCandidateCount: {
     type: Number,
     default: 0,
@@ -295,6 +299,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
       <p>{{ errorMessage }}</p>
     </article>
 
+    <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
     <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !currentRun">

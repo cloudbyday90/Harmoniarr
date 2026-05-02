@@ -21,7 +21,12 @@ import { createApp } from './app.js';
 import { createImportCandidateExecutionHeartbeat } from './import-candidates/import-candidate-execution-heartbeat.js';
 import { createLibraryDiscoveryHeartbeat } from './library/library-discovery-heartbeat.js';
 import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discovery-heartbeat-config.js';
+import { createMetadataRefreshHeartbeat } from './metadata/metadata-refresh-heartbeat.js';
 import { assertNoPendingMigrations } from './migrations.js';
+import { createOperationQueueDispatcher } from './operation-queue-dispatcher.js';
+import { createOperationQueueHandlers } from './operation-queue-handlers.js';
+import { createOperationQueueStore } from './operation-queue-store.js';
+import { createOperationStrandedRunRecoveryService } from './operation-stranded-run-recovery-service.js';
 import { createRuntimeReporter } from './runtime-reporter.js';
 import { bootstrapDatabaseSchemaFromSnapshot } from './schema-bootstrap.js';
 import { createStartupServiceSupervisor } from './startup-service-supervisor.js';
@@ -45,6 +50,11 @@ export async function startServerRuntime({
   createApp: buildApp = createApp,
   createImportCandidateExecutionHeartbeat: buildImportCandidateExecutionHeartbeat = createImportCandidateExecutionHeartbeat,
   createLibraryDiscoveryHeartbeat: buildLibraryDiscoveryHeartbeat = createLibraryDiscoveryHeartbeat,
+  createMetadataRefreshHeartbeat: buildMetadataRefreshHeartbeat = createMetadataRefreshHeartbeat,
+  createOperationQueueDispatcher: buildOperationQueueDispatcher = createOperationQueueDispatcher,
+  createOperationQueueHandlers: buildOperationQueueHandlers = createOperationQueueHandlers,
+  createOperationQueueStore: buildOperationQueueStore = createOperationQueueStore,
+  createOperationStrandedRunRecoveryService: buildOperationStrandedRunRecoveryService = createOperationStrandedRunRecoveryService,
   createStartupServiceSupervisor: buildStartupServiceSupervisor = createStartupServiceSupervisor,
   bootstrapDatabaseSchemaFromSnapshot: bootstrapSchemaFromSnapshot = bootstrapDatabaseSchemaFromSnapshot,
   getPool: resolvePool = getPool,
@@ -70,7 +80,17 @@ export async function startServerRuntime({
   await verifyNoPendingMigrations();
   await resolvePool().query('SELECT 1');
 
-  const { app, appPort, importCandidateModule, libraryModule } = buildApp();
+  const {
+    app,
+    appPort,
+    artworkModule,
+    importCandidateModule,
+    libraryModule,
+    metadataModule,
+    systemModule,
+  } = buildApp();
+  const getDependencyHealth = systemModule?.dependencyHealthService?.getDependencyHealth
+    ?? (async () => []);
   const libraryDiscoveryHeartbeatConfig = buildLibraryDiscoveryHeartbeatConfig();
   const libraryDiscoveryHeartbeat = buildLibraryDiscoveryHeartbeat({
     getActiveRun: libraryModule.libraryDiscoveryRunStore.getActiveRun,
@@ -91,12 +111,45 @@ export async function startServerRuntime({
     },
     reconcileImportCandidateExecutionState: importCandidateModule.importCandidateExecutionReconciliationService.reconcileImportCandidateExecutionState,
   });
+  const metadataRefreshHeartbeat = buildMetadataRefreshHeartbeat({
+    getDependencyHealth,
+    intervalMs: metadataModule.metadataRefreshHeartbeatConfig.intervalMs,
+    metadataRefreshDispatchPolicyService: metadataModule.metadataRefreshDispatchPolicyService,
+    metadataRefreshHeartbeatState: metadataModule.metadataRefreshHeartbeatState,
+    metadataRefreshSchedulerService: metadataModule.metadataRefreshSchedulerService,
+    onError: (error) => {
+      runtimeReporter.writeError(error, { label: 'metadata refresh heartbeat failed' });
+    },
+    startMetadataArtistRefresh: metadataModule.metadataArtistRefreshService.startMetadataArtistRefresh,
+  });
+  const operationQueueStore = buildOperationQueueStore();
+  const operationStrandedRunRecoveryService = buildOperationStrandedRunRecoveryService({
+    operationQueueStore,
+  });
+  const operationQueueDispatcher = buildOperationQueueDispatcher({
+    handlers: buildOperationQueueHandlers({
+      artworkModule,
+      importCandidateModule,
+      libraryModule,
+      metadataModule,
+      systemModule,
+    }),
+    onError: (error, { run } = {}) => {
+      runtimeReporter.writeError(error, {
+        label: run?.id ? `operation queue dispatch failed for ${run.id}` : 'operation queue dispatch failed',
+      });
+    },
+    operationQueueStore,
+    operationStrandedRunRecoveryService,
+  });
 
   const server = app.listen(appPort, host, () => {
     runtimeReporter.writeInfo(`listening on ${host}:${appPort}`);
   });
   const startupServiceSupervisor = buildStartupServiceSupervisor({ processEmitter });
 
+  startupServiceSupervisor.registerService(operationQueueDispatcher);
+  startupServiceSupervisor.registerService(metadataRefreshHeartbeat);
   startupServiceSupervisor.registerService(libraryDiscoveryHeartbeat);
   startupServiceSupervisor.registerService(importExecutionHeartbeat);
   startupServiceSupervisor.startAll();
@@ -118,6 +171,8 @@ export async function startServerRuntime({
   return {
     importExecutionHeartbeat,
     libraryDiscoveryHeartbeat,
+    metadataRefreshHeartbeat,
+    operationQueueDispatcher,
     server,
     startupServiceSupervisor,
   };

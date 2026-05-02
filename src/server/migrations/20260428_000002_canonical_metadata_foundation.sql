@@ -15,7 +15,7 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS metadata_artists (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   source_provider TEXT NOT NULL,
   source_artist_id TEXT NOT NULL,
   musicbrainz_artist_id UUID NULL,
@@ -38,7 +38,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS metadata_artists_musicbrainz_artist_id_unique
   WHERE musicbrainz_artist_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS metadata_artist_aliases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   alias TEXT NOT NULL,
   locale TEXT NULL,
@@ -53,7 +53,7 @@ CREATE INDEX IF NOT EXISTS metadata_artist_aliases_artist_lookup_idx
   ON metadata_artist_aliases (metadata_artist_id, is_primary DESC, created_at ASC);
 
 CREATE TABLE IF NOT EXISTS metadata_release_groups (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   source_provider TEXT NOT NULL,
   source_release_group_id TEXT NOT NULL,
@@ -78,7 +78,7 @@ CREATE INDEX IF NOT EXISTS metadata_release_groups_artist_lookup_idx
   ON metadata_release_groups (metadata_artist_id, created_at ASC);
 
 CREATE TABLE IF NOT EXISTS metadata_releases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_release_group_id UUID NOT NULL REFERENCES metadata_release_groups(id) ON DELETE CASCADE,
   source_provider TEXT NOT NULL,
   source_release_id TEXT NOT NULL,
@@ -106,7 +106,7 @@ CREATE INDEX IF NOT EXISTS metadata_releases_release_group_lookup_idx
   ON metadata_releases (metadata_release_group_id, created_at ASC);
 
 CREATE TABLE IF NOT EXISTS metadata_media (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_release_id UUID NOT NULL REFERENCES metadata_releases(id) ON DELETE CASCADE,
   position INTEGER NOT NULL CHECK (position > 0),
   title TEXT NULL,
@@ -121,7 +121,7 @@ CREATE INDEX IF NOT EXISTS metadata_media_release_lookup_idx
   ON metadata_media (metadata_release_id, position ASC);
 
 CREATE TABLE IF NOT EXISTS metadata_recordings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   source_provider TEXT NOT NULL,
   source_recording_id TEXT NOT NULL,
   musicbrainz_recording_id UUID NULL,
@@ -140,7 +140,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS metadata_recordings_musicbrainz_recording_id_u
   WHERE musicbrainz_recording_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS metadata_tracks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_medium_id UUID NOT NULL REFERENCES metadata_media(id) ON DELETE CASCADE,
   metadata_recording_id UUID NULL REFERENCES metadata_recordings(id) ON DELETE SET NULL,
   position INTEGER NOT NULL CHECK (position > 0),
@@ -161,7 +161,7 @@ CREATE INDEX IF NOT EXISTS metadata_tracks_recording_lookup_idx
   WHERE metadata_recording_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS metadata_provider_snapshots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   provider TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id UUID NULL,

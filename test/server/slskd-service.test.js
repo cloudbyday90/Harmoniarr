@@ -134,6 +134,37 @@ test('createSlskdService maps connected unauthenticated server state to degraded
   });
 });
 
+test('createSlskdService builds provider clients from shared runtime config when a static client is not injected', async (t) => {
+  const getClientConfig = t.mock.fn(async () => ({
+    apiKey: 'stored-api-key',
+    baseUrl: 'http://slskd.internal:5030',
+    requestTimeoutMs: 15000,
+  }));
+  const createSlskdClientFn = t.mock.fn(() => ({
+    getApplicationState: async () => ({
+      server: {
+        state: 'Connected, LoggedIn',
+        isConnected: true,
+        isLoggedIn: true,
+        isTransitioning: false,
+      },
+    }),
+  }));
+  const service = createSlskdService({
+    createSlskdClientFn,
+    getClientConfig,
+  });
+
+  await service.getConnectionStatus();
+
+  assert.equal(getClientConfig.mock.callCount(), 1);
+  assert.deepEqual(createSlskdClientFn.mock.calls[0].arguments[0], {
+    apiKey: 'stored-api-key',
+    baseUrl: 'http://slskd.internal:5030',
+    requestTimeoutMs: 15000,
+  });
+});
+
 test('createSlskdService validates search requests before calling slskd', async (t) => {
   const startSearch = t.mock.fn(async () => ({ id: 'search-1' }));
   const service = createSlskdService({

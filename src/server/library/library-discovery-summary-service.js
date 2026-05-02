@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createApiError } from '../auth.js';
 import { createLibraryDiscoverySummaryStore } from './library-discovery-summary-store.js';
 import { createLibraryDiscoveryRunStore } from './library-discovery-run-store.js';
 import { resolveLibraryDiscoveryHeartbeatConfig } from './library-discovery-heartbeat-config.js';
@@ -55,6 +56,19 @@ export function createLibraryDiscoverySummaryService({
   libraryDiscoveryRunStore = createLibraryDiscoveryRunStore(),
   libraryDiscoverySummaryStore = createLibraryDiscoverySummaryStore(),
 } = {}) {
+  async function buildLibraryDiscoveryRunDetail({ runId }) {
+    const run = await libraryDiscoveryRunStore.getRunById(runId);
+
+    if (!run) {
+      throw createApiError(404, 'library_discovery_run_not_found', 'Library discovery run not found');
+    }
+
+    return {
+      checkedAt: new Date().toISOString(),
+      run,
+    };
+  }
+
   async function buildLibraryDiscoverySummary() {
     const checkedAt = new Date().toISOString();
     const [snapshot, latestRun] = await Promise.all([
@@ -77,6 +91,7 @@ export function createLibraryDiscoverySummaryService({
   }
 
   return {
+    buildLibraryDiscoveryRunDetail,
     buildLibraryDiscoverySummary,
   };
 }

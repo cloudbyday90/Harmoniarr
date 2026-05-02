@@ -1,0 +1,124 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import { createAppUserProvisioningService } from '../app-user-provisioning-service.js';
+import { createAppUserService } from '../app-user-service.js';
+import { createRequestAuthDependencies } from '../auth-module.js';
+import { asyncRoute } from '../http.js';
+
+const defaultAppUserService = createAppUserService();
+const defaultAppUserProvisioningService = createAppUserProvisioningService({
+  getAppUserById: defaultAppUserService.getAppUserById,
+});
+const defaultRequestAuthDependencies = createRequestAuthDependencies();
+
+export function registerAppUserRoutes(app, {
+  claimManagedLibraryRoot = defaultAppUserProvisioningService.claimManagedLibraryRoot,
+  createAppUser = defaultAppUserService.createAppUser,
+  getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
+  listAppUsers = defaultAppUserService.listAppUsers,
+  provisionManagedLibraryRoot = defaultAppUserProvisioningService.provisionManagedLibraryRoot,
+  requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
+  requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
+  requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
+  roleOptions = defaultAppUserService.roleOptions,
+  updateAppUser = defaultAppUserService.updateAppUser,
+} = {}) {
+  app.get('/api/v1/users', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+    response.json({
+      ok: true,
+      roleOptions,
+      users: await listAppUsers(),
+    });
+  }));
+
+  app.post('/api/v1/users', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const user = await createAppUser({
+      actorUserId: session.appUserId,
+      managedLibraryRelativeRoot: request.body?.managedLibraryRelativeRoot,
+      password: request.body?.password,
+      requestMetadata: getRequestMetadata(request),
+      role: request.body?.role,
+      username: request.body?.username,
+    });
+
+    response.status(201).json({
+      ok: true,
+      roleOptions,
+      user,
+    });
+  }));
+
+  app.patch('/api/v1/users/:userId', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const user = await updateAppUser({
+      actorUserId: session.appUserId,
+      isDisabled: request.body?.isDisabled,
+      managedLibraryRelativeRoot: request.body?.managedLibraryRelativeRoot,
+      requestMetadata: getRequestMetadata(request),
+      role: request.body?.role,
+      userId: request.params.userId,
+    });
+
+    response.json({
+      ok: true,
+      user,
+    });
+  }));
+
+  app.post('/api/v1/users/:userId/provision-managed-library-root', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await provisionManagedLibraryRoot({
+      actorUserId: session.appUserId,
+      requestMetadata: getRequestMetadata(request),
+      userId: request.params.userId,
+    });
+
+    response.status(201).json({
+      ok: true,
+      provisioning: result.provisioning,
+      user: result.user,
+    });
+  }));
+
+  app.post('/api/v1/users/me/claim-managed-library-root', asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+
+    const result = await claimManagedLibraryRoot({
+      actorUserId: session.appUserId,
+      managedLibraryRelativeRoot: request.body?.managedLibraryRelativeRoot,
+      requestMetadata: getRequestMetadata(request),
+    });
+
+    response.status(201).json({
+      ok: true,
+      provisioning: result.provisioning,
+      user: result.user,
+    });
+  }));
+}

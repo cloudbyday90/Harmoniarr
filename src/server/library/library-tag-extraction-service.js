@@ -117,6 +117,7 @@ export function createLibraryTagExtractionService({
   extractMetadata = parseFile,
   extractor = 'music-metadata',
   extractorVersion = null,
+  libraryEmbeddedArtworkService = null,
   libraryTagSnapshotStore = createLibraryTagSnapshotStore(),
 } = {}) {
   async function extractLibraryFileTags({ files }) {
@@ -133,6 +134,17 @@ export function createLibraryTagExtractionService({
           extractorVersion,
           libraryFileId: file.id,
         });
+
+        if (libraryEmbeddedArtworkService) {
+          try {
+            await libraryEmbeddedArtworkService.captureEmbeddedArtwork({
+              libraryFileId: file.id,
+              metadata,
+            });
+          } catch {
+            // Embedded artwork capture remains best-effort; missing or invalid art must not block scans.
+          }
+        }
       } catch (error) {
         await libraryTagSnapshotStore.writeLibraryFileTagSnapshot({
           extractor,

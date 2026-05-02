@@ -23,9 +23,6 @@ test('createLibraryScanService blocks new runs when shared path validation is no
         },
       }),
     },
-    startWorkerRun: async () => {
-      throw new Error('startWorkerRun should not be called');
-    },
   });
 
   await assert.rejects(
@@ -38,14 +35,13 @@ test('createLibraryScanService blocks new runs when shared path validation is no
   );
 });
 
-test('createLibraryScanService persists a pending run and hands it off to the worker when paths are ready', async (t) => {
+test('createLibraryScanService persists a pending run for durable dispatch when paths are ready', async (t) => {
   const createOperationRun = t.mock.fn(async ({ libraryRoot, status, triggeredByUserId }) => ({
     id: 'run-1',
     libraryRoot,
     status,
     triggeredByUserId,
   }));
-  const startWorkerRun = t.mock.fn(async () => {});
   const service = createLibraryScanService({
     createOperationRun,
     getActiveRun: async () => null,
@@ -65,7 +61,6 @@ test('createLibraryScanService persists a pending run and hands it off to the wo
         },
       }),
     },
-    startWorkerRun,
   });
 
   const result = await service.startLibraryScan({ triggeredByUserId: 'user-7' });
@@ -74,10 +69,6 @@ test('createLibraryScanService persists a pending run and hands it off to the wo
     libraryRoot: '/srv/music',
     status: 'pending',
     triggeredByUserId: 'user-7',
-  }]);
-  assert.deepEqual(startWorkerRun.mock.calls[0].arguments, [{
-    libraryRoot: '/srv/music',
-    runId: 'run-1',
   }]);
   assert.deepEqual(result, {
     accepted: true,

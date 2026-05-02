@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { registerImportCandidateRoutes } from '../../src/server/routes/import-candidate-routes.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
 
@@ -202,6 +203,24 @@ function createImportCandidateRouteTestApp(overrides = {}) {
           reason,
         },
       }),
+      setImportCandidateFileAllowLossyDerivativeDecision: async ({ actorUserId, importCandidateFileId, importCandidateId, reason, requestMetadata }) => ({
+        candidate: {
+          id: importCandidateId,
+          status: 'import_pending',
+        },
+        decision: {
+          decisionType: 'allow_lossy_derivative',
+          importCandidateFileId,
+        },
+        file: {
+          id: importCandidateFileId,
+        },
+        source: {
+          actorUserId,
+          requestMetadata,
+          reason,
+        },
+      }),
       previewImportCandidate: async ({ importCandidateId }) => ({
         candidate: {
           id: importCandidateId,
@@ -350,7 +369,14 @@ function createImportCandidateRouteTestApp(overrides = {}) {
           requestMetadata,
         },
       }),
+      limitImportCandidateApplyRun: (_request, _response, next) => next(),
+      limitImportCandidateMediaInspectionRun: (_request, _response, next) => next(),
+      limitImportCandidateTranscodeRun: (_request, _response, next) => next(),
+      limitImportCandidateExecutionReconcile: (_request, _response, next) => next(),
+      limitImportCandidateExecutionRun: (_request, _response, next) => next(),
+      limitImportCandidateSlskdIngest: (_request, _response, next) => next(),
       requireCsrf: () => {},
+      requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
       requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
       reopenImportCandidate: async ({ importCandidateId, actorUserId, reason, requestMetadata }) => ({
         candidate: {
@@ -372,6 +398,28 @@ function createImportCandidateRouteTestApp(overrides = {}) {
         accepted: true,
         run: {
           id: 'apply-run-1',
+          status: 'pending',
+        },
+        source: {
+          triggeredByUserId,
+          requestMetadata,
+        },
+      }),
+      startImportCandidateMediaInspectionRun: async ({ triggeredByUserId, requestMetadata }) => ({
+        accepted: true,
+        run: {
+          id: 'inspection-run-1',
+          status: 'pending',
+        },
+        source: {
+          triggeredByUserId,
+          requestMetadata,
+        },
+      }),
+      startImportCandidateTranscodeRun: async ({ triggeredByUserId, requestMetadata }) => ({
+        accepted: true,
+        run: {
+          id: 'transcode-run-1',
           status: 'pending',
         },
         source: {
@@ -534,7 +582,10 @@ test('import candidate selected summary route returns operator-facing execution 
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(buildSelectedImportCandidateSummary.mock.calls[0].arguments, [{ limit: '10' }]);
+    assert.deepEqual(buildSelectedImportCandidateSummary.mock.calls[0].arguments, [{
+      limit: '10',
+      targetUser: { id: 'user-1' },
+    }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.selectedImportCandidates.counts.blocked, 1);
     assert.equal(payload.selectedImportCandidates.selectedCandidates[0].executionStatus.code, 'blocked');
@@ -574,7 +625,10 @@ test('import candidate import-pending summary route returns completed-download i
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{ limit: '10' }]);
+    assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{
+      limit: '10',
+      targetUser: { id: 'user-1' },
+    }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.importPendingCandidates.counts.totalImportPending, 1);
     assert.equal(payload.importPendingCandidates.importPendingCandidates[0].importStatus.code, 'ready');
@@ -723,6 +777,86 @@ test('import candidate apply start route enforces csrf and returns accepted run 
   });
 });
 
+test('import candidate media-inspection start route enforces csrf and returns accepted run state', async (t) => {
+  const startImportCandidateMediaInspectionRun = t.mock.fn(async ({ triggeredByUserId, requestMetadata }) => ({
+    accepted: true,
+    run: {
+      id: 'inspection-run-1',
+      status: 'pending',
+    },
+    source: {
+      triggeredByUserId,
+      requestMetadata,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const app = createImportCandidateRouteTestApp({ requireCsrf, startImportCandidateMediaInspectionRun });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/media-inspection-runs`, {
+      method: 'POST',
+      headers: {
+        'x-forwarded-for': '203.0.113.31',
+        'user-agent': 'HarmoniarrMediaInspectionTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(startImportCandidateMediaInspectionRun.mock.callCount(), 1);
+    assert.deepEqual(startImportCandidateMediaInspectionRun.mock.calls[0].arguments, [{
+      requestMetadata: {
+        ipAddress: '203.0.113.31',
+        userAgent: 'HarmoniarrMediaInspectionTest/1.0',
+      },
+      triggeredByUserId: 'user-1',
+    }]);
+    assert.equal(payload.accepted, true);
+    assert.equal(payload.run.id, 'inspection-run-1');
+  });
+});
+
+test('import candidate transcode start route enforces csrf and returns accepted run state', async (t) => {
+  const startImportCandidateTranscodeRun = t.mock.fn(async ({ triggeredByUserId, requestMetadata }) => ({
+    accepted: true,
+    run: {
+      id: 'transcode-run-1',
+      status: 'pending',
+    },
+    source: {
+      triggeredByUserId,
+      requestMetadata,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const app = createImportCandidateRouteTestApp({ requireCsrf, startImportCandidateTranscodeRun });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/transcode-runs`, {
+      method: 'POST',
+      headers: {
+        'x-forwarded-for': '203.0.113.32',
+        'user-agent': 'HarmoniarrTranscodeTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(startImportCandidateTranscodeRun.mock.callCount(), 1);
+    assert.deepEqual(startImportCandidateTranscodeRun.mock.calls[0].arguments, [{
+      requestMetadata: {
+        ipAddress: '203.0.113.32',
+        userAgent: 'HarmoniarrTranscodeTest/1.0',
+      },
+      triggeredByUserId: 'user-1',
+    }]);
+    assert.equal(payload.accepted, true);
+    assert.equal(payload.run.id, 'transcode-run-1');
+  });
+});
+
 test('import candidate execution reconcile route enforces csrf and returns persisted transitions', async (t) => {
   const reconcileImportCandidateExecutionState = t.mock.fn(async ({ actorUserId, requestMetadata }) => ({
     currentRunId: 'run-1',
@@ -768,7 +902,7 @@ test('import candidate execution reconcile route enforces csrf and returns persi
 });
 
 test('import candidate preview route returns read-only planning preview data', async (t) => {
-  const previewImportCandidate = t.mock.fn(async ({ importCandidateId }) => ({
+  const previewImportCandidate = t.mock.fn(async ({ importCandidateId, targetUser }) => ({
     candidate: {
       id: importCandidateId,
       status: 'selected',
@@ -789,8 +923,9 @@ test('import candidate preview route returns read-only planning preview data', a
     },
     library: {
       root: '/data/music',
-      rootFolderPolicy: 'single_root',
-      previewFolderPath: '/data/music/Autechre/Amber',
+      rootFolderPolicy: 'per_user_subdirectory',
+      previewFolderPath: `/data/music/users/${targetUser.id}/Autechre/Amber`,
+      targetUser,
     },
     naming: {
       strategy: 'mirror_candidate_path',
@@ -799,7 +934,7 @@ test('import candidate preview route returns read-only planning preview data', a
         filename: '01 Foil.flac',
         sourcePath: '/data/downloads/Autechre/Amber/01 Foil.flac',
         stagingPath: '/data/staging/import-candidates/candidate-1/Autechre/Amber/01 Foil.flac',
-        libraryPath: '/data/music/Autechre/Amber/01 Foil.flac',
+        libraryPath: `/data/music/users/${targetUser.id}/Autechre/Amber/01 Foil.flac`,
       }],
     },
     validation: {
@@ -817,16 +952,17 @@ test('import candidate preview route returns read-only planning preview data', a
     assert.equal(response.status, 200);
     assert.deepEqual(previewImportCandidate.mock.calls[0].arguments, [{
       importCandidateId: 'candidate-1',
+      targetUser: { id: 'user-1' },
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.importCandidatePreview.candidate.id, 'candidate-1');
     assert.equal(payload.importCandidatePreview.source.resolvedFolderPath, '/data/downloads/Autechre/Amber');
-    assert.equal(payload.importCandidatePreview.naming.filePreviews[0].libraryPath, '/data/music/Autechre/Amber/01 Foil.flac');
+    assert.equal(payload.importCandidatePreview.naming.filePreviews[0].libraryPath, '/data/music/users/user-1/Autechre/Amber/01 Foil.flac');
   });
 });
 
 test('import candidate apply preview route returns file-level import apply safety data', async (t) => {
-  const previewImportCandidateApply = t.mock.fn(async ({ importCandidateId }) => ({
+  const previewImportCandidateApply = t.mock.fn(async ({ importCandidateId, targetUser }) => ({
     counts: {
       collisionCount: 1,
       missingSourceCount: 0,
@@ -843,6 +979,9 @@ test('import candidate apply preview route returns file-level import apply safet
     }],
     preview: {
       candidate: { id: importCandidateId },
+      library: {
+        targetUser,
+      },
     },
     summary: {
       status: 'blocked',
@@ -858,6 +997,7 @@ test('import candidate apply preview route returns file-level import apply safet
     assert.equal(response.status, 200);
     assert.deepEqual(previewImportCandidateApply.mock.calls[0].arguments, [{
       importCandidateId: 'candidate-1',
+      targetUser: { id: 'user-1' },
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.importCandidateApplyPreview.summary.status, 'blocked');
@@ -882,10 +1022,10 @@ test('import candidate file skip route enforces csrf and persists the decision',
     },
   }));
   const requireCsrf = t.mock.fn();
-  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-11', csrfToken: 'csrf-token' }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-11', csrfToken: 'csrf-token', user: { role: 'admin' } }));
   const app = createImportCandidateRouteTestApp({
     requireCsrf,
-    requireSession,
+    requireFreshAdminSession,
     setImportCandidateFileSkipDecision,
   });
 
@@ -903,7 +1043,7 @@ test('import candidate file skip route enforces csrf and persists the decision',
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(requireSession.mock.callCount(), 1);
+  assert.equal(requireFreshAdminSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.deepEqual(setImportCandidateFileSkipDecision.mock.calls[0].arguments, [{
       actorUserId: 'user-11',
@@ -937,11 +1077,11 @@ test('import candidate file decision clear route enforces csrf and clears the de
     },
   }));
   const requireCsrf = t.mock.fn();
-  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-12', csrfToken: 'csrf-token' }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-12', csrfToken: 'csrf-token', user: { role: 'admin' } }));
   const app = createImportCandidateRouteTestApp({
     clearImportCandidateFileDecision,
     requireCsrf,
-    requireSession,
+    requireFreshAdminSession,
   });
 
   await withServer(app, async (baseUrl) => {
@@ -958,7 +1098,7 @@ test('import candidate file decision clear route enforces csrf and clears the de
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(requireSession.mock.callCount(), 1);
+  assert.equal(requireFreshAdminSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.deepEqual(clearImportCandidateFileDecision.mock.calls[0].arguments, [{
       actorUserId: 'user-12',
@@ -972,6 +1112,61 @@ test('import candidate file decision clear route enforces csrf and clears the de
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.importCandidateFileDecision.clearedDecision.decisionType, 'skip');
+  });
+});
+
+test('import candidate allow-lossy-derivative route enforces csrf and persists the decision', async (t) => {
+  const setImportCandidateFileAllowLossyDerivativeDecision = t.mock.fn(async ({ actorUserId, importCandidateFileId, importCandidateId, reason, requestMetadata }) => ({
+    candidate: {
+      id: importCandidateId,
+      status: 'import_pending',
+    },
+    decision: {
+      decisionType: 'allow_lossy_derivative',
+      importCandidateFileId,
+    },
+    source: {
+      actorUserId,
+      requestMetadata,
+      reason,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-13', csrfToken: 'csrf-token', user: { role: 'admin' } }));
+  const app = createImportCandidateRouteTestApp({
+    requireCsrf,
+    requireFreshAdminSession,
+    setImportCandidateFileAllowLossyDerivativeDecision,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/files/file-1/allow-lossy-derivative`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.26',
+        'user-agent': 'HarmoniarrReviewRouteTest/1.0',
+      },
+      body: JSON.stringify({ reason: 'Allow lossy derivative for this import' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(setImportCandidateFileAllowLossyDerivativeDecision.mock.calls[0].arguments, [{
+      actorUserId: 'user-13',
+      importCandidateFileId: 'file-1',
+      importCandidateId: 'candidate-1',
+      reason: 'Allow lossy derivative for this import',
+      requestMetadata: {
+        ipAddress: '198.51.100.26',
+        userAgent: 'HarmoniarrReviewRouteTest/1.0',
+      },
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.importCandidateFileDecision.decision.decisionType, 'allow_lossy_derivative');
   });
 });
 
@@ -1018,11 +1213,11 @@ test('import candidate hold route enforces csrf and returns transition evidence'
     },
   }));
   const requireCsrf = t.mock.fn();
-  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-10', csrfToken: 'csrf-token' }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-10', csrfToken: 'csrf-token', user: { role: 'admin' } }));
   const app = createImportCandidateRouteTestApp({
     holdImportCandidate,
     requireCsrf,
-    requireSession,
+    requireFreshAdminSession,
   });
 
   await withServer(app, async (baseUrl) => {
@@ -1039,7 +1234,7 @@ test('import candidate hold route enforces csrf and returns transition evidence'
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(requireSession.mock.callCount(), 1);
+  assert.equal(requireFreshAdminSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.calls[0].arguments[0].headers['x-csrf-token'], 'csrf-token');
     assert.deepEqual(holdImportCandidate.mock.calls[0].arguments, [{
@@ -1185,11 +1380,11 @@ test('import candidate slskd ingestion route enforces csrf and returns stored ca
     }],
   }));
   const requireCsrf = t.mock.fn();
-  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-9', csrfToken: 'csrf-token' }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-9', csrfToken: 'csrf-token', user: { role: 'admin' } }));
   const app = createImportCandidateRouteTestApp({
     ingestSlskdSearchResponses,
     requireCsrf,
-    requireSession,
+    requireFreshAdminSession,
   });
 
   await withServer(app, async (baseUrl) => {
@@ -1204,12 +1399,15 @@ test('import candidate slskd ingestion route enforces csrf and returns stored ca
     const payload = await response.json();
 
     assert.equal(response.status, 201);
-    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.calls[0].arguments[0].headers['x-csrf-token'], 'csrf-token');
     assert.deepEqual(requireCsrf.mock.calls[0].arguments[1], {
       appUserId: 'user-9',
       csrfToken: 'csrf-token',
+      user: {
+        role: 'admin',
+      },
     });
     assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments, [{
       searchId: 'search-1',
@@ -1244,6 +1442,68 @@ test('import candidate slskd ingestion route enforces csrf and returns stored ca
             filename: '01 Foil.flac',
           }],
         }],
+      },
+    });
+  });
+});
+
+test('import candidate execution start route preserves forced re-auth failures from the injected admin guard', async () => {
+  const app = createImportCandidateRouteTestApp({
+    requireFreshAdminSession: async () => {
+      throw Object.assign(new Error('Re-authentication is required before continuing'), {
+        status: 403,
+        code: 'reauth_required',
+      });
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-runs`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'reauth_required',
+        message: 'Re-authentication is required before continuing',
+      },
+    });
+  });
+});
+
+test('import candidate execution start route preserves injected rate limit failures before run creation', async (t) => {
+  const startImportCandidateExecutionRun = t.mock.fn(async () => ({ accepted: true }));
+  const app = createImportCandidateRouteTestApp({
+    limitImportCandidateExecutionRun: (_request, _response, next) => {
+      next(createApiError(429, 'rate_limited', 'Too many requests. Try again later.'));
+    },
+    startImportCandidateExecutionRun,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-runs`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 429);
+    assert.equal(startImportCandidateExecutionRun.mock.callCount(), 0);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'rate_limited',
+        message: 'Too many requests. Try again later.',
       },
     });
   });

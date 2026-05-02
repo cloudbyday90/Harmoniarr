@@ -17,11 +17,35 @@
  */
 
 import { createApiError } from '../auth.js';
+import {
+  csrfProtectionModes,
+  resolveCsrfProtectionMode,
+  resolveHttpsEnforcementEnabled,
+  resolveSecureCookiesEnabled,
+  resolveStrictTransportSecurityEnabled,
+} from '../deployment-security-service.js';
+import {
+  normalizeSlskdBaseUrl,
+  normalizeSlskdRequestTimeoutMs,
+  resolveSlskdBaseUrlDefault,
+  resolveSlskdRequestTimeoutDefault,
+} from '../integrations/slskd/slskd-config.js';
 import { normalizeDownloadPathMappings } from '../paths/download-path-mapping-service.js';
+import { normalizeUserMusicRoots } from '../paths/user-music-root-service.js';
 
 function createSettingsValidationError(message) {
   return createApiError(400, 'validation_error', message);
 }
+
+const supportedArtworkProviders = new Set([
+  'appleMusic',
+  'coverArtArchive',
+  'deezer',
+  'discogs',
+  'spotify',
+  'theAudioDb',
+  'tidal',
+]);
 
 const settingDefinitions = {
   system: {
@@ -47,6 +71,30 @@ const settingDefinitions = {
       },
     },
   },
+  security: {
+    csrfProtectionMode: {
+      defaultValue: resolveCsrfProtectionMode(),
+      normalize(value) {
+        try {
+          return resolveCsrfProtectionMode(value);
+        } catch (error) {
+          throw createSettingsValidationError(error.message);
+        }
+      },
+    },
+    enforceHttps: {
+      defaultValue: resolveHttpsEnforcementEnabled(),
+      normalize: normalizeBooleanSetting('security.enforceHttps'),
+    },
+    secureCookies: {
+      defaultValue: resolveSecureCookiesEnabled(),
+      normalize: normalizeBooleanSetting('security.secureCookies'),
+    },
+    strictTransportSecurity: {
+      defaultValue: resolveStrictTransportSecurityEnabled(),
+      normalize: normalizeBooleanSetting('security.strictTransportSecurity'),
+    },
+  },
   paths: {
     downloads: {
       defaultValue: process.env.HARMONIARR_DOWNLOADS ?? '/data/downloads',
@@ -65,6 +113,16 @@ const settingDefinitions = {
     music: {
       defaultValue: process.env.HARMONIARR_MUSIC ?? '/data/music',
       normalize: normalizePathSetting,
+    },
+    userMusicRoots: {
+      defaultValue: [],
+      normalize(value) {
+        try {
+          return normalizeUserMusicRoots(value);
+        } catch (error) {
+          throw createSettingsValidationError(error.message);
+        }
+      },
     },
     staging: {
       defaultValue: process.env.HARMONIARR_STAGING ?? '/data/staging',
@@ -99,7 +157,11 @@ const settingDefinitions = {
           throw createSettingsValidationError('artwork.providerOrder entries must be non-empty strings');
         }
 
-        return normalized;
+        if (normalized.some((entry) => !supportedArtworkProviders.has(entry))) {
+          throw createSettingsValidationError(`artwork.providerOrder entries must be one of ${[...supportedArtworkProviders].join(', ')}`);
+        }
+
+        return [...new Set(normalized)];
       },
     },
     captureEmbedded: {
@@ -133,6 +195,24 @@ const settingDefinitions = {
         return [...new Set(normalized)].sort((left, right) => left - right);
       },
     },
+    maxOriginalFileSizeBytes: {
+      defaultValue: 20 * 1024 * 1024,
+      normalize(value) {
+        return normalizeIntegerSetting('artwork.maxOriginalFileSizeBytes', value, { min: 1024 * 1024, max: 100 * 1024 * 1024 });
+      },
+    },
+    maxOriginalDimensionPixels: {
+      defaultValue: 4000,
+      normalize(value) {
+        return normalizeIntegerSetting('artwork.maxOriginalDimensionPixels', value, { min: 256, max: 8192 });
+      },
+    },
+    derivativeCacheSizeMb: {
+      defaultValue: 1024,
+      normalize(value) {
+        return normalizeIntegerSetting('artwork.derivativeCacheSizeMb', value, { min: 64, max: 16384 });
+      },
+    },
     derivativeRetentionDays: {
       defaultValue: 30,
       normalize(value) {
@@ -145,8 +225,117 @@ const settingDefinitions = {
         return normalizeIntegerSetting('artwork.unassignedRetentionDays', value, { min: 1, max: 3650 });
       },
     },
+    refreshAfterMetadataRefresh: {
+      defaultValue: true,
+      normalize: normalizeBooleanSetting('artwork.refreshAfterMetadataRefresh'),
+    },
+    refreshAfterImport: {
+      defaultValue: true,
+      normalize: normalizeBooleanSetting('artwork.refreshAfterImport'),
+    },
+    refreshAfterLibraryScan: {
+      defaultValue: false,
+      normalize: normalizeBooleanSetting('artwork.refreshAfterLibraryScan'),
+    },
+    refetchMissingAutomatically: {
+      defaultValue: false,
+      normalize: normalizeBooleanSetting('artwork.refetchMissingAutomatically'),
+    },
+  },
+  slskd: {
+    baseUrl: {
+      defaultValue: resolveSlskdBaseUrlDefault(),
+      normalize(value) {
+        try {
+          return normalizeSlskdBaseUrl(value);
+        } catch (error) {
+          throw createSettingsValidationError(error.message);
+        }
+      },
+    },
+    requestTimeoutMs: {
+      defaultValue: resolveSlskdRequestTimeoutDefault(),
+      normalize(value) {
+        try {
+          return normalizeSlskdRequestTimeoutMs(value);
+        } catch (error) {
+          throw createSettingsValidationError(error.message);
+        }
+      },
+    },
+  },
+  providers: {
+    spotifyClientId: {
+      defaultValue: process.env.SPOTIFY_CLIENT_ID ?? '',
+      normalize: normalizeStringAllowEmpty('providers.spotifyClientId'),
+    },
+    spotifyEnabled: {
+      defaultValue: Boolean(process.env.SPOTIFY_CLIENT_ID),
+      normalize: normalizeBooleanSetting('providers.spotifyEnabled'),
+    },
+    youtubeEnabled: {
+      defaultValue: Boolean(process.env.YOUTUBE_API_KEY),
+      normalize: normalizeBooleanSetting('providers.youtubeEnabled'),
+    },
+    youtubeClientId: {
+      defaultValue: process.env.YOUTUBE_CLIENT_ID ?? '',
+      normalize: normalizeStringAllowEmpty('providers.youtubeClientId'),
+    },
+    appleMusicTeamId: {
+      defaultValue: process.env.APPLE_MUSIC_TEAM_ID ?? '',
+      normalize: normalizeStringAllowEmpty('providers.appleMusicTeamId'),
+    },
+    appleMusicKeyId: {
+      defaultValue: process.env.APPLE_MUSIC_KEY_ID ?? '',
+      normalize: normalizeStringAllowEmpty('providers.appleMusicKeyId'),
+    },
+    appleMusicStorefront: {
+      defaultValue: process.env.APPLE_MUSIC_STOREFRONT ?? 'us',
+      normalize(value) {
+        if (typeof value !== 'string') {
+          throw createSettingsValidationError('providers.appleMusicStorefront must be a string');
+        }
+
+        const normalized = value.trim().toLowerCase();
+        if (!normalized || normalized.length < 2 || normalized.length > 5) {
+          throw createSettingsValidationError('providers.appleMusicStorefront must be a valid ISO 3166-1 alpha-2 storefront code');
+        }
+
+        return normalized;
+      },
+    },
+    appleMusicEnabled: {
+      defaultValue: Boolean(process.env.APPLE_MUSIC_TEAM_ID && process.env.APPLE_MUSIC_KEY_ID),
+      normalize: normalizeBooleanSetting('providers.appleMusicEnabled'),
+    },
+    playlistExpansionPolicy: {
+      defaultValue: 'bounded',
+      normalize(value) {
+        if (!['bounded', 'artist_discovery'].includes(value)) {
+          throw createSettingsValidationError('providers.playlistExpansionPolicy must be one of bounded, artist_discovery');
+        }
+
+        return value;
+      },
+    },
+    requestTimeoutMs: {
+      defaultValue: 15000,
+      normalize(value) {
+        return normalizeIntegerSetting('providers.requestTimeoutMs', value, { min: 1000, max: 60000 });
+      },
+    },
   },
 };
+
+function normalizeStringAllowEmpty(settingName) {
+  return function normalizeString(value) {
+    if (typeof value !== 'string') {
+      throw createSettingsValidationError(`${settingName} must be a string`);
+    }
+
+    return value.trim();
+  };
+}
 
 function normalizePathSetting(value) {
   if (typeof value !== 'string') {

@@ -29,9 +29,11 @@
     "check-copyright": "node scripts/check-copyright.js",
     "check:esm": "node scripts/check-esm-consistency.js",
     "check:image-tags": "node scripts/check-compose-image-tags.js",
+    "check:migration-id-policy": "node scripts/check-migration-id-policy.js",
     "check:migrations": "node dist/server/check-migrations.js",
+    "check:migration-checksums": "node dist/server/check-migration-checksums.js",
     "check:schema-snapshot": "node scripts/check-schema-snapshot.js",
-    "migration:check": "node scripts/check-migration-filenames.js",
+    "migration:check": "node scripts/check-migration-filenames.js && node scripts/check-migration-id-policy.js",
     "migration:create": "node scripts/create-migration.js",
     "migrate": "node dist/server/migrate.js",
     "prepare:database": "node dist/server/prepare-database.js",
@@ -62,6 +64,7 @@
     "express": "^5.2.1",
     "music-metadata": "^11.12.3",
     "pg": "^8.20.0",
+    "sharp": "^0.34.5",
     "vue": "^3.5.33",
     "vue-router": "^5.0.6"
   }

@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import { createOperationRunStore } from '../operation-run-store.js';
+import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
@@ -35,6 +36,7 @@ function normalizeRun(run) {
     blockedCount: toNumberOrNull(run.summary.blockedCount),
     currentStep: run.summary.currentStep ?? null,
     errorMessage: run.errorMessage,
+    executableCandidateCount: toNumberOrNull(run.summary.executableCandidateCount),
     executionMode: run.summary.executionMode ?? 'move',
     finishedAt: run.finishedAt,
     id: run.id,
@@ -51,17 +53,19 @@ function normalizeRun(run) {
 export function createImportCandidateApplyRunStore({
   getPoolFn = getPool,
 } = {}) {
+  const operationDescriptor = operationRunRegistry.importCandidateApply;
   const operationRunStore = createOperationRunStore({
     getPoolFn,
-    leaseJobType: 'import_candidate_apply',
-    operationType: 'import_candidate_apply',
+    leaseJobType: operationDescriptor.leaseJobType,
+    operationType: operationDescriptor.operationType,
   });
 
-  async function createOperationRun({ executionMode = 'move', requestedCandidateCount, status = 'pending', triggeredByUserId = null }) {
+  async function createOperationRun({ executableCandidateCount = null, executionMode = 'move', requestedCandidateCount, status = 'pending', triggeredByUserId = null }) {
     const run = await operationRunStore.createOperationRun({
       status,
       summary: {
         currentStep: 'queued',
+        executableCandidateCount,
         executionMode,
         requestedCandidateCount,
       },
@@ -79,14 +83,22 @@ export function createImportCandidateApplyRunStore({
     return normalizeRun(await operationRunStore.getLatestRun());
   }
 
+  async function getRunById(runId) {
+    return normalizeRun(await operationRunStore.getRunById(runId));
+  }
+
   return {
     acquireLease: operationRunStore.acquireLease,
     createOperationRun,
     getActiveRun,
+    getRunById,
     getLatestRun,
+    isCancellationRequested: operationRunStore.isCancellationRequested,
+    markRunCancelled: operationRunStore.markRunCancelled,
     markRunCompleted: operationRunStore.markRunCompleted,
     markRunFailed: operationRunStore.markRunFailed,
     markRunStarted: operationRunStore.markRunStarted,
     releaseLease: operationRunStore.releaseLease,
+    renewLease: operationRunStore.renewLease,
   };
 }

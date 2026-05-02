@@ -17,10 +17,19 @@
 -->
 
 <script setup>
+import {
+  getOperationRunStatusClass,
+  getOperationRunStatusLabel,
+} from '../lib/operation-run-status.js';
+
 const props = defineProps({
   actionErrorMessage: {
     type: String,
     default: '',
+  },
+  currentRun: {
+    type: Object,
+    default: null,
   },
   errorMessage: {
     type: String,
@@ -33,6 +42,10 @@ const props = defineProps({
   isStarting: {
     type: Boolean,
     default: false,
+  },
+  runDetailErrorMessage: {
+    type: String,
+    default: '',
   },
   summaryPayload: {
     type: Object,
@@ -65,35 +78,6 @@ function summaryLabel(status) {
       return 'Blocked';
     default:
       return 'Empty';
-  }
-}
-
-function runStatusLabel(status) {
-  switch (status) {
-    case 'completed':
-      return 'Completed';
-    case 'running':
-      return 'Running';
-    case 'pending':
-      return 'Queued';
-    case 'failed':
-      return 'Failed';
-    default:
-      return 'Not started';
-  }
-}
-
-function runStatusClass(status) {
-  switch (status) {
-    case 'completed':
-      return 'review-status-selected';
-    case 'running':
-    case 'pending':
-      return 'review-status-pending';
-    case 'failed':
-      return 'review-status-failed';
-    default:
-      return 'review-status-held';
   }
 }
 
@@ -172,6 +156,7 @@ function canStartDispatch(summaryPayload) {
     </div>
 
     <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
+    <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
 
     <article class="error-panel panel-light" v-if="errorMessage">
       <h3>Discovery summary unavailable</h3>
@@ -187,8 +172,8 @@ function canStartDispatch(summaryPayload) {
           <strong>{{ summaryLabel(summaryPayload.summary.status) }}</strong>
         </div>
         <div class="pill">
-          <span>Latest run</span>
-          <strong>{{ runStatusLabel(summaryPayload.latestRun?.status) }}</strong>
+          <span>Displayed run</span>
+          <strong>{{ getOperationRunStatusLabel(currentRun?.status) }}</strong>
         </div>
       </div>
 
@@ -253,37 +238,37 @@ function canStartDispatch(summaryPayload) {
       <article class="onboarding-step-card">
         <div class="review-detail-header">
           <div>
-            <p>Latest dispatch run</p>
+            <p>Displayed dispatch run</p>
             <strong>
-              {{ summaryPayload.latestRun
-                ? `${summaryPayload.latestRun.dispatchedCount ?? 0} search dispatches completed in the latest run.`
+              {{ currentRun
+                ? `${currentRun.dispatchedCount ?? 0} search dispatches completed in the displayed run.`
                 : 'No discovery dispatch has been recorded yet.' }}
             </strong>
           </div>
-          <span class="review-status-pill" :class="runStatusClass(summaryPayload.latestRun?.status)">
-            {{ runStatusLabel(summaryPayload.latestRun?.status) }}
+            <span class="review-status-pill" :class="getOperationRunStatusClass(currentRun?.status)">
+              {{ getOperationRunStatusLabel(currentRun?.status) }}
           </span>
         </div>
         <dl class="review-meta-grid onboarding-meta-grid">
           <div>
             <dt>Started</dt>
-            <dd>{{ summaryPayload.latestRun?.startedAt ?? 'Not yet recorded' }}</dd>
+            <dd>{{ currentRun?.startedAt ?? 'Not yet recorded' }}</dd>
           </div>
           <div>
             <dt>Finished</dt>
-            <dd>{{ summaryPayload.latestRun?.finishedAt ?? 'Not yet recorded' }}</dd>
+            <dd>{{ currentRun?.finishedAt ?? 'Not yet recorded' }}</dd>
           </div>
           <div>
             <dt>Searches dispatched</dt>
-            <dd>{{ summaryPayload.latestRun?.dispatchedCount ?? 'Unavailable' }}</dd>
+            <dd>{{ currentRun?.dispatchedCount ?? 'Unavailable' }}</dd>
           </div>
           <div>
             <dt>Import candidates</dt>
-            <dd>{{ summaryPayload.latestRun?.candidateCount ?? 'Unavailable' }}</dd>
+            <dd>{{ currentRun?.candidateCount ?? 'Unavailable' }}</dd>
           </div>
           <div>
             <dt>Triggered by</dt>
-            <dd>{{ triggerSourceLabel(summaryPayload.latestRun?.triggerSource) }}</dd>
+            <dd>{{ triggerSourceLabel(currentRun?.triggerSource) }}</dd>
           </div>
         </dl>
       </article>

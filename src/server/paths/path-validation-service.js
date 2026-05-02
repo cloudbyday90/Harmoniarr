@@ -22,6 +22,10 @@ import {
   resolveDownloadCandidateFolder,
   validateDownloadPathMappingsAgainstSettings,
 } from './download-path-mapping-service.js';
+import {
+  buildUserMusicRootPath,
+  normalizeUserMusicRoots,
+} from './user-music-root-service.js';
 
 function getStatusRank(status) {
   switch (status) {
@@ -50,6 +54,73 @@ function formatErrorMessage(error, fallback) {
 
 function joinExamplePath(prefix) {
   return `${prefix.replace(/\/+$/g, '')}/Example Artist/Example Album`;
+}
+
+async function validateManagedSubdirectory({
+  accessFn,
+  key,
+  label,
+  parentRoot,
+  pathValue,
+  realpathFn,
+  statFn,
+}) {
+  const result = {
+    key,
+    label,
+    path: pathValue,
+    resolvedPath: null,
+    status: parentRoot?.status === 'unavailable' ? 'unavailable' : 'healthy',
+    message: '',
+  };
+
+  try {
+    const stats = await statFn(pathValue);
+    if (!stats.isDirectory()) {
+      return {
+        ...result,
+        status: 'unavailable',
+        message: 'Configured per-user destination exists but is not a directory.',
+      };
+    }
+  } catch (error) {
+    if (error?.code === 'ENOENT' && parentRoot?.status !== 'unavailable') {
+      return {
+        ...result,
+        status: parentRoot?.permissions?.write ? 'healthy' : 'degraded',
+        message: parentRoot?.permissions?.write
+          ? 'Per-user destination does not exist yet and will be created during import apply.'
+          : 'Per-user destination does not exist yet and the shared library root is not confirmed writable.',
+      };
+    }
+
+    return {
+      ...result,
+      status: 'unavailable',
+      message: formatErrorMessage(error, 'Configured per-user destination is not reachable from Harmoniarr.'),
+    };
+  }
+
+  try {
+    result.resolvedPath = await realpathFn(pathValue);
+  } catch {
+    result.resolvedPath = null;
+  }
+
+  try {
+    await accessFn(pathValue, constants.R_OK | constants.W_OK);
+  } catch (error) {
+    return {
+      ...result,
+      status: 'degraded',
+      message: formatErrorMessage(error, 'Configured per-user destination exists but is not readable and writable.'),
+    };
+  }
+
+  return {
+    ...result,
+    message: 'Per-user destination exists and is ready for import apply.',
+  };
 }
 
 export function createPathValidationService({
@@ -178,6 +249,7 @@ export function createPathValidationService({
     }
 
     const downloadRoot = roots.find((root) => root.key === 'downloads');
+    const libraryRoot = roots.find((root) => root.key === 'music');
     const downloadMappings = await Promise.all(normalizedMappings.map(async (mapping, index) => {
       const localRoot = await validateDirectory({
         key: `downloadMapping-${index}`,
@@ -201,10 +273,39 @@ export function createPathValidationService({
         message: localRoot.message,
       };
     }));
+    const normalizedUserMusicRoots = normalizeUserMusicRoots(settings.paths.userMusicRoots ?? [], {
+      fieldName: 'paths.userMusicRoots',
+    });
+    const userMusicRoots = await Promise.all(normalizedUserMusicRoots.map(async (entry, index) => {
+      const absolutePath = buildUserMusicRootPath({
+        musicRoot: settings.paths.music,
+        relativeRoot: entry.relativeRoot,
+      });
+      const destinationRoot = await validateManagedSubdirectory({
+        accessFn,
+        key: `userMusicRoot-${index}`,
+        label: `Per-user music root ${index + 1}`,
+        parentRoot: libraryRoot,
+        pathValue: absolutePath,
+        realpathFn,
+        statFn,
+      });
+
+      return {
+        index,
+        path: absolutePath,
+        relativeRoot: entry.relativeRoot,
+        resolvedPath: destinationRoot.resolvedPath,
+        status: destinationRoot.status,
+        message: destinationRoot.message,
+        userId: entry.userId,
+      };
+    }));
 
     const summaryStatus = mergeStatuses([
       ...roots.map((root) => root.status),
       ...downloadMappings.map((mapping) => mapping.status),
+      ...userMusicRoots.map((root) => root.status),
       mappingWarning ? 'degraded' : 'healthy',
       downloadMappings.length === 0 ? 'degraded' : 'healthy',
     ]);
@@ -220,6 +321,7 @@ export function createPathValidationService({
       },
       roots,
       downloadMappings,
+      userMusicRoots,
       notes: {
         remoteSlskdValidation: 'slskd-visible prefixes are modeled as configuration only in this slice; the app validates translated local paths and deterministic example translations without mutating media.',
         downloadsRootResolvedPath: downloadRoot?.resolvedPath ?? null,

@@ -86,3 +86,62 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
     status: 'completed',
   });
 });
+
+test('createLibraryDiscoveryWorker marks the run cancelled before dispatch when an operator cancellation is requested', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const dispatchDiscoveryRequests = t.mock.fn(async () => ({
+    attemptedCount: 1,
+    candidateCount: 2,
+    dispatchedCount: 1,
+    failedCount: 0,
+    fileCount: 4,
+  }));
+  const isCancellationRequested = t.mock.fn(async () => true);
+  const markRunCancelled = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const worker = createLibraryDiscoveryWorker({
+    acquireLease,
+    dispatchDiscoveryRequests,
+    isCancellationRequested,
+    markRunCancelled,
+    markRunCompleted,
+    markRunFailed,
+    markRunStarted,
+    releaseLease,
+  });
+
+  const cancelled = new Promise((resolve) => {
+    markRunCancelled.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+  const leaseReleased = new Promise((resolve) => {
+    releaseLease.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({ runId: 'run-cancelled' });
+
+  const cancelledArgs = await cancelled;
+  const releasedLeaseArgs = await leaseReleased;
+
+  assert.equal(markRunStarted.mock.callCount(), 0);
+  assert.equal(dispatchDiscoveryRequests.mock.callCount(), 0);
+  assert.equal(markRunCompleted.mock.callCount(), 0);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.deepEqual(cancelledArgs, {
+    runId: 'run-cancelled',
+    summary: {
+      currentStep: 'Library discovery cancelled',
+      triggerSource: 'manual',
+    },
+  });
+  assert.deepEqual(releasedLeaseArgs, {
+    runId: 'run-cancelled',
+    status: 'cancelled',
+  });
+});

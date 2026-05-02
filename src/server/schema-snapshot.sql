@@ -42,8 +42,28 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 
 
+CREATE OR REPLACE FUNCTION harmoniarr_generate_uuid()
+RETURNS UUID
+LANGUAGE plpgsql
+VOLATILE
+AS $$
+DECLARE
+  generated_id UUID;
+BEGIN
+  BEGIN
+    EXECUTE 'SELECT uuidv7()' INTO generated_id;
+    RETURN generated_id;
+  EXCEPTION
+    WHEN undefined_function THEN
+      RETURN gen_random_uuid();
+  END;
+END;
+$$;
+
+
+
 CREATE TABLE IF NOT EXISTS schema_migrations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   migration_key TEXT NOT NULL UNIQUE,
   filename TEXT NOT NULL UNIQUE,
   description TEXT NULL,
@@ -61,7 +81,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 
 -- Migration: 20260427_000001_bootstrap_core_tables.sql
--- Checksum: fe1f01de8242169316218ad4a91b67c83e99d241b17adfcab3121d5e3153450f
+-- Checksum: 95b82591c7238e505291105dd7e1a01101b5309fa2319a67e0002422ea3982a8
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -79,6 +99,24 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION harmoniarr_generate_uuid()
+RETURNS UUID
+LANGUAGE plpgsql
+VOLATILE
+AS $$
+DECLARE
+  generated_id UUID;
+BEGIN
+  BEGIN
+    EXECUTE 'SELECT uuidv7()' INTO generated_id;
+    RETURN generated_id;
+  EXCEPTION
+    WHEN undefined_function THEN
+      RETURN gen_random_uuid();
+  END;
+END;
+$$;
 
 CREATE TABLE IF NOT EXISTS app_runtime_state (
   key TEXT PRIMARY KEY,
@@ -105,7 +143,7 @@ SET path = EXCLUDED.path,
     description = EXCLUDED.description;
 
 CREATE TABLE IF NOT EXISTS app_users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL,
@@ -120,7 +158,7 @@ CREATE TABLE IF NOT EXISTS app_users (
 );
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   app_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   token_family_id UUID NOT NULL,
@@ -140,7 +178,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 
 CREATE TABLE IF NOT EXISTS api_keys (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   name TEXT NOT NULL,
   key_hash TEXT NOT NULL UNIQUE,
   encrypted_key_preview TEXT NULL,
@@ -154,7 +192,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 
 CREATE TABLE IF NOT EXISTS encrypted_secrets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   secret_type TEXT NOT NULL,
   name TEXT NOT NULL,
   encrypted_value BYTEA NOT NULL,
@@ -165,7 +203,7 @@ CREATE TABLE IF NOT EXISTS encrypted_secrets (
 );
 
 CREATE TABLE IF NOT EXISTS audit_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   occurred_at TIMESTAMPTZ NOT NULL,
   actor_user_id UUID NULL REFERENCES app_users(id),
   actor_type TEXT NOT NULL,
@@ -180,7 +218,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
 );
 
 CREATE TABLE IF NOT EXISTS app_settings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   namespace TEXT NOT NULL,
   setting_key TEXT NOT NULL,
   setting_value JSONB NOT NULL,
@@ -191,7 +229,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 CREATE TABLE IF NOT EXISTS maintenance_locks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   lock_type TEXT NOT NULL,
   status TEXT NOT NULL,
   owner_instance_id TEXT NULL,
@@ -204,7 +242,7 @@ CREATE TABLE IF NOT EXISTS maintenance_locks (
 );
 
 CREATE TABLE IF NOT EXISTS admin_recovery_runs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   status TEXT NOT NULL,
   recovery_code_hash TEXT NOT NULL,
   armed_via TEXT NOT NULL,
@@ -222,7 +260,7 @@ CREATE TABLE IF NOT EXISTS admin_recovery_runs (
 );
 
 CREATE TABLE IF NOT EXISTS operation_runs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   operation_type TEXT NOT NULL,
   status TEXT NOT NULL,
   started_at TIMESTAMPTZ NOT NULL,
@@ -235,7 +273,7 @@ CREATE TABLE IF NOT EXISTS operation_runs (
 );
 
 CREATE TABLE IF NOT EXISTS job_leases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   job_type TEXT NOT NULL,
   lease_key TEXT NOT NULL UNIQUE,
   owner_instance_id TEXT NOT NULL,
@@ -265,7 +303,7 @@ VALUES (
   '20260427_000001',
   '20260427_000001_bootstrap_core_tables.sql',
   'bootstrap_core_tables',
-  'fe1f01de8242169316218ad4a91b67c83e99d241b17adfcab3121d5e3153450f',
+  '95b82591c7238e505291105dd7e1a01101b5309fa2319a67e0002422ea3982a8',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -281,7 +319,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260428_000001_artwork_asset_foundation.sql
--- Checksum: d310afd6faa4ac5f054619114fb138ace4ff00178e5f3a19e746dbd163b4859c
+-- Checksum: 326f4ef00fbd4a83b60b516eb1842e2fea215c9a13f89ffdef527fe2c86857a3
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -306,7 +344,7 @@ SET path = EXCLUDED.path,
     description = EXCLUDED.description;
 
 CREATE TABLE IF NOT EXISTS artwork_assets (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   storage_namespace TEXT NOT NULL,
   relative_path TEXT NOT NULL,
   sha256 TEXT NOT NULL,
@@ -327,7 +365,7 @@ CREATE TABLE IF NOT EXISTS artwork_assets (
 );
 
 CREATE TABLE IF NOT EXISTS artwork_assignments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   artwork_asset_id UUID NOT NULL REFERENCES artwork_assets(id) ON DELETE CASCADE,
   owner_type TEXT NOT NULL,
   owner_id UUID NOT NULL,
@@ -360,7 +398,7 @@ VALUES (
   '20260428_000001',
   '20260428_000001_artwork_asset_foundation.sql',
   'artwork_asset_foundation',
-  'd310afd6faa4ac5f054619114fb138ace4ff00178e5f3a19e746dbd163b4859c',
+  '326f4ef00fbd4a83b60b516eb1842e2fea215c9a13f89ffdef527fe2c86857a3',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -376,7 +414,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260428_000002_canonical_metadata_foundation.sql
--- Checksum: 81a11a79752aaf753a7df9b09677f29d4e36eddd54b0b469ba081cd7646a84c3
+-- Checksum: d1f0fcd20797b4e293d82ef7439f24928cfeac81886c29b0cfdb69c872d9a120
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -394,7 +432,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS metadata_artists (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   source_provider TEXT NOT NULL,
   source_artist_id TEXT NOT NULL,
   musicbrainz_artist_id UUID NULL,
@@ -417,7 +455,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS metadata_artists_musicbrainz_artist_id_unique
   WHERE musicbrainz_artist_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS metadata_artist_aliases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   alias TEXT NOT NULL,
   locale TEXT NULL,
@@ -432,7 +470,7 @@ CREATE INDEX IF NOT EXISTS metadata_artist_aliases_artist_lookup_idx
   ON metadata_artist_aliases (metadata_artist_id, is_primary DESC, created_at ASC);
 
 CREATE TABLE IF NOT EXISTS metadata_release_groups (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   source_provider TEXT NOT NULL,
   source_release_group_id TEXT NOT NULL,
@@ -457,7 +495,7 @@ CREATE INDEX IF NOT EXISTS metadata_release_groups_artist_lookup_idx
   ON metadata_release_groups (metadata_artist_id, created_at ASC);
 
 CREATE TABLE IF NOT EXISTS metadata_releases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_release_group_id UUID NOT NULL REFERENCES metadata_release_groups(id) ON DELETE CASCADE,
   source_provider TEXT NOT NULL,
   source_release_id TEXT NOT NULL,
@@ -485,7 +523,7 @@ CREATE INDEX IF NOT EXISTS metadata_releases_release_group_lookup_idx
   ON metadata_releases (metadata_release_group_id, created_at ASC);
 
 CREATE TABLE IF NOT EXISTS metadata_media (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_release_id UUID NOT NULL REFERENCES metadata_releases(id) ON DELETE CASCADE,
   position INTEGER NOT NULL CHECK (position > 0),
   title TEXT NULL,
@@ -500,7 +538,7 @@ CREATE INDEX IF NOT EXISTS metadata_media_release_lookup_idx
   ON metadata_media (metadata_release_id, position ASC);
 
 CREATE TABLE IF NOT EXISTS metadata_recordings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   source_provider TEXT NOT NULL,
   source_recording_id TEXT NOT NULL,
   musicbrainz_recording_id UUID NULL,
@@ -519,7 +557,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS metadata_recordings_musicbrainz_recording_id_u
   WHERE musicbrainz_recording_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS metadata_tracks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_medium_id UUID NOT NULL REFERENCES metadata_media(id) ON DELETE CASCADE,
   metadata_recording_id UUID NULL REFERENCES metadata_recordings(id) ON DELETE SET NULL,
   position INTEGER NOT NULL CHECK (position > 0),
@@ -540,7 +578,7 @@ CREATE INDEX IF NOT EXISTS metadata_tracks_recording_lookup_idx
   WHERE metadata_recording_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS metadata_provider_snapshots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   provider TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id UUID NULL,
@@ -570,7 +608,7 @@ VALUES (
   '20260428_000002',
   '20260428_000002_canonical_metadata_foundation.sql',
   'canonical_metadata_foundation',
-  '81a11a79752aaf753a7df9b09677f29d4e36eddd54b0b469ba081cd7646a84c3',
+  'd1f0fcd20797b4e293d82ef7439f24928cfeac81886c29b0cfdb69c872d9a120',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -644,7 +682,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000001_import_candidate_foundation.sql
--- Checksum: 5c34acbfdd410c68c68b583af1e4d8444bf47e3596ee8129995e597f2ec971d8
+-- Checksum: 476939ce1e119ac99ecf8372b0bff540be4f2404e770c2374099d7c6d96a165f
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -662,7 +700,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_candidates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   source_provider TEXT NOT NULL,
   source_search_id TEXT NOT NULL,
   source_response_key TEXT NOT NULL,
@@ -695,7 +733,7 @@ CREATE INDEX IF NOT EXISTS import_candidates_normalized_payload_gin_idx
   ON import_candidates USING GIN (normalized_payload jsonb_path_ops);
 
 CREATE TABLE IF NOT EXISTS import_candidate_files (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   source_file_index INTEGER NOT NULL CHECK (source_file_index >= 0),
   filename TEXT NOT NULL,
@@ -730,7 +768,7 @@ VALUES (
   '20260430_000001',
   '20260430_000001_import_candidate_foundation.sql',
   'import_candidate_foundation',
-  '5c34acbfdd410c68c68b583af1e4d8444bf47e3596ee8129995e597f2ec971d8',
+  '476939ce1e119ac99ecf8372b0bff540be4f2404e770c2374099d7c6d96a165f',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -746,7 +784,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000002_import_candidate_review_events.sql
--- Checksum: 1ae9688ae3e3740e9ea54c8f6dafaef12c099bc3698c051a7198d52dfc9d9006
+-- Checksum: 278e7982e84c5aba4ea38e3a85d9f793254592c9dad1ee70e0796bb57771dc89
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -764,7 +802,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_candidate_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL,
   previous_status TEXT NULL,
@@ -793,7 +831,7 @@ VALUES (
   '20260430_000002',
   '20260430_000002_import_candidate_review_events.sql',
   'import_candidate_review_events',
-  '1ae9688ae3e3740e9ea54c8f6dafaef12c099bc3698c051a7198d52dfc9d9006',
+  '278e7982e84c5aba4ea38e3a85d9f793254592c9dad1ee70e0796bb57771dc89',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -809,7 +847,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000003_library_catalog_foundation.sql
--- Checksum: b18efdef348a6cab5c208a48722d9b14094e18f2baced920e35ead4ae4ddd567
+-- Checksum: fe82fcc78bdb39da557ab90fccf822f9d65ba2a88f6a2bf124fbcdd9016aa729
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -827,7 +865,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS library_roots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   name TEXT NOT NULL,
   path TEXT NOT NULL,
   canonical_path TEXT NOT NULL UNIQUE,
@@ -841,7 +879,7 @@ CREATE INDEX IF NOT EXISTS library_roots_enabled_idx
   ON library_roots (is_enabled, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS library_files (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   library_root_id UUID NOT NULL REFERENCES library_roots(id) ON DELETE CASCADE,
   canonical_path TEXT NOT NULL UNIQUE,
   relative_path TEXT NOT NULL,
@@ -885,7 +923,7 @@ VALUES (
   '20260430_000003',
   '20260430_000003_library_catalog_foundation.sql',
   'library_catalog_foundation',
-  'b18efdef348a6cab5c208a48722d9b14094e18f2baced920e35ead4ae4ddd567',
+  'fe82fcc78bdb39da557ab90fccf822f9d65ba2a88f6a2bf124fbcdd9016aa729',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -901,7 +939,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000004_library_file_tag_snapshots.sql
--- Checksum: 9d8e14fe3bd8cdbb9cedc1b7f43573c1ba54abe12fac8095a9205167d53a7fde
+-- Checksum: 7d1a55201645035f935d97d27c78e28d719e2071c2dc0f04fdff040eb991ab35
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -919,7 +957,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS file_tag_snapshots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   library_file_id UUID NOT NULL REFERENCES library_files(id) ON DELETE CASCADE,
   extractor TEXT NOT NULL,
   extractor_version TEXT NULL,
@@ -951,7 +989,7 @@ VALUES (
   '20260430_000004',
   '20260430_000004_library_file_tag_snapshots.sql',
   'library_file_tag_snapshots',
-  '9d8e14fe3bd8cdbb9cedc1b7f43573c1ba54abe12fac8095a9205167d53a7fde',
+  '7d1a55201645035f935d97d27c78e28d719e2071c2dc0f04fdff040eb991ab35',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -967,7 +1005,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000005_library_file_match_baseline.sql
--- Checksum: 3edb0951e02cda506413b6427925bcdc2c4df74f4568136024874fc953650790
+-- Checksum: 378e68fce24d78d6b3d437d24bd00895a434969addb9644e8b4dc8c8285d4608
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -985,7 +1023,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS library_file_matches (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   library_file_id UUID NOT NULL REFERENCES library_files(id) ON DELETE CASCADE,
   metadata_artist_id UUID NULL REFERENCES metadata_artists(id) ON DELETE SET NULL,
   metadata_release_group_id UUID NULL REFERENCES metadata_release_groups(id) ON DELETE SET NULL,
@@ -1023,7 +1061,7 @@ VALUES (
   '20260430_000005',
   '20260430_000005_library_file_match_baseline.sql',
   'library_file_match_baseline',
-  '3edb0951e02cda506413b6427925bcdc2c4df74f4568136024874fc953650790',
+  '378e68fce24d78d6b3d437d24bd00895a434969addb9644e8b4dc8c8285d4608',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -1039,7 +1077,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000006_library_release_reconciliation_baseline.sql
--- Checksum: cdd009c8ffb795b14edabe5e9323a511ce1b0ab6b82fe041d4320e5032dd14d2
+-- Checksum: 3f67acfe5628c27e3c06df00fda09844cd7ba738eec102b722391dfa086edd17
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -1057,7 +1095,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS library_release_reconciliations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   metadata_release_group_id UUID NOT NULL REFERENCES metadata_release_groups(id) ON DELETE CASCADE,
   metadata_release_id UUID NOT NULL REFERENCES metadata_releases(id) ON DELETE CASCADE,
@@ -1092,7 +1130,7 @@ VALUES (
   '20260430_000006',
   '20260430_000006_library_release_reconciliation_baseline.sql',
   'library_release_reconciliation_baseline',
-  'cdd009c8ffb795b14edabe5e9323a511ce1b0ab6b82fe041d4320e5032dd14d2',
+  '3f67acfe5628c27e3c06df00fda09844cd7ba738eec102b722391dfa086edd17',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -1108,7 +1146,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000007_metadata_artist_monitoring_baseline.sql
--- Checksum: 467768fbb751b54b2e2faddc1a12bf3e557267875298f4093219553420458d35
+-- Checksum: c1653440196884b45805760057d4ea9cecd69eed6881113b9345b0afbd0a9be2
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -1126,7 +1164,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS metadata_artist_monitoring (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   is_monitored BOOLEAN NOT NULL DEFAULT FALSE,
   monitored_release_group_types TEXT[] NOT NULL DEFAULT ARRAY['album', 'ep']::text[],
@@ -1149,7 +1187,7 @@ VALUES (
   '20260430_000007',
   '20260430_000007_metadata_artist_monitoring_baseline.sql',
   'metadata_artist_monitoring_baseline',
-  '467768fbb751b54b2e2faddc1a12bf3e557267875298f4093219553420458d35',
+  'c1653440196884b45805760057d4ea9cecd69eed6881113b9345b0afbd0a9be2',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -1165,7 +1203,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000008_library_wanted_release_baseline.sql
--- Checksum: 7834f58a8d960d557e469e56095860316b47057aa93ea5f3b0e021475d8607e3
+-- Checksum: 2209294b6cc559ca6d35cd4d23d2f5fb61320c1b41972138069db3385c4674f3
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -1183,7 +1221,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS library_wanted_releases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   metadata_release_group_id UUID NOT NULL REFERENCES metadata_release_groups(id) ON DELETE CASCADE,
   metadata_release_id UUID NOT NULL REFERENCES metadata_releases(id) ON DELETE CASCADE,
@@ -1225,7 +1263,7 @@ VALUES (
   '20260430_000008',
   '20260430_000008_library_wanted_release_baseline.sql',
   'library_wanted_release_baseline',
-  '7834f58a8d960d557e469e56095860316b47057aa93ea5f3b0e021475d8607e3',
+  '2209294b6cc559ca6d35cd4d23d2f5fb61320c1b41972138069db3385c4674f3',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -1241,7 +1279,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000009_library_discovery_request_baseline.sql
--- Checksum: 1f9d9b50b7434f7078d9c46e8dd872d1430dd1600327afa8e40c42f8348f6ee1
+-- Checksum: fa24f1db4a20988b23efae57fd9b14a14afadae8cbafd032ce15431504ba89ec
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -1259,7 +1297,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS library_discovery_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
   metadata_release_group_id UUID NOT NULL REFERENCES metadata_release_groups(id) ON DELETE CASCADE,
   metadata_release_id UUID NOT NULL REFERENCES metadata_releases(id) ON DELETE CASCADE,
@@ -1298,7 +1336,7 @@ VALUES (
   '20260430_000009',
   '20260430_000009_library_discovery_request_baseline.sql',
   'library_discovery_request_baseline',
-  '1f9d9b50b7434f7078d9c46e8dd872d1430dd1600327afa8e40c42f8348f6ee1',
+  'fa24f1db4a20988b23efae57fd9b14a14afadae8cbafd032ce15431504ba89ec',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -1314,7 +1352,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000010_import_execution_run_items.sql
--- Checksum: a596d76878e0e1aabad38b1f18f28719c350e57dfdbb21d755d1e0ee21313095
+-- Checksum: fe6b48b6f64efeb4e199ec8d7e393d9bc5622d06b9c96853f2813ddda647f82c
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -1332,7 +1370,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_execution_run_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   operation_run_id UUID NOT NULL REFERENCES operation_runs(id) ON DELETE CASCADE,
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   position INTEGER NOT NULL CHECK (position > 0),
@@ -1363,7 +1401,7 @@ VALUES (
   '20260430_000010',
   '20260430_000010_import_execution_run_items.sql',
   'import_execution_run_items',
-  'a596d76878e0e1aabad38b1f18f28719c350e57dfdbb21d755d1e0ee21313095',
+  'fe6b48b6f64efeb4e199ec8d7e393d9bc5622d06b9c96853f2813ddda647f82c',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -1497,7 +1535,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000013_import_apply_run_items.sql
--- Checksum: 68169a4b625c244993594b13926d7c55c31a4045b91d4a90198311f3f37f1f62
+-- Checksum: 24c76f2e1c79d01338a641462f174966ad6b9e36c79108dda5282977a65e661e
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -1515,7 +1553,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_apply_run_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   operation_run_id UUID NOT NULL REFERENCES operation_runs(id) ON DELETE CASCADE,
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   position INTEGER NOT NULL CHECK (position > 0),
@@ -1553,7 +1591,7 @@ VALUES (
   '20260430_000013',
   '20260430_000013_import_apply_run_items.sql',
   'import_apply_run_items',
-  '68169a4b625c244993594b13926d7c55c31a4045b91d4a90198311f3f37f1f62',
+  '24c76f2e1c79d01338a641462f174966ad6b9e36c79108dda5282977a65e661e',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -1569,7 +1607,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_000014_import_operations.sql
--- Checksum: 11127d8bd97959fb24883785975f5ea619d2402e2464bfb5f90a6e611e15fc27
+-- Checksum: 1a85f0781b7b3608b2d9590d87966652c74501f12e35acb42465fd4d63389d0d
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -1587,7 +1625,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_operations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   operation_run_id UUID NOT NULL REFERENCES operation_runs(id) ON DELETE CASCADE,
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   import_candidate_file_id UUID NOT NULL REFERENCES import_candidate_files(id) ON DELETE CASCADE,
@@ -1630,7 +1668,7 @@ VALUES (
   '20260430_000014',
   '20260430_000014_import_operations.sql',
   'import_operations',
-  '11127d8bd97959fb24883785975f5ea619d2402e2464bfb5f90a6e611e15fc27',
+  '1a85f0781b7b3608b2d9590d87966652c74501f12e35acb42465fd4d63389d0d',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -1646,7 +1684,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260430_235900_import_candidate_file_decisions.sql
--- Checksum: f8c9ce07258cbc2ff6f1a58f8dd2734c393cdbf48c8c550f6cfd0efeb77bda3c
+-- Checksum: dc48fdcd551db75647826d545533798794f9ded9c8e063400f29ab9a555e1079
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -1664,7 +1702,7 @@ SET migration_key = EXCLUDED.migration_key,
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_candidate_file_decisions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   import_candidate_file_id UUID NOT NULL REFERENCES import_candidate_files(id) ON DELETE CASCADE,
   decision_type TEXT NOT NULL
@@ -1697,7 +1735,796 @@ VALUES (
   '20260430_235900',
   '20260430_235900_import_candidate_file_decisions.sql',
   'import_candidate_file_decisions',
-  'f8c9ce07258cbc2ff6f1a58f8dd2734c393cdbf48c8c550f6cfd0efeb77bda3c',
+  'dc48fdcd551db75647826d545533798794f9ded9c8e063400f29ab9a555e1079',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260501_000001_artwork_unassigned_retention.sql
+-- Checksum: ec609b57caaca9b3f3f62c329c2935a39122d33926e3c25007cbde321026bc23
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE artwork_assets
+  ADD COLUMN IF NOT EXISTS unassigned_at TIMESTAMPTZ NULL;
+
+ALTER TABLE artwork_assets
+  ALTER COLUMN unassigned_at SET DEFAULT NOW();
+
+UPDATE artwork_assets AS assets
+SET unassigned_at = CASE
+      WHEN EXISTS (
+        SELECT 1
+        FROM artwork_assignments AS assignments
+        WHERE assignments.artwork_asset_id = assets.id
+      ) THEN NULL
+      ELSE NOW()
+    END
+WHERE assets.unassigned_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS artwork_assets_unassigned_cleanup_idx
+  ON artwork_assets (unassigned_at ASC, created_at ASC, id ASC)
+  WHERE unassigned_at IS NOT NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260501_000001',
+  '20260501_000001_artwork_unassigned_retention.sql',
+  'artwork_unassigned_retention',
+  'ec609b57caaca9b3f3f62c329c2935a39122d33926e3c25007cbde321026bc23',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260501_000015_operation_run_cancellation.sql
+-- Checksum: f97ee2bb3302e05e61ca7745c5da275585754dc632a61fc20569d0ec13bb798a
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE operation_runs
+  ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ NULL,
+  ADD COLUMN IF NOT EXISTS cancel_requested_by_user_id UUID NULL REFERENCES app_users(id),
+  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260501_000015',
+  '20260501_000015_operation_run_cancellation.sql',
+  'operation_run_cancellation',
+  'f97ee2bb3302e05e61ca7745c5da275585754dc632a61fc20569d0ec13bb798a',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260501_000016_operation_run_queue_retry.sql
+-- Checksum: 9315764e757b31a77b8c94f27554e849e2286d9f0ebc74fdbcf8d5224504a63f
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE operation_runs
+  ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  ADD COLUMN IF NOT EXISTS max_attempts INTEGER NOT NULL DEFAULT 1 CHECK (max_attempts >= 1),
+  ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ NULL,
+  ADD COLUMN IF NOT EXISTS claimed_by_instance_id TEXT NULL;
+
+CREATE INDEX IF NOT EXISTS operation_runs_pending_dispatch_idx
+  ON operation_runs (next_attempt_at ASC, started_at ASC, created_at ASC)
+  WHERE status = 'pending';
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260501_000016',
+  '20260501_000016_operation_run_queue_retry.sql',
+  'operation_run_queue_retry',
+  '9315764e757b31a77b8c94f27554e849e2286d9f0ebc74fdbcf8d5224504a63f',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260501_000017_operation_run_recovery_index.sql
+-- Checksum: 76fd7608ad35eb3ad5fb0b3b4f3cfa9f7e8ab04affe457d3ba2841f719452fc1
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE INDEX IF NOT EXISTS operation_runs_running_recovery_idx
+  ON operation_runs (started_at ASC, created_at ASC)
+  WHERE status = 'running';
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260501_000017',
+  '20260501_000017_operation_run_recovery_index.sql',
+  'operation_run_recovery_index',
+  '76fd7608ad35eb3ad5fb0b3b4f3cfa9f7e8ab04affe457d3ba2841f719452fc1',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260501_000018_metadata_refresh_schedule.sql
+-- Checksum: d7e05bd7d1041e5dce00c4ca71177e871ac6e599339f384e1b08b5f46e547e7b
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE metadata_artist_monitoring
+  ADD COLUMN IF NOT EXISTS last_refreshed_at TIMESTAMPTZ NULL,
+  ADD COLUMN IF NOT EXISTS next_refresh_at TIMESTAMPTZ NULL;
+
+CREATE INDEX IF NOT EXISTS metadata_artist_monitoring_due_refresh_idx
+  ON metadata_artist_monitoring (is_monitored, next_refresh_at ASC, updated_at DESC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260501_000018',
+  '20260501_000018_metadata_refresh_schedule.sql',
+  'metadata_refresh_schedule',
+  'd7e05bd7d1041e5dce00c4ca71177e871ac6e599339f384e1b08b5f46e547e7b',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000001_metadata_release_detection_events.sql
+-- Checksum: 44a73df113b905e149514770e6a93031b1e4042d0efbf31c1b73cce26629edcf
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS metadata_release_detection_events (
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE,
+  metadata_release_group_id UUID NOT NULL REFERENCES metadata_release_groups(id) ON DELETE CASCADE,
+  musicbrainz_release_group_id TEXT NULL,
+  provider TEXT NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  detection_type TEXT NOT NULL,
+  trigger_source TEXT NOT NULL,
+  monitoring_decision TEXT NOT NULL,
+  resulting_wanted_status TEXT NULL,
+  title TEXT NOT NULL,
+  primary_type TEXT NULL,
+  first_release_date DATE NULL,
+  operation_run_id UUID NULL REFERENCES operation_runs(id) ON DELETE SET NULL,
+  details JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS metadata_release_detection_events_artist_idx
+  ON metadata_release_detection_events (metadata_artist_id, occurred_at DESC, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS metadata_release_detection_events_run_idx
+  ON metadata_release_detection_events (operation_run_id)
+  WHERE operation_run_id IS NOT NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000001',
+  '20260502_000001_metadata_release_detection_events.sql',
+  'metadata_release_detection_events',
+  '44a73df113b905e149514770e6a93031b1e4042d0efbf31c1b73cce26629edcf',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000002_metadata_release_detection_pagination_idx.sql
+-- Checksum: 08fda81c1a583e855fc73add99bb648cd6143ad9d0e4996ff6b87b6409a3e714
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE INDEX IF NOT EXISTS metadata_release_detection_events_artist_page_idx
+  ON metadata_release_detection_events (metadata_artist_id, occurred_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS metadata_release_detection_events_occurred_idx
+  ON metadata_release_detection_events (occurred_at ASC, id ASC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000002',
+  '20260502_000002_metadata_release_detection_pagination_idx.sql',
+  'metadata_release_detection_pagination_idx',
+  '08fda81c1a583e855fc73add99bb648cd6143ad9d0e4996ff6b87b6409a3e714',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000003_app_user_provisioning_baseline.sql
+-- Checksum: c45b4f1d4f56b4711198570bb2a62381a4b8065ba27f2016568455069ae9b283
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE app_users
+  ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'local',
+  ADD COLUMN IF NOT EXISTS auth_subject TEXT NULL,
+  ADD COLUMN IF NOT EXISTS managed_library_relative_root TEXT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS app_users_auth_provider_subject_unique
+  ON app_users (auth_provider, auth_subject)
+  WHERE auth_subject IS NOT NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000003',
+  '20260502_000003_app_user_provisioning_baseline.sql',
+  'app_user_provisioning_baseline',
+  'c45b4f1d4f56b4711198570bb2a62381a4b8065ba27f2016568455069ae9b283',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000004_app_user_managed_library_root_uniqueness.sql
+-- Checksum: c53cbdf55cae8cf9b208b4acfd7840fdd221b67f9986c501b0f3505c28769b46
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE UNIQUE INDEX IF NOT EXISTS app_users_managed_library_relative_root_unique
+  ON app_users (managed_library_relative_root)
+  WHERE managed_library_relative_root IS NOT NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000004',
+  '20260502_000004_app_user_managed_library_root_uniqueness.sql',
+  'app_user_managed_library_root_uniqueness',
+  'c53cbdf55cae8cf9b208b4acfd7840fdd221b67f9986c501b0f3505c28769b46',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000005_media_request_intake.sql
+-- Checksum: 489ca83c79810098d8117d4672c85f02dd1d7985376ff5eac076435f119c769e
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS media_requests (
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  requested_by_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  request_kind TEXT NOT NULL,
+  request_state TEXT NOT NULL,
+  artist_name TEXT NULL,
+  release_title TEXT NULL,
+  track_title TEXT NULL,
+  source_url TEXT NULL,
+  source_provider TEXT NULL,
+  normalized_query TEXT NOT NULL,
+  matched_metadata_release_group_id UUID NULL REFERENCES metadata_release_groups(id) ON DELETE SET NULL,
+  matched_metadata_release_id UUID NULL REFERENCES metadata_releases(id) ON DELETE SET NULL,
+  notes TEXT NULL,
+  evidence JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT media_requests_kind_check CHECK (request_kind IN ('release', 'track', 'external_url')),
+  CONSTRAINT media_requests_state_check CHECK (request_state IN ('already_exists', 'needs_fetch', 'needs_review')),
+  CONSTRAINT media_requests_payload_check CHECK (
+    (request_kind = 'release' AND artist_name IS NOT NULL AND release_title IS NOT NULL AND track_title IS NULL)
+    OR (request_kind = 'track' AND artist_name IS NOT NULL AND track_title IS NOT NULL)
+    OR (request_kind = 'external_url' AND source_url IS NOT NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS media_requests_requested_by_user_created_at_idx
+  ON media_requests (requested_by_user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS media_requests_state_created_at_idx
+  ON media_requests (request_state, created_at DESC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000005',
+  '20260502_000005_media_request_intake.sql',
+  'media_request_intake',
+  '489ca83c79810098d8117d4672c85f02dd1d7985376ff5eac076435f119c769e',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000006_uuid_surrogate_key_policy.sql
+-- Checksum: 984daae6e682307349e8cb5cc2d92af994733dc3cdd98505cac52cd946849e43
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION harmoniarr_generate_uuid()
+RETURNS UUID
+LANGUAGE plpgsql
+VOLATILE
+AS $$
+DECLARE
+  generated_id UUID;
+BEGIN
+  BEGIN
+    EXECUTE 'SELECT uuidv7()' INTO generated_id;
+    RETURN generated_id;
+  EXCEPTION
+    WHEN undefined_function THEN
+      RETURN gen_random_uuid();
+  END;
+END;
+$$;
+
+ALTER TABLE IF EXISTS schema_migrations ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS app_users ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS refresh_tokens ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS api_keys ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS encrypted_secrets ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS audit_events ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS app_settings ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS maintenance_locks ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS admin_recovery_runs ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS operation_runs ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS job_leases ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS artwork_assets ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS artwork_assignments ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_artists ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_artist_aliases ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_release_groups ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_releases ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_media ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_recordings ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_tracks ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_provider_snapshots ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS import_candidates ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS import_candidate_files ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS import_candidate_events ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS library_roots ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS library_files ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS file_tag_snapshots ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS library_file_matches ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS library_release_reconciliations ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_artist_monitoring ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS library_wanted_releases ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS library_discovery_requests ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS import_execution_run_items ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS import_apply_run_items ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS import_operations ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS import_candidate_file_decisions ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS metadata_release_detection_events ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+ALTER TABLE IF EXISTS media_requests ALTER COLUMN id SET DEFAULT harmoniarr_generate_uuid();
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000006',
+  '20260502_000006_uuid_surrogate_key_policy.sql',
+  'uuid_surrogate_key_policy',
+  '984daae6e682307349e8cb5cc2d92af994733dc3cdd98505cac52cd946849e43',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000007_import_candidate_file_lossy_derivative_decision.sql
+-- Checksum: 4999a966c3db6ff6b3392fbb834a0388150fd779527fa6d88518238fdc07c8bd
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE import_candidate_file_decisions
+  DROP CONSTRAINT IF EXISTS import_candidate_file_decisions_decision_type_check;
+
+ALTER TABLE import_candidate_file_decisions
+  ADD CONSTRAINT import_candidate_file_decisions_decision_type_check
+  CHECK (decision_type IN ('skip', 'allow_lossy_derivative'));
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000007',
+  '20260502_000007_import_candidate_file_lossy_derivative_decision.sql',
+  'import_candidate_file_lossy_derivative_decision',
+  '4999a966c3db6ff6b3392fbb834a0388150fd779527fa6d88518238fdc07c8bd',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000007_provider_ingest_request_intents.sql
+-- Checksum: a48e97c2581eae43db5d8deeca1f97d9f823adb3bdef4bae0bb2b9ccb64b2896
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS provider_ingest_requests (
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  media_request_id UUID NOT NULL REFERENCES media_requests(id) ON DELETE CASCADE,
+  source_provider TEXT NOT NULL,
+  source_resource_type TEXT NOT NULL,
+  ingest_target_type TEXT NOT NULL,
+  source_identifier TEXT NOT NULL,
+  canonical_url TEXT NOT NULL,
+  page_number INTEGER NOT NULL DEFAULT 1 CHECK (page_number > 0),
+  page_cursor TEXT NULL,
+  status TEXT NOT NULL DEFAULT 'planned',
+  evidence JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT provider_ingest_requests_source_provider_check CHECK (source_provider IN ('spotify', 'youtube', 'apple_music')),
+  CONSTRAINT provider_ingest_requests_source_resource_type_check CHECK (source_resource_type IN ('playlist', 'artist', 'release', 'track', 'video')),
+  CONSTRAINT provider_ingest_requests_ingest_target_type_check CHECK (ingest_target_type IN ('playlist_page', 'artist', 'release', 'track', 'video')),
+  CONSTRAINT provider_ingest_requests_status_check CHECK (status IN ('planned', 'processing', 'completed', 'failed', 'unsupported'))
+);
+
+CREATE INDEX IF NOT EXISTS provider_ingest_requests_media_request_idx
+  ON provider_ingest_requests (media_request_id, created_at ASC);
+
+CREATE INDEX IF NOT EXISTS provider_ingest_requests_status_idx
+  ON provider_ingest_requests (status, source_provider, created_at ASC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000007',
+  '20260502_000007_provider_ingest_request_intents.sql',
+  'provider_ingest_request_intents',
+  'a48e97c2581eae43db5d8deeca1f97d9f823adb3bdef4bae0bb2b9ccb64b2896',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE

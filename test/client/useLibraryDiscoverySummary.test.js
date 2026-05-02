@@ -107,3 +107,50 @@ test('useLibraryDiscoverySummary starts a protected discovery run and refreshes 
   assert.equal(workflow.isStarting.value, false);
   assert.equal(workflow.latestRun.value.id, 'run-9');
 });
+
+test('useLibraryDiscoverySummary can load an exact historical discovery run independently of the latest summary run', async () => {
+  const workflow = useLibraryDiscoverySummary({
+    fetchLibraryDiscoveryRunDetail: async (runId) => ({
+      libraryDiscoveryRun: {
+        checkedAt: '2026-05-01T01:05:00.000Z',
+        run: {
+          candidateCount: 4,
+          dispatchedCount: 2,
+          id: runId,
+          status: 'failed',
+          triggerSource: 'manual',
+        },
+      },
+    }),
+    fetchLibraryDiscoverySummary: async () => ({
+      heartbeat: {
+        intervalLabel: '15 minutes',
+        intervalMs: 900000,
+        mode: 'automatic',
+        source: 'default',
+      },
+      lastEvaluatedAt: '2026-05-01T00:30:00.000Z',
+      latestRun: {
+        id: 'discovery-run-latest',
+        status: 'completed',
+      },
+      nextEligibleAt: '2026-05-01T02:00:00.000Z',
+      requestCounts: {
+        blocked: 0,
+        cooldown: 2,
+        ready: 1,
+        totalRequests: 3,
+      },
+      summary: {
+        status: 'ready',
+        message: '1 discovery request is ready to search now.',
+      },
+    }),
+  });
+
+  await workflow.loadLibraryDiscoverySummary({ preferredRunId: 'discovery-run-older-3' });
+
+  assert.equal(workflow.selectedRunId.value, 'discovery-run-older-3');
+  assert.equal(workflow.currentRun.value.id, 'discovery-run-older-3');
+  assert.equal(workflow.runDetailErrorMessage.value, '');
+});

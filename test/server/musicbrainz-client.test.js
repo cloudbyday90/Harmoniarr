@@ -14,6 +14,7 @@ function createJsonResponse(body, { status = 200, headers = {} } = {}) {
 
 function createTestClient({ fetchImpl, sleepImpl = async () => {} } = {}) {
   return createMusicBrainzClient({
+    allowedHosts: ['musicbrainz.test'],
     baseUrl: 'https://musicbrainz.test/ws/2',
     contactUrl: 'https://harmoniarr.test/contact',
     fetchImpl,
@@ -66,6 +67,7 @@ test('MusicBrainz client retries throttled responses using Retry-After metadata'
   assert.equal(url.toString(), 'https://musicbrainz.test/ws/2/artist?fmt=json&query=Autechre&limit=1&offset=0');
   assert.equal(options.headers.Accept, 'application/json');
   assert.equal(options.headers['User-Agent'], 'Harmoniarr/0.1.0-beta (https://harmoniarr.test/contact)');
+  assert.equal(options.redirect, 'error');
 });
 
 test('MusicBrainz client exposes throttling details when retries are exhausted', async (t) => {
@@ -76,6 +78,7 @@ test('MusicBrainz client exposes throttling details when retries are exhausted',
     },
   }));
   const client = createMusicBrainzClient({
+    allowedHosts: ['musicbrainz.test'],
     baseUrl: 'https://musicbrainz.test/ws/2',
     contactEmail: 'ops@harmoniarr.test',
     fetchImpl,
@@ -124,4 +127,16 @@ test('MusicBrainz client classifies non-retryable upstream failures as request f
   );
 
   assert.equal(fetchImpl.mock.callCount(), 1);
+});
+
+test('MusicBrainz client rejects insecure or private override base URLs', async () => {
+  assert.throws(
+    () => createMusicBrainzClient({
+      baseUrl: 'http://127.0.0.1:8080/ws/2',
+      contactUrl: 'https://harmoniarr.test/contact',
+      fetchImpl: async () => createJsonResponse({}),
+    }),
+    (error) => error?.code === 'musicbrainz_misconfigured'
+      && error?.message === 'Invalid MusicBrainz base URL: http://127.0.0.1:8080/ws/2',
+  );
 });

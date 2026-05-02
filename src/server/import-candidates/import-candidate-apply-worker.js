@@ -16,6 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
+import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+
 function buildRunItems(importPendingCandidates) {
   return importPendingCandidates.map((candidate, index) => ({
     applySnapshot: {
@@ -73,6 +76,14 @@ function buildApplyStatusMessage({ applyResult, importStatusCode }) {
     message = `${message} ${summary.skippedFileCount} colliding file${summary.skippedFileCount === 1 ? ' was' : 's were'} skipped by saved operator decision.`;
   }
 
+  if ((summary.transcodePreflightFailedCount ?? 0) > 0) {
+    message = `${message} ${summary.transcodePreflightFailedCount} transcode preflight validation${summary.transcodePreflightFailedCount === 1 ? ' check failed' : ' checks failed'} and should be reviewed.`;
+  }
+
+  if ((summary.transcodePreflightUnavailableCount ?? 0) > 0) {
+    message = `${message} ${summary.transcodePreflightUnavailableCount} transcode preflight validation${summary.transcodePreflightUnavailableCount === 1 ? ' check was skipped because ffmpeg is unavailable' : ' checks were skipped because ffmpeg is unavailable'}.`;
+  }
+
   return importStatusCode === 'ready_with_warnings'
     ? `${message} Import preview warnings were present when the run started.`
     : message;
@@ -100,8 +111,11 @@ export function createImportCandidateApplyWorker({
     },
     importPendingCandidates: [],
   }),
+  createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
+  isCancellationRequested,
   markImportCandidateApplied = async () => null,
   markRunCompleted,
+  markRunCancelled,
   markRunFailed,
   markRunStarted,
   previewImportCandidateApply = async () => ({
@@ -110,6 +124,7 @@ export function createImportCandidateApplyWorker({
     summary: { status: 'blocked' },
   }),
   releaseLease,
+  renewLease,
   replaceImportApplyRunItems = async () => [],
   updateImportApplyRunItem = async () => null,
 } = {}) {
@@ -117,9 +132,15 @@ export function createImportCandidateApplyWorker({
 
   async function runApply({ executableCandidateCount, requestedCandidateCount, runId }) {
     let finalLeaseStatus = 'completed';
+    let leaseHeartbeat = null;
 
     try {
       await acquireLease({ runId });
+      if (renewLease) {
+        leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
+        leaseHeartbeat.start();
+      }
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
       await markRunStarted({
         runId,
         summary: {
@@ -142,6 +163,7 @@ export function createImportCandidateApplyWorker({
       };
 
       for (const summaryCandidate of importPendingSummary.importPendingCandidates ?? []) {
+        await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
         const baseSnapshot = createBaseSnapshot(summaryCandidate);
 
         if (summaryCandidate.importStatus.code === 'blocked') {
@@ -173,6 +195,8 @@ export function createImportCandidateApplyWorker({
           const itemStatus = (applyResult.summary.failedFileCount ?? 0) > 0
             ? 'apply_failed'
             : summaryCandidate.importStatus.code === 'ready_with_warnings'
+              || (applyResult.summary.transcodePreflightFailedCount ?? 0) > 0
+              || (applyResult.summary.transcodePreflightUnavailableCount ?? 0) > 0
               || (applyResult.summary.skippedFileCount ?? 0) > 0
               ? 'applied_with_warnings'
               : 'applied';
@@ -251,6 +275,20 @@ export function createImportCandidateApplyWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunCancellationError(error)) {
+        finalLeaseStatus = 'cancelled';
+        await markRunCancelled({
+          runId,
+          summary: {
+            currentStep: 'Import apply cancelled',
+            executionMode: 'move',
+            executableCandidateCount,
+            requestedCandidateCount,
+          },
+        });
+        return;
+      }
+
       finalLeaseStatus = 'failed';
       await markRunFailed({
         errorMessage: error.message,
@@ -263,6 +301,7 @@ export function createImportCandidateApplyWorker({
         },
       });
     } finally {
+      leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
       await releaseLease({ runId, status: finalLeaseStatus });
     }

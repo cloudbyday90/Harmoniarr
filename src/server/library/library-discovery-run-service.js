@@ -18,6 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createLibraryDiscoveryRunService({
   createOperationRun = async () => {
@@ -25,10 +26,9 @@ export function createLibraryDiscoveryRunService({
   },
   getActiveRun = async () => null,
   recordAuditEventFn = recordAuditEvent,
-  startWorkerRun = async () => {
-    throw new Error('startWorkerRun dependency is required');
-  },
 } = {}) {
+  const operationDescriptor = operationRunRegistry.libraryDiscoveryDispatch;
+
   async function startLibraryDiscoveryRun({
     requestMetadata = null,
     triggerSource = 'manual',
@@ -54,17 +54,10 @@ export function createLibraryDiscoveryRunService({
       },
       entityId: run.id,
       entityType: 'operation_run',
-      eventType: 'library_discovery_dispatch_started',
+      eventType: operationDescriptor.startedEventType,
       ipAddress: requestMetadata?.ipAddress ?? null,
       summary: 'Library discovery dispatch started',
       userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    await startWorkerRun({
-      requestMetadata,
-      runId: run.id,
-      triggerSource,
-      triggeredByUserId,
     });
 
     return {

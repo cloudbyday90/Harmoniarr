@@ -1,7 +1,7 @@
 # Harmoniarr Security Policy And Posture
 
 - **Version:** Planning baseline
-- **Last Updated:** 2026-04-27
+- **Last Updated:** 2026-05-01
 - **Scope:** Harmoniarr UI, API, embedded Postgres runtime, background workers, slskd integration, metadata providers, import pipeline, media tooling, and operator-facing deployment posture
 
 ---
@@ -31,6 +31,8 @@ Harmoniarr's security posture should optimize for the actual risks of the produc
 
 The app does not need enterprise IAM in v1. It does need strong local auth, clear privilege boundaries, safe file handling, and good operator visibility.
 
+Harmoniarr should be secured like a self-hosted companion app, not like a hosted business system. The goal is to reduce realistic self-hosted risk and operator foot-guns, not to chase enterprise control catalogs, formal SLAs, or best-in-class managed-service posture for their own sake.
+
 ---
 
 ## Threat Model Baseline
@@ -43,6 +45,7 @@ Harmoniarr should assume the following are untrusted or potentially hostile:
 - User-supplied service URLs and configuration values.
 - External API responses.
 - Generated code that has not been reviewed.
+- Every HTTP request field that crosses an API boundary, including headers, cookies, params, query values, methods, bodies, content types, and route sequencing.
 
 Harmoniarr should assume the following are sensitive:
 
@@ -53,6 +56,73 @@ Harmoniarr should assume the following are sensitive:
 - Filesystem path mappings.
 - Import destinations and library state.
 - Audit history and debug payloads that expose local infrastructure details.
+
+---
+
+## API Exposure And Entrypoint Posture
+
+Harmoniarr should treat exposed APIs as both the front door and the windows of the system.
+
+- The front door is the intended authenticated browser and integration API surface.
+- The windows are smaller or easier-to-overlook entrypoints such as bootstrap routes, health and diagnostics endpoints, static-file serving, SPA fallbacks, provider configuration, outbound fetch targets, import filenames and paths, and any future webhook or upload surfaces.
+
+The security objective is not only to protect authenticated routes, but to ensure that every exposed or indirectly reachable entrypoint is intentionally small, explicitly classified, and hardened against malformed, abusive, and out-of-sequence requests.
+
+### API Surface Rules
+
+- Maintain an explicit route inventory and classify each route as public, authenticated, admin-only, integration-only, or internal-only.
+- Deny by default; no route should become public by omission.
+- Keep management and diagnostics endpoints off the public Internet whenever practical.
+- Prefer separate hosts, ports, or reverse-proxy rules for highly sensitive control-plane surfaces when deployment constraints allow it.
+- Return generic 404 and 500 responses; do not expose framework defaults, debug stacks, or undeclared endpoints.
+- Do not rely on the frontend to preserve workflow sequencing; privileged state transitions must validate current server-side state before acting.
+
+### Request Shaping And Input Rules
+
+- Validate all request inputs on the server side as early as possible, including params, query, headers, cookies, and JSON bodies.
+- Use allowlisted schemas, enums, ranges, and length limits rather than denylist filtering.
+- Apply both syntactic validation and semantic validation.
+- Reject unexpected fields on privileged mutation routes to avoid mass-assignment style drift.
+- Normalize free-form text before deeper processing where canonicalization matters.
+- Keep regexes simple, anchored, and reviewable; avoid ReDoS-prone patterns.
+- Enforce request body size limits and endpoint-specific payload limits.
+- Enforce supported request and response content types explicitly; do not accept or emit undeclared types.
+- Treat repeated validation failures, unsupported methods, and out-of-contract content types as abuse signals worth logging and rate limiting.
+
+### Browser And API Perimeter Controls
+
+- Send security headers for browser-reachable responses, including at minimum correct `Content-Type`, `X-Content-Type-Options: nosniff`, appropriate cache control for sensitive responses, and a coherent CSP/header baseline for HTML responses.
+- Default browser-consumed API responses to `Cache-Control: no-store` unless a narrower, explicitly reviewed caching policy is introduced for a specific route family.
+- Keep CORS disabled unless a cross-origin caller is intentionally supported; when enabled, scope origins, methods, and headers narrowly.
+- Rate-limit authentication, bootstrap, recovery, search-dispatch, import-trigger, and other abuse-prone routes.
+- Prefer HTTPS and secure cookies in any non-local deployment, but make those controls explicit operator opt-ins so local-only HTTP installs do not inherit a half-configured transport posture.
+- Keep sensitive credentials, tokens, and API keys out of URLs.
+
+### Outbound Request And Third-Party API Rules
+
+- Treat third-party API responses as untrusted input, not trusted data.
+- Do not accept arbitrary outbound URLs when the target set is known; prefer allowlisted hosts or host patterns.
+- When a configurable service endpoint is necessary, validate scheme, host, port, and path expectations explicitly.
+- Prefer exact host allowlists for fixed integrations and tightly scoped suffix allowlists only when subdomain flexibility is truly required.
+- Block localhost, link-local, RFC1918, and metadata-service destinations for user-configurable outbound calls unless a deployment-specific rule explicitly requires them.
+- Disable automatic redirect following for user-influenced outbound requests unless the redirect target is revalidated.
+- Pair application-layer validation with network-layer egress restrictions where practical.
+
+### File, Path, And Import Entrypoint Rules
+
+- Treat downloaded archives, folders, filenames, tags, and embedded metadata as hostile input until validated.
+- Never trust user-controlled or provider-controlled filenames for final storage names.
+- Normalize and constrain path joins so import, staging, and library destinations cannot escape approved roots.
+- Enforce size, type, and content checks before later parser, FFmpeg, archive, or metadata-processing stages are introduced.
+- Keep imported or uploaded content outside any web-served root unless a dedicated safe-serving layer exists.
+
+### Inventory, Observability, And Failure Posture
+
+- Keep a current inventory of public and privileged endpoints, supported content types, and externally reachable hosts.
+- Keep a code-level route inventory under version control and fail validation when registered routes drift from that declared inventory.
+- Audit privileged mutations, authentication events, validation abuse, and outbound request failures with redaction.
+- Prefer normalized error codes and safe summaries over raw upstream or parser failures.
+- Make rate-limit, validation, and authorization denials observable without leaking internal details to clients.
 
 ---
 
@@ -131,6 +201,7 @@ Harmoniarr should use explicit route access tiers.
 - Require explicit registration of public routes.
 - Require authenticated user context for normal app operations.
 - Require admin role for sensitive system and configuration actions.
+- Require fresh admin sessions for privileged mutation routes that change settings, trigger operator-controlled execution, or mutate metadata/import/library state.
 - Do not let ordinary API keys act as admin users in v1.
 
 Recovery-specific authorization rules:
@@ -171,13 +242,16 @@ Manual overrides are high-trust user actions and should be preserved as explicit
 
 ## Browser And CSRF Posture
 
-If browser auth uses cookies, Harmoniarr should protect mutating requests with CSRF checks.
+If browser auth uses cookies, Harmoniarr should protect mutating requests with CSRF checks by default.
 
 - Require CSRF token headers for cookie-authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests.
 - Exempt safe methods.
 - Exempt setup/bootstrap endpoints where CSRF would deadlock first-run setup.
 - Exempt refresh endpoints where CSRF expiry would otherwise break valid remember-me sessions.
 - Exempt API-key-authenticated requests and bearer-token requests that do not rely on browser cookies.
+- Allow an explicit deployment-level opt-out only for tightly trusted local-only or separately network-restricted installs.
+- Do not treat a reverse proxy alone as a general substitute for CSRF protection on cookie-authenticated browser writes.
+- Treat secure cookies, HTTPS enforcement, and HSTS as sibling deployment-level opt-ins that should normally be enabled together when the app is actually served behind TLS.
 
 The shared frontend API client should be the only supported path for authenticated UI writes.
 
@@ -194,14 +268,15 @@ These exemptions apply only to the narrow bootstrap-admin recovery flow and shou
 
 ## API Key Posture
 
-API keys should exist for integrations and automation, not for normal browser administration.
+API keys, if Harmoniarr needs them at all, should exist only for limited local automation or narrowly scoped integrations, not for normal browser administration.
 
-- Support scoped permissions such as `read_only` and `read_write`.
-- Mask keys in normal responses and UI displays.
-- Allow explicit reveal only in controlled admin views when necessary.
+- Do not make first-party API keys a required v1 feature unless a real local automation use case exists.
+- Keep any token model intentionally small and understandable; a broad enterprise-style scope matrix is not required.
+- Prefer show-once creation semantics over routine plaintext reveal endpoints.
+- Mask tokens in normal responses and UI displays.
 - Record last-used and usage metadata where practical.
-- Support revocation and rotation.
-- Avoid using API keys for admin-only system actions in v1.
+- Support revocation and simple reissue or expiration when tokens are present.
+- Avoid using non-browser tokens for admin-only system actions in v1.
 
 ---
 
@@ -329,7 +404,7 @@ Harmoniarr is intended for Docker-first deployment and should follow a conservat
 
 Where multiple containers are involved, the deployment must make the shared download and library paths explicit. Harmoniarr should not rely on undocumented host-path coincidence between itself and `slskd`.
 
-Reverse proxy support is encouraged for production HTTPS, but application-level auth and authorization remain Harmoniarr's responsibility.
+Reverse proxy support is encouraged for non-local or TLS-terminated deployments, but application-level auth and authorization remain Harmoniarr's responsibility.
 
 ---
 

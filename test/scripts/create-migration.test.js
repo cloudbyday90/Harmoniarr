@@ -31,7 +31,7 @@ test('create-migration writes a filename to stdout without a prefix', async () =
 
     const filename = result.stdout.trim();
     const content = await readFile(resolve(tempDir, 'src/server/migrations', filename), 'utf8');
-    assert.equal(content, '-- forward-only migration\nBEGIN;\n\nCOMMIT;\n');
+    assert.equal(content, '-- forward-only migration\nBEGIN;\n\n-- Use DEFAULT harmoniarr_generate_uuid() for UUID surrogate primary keys.\n\nCOMMIT;\n');
   });
 });
 

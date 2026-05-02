@@ -13,12 +13,10 @@ test('startImportCandidateExecutionRun queues a planning run for selected candid
     },
   }));
   const recordAuditEventFn = t.mock.fn(async () => {});
-  const startWorkerRun = t.mock.fn(async () => {});
   const service = createImportCandidateExecutionService({
     createOperationRun,
     listImportCandidates,
     recordAuditEventFn,
-    startWorkerRun,
   });
 
   const result = await service.startImportCandidateExecutionRun({
@@ -40,10 +38,6 @@ test('startImportCandidateExecutionRun queues a planning run for selected candid
     requestedCandidateCount: 2,
     status: 'pending',
     triggeredByUserId: 'user-1',
-  }]);
-  assert.deepEqual(startWorkerRun.mock.calls[0].arguments, [{
-    requestedCandidateCount: 2,
-    runId: 'run-1',
   }]);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
 });

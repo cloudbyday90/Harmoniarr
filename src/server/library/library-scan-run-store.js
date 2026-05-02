@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import { createOperationRunStore } from '../operation-run-store.js';
+import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
@@ -54,10 +55,11 @@ function normalizeRun(row) {
 export function createLibraryScanRunStore({
   getPoolFn = getPool,
 } = {}) {
+  const operationDescriptor = operationRunRegistry.libraryScan;
   const operationRunStore = createOperationRunStore({
     getPoolFn,
-    leaseJobType: 'library_scan',
-    operationType: 'library_scan',
+    leaseJobType: operationDescriptor.leaseJobType,
+    operationType: operationDescriptor.operationType,
   });
 
   async function createOperationRun({ libraryRoot, status = 'pending', triggeredByUserId = null }) {
@@ -78,14 +80,22 @@ export function createLibraryScanRunStore({
     return normalizeRun(await operationRunStore.getLatestRun());
   }
 
+  async function getRunById(runId) {
+    return normalizeRun(await operationRunStore.getRunById(runId));
+  }
+
   return {
     acquireLease: operationRunStore.acquireLease,
     createOperationRun,
     getActiveRun,
+    getRunById,
     getLatestRun,
+    isCancellationRequested: operationRunStore.isCancellationRequested,
+    markRunCancelled: operationRunStore.markRunCancelled,
     markRunCompleted: operationRunStore.markRunCompleted,
     markRunFailed: operationRunStore.markRunFailed,
     markRunStarted: operationRunStore.markRunStarted,
     releaseLease: operationRunStore.releaseLease,
+    renewLease: operationRunStore.renewLease,
   };
 }

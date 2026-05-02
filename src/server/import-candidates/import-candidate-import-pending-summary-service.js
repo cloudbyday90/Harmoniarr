@@ -106,7 +106,7 @@ export function createImportCandidateImportPendingSummaryService({
       ? createImportCandidateApplyPreviewService({ previewImportCandidate }).previewImportCandidateApply
       : null);
 
-  async function buildImportPendingCandidateSummary({ limit } = {}) {
+  async function buildImportPendingCandidateSummary({ limit, targetUser = null } = {}) {
     const normalizedLimit = normalizeStageSummaryLimit(limit);
     const importPendingQueue = await listImportCandidates({
       limit: normalizedLimit,
@@ -123,7 +123,7 @@ export function createImportCandidateImportPendingSummaryService({
     }
 
     const importPendingCandidates = await Promise.all(importPendingQueue.candidates.map(async (candidate) => {
-      const applyPreview = await resolveApplyPreview({ importCandidateId: candidate.id });
+      const applyPreview = await resolveApplyPreview({ importCandidateId: candidate.id, targetUser });
       const importStatus = resolveImportStatus(applyPreview);
 
       return {

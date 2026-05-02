@@ -21,6 +21,33 @@ import { getPool } from '../database.js';
 export function createLibraryWantedReleaseStore({
   getPoolFn = getPool,
 } = {}) {
+  async function listWantedStatusesForReleaseGroups({ metadataReleaseGroupIds } = {}) {
+    if (!Array.isArray(metadataReleaseGroupIds) || metadataReleaseGroupIds.length < 1) {
+      return [];
+    }
+
+    const result = await getPoolFn().query(
+      `
+        SELECT
+          metadata_release_group_id,
+          CASE
+            WHEN BOOL_OR(wanted_status = 'missing') THEN 'missing'
+            WHEN BOOL_OR(wanted_status = 'partial') THEN 'partial'
+            ELSE MIN(wanted_status)
+          END AS wanted_status
+        FROM library_wanted_releases
+        WHERE metadata_release_group_id::text = ANY($1::text[])
+        GROUP BY metadata_release_group_id
+      `,
+      [metadataReleaseGroupIds],
+    );
+
+    return result.rows.map((row) => ({
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      wantedStatus: row.wanted_status,
+    }));
+  }
+
   async function replaceLibraryWantedReleases({ wantedReleases }) {
     const pool = getPoolFn();
     const client = await pool.connect();
@@ -86,6 +113,7 @@ export function createLibraryWantedReleaseStore({
   }
 
   return {
+    listWantedStatusesForReleaseGroups,
     replaceLibraryWantedReleases,
   };
 }

@@ -84,6 +84,13 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   const priorEvidence = row.prior_evidence && typeof row.prior_evidence === 'object'
     ? row.prior_evidence
     : {};
+  const requestSourceEvidence = row.source_media_request_id
+    ? {
+        sourceMediaRequestId: row.source_media_request_id,
+        sourceRequestKind: row.source_request_kind ?? null,
+        sourceRequestedByUserId: row.source_requested_by_user_id ?? null,
+      }
+    : {};
   const releaseDateDeadline = buildReleaseDateInstant(row.release_date);
   const cooldownDeadline = buildCooldownDeadline(row.last_search_at, automaticCooldownMs);
 
@@ -92,6 +99,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       blockedReason: null,
       evidence: {
         ...priorEvidence,
+        ...requestSourceEvidence,
         priorBlockedReason: row.blocked_reason ?? null,
         strategy: 'manual_override',
         wantedStrategy: row.wanted_strategy ?? null,
@@ -119,6 +127,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
     blockedReason: automaticState.blockedReason,
     evidence: {
       ...priorEvidence,
+      ...requestSourceEvidence,
       automaticCooldownMs,
       cooldownDeadline: cooldownDeadline?.toISOString() ?? null,
       releaseDateGate: releaseDateDeadline?.toISOString() ?? null,
@@ -149,22 +158,114 @@ export function createLibraryDiscoveryRequestService({
     const now = getNow();
     const result = await pool.query(
       `
+        WITH current_discovery AS (
+          SELECT
+            metadata_release_id,
+            search_mode,
+            blocked_reason,
+            evidence,
+            last_search_at,
+            manual_requested_at
+          FROM library_discovery_requests
+        ),
+        monitored_sources AS (
+          SELECT
+            1 AS source_priority,
+            library_wanted_releases.metadata_artist_id,
+            library_wanted_releases.metadata_release_group_id,
+            library_wanted_releases.metadata_release_id,
+            library_wanted_releases.release_date,
+            library_wanted_releases.wanted_status,
+            library_wanted_releases.evidence->>'strategy' AS wanted_strategy,
+            NULL::uuid AS source_media_request_id,
+            NULL::text AS source_request_kind,
+            NULL::uuid AS source_requested_by_user_id,
+            current_discovery.search_mode,
+            current_discovery.blocked_reason,
+            current_discovery.evidence AS prior_evidence,
+            current_discovery.last_search_at,
+            current_discovery.manual_requested_at
+          FROM library_wanted_releases
+          LEFT JOIN current_discovery
+            ON current_discovery.metadata_release_id = library_wanted_releases.metadata_release_id
+        ),
+        request_sources AS (
+          SELECT
+            0 AS source_priority,
+            release_groups.metadata_artist_id,
+            COALESCE(media_requests.matched_metadata_release_group_id, metadata_releases.metadata_release_group_id) AS metadata_release_group_id,
+            media_requests.matched_metadata_release_id AS metadata_release_id,
+            metadata_releases.release_date,
+            CASE
+              WHEN COALESCE(library_release_reconciliations.reconciliation_status, 'missing') = 'partial' THEN 'partial'
+              ELSE 'missing'
+            END AS wanted_status,
+            'media_request_intake' AS wanted_strategy,
+            media_requests.id AS source_media_request_id,
+            media_requests.request_kind AS source_request_kind,
+            media_requests.requested_by_user_id AS source_requested_by_user_id,
+            current_discovery.search_mode,
+            current_discovery.blocked_reason,
+            current_discovery.evidence AS prior_evidence,
+            current_discovery.last_search_at,
+            current_discovery.manual_requested_at
+          FROM media_requests
+          JOIN metadata_releases
+            ON metadata_releases.id = media_requests.matched_metadata_release_id
+          JOIN metadata_release_groups AS release_groups
+            ON release_groups.id = COALESCE(
+              media_requests.matched_metadata_release_group_id,
+              metadata_releases.metadata_release_group_id
+            )
+          LEFT JOIN library_release_reconciliations
+            ON library_release_reconciliations.metadata_release_id = media_requests.matched_metadata_release_id
+          LEFT JOIN current_discovery
+            ON current_discovery.metadata_release_id = media_requests.matched_metadata_release_id
+          WHERE media_requests.request_state = 'needs_fetch'
+            AND media_requests.matched_metadata_release_id IS NOT NULL
+            AND COALESCE(library_release_reconciliations.reconciliation_status, 'missing') <> 'complete'
+            AND COALESCE(library_release_reconciliations.reconciliation_status, 'missing') <> 'duplicate'
+        ),
+        deduped_sources AS (
+          SELECT DISTINCT ON (source_rows.metadata_release_id)
+            source_rows.metadata_artist_id,
+            source_rows.metadata_release_group_id,
+            source_rows.metadata_release_id,
+            source_rows.release_date,
+            source_rows.wanted_status,
+            source_rows.wanted_strategy,
+            source_rows.source_media_request_id,
+            source_rows.source_request_kind,
+            source_rows.source_requested_by_user_id,
+            source_rows.search_mode,
+            source_rows.blocked_reason,
+            source_rows.prior_evidence,
+            source_rows.last_search_at,
+            source_rows.manual_requested_at
+          FROM (
+            SELECT * FROM request_sources
+            UNION ALL
+            SELECT * FROM monitored_sources
+          ) AS source_rows
+          ORDER BY source_rows.metadata_release_id ASC, source_rows.source_priority ASC, source_rows.release_date ASC NULLS LAST
+        )
         SELECT
-          library_wanted_releases.metadata_artist_id,
-          library_wanted_releases.metadata_release_group_id,
-          library_wanted_releases.metadata_release_id,
-          library_wanted_releases.release_date,
-          library_wanted_releases.wanted_status,
-          library_wanted_releases.evidence->>'strategy' AS wanted_strategy,
-          library_discovery_requests.search_mode,
-          library_discovery_requests.blocked_reason,
-          library_discovery_requests.evidence AS prior_evidence,
-          library_discovery_requests.last_search_at,
-          library_discovery_requests.manual_requested_at
-        FROM library_wanted_releases
-        LEFT JOIN library_discovery_requests
-          ON library_discovery_requests.metadata_release_id = library_wanted_releases.metadata_release_id
-        ORDER BY library_wanted_releases.release_date NULLS LAST, library_wanted_releases.metadata_release_id ASC
+          deduped_sources.metadata_artist_id,
+          deduped_sources.metadata_release_group_id,
+          deduped_sources.metadata_release_id,
+          deduped_sources.release_date,
+          deduped_sources.wanted_status,
+          deduped_sources.wanted_strategy,
+          deduped_sources.source_media_request_id,
+          deduped_sources.source_request_kind,
+          deduped_sources.source_requested_by_user_id,
+          deduped_sources.search_mode,
+          deduped_sources.blocked_reason,
+          deduped_sources.prior_evidence,
+          deduped_sources.last_search_at,
+          deduped_sources.manual_requested_at
+        FROM deduped_sources
+        ORDER BY deduped_sources.release_date NULLS LAST, deduped_sources.metadata_release_id ASC
       `,
     );
 

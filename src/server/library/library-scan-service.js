@@ -18,6 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 import { createSettingsService } from '../settings-service.js';
 import { buildLibraryScanContext } from './library-scan-readiness.js';
 
@@ -28,10 +29,9 @@ export function createLibraryScanService({
   getActiveRun = async () => null,
   recordAuditEventFn = recordAuditEvent,
   settingsService = createSettingsService(),
-  startWorkerRun = async () => {
-    throw new Error('startWorkerRun dependency is required');
-  },
 } = {}) {
+  const operationDescriptor = operationRunRegistry.libraryScan;
+
   async function startLibraryScan({ requestMetadata = null, triggeredByUserId = null } = {}) {
     const activeRun = await getActiveRun();
     if (activeRun) {
@@ -60,15 +60,10 @@ export function createLibraryScanService({
       },
       entityId: run.id,
       entityType: 'operation_run',
-      eventType: 'library_scan_started',
+      eventType: operationDescriptor.startedEventType,
       ipAddress: requestMetadata?.ipAddress ?? null,
       summary: 'Library scan started',
       userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    await startWorkerRun({
-      libraryRoot,
-      runId: run.id,
     });
 
     return {

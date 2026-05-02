@@ -5,12 +5,17 @@ import { createMetadataMonitoringService } from '../../src/server/metadata/metad
 test('updateArtistMonitoring validates and persists monitoring state for an existing artist', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [{ id: 'artist-1' }] }));
   const upsertArtistMonitoring = t.mock.fn(async () => {});
+  const metadataRefreshSchedulerService = {
+    clearArtistRefreshSchedule: t.mock.fn(async () => {}),
+    ensureArtistRefreshScheduled: t.mock.fn(async () => ({ nextRefreshAt: '2026-05-01T00:00:00.000Z' })),
+  };
   const service = createMetadataMonitoringService({
     getPoolFn: () => ({ query }),
     metadataMonitoringStore: {
       getArtistMonitoring: async () => ({ isMonitored: false, monitoredReleaseGroupTypes: ['album', 'ep'] }),
       upsertArtistMonitoring,
     },
+    metadataRefreshSchedulerService,
   });
 
   const result = await service.updateArtistMonitoring({
@@ -27,6 +32,7 @@ test('updateArtistMonitoring validates and persists monitoring state for an exis
     metadataArtistId: 'artist-1',
     monitoredReleaseGroupTypes: ['album'],
   });
+  assert.equal(metadataRefreshSchedulerService.ensureArtistRefreshScheduled.mock.callCount(), 1);
   assert.deepEqual(result, {
     artistId: 'artist-1',
     monitoring: {
@@ -44,6 +50,10 @@ test('updateArtistMonitoring rejects unsupported release-group types', async () 
     metadataMonitoringStore: {
       getArtistMonitoring: async () => ({ isMonitored: false, monitoredReleaseGroupTypes: ['album', 'ep'] }),
       upsertArtistMonitoring: async () => {},
+    },
+    metadataRefreshSchedulerService: {
+      clearArtistRefreshSchedule: async () => {},
+      ensureArtistRefreshScheduled: async () => {},
     },
   });
 

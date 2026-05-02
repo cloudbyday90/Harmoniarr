@@ -16,51 +16,132 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createMetadataArtistRefreshRunStore } from './metadata-artist-refresh-run-store.js';
+import { createMetadataRefreshDispatchPolicyService } from './metadata-refresh-dispatch-policy-service.js';
+import { createMetadataReleaseDetectionService } from './metadata-release-detection-service.js';
+import { createMetadataArtistRefreshService } from './metadata-artist-refresh-service.js';
+import { createMetadataArtistRefreshWorker } from './metadata-artist-refresh-worker.js';
+import { createMetadataRefreshHeartbeatState } from './metadata-refresh-heartbeat-state.js';
+import { resolveMetadataRefreshHeartbeatConfig } from './metadata-refresh-heartbeat-config.js';
 import { createMetadataMonitoringService } from './metadata-monitoring-service.js';
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
+import { createMetadataRefreshSchedulerService } from './metadata-refresh-scheduler-service.js';
+import { createMetadataRefreshSchedulingPolicyService } from './metadata-refresh-scheduling-policy-service.js';
 import { createMetadataReadService } from './metadata-read-service.js';
+import { createMetadataRefreshService } from './metadata-refresh-service.js';
 import { createMetadataSearchService } from './metadata-search-service.js';
 import { createMusicBrainzCatalogService } from './musicbrainz-catalog-service.js';
 import { createMusicBrainzImportService } from './musicbrainz-import-service.js';
 import { createMusicBrainzSearchService } from './musicbrainz-search-service.js';
 
 export function createMetadataModule({
-  metadataMonitoringStore = createMetadataMonitoringStore(),
-  metadataMonitoringService = createMetadataMonitoringService({ metadataMonitoringStore }),
-  metadataReadService = createMetadataReadService({ metadataMonitoringStore }),
-  metadataSearchService = createMetadataSearchService(),
+  reconcileWantedReleases = null,
+  metadataArtistRefreshRunStore = null,
+  metadataArtistRefreshService = null,
+  metadataArtistRefreshWorker = null,
+  metadataReleaseDetectionService = null,
+  metadataRefreshDispatchPolicyService = null,
+  metadataRefreshHeartbeatConfig = null,
+  metadataRefreshHeartbeatState = null,
+  metadataRefreshSchedulerService = null,
+  metadataRefreshSchedulingPolicyService = null,
+  metadataMonitoringStore = null,
+  metadataMonitoringService = null,
+  metadataReadService = null,
+  metadataRefreshService = null,
+  metadataSearchService = null,
   providerHealthRecorder = null,
-  musicBrainzCatalogService = createMusicBrainzCatalogService({ providerHealthRecorder }),
-  musicBrainzImportService = createMusicBrainzImportService({ providerHealthRecorder }),
-  musicBrainzSearchService = createMusicBrainzSearchService({ providerHealthRecorder }),
+  musicBrainzCatalogService = null,
+  musicBrainzImportService = null,
+  musicBrainzSearchService = null,
 } = {}) {
-  return {
-    metadataReadService,
-    metadataMonitoringService,
-    metadataMonitoringStore,
-    metadataSearchService,
+  const resolvedMetadataMonitoringStore = metadataMonitoringStore ?? createMetadataMonitoringStore();
+  const resolvedMetadataReleaseDetectionService = metadataReleaseDetectionService ?? createMetadataReleaseDetectionService();
+  const resolvedMetadataReadService = metadataReadService ?? createMetadataReadService({
+    metadataMonitoringStore: resolvedMetadataMonitoringStore,
+    metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
+  });
+  const resolvedMetadataRefreshSchedulingPolicyService = metadataRefreshSchedulingPolicyService ?? createMetadataRefreshSchedulingPolicyService();
+  const resolvedMetadataRefreshSchedulerService = metadataRefreshSchedulerService ?? createMetadataRefreshSchedulerService({
+    getMetadataArtist: resolvedMetadataReadService.getArtist,
+    metadataMonitoringStore: resolvedMetadataMonitoringStore,
+    metadataRefreshSchedulingPolicyService: resolvedMetadataRefreshSchedulingPolicyService,
+  });
+  const resolvedMetadataMonitoringService = metadataMonitoringService ?? createMetadataMonitoringService({
+    metadataMonitoringStore: resolvedMetadataMonitoringStore,
+    metadataRefreshSchedulerService: resolvedMetadataRefreshSchedulerService,
+  });
+  const resolvedMetadataRefreshService = metadataRefreshService ?? createMetadataRefreshService({
+    getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,
     providerHealthRecorder,
-    musicBrainzCatalogService,
-    musicBrainzImportService,
-    musicBrainzSearchService,
+    metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
+    reconcileWantedReleases,
+  });
+  const resolvedMetadataArtistRefreshRunStore = metadataArtistRefreshRunStore ?? createMetadataArtistRefreshRunStore();
+  const resolvedMetadataArtistRefreshService = metadataArtistRefreshService ?? createMetadataArtistRefreshService({
+    createOperationRun: resolvedMetadataArtistRefreshRunStore.createOperationRun,
+    getActiveRunByMetadataArtistId: resolvedMetadataArtistRefreshRunStore.getActiveRunByMetadataArtistId,
+    getMetadataArtist: resolvedMetadataReadService.getArtist,
+  });
+  const resolvedMetadataArtistRefreshWorker = metadataArtistRefreshWorker ?? createMetadataArtistRefreshWorker({
+    acquireLease: resolvedMetadataArtistRefreshRunStore.acquireLease,
+    isCancellationRequested: resolvedMetadataArtistRefreshRunStore.isCancellationRequested,
+    markRunCancelled: resolvedMetadataArtistRefreshRunStore.markRunCancelled,
+    markRunCompleted: resolvedMetadataArtistRefreshRunStore.markRunCompleted,
+    markRunFailed: resolvedMetadataArtistRefreshRunStore.markRunFailed,
+    markRunStarted: resolvedMetadataArtistRefreshRunStore.markRunStarted,
+    recordArtistRefreshCompleted: resolvedMetadataRefreshSchedulerService.recordArtistRefreshCompleted,
+    refreshMetadataArtist: resolvedMetadataRefreshService.refreshArtistCatalogById,
+    releaseLease: resolvedMetadataArtistRefreshRunStore.releaseLease,
+    renewLease: resolvedMetadataArtistRefreshRunStore.renewLease,
+  });
+  const resolvedMetadataRefreshDispatchPolicyService = metadataRefreshDispatchPolicyService ?? createMetadataRefreshDispatchPolicyService();
+  const resolvedMetadataRefreshHeartbeatConfig = metadataRefreshHeartbeatConfig ?? resolveMetadataRefreshHeartbeatConfig();
+  const resolvedMetadataRefreshHeartbeatState = metadataRefreshHeartbeatState ?? createMetadataRefreshHeartbeatState();
+  const resolvedMetadataSearchService = metadataSearchService ?? createMetadataSearchService();
+  const resolvedMusicBrainzCatalogService = musicBrainzCatalogService ?? createMusicBrainzCatalogService({ providerHealthRecorder });
+  const resolvedMusicBrainzImportService = musicBrainzImportService ?? createMusicBrainzImportService({ providerHealthRecorder });
+  const resolvedMusicBrainzSearchService = musicBrainzSearchService ?? createMusicBrainzSearchService({ providerHealthRecorder });
+
+  return {
+    metadataArtistRefreshRunStore: resolvedMetadataArtistRefreshRunStore,
+    metadataArtistRefreshService: resolvedMetadataArtistRefreshService,
+    metadataArtistRefreshWorker: resolvedMetadataArtistRefreshWorker,
+    metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
+    metadataRefreshDispatchPolicyService: resolvedMetadataRefreshDispatchPolicyService,
+    metadataRefreshHeartbeatConfig: resolvedMetadataRefreshHeartbeatConfig,
+    metadataRefreshHeartbeatState: resolvedMetadataRefreshHeartbeatState,
+    metadataRefreshSchedulerService: resolvedMetadataRefreshSchedulerService,
+    metadataRefreshSchedulingPolicyService: resolvedMetadataRefreshSchedulingPolicyService,
+    metadataReadService: resolvedMetadataReadService,
+    metadataMonitoringService: resolvedMetadataMonitoringService,
+    metadataMonitoringStore: resolvedMetadataMonitoringStore,
+    metadataRefreshService: resolvedMetadataRefreshService,
+    metadataSearchService: resolvedMetadataSearchService,
+    providerHealthRecorder,
+    musicBrainzCatalogService: resolvedMusicBrainzCatalogService,
+    musicBrainzImportService: resolvedMusicBrainzImportService,
+    musicBrainzSearchService: resolvedMusicBrainzSearchService,
     routeDependencies: {
-      browseMusicBrainzArtistReleaseGroups: musicBrainzCatalogService.browseArtistReleaseGroups,
-      getMusicBrainzReleaseGroupReleases: musicBrainzCatalogService.getReleaseGroupReleases,
-      getMetadataArtist: metadataReadService.getArtist,
-      getMetadataArtistByMusicBrainzId: metadataReadService.getArtistByMusicBrainzId,
-      getMetadataRelease: metadataReadService.getRelease,
-      getMetadataReleaseByMusicBrainzId: metadataReadService.getReleaseByMusicBrainzId,
-      getMetadataReleaseGroup: metadataReadService.getReleaseGroup,
-      getMetadataReleaseGroupByMusicBrainzId: metadataReadService.getReleaseGroupByMusicBrainzId,
-      updateMetadataArtistMonitoring: metadataMonitoringService.updateArtistMonitoring,
-      importMusicBrainzArtist: musicBrainzImportService.importArtistById,
-      importMusicBrainzReleaseGroup: musicBrainzImportService.importReleaseGroupById,
-      importMusicBrainzRelease: musicBrainzImportService.importReleaseById,
-      searchLocalMetadataArtists: metadataSearchService.searchArtists,
-      searchLocalMetadataReleaseGroups: metadataSearchService.searchReleaseGroups,
-      searchLocalMetadataReleases: metadataSearchService.searchReleases,
-      searchMusicBrainzArtists: musicBrainzSearchService.searchArtists,
-      searchMusicBrainzReleases: musicBrainzSearchService.searchReleases,
+      browseMusicBrainzArtistReleaseGroups: resolvedMusicBrainzCatalogService.browseArtistReleaseGroups,
+      getMetadataArtistDetectionEvents: resolvedMetadataReadService.getArtistDetectionEvents,
+      getMusicBrainzReleaseGroupReleases: resolvedMusicBrainzCatalogService.getReleaseGroupReleases,
+      getMetadataArtist: resolvedMetadataReadService.getArtist,
+      getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,
+      getMetadataRelease: resolvedMetadataReadService.getRelease,
+      getMetadataReleaseByMusicBrainzId: resolvedMetadataReadService.getReleaseByMusicBrainzId,
+      getMetadataReleaseGroup: resolvedMetadataReadService.getReleaseGroup,
+      getMetadataReleaseGroupByMusicBrainzId: resolvedMetadataReadService.getReleaseGroupByMusicBrainzId,
+      startMetadataArtistRefresh: resolvedMetadataArtistRefreshService.startMetadataArtistRefresh,
+      updateMetadataArtistMonitoring: resolvedMetadataMonitoringService.updateArtistMonitoring,
+      importMusicBrainzArtist: resolvedMusicBrainzImportService.importArtistById,
+      importMusicBrainzReleaseGroup: resolvedMusicBrainzImportService.importReleaseGroupById,
+      importMusicBrainzRelease: resolvedMusicBrainzImportService.importReleaseById,
+      searchLocalMetadataArtists: resolvedMetadataSearchService.searchArtists,
+      searchLocalMetadataReleaseGroups: resolvedMetadataSearchService.searchReleaseGroups,
+      searchLocalMetadataReleases: resolvedMetadataSearchService.searchReleases,
+      searchMusicBrainzArtists: resolvedMusicBrainzSearchService.searchArtists,
+      searchMusicBrainzReleases: resolvedMusicBrainzSearchService.searchReleases,
     },
   };
 }

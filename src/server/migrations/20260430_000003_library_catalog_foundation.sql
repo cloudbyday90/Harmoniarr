@@ -15,7 +15,7 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS library_roots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   name TEXT NOT NULL,
   path TEXT NOT NULL,
   canonical_path TEXT NOT NULL UNIQUE,
@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS library_roots_enabled_idx
   ON library_roots (is_enabled, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS library_files (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   library_root_id UUID NOT NULL REFERENCES library_roots(id) ON DELETE CASCADE,
   canonical_path TEXT NOT NULL UNIQUE,
   relative_path TEXT NOT NULL,

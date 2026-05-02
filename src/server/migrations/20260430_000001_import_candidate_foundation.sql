@@ -15,7 +15,7 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_candidates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   source_provider TEXT NOT NULL,
   source_search_id TEXT NOT NULL,
   source_response_key TEXT NOT NULL,
@@ -48,7 +48,7 @@ CREATE INDEX IF NOT EXISTS import_candidates_normalized_payload_gin_idx
   ON import_candidates USING GIN (normalized_payload jsonb_path_ops);
 
 CREATE TABLE IF NOT EXISTS import_candidate_files (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   source_file_index INTEGER NOT NULL CHECK (source_file_index >= 0),
   filename TEXT NOT NULL,

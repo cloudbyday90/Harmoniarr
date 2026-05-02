@@ -19,6 +19,13 @@ function createMetadataRouteTestApp(overrides = {}) {
         releaseGroups: [],
         releases: [],
       }),
+      getMetadataArtistDetectionEvents: async () => ({
+        entries: [],
+        pageInfo: {
+          hasMore: false,
+          nextCursor: null,
+        },
+      }),
       getMetadataArtistByMusicBrainzId: async ({ musicBrainzArtistId }) => ({
         artist: { id: 'local-artist-1', source: { musicbrainzArtistId: musicBrainzArtistId } },
         aliases: [],
@@ -33,6 +40,15 @@ function createMetadataRouteTestApp(overrides = {}) {
       importMusicBrainzArtist: async ({ artistId, actorUserId, requestMetadata }) => ({
         artist: { id: `local-${artistId}` },
         source: { actorUserId, requestMetadata },
+      }),
+      startMetadataArtistRefresh: async ({ metadataArtistId, triggeredByUserId, requestMetadata }) => ({
+        accepted: true,
+        run: {
+          id: `run-${metadataArtistId}`,
+          metadataArtistId,
+          triggeredByUserId,
+          requestMetadata,
+        },
       }),
       importMusicBrainzReleaseGroup: async ({ releaseGroupId, actorUserId, requestMetadata }) => ({
         artist: { id: 'artist-1' },
@@ -53,6 +69,7 @@ function createMetadataRouteTestApp(overrides = {}) {
         },
       }),
       requireCsrf: () => {},
+      requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed', user: { role: 'admin' } }),
       requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' }),
       searchLocalMetadataArtists: async ({ query, limit }) => ({ query, limit: Number(limit), results: [{ id: 'artist-1', name: query }] }),
       searchLocalMetadataReleaseGroups: async ({ query, limit }) => ({ query, limit: Number(limit), results: [{ id: 'rg-1', title: query }] }),
@@ -89,6 +106,14 @@ test('metadata local artist read route returns the local canonical payload', asy
     getMetadataArtist: async ({ artistId }) => ({
       artist: { id: artistId, name: 'Boards of Canada' },
       aliases: [{ id: 'alias-1', name: 'BoC' }],
+      detectionEvents: [{
+        id: 'event-1',
+        monitoringDecision: 'wanted_release_detected',
+        occurredAt: '2026-05-02T12:00:00.000Z',
+        primaryType: 'Album',
+        resultingWantedStatus: 'missing',
+        title: 'Tomorrow\'s Harvest',
+      }],
       monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album'] },
       releaseGroups: [{ id: 'rg-1', title: 'Music Has the Right to Children' }],
       releases: [{ id: 'release-1', title: 'Geogaddi' }],
@@ -104,9 +129,70 @@ test('metadata local artist read route returns the local canonical payload', asy
       ok: true,
       artist: { id: 'local-artist-1', name: 'Boards of Canada' },
       aliases: [{ id: 'alias-1', name: 'BoC' }],
+      detectionEvents: [{
+        id: 'event-1',
+        monitoringDecision: 'wanted_release_detected',
+        occurredAt: '2026-05-02T12:00:00.000Z',
+        primaryType: 'Album',
+        resultingWantedStatus: 'missing',
+        title: 'Tomorrow\'s Harvest',
+      }],
+      detectionEventsPageInfo: {
+        hasMore: false,
+        nextCursor: null,
+      },
       monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album'] },
       releaseGroups: [{ id: 'rg-1', title: 'Music Has the Right to Children' }],
       releases: [{ id: 'release-1', title: 'Geogaddi' }],
+    });
+  });
+});
+
+test('metadata artist detection-events route returns the shared paginated history payload', async (t) => {
+  const getMetadataArtistDetectionEvents = t.mock.fn(async ({ artistId, before, limit }) => ({
+    entries: [{
+      id: 'event-1',
+      metadataArtistId: artistId,
+      metadataReleaseGroupId: 'rg-1',
+      monitoringDecision: 'wanted_release_detected',
+      occurredAt: '2026-05-02T12:00:00.000Z',
+      primaryType: 'Album',
+      resultingWantedStatus: 'missing',
+      title: 'Tomorrow\'s Harvest',
+    }],
+    pageInfo: {
+      hasMore: true,
+      nextCursor: 'cursor-2',
+    },
+  }));
+  const app = createMetadataRouteTestApp({ getMetadataArtistDetectionEvents });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/detection-events?before=cursor-1&limit=15`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(getMetadataArtistDetectionEvents.mock.calls[0].arguments, [{
+      artistId: 'local-artist-1',
+      before: 'cursor-1',
+      limit: '15',
+    }]);
+    assert.deepEqual(payload, {
+      ok: true,
+      detectionEvents: [{
+        id: 'event-1',
+        metadataArtistId: 'local-artist-1',
+        metadataReleaseGroupId: 'rg-1',
+        monitoringDecision: 'wanted_release_detected',
+        occurredAt: '2026-05-02T12:00:00.000Z',
+        primaryType: 'Album',
+        resultingWantedStatus: 'missing',
+        title: 'Tomorrow\'s Harvest',
+      }],
+      pageInfo: {
+        hasMore: true,
+        nextCursor: 'cursor-2',
+      },
     });
   });
 });
@@ -154,6 +240,62 @@ test('metadata artist monitoring route updates the shared monitoring payload', a
       monitoring: {
         isMonitored: true,
         monitoredReleaseGroupTypes: ['album'],
+      },
+    });
+  });
+});
+
+test('metadata artist refresh route queues a shared metadata refresh run', async (t) => {
+  const startMetadataArtistRefresh = t.mock.fn(async ({ metadataArtistId, triggeredByUserId, requestMetadata }) => ({
+    accepted: true,
+    run: {
+      id: 'run-local-artist-1',
+      metadataArtistId,
+      triggeredByUserId,
+      requestMetadata,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-4', csrfToken: 'csrf-token', csrfTokenHash: 'hashed', user: { role: 'admin' } }));
+  const app = createMetadataRouteTestApp({
+    requireCsrf,
+    requireFreshAdminSession,
+    startMetadataArtistRefresh,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/refresh`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.24',
+        'user-agent': 'HarmoniarrTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(startMetadataArtistRefresh.mock.callCount(), 1);
+    assert.deepEqual(startMetadataArtistRefresh.mock.calls[0].arguments[0], {
+      metadataArtistId: 'local-artist-1',
+      requestMetadata: {
+        ipAddress: '198.51.100.24',
+        userAgent: 'HarmoniarrTest/1.0',
+      },
+      triggeredByUserId: 'user-4',
+    });
+    assert.deepEqual(payload, {
+      ok: true,
+      accepted: true,
+      run: {
+        id: 'run-local-artist-1',
+        metadataArtistId: 'local-artist-1',
+        triggeredByUserId: 'user-4',
+        requestMetadata: {
+          ipAddress: '198.51.100.24',
+          userAgent: 'HarmoniarrTest/1.0',
+        },
       },
     });
   });
@@ -221,11 +363,12 @@ test('metadata import route passes session and request metadata to the shared im
     source: { actorUserId, requestMetadata },
   }));
   const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-9', csrfToken: 'csrf-token', csrfTokenHash: 'hashed', user: { role: 'admin' } }));
 
   const app = createMetadataRouteTestApp({
     importMusicBrainzArtist,
     requireCsrf,
-    requireSession: async () => ({ appUserId: 'user-9', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' }),
+    requireFreshAdminSession,
   });
 
   await withServer(app, async (baseUrl) => {
@@ -240,6 +383,7 @@ test('metadata import route passes session and request metadata to the shared im
     const payload = await response.json();
 
     assert.equal(response.status, 201);
+  assert.equal(requireFreshAdminSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.equal(importMusicBrainzArtist.mock.callCount(), 1);
     assert.deepEqual(importMusicBrainzArtist.mock.calls[0].arguments, [{
@@ -273,10 +417,11 @@ test('metadata release import route returns the shared imported release payload'
     release: { id: `local-${releaseId}` },
     source: { actorUserId, requestMetadata },
   }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-11', csrfToken: 'csrf-token', csrfTokenHash: 'hashed', user: { role: 'admin' } }));
 
   const app = createMetadataRouteTestApp({
     importMusicBrainzRelease,
-    requireSession: async () => ({ appUserId: 'user-11', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' }),
+    requireFreshAdminSession,
   });
 
   await withServer(app, async (baseUrl) => {
@@ -291,6 +436,7 @@ test('metadata release import route returns the shared imported release payload'
     const payload = await response.json();
 
     assert.equal(response.status, 201);
+  assert.equal(requireFreshAdminSession.mock.callCount(), 1);
     assert.equal(importMusicBrainzRelease.mock.callCount(), 1);
     assert.deepEqual(importMusicBrainzRelease.mock.calls[0].arguments, [{
       releaseId: 'mb-release-9',
@@ -313,6 +459,37 @@ test('metadata release import route returns the shared imported release payload'
             userAgent: 'HarmoniarrRouteTest/1.0',
           },
         },
+      },
+    });
+  });
+});
+
+test('metadata artist monitoring route preserves forced re-auth failures from the injected admin guard', async () => {
+  const app = createMetadataRouteTestApp({
+    requireFreshAdminSession: async () => {
+      throw Object.assign(new Error('Re-authentication is required before continuing'), {
+        status: 403,
+        code: 'reauth_required',
+      });
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/monitoring`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ isMonitored: true }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'reauth_required',
+        message: 'Re-authentication is required before continuing',
       },
     });
   });

@@ -18,13 +18,22 @@
 
 import { createRouter, createWebHistory } from 'vue-router';
 import AppShell from './components/AppShell.vue';
+import AccountSecurityView from './views/AccountSecurityView.vue';
 import BootstrapSetupView from './views/BootstrapSetupView.vue';
 import DashboardView from './views/DashboardView.vue';
 import ImportReviewView from './views/ImportReviewView.vue';
 import LoginView from './views/LoginView.vue';
 import MetadataView from './views/MetadataView.vue';
+import OperationsView from './views/OperationsView.vue';
+import RequestMusicView from './views/RequestMusicView.vue';
 import SettingsView from './views/SettingsView.vue';
 import { sessionStore } from './state/session.js';
+
+const requesterRestrictedRouteNames = new Set(['dashboard', 'jobs', 'metadata', 'review-queue', 'settings']);
+
+function defaultAuthenticatedRouteName() {
+  return sessionStore.state.user?.role === 'requester' ? 'request-music' : 'dashboard';
+}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -37,8 +46,11 @@ const router = createRouter({
       component: AppShell,
       meta: { requiresAuth: true },
       children: [
+        { path: 'account-security', name: 'account-security', component: AccountSecurityView },
         { path: '', name: 'dashboard', component: DashboardView },
+        { path: 'jobs', name: 'jobs', component: OperationsView },
         { path: 'metadata', name: 'metadata', component: MetadataView },
+        { path: 'requests', name: 'request-music', component: RequestMusicView },
         { path: 'review-queue', name: 'review-queue', component: ImportReviewView },
         { path: 'settings', name: 'settings', component: SettingsView },
       ],
@@ -56,7 +68,14 @@ router.beforeEach(async (to) => {
   }
 
   if (to.name === 'bootstrap') {
-    return sessionStore.state.authenticated ? { name: 'dashboard' } : { name: 'login' };
+    return sessionStore.state.authenticated ? { name: defaultAuthenticatedRouteName() } : { name: 'login' };
+  }
+
+  if (sessionStore.state.authenticated && sessionStore.state.user?.mustChangePassword && to.name !== 'account-security') {
+    return {
+      name: 'account-security',
+      query: to.fullPath === '/app/account-security' ? {} : { redirect: to.fullPath },
+    };
   }
 
   if (to.meta.requiresAuth && !sessionStore.state.authenticated) {
@@ -64,7 +83,11 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.anonymousOnly && sessionStore.state.authenticated) {
-    return { name: 'dashboard' };
+    return { name: defaultAuthenticatedRouteName() };
+  }
+
+  if (sessionStore.state.user?.role === 'requester' && requesterRestrictedRouteNames.has(String(to.name ?? ''))) {
+    return { name: 'request-music' };
   }
 
   return true;

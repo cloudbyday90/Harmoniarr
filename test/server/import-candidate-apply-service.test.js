@@ -16,12 +16,10 @@ test('startImportCandidateApplyRun queues a run for ready import-pending candida
     },
   }));
   const recordAuditEventFn = t.mock.fn(async () => {});
-  const startWorkerRun = t.mock.fn(async () => {});
   const service = createImportCandidateApplyService({
     buildImportPendingCandidateSummary,
     createOperationRun,
     recordAuditEventFn,
-    startWorkerRun,
   });
 
   const result = await service.startImportCandidateApplyRun({
@@ -35,15 +33,11 @@ test('startImportCandidateApplyRun queues a run for ready import-pending candida
   assert.equal(result.accepted, true);
   assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{ limit: 1000 }]);
   assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
+    executableCandidateCount: 2,
     executionMode: 'move',
     requestedCandidateCount: 3,
     status: 'pending',
     triggeredByUserId: 'user-1',
-  }]);
-  assert.deepEqual(startWorkerRun.mock.calls[0].arguments, [{
-    executableCandidateCount: 2,
-    requestedCandidateCount: 3,
-    runId: 'run-apply-1',
   }]);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
 });

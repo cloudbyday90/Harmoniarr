@@ -25,36 +25,55 @@ import {
   rotateSession as defaultRotateSession,
   setAuthCookies as defaultSetAuthCookies,
 } from '../auth.js';
+import { createAccountSecurityService } from '../account-security-service.js';
 import { createBootstrapStatusService } from '../bootstrap-status-service.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import {
+  createActiveSessionsResponse as defaultCreateActiveSessionsResponse,
   createAuthenticatedResponse as defaultCreateAuthenticatedResponse,
   createBootstrapStatusResponse as defaultCreateBootstrapStatusResponse,
   createLogoutResponse as defaultCreateLogoutResponse,
+  createPasswordChangedResponse as defaultCreatePasswordChangedResponse,
+  createRecentActivityResponse as defaultCreateRecentActivityResponse,
   createRefreshResponse as defaultCreateRefreshResponse,
   createSessionResponse as defaultCreateSessionResponse,
+  createSessionRevokedResponse as defaultCreateSessionRevokedResponse,
 } from '../auth-response.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
+const defaultAccountSecurityService = createAccountSecurityService();
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 const defaultBootstrapStatusService = createBootstrapStatusService();
 
 export function registerAuthRoutes(app, {
   buildSessionPayload = defaultBuildSessionPayload,
   buildBootstrapStatusPayload = defaultBootstrapStatusService.buildBootstrapStatusPayload,
+  changePassword = defaultAccountSecurityService.changePassword,
   clearAuthCookies = defaultClearAuthCookies,
+  createActiveSessionsResponse = defaultCreateActiveSessionsResponse,
   createAuthenticatedResponse = defaultCreateAuthenticatedResponse,
   createBootstrapAdmin = defaultCreateBootstrapAdmin,
   createBootstrapStatusResponse = defaultCreateBootstrapStatusResponse,
   createLogoutResponse = defaultCreateLogoutResponse,
+  createPasswordChangedResponse = defaultCreatePasswordChangedResponse,
+  createRecentActivityResponse = defaultCreateRecentActivityResponse,
   createRefreshResponse = defaultCreateRefreshResponse,
   createSessionResponse = defaultCreateSessionResponse,
+  createSessionRevokedResponse = defaultCreateSessionRevokedResponse,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getSessionFromRequest = defaultRequestAuthDependencies.getSessionFromRequest,
+  listActiveSessions = defaultAccountSecurityService.listActiveSessions,
+  listRecentActivity = defaultAccountSecurityService.listRecentActivity,
   loginUser = defaultLoginUser,
   logoutSession = defaultLogoutSession,
+  limitBootstrapAdmin = skipRateLimitMiddleware,
+  limitLogin = skipRateLimitMiddleware,
+  limitRefresh = skipRateLimitMiddleware,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  revokeSession = defaultAccountSecurityService.revokeSession,
   rotateSession = defaultRotateSession,
   setAuthCookies = defaultSetAuthCookies,
 } = {}) {
@@ -62,7 +81,7 @@ export function registerAuthRoutes(app, {
     response.json(createBootstrapStatusResponse(await buildBootstrapStatusPayload()));
   }));
 
-  app.post('/api/v1/bootstrap/admin', asyncRoute(async (request, response) => {
+  app.post('/api/v1/bootstrap/admin', limitBootstrapAdmin, asyncRoute(async (request, response) => {
     const requestMetadata = getRequestMetadata(request);
     const { user, issuedSession } = await createBootstrapAdmin({
       username: request.body?.username,
@@ -74,7 +93,7 @@ export function registerAuthRoutes(app, {
     response.status(201).json(createAuthenticatedResponse(user, issuedSession));
   }));
 
-  app.post('/api/v1/auth/login', asyncRoute(async (request, response) => {
+  app.post('/api/v1/auth/login', limitLogin, asyncRoute(async (request, response) => {
     const requestMetadata = getRequestMetadata(request);
     const { user, issuedSession } = await loginUser({
       username: request.body?.username,
@@ -86,14 +105,29 @@ export function registerAuthRoutes(app, {
     response.json(createAuthenticatedResponse(user, issuedSession));
   }));
 
-  app.post('/api/v1/auth/refresh', asyncRoute(async (request, response) => {
-    const session = await requireSession(request);
+  app.post('/api/v1/auth/refresh', limitRefresh, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
     const requestMetadata = getRequestMetadata(request);
     const issuedSession = await rotateSession(session, requestMetadata);
 
     setAuthCookies(response, issuedSession.refreshToken, issuedSession.csrfToken);
 
     response.json(createRefreshResponse(session.user, issuedSession));
+  }));
+
+  app.post('/api/v1/auth/change-password', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    requireCsrf(request, session);
+    const requestMetadata = getRequestMetadata(request);
+    const result = await changePassword({
+      currentPassword: request.body?.currentPassword,
+      newPassword: request.body?.newPassword,
+      requestMetadata,
+      session,
+    });
+
+    setAuthCookies(response, result.issuedSession.refreshToken, result.issuedSession.csrfToken);
+    response.json(createPasswordChangedResponse(result.user, result.issuedSession));
   }));
 
   app.post('/api/v1/auth/logout', asyncRoute(async (request, response) => {
@@ -109,5 +143,32 @@ export function registerAuthRoutes(app, {
 
   app.get('/api/v1/auth/session', asyncRoute(async (request, response) => {
     response.json(createSessionResponse(await buildSessionPayload(request)));
+  }));
+
+  app.get('/api/v1/auth/sessions', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    response.json(createActiveSessionsResponse({
+      sessions: await listActiveSessions({ session }),
+    }));
+  }));
+
+  app.get('/api/v1/auth/activity', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    response.json(createRecentActivityResponse({
+      events: await listRecentActivity({
+        limit: request.query?.limit,
+        session,
+      }),
+    }));
+  }));
+
+  app.post('/api/v1/auth/sessions/:refreshTokenId/revoke', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    requireCsrf(request, session);
+    response.json(createSessionRevokedResponse(await revokeSession({
+      refreshTokenId: request.params.refreshTokenId,
+      requestMetadata: getRequestMetadata(request),
+      session,
+    })));
   }));
 }

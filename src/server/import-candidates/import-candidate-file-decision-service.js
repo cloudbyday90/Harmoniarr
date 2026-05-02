@@ -26,6 +26,9 @@ import {
   upsertImportCandidateFileDecision,
 } from './import-candidate-file-decision-repository.js';
 
+const skipDecisionType = 'skip';
+const allowLossyDerivativeDecisionType = 'allow_lossy_derivative';
+
 function normalizeOptionalString(value, {
   fieldName,
   maxLength,
@@ -116,7 +119,7 @@ export function createImportCandidateFileDecisionService({
       throw createApiError(
         409,
         'import_candidate_not_import_pending',
-        'Collision decisions can only be changed while the candidate is import pending',
+        'File decisions can only be changed while the candidate is import pending',
       );
     }
 
@@ -165,7 +168,7 @@ export function createImportCandidateFileDecisionService({
 
       const decision = await upsertImportCandidateFileDecisionFn({
         actorUserId,
-        decisionType: 'skip',
+        decisionType: skipDecisionType,
         importCandidateFileId: normalizedImportCandidateFileId,
         importCandidateId: normalizedImportCandidateId,
         reason: normalizedReason,
@@ -175,7 +178,7 @@ export function createImportCandidateFileDecisionService({
         actorUserId,
         details: {
           ...buildDecisionDetails({ candidate, file, reason: normalizedReason }),
-          decisionType: 'skip',
+          decisionType: skipDecisionType,
         },
         eventType: 'import_candidate_file_skip_set',
         importCandidateId: normalizedImportCandidateId,
@@ -192,13 +195,94 @@ export function createImportCandidateFileDecisionService({
       actorType: actorUserId ? 'user' : 'system',
       details: {
         ...buildDecisionDetails({ candidate: result.candidate, file: result.file, reason: normalizedReason }),
-        decisionType: 'skip',
+        decisionType: skipDecisionType,
       },
       entityId: result.decision.id,
       entityType: 'import_candidate_file_decision',
       eventType: 'import_candidate_file_skip_set',
       ipAddress: requestMetadata?.ipAddress ?? null,
       summary: 'Import candidate file marked to skip during apply',
+      userAgent: requestMetadata?.userAgent ?? null,
+    });
+
+    return {
+      candidate: result.candidate,
+      decision: result.decision,
+      event: result.event,
+      file: result.file,
+    };
+  }
+
+  async function setImportCandidateFileAllowLossyDerivativeDecision({
+    actorUserId = null,
+    importCandidateFileId,
+    importCandidateId,
+    reason = null,
+    requestMetadata = null,
+  }) {
+    const normalizedImportCandidateId = normalizeRequiredString(importCandidateId, {
+      fieldName: 'importCandidateId',
+      maxLength: 100,
+    });
+    const normalizedImportCandidateFileId = normalizeRequiredString(importCandidateFileId, {
+      fieldName: 'importCandidateFileId',
+      maxLength: 100,
+    });
+    const normalizedReason = normalizeReason(reason);
+
+    const preview = await previewImportCandidateApply({ importCandidateId: normalizedImportCandidateId });
+    const previewFile = preview.files?.find((file) => file.fileId === normalizedImportCandidateFileId);
+    if (!previewFile || previewFile.transcodePlan?.recommendedAction !== 'transcode_candidate') {
+      throw createApiError(
+        409,
+        'import_candidate_file_lossy_decision_not_available',
+        'Only lossy transcode candidates can be marked with an explicit allow-lossy-derivative decision',
+      );
+    }
+
+    const result = await withTransaction(async (client) => {
+      const { candidate, file } = await validateCandidateFile({
+        client,
+        importCandidateFileId: normalizedImportCandidateFileId,
+        importCandidateId: normalizedImportCandidateId,
+      });
+
+      const decision = await upsertImportCandidateFileDecisionFn({
+        actorUserId,
+        decisionType: allowLossyDerivativeDecisionType,
+        importCandidateFileId: normalizedImportCandidateFileId,
+        importCandidateId: normalizedImportCandidateId,
+        reason: normalizedReason,
+      }, client);
+
+      const event = await insertImportCandidateEventFn({
+        actorUserId,
+        details: {
+          ...buildDecisionDetails({ candidate, file, reason: normalizedReason }),
+          decisionType: allowLossyDerivativeDecisionType,
+        },
+        eventType: 'import_candidate_file_allow_lossy_derivative_set',
+        importCandidateId: normalizedImportCandidateId,
+        newStatus: candidate.status,
+        previousStatus: candidate.status,
+        reason: normalizedReason,
+      }, client);
+
+      return { candidate, decision, event, file };
+    });
+
+    await recordAuditEventFn({
+      actorUserId,
+      actorType: actorUserId ? 'user' : 'system',
+      details: {
+        ...buildDecisionDetails({ candidate: result.candidate, file: result.file, reason: normalizedReason }),
+        decisionType: allowLossyDerivativeDecisionType,
+      },
+      entityId: result.decision.id,
+      entityType: 'import_candidate_file_decision',
+      eventType: 'import_candidate_file_allow_lossy_derivative_set',
+      ipAddress: requestMetadata?.ipAddress ?? null,
+      summary: 'Import candidate file marked for explicit lossy derivative allowance',
       userAgent: requestMetadata?.userAgent ?? null,
     });
 
@@ -266,7 +350,7 @@ export function createImportCandidateFileDecisionService({
       entityType: 'import_candidate_file_decision',
       eventType: 'import_candidate_file_decision_cleared',
       ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: 'Import candidate file skip decision cleared',
+      summary: 'Import candidate file decision cleared',
       userAgent: requestMetadata?.userAgent ?? null,
     });
 
@@ -281,6 +365,7 @@ export function createImportCandidateFileDecisionService({
   return {
     clearImportCandidateFileDecision,
     listImportCandidateFileDecisions: listImportCandidateFileDecisionsFn,
+    setImportCandidateFileAllowLossyDerivativeDecision,
     setImportCandidateFileSkipDecision,
   };
 }

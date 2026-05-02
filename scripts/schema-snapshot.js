@@ -9,6 +9,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadMigrationManifest } from '../src/server/migration-manifest.js';
+import { schemaIdFunctionSql, schemaIdPgcryptoSql } from '../src/server/schema-id-function.js';
 import { schemaMigrationsTableSql } from '../src/server/schema-migration-store.js';
 
 export const schemaSnapshotPath = resolve(process.cwd(), 'src/server/schema-snapshot.sql');
@@ -83,7 +84,9 @@ export function renderSchemaSnapshot({ migrations }) {
     '-- Generated from the accepted timestamped migration lineage.',
     '-- Refresh with: npm run update:schema-snapshot',
     '',
-    'CREATE EXTENSION IF NOT EXISTS pgcrypto;',
+    schemaIdPgcryptoSql,
+    '',
+    schemaIdFunctionSql,
     '',
     schemaMigrationsTableSql,
     '',

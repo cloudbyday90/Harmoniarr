@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { isAbortError } from './abort-error.js';
+
 export function readCookie(name) {
   const encodedName = `${name}=`;
   for (const part of document.cookie.split(';')) {
@@ -41,6 +43,12 @@ export function buildQueryString(params) {
   return query ? `?${query}` : '';
 }
 
+let authFailureHandler = null;
+
+export function setAuthFailureHandler(handler) {
+  authFailureHandler = typeof handler === 'function' ? handler : null;
+}
+
 export async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers ?? {});
   headers.set('Accept', 'application/json');
@@ -56,12 +64,22 @@ export async function apiRequest(path, options = {}) {
     }
   }
 
-  const response = await fetch(path, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    credentials: 'same-origin',
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      credentials: 'same-origin',
+      signal: options.signal,
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      error.code = 'request_aborted';
+    }
+
+    throw error;
+  }
 
   const contentType = response.headers.get('content-type') ?? '';
   const payload = contentType.includes('application/json')
@@ -72,6 +90,18 @@ export async function apiRequest(path, options = {}) {
     const error = new Error(payload?.error?.message ?? `Request failed with status ${response.status}`);
     error.status = response.status;
     error.code = payload?.error?.code ?? 'request_failed';
+
+    if (
+      authFailureHandler
+      && ((error.status === 401 && error.code === 'auth_required')
+        || (error.status === 403 && error.code === 'reauth_required'))
+    ) {
+      await authFailureHandler(error, {
+        method: options.method ?? 'GET',
+        path,
+      });
+    }
+
     throw error;
   }
 

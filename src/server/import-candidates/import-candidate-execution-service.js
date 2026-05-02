@@ -18,6 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createImportCandidateExecutionService({
   createOperationRun = async () => {
@@ -28,10 +29,9 @@ export function createImportCandidateExecutionService({
     pagination: { total: 0 },
   }),
   recordAuditEventFn = recordAuditEvent,
-  startWorkerRun = async () => {
-    throw new Error('startWorkerRun dependency is required');
-  },
 } = {}) {
+  const operationDescriptor = operationRunRegistry.importCandidateExecutionPlanning;
+
   async function startImportCandidateExecutionRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
     const activeRun = await getActiveRun();
     if (activeRun) {
@@ -65,15 +65,10 @@ export function createImportCandidateExecutionService({
       },
       entityId: run.id,
       entityType: 'operation_run',
-      eventType: 'import_candidate_execution_started',
+      eventType: operationDescriptor.startedEventType,
       ipAddress: requestMetadata?.ipAddress ?? null,
       summary: 'Import candidate download enqueue started',
       userAgent: requestMetadata?.userAgent ?? null,
-    });
-
-    await startWorkerRun({
-      requestedCandidateCount,
-      runId: run.id,
     });
 
     return {

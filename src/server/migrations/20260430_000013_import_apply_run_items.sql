@@ -15,7 +15,7 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS import_apply_run_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   operation_run_id UUID NOT NULL REFERENCES operation_runs(id) ON DELETE CASCADE,
   import_candidate_id UUID NOT NULL REFERENCES import_candidates(id) ON DELETE CASCADE,
   position INTEGER NOT NULL CHECK (position > 0),

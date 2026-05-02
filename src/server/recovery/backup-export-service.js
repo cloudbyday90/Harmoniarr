@@ -1,0 +1,173 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { createApiError } from '../auth.js';
+import { recordAuditEvent } from '../audit.js';
+import { getMigrationStatus } from '../migrations.js';
+import { loadSettings } from '../settings.js';
+import { createBackupManifestService } from './backup-manifest-service.js';
+
+function formatExportTimestamp(dateValue) {
+  return dateValue.toISOString().replaceAll(':', '-').replaceAll('.', '-');
+}
+
+function toMigrationLevel(status) {
+  const pending = Array.isArray(status?.pending) ? status.pending.length : 0;
+  const applied = Number.isFinite(status?.applied) ? status.applied : 0;
+  return pending > 0 ? `pending:${pending}` : `applied:${applied}`;
+}
+
+function sanitizeArtifact(artifact) {
+  if (!artifact) {
+    return null;
+  }
+
+  return {
+    appVersion: artifact.appVersion,
+    backupType: artifact.backupType,
+    createdAt: artifact.createdAt,
+    createdByUserId: artifact.createdByUserId,
+    encrypted: artifact.encrypted,
+    fileSizeBytes: artifact.fileSizeBytes,
+    filename: artifact.filename,
+    formatVersion: artifact.formatVersion,
+    id: artifact.id,
+    manifest: artifact.manifest,
+    migrationLevel: artifact.migrationLevel,
+    payloadSha256: artifact.payloadSha256,
+    scope: artifact.scope,
+  };
+}
+
+export function createBackupExportService({
+  backupsDirectory = process.env.HARMONIARR_BACKUPS ?? '/app/data/backups',
+  createBackupArtifact = async () => {
+    throw new Error('createBackupArtifact dependency is required');
+  },
+  getBackupArtifactById = async () => null,
+  getMigrationStatusFn = getMigrationStatus,
+  listBackupArtifacts = async () => [],
+  loadSettingsFn = loadSettings,
+  readPackageMetadataFn = async (path) => JSON.parse(await readFile(path, 'utf8')),
+  packageJsonPath,
+  recordAuditEventFn = recordAuditEvent,
+  backupManifestService = createBackupManifestService(),
+} = {}) {
+  if (!packageJsonPath) {
+    throw new Error('packageJsonPath is required');
+  }
+
+  async function createBackupExport({ requestMetadata = null, triggeredByUserId = null } = {}) {
+    const exportedAt = new Date();
+    const exportedAtIso = exportedAt.toISOString();
+    const packageMetadata = await readPackageMetadataFn(packageJsonPath);
+    const settingsSnapshot = await loadSettingsFn();
+    const migrationStatus = await getMigrationStatusFn();
+    const migrationLevel = toMigrationLevel(migrationStatus);
+
+    const manifest = backupManifestService.buildLogicalManifest({
+      appVersion: packageMetadata?.version ?? null,
+      exportedAt: exportedAtIso,
+      migrationLevel,
+      settingsSnapshot,
+    });
+
+    const backupDocument = {
+      ...manifest,
+      data: {
+        settings: settingsSnapshot,
+      },
+    };
+
+    const serialized = JSON.stringify(backupDocument, null, 2);
+    const payloadSha256 = createHash('sha256').update(serialized).digest('hex');
+    const filename = `harmoniarr_backup_${formatExportTimestamp(exportedAt)}.json`;
+    const storagePath = join(backupsDirectory, filename);
+
+    await mkdir(dirname(storagePath), { recursive: true });
+    await writeFile(storagePath, serialized, 'utf8');
+
+    const artifact = await createBackupArtifact({
+      appVersion: manifest.application.version,
+      backupType: manifest.backup.type,
+      createdByUserId: triggeredByUserId,
+      encrypted: manifest.backup.encrypted,
+      fileSizeBytes: Buffer.byteLength(serialized, 'utf8'),
+      filename,
+      formatVersion: manifest.formatVersion,
+      manifest,
+      migrationLevel: manifest.schema.migrationLevel,
+      payloadSha256,
+      scope: manifest.backup.scope,
+      storagePath,
+    });
+
+    await recordAuditEventFn({
+      actorType: triggeredByUserId ? 'user' : 'system',
+      actorUserId: triggeredByUserId,
+      details: {
+        backupArtifactId: artifact.id,
+        encrypted: artifact.encrypted,
+        fileSizeBytes: artifact.fileSizeBytes,
+        filename: artifact.filename,
+        formatVersion: artifact.formatVersion,
+        scope: artifact.scope,
+      },
+      entityId: artifact.id,
+      entityType: 'backup_artifact',
+      eventType: 'backup_export_created',
+      ipAddress: requestMetadata?.ipAddress ?? null,
+      summary: 'Backup export created',
+      userAgent: requestMetadata?.userAgent ?? null,
+    });
+
+    return {
+      accepted: true,
+      backupArtifact: sanitizeArtifact(artifact),
+    };
+  }
+
+  async function listBackupExports({ limit } = {}) {
+    const artifacts = await listBackupArtifacts({ limit });
+
+    return {
+      backupArtifacts: artifacts.map(sanitizeArtifact),
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  async function getBackupExportById({ backupArtifactId }) {
+    const artifact = await getBackupArtifactById({ backupArtifactId });
+    if (!artifact) {
+      throw createApiError(404, 'backup_artifact_not_found', 'Backup artifact was not found');
+    }
+
+    return {
+      backupArtifact: sanitizeArtifact(artifact),
+    };
+  }
+
+  return {
+    createBackupExport,
+    getBackupExportById,
+    listBackupExports,
+  };
+}

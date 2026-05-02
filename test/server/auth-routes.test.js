@@ -9,7 +9,12 @@ function createAuthRouteTestApp(overrides = {}) {
     registerAuthRoutes(app, {
       buildBootstrapStatusPayload: async () => ({ bootstrapRequired: false }),
       buildSessionPayload: async () => ({ bootstrapRequired: false, user: null, csrfToken: null }),
+      changePassword: async () => ({
+        user: { id: 'user-1', username: 'admin' },
+        issuedSession: { refreshToken: 'refresh-password', csrfToken: 'csrf-password' },
+      }),
       clearAuthCookies: () => {},
+      createActiveSessionsResponse: (payload) => ({ ok: true, ...payload }),
       createAuthenticatedResponse: (user, issuedSession) => ({
         ok: true,
         bootstrapRequired: false,
@@ -22,20 +27,41 @@ function createAuthRouteTestApp(overrides = {}) {
       }),
       createBootstrapStatusResponse: (payload) => ({ ok: true, ...payload }),
       createLogoutResponse: () => ({ ok: true }),
+      createPasswordChangedResponse: (user, issuedSession) => ({
+        ok: true,
+        bootstrapRequired: false,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          mustChangePassword: user.must_change_password,
+          lastLoginAt: user.last_login_at,
+        },
+        csrfToken: issuedSession.csrfToken,
+      }),
+      createRecentActivityResponse: (payload) => ({ ok: true, ...payload }),
       createRefreshResponse: (user, issuedSession) => ({ ok: true, bootstrapRequired: false, user, csrfToken: issuedSession.csrfToken }),
       createSessionResponse: (payload) => ({ ok: true, ...payload }),
+      createSessionRevokedResponse: (payload) => ({ ok: true, ...payload }),
       getRequestMetadata: (request) => ({
         ipAddress: request.headers['x-forwarded-for'] ?? '127.0.0.1',
         userAgent: request.headers['user-agent'] ?? null,
       }),
       getSessionFromRequest: async () => null,
+      listActiveSessions: async () => [],
+      listRecentActivity: async () => [],
       loginUser: async ({ username, password, requestMetadata }) => ({
         user: { id: 'user-1', username, password },
         issuedSession: { refreshToken: 'refresh-1', csrfToken: requestMetadata.userAgent ?? 'csrf-1' },
       }),
       logoutSession: async () => {},
+      limitBootstrapAdmin: (_request, _response, next) => next(),
+      limitLogin: (_request, _response, next) => next(),
+      limitRefresh: (_request, _response, next) => next(),
       requireCsrf: () => {},
+      requireFreshSession: async () => ({ appUserId: 'user-1', user: { id: 'user-1', username: 'admin' } }),
       requireSession: async () => ({ appUserId: 'user-1', user: { id: 'user-1', username: 'admin' } }),
+      revokeSession: async ({ refreshTokenId }) => ({ revokedSessionId: refreshTokenId }),
       rotateSession: async () => ({ refreshToken: 'refresh-2', csrfToken: 'csrf-2' }),
       setAuthCookies: () => {},
       ...overrides,
@@ -196,7 +222,7 @@ test('auth bootstrap admin route creates the bootstrap user through shared depen
 
 test('auth refresh route rotates the session through shared dependencies', async (t) => {
   const session = { appUserId: 'user-8', user: { id: 'user-8', username: 'refresh-user' } };
-  const requireSession = t.mock.fn(async () => session);
+  const requireFreshSession = t.mock.fn(async () => session);
   const rotateSession = t.mock.fn(async (activeSession, requestMetadata) => ({
     refreshToken: 'refresh-next',
     csrfToken: 'csrf-next',
@@ -206,7 +232,7 @@ test('auth refresh route rotates the session through shared dependencies', async
   const setAuthCookies = t.mock.fn();
 
   const app = createAuthRouteTestApp({
-    requireSession,
+    requireFreshSession,
     rotateSession,
     setAuthCookies,
     createRefreshResponse: (user, issuedSession) => ({
@@ -229,7 +255,7 @@ test('auth refresh route rotates the session through shared dependencies', async
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(requireSession.mock.callCount(), 1);
+  assert.equal(requireFreshSession.mock.callCount(), 1);
     assert.equal(rotateSession.mock.callCount(), 1);
     assert.equal(setAuthCookies.mock.callCount(), 1);
     assert.equal(rotateSession.mock.calls[0].arguments[0], session);
@@ -321,6 +347,166 @@ test('auth logout route still clears auth cookies without session-dependent work
   });
 });
 
+test('auth change-password route uses the shared account-security dependency and rotates auth cookies', async (t) => {
+  const changePassword = t.mock.fn(async ({ currentPassword, newPassword, requestMetadata, session }) => ({
+    user: { id: 'user-10', username: 'admin', role: 'admin', must_change_password: false, last_login_at: '2026-05-01T12:00:00.000Z' },
+    issuedSession: { refreshToken: 'refresh-10', csrfToken: 'csrf-10', currentPassword, newPassword, requestMetadata, session },
+  }));
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-10', refreshTokenId: 'session-10', user: { id: 'user-10', username: 'admin', mustChangePassword: true } }));
+  const requireCsrf = t.mock.fn();
+  const setAuthCookies = t.mock.fn();
+  const app = createAuthRouteTestApp({
+    changePassword,
+    requireCsrf,
+    requireSession,
+    setAuthCookies,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-10',
+        'x-forwarded-for': '198.51.100.44',
+        'user-agent': 'HarmoniarrPasswordTest/1.0',
+      },
+      body: JSON.stringify({ currentPassword: 'current-password', newPassword: 'next-password' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(changePassword.mock.callCount(), 1);
+    assert.equal(setAuthCookies.mock.callCount(), 1);
+    assert.equal(changePassword.mock.calls[0].arguments[0].currentPassword, 'current-password');
+    assert.equal(changePassword.mock.calls[0].arguments[0].newPassword, 'next-password');
+    assert.deepEqual(changePassword.mock.calls[0].arguments[0].requestMetadata, {
+      ipAddress: '198.51.100.44',
+      userAgent: 'HarmoniarrPasswordTest/1.0',
+    });
+    assert.equal(setAuthCookies.mock.calls[0].arguments[1], 'refresh-10');
+    assert.equal(setAuthCookies.mock.calls[0].arguments[2], 'csrf-10');
+    assert.deepEqual(payload, {
+      ok: true,
+      bootstrapRequired: false,
+      user: {
+        id: 'user-10',
+        username: 'admin',
+        role: 'admin',
+        mustChangePassword: false,
+        lastLoginAt: '2026-05-01T12:00:00.000Z',
+      },
+      csrfToken: 'csrf-10',
+    });
+  });
+});
+
+test('auth sessions route returns the shared active-session payload', async () => {
+  const app = createAuthRouteTestApp({
+    listActiveSessions: async () => ([{
+      id: 'session-1',
+      isCurrent: true,
+      issuedAt: '2026-05-01T12:00:00.000Z',
+      issuedIp: '203.0.113.10',
+      issuedUserAgent: 'Browser/1.0',
+      lastUsedAt: '2026-05-01T12:15:00.000Z',
+      expiresAt: '2026-05-15T12:00:00.000Z',
+    }]),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/sessions`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload, {
+      ok: true,
+      sessions: [{
+        id: 'session-1',
+        isCurrent: true,
+        issuedAt: '2026-05-01T12:00:00.000Z',
+        issuedIp: '203.0.113.10',
+        issuedUserAgent: 'Browser/1.0',
+        lastUsedAt: '2026-05-01T12:15:00.000Z',
+        expiresAt: '2026-05-15T12:00:00.000Z',
+      }],
+    });
+  });
+});
+
+test('auth activity route returns the shared recent-activity payload', async () => {
+  const app = createAuthRouteTestApp({
+    listRecentActivity: async () => ([{
+      entityId: 'run-22',
+      entityType: 'operation_run',
+      eventType: 'artwork_cleanup_started',
+      id: 'audit-1',
+      occurredAt: '2026-05-01T16:10:00.000Z',
+      summary: 'Artwork cleanup started',
+    }]),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/activity`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload, {
+      ok: true,
+      events: [{
+        entityId: 'run-22',
+        entityType: 'operation_run',
+        eventType: 'artwork_cleanup_started',
+        id: 'audit-1',
+        occurredAt: '2026-05-01T16:10:00.000Z',
+        summary: 'Artwork cleanup started',
+      }],
+    });
+  });
+});
+
+test('auth session revoke route enforces csrf and delegates to the shared session-management dependency', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-11', refreshTokenId: 'current-session', user: { id: 'user-11', username: 'admin' } }));
+  const requireCsrf = t.mock.fn();
+  const revokeSession = t.mock.fn(async ({ refreshTokenId }) => ({ revokedSessionId: refreshTokenId }));
+  const app = createAuthRouteTestApp({
+    requireCsrf,
+    requireSession,
+    revokeSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/sessions/session-2/revoke`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-session-2',
+        'x-forwarded-for': '192.0.2.88',
+        'user-agent': 'HarmoniarrRevokeSessionTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(revokeSession.mock.callCount(), 1);
+    assert.deepEqual(revokeSession.mock.calls[0].arguments[0], {
+      refreshTokenId: 'session-2',
+      requestMetadata: {
+        ipAddress: '192.0.2.88',
+        userAgent: 'HarmoniarrRevokeSessionTest/1.0',
+      },
+      session: { appUserId: 'user-11', refreshTokenId: 'current-session', user: { id: 'user-11', username: 'admin' } },
+    });
+    assert.deepEqual(payload, {
+      ok: true,
+      revokedSessionId: 'session-2',
+    });
+  });
+});
+
 test('auth session route returns the shared session payload', async () => {
   const app = createAuthRouteTestApp({
     buildSessionPayload: async () => ({
@@ -374,7 +560,7 @@ test('auth login route preserves injected api errors in the shared json error re
 
 test('auth refresh route preserves auth-required failures from the injected session guard', async () => {
   const app = createAuthRouteTestApp({
-    requireSession: async () => {
+    requireFreshSession: async () => {
       throw createApiError(401, 'auth_required', 'Authentication is required');
     },
   });
@@ -391,6 +577,91 @@ test('auth refresh route preserves auth-required failures from the injected sess
       error: {
         code: 'auth_required',
         message: 'Authentication is required',
+      },
+    });
+  });
+});
+
+test('auth refresh route preserves forced re-auth failures from the injected session guard', async () => {
+  const app = createAuthRouteTestApp({
+    requireFreshSession: async () => {
+      throw createApiError(403, 'reauth_required', 'Re-authentication is required before continuing');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'reauth_required',
+        message: 'Re-authentication is required before continuing',
+      },
+    });
+  });
+});
+
+test('auth login route preserves injected rate limit failures before calling the shared login service', async (t) => {
+  const loginUser = t.mock.fn(async () => ({
+    user: { id: 'user-1', username: 'admin' },
+    issuedSession: { refreshToken: 'refresh-1', csrfToken: 'csrf-1' },
+  }));
+  const app = createAuthRouteTestApp({
+    limitLogin: (_request, _response, next) => {
+      next(createApiError(429, 'rate_limited', 'Too many requests. Try again later.'));
+    },
+    loginUser,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ username: 'admin', password: 'secret-pass' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 429);
+    assert.equal(loginUser.mock.callCount(), 0);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'rate_limited',
+        message: 'Too many requests. Try again later.',
+      },
+    });
+  });
+});
+
+test('auth refresh route preserves injected rate limit failures before session rotation', async (t) => {
+  const rotateSession = t.mock.fn(async () => ({ refreshToken: 'refresh-2', csrfToken: 'csrf-2' }));
+  const app = createAuthRouteTestApp({
+    limitRefresh: (_request, _response, next) => {
+      next(createApiError(429, 'rate_limited', 'Too many requests. Try again later.'));
+    },
+    rotateSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 429);
+    assert.equal(rotateSession.mock.callCount(), 0);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'rate_limited',
+        message: 'Too many requests. Try again later.',
       },
     });
   });

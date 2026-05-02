@@ -16,6 +16,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  normalizeOutboundBaseUrl,
+  resolveAllowedOutboundHosts,
+  resolveAllowedOutboundHostSuffixes,
+} from '../../outbound-url-policy.js';
+
 function parsePositiveInteger(value, fallback) {
   if (value == null || value === '') {
     return fallback;
@@ -39,19 +45,22 @@ function createSlskdError(code, message, details = {}) {
   return error;
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value, { allowedHosts, allowedHostSuffixes }) {
   const candidate = value ?? 'http://slskd:5030';
 
   try {
-    const normalized = new URL(candidate);
-    const pathname = normalized.pathname.endsWith('/')
-      ? normalized.pathname
-      : `${normalized.pathname}/`;
-
-    normalized.pathname = pathname === '/'
-      ? '/api/v0/'
-      : pathname;
-    return normalized;
+    return normalizeOutboundBaseUrl(candidate, {
+      allowHttp: true,
+      allowedHosts,
+      allowedHostSuffixes,
+      allowHttps: true,
+      allowLocalhost: true,
+      allowPrivateHosts: true,
+      defaultPathname: '/api/v0/',
+      fieldName: 'SLSKD_BASE_URL',
+      protocolErrorCode: 'slskd_misconfigured',
+      validationErrorCode: 'slskd_misconfigured',
+    });
   } catch {
     throw createSlskdError(
       'slskd_misconfigured',
@@ -103,11 +112,17 @@ function buildFailureDetails({
 
 export function createSlskdClient({
   apiKey = process.env.SLSKD_API_KEY,
+  allowedHosts = resolveAllowedOutboundHosts(process.env.SLSKD_ALLOWED_HOSTS, {
+    envName: 'SLSKD_ALLOWED_HOSTS',
+  }),
+  allowedHostSuffixes = resolveAllowedOutboundHostSuffixes(process.env.SLSKD_ALLOWED_HOST_SUFFIXES, {
+    envName: 'SLSKD_ALLOWED_HOST_SUFFIXES',
+  }),
   baseUrl = process.env.SLSKD_BASE_URL,
   fetchImpl = fetch,
   requestTimeoutMs = process.env.SLSKD_REQUEST_TIMEOUT_MS,
 } = {}) {
-  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl, { allowedHosts, allowedHostSuffixes });
   const effectiveRequestTimeoutMs = parsePositiveInteger(requestTimeoutMs, 10000);
 
   async function requestJson(pathname, {
@@ -136,6 +151,7 @@ export function createSlskdClient({
       response = await fetchImpl(url, {
         method,
         headers,
+        redirect: 'error',
         signal: AbortSignal.timeout(effectiveRequestTimeoutMs),
         ...(body == null ? {} : { body: JSON.stringify(body) }),
       });

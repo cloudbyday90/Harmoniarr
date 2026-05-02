@@ -15,7 +15,7 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 CREATE TABLE IF NOT EXISTS file_tag_snapshots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
   library_file_id UUID NOT NULL REFERENCES library_files(id) ON DELETE CASCADE,
   extractor TEXT NOT NULL,
   extractor_version TEXT NULL,

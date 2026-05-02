@@ -2,19 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryDiscoveryRunService } from '../../src/server/library/library-discovery-run-service.js';
 
-test('startLibraryDiscoveryRun records a pending run and starts the worker', async (t) => {
+test('startLibraryDiscoveryRun records a pending run for durable dispatch', async (t) => {
   const createOperationRun = t.mock.fn(async () => ({
     id: 'run-1',
     status: 'pending',
   }));
   const getActiveRun = t.mock.fn(async () => null);
   const recordAuditEventFn = t.mock.fn(async () => {});
-  const startWorkerRun = t.mock.fn(async () => {});
   const service = createLibraryDiscoveryRunService({
     createOperationRun,
     getActiveRun,
     recordAuditEventFn,
-    startWorkerRun,
   });
 
   const result = await service.startLibraryDiscoveryRun({
@@ -32,16 +30,6 @@ test('startLibraryDiscoveryRun records a pending run and starts the worker', asy
     triggeredByUserId: 'user-7',
   });
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
-  assert.equal(startWorkerRun.mock.callCount(), 1);
-  assert.deepEqual(startWorkerRun.mock.calls[0].arguments[0], {
-    requestMetadata: {
-      ipAddress: '198.51.100.12',
-      userAgent: 'HarmoniarrDiscoveryRunServiceTest/1.0',
-    },
-    runId: 'run-1',
-    triggerSource: 'manual',
-    triggeredByUserId: 'user-7',
-  });
   assert.deepEqual(result, {
     accepted: true,
     run: {

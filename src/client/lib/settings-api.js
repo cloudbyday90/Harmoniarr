@@ -29,3 +29,31 @@ export function updateSettings(settings) {
     body: settings,
   });
 }
+
+export function startSpotifyOAuth() {
+  return apiRequest('/api/v1/providers/spotify/oauth/start', {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}
+
+export function clearSpotifyOAuth() {
+  return apiRequest('/api/v1/providers/spotify/oauth/clear', {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}
+
+export function startYouTubeOAuth() {
+  return apiRequest('/api/v1/providers/youtube/oauth/start', {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}
+
+export function clearYouTubeOAuth() {
+  return apiRequest('/api/v1/providers/youtube/oauth/clear', {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}

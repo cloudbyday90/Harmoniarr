@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { apiRequest } from './api.js';
+import { apiRequest, buildQueryString } from './api.js';
 
 export function fetchLibraryScanSummary() {
   return apiRequest('/api/v1/system/library-scan-summary');
@@ -28,4 +28,12 @@ export function fetchOnboardingSummary() {
 
 export function fetchSystemOverview() {
   return apiRequest('/api/v1/system/overview');
+}
+
+export function fetchSystemActivityFeed({ before, limit } = {}) {
+  return apiRequest(`/api/v1/system/activity-feed${buildQueryString({ before, limit })}`);
+}
+
+export function fetchSystemOperatorNotifications({ limit } = {}) {
+  return apiRequest(`/api/v1/system/operator-notifications${buildQueryString({ limit })}`);
 }

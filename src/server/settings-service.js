@@ -17,8 +17,14 @@
  */
 
 import { recordAuditEvent } from './audit.js';
+import { getPool } from './database.js';
 import { createPathValidationService } from './paths/path-validation-service.js';
+import { normalizeUserMusicRoots } from './paths/user-music-root-service.js';
 import { loadSettings, persistSettings } from './settings.js';
+import { createSlskdConfigService } from './slskd/slskd-config-service.js';
+import { createProviderCredentialsService } from './integrations/providers/provider-credentials-service.js';
+import { createSpotifyOAuthService } from './integrations/spotify/spotify-oauth-service.js';
+import { createYouTubeOAuthService } from './integrations/youtube/youtube-oauth-service.js';
 import { validateDownloadPathMappingsAgainstSettings } from './paths/download-path-mapping-service.js';
 import { normalizeSettingsPatch } from './validators/settings-validator.js';
 
@@ -33,14 +39,30 @@ function applySettingsUpdates(settings, updates) {
 }
 
 export function createSettingsService({
+  deploymentSecurityService = null,
+  getPoolFn = getPool,
   loadSettingsFn = loadSettings,
   pathValidationService = createPathValidationService(),
   persistSettingsFn = persistSettings,
+  providerCredentialsService = createProviderCredentialsService(),
   recordAuditEventFn = recordAuditEvent,
+  slskdConfigService = createSlskdConfigService({ loadSettingsFn }),
+  spotifyOAuthService = createSpotifyOAuthService({ loadSettingsFn }),
+  youtubeOAuthService = createYouTubeOAuthService({ loadSettingsFn, providerCredentialsService }),
   validateDownloadMappingsFn = validateDownloadPathMappingsAgainstSettings,
 } = {}) {
-  async function buildPayloadForSettings(settings) {
+  async function buildPayloadForSettings(settings, queryable) {
+    deploymentSecurityService?.applySettings(settings);
+
     return {
+      secretStatus: {
+        providers: {
+          ...(await providerCredentialsService.buildSecretStatus(queryable)),
+          spotifyOAuth: await spotifyOAuthService.buildStatus(queryable),
+          youtubeOAuth: await youtubeOAuthService.buildStatus(queryable),
+        },
+        slskd: await slskdConfigService.buildSecretStatus(queryable),
+      },
       settings,
       pathValidation: await pathValidationService.validateSettingsPaths(settings),
     };
@@ -48,11 +70,13 @@ export function createSettingsService({
 
   async function buildSettingsPayload() {
     const settings = await loadSettingsFn();
-    return buildPayloadForSettings(settings);
+    return buildPayloadForSettings(settings, getPoolFn());
   }
 
   async function updateSettings({ patch, actorUserId, requestMetadata }) {
-    const updates = normalizeSettingsPatch(patch);
+    const providerSecretMutation = providerCredentialsService.buildSecretMutation(patch);
+    const slskdSecretMutation = slskdConfigService.buildSecretMutation(providerSecretMutation.sanitizedPatch ?? patch);
+    const updates = normalizeSettingsPatch(slskdSecretMutation.sanitizedPatch ?? providerSecretMutation.sanitizedPatch ?? patch);
     const currentSettings = await loadSettingsFn();
     const nextSettings = applySettingsUpdates(currentSettings, updates);
 
@@ -60,8 +84,27 @@ export function createSettingsService({
       downloadMappings: nextSettings.paths?.downloadMappings,
       downloadsRoot: nextSettings.paths?.downloads,
     });
+    normalizeUserMusicRoots(nextSettings.paths?.userMusicRoots ?? []);
 
-    const settings = await persistSettingsFn(updates, actorUserId);
+    const pool = getPoolFn();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      if (updates.length > 0) {
+        await persistSettingsFn(updates, actorUserId, client);
+      }
+      await providerSecretMutation.apply(client);
+      await slskdSecretMutation.apply(client);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    deploymentSecurityService?.applySettings(nextSettings);
 
     await recordAuditEventFn({
       actorUserId,
@@ -69,7 +112,11 @@ export function createSettingsService({
       eventType: 'settings_updated',
       summary: 'Application settings updated',
       details: {
-        updatedKeys: updates.map((update) => `${update.namespace}.${update.settingKey}`),
+        updatedKeys: [
+          ...updates.map((update) => `${update.namespace}.${update.settingKey}`),
+          ...providerSecretMutation.updatedKeys,
+          ...slskdSecretMutation.updatedKeys,
+        ],
       },
       entityType: 'settings',
       ipAddress: requestMetadata.ipAddress,
@@ -77,7 +124,7 @@ export function createSettingsService({
     });
 
     return {
-      ...(await buildPayloadForSettings(settings)),
+      ...(await buildSettingsPayload()),
       updates,
     };
   }

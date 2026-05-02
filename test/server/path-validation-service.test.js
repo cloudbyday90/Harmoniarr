@@ -25,6 +25,7 @@ function createSettings(overrides = {}) {
       music: '/data/music',
       staging: '/data/staging',
       transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
     },
     ...overrides,
   };
@@ -114,4 +115,34 @@ test('createPathValidationService marks missing roots unavailable and warns when
   assert.equal(result.summary.status, 'unavailable');
   assert.equal(result.roots.find((root) => root.key === 'staging').status, 'unavailable');
   assert.match(result.summary.message, /No explicit slskd download mappings/);
+});
+
+test('createPathValidationService reports configured per-user roots and treats missing managed subdirectories as creatable', async () => {
+  const service = createPathValidationService({
+    accessFn: async () => {},
+    realpathFn: async (value) => value,
+    statFn: async (value) => {
+      if (value === '/data/music/users/family/alice') {
+        const error = new Error('missing');
+        error.code = 'ENOENT';
+        throw error;
+      }
+
+      return createStats();
+    },
+  });
+
+  const result = await service.validateSettingsPaths(createSettings({
+    paths: {
+      ...createSettings().paths,
+      userMusicRoots: [{
+        relativeRoot: 'family/alice',
+        userId: 'user-1',
+      }],
+    },
+  }));
+
+  assert.equal(result.userMusicRoots[0].status, 'healthy');
+  assert.equal(result.userMusicRoots[0].path, '/data/music/users/family/alice');
+  assert.match(result.userMusicRoots[0].message, /will be created during import apply/);
 });

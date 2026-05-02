@@ -17,17 +17,23 @@
  */
 
 import { createSlskdService } from './slskd-service.js';
+import { createSlskdConfigService } from './slskd-config-service.js';
 import { createSlskdTransferSnapshotService } from './slskd-transfer-snapshot-service.js';
 
 export function createSlskdModule({
   providerHealthRecorder = null,
-  slskdService = createSlskdService({ providerHealthRecorder }),
+  slskdConfigService = createSlskdConfigService(),
+  slskdService = createSlskdService({
+    getClientConfig: async () => slskdConfigService.buildRuntimeConfig(),
+    providerHealthRecorder,
+  }),
   slskdTransferSnapshotService = createSlskdTransferSnapshotService({
     getDownloads: slskdService.getDownloads,
   }),
 } = {}) {
   return {
     providerHealthRecorder,
+    slskdConfigService,
     slskdService,
     slskdTransferSnapshotService,
     routeDependencies: {

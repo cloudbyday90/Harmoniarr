@@ -33,6 +33,7 @@ Preferred ID strategy:
 - Prefer application-generated UUIDv7 if the app has a stable library.
 - PostgreSQL 18's built-in `uuidv7()` is acceptable as a database default for tables where database-side ID generation is simpler.
 - If UUIDv7 is not adopted immediately, ordinary UUIDs are acceptable as an implementation fallback.
+- For migration-defined table defaults, use the shared `harmoniarr_generate_uuid()` helper so PostgreSQL 18 can use `uuidv7()` while older clusters or bootstrap paths fall back to `gen_random_uuid()` without per-table drift.
 - Do not require a non-core PostgreSQL extension only to generate IDs.
 
 Natural key examples:
