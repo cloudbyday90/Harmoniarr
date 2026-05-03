@@ -25,12 +25,13 @@ import ImportReviewView from './views/ImportReviewView.vue';
 import LoginView from './views/LoginView.vue';
 import MetadataView from './views/MetadataView.vue';
 import RecoveryView from './views/RecoveryView.vue';
+import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
 import OperationsView from './views/OperationsView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
 import SettingsView from './views/SettingsView.vue';
 import { sessionStore } from './state/session.js';
 
-const requesterRestrictedRouteNames = new Set(['dashboard', 'jobs', 'metadata', 'review-queue', 'settings']);
+const requesterRestrictedRouteNames = new Set(['dashboard', 'jobs', 'metadata', 'recovery-workspace', 'review-queue', 'settings']);
 
 function defaultAuthenticatedRouteName() {
   return sessionStore.state.user?.role === 'requester' ? 'request-music' : 'dashboard';
@@ -52,6 +53,7 @@ const router = createRouter({
         { path: '', name: 'dashboard', component: DashboardView },
         { path: 'jobs', name: 'jobs', component: OperationsView },
         { path: 'metadata', name: 'metadata', component: MetadataView },
+        { path: 'recovery', name: 'recovery-workspace', component: RecoveryWorkspaceView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
         { path: 'review-queue', name: 'review-queue', component: ImportReviewView },
         { path: 'settings', name: 'settings', component: SettingsView },

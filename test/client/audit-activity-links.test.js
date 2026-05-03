@@ -83,6 +83,22 @@ test('buildAuditActivityLinkTarget links library scan and discovery audit events
   });
 });
 
+test('buildAuditActivityLinkTarget links backup restore audit events into jobs run detail state', () => {
+  assert.deepEqual(buildAuditActivityLinkTarget({
+    entityId: 'restore-run-1',
+    entityType: 'operation_run',
+    eventType: 'backup_restore_failed',
+  }), {
+    label: 'Open backup restore run',
+    to: {
+      name: 'jobs',
+      query: {
+        runId: 'restore-run-1',
+      },
+    },
+  });
+});
+
 test('buildAuditActivityLinkTarget ignores unsupported audit events', () => {
   assert.equal(buildAuditActivityLinkTarget({
     entityId: 'run-9',

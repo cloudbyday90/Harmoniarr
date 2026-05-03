@@ -120,7 +120,7 @@ function goToLogin() {
       <h1>Recover admin access</h1>
       <p>
         This page is available only when a recovery run has been armed from the command line
-        using <code>harmoniarrctl recovery arm</code>. Submit the recovery code, choose a new
+        using <code>harmoniarrctl recovery arm-bootstrap-admin</code>. Submit the recovery code, choose a new
         admin username and password, and all existing sessions will be revoked.
       </p>
     </article>
@@ -134,7 +134,7 @@ function goToLogin() {
       <p class="eyebrow">Recovery status error</p>
       <p class="error-copy">{{ errorMessage }}</p>
       <p class="muted-copy">
-        Ensure a recovery run is armed via <code>harmoniarrctl recovery arm</code> and try again.
+        Ensure a recovery run is armed via <code>harmoniarrctl recovery arm-bootstrap-admin</code> and try again.
       </p>
     </article>
 
@@ -143,7 +143,7 @@ function goToLogin() {
       <h2>Recovery is not available</h2>
       <p class="muted-copy">
         No armed recovery run was found. An operator must arm a recovery run from the command
-        line using <code>harmoniarrctl recovery arm</code> before this page can be used.
+        line using <code>harmoniarrctl recovery arm-bootstrap-admin</code> before this page can be used.
       </p>
     </article>
 
@@ -190,7 +190,7 @@ function goToLogin() {
       <article class="form-card panel-light">
         <h2>Complete recovery</h2>
         <p class="muted-copy">
-          Enter the recovery code displayed by <code>harmoniarrctl recovery arm</code>,
+          Enter the recovery code displayed by <code>harmoniarrctl recovery arm-bootstrap-admin</code>,
           then choose a username and password for the new admin account.
         </p>
         <form class="stack-form" @submit.prevent="submit">

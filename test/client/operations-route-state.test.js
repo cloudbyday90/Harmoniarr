@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildOperationRunDetailLocation,
   buildOperationsRouteQuery,
   getOperationsRouteStateKey,
   normalizeOperationsRouteState,
@@ -24,4 +25,14 @@ test('getOperationsRouteStateKey matches equivalent normalized route states', ()
     getOperationsRouteStateKey({ runId: ' run-22 ' }),
     getOperationsRouteStateKey({ runId: 'run-22' }),
   );
+});
+
+test('buildOperationRunDetailLocation links directly into jobs route detail state', () => {
+  assert.deepEqual(buildOperationRunDetailLocation(' run-22 '), {
+    name: 'jobs',
+    query: {
+      runId: 'run-22',
+    },
+  });
+  assert.equal(buildOperationRunDetailLocation(' '), null);
 });

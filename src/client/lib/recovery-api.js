@@ -16,15 +16,88 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { apiRequest } from './api.js';
+import { apiRequest, buildQueryString } from './api.js';
+import { createControlPlaneIdempotencyHeaders } from './control-plane-idempotency.js';
 
-export function fetchRecoveryStatus() {
-  return apiRequest('/api/v1/recovery/bootstrap-admin/status');
+export function fetchRecoveryStatus({ signal } = {}) {
+  return apiRequest('/api/v1/recovery/bootstrap-admin/status', { signal });
 }
 
 export function completeRecovery(form) {
   return apiRequest('/api/v1/recovery/bootstrap-admin/complete', {
     method: 'POST',
     body: form,
+  });
+}
+
+export function fetchBackupExports({ limit, signal } = {}) {
+  return apiRequest(`/api/v1/recovery/backups${buildQueryString({ limit })}`, { signal });
+}
+
+export function fetchBackupExportById(backupArtifactId, { signal } = {}) {
+  return apiRequest(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifactId)}`, { signal });
+}
+
+export function fetchBackupRestorePreview(backupArtifactId, { signal } = {}) {
+  return apiRequest(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifactId)}/restore-preview`, { signal });
+}
+
+export function startBackupExport() {
+  return apiRequest('/api/v1/recovery/backups', {
+    headers: createControlPlaneIdempotencyHeaders('recovery.backups.create'),
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function deleteBackupExport(backupArtifactId) {
+  return apiRequest(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifactId)}`, {
+    headers: createControlPlaneIdempotencyHeaders('recovery.backups.delete'),
+    includeCsrf: true,
+    method: 'DELETE',
+  });
+}
+
+export function startBackupRestoreApply(backupArtifactId, { expectedPayloadSha256 } = {}) {
+  return apiRequest(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifactId)}/restore-apply`, {
+    body: {
+      expectedPayloadSha256,
+    },
+    headers: createControlPlaneIdempotencyHeaders('recovery.backups.restore-apply'),
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function buildBackupExportDownloadUrl(backupArtifactId) {
+  return `/api/v1/recovery/backups/${encodeURIComponent(backupArtifactId)}/download`;
+}
+
+export function fetchQueueDiagnostics({ runLimit, signal } = {}) {
+  return apiRequest(`/api/v1/system/diagnostics/queue-state${buildQueryString({ runLimit })}`, { signal });
+}
+
+export function fetchRecoveryDiagnostics({ auditLimit, runLimit, signal } = {}) {
+  return apiRequest(`/api/v1/system/diagnostics/recovery-state${buildQueryString({ auditLimit, runLimit })}`, { signal });
+}
+
+export function enterMaintenanceLock({ expiresAt, lockType, reason } = {}) {
+  return apiRequest('/api/v1/recovery/maintenance-locks', {
+    body: {
+      expiresAt,
+      lockType,
+      reason,
+    },
+    headers: createControlPlaneIdempotencyHeaders('recovery.maintenance-locks.enter'),
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function releaseMaintenanceLock(lockId) {
+  return apiRequest(`/api/v1/recovery/maintenance-locks/${encodeURIComponent(lockId)}/release`, {
+    headers: createControlPlaneIdempotencyHeaders('recovery.maintenance-locks.release'),
+    includeCsrf: true,
+    method: 'POST',
   });
 }

@@ -32,6 +32,7 @@ import {
   getOperationRunDescriptorDefinitionForEventType,
   operationRunRegistry,
 } from '../../shared/operation-run-descriptors.js';
+import { buildOperationRunDetailLocation } from './operations-route-state.js';
 
 const operationRunLinkDefinitionsByType = new Map([
   [operationRunRegistry.artworkCleanup.operationType, {
@@ -54,6 +55,15 @@ const operationRunLinkDefinitionsByType = new Map([
     buildLocation: buildLibraryDiscoveryRunDashboardLocation,
     openLabel: 'Open library discovery run',
   }],
+  [operationRunRegistry.backupRestoreApply.operationType, {
+    buildLocation: buildOperationRunDetailLocation,
+    openLabel: 'Open backup restore run',
+  }],
+]);
+
+const operationEventAliasDefinitions = new Map([
+  ['backup_restore_completed', operationRunRegistry.backupRestoreApply.operationType],
+  ['backup_restore_failed', operationRunRegistry.backupRestoreApply.operationType],
 ]);
 
 function formatOperationTypeFallback(operationType) {
@@ -86,12 +96,17 @@ function buildDefinitionLinkTarget(definition, runId) {
   };
 }
 
+function getOperationRunDescriptorDefinitionForAnyEventType(eventType) {
+  return getOperationRunDescriptorDefinitionForEventType(eventType)
+    ?? getOperationRunDescriptorDefinition(operationEventAliasDefinitions.get(eventType));
+}
+
 export function buildOperationRunLinkTarget({ operationType, runId }) {
   return buildDefinitionLinkTarget(getOperationRunDescriptorDefinition(operationType), runId);
 }
 
 export function buildOperationRunLinkTargetFromEvent({ entityId, eventType }) {
-  return buildDefinitionLinkTarget(getOperationRunDescriptorDefinitionForEventType(eventType), entityId);
+  return buildDefinitionLinkTarget(getOperationRunDescriptorDefinitionForAnyEventType(eventType), entityId);
 }
 
 export function getOperationRunDescriptor(operationType) {

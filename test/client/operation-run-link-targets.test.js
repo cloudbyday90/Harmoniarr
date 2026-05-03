@@ -24,6 +24,15 @@ test('operation run link targets resolve shared descriptors by operation type', 
       },
     },
   });
+  assert.deepEqual(buildOperationRunLinkTarget({ operationType: 'backup_restore_apply', runId: 'restore-run-1' }), {
+    label: 'Open backup restore run',
+    to: {
+      name: 'jobs',
+      query: {
+        runId: 'restore-run-1',
+      },
+    },
+  });
 });
 
 test('operation run link targets resolve shared descriptors by started event type', () => {
@@ -37,6 +46,18 @@ test('operation run link targets resolve shared descriptors by started event typ
       name: 'review-queue',
       query: {
         executionRunId: 'run-44',
+      },
+    },
+  });
+  assert.deepEqual(buildOperationRunLinkTargetFromEvent({
+    entityId: 'restore-run-1',
+    eventType: 'backup_restore_failed',
+  }), {
+    label: 'Open backup restore run',
+    to: {
+      name: 'jobs',
+      query: {
+        runId: 'restore-run-1',
       },
     },
   });

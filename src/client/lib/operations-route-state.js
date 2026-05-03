@@ -41,3 +41,16 @@ export function getOperationsRouteStateKey(state) {
   const normalized = normalizeOperationsRouteState({ runId: state?.runId });
   return JSON.stringify([normalized.runId]);
 }
+
+export function buildOperationRunDetailLocation(runId) {
+  const normalizedRunId = normalizeRouteValue(runId);
+
+  if (!normalizedRunId) {
+    return null;
+  }
+
+  return {
+    name: 'jobs',
+    query: buildOperationsRouteQuery({ runId: normalizedRunId }),
+  };
+}

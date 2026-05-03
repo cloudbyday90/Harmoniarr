@@ -45,6 +45,7 @@ async function logout() {
         <RouterLink v-if="!isRequester" :to="{ name: 'jobs' }" class="nav-link">Jobs</RouterLink>
         <RouterLink :to="{ name: 'account-security' }" class="nav-link">Account Security</RouterLink>
         <RouterLink v-if="!isRequester" :to="{ name: 'metadata' }" class="nav-link">Metadata</RouterLink>
+        <RouterLink v-if="!isRequester" :to="{ name: 'recovery-workspace' }" class="nav-link">Recovery</RouterLink>
         <RouterLink v-if="!isRequester" :to="{ name: 'review-queue' }" class="nav-link">Review Queue</RouterLink>
         <RouterLink v-if="!isRequester" :to="{ name: 'settings' }" class="nav-link">Settings</RouterLink>
       </nav>
