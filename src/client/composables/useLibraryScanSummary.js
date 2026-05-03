@@ -18,8 +18,10 @@
 
 import { computed, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
-import { fetchLibraryScanRunDetail as defaultFetchLibraryScanRunDetail } from '../lib/library-api.js';
-import { startLibraryScanRun as defaultStartLibraryScanRun } from '../lib/library-api.js';
+import {
+  fetchLibraryScanRunDetail as defaultFetchLibraryScanRunDetail,
+  startLibraryScanRun as defaultStartLibraryScanRun,
+} from '../lib/library-api.js';
 import { fetchLibraryScanSummary as defaultFetchLibraryScanSummary } from '../lib/system-api.js';
 
 export function useLibraryScanSummary({

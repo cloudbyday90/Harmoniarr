@@ -97,7 +97,7 @@ export function validateReleaseImageWorkflowContract(source) {
   const issues = [];
   const normalizedSource = source.replace(/\r\n/g, '\n');
 
-  if (!normalizedSource.includes('trusted_dockerhub_mirror_enabled: ${{ steps.release.outputs.trusted_dockerhub_mirror_enabled }}')) {
+  if (!normalizedSource.includes(`trusted_dockerhub_mirror_enabled: \${{ steps.release.outputs.trusted_dockerhub_mirror_enabled }}`)) {
     issues.push('publish-image job must expose trusted_dockerhub_mirror_enabled output');
   }
 

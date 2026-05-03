@@ -9,12 +9,27 @@ const baseLanguageOptions = {
 };
 
 const sharedRules = {
+  'array-callback-return': ['error', {
+    checkForEach: true,
+  }],
+  eqeqeq: ['error', 'smart'],
+  'no-constant-binary-expression': 'error',
+  'no-duplicate-imports': ['error', {
+    includeExports: true,
+  }],
+  'no-promise-executor-return': 'error',
+  'no-shadow': 'error',
+  'no-template-curly-in-string': 'error',
+  'no-unreachable-loop': 'error',
   'no-unused-vars': ['error', {
     argsIgnorePattern: '^_',
     caughtErrorsIgnorePattern: '^_',
     ignoreRestSiblings: true,
     varsIgnorePattern: '^_',
   }],
+  'no-useless-catch': 'error',
+  'prefer-object-has-own': 'error',
+  radix: 'error',
 };
 
 export default defineConfig([

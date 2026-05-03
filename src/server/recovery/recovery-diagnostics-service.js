@@ -74,7 +74,7 @@ export function createRecoveryDiagnosticsService({
     };
 
     for (const row of summaryResult.rows) {
-      if (Object.prototype.hasOwnProperty.call(statusCounts, row.status)) {
+      if (Object.hasOwn(statusCounts, row.status)) {
         statusCounts[row.status] = Number.isFinite(row.count) ? row.count : Number.parseInt(row.count, 10) || 0;
       }
     }

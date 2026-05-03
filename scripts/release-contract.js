@@ -17,7 +17,7 @@ export const defaultReleaseAssetNames = Object.freeze({
 });
 
 function hasOwn(object, key) {
-  return Object.prototype.hasOwnProperty.call(object, key);
+  return Object.hasOwn(object, key);
 }
 
 function isNonEmptyString(value) {

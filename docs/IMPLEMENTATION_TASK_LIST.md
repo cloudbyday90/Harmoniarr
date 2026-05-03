@@ -405,8 +405,9 @@ Parallelizable after contract stabilization:
 - [x] Add repo-level ESLint validation, segmented native test commands, and suite conventions that match the current ESM-native stack.
   - Added native ESM `eslint.config.js` using ESLint flat config plus Vue flat essentials, with explicit server, shared, client, scripts, and test targets instead of a single catch-all lint surface.
   - Added `npm run lint`, `lint:server`, `lint:shared`, `lint:client`, `lint:test`, and `lint:scripts`, and wired lint into the repo-level `npm run validate` contract before tests and builds.
-  - Replaced the monolithic `node --test` package script with segmented `test:server`, `test:client`, `test:scripts`, `test:integration`, and `test:coverage` commands while keeping the top-level `npm test` aggregator native and ESM-only.
+  - Replaced the monolithic `node --test` package script with segmented `test:server`, `test:client`, `test:scripts`, `test:integration`, and `test:coverage` commands while keeping the top-level `npm test` aggregator native, ESM-only, and responsible for lint plus test-hygiene gating before Node suites run.
   - Introduced native `suite()` grouping in representative server, client, and script tests to establish the repo convention for static suites without forcing a churn-heavy test rewrite.
+  - Added a shared `scripts/test-hygiene.js` boundary plus `npm run check:test-hygiene` so committed `only`/`skip`/`todo` test markers and explicit `{ only|skip|todo: true }` options fail the same repo-level contract instead of silently swallowing coverage.
 - [x] Add unit tests for validators, service rules, workflow-state logic, and normalization helpers.
 - [x] Add integration tests for auth/session flows, settings contracts, import review, job ownership, and recovery operations.
 - [x] Add route-contract tests for normalized success/error payloads and permission enforcement.

@@ -25,7 +25,7 @@ function validatePositiveInteger(value, propertyName) {
 }
 
 export async function probePostgresConnection({
-  clientFactory = (config) => new Client(config),
+  clientFactory = (connectionConfig) => new Client(connectionConfig),
   config = buildConnectionConfig(),
 } = {}) {
   const client = clientFactory(config);
@@ -83,9 +83,9 @@ export async function waitForPostgres({
 }
 
 await runDirectScriptTask(import.meta, {
-    prefix: 'harmoniarr-wait-for-postgres',
-    renderSuccessMessage: ({ attempts, config, waitedMs }) => {
-      return `PostgreSQL at ${config.host}:${config.port}/${config.database} is ready after ${attempts} attempt(s) and ${waitedMs}ms`;
-    },
-    run: () => waitForPostgres(),
-  });
+  prefix: 'harmoniarr-wait-for-postgres',
+  renderSuccessMessage: ({ attempts, config, waitedMs }) => {
+    return `PostgreSQL at ${config.host}:${config.port}/${config.database} is ready after ${attempts} attempt(s) and ${waitedMs}ms`;
+  },
+  run: () => waitForPostgres(),
+});

@@ -44,7 +44,9 @@ test('startWorkerRun queues planning via microtask and completes run on success'
     sourceProvider: 'spotify',
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new Promise((resolve) => {
+    setTimeout(resolve, 10);
+  });
 
   assert.equal(acquireLease.mock.callCount(), 1);
   assert.equal(markRunStarted.mock.callCount(), 1);
@@ -85,7 +87,9 @@ test('startWorkerRun marks run failed on planning error', async (t) => {
     sourceProvider: 'spotify',
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new Promise((resolve) => {
+    setTimeout(resolve, 10);
+  });
 
   assert.equal(markRunFailed.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 0);
@@ -116,7 +120,9 @@ test('startWorkerRun is idempotent for the same runId', async (t) => {
   worker.startWorkerRun({ canonicalUrl: 'x', mediaRequestId: 'req-3', resourceType: 'release', runId: 'run-3', sourceIdentifier: 'z', sourceProvider: 'spotify' });
   worker.startWorkerRun({ canonicalUrl: 'x', mediaRequestId: 'req-3', resourceType: 'release', runId: 'run-3', sourceIdentifier: 'z', sourceProvider: 'spotify' });
 
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await new Promise((resolve) => {
+    setTimeout(resolve, 20);
+  });
 
   assert.equal(acquireLease.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 1);

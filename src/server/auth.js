@@ -19,6 +19,7 @@
 import { randomUUID } from 'node:crypto';
 import { getPool } from './database.js';
 import {
+  csrfProtectionModeEnvVar,
   csrfProtectionModes,
   resolveCsrfProtectionMode,
   resolveSecureCookiesEnabled,
@@ -31,12 +32,7 @@ import {
   serializeCookie,
   verifyPassword,
 } from './security.js';
-
-export {
-  csrfProtectionModeEnvVar,
-  csrfProtectionModes,
-  resolveCsrfProtectionMode,
-} from './deployment-security-service.js';
+export { csrfProtectionModeEnvVar, csrfProtectionModes, resolveCsrfProtectionMode };
 import { recordAuditEvent } from './audit.js';
 import { normalizeUsername, validatePassword } from './validators/auth-validator.js';
 

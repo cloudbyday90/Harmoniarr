@@ -5162,6 +5162,7 @@ The validation stack should stay aligned with the current ESM-native runtime ins
 - Native `fetch` plus lightweight HTTP helpers for route-contract coverage instead of introducing a separate request-testing abstraction by default.
 - Testcontainers or equivalent only where real database lifecycle coverage is necessary; keep lighter native tests as the default path.
 - ESLint flat config with Vue support and explicit target groups for server, shared, client, tests, and scripts.
+- A top-level native `npm test` aggregator that runs lint and committed-test-hygiene checks before segmented `node:test` entrypoints, so swallowed `only`/`skip`/`todo` markers fail the normal developer and CI path.
 - Native `node:test` coverage reporting for local and CI visibility, while keeping in mind that built-in coverage remains experimental in current Node documentation.
 
 Coverage should start as a visible native `node:test` report. Ratcheting can be added later once the current codebase has a stable baseline worth enforcing.
@@ -5170,6 +5171,7 @@ Quality gates should include:
 
 - ESLint for server code.
 - ESLint for client code.
+- Test-hygiene checks that reject committed `only`, `skip`, and `todo` markers or equivalent option flags.
 - Copyright/license header compliance using the same style as Classifarr.
 - Security-focused lint rules for backend code where practical.
 - Test linting to catch bad test patterns.
