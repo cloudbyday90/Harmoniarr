@@ -273,7 +273,7 @@ Parallelizable after contract stabilization:
   - Supported `external_url` requests now auto-dispatch a durable `library_external_intake_planning` operation run via the shared queue and operation-run-descriptor model.
   - The planning worker materializes normalized `provider_ingest_requests` rows from a durable `buildProviderIngestPlan` call, patches `evidence.providerRequest` and `evidence.providerAutomation` on the request row, and records audit events through the shared boundary.
   - Duplicate planning runs are prevented by an idempotency check in `library-external-intake-service.js` before any run is created.
-  - Migration `20260502_000007_provider_ingest_request_intents.sql` adds the `provider_ingest_requests` table with provider, resource type, ingest target, identifier, canonical URL, pagination state, status, and evidence columns.
+  - Migration `20260502_000011_provider_ingest_request_intents.sql` adds the `provider_ingest_requests` table with provider, resource type, ingest target, identifier, canonical URL, pagination state, status, and evidence columns.
 - [x] Model playlist import expansion policy so operators can keep selection bounded to playlist albums or opt into additional album discovery for artists referenced by the playlist.
 - [x] Add a dedicated Request Music dashboard and persisted user-owned media request inbox for release, track, and provider URL submissions, with requester-scoped history and admin all-request visibility separate from import review.
 - [x] Move per-user import destination ownership toward `app_users` by storing managed library subdirectories on user records and preferring them during preview planning, while keeping `paths.userMusicRoots` as a compatibility fallback during the transition.
@@ -409,7 +409,10 @@ Parallelizable after contract stabilization:
   - Introduced native `suite()` grouping in representative server, client, and script tests to establish the repo convention for static suites without forcing a churn-heavy test rewrite.
   - Added a shared `scripts/test-hygiene.js` boundary plus `npm run check:test-hygiene` so committed `only`/`skip`/`todo` test markers and explicit `{ only|skip|todo: true }` options fail the same repo-level contract instead of silently swallowing coverage.
 - [x] Add unit tests for validators, service rules, workflow-state logic, and normalization helpers.
-- [x] Add integration tests for auth/session flows, settings contracts, import review, job ownership, and recovery operations.
+- [x] Establish a shared temporary-Postgres integration harness plus first real auth/session, settings, and recovery route suites.
+  - Added reusable integration helpers under `testing/` for cookie-aware HTTP flows, Docker-backed PostgreSQL fallback via Testcontainers, and one-app-per-scenario runtime bootstrapping against the real static ESM server module graph.
+  - Added first integration coverage for bootstrap/login/refresh/logout session flow, authenticated settings read/update persistence, and maintenance-lock idempotency plus recovery diagnostics against real database state.
+- [ ] Expand integration tests for import review, job ownership, and the remaining critical-path route behavior.
 - [x] Add route-contract tests for normalized success/error payloads and permission enforcement.
 - [x] Keep ESM-only enforcement active in validation and CI so new CommonJS patterns do not regress into runtime code or scripts.
 - [x] Add migration replay and schema snapshot validation.

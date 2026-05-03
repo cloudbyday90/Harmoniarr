@@ -5161,6 +5161,7 @@ The validation stack should stay aligned with the current ESM-native runtime ins
 - `suite()` for static grouping and `test()` or nested subtests for generated or highly dynamic cases.
 - Native `fetch` plus lightweight HTTP helpers for route-contract coverage instead of introducing a separate request-testing abstraction by default.
 - Testcontainers or equivalent only where real database lifecycle coverage is necessary; keep lighter native tests as the default path.
+- Real integration scenarios should boot the actual static ESM server graph against disposable PostgreSQL state through shared test helpers, not a second application composition path that drifts from production wiring.
 - ESLint flat config with Vue support and explicit target groups for server, shared, client, tests, and scripts.
 - A top-level native `npm test` aggregator that runs lint and committed-test-hygiene checks before segmented `node:test` entrypoints, so swallowed `only`/`skip`/`todo` markers fail the normal developer and CI path.
 - Native `node:test` coverage reporting for local and CI visibility, while keeping in mind that built-in coverage remains experimental in current Node documentation.
@@ -5175,6 +5176,7 @@ Quality gates should include:
 - Copyright/license header compliance using the same style as Classifarr.
 - Security-focused lint rules for backend code where practical.
 - Test linting to catch bad test patterns.
+- Integration entrypoints may run with serialized file concurrency when their shared runtime bootstraps real databases or mutates process-scoped connection settings.
 - Migration filename validation.
 - Schema snapshot freshness checks once schema snapshots exist.
 - Markdown/docs linting.

@@ -8,7 +8,7 @@
 
 import { readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { migrationFilenamePattern } from '../src/server/migration-manifest.js';
+import { migrationFilenamePattern, parseMigrationFilename } from '../src/server/migration-manifest.js';
 import { runDirectScriptTask } from './script-runtime.js';
 
 async function checkMigrationFilenames() {
@@ -21,6 +21,25 @@ async function checkMigrationFilenames() {
 
   if (invalid.length > 0) {
     throw new Error(`Invalid migration filenames:\n${invalid.map((name) => `- ${name}`).join('\n')}`);
+  }
+
+  const migrationKeyToFilenames = new Map();
+
+  for (const filename of entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
+    .map((entry) => entry.name)) {
+    const { migrationKey } = parseMigrationFilename(filename);
+    const groupedFilenames = migrationKeyToFilenames.get(migrationKey) ?? [];
+    groupedFilenames.push(filename);
+    migrationKeyToFilenames.set(migrationKey, groupedFilenames);
+  }
+
+  const duplicateKeys = [...migrationKeyToFilenames.entries()]
+    .filter(([, filenames]) => filenames.length > 1)
+    .map(([migrationKey, filenames]) => `- ${migrationKey}: ${filenames.join(', ')}`);
+
+  if (duplicateKeys.length > 0) {
+    throw new Error(`Duplicate migration keys detected:\n${duplicateKeys.join('\n')}`);
   }
 }
 

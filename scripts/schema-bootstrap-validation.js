@@ -12,7 +12,7 @@ import {
   defaultSchemaSnapshotPath,
 } from '../src/server/schema-bootstrap.js';
 import { getAppliedMigrationFilenames } from '../src/server/schema-migration-store.js';
-import { withTemporaryPostgresDatabase } from './postgres-temporary-database.js';
+import { withTemporaryPostgresDatabase } from '../testing/postgres-temporary-database.js';
 
 export async function validateSchemaBootstrap({
   bootstrapSchemaFn = bootstrapDatabaseSchemaFromSnapshot,

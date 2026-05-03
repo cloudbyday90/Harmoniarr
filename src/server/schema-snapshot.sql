@@ -2469,76 +2469,6 @@ SET migration_key = EXCLUDED.migration_key,
     application_version = NULL,
     updated_at = NOW();
 
--- Migration: 20260502_000007_provider_ingest_request_intents.sql
--- Checksum: a48e97c2581eae43db5d8deeca1f97d9f823adb3bdef4bae0bb2b9ccb64b2896
--- Harmoniarr - Soulseek-native music library management
--- Copyright (C) 2026 Harmoniarr Contributors
---
--- This program is free software: you can redistribute it and/or modify
--- it under the terms of the GNU General Public License as published by
--- the Free Software Foundation, either version 3 of the License, or
--- (at your option) any later version.
---
--- This program is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
--- GNU General Public License for more details.
---
--- You should have received a copy of the GNU General Public License
--- along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-CREATE TABLE IF NOT EXISTS provider_ingest_requests (
-  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
-  media_request_id UUID NOT NULL REFERENCES media_requests(id) ON DELETE CASCADE,
-  source_provider TEXT NOT NULL,
-  source_resource_type TEXT NOT NULL,
-  ingest_target_type TEXT NOT NULL,
-  source_identifier TEXT NOT NULL,
-  canonical_url TEXT NOT NULL,
-  page_number INTEGER NOT NULL DEFAULT 1 CHECK (page_number > 0),
-  page_cursor TEXT NULL,
-  status TEXT NOT NULL DEFAULT 'planned',
-  evidence JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT provider_ingest_requests_source_provider_check CHECK (source_provider IN ('spotify', 'youtube', 'apple_music')),
-  CONSTRAINT provider_ingest_requests_source_resource_type_check CHECK (source_resource_type IN ('playlist', 'artist', 'release', 'track', 'video')),
-  CONSTRAINT provider_ingest_requests_ingest_target_type_check CHECK (ingest_target_type IN ('playlist_page', 'artist', 'release', 'track', 'video')),
-  CONSTRAINT provider_ingest_requests_status_check CHECK (status IN ('planned', 'processing', 'completed', 'failed', 'unsupported'))
-);
-
-CREATE INDEX IF NOT EXISTS provider_ingest_requests_media_request_idx
-  ON provider_ingest_requests (media_request_id, created_at ASC);
-
-CREATE INDEX IF NOT EXISTS provider_ingest_requests_status_idx
-  ON provider_ingest_requests (status, source_provider, created_at ASC);
-
-INSERT INTO schema_migrations (
-  migration_key,
-  filename,
-  description,
-  checksum,
-  status
-)
-VALUES (
-  '20260502_000007',
-  '20260502_000007_provider_ingest_request_intents.sql',
-  'provider_ingest_request_intents',
-  'a48e97c2581eae43db5d8deeca1f97d9f823adb3bdef4bae0bb2b9ccb64b2896',
-  'applied'
-)
-ON CONFLICT (filename) DO UPDATE
-SET migration_key = EXCLUDED.migration_key,
-    description = EXCLUDED.description,
-    checksum = EXCLUDED.checksum,
-    status = EXCLUDED.status,
-    started_at = NULL,
-    finished_at = NULL,
-    duration_ms = NULL,
-    error_message = NULL,
-    application_version = NULL,
-    updated_at = NOW();
-
 -- Migration: 20260502_000008_backup_artifact_metadata.sql
 -- Checksum: c6c1af6ea42f9bb87fe9093b4337b18bcb9f2b1b8cb21d169156213e70af8a3d
 -- Harmoniarr - Soulseek-native music library management
@@ -2707,6 +2637,76 @@ VALUES (
   '20260502_000010_control_plane_idempotency_records.sql',
   'control_plane_idempotency_records',
   '0704567e9201159fccf18b2f2fb5a8480d912c7ff2c46b25238e530201112506',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000011_provider_ingest_request_intents.sql
+-- Checksum: a48e97c2581eae43db5d8deeca1f97d9f823adb3bdef4bae0bb2b9ccb64b2896
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS provider_ingest_requests (
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  media_request_id UUID NOT NULL REFERENCES media_requests(id) ON DELETE CASCADE,
+  source_provider TEXT NOT NULL,
+  source_resource_type TEXT NOT NULL,
+  ingest_target_type TEXT NOT NULL,
+  source_identifier TEXT NOT NULL,
+  canonical_url TEXT NOT NULL,
+  page_number INTEGER NOT NULL DEFAULT 1 CHECK (page_number > 0),
+  page_cursor TEXT NULL,
+  status TEXT NOT NULL DEFAULT 'planned',
+  evidence JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT provider_ingest_requests_source_provider_check CHECK (source_provider IN ('spotify', 'youtube', 'apple_music')),
+  CONSTRAINT provider_ingest_requests_source_resource_type_check CHECK (source_resource_type IN ('playlist', 'artist', 'release', 'track', 'video')),
+  CONSTRAINT provider_ingest_requests_ingest_target_type_check CHECK (ingest_target_type IN ('playlist_page', 'artist', 'release', 'track', 'video')),
+  CONSTRAINT provider_ingest_requests_status_check CHECK (status IN ('planned', 'processing', 'completed', 'failed', 'unsupported'))
+);
+
+CREATE INDEX IF NOT EXISTS provider_ingest_requests_media_request_idx
+  ON provider_ingest_requests (media_request_id, created_at ASC);
+
+CREATE INDEX IF NOT EXISTS provider_ingest_requests_status_idx
+  ON provider_ingest_requests (status, source_provider, created_at ASC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000011',
+  '20260502_000011_provider_ingest_request_intents.sql',
+  'provider_ingest_request_intents',
+  'a48e97c2581eae43db5d8deeca1f97d9f823adb3bdef4bae0bb2b9ccb64b2896',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE

@@ -50,7 +50,7 @@
     "test": "npm run lint && npm run check:test-hygiene && npm run test:node",
     "test:client": "node --test \"test/client/**/*.test.js\"",
     "test:coverage": "node --test --experimental-test-coverage",
-    "test:integration": "node --test \"test/integration/**/*.test.js\"",
+    "test:integration": "node --test --test-concurrency=1 \"test/integration/**/*.test.js\"",
     "test:node": "npm run test:server && npm run test:client && npm run test:scripts && npm run test:integration",
     "test:scripts": "node --test \"test/scripts/**/*.test.js\" \"test/compose-image-tag-policy.test.js\"",
     "test:server": "node --test \"test/server/**/*.test.js\"",
@@ -70,6 +70,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testcontainers/postgresql": "^11.14.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "eslint": "^10.3.0",
     "eslint-plugin-vue": "^10.9.0",
