@@ -142,6 +142,18 @@ function createSystemRouteTestApp(overrides = {}) {
         canApplyRestore: true,
         checkedAt: '2026-05-02T12:18:00.000Z',
       }),
+      getDiagnosticsExportDownload: async ({ activityLimit, auditLimit, lockTypes, notificationLimit, runLimit }) => ({
+        content: Buffer.from(JSON.stringify({
+          activityLimit,
+          auditLimit,
+          lockTypes,
+          notificationLimit,
+          ok: true,
+          runLimit,
+        }), 'utf8'),
+        contentType: 'application/json; charset=utf-8',
+        filename: 'harmoniarr_diagnostics_2026-05-02T12-22-00-000Z.json',
+      }),
       getMaintenanceLockStatus: async ({ lockTypes }) => ({
         checkedAt: '2026-05-02T12:19:00.000Z',
         activeLocks: [],
@@ -974,6 +986,49 @@ test('recovery diagnostics route requires admin session and forwards limit and l
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.recentPrivilegedActions.length, 1);
+  });
+});
+
+test('diagnostics export route requires admin session, forwards filters, and returns a download attachment', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'user-42', user: { role: 'admin' } }));
+  const getDiagnosticsExportDownload = t.mock.fn(async ({ activityLimit, auditLimit, lockTypes, notificationLimit, runLimit }) => ({
+    content: Buffer.from(JSON.stringify({
+      activityLimit,
+      auditLimit,
+      lockTypes,
+      notificationLimit,
+      ok: true,
+      runLimit,
+    }), 'utf8'),
+    contentType: 'application/json; charset=utf-8',
+    filename: 'harmoniarr_diagnostics_2026-05-02T12-22-00-000Z.json',
+  }));
+  const app = createSystemRouteTestApp({ getDiagnosticsExportDownload, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/system/diagnostics/export?activityLimit=12&auditLimit=9&notificationLimit=6&runLimit=11&lockTypes=maintenance,restore`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(getDiagnosticsExportDownload.mock.callCount(), 1);
+    assert.deepEqual(getDiagnosticsExportDownload.mock.calls[0].arguments, [{
+      activityLimit: '12',
+      auditLimit: '9',
+      lockTypes: ['maintenance', 'restore'],
+      notificationLimit: '6',
+      runLimit: '11',
+    }]);
+    assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
+    assert.match(response.headers.get('content-disposition') ?? '', /attachment; filename="harmoniarr_diagnostics_/);
+    assert.deepEqual(payload, {
+      activityLimit: '12',
+      auditLimit: '9',
+      lockTypes: ['maintenance', 'restore'],
+      notificationLimit: '6',
+      ok: true,
+      runLimit: '11',
+    });
   });
 });
 

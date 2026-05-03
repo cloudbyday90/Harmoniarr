@@ -25,18 +25,18 @@ test('createRuntimeReporter writes prefixed info and error lines', () => {
     },
   });
 
-  runtimeReporter.writeInfo('listening on 0.0.0.0:3000');
-  runtimeReporter.writeError(new Error('server already closed'), { label: 'shutdown error' });
-  runtimeReporter.writeError('plain failure');
-  runtimeReporter.writeWarning('memory pressure detected');
+  runtimeReporter.writeInfo('listening on /app/data/runtime.sock for ops@example.com');
+  runtimeReporter.writeError(new Error('server already closed at /app/data/runtime.sock for ops@example.com'), { label: 'shutdown error' });
+  runtimeReporter.writeError('plain failure token=abc123');
+  runtimeReporter.writeWarning('memory pressure detected while scanning /mnt/music/library');
 
   assert.deepEqual(stdoutWrites, [
-    '[harmoniarr] listening on 0.0.0.0:3000\n',
+    '[harmoniarr] listening on [REDACTED_PATH] for [REDACTED_EMAIL]\n',
   ]);
   assert.deepEqual(stderrWrites, [
-    '[harmoniarr] shutdown error: server already closed\n',
-    '[harmoniarr] plain failure\n',
-    '[harmoniarr] warning: memory pressure detected\n',
+    '[harmoniarr] shutdown error: server already closed at [REDACTED_PATH] for [REDACTED_EMAIL]\n',
+    '[harmoniarr] plain failure token=[REDACTED]\n',
+    '[harmoniarr] warning: memory pressure detected while scanning [REDACTED_PATH]\n',
   ]);
 });
 

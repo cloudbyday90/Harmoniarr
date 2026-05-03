@@ -41,6 +41,7 @@ import { createOperationsModule } from './operations-module.js';
 import { createProviderModule } from './provider-module.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
+import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { registerArtworkRoutes } from './routes/artwork-routes.js';
 import { registerAppUserRoutes } from './routes/app-user-routes.js';
@@ -69,14 +70,19 @@ function parsePort(value, fallback) {
   return parsed;
 }
 
-function createSecurityEventLogger({ stderr = process.stderr } = {}) {
+export function createSecurityEventLogger({
+  controlPlaneRedactionService = createControlPlaneRedactionService(),
+  stderr = process.stderr,
+} = {}) {
   return function logSecurityEvent({ bucketName, request, retryAfterSeconds }) {
     const forwarded = request.headers['x-forwarded-for'];
     const ipAddress = typeof forwarded === 'string'
       ? forwarded.split(',')[0].trim()
       : request.socket?.remoteAddress ?? 'unknown';
+    const requestPath = controlPlaneRedactionService.redactLogMessage(request.originalUrl ?? request.url);
+    const safeIpAddress = controlPlaneRedactionService.redactLogMessage(ipAddress);
     stderr.write(
-      `[harmoniarr-security] rate_limited bucket=${bucketName} method=${request.method} path=${request.originalUrl ?? request.url} ip=${ipAddress} retry_after_s=${retryAfterSeconds}\n`,
+      `[harmoniarr-security] rate_limited bucket=${bucketName} method=${request.method} path=${requestPath} ip=${safeIpAddress} retry_after_s=${retryAfterSeconds}\n`,
     );
   };
 }
@@ -374,6 +380,11 @@ export function createApp({
       bucketName: 'backup-export',
       limit: 10,
       windowMs: 60 * 1000,
+    }),
+    limitDiagnosticsExport: requestRateLimiterService.createMiddleware({
+      bucketName: 'system-diagnostics-export',
+      limit: 20,
+      windowMs: 5 * 60 * 1000,
     }),
     limitOperatorNotificationFanoutRun: requestRateLimiterService.createMiddleware({
       bucketName: 'operator-notification-fanout-run',

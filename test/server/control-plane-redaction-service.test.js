@@ -71,3 +71,12 @@ test('control plane redaction service sanitizes maintenance lock reasons without
     status: 'active',
   });
 });
+
+test('control plane redaction service redacts sensitive parameter values inside log-style strings', () => {
+  const service = createControlPlaneRedactionService();
+
+  assert.equal(
+    service.redactLogMessage('/api/v1/recovery/bootstrap-admin/complete?recovery_code=HARM-ABCD-EFGH&token=abc123&email=ops@example.com'),
+    '/api/v1/recovery/bootstrap-admin/complete?recovery_code=[REDACTED]&token=[REDACTED]&email=[REDACTED_EMAIL]',
+  );
+});

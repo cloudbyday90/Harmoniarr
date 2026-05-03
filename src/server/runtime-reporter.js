@@ -16,11 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
+
 export function formatRuntimeErrorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
 export function createRuntimeReporter({
+  controlPlaneRedactionService = createControlPlaneRedactionService(),
   prefix,
   stderr = process.stderr,
   stdout = process.stdout,
@@ -30,17 +33,17 @@ export function createRuntimeReporter({
   }
 
   function writeInfo(message) {
-    stdout.write(`[${prefix}] ${message}\n`);
+    stdout.write(`[${prefix}] ${controlPlaneRedactionService.redactLogMessage(message)}\n`);
   }
 
   function writeError(error, { label } = {}) {
     const renderedMessage = formatRuntimeErrorMessage(error);
     const message = label ? `${label}: ${renderedMessage}` : renderedMessage;
-    stderr.write(`[${prefix}] ${message}\n`);
+    stderr.write(`[${prefix}] ${controlPlaneRedactionService.redactLogMessage(message)}\n`);
   }
 
   function writeWarning(message) {
-    stderr.write(`[${prefix}] warning: ${message}\n`);
+    stderr.write(`[${prefix}] warning: ${controlPlaneRedactionService.redactLogMessage(message)}\n`);
   }
 
   return {

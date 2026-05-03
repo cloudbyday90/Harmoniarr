@@ -45,6 +45,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/system/operator-notification-fanout-runs', access: 'admin', area: 'system', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/system/diagnostics/queue-state', access: 'admin', area: 'system', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/system/diagnostics/recovery-state', access: 'admin', area: 'system', kind: 'diagnostic' },
+  { method: 'GET', path: '/api/v1/system/diagnostics/export', access: 'admin', area: 'system', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/recovery/backups', access: 'admin', area: 'recovery', kind: 'read' },
   { method: 'GET', path: '/api/v1/recovery/backups/:backupArtifactId', access: 'admin', area: 'recovery', kind: 'read' },
   { method: 'GET', path: '/api/v1/recovery/backups/:backupArtifactId/download', access: 'admin', area: 'recovery', kind: 'read' },

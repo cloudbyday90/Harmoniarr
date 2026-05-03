@@ -23,6 +23,7 @@ test('createSystemModule exposes shared route dependencies from injected service
   const getMaintenanceLockStatus = () => {};
   const getQueueDiagnostics = () => {};
   const getRecoveryDiagnostics = () => {};
+  const getDiagnosticsExportDownload = () => {};
   const listBackupExports = () => {};
   const enterMaintenanceLock = () => {};
   const startBackupRestoreApply = () => {};
@@ -76,6 +77,9 @@ test('createSystemModule exposes shared route dependencies from injected service
     getQueueDiagnostics,
     getRecoveryDiagnostics,
   };
+  const diagnosticsExportService = {
+    getDiagnosticsExportDownload,
+  };
 
   const systemModule = createSystemModule({
     appPort: 4312,
@@ -89,6 +93,7 @@ test('createSystemModule exposes shared route dependencies from injected service
     controlPlaneIdempotencyService: {
       executeIdempotentMutation,
     },
+    diagnosticsExportService,
     recoveryDiagnosticsService,
     dependencyHealthService,
     libraryScanSummaryService,
@@ -129,6 +134,7 @@ test('createSystemModule exposes shared route dependencies from injected service
     releaseMaintenanceLockById,
     getQueueDiagnostics,
     getRecoveryDiagnostics,
+    getDiagnosticsExportDownload,
     startBackupRestoreApply,
     executeIdempotentMutation,
     listBackupExports,

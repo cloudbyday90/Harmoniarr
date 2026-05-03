@@ -20,6 +20,7 @@ import { createLibraryScanSummaryService } from './library-scan-summary-service.
 import { createOnboardingSummaryService } from './onboarding-summary-service.js';
 import { createActivityFeedService } from './activity-feed-service.js';
 import { createAuditReadService } from './audit-read-service.js';
+import { createDiagnosticsExportService } from './diagnostics-export-service.js';
 import { createSettingsService } from './settings-service.js';
 import { createDependencyHealthService } from './dependency-health-service.js';
 import { createOperatorNotificationService } from './operator-notification-service.js';
@@ -143,6 +144,7 @@ export function createSystemModule({
     adminRecoveryStore,
     maintenanceLockService,
   }),
+  diagnosticsExportService = null,
   systemRuntimeResourceMonitor = runtimeResourceMonitor ?? createRuntimeResourceMonitor({
     heartbeatDefinitions: [
       {
@@ -188,6 +190,12 @@ export function createSystemModule({
     dependencyHealthService,
     settingsService,
   }),
+  systemDiagnosticsExportService = diagnosticsExportService ?? createDiagnosticsExportService({
+    getOperatorNotifications: systemService.getOperatorNotifications,
+    getOverview: systemService.getOverview,
+    getQueueDiagnostics: systemRecoveryDiagnosticsService.getQueueDiagnostics,
+    getRecoveryDiagnostics: systemRecoveryDiagnosticsService.getRecoveryDiagnostics,
+  }),
 } = {}) {
   const resolvedOperatorNotificationFanoutService = operatorNotificationFanoutService
     ?? createOperatorNotificationFanoutService({
@@ -223,6 +231,7 @@ export function createSystemModule({
     artworkPolicyService,
     artworkSummaryService,
     dependencyHealthService,
+    diagnosticsExportService: systemDiagnosticsExportService,
     idempotencyRecordCleanupHeartbeat: resolvedIdempotencyRecordCleanupHeartbeat,
     operatorNotificationFanoutRunStore,
     operatorNotificationFanoutService: resolvedOperatorNotificationFanoutService,
@@ -249,6 +258,7 @@ export function createSystemModule({
       releaseMaintenanceLockById: systemMaintenanceLockControlService.releaseMaintenanceLockById,
       getQueueDiagnostics: systemRecoveryDiagnosticsService.getQueueDiagnostics,
       getRecoveryDiagnostics: systemRecoveryDiagnosticsService.getRecoveryDiagnostics,
+      getDiagnosticsExportDownload: systemDiagnosticsExportService.getDiagnosticsExportDownload,
       startBackupRestoreApply: systemBackupRestoreApplyService.startBackupRestoreApply,
       executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
       listBackupExports: systemBackupExportService.listBackupExports,

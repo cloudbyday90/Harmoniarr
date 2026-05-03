@@ -30,6 +30,7 @@ export function registerSystemRoutes(app, {
   getBackupExportById,
   getBackupExportDownloadById,
   getBackupRestorePreview,
+  getDiagnosticsExportDownload,
   getMaintenanceLockStatus,
   getQueueDiagnostics,
   getRecoveryDiagnostics,
@@ -39,6 +40,7 @@ export function registerSystemRoutes(app, {
   getOperatorNotifications,
   listBackupExports,
   limitBackupExport = skipRateLimitMiddleware,
+  limitDiagnosticsExport = skipRateLimitMiddleware,
   limitOperatorNotificationFanoutRun = skipRateLimitMiddleware,
   buildLibraryScanSummary,
   buildOnboardingSummary,
@@ -363,6 +365,29 @@ export function registerSystemRoutes(app, {
         runLimit: request.query.runLimit,
       }),
     });
+  }));
+
+  app.get('/api/v1/system/diagnostics/export', limitDiagnosticsExport, asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const lockTypes = typeof request.query.lockTypes === 'string'
+      ? request.query.lockTypes.split(',')
+      : [];
+    const download = await getDiagnosticsExportDownload({
+      activityLimit: request.query.activityLimit,
+      auditLimit: request.query.auditLimit,
+      lockTypes,
+      notificationLimit: request.query.notificationLimit,
+      runLimit: request.query.runLimit,
+    });
+    const safeFilename = String(download.filename ?? 'harmoniarr_diagnostics.json')
+      .replaceAll('"', '')
+      .replaceAll('\r', '')
+      .replaceAll('\n', '');
+
+    response.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    response.setHeader('Content-Type', download.contentType ?? 'application/json; charset=utf-8');
+    response.send(download.content);
   }));
 
   app.post('/api/v1/system/operator-notification-fanout-runs', limitOperatorNotificationFanoutRun, asyncRoute(async (request, response) => {

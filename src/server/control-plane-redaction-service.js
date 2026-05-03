@@ -65,6 +65,28 @@ const windowsPathPattern = /\b[A-Za-z]:\\(?:[^\\\r\n\t ]+\\?)+/g;
 const unixPathPattern = /\/(?:app|Users|home|mnt|srv|tmp|var|Volumes|backups?|data|downloads?|library|staging)(?:\/[^\s,)]+)+/g;
 const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const bearerPattern = /\bBearer\s+[A-Za-z0-9._~+/=-]+\b/gi;
+const sensitiveParameterNames = [
+  'access_token',
+  'api_key',
+  'authorization',
+  'client_secret',
+  'code',
+  'cookie',
+  'csrf',
+  'csrf_token',
+  'password',
+  'recovery_code',
+  'refresh_token',
+  'secret',
+  'session',
+  'session_id',
+  'state',
+  'token',
+];
+const sensitiveParameterPattern = new RegExp(
+  `([?&;,\\s]|^)((?:${sensitiveParameterNames.join('|')}))=([^&;,\\s]+)`,
+  'gi',
+);
 
 function normalizeKey(key) {
   if (typeof key !== 'string') {
@@ -78,6 +100,7 @@ function sanitizePlainString(value) {
   return String(value)
     .replaceAll('\r', ' ')
     .replaceAll('\n', ' ')
+    .replaceAll(sensitiveParameterPattern, (_match, prefix, key) => `${prefix}${key}=${redactedValue}`)
     .replaceAll(bearerPattern, redactedBearer)
     .replaceAll(emailPattern, redactedEmail)
     .replaceAll(windowsPathPattern, redactedPath)
@@ -140,6 +163,14 @@ export function createControlPlaneRedactionService() {
     return sanitizePlainString(message);
   }
 
+  function redactLogMessage(message) {
+    if (typeof message !== 'string' || message.length === 0) {
+      return message ?? null;
+    }
+
+    return sanitizePlainString(message);
+  }
+
   function redactOperationSummary(summary) {
     if (!summary || typeof summary !== 'object' || Array.isArray(summary)) {
       return {};
@@ -164,6 +195,7 @@ export function createControlPlaneRedactionService() {
   return {
     redactAuditDetails,
     redactErrorMessage,
+    redactLogMessage,
     redactMaintenanceLock,
     redactOperationSummary,
     redactValue,
