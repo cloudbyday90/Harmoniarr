@@ -6250,7 +6250,7 @@ Validation:
 - Add unit, integration, route-contract, migration, job-behavior, and end-to-end UI coverage for the V1 critical path.
 - Keep repo-level validation native to the runtime: ESLint flat config, segmented `node:test` entrypoints, and suite conventions that work in plain ESM without framework-specific indirection.
 - Keep integration coverage on the real static ESM server graph with shared helpers that reuse suite-level PostgreSQL runtime setup, isolate each scenario into a temporary database, and fail fast on startup/request/shutdown issues instead of leaving resource-heavy hangs.
-- Treat import review, operation history/lease ownership, operation cancel/retry controls, and maintenance-lock conflict enforcement for both import and library run-start routes as part of the critical integration baseline, not optional follow-up checks, because they validate operator-visible workflow state rather than isolated helper behavior.
+- Treat import review, operation history/lease ownership, operation cancel/retry controls, maintenance-lock conflict enforcement for both import and library run-start routes, and bootstrap-admin recovery status/completion with session revocation as part of the critical integration baseline, not optional follow-up checks, because they validate operator-visible workflow state rather than isolated helper behavior.
 - Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and recovery/restore scenarios.
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
 

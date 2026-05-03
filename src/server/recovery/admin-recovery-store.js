@@ -26,6 +26,7 @@ function normalizeRecoveryRun(row) {
   return {
     id: row.id,
     status: row.status,
+    recoveryCodeHash: row.recovery_code_hash,
     armedVia: row.armed_via,
     armedAt: row.armed_at?.toISOString?.() ?? row.armed_at ?? null,
     expiresAt: row.expires_at?.toISOString?.() ?? row.expires_at ?? null,
