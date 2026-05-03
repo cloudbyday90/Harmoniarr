@@ -34,6 +34,7 @@ function resolveEncoder(codec) {
 
 export function createMediaTranscodeExecutionService({
   ffmpegBin = process.env.HARMONIARR_FFMPEG_BIN || 'ffmpeg',
+  ffmpegThreads = null,
   getMediaToolingStatus = async () => ({
     details: {
       ffmpegAvailable: true,
@@ -77,6 +78,7 @@ export function createMediaTranscodeExecutionService({
       '-i', sourcePath,
       '-map', '0:a:0',
       '-vn',
+      ...(Number.isInteger(ffmpegThreads) && ffmpegThreads > 0 ? ['-threads', String(ffmpegThreads)] : []),
       '-c:a', encoder,
       '-f', 'null',
       '-',
@@ -86,6 +88,7 @@ export function createMediaTranscodeExecutionService({
       await mediaCommandService.runCommand({
         args,
         binary: ffmpegBin,
+        label: 'media transcode preflight',
         maxBuffer: 2 * 1024 * 1024,
         timeoutMs,
       });

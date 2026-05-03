@@ -28,6 +28,7 @@ test('createRuntimeReporter writes prefixed info and error lines', () => {
   runtimeReporter.writeInfo('listening on 0.0.0.0:3000');
   runtimeReporter.writeError(new Error('server already closed'), { label: 'shutdown error' });
   runtimeReporter.writeError('plain failure');
+  runtimeReporter.writeWarning('memory pressure detected');
 
   assert.deepEqual(stdoutWrites, [
     '[harmoniarr] listening on 0.0.0.0:3000\n',
@@ -35,6 +36,7 @@ test('createRuntimeReporter writes prefixed info and error lines', () => {
   assert.deepEqual(stderrWrites, [
     '[harmoniarr] shutdown error: server already closed\n',
     '[harmoniarr] plain failure\n',
+    '[harmoniarr] warning: memory pressure detected\n',
   ]);
 });
 

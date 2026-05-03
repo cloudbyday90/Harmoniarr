@@ -39,8 +39,13 @@ export function createRuntimeReporter({
     stderr.write(`[${prefix}] ${message}\n`);
   }
 
+  function writeWarning(message) {
+    stderr.write(`[${prefix}] warning: ${message}\n`);
+  }
+
   return {
     writeError,
     writeInfo,
+    writeWarning,
   };
 }

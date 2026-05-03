@@ -118,6 +118,7 @@ export function createMediaInspectionService({
       const { stdout } = await mediaCommandService.runCommand({
         args,
         binary: ffprobeBin,
+        label: 'media inspection',
         maxBuffer: 1024 * 1024,
         timeoutMs,
       });

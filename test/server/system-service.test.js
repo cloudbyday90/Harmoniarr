@@ -230,6 +230,7 @@ test('createSystemService reuses shared settings validation and configured paths
       title: 'Metadata detection',
     }],
   });
+  assert.equal(overview.runtime, null);
   assert.equal(overview.paths.find((entry) => entry.label === 'Downloads').value, '/srv/downloads');
   assert.equal(overview.paths.find((entry) => entry.label === 'Music library').value, '/srv/music');
 });
@@ -308,6 +309,7 @@ test('createSystemService can omit dependency checks while preserving validation
   assert.equal(overview.discoveryHeartbeat.intervalLabel, '30 minutes');
   assert.equal(overview.metadataRefreshHeartbeat, null);
   assert.equal(overview.pathValidation.summary.status, 'healthy');
+  assert.equal(overview.runtime, null);
 });
 
 test('createSystemService builds operator notifications from shared operation and heartbeat state', async (t) => {
@@ -393,4 +395,76 @@ test('createSystemService returns an empty notification payload when no shared n
   assert.equal(operationHistoryService.listRecentOperationRuns.mock.callCount(), 1);
   assert.equal(notifications.counts.total, 0);
   assert.deepEqual(notifications.notifications, []);
+});
+
+test('createSystemService includes runtime monitoring details in the overview payload when configured', async () => {
+  const runtimeResourceService = {
+    getRuntimeConfiguration() {
+      return {
+        mediaCommands: {
+          defaultKillGraceMs: 5000,
+          defaultMaxBufferBytes: 2097152,
+          defaultTimeoutMs: 30000,
+          ffmpegThreads: 4,
+        },
+        processMonitoring: {
+          heartbeatStaleMultiplier: 3,
+          heapUsedWarnBytes: 134217728,
+          intervalMs: 60000,
+          rssWarnBytes: 536870912,
+        },
+      };
+    },
+  };
+  const runtimeResourceMonitor = {
+    getRuntimeState() {
+      return {
+        latestSample: {
+          capturedAt: '2026-05-03T12:00:00.000Z',
+          memory: {
+            heapUsedBytes: 33554432,
+            rssBytes: 100663296,
+          },
+        },
+        message: 'Runtime monitoring has not detected resource pressure or stale worker heartbeats.',
+        status: 'healthy',
+        warnings: [],
+      };
+    },
+  };
+  const systemService = createSystemService({
+    dependencyHealthService: {
+      getDependencyHealth: async () => [],
+    },
+    getMigrationStatusFn: async () => ({ applied: 1, pending: [] }),
+    getPoolFn: () => ({ query: async () => ({ rows: [{ name: 'harmoniarr_test' }] }) }),
+    packageJsonPath: 'ignored-for-test',
+    readPackageMetadataFn: async () => ({ version: '0.1.0-beta' }),
+    runtimeResourceMonitor,
+    runtimeResourceService,
+    settingsService: {
+      buildSettingsPayload: async () => ({
+        settings: {
+          paths: {},
+        },
+      }),
+    },
+    startedAt: new Date('2026-05-03T11:00:00.000Z'),
+  });
+
+  const overview = await systemService.getOverview({ includeDependencies: false });
+
+  assert.deepEqual(overview.runtime, {
+    configuration: runtimeResourceService.getRuntimeConfiguration(),
+    latestSample: {
+      capturedAt: '2026-05-03T12:00:00.000Z',
+      memory: {
+        heapUsedBytes: 33554432,
+        rssBytes: 100663296,
+      },
+    },
+    message: 'Runtime monitoring has not detected resource pressure or stale worker heartbeats.',
+    status: 'healthy',
+    warnings: [],
+  });
 });

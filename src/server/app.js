@@ -32,8 +32,11 @@ import {
 } from './http-hardening.js';
 import { createImportCandidateModule } from './import-candidates/import-candidate-module.js';
 import { createLibraryModule } from './library/library-module.js';
+import { createMediaCommandService } from './media/media-command-service.js';
+import { createMediaInspectionService } from './media/media-inspection-service.js';
 import { createMetadataModule } from './metadata/metadata-module.js';
 import { createMediaToolingStatusService } from './media/media-tooling-status-service.js';
+import { createMediaTranscodeExecutionService } from './media/media-transcode-execution-service.js';
 import { createOperationsModule } from './operations-module.js';
 import { createProviderModule } from './provider-module.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
@@ -50,6 +53,7 @@ import { registerOperationsRoutes } from './routes/operations-routes.js';
 import { registerProviderRoutes } from './routes/provider-routes.js';
 import { registerSlskdRoutes } from './routes/slskd-routes.js';
 import { registerSystemRoutes } from './routes/system-routes.js';
+import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { loadSettings } from './settings.js';
 import { createSettingsService } from './settings-service.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
@@ -89,6 +93,15 @@ function buildLoginRateLimitKey(request) {
   return username ? `${ipAddress}:${username}` : ipAddress;
 }
 
+function resolveBinaryName(value, fallback) {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
 export function createApp({
   appPort = parsePort(process.env.APP_PORT, 3000),
   clientDistDir,
@@ -125,7 +138,18 @@ export function createApp({
   const resolvedClientDistDir = clientDistDir ?? process.env.HARMONIARR_CLIENT_DIST ?? resolve(serverDir, '../client');
   const resolvedPackageJsonPath = packageJsonPath ?? process.env.HARMONIARR_PACKAGE_JSON ?? resolve(serverDir, '../package.json');
   const providerHealthRecorder = createProviderHealthRecorder();
-  const mediaToolingStatusService = buildMediaToolingStatusService();
+  const runtimeResourceService = createRuntimeResourceService();
+  const ffmpegBinary = resolveBinaryName(process.env.HARMONIARR_FFMPEG_BIN, 'ffmpeg');
+  const ffprobeBinary = resolveBinaryName(process.env.HARMONIARR_FFPROBE_BIN, 'ffprobe');
+  const mediaCommandService = createMediaCommandService({
+    allowedBinaries: [ffmpegBinary, ffprobeBinary],
+    ...runtimeResourceService.getMediaCommandDefaults(),
+  });
+  const mediaToolingStatusService = buildMediaToolingStatusService({
+    ffmpegBinary,
+    ffprobeBinary,
+    mediaCommandService,
+  });
   const requestRateLimiterService = createRequestRateLimiterService({
     onLimit: createSecurityEventLogger(),
   });
@@ -147,6 +171,17 @@ export function createApp({
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
+    mediaInspectionService: createMediaInspectionService({
+      ffprobeBin: ffprobeBinary,
+      getMediaToolingStatus: mediaToolingStatusService.getStatus,
+      mediaCommandService,
+    }),
+    mediaTranscodeExecutionService: createMediaTranscodeExecutionService({
+      ffmpegBin: ffmpegBinary,
+      ffmpegThreads: runtimeResourceService.getRuntimeConfiguration().mediaCommands.ffmpegThreads,
+      getMediaToolingStatus: mediaToolingStatusService.getStatus,
+      mediaCommandService,
+    }),
     maintenanceLockService,
     slskdTransferSnapshotService: slskdModule.slskdTransferSnapshotService,
     slskdService: slskdModule.slskdService,
@@ -198,6 +233,7 @@ export function createApp({
     maintenanceLockService,
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: resolvedPackageJsonPath,
+    runtimeResourceService,
     settingsService,
     slskdService: slskdModule.slskdService,
     spotifyOAuthService: providerModule.spotifyOAuthService,
@@ -376,6 +412,7 @@ export function createApp({
     metadataModule,
     operationsModule,
     providerModule,
+    runtimeResourceService,
     systemModule,
   };
 }

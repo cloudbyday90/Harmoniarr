@@ -56,6 +56,29 @@ function buildRawHeartbeatOverview(config, heartbeatState) {
   };
 }
 
+function buildRuntimeOverview({
+  runtimeResourceMonitor = null,
+  runtimeResourceService = null,
+} = {}) {
+  if (!runtimeResourceMonitor && !runtimeResourceService) {
+    return null;
+  }
+
+  const runtimeState = runtimeResourceMonitor?.getRuntimeState
+    ? runtimeResourceMonitor.getRuntimeState()
+    : null;
+
+  return {
+    configuration: runtimeResourceService?.getRuntimeConfiguration
+      ? runtimeResourceService.getRuntimeConfiguration()
+      : null,
+    latestSample: runtimeState?.latestSample ?? null,
+    message: runtimeState?.message ?? 'Runtime monitoring is unavailable.',
+    status: runtimeState?.status ?? 'unknown',
+    warnings: runtimeState?.warnings ?? [],
+  };
+}
+
 export function createSystemService({
   activityFeedService = null,
   appleMusicStatusService = null,
@@ -72,6 +95,8 @@ export function createSystemService({
   spotifyOAuthService = null,
   startedAt,
   packageJsonPath,
+  runtimeResourceMonitor = null,
+  runtimeResourceService = null,
   youtubeOAuthService = null,
   dependencyHealthService = createDependencyHealthService(),
   getMigrationStatusFn = getMigrationStatus,
@@ -234,6 +259,10 @@ export function createSystemService({
         spotify: spotifyStatus,
         youtube: youtubeStatus,
       },
+      runtime: buildRuntimeOverview({
+        runtimeResourceMonitor,
+        runtimeResourceService,
+      }),
       paths: [
         {
           label: 'App data',

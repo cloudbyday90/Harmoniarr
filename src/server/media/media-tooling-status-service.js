@@ -32,6 +32,7 @@ async function checkBinary({ binary, mediaCommandService }) {
     await mediaCommandService.runCommand({
       args: ['-version'],
       binary,
+      label: `media tooling check (${binary})`,
       timeoutMs: 5000,
     });
     return {

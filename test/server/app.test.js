@@ -125,7 +125,12 @@ suite('createApp', () => {
     await rm(clientDistDir, { recursive: true, force: true });
   });
 
-  const { app, appPort, importCandidateModule: composedImportCandidateModule } = createApp({
+  const {
+    app,
+    appPort,
+    importCandidateModule: composedImportCandidateModule,
+    runtimeResourceService,
+  } = createApp({
     appPort: 4510,
     clientDistDir,
     packageJsonPath: 'C:/virtual/package.json',
@@ -192,6 +197,8 @@ suite('createApp', () => {
   assert.equal(importCandidateModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(importCandidateModuleArgs.slskdTransferSnapshotService, slskdTransferSnapshotService);
   assert.equal(importCandidateModuleArgs.getMediaToolingStatus, mediaToolingStatusService.getStatus);
+  assert.equal(typeof importCandidateModuleArgs.mediaInspectionService.inspectSourceFile, 'function');
+  assert.equal(typeof importCandidateModuleArgs.mediaTranscodeExecutionService.executeCandidate, 'function');
   assert.equal(typeof importCandidateModuleArgs.maintenanceLockService.listActiveMaintenanceLocks, 'function');
   assert.equal(artworkModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
   assert.equal(libraryModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
@@ -211,6 +218,7 @@ suite('createApp', () => {
   assert.equal(systemModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(systemModuleArgs.musicBrainzSearchService, metadataModule.musicBrainzSearchService);
   assert.equal(systemModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
+  assert.equal(systemModuleArgs.runtimeResourceService, runtimeResourceService);
 
   const providerError = new Error('MusicBrainz is throttled');
   providerError.code = 'musicbrainz_unavailable';
@@ -282,6 +290,7 @@ suite('createApp', () => {
     maintenanceLockService: systemModuleArgs.maintenanceLockService,
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: 'C:/virtual/package.json',
+    runtimeResourceService,
     settingsService,
     slskdService: slskdModule.slskdService,
     spotifyOAuthService: providerModule.spotifyOAuthService,

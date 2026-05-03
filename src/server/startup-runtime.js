@@ -89,6 +89,16 @@ export async function startServerRuntime({
     metadataModule,
     systemModule,
   } = buildApp();
+  systemModule?.runtimeResourceService?.applyProcessRuntimePreferences?.({
+    onInfo: runtimeReporter.writeInfo,
+    onWarning: runtimeReporter.writeWarning,
+  });
+  systemModule?.runtimeResourceMonitor?.setLogHandlers?.({
+    onInfo: runtimeReporter.writeInfo,
+    onWarning: (message) => {
+      runtimeReporter.writeWarning(message);
+    },
+  });
   const getDependencyHealth = systemModule?.dependencyHealthService?.getDependencyHealth
     ?? (async () => []);
   const libraryDiscoveryHeartbeatConfig = buildLibraryDiscoveryHeartbeatConfig();
@@ -153,6 +163,9 @@ export async function startServerRuntime({
   startupServiceSupervisor.registerService(libraryDiscoveryHeartbeat);
   startupServiceSupervisor.registerService(importExecutionHeartbeat);
   startupServiceSupervisor.registerService(systemModule.idempotencyRecordCleanupHeartbeat);
+  if (systemModule?.runtimeResourceMonitor) {
+    startupServiceSupervisor.registerService(systemModule.runtimeResourceMonitor);
+  }
   startupServiceSupervisor.startAll();
 
   startupServiceSupervisor.installSignalHandlers(async () => {
@@ -174,6 +187,7 @@ export async function startServerRuntime({
     libraryDiscoveryHeartbeat,
     metadataRefreshHeartbeat,
     operationQueueDispatcher,
+    runtimeResourceMonitor: systemModule?.runtimeResourceMonitor ?? null,
     server,
     startupServiceSupervisor,
   };

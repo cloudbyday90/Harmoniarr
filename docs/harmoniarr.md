@@ -6074,6 +6074,7 @@ Harmoniarr V1 should be delivered as a staged, self-hosted music automation plat
 - Metadata and music identity: MusicBrainz as canonical identity source; secondary enrichers are advisory and must not silently replace canonical IDs.
 - Soulseek backend: slskd behind an adapter boundary; all backend-specific behavior is normalized before reaching domain services.
 - Validation: native `node:test` with segmented server, client, script, and integration entrypoints plus ESLint flat-config enforcement across the ESM codebase, with shared integration helpers that bound runtime cost through explicit timeouts, small pools, deterministic cleanup, and disposable PostgreSQL state.
+- Runtime operations: shared process resource policy should tune sharp and media-tool subprocess behavior centrally, expose stale-heartbeat and memory-pressure diagnostics, and prefer bounded native-tool execution over introducing `worker_threads` into I/O-heavy paths by default.
 - Control-plane redaction: operator-visible diagnostics, audit/event detail reads, operation-history payloads, and recovery maintenance responses should flow through shared server-side redaction boundaries so path, token, session, and secret material are removed before those payloads reach browser views or support-oriented read models.
 
 ## 4. Execution Readiness And Governance
@@ -6236,6 +6237,8 @@ Security and reliability:
 
 - Enforce redaction policy for logs, diagnostics exports, and operator-visible event payloads.
 - Prefer one shared redaction policy module for operator-visible control-plane reads rather than view-local masking, so audit, diagnostics, maintenance, and recovery payloads stay consistent as new routes or panels are added.
+- Keep runtime CPU, memory, and subprocess policy centralized: sharp cache/concurrency, ffmpeg or ffprobe timeout plus kill behavior, and stale-heartbeat detection should come from shared runtime services rather than ad hoc worker-local tuning.
+- Treat stuck child processes and stalled background workers as diagnosable operational failures, with bounded termination, prefixed warning logs, and operator-visible runtime summary state instead of silent hangs.
 - Add startup checks, runtime invariants, and failure classification for external dependencies like slskd and metadata providers.
 - Add lock-aware handling so restore/recovery/upgrade windows pause unsafe operations predictably.
 

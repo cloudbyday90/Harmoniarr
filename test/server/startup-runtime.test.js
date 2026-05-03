@@ -63,6 +63,26 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       skipped: true,
     }),
   };
+  const runtimeResourceMonitor = {
+    setLogHandlers({ onInfo, onWarning }) {
+      callOrder.push('runtimeMonitor.setLogHandlers');
+      assert.equal(typeof onInfo, 'function');
+      assert.equal(typeof onWarning, 'function');
+    },
+    start() {
+      callOrder.push('start:runtime-monitor');
+    },
+    async stop() {
+      callOrder.push('stop:runtime-monitor');
+    },
+  };
+  const runtimeResourceService = {
+    applyProcessRuntimePreferences({ onInfo, onWarning }) {
+      callOrder.push('runtimeResourceService.apply');
+      assert.equal(typeof onInfo, 'function');
+      assert.equal(typeof onWarning, 'function');
+    },
+  };
 
   const server = {
     close(callback) {
@@ -159,6 +179,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
           getDependencyHealth: async () => [],
         },
         idempotencyRecordCleanupHeartbeat,
+        runtimeResourceMonitor,
+        runtimeResourceService,
       },
     }),
     createImportCandidateExecutionHeartbeat: (options) => {
@@ -262,11 +284,21 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   assert.equal(runtime.libraryDiscoveryHeartbeat, libraryDiscoveryHeartbeat);
   assert.equal(runtime.importExecutionHeartbeat, importExecutionHeartbeat);
   assert.equal(runtime.metadataRefreshHeartbeat, metadataRefreshHeartbeat);
-  assert.deepEqual(registeredServices, [operationQueueDispatcher, metadataRefreshHeartbeat, libraryDiscoveryHeartbeat, importExecutionHeartbeat, idempotencyRecordCleanupHeartbeat]);
+  assert.equal(runtime.runtimeResourceMonitor, runtimeResourceMonitor);
+  assert.deepEqual(registeredServices, [
+    operationQueueDispatcher,
+    metadataRefreshHeartbeat,
+    libraryDiscoveryHeartbeat,
+    importExecutionHeartbeat,
+    idempotencyRecordCleanupHeartbeat,
+    runtimeResourceMonitor,
+  ]);
   assert.deepEqual(callOrder, [
     'bootstrapSchema',
     'migrations',
     'query:SELECT 1',
+    'runtimeResourceService.apply',
+    'runtimeMonitor.setLogHandlers',
     'listen:0.0.0.0:4123',
     'startAll',
     'start:queue',
@@ -274,6 +306,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:library',
     'start:import',
     'start:idempotency-cleanup',
+    'start:runtime-monitor',
   ]);
   assert.deepEqual(stdoutWrites, [
     '[harmoniarr] loaded schema snapshot from schema.sql\n',
@@ -287,6 +320,8 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'bootstrapSchema',
     'migrations',
     'query:SELECT 1',
+    'runtimeResourceService.apply',
+    'runtimeMonitor.setLogHandlers',
     'listen:0.0.0.0:4123',
     'startAll',
     'start:queue',
@@ -294,7 +329,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:library',
     'start:import',
     'start:idempotency-cleanup',
+    'start:runtime-monitor',
     'shutdown',
+    'stop:runtime-monitor',
     'stop:idempotency-cleanup',
     'stop:import',
     'stop:library',

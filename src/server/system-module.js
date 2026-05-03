@@ -39,6 +39,9 @@ import { createMaintenanceLockControlService } from './recovery/maintenance-lock
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { createRecoveryDiagnosticsService } from './recovery/recovery-diagnostics-service.js';
 import { createRestoreScopeRuntimeSnapshotStore } from './recovery/restore-scope-runtime-snapshot-store.js';
+import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discovery-heartbeat-config.js';
+import { createRuntimeResourceMonitor } from './runtime-resource-monitor.js';
+import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { createSystemService } from './system-service.js';
 
 export function createSystemModule({
@@ -51,6 +54,7 @@ export function createSystemModule({
   dependencyHealthService = createDependencyHealthService(),
   importCandidateExecutionHeartbeatConfig = null,
   importCandidateExecutionHeartbeatState = null,
+  libraryDiscoveryHeartbeatConfig = resolveLibraryDiscoveryHeartbeatConfig(),
   libraryDiscoveryHeartbeatState = null,
   metadataRefreshHeartbeatConfig = null,
   metadataRefreshHeartbeatState = null,
@@ -76,6 +80,8 @@ export function createSystemModule({
   operatorNotificationFanoutWorker = null,
   operationHistoryService = null,
   packageJsonPath,
+  runtimeResourceMonitor = null,
+  runtimeResourceService = createRuntimeResourceService(),
   settingsService = createSettingsService(),
   spotifyOAuthService = null,
   youtubeOAuthService = null,
@@ -137,6 +143,29 @@ export function createSystemModule({
     adminRecoveryStore,
     maintenanceLockService,
   }),
+  systemRuntimeResourceMonitor = runtimeResourceMonitor ?? createRuntimeResourceMonitor({
+    heartbeatDefinitions: [
+      {
+        intervalMs: libraryDiscoveryHeartbeatConfig?.intervalMs ?? null,
+        heartbeatState: libraryDiscoveryHeartbeatState,
+        key: 'libraryDiscovery',
+        label: 'Discovery dispatch',
+      },
+      {
+        heartbeatState: importCandidateExecutionHeartbeatState,
+        intervalMs: importCandidateExecutionHeartbeatConfig?.intervalMs ?? null,
+        key: 'importExecution',
+        label: 'Import reconciliation',
+      },
+      {
+        heartbeatState: metadataRefreshHeartbeatState,
+        intervalMs: metadataRefreshHeartbeatConfig?.intervalMs ?? null,
+        key: 'metadataRefresh',
+        label: 'Metadata refresh',
+      },
+    ],
+    runtimeResourceService,
+  }),
   systemService = createSystemService({
     activityFeedService: systemActivityFeedService,
     appleMusicStatusService,
@@ -144,6 +173,7 @@ export function createSystemModule({
     artworkSummaryService,
     importCandidateExecutionHeartbeatConfig,
     importCandidateExecutionHeartbeatState,
+    libraryDiscoveryHeartbeatConfig,
     libraryDiscoveryHeartbeatState,
     metadataRefreshHeartbeatConfig,
     metadataRefreshHeartbeatState,
@@ -152,6 +182,8 @@ export function createSystemModule({
     spotifyOAuthService,
     startedAt,
     packageJsonPath,
+    runtimeResourceMonitor: systemRuntimeResourceMonitor,
+    runtimeResourceService,
     youtubeOAuthService,
     dependencyHealthService,
     settingsService,
@@ -199,6 +231,8 @@ export function createSystemModule({
     adminRecoveryStore,
     libraryScanSummaryService,
     onboardingSummaryService,
+    runtimeResourceMonitor: systemRuntimeResourceMonitor,
+    runtimeResourceService,
     settingsService,
     systemService,
     routeDependencies: {
