@@ -5162,6 +5162,7 @@ The validation stack should stay aligned with the current ESM-native runtime ins
 - Real integration scenarios should boot the actual static ESM server graph against disposable PostgreSQL state through shared test helpers, not a second application composition path that drifts from production wiring.
 - Integration helpers should reuse a suite-level PostgreSQL runtime where possible, isolate each scenario into its own temporary database, cap node-postgres pool size and idle lifetime for test runs, and apply explicit request plus startup/shutdown timeouts so runaway scenarios fail fast instead of exhausting local resources.
 - Integration suites should clean up deterministically and, when neither external PostgreSQL nor a supported local container runtime is available, skip locally with a concrete diagnostic rather than hanging or half-bootstrapping the process.
+- Critical-path integration coverage should include import-review state transitions, operation-run lease visibility through the operator API, and maintenance-lock conflict behavior for unsafe background-work entrypoints, because those workflow seams are easy to regress while still passing lighter unit tests.
 - ESLint flat config with Vue support and explicit target groups for server, shared, client, tests, and scripts.
 - A top-level native `npm test` aggregator that runs lint and committed-test-hygiene checks before segmented `node:test` entrypoints, so swallowed `only`/`skip`/`todo` markers fail the normal developer and CI path.
 - Native `node:test` coverage reporting for local and CI visibility, while keeping in mind that built-in coverage remains experimental in current Node documentation.
@@ -6249,6 +6250,7 @@ Validation:
 - Add unit, integration, route-contract, migration, job-behavior, and end-to-end UI coverage for the V1 critical path.
 - Keep repo-level validation native to the runtime: ESLint flat config, segmented `node:test` entrypoints, and suite conventions that work in plain ESM without framework-specific indirection.
 - Keep integration coverage on the real static ESM server graph with shared helpers that reuse suite-level PostgreSQL runtime setup, isolate each scenario into a temporary database, and fail fast on startup/request/shutdown issues instead of leaving resource-heavy hangs.
+- Treat import review, operation history/lease ownership, and maintenance-lock conflict enforcement as part of the critical integration baseline, not optional follow-up checks, because they validate operator-visible workflow state rather than isolated helper behavior.
 - Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and recovery/restore scenarios.
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
 

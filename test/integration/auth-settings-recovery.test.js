@@ -1,27 +1,16 @@
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
+import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
+import {
+  isSkippableIntegrationRuntimeError,
+  toIntegrationRuntimeUnavailableReason,
+} from '../../testing/integration/runtime-availability.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 let integrationRuntime;
 let runtimeUnavailableReason = null;
-
-function isSkippableIntegrationRuntimeError(error) {
-  const message = String(error?.message ?? '');
-  return message.includes('Could not find a working container runtime strategy');
-}
-
-async function bootstrapAdmin(client, overrides = {}) {
-  return client.requestJson('/api/v1/bootstrap/admin', {
-    json: {
-      password: 'IntegrationPass123!',
-      username: 'admin',
-      ...overrides,
-    },
-    method: 'POST',
-  });
-}
 
 suite('integration auth, settings, and recovery routes', () => {
   before(async () => {
@@ -35,7 +24,7 @@ suite('integration auth, settings, and recovery routes', () => {
         throw error;
       }
 
-      runtimeUnavailableReason = `${error.message}. Configure external PostgreSQL env vars or start a supported container runtime for integration tests.`;
+      runtimeUnavailableReason = toIntegrationRuntimeUnavailableReason(error);
     }
   }, {
     timeout: integrationRuntimeConfig.suiteSetupTimeoutMs,
@@ -62,7 +51,7 @@ suite('integration auth, settings, and recovery routes', () => {
       assert.equal(bootstrapStatus.response.status, 200);
       assert.equal(bootstrapStatus.payload.bootstrapRequired, true);
 
-      const bootstrapResponse = await bootstrapAdmin(client);
+      const bootstrapResponse = await bootstrapAdminSession(client);
       assert.equal(bootstrapResponse.response.status, 201);
       assert.equal(bootstrapResponse.payload.ok, true);
       assert.equal(bootstrapResponse.payload.user.username, 'admin');
@@ -144,7 +133,7 @@ suite('integration auth, settings, and recovery routes', () => {
       assert.equal(unauthenticatedRead.response.status, 401);
       assert.equal(unauthenticatedRead.payload.error.code, 'auth_required');
 
-      await bootstrapAdmin(client);
+      await bootstrapAdminSession(client);
 
       const settingsRead = await client.requestJson('/api/v1/settings');
       assert.equal(settingsRead.response.status, 200);
@@ -202,7 +191,7 @@ suite('integration auth, settings, and recovery routes', () => {
     }
 
     await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
-      await bootstrapAdmin(client);
+      await bootstrapAdminSession(client);
 
       const firstEnter = await client.requestJson('/api/v1/recovery/maintenance-locks', {
         csrf: true,
