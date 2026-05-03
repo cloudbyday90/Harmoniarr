@@ -6154,6 +6154,8 @@ Backend:
 
 - Implement bootstrap-admin flow, password hashing, login/logout, refresh-token rotation, session invalidation, and CSRF protection.
 - Prefer an optional preseeded owner-claim bootstrap mode for trusted self-hosted installs: if the operator configures a one-time claim secret plus owner username and/or email through environment, first-run admin creation should require that claim before the initial admin account is created.
+- Plex onboarding should reuse that same ownership-first posture: the preferred first Plex slice is a server-side Plex PIN/JWT connection for the owner account plus Plex user import into the existing `app_users` table, not a second competing bootstrap or identity store.
+- Plex managed accounts and regular Plex accounts must be treated differently. Managed accounts may be imported as Harmoniarr users for request ownership, permissions, notifications, and managed-library provisioning, but they should not be assumed to support direct Harmoniarr sign-in.
 - Add route-tier enforcement for anonymous, authenticated, privileged, maintenance-locked, and integration-key surfaces.
 - Implement settings read/write services with validation, masking/redaction rules, and audit logging.
 - Add API key creation/rotation/revocation for integrations, separate from browser auth.
@@ -6185,6 +6187,8 @@ Ingest/import:
 - Provider-playlist intake should normalize canonical external IDs, respect provider-specific paging and auth constraints, keep provider policy-sensitive assets and metadata bounded to what is needed for import intent, and degrade gracefully when a source exposes only partial or user-authorized playlist data.
 - Playlist ingest should preserve enough structure for operators to keep import scope bounded to playlist albums or expand into additional albums for artists surfaced by the playlist, without collapsing that policy choice into the provider-ingest layer.
 - Import planning should also carry the target user context so reviewed media lands in a user-owned subdirectory while still referencing shared canonical media state.
+- Request Music should distinguish the acting user from the target user. The internal model should carry both `requestedByUserId` and `requestedForUserId`, where the former is audit or operator attribution and the latter drives request ownership, request history scope, notifications, and final managed-library destination behavior.
+- Non-admin users remain self-only for requests. Admins may create requests for themselves or for another eligible Harmoniarr user, including users imported from Plex.
 - Add review queue state machine for candidate evaluation, operator decisions, hold/reject states, and idempotent reprocessing.
 - Implement path mapping, staging resolution, root-folder policy, and naming-preview generation without mutating media yet.
 
@@ -6201,6 +6205,7 @@ Acceptance criteria:
 - Harmoniarr can ingest candidate items into durable review state without mutating the library.
 - Canonical IDs, review state, and decision audit history are durable and resumable.
 - Import decisions are deterministic and replay-safe.
+- Request ownership remains explicit and auditable when an admin submits media on behalf of another user, and Plex-imported users can participate as request targets without requiring direct Plex login support first.
 
 ## Phase 4 - Background Jobs, Media Operations, And Notification Surfaces
 
@@ -6267,6 +6272,7 @@ Validation:
 - Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and recovery/restore scenarios.
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
 - Recommended next implementation slice: use the existing integration and runtime harnesses to validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior end to end, then use the resulting gaps to drive the remaining fixture, E2E, and release-closure work.
+- If product-value work is pulled forward ahead of broader release closure, the preferred identity/request slice is: import Plex users into `app_users`, add `requestedForUserId` to Request Music, and only then add optional direct Plex sign-in for direct-capable Plex accounts.
 
 Release closure:
 

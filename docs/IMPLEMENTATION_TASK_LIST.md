@@ -25,6 +25,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Embedded PostgreSQL startup, tracked timestamped migrations, bootstrap-admin creation, login/logout/session routes, and allowlisted settings persistence are now implemented.
 - The client now includes first-run bootstrap-admin, login, and protected settings views backed by shared auth and settings API modules.
 - First-run bootstrap can now optionally run in a preseeded owner-claim mode driven by environment configuration, requiring a one-time claim code plus matching owner username or email before the initial admin is created; local auth can now also match users by username or email.
+- Plex onboarding decisions are now explicit: `app_users` remains the canonical internal identity table, Plex import should create or update Plex-linked `app_users`, and Plex managed accounts may be imported as request and ownership profiles even though they should not be assumed to support direct Harmoniarr sign-in.
+- Request Music decisions are now explicit: request ownership must distinguish `requestedByUserId` from `requestedForUserId`, admins should be able to submit requests on behalf of another user, and final destination or ownership semantics should follow the target user rather than the acting admin.
 - The shared client API layer now also clears local auth state and redirects back to login when protected routes fail with `401 auth_required`, so expired browser sessions no longer leave the authenticated shell stranded on stale state.
 - Planning and implementation posture now explicitly targets a self-hosted companion app similar to Radarr/Sonarr, so security and automation scope should stay proportional to a trusted operator-run Docker deployment rather than drifting toward enterprise control-plane features.
 - Canonical MusicBrainz metadata foundation now exists for artists, release groups, releases, media, recordings, tracks, and provider snapshots with timestamped migrations.
@@ -178,6 +180,7 @@ Highest-priority remaining product-risk slices:
 Lower-priority or conditional slices:
 
 - Plex-linked onboarding remains a product-fit feature, but it is not currently on the shortest path to V1 readiness.
+- If Plex onboarding is pursued before broader release-closure work, the preferred sequence is: connect a Plex owner account, import Plex users into `app_users`, add admin-targeted Request Music ownership (`requestedForUserId`), and only then add optional direct Plex sign-in for direct-capable Plex accounts.
 - Personal or integration token flows remain conditional and should not be built unless a concrete non-browser automation need exists.
 - Remaining Phase 0 and start-gate items should be treated as documentation and contract-closure work unless they uncover a real architectural conflict.
 
@@ -291,6 +294,9 @@ Status note:
 - [ ] Implement provider-linked onboarding for Plex users using server-side Plex PIN auth, shared-server user import or claim flows, and explicit role mapping without ever collecting Plex passwords locally.
   - Owner-claim groundwork now exists for the local path: first-run bootstrap status can advertise a preseeded owner identity hint, and the bootstrap route can require a matching one-time claim code plus owner username/email before creating the initial admin account.
   - Next work on this item should bind Plex PIN auth onto that same shared owner-claim boundary rather than creating a second parallel first-run ownership flow.
+  - Decision: Plex import and Plex sign-in are related but not identical features. The first Plex slice should import users from Plex into `app_users` and keep that as the durable identity boundary before optional direct Plex sign-in is added.
+  - Decision: Plex managed accounts may be imported as Harmoniarr users for request ownership, permissions, notifications, and managed-library provisioning, but they should not be treated as direct-sign-in-capable identities unless Plex exposes a supported direct auth path for them.
+  - Decision: Harmoniarr should never collect or proxy Plex passwords. Browser auth must use the current Plex PIN/JWT flow server-side.
 - [ ] Verify admin recovery assumptions remain compatible with `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 - Canonical Model And Import Review
@@ -310,6 +316,11 @@ Status note:
   - Migration `20260502_000011_provider_ingest_request_intents.sql` adds the `provider_ingest_requests` table with provider, resource type, ingest target, identifier, canonical URL, pagination state, status, and evidence columns.
 - [x] Model playlist import expansion policy so operators can keep selection bounded to playlist albums or opt into additional album discovery for artists referenced by the playlist.
 - [x] Add a dedicated Request Music dashboard and persisted user-owned media request inbox for release, track, and provider URL submissions, with requester-scoped history and admin all-request visibility separate from import review.
+- [ ] Split Request Music ownership into acting user vs target user so admins can submit requests for another Harmoniarr user.
+  - Decision: request persistence should distinguish `requestedByUserId` from `requestedForUserId` instead of overloading one field to mean both.
+  - Decision: non-admin users remain self-only, while admins can choose any eligible user as the request target.
+  - Decision: request history and detail views should show both "requested by" and "requested for", and import or apply ownership plus managed-library routing should follow `requestedForUserId`.
+  - Decision: v1 should keep requests single-target only; multi-user fan-out can remain future work.
 - [x] Move per-user import destination ownership toward `app_users` by storing managed library subdirectories on user records and preferring them during preview planning, while keeping `paths.userMusicRoots` as a compatibility fallback during the transition.
 - [x] Add an explicit admin provisioning flow for managed library directories so user-owned subdirectory assignments can be materialized under the shared music root without relying on settings-era path creation behavior.
 - [x] Add a user-owned folder-access model and provisioning flow so admin-created or Plex-onboarded users can claim or generate managed library subdirectories without relying on settings-only mappings long term.
