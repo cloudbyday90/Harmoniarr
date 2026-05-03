@@ -12,6 +12,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Execution phases are defined, but no phase is complete yet.
 - The repo-level `npm run validate` contract currently passes end to end on Node 25.4.0, and the supported local baseline now tracks the Node 25.4 line through `.nvmrc`, `engines`, `devEngines`, and the Docker builder image.
 - Validation infrastructure now includes native ESM ESLint flat-config coverage across server, shared, client, scripts, and tests, plus segmented native `node:test` entrypoints for `server`, `client`, `scripts`, and `integration` slices.
+- The integration harness now reuses one bounded PostgreSQL runtime per suite, isolates each scenario into its own temporary database, applies explicit startup/request/shutdown timeouts plus small pool limits, and skips cleanly with a concrete message when neither external PostgreSQL nor a supported container runtime is available locally.
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
 - Embedded PostgreSQL startup, tracked timestamped migrations, bootstrap-admin creation, login/logout/session routes, and allowlisted settings persistence are now implemented.
 - The client now includes first-run bootstrap-admin, login, and protected settings views backed by shared auth and settings API modules.
@@ -412,6 +413,7 @@ Parallelizable after contract stabilization:
 - [x] Establish a shared temporary-Postgres integration harness plus first real auth/session, settings, and recovery route suites.
   - Added reusable integration helpers under `testing/` for cookie-aware HTTP flows, Docker-backed PostgreSQL fallback via Testcontainers, and one-app-per-scenario runtime bootstrapping against the real static ESM server module graph.
   - Added first integration coverage for bootstrap/login/refresh/logout session flow, authenticated settings read/update persistence, and maintenance-lock idempotency plus recovery diagnostics against real database state.
+  - Tightened the harness with shared suite-level PostgreSQL runtime reuse, per-scenario temporary databases, explicit request and startup/shutdown timeouts, reduced node-postgres pool sizing for integration runs, deterministic container stop/workspace cleanup, and graceful skip behavior when no supported local container runtime or external PostgreSQL admin connection is available.
 - [ ] Expand integration tests for import review, job ownership, and the remaining critical-path route behavior.
 - [x] Add route-contract tests for normalized success/error payloads and permission enforcement.
 - [x] Keep ESM-only enforcement active in validation and CI so new CommonJS patterns do not regress into runtime code or scripts.

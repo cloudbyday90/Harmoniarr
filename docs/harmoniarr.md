@@ -1978,14 +1978,12 @@ jsdom
 
 Testing roles:
 
-- `jest`: server unit and integration tests, matching Classifarr.
-- `supertest`: Express route tests.
+- Native `node:test`: server, script, client module/composable, and integration suites in the repo's ESM-native runtime.
+- Native `fetch` plus lightweight HTTP helpers: Express route and session-contract tests without a second request-testing abstraction.
 - `pg-mem`: fast database-adjacent unit tests where a real Postgres instance is not required.
 - `testcontainers` and `@testcontainers/postgresql`: database-backed integration tests.
-- `vitest`: client unit/component tests.
-- `@vitest/coverage-v8`: coverage reports and ratchet support.
-- `jsdom`: Vue component tests.
-- Vue Testing Library and Vue Test Utils: user-focused UI tests and lower-level component testing where needed.
+- Native `node:test` coverage reporting: local and CI visibility while Node's built-in coverage remains experimental.
+- Future browser E2E coverage should prefer Playwright when real UI flow automation becomes practical.
 
 Playwright can be added later for browser smoke and workflow tests once there is a stable UI to exercise.
 
@@ -5162,6 +5160,8 @@ The validation stack should stay aligned with the current ESM-native runtime ins
 - Native `fetch` plus lightweight HTTP helpers for route-contract coverage instead of introducing a separate request-testing abstraction by default.
 - Testcontainers or equivalent only where real database lifecycle coverage is necessary; keep lighter native tests as the default path.
 - Real integration scenarios should boot the actual static ESM server graph against disposable PostgreSQL state through shared test helpers, not a second application composition path that drifts from production wiring.
+- Integration helpers should reuse a suite-level PostgreSQL runtime where possible, isolate each scenario into its own temporary database, cap node-postgres pool size and idle lifetime for test runs, and apply explicit request plus startup/shutdown timeouts so runaway scenarios fail fast instead of exhausting local resources.
+- Integration suites should clean up deterministically and, when neither external PostgreSQL nor a supported local container runtime is available, skip locally with a concrete diagnostic rather than hanging or half-bootstrapping the process.
 - ESLint flat config with Vue support and explicit target groups for server, shared, client, tests, and scripts.
 - A top-level native `npm test` aggregator that runs lint and committed-test-hygiene checks before segmented `node:test` entrypoints, so swallowed `only`/`skip`/`todo` markers fail the normal developer and CI path.
 - Native `node:test` coverage reporting for local and CI visibility, while keeping in mind that built-in coverage remains experimental in current Node documentation.
@@ -6072,7 +6072,7 @@ Harmoniarr V1 should be delivered as a staged, self-hosted music automation plat
 - Auth: local browser auth via cookie session + refresh token, CSRF on cookie-authenticated writes, API keys for integrations only.
 - Metadata and music identity: MusicBrainz as canonical identity source; secondary enrichers are advisory and must not silently replace canonical IDs.
 - Soulseek backend: slskd behind an adapter boundary; all backend-specific behavior is normalized before reaching domain services.
-- Validation: native `node:test` with segmented server, client, script, and integration entrypoints plus ESLint flat-config enforcement across the ESM codebase.
+- Validation: native `node:test` with segmented server, client, script, and integration entrypoints plus ESLint flat-config enforcement across the ESM codebase, with shared integration helpers that bound runtime cost through explicit timeouts, small pools, deterministic cleanup, and disposable PostgreSQL state.
 
 ## 4. Execution Readiness And Governance
 
@@ -6248,6 +6248,7 @@ Validation:
 
 - Add unit, integration, route-contract, migration, job-behavior, and end-to-end UI coverage for the V1 critical path.
 - Keep repo-level validation native to the runtime: ESLint flat config, segmented `node:test` entrypoints, and suite conventions that work in plain ESM without framework-specific indirection.
+- Keep integration coverage on the real static ESM server graph with shared helpers that reuse suite-level PostgreSQL runtime setup, isolate each scenario into a temporary database, and fail fast on startup/request/shutdown issues instead of leaving resource-heavy hangs.
 - Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and recovery/restore scenarios.
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
 

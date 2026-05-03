@@ -38,7 +38,9 @@ function shouldAttachCsrfHeader(method, includeCsrfHeader) {
   return !['GET', 'HEAD'].includes(method);
 }
 
-export function createSessionHttpClient(baseUrl) {
+export function createSessionHttpClient(baseUrl, {
+  requestTimeoutMs = 15_000,
+} = {}) {
   const cookies = new Map();
   let csrfToken = null;
 
@@ -68,6 +70,7 @@ export function createSessionHttpClient(baseUrl) {
     headers = {},
     json = undefined,
     method = 'GET',
+    timeoutMs = requestTimeoutMs,
   } = {}) {
     const normalizedMethod = method.toUpperCase();
     const requestHeaders = new Headers(headers);
@@ -86,12 +89,32 @@ export function createSessionHttpClient(baseUrl) {
       requestHeaders.set('x-csrf-token', csrfToken);
     }
 
-    const response = await fetch(`${baseUrl}${path}`, {
-      body: json === undefined ? undefined : JSON.stringify(json),
-      headers: requestHeaders,
-      method: normalizedMethod,
-    });
-    const payload = await response.json();
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort(new Error(`${normalizedMethod} ${path} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    timeoutId.unref?.();
+
+    let response;
+    let payload;
+
+    try {
+      response = await fetch(`${baseUrl}${path}`, {
+        body: json === undefined ? undefined : JSON.stringify(json),
+        headers: requestHeaders,
+        method: normalizedMethod,
+        signal: abortController.signal,
+      });
+      payload = await response.json();
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        throw abortController.signal.reason ?? error;
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     applyResponseState(response, payload);
 

@@ -8,6 +8,8 @@
 
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import pg from 'pg';
+import { buildPoolConfig } from '../src/server/database.js';
+import { resolveIntegrationTestRuntimeConfig } from './integration/runtime-config.js';
 import { withTemporaryPostgresDatabase } from './postgres-temporary-database.js';
 
 const { Pool } = pg;
@@ -17,15 +19,89 @@ export function hasConfiguredPostgresAdminConnection(env = process.env) {
   return typeof password === 'string' && password.trim().length > 0;
 }
 
-function createDefaultPostgresContainer() {
-  return new PostgreSqlContainer('postgres:18-alpine')
+function createPoolFactory(env) {
+  return (databaseConfig) => new Pool({
+    ...buildPoolConfig(env),
+    ...databaseConfig,
+  });
+}
+
+function createDefaultPostgresContainer(config) {
+  const container = new PostgreSqlContainer(config.postgresImage)
+    .withStartupTimeout(config.startupTimeoutMs)
     .withDatabase('harmoniarr')
     .withUsername('harmoniarr')
     .withPassword('harmoniarr');
+
+  if (config.useContainerReuse) {
+    return container.withReuse();
+  }
+
+  return container;
+}
+
+export async function createPostgresIntegrationRuntime({
+  config = resolveIntegrationTestRuntimeConfig(),
+  createPostgresContainer = createDefaultPostgresContainer,
+  env = process.env,
+  withTemporaryPostgresDatabaseFn = withTemporaryPostgresDatabase,
+} = {}) {
+  if (hasConfiguredPostgresAdminConnection(env)) {
+    return {
+      config,
+      source: 'external_postgres',
+      async cleanup() {},
+      async runIsolatedDatabase(run) {
+        return withTemporaryPostgresDatabaseFn({
+          createPool: createPoolFactory(env),
+          env,
+          run: ({ databaseConfig, databaseName, getPoolFn }) => run({
+            databaseConfig,
+            databaseName,
+            getPoolFn,
+            source: 'external_postgres',
+          }),
+        });
+      },
+    };
+  }
+
+  const container = await createPostgresContainer(config).start();
+  const containerEnv = {
+    PGDATABASE: container.getDatabase(),
+    PGHOST: container.getHost(),
+    PGMAINTENANCE_DB: 'postgres',
+    PGPASSWORD: container.getPassword(),
+    PGPORT: String(container.getPort()),
+    PGUSER: container.getUsername(),
+  };
+
+  return {
+    config,
+    source: 'testcontainer_postgres',
+    async cleanup() {
+      await container.stop({
+        timeout: config.containerStopTimeoutMs,
+      }).catch(() => {});
+    },
+    async runIsolatedDatabase(run) {
+      return withTemporaryPostgresDatabaseFn({
+        createPool: createPoolFactory(containerEnv),
+        env: containerEnv,
+        run: ({ databaseConfig, databaseName, getPoolFn }) => run({
+          databaseConfig,
+          databaseName,
+          getPoolFn,
+          source: 'testcontainer_postgres',
+        }),
+      });
+    },
+  };
 }
 
 export async function withPostgresIntegrationRuntime({
   createPostgresContainer = createDefaultPostgresContainer,
+  config = resolveIntegrationTestRuntimeConfig(),
   env = process.env,
   run,
   withTemporaryPostgresDatabaseFn = withTemporaryPostgresDatabase,
@@ -34,36 +110,16 @@ export async function withPostgresIntegrationRuntime({
     throw new Error('run is required');
   }
 
-  if (hasConfiguredPostgresAdminConnection(env)) {
-    return withTemporaryPostgresDatabaseFn({
-      env,
-      run: ({ databaseConfig, databaseName, getPoolFn }) => run({
-        databaseConfig,
-        databaseName,
-        getPoolFn,
-        source: 'external_postgres',
-      }),
-    });
-  }
-
-  const container = await createPostgresContainer().start();
-  const databaseConfig = {
-    database: container.getDatabase(),
-    host: container.getHost(),
-    password: container.getPassword(),
-    port: container.getPort(),
-    user: container.getUsername(),
-  };
-  const pool = new Pool(databaseConfig);
+  const runtime = await createPostgresIntegrationRuntime({
+    config,
+    createPostgresContainer,
+    env,
+    withTemporaryPostgresDatabaseFn,
+  });
 
   try {
-    return await run({
-      databaseConfig,
-      databaseName: databaseConfig.database,
-      getPoolFn: () => pool,
-      source: 'testcontainer_postgres',
-    });
+    return await runtime.runIsolatedDatabase(run);
   } finally {
-    await pool.end().catch(() => {});
+    await runtime.cleanup();
   }
 }

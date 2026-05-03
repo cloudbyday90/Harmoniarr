@@ -22,24 +22,53 @@ export function createJsonTestApp(registerRoutes, {
   return app;
 }
 
-export async function withServer(app, callback) {
-  const server = await new Promise((resolve) => {
-    const activeServer = app.listen(0, '127.0.0.1', () => resolve(activeServer));
+function withTimeout(createPromise, timeoutMs, label) {
+  let timeoutId;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    timeoutId.unref?.();
   });
+
+  return Promise.race([
+    Promise.resolve().then(createPromise),
+    timeoutPromise,
+  ]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
+export async function withServer(app, callback, {
+  closeTimeoutMs = 10_000,
+  listenTimeoutMs = 10_000,
+} = {}) {
+  const server = await withTimeout(
+    () => new Promise((resolve) => {
+      const activeServer = app.listen(0, '127.0.0.1', () => resolve(activeServer));
+    }),
+    listenTimeoutMs,
+    'HTTP test server startup',
+  );
 
   try {
     const address = server.address();
     return await callback(`http://127.0.0.1:${address.port}`);
   } finally {
-    await new Promise((resolve, reject) => {
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
+    await withTimeout(
+      () => new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
 
-        resolve();
-      });
-    });
+          resolve();
+        });
+      }),
+      closeTimeoutMs,
+      'HTTP test server shutdown',
+    );
   }
 }

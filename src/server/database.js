@@ -22,6 +22,49 @@ const { Pool } = pg;
 
 let sharedPool;
 
+function parseOptionalInteger(value, name) {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${name} must be an integer when configured`);
+  }
+
+  return parsed;
+}
+
+function parseOptionalPositiveInteger(value, name) {
+  const parsed = parseOptionalInteger(value, name);
+  if (parsed === undefined) {
+    return undefined;
+  }
+
+  if (parsed <= 0) {
+    throw new Error(`${name} must be greater than 0 when configured`);
+  }
+
+  return parsed;
+}
+
+function parseOptionalBoolean(value, name) {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+
+  if (normalized === 'false') {
+    return false;
+  }
+
+  throw new Error(`${name} must be "true" or "false" when configured`);
+}
+
 export function buildConnectionConfig(env = process.env) {
   return {
     host: env.PGHOST ?? env.POSTGRES_HOST ?? '127.0.0.1',
@@ -32,9 +75,42 @@ export function buildConnectionConfig(env = process.env) {
   };
 }
 
+export function buildPoolConfig(env = process.env) {
+  const connectionConfig = buildConnectionConfig(env);
+  const allowExitOnIdle = parseOptionalBoolean(
+    env.HARMONIARR_PG_POOL_ALLOW_EXIT_ON_IDLE ?? env.PGPOOL_ALLOW_EXIT_ON_IDLE,
+    'HARMONIARR_PG_POOL_ALLOW_EXIT_ON_IDLE',
+  );
+  const connectionTimeoutMillis = parseOptionalPositiveInteger(
+    env.HARMONIARR_PG_POOL_CONNECTION_TIMEOUT_MS ?? env.PGPOOL_CONNECTION_TIMEOUT_MS,
+    'HARMONIARR_PG_POOL_CONNECTION_TIMEOUT_MS',
+  );
+  const idleTimeoutMillis = parseOptionalPositiveInteger(
+    env.HARMONIARR_PG_POOL_IDLE_TIMEOUT_MS ?? env.PGPOOL_IDLE_TIMEOUT_MS,
+    'HARMONIARR_PG_POOL_IDLE_TIMEOUT_MS',
+  );
+  const max = parseOptionalPositiveInteger(
+    env.HARMONIARR_PG_POOL_MAX ?? env.PGPOOL_MAX,
+    'HARMONIARR_PG_POOL_MAX',
+  );
+  const maxUses = parseOptionalPositiveInteger(
+    env.HARMONIARR_PG_POOL_MAX_USES ?? env.PGPOOL_MAX_USES,
+    'HARMONIARR_PG_POOL_MAX_USES',
+  );
+
+  return {
+    ...connectionConfig,
+    ...(allowExitOnIdle === undefined ? {} : { allowExitOnIdle }),
+    ...(connectionTimeoutMillis === undefined ? {} : { connectionTimeoutMillis }),
+    ...(idleTimeoutMillis === undefined ? {} : { idleTimeoutMillis }),
+    ...(max === undefined ? {} : { max }),
+    ...(maxUses === undefined ? {} : { maxUses }),
+  };
+}
+
 export function getPool() {
   if (!sharedPool) {
-    sharedPool = new Pool(buildConnectionConfig());
+    sharedPool = new Pool(buildPoolConfig());
   }
 
   return sharedPool;
