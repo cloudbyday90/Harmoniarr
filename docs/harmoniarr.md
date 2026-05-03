@@ -6156,6 +6156,9 @@ Backend:
 - Prefer an optional preseeded owner-claim bootstrap mode for trusted self-hosted installs: if the operator configures a one-time claim secret plus owner username and/or email through environment, first-run admin creation should require that claim before the initial admin account is created.
 - Plex onboarding should reuse that same ownership-first posture: the preferred first Plex slice is a server-side Plex PIN/JWT connection for the owner account plus Plex user import into the existing `app_users` table, not a second competing bootstrap or identity store.
 - Plex managed accounts and regular Plex accounts must be treated differently. Managed accounts may be imported as Harmoniarr users for request ownership, permissions, notifications, and managed-library provisioning, but they should not be assumed to support direct Harmoniarr sign-in.
+- Optional direct Plex sign-in should come only after the import-first identity boundary is working. Importing Plex users into `app_users` is the durable baseline; direct Plex login is an additive capability for direct-capable Plex accounts, not the root identity model.
+- If imported Plex managed users later need direct Harmoniarr access, prefer a local invite, claim, or password-set flow bound to the existing `app_users` row instead of trying to simulate unsupported Plex-auth behavior.
+- Plex directory synchronization should begin as an admin-triggered import or refresh flow with visible diffs and operator approval semantics. Automatic disable or removal based on upstream Plex state should remain deferred until the real lifecycle policy is proven.
 - Add route-tier enforcement for anonymous, authenticated, privileged, maintenance-locked, and integration-key surfaces.
 - Implement settings read/write services with validation, masking/redaction rules, and audit logging.
 - Add API key creation/rotation/revocation for integrations, separate from browser auth.
@@ -6189,6 +6192,7 @@ Ingest/import:
 - Import planning should also carry the target user context so reviewed media lands in a user-owned subdirectory while still referencing shared canonical media state.
 - Request Music should distinguish the acting user from the target user. The internal model should carry both `requestedByUserId` and `requestedForUserId`, where the former is audit or operator attribution and the latter drives request ownership, request history scope, notifications, and final managed-library destination behavior.
 - Non-admin users remain self-only for requests. Admins may create requests for themselves or for another eligible Harmoniarr user, including users imported from Plex.
+- Keep v1 request ownership single-target. If multi-user request fan-out is ever added later, it should create explicit per-target child requests or equivalent durable target-owned records rather than one ambiguous shared request.
 - Add review queue state machine for candidate evaluation, operator decisions, hold/reject states, and idempotent reprocessing.
 - Implement path mapping, staging resolution, root-folder policy, and naming-preview generation without mutating media yet.
 
@@ -6273,6 +6277,7 @@ Validation:
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
 - Recommended next implementation slice: use the existing integration and runtime harnesses to validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior end to end, then use the resulting gaps to drive the remaining fixture, E2E, and release-closure work.
 - If product-value work is pulled forward ahead of broader release closure, the preferred identity/request slice is: import Plex users into `app_users`, add `requestedForUserId` to Request Music, and only then add optional direct Plex sign-in for direct-capable Plex accounts.
+- Optional identity/request extensions should remain explicit and policy-driven: local-login fallback for Plex managed users only if there is a concrete operator need, admin-triggered Plex re-sync before any automatic reconciliation, and multi-user request fan-out only if it can preserve explicit per-user ownership and audit semantics.
 
 Release closure:
 

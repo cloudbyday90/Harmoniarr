@@ -181,6 +181,11 @@ Lower-priority or conditional slices:
 
 - Plex-linked onboarding remains a product-fit feature, but it is not currently on the shortest path to V1 readiness.
 - If Plex onboarding is pursued before broader release-closure work, the preferred sequence is: connect a Plex owner account, import Plex users into `app_users`, add admin-targeted Request Music ownership (`requestedForUserId`), and only then add optional direct Plex sign-in for direct-capable Plex accounts.
+- Optional identity and request follow-ons should stay explicit:
+  - direct Plex sign-in is valuable, but only after Plex import and admin-targeted request ownership exist
+  - local-credential fallback for imported Plex managed users should remain deferred unless there is a concrete need for those users to sign into Harmoniarr directly
+  - Plex user re-sync should start as an admin-triggered import or refresh operation rather than automatic background reconciliation
+  - multi-user request fan-out remains deferred; v1 should keep one target user per request
 - Personal or integration token flows remain conditional and should not be built unless a concrete non-browser automation need exists.
 - Remaining Phase 0 and start-gate items should be treated as documentation and contract-closure work unless they uncover a real architectural conflict.
 
@@ -297,6 +302,8 @@ Status note:
   - Decision: Plex import and Plex sign-in are related but not identical features. The first Plex slice should import users from Plex into `app_users` and keep that as the durable identity boundary before optional direct Plex sign-in is added.
   - Decision: Plex managed accounts may be imported as Harmoniarr users for request ownership, permissions, notifications, and managed-library provisioning, but they should not be treated as direct-sign-in-capable identities unless Plex exposes a supported direct auth path for them.
   - Decision: Harmoniarr should never collect or proxy Plex passwords. Browser auth must use the current Plex PIN/JWT flow server-side.
+  - Decision: if imported Plex managed users eventually need direct Harmoniarr login, the preferred fallback is an explicit local invite, claim, or password-set flow bound to the existing `app_users` record rather than attempting to emulate unsupported Plex login semantics.
+  - Decision: Plex directory synchronization should start as an explicit admin-run import or refresh action with visible diff results and operator confirmation rules. Automatic removal or disabling of existing Harmoniarr users based on Plex state should remain deferred until lifecycle semantics are proven.
 - [ ] Verify admin recovery assumptions remain compatible with `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 - Canonical Model And Import Review
@@ -321,6 +328,7 @@ Status note:
   - Decision: non-admin users remain self-only, while admins can choose any eligible user as the request target.
   - Decision: request history and detail views should show both "requested by" and "requested for", and import or apply ownership plus managed-library routing should follow `requestedForUserId`.
   - Decision: v1 should keep requests single-target only; multi-user fan-out can remain future work.
+  - Decision: if multi-user fan-out is ever added, it should materialize as explicit per-target child requests or equivalent durable target-owned records rather than one ambiguous request shared across many users.
 - [x] Move per-user import destination ownership toward `app_users` by storing managed library subdirectories on user records and preferring them during preview planning, while keeping `paths.userMusicRoots` as a compatibility fallback during the transition.
 - [x] Add an explicit admin provisioning flow for managed library directories so user-owned subdirectory assignments can be materialized under the shared music root without relying on settings-era path creation behavior.
 - [x] Add a user-owned folder-access model and provisioning flow so admin-created or Plex-onboarded users can claim or generate managed library subdirectories without relying on settings-only mappings long term.
