@@ -36,9 +36,7 @@ async function browseAllArtistReleaseGroups({
   const releaseGroups = [];
   const seenIds = new Set();
   let offset = 0;
-  let total = 0;
-
-  do {
+  while (true) {
     await throwIfCancelled();
     const payload = await observeMusicBrainzProviderCall(
       providerHealthRecorder,
@@ -51,7 +49,7 @@ async function browseAllArtistReleaseGroups({
     );
 
     const pageResults = Array.isArray(payload['release-groups']) ? payload['release-groups'] : [];
-    total = payload['release-group-count'] ?? payload.count ?? 0;
+    const total = payload['release-group-count'] ?? payload.count ?? 0;
 
     for (const releaseGroup of pageResults) {
       if (!releaseGroup?.id || seenIds.has(releaseGroup.id)) {
@@ -67,7 +65,10 @@ async function browseAllArtistReleaseGroups({
     }
 
     offset += pageResults.length;
-  } while (offset < total);
+    if (offset >= total) {
+      break;
+    }
+  }
 
   return releaseGroups;
 }
@@ -95,7 +96,7 @@ export function createMetadataRefreshService({
     try {
       existingArtist = await getMetadataArtistByMusicBrainzId({ musicBrainzArtistId });
     } catch {
-      existingArtist = null;
+      // Refresh still works without the cached artist projection.
     }
     const existingReleaseGroupIds = new Set((existingArtist?.releaseGroups ?? [])
       .map((releaseGroup) => releaseGroup.source?.musicbrainzReleaseGroupId)

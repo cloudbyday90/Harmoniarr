@@ -33,7 +33,7 @@ export function createImportCandidateTranscodeWorker({
     selectedCandidates: [],
   }),
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
-  executeTranscodeCandidate = async ({ sourcePath, transcodePlan }) => ({
+  executeTranscodeCandidate = async ({ sourcePath: _sourcePath, transcodePlan }) => ({
     mode: 'preflight_only',
     status: transcodePlan?.recommendedAction === 'transcode_candidate' ? 'preflight_passed' : 'not_required',
     warnings: [],

@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-const props = defineProps({
+defineProps({
   isImportingArtist: {
     type: Boolean,
     default: false,

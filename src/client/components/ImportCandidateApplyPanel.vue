@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-const props = defineProps({
+defineProps({
   actionErrorMessage: {
     type: String,
     default: '',
@@ -52,7 +52,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['refresh', 'start']);
+defineEmits(['refresh', 'start']);
 
 function formatTimestamp(value) {
   if (!value) {

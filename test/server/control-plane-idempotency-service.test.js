@@ -255,16 +255,6 @@ test('control plane idempotency service handles race condition via unique constr
 
   assert.equal(first.replayed, false);
 
-  const raceRecord = {
-    id: 'race-replay-id',
-    expiresAt: '2026-05-04T12:00:00.000Z',
-    requestHash: first.body ? undefined : undefined,
-    response: { accepted: true, runId: 'run-race-1' },
-    statusCode: 202,
-  };
-
-  const originalGet = service.executeIdempotentMutation;
-
   const result = await service.executeIdempotentMutation({
     actorUserId: 'user-race',
     executeMutation: async () => ({

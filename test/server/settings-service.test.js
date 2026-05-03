@@ -243,7 +243,6 @@ test('createSettingsService applies slskd secret mutations and records them in a
     persistSettingsFn,
     providerCredentialsService: createNoopProviderCredentialsService(),
     recordAuditEventFn,
-    providerCredentialsService: createNoopProviderCredentialsService(),
     slskdConfigService: {
       buildSecretMutation: t.mock.fn(() => ({
         sanitizedPatch: { slskd: { baseUrl: 'http://slskd.internal:5030' } },

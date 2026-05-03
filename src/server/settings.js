@@ -17,7 +17,7 @@
  */
 
 import { getPool } from './database.js';
-import { getDefaultSettings, normalizeSettingsPatch } from './validators/settings-validator.js';
+import { getDefaultSettings } from './validators/settings-validator.js';
 
 export async function loadSettings(queryable = getPool()) {
   const result = await queryable.query(

@@ -122,7 +122,7 @@ export function createAppUserProvisioningService({
     try {
       resolvedPath = await realpathFn(userRootPath);
     } catch {
-      resolvedPath = null;
+      // Leave the unresolved path as null when the real path is not yet available.
     }
 
     const provisioning = {

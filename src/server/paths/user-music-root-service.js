@@ -26,6 +26,13 @@ function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function containsControlCharacters(value) {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && codePoint <= 0x1F;
+  });
+}
+
 function normalizeRelativeRoot(value, fieldName) {
   if (typeof value !== 'string') {
     throw buildValidationError(fieldName, 'must be a string');
@@ -50,7 +57,7 @@ function normalizeRelativeRoot(value, fieldName) {
     throw buildValidationError(fieldName, 'must not contain dot traversal segments');
   }
 
-  if (segments.some((segment) => /[<>:"\\|?*\u0000-\u001F]/.test(segment))) {
+  if (segments.some((segment) => /[<>:"\\|?*]/.test(segment) || containsControlCharacters(segment))) {
     throw buildValidationError(fieldName, 'contains unsupported path characters');
   }
 

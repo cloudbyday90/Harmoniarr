@@ -34,7 +34,7 @@ function createNoopSecretMutation(patch) {
   };
 }
 
-function buildSingleSecretMutation({ encryptedSecretService, envFallback, fieldPath, patchNamespace, patchKey, clearPatchKey, secretName }) {
+function buildSingleSecretMutation({ encryptedSecretService, envFallback: _envFallback, fieldPath, patchNamespace, patchKey, clearPatchKey, secretName }) {
   return function extractMutation(patch) {
     const namespacePatch = patch?.[patchNamespace];
     if (!namespacePatch || typeof namespacePatch !== 'object' || Array.isArray(namespacePatch)) {

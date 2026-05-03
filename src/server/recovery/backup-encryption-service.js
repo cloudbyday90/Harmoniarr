@@ -21,7 +21,6 @@ import { resolveSecretEncryptionKey, secretEncryptionKeyEnvVar } from '../encryp
 
 const encryptionAlgorithm = 'aes-256-gcm';
 const ivBytes = 12;
-const authTagBytes = 16;
 
 export function computeKeyFingerprint(encryptionKey) {
   return createHash('sha256').update(encryptionKey).digest('hex');

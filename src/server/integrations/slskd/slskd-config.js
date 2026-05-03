@@ -57,7 +57,7 @@ export function normalizeSlskdBaseUrl(value, {
       validationErrorCode: 'slskd_misconfigured',
     }).toString();
   } catch (error) {
-    throw new Error(error?.message ?? `Invalid slskd base URL: ${candidate}`);
+    throw new Error(error?.message ?? `Invalid slskd base URL: ${candidate}`, { cause: error });
   }
 }
 

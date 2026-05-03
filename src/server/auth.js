@@ -19,7 +19,6 @@
 import { randomUUID } from 'node:crypto';
 import { getPool } from './database.js';
 import {
-  csrfProtectionModeEnvVar,
   csrfProtectionModes,
   resolveCsrfProtectionMode,
   resolveSecureCookiesEnabled,

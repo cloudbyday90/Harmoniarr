@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import {
   createAdminRecoveryService,
   generateRecoveryCode,
@@ -214,7 +214,7 @@ test('armBootstrapAdminRecovery creates armed run and returns plaintext code', a
 });
 
 test('armBootstrapAdminRecovery rejects when already armed without force', async () => {
-  const { service, store } = createTestDeps();
+  const { service } = createTestDeps();
 
   await service.armBootstrapAdminRecovery();
 
@@ -488,7 +488,7 @@ test('completeBootstrapAdminRecovery re-enables existing user', async () => {
   const existingUser = { id: 'existing-user-1', username: 'admin', is_disabled: true };
   let updateCalled = false;
 
-  const { service } = createTestDeps({
+  createTestDeps({
     storeOverrides: {},
   });
 

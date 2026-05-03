@@ -1502,13 +1502,10 @@ Recommended frontend stack, matching Classifarr where practical:
 - Vite
 - Vue 3
 - Vue Router
-- Pinia
-- Axios
-- Tailwind CSS
-- Heroicons Vue
-- VueUse, primarily for browser state helpers such as online/offline state
-- Socket.IO client
-- Vitest and Testing Library
+- Native `fetch` wrapped by shared client API modules
+- Shared Vue composables for route-owned data, polling, and mutation state
+- Plain CSS or narrowly-scoped utility usage chosen per screen rather than a framework-first styling dependency
+- Native `node:test` for client module and composable coverage, with browser E2E tooling added only where module-level tests stop being sufficient
 
 Vite should be used as the frontend build tool. In development, Vite can serve the client with hot reload and proxy API calls to the backend. In production, the backend should serve the compiled static assets from the Docker image.
 
@@ -1519,10 +1516,11 @@ Vue is the best compatibility choice if Harmoniarr should stay close to Classifa
 Frontend principles:
 
 - Use URL state for filters, selected views, and review context where useful.
-- Use Pinia for shared client state that is genuinely application-wide.
+- Prefer static ESM imports for first-party views, composables, and client services; only introduce lazy-loading when a measured startup-cost case justifies the complexity.
+- Keep application-wide state small and explicit; prefer route-owned composables and focused shared modules before adding a global store.
 - Use local component state for UI-only state.
-- Keep API access behind client service modules instead of calling Axios directly from large views.
-- Use the Harmoniarr SWR composable for service-backed page/module data.
+- Keep API access behind shared client service modules instead of calling `fetch` directly from large views.
+- Use shared composables for service-backed page and module data so polling, abort, retry, and auth-failure behavior stay modular.
 - Prefer feature folders over global component sprawl.
 - Keep dense table and review experiences fast and keyboard-friendly.
 
@@ -1530,7 +1528,7 @@ Frontend principles:
 
 Recommended backend stack, matching Classifarr where practical:
 
-- Node.js 24 LTS
+- Node.js 25.4 baseline
 - Express 5 as the HTTP server
 - Helmet, CORS, cookie-parser, JSON Web Token, and rate-limit middleware
 - Swagger UI for API documentation
@@ -5106,20 +5104,21 @@ Expected command groups:
 
 - `lint`
 - `lint:server`
+- `lint:shared`
 - `lint:client`
+- `lint:test`
+- `lint:scripts`
 - `test`
 - `test:server`
 - `test:client`
+- `test:scripts`
 - `test:integration`
 - `test:coverage`
-- `test:ci`
-- `coverage:ratchet:check`
-- `coverage:ratchet:update`
+- `validate`
 - `check:esm`
 - `migration:check`
 - `migration:create`
-- `db:dump-schema`
-- `lint:docs`
+- `validate:database`
 
 Server tests should cover:
 
@@ -5138,7 +5137,7 @@ Server tests should cover:
 Client tests should cover:
 
 - Core views
-- Stores/state management
+- Shared composables and route-state modules
 - API client wrappers
 - Candidate comparison UI behavior
 - Transfer/import status rendering
@@ -5156,17 +5155,16 @@ Integration tests should cover:
 - Docker-facing health checks
 - API route behavior with real database state
 
-The test stack should match Classifarr's shape:
+The validation stack should stay aligned with the current ESM-native runtime instead of forcing a second test ecosystem:
 
-- Jest for server tests.
-- Supertest for Express route tests.
-- Testcontainers and `@testcontainers/postgresql` for database-backed integration tests.
-- `pg-mem` for fast database-adjacent unit tests where appropriate.
-- Vitest for client tests.
-- Vue Testing Library and Vue Test Utils for frontend behavior.
-- Coverage reports for both server and client.
+- Native `node:test` for server, client module/composable, script, and integration coverage.
+- `suite()` for static grouping and `test()` or nested subtests for generated or highly dynamic cases.
+- Native `fetch` plus lightweight HTTP helpers for route-contract coverage instead of introducing a separate request-testing abstraction by default.
+- Testcontainers or equivalent only where real database lifecycle coverage is necessary; keep lighter native tests as the default path.
+- ESLint flat config with Vue support and explicit target groups for server, shared, client, tests, and scripts.
+- Native `node:test` coverage reporting for local and CI visibility, while keeping in mind that built-in coverage remains experimental in current Node documentation.
 
-Coverage should use a ratchet model. The baseline should be committed to the repository, and CI should fail when server or client coverage drops below the committed baseline beyond a small tolerance. Intentional decreases should require updating the baseline in the same change.
+Coverage should start as a visible native `node:test` report. Ratcheting can be added later once the current codebase has a stable baseline worth enforcing.
 
 Quality gates should include:
 
@@ -5258,14 +5256,12 @@ Pull request review checklist:
 
 The initial CI model should include:
 
-- Install root, server, and client dependencies.
+- Install dependencies once at the repo root.
 - Validate migration names.
-- Run server lint.
-- Run client lint.
-- Run server tests with coverage.
-- Run client tests with coverage.
-- Run coverage ratchet check.
-- Run database-backed integration tests.
+- Run segmented lint for server, shared, client, tests, and scripts.
+- Run segmented native tests for server, client, scripts, and integration.
+- Run native coverage reporting.
+- Run database-backed validation flows where the scenario requires a real Postgres lifecycle.
 - Build the client.
 - Build the Alpine Docker image.
 - Optionally run the image and check `/health`.
@@ -5987,7 +5983,7 @@ Know what is missing
 - Project name: Harmoniarr.
 - License: GPL-3.0-or-later, matching Classifarr.
 - Use a Classifarr-style GitHub Action to check copyright/license headers on source files.
-- Use the Classifarr-compatible stack as the default implementation baseline: Node 25.4, npm, Express 5, Vue 3, Vite, Pinia, Tailwind CSS, Socket.IO, Jest, Vitest, Testcontainers, Docker Alpine, and explicit PostgreSQL access through `pg`.
+- Use the current ESM-native stack as the default implementation baseline: Node 25.4, npm, Express 5, Vue 3, Vite, shared native-fetch client modules, native `node:test`, ESLint flat config, Docker Alpine, and explicit PostgreSQL access through `pg`.
 - Use a Classifarr-style local authentication model for v1: first-run admin setup, cookie-based browser auth, refresh-token-backed sessions, CSRF protection for cookie-authenticated writes, API keys for integrations, and explicit admin-only route protection.
 - Use ES modules for JavaScript and TypeScript code; avoid CommonJS for project scripts and application code.
 - Treat defensive coding as a baseline requirement: thin routes, schema validation at boundaries, centralized error handling, structured logging with correlation, explicit timeout and retry policy, and skeptical review of AI-generated code.
@@ -6063,15 +6059,16 @@ Harmoniarr V1 should be delivered as a staged, self-hosted music automation plat
 
 ## 3. Technical Baseline Locked For Implementation
 
-- Runtime: Node.js 24 LTS, ESM-only application code.
+- Runtime: Node.js 25.4 baseline, ESM-only application code.
 - Backend: Express 5 with thin route handlers and explicit validator/service/repository boundaries.
-- Frontend: Vue 3, Vite, Pinia, and shared typed API contracts at the boundary.
+- Frontend: Vue 3, Vite, static ESM route and view imports by default, and shared client API/composable boundaries at the browser edge.
 - Database: PostgreSQL 18 as the canonical state store, with timestamped migrations and fail-closed startup validation.
 - Packaging: Docker on Alpine 3.23, standard image includes embedded Postgres and local FFmpeg tooling.
 - Jobs: PostgreSQL-backed durable queue/work-lease model; no in-memory-only job ownership.
 - Auth: local browser auth via cookie session + refresh token, CSRF on cookie-authenticated writes, API keys for integrations only.
 - Metadata and music identity: MusicBrainz as canonical identity source; secondary enrichers are advisory and must not silently replace canonical IDs.
 - Soulseek backend: slskd behind an adapter boundary; all backend-specific behavior is normalized before reaching domain services.
+- Validation: native `node:test` with segmented server, client, script, and integration entrypoints plus ESLint flat-config enforcement across the ESM codebase.
 
 ## 4. Execution Readiness And Governance
 
@@ -6246,6 +6243,7 @@ Acceptance criteria:
 Validation:
 
 - Add unit, integration, route-contract, migration, job-behavior, and end-to-end UI coverage for the V1 critical path.
+- Keep repo-level validation native to the runtime: ESLint flat config, segmented `node:test` entrypoints, and suite conventions that work in plain ESM without framework-specific indirection.
 - Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and recovery/restore scenarios.
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
 

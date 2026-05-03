@@ -22,7 +22,7 @@ import {
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
 
-const props = defineProps({
+defineProps({
   actionErrorMessage: {
     type: String,
     default: '',
@@ -53,7 +53,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['refresh', 'start']);
+defineEmits(['refresh', 'start']);
 
 function summaryClass(status) {
   switch (status) {

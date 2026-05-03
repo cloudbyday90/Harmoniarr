@@ -43,10 +43,23 @@ const windowsReservedNames = new Set([
   'LPT9',
 ]);
 
-const reservedCharacterPattern = /[<>:"/\\|?*\u0000-\u001F]+/g;
+const reservedCharacterPattern = /[<>:"/\\|?*]+/g;
 const whitespacePattern = /\s+/g;
 const edgeDotsWhitespaceAndHyphenPattern = /^[.\s-]+|[.\s-]+$/g;
 const repeatedReplacementPattern = /(?:\s-\s){2,}/g;
+
+function replaceControlCharacters(value, replacement) {
+  let output = '';
+
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    output += codePoint !== undefined && codePoint <= 0x1F
+      ? replacement
+      : character;
+  }
+
+  return output;
+}
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.normalize('NFC') : '';
@@ -79,7 +92,8 @@ function splitFilename(value) {
 
 function sanitizeStem(value, { fallback = 'untitled', replacement = ' - ' } = {}) {
   const normalizedValue = normalizeText(value);
-  const replaced = normalizedValue.replace(reservedCharacterPattern, replacement);
+  const withoutControlCharacters = replaceControlCharacters(normalizedValue, replacement);
+  const replaced = withoutControlCharacters.replace(reservedCharacterPattern, replacement);
   const collapsed = collapseWhitespace(replaced).replace(repeatedReplacementPattern, ' - ');
   const trimmed = collapsed.replace(edgeDotsWhitespaceAndHyphenPattern, '');
   const safeStem = trimmed || fallback;

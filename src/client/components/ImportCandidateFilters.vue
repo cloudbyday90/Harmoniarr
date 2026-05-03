@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-const props = defineProps({
+defineProps({
   activeFilterCount: {
     type: Number,
     default: 0,

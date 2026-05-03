@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-const props = defineProps({
+defineProps({
   errorMessage: {
     type: String,
     default: '',
@@ -32,7 +32,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['refresh']);
+defineEmits(['refresh']);
 
 function summaryClass(status) {
   switch (status) {

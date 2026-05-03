@@ -35,7 +35,7 @@ function parseAuditOutput(stdout) {
   try {
     return JSON.parse(normalized);
   } catch (error) {
-    throw new Error(`Unable to parse npm audit JSON output: ${error.message}`);
+    throw new Error(`Unable to parse npm audit JSON output: ${error.message}`, { cause: error });
   }
 }
 

@@ -116,35 +116,6 @@ export function useMetadataArtistWorkflow({
     }
   }
 
-  async function loadArtistWorkspace(artist, { resetSelection = true } = {}) {
-    const request = artistWorkspaceRequestGate.begin();
-    selectedArtist.value = artist;
-    artistActionError.value = '';
-    queuedRefreshRun.value = null;
-    if (resetSelection) {
-      releaseWorkflow.resetReleaseSelection();
-    }
-    isLoadingArtist.value = true;
-
-    try {
-      await refreshArtistWorkspace(artist, request);
-    } catch (error) {
-      if (isAbortError(error)) {
-        return;
-      }
-
-      if (request.isCurrent()) {
-        localArtist.value = null;
-        providerReleaseGroups.value = [];
-        artistActionError.value = getErrorMessage(error, 'Loading imported artist failed');
-      }
-    } finally {
-      if (request.isCurrent()) {
-        isLoadingArtist.value = false;
-      }
-    }
-  }
-
   async function importArtist(artist) {
     const request = artistWorkspaceRequestGate.begin();
     selectedArtist.value = artist;

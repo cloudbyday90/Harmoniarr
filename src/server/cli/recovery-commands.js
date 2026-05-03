@@ -43,10 +43,6 @@ function parseRecoveryArgs(args) {
   });
 }
 
-function buildServiceOverrides() {
-  return {};
-}
-
 function cleanup() {
   return closePool();
 }

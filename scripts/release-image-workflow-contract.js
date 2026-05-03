@@ -58,10 +58,6 @@ function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 export function getWorkflowStepBlock(source, stepName) {
   if (!isNonEmptyString(source)) {
     throw new Error('workflow source is required');
@@ -83,7 +79,7 @@ export function getWorkflowStepBlock(source, stepName) {
   const collected = [];
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index];
-    if (index > startIndex && /^      - name: /.test(line)) {
+    if (index > startIndex && /^ {6}- name: /.test(line)) {
       break;
     }
 

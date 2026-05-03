@@ -37,7 +37,7 @@ function buildArtistCredit(artistCredit) {
 }
 
 function escapeLucenePhrase(value) {
-  return value.replace(/([+\-!(){}\[\]^"~*?:\\/]|&&|\|\|)/g, '\\$1');
+  return value.replace(/([-+!(){}[\]^"~*?:\\/]|&&|\|\|)/g, '\\$1');
 }
 
 function quoteLucene(value) {

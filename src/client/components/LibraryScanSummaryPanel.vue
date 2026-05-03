@@ -23,7 +23,7 @@ import {
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
 
-const props = defineProps({
+defineProps({
   actionErrorMessage: {
     type: String,
     default: '',

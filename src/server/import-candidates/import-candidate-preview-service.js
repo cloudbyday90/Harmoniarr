@@ -33,10 +33,6 @@ function buildPathWarning(code, message) {
   return { code, message };
 }
 
-function buildPathBlocker(code, message) {
-  return { code, message };
-}
-
 function resolveCandidateFolderPath(candidate) {
   const candidateFolderPath = normalizePathInput(candidate.folderPath);
   if (candidateFolderPath) {

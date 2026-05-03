@@ -129,7 +129,6 @@ export function useImportReviewWorkspace({
     listError,
     loadQueue,
     pagination,
-    reconcileSelection,
     rejectSelectedCandidate,
     reopenSelectedCandidate,
     resetFilters,

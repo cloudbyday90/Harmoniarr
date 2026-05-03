@@ -18,7 +18,6 @@
 
 import { createApiError } from '../auth.js';
 import {
-  csrfProtectionModes,
   resolveCsrfProtectionMode,
   resolveHttpsEnforcementEnabled,
   resolveSecureCookiesEnabled,

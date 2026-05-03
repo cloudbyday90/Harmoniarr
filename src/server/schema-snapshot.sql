@@ -2722,8 +2722,23 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260503_002533_backup_artifact_encryption_key_fingerprint.sql
--- Checksum: f27d5a5f5d76b67775000fd501e01977dee1c56abbd0569bb9ca1b9d8ddcec38
--- forward-only migration
+-- Checksum: 49d44711a4080a9183601b901f0be254007dc3402145c623cdb7ace0352f5798
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 BEGIN;
 
 ALTER TABLE backup_artifacts
@@ -2742,7 +2757,7 @@ VALUES (
   '20260503_002533',
   '20260503_002533_backup_artifact_encryption_key_fingerprint.sql',
   'backup_artifact_encryption_key_fingerprint',
-  'f27d5a5f5d76b67775000fd501e01977dee1c56abbd0569bb9ca1b9d8ddcec38',
+  '49d44711a4080a9183601b901f0be254007dc3402145c623cdb7ace0352f5798',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE

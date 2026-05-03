@@ -52,6 +52,13 @@ function resolveFilename(pathValue, fallback) {
   return segments.at(-1) ?? fallback;
 }
 
+function containsControlCharacters(value) {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && codePoint <= 0x1F;
+  });
+}
+
 export function createMediaStagingSafetyService() {
   function assessCandidateFile({ candidateId = null, file } = {}) {
     const fileId = file?.id ?? null;
@@ -67,7 +74,7 @@ export function createMediaStagingSafetyService() {
       });
     }
 
-    if (/[\u0000-\u001F]/.test(sourceFilename)) {
+    if (containsControlCharacters(sourceFilename)) {
       blockers.push({
         code: 'unsafe_source_filename_control_chars',
         fileId,

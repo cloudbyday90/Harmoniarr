@@ -6,11 +6,12 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current Status (2026-05-02)
+## Current Status (2026-05-03)
 
 - Initial implementation planning exists in `docs/harmoniarr.md`.
 - Execution phases are defined, but no phase is complete yet.
 - The repo-level `npm run validate` contract currently passes end to end on Node 25.4.0, and the supported local baseline now tracks the Node 25.4 line through `.nvmrc`, `engines`, `devEngines`, and the Docker builder image.
+- Validation infrastructure now includes native ESM ESLint flat-config coverage across server, shared, client, scripts, and tests, plus segmented native `node:test` entrypoints for `server`, `client`, `scripts`, and `integration` slices.
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
 - Embedded PostgreSQL startup, tracked timestamped migrations, bootstrap-admin creation, login/logout/session routes, and allowlisted settings persistence are now implemented.
 - The client now includes first-run bootstrap-admin, login, and protected settings views backed by shared auth and settings API modules.
@@ -401,6 +402,11 @@ Parallelizable after contract stabilization:
 
 ## Phase 6 - Validation, Release, And Closure
 
+- [x] Add repo-level ESLint validation, segmented native test commands, and suite conventions that match the current ESM-native stack.
+  - Added native ESM `eslint.config.js` using ESLint flat config plus Vue flat essentials, with explicit server, shared, client, scripts, and test targets instead of a single catch-all lint surface.
+  - Added `npm run lint`, `lint:server`, `lint:shared`, `lint:client`, `lint:test`, and `lint:scripts`, and wired lint into the repo-level `npm run validate` contract before tests and builds.
+  - Replaced the monolithic `node --test` package script with segmented `test:server`, `test:client`, `test:scripts`, `test:integration`, and `test:coverage` commands while keeping the top-level `npm test` aggregator native and ESM-only.
+  - Introduced native `suite()` grouping in representative server, client, and script tests to establish the repo convention for static suites without forcing a churn-heavy test rewrite.
 - [x] Add unit tests for validators, service rules, workflow-state logic, and normalization helpers.
 - [x] Add integration tests for auth/session flows, settings contracts, import review, job ownership, and recovery operations.
 - [x] Add route-contract tests for normalized success/error payloads and permission enforcement.

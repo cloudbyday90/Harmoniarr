@@ -86,7 +86,6 @@ HEADERS.jsx = HEADERS.js;
 HEADERS.ts = HEADERS.js;
 HEADERS.tsx = HEADERS.js;
 HEADERS.css = HEADERS.js;
-HEADERS.html = HEADERS.html;
 HEADERS.vue = HEADERS.html;
 
 export function listCopyrightManagedFiles({ glob = globSync } = {}) {

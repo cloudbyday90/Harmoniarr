@@ -49,10 +49,6 @@ function canTransition(currentStatus, targetStatus) {
   }
 }
 
-function shouldPersistTransferSnapshot(item) {
-  return item?.liveTransferSummary?.status && item.liveTransferSummary.status !== 'not_found';
-}
-
 function shouldPersistExecutionState(item) {
   return Boolean(item?.liveTransferSummary?.status);
 }

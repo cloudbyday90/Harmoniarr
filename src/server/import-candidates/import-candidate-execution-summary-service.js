@@ -78,7 +78,7 @@ function buildLiveTransferSummary(transfers, { item, missingTransferConfig, now 
   const totalBytes = transfers.reduce((sum, transfer) => sum + (Number(transfer.size) || 0), 0);
 
   let status = 'not_found';
-  let message = 'No live slskd transfers were found for this execution item.';
+  let message;
   let missingTransfer = null;
 
   if (total > 0 && active > 0) {

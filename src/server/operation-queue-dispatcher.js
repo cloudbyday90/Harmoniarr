@@ -49,14 +49,11 @@ export function createOperationQueueDispatcher({
       return;
     }
 
-    let launchPromise = null;
-    launchPromise = (async () => {
+    return (async () => {
       await handler({ run });
     })().catch(async (error) => {
       await onError(error, { run });
     });
-
-    return launchPromise;
   }
 
   const runner = createIntervalHeartbeatRunnerFn({

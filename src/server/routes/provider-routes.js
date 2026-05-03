@@ -67,7 +67,7 @@ export function registerProviderRoutes(app, {
   startYoutubeAuthorization,
 }) {
   app.get('/api/v1/providers/status', asyncRoute(async (request, response) => {
-    const session = await requireSession(request);
+    await requireSession(request);
 
     const [spotify, youtube, appleMusic] = await Promise.all([
       buildSpotifyOAuthStatus(),

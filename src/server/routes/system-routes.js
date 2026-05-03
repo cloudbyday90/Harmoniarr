@@ -51,7 +51,6 @@ export function registerSystemRoutes(app, {
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
-  requireSession = defaultRequestAuthDependencies.requireSession,
 }) {
   async function runIdempotentMutation({
     actorUserId,

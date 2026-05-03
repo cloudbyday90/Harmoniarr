@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import { suite, test } from 'node:test';
 import { createApp } from '../../src/server/app.js';
 import { withServer } from '../../testing/server/http-test-helpers.js';
 
-test('createApp composes shared modules and preserves api and spa fallbacks', async (t) => {
+suite('createApp', () => {
+  test('composes shared modules and preserves api and spa fallbacks', async (t) => {
   const clientDistDir = await mkdtemp(join(tmpdir(), 'harmoniarr-app-test-'));
   const startedAt = new Date('2026-04-28T12:00:00.000Z');
   const artworkModule = {
@@ -401,9 +402,9 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
     assert.equal(spaResponse.headers.get('x-content-type-options'), 'nosniff');
     assert.match(spaHtml, /Harmoniarr App Shell/);
   });
-});
+  });
 
-test('createApp enforces opt-in https and hsts from the shared deployment security service', async (t) => {
+  test('enforces opt-in https and hsts from the shared deployment security service', async (t) => {
   const clientDistDir = await mkdtemp(join(tmpdir(), 'harmoniarr-app-security-test-'));
   const deploymentSecurityPolicy = {
     csrfProtectionMode: 'required',
@@ -507,5 +508,6 @@ test('createApp enforces opt-in https and hsts from the shared deployment securi
       },
     });
     assert.equal(secureResponse.headers.get('strict-transport-security'), 'max-age=15552000; includeSubDomains');
+  });
   });
 });

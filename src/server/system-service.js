@@ -17,7 +17,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { buildHeartbeatOverview, buildHeartbeatOverviewList, resolveHeartbeatOverviewState } from './heartbeat/heartbeat-overview.js';
+import { buildHeartbeatOverviewList, resolveHeartbeatOverviewState } from './heartbeat/heartbeat-overview.js';
 import { getPool } from './database.js';
 import { createDependencyHealthService } from './dependency-health-service.js';
 import { getMigrationStatus } from './migrations.js';

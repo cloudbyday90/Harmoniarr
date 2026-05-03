@@ -43,7 +43,7 @@ function pendingStateSecretName(prefix, state) {
 export function createOAuthPKCEService({
   authorizeUrl,
   callbackPath,
-  clientIdSettingKey,
+  clientIdSettingKey: _clientIdSettingKey,
   defaultScopes,
   encryptedSecretService = createEncryptedSecretService(),
   fetchFn = globalThis.fetch,
@@ -56,7 +56,7 @@ export function createOAuthPKCEService({
   resolveClientCredentials,
   revokeTokenBeforeClear = null,
   tokenUrl,
-  tokenExchangeExtraParams = () => ({}),
+  tokenExchangeExtraParams: _tokenExchangeExtraParams = () => ({}),
 }) {
   const tokenSecretName = `providers.${providerPrefix}.oauth.token`;
   const pendingPrefix = `providers.${providerPrefix}.oauth.pending.`;

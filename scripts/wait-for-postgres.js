@@ -55,7 +55,7 @@ export async function waitForPostgres({
 
   const startedAt = getNow();
   let attempts = 0;
-  let lastError = null;
+  let lastError;
 
   while (true) {
     attempts += 1;
