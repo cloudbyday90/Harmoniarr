@@ -6251,6 +6251,11 @@ Acceptance criteria:
 
 ## Phase 6 - Testing, Packaging, Upgrade Safety, And V1 Release Closure
 
+Current execution priority note:
+
+- At this point, the highest remaining product risk is no longer first-pass feature construction. It is deployment-path proof: fresh install, upgrade, restore preview or apply, and rollback-aware behavior on the supported Docker plus PostgreSQL path.
+- The remaining unchecked Phase 0 and start-gate items should be treated as contract and documentation closure unless they uncover a real architectural contradiction.
+
 Validation:
 
 - Add unit, integration, route-contract, migration, job-behavior, and end-to-end UI coverage for the V1 critical path.
@@ -6259,6 +6264,7 @@ Validation:
 - Treat import review, operation history/lease ownership, operation cancel/retry controls, maintenance-lock conflict enforcement for both import and library run-start routes, and bootstrap-admin recovery status/completion with session revocation as part of the critical integration baseline, not optional follow-up checks, because they validate operator-visible workflow state rather than isolated helper behavior.
 - Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and recovery/restore scenarios.
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
+- Recommended next implementation slice: use the existing integration and runtime harnesses to validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior end to end, then use the resulting gaps to drive the remaining fixture, E2E, and release-closure work.
 
 Release closure:
 

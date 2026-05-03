@@ -19,6 +19,8 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Operator-visible control-plane reads now also pass through a shared server-side redaction boundary, so recovery diagnostics, operation history, maintenance-lock responses, restore-preview lock conflicts, and recent audit detail reads omit or sanitize secret-bearing values, emails, bearer tokens, and filesystem paths before they reach the UI.
 - Structured runtime and security log rendering now also pass through the same shared redaction policy, and an admin-only diagnostics export route now emits compact redacted JSON evidence bundles for support-oriented sharing without exposing plaintext recovery codes, session material, or filesystem paths.
 - Runtime operations now also flow through shared resource and monitoring boundaries, so sharp concurrency/cache tuning, ffmpeg/ffprobe timeout-plus-kill behavior, stale-heartbeat detection, memory-pressure diagnostics, and prefixed warning logging are owned centrally instead of drifting across workers and route-local command calls.
+- Remaining delivery risk is now concentrated more in deployment-path validation and release closure than in first-pass feature construction.
+- The unchecked start-gate and Phase 0 alignment items are now mostly documentation-governance follow-through, not evidence that the core implementation is still blocked from progressing.
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
 - Embedded PostgreSQL startup, tracked timestamped migrations, bootstrap-admin creation, login/logout/session routes, and allowlisted settings persistence are now implemented.
 - The client now includes first-run bootstrap-admin, login, and protected settings views backed by shared auth and settings API modules.
@@ -164,6 +166,20 @@ Database model source: `docs/DATABASE_MODEL.md`
 - A native Node.js test runner is now wired into the repo, with executable coverage around the shared local metadata search service, local-search workflow modules, the artist and release workflow local-first behaviors, and broader route-level metadata HTTP contracts backed by a shared native HTTP test helper.
 - This file is the operational execution tracker for the initial V1 build.
 
+## Remaining Priority Snapshot (2026-05-03)
+
+Highest-priority remaining product-risk slices:
+
+1. Validate the supported deployment path end to end: fresh install, upgrade, restore preview/apply, and rollback-aware behavior.
+2. Finish the remaining critical-path validation depth: broader integration scenarios, fixture packs, and practical UI end-to-end coverage for the operator workflows already implemented.
+3. Close the remaining runtime/deployment hardening gaps that still affect operability, such as fail-closed startup checks, standard-image FFmpeg verification, and full maintenance-lock pause validation across unsafe background work.
+
+Lower-priority or conditional slices:
+
+- Plex-linked onboarding remains a product-fit feature, but it is not currently on the shortest path to V1 readiness.
+- Personal or integration token flows remain conditional and should not be built unless a concrete non-browser automation need exists.
+- Remaining Phase 0 and start-gate items should be treated as documentation and contract-closure work unless they uncover a real architectural conflict.
+
 ## Component Task Lists
 
 These companion docs break the implementation plan into component-specific execution tracks:
@@ -177,6 +193,9 @@ These companion docs break the implementation plan into component-specific execu
 ## Implementation Start Gate
 
 Before implementation starts in earnest, confirm all of the following:
+
+Status note:
+- Most of these boxes now represent documentation-governance closure rather than true implementation blockers, because the repo has already progressed through Phases 1 to 6 feature delivery and validation work.
 
 - [ ] Review `docs/harmoniarr.md` implementation plan section end to end.
 - [ ] Confirm `docs/SECURITY_POLICY.md` remains the authoritative source for auth, secret handling, and recovery-sensitive controls.
@@ -219,6 +238,9 @@ Parallelizable after contract stabilization:
 
 ## Phase 0 - Prep and Alignment
 
+Status note:
+- These items should now be closed as explicit documentation and policy decisions. They are still important, but they should no longer be treated as prerequisites for the already-shipped implementation slices unless a contradiction is discovered.
+
 - [ ] Confirm V1 scope boundaries in `docs/harmoniarr.md` are accepted with no unresolved blockers.
 - [ ] Record any explicit V1 deferrals or out-of-scope decisions as durable documentation rather than implicit assumptions.
 - [ ] Confirm authoritative docs and ownership boundaries for security, backup/restore, admin recovery, and database model.
@@ -242,6 +264,7 @@ Parallelizable after contract stabilization:
 - [ ] Verify FFmpeg and required media inspection tooling are present in the standard image.
   - A shared `media-tooling-status-service.js` now probes `ffmpeg -version` and `ffprobe -version` and publishes safe availability flags (`ffmpegAvailable`, `ffprobeAvailable`) through the existing dependency-health surface.
   - App composition now includes a `media_tooling` dependency check alongside `slskd`, so system overview and diagnostics can expose tooling readiness before media inspection/transcoding execution paths are enabled.
+  - Remaining work is Docker-path proof that the standard runtime image actually contains and exposes the expected binaries, not just app-level probing support.
 - [x] Update schema snapshot/documentation once the initial migration package is stable.
 
 ## Phase 2 - Auth, Sessions, And Settings Contracts
@@ -406,6 +429,7 @@ Parallelizable after contract stabilization:
   - Added shared `runtime-resource-monitor.js`, wired into startup supervision and system overview, so stale background-work heartbeats plus process RSS/heap pressure are sampled on a bounded interval and reported through prefixed runtime warning logs and operator-visible runtime diagnostics.
   - Hardened `media-command-service.js` around allowlisted no-shell spawn execution, bounded stdout/stderr capture, timeout and abort handling, graceful terminate-plus-escalate behavior, and structured lifecycle logging so stuck ffmpeg/ffprobe child processes fail fast instead of hanging the app indefinitely.
 - [ ] Verify maintenance locks pause unsafe writes and background work consistently.
+  - Integration coverage already exercises many lock-conflict entrypoints, but the remaining gap is whole-system proof that queued or background execution paths also pause predictably during restore or recovery windows.
   - Added shared `maintenance-lock-write-guard-service.js` boundary and wired import-candidate execution/apply/media-inspection/transcode run start services to fail closed with `recovery_lock_conflict` when blocking maintenance locks are active.
   - Extended the same guard to library discovery-dispatch, organize-apply, and scan run-start services so filesystem-affecting/background library workflows now fail closed during active maintenance/recovery locks.
   - Added integration coverage proving active maintenance locks reject import execution, apply, media inspection, and transcode run-start routes with normalized `409 recovery_lock_conflict` failures through the real HTTP and database-backed server graph.
@@ -432,6 +456,8 @@ Parallelizable after contract stabilization:
   - Added first integration coverage for bootstrap/login/refresh/logout session flow, authenticated settings read/update persistence, and maintenance-lock idempotency plus recovery diagnostics against real database state.
   - Tightened the harness with shared suite-level PostgreSQL runtime reuse, per-scenario temporary databases, explicit request and startup/shutdown timeouts, reduced node-postgres pool sizing for integration runs, deterministic container stop/workspace cleanup, and graceful skip behavior when no supported local container runtime or external PostgreSQL admin connection is available.
 - [ ] Expand integration tests for import review, job ownership, and the remaining critical-path route behavior.
+  - The initial integration baseline already covers auth/session, settings, recovery, import-review transitions, operation cancel/retry, job-lease visibility, and lock conflicts.
+  - Remaining expansion should focus on import apply, media/transcode execution, stranded-run recovery, and fresh-install or upgrade-oriented end-to-end scenarios.
   - Added database-backed integration coverage for import review queue list/detail plus hold/select/reject/reopen transitions, with persisted candidate-event evidence verified through the real import-candidate tables.
   - Added database-backed integration coverage for import execution run creation plus operation-history and run-detail lease attachment, proving worker lease ownership shows up through the operator-facing operations API once a run is claimed.
   - Added database-backed integration coverage for operation-run cancel/retry controls, including durable cancellation intent persistence, duplicate-cancel rejection, and failed-run retry rescheduling against the real operations API.
@@ -446,6 +472,12 @@ Parallelizable after contract stabilization:
 - [ ] Validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior.
 - [ ] Finalize Docker artifacts, README/doc index updates, compose examples, and operator setup guidance.
 - [ ] Record V1 no-go conditions, smoke-test checklist, and release sign-off criteria.
+
+Recommended next execution slice:
+
+1. Validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior.
+2. Use that deployment-path work to prove standard-image FFmpeg/tooling presence, fail-closed startup assumptions, migration safety, backup/restore operability, and maintenance-lock behavior under realistic containerized startup conditions.
+3. Treat the remaining fixture-pack, E2E, and release-doc items as the immediate follow-on closure wave once that deployment-path slice is green.
 
 ## Dependencies
 
