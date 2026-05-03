@@ -51,9 +51,21 @@ test('getQueueDiagnostics returns status totals with recent runs', async (t) => 
 });
 
 test('getRecoveryDiagnostics returns maintenance locks, failed runs, and privileged audit actions', async (t) => {
-  const listActiveMaintenanceLocks = t.mock.fn(async () => [{ id: 'lock-1', lockType: 'maintenance' }]);
+  const listActiveMaintenanceLocks = t.mock.fn(async () => [{
+    id: 'lock-1',
+    lockType: 'maintenance',
+    reason: 'Inspect /app/data/backups/backup-1.json with ops@example.com',
+  }]);
   const listRecentOperationRuns = t.mock.fn(async () => ([
-    { id: 'run-failed', status: 'failed', operationType: 'backup_restore_apply', errorMessage: 'failed' },
+    {
+      id: 'run-failed',
+      status: 'failed',
+      operationType: 'backup_restore_apply',
+      errorMessage: 'failed at /mnt/music/library for admin@example.com',
+      summary: {
+        libraryRoot: '/mnt/music/library',
+      },
+    },
     { id: 'run-ok', status: 'completed', operationType: 'backup_restore_apply' },
   ]));
   const listRecentAuditEvents = t.mock.fn(async () => ([
@@ -64,7 +76,11 @@ test('getRecoveryDiagnostics returns maintenance locks, failed runs, and privile
       entityId: 'lock-1',
       occurredAt: '2026-05-02T12:55:00.000Z',
       summary: 'Maintenance lock entered',
-      details: { lockType: 'maintenance' },
+      details: {
+        lockType: 'maintenance',
+        recoveryCodeHash: 'abc123',
+        storagePath: '/app/data/backups/backup-1.json',
+      },
     },
     {
       id: 'audit-2',
@@ -94,8 +110,18 @@ test('getRecoveryDiagnostics returns maintenance locks, failed runs, and privile
   assert.equal(result.maintenance.hasActiveLocks, true);
   assert.equal(result.recentFailedRuns.length, 1);
   assert.equal(result.recentFailedRuns[0].id, 'run-failed');
+  assert.equal(result.recentFailedRuns[0].errorMessage, 'failed at [REDACTED_PATH] for [REDACTED_EMAIL]');
+  assert.deepEqual(result.recentFailedRuns[0].summary, {
+    libraryRoot: '[REDACTED_PATH]',
+  });
   assert.equal(result.recentPrivilegedActions.length, 1);
   assert.equal(result.recentPrivilegedActions[0].eventType, 'maintenance_lock_entered');
+  assert.deepEqual(result.recentPrivilegedActions[0].details, {
+    lockType: 'maintenance',
+    recoveryCodeHash: '[REDACTED]',
+    storagePath: '[REDACTED_PATH]',
+  });
+  assert.equal(result.maintenance.activeLocks[0].reason, 'Inspect [REDACTED_PATH] with [REDACTED_EMAIL]');
   assert.equal(listActiveMaintenanceLocks.mock.callCount(), 1);
   assert.equal(listRecentOperationRuns.mock.callCount(), 1);
   assert.equal(listRecentAuditEvents.mock.callCount(), 1);

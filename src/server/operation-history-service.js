@@ -18,6 +18,7 @@
 
 import { createApiError } from './auth.js';
 import { createAuditReadService } from './audit-read-service.js';
+import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
 import { getPool } from './database.js';
 import { buildJobLeaseKey, createJobLeaseStore } from './job-lease-store.js';
 import {
@@ -44,7 +45,7 @@ function normalizeRunSummary(summary) {
   return summary;
 }
 
-function toOperationRun(row) {
+function toOperationRun(row, controlPlaneRedactionService) {
   if (!row) {
     return null;
   }
@@ -56,7 +57,7 @@ function toOperationRun(row) {
     cancelledAt: row.cancelled_at?.toISOString?.() ?? row.cancelled_at ?? null,
     claimedAt: row.claimed_at?.toISOString?.() ?? row.claimed_at ?? null,
     claimedByInstanceId: row.claimed_by_instance_id ?? null,
-    errorMessage: row.error_message ?? null,
+    errorMessage: controlPlaneRedactionService.redactErrorMessage(row.error_message ?? null),
     finishedAt: row.finished_at?.toISOString?.() ?? row.finished_at ?? null,
     id: row.id,
     maxAttempts: Number.isFinite(row.max_attempts) ? row.max_attempts : null,
@@ -64,13 +65,14 @@ function toOperationRun(row) {
     operationType: row.operation_type,
     startedAt: row.started_at?.toISOString?.() ?? row.started_at ?? null,
     status: row.status,
-    summary: normalizeRunSummary(row.summary),
+    summary: controlPlaneRedactionService.redactOperationSummary(normalizeRunSummary(row.summary)),
     triggeredByUserId: row.triggered_by_user_id ?? null,
   };
 }
 
 export function createOperationHistoryService({
   auditReadService = createAuditReadService(),
+  controlPlaneRedactionService = createControlPlaneRedactionService(),
   getPoolFn = getPool,
   jobLeaseStore = createJobLeaseStore(),
   nowFn = () => new Date(),
@@ -132,7 +134,7 @@ export function createOperationHistoryService({
       [normalizeLimit(limit)],
     );
 
-    return attachLeasesToRuns(result.rows.map(toOperationRun));
+    return attachLeasesToRuns(result.rows.map((row) => toOperationRun(row, controlPlaneRedactionService)));
   }
 
   async function listRecentActivityRuns({ before = null, limit } = {}) {
@@ -176,7 +178,7 @@ export function createOperationHistoryService({
       values,
     );
 
-    return result.rows.map(toOperationRun);
+    return result.rows.map((row) => toOperationRun(row, controlPlaneRedactionService));
   }
 
   async function getOperationRunById(runId) {
@@ -206,7 +208,7 @@ export function createOperationHistoryService({
       [runId],
     );
 
-    const run = toOperationRun(result.rows[0]);
+    const run = toOperationRun(result.rows[0], controlPlaneRedactionService);
 
     if (!run) {
       return null;

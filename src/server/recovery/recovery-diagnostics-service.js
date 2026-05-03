@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { createControlPlaneRedactionService } from '../control-plane-redaction-service.js';
 
 const privilegedRecoveryEventTypes = new Set([
   'backup_restore_started',
@@ -47,6 +48,7 @@ function normalizeLockTypeFilter(lockTypes) {
 }
 
 export function createRecoveryDiagnosticsService({
+  controlPlaneRedactionService = createControlPlaneRedactionService(),
   getPoolFn = getPool,
   listActiveMaintenanceLocks = async () => [],
   listRecentAuditEvents = async () => [],
@@ -104,12 +106,12 @@ export function createRecoveryDiagnosticsService({
       .filter((run) => run?.status === 'failed')
       .slice(0, normalizedAuditLimit)
       .map((run) => ({
-        errorMessage: run.errorMessage ?? null,
+        errorMessage: controlPlaneRedactionService.redactErrorMessage(run.errorMessage ?? null),
         finishedAt: run.finishedAt ?? null,
         id: run.id,
         operationType: run.operationType,
         startedAt: run.startedAt ?? null,
-        summary: run.summary ?? {},
+        summary: controlPlaneRedactionService.redactOperationSummary(run.summary ?? {}),
         triggeredByUserId: run.triggeredByUserId ?? null,
       }));
 
@@ -117,7 +119,7 @@ export function createRecoveryDiagnosticsService({
       .filter((event) => privilegedRecoveryEventTypes.has(event?.eventType))
       .slice(0, normalizedAuditLimit)
       .map((event) => ({
-        details: event.details ?? {},
+        details: controlPlaneRedactionService.redactAuditDetails(event.details),
         entityId: event.entityId ?? null,
         entityType: event.entityType ?? null,
         eventType: event.eventType,
@@ -129,7 +131,7 @@ export function createRecoveryDiagnosticsService({
     return {
       checkedAt: nowFn().toISOString(),
       maintenance: {
-        activeLocks: maintenanceLocks,
+        activeLocks: maintenanceLocks.map((lock) => controlPlaneRedactionService.redactMaintenanceLock(lock)),
         hasActiveLocks: maintenanceLocks.length > 0,
         lockCount: maintenanceLocks.length,
         lockTypes: normalizedLockTypes,

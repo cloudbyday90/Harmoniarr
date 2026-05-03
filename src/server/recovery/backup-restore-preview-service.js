@@ -19,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createApiError } from '../auth.js';
+import { createControlPlaneRedactionService } from '../control-plane-redaction-service.js';
 import { getMigrationStatus } from '../migrations.js';
 import { createBackupEncryptionService } from './backup-encryption-service.js';
 
@@ -131,6 +132,7 @@ function buildMigrationCompatibilityChecks({ backupMigrationLevel, currentMigrat
 }
 
 export function createBackupRestorePreviewService({
+  controlPlaneRedactionService = createControlPlaneRedactionService(),
   getBackupArtifactById = async () => null,
   getMigrationStatusFn = getMigrationStatus,
   listRestoreApplyBlockingLocks = async () => [],
@@ -184,7 +186,7 @@ export function createBackupRestorePreviewService({
         },
         restoreReadiness: {
           blockedByLock: blockingLocks.length > 0,
-          blockingLocks,
+          blockingLocks: blockingLocks.map((lock) => controlPlaneRedactionService.redactMaintenanceLock(lock)),
         },
         canApplyRestore: false,
       };
@@ -292,7 +294,7 @@ export function createBackupRestorePreviewService({
       },
       restoreReadiness: {
         blockedByLock,
-        blockingLocks,
+        blockingLocks: blockingLocks.map((lock) => controlPlaneRedactionService.redactMaintenanceLock(lock)),
       },
       canApplyRestore: integrityPassed && compatibilityPassed && !blockedByLock,
     };

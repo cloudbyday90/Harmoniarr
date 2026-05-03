@@ -22,7 +22,11 @@ import test from 'node:test';
 import { createMaintenanceLockControlService } from '../../src/server/recovery/maintenance-lock-control-service.js';
 
 test('getMaintenanceLockStatus returns active locks with normalized filters', async (t) => {
-  const listActiveMaintenanceLocks = t.mock.fn(async ({ lockTypes }) => [{ id: 'lock-1', lockType: lockTypes[0] }]);
+  const listActiveMaintenanceLocks = t.mock.fn(async ({ lockTypes }) => [{
+    id: 'lock-1',
+    lockType: lockTypes[0],
+    reason: 'Review /mnt/music/library with ops@example.com',
+  }]);
   const service = createMaintenanceLockControlService({ listActiveMaintenanceLocks });
 
   const result = await service.getMaintenanceLockStatus({
@@ -33,6 +37,7 @@ test('getMaintenanceLockStatus returns active locks with normalized filters', as
   assert.equal(result.lockCount, 1);
   assert.equal(result.hasActiveLocks, true);
   assert.deepEqual(result.lockTypes, ['maintenance', 'restore']);
+  assert.equal(result.activeLocks[0].reason, 'Review [REDACTED_PATH] with [REDACTED_EMAIL]');
   assert.equal(listActiveMaintenanceLocks.mock.callCount(), 1);
   assert.deepEqual(listActiveMaintenanceLocks.mock.calls[0].arguments, [{
     lockTypes: ['maintenance', 'restore'],
@@ -44,7 +49,7 @@ test('enterMaintenanceLock validates lock type and records audit event', async (
     id: 'lock-11',
     lockType,
     status: 'active',
-    reason: 'patching',
+    reason: 'patching /app/data/staging',
     expiresAt: null,
   }));
   const recordAuditEventFn = t.mock.fn(async () => {});
@@ -55,7 +60,7 @@ test('enterMaintenanceLock validates lock type and records audit event', async (
 
   const result = await service.enterMaintenanceLock({
     lockType: 'maintenance',
-    reason: 'patching',
+    reason: 'patching /app/data/staging',
     requestMetadata: {
       ipAddress: '198.51.100.41',
       userAgent: 'maintenance-control-test',
@@ -65,6 +70,7 @@ test('enterMaintenanceLock validates lock type and records audit event', async (
 
   assert.equal(result.accepted, true);
   assert.equal(result.lock.id, 'lock-11');
+  assert.equal(result.lock.reason, 'patching [REDACTED_PATH]');
   assert.equal(acquireMaintenanceLock.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].eventType, 'maintenance_lock_entered');
@@ -117,7 +123,7 @@ test('releaseMaintenanceLockById releases active lock and records audit event', 
     id: lockId,
     lockType: 'maintenance',
     status: 'released',
-    reason: 'completed',
+    reason: 'completed /app/data/staging',
     releasedAt: '2026-05-02T12:22:00.000Z',
   }));
   const recordAuditEventFn = t.mock.fn(async () => {});
@@ -139,6 +145,7 @@ test('releaseMaintenanceLockById releases active lock and records audit event', 
   assert.equal(result.accepted, true);
   assert.equal(result.alreadyReleased, false);
   assert.equal(result.lock.id, 'lock-33');
+  assert.equal(result.lock.reason, 'completed [REDACTED_PATH]');
   assert.equal(releaseMaintenanceLock.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].eventType, 'maintenance_lock_released');

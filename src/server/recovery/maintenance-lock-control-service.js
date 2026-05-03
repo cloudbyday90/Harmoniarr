@@ -18,6 +18,7 @@
 
 import { recordAuditEvent } from '../audit.js';
 import { createApiError } from '../auth.js';
+import { createControlPlaneRedactionService } from '../control-plane-redaction-service.js';
 
 const supportedLockTypes = new Set(['admin_recovery', 'maintenance', 'restore', 'upgrade']);
 
@@ -45,6 +46,7 @@ export function createMaintenanceLockControlService({
   },
   getMaintenanceLockById = async () => null,
   listActiveMaintenanceLocks = async () => [],
+  controlPlaneRedactionService = createControlPlaneRedactionService(),
   recordAuditEventFn = recordAuditEvent,
   releaseMaintenanceLock = async () => null,
 } = {}) {
@@ -56,7 +58,7 @@ export function createMaintenanceLockControlService({
 
     return {
       checkedAt: new Date().toISOString(),
-      activeLocks,
+      activeLocks: activeLocks.map((lock) => controlPlaneRedactionService.redactMaintenanceLock(lock)),
       lockCount: activeLocks.length,
       lockTypes: normalizedLockTypes,
       hasActiveLocks: activeLocks.length > 0,
@@ -102,7 +104,7 @@ export function createMaintenanceLockControlService({
 
     return {
       accepted: true,
-      lock,
+      lock: controlPlaneRedactionService.redactMaintenanceLock(lock),
     };
   }
 
@@ -124,7 +126,7 @@ export function createMaintenanceLockControlService({
       return {
         accepted: true,
         alreadyReleased: true,
-        lock: existingLock,
+        lock: controlPlaneRedactionService.redactMaintenanceLock(existingLock),
       };
     }
 
@@ -156,7 +158,7 @@ export function createMaintenanceLockControlService({
     return {
       accepted: true,
       alreadyReleased: false,
-      lock: releasedLock,
+      lock: controlPlaneRedactionService.redactMaintenanceLock(releasedLock),
     };
   }
 

@@ -93,10 +93,60 @@ test('getBackupRestorePreview reports lock conflict and compatibility failure wh
   assert.equal(preview.compatibility.compatible, false);
   assert.equal(preview.restoreReadiness.blockedByLock, true);
   assert.equal(preview.restoreReadiness.blockingLocks.length, 1);
+  assert.equal(preview.restoreReadiness.blockingLocks[0].reason, 'upgrade in progress');
   assert.equal(preview.canApplyRestore, false);
   assert.equal(
     preview.compatibility.checks.some((check) => check.code === 'backup_requires_newer_schema'),
     true,
+  );
+});
+
+test('getBackupRestorePreview redacts blocking lock reason details before returning preview payload', async () => {
+  const serializedBackup = JSON.stringify({
+    formatVersion: '1',
+    backup: {
+      type: 'logical',
+    },
+  });
+
+  const service = createBackupRestorePreviewService({
+    getBackupArtifactById: async () => ({
+      id: 'backup-3',
+      filename: 'harmoniarr_backup_2026-05-03T12-00-00-000Z.json',
+      backupType: 'logical',
+      formatVersion: '1',
+      migrationLevel: 'applied:42',
+      scope: ['settings'],
+      createdAt: '2026-05-03T12:00:00.000Z',
+      createdByUserId: 'user-2',
+      encrypted: false,
+      appVersion: '0.1.0-beta',
+      fileSizeBytes: serializedBackup.length,
+      payloadSha256: 'sha-3',
+      storagePath: '/backups/backup-3.json',
+    }),
+    getMigrationStatusFn: async () => ({
+      applied: 42,
+      pending: [],
+    }),
+    listRestoreApplyBlockingLocks: async () => ([{
+      id: 'lock-2',
+      lockType: 'restore',
+      status: 'active',
+      reason: 'Inspect /app/data/backups/backup-3.json with ops@example.com',
+      acquiredAt: '2026-05-03T12:05:00.000Z',
+      expiresAt: null,
+      acquiredByUserId: 'user-admin',
+    }]),
+    readBackupPayloadFn: async () => serializedBackup,
+    sha256Fn: () => 'sha-3',
+  });
+
+  const preview = await service.getBackupRestorePreview({ backupArtifactId: 'backup-3' });
+
+  assert.equal(
+    preview.restoreReadiness.blockingLocks[0].reason,
+    'Inspect [REDACTED_PATH] with [REDACTED_EMAIL]',
   );
 });
 

@@ -74,3 +74,32 @@ test('audit read service can list events for one entity timeline', async (t) => 
   assert.deepEqual(query.mock.calls[0].arguments[1], ['operation_run', 'run-77', 4]);
   assert.equal(events[0].eventType, 'library_scan_started');
 });
+
+test('audit read service redacts operator-visible sensitive detail fields', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      details: {
+        accessToken: 'secret-token',
+        libraryRoot: '/mnt/music/library',
+        note: 'Email admin@example.com about /app/data/backups/backup-1.json',
+      },
+      entity_id: 'run-90',
+      entity_type: 'operation_run',
+      event_type: 'backup_restore_failed',
+      id: 'audit-90',
+      occurred_at: '2026-05-01T16:25:00.000Z',
+      summary: 'Backup restore failed',
+    }],
+  }));
+  const service = createAuditReadService({
+    getPoolFn: () => ({ query }),
+  });
+
+  const events = await service.listRecentAuditEvents({ limit: 3 });
+
+  assert.deepEqual(events[0].details, {
+    accessToken: '[REDACTED]',
+    libraryRoot: '[REDACTED_PATH]',
+    note: 'Email [REDACTED_EMAIL] about [REDACTED_PATH]',
+  });
+});

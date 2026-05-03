@@ -124,3 +124,43 @@ test('operation history service returns run detail with audit events', async (t)
   assert.equal(payload.run.lease.ownerInstanceId, 'instance-z');
   assert.equal(payload.auditEvents.length, 1);
 });
+
+test('operation history service redacts sensitive run summaries and error messages for operator detail reads', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      attempt_count: 1,
+      error_message: 'Import failed while reading /app/data/staging/tmp-7 for admin@example.com',
+      cancel_requested_at: null,
+      cancel_requested_by_user_id: null,
+      cancelled_at: null,
+      claimed_at: null,
+      claimed_by_instance_id: null,
+      finished_at: '2026-05-01T00:20:00.000Z',
+      id: 'run-12',
+      max_attempts: 2,
+      next_attempt_at: '2026-05-01T00:00:00.000Z',
+      operation_type: 'library_scan',
+      started_at: '2026-05-01T00:00:00.000Z',
+      status: 'failed',
+      summary: {
+        currentStep: 'Scanning /mnt/music/library for import candidates',
+        libraryRoot: '/mnt/music/library',
+      },
+      triggered_by_user_id: 'user-3',
+    }],
+  }));
+  const service = createOperationHistoryService({
+    getPoolFn: () => ({ query }),
+    jobLeaseStore: {
+      listLeases: t.mock.fn(async () => []),
+    },
+  });
+
+  const payload = await service.buildOperationHistory({ limit: 1 });
+
+  assert.equal(payload.runs[0].errorMessage, 'Import failed while reading [REDACTED_PATH] for [REDACTED_EMAIL]');
+  assert.deepEqual(payload.runs[0].summary, {
+    currentStep: 'Scanning [REDACTED_PATH] for import candidates',
+    libraryRoot: '[REDACTED_PATH]',
+  });
+});

@@ -17,15 +17,16 @@
  */
 
 import { getPool } from './database.js';
+import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
 import {
   decodeTimelineCursor,
   normalizeTimelinePageLimit,
   resolveTimelineCursorOccurredAt,
 } from './timeline-pagination.js';
 
-function toAuditEvent(row) {
+function toAuditEvent(row, controlPlaneRedactionService) {
   return {
-    details: row.details ?? {},
+    details: controlPlaneRedactionService.redactAuditDetails(row.details),
     entityId: row.entity_id,
     entityType: row.entity_type,
     eventType: row.event_type,
@@ -64,6 +65,7 @@ function buildAuditWhereClause({ actorUserId = null, entityId = null, entityType
 
 export function createAuditReadService({
   getPoolFn = getPool,
+  controlPlaneRedactionService = createControlPlaneRedactionService(),
 } = {}) {
   async function listRecentAuditEvents({ actorUserId = null, before = null, limit = 10 } = {}) {
     const normalizedLimit = normalizeTimelinePageLimit(limit, { defaultLimit: 10, maxLimit: 25 });
@@ -96,7 +98,7 @@ export function createAuditReadService({
       values,
     );
 
-    return result.rows.map(toAuditEvent);
+    return result.rows.map((row) => toAuditEvent(row, controlPlaneRedactionService));
   }
 
   async function listAuditEventsForEntity({ entityId, entityType, limit = 10 } = {}) {
@@ -123,7 +125,7 @@ export function createAuditReadService({
       values,
     );
 
-    return result.rows.map(toAuditEvent);
+    return result.rows.map((row) => toAuditEvent(row, controlPlaneRedactionService));
   }
 
   return {
