@@ -4,6 +4,7 @@ import { createImportCandidateExecutionRunStore } from '../../src/server/import-
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
 import { seedImportCandidateFixture } from '../../testing/integration/import-candidate-fixtures.js';
+import { enterMaintenanceLock } from '../../testing/integration/recovery-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -245,16 +246,9 @@ suite('integration import review and operations routes', () => {
     await integrationRuntime.runScenario(async ({ client }) => {
       await bootstrapAdminSession(client);
 
-      const lockResponse = await client.requestJson('/api/v1/recovery/maintenance-locks', {
-        csrf: true,
-        headers: {
-          'idempotency-key': 'import-lock-guard-1',
-        },
-        json: {
-          lockType: 'maintenance',
-          reason: 'Pause unsafe import workflow writes',
-        },
-        method: 'POST',
+      const lockResponse = await enterMaintenanceLock(client, {
+        idempotencyKey: 'import-lock-guard-1',
+        reason: 'Pause unsafe import workflow writes',
       });
       assert.equal(lockResponse.response.status, 202);
 

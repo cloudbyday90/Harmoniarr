@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
+import { enterMaintenanceLock, releaseMaintenanceLock } from '../../testing/integration/recovery-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -193,16 +194,8 @@ suite('integration auth, settings, and recovery routes', () => {
     await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
       await bootstrapAdminSession(client);
 
-      const firstEnter = await client.requestJson('/api/v1/recovery/maintenance-locks', {
-        csrf: true,
-        headers: {
-          'idempotency-key': 'integration-lock-enter-1',
-        },
-        json: {
-          lockType: 'maintenance',
-          reason: 'Integration test maintenance window',
-        },
-        method: 'POST',
+      const firstEnter = await enterMaintenanceLock(client, {
+        idempotencyKey: 'integration-lock-enter-1',
       });
 
       assert.equal(firstEnter.response.status, 202);
@@ -211,16 +204,8 @@ suite('integration auth, settings, and recovery routes', () => {
       assert.equal(firstEnter.payload.lock.status, 'active');
       const lockId = firstEnter.payload.lock.id;
 
-      const replayedEnter = await client.requestJson('/api/v1/recovery/maintenance-locks', {
-        csrf: true,
-        headers: {
-          'idempotency-key': 'integration-lock-enter-1',
-        },
-        json: {
-          lockType: 'maintenance',
-          reason: 'Integration test maintenance window',
-        },
-        method: 'POST',
+      const replayedEnter = await enterMaintenanceLock(client, {
+        idempotencyKey: 'integration-lock-enter-1',
       });
 
       assert.equal(replayedEnter.response.status, 202);
@@ -247,12 +232,8 @@ suite('integration auth, settings, and recovery routes', () => {
         true,
       );
 
-      const releaseResponse = await client.requestJson(`/api/v1/recovery/maintenance-locks/${lockId}/release`, {
-        csrf: true,
-        headers: {
-          'idempotency-key': 'integration-lock-release-1',
-        },
-        method: 'POST',
+      const releaseResponse = await releaseMaintenanceLock(client, lockId, {
+        idempotencyKey: 'integration-lock-release-1',
       });
 
       assert.equal(releaseResponse.response.status, 200);

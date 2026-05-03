@@ -14,6 +14,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Validation infrastructure now includes native ESM ESLint flat-config coverage across server, shared, client, scripts, and tests, plus segmented native `node:test` entrypoints for `server`, `client`, `scripts`, and `integration` slices.
 - The integration harness now reuses one bounded PostgreSQL runtime per suite, isolates each scenario into its own temporary database, applies explicit startup/request/shutdown timeouts plus small pool limits, and skips cleanly with a concrete message when neither external PostgreSQL nor a supported container runtime is available locally.
 - Integration coverage now also exercises import-review route transitions, import execution run creation, operation-history lease visibility, and import-run maintenance-lock conflicts against the real static ESM server graph plus temporary PostgreSQL state.
+- Integration coverage now also exercises operator-driven operation-run cancel/retry controls plus library discovery, organize, and scan maintenance-lock conflicts through the real HTTP and database-backed server graph, with shared fixture helpers for operation runs and recovery lock actions.
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
 - Embedded PostgreSQL startup, tracked timestamped migrations, bootstrap-admin creation, login/logout/session routes, and allowlisted settings persistence are now implemented.
 - The client now includes first-run bootstrap-admin, login, and protected settings views backed by shared auth and settings API modules.
@@ -395,6 +396,7 @@ Parallelizable after contract stabilization:
   - Added shared `maintenance-lock-write-guard-service.js` boundary and wired import-candidate execution/apply/media-inspection/transcode run start services to fail closed with `recovery_lock_conflict` when blocking maintenance locks are active.
   - Extended the same guard to library discovery-dispatch, organize-apply, and scan run-start services so filesystem-affecting/background library workflows now fail closed during active maintenance/recovery locks.
   - Added integration coverage proving active maintenance locks reject import execution, apply, media inspection, and transcode run-start routes with normalized `409 recovery_lock_conflict` failures through the real HTTP and database-backed server graph.
+  - Added matching integration coverage proving active maintenance locks also reject library discovery, organize, and scan run-start routes with the same normalized `409 recovery_lock_conflict` contract.
 - [x] Add frontend surfaces for backup/export, restore preview/apply, maintenance state, and diagnostics history.
   - Added shared recovery API client module (`src/client/lib/recovery-api.js`) with `fetchRecoveryStatus()` and `completeRecovery()` thin wrappers over the base `apiRequest` helper.
   - Added `useRecoveryStatus` composable (`src/client/composables/useRecoveryStatus.js`) with reactive status polling (10s interval), computed expiry countdown, lock-blocked detection, remaining-attempts tracking, and completion submission with DI-injected API functions for testability.
@@ -419,6 +421,8 @@ Parallelizable after contract stabilization:
 - [ ] Expand integration tests for import review, job ownership, and the remaining critical-path route behavior.
   - Added database-backed integration coverage for import review queue list/detail plus hold/select/reject/reopen transitions, with persisted candidate-event evidence verified through the real import-candidate tables.
   - Added database-backed integration coverage for import execution run creation plus operation-history and run-detail lease attachment, proving worker lease ownership shows up through the operator-facing operations API once a run is claimed.
+  - Added database-backed integration coverage for operation-run cancel/retry controls, including durable cancellation intent persistence, duplicate-cancel rejection, and failed-run retry rescheduling against the real operations API.
+  - Added shared ESM integration helpers for seeding `operation_runs` state and for entering/releasing maintenance locks so future critical-path suites can reuse the same test boundaries instead of embedding route-local setup.
 - [x] Add route-contract tests for normalized success/error payloads and permission enforcement.
 - [x] Keep ESM-only enforcement active in validation and CI so new CommonJS patterns do not regress into runtime code or scripts.
 - [x] Add migration replay and schema snapshot validation.
