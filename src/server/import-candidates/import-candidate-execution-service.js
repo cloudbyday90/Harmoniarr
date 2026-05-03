@@ -21,6 +21,7 @@ import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createImportCandidateExecutionService({
+  assertMaintenanceWriteAllowed = async () => {},
   createOperationRun = async () => {
     throw new Error('createOperationRun dependency is required');
   },
@@ -33,6 +34,8 @@ export function createImportCandidateExecutionService({
   const operationDescriptor = operationRunRegistry.importCandidateExecutionPlanning;
 
   async function startImportCandidateExecutionRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'import_candidate_execution_in_progress', 'An import execution planning run is already running or queued');

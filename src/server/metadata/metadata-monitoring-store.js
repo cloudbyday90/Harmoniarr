@@ -164,11 +164,74 @@ export function createMetadataMonitoringStore({
     }));
   }
 
+  async function listArtistMonitoringSnapshot() {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT metadata_artist_id, is_monitored, monitored_release_group_types, last_refreshed_at, next_refresh_at
+        FROM metadata_artist_monitoring
+        ORDER BY metadata_artist_id ASC
+      `,
+    );
+
+    return result.rows.map((row) => ({
+      isMonitored: row.is_monitored,
+      lastRefreshedAt: normalizeDateValue(row.last_refreshed_at),
+      metadataArtistId: row.metadata_artist_id,
+      monitoredReleaseGroupTypes: row.monitored_release_group_types ?? ['album', 'ep'],
+      nextRefreshAt: normalizeDateValue(row.next_refresh_at),
+    }));
+  }
+
+  async function replaceArtistMonitoringSnapshot({ artistMonitoring = [] } = {}) {
+    const pool = getPoolFn();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM metadata_artist_monitoring');
+
+      for (const row of artistMonitoring) {
+        await client.query(
+          `
+            INSERT INTO metadata_artist_monitoring (
+              metadata_artist_id,
+              is_monitored,
+              monitored_release_group_types,
+              last_refreshed_at,
+              next_refresh_at,
+              updated_at
+            )
+            VALUES ($1, $2, $3::text[], $4::timestamptz, $5::timestamptz, NOW())
+          `,
+          [
+            row.metadataArtistId,
+            row.isMonitored === true,
+            Array.isArray(row.monitoredReleaseGroupTypes) && row.monitoredReleaseGroupTypes.length > 0
+              ? row.monitoredReleaseGroupTypes
+              : ['album', 'ep'],
+            row.lastRefreshedAt ?? null,
+            row.nextRefreshAt ?? null,
+          ],
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   return {
     clearArtistRefreshSchedule,
     getArtistMonitoring,
+    listArtistMonitoringSnapshot,
     listArtistsDueForRefresh,
     recordArtistRefresh,
+    replaceArtistMonitoringSnapshot,
     scheduleArtistRefresh,
     upsertArtistMonitoring,
   };

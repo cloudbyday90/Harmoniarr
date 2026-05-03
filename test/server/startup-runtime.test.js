@@ -46,6 +46,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       callOrder.push('stop:queue');
     },
   };
+  const idempotencyRecordCleanupHeartbeat = {
+    start() {
+      callOrder.push('start:idempotency-cleanup');
+    },
+    async stop() {
+      callOrder.push('stop:idempotency-cleanup');
+    },
+  };
   const operationStrandedRunRecoveryService = {
     recoverStrandedRuns: async () => ({
       activeLeaseCount: 0,
@@ -145,6 +153,12 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         metadataArtistRefreshWorker: {
           startWorkerRun: async () => {},
         },
+      },
+      systemModule: {
+        dependencyHealthService: {
+          getDependencyHealth: async () => [],
+        },
+        idempotencyRecordCleanupHeartbeat,
       },
     }),
     createImportCandidateExecutionHeartbeat: (options) => {
@@ -248,7 +262,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   assert.equal(runtime.libraryDiscoveryHeartbeat, libraryDiscoveryHeartbeat);
   assert.equal(runtime.importExecutionHeartbeat, importExecutionHeartbeat);
   assert.equal(runtime.metadataRefreshHeartbeat, metadataRefreshHeartbeat);
-  assert.deepEqual(registeredServices, [operationQueueDispatcher, metadataRefreshHeartbeat, libraryDiscoveryHeartbeat, importExecutionHeartbeat]);
+  assert.deepEqual(registeredServices, [operationQueueDispatcher, metadataRefreshHeartbeat, libraryDiscoveryHeartbeat, importExecutionHeartbeat, idempotencyRecordCleanupHeartbeat]);
   assert.deepEqual(callOrder, [
     'bootstrapSchema',
     'migrations',
@@ -259,6 +273,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:metadata',
     'start:library',
     'start:import',
+    'start:idempotency-cleanup',
   ]);
   assert.deepEqual(stdoutWrites, [
     '[harmoniarr] loaded schema snapshot from schema.sql\n',
@@ -278,7 +293,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:metadata',
     'start:library',
     'start:import',
+    'start:idempotency-cleanup',
     'shutdown',
+    'stop:idempotency-cleanup',
     'stop:import',
     'stop:library',
     'stop:metadata',
@@ -373,6 +390,15 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         },
         metadataArtistRefreshWorker: {
           startWorkerRun: async () => {},
+        },
+      },
+      systemModule: {
+        dependencyHealthService: {
+          getDependencyHealth: async () => [],
+        },
+        idempotencyRecordCleanupHeartbeat: {
+          start() {},
+          async stop() {},
         },
       },
     }),

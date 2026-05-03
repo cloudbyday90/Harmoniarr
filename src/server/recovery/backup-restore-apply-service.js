@@ -21,6 +21,8 @@ import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
 import { createOperationRunStore } from '../operation-run-store.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
+import { createBackupEncryptionService } from './backup-encryption-service.js';
+import { createBackupRestoreScopeApplyService } from './backup-restore-scope-apply-service.js';
 
 function toSafeBackupArtifact(artifact) {
   return {
@@ -33,16 +35,10 @@ function toSafeBackupArtifact(artifact) {
     createdAt: artifact.createdAt,
     createdByUserId: artifact.createdByUserId,
     encrypted: artifact.encrypted,
+    encryptionKeyFingerprint: artifact.encryptionKeyFingerprint ?? null,
     appVersion: artifact.appVersion,
     fileSizeBytes: artifact.fileSizeBytes,
     payloadSha256: artifact.payloadSha256,
-  };
-}
-
-function toRestoreResult({ settingsUpdated }) {
-  return {
-    appliedScopes: settingsUpdated ? ['settings'] : [],
-    settingsUpdated,
   };
 }
 
@@ -68,11 +64,16 @@ export function createBackupRestoreApplyService({
   markRunFailed = null,
   markRunStarted = null,
   readBackupPayloadFn = (storagePath) => readFile(storagePath, 'utf8'),
+  replaceOverridesSnapshot = async () => {},
+  replaceLibraryWantedReleases = async () => {},
+  replaceMetadataArtistMonitoring = async () => {},
+  replaceTrustSnapshot = async () => {},
   recordAuditEventFn = recordAuditEvent,
   releaseMaintenanceLock = async () => null,
   updateSettingsFn = async () => {
     throw new Error('updateSettingsFn dependency is required');
   },
+  backupEncryptionService = createBackupEncryptionService(),
 } = {}) {
   const operationDescriptor = operationRunRegistry.backupRestoreApply;
   const operationRunStore = createOperationRun || markRunCompleted || markRunFailed || markRunStarted || getOperationRunById
@@ -89,19 +90,13 @@ export function createBackupRestoreApplyService({
     throw new Error('Operation run dependencies are required');
   }
 
-  async function applySettingsScope({ requestMetadata, restorePayloadSettings, triggeredByUserId }) {
-    if (!restorePayloadSettings || typeof restorePayloadSettings !== 'object' || Array.isArray(restorePayloadSettings)) {
-      throw createApiError(409, 'backup_restore_payload_invalid', 'Backup restore payload does not contain a valid settings scope');
-    }
-
-    await updateSettingsFn({
-      patch: restorePayloadSettings,
-      actorUserId: triggeredByUserId,
-      requestMetadata,
-    });
-
-    return toRestoreResult({ settingsUpdated: true });
-  }
+  const backupRestoreScopeApplyService = createBackupRestoreScopeApplyService({
+    replaceOverridesSnapshot,
+    replaceLibraryWantedReleases,
+    replaceMetadataArtistMonitoring,
+    replaceTrustSnapshot,
+    updateSettingsFn,
+  });
 
   async function startBackupRestoreApply({
     backupArtifactId,
@@ -179,19 +174,30 @@ export function createBackupRestoreApplyService({
       }
 
       const serializedPayload = await readBackupPayloadFn(artifact.storagePath);
+      const decryptionResult = backupEncryptionService.detectAndDecrypt(serializedPayload);
+
+      if (decryptionResult.encrypted && !backupEncryptionService.isEncryptionAvailable()) {
+        throw createApiError(409, 'backup_restore_encrypted_no_key', 'Backup artifact is encrypted but no decryption key is configured');
+      }
+
       let parsedPayload = null;
 
       try {
-        parsedPayload = JSON.parse(serializedPayload);
+        parsedPayload = JSON.parse(decryptionResult.decrypted);
       } catch {
         throw createApiError(409, 'backup_restore_payload_invalid', 'Backup restore payload is not valid JSON');
       }
 
-      const restoreResult = await applySettingsScope({
+      const restoreResult = await backupRestoreScopeApplyService.applyRestoreScopes({
+        artifactScope: artifact.scope,
+        parsedPayload,
         requestMetadata,
-        restorePayloadSettings: parsedPayload?.data?.settings,
         triggeredByUserId,
       });
+
+      if (restoreResult.appliedScopes.length === 0) {
+        throw createApiError(409, 'backup_restore_scope_payload_missing', 'Backup restore payload does not include any supported scope payloads');
+      }
 
       await markCompleted({
         runId: run.id,

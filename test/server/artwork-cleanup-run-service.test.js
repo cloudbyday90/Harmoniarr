@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createArtworkCleanupRunService } from '../../src/server/artwork/artwork-cleanup-run-service.js';
 
 test('startArtworkCleanupRun queues a cleanup run for eligible unassigned artwork', async (t) => {
@@ -65,5 +66,18 @@ test('startArtworkCleanupRun rejects when no cleanup candidates are retention-el
   await assert.rejects(
     () => service.startArtworkCleanupRun(),
     (error) => error.code === 'artwork_cleanup_not_ready',
+  );
+});
+
+test('startArtworkCleanupRun rejects when maintenance lock blocks unsafe writes', async () => {
+  const service = createArtworkCleanupRunService({
+    assertMaintenanceWriteAllowed: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents artwork cleanup');
+    },
+  });
+
+  await assert.rejects(
+    () => service.startArtworkCleanupRun(),
+    (error) => error.code === 'recovery_lock_conflict',
   );
 });

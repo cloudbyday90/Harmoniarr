@@ -21,6 +21,7 @@ import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createImportCandidateMediaInspectionService({
+  assertMaintenanceWriteAllowed = async () => {},
   createOperationRun = async () => {
     throw new Error('createOperationRun dependency is required');
   },
@@ -33,6 +34,8 @@ export function createImportCandidateMediaInspectionService({
   const operationDescriptor = operationRunRegistry.importCandidateMediaInspection;
 
   async function startImportCandidateMediaInspectionRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'import_candidate_media_inspection_in_progress', 'A media inspection run is already running or queued');

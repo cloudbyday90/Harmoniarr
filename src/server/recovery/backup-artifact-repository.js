@@ -38,6 +38,7 @@ function normalizeArtifact(row) {
     createdAt: row.created_at?.toISOString?.() ?? row.created_at ?? null,
     createdByUserId: row.created_by_user_id ?? null,
     encrypted: row.encrypted,
+    encryptionKeyFingerprint: row.encryption_key_fingerprint ?? null,
     fileSizeBytes: Number.isFinite(row.file_size_bytes) ? row.file_size_bytes : null,
     filename: row.filename,
     formatVersion: row.format_version,
@@ -58,6 +59,7 @@ export function createBackupArtifactRepository({
     backupType = 'logical',
     createdByUserId = null,
     encrypted = false,
+    encryptionKeyFingerprint = null,
     fileSizeBytes,
     filename,
     formatVersion,
@@ -74,6 +76,7 @@ export function createBackupArtifactRepository({
           filename,
           backup_type,
           encrypted,
+          encryption_key_fingerprint,
           format_version,
           app_version,
           migration_level,
@@ -84,13 +87,14 @@ export function createBackupArtifactRepository({
           storage_path,
           manifest_json
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12::jsonb)
-        RETURNING id, filename, backup_type, encrypted, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13::jsonb)
+        RETURNING id, filename, backup_type, encrypted, encryption_key_fingerprint, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
       `,
       [
         filename,
         backupType,
         encrypted,
+        encryptionKeyFingerprint,
         formatVersion,
         appVersion,
         migrationLevel,
@@ -110,7 +114,7 @@ export function createBackupArtifactRepository({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        SELECT id, filename, backup_type, encrypted, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
+        SELECT id, filename, backup_type, encrypted, encryption_key_fingerprint, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
         FROM backup_artifacts
         ORDER BY created_at DESC
         LIMIT $1
@@ -125,7 +129,7 @@ export function createBackupArtifactRepository({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        SELECT id, filename, backup_type, encrypted, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
+        SELECT id, filename, backup_type, encrypted, encryption_key_fingerprint, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
         FROM backup_artifacts
         WHERE id = $1
         LIMIT 1
@@ -136,8 +140,23 @@ export function createBackupArtifactRepository({
     return normalizeArtifact(result.rows[0]);
   }
 
+  async function deleteBackupArtifactById({ backupArtifactId }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        DELETE FROM backup_artifacts
+        WHERE id = $1
+        RETURNING id, filename, backup_type, encrypted, encryption_key_fingerprint, format_version, app_version, migration_level, scope_json, payload_sha256, file_size_bytes, created_by_user_id, storage_path, manifest_json, created_at
+      `,
+      [backupArtifactId],
+    );
+
+    return normalizeArtifact(result.rows[0]);
+  }
+
   return {
     createBackupArtifact,
+    deleteBackupArtifactById,
     getBackupArtifactById,
     listBackupArtifacts,
   };

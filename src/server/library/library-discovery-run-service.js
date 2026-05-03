@@ -21,6 +21,7 @@ import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createLibraryDiscoveryRunService({
+  assertMaintenanceWriteAllowed = async () => {},
   createOperationRun = async () => {
     throw new Error('createOperationRun dependency is required');
   },
@@ -34,6 +35,8 @@ export function createLibraryDiscoveryRunService({
     triggerSource = 'manual',
     triggeredByUserId = null,
   } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'library_discovery_in_progress', 'A library discovery dispatch is already running or queued');

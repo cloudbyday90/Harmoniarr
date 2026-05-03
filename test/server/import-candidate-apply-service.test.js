@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createImportCandidateApplyService } from '../../src/server/import-candidates/import-candidate-apply-service.js';
 
 test('startImportCandidateApplyRun queues a run for ready import-pending candidates', async (t) => {
@@ -57,5 +58,18 @@ test('startImportCandidateApplyRun rejects when nothing import-pending is execut
   await assert.rejects(
     () => service.startImportCandidateApplyRun(),
     (error) => error.code === 'import_candidate_apply_not_ready',
+  );
+});
+
+test('startImportCandidateApplyRun rejects when maintenance lock blocks unsafe writes', async () => {
+  const service = createImportCandidateApplyService({
+    assertMaintenanceWriteAllowed: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents import candidate apply');
+    },
+  });
+
+  await assert.rejects(
+    () => service.startImportCandidateApplyRun(),
+    (error) => error.code === 'recovery_lock_conflict',
   );
 });

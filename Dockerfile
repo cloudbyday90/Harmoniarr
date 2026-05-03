@@ -65,8 +65,9 @@ RUN npm ci --omit=dev
 COPY --from=client-builder /build/dist/client ./client-dist/
 COPY --from=server-builder /build/dist/server ./server-dist/
 COPY docker/entrypoint.sh /usr/local/bin/harmoniarr-entrypoint
+COPY docker/harmoniarrctl /usr/local/bin/harmoniarrctl
 
-RUN chmod 0755 /usr/local/bin/harmoniarr-entrypoint
+RUN chmod 0755 /usr/local/bin/harmoniarr-entrypoint /usr/local/bin/harmoniarrctl
 
 USER harmoniarr
 

@@ -63,6 +63,8 @@ import { createLibraryWantedSummaryService } from './library-wanted-summary-serv
 import { createLibraryWantedSummaryStore } from './library-wanted-summary-store.js';
 import { createLibraryScanWorker } from './library-scan-worker.js';
 import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
+import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
+import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 
 export function createLibraryModule({
   artworkAssignmentService = null,
@@ -90,12 +92,18 @@ export function createLibraryModule({
     providerIngestRequestStore: libraryProviderIngestRequestStore,
   }),
   libraryExternalIntakeService = createLibraryExternalIntakeService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library external intake planning',
+    }),
     createOperationRun: libraryExternalIntakeRunStore.createOperationRun,
     getActiveRunByMediaRequestId: libraryExternalIntakeRunStore.getActiveRunByMediaRequestId,
     mediaRequestStore: libraryMediaRequestStore,
   }),
   libraryProviderIngestExecutionRunStore = createLibraryProviderIngestExecutionRunStore(),
   libraryProviderIngestExecutionService = createLibraryProviderIngestExecutionService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library provider ingest execution',
+    }),
     executionRunStore: libraryProviderIngestExecutionRunStore,
     mediaRequestStore: libraryMediaRequestStore,
     providerIngestRequestStore: libraryProviderIngestRequestStore,
@@ -136,6 +144,9 @@ export function createLibraryModule({
   }),
   libraryOrganizeApplyRunStore = createLibraryOrganizeApplyRunStore(),
   libraryOrganizeApplyService = createLibraryOrganizeApplyService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library organize apply',
+    }),
     buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
     createOperationRun: libraryOrganizeApplyRunStore.createOperationRun,
     getActiveRun: libraryOrganizeApplyRunStore.getActiveRun,
@@ -170,6 +181,10 @@ export function createLibraryModule({
   libraryWantedReleaseService = createLibraryWantedReleaseService({
     libraryWantedReleaseStore,
   }),
+  maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+  }),
   libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState(),
   libraryDiscoveryRunStore = createLibraryDiscoveryRunStore(),
   libraryDiscoveryWorker = createLibraryDiscoveryWorker({
@@ -186,6 +201,9 @@ export function createLibraryModule({
     renewLease: libraryDiscoveryRunStore.renewLease,
   }),
   libraryDiscoveryRunService = createLibraryDiscoveryRunService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library discovery dispatch',
+    }),
     createOperationRun: libraryDiscoveryRunStore.createOperationRun,
     getActiveRun: libraryDiscoveryRunStore.getActiveRun,
   }),
@@ -231,6 +249,9 @@ export function createLibraryModule({
     renewLease: libraryScanRunStore.renewLease,
   }),
   libraryScanService = createLibraryScanService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library scan',
+    }),
     createOperationRun: libraryScanRunStore.createOperationRun,
     getActiveRun: libraryScanRunStore.getActiveRun,
     settingsService,

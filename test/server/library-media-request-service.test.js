@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createLibraryMediaRequestService } from '../../src/server/library/library-media-request-service.js';
 
 test('createLibraryMediaRequestService marks matched local releases as already existing media', async (t) => {
@@ -179,5 +180,43 @@ test('createLibraryMediaRequestService rejects invalid request payloads before p
       payload: { requestKind: 'release', artistName: 'Daft Punk' },
     }),
     (error) => error?.code === 'validation_error',
+  );
+});
+
+test('createLibraryMediaRequestService preserves lock conflicts from external intake planning', async () => {
+  const service = createLibraryMediaRequestService({
+    externalIntakeService: {
+      queueExternalMediaRequestPlanning: async () => {
+        throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents library external intake planning');
+      },
+    },
+    mediaRequestStore: {
+      createMediaRequest: async () => ({
+        id: 'request-9',
+        requestKind: 'external_url',
+        requestState: 'needs_fetch',
+        sourceUrl: 'https://open.spotify.com/playlist/12345',
+      }),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.createMediaRequest({
+      actorUserId: 'user-9',
+      payload: {
+        requestKind: 'external_url',
+        sourceUrl: 'https://open.spotify.com/playlist/12345',
+      },
+    }),
+    (error) => error.code === 'recovery_lock_conflict',
   );
 });

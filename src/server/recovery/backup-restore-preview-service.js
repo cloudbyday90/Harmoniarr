@@ -20,6 +20,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createApiError } from '../auth.js';
 import { getMigrationStatus } from '../migrations.js';
+import { createBackupEncryptionService } from './backup-encryption-service.js';
 
 function toIsoDate(value) {
   return value?.toISOString?.() ?? value ?? null;
@@ -136,6 +137,7 @@ export function createBackupRestorePreviewService({
   nowFn = () => new Date(),
   readBackupPayloadFn = (storagePath) => readFile(storagePath, 'utf8'),
   sha256Fn = createPayloadSha256,
+  backupEncryptionService = createBackupEncryptionService(),
 } = {}) {
   async function getBackupRestorePreview({ backupArtifactId }) {
     const artifact = await getBackupArtifactById({ backupArtifactId });
@@ -155,7 +157,42 @@ export function createBackupRestorePreviewService({
       throw createApiError(500, 'backup_artifact_unreadable', 'Backup artifact could not be read');
     }
 
-    const actualPayloadSha256 = sha256Fn(serializedPayload);
+    const decryptionResult = backupEncryptionService.detectAndDecrypt(serializedPayload);
+
+    if (decryptionResult.encrypted && !backupEncryptionService.isEncryptionAvailable()) {
+      checks.push({
+        code: 'payload_encrypted_no_key',
+        status: 'failed',
+        message: 'Backup artifact is encrypted but no decryption key is configured.',
+      });
+
+      const blockingLocks = await listRestoreApplyBlockingLocks();
+
+      return {
+        checkedAt: toIsoDate(nowFn()),
+        backupArtifact: toSafeBackupArtifact(artifact),
+        integrity: {
+          status: 'failed',
+          expectedPayloadSha256: artifact.payloadSha256 ?? null,
+          actualPayloadSha256: null,
+        },
+        compatibility: {
+          compatible: false,
+          backupMigrationLevel: artifact.migrationLevel,
+          currentMigrationLevel: null,
+          checks,
+        },
+        restoreReadiness: {
+          blockedByLock: blockingLocks.length > 0,
+          blockingLocks,
+        },
+        canApplyRestore: false,
+      };
+    }
+
+    const plaintextPayload = decryptionResult.decrypted;
+
+    const actualPayloadSha256 = sha256Fn(plaintextPayload);
     const expectedPayloadSha256 = artifact.payloadSha256 ?? null;
     if (!expectedPayloadSha256) {
       checks.push({
@@ -179,7 +216,7 @@ export function createBackupRestorePreviewService({
 
     let parsedPayload = null;
     try {
-      parsedPayload = JSON.parse(serializedPayload);
+      parsedPayload = JSON.parse(plaintextPayload);
       checks.push({
         code: 'payload_json_parseable',
         status: 'passed',

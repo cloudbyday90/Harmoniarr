@@ -42,7 +42,7 @@ function toCounts(settingsSnapshot = {}) {
 }
 
 export function createBackupManifestService() {
-  function buildLogicalManifest({ appVersion = null, exportedAt, migrationLevel = null, settingsSnapshot = {} }) {
+  function buildLogicalManifest({ appVersion = null, encrypted = false, exportedAt, migrationLevel = null, settingsSnapshot = {} }) {
     return {
       application: {
         name: 'harmoniarr',
@@ -53,7 +53,7 @@ export function createBackupManifestService() {
         interactiveAuthIncluded: false,
       },
       backup: {
-        encrypted: false,
+        encrypted,
         scope: logicalBackupScopes,
         type: 'logical',
       },

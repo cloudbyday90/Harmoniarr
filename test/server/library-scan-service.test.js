@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createLibraryScanService } from '../../src/server/library/library-scan-service.js';
 
 test('createLibraryScanService blocks new runs when shared path validation is not healthy', async () => {
@@ -79,4 +80,32 @@ test('createLibraryScanService persists a pending run for durable dispatch when 
       triggeredByUserId: 'user-7',
     },
   });
+});
+
+test('createLibraryScanService rejects when maintenance lock blocks unsafe writes', async () => {
+  const service = createLibraryScanService({
+    assertMaintenanceWriteAllowed: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents library scan');
+    },
+    settingsService: {
+      buildSettingsPayload: async () => ({
+        settings: {
+          paths: {
+            music: '/srv/music',
+          },
+        },
+        pathValidation: {
+          summary: {
+            status: 'healthy',
+            message: 'Validated',
+          },
+        },
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => service.startLibraryScan(),
+    (error) => error.code === 'recovery_lock_conflict',
+  );
 });

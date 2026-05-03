@@ -62,7 +62,9 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 ## Route Family 3 - Health, Readiness, And Diagnostics
 
 - [x] Define anonymous vs authenticated health surfaces.
-- [ ] Define authenticated diagnostics routes for queue state, maintenance locks, recent failures, and privileged action history.
+- [x] Define authenticated diagnostics routes for queue state, maintenance locks, recent failures, and privileged action history.
+	- Added guarded queue diagnostics read route `GET /api/v1/system/diagnostics/queue-state` returning tracked pending/running/failed queue state plus recent operation runs.
+	- Added guarded recovery diagnostics read route `GET /api/v1/system/diagnostics/recovery-state` returning maintenance lock state, recent failed runs, and recent recovery privileged actions.
 - [ ] Define redaction rules for diagnostics exports and operator-visible payloads.
 - [x] Define dependency-health classification for slskd and metadata provider failures.
 - [x] Define authenticated slskd discovery route contracts for status, search start, search state, and search response reads with normalized provider errors.
@@ -88,12 +90,18 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 
 ## Route Family 6 - Backup, Restore, Maintenance, And Admin Recovery
 
-- [ ] Define backup/export create, list, inspect, download, and delete routes.
-	- Added guarded create, list, and inspect routes for backup artifacts via `POST /api/v1/recovery/backups`, `GET /api/v1/recovery/backups`, and `GET /api/v1/recovery/backups/:backupArtifactId`; download and delete routes remain pending.
+- [x] Define backup/export create, list, inspect, download, and delete routes.
+	- Added guarded create, list, and inspect routes for backup artifacts via `POST /api/v1/recovery/backups`, `GET /api/v1/recovery/backups`, and `GET /api/v1/recovery/backups/:backupArtifactId`.
+	- Added guarded artifact download route `GET /api/v1/recovery/backups/:backupArtifactId/download` with attachment headers and managed-storage boundary checks.
+	- Added guarded artifact delete route `DELETE /api/v1/recovery/backups/:backupArtifactId` with fresh-admin + CSRF enforcement, file-delete + metadata-delete orchestration, and audit evidence.
 - [ ] Define restore preview and restore apply routes with maintenance-lock gating.
 	- Added guarded restore-preview read route `GET /api/v1/recovery/backups/:backupArtifactId/restore-preview` backed by backup artifact integrity checks and maintenance-lock readiness signaling.
 	- Added guarded restore-apply mutation route `POST /api/v1/recovery/backups/:backupArtifactId/restore-apply` with fresh-admin + CSRF enforcement and checksum-aware apply orchestration.
-- [ ] Define maintenance-lock status, enter, and release routes if exposed directly.
+	- Extended restore-apply service contract to consume scoped backup payloads (`data.scopeSettings`) and return explicit `requestedScopes`, `appliedScopes`, and `skippedScopes` summary metadata.
+- [x] Define maintenance-lock status, enter, and release routes if exposed directly.
+	- Added guarded maintenance-lock status route `GET /api/v1/recovery/maintenance-locks` for authenticated admin visibility into active lock state.
+	- Added guarded maintenance-lock enter route `POST /api/v1/recovery/maintenance-locks` with fresh-admin + CSRF enforcement and audit-backed lock acquisition.
+	- Added guarded maintenance-lock release route `POST /api/v1/recovery/maintenance-locks/:lockId/release` with idempotent-safe release behavior and audit evidence.
 - [ ] Define admin recovery issuance, verification, use, cancel, and audit lookup routes.
 - [ ] Ensure all recovery-sensitive routes align with `docs/BACKUP_RESTORE_DESIGN.md` and `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 

@@ -30,7 +30,9 @@ function normalizeLock(row) {
     reason: row.reason ?? null,
     acquiredByUserId: row.acquired_by_user_id ?? null,
     acquiredAt: row.acquired_at?.toISOString?.() ?? row.acquired_at ?? null,
+    createdAt: row.created_at?.toISOString?.() ?? row.created_at ?? null,
     expiresAt: row.expires_at?.toISOString?.() ?? row.expires_at ?? null,
+    releasedAt: row.released_at?.toISOString?.() ?? row.released_at ?? null,
   };
 }
 
@@ -46,7 +48,7 @@ export function createMaintenanceLockService({
     const hasLockTypeFilter = normalizedLockTypes.length > 0;
     const result = await pool.query(
       `
-        SELECT id, lock_type, status, reason, acquired_by_user_id, acquired_at, expires_at
+        SELECT id, lock_type, status, reason, acquired_by_user_id, acquired_at, expires_at, released_at, created_at
         FROM maintenance_locks
         WHERE status = 'active'
           AND released_at IS NULL
@@ -62,6 +64,25 @@ export function createMaintenanceLockService({
 
   async function listRestoreApplyBlockingLocks() {
     return listActiveMaintenanceLocks();
+  }
+
+  async function getMaintenanceLockById({ lockId } = {}) {
+    if (typeof lockId !== 'string' || lockId.trim().length < 1) {
+      throw new Error('lockId is required');
+    }
+
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT id, lock_type, status, reason, acquired_by_user_id, acquired_at, expires_at, released_at, created_at
+        FROM maintenance_locks
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [lockId.trim()],
+    );
+
+    return normalizeLock(result.rows[0]);
   }
 
   async function acquireMaintenanceLock({
@@ -90,7 +111,7 @@ export function createMaintenanceLockService({
           released_at
         )
         VALUES ($1, $2, $3, $4, $5, NOW(), $6::timestamptz, NULL)
-        RETURNING id, lock_type, status, reason, acquired_by_user_id, acquired_at, expires_at
+        RETURNING id, lock_type, status, reason, acquired_by_user_id, acquired_at, expires_at, released_at, created_at
       `,
       [lockType.trim(), status, ownerInstanceId, reason, acquiredByUserId, expiresAt],
     );
@@ -111,7 +132,7 @@ export function createMaintenanceLockService({
             released_at = NOW()
         WHERE id = $1
           AND released_at IS NULL
-        RETURNING id, lock_type, status, reason, acquired_by_user_id, acquired_at, expires_at
+        RETURNING id, lock_type, status, reason, acquired_by_user_id, acquired_at, expires_at, released_at, created_at
       `,
       [lockId, status],
     );
@@ -121,6 +142,7 @@ export function createMaintenanceLockService({
 
   return {
     acquireMaintenanceLock,
+    getMaintenanceLockById,
     listActiveMaintenanceLocks,
     listRestoreApplyBlockingLocks,
     releaseMaintenanceLock,

@@ -47,6 +47,8 @@ import { createMediaInspectionService } from '../media/media-inspection-service.
 import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
 import { createMediaTranscodeExecutionService } from '../media/media-transcode-execution-service.js';
 import { createMediaTranscodePlanningService } from '../media/media-transcode-planning-service.js';
+import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
+import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
 
 export function createImportCandidateModule({
@@ -92,6 +94,10 @@ export function createImportCandidateModule({
   }),
   importCandidateExecutionHeartbeatConfig = resolveImportCandidateExecutionHeartbeatConfig(),
   importCandidateExecutionHeartbeatState = createImportCandidateExecutionHeartbeatState(),
+  maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+  }),
   slskdTransferSnapshotService = createSlskdTransferSnapshotService({
     getDownloads: slskdService.getDownloads,
   }),
@@ -161,21 +167,33 @@ export function createImportCandidateModule({
     renewLease: importCandidateTranscodeRunStore.renewLease,
   }),
   importCandidateExecutionService = createImportCandidateExecutionService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'import candidate execution planning',
+    }),
     createOperationRun: importCandidateExecutionRunStore.createOperationRun,
     getActiveRun: importCandidateExecutionRunStore.getActiveRun,
     listImportCandidates: importCandidateService.listImportCandidates,
   }),
   importCandidateApplyService = createImportCandidateApplyService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'import candidate apply',
+    }),
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
     createOperationRun: importCandidateApplyRunStore.createOperationRun,
     getActiveRun: importCandidateApplyRunStore.getActiveRun,
   }),
   importCandidateMediaInspectionService = createImportCandidateMediaInspectionService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'import candidate media inspection',
+    }),
     createOperationRun: importCandidateMediaInspectionRunStore.createOperationRun,
     getActiveRun: importCandidateMediaInspectionRunStore.getActiveRun,
     listImportCandidates: importCandidateService.listImportCandidates,
   }),
   importCandidateTranscodeService = createImportCandidateTranscodeService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'import candidate transcode orchestration',
+    }),
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     createOperationRun: importCandidateTranscodeRunStore.createOperationRun,
     getActiveRun: importCandidateTranscodeRunStore.getActiveRun,

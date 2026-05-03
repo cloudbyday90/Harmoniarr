@@ -19,6 +19,7 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
   const authModule = { routeDependencies: { auth: 'deps' } };
   const importCandidateModule = { routeDependencies: { importCandidates: 'deps' } };
   const libraryModule = {
+    libraryWantedReleaseStore: { replaceLibraryWantedReleases: async () => {}, listLibraryWantedReleases: async () => [] },
     libraryWantedReleaseService: {
       reconcileWantedReleases: t.mock.fn(async () => {}),
     },
@@ -35,6 +36,7 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
     youtubeOAuthService: { resolveAccessToken: async () => null },
   };
   const metadataModule = {
+    metadataMonitoringStore: { replaceArtistMonitoringSnapshot: async () => {}, listArtistMonitoringSnapshot: async () => [] },
     musicBrainzSearchService: { checkProviderHealth: t.mock.fn(async () => ({ status: 'healthy' })) },
     routeDependencies: { metadata: 'deps' },
   };
@@ -58,7 +60,13 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
     },
     slskdTransferSnapshotService,
   };
-  const systemModule = { routeDependencies: { system: 'deps' } };
+  const systemModule = {
+    routeDependencies: { system: 'deps' },
+    adminRecoveryService: {
+      getBootstrapAdminRecoveryStatus: t.mock.fn(async () => ({ recoveryAvailable: false })),
+      completeBootstrapAdminRecovery: t.mock.fn(async () => ({ success: true, requiresLogin: true })),
+    },
+  };
   const createArtworkModule = t.mock.fn(() => artworkModule);
   const createAuthModule = t.mock.fn(() => authModule);
   const deploymentSecurityPolicy = {
@@ -100,6 +108,7 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
       response.json({ ok: true, pong: true });
     });
   });
+  const registerAdminRecoveryRoutes = t.mock.fn();
   const registerArtworkRoutes = t.mock.fn();
   const registerImportCandidateRoutes = t.mock.fn();
   const registerLibraryRoutes = t.mock.fn();
@@ -135,6 +144,7 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
     createSystemModule,
     registerArtworkRoutes,
     registerAuthRoutes,
+    registerAdminRecoveryRoutes,
     registerImportCandidateRoutes,
     registerLibraryRoutes,
     registerMetadataRoutes,
@@ -168,6 +178,7 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
   const systemModuleArgs = createSystemModule.mock.calls[0].arguments[0];
 
   assert.equal(artworkModuleArgs.settingsService, settingsService);
+  assert.equal(typeof artworkModuleArgs.maintenanceLockService.listActiveMaintenanceLocks, 'function');
   assert.equal(authModuleArgs.settingsService, settingsService);
   assert.equal(createSettingsService.mock.calls[0].arguments[0].deploymentSecurityService, deploymentSecurityService);
   assert.equal(createSettingsService.mock.calls[0].arguments[0].slskdConfigService, slskdConfigService);
@@ -180,6 +191,9 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
   assert.equal(importCandidateModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(importCandidateModuleArgs.slskdTransferSnapshotService, slskdTransferSnapshotService);
   assert.equal(importCandidateModuleArgs.getMediaToolingStatus, mediaToolingStatusService.getStatus);
+  assert.equal(typeof importCandidateModuleArgs.maintenanceLockService.listActiveMaintenanceLocks, 'function');
+  assert.equal(artworkModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
+  assert.equal(libraryModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
   assert.equal(libraryModuleArgs.artworkAssignmentService, artworkModule.artworkAssignmentService);
   assert.equal(libraryModuleArgs.artworkIngestionService, artworkModule.artworkIngestionService);
   assert.equal(libraryModuleArgs.importCandidateService, importCandidateModule.importCandidateService);
@@ -189,10 +203,13 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
   assert.equal(systemModuleArgs.artworkPolicyService, artworkModule.artworkPolicyService);
   assert.equal(typeof systemModuleArgs.dependencyHealthService.getDependencyHealth, 'function');
   assert.equal(systemModuleArgs.libraryScanSummaryService, libraryModule.libraryScanSummaryService);
+  assert.equal(systemModuleArgs.libraryWantedReleaseStore, libraryModule.libraryWantedReleaseStore);
+  assert.equal(systemModuleArgs.metadataMonitoringStore, metadataModule.metadataMonitoringStore);
   assert.equal(systemModuleArgs.operationHistoryService, operationsModule.operationHistoryService);
   assert.equal(systemModuleArgs.settingsService, settingsService);
   assert.equal(systemModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(systemModuleArgs.musicBrainzSearchService, metadataModule.musicBrainzSearchService);
+  assert.equal(systemModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
 
   const providerError = new Error('MusicBrainz is throttled');
   providerError.code = 'musicbrainz_unavailable';
@@ -256,9 +273,12 @@ test('createApp composes shared modules and preserves api and spa fallbacks', as
     importCandidateExecutionHeartbeatState: undefined,
     libraryDiscoveryHeartbeatState: undefined,
     libraryScanSummaryService: libraryModule.libraryScanSummaryService,
+    libraryWantedReleaseStore: libraryModule.libraryWantedReleaseStore,
     metadataRefreshHeartbeatConfig: undefined,
     metadataRefreshHeartbeatState: undefined,
+    metadataMonitoringStore: metadataModule.metadataMonitoringStore,
     musicBrainzSearchService: metadataModule.musicBrainzSearchService,
+    maintenanceLockService: systemModuleArgs.maintenanceLockService,
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: 'C:/virtual/package.json',
     settingsService,
@@ -429,7 +449,13 @@ test('createApp enforces opt-in https and hsts from the shared deployment securi
       slskdService: { getConnectionStatus: async () => ({ provider: 'slskd', status: 'healthy', details: {} }) },
       slskdTransferSnapshotService: {},
     }),
-    createSystemModule: () => ({ routeDependencies: {} }),
+    createSystemModule: () => ({
+      routeDependencies: {},
+      adminRecoveryService: {
+        getBootstrapAdminRecoveryStatus: async () => ({ recoveryAvailable: false }),
+        completeBootstrapAdminRecovery: async () => ({ success: true, requiresLogin: true }),
+      },
+    }),
     registerAuthRoutes(testApp) {
       testApp.get('/api/v1/test/ping', (_request, response) => {
         response.json({ ok: true });
@@ -444,6 +470,7 @@ test('createApp enforces opt-in https and hsts from the shared deployment securi
     registerSlskdRoutes: () => {},
     registerSystemRoutes: () => {},
     registerArtworkRoutes: () => {},
+    registerAdminRecoveryRoutes: () => {},
   });
 
   await withServer(app, async (baseUrl) => {

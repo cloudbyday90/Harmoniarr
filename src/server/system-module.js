@@ -30,7 +30,15 @@ import { createBackupArtifactRepository } from './recovery/backup-artifact-repos
 import { createBackupExportService } from './recovery/backup-export-service.js';
 import { createBackupRestoreApplyService } from './recovery/backup-restore-apply-service.js';
 import { createBackupRestorePreviewService } from './recovery/backup-restore-preview-service.js';
+import { createAdminRecoveryService } from './recovery/admin-recovery-service.js';
+import { createAdminRecoveryStore } from './recovery/admin-recovery-store.js';
+import { createControlPlaneIdempotencyService } from './recovery/control-plane-idempotency-service.js';
+import { createControlPlaneIdempotencyStore } from './recovery/control-plane-idempotency-store.js';
+import { createIdempotencyRecordCleanupHeartbeat } from './recovery/idempotency-record-cleanup-heartbeat.js';
+import { createMaintenanceLockControlService } from './recovery/maintenance-lock-control-service.js';
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
+import { createRecoveryDiagnosticsService } from './recovery/recovery-diagnostics-service.js';
+import { createRestoreScopeRuntimeSnapshotStore } from './recovery/restore-scope-runtime-snapshot-store.js';
 import { createSystemService } from './system-service.js';
 
 export function createSystemModule({
@@ -51,7 +59,17 @@ export function createSystemModule({
   backupExportService = null,
   backupRestoreApplyService = null,
   backupRestorePreviewService = null,
+  adminRecoveryService = null,
+  adminRecoveryStore = createAdminRecoveryStore(),
+  controlPlaneIdempotencyService = createControlPlaneIdempotencyService(),
+  controlPlaneIdempotencyStore = createControlPlaneIdempotencyStore(),
+  idempotencyRecordCleanupHeartbeat = null,
+  maintenanceLockControlService = null,
   maintenanceLockService = createMaintenanceLockService(),
+  metadataMonitoringStore = null,
+  recoveryDiagnosticsService = null,
+  restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore(),
+  libraryWantedReleaseStore = null,
   operatorNotificationService = null,
   operatorNotificationFanoutRunStore = createOperatorNotificationFanoutRunStore(),
   operatorNotificationFanoutService = null,
@@ -72,15 +90,21 @@ export function createSystemModule({
     settingsService,
     slskdService,
   }),
+  resolvedAuditReadService = auditReadService ?? createAuditReadService(),
   systemActivityFeedService = activityFeedService ?? createActivityFeedService({
-    auditReadService: auditReadService ?? createAuditReadService(),
+    auditReadService: resolvedAuditReadService,
     operationHistoryService,
   }),
   systemOperatorNotificationService = operatorNotificationService ?? createOperatorNotificationService(),
   systemBackupExportService = backupExportService ?? createBackupExportService({
     createBackupArtifact: backupArtifactRepository.createBackupArtifact,
+    deleteBackupArtifactById: backupArtifactRepository.deleteBackupArtifactById,
     getBackupArtifactById: backupArtifactRepository.getBackupArtifactById,
+    listArtistMonitoringForBackup: metadataMonitoringStore?.listArtistMonitoringSnapshot,
     listBackupArtifacts: backupArtifactRepository.listBackupArtifacts,
+    listOverridesSnapshotForBackup: restoreScopeRuntimeSnapshotStore.listOverridesSnapshot,
+    listTrustSnapshotForBackup: restoreScopeRuntimeSnapshotStore.listTrustSnapshot,
+    listWantedReleasesForBackup: libraryWantedReleaseStore?.listLibraryWantedReleases,
     packageJsonPath,
   }),
   systemBackupRestorePreviewService = backupRestorePreviewService ?? createBackupRestorePreviewService({
@@ -91,8 +115,27 @@ export function createSystemModule({
     acquireMaintenanceLock: maintenanceLockService.acquireMaintenanceLock,
     getBackupArtifactById: backupArtifactRepository.getBackupArtifactById,
     getBackupRestorePreview: systemBackupRestorePreviewService.getBackupRestorePreview,
+    replaceOverridesSnapshot: restoreScopeRuntimeSnapshotStore.replaceOverridesSnapshot,
+    replaceLibraryWantedReleases: libraryWantedReleaseStore?.replaceLibraryWantedReleases,
+    replaceMetadataArtistMonitoring: metadataMonitoringStore?.replaceArtistMonitoringSnapshot,
+    replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
     releaseMaintenanceLock: maintenanceLockService.releaseMaintenanceLock,
     updateSettingsFn: settingsService.updateSettings,
+  }),
+  systemMaintenanceLockControlService = maintenanceLockControlService ?? createMaintenanceLockControlService({
+    acquireMaintenanceLock: maintenanceLockService.acquireMaintenanceLock,
+    getMaintenanceLockById: maintenanceLockService.getMaintenanceLockById,
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+    releaseMaintenanceLock: maintenanceLockService.releaseMaintenanceLock,
+  }),
+  systemRecoveryDiagnosticsService = recoveryDiagnosticsService ?? createRecoveryDiagnosticsService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+    listRecentAuditEvents: resolvedAuditReadService.listRecentAuditEvents,
+    listRecentOperationRuns: operationHistoryService?.listRecentOperationRuns,
+  }),
+  systemAdminRecoveryService = adminRecoveryService ?? createAdminRecoveryService({
+    adminRecoveryStore,
+    maintenanceLockService,
   }),
   systemService = createSystemService({
     activityFeedService: systemActivityFeedService,
@@ -133,6 +176,11 @@ export function createSystemModule({
       renewLease: operatorNotificationFanoutRunStore.renewLease,
     });
 
+  const resolvedIdempotencyRecordCleanupHeartbeat = idempotencyRecordCleanupHeartbeat
+    ?? createIdempotencyRecordCleanupHeartbeat({
+      deleteExpiredRecords: controlPlaneIdempotencyStore.deleteExpiredRecords,
+    });
+
   return {
     activityFeedService: systemActivityFeedService,
     operatorNotificationService: systemOperatorNotificationService,
@@ -143,9 +191,12 @@ export function createSystemModule({
     artworkPolicyService,
     artworkSummaryService,
     dependencyHealthService,
+    idempotencyRecordCleanupHeartbeat: resolvedIdempotencyRecordCleanupHeartbeat,
     operatorNotificationFanoutRunStore,
     operatorNotificationFanoutService: resolvedOperatorNotificationFanoutService,
     operatorNotificationFanoutWorker: resolvedOperatorNotificationFanoutWorker,
+    adminRecoveryService: systemAdminRecoveryService,
+    adminRecoveryStore,
     libraryScanSummaryService,
     onboardingSummaryService,
     settingsService,
@@ -155,9 +206,17 @@ export function createSystemModule({
       getActivityFeed: systemService.getActivityFeed,
       getOperatorNotifications: systemService.getOperatorNotifications,
       createBackupExport: systemBackupExportService.createBackupExport,
+      deleteBackupExportById: systemBackupExportService.deleteBackupExportById,
       getBackupExportById: systemBackupExportService.getBackupExportById,
+      getBackupExportDownloadById: systemBackupExportService.getBackupExportDownloadById,
       getBackupRestorePreview: systemBackupRestorePreviewService.getBackupRestorePreview,
+      getMaintenanceLockStatus: systemMaintenanceLockControlService.getMaintenanceLockStatus,
+      enterMaintenanceLock: systemMaintenanceLockControlService.enterMaintenanceLock,
+      releaseMaintenanceLockById: systemMaintenanceLockControlService.releaseMaintenanceLockById,
+      getQueueDiagnostics: systemRecoveryDiagnosticsService.getQueueDiagnostics,
+      getRecoveryDiagnostics: systemRecoveryDiagnosticsService.getRecoveryDiagnostics,
       startBackupRestoreApply: systemBackupRestoreApplyService.startBackupRestoreApply,
+      executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
       listBackupExports: systemBackupExportService.listBackupExports,
       startOperatorNotificationFanoutRun: resolvedOperatorNotificationFanoutService.startOperatorNotificationFanoutRun,
       buildLibraryScanSummary: libraryScanSummaryService.buildLibraryScanSummary,
@@ -165,6 +224,8 @@ export function createSystemModule({
       getOverview: systemService.getOverview,
       buildSettingsPayload: settingsService.buildSettingsPayload,
       updateSettings: settingsService.updateSettings,
+      getBootstrapAdminRecoveryStatus: systemAdminRecoveryService.getBootstrapAdminRecoveryStatus,
+      completeBootstrapAdminRecovery: systemAdminRecoveryService.completeBootstrapAdminRecovery,
     },
   };
 }

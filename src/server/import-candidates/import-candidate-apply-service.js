@@ -21,6 +21,7 @@ import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createImportCandidateApplyService({
+  assertMaintenanceWriteAllowed = async () => {},
   buildImportPendingCandidateSummary = async () => ({
     counts: {
       ready: 0,
@@ -37,6 +38,8 @@ export function createImportCandidateApplyService({
   const operationDescriptor = operationRunRegistry.importCandidateApply;
 
   async function startImportCandidateApplyRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'import_candidate_apply_in_progress', 'An import apply run is already running or queued');

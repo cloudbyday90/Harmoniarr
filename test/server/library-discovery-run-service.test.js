@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createLibraryDiscoveryRunService } from '../../src/server/library/library-discovery-run-service.js';
 
 test('startLibraryDiscoveryRun records a pending run for durable dispatch', async (t) => {
@@ -54,5 +55,18 @@ test('startLibraryDiscoveryRun rejects concurrent discovery dispatch runs', asyn
       message: 'A library discovery dispatch is already running or queued',
       status: 409,
     },
+  );
+});
+
+test('startLibraryDiscoveryRun rejects when maintenance lock blocks unsafe writes', async () => {
+  const service = createLibraryDiscoveryRunService({
+    assertMaintenanceWriteAllowed: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents library discovery dispatch');
+    },
+  });
+
+  await assert.rejects(
+    () => service.startLibraryDiscoveryRun(),
+    (error) => error.code === 'recovery_lock_conflict',
   );
 });

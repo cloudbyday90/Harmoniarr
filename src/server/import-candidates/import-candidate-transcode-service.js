@@ -25,6 +25,7 @@ function countTranscodeCandidates(files = []) {
 }
 
 export function createImportCandidateTranscodeService({
+  assertMaintenanceWriteAllowed = async () => {},
   buildSelectedImportCandidateSummary = async () => ({
     selectedCandidates: [],
   }),
@@ -38,6 +39,8 @@ export function createImportCandidateTranscodeService({
   const operationDescriptor = operationRunRegistry.importCandidateTranscodeOrchestration;
 
   async function startImportCandidateTranscodeRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'import_candidate_transcode_in_progress', 'A transcode orchestration run is already running or queued');

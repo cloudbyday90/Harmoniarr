@@ -239,3 +239,27 @@ test('artwork cleanup run route returns shared API errors from the run service',
     assert.equal(payload.error.code, 'artwork_cleanup_not_ready');
   });
 });
+
+test('artwork cleanup run route returns lock conflicts from the run service', async () => {
+  const app = createArtworkRouteTestApp({
+    startArtworkCleanupRun: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents artwork cleanup');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/cleanup-runs`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({}),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.code, 'recovery_lock_conflict');
+  });
+});

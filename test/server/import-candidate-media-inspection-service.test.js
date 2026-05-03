@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createImportCandidateMediaInspectionService } from '../../src/server/import-candidates/import-candidate-media-inspection-service.js';
 
 test('startImportCandidateMediaInspectionRun queues a pending media-inspection run for selected candidates', async (t) => {
@@ -55,5 +56,18 @@ test('startImportCandidateMediaInspectionRun rejects when no selected candidates
   await assert.rejects(
     () => service.startImportCandidateMediaInspectionRun(),
     (error) => error.code === 'import_candidate_media_inspection_not_ready',
+  );
+});
+
+test('startImportCandidateMediaInspectionRun rejects when maintenance lock blocks unsafe writes', async () => {
+  const service = createImportCandidateMediaInspectionService({
+    assertMaintenanceWriteAllowed: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents import candidate media inspection');
+    },
+  });
+
+  await assert.rejects(
+    () => service.startImportCandidateMediaInspectionRun(),
+    (error) => error.code === 'recovery_lock_conflict',
   );
 });

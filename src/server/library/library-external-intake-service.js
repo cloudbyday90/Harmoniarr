@@ -20,6 +20,7 @@ import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createLibraryExternalIntakeService({
+  assertMaintenanceWriteAllowed = async () => {},
   createOperationRun = async () => {
     throw new Error('createOperationRun dependency is required');
   },
@@ -37,6 +38,8 @@ export function createLibraryExternalIntakeService({
     triggerSource = 'request_submit',
     triggeredByUserId = null,
   }) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRunByMediaRequestId(mediaRequestId);
     if (activeRun) {
       return {

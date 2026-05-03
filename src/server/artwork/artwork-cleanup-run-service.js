@@ -24,6 +24,7 @@ import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { getArtworkCleanupSnapshot } from './artwork-repository.js';
 
 export function createArtworkCleanupRunService({
+  assertMaintenanceWriteAllowed = async () => {},
   artworkPolicyService = createArtworkPolicyService(),
   createOperationRun = async () => {
     throw new Error('createOperationRun dependency is required');
@@ -36,6 +37,8 @@ export function createArtworkCleanupRunService({
   const operationDescriptor = operationRunRegistry.artworkCleanup;
 
   async function startArtworkCleanupRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'artwork_cleanup_in_progress', 'An artwork cleanup run is already running or queued');

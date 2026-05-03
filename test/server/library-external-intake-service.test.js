@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createLibraryExternalIntakeService } from '../../src/server/library/library-external-intake-service.js';
 
 test('queueExternalMediaRequestPlanning queues a planning run and patches evidence', async (t) => {
@@ -66,4 +67,29 @@ test('queueExternalMediaRequestPlanning reuses an active run without creating a 
   assert.equal(result.run, existingRun);
   assert.equal(createOperationRun.mock.callCount(), 0);
   assert.equal(recordAuditEventFn.mock.callCount(), 0);
+});
+
+test('queueExternalMediaRequestPlanning rejects when maintenance lock blocks unsafe writes', async () => {
+  const service = createLibraryExternalIntakeService({
+    assertMaintenanceWriteAllowed: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents library external intake planning');
+    },
+    createOperationRun: async () => {
+      throw new Error('createOperationRun should not be called');
+    },
+    getActiveRunByMediaRequestId: async () => null,
+  });
+
+  await assert.rejects(
+    () => service.queueExternalMediaRequestPlanning({
+      mediaRequestId: 'req-2',
+      normalizedSource: {
+        canonicalUrl: 'https://open.spotify.com/album/xyz',
+        provider: 'spotify',
+        resourceType: 'release',
+        sourceIdentifier: 'xyz',
+      },
+    }),
+    (error) => error.code === 'recovery_lock_conflict',
+  );
 });

@@ -43,9 +43,16 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/system/activity-feed', access: 'admin', area: 'system', kind: 'read' },
   { method: 'GET', path: '/api/v1/system/operator-notifications', access: 'admin', area: 'system', kind: 'read' },
   { method: 'POST', path: '/api/v1/system/operator-notification-fanout-runs', access: 'admin', area: 'system', kind: 'mutation' },
+  { method: 'GET', path: '/api/v1/system/diagnostics/queue-state', access: 'admin', area: 'system', kind: 'diagnostic' },
+  { method: 'GET', path: '/api/v1/system/diagnostics/recovery-state', access: 'admin', area: 'system', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/recovery/backups', access: 'admin', area: 'recovery', kind: 'read' },
   { method: 'GET', path: '/api/v1/recovery/backups/:backupArtifactId', access: 'admin', area: 'recovery', kind: 'read' },
+  { method: 'GET', path: '/api/v1/recovery/backups/:backupArtifactId/download', access: 'admin', area: 'recovery', kind: 'read' },
   { method: 'GET', path: '/api/v1/recovery/backups/:backupArtifactId/restore-preview', access: 'admin', area: 'recovery', kind: 'read' },
+  { method: 'DELETE', path: '/api/v1/recovery/backups/:backupArtifactId', access: 'admin', area: 'recovery', kind: 'mutation' },
+  { method: 'GET', path: '/api/v1/recovery/maintenance-locks', access: 'admin', area: 'recovery', kind: 'read' },
+  { method: 'POST', path: '/api/v1/recovery/maintenance-locks', access: 'admin', area: 'recovery', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/recovery/maintenance-locks/:lockId/release', access: 'admin', area: 'recovery', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/recovery/backups/:backupArtifactId/restore-apply', access: 'admin', area: 'recovery', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/recovery/backups', access: 'admin', area: 'recovery', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/system/onboarding', access: 'admin', area: 'system', kind: 'diagnostic' },
@@ -119,6 +126,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/import-candidates/:importCandidateId/reject', access: 'admin', area: 'import-candidates', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/import-candidates/:importCandidateId/reopen', access: 'admin', area: 'import-candidates', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/import-candidates/slskd/searches/:searchId', access: 'admin', area: 'import-candidates', kind: 'mutation' },
+  { method: 'GET', path: '/api/v1/recovery/bootstrap-admin/status', access: 'public', area: 'recovery', kind: 'read' },
+  { method: 'POST', path: '/api/v1/recovery/bootstrap-admin/complete', access: 'public', area: 'recovery', kind: 'mutation' },
 ]);
 
 export function toRouteSignature({ method, path }) {

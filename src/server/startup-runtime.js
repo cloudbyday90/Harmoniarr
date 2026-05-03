@@ -152,6 +152,7 @@ export async function startServerRuntime({
   startupServiceSupervisor.registerService(metadataRefreshHeartbeat);
   startupServiceSupervisor.registerService(libraryDiscoveryHeartbeat);
   startupServiceSupervisor.registerService(importExecutionHeartbeat);
+  startupServiceSupervisor.registerService(systemModule.idempotencyRecordCleanupHeartbeat);
   startupServiceSupervisor.startAll();
 
   startupServiceSupervisor.installSignalHandlers(async () => {

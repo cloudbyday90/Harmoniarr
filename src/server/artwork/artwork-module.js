@@ -26,10 +26,16 @@ import { createArtworkCleanupWorker } from './artwork-cleanup-worker.js';
 import { createArtworkIngestionService } from './artwork-ingestion-service.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { createArtworkSummaryService } from './artwork-summary-service.js';
+import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
+import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import * as artworkRepository from './artwork-repository.js';
 
 export function createArtworkModule({
   settingsService,
+  maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+  }),
   artworkCleanupDetailService,
   artworkCleanupService,
   artworkCleanupHistoryService,
@@ -57,6 +63,9 @@ export function createArtworkModule({
     });
   const resolvedArtworkCleanupRunService = artworkCleanupRunService
     ?? createArtworkCleanupRunService({
+      assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+        operationLabel: 'artwork cleanup',
+      }),
       artworkPolicyService,
       createOperationRun: artworkCleanupRunStore.createOperationRun,
       getActiveRun: artworkCleanupRunStore.getActiveRun,

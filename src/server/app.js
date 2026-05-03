@@ -38,9 +38,11 @@ import { createOperationsModule } from './operations-module.js';
 import { createProviderModule } from './provider-module.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
+import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { registerArtworkRoutes } from './routes/artwork-routes.js';
 import { registerAppUserRoutes } from './routes/app-user-routes.js';
 import { registerAuthRoutes } from './routes/auth-routes.js';
+import { registerAdminRecoveryRoutes } from './routes/admin-recovery-routes.js';
 import { registerImportCandidateRoutes } from './routes/import-candidate-routes.js';
 import { registerLibraryRoutes } from './routes/library-routes.js';
 import { registerMetadataRoutes } from './routes/metadata-routes.js';
@@ -109,6 +111,7 @@ export function createApp({
   registerArtworkRoutes: mountArtworkRoutes = registerArtworkRoutes,
   registerAppUserRoutes: mountAppUserRoutes = registerAppUserRoutes,
   registerAuthRoutes: mountAuthRoutes = registerAuthRoutes,
+  registerAdminRecoveryRoutes: mountAdminRecoveryRoutes = registerAdminRecoveryRoutes,
   registerImportCandidateRoutes: mountImportCandidateRoutes = registerImportCandidateRoutes,
   registerLibraryRoutes: mountLibraryRoutes = registerLibraryRoutes,
   registerMetadataRoutes: mountMetadataRoutes = registerMetadataRoutes,
@@ -135,14 +138,16 @@ export function createApp({
     spotifyOAuthService: providerModule.spotifyOAuthService,
     youtubeOAuthService: providerModule.youtubeOAuthService,
   });
+  const maintenanceLockService = createMaintenanceLockService();
   const appUserModule = buildAppUserModule();
-  const artworkModule = buildArtworkModule({ settingsService });
+  const artworkModule = buildArtworkModule({ maintenanceLockService, settingsService });
   const authModule = buildAuthModule({ settingsService });
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
+    maintenanceLockService,
     slskdTransferSnapshotService: slskdModule.slskdTransferSnapshotService,
     slskdService: slskdModule.slskdService,
   });
@@ -150,6 +155,7 @@ export function createApp({
     artworkAssignmentService: artworkModule.artworkAssignmentService,
     artworkIngestionService: artworkModule.artworkIngestionService,
     importCandidateService: importCandidateModule.importCandidateService,
+    maintenanceLockService,
     providerClientResolverService: createProviderClientResolverService({
       spotifyOAuthService: providerModule.spotifyOAuthService,
       youtubeOAuthService: providerModule.youtubeOAuthService,
@@ -183,10 +189,13 @@ export function createApp({
     importCandidateExecutionHeartbeatConfig: importCandidateModule.importCandidateExecutionHeartbeatConfig,
     importCandidateExecutionHeartbeatState: importCandidateModule.importCandidateExecutionHeartbeatState,
     libraryDiscoveryHeartbeatState: libraryModule.libraryDiscoveryHeartbeatState,
+    libraryWantedReleaseStore: libraryModule.libraryWantedReleaseStore,
     libraryScanSummaryService: libraryModule.libraryScanSummaryService,
     metadataRefreshHeartbeatConfig: metadataModule.metadataRefreshHeartbeatConfig,
     metadataRefreshHeartbeatState: metadataModule.metadataRefreshHeartbeatState,
+    metadataMonitoringStore: metadataModule.metadataMonitoringStore,
     musicBrainzSearchService: metadataModule.musicBrainzSearchService,
+    maintenanceLockService,
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: resolvedPackageJsonPath,
     settingsService,
@@ -234,6 +243,20 @@ export function createApp({
       bucketName: 'auth-refresh',
       limit: 30,
       windowMs: 5 * 60 * 1000,
+    }),
+  });
+  mountAdminRecoveryRoutes(app, {
+    getBootstrapAdminRecoveryStatus: systemModule.adminRecoveryService.getBootstrapAdminRecoveryStatus,
+    completeBootstrapAdminRecovery: systemModule.adminRecoveryService.completeBootstrapAdminRecovery,
+    limitRecoveryStatus: requestRateLimiterService.createMiddleware({
+      bucketName: 'recovery-status',
+      limit: 30,
+      windowMs: 5 * 60 * 1000,
+    }),
+    limitRecoveryComplete: requestRateLimiterService.createMiddleware({
+      bucketName: 'recovery-complete',
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
     }),
   });
   mountAppUserRoutes(app, {

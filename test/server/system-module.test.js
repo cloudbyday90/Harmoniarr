@@ -16,10 +16,18 @@ test('createSystemModule exposes shared route dependencies from injected service
   const getOverview = () => {};
   const getActivityFeed = () => {};
   const createBackupExport = () => {};
+  const deleteBackupExportById = () => {};
   const getBackupExportById = () => {};
+  const getBackupExportDownloadById = () => {};
   const getBackupRestorePreview = () => {};
+  const getMaintenanceLockStatus = () => {};
+  const getQueueDiagnostics = () => {};
+  const getRecoveryDiagnostics = () => {};
   const listBackupExports = () => {};
+  const enterMaintenanceLock = () => {};
   const startBackupRestoreApply = () => {};
+  const releaseMaintenanceLockById = () => {};
+  const executeIdempotentMutation = () => {};
   const getOperatorNotifications = () => {};
   const startOperatorNotificationFanoutRun = () => {};
   const dependencyHealthService = {
@@ -48,7 +56,9 @@ test('createSystemModule exposes shared route dependencies from injected service
   const backupArtifactRepository = {};
   const backupExportService = {
     createBackupExport,
+    deleteBackupExportById,
     getBackupExportById,
+    getBackupExportDownloadById,
     listBackupExports,
   };
   const backupRestorePreviewService = {
@@ -56,6 +66,15 @@ test('createSystemModule exposes shared route dependencies from injected service
   };
   const backupRestoreApplyService = {
     startBackupRestoreApply,
+  };
+  const maintenanceLockControlService = {
+    enterMaintenanceLock,
+    getMaintenanceLockStatus,
+    releaseMaintenanceLockById,
+  };
+  const recoveryDiagnosticsService = {
+    getQueueDiagnostics,
+    getRecoveryDiagnostics,
   };
 
   const systemModule = createSystemModule({
@@ -66,6 +85,11 @@ test('createSystemModule exposes shared route dependencies from injected service
     backupExportService,
     backupRestoreApplyService,
     backupRestorePreviewService,
+    maintenanceLockControlService,
+    controlPlaneIdempotencyService: {
+      executeIdempotentMutation,
+    },
+    recoveryDiagnosticsService,
     dependencyHealthService,
     libraryScanSummaryService,
     onboardingSummaryService,
@@ -96,14 +120,24 @@ test('createSystemModule exposes shared route dependencies from injected service
     buildOnboardingSummary,
     getActivityFeed,
     createBackupExport,
+    deleteBackupExportById,
     getBackupExportById,
+    getBackupExportDownloadById,
     getBackupRestorePreview,
+    getMaintenanceLockStatus,
+    enterMaintenanceLock,
+    releaseMaintenanceLockById,
+    getQueueDiagnostics,
+    getRecoveryDiagnostics,
     startBackupRestoreApply,
+    executeIdempotentMutation,
     listBackupExports,
     getOperatorNotifications,
     startOperatorNotificationFanoutRun,
     getOverview,
     buildSettingsPayload,
     updateSettings,
+    getBootstrapAdminRecoveryStatus: systemModule.adminRecoveryService.getBootstrapAdminRecoveryStatus,
+    completeBootstrapAdminRecovery: systemModule.adminRecoveryService.completeBootstrapAdminRecovery,
   });
 });

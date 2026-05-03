@@ -21,6 +21,39 @@ import { getPool } from '../database.js';
 export function createLibraryWantedReleaseStore({
   getPoolFn = getPool,
 } = {}) {
+  async function listLibraryWantedReleases() {
+    const result = await getPoolFn().query(
+      `
+        SELECT
+          metadata_artist_id,
+          metadata_release_group_id,
+          metadata_release_id,
+          wanted_status,
+          expected_track_count,
+          matched_track_count,
+          missing_track_count,
+          release_date,
+          release_status,
+          evidence
+        FROM library_wanted_releases
+        ORDER BY metadata_artist_id ASC, metadata_release_group_id ASC, metadata_release_id ASC
+      `,
+    );
+
+    return result.rows.map((row) => ({
+      evidence: row.evidence ?? {},
+      expectedTrackCount: row.expected_track_count,
+      matchedTrackCount: row.matched_track_count,
+      metadataArtistId: row.metadata_artist_id,
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id,
+      missingTrackCount: row.missing_track_count,
+      releaseDate: row.release_date ?? null,
+      releaseStatus: row.release_status ?? null,
+      wantedStatus: row.wanted_status,
+    }));
+  }
+
   async function listWantedStatusesForReleaseGroups({ metadataReleaseGroupIds } = {}) {
     if (!Array.isArray(metadataReleaseGroupIds) || metadataReleaseGroupIds.length < 1) {
       return [];
@@ -113,6 +146,7 @@ export function createLibraryWantedReleaseStore({
   }
 
   return {
+    listLibraryWantedReleases,
     listWantedStatusesForReleaseGroups,
     replaceLibraryWantedReleases,
   };

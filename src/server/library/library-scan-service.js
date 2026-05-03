@@ -23,6 +23,7 @@ import { createSettingsService } from '../settings-service.js';
 import { buildLibraryScanContext } from './library-scan-readiness.js';
 
 export function createLibraryScanService({
+  assertMaintenanceWriteAllowed = async () => {},
   createOperationRun = async () => {
     throw new Error('createOperationRun dependency is required');
   },
@@ -33,6 +34,8 @@ export function createLibraryScanService({
   const operationDescriptor = operationRunRegistry.libraryScan;
 
   async function startLibraryScan({ requestMetadata = null, triggeredByUserId = null } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'library_scan_in_progress', 'A library scan is already running or queued');

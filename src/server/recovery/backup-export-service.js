@@ -17,13 +17,14 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
 import { getMigrationStatus } from '../migrations.js';
 import { loadSettings } from '../settings.js';
 import { createBackupManifestService } from './backup-manifest-service.js';
+import { createBackupEncryptionService } from './backup-encryption-service.js';
 
 function formatExportTimestamp(dateValue) {
   return dateValue.toISOString().replaceAll(':', '-').replaceAll('.', '-');
@@ -46,6 +47,7 @@ function sanitizeArtifact(artifact) {
     createdAt: artifact.createdAt,
     createdByUserId: artifact.createdByUserId,
     encrypted: artifact.encrypted,
+    encryptionKeyFingerprint: artifact.encryptionKeyFingerprint ?? null,
     fileSizeBytes: artifact.fileSizeBytes,
     filename: artifact.filename,
     formatVersion: artifact.formatVersion,
@@ -57,19 +59,70 @@ function sanitizeArtifact(artifact) {
   };
 }
 
+function resolveArtifactStoragePath({ artifact, backupsDirectory }) {
+  if (!artifact?.storagePath || typeof artifact.storagePath !== 'string') {
+    throw createApiError(409, 'backup_artifact_storage_path_invalid', 'Backup artifact storage path is not valid');
+  }
+
+  const resolvedBackupsDirectory = resolve(backupsDirectory);
+  const resolvedStoragePath = resolve(artifact.storagePath);
+  const relativePath = relative(resolvedBackupsDirectory, resolvedStoragePath);
+
+  if (isAbsolute(relativePath) || relativePath.startsWith('..') || relativePath === '') {
+    throw createApiError(409, 'backup_artifact_storage_path_invalid', 'Backup artifact storage path is outside the managed backup directory');
+  }
+
+  return resolvedStoragePath;
+}
+
+function buildScopeSettings({ artistMonitoring, manualOverrides, settingsSnapshot = {}, sourceUsers, wantedReleases }) {
+  return {
+    mediaManagement: {
+      artwork: settingsSnapshot.artwork,
+      qualityProfiles: settingsSnapshot.quality,
+    },
+    monitoring: {
+      artistMonitoring,
+    },
+    pathMappings: {
+      paths: settingsSnapshot.paths,
+    },
+    providers: {
+      providers: settingsSnapshot.providers,
+      slskd: settingsSnapshot.slskd,
+    },
+    settings: settingsSnapshot,
+    overrides: {
+      manualOverrides,
+    },
+    trust: {
+      sourceUsers,
+    },
+    wanted: {
+      wantedReleases,
+    },
+  };
+}
+
 export function createBackupExportService({
   backupsDirectory = process.env.HARMONIARR_BACKUPS ?? '/app/data/backups',
   createBackupArtifact = async () => {
     throw new Error('createBackupArtifact dependency is required');
   },
+  deleteBackupArtifactById = async () => null,
   getBackupArtifactById = async () => null,
   getMigrationStatusFn = getMigrationStatus,
+  listArtistMonitoringForBackup = async () => [],
   listBackupArtifacts = async () => [],
+  listOverridesSnapshotForBackup = async () => [],
+  listTrustSnapshotForBackup = async () => [],
+  listWantedReleasesForBackup = async () => [],
   loadSettingsFn = loadSettings,
   readPackageMetadataFn = async (path) => JSON.parse(await readFile(path, 'utf8')),
   packageJsonPath,
   recordAuditEventFn = recordAuditEvent,
   backupManifestService = createBackupManifestService(),
+  backupEncryptionService = createBackupEncryptionService(),
 } = {}) {
   if (!packageJsonPath) {
     throw new Error('packageJsonPath is required');
@@ -81,10 +134,20 @@ export function createBackupExportService({
     const packageMetadata = await readPackageMetadataFn(packageJsonPath);
     const settingsSnapshot = await loadSettingsFn();
     const migrationStatus = await getMigrationStatusFn();
+    const [artistMonitoring, manualOverrides, sourceUsers, wantedReleases] = await Promise.all([
+      listArtistMonitoringForBackup(),
+      listOverridesSnapshotForBackup(),
+      listTrustSnapshotForBackup(),
+      listWantedReleasesForBackup(),
+    ]);
     const migrationLevel = toMigrationLevel(migrationStatus);
+
+    const useEncryption = backupEncryptionService.isEncryptionAvailable();
+    const encrypted = useEncryption;
 
     const manifest = backupManifestService.buildLogicalManifest({
       appVersion: packageMetadata?.version ?? null,
+      encrypted,
       exportedAt: exportedAtIso,
       migrationLevel,
       settingsSnapshot,
@@ -93,24 +156,37 @@ export function createBackupExportService({
     const backupDocument = {
       ...manifest,
       data: {
+        scopeSettings: buildScopeSettings({
+          artistMonitoring,
+          manualOverrides,
+          settingsSnapshot,
+          sourceUsers,
+          wantedReleases,
+        }),
         settings: settingsSnapshot,
       },
     };
 
     const serialized = JSON.stringify(backupDocument, null, 2);
     const payloadSha256 = createHash('sha256').update(serialized).digest('hex');
+
+    const fileContent = useEncryption
+      ? backupEncryptionService.encryptBackupPayload(serialized)
+      : serialized;
+
     const filename = `harmoniarr_backup_${formatExportTimestamp(exportedAt)}.json`;
     const storagePath = join(backupsDirectory, filename);
 
     await mkdir(dirname(storagePath), { recursive: true });
-    await writeFile(storagePath, serialized, 'utf8');
+    await writeFile(storagePath, fileContent, 'utf8');
 
     const artifact = await createBackupArtifact({
       appVersion: manifest.application.version,
       backupType: manifest.backup.type,
       createdByUserId: triggeredByUserId,
-      encrypted: manifest.backup.encrypted,
-      fileSizeBytes: Buffer.byteLength(serialized, 'utf8'),
+      encrypted,
+      encryptionKeyFingerprint: backupEncryptionService.getKeyFingerprint(),
+      fileSizeBytes: Buffer.byteLength(fileContent, 'utf8'),
       filename,
       formatVersion: manifest.formatVersion,
       manifest,
@@ -165,9 +241,89 @@ export function createBackupExportService({
     };
   }
 
+  async function getBackupExportDownloadById({ backupArtifactId }) {
+    const artifact = await getBackupArtifactById({ backupArtifactId });
+    if (!artifact) {
+      throw createApiError(404, 'backup_artifact_not_found', 'Backup artifact was not found');
+    }
+
+    const storagePath = resolveArtifactStoragePath({
+      artifact,
+      backupsDirectory,
+    });
+
+    let payload;
+    try {
+      payload = await readFile(storagePath);
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        throw createApiError(404, 'backup_artifact_payload_not_found', 'Backup artifact payload file was not found');
+      }
+
+      throw error;
+    }
+
+    return {
+      backupArtifact: sanitizeArtifact(artifact),
+      content: payload,
+      contentType: 'application/json; charset=utf-8',
+      filename: artifact.filename ?? basename(storagePath),
+    };
+  }
+
+  async function deleteBackupExportById({ backupArtifactId, requestMetadata = null, triggeredByUserId = null } = {}) {
+    const artifact = await getBackupArtifactById({ backupArtifactId });
+    if (!artifact) {
+      throw createApiError(404, 'backup_artifact_not_found', 'Backup artifact was not found');
+    }
+
+    const storagePath = resolveArtifactStoragePath({
+      artifact,
+      backupsDirectory,
+    });
+
+    let fileDeleted = true;
+    try {
+      await unlink(storagePath);
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        fileDeleted = false;
+      } else {
+        throw error;
+      }
+    }
+
+    const deletedArtifact = await deleteBackupArtifactById({ backupArtifactId });
+    const resolvedDeletedArtifact = deletedArtifact ?? artifact;
+
+    await recordAuditEventFn({
+      actorType: triggeredByUserId ? 'user' : 'system',
+      actorUserId: triggeredByUserId,
+      details: {
+        backupArtifactId: resolvedDeletedArtifact.id,
+        fileDeleted,
+        filename: resolvedDeletedArtifact.filename,
+      },
+      entityId: resolvedDeletedArtifact.id,
+      entityType: 'backup_artifact',
+      eventType: 'backup_export_deleted',
+      ipAddress: requestMetadata?.ipAddress ?? null,
+      summary: 'Backup export deleted',
+      userAgent: requestMetadata?.userAgent ?? null,
+    });
+
+    return {
+      accepted: true,
+      backupArtifact: sanitizeArtifact(resolvedDeletedArtifact),
+      fileDeleted,
+    };
+  }
+
   return {
     createBackupExport,
+    deleteBackupExportById,
     getBackupExportById,
+    getBackupExportDownloadById,
     listBackupExports,
   };
 }

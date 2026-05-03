@@ -25,9 +25,16 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
 export function registerSystemRoutes(app, {
   appPort,
   createBackupExport,
+  deleteBackupExportById,
   getActivityFeed,
   getBackupExportById,
+  getBackupExportDownloadById,
   getBackupRestorePreview,
+  getMaintenanceLockStatus,
+  getQueueDiagnostics,
+  getRecoveryDiagnostics,
+  enterMaintenanceLock,
+  releaseMaintenanceLockById,
   startBackupRestoreApply,
   getOperatorNotifications,
   listBackupExports,
@@ -35,6 +42,7 @@ export function registerSystemRoutes(app, {
   limitOperatorNotificationFanoutRun = skipRateLimitMiddleware,
   buildLibraryScanSummary,
   buildOnboardingSummary,
+  executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
   getOverview,
   startOperatorNotificationFanoutRun,
   buildSettingsPayload,
@@ -45,6 +53,28 @@ export function registerSystemRoutes(app, {
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
 }) {
+  async function runIdempotentMutation({
+    actorUserId,
+    executeMutation,
+    idempotencyKey,
+    operationScope,
+    requestPayload,
+    statusCode,
+  }) {
+    const result = await executeIdempotentMutation({
+      actorUserId,
+      executeMutation,
+      idempotencyKey,
+      operationScope,
+      requestPayload,
+    });
+
+    return {
+      body: result?.body ?? {},
+      statusCode: result?.statusCode ?? statusCode,
+    };
+  }
+
   app.get('/healthz', asyncRoute(async (_request, response) => {
     const overview = await getOverview({ includeArtworkMaintenance: false, includeDependencies: false });
     response.json({
@@ -123,6 +153,23 @@ export function registerSystemRoutes(app, {
     });
   }));
 
+  app.get('/api/v1/recovery/backups/:backupArtifactId/download', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const download = await getBackupExportDownloadById({
+      backupArtifactId: request.params.backupArtifactId,
+    });
+
+    const safeFilename = String(download.filename ?? 'backup.json')
+      .replaceAll('"', '')
+      .replaceAll('\r', '')
+      .replaceAll('\n', '');
+
+    response.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    response.setHeader('Content-Type', download.contentType ?? 'application/octet-stream');
+    response.send(download.content);
+  }));
+
   app.get('/api/v1/recovery/backups/:backupArtifactId/restore-preview', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
 
@@ -138,12 +185,52 @@ export function registerSystemRoutes(app, {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
-    response.status(202).json({
-      ok: true,
-      ...await createBackupExport({
-        requestMetadata: getRequestMetadata(request),
-        triggeredByUserId: session.appUserId,
+    const result = await runIdempotentMutation({
+      actorUserId: session.appUserId,
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'recovery.backups.create',
+      requestPayload: null,
+      statusCode: 202,
+      executeMutation: async () => ({
+        body: await createBackupExport({
+          requestMetadata: getRequestMetadata(request),
+          triggeredByUserId: session.appUserId,
+        }),
+        statusCode: 202,
       }),
+    });
+
+    response.status(result.statusCode).json({
+      ok: true,
+      ...result.body,
+    });
+  }));
+
+  app.delete('/api/v1/recovery/backups/:backupArtifactId', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await runIdempotentMutation({
+      actorUserId: session.appUserId,
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'recovery.backups.delete',
+      requestPayload: {
+        backupArtifactId: request.params.backupArtifactId,
+      },
+      statusCode: 200,
+      executeMutation: async () => ({
+        body: await deleteBackupExportById({
+          backupArtifactId: request.params.backupArtifactId,
+          requestMetadata: getRequestMetadata(request),
+          triggeredByUserId: session.appUserId,
+        }),
+        statusCode: 200,
+      }),
+    });
+
+    response.json({
+      ok: true,
+      ...result.body,
     });
   }));
 
@@ -151,13 +238,130 @@ export function registerSystemRoutes(app, {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
-    response.status(202).json({
-      ok: true,
-      ...await startBackupRestoreApply({
+    const result = await runIdempotentMutation({
+      actorUserId: session.appUserId,
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'recovery.backups.restoreApply',
+      requestPayload: {
         backupArtifactId: request.params.backupArtifactId,
-        expectedPayloadSha256: request.body?.expectedPayloadSha256,
-        requestMetadata: getRequestMetadata(request),
-        triggeredByUserId: session.appUserId,
+        expectedPayloadSha256: request.body?.expectedPayloadSha256 ?? null,
+      },
+      statusCode: 202,
+      executeMutation: async () => ({
+        body: await startBackupRestoreApply({
+          backupArtifactId: request.params.backupArtifactId,
+          expectedPayloadSha256: request.body?.expectedPayloadSha256,
+          requestMetadata: getRequestMetadata(request),
+          triggeredByUserId: session.appUserId,
+        }),
+        statusCode: 202,
+      }),
+    });
+
+    response.status(result.statusCode).json({
+      ok: true,
+      ...result.body,
+    });
+  }));
+
+  app.get('/api/v1/recovery/maintenance-locks', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+    const lockTypes = typeof request.query.lockTypes === 'string'
+      ? request.query.lockTypes.split(',')
+      : [];
+
+    response.json({
+      ok: true,
+      ...await getMaintenanceLockStatus({
+        lockTypes,
+      }),
+    });
+  }));
+
+  app.post('/api/v1/recovery/maintenance-locks', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await runIdempotentMutation({
+      actorUserId: session.appUserId,
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'recovery.maintenanceLocks.enter',
+      requestPayload: {
+        expiresAt: request.body?.expiresAt ?? null,
+        lockType: request.body?.lockType ?? null,
+        reason: request.body?.reason ?? null,
+      },
+      statusCode: 202,
+      executeMutation: async () => ({
+        body: await enterMaintenanceLock({
+          expiresAt: request.body?.expiresAt,
+          lockType: request.body?.lockType,
+          reason: request.body?.reason,
+          requestMetadata: getRequestMetadata(request),
+          triggeredByUserId: session.appUserId,
+        }),
+        statusCode: 202,
+      }),
+    });
+
+    response.status(result.statusCode).json({
+      ok: true,
+      ...result.body,
+    });
+  }));
+
+  app.post('/api/v1/recovery/maintenance-locks/:lockId/release', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await runIdempotentMutation({
+      actorUserId: session.appUserId,
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'recovery.maintenanceLocks.release',
+      requestPayload: {
+        lockId: request.params.lockId,
+      },
+      statusCode: 200,
+      executeMutation: async () => ({
+        body: await releaseMaintenanceLockById({
+          lockId: request.params.lockId,
+          requestMetadata: getRequestMetadata(request),
+          triggeredByUserId: session.appUserId,
+        }),
+        statusCode: 200,
+      }),
+    });
+
+    response.json({
+      ok: true,
+      ...result.body,
+    });
+  }));
+
+  app.get('/api/v1/system/diagnostics/queue-state', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    response.json({
+      ok: true,
+      ...await getQueueDiagnostics({
+        runLimit: request.query.runLimit,
+      }),
+    });
+  }));
+
+  app.get('/api/v1/system/diagnostics/recovery-state', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const lockTypes = typeof request.query.lockTypes === 'string'
+      ? request.query.lockTypes.split(',')
+      : [];
+
+    response.json({
+      ok: true,
+      ...await getRecoveryDiagnostics({
+        auditLimit: request.query.auditLimit,
+        lockTypes,
+        runLimit: request.query.runLimit,
       }),
     });
   }));

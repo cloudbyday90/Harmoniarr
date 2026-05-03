@@ -16,6 +16,15 @@ function createSystemRouteTestApp(overrides = {}) {
           createdByUserId: triggeredByUserId,
         },
       }),
+      deleteBackupExportById: async ({ backupArtifactId, triggeredByUserId }) => ({
+        accepted: true,
+        backupArtifact: {
+          id: backupArtifactId,
+          filename: 'harmoniarr_backup_2026-05-02T12-00-00-000Z.json',
+          deletedByUserId: triggeredByUserId,
+        },
+        fileDeleted: true,
+      }),
       buildLibraryScanSummary: async () => ({
         checkedAt: '2026-04-30T22:30:00.000Z',
         libraryRoot: '/srv/music',
@@ -50,6 +59,7 @@ function createSystemRouteTestApp(overrides = {}) {
           message: 'Validation needs attention',
         }],
       }),
+      executeIdempotentMutation: async ({ executeMutation }) => executeMutation(),
       buildSettingsPayload: async () => ({
         settings: {
           libraryPath: '/music/library',
@@ -103,6 +113,15 @@ function createSystemRouteTestApp(overrides = {}) {
           backupType: 'logical',
         },
       }),
+      getBackupExportDownloadById: async ({ backupArtifactId }) => ({
+        backupArtifact: {
+          id: backupArtifactId,
+          filename: 'harmoniarr_backup_2026-05-02T12-00-00-000Z.json',
+        },
+        content: Buffer.from('{"backup":true}\n', 'utf8'),
+        contentType: 'application/json; charset=utf-8',
+        filename: 'harmoniarr_backup_2026-05-02T12-00-00-000Z.json',
+      }),
       getBackupRestorePreview: async ({ backupArtifactId }) => ({
         backupArtifact: {
           id: backupArtifactId,
@@ -122,6 +141,64 @@ function createSystemRouteTestApp(overrides = {}) {
         },
         canApplyRestore: true,
         checkedAt: '2026-05-02T12:18:00.000Z',
+      }),
+      getMaintenanceLockStatus: async ({ lockTypes }) => ({
+        checkedAt: '2026-05-02T12:19:00.000Z',
+        activeLocks: [],
+        lockCount: 0,
+        lockTypes,
+        hasActiveLocks: false,
+      }),
+      getQueueDiagnostics: async ({ runLimit }) => ({
+        checkedAt: '2026-05-02T12:20:45.000Z',
+        queueState: {
+          failed: 1,
+          pending: 2,
+          running: 1,
+          totalTracked: 4,
+        },
+        recentRuns: [{ id: 'run-queue-1', status: 'failed', operationType: 'backup_restore_apply' }],
+        runLimit,
+      }),
+      getRecoveryDiagnostics: async ({ auditLimit, lockTypes, runLimit }) => ({
+        checkedAt: '2026-05-02T12:21:00.000Z',
+        maintenance: {
+          activeLocks: [],
+          hasActiveLocks: false,
+          lockCount: 0,
+          lockTypes,
+        },
+        recentFailedRuns: [],
+        recentPrivilegedActions: [{ id: 'audit-1', eventType: 'maintenance_lock_entered' }],
+        source: {
+          auditLimit,
+          runLimit,
+        },
+      }),
+      enterMaintenanceLock: async ({ expiresAt, lockType, reason, triggeredByUserId }) => ({
+        accepted: true,
+        lock: {
+          id: 'lock-entered-1',
+          lockType: lockType ?? 'maintenance',
+          status: 'active',
+          reason: reason ?? null,
+          expiresAt: expiresAt ?? null,
+          acquiredByUserId: triggeredByUserId,
+          acquiredAt: '2026-05-02T12:19:30.000Z',
+          releasedAt: null,
+        },
+      }),
+      releaseMaintenanceLockById: async ({ lockId }) => ({
+        accepted: true,
+        alreadyReleased: false,
+        lock: {
+          id: lockId,
+          lockType: 'maintenance',
+          status: 'released',
+          reason: 'Operator requested maintenance window',
+          acquiredAt: '2026-05-02T12:19:30.000Z',
+          releasedAt: '2026-05-02T12:20:15.000Z',
+        },
       }),
       startBackupRestoreApply: async ({ backupArtifactId, expectedPayloadSha256, triggeredByUserId }) => ({
         accepted: true,
@@ -209,6 +286,173 @@ function createSystemRouteTestApp(overrides = {}) {
   });
 }
 
+test('backup delete route forwards idempotency inputs and replays response', async (t) => {
+  const deleteBackupExportById = t.mock.fn(async () => ({
+    accepted: true,
+    backupArtifact: { id: 'backup-del-idem-1' },
+    fileDeleted: true,
+  }));
+  const executeIdempotentMutation = t.mock.fn(async ({
+    actorUserId,
+    executeMutation,
+    idempotencyKey,
+    operationScope,
+    requestPayload,
+  }) => {
+    assert.equal(actorUserId, 'user-1');
+    assert.equal(idempotencyKey, 'idem-del-1');
+    assert.equal(operationScope, 'recovery.backups.delete');
+    assert.deepEqual(requestPayload, { backupArtifactId: 'backup-del-idem-1' });
+    await executeMutation();
+    return {
+      body: {
+        accepted: true,
+        backupArtifact: { id: 'backup-del-idem-1' },
+        fileDeleted: true,
+      },
+      replayed: true,
+      statusCode: 200,
+    };
+  });
+  const app = createSystemRouteTestApp({ deleteBackupExportById, executeIdempotentMutation });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/backups/backup-del-idem-1`, {
+      method: 'DELETE',
+      headers: {
+        'idempotency-key': 'idem-del-1',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(executeIdempotentMutation.mock.callCount(), 1);
+    assert.equal(deleteBackupExportById.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.backupArtifact.id, 'backup-del-idem-1');
+  });
+});
+
+test('maintenance lock enter route forwards idempotency inputs and replays response', async (t) => {
+  const enterMaintenanceLock = t.mock.fn(async () => ({
+    accepted: true,
+    lock: {
+      id: 'lock-idem-1',
+      lockType: 'maintenance',
+      status: 'active',
+      reason: 'test idempotency',
+    },
+  }));
+  const executeIdempotentMutation = t.mock.fn(async ({
+    actorUserId,
+    executeMutation,
+    idempotencyKey,
+    operationScope,
+    requestPayload,
+  }) => {
+    assert.equal(actorUserId, 'user-1');
+    assert.equal(idempotencyKey, 'idem-lock-enter-1');
+    assert.equal(operationScope, 'recovery.maintenanceLocks.enter');
+    assert.deepEqual(requestPayload, {
+      expiresAt: '2026-05-02T14:00:00.000Z',
+      lockType: 'maintenance',
+      reason: 'test idempotency',
+    });
+    await executeMutation();
+    return {
+      body: {
+        accepted: true,
+        lock: {
+          id: 'lock-idem-1',
+          lockType: 'maintenance',
+          status: 'active',
+          reason: 'test idempotency',
+        },
+      },
+      replayed: true,
+      statusCode: 202,
+    };
+  });
+  const app = createSystemRouteTestApp({ enterMaintenanceLock, executeIdempotentMutation });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/maintenance-locks`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': 'idem-lock-enter-1',
+      },
+      body: JSON.stringify({
+        expiresAt: '2026-05-02T14:00:00.000Z',
+        lockType: 'maintenance',
+        reason: 'test idempotency',
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(executeIdempotentMutation.mock.callCount(), 1);
+    assert.equal(enterMaintenanceLock.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.lock.id, 'lock-idem-1');
+  });
+});
+
+test('maintenance lock release route forwards idempotency inputs and replays response', async (t) => {
+  const releaseMaintenanceLockById = t.mock.fn(async () => ({
+    accepted: true,
+    alreadyReleased: false,
+    lock: {
+      id: 'lock-release-idem-1',
+      lockType: 'maintenance',
+      status: 'released',
+    },
+  }));
+  const executeIdempotentMutation = t.mock.fn(async ({
+    actorUserId,
+    executeMutation,
+    idempotencyKey,
+    operationScope,
+    requestPayload,
+  }) => {
+    assert.equal(actorUserId, 'user-1');
+    assert.equal(idempotencyKey, 'idem-lock-release-1');
+    assert.equal(operationScope, 'recovery.maintenanceLocks.release');
+    assert.deepEqual(requestPayload, { lockId: 'lock-release-idem-1' });
+    await executeMutation();
+    return {
+      body: {
+        accepted: true,
+        alreadyReleased: false,
+        lock: {
+          id: 'lock-release-idem-1',
+          lockType: 'maintenance',
+          status: 'released',
+        },
+      },
+      replayed: true,
+      statusCode: 200,
+    };
+  });
+  const app = createSystemRouteTestApp({ releaseMaintenanceLockById, executeIdempotentMutation });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/maintenance-locks/lock-release-idem-1/release`, {
+      method: 'POST',
+      headers: {
+        'idempotency-key': 'idem-lock-release-1',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(executeIdempotentMutation.mock.callCount(), 1);
+    assert.equal(releaseMaintenanceLockById.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.lock.id, 'lock-release-idem-1');
+  });
+});
+
 test('backup export create route enforces csrf and returns accepted backup artifact', async (t) => {
   const createBackupExport = t.mock.fn(async ({ requestMetadata, triggeredByUserId }) => ({
     accepted: true,
@@ -244,6 +488,55 @@ test('backup export create route enforces csrf and returns accepted backup artif
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.backupArtifact.id, 'backup-44');
+  });
+});
+
+test('backup export create route forwards idempotency inputs and replays response', async (t) => {
+  const createBackupExport = t.mock.fn(async () => ({
+    accepted: true,
+    backupArtifact: {
+      id: 'backup-replayed-1',
+    },
+  }));
+  const executeIdempotentMutation = t.mock.fn(async ({
+    actorUserId,
+    executeMutation,
+    idempotencyKey,
+    operationScope,
+    requestPayload,
+  }) => {
+    assert.equal(actorUserId, 'user-1');
+    assert.equal(idempotencyKey, 'idem-key-1');
+    assert.equal(operationScope, 'recovery.backups.create');
+    assert.equal(requestPayload, null);
+    await executeMutation();
+    return {
+      body: {
+        accepted: true,
+        backupArtifact: {
+          id: 'backup-replayed-1',
+        },
+      },
+      replayed: true,
+      statusCode: 202,
+    };
+  });
+  const app = createSystemRouteTestApp({ createBackupExport, executeIdempotentMutation });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/backups`, {
+      method: 'POST',
+      headers: {
+        'idempotency-key': 'idem-key-1',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(executeIdempotentMutation.mock.callCount(), 1);
+    assert.equal(createBackupExport.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.backupArtifact.id, 'backup-replayed-1');
   });
 });
 
@@ -293,6 +586,80 @@ test('backup export detail route requires admin session and returns artifact det
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.backupArtifact.id, 'backup-1');
+  });
+});
+
+test('backup export download route requires admin session and returns attachment payload', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'user-1', user: { role: 'admin' } }));
+  const getBackupExportDownloadById = t.mock.fn(async ({ backupArtifactId }) => ({
+    backupArtifact: {
+      id: backupArtifactId,
+      filename: 'harmoniarr_backup_2026-05-02T12-00-00-000Z.json',
+    },
+    content: Buffer.from('{"backup":true}\n', 'utf8'),
+    contentType: 'application/json; charset=utf-8',
+    filename: 'harmoniarr_backup_2026-05-02T12-00-00-000Z.json',
+  }));
+  const app = createSystemRouteTestApp({ getBackupExportDownloadById, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/backups/backup-1/download`);
+    const payload = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(getBackupExportDownloadById.mock.callCount(), 1);
+    assert.deepEqual(getBackupExportDownloadById.mock.calls[0].arguments, [{
+      backupArtifactId: 'backup-1',
+    }]);
+    assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
+    assert.equal(response.headers.get('content-disposition'), 'attachment; filename="harmoniarr_backup_2026-05-02T12-00-00-000Z.json"');
+    assert.equal(payload, '{"backup":true}\n');
+  });
+});
+
+test('backup export delete route enforces fresh admin session and csrf and deletes artifact', async (t) => {
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-13', csrfToken: 'csrf-token', user: { role: 'admin' } }));
+  const deleteBackupExportById = t.mock.fn(async ({ backupArtifactId, requestMetadata, triggeredByUserId }) => ({
+    accepted: true,
+    backupArtifact: {
+      id: backupArtifactId,
+      filename: 'harmoniarr_backup_2026-05-02T12-00-00-000Z.json',
+    },
+    fileDeleted: true,
+    source: {
+      requestMetadata,
+      triggeredByUserId,
+    },
+  }));
+  const app = createSystemRouteTestApp({ deleteBackupExportById, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/backups/backup-1`, {
+      method: 'DELETE',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.64',
+        'user-agent': 'HarmoniarrBackupDeleteRouteTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(deleteBackupExportById.mock.callCount(), 1);
+    assert.deepEqual(deleteBackupExportById.mock.calls[0].arguments, [{
+      backupArtifactId: 'backup-1',
+      requestMetadata: {
+        ipAddress: '198.51.100.64',
+        userAgent: 'HarmoniarrBackupDeleteRouteTest/1.0',
+      },
+      triggeredByUserId: 'user-13',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.fileDeleted, true);
   });
 });
 
@@ -392,6 +759,221 @@ test('backup restore apply route enforces fresh admin session and csrf and retur
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.run.id, 'run-restore-9');
+  });
+});
+
+test('backup restore apply route rejects idempotency key payload mismatch', async (t) => {
+  const executeIdempotentMutation = t.mock.fn(async () => {
+    throw createApiError(409, 'idempotency_key_payload_mismatch', 'Idempotency key was already used with a different request payload');
+  });
+  const startBackupRestoreApply = t.mock.fn();
+  const app = createSystemRouteTestApp({ executeIdempotentMutation, startBackupRestoreApply });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/backups/backup-1/restore-apply`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': 'idem-restore-1',
+      },
+      body: JSON.stringify({
+        expectedPayloadSha256: 'sha-original',
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(executeIdempotentMutation.mock.callCount(), 1);
+    assert.equal(startBackupRestoreApply.mock.callCount(), 0);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error?.code, 'idempotency_key_payload_mismatch');
+  });
+});
+
+test('maintenance lock status route requires admin session and returns active lock status', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'user-2', user: { role: 'admin' } }));
+  const getMaintenanceLockStatus = t.mock.fn(async ({ lockTypes }) => ({
+    checkedAt: '2026-05-02T12:19:00.000Z',
+    activeLocks: [],
+    lockCount: 0,
+    lockTypes,
+    hasActiveLocks: false,
+  }));
+  const app = createSystemRouteTestApp({ getMaintenanceLockStatus, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/maintenance-locks?lockTypes=maintenance,restore`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(getMaintenanceLockStatus.mock.callCount(), 1);
+    assert.deepEqual(getMaintenanceLockStatus.mock.calls[0].arguments, [{
+      lockTypes: ['maintenance', 'restore'],
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.hasActiveLocks, false);
+  });
+});
+
+test('maintenance lock enter route enforces fresh admin session and csrf', async (t) => {
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-5', csrfToken: 'csrf-token', user: { role: 'admin' } }));
+  const enterMaintenanceLock = t.mock.fn(async ({ expiresAt, lockType, reason, requestMetadata, triggeredByUserId }) => ({
+    accepted: true,
+    lock: {
+      id: 'lock-55',
+      lockType,
+      status: 'active',
+      reason,
+      expiresAt,
+      acquiredByUserId: triggeredByUserId,
+      requestMetadata,
+    },
+  }));
+  const app = createSystemRouteTestApp({ enterMaintenanceLock, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/maintenance-locks`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.62',
+        'user-agent': 'HarmoniarrMaintenanceLockRouteTest/1.0',
+      },
+      body: JSON.stringify({
+        expiresAt: '2026-05-02T13:00:00.000Z',
+        lockType: 'maintenance',
+        reason: 'Operator requested maintenance window',
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(enterMaintenanceLock.mock.callCount(), 1);
+    assert.deepEqual(enterMaintenanceLock.mock.calls[0].arguments, [{
+      expiresAt: '2026-05-02T13:00:00.000Z',
+      lockType: 'maintenance',
+      reason: 'Operator requested maintenance window',
+      requestMetadata: {
+        ipAddress: '198.51.100.62',
+        userAgent: 'HarmoniarrMaintenanceLockRouteTest/1.0',
+      },
+      triggeredByUserId: 'user-5',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.lock.id, 'lock-55');
+  });
+});
+
+test('maintenance lock release route enforces fresh admin session and csrf', async (t) => {
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-8', csrfToken: 'csrf-token', user: { role: 'admin' } }));
+  const releaseMaintenanceLockById = t.mock.fn(async ({ lockId, requestMetadata, triggeredByUserId }) => ({
+    accepted: true,
+    alreadyReleased: false,
+    lock: {
+      id: lockId,
+      lockType: 'maintenance',
+      status: 'released',
+      acquiredByUserId: triggeredByUserId,
+      requestMetadata,
+    },
+  }));
+  const app = createSystemRouteTestApp({ releaseMaintenanceLockById, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/recovery/maintenance-locks/lock-8/release`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '198.51.100.63',
+        'user-agent': 'HarmoniarrMaintenanceLockReleaseRouteTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(releaseMaintenanceLockById.mock.callCount(), 1);
+    assert.deepEqual(releaseMaintenanceLockById.mock.calls[0].arguments, [{
+      lockId: 'lock-8',
+      requestMetadata: {
+        ipAddress: '198.51.100.63',
+        userAgent: 'HarmoniarrMaintenanceLockReleaseRouteTest/1.0',
+      },
+      triggeredByUserId: 'user-8',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.lock.id, 'lock-8');
+  });
+});
+
+test('queue diagnostics route requires admin session and returns queue state payload', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'user-3', user: { role: 'admin' } }));
+  const getQueueDiagnostics = t.mock.fn(async ({ runLimit }) => ({
+    checkedAt: '2026-05-02T12:20:45.000Z',
+    queueState: {
+      failed: 1,
+      pending: 2,
+      running: 1,
+      totalTracked: 4,
+    },
+    recentRuns: [{ id: 'run-queue-1', status: 'failed', operationType: 'backup_restore_apply' }],
+    runLimit,
+  }));
+  const app = createSystemRouteTestApp({ getQueueDiagnostics, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/system/diagnostics/queue-state?runLimit=12`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(getQueueDiagnostics.mock.callCount(), 1);
+    assert.deepEqual(getQueueDiagnostics.mock.calls[0].arguments, [{ runLimit: '12' }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.queueState.totalTracked, 4);
+  });
+});
+
+test('recovery diagnostics route requires admin session and forwards limit and lock filters', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'user-4', user: { role: 'admin' } }));
+  const getRecoveryDiagnostics = t.mock.fn(async ({ auditLimit, lockTypes, runLimit }) => ({
+    checkedAt: '2026-05-02T12:21:00.000Z',
+    maintenance: {
+      activeLocks: [],
+      hasActiveLocks: false,
+      lockCount: 0,
+      lockTypes,
+    },
+    recentFailedRuns: [],
+    recentPrivilegedActions: [{ id: 'audit-1', eventType: 'maintenance_lock_entered' }],
+    source: {
+      auditLimit,
+      runLimit,
+    },
+  }));
+  const app = createSystemRouteTestApp({ getRecoveryDiagnostics, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/system/diagnostics/recovery-state?auditLimit=9&runLimit=11&lockTypes=maintenance,restore`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(getRecoveryDiagnostics.mock.callCount(), 1);
+    assert.deepEqual(getRecoveryDiagnostics.mock.calls[0].arguments, [{
+      auditLimit: '9',
+      lockTypes: ['maintenance', 'restore'],
+      runLimit: '11',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.recentPrivilegedActions.length, 1);
   });
 });
 

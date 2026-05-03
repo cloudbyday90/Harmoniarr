@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createImportCandidateTranscodeService } from '../../src/server/import-candidates/import-candidate-transcode-service.js';
 
 test('startImportCandidateTranscodeRun queues pending transcode orchestration for selected candidates', async (t) => {
@@ -105,5 +106,18 @@ test('startImportCandidateTranscodeRun rejects when selected candidates have no 
   await assert.rejects(
     () => service.startImportCandidateTranscodeRun(),
     (error) => error.code === 'import_candidate_transcode_no_candidates',
+  );
+});
+
+test('startImportCandidateTranscodeRun rejects when maintenance lock blocks unsafe writes', async () => {
+  const service = createImportCandidateTranscodeService({
+    assertMaintenanceWriteAllowed: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents import candidate transcode orchestration');
+    },
+  });
+
+  await assert.rejects(
+    () => service.startImportCandidateTranscodeRun(),
+    (error) => error.code === 'recovery_lock_conflict',
   );
 });

@@ -49,6 +49,7 @@ function deriveSpotifyArtistAlbumsRequests({ mediaRequestId, pageData }) {
 }
 
 export function createLibraryExternalIntakeService({
+  assertMaintenanceWriteAllowed = async () => {},
   createOperationRun,
   getActiveRunByMediaRequestId,
   getNow = () => new Date(),
@@ -56,6 +57,8 @@ export function createLibraryExternalIntakeService({
   recordAuditEventFn = recordAuditEvent,
 } = {}) {
   async function queueExternalMediaRequestPlanning({ mediaRequestId, normalizedSource, requestMetadata = {}, triggerSource = 'request_submit', triggeredByUserId = null }) {
+    await assertMaintenanceWriteAllowed();
+
     const existingRun = await getActiveRunByMediaRequestId(mediaRequestId);
     if (existingRun) {
       return { accepted: true, reusedExistingRun: true, run: existingRun };
@@ -110,6 +113,7 @@ export function createLibraryExternalIntakeService({
 }
 
 export function createLibraryProviderIngestExecutionService({
+  assertMaintenanceWriteAllowed = async () => {},
   executionRunStore = createLibraryProviderIngestExecutionRunStore(),
   getNow = () => new Date(),
   mediaRequestStore = createLibraryMediaRequestStore(),
@@ -118,6 +122,8 @@ export function createLibraryProviderIngestExecutionService({
   resolveProviderClients = () => ({}),
 } = {}) {
   async function queueExternalMediaRequestExecution({ mediaRequestId, canonicalUrl, resourceType, sourceIdentifier, sourceProvider, triggerSource = 'planning_complete', triggeredByUserId = null } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const existingRun = await executionRunStore.getActiveRunByMediaRequestId(mediaRequestId);
     if (existingRun) {
       return { accepted: true, reusedExistingRun: true, run: existingRun };

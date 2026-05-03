@@ -3,6 +3,7 @@ import test from 'node:test';
 import { registerArtworkRoutes } from '../../src/server/routes/artwork-routes.js';
 import { registerAppUserRoutes } from '../../src/server/routes/app-user-routes.js';
 import { registerAuthRoutes } from '../../src/server/routes/auth-routes.js';
+import { registerAdminRecoveryRoutes } from '../../src/server/routes/admin-recovery-routes.js';
 import { registerImportCandidateRoutes } from '../../src/server/routes/import-candidate-routes.js';
 import { registerLibraryRoutes } from '../../src/server/routes/library-routes.js';
 import { registerMetadataRoutes } from '../../src/server/routes/metadata-routes.js';
@@ -50,6 +51,11 @@ function collectRegisteredRoutes() {
     requireFreshSession: asyncNoopResult({ appUserId: 'user-1' }),
     requireSession: asyncNoopResult({ appUserId: 'user-1' }),
     rotateSession: asyncNoopResult({}),
+  });
+
+  registerAdminRecoveryRoutes(app, {
+    getBootstrapAdminRecoveryStatus: asyncNoopResult({ recoveryAvailable: false }),
+    completeBootstrapAdminRecovery: asyncNoopResult({ success: true, requiresLogin: true }),
   });
 
   registerAppUserRoutes(app, {
@@ -172,8 +178,14 @@ function collectRegisteredRoutes() {
     buildOnboardingSummary: asyncNoopResult({}),
     buildSettingsPayload: asyncNoopResult({}),
     createBackupExport: asyncNoopResult({}),
+    deleteBackupExportById: asyncNoopResult({}),
+    enterMaintenanceLock: asyncNoopResult({}),
+    getQueueDiagnostics: asyncNoopResult({}),
+    getRecoveryDiagnostics: asyncNoopResult({}),
     getBackupExportById: asyncNoopResult({}),
+    getBackupExportDownloadById: asyncNoopResult({}),
     getBackupRestorePreview: asyncNoopResult({}),
+    getMaintenanceLockStatus: asyncNoopResult({}),
     startBackupRestoreApply: asyncNoopResult({}),
     getOperatorNotifications: asyncNoopResult({}),
     getOverview: asyncNoopResult({ service: { name: 'harmoniarr', startedAt: 'now' }, database: { name: 'postgres', pendingMigrations: 0 } }),
@@ -182,6 +194,7 @@ function collectRegisteredRoutes() {
     requireAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
     requireCsrf: () => {},
     requireFreshAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
+    releaseMaintenanceLockById: asyncNoopResult({}),
     requireSession: asyncNoopResult({ appUserId: 'user-1' }),
     startOperatorNotificationFanoutRun: asyncNoopResult({}),
     updateSettings: asyncNoopResult({}),

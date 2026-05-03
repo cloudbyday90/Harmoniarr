@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createApiError } from '../../src/server/auth.js';
 import { createLibraryProviderIngestExecutionService } from '../../src/server/library/library-provider-ingest-execution-service.js';
 
 test('executeProviderIngestRequests applies bounded playlist policy through provider expansion service', async (t) => {
@@ -99,4 +100,23 @@ test('executeProviderIngestRequests expands playlist artists when policy opts in
     ['release', 'album-1'],
     ['artist', 'artist-1'],
   ]);
+});
+
+test('queueExternalMediaRequestExecution rejects when maintenance lock blocks unsafe writes', async () => {
+  const service = createLibraryProviderIngestExecutionService({
+    assertMaintenanceWriteAllowed: async () => {
+      throw createApiError(409, 'recovery_lock_conflict', 'A conflicting maintenance lock prevents library provider ingest execution');
+    },
+  });
+
+  await assert.rejects(
+    () => service.queueExternalMediaRequestExecution({
+      mediaRequestId: 'request-7',
+      canonicalUrl: 'https://open.spotify.com/playlist/pl-7',
+      resourceType: 'playlist',
+      sourceIdentifier: 'pl-7',
+      sourceProvider: 'spotify',
+    }),
+    (error) => error.code === 'recovery_lock_conflict',
+  );
 });

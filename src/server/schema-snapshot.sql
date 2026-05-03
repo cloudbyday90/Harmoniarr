@@ -2538,3 +2538,293 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260502_000008_backup_artifact_metadata.sql
+-- Checksum: c6c1af6ea42f9bb87fe9093b4337b18bcb9f2b1b8cb21d169156213e70af8a3d
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS backup_artifacts (
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  filename TEXT NOT NULL UNIQUE,
+  backup_type TEXT NOT NULL,
+  encrypted BOOLEAN NOT NULL DEFAULT FALSE,
+  format_version TEXT NOT NULL,
+  app_version TEXT NULL,
+  migration_level TEXT NULL,
+  scope_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  payload_sha256 TEXT NOT NULL,
+  file_size_bytes BIGINT NOT NULL CHECK (file_size_bytes >= 0),
+  created_by_user_id UUID NULL REFERENCES app_users(id),
+  storage_path TEXT NOT NULL,
+  manifest_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_backup_artifacts_created_at
+  ON backup_artifacts (created_at DESC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000008',
+  '20260502_000008_backup_artifact_metadata.sql',
+  'backup_artifact_metadata',
+  'c6c1af6ea42f9bb87fe9093b4337b18bcb9f2b1b8cb21d169156213e70af8a3d',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000009_recovery_scope_runtime_snapshots.sql
+-- Checksum: 497564769ddd5b63d16a66d2ad1cdf608e37d725bf86cd3df08179d6ca218f71
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS recovery_trust_snapshots (
+  snapshot_order INTEGER PRIMARY KEY,
+  payload JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (snapshot_order >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS recovery_override_snapshots (
+  snapshot_order INTEGER PRIMARY KEY,
+  payload JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (snapshot_order >= 0)
+);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000009',
+  '20260502_000009_recovery_scope_runtime_snapshots.sql',
+  'recovery_scope_runtime_snapshots',
+  '497564769ddd5b63d16a66d2ad1cdf608e37d725bf86cd3df08179d6ca218f71',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260502_000010_control_plane_idempotency_records.sql
+-- Checksum: 0704567e9201159fccf18b2f2fb5a8480d912c7ff2c46b25238e530201112506
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS control_plane_idempotency_records (
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  operation_scope TEXT NOT NULL,
+  actor_user_id UUID NULL REFERENCES app_users(id) ON DELETE SET NULL,
+  idempotency_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status_code INTEGER NOT NULL,
+  response_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NULL,
+  UNIQUE (operation_scope, actor_user_id, idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_control_plane_idempotency_records_expires_at
+  ON control_plane_idempotency_records (expires_at);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260502_000010',
+  '20260502_000010_control_plane_idempotency_records.sql',
+  'control_plane_idempotency_records',
+  '0704567e9201159fccf18b2f2fb5a8480d912c7ff2c46b25238e530201112506',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260503_002533_backup_artifact_encryption_key_fingerprint.sql
+-- Checksum: f27d5a5f5d76b67775000fd501e01977dee1c56abbd0569bb9ca1b9d8ddcec38
+-- forward-only migration
+BEGIN;
+
+ALTER TABLE backup_artifacts
+  ADD COLUMN IF NOT EXISTS encryption_key_fingerprint TEXT NULL;
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260503_002533',
+  '20260503_002533_backup_artifact_encryption_key_fingerprint.sql',
+  'backup_artifact_encryption_key_fingerprint',
+  'f27d5a5f5d76b67775000fd501e01977dee1c56abbd0569bb9ca1b9d8ddcec38',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260503_003100_admin_recovery_runs.sql
+-- Checksum: 66f6aea47a255adde65534301fcb5f20cdfa0b1cd95dd44f6cdfbae4cee545f7
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+-- Admin recovery runs for emergency bootstrap-admin recovery
+
+CREATE TABLE IF NOT EXISTS admin_recovery_runs (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  status TEXT NOT NULL DEFAULT 'armed'
+    CHECK (status IN ('armed', 'completed', 'cancelled', 'expired', 'invalidated')),
+  recovery_code_hash TEXT NOT NULL,
+  armed_via TEXT NOT NULL DEFAULT 'harmoniarrctl',
+  armed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  invalid_attempt_count INTEGER NOT NULL DEFAULT 0,
+  max_attempts INTEGER NOT NULL DEFAULT 5,
+  completed_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ,
+  created_admin_user_id TEXT REFERENCES app_users(id),
+  completed_from_ip TEXT,
+  completed_user_agent TEXT,
+  reason TEXT,
+  details_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_recovery_runs_active
+  ON admin_recovery_runs (status, expires_at)
+  WHERE status = 'armed';
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260503_003100',
+  '20260503_003100_admin_recovery_runs.sql',
+  'admin_recovery_runs',
+  '66f6aea47a255adde65534301fcb5f20cdfa0b1cd95dd44f6cdfbae4cee545f7',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

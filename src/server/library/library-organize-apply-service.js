@@ -21,6 +21,7 @@ import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 
 export function createLibraryOrganizeApplyService({
+  assertMaintenanceWriteAllowed = async () => {},
   buildLibraryOrganizePreview = async () => ({ counts: { renameRequiredCount: 0 } }),
   createOperationRun = async () => {
     throw new Error('createOperationRun dependency is required');
@@ -31,6 +32,8 @@ export function createLibraryOrganizeApplyService({
   const operationDescriptor = operationRunRegistry.libraryOrganizeApply;
 
   async function startLibraryOrganizeApplyRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+    await assertMaintenanceWriteAllowed();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'library_organize_apply_in_progress', 'A library organize apply run is already running or queued');
