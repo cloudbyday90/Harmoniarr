@@ -40,6 +40,21 @@ export function useBootstrapStatus({
     };
   });
 
+  const ownerClaimSummary = computed(() => {
+    const ownerClaim = bootstrapStatus.value?.ownerClaim;
+    if (!ownerClaim) {
+      return null;
+    }
+
+    return {
+      authMethods: Array.isArray(ownerClaim.authMethods) ? ownerClaim.authMethods : [],
+      emailHint: ownerClaim.emailHint ?? null,
+      emailRequired: Boolean(ownerClaim.emailRequired),
+      required: Boolean(ownerClaim.required),
+      usernameHint: ownerClaim.usernameHint ?? null,
+    };
+  });
+
   async function loadStatus() {
     isLoading.value = true;
     errorMessage.value = '';
@@ -58,6 +73,7 @@ export function useBootstrapStatus({
     errorMessage,
     isLoading,
     loadStatus,
+    ownerClaimSummary,
     pathValidationSummary,
   };
 }

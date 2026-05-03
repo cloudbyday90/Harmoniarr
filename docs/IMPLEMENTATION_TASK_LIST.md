@@ -24,6 +24,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
 - Embedded PostgreSQL startup, tracked timestamped migrations, bootstrap-admin creation, login/logout/session routes, and allowlisted settings persistence are now implemented.
 - The client now includes first-run bootstrap-admin, login, and protected settings views backed by shared auth and settings API modules.
+- First-run bootstrap can now optionally run in a preseeded owner-claim mode driven by environment configuration, requiring a one-time claim code plus matching owner username or email before the initial admin is created; local auth can now also match users by username or email.
 - The shared client API layer now also clears local auth state and redirects back to login when protected routes fail with `401 auth_required`, so expired browser sessions no longer leave the authenticated shell stranded on stale state.
 - Planning and implementation posture now explicitly targets a self-hosted companion app similar to Radarr/Sonarr, so security and automation scope should stay proportional to a trusted operator-run Docker deployment rather than drifting toward enterprise control-plane features.
 - Canonical MusicBrainz metadata foundation now exists for artists, release groups, releases, media, recordings, tracks, and provider snapshots with timestamped migrations.
@@ -270,6 +271,7 @@ Status note:
 ## Phase 2 - Auth, Sessions, And Settings Contracts
 
 - [x] Implement bootstrap-admin creation flow for first-run setup.
+  - The first-run bootstrap flow now supports an optional owner-claim mode driven by `HARMONIARR_BOOTSTRAP_OWNER_USERNAME`, `HARMONIARR_BOOTSTRAP_OWNER_EMAIL`, and `HARMONIARR_BOOTSTRAP_OWNER_CLAIM_CODE`, so a deployment can preseed the expected administrator identity and require a one-time claim secret instead of leaving first-user creation open to whoever reaches the UI first.
 - [x] Implement password hashing, login, logout, and refresh-token rotation.
 - [x] Complete forced re-auth behavior, including password-change and active-session management resolution flows reachable without fresh-admin session requirements.
 - [x] Add CSRF protection for cookie-authenticated write routes, with an explicit deployment-level opt-out for tightly trusted local-only installs.
@@ -287,6 +289,8 @@ Status note:
 - [x] Verify the first protected settings field does not round-trip in plaintext after initial write.
 - [x] Add an admin-managed local user directory with shared role-permission presets and protected create/update flows as the durable identity baseline for non-bootstrap accounts.
 - [ ] Implement provider-linked onboarding for Plex users using server-side Plex PIN auth, shared-server user import or claim flows, and explicit role mapping without ever collecting Plex passwords locally.
+  - Owner-claim groundwork now exists for the local path: first-run bootstrap status can advertise a preseeded owner identity hint, and the bootstrap route can require a matching one-time claim code plus owner username/email before creating the initial admin account.
+  - Next work on this item should bind Plex PIN auth onto that same shared owner-claim boundary rather than creating a second parallel first-run ownership flow.
 - [ ] Verify admin recovery assumptions remain compatible with `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 - Canonical Model And Import Review

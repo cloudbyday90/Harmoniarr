@@ -34,7 +34,13 @@ import {
 } from './security.js';
 export { csrfProtectionModeEnvVar, csrfProtectionModes, resolveCsrfProtectionMode };
 import { recordAuditEvent } from './audit.js';
-import { normalizeUsername, validatePassword } from './validators/auth-validator.js';
+import { createBootstrapOwnerClaimService } from './bootstrap-owner-claim-service.js';
+import {
+  normalizeLoginIdentifier,
+  normalizeOptionalEmail,
+  normalizeUsername,
+  validatePassword,
+} from './validators/auth-validator.js';
 
 const refreshCookieName = 'harmoniarr_refresh';
 const csrfCookieName = 'harmoniarr_csrf';
@@ -318,6 +324,15 @@ export async function findUserByUsername(username) {
   return result.rows[0] ?? null;
 }
 
+export async function findUserByLoginIdentifier(identifier) {
+  const normalizedIdentifier = normalizeLoginIdentifier(identifier);
+  const query = normalizedIdentifier.includes('@')
+    ? 'SELECT * FROM app_users WHERE lower(email) = $1 LIMIT 1'
+    : 'SELECT * FROM app_users WHERE username = $1 LIMIT 1';
+  const result = await getPool().query(query, [normalizedIdentifier]);
+  return result.rows[0] ?? null;
+}
+
 export async function buildSessionPayload(request, session = null) {
   const activeSession = session ?? await getSessionFromRequest(request);
   return {
@@ -356,22 +371,35 @@ export async function handleLoginFailure(user, requestMetadata, username) {
   });
 }
 
-export async function createBootstrapAdmin({ username, password, requestMetadata }) {
+export async function createBootstrapAdmin({
+  claimCode = null,
+  email = null,
+  password,
+  requestMetadata,
+  username,
+  bootstrapOwnerClaimService = createBootstrapOwnerClaimService(),
+}) {
   if (!await isBootstrapRequired()) {
     throw createApiError(409, 'bootstrap_unavailable', 'Bootstrap admin setup is no longer available');
   }
 
-  const normalizedUsername = normalizeUsername(username);
+  const claimResult = bootstrapOwnerClaimService.assertLocalOwnerClaim({
+    claimCode,
+    email,
+    username,
+  });
+  const normalizedUsername = claimResult.username ?? normalizeUsername(username);
+  const normalizedEmail = claimResult.email ?? normalizeOptionalEmail(email);
   const validatedPassword = validatePassword(password);
   const passwordHash = await hashPassword(validatedPassword);
 
   const result = await getPool().query(
     `
-      INSERT INTO app_users (username, password_hash, role, password_changed_at)
-      VALUES ($1, $2, 'admin', NOW())
+      INSERT INTO app_users (username, email, password_hash, role, password_changed_at)
+      VALUES ($1, $2, $3, 'admin', NOW())
       RETURNING *
     `,
-    [normalizedUsername, passwordHash],
+    [normalizedUsername, normalizedEmail, passwordHash],
   );
 
   const user = result.rows[0];
@@ -381,12 +409,15 @@ export async function createBootstrapAdmin({ username, password, requestMetadata
     actorUserId: user.id,
     actorType: 'user',
     eventType: 'bootstrap_admin_created',
-    summary: 'Bootstrap admin account created',
-    entityType: 'app_user',
-    entityId: user.id,
-    ipAddress: requestMetadata.ipAddress,
-    userAgent: requestMetadata.userAgent,
-  });
+      summary: 'Bootstrap admin account created',
+      entityType: 'app_user',
+      entityId: user.id,
+      details: {
+        bootstrapMode: bootstrapOwnerClaimService.isClaimRequired() ? 'owner_claim' : 'open',
+      },
+      ipAddress: requestMetadata.ipAddress,
+      userAgent: requestMetadata.userAgent,
+    });
 
   return {
     user,
@@ -399,13 +430,13 @@ export async function loginUser({ username, password, requestMetadata }) {
     throw createApiError(409, 'bootstrap_required', 'Create the bootstrap admin account before logging in');
   }
 
-  const normalizedUsername = normalizeUsername(username);
+  const normalizedIdentifier = normalizeLoginIdentifier(username);
   const validatedPassword = validatePassword(password);
-  const user = await findUserByUsername(normalizedUsername);
+  const user = await findUserByLoginIdentifier(normalizedIdentifier);
 
   if (!user || user.is_disabled) {
-    await handleLoginFailure(user, requestMetadata, normalizedUsername);
-    throw createApiError(401, 'invalid_credentials', 'Username or password is incorrect');
+    await handleLoginFailure(user, requestMetadata, normalizedIdentifier);
+    throw createApiError(401, 'invalid_credentials', 'Username or email and password combination is incorrect');
   }
 
   if (user.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
@@ -413,8 +444,8 @@ export async function loginUser({ username, password, requestMetadata }) {
   }
 
   if (!await verifyPassword(validatedPassword, user.password_hash)) {
-    await handleLoginFailure(user, requestMetadata, normalizedUsername);
-    throw createApiError(401, 'invalid_credentials', 'Username or password is incorrect');
+    await handleLoginFailure(user, requestMetadata, normalizedIdentifier);
+    throw createApiError(401, 'invalid_credentials', 'Username or email and password combination is incorrect');
   }
 
   await getPool().query(

@@ -17,10 +17,12 @@
  */
 
 import { isBootstrapRequired } from './auth.js';
+import { createBootstrapOwnerClaimService } from './bootstrap-owner-claim-service.js';
 import { createPathValidationSummary } from './paths/path-validation-summary.js';
 import { createSettingsService } from './settings-service.js';
 
 export function createBootstrapStatusService({
+  bootstrapOwnerClaimService = createBootstrapOwnerClaimService(),
   getBootstrapRequired = isBootstrapRequired,
   settingsService = createSettingsService(),
 } = {}) {
@@ -37,6 +39,7 @@ export function createBootstrapStatusService({
 
     return {
       bootstrapRequired,
+      ownerClaim: bootstrapOwnerClaimService.buildBootstrapOwnerClaimStatus(),
       pathValidation: createPathValidationSummary(settingsPayload),
     };
   }

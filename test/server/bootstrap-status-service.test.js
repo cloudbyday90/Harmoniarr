@@ -21,6 +21,16 @@ test('createBootstrapStatusService returns only bootstrapRequired when bootstrap
 
 test('createBootstrapStatusService reuses shared settings validation summary during bootstrap', async () => {
   const service = createBootstrapStatusService({
+    bootstrapOwnerClaimService: {
+      buildBootstrapOwnerClaimStatus: () => ({
+        required: true,
+        authMethods: ['local'],
+        usernameHint: 'owner-admin',
+        emailHint: 'o***@e***.com',
+        emailRequired: true,
+        usernameRequired: true,
+      }),
+    },
     getBootstrapRequired: async () => true,
     settingsService: {
       buildSettingsPayload: async () => ({
@@ -47,6 +57,14 @@ test('createBootstrapStatusService reuses shared settings validation summary dur
 
   assert.deepEqual(payload, {
     bootstrapRequired: true,
+    ownerClaim: {
+      required: true,
+      authMethods: ['local'],
+      usernameHint: 'owner-admin',
+      emailHint: 'o***@e***.com',
+      emailRequired: true,
+      usernameRequired: true,
+    },
     pathValidation: {
       checkedAt: '2026-04-30T21:00:00.000Z',
       configuredDownloadMappings: 1,

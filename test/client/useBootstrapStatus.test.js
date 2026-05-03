@@ -5,6 +5,13 @@ import { useBootstrapStatus } from '../../src/client/composables/useBootstrapSta
 test('useBootstrapStatus loads bootstrap preflight summary from the injected shared route client', async (t) => {
   const fetchBootstrapStatus = t.mock.fn(async () => ({
     bootstrapRequired: true,
+    ownerClaim: {
+      required: true,
+      authMethods: ['local'],
+      usernameHint: 'owner-admin',
+      emailHint: 'o***@e***.com',
+      emailRequired: true,
+    },
     pathValidation: {
       checkedAt: '2026-04-30T21:00:00.000Z',
       configuredDownloadMappings: 2,
@@ -28,6 +35,13 @@ test('useBootstrapStatus loads bootstrap preflight summary from the injected sha
     message: 'Validation needs attention',
     status: 'degraded',
   });
+  assert.deepEqual(workflow.ownerClaimSummary.value, {
+    required: true,
+    authMethods: ['local'],
+    usernameHint: 'owner-admin',
+    emailHint: 'o***@e***.com',
+    emailRequired: true,
+  });
   assert.equal(workflow.isLoading.value, false);
 });
 
@@ -43,5 +57,6 @@ test('useBootstrapStatus clears stale state on bootstrap status failures', async
   assert.equal(workflow.bootstrapStatus.value, null);
   assert.equal(workflow.errorMessage.value, 'bootstrap status unavailable');
   assert.equal(workflow.pathValidationSummary.value, null);
+  assert.equal(workflow.ownerClaimSummary.value, null);
   assert.equal(workflow.isLoading.value, false);
 });

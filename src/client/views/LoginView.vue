@@ -69,7 +69,7 @@ async function submit() {
       <p class="metadata-card-copy" v-if="infoMessage()">{{ infoMessage() }}</p>
       <form class="stack-form" @submit.prevent="submit">
         <label>
-          Username
+          Username or email
           <input v-model="form.username" autocomplete="username" required />
         </label>
         <label>

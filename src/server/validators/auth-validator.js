@@ -18,6 +18,8 @@
 
 import { createApiError } from '../auth.js';
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function normalizeUsername(value) {
   if (typeof value !== 'string') {
     throw createApiError(400, 'validation_error', 'Username must be a string');
@@ -29,6 +31,49 @@ export function normalizeUsername(value) {
   }
 
   return normalized;
+}
+
+export function normalizeEmail(value) {
+  if (typeof value !== 'string') {
+    throw createApiError(400, 'validation_error', 'Email must be a string');
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!emailPattern.test(normalized)) {
+    throw createApiError(400, 'validation_error', 'Email must be a valid address');
+  }
+
+  return normalized;
+}
+
+export function normalizeOptionalEmail(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw createApiError(400, 'validation_error', 'Email must be a string');
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  return normalizeEmail(trimmed);
+}
+
+export function normalizeLoginIdentifier(value) {
+  if (typeof value !== 'string') {
+    throw createApiError(400, 'validation_error', 'Username or email must be a string');
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.includes('@')) {
+    return normalizeEmail(trimmed);
+  }
+
+  return normalizeUsername(trimmed);
 }
 
 export function validatePassword(value) {

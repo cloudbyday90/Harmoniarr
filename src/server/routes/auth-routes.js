@@ -84,6 +84,8 @@ export function registerAuthRoutes(app, {
   app.post('/api/v1/bootstrap/admin', limitBootstrapAdmin, asyncRoute(async (request, response) => {
     const requestMetadata = getRequestMetadata(request);
     const { user, issuedSession } = await createBootstrapAdmin({
+      claimCode: request.body?.claimCode,
+      email: request.body?.email,
       username: request.body?.username,
       password: request.body?.password,
       requestMetadata,

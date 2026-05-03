@@ -23,13 +23,14 @@ import { useBootstrapStatus } from '../composables/useBootstrapStatus.js';
 import { sessionStore } from '../state/session.js';
 
 const router = useRouter();
-const form = reactive({ username: '', password: '', confirmPassword: '' });
+const form = reactive({ claimCode: '', email: '', password: '', confirmPassword: '', username: '' });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
 const {
   errorMessage: bootstrapStatusError,
   isLoading: isLoadingBootstrapStatus,
   loadStatus,
+  ownerClaimSummary,
   pathValidationSummary,
 } = useBootstrapStatus();
 
@@ -65,7 +66,12 @@ async function submit() {
 
   isSubmitting.value = true;
   try {
-    await sessionStore.bootstrapAdmin({ username: form.username, password: form.password });
+    await sessionStore.bootstrapAdmin({
+      claimCode: form.claimCode,
+      email: form.email,
+      password: form.password,
+      username: form.username,
+    });
     await router.push({ name: 'dashboard', query: { onboarding: 'setup' } });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Bootstrap failed';
@@ -79,10 +85,14 @@ async function submit() {
   <section class="auth-layout">
     <article class="hero-card panel-dark">
       <p class="eyebrow">First-run setup</p>
-      <h1>Bootstrap the first admin</h1>
+      <h1>{{ ownerClaimSummary?.required ? 'Claim the configured owner account' : 'Bootstrap the first admin' }}</h1>
       <p>
         Harmoniarr now has the runtime, migration layer, and protected routes in place.
-        The first step is creating the initial admin account.
+        The first step is establishing the initial administrator account.
+      </p>
+      <p v-if="ownerClaimSummary?.required" class="muted-copy">
+        This install was preconfigured with an owner claim secret, so first-run setup must match the configured
+        owner identity before the initial admin account can be created.
       </p>
     </article>
 
@@ -117,12 +127,36 @@ async function submit() {
     </article>
 
     <article class="form-card panel-light">
-      <h2>Create admin account</h2>
+      <h2>{{ ownerClaimSummary?.required ? 'Claim owner account' : 'Create admin account' }}</h2>
       <form class="stack-form" @submit.prevent="submit">
+        <label v-if="ownerClaimSummary?.required">
+          Claim code
+          <input v-model="form.claimCode" autocomplete="one-time-code" required />
+        </label>
         <label>
           Username
-          <input v-model="form.username" autocomplete="username" required />
+          <input
+            v-model="form.username"
+            :placeholder="ownerClaimSummary?.usernameHint ?? ''"
+            autocomplete="username"
+            required
+          />
         </label>
+        <p class="muted-copy" v-if="ownerClaimSummary?.usernameHint">
+          This install expects the owner username <strong>{{ ownerClaimSummary.usernameHint }}</strong>.
+        </p>
+        <label>
+          Email
+          <input
+            v-model="form.email"
+            :required="ownerClaimSummary?.emailRequired"
+            autocomplete="email"
+            type="email"
+          />
+        </label>
+        <p class="muted-copy" v-if="ownerClaimSummary?.emailHint">
+          Enter the matching owner email ending with <strong>{{ ownerClaimSummary.emailHint }}</strong>.
+        </p>
         <label>
           Password
           <input v-model="form.password" type="password" autocomplete="new-password" required />

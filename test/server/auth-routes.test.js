@@ -73,6 +73,14 @@ test('auth bootstrap status route returns the shared bootstrap response', async 
   const app = createAuthRouteTestApp({
     buildBootstrapStatusPayload: async () => ({
       bootstrapRequired: true,
+      ownerClaim: {
+        required: true,
+        authMethods: ['local'],
+        usernameHint: 'owner-admin',
+        emailHint: 'o***@e***.com',
+        emailRequired: true,
+        usernameRequired: true,
+      },
       pathValidation: {
         checkedAt: '2026-04-30T21:00:00.000Z',
         configuredDownloadMappings: 1,
@@ -93,6 +101,14 @@ test('auth bootstrap status route returns the shared bootstrap response', async 
     assert.deepEqual(payload, {
       ok: true,
       bootstrapRequired: true,
+      ownerClaim: {
+        required: true,
+        authMethods: ['local'],
+        usernameHint: 'owner-admin',
+        emailHint: 'o***@e***.com',
+        emailRequired: true,
+        usernameRequired: true,
+      },
       pathValidation: {
         checkedAt: '2026-04-30T21:00:00.000Z',
         configuredDownloadMappings: 1,
@@ -164,9 +180,9 @@ test('auth login route passes request metadata to the injected shared login serv
 });
 
 test('auth bootstrap admin route creates the bootstrap user through shared dependencies', async (t) => {
-  const createBootstrapAdmin = t.mock.fn(async ({ username, password, requestMetadata }) => ({
+  const createBootstrapAdmin = t.mock.fn(async ({ claimCode, email, username, password, requestMetadata }) => ({
     user: { id: 'user-bootstrap', username },
-    issuedSession: { refreshToken: 'refresh-bootstrap', csrfToken: 'csrf-bootstrap', password, requestMetadata },
+    issuedSession: { refreshToken: 'refresh-bootstrap', csrfToken: 'csrf-bootstrap', claimCode, email, password, requestMetadata },
   }));
   const setAuthCookies = t.mock.fn();
 
@@ -190,7 +206,12 @@ test('auth bootstrap admin route creates the bootstrap user through shared depen
         'x-forwarded-for': '198.51.100.20',
         'user-agent': 'HarmoniarrBootstrapTest/1.0',
       },
-      body: JSON.stringify({ username: 'root-admin', password: 'bootstrap-pass' }),
+      body: JSON.stringify({
+        claimCode: 'owner-claim-code-1234',
+        email: 'owner@example.com',
+        username: 'root-admin',
+        password: 'bootstrap-pass',
+      }),
     });
     const payload = await response.json();
 
@@ -198,6 +219,8 @@ test('auth bootstrap admin route creates the bootstrap user through shared depen
     assert.equal(createBootstrapAdmin.mock.callCount(), 1);
     assert.equal(setAuthCookies.mock.callCount(), 1);
     assert.deepEqual(createBootstrapAdmin.mock.calls[0].arguments, [{
+      claimCode: 'owner-claim-code-1234',
+      email: 'owner@example.com',
       username: 'root-admin',
       password: 'bootstrap-pass',
       requestMetadata: {

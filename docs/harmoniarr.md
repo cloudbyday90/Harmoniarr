@@ -6153,6 +6153,7 @@ Acceptance criteria:
 Backend:
 
 - Implement bootstrap-admin flow, password hashing, login/logout, refresh-token rotation, session invalidation, and CSRF protection.
+- Prefer an optional preseeded owner-claim bootstrap mode for trusted self-hosted installs: if the operator configures a one-time claim secret plus owner username and/or email through environment, first-run admin creation should require that claim before the initial admin account is created.
 - Add route-tier enforcement for anonymous, authenticated, privileged, maintenance-locked, and integration-key surfaces.
 - Implement settings read/write services with validation, masking/redaction rules, and audit logging.
 - Add API key creation/rotation/revocation for integrations, separate from browser auth.
@@ -6167,6 +6168,7 @@ Acceptance criteria:
 - All mutating routes are protected by auth, CSRF, and role checks.
 - Secrets never round-trip in plaintext after initial entry.
 - Admin recovery and bootstrap assumptions remain compatible with the dedicated runbook and schema design.
+- Preseeded first-run owner-claim bootstrap should be able to establish the initial admin via local credentials without leaving an unauthenticated open-bootstrap race in place.
 
 ## Phase 3 - Canonical Music Model, Import Discovery, And Review-First Workflow State
 
