@@ -24,6 +24,7 @@ import DashboardView from './views/DashboardView.vue';
 import ImportReviewView from './views/ImportReviewView.vue';
 import LoginView from './views/LoginView.vue';
 import MetadataView from './views/MetadataView.vue';
+import RecoveryView from './views/RecoveryView.vue';
 import OperationsView from './views/OperationsView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
 import SettingsView from './views/SettingsView.vue';
@@ -41,6 +42,7 @@ const router = createRouter({
     { path: '/', redirect: '/app' },
     { path: '/bootstrap', name: 'bootstrap', component: BootstrapSetupView, meta: { anonymousOnly: true } },
     { path: '/login', name: 'login', component: LoginView, meta: { anonymousOnly: true } },
+    { path: '/recover/bootstrap-admin', name: 'recovery', component: RecoveryView },
     {
       path: '/app',
       component: AppShell,

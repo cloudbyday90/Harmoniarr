@@ -381,6 +381,7 @@ Parallelizable after contract stabilization:
   - Added `harmoniarrctl` CLI entrypoint (`src/server/cli/harmoniarrctl.js`) with subcommand routing for `recovery arm-bootstrap-admin`, `recovery bootstrap-admin-status`, and `recovery cancel-bootstrap-admin`, using shared `cli-runtime.js` for stable exit codes (0-4), JSON envelope formatting, and human-readable output, plus `recovery-commands.js` command handlers that delegate to the shared `admin-recovery-service` boundary.
   - Added Docker shell wrapper (`docker/harmoniarrctl`) installed at `/usr/local/bin/harmoniarrctl` via the Dockerfile, enabling `docker exec harmoniarr harmoniarrctl recovery arm-bootstrap-admin` usage.
   - Added 20 dedicated CLI tests covering exit code mapping, JSON output schema compliance, human-readable output formatting, `--json`/`--force`/`--ttl-minutes`/`--reason` flag handling, error envelope formatting for all recovery error codes, and verification that status output never exposes the plaintext recovery code.
+  - Added frontend recovery UI surface at `/recover/bootstrap-admin` with status polling, countdown timer, lock-conflict display, completion form, and post-completion checklist with login redirect.
 - [ ] Add control-plane diagnostics for health, queue state, failed jobs, maintenance state, and recent privileged actions.
   - Added shared `recovery-diagnostics-service.js` boundary with guarded diagnostics routes (`GET /api/v1/system/diagnostics/queue-state`, `GET /api/v1/system/diagnostics/recovery-state`) so queue counts, active maintenance locks, recent failed runs, and recovery privileged audit actions are composed through static ESM service wiring.
 - [ ] Enforce redaction rules for logs, diagnostics, exported evidence, and operator-visible payloads.
@@ -389,6 +390,10 @@ Parallelizable after contract stabilization:
   - Added shared `maintenance-lock-write-guard-service.js` boundary and wired import-candidate execution/apply/media-inspection/transcode run start services to fail closed with `recovery_lock_conflict` when blocking maintenance locks are active.
   - Extended the same guard to library discovery-dispatch, organize-apply, and scan run-start services so filesystem-affecting/background library workflows now fail closed during active maintenance/recovery locks.
 - [ ] Add frontend surfaces for backup/export, restore preview/apply, maintenance state, and diagnostics history.
+  - Added shared recovery API client module (`src/client/lib/recovery-api.js`) with `fetchRecoveryStatus()` and `completeRecovery()` thin wrappers over the base `apiRequest` helper.
+  - Added `useRecoveryStatus` composable (`src/client/composables/useRecoveryStatus.js`) with reactive status polling (10s interval), computed expiry countdown, lock-blocked detection, remaining-attempts tracking, and completion submission with DI-injected API functions for testability.
+  - Added `RecoveryView.vue` page SFC (`src/client/views/RecoveryView.vue`) using the `auth-layout` CSS pattern with status panel (countdown timer, remaining attempts, lock conflicts), completion form (recovery code, username, password, confirmation), and post-completion checklist display with login redirect.
+  - Added `/recover/bootstrap-admin` route (name: `recovery`) to the Vue router as a top-level public route, accessible with or without an active session, not subject to `anonymousOnly` or `requiresAuth` guards.
 
 ## Phase 6 - Validation, Release, And Closure
 
