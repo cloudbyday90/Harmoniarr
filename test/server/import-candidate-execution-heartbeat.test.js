@@ -123,10 +123,14 @@ test('createImportCandidateExecutionHeartbeat starts reconciliation and configur
   assert.deepEqual(heartbeatState.getHeartbeatState(), {
     lastErrorMessage: null,
     lastOutcome: 'started',
+    lastPauseCode: null,
+    lastPauseMessage: null,
+    lastPauseProvider: null,
     lastSkipReason: null,
     lastTickAt: '2026-04-30T14:00:00.000Z',
     lastTransitionCount: 1,
     lastTriggeredAt: '2026-04-30T14:00:00.000Z',
+    nextRetryAt: null,
   });
 
   heartbeat.stop();
@@ -189,4 +193,45 @@ test('createImportCandidateExecutionHeartbeat skips when no actionable transfers
   });
   assert.deepEqual(errors, ['slskd unavailable']);
   assert.equal(failingState.getHeartbeatState().lastOutcome, 'error');
+});
+
+test('createImportCandidateExecutionHeartbeat pauses while a conflicting maintenance lock is active', async () => {
+  const heartbeatState = createImportCandidateExecutionHeartbeatState();
+  const heartbeat = createImportCandidateExecutionHeartbeat({
+    buildImportCandidateExecutionSummary: async () => {
+      throw new Error('summary lookup should not run while paused');
+    },
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    heartbeatPauseService: {
+      resolveHeartbeatReadiness: async () => ({
+        allowed: false,
+        nextRetryAt: '2026-04-30T14:05:00.000Z',
+        pauseCode: 'recovery_lock_conflict',
+        pauseMessage: 'Import reconciliation is paused while the restore maintenance lock is active.',
+        pauseProvider: 'restore',
+      }),
+    },
+    importCandidateExecutionHeartbeatState: heartbeatState,
+  });
+
+  const result = await heartbeat.tick();
+
+  assert.deepEqual(result, {
+    nextRetryAt: '2026-04-30T14:05:00.000Z',
+    provider: 'restore',
+    reason: 'paused',
+    skipped: true,
+  });
+  assert.deepEqual(heartbeatState.getHeartbeatState(), {
+    lastErrorMessage: null,
+    lastOutcome: 'skipped',
+    lastPauseCode: 'recovery_lock_conflict',
+    lastPauseMessage: 'Import reconciliation is paused while the restore maintenance lock is active.',
+    lastPauseProvider: 'restore',
+    lastSkipReason: 'paused',
+    lastTickAt: '2026-04-30T14:00:00.000Z',
+    lastTransitionCount: 0,
+    lastTriggeredAt: null,
+    nextRetryAt: '2026-04-30T14:05:00.000Z',
+  });
 });

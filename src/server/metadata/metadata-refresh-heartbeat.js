@@ -27,6 +27,7 @@ export function createMetadataRefreshHeartbeat({
   getDependencyHealth = async () => [],
   getNow = () => new Date(),
   intervalMs = defaultHeartbeatIntervalMs,
+  heartbeatPauseService = null,
   metadataRefreshDispatchPolicyService = createMetadataRefreshDispatchPolicyService(),
   metadataRefreshHeartbeatState = createMetadataRefreshHeartbeatState(),
   metadataRefreshSchedulerService,
@@ -45,6 +46,28 @@ export function createMetadataRefreshHeartbeat({
     const occurredAt = getNow().toISOString();
 
     try {
+      const heartbeatReadiness = await heartbeatPauseService?.resolveHeartbeatReadiness?.({
+        operationLabel: 'Metadata refresh',
+      }) ?? { allowed: true };
+
+      if (!heartbeatReadiness.allowed) {
+        metadataRefreshHeartbeatState.recordHeartbeatOutcome({
+          occurredAt,
+          outcome: 'skipped',
+          pauseCode: heartbeatReadiness.pauseCode,
+          pauseMessage: heartbeatReadiness.pauseMessage,
+          pauseProvider: heartbeatReadiness.pauseProvider,
+          skipReason: 'paused',
+          nextRetryAt: heartbeatReadiness.nextRetryAt,
+        });
+        return {
+          nextRetryAt: heartbeatReadiness.nextRetryAt ?? null,
+          provider: heartbeatReadiness.pauseProvider ?? null,
+          reason: 'paused',
+          skipped: true,
+        };
+      }
+
       const dependencyStatuses = await getDependencyHealth({ providers: ['musicbrainz'] });
       const dispatchReadiness = metadataRefreshDispatchPolicyService.resolveDispatchReadiness({
         dependencyStatuses,

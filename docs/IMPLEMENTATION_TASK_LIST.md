@@ -482,8 +482,10 @@ Status note:
   - Integration coverage already exercises many lock-conflict entrypoints, but the remaining gap is whole-system proof that queued or background execution paths also pause predictably during restore or recovery windows.
   - Added shared `maintenance-lock-write-guard-service.js` boundary and wired import-candidate execution/apply/media-inspection/transcode run start services to fail closed with `recovery_lock_conflict` when blocking maintenance locks are active.
   - Extended the same guard to library discovery-dispatch, organize-apply, and scan run-start services so filesystem-affecting/background library workflows now fail closed during active maintenance/recovery locks.
+  - Automatic import-reconciliation, library-discovery, and metadata-refresh heartbeats now also share a maintenance-lock pause boundary and pause-aware heartbeat state, so active `maintenance`/`restore`/`upgrade`/`admin_recovery` locks are surfaced through operator-visible heartbeat diagnostics instead of only failing at route-trigger time.
   - Added integration coverage proving active maintenance locks reject import execution, apply, media inspection, and transcode run-start routes with normalized `409 recovery_lock_conflict` failures through the real HTTP and database-backed server graph.
   - Added matching integration coverage proving active maintenance locks also reject library discovery, organize, and scan run-start routes with the same normalized `409 recovery_lock_conflict` contract.
+  - Remaining work is concentrated in queued-dispatch and in-flight worker pause proof beyond the now-paused automatic heartbeat triggers.
 - [x] Add frontend surfaces for backup/export, restore preview/apply, maintenance state, and diagnostics history.
   - Added shared recovery API client module (`src/client/lib/recovery-api.js`) with `fetchRecoveryStatus()` and `completeRecovery()` thin wrappers over the base `apiRequest` helper.
   - Added `useRecoveryStatus` composable (`src/client/composables/useRecoveryStatus.js`) with reactive status polling (10s interval), computed expiry countdown, lock-blocked detection, remaining-attempts tracking, and completion submission with DI-injected API functions for testability.
@@ -522,6 +524,7 @@ Status note:
 - [ ] Validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior.
   - The shared Docker smoke validator now covers fresh-install schema bootstrap, fail-closed startup refusal, FFmpeg/FFprobe availability, embedded PostgreSQL readiness plus persistence, backup export plus restore preview/apply validation, existing-data restart behavior, and optional machine-readable evidence output through `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH`.
   - A dedicated `npm run validate:docker-upgrade` wrapper now also validates a baseline-to-candidate image upgrade path against the same bind-mounted state, proving post-upgrade startup plus persisted settings continuity without introducing a separate validation harness.
+  - The `release-image` workflow now also preserves released-image smoke evidence as a first-class artifact by setting `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH` during `npm run validate:docker-released-image` and uploading the emitted JSON file, so release verification retains structured proof instead of only console logs.
   - Remaining work is live execution in a Docker-capable environment plus any additional rollback-oriented scenarios that go beyond the current baseline-upgrade and restore-apply seam.
 - [ ] Finalize Docker artifacts, README/doc index updates, compose examples, and operator setup guidance.
 - [ ] Record V1 no-go conditions, smoke-test checklist, and release sign-off criteria.
@@ -530,7 +533,7 @@ Recommended next execution slice:
 
 1. Execute the shared Docker smoke contract in a live Docker-capable environment and use its evidence output to close the remaining fresh-install, startup-refusal, FFmpeg/tooling, and embedded-Postgres release-validation items.
 2. Execute the new recovery and upgrade smoke commands in that same Docker-capable environment to close the remaining backup/export, restore preview/apply, and baseline-upgrade validation items with machine-readable evidence instead of checklist-only intent.
-3. After the deployment-path slice is green, close the remaining whole-system maintenance-lock pause proof, fixture-pack, E2E, and release-doc items as the immediate release-closure wave.
+3. After the deployment-path slice is green, close the remaining queued-worker maintenance-lock pause proof, fixture-pack, E2E, and release-doc items as the immediate release-closure wave.
 
 ## Dependencies
 

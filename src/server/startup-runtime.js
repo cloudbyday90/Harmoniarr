@@ -27,6 +27,7 @@ import { createOperationQueueDispatcher } from './operation-queue-dispatcher.js'
 import { createOperationQueueHandlers } from './operation-queue-handlers.js';
 import { createOperationQueueStore } from './operation-queue-store.js';
 import { createOperationStrandedRunRecoveryService } from './operation-stranded-run-recovery-service.js';
+import { createMaintenanceLockHeartbeatPauseService } from './recovery/maintenance-lock-heartbeat-pause-service.js';
 import { createRuntimeReporter } from './runtime-reporter.js';
 import { bootstrapDatabaseSchemaFromSnapshot } from './schema-bootstrap.js';
 import { createStartupServiceSupervisor } from './startup-service-supervisor.js';
@@ -90,9 +91,13 @@ export async function startServerRuntime({
     artworkModule,
     importCandidateModule,
     libraryModule,
+    maintenanceLockService,
     metadataModule,
     systemModule,
   } = buildApp();
+  const maintenanceLockHeartbeatPauseService = createMaintenanceLockHeartbeatPauseService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+  });
   systemModule?.runtimeResourceService?.applyProcessRuntimePreferences?.({
     onInfo: runtimeReporter.writeInfo,
     onWarning: runtimeReporter.writeWarning,
@@ -109,6 +114,7 @@ export async function startServerRuntime({
   const libraryDiscoveryHeartbeat = buildLibraryDiscoveryHeartbeat({
     getActiveRun: libraryModule.libraryDiscoveryRunStore.getActiveRun,
     getDiscoverySnapshot: libraryModule.libraryDiscoverySummaryStore.getLibraryDiscoverySnapshot,
+    heartbeatPauseService: maintenanceLockHeartbeatPauseService,
     intervalMs: libraryDiscoveryHeartbeatConfig.intervalMs,
     libraryDiscoveryHeartbeatState: libraryModule.libraryDiscoveryHeartbeatState,
     onError: (error) => {
@@ -118,6 +124,7 @@ export async function startServerRuntime({
   });
   const importExecutionHeartbeat = buildImportCandidateExecutionHeartbeat({
     buildImportCandidateExecutionSummary: importCandidateModule.importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
+    heartbeatPauseService: maintenanceLockHeartbeatPauseService,
     importCandidateExecutionHeartbeatState: importCandidateModule.importCandidateExecutionHeartbeatState,
     intervalMs: importCandidateModule.importCandidateExecutionHeartbeatConfig.intervalMs,
     onError: (error) => {
@@ -127,6 +134,7 @@ export async function startServerRuntime({
   });
   const metadataRefreshHeartbeat = buildMetadataRefreshHeartbeat({
     getDependencyHealth,
+    heartbeatPauseService: maintenanceLockHeartbeatPauseService,
     intervalMs: metadataModule.metadataRefreshHeartbeatConfig.intervalMs,
     metadataRefreshDispatchPolicyService: metadataModule.metadataRefreshDispatchPolicyService,
     metadataRefreshHeartbeatState: metadataModule.metadataRefreshHeartbeatState,

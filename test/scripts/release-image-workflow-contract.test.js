@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   assertReleaseImageWorkflowContract,
   getWorkflowStepBlock,
+  releaseImageEvidenceStep,
   releaseImageSummarySteps,
   trustedMirrorWorkflowEnvAnchor,
   trustedMirrorWorkflowSteps,
@@ -35,4 +36,14 @@ test('release-image workflow delegates summary steps to Node scripts', async () 
     const block = getWorkflowStepBlock(workflowSource, step.name);
     assert.match(block, new RegExp(step.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+});
+
+test('release-image workflow uploads the published-image smoke evidence artifact', async () => {
+  const workflowSource = await readFile(workflowPath, 'utf8');
+
+  const block = getWorkflowStepBlock(workflowSource, releaseImageEvidenceStep.name);
+
+  assert.match(block, new RegExp(releaseImageEvidenceStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(block, new RegExp(releaseImageEvidenceStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(block, new RegExp(releaseImageEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });

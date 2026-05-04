@@ -16,33 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createHeartbeatState } from '../heartbeat/heartbeat-state.js';
+import { createPausableHeartbeatState } from '../heartbeat/pausable-heartbeat-state.js';
 
 export function createMetadataRefreshHeartbeatState({ initialState = {} } = {}) {
-  return createHeartbeatState({
-    initialState,
-    normalizeExtraState: (state) => ({
-      lastPauseCode: typeof state.lastPauseCode === 'string' ? state.lastPauseCode : null,
-      lastPauseMessage: typeof state.lastPauseMessage === 'string' ? state.lastPauseMessage : null,
-      lastPauseProvider: typeof state.lastPauseProvider === 'string' ? state.lastPauseProvider : null,
-      nextRetryAt: typeof state.nextRetryAt === 'string' ? state.nextRetryAt : null,
-    }),
-    resolveExtraStateForOutcome: ({ details, nextBaseState }) => {
-      if (nextBaseState.lastSkipReason !== 'paused') {
-        return {
-          lastPauseCode: null,
-          lastPauseMessage: null,
-          lastPauseProvider: null,
-          nextRetryAt: null,
-        };
-      }
-
-      return {
-        lastPauseCode: typeof details.pauseCode === 'string' ? details.pauseCode : null,
-        lastPauseMessage: typeof details.pauseMessage === 'string' ? details.pauseMessage : null,
-        lastPauseProvider: typeof details.pauseProvider === 'string' ? details.pauseProvider : null,
-        nextRetryAt: typeof details.nextRetryAt === 'string' ? details.nextRetryAt : null,
-      };
-    },
-  });
+  return createPausableHeartbeatState({ initialState });
 }

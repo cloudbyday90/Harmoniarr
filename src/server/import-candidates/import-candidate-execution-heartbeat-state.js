@@ -16,10 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createHeartbeatState } from '../heartbeat/heartbeat-state.js';
+import { createPausableHeartbeatState } from '../heartbeat/pausable-heartbeat-state.js';
 
 export function createImportCandidateExecutionHeartbeatState({ initialState = {} } = {}) {
-  return createHeartbeatState({
+  return createPausableHeartbeatState({
     initialState,
     normalizeExtraState: (state) => ({
       lastTransitionCount: Number.isInteger(state.lastTransitionCount) ? state.lastTransitionCount : 0,

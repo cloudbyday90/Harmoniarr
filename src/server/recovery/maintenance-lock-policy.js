@@ -16,23 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createApiError } from '../auth.js';
-import { defaultBlockingMaintenanceLockTypes } from './maintenance-lock-policy.js';
+export const defaultBlockingMaintenanceLockTypes = Object.freeze([
+  'admin_recovery',
+  'maintenance',
+  'restore',
+  'upgrade',
+]);
 
-export function createMaintenanceLockWriteGuardService({
-  listActiveMaintenanceLocks = async () => [],
-} = {}) {
-  async function assertNoActiveWriteLocks({ operationLabel = 'write operations' } = {}) {
-    const blockingLocks = await listActiveMaintenanceLocks({
-      lockTypes: [...defaultBlockingMaintenanceLockTypes],
-    });
-
-    if (blockingLocks.length > 0) {
-      throw createApiError(409, 'recovery_lock_conflict', `A conflicting maintenance lock prevents ${operationLabel}`);
-    }
-  }
-
-  return {
-    assertNoActiveWriteLocks,
-  };
-}
+export const maintenanceLockPauseCode = 'recovery_lock_conflict';

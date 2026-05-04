@@ -16,8 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createHeartbeatState } from '../heartbeat/heartbeat-state.js';
+import { createPausableHeartbeatState } from '../heartbeat/pausable-heartbeat-state.js';
 
 export function createLibraryDiscoveryHeartbeatState({ initialState = {} } = {}) {
-  return createHeartbeatState({ initialState });
+  return createPausableHeartbeatState({ initialState });
 }

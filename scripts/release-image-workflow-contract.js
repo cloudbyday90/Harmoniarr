@@ -39,6 +39,13 @@ export const releaseImageSummarySteps = Object.freeze({
   },
 });
 
+export const releaseImageEvidenceStep = Object.freeze({
+  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  artifactName: 'harmoniarr-docker-smoke-released-image.json',
+  name: 'Upload published-image smoke evidence artifact',
+  path: 'supply-chain/harmoniarr-docker-smoke-released-image.json',
+});
+
 export const trustedMirrorWorkflowEnvKeys = [
   'DOCKERHUB_TOKEN',
   'DOCKERHUB_USERNAME',
@@ -151,6 +158,28 @@ export function validateReleaseImageWorkflowContract(source) {
     if (!block.includes(`run: ${step.command}`)) {
       issues.push(`${step.name} must run ${step.command}`);
     }
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageEvidenceStep.name);
+
+    if (!block.includes(`uses: ${releaseImageEvidenceStep.action}`)) {
+      issues.push(`${releaseImageEvidenceStep.name} must use ${releaseImageEvidenceStep.action}`);
+    }
+
+    if (!block.includes(`name: ${releaseImageEvidenceStep.artifactName}`)) {
+      issues.push(`${releaseImageEvidenceStep.name} must publish ${releaseImageEvidenceStep.artifactName}`);
+    }
+
+    if (!block.includes(`path: ${releaseImageEvidenceStep.path}`)) {
+      issues.push(`${releaseImageEvidenceStep.name} must upload ${releaseImageEvidenceStep.path}`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  if (!normalizedSource.includes("HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-released-image.json")) {
+    issues.push('verify-published-image summary must report the smoke evidence artifact name');
   }
 
   if (!/name:\s+Verify Release Contract[\s\S]*needs:[\s\S]*- publish-image[\s\S]*- verify-published-image/.test(normalizedSource)) {

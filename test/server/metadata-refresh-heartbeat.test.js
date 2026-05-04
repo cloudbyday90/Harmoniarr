@@ -157,3 +157,48 @@ test('createMetadataRefreshHeartbeat pauses dispatch when provider health blocks
     nextRetryAt: '2026-05-01T14:00:05.000Z',
   });
 });
+
+test('createMetadataRefreshHeartbeat pauses before dependency checks when a conflicting maintenance lock is active', async () => {
+  const metadataRefreshHeartbeatState = createMetadataRefreshHeartbeatState();
+  const heartbeat = createMetadataRefreshHeartbeat({
+    getDependencyHealth: async () => {
+      throw new Error('dependency health should not run while paused');
+    },
+    getNow: () => new Date('2026-05-01T14:00:00.000Z'),
+    heartbeatPauseService: {
+      resolveHeartbeatReadiness: async () => ({
+        allowed: false,
+        nextRetryAt: '2026-05-01T14:05:00.000Z',
+        pauseCode: 'recovery_lock_conflict',
+        pauseMessage: 'Metadata refresh is paused while the restore maintenance lock is active.',
+        pauseProvider: 'restore',
+      }),
+    },
+    metadataRefreshHeartbeatState,
+    metadataRefreshSchedulerService: {
+      getNextDueArtist: async () => {
+        throw new Error('scheduler lookup should not run while paused');
+      },
+    },
+  });
+
+  const result = await heartbeat.tick();
+
+  assert.deepEqual(result, {
+    nextRetryAt: '2026-05-01T14:05:00.000Z',
+    provider: 'restore',
+    reason: 'paused',
+    skipped: true,
+  });
+  assert.deepEqual(metadataRefreshHeartbeatState.getHeartbeatState(), {
+    lastErrorMessage: null,
+    lastOutcome: 'skipped',
+    lastPauseCode: 'recovery_lock_conflict',
+    lastPauseMessage: 'Metadata refresh is paused while the restore maintenance lock is active.',
+    lastPauseProvider: 'restore',
+    lastSkipReason: 'paused',
+    lastTickAt: '2026-05-01T14:00:00.000Z',
+    lastTriggeredAt: null,
+    nextRetryAt: '2026-05-01T14:05:00.000Z',
+  });
+});

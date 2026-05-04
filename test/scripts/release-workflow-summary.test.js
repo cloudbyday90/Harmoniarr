@@ -40,11 +40,13 @@ test('renderReleaseImageSummaryLines formats release assets and tags', () => {
 test('renderPublishedImageVerificationSummaryLines formats the smoke summary', () => {
   assert.deepEqual(renderPublishedImageVerificationSummaryLines({
     imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+    smokeEvidenceArtifactName: 'harmoniarr-docker-smoke-released-image.json',
   }), [
     '## Published Image Verification',
     '',
     '- Verified image: ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
     '- Smoke contract: fresh install bootstrap plus existing-data restart',
+    '- Smoke evidence artifact: harmoniarr-docker-smoke-released-image.json',
     '',
   ]);
 });
@@ -96,6 +98,29 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for publish-image summar
     assert.match(summary, /## Release Image/);
     assert.match(summary, /Docker Hub mirror: cloudbyday90\/harmoniarr/);
     assert.match(summary, /Release manifest: harmoniarr-release-metadata.json/);
+  } finally {
+    await rm(tempDirectory, { force: true, recursive: true });
+  }
+});
+
+test('writeReleaseWorkflowSummary accepts CLI overrides for published-image verification summaries', async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), 'harmoniarr-release-summary-'));
+  const summaryPath = join(tempDirectory, 'summary.md');
+
+  try {
+    await writeReleaseWorkflowSummary('verify-published-image', {
+      args: [
+        'verify-published-image',
+        '--summary-path', summaryPath,
+        '--image-ref', 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+        '--smoke-evidence-artifact-name', 'harmoniarr-docker-smoke-released-image.json',
+      ],
+      env: {},
+    });
+
+    const summary = await readFile(summaryPath, 'utf8');
+    assert.match(summary, /Published Image Verification/);
+    assert.match(summary, /Smoke evidence artifact: harmoniarr-docker-smoke-released-image.json/);
   } finally {
     await rm(tempDirectory, { force: true, recursive: true });
   }

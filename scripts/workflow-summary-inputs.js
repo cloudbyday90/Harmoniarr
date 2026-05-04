@@ -22,6 +22,7 @@ export const releaseWorkflowSummaryCliOptions = Object.freeze({
   'metadata-asset-name': { type: 'string' },
   'release-tag': { type: 'string' },
   'sbom-asset-name': { type: 'string' },
+  'smoke-evidence-artifact-name': { type: 'string' },
   'summary-path': { type: 'string' },
   tag: { multiple: true, type: 'string' },
   'trusted-mirror-probe-status': { type: 'string' },
@@ -72,6 +73,7 @@ export function resolveReleaseWorkflowSummaryInputs(summaryKind, {
     case 'verify-published-image':
       return {
         imageRef: getRequiredStringInput(resolvedValues, 'image-ref', 'HARMONIARR_SUMMARY_IMAGE_REF', env),
+        smokeEvidenceArtifactName: getOptionalStringInput(resolvedValues, 'smoke-evidence-artifact-name', 'HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME', env),
         summaryPath,
       };
     case 'verify-release-contract':

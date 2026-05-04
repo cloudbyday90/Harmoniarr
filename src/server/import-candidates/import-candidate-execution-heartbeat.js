@@ -49,6 +49,7 @@ export function createImportCandidateExecutionHeartbeat({
   buildImportCandidateExecutionSummary = async () => ({ currentRun: null }),
   clearIntervalFn = clearInterval,
   getNow = () => new Date(),
+  heartbeatPauseService = null,
   importCandidateExecutionHeartbeatState = createImportCandidateExecutionHeartbeatState(),
   intervalMs = defaultHeartbeatIntervalMs,
   onError = () => {},
@@ -59,6 +60,28 @@ export function createImportCandidateExecutionHeartbeat({
     const occurredAt = getNow().toISOString();
 
     try {
+      const heartbeatReadiness = await heartbeatPauseService?.resolveHeartbeatReadiness?.({
+        operationLabel: 'Import reconciliation',
+      }) ?? { allowed: true };
+
+      if (!heartbeatReadiness.allowed) {
+        importCandidateExecutionHeartbeatState.recordHeartbeatOutcome({
+          occurredAt,
+          outcome: 'skipped',
+          pauseCode: heartbeatReadiness.pauseCode,
+          pauseMessage: heartbeatReadiness.pauseMessage,
+          pauseProvider: heartbeatReadiness.pauseProvider,
+          skipReason: 'paused',
+          nextRetryAt: heartbeatReadiness.nextRetryAt,
+        });
+        return {
+          nextRetryAt: heartbeatReadiness.nextRetryAt ?? null,
+          provider: heartbeatReadiness.pauseProvider ?? null,
+          reason: 'paused',
+          skipped: true,
+        };
+      }
+
       const executionSummary = await buildImportCandidateExecutionSummary();
       if (!shouldRunImportCandidateExecutionHeartbeat({ executionSummary })) {
         importCandidateExecutionHeartbeatState.recordHeartbeatOutcome({

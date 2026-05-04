@@ -435,6 +435,7 @@ export function createApp({
     artworkModule,
     importCandidateModule,
     libraryModule,
+    maintenanceLockService,
     metadataModule,
     operationsModule,
     providerModule,

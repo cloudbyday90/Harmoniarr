@@ -143,6 +143,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
           startWorkerRun: async () => {},
         },
       },
+      maintenanceLockService: {
+        listActiveMaintenanceLocks: async () => [],
+      },
       libraryModule: {
         libraryDiscoveryHeartbeatState: { kind: 'library-state' },
         libraryDiscoveryRunService: {
@@ -189,17 +192,20 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       },
     }),
     createImportCandidateExecutionHeartbeat: (options) => {
+      assert.equal(typeof options.heartbeatPauseService.resolveHeartbeatReadiness, 'function');
       assert.equal(options.intervalMs, 60000);
       assert.equal(typeof options.onError, 'function');
       return importExecutionHeartbeat;
     },
     createLibraryDiscoveryHeartbeat: (options) => {
+      assert.equal(typeof options.heartbeatPauseService.resolveHeartbeatReadiness, 'function');
       assert.equal(options.intervalMs, 900000);
       assert.equal(typeof options.onError, 'function');
       return libraryDiscoveryHeartbeat;
     },
     createMetadataRefreshHeartbeat: (options) => {
       assert.equal(typeof options.getDependencyHealth, 'function');
+      assert.equal(typeof options.heartbeatPauseService.resolveHeartbeatReadiness, 'function');
       assert.equal(options.intervalMs, 900000);
       assert.equal(typeof options.onError, 'function');
       assert.equal(typeof options.metadataRefreshDispatchPolicyService.resolveDispatchReadiness, 'function');
@@ -395,6 +401,9 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         importCandidateExecutionWorker: {
           startWorkerRun: async () => {},
         },
+      },
+      maintenanceLockService: {
+        listActiveMaintenanceLocks: async () => [],
       },
       libraryModule: {
         libraryDiscoveryHeartbeatState: {},

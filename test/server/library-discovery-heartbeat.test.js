@@ -93,9 +93,13 @@ test('createLibraryDiscoveryHeartbeat starts a due discovery run and configures 
   assert.deepEqual(libraryDiscoveryHeartbeatState.getHeartbeatState(), {
     lastErrorMessage: null,
     lastOutcome: 'started',
+    lastPauseCode: null,
+    lastPauseMessage: null,
+    lastPauseProvider: null,
     lastSkipReason: null,
     lastTickAt: '2026-04-30T14:00:00.000Z',
     lastTriggeredAt: '2026-04-30T14:00:00.000Z',
+    nextRetryAt: null,
   });
 
   heartbeat.stop();
@@ -171,4 +175,44 @@ test('createLibraryDiscoveryHeartbeat swallows concurrent-run conflicts and surf
   });
   assert.deepEqual(errors, ['slskd unavailable']);
   assert.equal(failingState.getHeartbeatState().lastOutcome, 'error');
+});
+
+test('createLibraryDiscoveryHeartbeat pauses while a conflicting maintenance lock is active', async () => {
+  const libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState();
+  const heartbeat = createLibraryDiscoveryHeartbeat({
+    getActiveRun: async () => {
+      throw new Error('active run lookup should not run while paused');
+    },
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    heartbeatPauseService: {
+      resolveHeartbeatReadiness: async () => ({
+        allowed: false,
+        nextRetryAt: '2026-04-30T14:05:00.000Z',
+        pauseCode: 'recovery_lock_conflict',
+        pauseMessage: 'Discovery dispatch is paused while the maintenance maintenance lock is active.',
+        pauseProvider: 'maintenance',
+      }),
+    },
+    libraryDiscoveryHeartbeatState,
+  });
+
+  const result = await heartbeat.tick();
+
+  assert.deepEqual(result, {
+    nextRetryAt: '2026-04-30T14:05:00.000Z',
+    provider: 'maintenance',
+    reason: 'paused',
+    skipped: true,
+  });
+  assert.deepEqual(libraryDiscoveryHeartbeatState.getHeartbeatState(), {
+    lastErrorMessage: null,
+    lastOutcome: 'skipped',
+    lastPauseCode: 'recovery_lock_conflict',
+    lastPauseMessage: 'Discovery dispatch is paused while the maintenance maintenance lock is active.',
+    lastPauseProvider: 'maintenance',
+    lastSkipReason: 'paused',
+    lastTickAt: '2026-04-30T14:00:00.000Z',
+    lastTriggeredAt: null,
+    nextRetryAt: '2026-04-30T14:05:00.000Z',
+  });
 });

@@ -43,12 +43,16 @@ export function renderReleaseImageSummaryLines({
   ];
 }
 
-export function renderPublishedImageVerificationSummaryLines({ imageRef } = {}) {
+export function renderPublishedImageVerificationSummaryLines({
+  imageRef,
+  smokeEvidenceArtifactName = null,
+} = {}) {
   return [
     '## Published Image Verification',
     '',
     `- Verified image: ${imageRef}`,
     '- Smoke contract: fresh install bootstrap plus existing-data restart',
+    ...(smokeEvidenceArtifactName ? [`- Smoke evidence artifact: ${smokeEvidenceArtifactName}`] : []),
     '',
   ];
 }

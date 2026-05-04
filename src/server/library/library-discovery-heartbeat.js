@@ -80,6 +80,7 @@ export function createLibraryDiscoveryHeartbeat({
     },
   }),
   getNow = () => new Date(),
+  heartbeatPauseService = null,
   intervalMs = defaultHeartbeatIntervalMs,
   libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState(),
   onError = () => {},
@@ -90,6 +91,28 @@ export function createLibraryDiscoveryHeartbeat({
     const occurredAt = getNow().toISOString();
 
     try {
+      const heartbeatReadiness = await heartbeatPauseService?.resolveHeartbeatReadiness?.({
+        operationLabel: 'Discovery dispatch',
+      }) ?? { allowed: true };
+
+      if (!heartbeatReadiness.allowed) {
+        libraryDiscoveryHeartbeatState.recordHeartbeatOutcome({
+          occurredAt,
+          outcome: 'skipped',
+          pauseCode: heartbeatReadiness.pauseCode,
+          pauseMessage: heartbeatReadiness.pauseMessage,
+          pauseProvider: heartbeatReadiness.pauseProvider,
+          skipReason: 'paused',
+          nextRetryAt: heartbeatReadiness.nextRetryAt,
+        });
+        return {
+          nextRetryAt: heartbeatReadiness.nextRetryAt ?? null,
+          provider: heartbeatReadiness.pauseProvider ?? null,
+          reason: 'paused',
+          skipped: true,
+        };
+      }
+
       const [activeRun, snapshot] = await Promise.all([
         getActiveRun(),
         getDiscoverySnapshot(),
