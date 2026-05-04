@@ -21,10 +21,13 @@ function getRequiredImageRef(env = process.env) {
 
 await runDirectScriptTask(import.meta, {
     prefix: 'harmoniarr-validate-docker-released-image',
-    renderSuccessMessage: ({ existingDataRestart, freshInstall, imageRef, port, projectName }) => {
+    renderSuccessMessage: ({ existingDataRestart, freshInstall, imageRef, port, projectName, startupFailure }) => {
       const freshSummary = freshInstall.healthBody.service ?? (freshInstall.healthBody.ok === true ? 'ok' : 'unknown');
       const restartSummary = existingDataRestart?.healthBody.service ?? (existingDataRestart?.healthBody.ok === true ? 'ok' : 'unknown');
-      return `Released image smoke passed for ${imageRef} via project ${projectName} on http://127.0.0.1:${port}/healthz (${freshSummary} fresh install with snapshot bootstrap; ${freshInstall.mediaTooling.ffmpegVersion}; ${freshInstall.mediaTooling.ffprobeVersion}; ${restartSummary} existing-data restart without snapshot bootstrap; ${freshInstall.migrationCheckOutput})`;
+      const startupFailureSummary = startupFailure
+        ? `startup refusal verified (${startupFailure.serviceStatus}; exit ${startupFailure.serviceExitCode})`
+        : 'startup refusal verification skipped';
+      return `Released image smoke passed for ${imageRef} via project ${projectName} on http://127.0.0.1:${port}/healthz (${freshSummary} fresh install with snapshot bootstrap; ${freshInstall.mediaTooling.ffmpegVersion}; ${freshInstall.mediaTooling.ffprobeVersion}; ${restartSummary} existing-data restart without snapshot bootstrap; ${freshInstall.migrationCheckOutput}; ${startupFailureSummary})`;
     },
     run: () => validateDockerFreshInstall({
       buildImage: false,

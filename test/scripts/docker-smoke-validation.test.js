@@ -14,6 +14,9 @@ function createFetchResponse(body, status = 200) {
 }
 
 function createRunCommandStub({
+  failureComposeExitCode = 1,
+  failureLogs = '[harmoniarr] startup failed: HARMONIARR_BOOTSTRAP_OWNER_CLAIM_CODE is required when HARMONIARR_BOOTSTRAP_OWNER_USERNAME or HARMONIARR_BOOTSTRAP_OWNER_EMAIL is configured.',
+  failureServiceState = { ExitCode: 1, Status: 'exited' },
   ffmpegVersion = 'ffmpeg version 7.1.1',
   ffprobeVersion = 'ffprobe version 7.1.1',
   logs = 'loaded schema snapshot from src/server/schema-snapshot.sql',
@@ -32,6 +35,10 @@ function createRunCommandStub({
     const isComposeCommand = args[0] === 'compose';
 
     if (isComposeCommand && args.includes('up')) {
+      if (args.includes('--abort-on-container-failure')) {
+        return { exitCode: failureComposeExitCode, stderr: '', stdout: '' };
+      }
+
       return { exitCode: 0, stderr: '', stdout: '' };
     }
 
@@ -39,12 +46,16 @@ function createRunCommandStub({
       return { exitCode: 0, stderr: '', stdout: '' };
     }
 
-    if (isComposeCommand && args.includes('ps') && args.includes('-q') && args.at(-1) === 'harmoniarr') {
+    if (isComposeCommand && args.includes('ps') && (args.includes('-q') || args.includes('-aq')) && args.at(-1) === 'harmoniarr') {
       return { exitCode: 0, stderr: '', stdout: 'container-123\n' };
     }
 
-    if (args[0] === 'inspect') {
+    if (args[0] === 'inspect' && args.includes('{{json .HostConfig.ReadonlyRootfs}}')) {
       return { exitCode: 0, stderr: '', stdout: 'true\n' };
+    }
+
+    if (args[0] === 'inspect' && args.includes('{{json .State}}')) {
+      return { exitCode: 0, stderr: '', stdout: `${JSON.stringify(failureServiceState)}\n` };
     }
 
     if (isComposeCommand && args.includes('ffmpeg') && args.includes('-version')) {
@@ -64,7 +75,11 @@ function createRunCommandStub({
     }
 
     if (isComposeCommand && args.includes('logs')) {
-      return { exitCode: 0, stderr: '', stdout: logs };
+      return {
+        exitCode: 0,
+        stderr: '',
+        stdout: env?.HARMONIARR_BOOTSTRAP_OWNER_USERNAME === 'docker-smoke-owner' ? failureLogs : logs,
+      };
     }
 
     if (isComposeCommand && args.includes('/app/server-dist/check-migrations.js')) {
@@ -115,6 +130,12 @@ test('validateDockerFreshInstall verifies ffmpeg and ffprobe in the running imag
     ffmpegVersion: 'ffmpeg version 7.2.0-static',
     ffprobeVersion: 'ffprobe version 7.2.0-static',
   });
+  assert.deepEqual(result.startupFailure, {
+    composeExitCode: 1,
+    expectedLogSnippet: 'HARMONIARR_BOOTSTRAP_OWNER_CLAIM_CODE is required when HARMONIARR_BOOTSTRAP_OWNER_USERNAME or HARMONIARR_BOOTSTRAP_OWNER_EMAIL is configured.',
+    serviceExitCode: 1,
+    serviceStatus: 'exited',
+  });
   assert.equal(removedDirectories[0], '/tmp/harmoniarr-smoke');
 
   const execCommands = calls
@@ -126,6 +147,9 @@ test('validateDockerFreshInstall verifies ffmpeg and ffprobe in the running imag
     'ffprobe -version',
     'node /app/server-dist/check-migrations.js',
   ]);
+
+  assert.ok(calls.some(({ args }) => args.includes('--abort-on-container-failure')));
+  assert.ok(calls.some(({ args }) => args.includes('{{json .State}}')));
 });
 
 test('validateDockerFreshInstall fails when a tooling version probe returns no version line', async () => {
@@ -156,5 +180,36 @@ test('validateDockerFreshInstall fails when a tooling version probe returns no v
       tempRootDir: '/tmp',
     }),
     /could not read a version line from ffprobe -version/,
+  );
+});
+
+test('validateDockerFreshInstall fails when the invalid-startup scenario does not emit the expected refusal log', async () => {
+  const { runCommandFn } = createRunCommandStub({
+    failureLogs: '[harmoniarr] startup failed: unexpected startup error',
+  });
+
+  await assert.rejects(
+    () => validateDockerFreshInstall({
+      fetchFn: async () => createFetchResponse({
+        ok: true,
+        pendingMigrations: 0,
+        service: 'ok',
+      }),
+      getAvailablePortFn: async () => 4302,
+      makeDirectoryLayoutFn: async () => ({
+        appData: '/tmp/appdata',
+        downloads: '/tmp/downloads',
+        music: '/tmp/music',
+        staging: '/tmp/staging',
+        transcodeTemp: '/tmp/transcode-temp',
+      }),
+      mkdtempFn: async () => '/tmp/harmoniarr-smoke',
+      processEnv: {},
+      projectName: 'harmoniarrsmoke-test',
+      removeFn: async () => {},
+      runCommandFn,
+      tempRootDir: '/tmp',
+    }),
+    /did not observe the expected startup-refusal log/,
   );
 });

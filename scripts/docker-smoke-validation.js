@@ -17,6 +17,14 @@ import { runBufferedCommand } from './process-runtime.js';
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const schemaBootstrapLogSnippet = 'loaded schema snapshot from';
 const harmoniarrServiceName = 'harmoniarr';
+const defaultStartupValidationFailureScenario = Object.freeze({
+  env: {
+    HARMONIARR_BOOTSTRAP_OWNER_CLAIM_CODE: '',
+    HARMONIARR_BOOTSTRAP_OWNER_EMAIL: '',
+    HARMONIARR_BOOTSTRAP_OWNER_USERNAME: 'docker-smoke-owner',
+  },
+  expectedLogSnippet: 'HARMONIARR_BOOTSTRAP_OWNER_CLAIM_CODE is required when HARMONIARR_BOOTSTRAP_OWNER_USERNAME or HARMONIARR_BOOTSTRAP_OWNER_EMAIL is configured.',
+});
 
 function createProjectName(prefix = 'harmoniarrsmoke') {
   return `${prefix}${Date.now()}`;
@@ -61,12 +69,14 @@ async function runCommand({
   command,
   cwd = rootDir,
   env,
+  expectedExitCodes,
 } = {}) {
   return runBufferedCommand({
     args,
     command,
     cwd,
     env,
+    expectedExitCodes,
   });
 }
 
@@ -74,20 +84,21 @@ async function runComposeCommand({
   composeArgs,
   env,
   args,
+  expectedExitCodes,
   runCommandFn,
 } = {}) {
   return runCommandFn({
     args: [...composeArgs, ...args],
     command: 'docker',
     env,
+    expectedExitCodes,
   });
 }
 
-async function startComposeProject({
+function buildComposeUpArgs({
   buildImage,
-  composeArgs,
-  env,
-  runCommandFn,
+  detach = true,
+  serviceName = harmoniarrServiceName,
 } = {}) {
   const args = ['up'];
 
@@ -97,10 +108,26 @@ async function startComposeProject({
     args.push('--no-build');
   }
 
-  args.push('--detach', '--wait', '--wait-timeout', '180');
+  if (detach) {
+    args.push('--detach', '--wait', '--wait-timeout', '180');
+    return args;
+  }
 
+  args.push('--abort-on-container-failure', '--exit-code-from', serviceName, '--no-color');
+  return args;
+}
+
+async function startComposeProject({
+  buildImage,
+  composeArgs,
+  env,
+  runCommandFn,
+} = {}) {
   await runComposeCommand({
-    args,
+    args: buildComposeUpArgs({
+      buildImage,
+      detach: true,
+    }),
     composeArgs,
     env,
     runCommandFn,
@@ -132,11 +159,12 @@ async function stopComposeProject({
 async function getServiceContainerId({
   composeArgs,
   env,
+  includeStopped = false,
   runCommandFn,
   serviceName = harmoniarrServiceName,
 } = {}) {
   const containerResult = await runComposeCommand({
-    args: ['ps', '-q', serviceName],
+    args: ['ps', includeStopped ? '-aq' : '-q', serviceName],
     composeArgs,
     env,
     runCommandFn,
@@ -228,6 +256,44 @@ async function getMediaToolingSummary({
   };
 }
 
+async function getServiceState({
+  composeArgs,
+  env,
+  runCommandFn,
+  serviceName = harmoniarrServiceName,
+} = {}) {
+  const containerId = await getServiceContainerId({
+    composeArgs,
+    env,
+    includeStopped: true,
+    runCommandFn,
+    serviceName,
+  });
+  const inspectResult = await runCommandFn({
+    args: ['inspect', '--format', '{{json .State}}', containerId],
+    command: 'docker',
+    env,
+  });
+
+  let state;
+
+  try {
+    state = JSON.parse(inspectResult.stdout.trim());
+  } catch {
+    throw new Error(`Docker smoke validation could not parse state inspection for container ${containerId}`);
+  }
+
+  if (!state || typeof state.ExitCode !== 'number' || typeof state.Status !== 'string') {
+    throw new Error(`Docker smoke validation could not read the exit state for container ${containerId}`);
+  }
+
+  return {
+    containerId,
+    exitCode: state.ExitCode,
+    status: state.Status,
+  };
+}
+
 async function getHealthSummary({ fetchFn, port } = {}) {
   const healthResponse = await fetchFn(`http://127.0.0.1:${port}/healthz`);
   if (!healthResponse.ok) {
@@ -240,10 +306,11 @@ async function getHealthSummary({ fetchFn, port } = {}) {
 async function getServiceLogs({
   composeArgs,
   env,
+  serviceName = harmoniarrServiceName,
   runCommandFn,
 } = {}) {
   const logResult = await runComposeCommand({
-    args: ['logs', '--no-color', 'harmoniarr'],
+    args: ['logs', '--no-color', serviceName],
     composeArgs,
     env,
     runCommandFn,
@@ -319,6 +386,63 @@ async function validateRunningStack({
   };
 }
 
+async function validateStartupRefusal({
+  buildImage,
+  composeArgs,
+  env,
+  runCommandFn,
+  startupValidationFailureScenario,
+  serviceName = harmoniarrServiceName,
+} = {}) {
+  const failureEnv = {
+    ...env,
+    ...startupValidationFailureScenario.env,
+  };
+  const composeResult = await runComposeCommand({
+    args: buildComposeUpArgs({
+      buildImage,
+      detach: false,
+      serviceName,
+    }),
+    composeArgs,
+    env: failureEnv,
+    expectedExitCodes: [1],
+    runCommandFn,
+  });
+  const serviceState = await getServiceState({
+    composeArgs,
+    env: failureEnv,
+    runCommandFn,
+    serviceName,
+  });
+
+  if (serviceState.status !== 'exited') {
+    throw new Error(`Docker smoke validation expected ${serviceName} to exit during invalid startup validation, but container ${serviceState.containerId} is ${serviceState.status}`);
+  }
+
+  if (serviceState.exitCode !== 1) {
+    throw new Error(`Docker smoke validation expected ${serviceName} to exit with code 1 during invalid startup validation, but container ${serviceState.containerId} exited with ${serviceState.exitCode}`);
+  }
+
+  const logs = await getServiceLogs({
+    composeArgs,
+    env: failureEnv,
+    serviceName,
+    runCommandFn,
+  });
+
+  if (!logs.includes(startupValidationFailureScenario.expectedLogSnippet)) {
+    throw new Error('Docker smoke validation did not observe the expected startup-refusal log for the invalid configuration scenario');
+  }
+
+  return {
+    composeExitCode: composeResult.exitCode,
+    expectedLogSnippet: startupValidationFailureScenario.expectedLogSnippet,
+    serviceExitCode: serviceState.exitCode,
+    serviceStatus: serviceState.status,
+  };
+}
+
 function buildValidationEnvironment({
   directories,
   imageRef,
@@ -352,6 +476,7 @@ export async function validateDockerFreshInstall({
   projectName = createProjectName(),
   removeFn = rm,
   runCommandFn = runCommand,
+  startupValidationFailureScenario = defaultStartupValidationFailureScenario,
   tempRootDir = tmpdir(),
   verifyExistingDataRestart = false,
 } = {}) {
@@ -384,6 +509,7 @@ export async function validateDockerFreshInstall({
     });
 
     let existingDataRestart = null;
+    let startupFailure = null;
 
     if (verifyExistingDataRestart) {
       await stopComposeProject({
@@ -410,12 +536,30 @@ export async function validateDockerFreshInstall({
       });
     }
 
+    if (startupValidationFailureScenario) {
+      await stopComposeProject({
+        composeArgs,
+        env,
+        removeVolumes: false,
+        runCommandFn,
+      });
+
+      startupFailure = await validateStartupRefusal({
+        buildImage: false,
+        composeArgs,
+        env,
+        runCommandFn,
+        startupValidationFailureScenario,
+      });
+    }
+
     return {
       existingDataRestart,
       freshInstall,
       imageRef: imageRef ?? null,
       port,
       projectName,
+      startupFailure,
       workspaceRoot,
     };
   } finally {

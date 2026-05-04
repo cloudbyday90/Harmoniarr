@@ -32,6 +32,8 @@ Security source: `docs/SECURITY_POLICY.md`
 - [x] Validate fresh-install schema bootstrap against a disposable PostgreSQL database.
 - [ ] Validate upgrade from the prior accepted state or baseline image.
 - [ ] Validate startup refusal on incompatible or unsafe configuration states.
+	- The shared Docker smoke contract now includes a fail-closed invalid-startup scenario using `docker compose up --abort-on-container-failure --exit-code-from harmoniarr`, asserting both service exit code `1` and the expected startup-refusal log message for an invalid bootstrap-owner configuration.
+	- Remaining work is one live Docker-capable execution of `npm run validate:docker-fresh-install` or the released-image equivalent in an environment with a running Docker daemon.
 - [ ] Validate embedded Postgres initialization, health reporting, and persistence behavior.
 - [x] Validate FFmpeg/tooling availability in the running image.
 
