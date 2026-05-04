@@ -1,5 +1,16 @@
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
+import { createLibraryScanRunStore } from '../../src/server/library/library-scan-run-store.js';
+import { createLibraryScanWorker } from '../../src/server/library/library-scan-worker.js';
+import {
+  createOperationRunInterruptionGate,
+} from '../../src/server/operation-run-cancellation.js';
+import { createOperationQueueStore } from '../../src/server/operation-queue-store.js';
+import {
+  createMaintenanceLockOperationPauseService,
+} from '../../src/server/recovery/maintenance-lock-operation-pause-service.js';
+import { maintenanceLockPauseCode } from '../../src/server/recovery/maintenance-lock-policy.js';
+import { createMaintenanceLockService } from '../../src/server/recovery/maintenance-lock-service.js';
 import { operationRunRegistry } from '../../src/shared/operation-run-descriptors.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
@@ -14,6 +25,43 @@ import {
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 let integrationRuntime;
 let runtimeUnavailableReason = null;
+
+async function waitForPersistedOperationRun(getPoolFn, runId, {
+  intervalMs = 25,
+  timeoutMs = 2000,
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() <= deadline) {
+    const result = await getPoolFn().query(
+      `
+        SELECT
+          attempt_count,
+          claimed_at,
+          claimed_by_instance_id,
+          error_message,
+          finished_at,
+          next_attempt_at,
+          status,
+          summary
+        FROM operation_runs
+        WHERE id = $1
+      `,
+      [runId],
+    );
+
+    const row = result.rows[0] ?? null;
+    if (row?.status === 'pending' && row.claimed_at === null && row.claimed_by_instance_id === null) {
+      return row;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, intervalMs);
+    });
+  }
+
+  throw new Error(`Timed out waiting for operation run ${runId} to return to pending`);
+}
 
 suite('integration operations lifecycle and library lock routes', () => {
   before(async () => {
@@ -215,6 +263,105 @@ suite('integration operations lifecycle and library lock routes', () => {
       assert.match(scanResponse.payload.error.message, /prevents library scan/i);
     }, {
       scenarioName: 'maintenance_lock_library_run_guards',
+    });
+  });
+
+  test('maintenance locks pause a claimed library scan run and return it to pending without spending retry budget', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
+      await bootstrapAdminSession(client);
+
+      const runStore = createLibraryScanRunStore({ getPoolFn });
+      const queueStore = createOperationQueueStore({
+        claimOwnerInstanceId: 'integration-library-scan-worker',
+        getPoolFn,
+      });
+      const maintenanceLockService = createMaintenanceLockService({ getPoolFn });
+      const operationPauseService = createMaintenanceLockOperationPauseService({
+        listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+      });
+      let executeScanCallCount = 0;
+
+      const worker = createLibraryScanWorker({
+        acquireLease: runStore.acquireLease,
+        createOperationRunLeaseHeartbeatFn: () => ({
+          start() {},
+          stop() {},
+        }),
+        executeScan: async ({ libraryRoot }) => {
+          executeScanCallCount += 1;
+
+          return {
+            filesMatched: 0,
+            filesSeen: 0,
+            filesUnmatched: 0,
+            libraryRoot,
+          };
+        },
+        isCancellationRequested: createOperationRunInterruptionGate({
+          isCancellationRequested: runStore.isCancellationRequested,
+          operationLabel: 'Library scan',
+          operationPauseService,
+        }),
+        markRunCancelled: runStore.markRunCancelled,
+        markRunCompleted: runStore.markRunCompleted,
+        markRunFailed: runStore.markRunFailed,
+        markRunPaused: runStore.markRunPaused,
+        markRunStarted: runStore.markRunStarted,
+        releaseLease: runStore.releaseLease,
+        renewLease: runStore.renewLease,
+      });
+
+      const seededRun = await runStore.createOperationRun({
+        libraryRoot: '/library/music',
+        status: 'pending',
+        triggeredByUserId: null,
+      });
+
+      const claimedRun = await queueStore.claimNextRunnableRun({
+        operationTypes: [operationRunRegistry.libraryScan.operationType],
+      });
+
+      assert.equal(claimedRun?.id, seededRun.id);
+      assert.equal(claimedRun?.attemptCount, 1);
+      assert.equal(claimedRun?.status, 'pending');
+      assert.ok(claimedRun?.claimedAt);
+      assert.equal(claimedRun?.claimedByInstanceId, 'integration-library-scan-worker');
+
+      const lockResponse = await enterMaintenanceLock(client, {
+        idempotencyKey: 'library-scan-worker-pause-lock',
+        reason: 'Pause claimed library scan worker startup',
+      });
+      assert.equal(lockResponse.response.status, 202);
+
+      await worker.startWorkerRun({
+        libraryRoot: '/library/music',
+        runId: seededRun.id,
+      });
+
+      const persistedRun = await waitForPersistedOperationRun(getPoolFn, seededRun.id);
+
+      assert.equal(executeScanCallCount, 0);
+      assert.equal(persistedRun.status, 'pending');
+      assert.equal(persistedRun.attempt_count, 0);
+      assert.equal(persistedRun.claimed_at, null);
+      assert.equal(persistedRun.claimed_by_instance_id, null);
+      assert.equal(persistedRun.error_message, null);
+      assert.equal(persistedRun.finished_at, null);
+      assert.ok(persistedRun.next_attempt_at);
+      assert.equal(persistedRun.summary.libraryRoot, '/library/music');
+      assert.equal(persistedRun.summary.currentStep, 'Library scan paused by maintenance lock');
+      assert.equal(persistedRun.summary.pauseCode, maintenanceLockPauseCode);
+      assert.equal(persistedRun.summary.pauseProvider, 'maintenance');
+      assert.match(persistedRun.summary.pauseMessage, /library scan is paused while the maintenance lock is active/i);
+    }, {
+      scenarioName: 'maintenance_lock_library_scan_worker_pause',
     });
   });
 });

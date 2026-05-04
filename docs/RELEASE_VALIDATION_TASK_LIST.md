@@ -31,6 +31,7 @@ Security source: `docs/SECURITY_POLICY.md`
 - [x] Validate fresh-install schema bootstrap against a disposable PostgreSQL database.
 - [ ] Validate upgrade from the prior accepted state or baseline image.
 	- `npm run validate:docker-upgrade` now drives a baseline image followed by the candidate image against the same bind-mounted state, proving post-upgrade startup plus persisted settings continuity through the shared smoke contract.
+	- The `release-image` workflow now also exposes an optional `baseline_image` dispatch input, falls back to repository variable `DOCKER_UPGRADE_BASELINE_IMAGE`, and uploads `harmoniarr-docker-smoke-upgrade-path.json` when published-image upgrade validation runs in CI.
 	- Remaining work is one live Docker-capable execution with `HARMONIARR_BASELINE_IMAGE` set to the prior accepted immutable image reference, plus any extra rollback-specific assertions the release wants beyond the current continuity probe.
 - [ ] Validate startup refusal on incompatible or unsafe configuration states.
 	- The shared Docker smoke contract now includes a fail-closed invalid-startup scenario using `docker compose up --abort-on-container-failure --exit-code-from harmoniarr`, asserting both service exit code `1` and the expected startup-refusal log message for an invalid bootstrap-owner configuration.
@@ -76,6 +77,7 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Record smoke-test commands and manual verification notes.
 	- The Docker smoke scripts now optionally emit a machine-readable JSON evidence file when `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH` is set, so release workflows and support diagnostics can archive the exact validated result instead of scraping console output.
 	- The `release-image` workflow now uses that same seam during published-image verification and uploads `harmoniarr-docker-smoke-released-image.json` as a workflow artifact so immutable-image smoke proof survives beyond the job log.
+	- When a baseline immutable image is configured, the same workflow now also archives `harmoniarr-docker-smoke-upgrade-path.json` so upgrade-path evidence survives beyond the job log too.
 - [x] Document native local replay for release-image and container-maintenance workflow scripts with Node `--env-file` layering, local `GITHUB_OUTPUT`/`GITHUB_STEP_SUMMARY` files, and trusted-mirror preflight commands.
 - [ ] Document the promoted Docker Hub trusted-mirror flow, including the ORAS discovery probe, recursive artifact-copy step, and any OCI 1.1 referrers API versus referrers-tag behavior observed in the live release run.
 

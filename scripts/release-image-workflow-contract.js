@@ -46,6 +46,25 @@ export const releaseImageEvidenceStep = Object.freeze({
   path: 'supply-chain/harmoniarr-docker-smoke-released-image.json',
 });
 
+export const releaseImageUpgradeWorkflow = Object.freeze({
+  baselineInputName: 'baseline_image',
+  jobId: 'verify-upgrade-path',
+  baselineVariableName: 'DOCKER_UPGRADE_BASELINE_IMAGE',
+  jobName: 'Verify Upgrade Path',
+});
+
+export const releaseImageUpgradeValidationStep = Object.freeze({
+  command: 'npm run validate:docker-upgrade',
+  name: 'Validate published image upgrade path',
+});
+
+export const releaseImageUpgradeEvidenceStep = Object.freeze({
+  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  artifactName: 'harmoniarr-docker-smoke-upgrade-path.json',
+  name: 'Upload upgrade-path smoke evidence artifact',
+  path: 'supply-chain/harmoniarr-docker-smoke-upgrade-path.json',
+});
+
 export const trustedMirrorWorkflowEnvKeys = [
   'DOCKERHUB_TOKEN',
   'DOCKERHUB_USERNAME',
@@ -87,6 +106,37 @@ export function getWorkflowStepBlock(source, stepName) {
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index];
     if (index > startIndex && /^ {6}- name: /.test(line)) {
+      break;
+    }
+
+    collected.push(line);
+  }
+
+  return collected.join('\n');
+}
+
+export function getWorkflowJobBlock(source, jobId) {
+  if (!isNonEmptyString(source)) {
+    throw new Error('workflow source is required');
+  }
+
+  if (!isNonEmptyString(jobId)) {
+    throw new Error('jobId is required');
+  }
+
+  const normalizedSource = source.replace(/\r\n/g, '\n');
+  const lines = normalizedSource.split('\n');
+  const header = `  ${jobId.trim()}:`;
+  const startIndex = lines.findIndex((line) => line === header);
+
+  if (startIndex === -1) {
+    throw new Error(`Workflow job ${jobId} was not found`);
+  }
+
+  const collected = [];
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (index > startIndex && /^  [a-z0-9][a-z0-9-]*:$/i.test(line)) {
       break;
     }
 
@@ -180,6 +230,64 @@ export function validateReleaseImageWorkflowContract(source) {
 
   if (!normalizedSource.includes("HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-released-image.json")) {
     issues.push('verify-published-image summary must report the smoke evidence artifact name');
+  }
+
+  if (!normalizedSource.includes(`${releaseImageUpgradeWorkflow.baselineInputName}:`)) {
+    issues.push(`workflow_dispatch inputs must expose ${releaseImageUpgradeWorkflow.baselineInputName}`);
+  }
+
+  if (!normalizedSource.includes(`vars['${releaseImageUpgradeWorkflow.baselineVariableName}']`)) {
+    issues.push(`verify-upgrade-path job must read ${releaseImageUpgradeWorkflow.baselineVariableName}`);
+  }
+
+  try {
+    const block = getWorkflowJobBlock(normalizedSource, releaseImageUpgradeWorkflow.jobId);
+
+    if (!block.includes(`name: ${releaseImageUpgradeWorkflow.jobName}`)) {
+      issues.push(`workflow job ${releaseImageUpgradeWorkflow.jobId} must be named ${releaseImageUpgradeWorkflow.jobName}`);
+    }
+
+    if (!block.includes('needs:') || !block.includes('- publish-image') || !block.includes('- verify-published-image')) {
+      issues.push('verify-upgrade-path job must depend on publish-image and verify-published-image');
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageUpgradeValidationStep.name);
+
+    if (!block.includes(`run: ${releaseImageUpgradeValidationStep.command}`)) {
+      issues.push(`${releaseImageUpgradeValidationStep.name} must run ${releaseImageUpgradeValidationStep.command}`);
+    }
+
+    if (!block.includes(`HARMONIARR_BASELINE_IMAGE: \${{ github.event_name == 'workflow_dispatch' && inputs.${releaseImageUpgradeWorkflow.baselineInputName} || vars['${releaseImageUpgradeWorkflow.baselineVariableName}'] }}`.replace('\\', ''))) {
+      issues.push(`${releaseImageUpgradeValidationStep.name} must source HARMONIARR_BASELINE_IMAGE from workflow input or repository variable`);
+    }
+
+    if (!block.includes("HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}")) {
+      issues.push(`${releaseImageUpgradeValidationStep.name} must validate the published immutable image`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageUpgradeEvidenceStep.name);
+
+    if (!block.includes(`uses: ${releaseImageUpgradeEvidenceStep.action}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceStep.name} must use ${releaseImageUpgradeEvidenceStep.action}`);
+    }
+
+    if (!block.includes(`name: ${releaseImageUpgradeEvidenceStep.artifactName}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceStep.name} must publish ${releaseImageUpgradeEvidenceStep.artifactName}`);
+    }
+
+    if (!block.includes(`path: ${releaseImageUpgradeEvidenceStep.path}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceStep.name} must upload ${releaseImageUpgradeEvidenceStep.path}`);
+    }
+  } catch (error) {
+    issues.push(error.message);
   }
 
   if (!/name:\s+Verify Release Contract[\s\S]*needs:[\s\S]*- publish-image[\s\S]*- verify-published-image/.test(normalizedSource)) {

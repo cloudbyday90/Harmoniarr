@@ -5,6 +5,10 @@ on:
     types: [ published ]
   workflow_dispatch:
     inputs:
+      baseline_image:
+        description: Prior immutable image reference to validate upgrades from; defaults to repository variable DOCKER_UPGRADE_BASELINE_IMAGE
+        required: false
+        type: string
       release_tag:
         description: Release tag to publish, for example v0.1.0-beta
         required: true
@@ -265,6 +269,50 @@ jobs:
           HARMONIARR_SUMMARY_IMAGE_REF: ${{ needs.publish-image.outputs.image_ref }}
           HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-released-image.json
         run: node scripts/release-workflow-summary.js verify-published-image
+
+  verify-upgrade-path:
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.baseline_image != '') || vars['DOCKER_UPGRADE_BASELINE_IMAGE'] != '' }}
+    name: Verify Upgrade Path
+    needs:
+      - publish-image
+      - verify-published-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull published immutable image
+        run: docker pull "${{ needs.publish-image.outputs.image_ref }}"
+
+      - name: Validate published image upgrade path
+        env:
+          HARMONIARR_BASELINE_IMAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.baseline_image || vars['DOCKER_UPGRADE_BASELINE_IMAGE'] }}
+          HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-upgrade-path.json
+          HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
+        run: npm run validate:docker-upgrade
+
+      - name: Upload upgrade-path smoke evidence artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harmoniarr-docker-smoke-upgrade-path.json
+          path: supply-chain/harmoniarr-docker-smoke-upgrade-path.json
+          if-no-files-found: error
 
   verify-release-contract:
     if: github.event_name == 'release'
