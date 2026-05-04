@@ -179,3 +179,61 @@ test('createAppUserService resolves users by id for import target ownership look
   assert.equal(user.id, 'user-1');
   assert.equal(user.managedLibraryRelativeRoot, 'listeners/listener');
 });
+
+test('createAppUserService resets a user password, requires password change, and revokes sessions', async (t) => {
+  const query = t.mock.fn(async (sql) => {
+    if (sql === 'BEGIN' || sql === 'COMMIT') {
+      return { rowCount: 0, rows: [] };
+    }
+
+    if (String(sql).includes('UPDATE app_users')) {
+      return {
+        rowCount: 1,
+        rows: [{
+          auth_provider: 'plex',
+          auth_subject: 'plex-user-1',
+          created_at: '2026-05-02T15:05:00.000Z',
+          id: 'user-2',
+          is_disabled: false,
+          last_login_at: null,
+          managed_library_relative_root: null,
+          must_change_password: true,
+          role: 'requester',
+          updated_at: '2026-05-04T18:00:00.000Z',
+          username: 'plex-friend',
+        }],
+      };
+    }
+
+    if (String(sql).includes('UPDATE refresh_tokens')) {
+      return { rowCount: 3, rows: [] };
+    }
+
+    return { rowCount: 0, rows: [] };
+  });
+  const client = {
+    query,
+    release: t.mock.fn(),
+  };
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createAppUserService({
+    getPoolFn: () => ({ connect: async () => client }),
+    hashPasswordFn: t.mock.fn(async () => 'hashed-password'),
+    recordAuditEventFn,
+  });
+
+  const result = await service.resetAppUserPassword({
+    actorUserId: 'admin-1',
+    password: 'password-1234',
+    requestMetadata: { ipAddress: '203.0.113.10', userAgent: 'HarmoniarrTest/1.0' },
+    userId: 'user-2',
+  });
+
+  assert.equal(result.user.id, 'user-2');
+  assert.equal(result.user.mustChangePassword, true);
+  assert.equal(result.user.authProvider, 'plex');
+  assert.equal(result.revokedSessionCount, 3);
+  assert.equal(client.release.mock.callCount(), 1);
+  assert.equal(recordAuditEventFn.mock.callCount(), 1);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].eventType, 'app_user_password_reset');
+});

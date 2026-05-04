@@ -31,6 +31,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/users', access: 'admin', area: 'users', kind: 'read' },
   { method: 'POST', path: '/api/v1/users', access: 'admin', area: 'users', kind: 'mutation' },
   { method: 'PATCH', path: '/api/v1/users/:userId', access: 'admin', area: 'users', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/users/:userId/reset-password', access: 'admin', area: 'users', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/users/:userId/provision-managed-library-root', access: 'admin', area: 'users', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/users/me/claim-managed-library-root', access: 'authenticated', area: 'users', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/users/imports/plex/preview', access: 'admin', area: 'users', kind: 'read' },

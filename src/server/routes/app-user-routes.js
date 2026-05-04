@@ -35,6 +35,7 @@ export function registerAppUserRoutes(app, {
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   listAppUsers = defaultAppUserService.listAppUsers,
   relinkPlexDirectoryConflict = null,
+  resetAppUserPassword = defaultAppUserService.resetAppUserPassword,
   provisionManagedLibraryRoot = defaultAppUserProvisioningService.provisionManagedLibraryRoot,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
@@ -88,6 +89,24 @@ export function registerAppUserRoutes(app, {
     response.json({
       ok: true,
       user,
+    });
+  }));
+
+  app.post('/api/v1/users/:userId/reset-password', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await resetAppUserPassword({
+      actorUserId: session.appUserId,
+      password: request.body?.password,
+      requestMetadata: getRequestMetadata(request),
+      userId: request.params.userId,
+    });
+
+    response.status(201).json({
+      ok: true,
+      revokedSessionCount: result.revokedSessionCount,
+      user: result.user,
     });
   }));
 

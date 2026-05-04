@@ -34,6 +34,7 @@ import {
   fetchUsers,
   previewPlexUserImport,
   relinkPlexUserConflict,
+  resetUserPassword,
   provisionUserManagedLibraryRoot,
   updateUser,
 } from '../lib/users-api.js';
@@ -195,8 +196,10 @@ function applyUsers(payload) {
       ...user,
       pendingIsDisabled: Boolean(user.isDisabled),
       pendingManagedLibraryRelativeRoot: user.managedLibraryRelativeRoot ?? '',
+      pendingPasswordReset: '',
       pendingRole: user.role,
       provisioning: false,
+      resettingPassword: false,
       saving: false,
     }))
     : [];
@@ -512,6 +515,31 @@ async function provisionManagedUserLibraryRoot(user) {
   } catch (error) {
     user.provisioning = false;
     userManagementErrorMessage.value = error instanceof Error ? error.message : 'Managed library folder provisioning failed';
+  }
+}
+
+async function resetManagedUserPassword(user) {
+  user.resettingPassword = true;
+  userManagementErrorMessage.value = '';
+  userManagementSuccessMessage.value = '';
+
+  try {
+    const payload = await resetUserPassword(user.id, user.pendingPasswordReset);
+    Object.assign(user, {
+      ...payload.user,
+      pendingIsDisabled: payload.user.isDisabled,
+      pendingManagedLibraryRelativeRoot: payload.user.managedLibraryRelativeRoot ?? '',
+      pendingPasswordReset: '',
+      pendingRole: payload.user.role,
+      provisioning: false,
+      resettingPassword: false,
+      saving: false,
+    });
+
+    userManagementSuccessMessage.value = `Temporary password set for ${payload.user.username}. The user must change it on next login.`;
+  } catch (error) {
+    user.resettingPassword = false;
+    userManagementErrorMessage.value = error instanceof Error ? error.message : 'User password reset failed';
   }
 }
 
@@ -1254,6 +1282,10 @@ onMounted(() => {
               <input v-model="user.pendingIsDisabled" type="checkbox" />
               Disable user access
             </label>
+            <label>
+              Temporary password
+              <input v-model="user.pendingPasswordReset" type="password" autocomplete="new-password" placeholder="Set a temporary password" />
+            </label>
             <p class="metadata-card-copy">Resolved permissions: {{ user.permissions.join(', ') }}</p>
             <p class="metadata-card-copy" v-if="user.managedLibraryRelativeRoot">Managed library subdirectory: {{ user.managedLibraryRelativeRoot }}</p>
             <p class="metadata-card-copy" v-else>No managed library subdirectory configured yet.</p>
@@ -1268,7 +1300,16 @@ onMounted(() => {
             >
               {{ user.provisioning ? 'Provisioning...' : 'Provision folder' }}
             </button>
+            <button
+              type="button"
+              class="review-reset-button"
+              @click="resetManagedUserPassword(user)"
+              :disabled="user.resettingPassword || !user.pendingPasswordReset"
+            >
+              {{ user.resettingPassword ? 'Setting password...' : 'Set temporary password' }}
+            </button>
             <p class="metadata-card-copy" v-if="hasPendingManagedLibraryRootChanges(user)">Save the managed library subdirectory change before provisioning the folder.</p>
+            <p class="metadata-card-copy" v-if="user.authProvider === 'plex'">Use a temporary password here to provide local fallback access for a Plex-linked user without removing the Plex binding.</p>
           </article>
         </div>
       </template>

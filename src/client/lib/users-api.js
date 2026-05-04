@@ -38,6 +38,14 @@ export function updateUser(userId, patch) {
   });
 }
 
+export function resetUserPassword(userId, password) {
+  return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/reset-password`, {
+    method: 'POST',
+    includeCsrf: true,
+    body: { password },
+  });
+}
+
 export function provisionUserManagedLibraryRoot(userId) {
   return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/provision-managed-library-root`, {
     method: 'POST',

@@ -66,6 +66,18 @@ function createAppUserRouteTestApp(overrides = {}) {
         userAgent: request.headers['user-agent'] ?? null,
       }),
       listAppUsers: async () => [{ id: 'user-1', username: 'admin', role: 'admin', authProvider: 'local', managedLibraryRelativeRoot: 'staff/admin', permissions: ['admin.system'] }],
+      resetAppUserPassword: async ({ userId }) => ({
+        revokedSessionCount: 0,
+        user: {
+          id: userId,
+          username: 'listener',
+          role: 'requester',
+          authProvider: 'local',
+          mustChangePassword: true,
+          managedLibraryRelativeRoot: 'listeners/listener',
+          permissions: ['media.request'],
+        },
+      }),
       provisionManagedLibraryRoot: async ({ userId }) => ({
         provisioning: {
           authProvider: 'local',
@@ -280,6 +292,54 @@ test('app user provisioning route provisions the configured managed library root
     assert.equal(payload.ok, true);
     assert.equal(payload.provisioning.userRootPath, '/data/music/users/listeners/listener');
     assert.equal(payload.user.id, 'user-2');
+  });
+});
+
+test('app user reset-password route passes actor and temporary password to the shared service', async (t) => {
+  const resetAppUserPassword = t.mock.fn(async ({ userId }) => ({
+    revokedSessionCount: 2,
+    user: {
+      id: userId,
+      authProvider: 'plex',
+      managedLibraryRelativeRoot: 'listeners/listener',
+      mustChangePassword: true,
+      permissions: ['media.request'],
+      role: 'requester',
+      username: 'listener',
+    },
+  }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-users', user: { role: 'admin' } }));
+  const requireCsrf = t.mock.fn();
+  const app = createAppUserRouteTestApp({ requireCsrf, requireFreshAdminSession, resetAppUserPassword });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/user-2/reset-password`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-users',
+        'x-forwarded-for': '198.51.100.10',
+        'user-agent': 'HarmoniarrUsersTest/1.0',
+      },
+      body: JSON.stringify({ password: 'password-1234' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(resetAppUserPassword.mock.calls[0].arguments, [{
+      actorUserId: 'admin-1',
+      password: 'password-1234',
+      requestMetadata: {
+        ipAddress: '198.51.100.10',
+        userAgent: 'HarmoniarrUsersTest/1.0',
+      },
+      userId: 'user-2',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.revokedSessionCount, 2);
+    assert.equal(payload.user.mustChangePassword, true);
   });
 });
 

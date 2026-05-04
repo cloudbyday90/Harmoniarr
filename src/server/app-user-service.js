@@ -246,10 +246,82 @@ export function createAppUserService({
     return user;
   }
 
+  async function resetAppUserPassword({ actorUserId, password, requestMetadata, userId }) {
+    const normalizedActorUserId = normalizeUserId(actorUserId);
+    const normalizedUserId = normalizeUserId(userId);
+    const passwordHash = await hashPasswordFn(validatePassword(password));
+
+    const pool = getPoolFn();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        `
+          UPDATE app_users
+          SET password_hash = $2,
+              must_change_password = TRUE,
+              password_changed_at = NOW(),
+              updated_at = NOW()
+          WHERE id = $1
+          RETURNING *
+        `,
+        [normalizedUserId, passwordHash],
+      );
+
+      if ((result.rowCount ?? 0) === 0) {
+        throw createApiError(404, 'app_user_not_found', 'The requested user could not be found');
+      }
+
+      const revokedSessionsResult = await client.query(
+        `
+          UPDATE refresh_tokens
+          SET is_revoked = TRUE,
+              revoked_at = NOW(),
+              revoked_reason = 'admin_password_reset'
+          WHERE app_user_id = $1
+            AND is_revoked = FALSE
+        `,
+        [normalizedUserId],
+      );
+
+      await client.query('COMMIT');
+
+      const user = mapAppUserRow(result.rows[0], permissionService);
+
+      await recordAuditEventFn({
+        actorUserId: normalizedActorUserId,
+        actorType: 'user',
+        details: {
+          revokedSessionCount: revokedSessionsResult.rowCount ?? 0,
+          username: user.username,
+        },
+        entityId: user.id,
+        entityType: 'app_user',
+        eventType: 'app_user_password_reset',
+        ipAddress: requestMetadata?.ipAddress ?? null,
+        summary: 'App user password reset',
+        userAgent: requestMetadata?.userAgent ?? null,
+      });
+
+      return {
+        revokedSessionCount: revokedSessionsResult.rowCount ?? 0,
+        user,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   return {
     createAppUser,
     getAppUserById,
     listAppUsers,
+    resetAppUserPassword,
     roleOptions: [...permissionService.roleOptions],
     updateAppUser,
   };

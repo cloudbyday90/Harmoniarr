@@ -46,6 +46,7 @@ export function createAppUserModule({
       claimManagedLibraryRoot: resolvedAppUserProvisioningService.claimManagedLibraryRoot,
       getAppUserById: resolvedAppUserService.getAppUserById,
       listAppUsers: resolvedAppUserService.listAppUsers,
+      resetAppUserPassword: resolvedAppUserService.resetAppUserPassword,
       ...(plexDirectoryImportService
         ? {
           applyPlexDirectoryImport: plexDirectoryImportService.applyImport,

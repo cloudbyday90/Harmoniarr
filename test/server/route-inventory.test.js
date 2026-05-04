@@ -66,6 +66,7 @@ function collectRegisteredRoutes() {
     getRequestMetadata: () => ({}),
     listAppUsers: asyncNoopResult([]),
     relinkPlexDirectoryConflict: asyncNoopResult({}),
+    resetAppUserPassword: asyncNoopResult({}),
     provisionManagedLibraryRoot: asyncNoopResult({}),
     requireAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
     requireCsrf: () => {},
