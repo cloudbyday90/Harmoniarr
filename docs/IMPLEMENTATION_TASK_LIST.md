@@ -375,6 +375,7 @@ Status note:
   - Claiming now runs through `app-user-provisioning-service.js` so root ownership and provisioning behavior stay centralized, with generated defaults (`listeners/<username-slug>`) when no explicit root is supplied.
   - Existing admin provisioning remains available at `POST /api/v1/users/:userId/provision-managed-library-root`, while route inventory and server tests now cover both admin and self-service flows.
 - [x] Extend the self-service request boundary so release-backed `needs_fetch` requests that resolve to canonical metadata releases feed discovery reconciliation and dispatch instead of stopping at request classification alone.
+  - Progress: request-driven discovery reconciliation now preserves both acting and target user ids from delegated Request Music intake, so downstream fulfillment seams can follow `requestedForUserId` without losing the original acting-user audit link.
 - [x] Extend provider-URL request handling so external playlist and collection requests dispatch into provider fetch and import automation instead of remaining classified-only.
   - `library-media-request-service.js` now calls `externalIntakeService.queueExternalMediaRequestPlanning` inline after persisting a supported `external_url` request, making dispatch synchronous with request creation rather than deferred.
   - The planning operation type `library_external_intake_planning` is registered in the shared `operationRunRegistry` and dispatched by the shared `operation-queue-dispatcher` poll loop alongside existing operation types.

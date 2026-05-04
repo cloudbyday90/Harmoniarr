@@ -89,6 +89,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
         sourceMediaRequestId: row.source_media_request_id,
         sourceRequestKind: row.source_request_kind ?? null,
         sourceRequestedByUserId: row.source_requested_by_user_id ?? null,
+        sourceRequestedForUserId: row.source_requested_for_user_id ?? row.source_requested_by_user_id ?? null,
       }
     : {};
   const releaseDateDeadline = buildReleaseDateInstant(row.release_date);
@@ -204,6 +205,7 @@ export function createLibraryDiscoveryRequestService({
             media_requests.id AS source_media_request_id,
             media_requests.request_kind AS source_request_kind,
             media_requests.requested_by_user_id AS source_requested_by_user_id,
+            media_requests.requested_for_user_id AS source_requested_for_user_id,
             current_discovery.search_mode,
             current_discovery.blocked_reason,
             current_discovery.evidence AS prior_evidence,
@@ -237,6 +239,7 @@ export function createLibraryDiscoveryRequestService({
             source_rows.source_media_request_id,
             source_rows.source_request_kind,
             source_rows.source_requested_by_user_id,
+            source_rows.source_requested_for_user_id,
             source_rows.search_mode,
             source_rows.blocked_reason,
             source_rows.prior_evidence,
@@ -259,6 +262,7 @@ export function createLibraryDiscoveryRequestService({
           deduped_sources.source_media_request_id,
           deduped_sources.source_request_kind,
           deduped_sources.source_requested_by_user_id,
+          deduped_sources.source_requested_for_user_id,
           deduped_sources.search_mode,
           deduped_sources.blocked_reason,
           deduped_sources.prior_evidence,
