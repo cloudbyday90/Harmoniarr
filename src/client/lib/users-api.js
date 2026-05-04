@@ -44,3 +44,14 @@ export function provisionUserManagedLibraryRoot(userId) {
     includeCsrf: true,
   });
 }
+
+export function previewPlexUserImport() {
+  return apiRequest('/api/v1/users/imports/plex/preview');
+}
+
+export function applyPlexUserImport() {
+  return apiRequest('/api/v1/users/imports/plex/apply', {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}

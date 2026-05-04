@@ -6155,6 +6155,7 @@ Backend:
 - Implement bootstrap-admin flow, password hashing, login/logout, refresh-token rotation, session invalidation, and CSRF protection.
 - Prefer an optional preseeded owner-claim bootstrap mode for trusted self-hosted installs: if the operator configures a one-time claim secret plus owner username and/or email through environment, first-run admin creation should require that claim before the initial admin account is created.
 - Plex onboarding should reuse that same ownership-first posture: the preferred first Plex slice is a server-side Plex PIN/JWT connection for the owner account plus Plex user import into the existing `app_users` table, not a second competing bootstrap or identity store.
+- That first Plex slice is now in place at the control-plane level: Harmoniarr can link a Plex owner account, preview Plex Home users, import non-conflicting Plex-linked identities into `app_users`, and refresh metadata for already-linked users through shared server-side services.
 - Plex managed accounts and regular Plex accounts must be treated differently. Managed accounts may be imported as Harmoniarr users for request ownership, permissions, notifications, and managed-library provisioning, but they should not be assumed to support direct Harmoniarr sign-in.
 - Direct Plex sign-in should come only after the import-first identity boundary is working. Importing Plex users into `app_users` is the durable baseline; direct Plex login is an additive capability for direct-capable Plex accounts, not the root identity model.
 - Imported Plex managed users should also have a first-class local invite, claim, or password-set flow bound to the same `app_users` row, because Plex managed accounts do not support direct sign-in semantics on their own.
@@ -6274,7 +6275,7 @@ Current execution priority note:
 
 - At this point, the highest remaining product risk is no longer first-pass feature construction. It is deployment-path proof: fresh install, upgrade, restore preview or apply, and rollback-aware behavior on the supported Docker plus PostgreSQL path.
 - The remaining unchecked Phase 0 and start-gate items should be treated as contract and documentation closure unless they uncover a real architectural contradiction.
-- If product-value work is deliberately prioritized ahead of that release-risk track, the next architecture-aligned slices are: Plex directory import or refresh plus imported library-access awareness, delegated Request Music ownership plus target-user inbox visibility, then direct Plex sign-in and managed-user local-login fallback on the shared `app_users` identity boundary.
+- If product-value work is deliberately prioritized ahead of that release-risk track, the next architecture-aligned slices are: delegated Request Music ownership plus target-user inbox visibility, then Plex import merge/relink and richer library-access policy, then direct Plex sign-in and managed-user local-login fallback on the shared `app_users` identity boundary.
 
 Validation:
 
@@ -6285,7 +6286,7 @@ Validation:
 - Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and recovery/restore scenarios.
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
 - Recommended next implementation slice: use the existing integration and runtime harnesses to validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior end to end, then use the resulting gaps to drive the remaining fixture, E2E, and release-closure work.
-- If product-value work is pulled forward ahead of broader release closure, the preferred identity/request slice is: import Plex users into `app_users`, add `requestedForUserId` to Request Music, add direct Plex sign-in for direct-capable Plex accounts, add local-login fallback for imported managed users, then add explicit per-target fan-out plus notifications.
+- If product-value work is pulled forward ahead of broader release closure, the preferred identity/request slice is now: build on the shipped Plex owner-link and directory-import foundation, add `requestedForUserId` to Request Music, add direct Plex sign-in for direct-capable Plex accounts, add local-login fallback for imported managed users, then add explicit per-target fan-out plus notifications.
 - Additional high-value follow-on work that fits this architecture well includes Plex library-access awareness on imported users, audited request reassignment, and Plex webhook-backed completion or fulfillment signals, because those features improve delegated ownership clarity without replacing the canonical Harmoniarr workflow state.
 
 Release closure:

@@ -28,6 +28,8 @@ const defaultAppUserProvisioningService = createAppUserProvisioningService({
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
 export function registerAppUserRoutes(app, {
+  applyPlexDirectoryImport = null,
+  buildPlexDirectoryImportPreview = null,
   claimManagedLibraryRoot = defaultAppUserProvisioningService.claimManagedLibraryRoot,
   createAppUser = defaultAppUserService.createAppUser,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
@@ -121,4 +123,30 @@ export function registerAppUserRoutes(app, {
       user: result.user,
     });
   }));
+
+  if (typeof buildPlexDirectoryImportPreview === 'function') {
+    app.get('/api/v1/users/imports/plex/preview', asyncRoute(async (request, response) => {
+      await requireAdminSession(request);
+
+      response.json({
+        ok: true,
+        ...(await buildPlexDirectoryImportPreview()),
+      });
+    }));
+  }
+
+  if (typeof applyPlexDirectoryImport === 'function') {
+    app.post('/api/v1/users/imports/plex/apply', asyncRoute(async (request, response) => {
+      const session = await requireFreshAdminSession(request);
+      requireCsrf(request, session);
+
+      response.status(201).json({
+        ok: true,
+        ...(await applyPlexDirectoryImport({
+          actorUserId: session.appUserId,
+          requestMetadata: getRequestMetadata(request),
+        })),
+      });
+    }));
+  }
 }

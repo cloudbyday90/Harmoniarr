@@ -23,6 +23,7 @@ import { normalizeUserMusicRoots } from './paths/user-music-root-service.js';
 import { loadSettings, persistSettings } from './settings.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
 import { createProviderCredentialsService } from './integrations/providers/provider-credentials-service.js';
+import { createPlexOwnerLinkService } from './integrations/plex/plex-owner-link-service.js';
 import { createSpotifyOAuthService } from './integrations/spotify/spotify-oauth-service.js';
 import { createYouTubeOAuthService } from './integrations/youtube/youtube-oauth-service.js';
 import { validateDownloadPathMappingsAgainstSettings } from './paths/download-path-mapping-service.js';
@@ -43,6 +44,7 @@ export function createSettingsService({
   getPoolFn = getPool,
   loadSettingsFn = loadSettings,
   pathValidationService = createPathValidationService(),
+  plexOwnerLinkService = createPlexOwnerLinkService({ loadSettingsFn }),
   persistSettingsFn = persistSettings,
   providerCredentialsService = createProviderCredentialsService(),
   recordAuditEventFn = recordAuditEvent,
@@ -58,6 +60,7 @@ export function createSettingsService({
       secretStatus: {
         providers: {
           ...(await providerCredentialsService.buildSecretStatus(queryable)),
+          plex: await plexOwnerLinkService.buildStatus(queryable),
           spotifyOAuth: await spotifyOAuthService.buildStatus(queryable),
           youtubeOAuth: await youtubeOAuthService.buildStatus(queryable),
         },

@@ -39,6 +39,7 @@ import { createMediaToolingStatusService } from './media/media-tooling-status-se
 import { createMediaTranscodeExecutionService } from './media/media-transcode-execution-service.js';
 import { createOperationsModule } from './operations-module.js';
 import { createProviderModule } from './provider-module.js';
+import { createPlexDirectoryImportService } from './integrations/plex/plex-directory-import-service.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
 import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
@@ -164,12 +165,25 @@ export function createApp({
   const providerModule = buildProviderModule();
   const settingsService = buildSettingsService({
     deploymentSecurityService,
+    plexOwnerLinkService: providerModule.plexOwnerLinkService,
     slskdConfigService,
     spotifyOAuthService: providerModule.spotifyOAuthService,
     youtubeOAuthService: providerModule.youtubeOAuthService,
   });
   const maintenanceLockService = createMaintenanceLockService();
-  const appUserModule = buildAppUserModule();
+  const baseAppUserModule = buildAppUserModule();
+  const plexDirectoryImportService = createPlexDirectoryImportService({
+    listAppUsers: baseAppUserModule.appUserService.listAppUsers,
+    plexOwnerLinkService: providerModule.plexOwnerLinkService,
+  });
+  const appUserModule = {
+    ...baseAppUserModule,
+    routeDependencies: {
+      ...baseAppUserModule.routeDependencies,
+      applyPlexDirectoryImport: plexDirectoryImportService.applyImport,
+      buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
+    },
+  };
   const artworkModule = buildArtworkModule({ maintenanceLockService, settingsService });
   const authModule = buildAuthModule({ settingsService });
   const operationsModule = buildOperationsModule();
@@ -239,6 +253,7 @@ export function createApp({
     maintenanceLockService,
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: resolvedPackageJsonPath,
+    plexOwnerLinkService: providerModule.plexOwnerLinkService,
     runtimeResourceService,
     settingsService,
     slskdService: slskdModule.slskdService,

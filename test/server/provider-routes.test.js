@@ -14,6 +14,17 @@ function createProviderRouteTestApp(overrides = {}) {
         keyIdConfigured: false,
         privateKeyConfigured: false,
       }),
+      buildPlexLinkStatus: async () => ({
+        linked: false,
+        linkedAt: null,
+        linkedUserEmail: null,
+        linkedUserId: null,
+        linkedUserTitle: null,
+        linkedUsername: null,
+        linkedUserUuid: null,
+        thumbUrl: null,
+        updatedAt: null,
+      }),
       buildSpotifyOAuthStatus: async () => ({
         linked: false,
         scope: null,
@@ -28,6 +39,10 @@ function createProviderRouteTestApp(overrides = {}) {
         tokenType: null,
         updatedAt: null,
       }),
+      clearPlexLink: async () => ({
+        provider: 'plex',
+        status: { linked: false },
+      }),
       clearSpotifyAuthorization: async () => ({
         provider: 'spotify',
         status: { linked: false },
@@ -36,6 +51,7 @@ function createProviderRouteTestApp(overrides = {}) {
         provider: 'youtube',
         status: { linked: false },
       }),
+      completePlexLink: async () => ({ provider: 'plex' }),
       completeSpotifyAuthorization: async () => ({ provider: 'spotify' }),
       completeYoutubeAuthorization: async () => ({ provider: 'youtube' }),
       getRequestMetadata: (request) => ({
@@ -45,6 +61,11 @@ function createProviderRouteTestApp(overrides = {}) {
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
       requireSession: async () => ({ appUserId: 'user-1', user: { role: 'admin' } }),
+      startPlexLink: async ({ actorUserId, requestMetadata }) => ({
+        authorizationUrl: `https://app.plex.tv/auth#?actor=${actorUserId}&origin=${encodeURIComponent(requestMetadata.origin)}`,
+        expiresAt: '2026-05-02T12:10:00.000Z',
+        provider: 'plex',
+      }),
       startSpotifyAuthorization: async ({ actorUserId, requestMetadata }) => ({
         authorizationUrl: `https://accounts.spotify.com/authorize?actor=${actorUserId}&origin=${encodeURIComponent(requestMetadata.origin)}`,
         expiresAt: '2026-05-02T12:10:00.000Z',
@@ -70,11 +91,32 @@ test('GET /api/v1/providers/status returns unified provider status', async () =>
     const body = await response.json();
 
     assert.equal(response.status, 200);
+    assert.equal(body.plex.linked, false);
     assert.equal(body.spotify.linked, false);
     assert.equal(body.youtube.linked, false);
     assert.equal(body.appleMusic.configured, false);
     assert.equal(body.appleMusic.provider, 'apple_music');
     assert.equal(body.appleMusic.storefront, 'us');
+  });
+});
+
+test('POST /api/v1/providers/plex/link/start returns authorization URL with request origin', async () => {
+  const app = createProviderRouteTestApp();
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/providers/plex/link/start`, {
+      headers: {
+        'x-forwarded-host': 'music.example.test',
+        'x-forwarded-proto': 'https',
+      },
+      method: 'POST',
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(body.ok, true);
+    assert.equal(body.provider, 'plex');
+    assert.match(body.authorizationUrl, /https%3A%2F%2Fmusic\.example\.test/);
   });
 });
 
@@ -171,5 +213,33 @@ test('POST /api/v1/providers/youtube/oauth/clear clears linked YouTube authoriza
     assert.equal(response.status, 200);
     assert.equal(body.ok, true);
     assert.deepEqual(body.status, { linked: false });
+  });
+});
+
+test('POST /api/v1/providers/plex/link/clear clears linked Plex authorization', async () => {
+  const app = createProviderRouteTestApp();
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/providers/plex/link/clear`, {
+      method: 'POST',
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.status, { linked: false });
+  });
+});
+
+test('GET /api/v1/providers/plex/link/callback completes callback and redirects to settings', async () => {
+  const app = createProviderRouteTestApp();
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/providers/plex/link/callback?state=state-1`, {
+      redirect: 'manual',
+    });
+
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.get('location'), '/app/settings?plexOAuth=linked');
   });
 });

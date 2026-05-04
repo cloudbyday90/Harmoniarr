@@ -179,8 +179,8 @@ Highest-priority remaining product-risk slices:
 
 Highest-priority product-value slices if feature work is intentionally pulled forward:
 
-1. Add an admin-run Plex directory import or refresh flow with diff review, conflict reporting, merge/relink actions, and imported library-access awareness on `app_users`.
-2. Split Request Music ownership into `requestedByUserId` and `requestedForUserId`, then add target-user inbox and notification visibility for delegated requests.
+1. Split Request Music ownership into `requestedByUserId` and `requestedForUserId`, then add target-user inbox and notification visibility for delegated requests.
+2. Extend the shipped Plex import base with conflict-safe merge/relink actions, richer library-access awareness, and lifecycle-safe refresh semantics on `app_users`.
 3. Add direct Plex sign-in for direct-capable Plex accounts plus local invite/claim/password fallback for imported Plex managed users, all bound to the same shared `app_users` identity model.
 
 Lower-priority or conditional slices:
@@ -312,6 +312,7 @@ Status note:
   - Owner-claim groundwork now exists for the local path: first-run bootstrap status can advertise a preseeded owner identity hint, and the bootstrap route can require a matching one-time claim code plus owner username/email before creating the initial admin account.
   - Next work on this item should bind Plex PIN auth onto that same shared owner-claim boundary rather than creating a second parallel first-run ownership flow.
   - Decision: Plex import and Plex sign-in are related but not identical features. The first Plex slice should import users from Plex into `app_users` and keep that as the durable identity boundary before direct Plex sign-in is added.
+  - Progress: the first Plex slice now exists. Admins can link a Plex owner account through the shared provider-link boundary, preview Plex Home users, import non-conflicting Plex-linked `app_users`, and refresh metadata for already-linked identities without creating a second local identity store.
   - Decision: Plex managed accounts may be imported as Harmoniarr users for request ownership, permissions, notifications, and managed-library provisioning, but they should not be treated as direct-sign-in-capable identities unless Plex exposes a supported direct auth path for them.
   - Decision: Harmoniarr should never collect or proxy Plex passwords. Browser auth must use the current Plex PIN/JWT flow server-side.
   - Decision: imported Plex managed users should get a first-class local invite, claim, or password-set fallback bound to the existing `app_users` record rather than attempting to emulate unsupported Plex login semantics.
@@ -319,8 +320,10 @@ Status note:
   - Decision: Plex import should include conflict-safe merge, relink, and unlink actions so existing local users can be bound to imported Plex identities without unsafe silent reassignment.
 - [ ] Implement direct Plex sign-in for imported direct-capable Plex accounts through the same shared session and route-tier model as local auth, without introducing a second identity store.
 - [ ] Implement a local invite, claim, or password-set flow for imported Plex managed users so they can authenticate into Harmoniarr directly while remaining linked to the imported `app_users` identity.
-- [ ] Add an admin-run Plex directory import or refresh surface with visible diffs, conflict reporting, merge or relink actions, and safe no-auto-delete lifecycle semantics.
-- [ ] Add Plex library-access awareness to imported users so Harmoniarr can distinguish which Plex-linked users have relevant server or library visibility when presenting request-targeting, provisioning, and fulfillment affordances.
+- [ ] Extend the admin-run Plex directory import or refresh surface with conflict-safe merge or relink actions and safe no-auto-delete lifecycle semantics.
+  - Progress: a shipped base flow now covers owner-account linking, preview or diff classification, non-conflicting user import into `app_users`, and metadata refresh for already-linked Plex users.
+- [ ] Extend Plex library-access awareness on imported users so Harmoniarr can distinguish which Plex-linked users have relevant server or library visibility when presenting request-targeting, provisioning, and fulfillment affordances.
+  - Progress: imported Plex profiles now persist coarse access-state metadata and raw evidence; follow-on work should turn that into stricter request-targeting and fulfillment policy.
 - [ ] Verify admin recovery assumptions remain compatible with `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 - Canonical Model And Import Review

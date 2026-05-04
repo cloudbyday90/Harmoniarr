@@ -6,6 +6,47 @@ import { createJsonTestApp, withServer } from '../../testing/server/http-test-he
 function createAppUserRouteTestApp(overrides = {}) {
   return createJsonTestApp((app) => {
     registerAppUserRoutes(app, {
+      applyPlexDirectoryImport: async ({ actorUserId }) => ({
+        appliedAt: '2026-05-03T12:00:00.000Z',
+        importedUsers: [{ id: 'user-plex-1', username: 'plex-friend', role: 'requester', authProvider: 'plex' }],
+        linkedOwner: { id: 'owner-1', title: 'Owner Account' },
+        profiles: [],
+        summary: {
+          conflicts: 0,
+          created: 1,
+          importable: 1,
+          linked: 0,
+          ownerAccounts: 1,
+          skipped: 0,
+          total: 2,
+          updated: 0,
+        },
+        triggeredBy: actorUserId,
+      }),
+      buildPlexDirectoryImportPreview: async () => ({
+        fetchedAt: '2026-05-03T11:55:00.000Z',
+        linkedOwner: { id: 'owner-1', title: 'Owner Account' },
+        profiles: [{
+          classification: 'create',
+          email: 'friend@example.com',
+          homeRole: 'home_member',
+          id: 'plex-1',
+          libraryAccessDetails: { serverIds: ['server-1'] },
+          libraryAccessState: 'shared',
+          suggestedUsername: 'plex-friend',
+          title: 'Friend',
+          username: 'friend',
+          uuid: 'plex-uuid-1',
+        }],
+        summary: {
+          conflicts: 0,
+          importable: 1,
+          linked: 0,
+          ownerAccounts: 1,
+          skipped: 0,
+          total: 2,
+        },
+      }),
       claimManagedLibraryRoot: async ({ actorUserId }) => ({
         provisioning: {
           authProvider: 'local',
@@ -294,5 +335,88 @@ test('app user self-claim route claims and provisions a managed library root for
     assert.equal(payload.ok, true);
     assert.equal(payload.provisioning.id, 'user-2');
     assert.equal(payload.user.id, 'user-2');
+  });
+});
+
+test('app user Plex preview route returns the classified directory preview for admins', async (t) => {
+  const buildPlexDirectoryImportPreview = t.mock.fn(async () => ({
+    fetchedAt: '2026-05-03T11:55:00.000Z',
+    linkedOwner: { id: 'owner-1', title: 'Owner Account' },
+    profiles: [{
+      classification: 'create',
+      id: 'plex-1',
+      suggestedUsername: 'plex-friend',
+      title: 'Friend',
+    }],
+    summary: {
+      conflicts: 0,
+      importable: 1,
+      linked: 0,
+      ownerAccounts: 1,
+      skipped: 0,
+      total: 2,
+    },
+  }));
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', user: { role: 'admin' } }));
+  const app = createAppUserRouteTestApp({ buildPlexDirectoryImportPreview, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/imports/plex/preview`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(buildPlexDirectoryImportPreview.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.summary.importable, 1);
+    assert.equal(payload.profiles[0].suggestedUsername, 'plex-friend');
+  });
+});
+
+test('app user Plex import route applies the import through the shared service', async (t) => {
+  const applyPlexDirectoryImport = t.mock.fn(async ({ actorUserId, requestMetadata }) => ({
+    appliedAt: '2026-05-03T12:00:00.000Z',
+    importedUsers: [{ id: 'user-plex-1', username: 'plex-friend', role: 'requester', authProvider: 'plex' }],
+    profiles: [],
+    summary: {
+      conflicts: 0,
+      created: 1,
+      importable: 1,
+      linked: 0,
+      ownerAccounts: 1,
+      skipped: 0,
+      total: 2,
+      updated: 0,
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-users', user: { role: 'admin' } }));
+  const app = createAppUserRouteTestApp({ applyPlexDirectoryImport, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/imports/plex/apply`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-users',
+        'x-forwarded-for': '198.51.100.20',
+        'user-agent': 'HarmoniarrUsersTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(applyPlexDirectoryImport.mock.calls[0].arguments, [{
+      actorUserId: 'admin-1',
+      requestMetadata: {
+        ipAddress: '198.51.100.20',
+        userAgent: 'HarmoniarrUsersTest/1.0',
+      },
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.summary.created, 1);
+    assert.equal(payload.importedUsers[0].authProvider, 'plex');
   });
 });

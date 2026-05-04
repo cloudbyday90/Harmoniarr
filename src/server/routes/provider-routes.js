@@ -53,23 +53,28 @@ function settingsRedirectUrl(provider, status, code = null) {
 
 export function registerProviderRoutes(app, {
   buildAppleMusicStatus,
+  buildPlexLinkStatus,
   buildSpotifyOAuthStatus,
   buildYoutubeOAuthStatus,
+  clearPlexLink,
   clearSpotifyAuthorization,
   clearYoutubeAuthorization,
+  completePlexLink,
   completeSpotifyAuthorization,
   completeYoutubeAuthorization,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  startPlexLink,
   startSpotifyAuthorization,
   startYoutubeAuthorization,
 }) {
   app.get('/api/v1/providers/status', asyncRoute(async (request, response) => {
     await requireSession(request);
 
-    const [spotify, youtube, appleMusic] = await Promise.all([
+    const [plex, spotify, youtube, appleMusic] = await Promise.all([
+      buildPlexLinkStatus(),
       buildSpotifyOAuthStatus(),
       buildYoutubeOAuthStatus(),
       buildAppleMusicStatus(),
@@ -77,8 +82,22 @@ export function registerProviderRoutes(app, {
 
     response.json({
       appleMusic,
+      plex,
       spotify,
       youtube,
+    });
+  }));
+
+  app.post('/api/v1/providers/plex/link/start', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    response.status(202).json({
+      ok: true,
+      ...(await startPlexLink({
+        actorUserId: session.appUserId,
+        requestMetadata: withRequestOrigin(request, getRequestMetadata),
+      })),
     });
   }));
 
@@ -134,6 +153,19 @@ export function registerProviderRoutes(app, {
     });
   }));
 
+  app.post('/api/v1/providers/plex/link/clear', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    response.json({
+      ok: true,
+      ...(await clearPlexLink({
+        actorUserId: session.appUserId,
+        requestMetadata: getRequestMetadata(request),
+      })),
+    });
+  }));
+
   app.get('/api/v1/providers/spotify/oauth/callback', asyncRoute(async (request, response) => {
     try {
       await completeSpotifyAuthorization({
@@ -157,6 +189,18 @@ export function registerProviderRoutes(app, {
       response.redirect(303, settingsRedirectUrl('youtube', 'linked'));
     } catch (error) {
       response.redirect(303, settingsRedirectUrl('youtube', 'failed', error?.code ?? 'youtube_oauth_failed'));
+    }
+  }));
+
+  app.get('/api/v1/providers/plex/link/callback', asyncRoute(async (request, response) => {
+    try {
+      await completePlexLink({
+        requestMetadata: getRequestMetadata(request),
+        state: request.query.state,
+      });
+      response.redirect(303, settingsRedirectUrl('plex', 'linked'));
+    } catch (error) {
+      response.redirect(303, settingsRedirectUrl('plex', 'failed', error?.code ?? 'plex_link_failed'));
     }
   }));
 }

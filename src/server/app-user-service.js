@@ -37,12 +37,25 @@ function mapAppUserRow(row, permissionService) {
     authProvider: row.auth_provider ?? 'local',
     authSubject: row.auth_subject ?? null,
     createdAt: row.created_at,
+    email: row.email ?? null,
     id: row.id,
     isDisabled: row.is_disabled,
     lastLoginAt: row.last_login_at,
     managedLibraryRelativeRoot: row.managed_library_relative_root ?? null,
     mustChangePassword: row.must_change_password,
     permissions: permissionService.listPermissionsForRole(row.role),
+    plexProfile: row.plex_user_id ? {
+      homeRole: row.plex_home_role,
+      libraryAccessDetails: row.plex_library_access_details ?? {},
+      libraryAccessState: row.plex_library_access_state ?? 'unknown',
+      plexEmail: row.plex_email ?? null,
+      plexTitle: row.plex_title,
+      plexUserId: row.plex_user_id,
+      plexUsername: row.plex_username ?? null,
+      plexUuid: row.plex_uuid ?? null,
+      thumbUrl: row.plex_thumb_url ?? null,
+      syncedAt: row.plex_synced_at ?? null,
+    } : null,
     role: row.role,
     updatedAt: row.updated_at,
     username: row.username,
@@ -53,6 +66,10 @@ function mapDatabaseError(error) {
   if (error?.code === '23505') {
     if (error?.constraint === 'app_users_managed_library_relative_root_unique') {
       throw createApiError(409, 'app_user_managed_library_root_conflict', 'Another user already owns that managed library subdirectory');
+    }
+
+    if (error?.constraint === 'app_users_email_unique') {
+      throw createApiError(409, 'app_user_email_conflict', 'A user with that email already exists');
     }
 
     throw createApiError(409, 'app_user_username_conflict', 'A user with that username already exists');
@@ -67,9 +84,27 @@ export function createAppUserService({
   permissionService = createAppUserPermissionService(),
   recordAuditEventFn = recordAuditEvent,
 } = {}) {
+  const appUserSelectSql = `
+    SELECT
+      app_users.*,
+      app_user_plex_profiles.plex_user_id,
+      app_user_plex_profiles.plex_uuid,
+      app_user_plex_profiles.plex_username,
+      app_user_plex_profiles.plex_email,
+      app_user_plex_profiles.plex_title,
+      app_user_plex_profiles.plex_thumb_url,
+      app_user_plex_profiles.plex_home_role,
+      app_user_plex_profiles.plex_library_access_state,
+      app_user_plex_profiles.plex_library_access_details,
+      app_user_plex_profiles.synced_at AS plex_synced_at
+    FROM app_users
+    LEFT JOIN app_user_plex_profiles
+      ON app_user_plex_profiles.app_user_id = app_users.id
+  `;
+
   async function getAppUserById({ userId }) {
     const normalizedUserId = normalizeUserId(userId);
-    const result = await getPoolFn().query('SELECT * FROM app_users WHERE id = $1 LIMIT 1', [normalizedUserId]);
+    const result = await getPoolFn().query(`${appUserSelectSql} WHERE app_users.id = $1 LIMIT 1`, [normalizedUserId]);
 
     if ((result.rowCount ?? result.rows.length ?? 0) === 0) {
       return null;
@@ -80,9 +115,8 @@ export function createAppUserService({
 
   async function listAppUsers() {
     const result = await getPoolFn().query(`
-      SELECT *
-      FROM app_users
-      ORDER BY username ASC
+      ${appUserSelectSql}
+      ORDER BY app_users.username ASC
     `);
 
     return result.rows.map((row) => mapAppUserRow(row, permissionService));

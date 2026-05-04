@@ -37,6 +37,20 @@ export function startSpotifyOAuth() {
   });
 }
 
+export function startPlexLink() {
+  return apiRequest('/api/v1/providers/plex/link/start', {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}
+
+export function clearPlexLink() {
+  return apiRequest('/api/v1/providers/plex/link/clear', {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}
+
 export function clearSpotifyOAuth() {
   return apiRequest('/api/v1/providers/spotify/oauth/clear', {
     method: 'POST',

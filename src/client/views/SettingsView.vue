@@ -19,14 +19,23 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue';
 import {
+  clearPlexLink,
   clearSpotifyOAuth,
   clearYouTubeOAuth,
   fetchSettings,
+  startPlexLink,
   startSpotifyOAuth,
   startYouTubeOAuth,
   updateSettings,
 } from '../lib/settings-api.js';
-import { createUser, fetchUsers, provisionUserManagedLibraryRoot, updateUser } from '../lib/users-api.js';
+import {
+  applyPlexUserImport,
+  createUser,
+  fetchUsers,
+  previewPlexUserImport,
+  provisionUserManagedLibraryRoot,
+  updateUser,
+} from '../lib/users-api.js';
 import {
   buildSettingsUpdatePayload,
   createEmptyDownloadMapping,
@@ -41,16 +50,21 @@ const isStartingSpotifyOAuth = ref(false);
 const isClearingSpotifyOAuth = ref(false);
 const isStartingYouTubeOAuth = ref(false);
 const isClearingYouTubeOAuth = ref(false);
+const isStartingPlexLink = ref(false);
+const isClearingPlexLink = ref(false);
 const errorMessage = ref('');
 const pathValidation = ref(null);
 const secretStatus = ref(null);
 const successMessage = ref('');
 const isUsersLoading = ref(true);
 const isCreatingUser = ref(false);
+const isPreviewingPlexUsers = ref(false);
+const isImportingPlexUsers = ref(false);
 const userManagementErrorMessage = ref('');
 const userManagementSuccessMessage = ref('');
 const roleOptions = ref(['admin', 'operator', 'requester']);
 const users = ref([]);
+const plexUserImportPreview = ref(null);
 const form = reactive({
   artwork: {
     captureEmbedded: true,
@@ -268,6 +282,19 @@ function youtubeOAuthStatusLabel() {
   return status.tokenExpiresAt ? `Linked until ${new Date(status.tokenExpiresAt).toLocaleString()}` : 'Linked';
 }
 
+function plexLinkStatusLabel() {
+  const status = secretStatus.value?.providers?.plex;
+  if (!status?.linked) {
+    return 'Not linked';
+  }
+
+  if (status.linkedUserTitle && status.linkedUserEmail) {
+    return `Linked as ${status.linkedUserTitle} (${status.linkedUserEmail})`;
+  }
+
+  return status.linkedUserTitle ? `Linked as ${status.linkedUserTitle}` : 'Linked';
+}
+
 function resetNewUserForm() {
   newUserForm.managedLibraryRelativeRoot = '';
   newUserForm.password = '';
@@ -374,6 +401,37 @@ async function disconnectYouTubeOAuth() {
   }
 }
 
+async function connectPlexLink() {
+  isStartingPlexLink.value = true;
+  userManagementErrorMessage.value = '';
+  userManagementSuccessMessage.value = '';
+  try {
+    const payload = await startPlexLink();
+    window.location.href = payload.authorizationUrl;
+  } catch (error) {
+    userManagementErrorMessage.value = error instanceof Error ? error.message : 'Plex link start failed';
+    isStartingPlexLink.value = false;
+  }
+}
+
+async function disconnectPlexLink() {
+  isClearingPlexLink.value = true;
+  userManagementErrorMessage.value = '';
+  userManagementSuccessMessage.value = '';
+  try {
+    const payload = await clearPlexLink();
+    if (secretStatus.value?.providers) {
+      secretStatus.value.providers.plex = payload.status;
+    }
+    plexUserImportPreview.value = null;
+    userManagementSuccessMessage.value = 'Plex owner link cleared.';
+  } catch (error) {
+    userManagementErrorMessage.value = error instanceof Error ? error.message : 'Plex link clear failed';
+  } finally {
+    isClearingPlexLink.value = false;
+  }
+}
+
 async function saveNewUser() {
   isCreatingUser.value = true;
   userManagementErrorMessage.value = '';
@@ -452,6 +510,36 @@ async function provisionManagedUserLibraryRoot(user) {
   } catch (error) {
     user.provisioning = false;
     userManagementErrorMessage.value = error instanceof Error ? error.message : 'Managed library folder provisioning failed';
+  }
+}
+
+async function loadPlexUserImportPreview() {
+  isPreviewingPlexUsers.value = true;
+  userManagementErrorMessage.value = '';
+  try {
+    plexUserImportPreview.value = await previewPlexUserImport();
+  } catch (error) {
+    userManagementErrorMessage.value = error instanceof Error ? error.message : 'Plex user preview failed';
+  } finally {
+    isPreviewingPlexUsers.value = false;
+  }
+}
+
+async function importPlexUsersNow() {
+  isImportingPlexUsers.value = true;
+  userManagementErrorMessage.value = '';
+  userManagementSuccessMessage.value = '';
+  try {
+    const payload = await applyPlexUserImport();
+    plexUserImportPreview.value = payload;
+    await loadUsers();
+    const created = payload.summary?.created ?? 0;
+    const updated = payload.summary?.updated ?? 0;
+    userManagementSuccessMessage.value = `Plex user import applied. Created ${created}, refreshed ${updated}.`;
+  } catch (error) {
+    userManagementErrorMessage.value = error instanceof Error ? error.message : 'Plex user import failed';
+  } finally {
+    isImportingPlexUsers.value = false;
   }
 }
 
@@ -958,6 +1046,84 @@ onMounted(() => {
       </article>
 
       <template v-else>
+        <section class="settings-validation-section">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Plex directory</p>
+              <h3>Plex-linked user import</h3>
+              <p class="metadata-card-copy">Link the Plex owner account, preview home users, then import non-conflicting Plex-linked users into the shared `app_users` identity boundary.</p>
+            </div>
+            <span class="review-status-pill" :class="secretStatus?.providers?.plex?.linked ? 'review-status-selected' : 'review-status-held'">
+              {{ secretStatus?.providers?.plex?.linked ? 'Linked' : 'Not linked' }}
+            </span>
+          </div>
+
+          <p class="metadata-card-copy">{{ plexLinkStatusLabel() }}</p>
+
+          <div class="settings-button-row">
+            <button type="button" @click="connectPlexLink" :disabled="isStartingPlexLink">
+              {{ isStartingPlexLink ? 'Starting...' : 'Connect Plex owner account' }}
+            </button>
+            <button type="button" class="review-reset-button" @click="disconnectPlexLink" :disabled="isClearingPlexLink || !secretStatus?.providers?.plex?.linked">
+              {{ isClearingPlexLink ? 'Clearing...' : 'Clear Plex link' }}
+            </button>
+            <button type="button" class="review-reset-button" @click="loadPlexUserImportPreview" :disabled="isPreviewingPlexUsers || !secretStatus?.providers?.plex?.linked">
+              {{ isPreviewingPlexUsers ? 'Refreshing...' : 'Preview Plex users' }}
+            </button>
+            <button type="button" class="review-reset-button" @click="importPlexUsersNow" :disabled="isImportingPlexUsers || !secretStatus?.providers?.plex?.linked">
+              {{ isImportingPlexUsers ? 'Importing...' : 'Import non-conflicting Plex users' }}
+            </button>
+          </div>
+
+          <article class="panel-light review-empty-state" v-if="!plexUserImportPreview">
+            <h3>No Plex directory preview loaded</h3>
+            <p>Previewing will classify linked users, importable users, owner-account skips, and conflicts before any new Harmoniarr users are created.</p>
+          </article>
+
+          <template v-else>
+            <dl class="review-meta-grid review-meta-grid-wide">
+              <div>
+                <dt>Importable</dt>
+                <dd>{{ plexUserImportPreview.summary?.importable ?? 0 }}</dd>
+              </div>
+              <div>
+                <dt>Linked refresh</dt>
+                <dd>{{ plexUserImportPreview.summary?.linked ?? 0 }}</dd>
+              </div>
+              <div>
+                <dt>Conflicts</dt>
+                <dd>{{ plexUserImportPreview.summary?.conflicts ?? 0 }}</dd>
+              </div>
+              <div>
+                <dt>Owner skips</dt>
+                <dd>{{ plexUserImportPreview.summary?.ownerAccounts ?? 0 }}</dd>
+              </div>
+            </dl>
+
+            <div class="settings-mapping-list" v-if="plexUserImportPreview.profiles?.length">
+              <article class="settings-mapping-card" v-for="profile in plexUserImportPreview.profiles" :key="`plex-preview-${profile.uuid ?? profile.id}`">
+                <div class="section-header">
+                  <div>
+                    <p class="eyebrow">{{ profile.homeRole }}</p>
+                    <h3>{{ profile.title }}</h3>
+                    <p class="metadata-card-copy">{{ profile.email ?? profile.username ?? profile.id }}</p>
+                  </div>
+                  <span class="review-status-pill" :class="profile.classification === 'create'
+                    ? 'review-status-selected'
+                    : (profile.classification === 'linked'
+                      ? 'review-status-held'
+                      : 'review-status-failed')">
+                    {{ profile.classification }}
+                  </span>
+                </div>
+                <p class="metadata-card-copy">Library access: {{ profile.libraryAccessState }}</p>
+                <p class="metadata-card-copy" v-if="profile.suggestedUsername">Suggested username: {{ profile.suggestedUsername }}</p>
+                <p class="metadata-card-copy" v-if="profile.existingUser">Existing user: {{ profile.existingUser.username }}<span v-if="profile.conflictReason"> ({{ profile.conflictReason }})</span></p>
+              </article>
+            </div>
+          </template>
+        </section>
+
         <form class="settings-grid" @submit.prevent="saveNewUser">
           <section>
             <p class="eyebrow">Create user</p>

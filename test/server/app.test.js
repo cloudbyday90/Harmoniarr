@@ -33,6 +33,13 @@ suite('createApp', () => {
   };
   const providerModule = {
     routeDependencies: { providers: 'deps' },
+    plexOwnerLinkService: {
+      buildStatus: t.mock.fn(async () => ({ linked: false })),
+      clearLink: t.mock.fn(async () => ({ status: { linked: false } })),
+      completeLink: t.mock.fn(async () => ({ status: { linked: true } })),
+      resolveLinkedAccessToken: t.mock.fn(async () => null),
+      startLink: t.mock.fn(async () => ({ authorizationUrl: 'https://app.plex.tv/auth#?' })),
+    },
     spotifyOAuthService: { resolveAccessToken: async () => null },
     youtubeOAuthService: { resolveAccessToken: async () => null },
   };
@@ -187,6 +194,7 @@ suite('createApp', () => {
   assert.equal(typeof artworkModuleArgs.maintenanceLockService.listActiveMaintenanceLocks, 'function');
   assert.equal(authModuleArgs.settingsService, settingsService);
   assert.equal(createSettingsService.mock.calls[0].arguments[0].deploymentSecurityService, deploymentSecurityService);
+  assert.equal(createSettingsService.mock.calls[0].arguments[0].plexOwnerLinkService, providerModule.plexOwnerLinkService);
   assert.equal(createSettingsService.mock.calls[0].arguments[0].slskdConfigService, slskdConfigService);
   assert.equal(createSettingsService.mock.calls[0].arguments[0].spotifyOAuthService, providerModule.spotifyOAuthService);
   assert.equal(createSettingsService.mock.calls[0].arguments[0].youtubeOAuthService, providerModule.youtubeOAuthService);
@@ -290,6 +298,7 @@ suite('createApp', () => {
     maintenanceLockService: systemModuleArgs.maintenanceLockService,
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: 'C:/virtual/package.json',
+    plexOwnerLinkService: providerModule.plexOwnerLinkService,
     runtimeResourceService,
     settingsService,
     slskdService: slskdModule.slskdService,

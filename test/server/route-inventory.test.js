@@ -59,6 +59,8 @@ function collectRegisteredRoutes() {
   });
 
   registerAppUserRoutes(app, {
+    applyPlexDirectoryImport: asyncNoopResult({}),
+    buildPlexDirectoryImportPreview: asyncNoopResult({}),
     claimManagedLibraryRoot: asyncNoopResult({}),
     createAppUser: asyncNoopResult({}),
     getRequestMetadata: () => ({}),
@@ -201,13 +203,21 @@ function collectRegisteredRoutes() {
   });
 
   registerProviderRoutes(app, {
+    buildAppleMusicStatus: asyncNoopResult({}),
+    buildPlexLinkStatus: asyncNoopResult({}),
+    buildSpotifyOAuthStatus: asyncNoopResult({}),
+    buildYoutubeOAuthStatus: asyncNoopResult({}),
+    clearPlexLink: asyncNoopResult({}),
     clearSpotifyAuthorization: asyncNoopResult({}),
     clearYoutubeAuthorization: asyncNoopResult({}),
+    completePlexLink: asyncNoopResult({}),
     completeSpotifyAuthorization: asyncNoopResult({}),
     completeYoutubeAuthorization: asyncNoopResult({}),
     getRequestMetadata: () => ({}),
     requireCsrf: () => {},
     requireFreshAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
+    requireSession: asyncNoopResult({ appUserId: 'user-1' }),
+    startPlexLink: asyncNoopResult({}),
     startSpotifyAuthorization: asyncNoopResult({}),
     startYoutubeAuthorization: asyncNoopResult({}),
   });

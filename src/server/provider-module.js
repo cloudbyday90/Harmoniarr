@@ -17,26 +17,33 @@
  */
 
 import { createAppleMusicStatusService } from './integrations/apple-music/apple-music-status-service.js';
+import { createPlexOwnerLinkService } from './integrations/plex/plex-owner-link-service.js';
 import { createSpotifyOAuthService } from './integrations/spotify/spotify-oauth-service.js';
 import { createYouTubeOAuthService } from './integrations/youtube/youtube-oauth-service.js';
 
 export function createProviderModule({
   appleMusicStatusService = createAppleMusicStatusService(),
+  plexOwnerLinkService = createPlexOwnerLinkService(),
   spotifyOAuthService = createSpotifyOAuthService(),
   youtubeOAuthService = createYouTubeOAuthService(),
 } = {}) {
   return {
     appleMusicStatusService,
+    plexOwnerLinkService,
     spotifyOAuthService,
     youtubeOAuthService,
     routeDependencies: {
       buildAppleMusicStatus: appleMusicStatusService.buildStatus,
+      buildPlexLinkStatus: plexOwnerLinkService.buildStatus,
       buildSpotifyOAuthStatus: spotifyOAuthService.buildStatus,
       buildYoutubeOAuthStatus: youtubeOAuthService.buildStatus,
+      clearPlexLink: plexOwnerLinkService.clearLink,
       clearSpotifyAuthorization: spotifyOAuthService.clearAuthorization,
       clearYoutubeAuthorization: youtubeOAuthService.clearAuthorization,
+      completePlexLink: plexOwnerLinkService.completeLink,
       completeSpotifyAuthorization: spotifyOAuthService.completeAuthorization,
       completeYoutubeAuthorization: youtubeOAuthService.completeAuthorization,
+      startPlexLink: plexOwnerLinkService.startLink,
       startSpotifyAuthorization: spotifyOAuthService.startAuthorization,
       startYoutubeAuthorization: youtubeOAuthService.startAuthorization,
     },
