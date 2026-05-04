@@ -150,6 +150,7 @@ Expected `Release Image` workflow artifacts:
 
 - `harmoniarr-docker-smoke-released-image.json`
 - `harmoniarr-docker-smoke-upgrade-path.json` when upgrade validation ran
+- `harmoniarr-docker-deployment-summary.json`
 - `harmoniarr-image-attestation.json` when attestation verification ran
 
 Expected `Release Image` verification stages:
@@ -180,6 +181,7 @@ Then confirm all of the following:
 - The `verify-release-contract` job passed.
 - The archived `harmoniarr-docker-smoke-released-image.json` artifact was verified successfully.
 - The archived `harmoniarr-docker-smoke-upgrade-path.json` artifact was verified successfully when upgrade validation ran.
+- The archived `harmoniarr-docker-deployment-summary.json` artifact was produced from the verified smoke evidence set for the release run.
 - The Docker Hub mirror verification passed when Docker Hub publishing is enabled.
 - The trusted-mirror capability probe and referrer verification passed when trusted mirror mode is enabled.
 - The `Supply Chain` workflow emitted the expected SBOM and any applicable attestations for the release commit.

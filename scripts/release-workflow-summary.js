@@ -61,6 +61,7 @@ export function renderPublishedImageVerificationSummaryLines({
 
 export function renderReleaseContractVerificationSummaryLines({
   attestationVerificationStatus,
+  deploymentSummaryArtifactName = null,
   dockerHubMirrorStatus,
   releaseTag,
   smokeEvidenceStatus = null,
@@ -76,6 +77,7 @@ export function renderReleaseContractVerificationSummaryLines({
     '- Compose override asset checked against the immutable image reference',
     ...(smokeEvidenceStatus ? [`- Archived smoke evidence verification: ${smokeEvidenceStatus}`] : []),
     ...(upgradeSmokeEvidenceStatus ? [`- Archived upgrade smoke evidence verification: ${upgradeSmokeEvidenceStatus}`] : []),
+    ...(deploymentSummaryArtifactName ? [`- Deployment summary artifact: ${deploymentSummaryArtifactName}`] : []),
     `- Docker Hub mirror verification: ${dockerHubMirrorStatus}`,
     `- Docker Hub trusted mirror capability probe: ${trustedMirrorProbeStatus}`,
     `- Docker Hub trusted mirror referrer verification: ${trustedMirrorReferrerStatus}`,

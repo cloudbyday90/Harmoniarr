@@ -5,6 +5,8 @@ import test from 'node:test';
 import {
   assertReleaseImageWorkflowContract,
   getWorkflowStepBlock,
+  releaseImageDeploymentSummaryArtifactStep,
+  releaseImageDeploymentSummaryStep,
   releaseImageEvidenceDownloadStep,
   releaseImageEvidenceStep,
   releaseImageEvidenceReleaseContractVerificationStep,
@@ -106,4 +108,18 @@ test('release-image workflow optionally downloads and re-verifies archived upgra
   assert.match(verificationBlock, new RegExp(releaseImageUpgradeEvidenceReleaseContractVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(verificationBlock, new RegExp(releaseImageUpgradeEvidenceReleaseContractVerificationStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(verificationBlock, /if: \$\{\{ needs\.verify-upgrade-path\.result == 'success' \}\}/);
+});
+
+test('release-image workflow writes and uploads a deployment summary artifact during release-contract verification', async () => {
+  const workflowSource = await readFile(workflowPath, 'utf8');
+
+  const writeBlock = getWorkflowStepBlock(workflowSource, releaseImageDeploymentSummaryStep.name);
+  const uploadBlock = getWorkflowStepBlock(workflowSource, releaseImageDeploymentSummaryArtifactStep.name);
+
+  assert.match(writeBlock, new RegExp(releaseImageDeploymentSummaryStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(writeBlock, new RegExp(releaseImageDeploymentSummaryStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(writeBlock, /HARMONIARR_DOCKER_DEPLOYMENT_RELEASED_IMAGE_EVIDENCE_PATH: supply-chain\/harmoniarr-docker-smoke-released-image.json/);
+  assert.match(uploadBlock, new RegExp(releaseImageDeploymentSummaryArtifactStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(uploadBlock, new RegExp(releaseImageDeploymentSummaryArtifactStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(uploadBlock, new RegExp(releaseImageDeploymentSummaryArtifactStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });

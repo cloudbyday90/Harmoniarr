@@ -101,6 +101,19 @@ export const releaseImageUpgradeEvidenceReleaseContractVerificationStep = Object
   path: 'supply-chain/harmoniarr-docker-smoke-upgrade-path.json',
 });
 
+export const releaseImageDeploymentSummaryStep = Object.freeze({
+  command: 'npm run write:docker-deployment-summary',
+  name: 'Write deployment summary artifact',
+  path: 'supply-chain/harmoniarr-docker-deployment-summary.json',
+});
+
+export const releaseImageDeploymentSummaryArtifactStep = Object.freeze({
+  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  artifactName: 'harmoniarr-docker-deployment-summary.json',
+  name: 'Upload deployment summary artifact',
+  path: 'supply-chain/harmoniarr-docker-deployment-summary.json',
+});
+
 export const trustedMirrorWorkflowEnvKeys = [
   'DOCKERHUB_TOKEN',
   'DOCKERHUB_USERNAME',
@@ -454,6 +467,46 @@ export function validateReleaseImageWorkflowContract(source) {
 
   if (!normalizedSource.includes('HARMONIARR_SUMMARY_UPGRADE_SMOKE_EVIDENCE_STATUS: ${{ needs.verify-upgrade-path.result == \'success\' && \'upgrade-path artifact passed\' || \'skipped\' }}')) {
     issues.push('verify-release-contract summary must report archived upgrade smoke evidence verification status');
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageDeploymentSummaryStep.name);
+
+    if (!block.includes(`run: ${releaseImageDeploymentSummaryStep.command}`)) {
+      issues.push(`${releaseImageDeploymentSummaryStep.name} must run ${releaseImageDeploymentSummaryStep.command}`);
+    }
+
+    if (!block.includes(`HARMONIARR_DOCKER_DEPLOYMENT_SUMMARY_PATH: ${releaseImageDeploymentSummaryStep.path}`)) {
+      issues.push(`${releaseImageDeploymentSummaryStep.name} must write ${releaseImageDeploymentSummaryStep.path}`);
+    }
+
+    if (!block.includes('HARMONIARR_DOCKER_DEPLOYMENT_RELEASED_IMAGE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-released-image.json')) {
+      issues.push(`${releaseImageDeploymentSummaryStep.name} must source the archived published-image smoke evidence artifact`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageDeploymentSummaryArtifactStep.name);
+
+    if (!block.includes(`uses: ${releaseImageDeploymentSummaryArtifactStep.action}`)) {
+      issues.push(`${releaseImageDeploymentSummaryArtifactStep.name} must use ${releaseImageDeploymentSummaryArtifactStep.action}`);
+    }
+
+    if (!block.includes(`name: ${releaseImageDeploymentSummaryArtifactStep.artifactName}`)) {
+      issues.push(`${releaseImageDeploymentSummaryArtifactStep.name} must publish ${releaseImageDeploymentSummaryArtifactStep.artifactName}`);
+    }
+
+    if (!block.includes(`path: ${releaseImageDeploymentSummaryArtifactStep.path}`)) {
+      issues.push(`${releaseImageDeploymentSummaryArtifactStep.name} must upload ${releaseImageDeploymentSummaryArtifactStep.path}`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  if (!normalizedSource.includes('HARMONIARR_SUMMARY_DEPLOYMENT_SUMMARY_ARTIFACT_NAME: harmoniarr-docker-deployment-summary.json')) {
+    issues.push('verify-release-contract summary must report the deployment summary artifact name');
   }
 
   if (!/name:\s+Verify Release Contract[\s\S]*needs:[\s\S]*- publish-image[\s\S]*- verify-published-image[\s\S]*- verify-upgrade-path/.test(normalizedSource)) {

@@ -56,6 +56,7 @@ test('renderPublishedImageVerificationSummaryLines formats the smoke summary', (
 test('renderReleaseContractVerificationSummaryLines formats the contract summary', () => {
   assert.deepEqual(renderReleaseContractVerificationSummaryLines({
     attestationVerificationStatus: 'passed',
+    deploymentSummaryArtifactName: 'harmoniarr-docker-deployment-summary.json',
     dockerHubMirrorStatus: 'passed',
     releaseTag: 'v0.1.0-beta',
     smokeEvidenceStatus: 'published-image artifact passed',
@@ -70,6 +71,7 @@ test('renderReleaseContractVerificationSummaryLines formats the contract summary
     '- Compose override asset checked against the immutable image reference',
     '- Archived smoke evidence verification: published-image artifact passed',
     '- Archived upgrade smoke evidence verification: upgrade-path artifact passed',
+    '- Deployment summary artifact: harmoniarr-docker-deployment-summary.json',
     '- Docker Hub mirror verification: passed',
     '- Docker Hub trusted mirror capability probe: passed via v1.1-referrers-api',
     '- Docker Hub trusted mirror referrer verification: passed',
@@ -88,6 +90,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for release-contract sum
         'verify-release-contract',
         '--summary-path', summaryPath,
         '--attestation-status', 'passed',
+        '--deployment-summary-artifact-name', 'harmoniarr-docker-deployment-summary.json',
         '--dockerhub-mirror-status', 'passed',
         '--release-tag', 'v0.1.0-beta',
         '--smoke-evidence-status', 'published-image artifact passed',
@@ -102,6 +105,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for release-contract sum
     assert.match(summary, /Release Contract Verification/);
     assert.match(summary, /Archived smoke evidence verification: published-image artifact passed/);
     assert.match(summary, /Archived upgrade smoke evidence verification: upgrade-path artifact passed/);
+    assert.match(summary, /Deployment summary artifact: harmoniarr-docker-deployment-summary.json/);
   } finally {
     await rm(tempDirectory, { force: true, recursive: true });
   }

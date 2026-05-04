@@ -386,6 +386,22 @@ jobs:
           HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-upgrade-path.json
         run: npm run validate:docker-smoke-evidence
 
+      - name: Write deployment summary artifact
+        env:
+          HARMONIARR_DOCKER_DEPLOYMENT_IMAGE_REF: ${{ needs.publish-image.outputs.image_ref }}
+          HARMONIARR_DOCKER_DEPLOYMENT_RELEASE_TAG: ${{ needs.publish-image.outputs.release_tag }}
+          HARMONIARR_DOCKER_DEPLOYMENT_RELEASED_IMAGE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-released-image.json
+          HARMONIARR_DOCKER_DEPLOYMENT_SUMMARY_PATH: supply-chain/harmoniarr-docker-deployment-summary.json
+          HARMONIARR_DOCKER_DEPLOYMENT_UPGRADE_EVIDENCE_PATH: ${{ needs.verify-upgrade-path.result == 'success' && 'supply-chain/harmoniarr-docker-smoke-upgrade-path.json' || '' }}
+        run: npm run write:docker-deployment-summary
+
+      - name: Upload deployment summary artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harmoniarr-docker-deployment-summary.json
+          path: supply-chain/harmoniarr-docker-deployment-summary.json
+          if-no-files-found: error
+
       - name: Verify release metadata and Compose override assets
         env:
           HARMONIARR_RELEASE_COMPOSE_OVERRIDE_PATH: supply-chain/${{ needs.publish-image.outputs.compose_asset_name }}
@@ -472,6 +488,7 @@ jobs:
       - name: Publish release-contract summary
         env:
           HARMONIARR_SUMMARY_ATTESTATION_STATUS: ${{ github.event.repository.private && 'skipped for private repository' || 'passed' }}
+          HARMONIARR_SUMMARY_DEPLOYMENT_SUMMARY_ARTIFACT_NAME: harmoniarr-docker-deployment-summary.json
           HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && 'passed' || 'skipped' }}
           HARMONIARR_SUMMARY_RELEASE_TAG: ${{ needs.publish-image.outputs.release_tag }}
           HARMONIARR_SUMMARY_SMOKE_EVIDENCE_STATUS: published-image artifact passed

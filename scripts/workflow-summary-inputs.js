@@ -16,6 +16,7 @@ import {
 export const releaseWorkflowSummaryCliOptions = Object.freeze({
   'attestation-status': { type: 'string' },
   'compose-asset-name': { type: 'string' },
+  'deployment-summary-artifact-name': { type: 'string' },
   'dockerhub-image-name': { type: 'string' },
   'dockerhub-mirror-status': { type: 'string' },
   'image-ref': { type: 'string' },
@@ -83,6 +84,7 @@ export function resolveReleaseWorkflowSummaryInputs(summaryKind, {
     case 'verify-release-contract':
       return {
         attestationVerificationStatus: getRequiredStringInput(resolvedValues, 'attestation-status', 'HARMONIARR_SUMMARY_ATTESTATION_STATUS', env),
+        deploymentSummaryArtifactName: getOptionalStringInput(resolvedValues, 'deployment-summary-artifact-name', 'HARMONIARR_SUMMARY_DEPLOYMENT_SUMMARY_ARTIFACT_NAME', env),
         dockerHubMirrorStatus: getRequiredStringInput(resolvedValues, 'dockerhub-mirror-status', 'HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS', env),
         releaseTag: getRequiredStringInput(resolvedValues, 'release-tag', 'HARMONIARR_SUMMARY_RELEASE_TAG', env),
         smokeEvidenceStatus: getOptionalStringInput(resolvedValues, 'smoke-evidence-status', 'HARMONIARR_SUMMARY_SMOKE_EVIDENCE_STATUS', env),
