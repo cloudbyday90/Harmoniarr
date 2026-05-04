@@ -13,7 +13,7 @@ await runDirectScriptTask(import.meta, {
     prefix: 'harmoniarr-validate-docker-fresh-install',
     renderSuccessMessage: ({ freshInstall, port, projectName }) => {
       const healthSummary = freshInstall.healthBody.service ?? (freshInstall.healthBody.ok === true ? 'ok' : 'unknown');
-      return `Docker fresh-install smoke passed for project ${projectName} on http://127.0.0.1:${port}/healthz (${healthSummary}; read-only rootfs verified; pending migrations ${freshInstall.healthBody.pendingMigrations}; ${freshInstall.migrationCheckOutput})`;
+      return `Docker fresh-install smoke passed for project ${projectName} on http://127.0.0.1:${port}/healthz (${healthSummary}; read-only rootfs verified; ${freshInstall.mediaTooling.ffmpegVersion}; ${freshInstall.mediaTooling.ffprobeVersion}; pending migrations ${freshInstall.healthBody.pendingMigrations}; ${freshInstall.migrationCheckOutput})`;
     },
     run: () => validateDockerFreshInstall(),
   });

@@ -24,7 +24,7 @@ await runDirectScriptTask(import.meta, {
     renderSuccessMessage: ({ existingDataRestart, freshInstall, imageRef, port, projectName }) => {
       const freshSummary = freshInstall.healthBody.service ?? (freshInstall.healthBody.ok === true ? 'ok' : 'unknown');
       const restartSummary = existingDataRestart?.healthBody.service ?? (existingDataRestart?.healthBody.ok === true ? 'ok' : 'unknown');
-      return `Released image smoke passed for ${imageRef} via project ${projectName} on http://127.0.0.1:${port}/healthz (${freshSummary} fresh install with snapshot bootstrap; ${restartSummary} existing-data restart without snapshot bootstrap; ${freshInstall.migrationCheckOutput})`;
+      return `Released image smoke passed for ${imageRef} via project ${projectName} on http://127.0.0.1:${port}/healthz (${freshSummary} fresh install with snapshot bootstrap; ${freshInstall.mediaTooling.ffmpegVersion}; ${freshInstall.mediaTooling.ffprobeVersion}; ${restartSummary} existing-data restart without snapshot bootstrap; ${freshInstall.migrationCheckOutput})`;
     },
     run: () => validateDockerFreshInstall({
       buildImage: false,

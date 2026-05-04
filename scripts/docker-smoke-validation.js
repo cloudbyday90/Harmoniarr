@@ -16,6 +16,7 @@ import { runBufferedCommand } from './process-runtime.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const schemaBootstrapLogSnippet = 'loaded schema snapshot from';
+const harmoniarrServiceName = 'harmoniarr';
 
 function createProjectName(prefix = 'harmoniarrsmoke') {
   return `${prefix}${Date.now()}`;
@@ -128,13 +129,14 @@ async function stopComposeProject({
   });
 }
 
-async function assertReadonlyRootFilesystem({
+async function getServiceContainerId({
   composeArgs,
   env,
   runCommandFn,
+  serviceName = harmoniarrServiceName,
 } = {}) {
   const containerResult = await runComposeCommand({
-    args: ['ps', '-q', 'harmoniarr'],
+    args: ['ps', '-q', serviceName],
     composeArgs,
     env,
     runCommandFn,
@@ -142,8 +144,22 @@ async function assertReadonlyRootFilesystem({
   const containerId = containerResult.stdout.trim();
 
   if (!containerId) {
-    throw new Error('Docker smoke validation could not resolve the Harmoniarr container ID');
+    throw new Error(`Docker smoke validation could not resolve the ${serviceName} container ID`);
   }
+
+  return containerId;
+}
+
+async function assertReadonlyRootFilesystem({
+  composeArgs,
+  env,
+  runCommandFn,
+} = {}) {
+  const containerId = await getServiceContainerId({
+    composeArgs,
+    env,
+    runCommandFn,
+  });
 
   const inspectResult = await runCommandFn({
     args: ['inspect', '--format', '{{json .HostConfig.ReadonlyRootfs}}', containerId],
@@ -155,6 +171,61 @@ async function assertReadonlyRootFilesystem({
   if (readonlyRootfs !== 'true') {
     throw new Error(`Docker container ${containerId} is not running with a read-only root filesystem`);
   }
+}
+
+function getFirstNonEmptyLine(output = '') {
+  return output
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0) ?? '';
+}
+
+async function getBinaryVersion({
+  binary,
+  composeArgs,
+  env,
+  runCommandFn,
+  serviceName = harmoniarrServiceName,
+} = {}) {
+  const versionResult = await runComposeCommand({
+    args: ['exec', '-T', serviceName, binary, '-version'],
+    composeArgs,
+    env,
+    runCommandFn,
+  });
+  const version = getFirstNonEmptyLine(versionResult.stdout);
+
+  if (!version) {
+    throw new Error(`Docker smoke validation could not read a version line from ${binary} -version`);
+  }
+
+  return version;
+}
+
+async function getMediaToolingSummary({
+  composeArgs,
+  env,
+  runCommandFn,
+} = {}) {
+  const [ffmpegVersion, ffprobeVersion] = await Promise.all([
+    getBinaryVersion({
+      binary: 'ffmpeg',
+      composeArgs,
+      env,
+      runCommandFn,
+    }),
+    getBinaryVersion({
+      binary: 'ffprobe',
+      composeArgs,
+      env,
+      runCommandFn,
+    }),
+  ]);
+
+  return {
+    ffmpegVersion,
+    ffprobeVersion,
+  };
 }
 
 async function getHealthSummary({ fetchFn, port } = {}) {
@@ -214,6 +285,11 @@ async function validateRunningStack({
     fetchFn,
     port,
   });
+  const mediaTooling = await getMediaToolingSummary({
+    composeArgs,
+    env,
+    runCommandFn,
+  });
   const logs = await getServiceLogs({
     composeArgs,
     env,
@@ -237,6 +313,7 @@ async function validateRunningStack({
 
   return {
     healthBody,
+    mediaTooling,
     migrationCheckOutput,
     sawBootstrapLog,
   };

@@ -33,7 +33,7 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Validate upgrade from the prior accepted state or baseline image.
 - [ ] Validate startup refusal on incompatible or unsafe configuration states.
 - [ ] Validate embedded Postgres initialization, health reporting, and persistence behavior.
-- [ ] Validate FFmpeg/tooling availability in the running image.
+- [x] Validate FFmpeg/tooling availability in the running image.
 
 ## Recovery And Safety Validation
 
