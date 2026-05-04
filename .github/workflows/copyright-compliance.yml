@@ -24,7 +24,21 @@ jobs:
   validate:
     name: Validate Repository
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: harmoniarr
+          POSTGRES_PASSWORD: harmoniarr
+          POSTGRES_USER: harmoniarr
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U harmoniarr -d harmoniarr"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -38,6 +52,13 @@ jobs:
         run: npm ci
       - name: Run repository validation
         run: npm run validate
+        env:
+          PGDATABASE: harmoniarr
+          PGHOST: 127.0.0.1
+          PGMAINTENANCE_DB: postgres
+          PGPASSWORD: harmoniarr
+          PGPORT: 5432
+          PGUSER: harmoniarr
 
   validate-database:
     name: Validate Database Migrations

@@ -13,6 +13,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 - The repo-level `npm run validate` contract currently passes end to end on Node 25.4.0, and the supported local baseline now tracks the Node 25.4 line through `.nvmrc`, `engines`, `devEngines`, and the Docker builder image.
 - Validation infrastructure now includes native ESM ESLint flat-config coverage across server, shared, client, scripts, and tests, plus segmented native `node:test` entrypoints for `server`, `client`, `scripts`, and `integration` slices.
 - The integration harness now reuses one bounded PostgreSQL runtime per suite, isolates each scenario into its own temporary database, applies explicit startup/request/shutdown timeouts plus small pool limits, and skips cleanly with a concrete message when neither external PostgreSQL nor a supported container runtime is available locally.
+- The main repository validation workflow now also provisions a PostgreSQL service and passes the shared env contract into `npm run validate`, so the native integration slice runs as real CI evidence instead of silently degrading to local-only or skipped coverage.
 - Integration coverage now also exercises import-review route transitions, import execution run creation, operation-history lease visibility, and import-run maintenance-lock conflicts against the real static ESM server graph plus temporary PostgreSQL state.
 - Integration coverage now also exercises operator-driven operation-run cancel/retry controls plus library discovery, organize, and scan maintenance-lock conflicts through the real HTTP and database-backed server graph, with shared fixture helpers for operation runs and recovery lock actions.
 - Integration coverage now also proves a claimed library-scan worker run pauses and returns to `pending` through the real database-backed operation-run path when a blocking maintenance lock becomes active before worker startup, preserving retry budget and clearing the queue claim without reopening production worker logic.
@@ -180,7 +181,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 Highest-priority remaining product-risk slices:
 
 1. Validate the supported deployment path end to end: fresh install, upgrade, restore preview/apply, and rollback-aware behavior.
-2. Finish the remaining critical-path validation depth: broader integration scenarios, fixture packs, and practical UI end-to-end coverage for the operator workflows already implemented.
+2. Finish the remaining critical-path validation depth: broader packaged-runtime scenarios, fixture packs, and practical UI end-to-end coverage for the operator workflows already implemented.
 3. Close the remaining runtime/deployment hardening gaps that still affect operability, especially whole-system maintenance-lock pause proof and upgrade plus restore safety under realistic containerized startup conditions.
 
 Highest-priority product-value slices if feature work is intentionally pulled forward:
