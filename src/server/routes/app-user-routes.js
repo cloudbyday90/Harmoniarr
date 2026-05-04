@@ -34,6 +34,7 @@ export function registerAppUserRoutes(app, {
   createAppUser = defaultAppUserService.createAppUser,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   listAppUsers = defaultAppUserService.listAppUsers,
+  relinkPlexDirectoryConflict = null,
   provisionManagedLibraryRoot = defaultAppUserProvisioningService.provisionManagedLibraryRoot,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
@@ -145,6 +146,23 @@ export function registerAppUserRoutes(app, {
         ...(await applyPlexDirectoryImport({
           actorUserId: session.appUserId,
           requestMetadata: getRequestMetadata(request),
+        })),
+      });
+    }));
+  }
+
+  if (typeof relinkPlexDirectoryConflict === 'function') {
+    app.post('/api/v1/users/imports/plex/relink', asyncRoute(async (request, response) => {
+      const session = await requireFreshAdminSession(request);
+      requireCsrf(request, session);
+
+      response.status(201).json({
+        ok: true,
+        ...(await relinkPlexDirectoryConflict({
+          actorUserId: session.appUserId,
+          plexUserId: request.body?.plexUserId,
+          requestMetadata: getRequestMetadata(request),
+          userId: request.body?.userId,
         })),
       });
     }));

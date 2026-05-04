@@ -420,3 +420,53 @@ test('app user Plex import route applies the import through the shared service',
     assert.equal(payload.importedUsers[0].authProvider, 'plex');
   });
 });
+
+test('app user Plex relink route resolves a conflict through the shared service', async (t) => {
+  const relinkPlexDirectoryConflict = t.mock.fn(async ({ actorUserId, plexUserId, requestMetadata, userId }) => ({
+    linkedAt: '2026-05-04T10:00:00.000Z',
+    profile: {
+      classification: 'linked',
+      existingUser: { id: userId, username: 'conflict-user' },
+      id: plexUserId,
+    },
+    user: {
+      authProvider: 'plex',
+      authSubject: 'plex-conflict-uuid',
+      id: userId,
+      username: 'conflict-user',
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-users', user: { role: 'admin' } }));
+  const app = createAppUserRouteTestApp({ relinkPlexDirectoryConflict, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/imports/plex/relink`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-users',
+        'x-forwarded-for': '198.51.100.21',
+        'user-agent': 'HarmoniarrUsersTest/1.0',
+      },
+      body: JSON.stringify({ plexUserId: 'plex-1', userId: 'user-conflict' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(relinkPlexDirectoryConflict.mock.calls[0].arguments, [{
+      actorUserId: 'admin-1',
+      plexUserId: 'plex-1',
+      requestMetadata: {
+        ipAddress: '198.51.100.21',
+        userAgent: 'HarmoniarrUsersTest/1.0',
+      },
+      userId: 'user-conflict',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.user.authProvider, 'plex');
+    assert.equal(payload.profile.classification, 'linked');
+  });
+});

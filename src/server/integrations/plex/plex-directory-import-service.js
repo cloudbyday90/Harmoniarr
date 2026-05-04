@@ -321,6 +321,10 @@ function mapPreviewProfile(profile) {
   };
 }
 
+function resolvePlexSubject(profile) {
+  return profile.uuid ?? profile.id ?? null;
+}
+
 export function createPlexDirectoryImportService({
   getNow = () => new Date(),
   getPoolFn = getPool,
@@ -531,8 +535,186 @@ export function createPlexDirectoryImportService({
     };
   }
 
+  async function relinkConflict({ actorUserId, plexUserId, requestMetadata, userId }) {
+    if (typeof plexUserId !== 'string' || plexUserId.trim().length === 0) {
+      throw createApiError(400, 'validation_error', 'Plex user id must be provided');
+    }
+
+    if (typeof userId !== 'string' || userId.trim().length === 0) {
+      throw createApiError(400, 'validation_error', 'User id must be provided');
+    }
+
+    const preview = await buildPreview();
+    const targetPlexUserId = plexUserId.trim();
+    const targetUserId = userId.trim();
+    const profile = preview.profiles.find((candidate) => candidate.id === targetPlexUserId);
+
+    if (!profile) {
+      throw createApiError(404, 'plex_directory_profile_not_found', 'The requested Plex profile could not be found in the current preview');
+    }
+
+    if (profile.classification !== 'conflict') {
+      throw createApiError(409, 'plex_directory_profile_not_conflict', 'The requested Plex profile is not currently blocked by a relinkable conflict');
+    }
+
+    if (profile.existingUser?.id !== targetUserId) {
+      throw createApiError(409, 'plex_directory_conflict_target_mismatch', 'The requested user does not match the current conflict target');
+    }
+
+    const subject = resolvePlexSubject(profile);
+    if (!subject) {
+      throw createApiError(400, 'plex_directory_profile_missing_subject', 'The requested Plex profile is missing a linkable identity');
+    }
+
+    const pool = getPoolFn();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const updatedUserResult = await client.query(
+        `
+          UPDATE app_users
+          SET auth_provider = 'plex',
+              auth_subject = $2,
+              updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, username, email, role, auth_provider, auth_subject, is_disabled, must_change_password, managed_library_relative_root, created_at, updated_at, last_login_at
+        `,
+        [targetUserId, subject],
+      );
+
+      if ((updatedUserResult.rowCount ?? 0) === 0) {
+        throw createApiError(404, 'app_user_not_found', 'The requested user could not be found');
+      }
+
+      const updateProfileResult = await client.query(
+        `
+          UPDATE app_user_plex_profiles
+          SET plex_user_id = $2,
+              plex_uuid = $3,
+              plex_username = $4,
+              plex_email = $5,
+              plex_title = $6,
+              plex_thumb_url = $7,
+              plex_home_role = $8,
+              plex_library_access_state = $9,
+              plex_library_access_details = $10::jsonb,
+              raw_profile = $11::jsonb,
+              synced_at = NOW(),
+              updated_at = NOW()
+          WHERE app_user_id = $1
+        `,
+        [
+          targetUserId,
+          profile.id,
+          profile.uuid,
+          profile.username,
+          profile.email,
+          profile.title,
+          profile.thumbUrl,
+          profile.homeRole,
+          profile.libraryAccessState,
+          JSON.stringify(profile.libraryAccessDetails ?? {}),
+          JSON.stringify(profile),
+        ],
+      );
+
+      if ((updateProfileResult.rowCount ?? 0) === 0) {
+        await client.query(
+          `
+            INSERT INTO app_user_plex_profiles (
+              app_user_id,
+              plex_user_id,
+              plex_uuid,
+              plex_username,
+              plex_email,
+              plex_title,
+              plex_thumb_url,
+              plex_home_role,
+              plex_library_access_state,
+              plex_library_access_details,
+              raw_profile,
+              linked_at,
+              synced_at,
+              updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, NOW(), NOW(), NOW())
+          `,
+          [
+            targetUserId,
+            profile.id,
+            profile.uuid,
+            profile.username,
+            profile.email,
+            profile.title,
+            profile.thumbUrl,
+            profile.homeRole,
+            profile.libraryAccessState,
+            JSON.stringify(profile.libraryAccessDetails ?? {}),
+            JSON.stringify(profile),
+          ],
+        );
+      }
+
+      await client.query('COMMIT');
+
+      const user = updatedUserResult.rows[0];
+
+      await recordAuditEventFn({
+        actorType: 'user',
+        actorUserId,
+        details: {
+          conflictReason: profile.conflictReason ?? null,
+          plexUserId: profile.id,
+          plexUuid: profile.uuid,
+          linkedUserId: user.id,
+          linkedUsername: user.username,
+        },
+        entityId: user.id,
+        entityType: 'app_user',
+        eventType: 'plex_directory_conflict_relinked',
+        ipAddress: requestMetadata?.ipAddress ?? null,
+        summary: 'Plex directory conflict relinked to an existing app user',
+        userAgent: requestMetadata?.userAgent ?? null,
+      });
+
+      return {
+        linkedAt: getNow().toISOString(),
+        profile: mapPreviewProfile({
+          ...profile,
+          classification: 'linked',
+          conflictReason: null,
+          existingUser: {
+            ...profile.existingUser,
+            authProvider: user.auth_provider,
+            authSubject: user.auth_subject,
+            email: user.email,
+            id: user.id,
+            role: user.role,
+            username: user.username,
+          },
+        }),
+        user: {
+          authProvider: user.auth_provider,
+          authSubject: user.auth_subject,
+          email: user.email,
+          id: user.id,
+          role: user.role,
+          username: user.username,
+        },
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   return {
     applyImport,
     buildPreview,
+    relinkConflict,
   };
 }

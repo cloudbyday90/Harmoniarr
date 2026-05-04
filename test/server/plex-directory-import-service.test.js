@@ -166,3 +166,136 @@ test('createPlexDirectoryImportService applyImport creates new Plex users and re
     true,
   );
 });
+
+test('createPlexDirectoryImportService relinkConflict links a conflicting local user to the Plex profile', async (t) => {
+  const query = t.mock.fn(async (sql, values) => {
+    if (sql === 'BEGIN' || sql === 'COMMIT') {
+      return { rowCount: 0, rows: [] };
+    }
+
+    if (String(sql).includes('UPDATE app_users')) {
+      return {
+        rowCount: 1,
+        rows: [{
+          auth_provider: 'plex',
+          auth_subject: values[1],
+          email: 'conflict@example.com',
+          id: values[0],
+          role: 'requester',
+          username: 'conflict-user',
+        }],
+      };
+    }
+
+    if (String(sql).includes('UPDATE app_user_plex_profiles')) {
+      return { rowCount: 0, rows: [] };
+    }
+
+    if (String(sql).includes('INSERT INTO app_user_plex_profiles')) {
+      return { rowCount: 1, rows: [] };
+    }
+
+    return { rowCount: 0, rows: [] };
+  });
+  const client = {
+    query,
+    release: t.mock.fn(),
+  };
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createPlexDirectoryImportService({
+    getNow: () => new Date('2026-05-04T10:00:00.000Z'),
+    getPoolFn: () => ({
+      connect: async () => client,
+    }),
+    listAppUsers: async () => [{
+      authProvider: 'local',
+      authSubject: null,
+      email: 'conflict@example.com',
+      id: 'user-conflict',
+      isDisabled: false,
+      managedLibraryRelativeRoot: 'listeners/conflict',
+      plexProfile: null,
+      role: 'requester',
+      username: 'conflict-user',
+    }],
+    plexHttpClient: {
+      fetchHomeUsers: async () => [
+        { email: 'owner@example.com', id: 'owner-id', title: 'Owner', username: 'owner.admin', uuid: 'owner-uuid' },
+        { email: 'conflict@example.com', id: 'conflict-id', title: 'Conflict User', username: 'conflict-user', uuid: 'plex-conflict-uuid', servers: ['server-1'] },
+      ],
+    },
+    plexOwnerLinkService: {
+      resolveLinkedAccessToken: async () => ({
+        accessToken: 'plex-access-token',
+        clientIdentifier: 'plex-client-id',
+        linkedUser: {
+          email: 'owner@example.com',
+          id: 'owner-id',
+          title: 'Owner',
+          username: 'owner.admin',
+          uuid: 'owner-uuid',
+        },
+      }),
+    },
+    recordAuditEventFn,
+  });
+
+  const result = await service.relinkConflict({
+    actorUserId: 'admin-1',
+    plexUserId: 'conflict-id',
+    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test' },
+    userId: 'user-conflict',
+  });
+
+  assert.equal(result.user.id, 'user-conflict');
+  assert.equal(result.user.authProvider, 'plex');
+  assert.equal(result.user.authSubject, 'plex-conflict-uuid');
+  assert.equal(result.profile.classification, 'linked');
+  assert.equal(result.profile.existingUser.id, 'user-conflict');
+  assert.equal(client.release.mock.callCount(), 1);
+  assert.equal(recordAuditEventFn.mock.callCount(), 1);
+  assert.equal(
+    query.mock.calls.some((call) => String(call.arguments[0]).includes('INSERT INTO app_user_plex_profiles')),
+    true,
+  );
+});
+
+test('createPlexDirectoryImportService relinkConflict rejects non-conflict profiles', async () => {
+  const service = createPlexDirectoryImportService({
+    listAppUsers: async () => [{
+      authProvider: 'plex',
+      authSubject: 'plex-linked-uuid',
+      email: 'linked@example.com',
+      id: 'user-linked',
+      isDisabled: false,
+      managedLibraryRelativeRoot: 'listeners/linked',
+      plexProfile: null,
+      role: 'requester',
+      username: 'linked-user',
+    }],
+    plexHttpClient: {
+      fetchHomeUsers: async () => [
+        { email: 'owner@example.com', id: 'owner-id', title: 'Owner', username: 'owner.admin', uuid: 'owner-uuid' },
+        { email: 'linked@example.com', id: 'linked-id', title: 'Linked User', username: 'linked-user', uuid: 'plex-linked-uuid' },
+      ],
+    },
+    plexOwnerLinkService: {
+      resolveLinkedAccessToken: async () => ({
+        accessToken: 'plex-access-token',
+        clientIdentifier: 'plex-client-id',
+        linkedUser: {
+          email: 'owner@example.com',
+          id: 'owner-id',
+          title: 'Owner',
+          username: 'owner.admin',
+          uuid: 'owner-uuid',
+        },
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => service.relinkConflict({ actorUserId: 'admin-1', plexUserId: 'linked-id', userId: 'user-linked' }),
+    (error) => error?.code === 'plex_directory_profile_not_conflict',
+  );
+});

@@ -50,6 +50,7 @@ export function createAppUserModule({
         ? {
           applyPlexDirectoryImport: plexDirectoryImportService.applyImport,
           buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
+          relinkPlexDirectoryConflict: plexDirectoryImportService.relinkConflict,
         }
         : {}),
       provisionManagedLibraryRoot: resolvedAppUserProvisioningService.provisionManagedLibraryRoot,
