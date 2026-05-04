@@ -24,15 +24,18 @@ Security source: `docs/SECURITY_POLICY.md`
 	- Native integration coverage now also exercises the public app-user claim completion route end to end against the real HTTP and database-backed server graph, including admin-issued claim code creation, no auto-login on completion, and a subsequent normal login with the claimed password.
 	- Native integration coverage now also proves delegated Request Music creation, target-user scoped inbox summary and list reads, linked import-candidate fulfillment projection, notification feed derivation, and delegated import-candidate visibility through the real HTTP and database-backed server graph.
 	- The repository validation workflow now provisions a PostgreSQL service for `npm run validate`, so the shared integration suite can execute against a real external PostgreSQL runtime in CI instead of skipping when no container runtime is available inside the job.
-	- Remaining work is packaged-runtime execution alongside the existing CI-backed run so the same coverage contributes release-image and operator-path evidence instead of only native server-graph proof.
+	- The shared Docker smoke contract now also proves one packaged-runtime delegated Request Music journey by creating a target requester, submitting an admin-on-behalf request, and verifying target-user scoped summary, list, and notification visibility through the running container.
+	- Remaining work is broader packaged-runtime execution beyond the queued delegated-request seam, so the release pack also captures linked fulfillment and adjacent operator-path evidence instead of only native server-graph proof.
 - [ ] Run route-contract validation for normalized payloads and permission failures.
 	- Native integration coverage now also exercises the delegated Request Music scope contract end to end by showing that non-admin `scope=all` requests are forced back to `mine`, linked import candidates stay target-user visible, and unrelated import candidates fail closed as not found.
 - [x] Run migration replay and schema snapshot validation.
 - [ ] Run UI/end-to-end coverage for bootstrap, login, settings, review queue, jobs/history, and restore preview/apply where practical.
+	- The shared Docker smoke contract now covers one packaged-runtime Request Music user journey through real HTTP APIs, but browser-driven UI coverage for the operator surfaces is still open.
 
 ## Deployment-Path Validation
 
 - [ ] Validate fresh install on the standard Docker deployment path.
+	- The shared Docker smoke validator now also bootstraps a target requester, submits a delegated Request Music item, and verifies target-user scoped summary, list, and notification visibility through the packaged runtime.
 - [x] Validate fresh-install schema bootstrap against a disposable PostgreSQL database.
 - [ ] Validate upgrade from the prior accepted state or baseline image.
 	- `npm run validate:docker-upgrade` now drives a baseline image followed by the candidate image against the same bind-mounted state, proving post-upgrade startup plus persisted settings continuity through the shared smoke contract.

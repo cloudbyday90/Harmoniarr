@@ -26,6 +26,11 @@ const defaultSmokeAdminCredentials = Object.freeze({
   password: 'DockerSmokePass123!',
   username: 'smoke-admin',
 });
+const defaultSmokeRequestTargetCredentials = Object.freeze({
+  password: 'DockerSmokeListener123!',
+  role: 'requester',
+  username: 'smoke-listener',
+});
 const defaultUpgradeSettingsProbe = Object.freeze({
   system: {
     logLevel: 'debug',
@@ -132,6 +137,96 @@ async function loginSmokeAdminSession({
   }
 
   return response;
+}
+
+async function createSmokeAppUser({
+  client,
+  credentials = defaultSmokeRequestTargetCredentials,
+} = {}) {
+  const response = await client.requestJson('/api/v1/users', {
+    json: {
+      password: credentials.password,
+      role: credentials.role,
+      username: credentials.username,
+    },
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 201,
+    label: 'app-user creation',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || response.payload?.user?.username !== credentials.username) {
+    throw new Error('Docker smoke validation did not receive the expected app-user creation payload');
+  }
+
+  return response.payload.user;
+}
+
+async function createSmokeMediaRequest({
+  client,
+  payload,
+} = {}) {
+  const response = await client.requestJson('/api/v1/library/media-requests', {
+    json: payload,
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 201,
+    label: 'media request creation',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || typeof response.payload?.mediaRequest?.id !== 'string') {
+    throw new Error('Docker smoke validation did not receive the expected media request creation payload');
+  }
+
+  return response.payload.mediaRequest;
+}
+
+async function getMediaRequestSummary({
+  client,
+  scope = 'mine',
+} = {}) {
+  const response = await client.requestJson(`/api/v1/library/media-request-summary?scope=${encodeURIComponent(scope)}`);
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'media request summary read',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || typeof response.payload?.scope !== 'string') {
+    throw new Error('Docker smoke validation did not receive the expected media request summary payload');
+  }
+
+  return response.payload;
+}
+
+async function getMediaRequests({
+  client,
+  scope = 'mine',
+} = {}) {
+  const response = await client.requestJson(`/api/v1/library/media-requests?scope=${encodeURIComponent(scope)}`);
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'media request list read',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || !Array.isArray(response.payload?.mediaRequests)) {
+    throw new Error('Docker smoke validation did not receive the expected media request list payload');
+  }
+
+  return response.payload;
 }
 
 async function getSettingsSnapshot({ client } = {}) {
@@ -331,33 +426,36 @@ async function startBackupRestoreApply({ backupArtifactId, client, expectedPaylo
 }
 
 async function validateBackupRestoreFlow({
+  client = null,
   fetchFn,
   port,
   projectName,
   requestTimeoutMs = defaultSessionRequestTimeoutMs,
   smokeAdminCredentials = defaultSmokeAdminCredentials,
 } = {}) {
-  const client = createValidationSessionClient({
+  const sessionClient = client ?? createValidationSessionClient({
     fetchFn,
     port,
     requestTimeoutMs,
   });
 
-  await bootstrapSmokeAdminSession({
-    client,
-    credentials: smokeAdminCredentials,
-  });
+  if (!client) {
+    await bootstrapSmokeAdminSession({
+      client: sessionClient,
+      credentials: smokeAdminCredentials,
+    });
+  }
 
-  const initialLockStatus = await getMaintenanceLockStatus({ client });
-  const backupArtifact = await createBackupArtifact({ client, projectName });
-  const backupArtifacts = await getBackupArtifacts({ client });
+  const initialLockStatus = await getMaintenanceLockStatus({ client: sessionClient });
+  const backupArtifact = await createBackupArtifact({ client: sessionClient, projectName });
+  const backupArtifacts = await getBackupArtifacts({ client: sessionClient });
   const backupDetail = await getBackupArtifactDetail({
     backupArtifactId: backupArtifact.id,
-    client,
+    client: sessionClient,
   });
   const restorePreview = await getBackupRestorePreview({
     backupArtifactId: backupArtifact.id,
-    client,
+    client: sessionClient,
   });
 
   if (!backupArtifacts.some((artifact) => artifact?.id === backupArtifact.id)) {
@@ -368,17 +466,17 @@ async function validateBackupRestoreFlow({
     throw new Error('Docker smoke validation expected restore preview to be applicable before lock conflict injection');
   }
 
-  const blockingLock = await enterMaintenanceLock({ client, projectName });
+  const blockingLock = await enterMaintenanceLock({ client: sessionClient, projectName });
   const blockedRestorePreview = await getBackupRestorePreview({
     backupArtifactId: backupArtifact.id,
-    client,
+    client: sessionClient,
   });
 
   if (blockedRestorePreview.restoreReadiness?.blockedByLock !== true || blockedRestorePreview.canApplyRestore !== false) {
     throw new Error('Docker smoke validation expected restore preview to surface the injected maintenance-lock conflict');
   }
 
-  const blockedRestoreApply = await client.requestJson(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifact.id)}/restore-apply`, {
+  const blockedRestoreApply = await sessionClient.requestJson(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifact.id)}/restore-apply`, {
     headers: {
       'idempotency-key': buildValidationIdempotencyKey(projectName, 'restore-apply-blocked'),
     },
@@ -400,18 +498,18 @@ async function validateBackupRestoreFlow({
   }
 
   await releaseMaintenanceLock({
-    client,
+    client: sessionClient,
     lockId: blockingLock.id,
     projectName,
   });
 
   const appliedRestore = await startBackupRestoreApply({
     backupArtifactId: backupArtifact.id,
-    client,
+    client: sessionClient,
     expectedPayloadSha256: restorePreview.integrity?.expectedPayloadSha256 ?? null,
     projectName,
   });
-  const finalLockStatus = await getMaintenanceLockStatus({ client });
+  const finalLockStatus = await getMaintenanceLockStatus({ client: sessionClient });
   const appliedScopes = Array.isArray(appliedRestore.restoreResult?.appliedScopes)
     ? appliedRestore.restoreResult.appliedScopes
     : [];
@@ -436,6 +534,116 @@ async function validateBackupRestoreFlow({
     restoreApplyStatus: appliedRestore.run.status ?? null,
     restorePreviewChecksum: restorePreview.integrity?.expectedPayloadSha256 ?? null,
     restorePreviewCompatibility: restorePreview.compatibility?.compatible ?? false,
+  };
+}
+
+async function validateRequestMusicFlow({
+  adminClient = null,
+  fetchFn,
+  port,
+  requestTimeoutMs = defaultSessionRequestTimeoutMs,
+  smokeAdminCredentials = defaultSmokeAdminCredentials,
+  targetUserCredentials = defaultSmokeRequestTargetCredentials,
+} = {}) {
+  const sessionClient = adminClient ?? createValidationSessionClient({
+    fetchFn,
+    port,
+    requestTimeoutMs,
+  });
+
+  if (!adminClient) {
+    await bootstrapSmokeAdminSession({
+      client: sessionClient,
+      credentials: smokeAdminCredentials,
+    });
+  }
+
+  const targetUser = await createSmokeAppUser({
+    client: sessionClient,
+    credentials: targetUserCredentials,
+  });
+  const mediaRequest = await createSmokeMediaRequest({
+    client: sessionClient,
+    payload: {
+      artistName: 'Autechre',
+      releaseTitle: 'Amber',
+      requestKind: 'release',
+      requestedForUserId: targetUser.id,
+    },
+  });
+
+  const targetClient = createValidationSessionClient({
+    fetchFn,
+    port,
+    requestTimeoutMs,
+  });
+  await loginSmokeAdminSession({
+    client: targetClient,
+    credentials: targetUserCredentials,
+  });
+
+  const summary = await getMediaRequestSummary({
+    client: targetClient,
+    scope: 'all',
+  });
+  const list = await getMediaRequests({
+    client: targetClient,
+    scope: 'all',
+  });
+  const sortedNotificationTitles = Array.isArray(summary.notificationFeed?.notifications)
+    ? summary.notificationFeed.notifications.map((notification) => notification?.title ?? '').sort()
+    : [];
+  const recentRequest = Array.isArray(summary.recentRequests) ? summary.recentRequests[0] : null;
+  const listedRequest = Array.isArray(list.mediaRequests) ? list.mediaRequests[0] : null;
+
+  if (summary.scope !== 'mine') {
+    throw new Error(`Docker smoke validation expected delegated media request summary scope to resolve to mine, but observed ${summary.scope}`);
+  }
+
+  if ((summary.counts?.totalRequests ?? 0) !== 1) {
+    throw new Error(`Docker smoke validation expected one delegated media request in the target summary, but observed ${summary.counts?.totalRequests ?? 0}`);
+  }
+
+  if ((summary.fulfillmentCounts?.queued ?? 0) !== 1 || (summary.fulfillmentCounts?.active ?? 0) !== 1) {
+    throw new Error('Docker smoke validation expected delegated media request fulfillment to remain queued and active');
+  }
+
+  if ((summary.notificationFeed?.counts?.total ?? 0) !== 2) {
+    throw new Error(`Docker smoke validation expected two delegated media request notifications, but observed ${summary.notificationFeed?.counts?.total ?? 0}`);
+  }
+
+  if (
+    (summary.notificationFeed?.counts?.byCategory?.delegated_request ?? 0) !== 1
+    || (summary.notificationFeed?.counts?.byCategory?.fulfillment ?? 0) !== 1
+  ) {
+    throw new Error('Docker smoke validation expected delegated-request and fulfillment notification counts to each equal one');
+  }
+
+  if (sortedNotificationTitles.join('|') !== ['Music requested for you', 'Request queued'].join('|')) {
+    throw new Error(`Docker smoke validation observed unexpected delegated media request notification titles: ${sortedNotificationTitles.join(', ')}`);
+  }
+
+  if (recentRequest?.fulfillmentStatus?.code !== 'queued') {
+    throw new Error(`Docker smoke validation expected delegated media request fulfillment code queued, but observed ${recentRequest?.fulfillmentStatus?.code ?? 'missing'}`);
+  }
+
+  if (list.scope !== 'mine' || !listedRequest || list.mediaRequests.length !== 1) {
+    throw new Error('Docker smoke validation expected delegated media request list scope to remain mine with exactly one visible request');
+  }
+
+  if (listedRequest.requestedByUser?.username !== smokeAdminCredentials.username || listedRequest.requestedForUser?.username !== targetUserCredentials.username) {
+    throw new Error('Docker smoke validation observed unexpected delegated media request ownership in the target user list');
+  }
+
+  return {
+    delegatedRequestId: mediaRequest.id,
+    fulfillmentCode: recentRequest.fulfillmentStatus.code,
+    listCount: list.mediaRequests.length,
+    listScope: list.scope,
+    notificationTitles: sortedNotificationTitles,
+    requestedByUsername: listedRequest.requestedByUser.username,
+    requestedForUsername: listedRequest.requestedForUser.username,
+    summaryScope: summary.scope,
   };
 }
 
@@ -1091,6 +1299,7 @@ export async function validateDockerFreshInstall({
   tempRootDir = tmpdir(),
   verifyBackupRestoreFlow = false,
   verifyExistingDataRestart = false,
+  verifyRequestMusicFlow = false,
 } = {}) {
   const workspaceRoot = await mkdtempFn(resolve(tempRootDir, 'harmoniarr-docker-smoke-'));
   const port = await getAvailablePortFn();
@@ -1124,13 +1333,39 @@ export async function validateDockerFreshInstall({
     let backupRestoreFlow = null;
     let embeddedPostgresPersistence = null;
     let existingDataRestart = null;
+    let requestMusicFlow = null;
     let startupFailure = null;
+
+    let adminClient = null;
+    if (verifyBackupRestoreFlow || verifyRequestMusicFlow) {
+      adminClient = createValidationSessionClient({
+        fetchFn,
+        port,
+        requestTimeoutMs,
+      });
+
+      await bootstrapSmokeAdminSession({
+        client: adminClient,
+        credentials: smokeAdminCredentials,
+      });
+    }
 
     if (verifyBackupRestoreFlow) {
       backupRestoreFlow = await validateBackupRestoreFlow({
+        client: adminClient,
         fetchFn,
         port,
         projectName,
+        requestTimeoutMs,
+        smokeAdminCredentials,
+      });
+    }
+
+    if (verifyRequestMusicFlow) {
+      requestMusicFlow = await validateRequestMusicFlow({
+        adminClient,
+        fetchFn,
+        port,
         requestTimeoutMs,
         smokeAdminCredentials,
       });
@@ -1201,6 +1436,7 @@ export async function validateDockerFreshInstall({
       imageRef: imageRef ?? null,
       port,
       projectName,
+      requestMusicFlow,
       startupFailure,
       workspaceRoot,
     };

@@ -25,6 +25,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Structured runtime and security log rendering now also pass through the same shared redaction policy, and an admin-only diagnostics export route now emits compact redacted JSON evidence bundles for support-oriented sharing without exposing plaintext recovery codes, session material, or filesystem paths.
 - Runtime operations now also flow through shared resource and monitoring boundaries, so sharp concurrency/cache tuning, ffmpeg/ffprobe timeout-plus-kill behavior, stale-heartbeat detection, memory-pressure diagnostics, and prefixed warning logging are owned centrally instead of drifting across workers and route-local command calls.
 - Deployment-path validation now also routes through a shared Docker smoke validator that proves read-only-rootfs posture, fail-closed startup refusal, FFmpeg/FFprobe availability, embedded PostgreSQL startup plus restart persistence, and optional machine-readable evidence emission without introducing workflow-local shell composition.
+- Deployment-path validation now also uses that shared Docker smoke validator to prove one packaged-runtime delegated Request Music journey through real HTTP APIs, covering admin-on-behalf request creation plus target-user scoped summary, list, and notification visibility without adding test-only runtime seams.
 - Remaining delivery risk is now concentrated more in deployment-path validation and release closure than in first-pass feature construction.
 - The unchecked start-gate and Phase 0 alignment items are now mostly documentation-governance follow-through, not evidence that the core implementation is still blocked from progressing.
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
@@ -181,7 +182,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 Highest-priority remaining product-risk slices:
 
 1. Validate the supported deployment path end to end: fresh install, upgrade, restore preview/apply, and rollback-aware behavior.
-2. Finish the remaining critical-path validation depth: broader packaged-runtime scenarios, fixture packs, and practical UI end-to-end coverage for the operator workflows already implemented.
+2. Finish the remaining critical-path validation depth: broader packaged-runtime scenarios with linked fulfillment evidence, fixture packs, and practical UI end-to-end coverage for the operator workflows already implemented.
 3. Close the remaining runtime/deployment hardening gaps that still affect operability, especially whole-system maintenance-lock pause proof and upgrade plus restore safety under realistic containerized startup conditions.
 
 Highest-priority product-value slices if feature work is intentionally pulled forward:

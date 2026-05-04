@@ -53,9 +53,146 @@ function createSmokeApiFetchStub({
   const calls = [];
   const activeLocks = [];
   const backupArtifacts = [];
+  const mediaRequests = [];
+  const sessions = new Map();
+  const users = [];
   let nextLockId = 1;
   let nextRunId = 1;
+  let nextRequestId = 1;
+  let nextUserId = 1;
   let settings = structuredClone(initialSettings);
+
+  function issueSession(user) {
+    const sessionId = `session-${user.id}-${sessions.size + 1}`;
+    sessions.set(sessionId, user);
+    return `sid=${sessionId}; Path=/; HttpOnly`;
+  }
+
+  function resolveSessionUser(headers) {
+    const cookieHeader = headers.get('cookie') ?? '';
+    const sessionId = cookieHeader
+      .split(';')
+      .map((segment) => segment.trim())
+      .find((segment) => segment.startsWith('sid='))
+      ?.slice(4);
+
+    return sessionId ? sessions.get(sessionId) ?? null : null;
+  }
+
+  function buildVisibleRequests(currentUser, scope) {
+    if (currentUser?.role === 'admin' && scope === 'all') {
+      return mediaRequests;
+    }
+
+    return mediaRequests.filter((request) => request.requestedForUser.id === currentUser?.id);
+  }
+
+  function buildFulfillmentStatus(request) {
+    switch (request.requestState) {
+      case 'already_exists':
+        return {
+          code: 'already_available',
+          detail: 'This request already matched imported media.',
+          label: 'Already available',
+          occurredAt: request.updatedAt,
+          tone: 'selected',
+        };
+      case 'needs_review':
+        return {
+          code: 'under_review',
+          detail: 'Needs operator review before fetch can continue.',
+          label: 'Needs review',
+          occurredAt: request.updatedAt,
+          tone: 'held',
+        };
+      default:
+        return {
+          code: 'queued',
+          detail: 'Waiting for fetch and discovery follow-up.',
+          label: 'Queued',
+          occurredAt: request.updatedAt,
+          tone: 'held',
+        };
+    }
+  }
+
+  function buildNotificationFeed(requests) {
+    const notifications = [];
+
+    for (const request of requests) {
+      if (request.requestedByUser.id !== request.requestedForUser.id) {
+        notifications.push({
+          category: 'delegated_request',
+          id: `media-request:${request.id}:delegated`,
+          message: `${request.requestedByUser.username} requested ${request.artistName} - ${request.releaseTitle} for you.`,
+          occurredAt: request.createdAt,
+          severity: 'info',
+          title: 'Music requested for you',
+        });
+      }
+
+      notifications.push({
+        category: 'fulfillment',
+        id: `media-request:${request.id}:queued`,
+        message: `${request.artistName} - ${request.releaseTitle} has been queued for fulfillment.`,
+        occurredAt: request.updatedAt,
+        severity: 'info',
+        title: 'Request queued',
+      });
+    }
+
+    return {
+      checkedAt: '2026-05-04T12:05:00.000Z',
+      counts: {
+        byCategory: {
+          delegated_request: notifications.filter((notification) => notification.category === 'delegated_request').length,
+          failure: 0,
+          fulfillment: notifications.filter((notification) => notification.category === 'fulfillment').length,
+          review: 0,
+        },
+        total: notifications.length,
+      },
+      notifications,
+    };
+  }
+
+  function buildSummaryPayload(currentUser, scope) {
+    const resolvedScope = currentUser?.role === 'admin' && scope === 'all' ? 'all' : 'mine';
+    const visibleRequests = buildVisibleRequests(currentUser, resolvedScope);
+    const enrichedRequests = visibleRequests.map((request) => ({
+      ...request,
+      fulfillmentStatus: buildFulfillmentStatus(request),
+    }));
+
+    return {
+      counts: {
+        alreadyExists: enrichedRequests.filter((request) => request.requestState === 'already_exists').length,
+        needsFetch: enrichedRequests.filter((request) => request.requestState === 'needs_fetch').length,
+        needsReview: enrichedRequests.filter((request) => request.requestState === 'needs_review').length,
+        totalRequests: enrichedRequests.length,
+      },
+      fulfillmentCounts: {
+        active: enrichedRequests.filter((request) => request.fulfillmentStatus.code === 'queued').length,
+        alreadyAvailable: 0,
+        downloading: 0,
+        failed: 0,
+        fulfilled: 0,
+        importPending: 0,
+        queued: enrichedRequests.filter((request) => request.fulfillmentStatus.code === 'queued').length,
+        satisfied: 0,
+        totalRequests: enrichedRequests.length,
+        underReview: enrichedRequests.filter((request) => request.fulfillmentStatus.code === 'under_review').length,
+      },
+      notificationFeed: buildNotificationFeed(enrichedRequests),
+      ok: true,
+      recentRequests: enrichedRequests,
+      scope: resolvedScope,
+      summary: {
+        message: `${enrichedRequests.length} requests are waiting for fetch and import follow-up.`,
+        status: 'active',
+      },
+    };
+  }
 
   async function fetchFn(url, options = {}) {
     const method = String(options.method ?? 'GET').toUpperCase();
@@ -72,6 +209,8 @@ function createSmokeApiFetchStub({
       path: `${parsedUrl.pathname}${parsedUrl.search}`,
     });
 
+    const currentUser = resolveSessionUser(headers);
+
     if (parsedUrl.pathname === '/healthz') {
       return createFetchResponse({
         ok: true,
@@ -81,30 +220,50 @@ function createSmokeApiFetchStub({
     }
 
     if (parsedUrl.pathname === '/api/v1/bootstrap/admin' && method === 'POST') {
+      const adminUser = {
+        id: 'admin-1',
+        password: body?.password ?? 'DockerSmokePass123!',
+        role: 'admin',
+        username: body?.username ?? 'smoke-admin',
+      };
+      users.splice(0, users.length, adminUser);
+
       return createFetchResponse({
         csrfToken: 'csrf-bootstrap',
         ok: true,
         user: {
-          username: body?.username ?? 'smoke-admin',
+          username: adminUser.username,
         },
       }, 201, {
-        setCookie: 'sid=bootstrap-session; Path=/; HttpOnly',
+        setCookie: issueSession(adminUser),
       });
     }
 
     if (parsedUrl.pathname === '/api/v1/auth/login' && method === 'POST') {
+      const matchedUser = users.find((user) => user.username === body?.username && user.password === body?.password);
+
+      if (!matchedUser) {
+        return createFetchResponse({
+          error: {
+            code: 'invalid_credentials',
+            message: 'Invalid credentials',
+          },
+          ok: false,
+        }, 401);
+      }
+
       return createFetchResponse({
-        csrfToken: 'csrf-login',
+        csrfToken: `csrf-${matchedUser.username}`,
         ok: true,
         user: {
-          username: body?.username ?? 'smoke-admin',
+          username: matchedUser.username,
         },
       }, 200, {
-        setCookie: 'sid=login-session; Path=/; HttpOnly',
+        setCookie: issueSession(matchedUser),
       });
     }
 
-    if (!headers.get('cookie')) {
+    if (!currentUser) {
       return createFetchResponse({
         error: {
           code: 'auth_required',
@@ -127,6 +286,70 @@ function createSmokeApiFetchStub({
         ok: true,
         settings,
         updates: [],
+      });
+    }
+
+    if (parsedUrl.pathname === '/api/v1/users' && method === 'POST') {
+      const user = {
+        id: `user-${nextUserId++}`,
+        password: body?.password,
+        role: body?.role ?? 'requester',
+        username: body?.username ?? `user-${nextUserId}`,
+      };
+      users.push(user);
+
+      return createFetchResponse({
+        ok: true,
+        roleOptions: [],
+        user: {
+          id: user.id,
+          role: user.role,
+          username: user.username,
+        },
+      }, 201);
+    }
+
+    if (parsedUrl.pathname === '/api/v1/library/media-requests' && method === 'POST') {
+      const requestedForUser = users.find((user) => user.id === body?.requestedForUserId) ?? currentUser;
+      const request = {
+        artistName: body?.artistName ?? null,
+        createdAt: '2026-05-04T12:03:00.000Z',
+        id: `request-${nextRequestId++}`,
+        releaseTitle: body?.releaseTitle ?? null,
+        requestKind: body?.requestKind ?? 'release',
+        requestState: 'needs_fetch',
+        requestedByUser: {
+          id: currentUser.id,
+          role: currentUser.role,
+          username: currentUser.username,
+        },
+        requestedForUser: {
+          id: requestedForUser.id,
+          role: requestedForUser.role,
+          username: requestedForUser.username,
+        },
+        updatedAt: '2026-05-04T12:03:00.000Z',
+      };
+      mediaRequests.push(request);
+
+      return createFetchResponse({
+        mediaRequest: request,
+        ok: true,
+      }, 201);
+    }
+
+    if (parsedUrl.pathname === '/api/v1/library/media-request-summary' && method === 'GET') {
+      return createFetchResponse(buildSummaryPayload(currentUser, parsedUrl.searchParams.get('scope') ?? 'mine'));
+    }
+
+    if (parsedUrl.pathname === '/api/v1/library/media-requests' && method === 'GET') {
+      const scope = parsedUrl.searchParams.get('scope') ?? 'mine';
+      const summaryPayload = buildSummaryPayload(currentUser, scope);
+
+      return createFetchResponse({
+        mediaRequests: summaryPayload.recentRequests,
+        ok: true,
+        scope: summaryPayload.scope,
       });
     }
 
@@ -576,6 +799,41 @@ test('validateDockerFreshInstall validates backup export and restore preview/app
     restoreApplyStatus: 'completed',
     restorePreviewChecksum: 'sha-backup-1',
     restorePreviewCompatibility: true,
+  });
+});
+
+test('validateDockerFreshInstall validates delegated request music summary and notifications through the running control plane', async () => {
+  const { fetchFn } = createSmokeApiFetchStub();
+  const { runCommandFn } = createRunCommandStub();
+
+  const result = await validateDockerFreshInstall({
+    fetchFn,
+    getAvailablePortFn: async () => 4306,
+    makeDirectoryLayoutFn: async () => ({
+      appData: '/tmp/appdata',
+      downloads: '/tmp/downloads',
+      music: '/tmp/music',
+      staging: '/tmp/staging',
+      transcodeTemp: '/tmp/transcode-temp',
+    }),
+    mkdtempFn: async () => '/tmp/harmoniarr-smoke',
+    processEnv: {},
+    projectName: 'harmoniarrsmoke-test',
+    removeFn: async () => {},
+    runCommandFn,
+    tempRootDir: '/tmp',
+    verifyRequestMusicFlow: true,
+  });
+
+  assert.deepEqual(result.requestMusicFlow, {
+    delegatedRequestId: 'request-1',
+    fulfillmentCode: 'queued',
+    listCount: 1,
+    listScope: 'mine',
+    notificationTitles: ['Music requested for you', 'Request queued'],
+    requestedByUsername: 'smoke-admin',
+    requestedForUsername: 'smoke-listener',
+    summaryScope: 'mine',
   });
 });
 
