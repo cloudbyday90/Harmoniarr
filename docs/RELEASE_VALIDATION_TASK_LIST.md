@@ -93,6 +93,7 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Record smoke-test commands and manual verification notes.
 	- The Docker smoke scripts now optionally emit a machine-readable JSON evidence file when `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH` is set, so release workflows and support diagnostics can archive the exact validated result instead of scraping console output.
 	- That machine-readable evidence path now also fail-closes on missing required validation sections for known smoke kinds, so fresh-install and released-image artifacts cannot silently omit packaged-runtime Request Music proof while still producing a JSON file.
+	- The `release-image` workflow now also re-validates both published-image and upgrade-path smoke evidence files before uploading them as artifacts, so archived JSON proof follows the same shared contract checks as the writer instead of treating artifact presence alone as success.
 	- The `release-image` workflow now uses that same seam during published-image verification and uploads `harmoniarr-docker-smoke-released-image.json` as a workflow artifact so immutable-image smoke proof survives beyond the job log.
 	- When a baseline immutable image is configured, the same workflow now also archives `harmoniarr-docker-smoke-upgrade-path.json` so upgrade-path evidence survives beyond the job log too.
 - [x] Document native local replay for release-image and container-maintenance workflow scripts with Node `--env-file` layering, local `GITHUB_OUTPUT`/`GITHUB_STEP_SUMMARY` files, and trusted-mirror preflight commands.

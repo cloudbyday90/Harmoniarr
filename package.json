@@ -59,6 +59,7 @@
     "validate:docker-fresh-install": "node scripts/validate-docker-fresh-install.js",
     "validate:docker-upgrade": "node scripts/validate-docker-upgrade.js",
     "validate:docker-released-image": "node scripts/validate-docker-released-image.js",
+    "validate:docker-smoke-evidence": "node scripts/verify-docker-smoke-evidence.js",
     "validate:release-contract": "node scripts/verify-release-contract.js",
     "validate:release-mirror-referrers": "node scripts/verify-release-mirror-referrers.js",
     "validate:schema-bootstrap": "node scripts/validate-schema-bootstrap.js",

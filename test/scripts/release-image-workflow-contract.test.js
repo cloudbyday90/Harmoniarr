@@ -6,7 +6,9 @@ import {
   assertReleaseImageWorkflowContract,
   getWorkflowStepBlock,
   releaseImageEvidenceStep,
+  releaseImageEvidenceVerificationStep,
   releaseImageUpgradeEvidenceStep,
+  releaseImageUpgradeEvidenceVerificationStep,
   releaseImageUpgradeValidationStep,
   releaseImageUpgradeWorkflow,
   releaseImageSummarySteps,
@@ -44,8 +46,11 @@ test('release-image workflow delegates summary steps to Node scripts', async () 
 test('release-image workflow uploads the published-image smoke evidence artifact', async () => {
   const workflowSource = await readFile(workflowPath, 'utf8');
 
+  const verificationBlock = getWorkflowStepBlock(workflowSource, releaseImageEvidenceVerificationStep.name);
   const block = getWorkflowStepBlock(workflowSource, releaseImageEvidenceStep.name);
 
+  assert.match(verificationBlock, new RegExp(releaseImageEvidenceVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verificationBlock, new RegExp(releaseImageEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(block, new RegExp(releaseImageEvidenceStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(block, new RegExp(releaseImageEvidenceStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(block, new RegExp(releaseImageEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -58,11 +63,14 @@ test('release-image workflow supports optional published-image upgrade validatio
   assert.match(workflowSource, new RegExp(`vars\\['${releaseImageUpgradeWorkflow.baselineVariableName}'\\]`));
 
   const validationBlock = getWorkflowStepBlock(workflowSource, releaseImageUpgradeValidationStep.name);
+  const verificationBlock = getWorkflowStepBlock(workflowSource, releaseImageUpgradeEvidenceVerificationStep.name);
   const evidenceBlock = getWorkflowStepBlock(workflowSource, releaseImageUpgradeEvidenceStep.name);
 
   assert.match(validationBlock, new RegExp(releaseImageUpgradeValidationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(validationBlock, /HARMONIARR_BASELINE_IMAGE:/);
   assert.match(validationBlock, /HARMONIARR_IMAGE: \$\{\{ needs\.publish-image\.outputs\.image_ref \}\}/);
+  assert.match(verificationBlock, new RegExp(releaseImageUpgradeEvidenceVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verificationBlock, new RegExp(releaseImageUpgradeEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(evidenceBlock, new RegExp(releaseImageUpgradeEvidenceStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(evidenceBlock, new RegExp(releaseImageUpgradeEvidenceStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(evidenceBlock, new RegExp(releaseImageUpgradeEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));

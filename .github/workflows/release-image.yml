@@ -257,6 +257,11 @@ jobs:
           HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
         run: npm run validate:docker-released-image
 
+      - name: Verify published-image smoke evidence artifact
+        env:
+          HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-released-image.json
+        run: npm run validate:docker-smoke-evidence
+
       - name: Upload published-image smoke evidence artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -267,6 +272,7 @@ jobs:
       - name: Publish verification summary
         env:
           HARMONIARR_SUMMARY_IMAGE_REF: ${{ needs.publish-image.outputs.image_ref }}
+          HARMONIARR_SUMMARY_SMOKE_CONTRACT_STATUS: passed
           HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-released-image.json
         run: node scripts/release-workflow-summary.js verify-published-image
 
@@ -306,6 +312,11 @@ jobs:
           HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-upgrade-path.json
           HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}
         run: npm run validate:docker-upgrade
+
+      - name: Verify upgrade-path smoke evidence artifact
+        env:
+          HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-upgrade-path.json
+        run: npm run validate:docker-smoke-evidence
 
       - name: Upload upgrade-path smoke evidence artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

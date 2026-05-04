@@ -3,9 +3,12 @@ import test from 'node:test';
 
 import {
   assertDockerSmokeValidationResultContract,
+  assertDockerSmokeEvidenceContract,
   createDockerSmokeEvidence,
   dockerSmokeEvidencePathEnvVar,
   getOptionalDockerSmokeEvidencePath,
+  parseDockerSmokeEvidence,
+  verifyDockerSmokeEvidenceFile,
   writeDockerSmokeEvidence,
 } from '../../scripts/docker-smoke-evidence.js';
 
@@ -100,6 +103,43 @@ test('assertDockerSmokeValidationResultContract rejects fresh-install evidence w
       },
     },
   }), /fresh-install\.requestMusicFlow must be an object/);
+});
+
+test('parseDockerSmokeEvidence rejects invalid JSON', () => {
+  assert.throws(() => parseDockerSmokeEvidence('{not json'), /docker smoke evidence must be valid JSON/);
+});
+
+test('assertDockerSmokeEvidenceContract validates released-image evidence payloads', () => {
+  const evidence = assertDockerSmokeEvidenceContract({
+    generatedAt: '2026-05-04T00:00:00.000Z',
+    schemaVersion: 1,
+    validationKind: 'released-image',
+    validationResult: {
+      ...createFreshInstallValidationResult(),
+      imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+    },
+  });
+
+  assert.equal(evidence.validationKind, 'released-image');
+  assert.equal(evidence.validationResult.requestMusicFlow.delegatedRequestId, 'request-1');
+});
+
+test('verifyDockerSmokeEvidenceFile reads and validates a smoke evidence artifact', async () => {
+  const evidence = await verifyDockerSmokeEvidenceFile('artifacts/docker-smoke.json', {
+    readFileFn: async (filePath, encoding) => {
+      assert.equal(filePath, 'artifacts/docker-smoke.json');
+      assert.equal(encoding, 'utf8');
+      return JSON.stringify({
+        generatedAt: '2026-05-04T00:00:00.000Z',
+        schemaVersion: 1,
+        validationKind: 'fresh-install',
+        validationResult: createFreshInstallValidationResult(),
+      });
+    },
+  });
+
+  assert.equal(evidence.validationKind, 'fresh-install');
+  assert.equal(evidence.validationResult.requestMusicFlow.requestedForUsername, 'smoke-listener');
 });
 
 test('writeDockerSmokeEvidence writes a JSON file when configured', async () => {

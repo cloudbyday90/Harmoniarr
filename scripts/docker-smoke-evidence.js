@@ -6,7 +6,7 @@
  * See LICENSE file for details.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 export const dockerSmokeEvidencePathEnvVar = 'HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH';
@@ -129,4 +129,52 @@ export async function writeDockerSmokeEvidence({
     evidence,
     evidencePath: resolvedEvidencePath,
   };
+}
+
+function assertDockerSmokeEvidenceObject(evidence) {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
+    throw new Error('docker smoke evidence must be an object');
+  }
+}
+
+export function parseDockerSmokeEvidence(text) {
+  if (typeof text !== 'string' || text.length === 0) {
+    throw new Error('docker smoke evidence text is required');
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('docker smoke evidence must be valid JSON');
+  }
+}
+
+export function assertDockerSmokeEvidenceContract(evidence) {
+  assertDockerSmokeEvidenceObject(evidence);
+
+  if (evidence.schemaVersion !== 1) {
+    throw new Error(`docker smoke evidence schemaVersion must equal 1, received ${String(evidence.schemaVersion)}`);
+  }
+
+  assertStringField(evidence.validationKind, 'docker smoke evidence.validationKind');
+  assertStringField(evidence.generatedAt, 'docker smoke evidence.generatedAt');
+
+  return {
+    ...evidence,
+    validationResult: assertDockerSmokeValidationResultContract({
+      validationKind: evidence.validationKind,
+      validationResult: evidence.validationResult,
+    }),
+  };
+}
+
+export async function verifyDockerSmokeEvidenceFile(filePath, {
+  readFileFn = readFile,
+} = {}) {
+  if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+    throw new Error('docker smoke evidence filePath is required');
+  }
+
+  const text = await readFileFn(filePath, 'utf8');
+  return assertDockerSmokeEvidenceContract(parseDockerSmokeEvidence(text));
 }

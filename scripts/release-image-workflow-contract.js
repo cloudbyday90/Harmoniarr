@@ -46,6 +46,11 @@ export const releaseImageEvidenceStep = Object.freeze({
   path: 'supply-chain/harmoniarr-docker-smoke-released-image.json',
 });
 
+export const releaseImageEvidenceVerificationStep = Object.freeze({
+  command: 'npm run validate:docker-smoke-evidence',
+  name: 'Verify published-image smoke evidence artifact',
+});
+
 export const releaseImageUpgradeWorkflow = Object.freeze({
   baselineInputName: 'baseline_image',
   jobId: 'verify-upgrade-path',
@@ -63,6 +68,11 @@ export const releaseImageUpgradeEvidenceStep = Object.freeze({
   artifactName: 'harmoniarr-docker-smoke-upgrade-path.json',
   name: 'Upload upgrade-path smoke evidence artifact',
   path: 'supply-chain/harmoniarr-docker-smoke-upgrade-path.json',
+});
+
+export const releaseImageUpgradeEvidenceVerificationStep = Object.freeze({
+  command: 'npm run validate:docker-smoke-evidence',
+  name: 'Verify upgrade-path smoke evidence artifact',
 });
 
 export const trustedMirrorWorkflowEnvKeys = [
@@ -211,6 +221,20 @@ export function validateReleaseImageWorkflowContract(source) {
   }
 
   try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageEvidenceVerificationStep.name);
+
+    if (!block.includes(`run: ${releaseImageEvidenceVerificationStep.command}`)) {
+      issues.push(`${releaseImageEvidenceVerificationStep.name} must run ${releaseImageEvidenceVerificationStep.command}`);
+    }
+
+    if (!block.includes(`HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: ${releaseImageEvidenceStep.path}`)) {
+      issues.push(`${releaseImageEvidenceVerificationStep.name} must verify ${releaseImageEvidenceStep.path}`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  try {
     const block = getWorkflowStepBlock(normalizedSource, releaseImageEvidenceStep.name);
 
     if (!block.includes(`uses: ${releaseImageEvidenceStep.action}`)) {
@@ -230,6 +254,10 @@ export function validateReleaseImageWorkflowContract(source) {
 
   if (!normalizedSource.includes("HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-released-image.json")) {
     issues.push('verify-published-image summary must report the smoke evidence artifact name');
+  }
+
+  if (!normalizedSource.includes('HARMONIARR_SUMMARY_SMOKE_CONTRACT_STATUS: passed')) {
+    issues.push('verify-published-image summary must report the smoke evidence contract status');
   }
 
   if (!normalizedSource.includes(`${releaseImageUpgradeWorkflow.baselineInputName}:`)) {
@@ -267,6 +295,20 @@ export function validateReleaseImageWorkflowContract(source) {
 
     if (!block.includes("HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}")) {
       issues.push(`${releaseImageUpgradeValidationStep.name} must validate the published immutable image`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageUpgradeEvidenceVerificationStep.name);
+
+    if (!block.includes(`run: ${releaseImageUpgradeEvidenceVerificationStep.command}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceVerificationStep.name} must run ${releaseImageUpgradeEvidenceVerificationStep.command}`);
+    }
+
+    if (!block.includes(`HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: ${releaseImageUpgradeEvidenceStep.path}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceVerificationStep.name} must verify ${releaseImageUpgradeEvidenceStep.path}`);
     }
   } catch (error) {
     issues.push(error.message);
