@@ -21,6 +21,8 @@ Security source: `docs/SECURITY_POLICY.md`
 
 - [ ] Run unit tests for validators, service logic, and normalization helpers.
 - [ ] Run integration tests for auth/session, settings, import review, jobs, and recovery-sensitive operations.
+	- Native integration coverage now also exercises the public app-user claim completion route end to end against the real HTTP and database-backed server graph, including admin-issued claim code creation, no auto-login on completion, and a subsequent normal login with the claimed password.
+	- Remaining work is packaged or CI-backed execution in an environment with a working PostgreSQL integration runtime so this coverage contributes live release evidence instead of existing only as committed test coverage.
 - [ ] Run route-contract validation for normalized payloads and permission failures.
 - [x] Run migration replay and schema snapshot validation.
 - [ ] Run UI/end-to-end coverage for bootstrap, login, settings, review queue, jobs/history, and restore preview/apply where practical.
@@ -70,6 +72,7 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Validate CSRF protection on cookie-authenticated write routes.
 - [ ] Validate secret masking/redaction in settings, logs, diagnostics, and exports.
 - [ ] Validate session expiry, token revocation, and forced re-auth behavior.
+	- Native integration coverage now also proves the claim-completion path does not mint a new authenticated session cookie and still requires a fresh normal login afterward, complementing the existing refresh, logout, password-change, and recovery-session-revocation contracts.
 - [ ] Validate maintenance-lock denial behavior for unsafe operations.
 - [ ] Validate dependency-failure classification for slskd and metadata providers.
 - [ ] Run a real release workflow execution with `DOCKERHUB_TRUSTED_MIRROR=true` and confirm the capability probe, ORAS recursive copy, and referrer-graph verification all succeed against the live registries.

@@ -3,6 +3,7 @@ import { after, before, suite, test } from 'node:test';
 import { operationRunRegistry } from '../../src/shared/operation-run-descriptors.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
+import { createSessionHttpClient } from '../../testing/server/http-session-client.js';
 import {
   createBackupExport,
   enterMaintenanceLock,
@@ -21,6 +22,15 @@ import {
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 let integrationRuntime;
 let runtimeUnavailableReason = null;
+
+function getSetCookieHeaders(response) {
+  if (typeof response.headers.getSetCookie === 'function') {
+    return response.headers.getSetCookie();
+  }
+
+  const setCookie = response.headers.get('set-cookie');
+  return setCookie ? [setCookie] : [];
+}
 
 suite('integration auth, settings, and recovery routes', () => {
   before(async () => {
@@ -189,6 +199,133 @@ suite('integration auth, settings, and recovery routes', () => {
       );
     }, {
       scenarioName: 'settings_read_write',
+    });
+  });
+
+  test('admin-issued claim codes complete through the public auth route and require a fresh login afterward', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await integrationRuntime.runScenario(async ({ baseUrl, client, getPoolFn }) => {
+      await bootstrapAdminSession(client);
+      const publicClient = createSessionHttpClient(baseUrl, {
+        requestTimeoutMs: integrationRuntimeConfig.httpRequestTimeoutMs,
+      });
+
+      const createUserResponse = await client.requestJson('/api/v1/users', {
+        csrf: true,
+        json: {
+          password: 'TempClaimPass123!',
+          role: 'requester',
+          username: 'claimuser',
+        },
+        method: 'POST',
+      });
+      assert.equal(createUserResponse.response.status, 201);
+      const claimUserId = createUserResponse.payload.user.id;
+
+      const claimCodeResponse = await client.requestJson(`/api/v1/users/${claimUserId}/claim-code`, {
+        csrf: true,
+        json: {
+          ttlMinutes: 30,
+        },
+        method: 'POST',
+      });
+      assert.equal(claimCodeResponse.response.status, 201);
+      assert.equal(claimCodeResponse.payload.ok, true);
+      assert.equal(claimCodeResponse.payload.user.username, 'claimuser');
+      assert.match(claimCodeResponse.payload.claimCode, /^HCLM-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+
+      const claimCompleteResponse = await publicClient.requestJson('/api/v1/auth/claim', {
+        csrf: false,
+        json: {
+          claimCode: claimCodeResponse.payload.claimCode,
+          password: 'ClaimedPass123!',
+          username: 'claimuser',
+        },
+        method: 'POST',
+      });
+      assert.equal(claimCompleteResponse.response.status, 201);
+      assert.equal(claimCompleteResponse.payload.ok, true);
+      assert.equal(claimCompleteResponse.payload.requiresLogin, true);
+      assert.equal(claimCompleteResponse.payload.username, 'claimuser');
+      assert.deepEqual(getSetCookieHeaders(claimCompleteResponse.response), []);
+      assert.equal(publicClient.getCookieHeader(), '');
+
+      const publicSessionAfterClaim = await publicClient.requestJson('/api/v1/auth/session');
+      assert.equal(publicSessionAfterClaim.response.status, 200);
+      assert.equal(publicSessionAfterClaim.payload.user, null);
+
+      const oldPasswordLoginResponse = await publicClient.requestJson('/api/v1/auth/login', {
+        json: {
+          password: 'TempClaimPass123!',
+          username: 'claimuser',
+        },
+        method: 'POST',
+      });
+      assert.equal(oldPasswordLoginResponse.response.status, 401);
+      assert.equal(oldPasswordLoginResponse.payload.error.code, 'invalid_credentials');
+
+      const claimedLoginResponse = await publicClient.requestJson('/api/v1/auth/login', {
+        json: {
+          password: 'ClaimedPass123!',
+          username: 'claimuser',
+        },
+        method: 'POST',
+      });
+      assert.equal(claimedLoginResponse.response.status, 200);
+      assert.equal(claimedLoginResponse.payload.user.username, 'claimuser');
+      assert.equal(claimedLoginResponse.payload.user.mustChangePassword, false);
+
+      const claimedSessionResponse = await publicClient.requestJson('/api/v1/auth/session');
+      assert.equal(claimedSessionResponse.response.status, 200);
+      assert.equal(claimedSessionResponse.payload.user.username, 'claimuser');
+      assert.equal(claimedSessionResponse.payload.user.mustChangePassword, false);
+
+      const claimedUserRows = await getPoolFn().query(
+        `
+          SELECT must_change_password, password_changed_at
+          FROM app_users
+          WHERE id = $1
+        `,
+        [claimUserId],
+      );
+      assert.equal(claimedUserRows.rows[0]?.must_change_password, false);
+      assert.ok(claimedUserRows.rows[0]?.password_changed_at);
+
+      const claimRows = await getPoolFn().query(
+        `
+          SELECT consumed_at, revoked_at
+          FROM app_user_claim_codes
+          WHERE app_user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        `,
+        [claimUserId],
+      );
+      assert.ok(claimRows.rows[0]?.consumed_at);
+      assert.equal(claimRows.rows[0]?.revoked_at, null);
+
+      const auditRows = await getPoolFn().query(
+        `
+          SELECT event_type
+          FROM audit_events
+          WHERE entity_id = $1
+            AND event_type IN ('app_user_claim_code_issued', 'app_user_claim_completed')
+          ORDER BY occurred_at ASC, created_at ASC
+        `,
+        [claimUserId],
+      );
+      assert.deepEqual(
+        auditRows.rows.map((row) => row.event_type),
+        ['app_user_claim_code_issued', 'app_user_claim_completed'],
+      );
+    }, {
+      scenarioName: 'auth_claim_lifecycle',
     });
   });
 
