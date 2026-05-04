@@ -32,6 +32,7 @@ import {
   applyPlexUserImport,
   createUser,
   fetchUsers,
+  issueUserClaimCode,
   previewPlexUserImport,
   relinkPlexUserConflict,
   resetUserPassword,
@@ -138,6 +139,22 @@ const newUserForm = reactive({
   username: '',
 });
 
+function toEditableUser(user, overrides = {}) {
+  return {
+    ...user,
+    claimCode: overrides.claimCode ?? null,
+    claimCodeExpiresAt: overrides.claimCodeExpiresAt ?? null,
+    issuingClaimCode: false,
+    pendingIsDisabled: Boolean(user.isDisabled),
+    pendingManagedLibraryRelativeRoot: user.managedLibraryRelativeRoot ?? '',
+    pendingPasswordReset: '',
+    pendingRole: user.role,
+    provisioning: false,
+    resettingPassword: false,
+    saving: false,
+  };
+}
+
 function formatCommaSeparatedList(value) {
   return Array.isArray(value) ? value.join(', ') : '';
 }
@@ -192,16 +209,7 @@ function applyUsers(payload) {
     ? payload.roleOptions
     : ['admin', 'operator', 'requester'];
   users.value = Array.isArray(payload.users)
-    ? payload.users.map((user) => ({
-      ...user,
-      pendingIsDisabled: Boolean(user.isDisabled),
-      pendingManagedLibraryRelativeRoot: user.managedLibraryRelativeRoot ?? '',
-      pendingPasswordReset: '',
-      pendingRole: user.role,
-      provisioning: false,
-      resettingPassword: false,
-      saving: false,
-    }))
+    ? payload.users.map((user) => toEditableUser(user))
     : [];
 
   if (!roleOptions.value.includes(newUserForm.role)) {
@@ -470,14 +478,10 @@ async function saveManagedUser(user) {
     });
     const index = users.value.findIndex((entry) => entry.id === user.id);
     if (index >= 0) {
-      users.value[index] = {
-        ...payload.user,
-        pendingIsDisabled: Boolean(payload.user.isDisabled),
-        pendingManagedLibraryRelativeRoot: payload.user.managedLibraryRelativeRoot ?? '',
-        pendingRole: payload.user.role,
-        provisioning: false,
-        saving: false,
-      };
+      users.value[index] = toEditableUser(payload.user, {
+        claimCode: users.value[index].claimCode,
+        claimCodeExpiresAt: users.value[index].claimCodeExpiresAt,
+      });
     }
     userManagementSuccessMessage.value = `User ${payload.user.username} updated.`;
   } catch (error) {
@@ -499,14 +503,10 @@ async function provisionManagedUserLibraryRoot(user) {
     const payload = await provisionUserManagedLibraryRoot(user.id);
     const index = users.value.findIndex((entry) => entry.id === user.id);
     if (index >= 0) {
-      users.value[index] = {
-        ...payload.user,
-        pendingIsDisabled: Boolean(payload.user.isDisabled),
-        pendingManagedLibraryRelativeRoot: payload.user.managedLibraryRelativeRoot ?? '',
-        pendingRole: payload.user.role,
-        provisioning: false,
-        saving: false,
-      };
+      users.value[index] = toEditableUser(payload.user, {
+        claimCode: users.value[index].claimCode,
+        claimCodeExpiresAt: users.value[index].claimCodeExpiresAt,
+      });
     }
 
     userManagementSuccessMessage.value = payload.provisioning?.created
@@ -518,6 +518,25 @@ async function provisionManagedUserLibraryRoot(user) {
   }
 }
 
+async function issueManagedUserClaimCode(user) {
+  user.issuingClaimCode = true;
+  userManagementErrorMessage.value = '';
+  userManagementSuccessMessage.value = '';
+
+  try {
+    const payload = await issueUserClaimCode(user.id);
+    Object.assign(user, toEditableUser(payload.user, {
+      claimCode: payload.claimCode,
+      claimCodeExpiresAt: payload.expiresAt,
+    }));
+
+    userManagementSuccessMessage.value = `Claim code issued for ${payload.user.username}. Share it before ${new Date(payload.expiresAt).toLocaleString()}.`;
+  } catch (error) {
+    user.issuingClaimCode = false;
+    userManagementErrorMessage.value = error instanceof Error ? error.message : 'User claim code issuance failed';
+  }
+}
+
 async function resetManagedUserPassword(user) {
   user.resettingPassword = true;
   userManagementErrorMessage.value = '';
@@ -525,16 +544,10 @@ async function resetManagedUserPassword(user) {
 
   try {
     const payload = await resetUserPassword(user.id, user.pendingPasswordReset);
-    Object.assign(user, {
-      ...payload.user,
-      pendingIsDisabled: payload.user.isDisabled,
-      pendingManagedLibraryRelativeRoot: payload.user.managedLibraryRelativeRoot ?? '',
-      pendingPasswordReset: '',
-      pendingRole: payload.user.role,
-      provisioning: false,
-      resettingPassword: false,
-      saving: false,
-    });
+    Object.assign(user, toEditableUser(payload.user, {
+      claimCode: user.claimCode,
+      claimCodeExpiresAt: user.claimCodeExpiresAt,
+    }));
 
     userManagementSuccessMessage.value = `Temporary password set for ${payload.user.username}. The user must change it on next login.`;
   } catch (error) {
@@ -1308,8 +1321,18 @@ onMounted(() => {
             >
               {{ user.resettingPassword ? 'Setting password...' : 'Set temporary password' }}
             </button>
+            <button
+              type="button"
+              class="secondary-button"
+              @click="issueManagedUserClaimCode(user)"
+              :disabled="user.issuingClaimCode"
+            >
+              {{ user.issuingClaimCode ? 'Issuing claim code...' : 'Issue claim code' }}
+            </button>
             <p class="metadata-card-copy" v-if="hasPendingManagedLibraryRootChanges(user)">Save the managed library subdirectory change before provisioning the folder.</p>
             <p class="metadata-card-copy" v-if="user.authProvider === 'plex'">Use a temporary password here to provide local fallback access for a Plex-linked user without removing the Plex binding.</p>
+            <p class="metadata-card-copy" v-if="user.claimCode">Current claim code: {{ user.claimCode }}</p>
+            <p class="metadata-card-copy" v-if="user.claimCodeExpiresAt">Claim code expires {{ new Date(user.claimCodeExpiresAt).toLocaleString() }}. The user can complete setup on the public /claim-account screen with username {{ user.username }}.</p>
           </article>
         </div>
       </template>

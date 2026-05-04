@@ -38,6 +38,14 @@ export function updateUser(userId, patch) {
   });
 }
 
+export function issueUserClaimCode(userId, ttlMinutes) {
+  return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/claim-code`, {
+    method: 'POST',
+    includeCsrf: true,
+    body: { ttlMinutes },
+  });
+}
+
 export function resetUserPassword(userId, password) {
   return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/reset-password`, {
     method: 'POST',

@@ -14,6 +14,7 @@ function createAuthRouteTestApp(overrides = {}) {
         issuedSession: { refreshToken: 'refresh-password', csrfToken: 'csrf-password' },
       }),
       clearAuthCookies: () => {},
+      completeAppUserClaim: async ({ username }) => ({ requiresLogin: true, username }),
       createActiveSessionsResponse: (payload) => ({ ok: true, ...payload }),
       createAuthenticatedResponse: (user, issuedSession) => ({
         ok: true,
@@ -26,6 +27,7 @@ function createAuthRouteTestApp(overrides = {}) {
         issuedSession: { refreshToken: 'refresh-1', csrfToken: 'csrf-1' },
       }),
       createBootstrapStatusResponse: (payload) => ({ ok: true, ...payload }),
+      createClaimCompletedResponse: (payload) => ({ ok: true, ...payload }),
       createLogoutResponse: () => ({ ok: true }),
       createPasswordChangedResponse: (user, issuedSession) => ({
         ok: true,
@@ -56,6 +58,7 @@ function createAuthRouteTestApp(overrides = {}) {
       }),
       logoutSession: async () => {},
       limitBootstrapAdmin: (_request, _response, next) => next(),
+      limitClaimComplete: (_request, _response, next) => next(),
       limitLogin: (_request, _response, next) => next(),
       limitRefresh: (_request, _response, next) => next(),
       requireCsrf: () => {},
@@ -422,6 +425,62 @@ test('auth change-password route uses the shared account-security dependency and
         lastLoginAt: '2026-05-01T12:00:00.000Z',
       },
       csrfToken: 'csrf-10',
+    });
+  });
+});
+
+test('auth claim route completes the issued app-user claim without creating a session', async (t) => {
+  const completeAppUserClaim = t.mock.fn(async ({ username, claimCode, password, requestMetadata }) => ({
+    claimCode,
+    password,
+    requestMetadata,
+    requiresLogin: true,
+    username,
+  }));
+  const setAuthCookies = t.mock.fn();
+  const app = createAuthRouteTestApp({
+    completeAppUserClaim,
+    setAuthCookies,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/claim`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': '198.51.100.40',
+        'user-agent': 'HarmoniarrClaimTest/1.0',
+      },
+      body: JSON.stringify({
+        claimCode: 'HCLM-ABCD-EFGH-JKLM',
+        password: 'claim-password-1234',
+        username: 'plex-friend',
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(completeAppUserClaim.mock.callCount(), 1);
+    assert.equal(setAuthCookies.mock.callCount(), 0);
+    assert.deepEqual(completeAppUserClaim.mock.calls[0].arguments, [{
+      claimCode: 'HCLM-ABCD-EFGH-JKLM',
+      password: 'claim-password-1234',
+      requestMetadata: {
+        ipAddress: '198.51.100.40',
+        userAgent: 'HarmoniarrClaimTest/1.0',
+      },
+      username: 'plex-friend',
+    }]);
+    assert.deepEqual(payload, {
+      claimCode: 'HCLM-ABCD-EFGH-JKLM',
+      ok: true,
+      password: 'claim-password-1234',
+      requestMetadata: {
+        ipAddress: '198.51.100.40',
+        userAgent: 'HarmoniarrClaimTest/1.0',
+      },
+      requiresLogin: true,
+      username: 'plex-friend',
     });
   });
 });

@@ -66,6 +66,14 @@ export function createPasswordChangedResponse(user, issuedSession) {
   };
 }
 
+export function createClaimCompletedResponse(payload) {
+  return {
+    ok: true,
+    requiresLogin: true,
+    ...payload,
+  };
+}
+
 export function createSessionRevokedResponse(payload) {
   return {
     ok: true,

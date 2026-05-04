@@ -32,6 +32,7 @@ import {
   createActiveSessionsResponse as defaultCreateActiveSessionsResponse,
   createAuthenticatedResponse as defaultCreateAuthenticatedResponse,
   createBootstrapStatusResponse as defaultCreateBootstrapStatusResponse,
+  createClaimCompletedResponse as defaultCreateClaimCompletedResponse,
   createLogoutResponse as defaultCreateLogoutResponse,
   createPasswordChangedResponse as defaultCreatePasswordChangedResponse,
   createRecentActivityResponse as defaultCreateRecentActivityResponse,
@@ -51,10 +52,12 @@ export function registerAuthRoutes(app, {
   buildBootstrapStatusPayload = defaultBootstrapStatusService.buildBootstrapStatusPayload,
   changePassword = defaultAccountSecurityService.changePassword,
   clearAuthCookies = defaultClearAuthCookies,
+  completeAppUserClaim = null,
   createActiveSessionsResponse = defaultCreateActiveSessionsResponse,
   createAuthenticatedResponse = defaultCreateAuthenticatedResponse,
   createBootstrapAdmin = defaultCreateBootstrapAdmin,
   createBootstrapStatusResponse = defaultCreateBootstrapStatusResponse,
+  createClaimCompletedResponse = defaultCreateClaimCompletedResponse,
   createLogoutResponse = defaultCreateLogoutResponse,
   createPasswordChangedResponse = defaultCreatePasswordChangedResponse,
   createRecentActivityResponse = defaultCreateRecentActivityResponse,
@@ -68,6 +71,7 @@ export function registerAuthRoutes(app, {
   loginUser = defaultLoginUser,
   logoutSession = defaultLogoutSession,
   limitBootstrapAdmin = skipRateLimitMiddleware,
+  limitClaimComplete = skipRateLimitMiddleware,
   limitLogin = skipRateLimitMiddleware,
   limitRefresh = skipRateLimitMiddleware,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
@@ -131,6 +135,17 @@ export function registerAuthRoutes(app, {
     setAuthCookies(response, result.issuedSession.refreshToken, result.issuedSession.csrfToken);
     response.json(createPasswordChangedResponse(result.user, result.issuedSession));
   }));
+
+  if (typeof completeAppUserClaim === 'function') {
+    app.post('/api/v1/auth/claim', limitClaimComplete, asyncRoute(async (request, response) => {
+      response.status(201).json(createClaimCompletedResponse(await completeAppUserClaim({
+        claimCode: request.body?.claimCode,
+        password: request.body?.password,
+        requestMetadata: getRequestMetadata(request),
+        username: request.body?.username,
+      })));
+    }));
+  }
 
   app.post('/api/v1/auth/logout', asyncRoute(async (request, response) => {
     const session = await getSessionFromRequest(request);

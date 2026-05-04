@@ -20,7 +20,9 @@ test('createRequestAuthDependencies exposes shared request auth helpers from ove
 
 test('createAuthModule exposes shared auth route dependencies from overrides', () => {
   const changePassword = async () => {};
+  const completeAppUserClaim = async () => {};
   const createActiveSessionsResponse = () => {};
+  const createClaimCompletedResponse = () => {};
   const createPasswordChangedResponse = () => {};
   const createRecentActivityResponse = () => {};
   const createSessionRevokedResponse = () => {};
@@ -32,10 +34,12 @@ test('createAuthModule exposes shared auth route dependencies from overrides', (
     buildSessionPayload: () => {},
     changePassword,
     clearAuthCookies: () => {},
+    completeAppUserClaim,
     createActiveSessionsResponse,
     createAuthenticatedResponse: () => {},
     createBootstrapAdmin: () => {},
     createBootstrapStatusResponse: () => {},
+    createClaimCompletedResponse,
     createLogoutResponse: () => {},
     createPasswordChangedResponse,
     createRecentActivityResponse,

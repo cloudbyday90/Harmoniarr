@@ -38,9 +38,11 @@ function collectRegisteredRoutes() {
   const { app, routes } = createRecordingApp();
 
   registerAuthRoutes(app, {
+    completeAppUserClaim: asyncNoopResult({ requiresLogin: true }),
     createAuthenticatedResponse: () => ({}),
     createBootstrapAdmin: asyncNoopResult({ user: {}, issuedSession: {} }),
     createBootstrapStatusResponse: () => ({}),
+    createClaimCompletedResponse: () => ({}),
     createLogoutResponse: () => ({}),
     createRefreshResponse: () => ({}),
     createSessionResponse: () => ({}),
@@ -64,6 +66,7 @@ function collectRegisteredRoutes() {
     claimManagedLibraryRoot: asyncNoopResult({}),
     createAppUser: asyncNoopResult({}),
     getRequestMetadata: () => ({}),
+    issueAppUserClaimCode: asyncNoopResult({}),
     listAppUsers: asyncNoopResult([]),
     relinkPlexDirectoryConflict: asyncNoopResult({}),
     resetAppUserPassword: asyncNoopResult({}),

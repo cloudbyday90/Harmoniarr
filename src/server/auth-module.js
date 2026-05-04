@@ -17,6 +17,7 @@
  */
 
 import { createAccountSecurityService } from './account-security-service.js';
+import { createAccountClaimService } from './account-claim-service.js';
 import {
   buildSessionPayload,
   clearAuthCookies,
@@ -38,6 +39,7 @@ import {
   createActiveSessionsResponse,
   createAuthenticatedResponse,
   createBootstrapStatusResponse,
+  createClaimCompletedResponse,
   createLogoutResponse,
   createPasswordChangedResponse,
   createRecentActivityResponse,
@@ -61,11 +63,14 @@ export function createRequestAuthDependencies(overrides = {}) {
 }
 
 export function createAuthModule({
+  accountClaimService,
   accountSecurityService,
   bootstrapStatusService,
   settingsService,
   ...overrides
 } = {}) {
+  const resolvedAccountClaimService = accountClaimService
+    ?? createAccountClaimService();
   const resolvedAccountSecurityService = accountSecurityService
     ?? createAccountSecurityService();
   const resolvedBootstrapStatusService = bootstrapStatusService
@@ -77,10 +82,12 @@ export function createAuthModule({
       buildBootstrapStatusPayload: resolvedBootstrapStatusService.buildBootstrapStatusPayload,
       changePassword: resolvedAccountSecurityService.changePassword,
       clearAuthCookies,
+      completeAppUserClaim: resolvedAccountClaimService.completeClaim,
       createActiveSessionsResponse,
       createAuthenticatedResponse,
       createBootstrapAdmin,
       createBootstrapStatusResponse,
+      createClaimCompletedResponse,
       createLogoutResponse,
       createPasswordChangedResponse,
       createRecentActivityResponse,

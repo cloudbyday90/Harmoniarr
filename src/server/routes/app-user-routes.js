@@ -33,6 +33,7 @@ export function registerAppUserRoutes(app, {
   claimManagedLibraryRoot = defaultAppUserProvisioningService.claimManagedLibraryRoot,
   createAppUser = defaultAppUserService.createAppUser,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
+  issueAppUserClaimCode = null,
   listAppUsers = defaultAppUserService.listAppUsers,
   relinkPlexDirectoryConflict = null,
   resetAppUserPassword = defaultAppUserService.resetAppUserPassword,
@@ -91,6 +92,28 @@ export function registerAppUserRoutes(app, {
       user,
     });
   }));
+
+  if (typeof issueAppUserClaimCode === 'function') {
+    app.post('/api/v1/users/:userId/claim-code', asyncRoute(async (request, response) => {
+      const session = await requireFreshAdminSession(request);
+      requireCsrf(request, session);
+
+      const result = await issueAppUserClaimCode({
+        actorUserId: session.appUserId,
+        requestMetadata: getRequestMetadata(request),
+        ttlMinutes: request.body?.ttlMinutes,
+        userId: request.params.userId,
+      });
+
+      response.status(201).json({
+        claimCode: result.claimCode,
+        expiresAt: result.expiresAt,
+        ok: true,
+        replacedExistingClaim: result.replacedExistingClaim,
+        user: result.user,
+      });
+    }));
+  }
 
   app.post('/api/v1/users/:userId/reset-password', asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);

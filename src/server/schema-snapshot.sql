@@ -2970,3 +2970,64 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260504_010000_app_user_claim_codes.sql
+-- Checksum: 8660cf964db827de1dacf07f8d3bad73c393f32719f70355415a65a382102cf7
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS app_user_claim_codes (
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  app_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  issued_by_user_id UUID NULL REFERENCES app_users(id) ON DELETE SET NULL,
+  claim_code_hash TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ NULL,
+  revoked_at TIMESTAMPTZ NULL,
+  revoke_reason TEXT NULL
+);
+
+CREATE INDEX IF NOT EXISTS app_user_claim_codes_active_user_idx
+  ON app_user_claim_codes (app_user_id, created_at DESC)
+  WHERE consumed_at IS NULL
+    AND revoked_at IS NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260504_010000',
+  '20260504_010000_app_user_claim_codes.sql',
+  'app_user_claim_codes',
+  '8660cf964db827de1dacf07f8d3bad73c393f32719f70355415a65a382102cf7',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

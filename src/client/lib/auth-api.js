@@ -40,6 +40,13 @@ export function login(form) {
   });
 }
 
+export function claimAccount(form) {
+  return apiRequest('/api/v1/auth/claim', {
+    method: 'POST',
+    body: form,
+  });
+}
+
 export function logout() {
   return apiRequest('/api/v1/auth/logout', {
     method: 'POST',

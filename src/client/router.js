@@ -20,6 +20,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import AppShell from './components/AppShell.vue';
 import AccountSecurityView from './views/AccountSecurityView.vue';
 import BootstrapSetupView from './views/BootstrapSetupView.vue';
+import ClaimAccountView from './views/ClaimAccountView.vue';
 import DashboardView from './views/DashboardView.vue';
 import ImportReviewView from './views/ImportReviewView.vue';
 import LoginView from './views/LoginView.vue';
@@ -42,6 +43,7 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/app' },
     { path: '/bootstrap', name: 'bootstrap', component: BootstrapSetupView, meta: { anonymousOnly: true } },
+    { path: '/claim-account', name: 'claim-account', component: ClaimAccountView, meta: { anonymousOnly: true } },
     { path: '/login', name: 'login', component: LoginView, meta: { anonymousOnly: true } },
     { path: '/recover/bootstrap-admin', name: 'recovery', component: RecoveryView },
     {

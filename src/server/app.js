@@ -193,7 +193,10 @@ export function createApp({
     maintenanceLockService,
     settingsService,
   });
-  const authModule = buildAuthModule({ settingsService });
+  const authModule = buildAuthModule({
+    accountClaimService: appUserModule.accountClaimService,
+    settingsService,
+  });
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const importCandidateModule = buildImportCandidateModule({
@@ -301,6 +304,12 @@ export function createApp({
       bucketName: 'bootstrap-admin',
       limit: 5,
       windowMs: 10 * 60 * 1000,
+    }),
+    limitClaimComplete: requestRateLimiterService.createMiddleware({
+      bucketName: 'auth-claim-complete',
+      keyFn: buildLoginRateLimitKey,
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
     }),
     limitLogin: requestRateLimiterService.createMiddleware({
       bucketName: 'auth-login',

@@ -19,41 +19,42 @@
 <script setup>
 import { reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { sessionStore } from '../state/session.js';
+import { claimAccount } from '../lib/auth-api.js';
 
 const route = useRoute();
 const router = useRouter();
 const form = reactive({
-  username: typeof route.query.username === 'string' ? route.query.username : '',
+  claimCode: '',
+  confirmPassword: '',
   password: '',
+  username: typeof route.query.username === 'string' ? route.query.username : '',
 });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
 
-function infoMessage() {
-  if (route.query.reason === 'claim-complete') {
-    return 'Your account claim is complete. Sign in with the password you just set.';
-  }
-
-  if (route.query.reason === 'session-expired') {
-    return 'Your session expired. Sign in again to continue.';
-  }
-
-  if (route.query.reason === 'reauth-required') {
-    return 'A privileged action requires you to re-authenticate before continuing.';
-  }
-
-  return '';
-}
-
 async function submit() {
   errorMessage.value = '';
+  if (form.password !== form.confirmPassword) {
+    errorMessage.value = 'Passwords must match.';
+    return;
+  }
+
   isSubmitting.value = true;
   try {
-    await sessionStore.login(form);
-    await router.push(typeof route.query.redirect === 'string' ? route.query.redirect : { name: 'dashboard' });
+    const payload = await claimAccount({
+      claimCode: form.claimCode,
+      password: form.password,
+      username: form.username,
+    });
+    await router.push({
+      name: 'login',
+      query: {
+        reason: payload.requiresLogin ? 'claim-complete' : undefined,
+        username: payload.username ?? form.username,
+      },
+    });
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Login failed';
+    errorMessage.value = error instanceof Error ? error.message : 'Account claim failed';
   } finally {
     isSubmitting.value = false;
   }
@@ -63,35 +64,38 @@ async function submit() {
 <template>
   <section class="auth-layout">
     <article class="hero-card panel-dark">
-      <p class="eyebrow">Browser auth</p>
-      <h1>Sign in to Harmoniarr</h1>
+      <p class="eyebrow">Account claim</p>
+      <h1>Set your Harmoniarr password</h1>
       <p>
-        Session cookies and CSRF protection are now active. Login uses the same local
-        auth model planned in the implementation docs.
+        Use the one-time claim code issued by an administrator to set a local password for your existing account.
+        This does not sign you in automatically. After the claim succeeds, return to the login screen and sign in normally.
       </p>
     </article>
 
     <article class="form-card panel-light">
-      <h2>Login</h2>
-      <p class="metadata-card-copy" v-if="infoMessage()">{{ infoMessage() }}</p>
+      <h2>Claim account</h2>
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username or email
           <input v-model="form.username" autocomplete="username" required />
         </label>
         <label>
-          Password
-          <input v-model="form.password" type="password" autocomplete="current-password" required />
+          Claim code
+          <input v-model="form.claimCode" autocomplete="off" placeholder="HCLM-XXXX-XXXX-XXXX" required />
+        </label>
+        <label>
+          New password
+          <input v-model="form.password" type="password" autocomplete="new-password" required />
+        </label>
+        <label>
+          Confirm password
+          <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required />
         </label>
         <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
         <button type="submit" :disabled="isSubmitting">
-          {{ isSubmitting ? 'Signing in...' : 'Login' }}
+          {{ isSubmitting ? 'Claiming...' : 'Claim account' }}
         </button>
       </form>
-      <p class="metadata-card-copy">Have a claim code for an existing account? Use the public claim flow first.</p>
-      <RouterLink class="secondary-button" :to="{ name: 'claim-account', query: form.username ? { username: form.username } : {} }">
-        Claim account
-      </RouterLink>
     </article>
   </section>
 </template>

@@ -17,11 +17,13 @@
  */
 
 import { createRequestAuthDependencies } from './auth-module.js';
+import { createAccountClaimService } from './account-claim-service.js';
 import { createAppUserProvisioningService } from './app-user-provisioning-service.js';
 import { createAppUserPermissionService } from './app-user-permission-service.js';
 import { createAppUserService } from './app-user-service.js';
 
 export function createAppUserModule({
+  accountClaimService,
   appUserProvisioningService,
   appUserService,
   permissionService,
@@ -32,12 +34,16 @@ export function createAppUserModule({
   const resolvedAppUserService = appUserService ?? createAppUserService({
     permissionService: resolvedPermissionService,
   });
+  const resolvedAccountClaimService = accountClaimService ?? createAccountClaimService({
+    getAppUserByIdFn: resolvedAppUserService.getAppUserById,
+  });
   const resolvedAppUserProvisioningService = appUserProvisioningService ?? createAppUserProvisioningService({
     getAppUserById: resolvedAppUserService.getAppUserById,
     updateAppUser: resolvedAppUserService.updateAppUser,
   });
 
   return {
+    accountClaimService: resolvedAccountClaimService,
     appUserProvisioningService: resolvedAppUserProvisioningService,
     appUserService: resolvedAppUserService,
     permissionService: resolvedPermissionService,
@@ -45,6 +51,7 @@ export function createAppUserModule({
       createAppUser: resolvedAppUserService.createAppUser,
       claimManagedLibraryRoot: resolvedAppUserProvisioningService.claimManagedLibraryRoot,
       getAppUserById: resolvedAppUserService.getAppUserById,
+      issueAppUserClaimCode: resolvedAccountClaimService.issueClaimCode,
       listAppUsers: resolvedAppUserService.listAppUsers,
       resetAppUserPassword: resolvedAppUserService.resetAppUserPassword,
       ...(plexDirectoryImportService

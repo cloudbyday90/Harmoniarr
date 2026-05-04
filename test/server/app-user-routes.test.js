@@ -65,6 +65,20 @@ function createAppUserRouteTestApp(overrides = {}) {
         ipAddress: request.headers['x-forwarded-for'] ?? '127.0.0.1',
         userAgent: request.headers['user-agent'] ?? null,
       }),
+      issueAppUserClaimCode: async ({ userId }) => ({
+        claimCode: 'HCLM-ABCD-EFGH-JKLM',
+        expiresAt: '2026-05-05T01:00:00.000Z',
+        replacedExistingClaim: false,
+        user: {
+          id: userId,
+          username: 'listener',
+          role: 'requester',
+          authProvider: 'plex',
+          mustChangePassword: false,
+          managedLibraryRelativeRoot: 'listeners/listener',
+          permissions: ['media.request'],
+        },
+      }),
       listAppUsers: async () => [{ id: 'user-1', username: 'admin', role: 'admin', authProvider: 'local', managedLibraryRelativeRoot: 'staff/admin', permissions: ['admin.system'] }],
       resetAppUserPassword: async ({ userId }) => ({
         revokedSessionCount: 0,
@@ -292,6 +306,57 @@ test('app user provisioning route provisions the configured managed library root
     assert.equal(payload.ok, true);
     assert.equal(payload.provisioning.userRootPath, '/data/music/users/listeners/listener');
     assert.equal(payload.user.id, 'user-2');
+  });
+});
+
+test('app user claim-code route passes actor and request metadata to the shared claim service', async (t) => {
+  const issueAppUserClaimCode = t.mock.fn(async ({ userId }) => ({
+    claimCode: 'HCLM-ABCD-EFGH-JKLM',
+    expiresAt: '2026-05-05T01:00:00.000Z',
+    replacedExistingClaim: true,
+    user: {
+      id: userId,
+      authProvider: 'plex',
+      managedLibraryRelativeRoot: 'listeners/listener',
+      mustChangePassword: false,
+      permissions: ['media.request'],
+      role: 'requester',
+      username: 'listener',
+    },
+  }));
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-users', user: { role: 'admin' } }));
+  const requireCsrf = t.mock.fn();
+  const app = createAppUserRouteTestApp({ issueAppUserClaimCode, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/user-2/claim-code`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-users',
+        'x-forwarded-for': '198.51.100.11',
+        'user-agent': 'HarmoniarrUsersTest/1.0',
+      },
+      body: JSON.stringify({ ttlMinutes: 30 }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(issueAppUserClaimCode.mock.calls[0].arguments, [{
+      actorUserId: 'admin-1',
+      requestMetadata: {
+        ipAddress: '198.51.100.11',
+        userAgent: 'HarmoniarrUsersTest/1.0',
+      },
+      ttlMinutes: 30,
+      userId: 'user-2',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.claimCode, 'HCLM-ABCD-EFGH-JKLM');
+    assert.equal(payload.replacedExistingClaim, true);
+    assert.equal(payload.user.authProvider, 'plex');
   });
 });
 
