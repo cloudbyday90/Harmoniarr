@@ -6160,6 +6160,7 @@ Backend:
 - Imported Plex managed users should also have a first-class local invite, claim, or password-set flow bound to the same `app_users` row, because Plex managed accounts do not support direct sign-in semantics on their own.
 - Plex directory synchronization should begin as an admin-triggered import or refresh flow with visible diffs, conflict reporting, and operator approval semantics. Automatic disable or removal based on upstream Plex state should wait until the manual lifecycle policy is proven.
 - Plex import should support explicit merge, relink, and unlink actions so existing local Harmoniarr users can be safely connected to or separated from Plex identities without silent ownership drift.
+- Plex-linked users should also retain enough imported library-access context for Harmoniarr to make sane request-targeting, provisioning, and fulfillment decisions without pretending to fully mirror Plex authorization policy.
 - Add route-tier enforcement for anonymous, authenticated, privileged, maintenance-locked, and integration-key surfaces.
 - Implement settings read/write services with validation, masking/redaction rules, and audit logging.
 - Add API key creation/rotation/revocation for integrations, separate from browser auth.
@@ -6194,7 +6195,9 @@ Ingest/import:
 - Request Music should distinguish the acting user from the target user. The internal model should carry both `requestedByUserId` and `requestedForUserId`, where the former is audit or operator attribution and the latter drives request ownership, request history scope, notifications, and final managed-library destination behavior.
 - Non-admin users remain self-only for requests. Admins may create requests for themselves or for another eligible Harmoniarr user, including users imported from Plex.
 - Implement the single-target ownership split first, then extend into multi-user request fan-out through explicit per-target child requests or equivalent durable target-owned records rather than one ambiguous shared request.
+- If a request target ever changes after creation, treat that as an explicit audited reassignment transition rather than rewriting ownership in place.
 - Target users should receive explicit inbox and notification visibility when an admin creates, reviews, queues, fulfills, or fails a request on their behalf.
+- Request fulfillment and completion signals may also incorporate supplemental Plex webhook evidence where available, but Harmoniarr's own durable workflow state must remain authoritative.
 - Add review queue state machine for candidate evaluation, operator decisions, hold/reject states, and idempotent reprocessing.
 - Implement path mapping, staging resolution, root-folder policy, and naming-preview generation without mutating media yet.
 
@@ -6233,6 +6236,7 @@ Notifications:
 - Add in-app notifications and operator feedback for queued work, failures, recoveries, manual intervention needs, and completed actions.
 - Add target-user notifications and inbox visibility for on-behalf-of request creation, review, queueing, fulfillment, and failure states so delegated request ownership is visible to the affected user, not only the acting admin.
 - Add Plex webhook ingestion for supported environments as a supplemental event source for playback-started and library-new signals, using those events to enrich request fulfillment visibility and operator diagnostics without replacing Harmoniarr's canonical workflow state.
+- Add request-completion and fulfillment visibility that can correlate Harmoniarr workflow state with Plex webhook or Plex-linked playback evidence when the operator environment supports it, while still preserving the local workflow state as the source of truth.
 
 Acceptance criteria:
 
@@ -6270,6 +6274,7 @@ Current execution priority note:
 
 - At this point, the highest remaining product risk is no longer first-pass feature construction. It is deployment-path proof: fresh install, upgrade, restore preview or apply, and rollback-aware behavior on the supported Docker plus PostgreSQL path.
 - The remaining unchecked Phase 0 and start-gate items should be treated as contract and documentation closure unless they uncover a real architectural contradiction.
+- If product-value work is deliberately prioritized ahead of that release-risk track, the next architecture-aligned slices are: Plex directory import or refresh plus imported library-access awareness, delegated Request Music ownership plus target-user inbox visibility, then direct Plex sign-in and managed-user local-login fallback on the shared `app_users` identity boundary.
 
 Validation:
 
@@ -6281,7 +6286,7 @@ Validation:
 - Validate upgrade path, migration replay safety, schema snapshot accuracy, and backup/restore round-trip behavior.
 - Recommended next implementation slice: use the existing integration and runtime harnesses to validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior end to end, then use the resulting gaps to drive the remaining fixture, E2E, and release-closure work.
 - If product-value work is pulled forward ahead of broader release closure, the preferred identity/request slice is: import Plex users into `app_users`, add `requestedForUserId` to Request Music, add direct Plex sign-in for direct-capable Plex accounts, add local-login fallback for imported managed users, then add explicit per-target fan-out plus notifications.
-- Additional high-value follow-on work that fits this architecture well includes Plex webhook ingestion for playback and library events where the operator's Plex environment supports it, because those events can enrich request fulfillment visibility, operator diagnostics, and per-user activity context without replacing the canonical Harmoniarr workflow state.
+- Additional high-value follow-on work that fits this architecture well includes Plex library-access awareness on imported users, audited request reassignment, and Plex webhook-backed completion or fulfillment signals, because those features improve delegated ownership clarity without replacing the canonical Harmoniarr workflow state.
 
 Release closure:
 

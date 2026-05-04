@@ -177,6 +177,12 @@ Highest-priority remaining product-risk slices:
 2. Finish the remaining critical-path validation depth: broader integration scenarios, fixture packs, and practical UI end-to-end coverage for the operator workflows already implemented.
 3. Close the remaining runtime/deployment hardening gaps that still affect operability, such as fail-closed startup checks, standard-image FFmpeg verification, and full maintenance-lock pause validation across unsafe background work.
 
+Highest-priority product-value slices if feature work is intentionally pulled forward:
+
+1. Add an admin-run Plex directory import or refresh flow with diff review, conflict reporting, merge/relink actions, and imported library-access awareness on `app_users`.
+2. Split Request Music ownership into `requestedByUserId` and `requestedForUserId`, then add target-user inbox and notification visibility for delegated requests.
+3. Add direct Plex sign-in for direct-capable Plex accounts plus local invite/claim/password fallback for imported Plex managed users, all bound to the same shared `app_users` identity model.
+
 Lower-priority or conditional slices:
 
 - Plex-linked onboarding remains a product-fit feature, but it is not currently on the shortest path to V1 readiness.
@@ -187,7 +193,10 @@ Lower-priority or conditional slices:
   - implement Plex user re-sync as an admin-triggered import or refresh operation with visible diff results before considering any later automatic reconciliation
   - implement multi-user request fan-out as explicit per-target records rather than one ambiguous shared request
   - implement conflict-safe Plex identity merge, relink, and unlink flows for cases where imported Plex users match existing local Harmoniarr users
+  - implement request reassignment, if needed, as an explicit audited transition instead of a silent target-user mutation
   - implement target-user notifications and inbox visibility so users can see when an admin requested, reviewed, queued, or fulfilled media on their behalf
+  - implement Plex library-access awareness on imported users so Harmoniarr can reflect which Plex-linked users should receive request-targeting and fulfillment affordances
+  - implement request completion signals that combine Harmoniarr workflow state with Plex webhook evidence when available, without letting Plex become the authoritative workflow source
   - implement Plex webhook intake, when the operator's Plex environment supports it, for high-value playback and library events that can enrich request status, fulfillment visibility, or user activity diagnostics
 - Personal or integration token flows remain conditional and should not be built unless a concrete non-browser automation need exists.
 - Remaining Phase 0 and start-gate items should be treated as documentation and contract-closure work unless they uncover a real architectural conflict.
@@ -311,6 +320,7 @@ Status note:
 - [ ] Implement direct Plex sign-in for imported direct-capable Plex accounts through the same shared session and route-tier model as local auth, without introducing a second identity store.
 - [ ] Implement a local invite, claim, or password-set flow for imported Plex managed users so they can authenticate into Harmoniarr directly while remaining linked to the imported `app_users` identity.
 - [ ] Add an admin-run Plex directory import or refresh surface with visible diffs, conflict reporting, merge or relink actions, and safe no-auto-delete lifecycle semantics.
+- [ ] Add Plex library-access awareness to imported users so Harmoniarr can distinguish which Plex-linked users have relevant server or library visibility when presenting request-targeting, provisioning, and fulfillment affordances.
 - [ ] Verify admin recovery assumptions remain compatible with `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 - Canonical Model And Import Review
@@ -337,7 +347,9 @@ Status note:
   - Decision: initial implementation should land the single-target ownership split first, then extend into multi-user fan-out through explicit per-target child requests or equivalent durable target-owned records rather than one ambiguous request shared across many users.
   - Decision: target users should receive explicit inbox and notification visibility for admin-on-behalf request creation, review, queueing, fulfillment, and failure states.
 - [ ] Extend admin-targeted Request Music into explicit per-target fan-out records so a single admin action can materialize durable target-owned requests for multiple users without collapsing ownership or audit history.
+- [ ] Add explicit audited request reassignment flows so admins can change the target user only through a visible state transition that preserves prior ownership history.
 - [ ] Add target-user request notifications and inbox visibility so users can see when media was requested, reviewed, queued, fulfilled, or failed on their behalf.
+- [ ] Add fulfillment and completion signals that can combine Harmoniarr workflow state with supplemental Plex webhook evidence when the operator has Plex webhook support enabled, without making Plex the source of truth for request completion.
 - [x] Move per-user import destination ownership toward `app_users` by storing managed library subdirectories on user records and preferring them during preview planning, while keeping `paths.userMusicRoots` as a compatibility fallback during the transition.
 - [x] Add an explicit admin provisioning flow for managed library directories so user-owned subdirectory assignments can be materialized under the shared music root without relying on settings-era path creation behavior.
 - [x] Add a user-owned folder-access model and provisioning flow so admin-created or Plex-onboarded users can claim or generate managed library subdirectories without relying on settings-only mappings long term.
