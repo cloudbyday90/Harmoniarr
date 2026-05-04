@@ -30,15 +30,32 @@ test('getQueueDiagnostics returns status totals with recent runs', async (t) => 
     ],
   }));
   const listRecentOperationRuns = t.mock.fn(async () => [{ id: 'run-1', status: 'failed' }]);
+  const resolveQueueDispatchReadiness = t.mock.fn(async () => ({
+    allowed: false,
+    nextRetryAt: '2026-05-02T13:30:00.000Z',
+    pauseCode: 'recovery_lock_conflict',
+    pauseMessage: 'Operation queue dispatch is paused while the maintenance lock is active.',
+    pauseProvider: 'maintenance',
+    pausedOperationTypes: ['library_scan'],
+  }));
   const service = createRecoveryDiagnosticsService({
     getPoolFn: () => ({ query }),
     listRecentOperationRuns,
     nowFn: () => new Date('2026-05-02T13:00:00.000Z'),
+    resolveQueueDispatchReadiness,
   });
 
   const result = await service.getQueueDiagnostics({ runLimit: 15 });
 
   assert.equal(result.checkedAt, '2026-05-02T13:00:00.000Z');
+  assert.deepEqual(result.dispatchReadiness, {
+    allowed: false,
+    nextRetryAt: '2026-05-02T13:30:00.000Z',
+    pauseCode: 'recovery_lock_conflict',
+    pauseMessage: 'Operation queue dispatch is paused while the maintenance lock is active.',
+    pauseProvider: 'maintenance',
+    pausedOperationTypes: ['library_scan'],
+  });
   assert.deepEqual(result.queueState, {
     failed: 3,
     pending: 2,
@@ -48,6 +65,7 @@ test('getQueueDiagnostics returns status totals with recent runs', async (t) => 
   assert.deepEqual(result.recentRuns, [{ id: 'run-1', status: 'failed' }]);
   assert.equal(query.mock.callCount(), 1);
   assert.equal(listRecentOperationRuns.mock.callCount(), 1);
+  assert.equal(resolveQueueDispatchReadiness.mock.callCount(), 1);
 });
 
 test('getRecoveryDiagnostics returns maintenance locks, failed runs, and privileged audit actions', async (t) => {

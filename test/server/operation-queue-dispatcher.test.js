@@ -81,3 +81,63 @@ test('operation queue dispatcher claims runnable runs and launches matching hand
     skipped: false,
   });
 });
+
+test('operation queue dispatcher skips claims while maintenance dispatch readiness is paused', async (t) => {
+  const claimNextRunnableRun = t.mock.fn(async () => null);
+  const recoverStrandedRuns = t.mock.fn(async () => ({
+    activeLeaseCount: 0,
+    failedCount: 0,
+    retriedCount: 0,
+    scannedCount: 0,
+    skipped: true,
+  }));
+  const resolveDispatchReadiness = t.mock.fn(async () => ({
+    allowed: false,
+    nextRetryAt: '2026-05-04T12:00:00.000Z',
+    pauseCode: 'recovery_lock_conflict',
+    pauseMessage: 'Operation queue dispatch is paused while the restore maintenance lock is active.',
+    pauseProvider: 'restore',
+    pausedOperationTypes: ['library_scan'],
+  }));
+  const dispatcher = createOperationQueueDispatcher({
+    createIntervalHeartbeatRunnerFn: ({ onTick }) => ({
+      start() {},
+      stop() {},
+      tick() {
+        return onTick();
+      },
+    }),
+    dispatchPauseService: {
+      resolveDispatchReadiness,
+    },
+    handlers: {
+      library_scan: async () => {},
+    },
+    operationQueueStore: {
+      claimNextRunnableRun,
+    },
+    operationStrandedRunRecoveryService: {
+      recoverStrandedRuns,
+    },
+  });
+
+  const result = await dispatcher.tick();
+
+  assert.deepEqual(resolveDispatchReadiness.mock.calls[0].arguments, [{
+    operationTypes: ['library_scan'],
+  }]);
+  assert.equal(claimNextRunnableRun.mock.callCount(), 0);
+  assert.deepEqual(result, {
+    claimedCount: 0,
+    failedCount: 0,
+    nextRetryAt: '2026-05-04T12:00:00.000Z',
+    pauseCode: 'recovery_lock_conflict',
+    pauseMessage: 'Operation queue dispatch is paused while the restore maintenance lock is active.',
+    pauseProvider: 'restore',
+    pausedOperationTypes: ['library_scan'],
+    reason: 'paused',
+    retriedCount: 0,
+    scannedCount: 0,
+    skipped: true,
+  });
+});

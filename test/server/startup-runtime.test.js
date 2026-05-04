@@ -214,11 +214,13 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       return metadataRefreshHeartbeat;
     },
     createOperationQueueDispatcher: ({
+      dispatchPauseService,
       handlers,
       onError,
       operationQueueStore,
       operationStrandedRunRecoveryService: injectedRecoveryService,
     }) => {
+      assert.equal(typeof dispatchPauseService.resolveDispatchReadiness, 'function');
       assert.equal(typeof onError, 'function');
       assert.equal(typeof handlers.artwork_cleanup, 'function');
       assert.equal(typeof handlers.library_scan, 'function');

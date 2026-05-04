@@ -18,6 +18,21 @@
 
 import { operationRunRegistry } from '../shared/operation-run-descriptors.js';
 
+export const defaultOperationQueueDispatchOperationTypes = Object.freeze([
+  operationRunRegistry.artworkCleanup.operationType,
+  operationRunRegistry.importCandidateExecutionPlanning.operationType,
+  operationRunRegistry.importCandidateApply.operationType,
+  operationRunRegistry.importCandidateMediaInspection.operationType,
+  operationRunRegistry.importCandidateTranscodeOrchestration.operationType,
+  operationRunRegistry.libraryDiscoveryDispatch.operationType,
+  operationRunRegistry.libraryExternalIntakePlanning.operationType,
+  operationRunRegistry.libraryExternalIntakeExecution.operationType,
+  operationRunRegistry.libraryOrganizeApply.operationType,
+  operationRunRegistry.libraryScan.operationType,
+  operationRunRegistry.metadataArtistRefresh.operationType,
+  operationRunRegistry.operatorNotificationFanout.operationType,
+]);
+
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
 }

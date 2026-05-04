@@ -37,6 +37,7 @@ import { createControlPlaneIdempotencyService } from './recovery/control-plane-i
 import { createControlPlaneIdempotencyStore } from './recovery/control-plane-idempotency-store.js';
 import { createIdempotencyRecordCleanupHeartbeat } from './recovery/idempotency-record-cleanup-heartbeat.js';
 import { createMaintenanceLockControlService } from './recovery/maintenance-lock-control-service.js';
+import { createMaintenanceLockOperationPauseService } from './recovery/maintenance-lock-operation-pause-service.js';
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { createRecoveryDiagnosticsService } from './recovery/recovery-diagnostics-service.js';
 import { createRestoreScopeRuntimeSnapshotStore } from './recovery/restore-scope-runtime-snapshot-store.js';
@@ -135,10 +136,14 @@ export function createSystemModule({
     listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
     releaseMaintenanceLock: maintenanceLockService.releaseMaintenanceLock,
   }),
+  maintenanceLockOperationPauseService = createMaintenanceLockOperationPauseService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+  }),
   systemRecoveryDiagnosticsService = recoveryDiagnosticsService ?? createRecoveryDiagnosticsService({
     listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
     listRecentAuditEvents: resolvedAuditReadService.listRecentAuditEvents,
     listRecentOperationRuns: operationHistoryService?.listRecentOperationRuns,
+    resolveQueueDispatchReadiness: maintenanceLockOperationPauseService.resolveDispatchReadiness,
   }),
   systemAdminRecoveryService = adminRecoveryService ?? createAdminRecoveryService({
     adminRecoveryStore,

@@ -33,6 +33,7 @@ function normalizeDispatchIntervalMs(intervalMs) {
 
 export function createOperationQueueDispatcher({
   createIntervalHeartbeatRunnerFn = createIntervalHeartbeatRunner,
+  dispatchPauseService = null,
   handlers = {},
   intervalMs = defaultDispatchIntervalMs,
   onError = async () => {},
@@ -64,6 +65,28 @@ export function createOperationQueueDispatcher({
           operationTypes: supportedOperationTypes,
         })
         : null;
+      const dispatchReadiness = dispatchPauseService?.resolveDispatchReadiness
+        ? await dispatchPauseService.resolveDispatchReadiness({
+          operationTypes: supportedOperationTypes,
+        })
+        : { allowed: true };
+
+      if (dispatchReadiness && dispatchReadiness.allowed === false) {
+        return {
+          claimedCount: 0,
+          failedCount: recoveryResult?.failedCount ?? 0,
+          nextRetryAt: dispatchReadiness.nextRetryAt ?? null,
+          pauseCode: dispatchReadiness.pauseCode ?? null,
+          pauseMessage: dispatchReadiness.pauseMessage ?? null,
+          pauseProvider: dispatchReadiness.pauseProvider ?? null,
+          pausedOperationTypes: dispatchReadiness.pausedOperationTypes ?? supportedOperationTypes,
+          reason: 'paused',
+          retriedCount: recoveryResult?.retriedCount ?? 0,
+          scannedCount: recoveryResult?.scannedCount ?? 0,
+          skipped: true,
+        };
+      }
+
       let claimedCount = 0;
 
       while (true) {

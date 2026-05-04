@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import { createControlPlaneRedactionService } from '../control-plane-redaction-service.js';
+import { defaultOperationQueueDispatchOperationTypes } from '../operation-queue-handlers.js';
 
 const privilegedRecoveryEventTypes = new Set([
   'backup_restore_started',
@@ -54,10 +55,14 @@ export function createRecoveryDiagnosticsService({
   listRecentAuditEvents = async () => [],
   listRecentOperationRuns = async () => [],
   nowFn = () => new Date(),
+  resolveQueueDispatchReadiness = async () => ({
+    allowed: true,
+    pausedOperationTypes: defaultOperationQueueDispatchOperationTypes,
+  }),
 } = {}) {
   async function getQueueDiagnostics({ runLimit } = {}) {
     const normalizedRunLimit = normalizeLimit(runLimit, { defaultLimit: 20, maxLimit: 50 });
-    const [summaryResult, recentRuns] = await Promise.all([
+    const [summaryResult, recentRuns, dispatchReadiness] = await Promise.all([
       getPoolFn().query(
         `
           SELECT status, COUNT(*)::int AS count
@@ -67,6 +72,9 @@ export function createRecoveryDiagnosticsService({
         `,
       ),
       listRecentOperationRuns({ limit: normalizedRunLimit }),
+      resolveQueueDispatchReadiness({
+        operationTypes: defaultOperationQueueDispatchOperationTypes,
+      }),
     ]);
 
     const statusCounts = {
@@ -83,6 +91,14 @@ export function createRecoveryDiagnosticsService({
 
     return {
       checkedAt: nowFn().toISOString(),
+      dispatchReadiness: {
+        allowed: dispatchReadiness?.allowed !== false,
+        nextRetryAt: dispatchReadiness?.nextRetryAt ?? null,
+        pauseCode: dispatchReadiness?.pauseCode ?? null,
+        pauseMessage: dispatchReadiness?.pauseMessage ?? null,
+        pauseProvider: dispatchReadiness?.pauseProvider ?? null,
+        pausedOperationTypes: dispatchReadiness?.pausedOperationTypes ?? defaultOperationQueueDispatchOperationTypes,
+      },
       queueState: {
         ...statusCounts,
         totalTracked: statusCounts.pending + statusCounts.running + statusCounts.failed,
