@@ -45,9 +45,11 @@ Security source: `docs/SECURITY_POLICY.md`
 
 - [ ] Validate backup/export creation and artifact inspection.
 	- `npm run validate:docker-fresh-install` and `npm run validate:docker-released-image` now bootstrap an admin session inside the running container, create a backup artifact, and verify inventory plus detail reads through the shipped recovery routes.
+	- Native integration coverage now also proves backup export creation plus artifact list or detail inspection against the real HTTP and database-backed recovery routes, so the remaining gap is packaged-runtime execution rather than missing server-graph proof.
 	- Remaining work is one live Docker-capable execution so the release evidence includes the real persisted artifact path and runtime-side payload handling.
 - [ ] Validate restore preview without unsafe side effects.
 	- The shared smoke contract now verifies restore preview on the real running container both before and during an injected maintenance-lock conflict, asserting that the lock flips `blockedByLock` and prevents unsafe apply.
+	- Native integration coverage now also proves restore preview returns `canApplyRestore=false` with `blockedByLock=true` under an injected maintenance lock and returns to ready state once the lock is released through the real HTTP and database-backed recovery routes.
 	- Remaining work is one live Docker-capable execution to capture evidence from the actual packaged runtime and operator filesystem layout.
 - [ ] Validate restore apply with maintenance locking and job pausing behavior.
 	- The shared smoke contract now proves restore-apply rejection under an injected maintenance lock and then completes a successful restore-apply run after the lock is released, asserting the returned run metadata and that no active locks remain afterward.
@@ -55,6 +57,7 @@ Security source: `docs/SECURITY_POLICY.md`
 	- The shared startup queue dispatcher now also pauses new operation-run claims under blocking maintenance locks and surfaces that paused dispatcher state through queue diagnostics.
 	- In-flight queue workers now also pause and requeue safely under blocking maintenance locks, releasing their leases as `paused` and preserving retry budget while the lock remains active.
 	- Focused native `node:test` coverage now proves the shared operation-pause readiness contract plus representative import-execution and library-scan worker requeue behavior in addition to the earlier discovery-worker proof.
+	- Native integration coverage now also proves restore-apply rejection under a blocking maintenance lock and successful backed-up settings restoration after the lock is released, including completed `backup_restore_apply` run persistence and released maintenance-lock state through the real HTTP and database-backed recovery graph.
 	- Remaining work is one live Docker-capable execution to capture the same evidence from the packaged runtime and operator filesystem layout.
 - [ ] Validate admin recovery flow against the documented runbook.
 - [ ] Validate destructive filesystem actions stay preview-first and operator-gated.

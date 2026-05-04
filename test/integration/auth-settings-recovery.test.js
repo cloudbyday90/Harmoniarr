@@ -1,8 +1,17 @@
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
+import { operationRunRegistry } from '../../src/shared/operation-run-descriptors.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
-import { enterMaintenanceLock, releaseMaintenanceLock } from '../../testing/integration/recovery-helpers.js';
+import {
+  createBackupExport,
+  enterMaintenanceLock,
+  getBackupExportById,
+  getBackupRestorePreview,
+  listBackupExports,
+  releaseMaintenanceLock,
+  startBackupRestoreApply,
+} from '../../testing/integration/recovery-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -249,6 +258,173 @@ suite('integration auth, settings, and recovery routes', () => {
       assert.equal(releasedLockRows.rows[0].released_count, 1);
     }, {
       scenarioName: 'maintenance_lock_diagnostics',
+    });
+  });
+
+  test('backup export, restore preview, and restore apply honor maintenance-lock readiness through the real recovery routes', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
+      await bootstrapAdminSession(client);
+
+      const backedUpSettings = {
+        providers: {
+          requestTimeoutMs: 21000,
+        },
+        system: {
+          logLevel: 'debug',
+        },
+      };
+      const mutatedSettings = {
+        providers: {
+          requestTimeoutMs: 12000,
+        },
+        system: {
+          logLevel: 'warn',
+        },
+      };
+
+      const seedSettingsResponse = await client.requestJson('/api/v1/settings', {
+        csrf: true,
+        json: backedUpSettings,
+        method: 'PUT',
+      });
+      assert.equal(seedSettingsResponse.response.status, 200);
+      assert.equal(seedSettingsResponse.payload.settings.system.logLevel, 'debug');
+      assert.equal(seedSettingsResponse.payload.settings.providers.requestTimeoutMs, 21000);
+
+      const backupCreateResponse = await createBackupExport(client, {
+        idempotencyKey: 'integration-backup-export-create-1',
+      });
+      assert.equal(backupCreateResponse.response.status, 202);
+      assert.equal(backupCreateResponse.payload.ok, true);
+      assert.equal(backupCreateResponse.payload.accepted, true);
+
+      const backupArtifactId = backupCreateResponse.payload.backupArtifact.id;
+      const expectedPayloadSha256 = backupCreateResponse.payload.backupArtifact.payloadSha256;
+
+      assert.ok(backupArtifactId);
+      assert.ok(expectedPayloadSha256);
+
+      const backupListResponse = await listBackupExports(client, { limit: 5 });
+      assert.equal(backupListResponse.response.status, 200);
+      assert.equal(backupListResponse.payload.ok, true);
+      assert.equal(backupListResponse.payload.backupArtifacts.length, 1);
+      assert.equal(backupListResponse.payload.backupArtifacts[0].id, backupArtifactId);
+
+      const backupDetailResponse = await getBackupExportById(client, backupArtifactId);
+      assert.equal(backupDetailResponse.response.status, 200);
+      assert.equal(backupDetailResponse.payload.ok, true);
+      assert.equal(backupDetailResponse.payload.backupArtifact.id, backupArtifactId);
+      assert.equal(backupDetailResponse.payload.backupArtifact.payloadSha256, expectedPayloadSha256);
+
+      const mutateSettingsResponse = await client.requestJson('/api/v1/settings', {
+        csrf: true,
+        json: mutatedSettings,
+        method: 'PUT',
+      });
+      assert.equal(mutateSettingsResponse.response.status, 200);
+      assert.equal(mutateSettingsResponse.payload.settings.system.logLevel, 'warn');
+      assert.equal(mutateSettingsResponse.payload.settings.providers.requestTimeoutMs, 12000);
+
+      const initialPreviewResponse = await getBackupRestorePreview(client, backupArtifactId);
+      assert.equal(initialPreviewResponse.response.status, 200);
+      assert.equal(initialPreviewResponse.payload.ok, true);
+      assert.equal(initialPreviewResponse.payload.backupArtifact.id, backupArtifactId);
+      assert.equal(initialPreviewResponse.payload.canApplyRestore, true);
+      assert.equal(initialPreviewResponse.payload.restoreReadiness.blockedByLock, false);
+      assert.equal(initialPreviewResponse.payload.integrity.expectedPayloadSha256, expectedPayloadSha256);
+      assert.equal(initialPreviewResponse.payload.integrity.actualPayloadSha256, expectedPayloadSha256);
+      assert.equal(initialPreviewResponse.payload.compatibility.compatible, true);
+
+      const lockResponse = await enterMaintenanceLock(client, {
+        idempotencyKey: 'integration-backup-restore-lock-1',
+        reason: 'Block restore apply during integration preview',
+      });
+      assert.equal(lockResponse.response.status, 202);
+      const lockId = lockResponse.payload.lock.id;
+
+      const blockedPreviewResponse = await getBackupRestorePreview(client, backupArtifactId);
+      assert.equal(blockedPreviewResponse.response.status, 200);
+      assert.equal(blockedPreviewResponse.payload.canApplyRestore, false);
+      assert.equal(blockedPreviewResponse.payload.restoreReadiness.blockedByLock, true);
+      assert.equal(blockedPreviewResponse.payload.restoreReadiness.blockingLocks.length, 1);
+      assert.equal(blockedPreviewResponse.payload.restoreReadiness.blockingLocks[0].id, lockId);
+
+      const blockedApplyResponse = await startBackupRestoreApply(client, backupArtifactId, {
+        expectedPayloadSha256,
+        idempotencyKey: 'integration-backup-restore-apply-blocked',
+      });
+      assert.equal(blockedApplyResponse.response.status, 409);
+      assert.equal(blockedApplyResponse.payload.error.code, 'recovery_lock_conflict');
+
+      const lockReleaseResponse = await releaseMaintenanceLock(client, lockId, {
+        idempotencyKey: 'integration-backup-restore-lock-release-1',
+      });
+      assert.equal(lockReleaseResponse.response.status, 200);
+
+      const restoreApplyResponse = await startBackupRestoreApply(client, backupArtifactId, {
+        expectedPayloadSha256,
+        idempotencyKey: 'integration-backup-restore-apply-success',
+      });
+      assert.equal(restoreApplyResponse.response.status, 202);
+      assert.equal(restoreApplyResponse.payload.ok, true);
+      assert.equal(restoreApplyResponse.payload.accepted, true);
+      assert.equal(restoreApplyResponse.payload.backupArtifact.id, backupArtifactId);
+      assert.equal(restoreApplyResponse.payload.restoreResult.settingsUpdated, true);
+      assert.equal(restoreApplyResponse.payload.run.operationType, operationRunRegistry.backupRestoreApply.operationType);
+      assert.equal(restoreApplyResponse.payload.run.status, 'completed');
+      assert.equal(restoreApplyResponse.payload.run.summary.settingsUpdated, true);
+      assert.equal(restoreApplyResponse.payload.run.summary.currentStep, 'Restore apply completed');
+      assert.equal(
+        restoreApplyResponse.payload.restoreResult.appliedScopes.includes('settings'),
+        true,
+      );
+
+      const restoredSettingsResponse = await client.requestJson('/api/v1/settings');
+      assert.equal(restoredSettingsResponse.response.status, 200);
+      assert.equal(restoredSettingsResponse.payload.settings.system.logLevel, 'debug');
+      assert.equal(restoredSettingsResponse.payload.settings.providers.requestTimeoutMs, 21000);
+
+      const persistedRows = await getPoolFn().query(
+        `
+          SELECT operation_type, status
+          FROM operation_runs
+          WHERE operation_type = $1
+        `,
+        [operationRunRegistry.backupRestoreApply.operationType],
+      );
+      assert.equal(persistedRows.rows.length, 1);
+      assert.equal(persistedRows.rows[0].status, 'completed');
+
+      const activeRestoreLocks = await getPoolFn().query(
+        `
+          SELECT COUNT(*)::integer AS active_count
+          FROM maintenance_locks
+          WHERE status = 'active'
+        `,
+      );
+      assert.equal(activeRestoreLocks.rows[0].active_count, 0);
+
+      const auditEvents = await getPoolFn().query(
+        `
+          SELECT event_type
+          FROM audit_events
+          WHERE event_type IN ('backup_export_created', 'backup_restore_completed')
+          ORDER BY created_at ASC
+        `,
+      );
+      assert.deepEqual(
+        auditEvents.rows.map((row) => row.event_type),
+        ['backup_export_created', 'backup_restore_completed'],
+      );
+    }, {
+      scenarioName: 'recovery_backup_restore_apply',
     });
   });
 });
