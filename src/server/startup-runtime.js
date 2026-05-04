@@ -30,6 +30,7 @@ import { createOperationStrandedRunRecoveryService } from './operation-stranded-
 import { createRuntimeReporter } from './runtime-reporter.js';
 import { bootstrapDatabaseSchemaFromSnapshot } from './schema-bootstrap.js';
 import { createStartupServiceSupervisor } from './startup-service-supervisor.js';
+import { createStartupValidationService } from './startup-validation-service.js';
 
 function closeServer(server) {
   return new Promise((resolve, reject) => {
@@ -56,6 +57,7 @@ export async function startServerRuntime({
   createOperationQueueStore: buildOperationQueueStore = createOperationQueueStore,
   createOperationStrandedRunRecoveryService: buildOperationStrandedRunRecoveryService = createOperationStrandedRunRecoveryService,
   createStartupServiceSupervisor: buildStartupServiceSupervisor = createStartupServiceSupervisor,
+  createStartupValidationService: buildStartupValidationService = createStartupValidationService,
   bootstrapDatabaseSchemaFromSnapshot: bootstrapSchemaFromSnapshot = bootstrapDatabaseSchemaFromSnapshot,
   getPool: resolvePool = getPool,
   host = '0.0.0.0',
@@ -78,7 +80,9 @@ export async function startServerRuntime({
   }
 
   await verifyNoPendingMigrations();
-  await resolvePool().query('SELECT 1');
+  await buildStartupValidationService({
+    getPoolFn: resolvePool,
+  }).assertStartupReady();
 
   const {
     app,

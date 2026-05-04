@@ -329,7 +329,21 @@ export function createPathValidationService({
     };
   }
 
+  async function validateRuntimePaths({ appDataPath, settings }) {
+    return {
+      appData: await validateDirectory({
+        key: 'appData',
+        label: 'App data root',
+        pathValue: appDataPath,
+        requireRead: true,
+        requireWrite: true,
+      }),
+      settingsPathValidation: await validateSettingsPaths(settings),
+    };
+  }
+
   return {
+    validateRuntimePaths,
     validateSettingsPaths,
   };
 }

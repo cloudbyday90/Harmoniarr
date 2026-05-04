@@ -45,6 +45,23 @@ test('createPathValidationService reports healthy roots and translated mapping e
   assert.equal(result.downloadMappings[0].exampleTranslatedPath, '/data/downloads/completed/Example Artist/Example Album');
 });
 
+test('createPathValidationService validates app data alongside runtime settings roots', async () => {
+  const service = createPathValidationService({
+    accessFn: async () => {},
+    realpathFn: async (value) => value,
+    statFn: async () => createStats(),
+  });
+
+  const result = await service.validateRuntimePaths({
+    appDataPath: '/app/data',
+    settings: createSettings(),
+  });
+
+  assert.equal(result.appData.key, 'appData');
+  assert.equal(result.appData.status, 'healthy');
+  assert.equal(result.settingsPathValidation.summary.status, 'healthy');
+});
+
 test('createPathValidationService degrades when translated local roots are unreadable', async () => {
   const service = createPathValidationService({
     accessFn: async (value, mode) => {

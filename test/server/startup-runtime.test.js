@@ -99,6 +99,11 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         schemaSnapshotPath: 'schema.sql',
       };
     },
+    createStartupValidationService: () => ({
+      async assertStartupReady() {
+        callOrder.push('startupValidation');
+      },
+    }),
     assertNoPendingMigrations: async () => {
       callOrder.push('migrations');
     },
@@ -258,11 +263,6 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
       };
     },
-    getPool: () => ({
-      async query(sql) {
-        callOrder.push(`query:${sql}`);
-      },
-    }),
     processEmitter,
     resolveLibraryDiscoveryHeartbeatConfig: () => ({
       intervalMs: 900000,
@@ -296,7 +296,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   assert.deepEqual(callOrder, [
     'bootstrapSchema',
     'migrations',
-    'query:SELECT 1',
+    'startupValidation',
     'runtimeResourceService.apply',
     'runtimeMonitor.setLogHandlers',
     'listen:0.0.0.0:4123',
@@ -319,7 +319,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
   assert.deepEqual(callOrder, [
     'bootstrapSchema',
     'migrations',
-    'query:SELECT 1',
+    'startupValidation',
     'runtimeResourceService.apply',
     'runtimeMonitor.setLogHandlers',
     'listen:0.0.0.0:4123',
@@ -355,6 +355,9 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
     bootstrapDatabaseSchemaFromSnapshot: async () => ({
       bootstrapped: false,
       schemaSnapshotPath: 'schema.sql',
+    }),
+    createStartupValidationService: () => ({
+      async assertStartupReady() {},
     }),
     assertNoPendingMigrations: async () => {},
     closePool: async () => {},
@@ -473,9 +476,6 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         await onShutdown();
       },
     }),
-    getPool: () => ({
-      async query() {},
-    }),
     processEmitter,
     resolveLibraryDiscoveryHeartbeatConfig: () => ({
       intervalMs: 900000,
@@ -498,4 +498,26 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
   assert.deepEqual(stderrWrites, [
     '[harmoniarr] shutdown error: server already closed\n',
   ]);
+});
+
+test('startServerRuntime fails before app composition when startup validation rejects', async () => {
+  await assert.rejects(
+    () => startServerRuntime({
+      bootstrapDatabaseSchemaFromSnapshot: async () => ({
+        bootstrapped: false,
+        schemaSnapshotPath: 'schema.sql',
+      }),
+      createApp: () => {
+        throw new Error('createApp should not run when startup validation fails');
+      },
+      createStartupValidationService: () => ({
+        async assertStartupReady() {
+          throw new Error('Startup validation failed: Staging root: Configured path is not reachable from Harmoniarr. (ENOENT)');
+        },
+      }),
+      assertNoPendingMigrations: async () => {},
+      closePool: async () => {},
+    }),
+    /Startup validation failed: Staging root: Configured path is not reachable from Harmoniarr\. \(ENOENT\)/,
+  );
 });
