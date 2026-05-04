@@ -18,7 +18,11 @@
 
 import { basename } from 'node:path';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 function buildMovePlan({ createExclusiveFileMutationPlan, file }) {
   return createExclusiveFileMutationPlan({
@@ -37,6 +41,7 @@ export function createLibraryOrganizeApplyWorker({
   createExclusiveFileMutationPlan,
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
   isCancellationRequested,
+  markRunPaused,
   markRunCancelled,
   markRunCompleted,
   markRunFailed,
@@ -108,6 +113,22 @@ export function createLibraryOrganizeApplyWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Library organize apply paused by maintenance lock',
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            plannedRenameCount,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

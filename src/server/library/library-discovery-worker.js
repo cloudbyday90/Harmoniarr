@@ -17,7 +17,11 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 export function createLibraryDiscoveryWorker({
   acquireLease,
@@ -32,6 +36,7 @@ export function createLibraryDiscoveryWorker({
   markRunCompleted,
   markRunCancelled,
   markRunFailed,
+  markRunPaused,
   markRunStarted,
   isCancellationRequested,
   reconcileDiscoveryRequests = null,
@@ -87,6 +92,22 @@ export function createLibraryDiscoveryWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused?.({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Library discovery paused by maintenance lock',
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            triggerSource,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

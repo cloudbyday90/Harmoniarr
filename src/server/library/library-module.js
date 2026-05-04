@@ -63,6 +63,7 @@ import { createLibraryWantedSummaryService } from './library-wanted-summary-serv
 import { createLibraryWantedSummaryStore } from './library-wanted-summary-store.js';
 import { createLibraryScanWorker } from './library-scan-worker.js';
 import { createMediaFilesystemService } from '../media/media-filesystem-service.js';
+import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 
@@ -112,20 +113,34 @@ export function createLibraryModule({
   libraryProviderIngestExecutionWorker = createLibraryProviderIngestExecutionWorker({
     acquireLease: libraryProviderIngestExecutionRunStore.acquireLease,
     executeProviderIngestRequests: libraryProviderIngestExecutionService.executeProviderIngestRequests,
-    isCancellationRequested: libraryProviderIngestExecutionRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: libraryProviderIngestExecutionRunStore.isCancellationRequested,
+        operationLabel: 'Provider ingest execution',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : libraryProviderIngestExecutionRunStore.isCancellationRequested,
     markRunCancelled: libraryProviderIngestExecutionRunStore.markRunCancelled,
     markRunCompleted: libraryProviderIngestExecutionRunStore.markRunCompleted,
     markRunFailed: libraryProviderIngestExecutionRunStore.markRunFailed,
+    markRunPaused: libraryProviderIngestExecutionRunStore.markRunPaused,
     markRunStarted: libraryProviderIngestExecutionRunStore.markRunStarted,
     releaseLease: libraryProviderIngestExecutionRunStore.releaseLease,
     renewLease: libraryProviderIngestExecutionRunStore.renewLease,
   }),
   libraryExternalIntakeWorker = createLibraryExternalIntakeWorker({
     acquireLease: libraryExternalIntakeRunStore.acquireLease,
-    isCancellationRequested: libraryExternalIntakeRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: libraryExternalIntakeRunStore.isCancellationRequested,
+        operationLabel: 'External provider ingest planning',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : libraryExternalIntakeRunStore.isCancellationRequested,
     markRunCancelled: libraryExternalIntakeRunStore.markRunCancelled,
     markRunCompleted: libraryExternalIntakeRunStore.markRunCompleted,
     markRunFailed: libraryExternalIntakeRunStore.markRunFailed,
+    markRunPaused: libraryExternalIntakeRunStore.markRunPaused,
     markRunStarted: libraryExternalIntakeRunStore.markRunStarted,
     planExternalMediaRequest: libraryProviderIngestPlanningService.planExternalMediaRequest,
     queueExternalMediaRequestExecution: libraryProviderIngestExecutionService.queueExternalMediaRequestExecution,
@@ -156,10 +171,17 @@ export function createLibraryModule({
     applyExclusiveFileMutationPlan: mediaFilesystemService.applyExclusiveFileMutationPlan,
     buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
     createExclusiveFileMutationPlan: mediaFilesystemService.createExclusiveFileMutationPlan,
-    isCancellationRequested: libraryOrganizeApplyRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: libraryOrganizeApplyRunStore.isCancellationRequested,
+        operationLabel: 'Library organize apply',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : libraryOrganizeApplyRunStore.isCancellationRequested,
     markRunCancelled: libraryOrganizeApplyRunStore.markRunCancelled,
     markRunCompleted: libraryOrganizeApplyRunStore.markRunCompleted,
     markRunFailed: libraryOrganizeApplyRunStore.markRunFailed,
+    markRunPaused: libraryOrganizeApplyRunStore.markRunPaused,
     markRunStarted: libraryOrganizeApplyRunStore.markRunStarted,
     releaseLease: libraryOrganizeApplyRunStore.releaseLease,
     renewLease: libraryOrganizeApplyRunStore.renewLease,
@@ -182,6 +204,7 @@ export function createLibraryModule({
     libraryWantedReleaseStore,
   }),
   maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockOperationPauseService = null,
   maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
     listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
   }),
@@ -190,10 +213,15 @@ export function createLibraryModule({
   libraryDiscoveryWorker = createLibraryDiscoveryWorker({
     acquireLease: libraryDiscoveryRunStore.acquireLease,
     dispatchDiscoveryRequests: libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests,
-    isCancellationRequested: libraryDiscoveryRunStore.isCancellationRequested,
+    isCancellationRequested: createOperationRunInterruptionGate({
+      isCancellationRequested: libraryDiscoveryRunStore.isCancellationRequested,
+      operationLabel: 'Library discovery',
+      operationPauseService: maintenanceLockOperationPauseService,
+    }),
     markRunCancelled: libraryDiscoveryRunStore.markRunCancelled,
     markRunCompleted: libraryDiscoveryRunStore.markRunCompleted,
     markRunFailed: libraryDiscoveryRunStore.markRunFailed,
+    markRunPaused: libraryDiscoveryRunStore.markRunPaused,
     markRunStarted: libraryDiscoveryRunStore.markRunStarted,
     reconcileDiscoveryRequests: libraryDiscoveryRequestService.reconcileDiscoveryRequests,
     reconcileWantedReleases: libraryWantedReleaseService.reconcileWantedReleases,
@@ -235,7 +263,13 @@ export function createLibraryModule({
     acquireLease: libraryScanRunStore.acquireLease,
     captureLibrarySidecarArtwork: librarySidecarArtworkService.captureSidecarArtwork,
     extractLibraryFileTags: libraryTagExtractionService.extractLibraryFileTags,
-    isCancellationRequested: libraryScanRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: libraryScanRunStore.isCancellationRequested,
+        operationLabel: 'Library scan',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : libraryScanRunStore.isCancellationRequested,
     markRunCancelled: libraryScanRunStore.markRunCancelled,
     matchLibraryFiles: libraryFileMatcherService.matchLibraryFiles,
     reconcileDiscoveryRequests: libraryDiscoveryRequestService.reconcileDiscoveryRequests,
@@ -243,6 +277,7 @@ export function createLibraryModule({
     reconcileWantedReleases: libraryWantedReleaseService.reconcileWantedReleases,
     markRunCompleted: libraryScanRunStore.markRunCompleted,
     markRunFailed: libraryScanRunStore.markRunFailed,
+    markRunPaused: libraryScanRunStore.markRunPaused,
     markRunStarted: libraryScanRunStore.markRunStarted,
     recordLibraryFiles: libraryCatalogStore.recordLibraryFiles,
     releaseLease: libraryScanRunStore.releaseLease,

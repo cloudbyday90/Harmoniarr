@@ -43,10 +43,45 @@ function formatDispatchPauseMessage({ blockingLock }) {
   return `Operation queue dispatch is paused while the ${lockLabel} is active.`;
 }
 
+function formatOperationPauseMessage({ blockingLock, operationLabel }) {
+  const lockType = typeof blockingLock?.lockType === 'string' && blockingLock.lockType.trim().length > 0
+    ? blockingLock.lockType.trim()
+    : 'maintenance';
+  const lockLabel = lockType === 'maintenance'
+    ? 'maintenance lock'
+    : `${lockType} maintenance lock`;
+  const resolvedOperationLabel = typeof operationLabel === 'string' && operationLabel.trim().length > 0
+    ? operationLabel.trim()
+    : 'Background work';
+
+  return `${resolvedOperationLabel} is paused while the ${lockLabel} is active.`;
+}
+
 export function createMaintenanceLockOperationPauseService({
   blockingLockTypes = defaultBlockingMaintenanceLockTypes,
   listActiveMaintenanceLocks = async () => [],
 } = {}) {
+  async function resolveOperationReadiness({ operationLabel } = {}) {
+    const blockingLocks = await listActiveMaintenanceLocks({
+      lockTypes: [...blockingLockTypes],
+    });
+
+    if (!Array.isArray(blockingLocks) || blockingLocks.length < 1) {
+      return { allowed: true };
+    }
+
+    const blockingLock = blockingLocks[0];
+    return {
+      allowed: false,
+      blockingLock,
+      blockingLocks,
+      nextRetryAt: blockingLock?.expiresAt ?? null,
+      pauseCode: maintenanceLockPauseCode,
+      pauseMessage: formatOperationPauseMessage({ blockingLock, operationLabel }),
+      pauseProvider: blockingLock?.lockType ?? 'maintenance',
+    };
+  }
+
   async function resolveDispatchReadiness({ operationTypes } = {}) {
     const normalizedOperationTypes = normalizeOperationTypes(operationTypes);
 
@@ -82,6 +117,7 @@ export function createMaintenanceLockOperationPauseService({
   }
 
   return {
+    resolveOperationReadiness,
     resolveDispatchReadiness,
   };
 }

@@ -17,7 +17,11 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 export function createMetadataArtistRefreshWorker({
   acquireLease,
@@ -26,6 +30,7 @@ export function createMetadataArtistRefreshWorker({
   markRunCancelled,
   markRunCompleted,
   markRunFailed,
+  markRunPaused,
   markRunStarted,
   recordArtistRefreshCompleted = async () => null,
   refreshMetadataArtist,
@@ -85,6 +90,25 @@ export function createMetadataArtistRefreshWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            artistName,
+            currentStep: 'Metadata artist refresh paused by maintenance lock',
+            metadataArtistId,
+            musicBrainzArtistId,
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            triggerSource,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

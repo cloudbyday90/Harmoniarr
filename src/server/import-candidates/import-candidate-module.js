@@ -47,6 +47,7 @@ import { createMediaInspectionService } from '../media/media-inspection-service.
 import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
 import { createMediaTranscodeExecutionService } from '../media/media-transcode-execution-service.js';
 import { createMediaTranscodePlanningService } from '../media/media-transcode-planning-service.js';
+import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
@@ -95,6 +96,7 @@ export function createImportCandidateModule({
   importCandidateExecutionHeartbeatConfig = resolveImportCandidateExecutionHeartbeatConfig(),
   importCandidateExecutionHeartbeatState = createImportCandidateExecutionHeartbeatState(),
   maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockOperationPauseService = null,
   maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
     listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
   }),
@@ -113,12 +115,19 @@ export function createImportCandidateModule({
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     enqueueDownloads: slskdService.enqueueDownloads,
     getImportCandidate: importCandidateService.getImportCandidate,
-    isCancellationRequested: importCandidateExecutionRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: importCandidateExecutionRunStore.isCancellationRequested,
+        operationLabel: 'Import execution',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : importCandidateExecutionRunStore.isCancellationRequested,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
     markImportCandidateDownloading: importCandidateService.markImportCandidateDownloading,
     markRunCancelled: importCandidateExecutionRunStore.markRunCancelled,
     markRunCompleted: importCandidateExecutionRunStore.markRunCompleted,
     markRunFailed: importCandidateExecutionRunStore.markRunFailed,
+    markRunPaused: importCandidateExecutionRunStore.markRunPaused,
     markRunStarted: importCandidateExecutionRunStore.markRunStarted,
     releaseLease: importCandidateExecutionRunStore.releaseLease,
     renewLease: importCandidateExecutionRunStore.renewLease,
@@ -129,11 +138,18 @@ export function createImportCandidateModule({
     acquireLease: importCandidateApplyRunStore.acquireLease,
     applyImportCandidatePreview: importCandidateApplyOperationService.applyImportCandidatePreview,
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
-    isCancellationRequested: importCandidateApplyRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: importCandidateApplyRunStore.isCancellationRequested,
+        operationLabel: 'Import apply',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : importCandidateApplyRunStore.isCancellationRequested,
     markImportCandidateApplied: importCandidateService.markImportCandidateApplied,
     markRunCancelled: importCandidateApplyRunStore.markRunCancelled,
     markRunCompleted: importCandidateApplyRunStore.markRunCompleted,
     markRunFailed: importCandidateApplyRunStore.markRunFailed,
+    markRunPaused: importCandidateApplyRunStore.markRunPaused,
     markRunStarted: importCandidateApplyRunStore.markRunStarted,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     releaseLease: importCandidateApplyRunStore.releaseLease,
@@ -144,10 +160,17 @@ export function createImportCandidateModule({
   importCandidateMediaInspectionWorker = createImportCandidateMediaInspectionWorker({
     acquireLease: importCandidateMediaInspectionRunStore.acquireLease,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
-    isCancellationRequested: importCandidateMediaInspectionRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: importCandidateMediaInspectionRunStore.isCancellationRequested,
+        operationLabel: 'Media inspection',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : importCandidateMediaInspectionRunStore.isCancellationRequested,
     markRunCancelled: importCandidateMediaInspectionRunStore.markRunCancelled,
     markRunCompleted: importCandidateMediaInspectionRunStore.markRunCompleted,
     markRunFailed: importCandidateMediaInspectionRunStore.markRunFailed,
+    markRunPaused: importCandidateMediaInspectionRunStore.markRunPaused,
     markRunStarted: importCandidateMediaInspectionRunStore.markRunStarted,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     releaseLease: importCandidateMediaInspectionRunStore.releaseLease,
@@ -157,10 +180,17 @@ export function createImportCandidateModule({
     acquireLease: importCandidateTranscodeRunStore.acquireLease,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     executeTranscodeCandidate: mediaTranscodeExecutionService.executeCandidate,
-    isCancellationRequested: importCandidateTranscodeRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: importCandidateTranscodeRunStore.isCancellationRequested,
+        operationLabel: 'Transcode orchestration',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : importCandidateTranscodeRunStore.isCancellationRequested,
     markRunCancelled: importCandidateTranscodeRunStore.markRunCancelled,
     markRunCompleted: importCandidateTranscodeRunStore.markRunCompleted,
     markRunFailed: importCandidateTranscodeRunStore.markRunFailed,
+    markRunPaused: importCandidateTranscodeRunStore.markRunPaused,
     markRunStarted: importCandidateTranscodeRunStore.markRunStarted,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     releaseLease: importCandidateTranscodeRunStore.releaseLease,

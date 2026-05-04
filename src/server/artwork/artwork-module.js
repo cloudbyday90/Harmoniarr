@@ -26,6 +26,7 @@ import { createArtworkCleanupWorker } from './artwork-cleanup-worker.js';
 import { createArtworkIngestionService } from './artwork-ingestion-service.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { createArtworkSummaryService } from './artwork-summary-service.js';
+import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import * as artworkRepository from './artwork-repository.js';
@@ -33,6 +34,7 @@ import * as artworkRepository from './artwork-repository.js';
 export function createArtworkModule({
   settingsService,
   maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockOperationPauseService = null,
   maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
     listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
   }),
@@ -49,14 +51,22 @@ export function createArtworkModule({
 } = {}) {
   const resolvedArtworkCleanupService = artworkCleanupService
     ?? createArtworkCleanupService({ artworkPolicyService });
+  const artworkCleanupInterruptionGate = maintenanceLockOperationPauseService
+    ? createOperationRunInterruptionGate({
+      isCancellationRequested: artworkCleanupRunStore.isCancellationRequested,
+      operationLabel: 'Artwork cleanup',
+      operationPauseService: maintenanceLockOperationPauseService,
+    })
+    : artworkCleanupRunStore.isCancellationRequested;
   const resolvedArtworkCleanupWorker = artworkCleanupWorker
     ?? createArtworkCleanupWorker({
       acquireLease: artworkCleanupRunStore.acquireLease,
       artworkCleanupService: resolvedArtworkCleanupService,
-      isCancellationRequested: artworkCleanupRunStore.isCancellationRequested,
+      isCancellationRequested: artworkCleanupInterruptionGate,
       markRunCancelled: artworkCleanupRunStore.markRunCancelled,
       markRunCompleted: artworkCleanupRunStore.markRunCompleted,
       markRunFailed: artworkCleanupRunStore.markRunFailed,
+      markRunPaused: artworkCleanupRunStore.markRunPaused,
       markRunStarted: artworkCleanupRunStore.markRunStarted,
       releaseLease: artworkCleanupRunStore.releaseLease,
       renewLease: artworkCleanupRunStore.renewLease,

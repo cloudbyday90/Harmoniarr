@@ -145,3 +145,75 @@ test('createLibraryDiscoveryWorker marks the run cancelled before dispatch when 
     status: 'cancelled',
   });
 });
+
+test('createLibraryDiscoveryWorker requeues the run when a maintenance pause is requested', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const dispatchDiscoveryRequests = t.mock.fn(async () => ({
+    attemptedCount: 1,
+    candidateCount: 2,
+    dispatchedCount: 1,
+    failedCount: 0,
+    fileCount: 4,
+  }));
+  const isCancellationRequested = t.mock.fn(async () => ({
+    kind: 'paused',
+    nextRetryAt: '2026-05-04T12:30:00.000Z',
+    pauseCode: 'recovery_lock_conflict',
+    pauseMessage: 'Library discovery is paused while the restore maintenance lock is active.',
+    pauseProvider: 'restore',
+  }));
+  const markRunCancelled = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunPaused = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const worker = createLibraryDiscoveryWorker({
+    acquireLease,
+    dispatchDiscoveryRequests,
+    isCancellationRequested,
+    markRunCancelled,
+    markRunCompleted,
+    markRunFailed,
+    markRunPaused,
+    markRunStarted,
+    releaseLease,
+  });
+
+  const paused = new Promise((resolve) => {
+    markRunPaused.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+  const leaseReleased = new Promise((resolve) => {
+    releaseLease.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({ runId: 'run-paused' });
+
+  const pausedArgs = await paused;
+  const releasedLeaseArgs = await leaseReleased;
+
+  assert.equal(markRunStarted.mock.callCount(), 0);
+  assert.equal(dispatchDiscoveryRequests.mock.callCount(), 0);
+  assert.equal(markRunCompleted.mock.callCount(), 0);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.equal(markRunCancelled.mock.callCount(), 0);
+  assert.deepEqual(pausedArgs, {
+    nextAttemptAt: '2026-05-04T12:30:00.000Z',
+    runId: 'run-paused',
+    summary: {
+      currentStep: 'Library discovery paused by maintenance lock',
+      pauseCode: 'recovery_lock_conflict',
+      pauseMessage: 'Library discovery is paused while the restore maintenance lock is active.',
+      pauseProvider: 'restore',
+      triggerSource: 'manual',
+    },
+  });
+  assert.deepEqual(releasedLeaseArgs, {
+    runId: 'run-paused',
+    status: 'paused',
+  });
+});

@@ -65,6 +65,7 @@ export function createOperatorNotificationFanoutRunStore({
     getActiveRun,
     isCancellationRequested: operationRunStore.isCancellationRequested,
     markRunCancelled: operationRunStore.markRunCancelled,
+    markRunPaused: operationRunStore.markRunPaused,
     markRunCompleted: operationRunStore.markRunCompleted,
     markRunFailed: operationRunStore.markRunFailed,
     markRunStarted: operationRunStore.markRunStarted,

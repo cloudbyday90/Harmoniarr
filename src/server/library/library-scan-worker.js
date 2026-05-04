@@ -18,7 +18,11 @@
 
 import { executeLibraryScan } from './library-scan-executor.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 export function createLibraryScanWorker({
   acquireLease,
@@ -28,6 +32,7 @@ export function createLibraryScanWorker({
   extractLibraryFileTags = null,
   matchLibraryFiles = null,
   markRunCompleted,
+  markRunPaused,
   markRunCancelled,
   markRunFailed,
   markRunStarted,
@@ -113,6 +118,22 @@ export function createLibraryScanWorker({
 
       await markRunCompleted({ runId, summary });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Library scan paused by maintenance lock',
+            libraryRoot,
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

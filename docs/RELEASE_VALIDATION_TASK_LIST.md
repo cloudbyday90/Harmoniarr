@@ -52,7 +52,8 @@ Security source: `docs/SECURITY_POLICY.md`
 	- The shared smoke contract now proves restore-apply rejection under an injected maintenance lock and then completes a successful restore-apply run after the lock is released, asserting the returned run metadata and that no active locks remain afterward.
 	- Automatic import-reconciliation, library-discovery, and metadata-refresh heartbeats now also pause under blocking maintenance locks and surface that paused state through the existing operator heartbeat diagnostics.
 	- The shared startup queue dispatcher now also pauses new operation-run claims under blocking maintenance locks and surfaces that paused dispatcher state through queue diagnostics.
-	- Remaining work is one live Docker-capable execution plus any deeper in-flight worker interruption or requeue assertions beyond the current lock-conflict, heartbeat-pause, queued-dispatch-pause, and completion proof.
+	- In-flight queue workers now also pause and requeue safely under blocking maintenance locks, releasing their leases as `paused` and preserving retry budget while the lock remains active.
+	- Remaining work is one live Docker-capable execution to capture the same evidence from the packaged runtime and operator filesystem layout.
 - [ ] Validate admin recovery flow against the documented runbook.
 - [ ] Validate destructive filesystem actions stay preview-first and operator-gated.
 

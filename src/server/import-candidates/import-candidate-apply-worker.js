@@ -17,7 +17,11 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 function buildRunItems(importPendingCandidates) {
   return importPendingCandidates.map((candidate, index) => ({
@@ -115,6 +119,7 @@ export function createImportCandidateApplyWorker({
   isCancellationRequested,
   markImportCandidateApplied = async () => null,
   markRunCompleted,
+  markRunPaused,
   markRunCancelled,
   markRunFailed,
   markRunStarted,
@@ -275,6 +280,24 @@ export function createImportCandidateApplyWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Import apply paused by maintenance lock',
+            executionMode: 'move',
+            executableCandidateCount,
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            requestedCandidateCount,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

@@ -17,7 +17,11 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from './heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from './operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from './operation-run-cancellation.js';
 
 export function createOperatorNotificationFanoutWorker({
   acquireLease,
@@ -27,6 +31,7 @@ export function createOperatorNotificationFanoutWorker({
   markRunCancelled,
   markRunCompleted,
   markRunFailed,
+  markRunPaused,
   markRunStarted,
   releaseLease,
   renewLease,
@@ -58,6 +63,21 @@ export function createOperatorNotificationFanoutWorker({
         summary: fanoutSummary,
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Operator notification fan-out paused by maintenance lock',
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

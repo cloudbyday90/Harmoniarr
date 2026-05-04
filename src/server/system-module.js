@@ -23,6 +23,7 @@ import { createAuditReadService } from './audit-read-service.js';
 import { createDiagnosticsExportService } from './diagnostics-export-service.js';
 import { createSettingsService } from './settings-service.js';
 import { createDependencyHealthService } from './dependency-health-service.js';
+import { createOperationRunInterruptionGate } from './operation-run-cancellation.js';
 import { createOperatorNotificationService } from './operator-notification-service.js';
 import { createOperatorNotificationFanoutRunStore } from './operator-notification-fanout-run-store.js';
 import { createOperatorNotificationFanoutService } from './operator-notification-fanout-service.js';
@@ -208,14 +209,22 @@ export function createSystemModule({
       getActiveRun: operatorNotificationFanoutRunStore.getActiveRun,
       getOperatorNotifications: systemService.getOperatorNotifications,
     });
+  const operatorNotificationFanoutInterruptionGate = maintenanceLockOperationPauseService
+    ? createOperationRunInterruptionGate({
+      isCancellationRequested: operatorNotificationFanoutRunStore.isCancellationRequested,
+      operationLabel: 'Operator notification fan-out',
+      operationPauseService: maintenanceLockOperationPauseService,
+    })
+    : operatorNotificationFanoutRunStore.isCancellationRequested;
   const resolvedOperatorNotificationFanoutWorker = operatorNotificationFanoutWorker
     ?? createOperatorNotificationFanoutWorker({
       acquireLease: operatorNotificationFanoutRunStore.acquireLease,
       fanOutOperatorNotifications: resolvedOperatorNotificationFanoutService.fanOutOperatorNotifications,
-      isCancellationRequested: operatorNotificationFanoutRunStore.isCancellationRequested,
+      isCancellationRequested: operatorNotificationFanoutInterruptionGate,
       markRunCancelled: operatorNotificationFanoutRunStore.markRunCancelled,
       markRunCompleted: operatorNotificationFanoutRunStore.markRunCompleted,
       markRunFailed: operatorNotificationFanoutRunStore.markRunFailed,
+      markRunPaused: operatorNotificationFanoutRunStore.markRunPaused,
       markRunStarted: operatorNotificationFanoutRunStore.markRunStarted,
       releaseLease: operatorNotificationFanoutRunStore.releaseLease,
       renewLease: operatorNotificationFanoutRunStore.renewLease,

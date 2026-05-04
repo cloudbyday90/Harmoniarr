@@ -18,7 +18,11 @@
 
 import { createArtworkCleanupService } from './artwork-cleanup-service.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 export function createArtworkCleanupWorker({
   acquireLease,
@@ -28,6 +32,7 @@ export function createArtworkCleanupWorker({
   markRunCompleted,
   markRunCancelled,
   markRunFailed,
+  markRunPaused,
   markRunStarted,
   releaseLease,
   renewLease,
@@ -67,6 +72,23 @@ export function createArtworkCleanupWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Artwork cleanup paused by maintenance lock',
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            requestedAssetCount,
+            retentionCutoff,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

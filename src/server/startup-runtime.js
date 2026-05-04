@@ -28,7 +28,6 @@ import { createOperationQueueHandlers } from './operation-queue-handlers.js';
 import { createOperationQueueStore } from './operation-queue-store.js';
 import { createOperationStrandedRunRecoveryService } from './operation-stranded-run-recovery-service.js';
 import { createMaintenanceLockHeartbeatPauseService } from './recovery/maintenance-lock-heartbeat-pause-service.js';
-import { createMaintenanceLockOperationPauseService } from './recovery/maintenance-lock-operation-pause-service.js';
 import { createRuntimeReporter } from './runtime-reporter.js';
 import { bootstrapDatabaseSchemaFromSnapshot } from './schema-bootstrap.js';
 import { createStartupServiceSupervisor } from './startup-service-supervisor.js';
@@ -92,14 +91,12 @@ export async function startServerRuntime({
     artworkModule,
     importCandidateModule,
     libraryModule,
+    maintenanceLockOperationPauseService,
     maintenanceLockService,
     metadataModule,
     systemModule,
   } = buildApp();
   const maintenanceLockHeartbeatPauseService = createMaintenanceLockHeartbeatPauseService({
-    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
-  });
-  const maintenanceLockOperationPauseService = createMaintenanceLockOperationPauseService({
     listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
   });
   systemModule?.runtimeResourceService?.applyProcessRuntimePreferences?.({

@@ -33,8 +33,10 @@ import { createMetadataSearchService } from './metadata-search-service.js';
 import { createMusicBrainzCatalogService } from './musicbrainz-catalog-service.js';
 import { createMusicBrainzImportService } from './musicbrainz-import-service.js';
 import { createMusicBrainzSearchService } from './musicbrainz-search-service.js';
+import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 
 export function createMetadataModule({
+  maintenanceLockOperationPauseService = null,
   reconcileWantedReleases = null,
   metadataArtistRefreshRunStore = null,
   metadataArtistRefreshService = null,
@@ -85,10 +87,17 @@ export function createMetadataModule({
   });
   const resolvedMetadataArtistRefreshWorker = metadataArtistRefreshWorker ?? createMetadataArtistRefreshWorker({
     acquireLease: resolvedMetadataArtistRefreshRunStore.acquireLease,
-    isCancellationRequested: resolvedMetadataArtistRefreshRunStore.isCancellationRequested,
+    isCancellationRequested: maintenanceLockOperationPauseService
+      ? createOperationRunInterruptionGate({
+        isCancellationRequested: resolvedMetadataArtistRefreshRunStore.isCancellationRequested,
+        operationLabel: 'Metadata artist refresh',
+        operationPauseService: maintenanceLockOperationPauseService,
+      })
+      : resolvedMetadataArtistRefreshRunStore.isCancellationRequested,
     markRunCancelled: resolvedMetadataArtistRefreshRunStore.markRunCancelled,
     markRunCompleted: resolvedMetadataArtistRefreshRunStore.markRunCompleted,
     markRunFailed: resolvedMetadataArtistRefreshRunStore.markRunFailed,
+    markRunPaused: resolvedMetadataArtistRefreshRunStore.markRunPaused,
     markRunStarted: resolvedMetadataArtistRefreshRunStore.markRunStarted,
     recordArtistRefreshCompleted: resolvedMetadataRefreshSchedulerService.recordArtistRefreshCompleted,
     refreshMetadataArtist: resolvedMetadataRefreshService.refreshArtistCatalogById,

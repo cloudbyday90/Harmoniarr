@@ -293,6 +293,26 @@ export function createOperationRunStore({
     );
   }
 
+  async function markRunPaused({ nextAttemptAt = null, runId, summary = {} }) {
+    const pool = getPoolFn();
+    await pool.query(
+      `
+        UPDATE operation_runs
+        SET status = 'pending',
+            finished_at = NULL,
+            summary = COALESCE(summary, '{}'::jsonb) || $2::jsonb,
+            claimed_at = NULL,
+            claimed_by_instance_id = NULL,
+            error_message = NULL,
+            next_attempt_at = COALESCE($3::timestamptz, NOW()),
+            attempt_count = GREATEST(attempt_count - 1, 0)
+        WHERE id = $1
+          AND status IN ('pending', 'running')
+      `,
+      [runId, JSON.stringify(normalizeRunSummary(summary)), nextAttemptAt],
+    );
+  }
+
   async function acquireLease({ runId }) {
     return jobLeaseStore.acquireLease({
       jobType: resolvedLeaseJobType,
@@ -328,6 +348,7 @@ export function createOperationRunStore({
     getLatestRun,
     getRunById,
     isCancellationRequested,
+    markRunPaused,
     listRecentRuns,
     markRunCancelled,
     markRunCompleted,

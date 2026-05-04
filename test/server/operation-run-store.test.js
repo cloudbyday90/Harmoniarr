@@ -171,3 +171,32 @@ test('operation run store reschedules failed attempts through the shared retry p
   assert.match(query.mock.calls[1].arguments[0], /SET status = 'pending'/);
   assert.match(query.mock.calls[1].arguments[0], /next_attempt_at = \$3::timestamptz/);
 });
+
+test('operation run store requeues a paused run without consuming retry budget', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const operationRunStore = createOperationRunStore({
+    getPoolFn: () => ({ query }),
+    operationType: 'library_scan',
+  });
+
+  await operationRunStore.markRunPaused({
+    nextAttemptAt: '2026-05-04T12:30:00.000Z',
+    runId: 'run-81',
+    summary: {
+      currentStep: 'Library scan paused by maintenance lock',
+      pauseCode: 'recovery_lock_conflict',
+    },
+  });
+
+  assert.equal(query.mock.callCount(), 1);
+  assert.deepEqual(query.mock.calls[0].arguments[1], [
+    'run-81',
+    JSON.stringify({
+      currentStep: 'Library scan paused by maintenance lock',
+      pauseCode: 'recovery_lock_conflict',
+    }),
+    '2026-05-04T12:30:00.000Z',
+  ]);
+  assert.match(query.mock.calls[0].arguments[0], /attempt_count = GREATEST\(attempt_count - 1, 0\)/);
+  assert.match(query.mock.calls[0].arguments[0], /status IN \('pending', 'running'\)/);
+});

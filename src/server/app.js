@@ -43,6 +43,7 @@ import { createPlexDirectoryImportService } from './integrations/plex/plex-direc
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
 import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
+import { createMaintenanceLockOperationPauseService } from './recovery/maintenance-lock-operation-pause-service.js';
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { registerArtworkRoutes } from './routes/artwork-routes.js';
 import { registerAppUserRoutes } from './routes/app-user-routes.js';
@@ -171,6 +172,9 @@ export function createApp({
     youtubeOAuthService: providerModule.youtubeOAuthService,
   });
   const maintenanceLockService = createMaintenanceLockService();
+  const maintenanceLockOperationPauseService = createMaintenanceLockOperationPauseService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+  });
   const baseAppUserModule = buildAppUserModule();
   const plexDirectoryImportService = createPlexDirectoryImportService({
     listAppUsers: baseAppUserModule.appUserService.listAppUsers,
@@ -184,7 +188,11 @@ export function createApp({
       buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
     },
   };
-  const artworkModule = buildArtworkModule({ maintenanceLockService, settingsService });
+  const artworkModule = buildArtworkModule({
+    maintenanceLockOperationPauseService,
+    maintenanceLockService,
+    settingsService,
+  });
   const authModule = buildAuthModule({ settingsService });
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
@@ -203,6 +211,7 @@ export function createApp({
       mediaCommandService,
     }),
     maintenanceLockService,
+    maintenanceLockOperationPauseService,
     slskdTransferSnapshotService: slskdModule.slskdTransferSnapshotService,
     slskdService: slskdModule.slskdService,
   });
@@ -210,6 +219,7 @@ export function createApp({
     artworkAssignmentService: artworkModule.artworkAssignmentService,
     artworkIngestionService: artworkModule.artworkIngestionService,
     importCandidateService: importCandidateModule.importCandidateService,
+    maintenanceLockOperationPauseService,
     maintenanceLockService,
     providerClientResolverService: createProviderClientResolverService({
       spotifyOAuthService: providerModule.spotifyOAuthService,
@@ -219,6 +229,7 @@ export function createApp({
     slskdService: slskdModule.slskdService,
   });
   const metadataModule = buildMetadataModule({
+    maintenanceLockOperationPauseService,
     providerHealthRecorder,
     reconcileWantedReleases: libraryModule.libraryWantedReleaseService.reconcileWantedReleases,
   });
@@ -250,6 +261,7 @@ export function createApp({
     metadataRefreshHeartbeatState: metadataModule.metadataRefreshHeartbeatState,
     metadataMonitoringStore: metadataModule.metadataMonitoringStore,
     musicBrainzSearchService: metadataModule.musicBrainzSearchService,
+    maintenanceLockOperationPauseService,
     maintenanceLockService,
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: resolvedPackageJsonPath,
@@ -435,6 +447,7 @@ export function createApp({
     artworkModule,
     importCandidateModule,
     libraryModule,
+    maintenanceLockOperationPauseService,
     maintenanceLockService,
     metadataModule,
     operationsModule,

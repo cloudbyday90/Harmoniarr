@@ -112,6 +112,7 @@ export function createArtworkCleanupRunStore({
     isCancellationRequested: operationRunStore.isCancellationRequested,
     listRecentRuns,
     markRunCancelled: operationRunStore.markRunCancelled,
+    markRunPaused: operationRunStore.markRunPaused,
     markRunCompleted: operationRunStore.markRunCompleted,
     markRunFailed: operationRunStore.markRunFailed,
     markRunStarted: operationRunStore.markRunStarted,

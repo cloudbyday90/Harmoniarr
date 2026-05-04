@@ -26,8 +26,57 @@ export function createOperationRunCancellationError({
   return error;
 }
 
+export function createOperationRunPauseError({
+  message = 'Operation run paused due to an active maintenance lock',
+  nextRetryAt = null,
+  pauseCode = null,
+  pauseProvider = null,
+  runId,
+} = {}) {
+  const error = new Error(message);
+  error.code = 'operation_run_paused';
+  error.nextRetryAt = nextRetryAt;
+  error.pauseCode = pauseCode;
+  error.pauseProvider = pauseProvider;
+  error.runId = runId ?? null;
+  return error;
+}
+
 export function isOperationRunCancellationError(error) {
   return error?.code === 'operation_run_cancelled';
+}
+
+export function isOperationRunPauseError(error) {
+  return error?.code === 'operation_run_paused';
+}
+
+export function createOperationRunInterruptionGate({
+  isCancellationRequested = async () => false,
+  operationLabel,
+  operationPauseService = null,
+} = {}) {
+  return async function checkOperationRunInterruption({ runId } = {}) {
+    if (await isCancellationRequested({ runId })) {
+      return true;
+    }
+
+    if (!operationPauseService?.resolveOperationReadiness) {
+      return false;
+    }
+
+    const readiness = await operationPauseService.resolveOperationReadiness({ operationLabel });
+    if (readiness?.allowed !== false) {
+      return false;
+    }
+
+    return {
+      kind: 'paused',
+      nextRetryAt: readiness.nextRetryAt ?? null,
+      pauseCode: readiness.pauseCode ?? null,
+      pauseMessage: readiness.pauseMessage ?? null,
+      pauseProvider: readiness.pauseProvider ?? null,
+    };
+  };
 }
 
 export async function throwIfOperationRunCancellationRequested({
@@ -38,7 +87,18 @@ export async function throwIfOperationRunCancellationRequested({
     return;
   }
 
-  if (await isCancellationRequested({ runId })) {
+  const interruption = await isCancellationRequested({ runId });
+  if (interruption === true) {
     throw createOperationRunCancellationError({ runId });
+  }
+
+  if (interruption && typeof interruption === 'object' && interruption.kind === 'paused') {
+    throw createOperationRunPauseError({
+      message: interruption.pauseMessage,
+      nextRetryAt: interruption.nextRetryAt,
+      pauseCode: interruption.pauseCode,
+      pauseProvider: interruption.pauseProvider,
+      runId,
+    });
   }
 }

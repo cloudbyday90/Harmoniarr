@@ -17,12 +17,17 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 export function createLibraryExternalIntakeWorker({
     acquireLease,
     createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
     isCancellationRequested,
+    markRunPaused,
     markRunCancelled,
     markRunCompleted,
     markRunFailed,
@@ -93,6 +98,27 @@ export function createLibraryExternalIntakeWorker({
         });
       }
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            canonicalUrl,
+            currentStep: 'External provider ingest planning paused by maintenance lock',
+            mediaRequestId,
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            resourceType,
+            sourceIdentifier,
+            sourceProvider,
+            triggerSource,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

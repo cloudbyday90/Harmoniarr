@@ -17,7 +17,11 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 function summarizeInspection(files = []) {
   const inspectionWarnings = files.flatMap((file) => file?.inspection?.warnings ?? []);
@@ -39,6 +43,7 @@ export function createImportCandidateMediaInspectionWorker({
   }),
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
   isCancellationRequested,
+  markRunPaused,
   markRunCancelled,
   markRunCompleted,
   markRunFailed,
@@ -110,6 +115,22 @@ export function createImportCandidateMediaInspectionWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Media inspection paused by maintenance lock',
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            requestedCandidateCount,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

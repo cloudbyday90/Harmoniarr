@@ -17,7 +17,11 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 function isTranscodeCandidate(file) {
   return file?.transcodePlan?.recommendedAction === 'transcode_candidate';
@@ -39,6 +43,7 @@ export function createImportCandidateTranscodeWorker({
     warnings: [],
   }),
   isCancellationRequested,
+  markRunPaused,
   markRunCancelled,
   markRunCompleted,
   markRunFailed,
@@ -137,6 +142,22 @@ export function createImportCandidateTranscodeWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Transcode orchestration paused by maintenance lock',
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            requestedCandidateCount,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

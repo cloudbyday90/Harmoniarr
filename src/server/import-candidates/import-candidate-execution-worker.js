@@ -17,7 +17,11 @@
  */
 
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
-import { isOperationRunCancellationError, throwIfOperationRunCancellationRequested } from '../operation-run-cancellation.js';
+import {
+  isOperationRunCancellationError,
+  isOperationRunPauseError,
+  throwIfOperationRunCancellationRequested,
+} from '../operation-run-cancellation.js';
 
 function normalizeRemoteFilename(file) {
   const rawFilename = typeof file?.rawPayload?.filename === 'string'
@@ -70,6 +74,7 @@ export function createImportCandidateExecutionWorker({
   }),
   getImportCandidate = async () => null,
   isCancellationRequested,
+  markRunPaused,
   markImportCandidateDownloadFailed = async () => null,
   markImportCandidateDownloading = async () => null,
   markRunCompleted,
@@ -279,6 +284,23 @@ export function createImportCandidateExecutionWorker({
         },
       });
     } catch (error) {
+      if (isOperationRunPauseError(error)) {
+        finalLeaseStatus = 'paused';
+        await markRunPaused({
+          nextAttemptAt: error.nextRetryAt ?? null,
+          runId,
+          summary: {
+            currentStep: 'Download enqueue paused by maintenance lock',
+            executionMode: 'download_enqueue',
+            pauseCode: error.pauseCode ?? null,
+            pauseMessage: error.message,
+            pauseProvider: error.pauseProvider ?? null,
+            requestedCandidateCount,
+          },
+        });
+        return;
+      }
+
       if (isOperationRunCancellationError(error)) {
         finalLeaseStatus = 'cancelled';
         await markRunCancelled({

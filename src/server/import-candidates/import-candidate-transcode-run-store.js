@@ -85,6 +85,7 @@ export function createImportCandidateTranscodeRunStore({
     getLatestRun: async () => normalizeRun(await operationRunStore.getLatestRun()),
     isCancellationRequested: operationRunStore.isCancellationRequested,
     markRunCancelled: operationRunStore.markRunCancelled,
+    markRunPaused: operationRunStore.markRunPaused,
     markRunCompleted: operationRunStore.markRunCompleted,
     markRunFailed: operationRunStore.markRunFailed,
     markRunStarted: operationRunStore.markRunStarted,

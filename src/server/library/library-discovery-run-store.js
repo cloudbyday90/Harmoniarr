@@ -85,6 +85,7 @@ export function createLibraryDiscoveryRunStore({
     getRunById,
     getLatestRun,
     isCancellationRequested: operationRunStore.isCancellationRequested,
+    markRunPaused: operationRunStore.markRunPaused,
     markRunCancelled: operationRunStore.markRunCancelled,
     markRunCompleted: operationRunStore.markRunCompleted,
     markRunFailed: operationRunStore.markRunFailed,
