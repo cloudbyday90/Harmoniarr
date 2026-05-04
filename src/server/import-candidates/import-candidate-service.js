@@ -187,6 +187,7 @@ function normalizeResponseFile(file, {
 
 export function normalizeSlskdResponsesToImportCandidates({
   discoveredAt = new Date(),
+  requestOwnership = null,
   responses = [],
   searchId,
 }) {
@@ -260,6 +261,7 @@ export function normalizeSlskdResponsesToImportCandidates({
       rawPayload: {
         username: group.username,
         folderPath: group.folderPath,
+        requestOwnership,
         response: {
           ...group.response,
           files: group.rawFiles,
@@ -271,6 +273,7 @@ export function normalizeSlskdResponsesToImportCandidates({
         folderPath: group.folderPath,
         hasFreeUploadSlot: group.response.hasFreeUploadSlot ?? false,
         queueLength: group.response.queueLength ?? null,
+        requestOwnership,
         uploadSpeed: group.response.uploadSpeed ?? null,
         fileCount: group.files.length,
         lockedFileCount,
@@ -603,11 +606,13 @@ export function createImportCandidateService({
 
   async function ingestSlskdSearchResponses({
     actorUserId = null,
+    requestOwnership = null,
     requestMetadata = null,
     searchId,
   }) {
     const searchResponses = await slskdService.getSearchResponses({ searchId });
     const candidates = normalizeSlskdResponsesToImportCandidates({
+      requestOwnership,
       responses: searchResponses.responses,
       searchId: searchResponses.searchId,
     });

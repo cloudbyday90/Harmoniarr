@@ -392,6 +392,7 @@ Status note:
   - The protected system overview now includes a `providers` section with Spotify/YouTube OAuth linked state and Apple Music credential configuration state, consumed through a `providerStatus` computed property on the shared `useSystemOverview` composable.
   - A shared `ProviderStatusPanel.vue` component now renders provider authorization state on the authenticated dashboard using the same `panel-light`/`dependency-grid`/`dependency-card` visual pattern as the existing `DependencyStatusPanel`, surfaced through the `useSystemOverview` composable's `providerStatus` computed property.
 - [x] Add per-user import destinations that map reviewed media into user-owned subdirectories while keeping canonical media reuse available across users.
+  - Progress: request-driven discovery ingest now persists delegated Request Music ownership on import candidates, and shared import preview planning prefers that candidate-owned target user when resolving per-user library placement.
 - [x] Implement the import review state baseline with durable pending, held, selected, rejected, and reopen transitions, while reserving apply/download execution semantics for later slices.
 - [x] Implement path mapping, staging resolution, root-folder policy, and naming-preview generation for the read-only import planning preview.
 - [x] Build an initial frontend metadata workspace for provider search/import, local reopen, and local search over canonical metadata.

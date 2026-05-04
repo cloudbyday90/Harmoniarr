@@ -125,6 +125,34 @@ test('createImportCandidatePreviewService plans per-user library placement when 
   assert.equal(preview.library.reusePolicy.duplicateLosslessPolicy, 'reuse_existing_lossless_by_default');
 });
 
+test('createImportCandidatePreviewService prefers candidate-owned delegated request targets over the viewer context', async () => {
+  const service = createImportCandidatePreviewService({
+    getAppUserById: async ({ userId }) => ({
+      authProvider: 'local',
+      id: userId,
+      managedLibraryRelativeRoot: userId === 'user-request-target' ? 'owned/request-target' : 'owned/viewer',
+    }),
+    getImportCandidate: async () => createCandidate({
+      normalizedPayload: {
+        requestOwnership: {
+          sourceRequestedByUserId: 'admin-1',
+          sourceRequestedForUserId: 'user-request-target',
+          sourceType: 'media_request',
+        },
+      },
+    }),
+    loadSettingsFn: async () => createSettings(),
+  });
+
+  const preview = await service.previewImportCandidate({
+    importCandidateId: 'candidate-1',
+    targetUser: { id: 'viewer-user' },
+  });
+
+  assert.equal(preview.library.targetUser.id, 'user-request-target');
+  assert.equal(preview.library.previewFolderPath, '/data/music/users/owned/request-target/Autechre/Amber');
+});
+
 test('createImportCandidatePreviewService prefers canonical release naming when a shared naming plan is available', async () => {
   const service = createImportCandidatePreviewService({
     canonicalImportNamingService: {

@@ -77,6 +77,16 @@ function buildFilePreview({
   };
 }
 
+function resolveCandidateOwnedTargetUser(candidate) {
+  const requestedForUserId = candidate?.normalizedPayload?.requestOwnership?.sourceRequestedForUserId;
+  if (typeof requestedForUserId !== 'string') {
+    return null;
+  }
+
+  const normalizedUserId = requestedForUserId.trim();
+  return normalizedUserId ? { id: normalizedUserId } : null;
+}
+
 export function createImportCandidatePreviewService({
   canonicalImportNamingService = createImportCandidateCanonicalNamingService(),
   getImportCandidate,
@@ -107,13 +117,14 @@ export function createImportCandidatePreviewService({
     const musicRoot = settings.paths?.music;
     const userMusicRoots = settings.paths?.userMusicRoots ?? [];
     const resolvedFolderPath = resolveCandidateFolderPath(candidate);
+    const effectiveTargetUser = resolveCandidateOwnedTargetUser(candidate) ?? targetUser;
     const sourceResolution = resolveDownloadCandidateFolder({
       candidateFolderPath: resolvedFolderPath,
       downloadMappings,
       downloadsRoot,
     });
-    const appUser = targetUser && typeof getAppUserById === 'function'
-      ? await getAppUserById({ userId: targetUser.id })
+    const appUser = effectiveTargetUser && typeof getAppUserById === 'function'
+      ? await getAppUserById({ userId: effectiveTargetUser.id })
       : null;
     const canonicalNamingPlan = typeof canonicalImportNamingService?.resolveCanonicalImportNaming === 'function'
       ? await canonicalImportNamingService.resolveCanonicalImportNaming({ candidate })
@@ -142,10 +153,10 @@ export function createImportCandidatePreviewService({
       appUsers: appUser ? [appUser] : [],
       musicRoot,
       relativeFolderPath,
-      targetUser,
+      targetUser: effectiveTargetUser,
       userMusicRoots,
     });
-    if (targetUser && !libraryPlacement.targetUser?.configured) {
+    if (effectiveTargetUser && !libraryPlacement.targetUser?.configured) {
       warnings.push(buildPathWarning(
         'per_user_destination_unconfigured',
         'No configured per-user destination exists for the active app user, so preview falls back to the shared library root until a per-user path is configured in settings.',

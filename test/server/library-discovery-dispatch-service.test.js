@@ -17,6 +17,12 @@ test('buildDiscoverySearchQuery uses canonical artist, release title, and year',
 test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts searches, and ingests candidates', async (t) => {
   const claimedRequests = [{
     artistName: 'Autechre',
+    evidence: {
+      sourceMediaRequestId: 'request-1',
+      sourceRequestKind: 'release',
+      sourceRequestedByUserId: 'admin-1',
+      sourceRequestedForUserId: 'user-7',
+    },
     metadataReleaseId: 'release-1',
     releaseDate: '2001-04-30',
     releaseGroupTitle: 'Confield',
@@ -69,6 +75,13 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
   assert.equal(ingestSlskdSearchResponses.mock.callCount(), 1);
   assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0], {
     actorUserId: 'user-1',
+    requestOwnership: {
+      sourceMediaRequestId: 'request-1',
+      sourceRequestKind: 'release',
+      sourceRequestedByUserId: 'admin-1',
+      sourceRequestedForUserId: 'user-7',
+      sourceType: 'media_request',
+    },
     requestMetadata: {
       ipAddress: '198.51.100.24',
       userAgent: 'HarmoniarrDiscoveryDispatchTest/1.0',

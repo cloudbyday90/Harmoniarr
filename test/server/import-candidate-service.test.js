@@ -44,6 +44,11 @@ function createStoredCandidate(overrides = {}) {
 test('normalizeSlskdResponsesToImportCandidates groups slskd files by user and folder', () => {
   const candidates = normalizeSlskdResponsesToImportCandidates({
     discoveredAt: new Date('2026-04-30T14:00:00.000Z'),
+    requestOwnership: {
+      sourceRequestedByUserId: 'admin-1',
+      sourceRequestedForUserId: 'user-2',
+      sourceType: 'media_request',
+    },
     searchId: 'search-1',
     responses: [{
       username: 'source-user',
@@ -108,6 +113,16 @@ test('normalizeSlskdResponsesToImportCandidates groups slskd files by user and f
   assert.equal(candidates[0].files[2].isLocked, true);
   assert.equal(candidates[0].rawPayload.response.files.length, 2);
   assert.equal(candidates[0].rawPayload.response.lockedFiles.length, 1);
+  assert.deepEqual(candidates[0].normalizedPayload.requestOwnership, {
+    sourceRequestedByUserId: 'admin-1',
+    sourceRequestedForUserId: 'user-2',
+    sourceType: 'media_request',
+  });
+  assert.deepEqual(candidates[0].rawPayload.requestOwnership, {
+    sourceRequestedByUserId: 'admin-1',
+    sourceRequestedForUserId: 'user-2',
+    sourceType: 'media_request',
+  });
 });
 
 test('createImportCandidateService ingests slskd responses in one transaction and records audit', async (t) => {
@@ -144,6 +159,11 @@ test('createImportCandidateService ingests slskd responses in one transaction an
 
   const result = await service.ingestSlskdSearchResponses({
     actorUserId: 'user-1',
+    requestOwnership: {
+      sourceRequestedByUserId: 'admin-9',
+      sourceRequestedForUserId: 'user-12',
+      sourceType: 'media_request',
+    },
     requestMetadata: {
       ipAddress: '203.0.113.10',
       userAgent: 'HarmoniarrTest/1.0',
@@ -158,6 +178,11 @@ test('createImportCandidateService ingests slskd responses in one transaction an
   assert.equal(client.release.mock.callCount(), 1);
   assert.equal(upsertImportCandidateFn.mock.callCount(), 1);
   assert.equal(replaceImportCandidateFilesFn.mock.callCount(), 1);
+  assert.deepEqual(upsertImportCandidateFn.mock.calls[0].arguments[0].normalizedPayload.requestOwnership, {
+    sourceRequestedByUserId: 'admin-9',
+    sourceRequestedForUserId: 'user-12',
+    sourceType: 'media_request',
+  });
   assert.equal(replaceImportCandidateFilesFn.mock.calls[0].arguments[0], 'candidate-1');
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
   assert.deepEqual(recordAuditEventFn.mock.calls[0].arguments[0], {

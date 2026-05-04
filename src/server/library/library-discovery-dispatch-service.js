@@ -63,6 +63,23 @@ export function createLibraryDiscoveryDispatchService({
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
   slskdService = null,
 } = {}) {
+  function buildRequestOwnershipContext(claimedRequest) {
+    const sourceRequestedByUserId = claimedRequest?.evidence?.sourceRequestedByUserId ?? null;
+    const sourceRequestedForUserId = claimedRequest?.evidence?.sourceRequestedForUserId ?? sourceRequestedByUserId ?? null;
+
+    if (!sourceRequestedForUserId) {
+      return null;
+    }
+
+    return {
+      sourceMediaRequestId: claimedRequest?.evidence?.sourceMediaRequestId ?? null,
+      sourceRequestKind: claimedRequest?.evidence?.sourceRequestKind ?? null,
+      sourceRequestedByUserId,
+      sourceRequestedForUserId,
+      sourceType: 'media_request',
+    };
+  }
+
   async function dispatchReadyDiscoveryRequests({
     actorUserId = null,
     requestMetadata = null,
@@ -121,8 +138,10 @@ export function createLibraryDiscoveryDispatchService({
         const search = await slskdService.startSearch({
           query: searchQuery,
         });
+        const requestOwnership = buildRequestOwnershipContext(claimedRequest);
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
           actorUserId,
+          requestOwnership,
           requestMetadata,
           searchId: search.id,
         });
