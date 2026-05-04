@@ -36,6 +36,7 @@ Security source: `docs/SECURITY_POLICY.md`
 
 - [ ] Validate fresh install on the standard Docker deployment path.
 	- The shared Docker smoke validator now also bootstraps a target requester, submits a delegated Request Music item, and verifies target-user scoped summary, list, and notification visibility through the packaged runtime.
+	- `npm run validate:docker-deployment-path` now orchestrates the live fresh-install contract plus optional released-image and upgrade-path checks from one ESM entrypoint, writing stable evidence filenames into `HARMONIARR_DOCKER_VALIDATION_EVIDENCE_DIR` when that directory is configured.
 - [x] Validate fresh-install schema bootstrap against a disposable PostgreSQL database.
 - [ ] Validate upgrade from the prior accepted state or baseline image.
 	- `npm run validate:docker-upgrade` now drives a baseline image followed by the candidate image against the same bind-mounted state, proving post-upgrade startup plus persisted settings continuity through the shared smoke contract.
@@ -92,6 +93,7 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Prepare release notes and technical change summary.
 - [ ] Record smoke-test commands and manual verification notes.
 	- The Docker smoke scripts now optionally emit a machine-readable JSON evidence file when `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH` is set, so release workflows and support diagnostics can archive the exact validated result instead of scraping console output.
+	- The shared deployment-path wrapper now also gives operators one replayable command for live release evidence: it always runs fresh-install validation, adds released-image validation when `HARMONIARR_IMAGE` is set, and adds upgrade-path validation when `HARMONIARR_BASELINE_IMAGE` is set.
 	- That machine-readable evidence path now also fail-closes on missing required validation sections for known smoke kinds, so fresh-install and released-image artifacts cannot silently omit packaged-runtime Request Music proof while still producing a JSON file.
 	- The `release-image` workflow now also re-validates both published-image and upgrade-path smoke evidence files before uploading them as artifacts, so archived JSON proof follows the same shared contract checks as the writer instead of treating artifact presence alone as success.
 	- The release-contract job now also downloads the archived published-image smoke artifact and re-verifies it before final release summary publication, so the consumer side fails closed if archived proof drifts from the expected shared contract.
