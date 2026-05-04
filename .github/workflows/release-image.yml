@@ -361,6 +361,17 @@ jobs:
         run: |
           gh release download "${{ needs.publish-image.outputs.release_tag }}" --repo "${{ github.repository }}" -p "${{ needs.publish-image.outputs.metadata_asset_name }}" -p "${{ needs.publish-image.outputs.compose_asset_name }}" -D supply-chain --clobber
 
+      - name: Download published-image smoke evidence artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: harmoniarr-docker-smoke-released-image.json
+          path: supply-chain
+
+      - name: Verify archived published-image smoke evidence artifact
+        env:
+          HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-released-image.json
+        run: npm run validate:docker-smoke-evidence
+
       - name: Verify release metadata and Compose override assets
         env:
           HARMONIARR_RELEASE_COMPOSE_OVERRIDE_PATH: supply-chain/${{ needs.publish-image.outputs.compose_asset_name }}
@@ -449,6 +460,7 @@ jobs:
           HARMONIARR_SUMMARY_ATTESTATION_STATUS: ${{ github.event.repository.private && 'skipped for private repository' || 'passed' }}
           HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && 'passed' || 'skipped' }}
           HARMONIARR_SUMMARY_RELEASE_TAG: ${{ needs.publish-image.outputs.release_tag }}
+          HARMONIARR_SUMMARY_SMOKE_EVIDENCE_STATUS: published-image artifact passed
           HARMONIARR_SUMMARY_TRUSTED_MIRROR_PROBE_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' && format('passed via {0}', steps.probe_trusted_mirror.outputs.target_distribution_spec) || 'skipped' }}
           HARMONIARR_SUMMARY_TRUSTED_MIRROR_REFERRER_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' && 'passed' || 'skipped' }}
         run: node scripts/release-workflow-summary.js verify-release-contract

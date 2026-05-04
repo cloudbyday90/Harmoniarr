@@ -63,6 +63,7 @@ export function renderReleaseContractVerificationSummaryLines({
   attestationVerificationStatus,
   dockerHubMirrorStatus,
   releaseTag,
+  smokeEvidenceStatus = null,
   trustedMirrorProbeStatus,
   trustedMirrorReferrerStatus,
 } = {}) {
@@ -72,6 +73,7 @@ export function renderReleaseContractVerificationSummaryLines({
     `- Release tag: ${releaseTag}`,
     '- Release manifest checked against GitHub release assets',
     '- Compose override asset checked against the immutable image reference',
+    ...(smokeEvidenceStatus ? [`- Archived smoke evidence verification: ${smokeEvidenceStatus}`] : []),
     `- Docker Hub mirror verification: ${dockerHubMirrorStatus}`,
     `- Docker Hub trusted mirror capability probe: ${trustedMirrorProbeStatus}`,
     `- Docker Hub trusted mirror referrer verification: ${trustedMirrorReferrerStatus}`,

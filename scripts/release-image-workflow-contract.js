@@ -51,6 +51,19 @@ export const releaseImageEvidenceVerificationStep = Object.freeze({
   name: 'Verify published-image smoke evidence artifact',
 });
 
+export const releaseImageEvidenceDownloadStep = Object.freeze({
+  action: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0',
+  artifactName: 'harmoniarr-docker-smoke-released-image.json',
+  name: 'Download published-image smoke evidence artifact',
+  path: 'supply-chain',
+});
+
+export const releaseImageEvidenceReleaseContractVerificationStep = Object.freeze({
+  command: 'npm run validate:docker-smoke-evidence',
+  name: 'Verify archived published-image smoke evidence artifact',
+  path: 'supply-chain/harmoniarr-docker-smoke-released-image.json',
+});
+
 export const releaseImageUpgradeWorkflow = Object.freeze({
   baselineInputName: 'baseline_image',
   jobId: 'verify-upgrade-path',
@@ -258,6 +271,42 @@ export function validateReleaseImageWorkflowContract(source) {
 
   if (!normalizedSource.includes('HARMONIARR_SUMMARY_SMOKE_CONTRACT_STATUS: passed')) {
     issues.push('verify-published-image summary must report the smoke evidence contract status');
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageEvidenceDownloadStep.name);
+
+    if (!block.includes(`uses: ${releaseImageEvidenceDownloadStep.action}`)) {
+      issues.push(`${releaseImageEvidenceDownloadStep.name} must use ${releaseImageEvidenceDownloadStep.action}`);
+    }
+
+    if (!block.includes(`name: ${releaseImageEvidenceDownloadStep.artifactName}`)) {
+      issues.push(`${releaseImageEvidenceDownloadStep.name} must download ${releaseImageEvidenceDownloadStep.artifactName}`);
+    }
+
+    if (!block.includes(`path: ${releaseImageEvidenceDownloadStep.path}`)) {
+      issues.push(`${releaseImageEvidenceDownloadStep.name} must extract to ${releaseImageEvidenceDownloadStep.path}`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageEvidenceReleaseContractVerificationStep.name);
+
+    if (!block.includes(`run: ${releaseImageEvidenceReleaseContractVerificationStep.command}`)) {
+      issues.push(`${releaseImageEvidenceReleaseContractVerificationStep.name} must run ${releaseImageEvidenceReleaseContractVerificationStep.command}`);
+    }
+
+    if (!block.includes(`HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: ${releaseImageEvidenceReleaseContractVerificationStep.path}`)) {
+      issues.push(`${releaseImageEvidenceReleaseContractVerificationStep.name} must verify ${releaseImageEvidenceReleaseContractVerificationStep.path}`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  if (!normalizedSource.includes('HARMONIARR_SUMMARY_SMOKE_EVIDENCE_STATUS: published-image artifact passed')) {
+    issues.push('verify-release-contract summary must report archived smoke evidence verification status');
   }
 
   if (!normalizedSource.includes(`${releaseImageUpgradeWorkflow.baselineInputName}:`)) {

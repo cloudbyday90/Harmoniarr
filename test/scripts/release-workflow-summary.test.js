@@ -58,6 +58,7 @@ test('renderReleaseContractVerificationSummaryLines formats the contract summary
     attestationVerificationStatus: 'passed',
     dockerHubMirrorStatus: 'passed',
     releaseTag: 'v0.1.0-beta',
+    smokeEvidenceStatus: 'published-image artifact passed',
     trustedMirrorProbeStatus: 'passed via v1.1-referrers-api',
     trustedMirrorReferrerStatus: 'passed',
   }), [
@@ -66,12 +67,40 @@ test('renderReleaseContractVerificationSummaryLines formats the contract summary
     '- Release tag: v0.1.0-beta',
     '- Release manifest checked against GitHub release assets',
     '- Compose override asset checked against the immutable image reference',
+    '- Archived smoke evidence verification: published-image artifact passed',
     '- Docker Hub mirror verification: passed',
     '- Docker Hub trusted mirror capability probe: passed via v1.1-referrers-api',
     '- Docker Hub trusted mirror referrer verification: passed',
     '- Image attestation verification: passed',
     '',
   ]);
+});
+
+test('writeReleaseWorkflowSummary accepts CLI overrides for release-contract summaries', async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), 'harmoniarr-release-summary-'));
+  const summaryPath = join(tempDirectory, 'summary.md');
+
+  try {
+    await writeReleaseWorkflowSummary('verify-release-contract', {
+      args: [
+        'verify-release-contract',
+        '--summary-path', summaryPath,
+        '--attestation-status', 'passed',
+        '--dockerhub-mirror-status', 'passed',
+        '--release-tag', 'v0.1.0-beta',
+        '--smoke-evidence-status', 'published-image artifact passed',
+        '--trusted-mirror-probe-status', 'passed via v1.1-referrers-api',
+        '--trusted-mirror-referrer-status', 'passed',
+      ],
+      env: {},
+    });
+
+    const summary = await readFile(summaryPath, 'utf8');
+    assert.match(summary, /Release Contract Verification/);
+    assert.match(summary, /Archived smoke evidence verification: published-image artifact passed/);
+  } finally {
+    await rm(tempDirectory, { force: true, recursive: true });
+  }
 });
 
 test('writeReleaseWorkflowSummary accepts CLI overrides for publish-image summaries', async () => {

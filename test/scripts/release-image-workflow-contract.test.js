@@ -5,7 +5,9 @@ import test from 'node:test';
 import {
   assertReleaseImageWorkflowContract,
   getWorkflowStepBlock,
+  releaseImageEvidenceDownloadStep,
   releaseImageEvidenceStep,
+  releaseImageEvidenceReleaseContractVerificationStep,
   releaseImageEvidenceVerificationStep,
   releaseImageUpgradeEvidenceStep,
   releaseImageUpgradeEvidenceVerificationStep,
@@ -54,6 +56,19 @@ test('release-image workflow uploads the published-image smoke evidence artifact
   assert.match(block, new RegExp(releaseImageEvidenceStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(block, new RegExp(releaseImageEvidenceStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(block, new RegExp(releaseImageEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('release-image workflow downloads and re-verifies archived published-image smoke evidence during release-contract verification', async () => {
+  const workflowSource = await readFile(workflowPath, 'utf8');
+
+  const downloadBlock = getWorkflowStepBlock(workflowSource, releaseImageEvidenceDownloadStep.name);
+  const verificationBlock = getWorkflowStepBlock(workflowSource, releaseImageEvidenceReleaseContractVerificationStep.name);
+
+  assert.match(downloadBlock, new RegExp(releaseImageEvidenceDownloadStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(downloadBlock, new RegExp(releaseImageEvidenceDownloadStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(downloadBlock, new RegExp(releaseImageEvidenceDownloadStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verificationBlock, new RegExp(releaseImageEvidenceReleaseContractVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verificationBlock, new RegExp(releaseImageEvidenceReleaseContractVerificationStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
 test('release-image workflow supports optional published-image upgrade validation evidence', async () => {
