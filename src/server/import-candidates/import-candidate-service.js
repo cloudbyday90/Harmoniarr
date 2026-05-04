@@ -25,6 +25,7 @@ import {
   insertImportCandidateEvent,
   listImportCandidateFiles,
   listImportCandidates as listImportCandidatesFromRepository,
+  listImportCandidatesBySourceMediaRequestIds as listImportCandidatesBySourceMediaRequestIdsFromRepository,
   replaceImportCandidateFiles,
   transitionImportCandidateStatus,
   upsertImportCandidate,
@@ -291,6 +292,7 @@ export function createImportCandidateService({
   insertImportCandidateEventFn = insertImportCandidateEvent,
   listImportCandidateFilesFn = listImportCandidateFiles,
   listImportCandidatesFn = listImportCandidatesFromRepository,
+  listImportCandidatesBySourceMediaRequestIdsFn = listImportCandidatesBySourceMediaRequestIdsFromRepository,
   pool = getPool(),
   recordAuditEventFn = recordAuditEvent,
   replaceImportCandidateFilesFn = replaceImportCandidateFiles,
@@ -368,6 +370,29 @@ export function createImportCandidateService({
         total: result.total,
       },
     };
+  }
+
+  async function listImportCandidatesBySourceMediaRequestIds({ sourceMediaRequestIds } = {}) {
+    if (!Array.isArray(sourceMediaRequestIds)) {
+      throw createApiError(400, 'validation_error', 'sourceMediaRequestIds must be an array');
+    }
+
+    const normalizedIds = [...new Set(sourceMediaRequestIds
+      .map((value) => normalizeOptionalString(value, {
+        fieldName: 'sourceMediaRequestIds',
+        maxLength: 100,
+      }))
+      .filter(Boolean))];
+
+    if (normalizedIds.length === 0) {
+      return [];
+    }
+
+    if (normalizedIds.length > 200) {
+      throw createApiError(400, 'validation_error', 'sourceMediaRequestIds must contain 200 items or fewer');
+    }
+
+    return listImportCandidatesBySourceMediaRequestIdsFn(normalizedIds);
   }
 
   async function getImportCandidate({
@@ -672,6 +697,7 @@ export function createImportCandidateService({
     holdImportCandidate,
     ingestSlskdSearchResponses,
     listImportCandidates,
+    listImportCandidatesBySourceMediaRequestIds,
     markImportCandidateDownloadFailed,
     markImportCandidateDownloading,
     markImportCandidateApplied,

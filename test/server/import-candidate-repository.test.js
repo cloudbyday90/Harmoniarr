@@ -5,6 +5,7 @@ import {
   insertImportCandidateEvent,
   listImportCandidateFiles,
   listImportCandidates,
+  listImportCandidatesBySourceMediaRequestIds,
   replaceImportCandidateFiles,
   transitionImportCandidateStatus,
   upsertImportCandidate,
@@ -65,6 +66,20 @@ test('listImportCandidates applies bounded filters and deterministic ordering', 
   ]);
   assert.equal(result.total, 1);
   assert.equal(result.items[0].id, 'candidate-1');
+});
+
+test('listImportCandidatesBySourceMediaRequestIds filters candidates by linked media request ids', async (t) => {
+  const queryable = {
+    query: t.mock.fn(async () => ({
+      rows: [],
+    })),
+  };
+
+  await listImportCandidatesBySourceMediaRequestIds(['request-1', 'request-2'], queryable);
+
+  const [sql, values] = queryable.query.mock.calls[0].arguments;
+  assert.match(sql, /normalized_payload -> 'requestOwnership' ->> 'sourceMediaRequestId' = ANY\(\$1::text\[\]\)/);
+  assert.deepEqual(values, [['request-1', 'request-2']]);
 });
 
 test('getImportCandidateById maps a candidate row or null', async (t) => {

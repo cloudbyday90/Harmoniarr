@@ -21,6 +21,7 @@ import { recordAuditEvent } from '../audit.js';
 import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
 import { createMetadataSearchService } from '../metadata/metadata-search-service.js';
 import { normalizeExternalMediaSource } from './external-media-source-parser.js';
+import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
 import { createLibraryReleaseAvailabilityStore } from './library-release-availability-store.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
 
@@ -122,30 +123,37 @@ function detectExternalProvider(sourceUrl) {
   return supportedExternalProviders.get(parsedUrl.hostname.toLowerCase()) ?? null;
 }
 
-function buildSummaryMessage(counts) {
-  if (counts.totalRequests === 0) {
+function buildSummaryMessage(fulfillmentCounts) {
+  if (fulfillmentCounts.totalRequests === 0) {
     return {
       message: 'No music requests have been submitted yet.',
       status: 'empty',
     };
   }
 
-  if (counts.needsFetch > 0) {
+  if (fulfillmentCounts.failed > 0) {
     return {
-      message: `${counts.needsFetch} request${counts.needsFetch === 1 ? ' is' : 's are'} waiting for fetch and import follow-up.`,
+      message: `${fulfillmentCounts.failed} request${fulfillmentCounts.failed === 1 ? ' needs' : 's need'} operator attention before fulfillment can complete.`,
+      status: 'attention',
+    };
+  }
+
+  if (fulfillmentCounts.active > 0) {
+    return {
+      message: `${fulfillmentCounts.active} request${fulfillmentCounts.active === 1 ? ' is' : 's are'} queued, downloading, or waiting for import apply.`,
       status: 'active',
     };
   }
 
-  if (counts.needsReview > 0) {
+  if (fulfillmentCounts.underReview > 0) {
     return {
-      message: `${counts.needsReview} request${counts.needsReview === 1 ? ' needs' : 's need'} manual review before provider fetch can continue.`,
+      message: `${fulfillmentCounts.underReview} request${fulfillmentCounts.underReview === 1 ? ' is' : 's are'} still under review before fulfillment can continue.`,
       status: 'attention',
     };
   }
 
   return {
-    message: `${counts.alreadyExists} request${counts.alreadyExists === 1 ? ' already maps' : 's already map'} to imported media.`,
+    message: `${fulfillmentCounts.satisfied} request${fulfillmentCounts.satisfied === 1 ? ' is' : 's are'} already available or fulfilled.`,
     status: 'satisfied',
   };
 }
@@ -210,6 +218,7 @@ export function createLibraryMediaRequestService({
   externalIntakeService = null,
   getAppUserById = null,
   mediaRequestStore = createLibraryMediaRequestStore(),
+  mediaRequestFulfillmentService = createLibraryMediaRequestFulfillmentService(),
   metadataSearchService = createMetadataSearchService(),
   releaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
   recordAuditEventFn = recordAuditEvent,
@@ -358,19 +367,22 @@ export function createLibraryMediaRequestService({
   }
 
   async function listMediaRequests({ requestedForUserId = null } = {}) {
-    return mediaRequestStore.listMediaRequests({ requestedForUserId });
+    const mediaRequests = await mediaRequestStore.listMediaRequests({ requestedForUserId });
+    return mediaRequestFulfillmentService.enrichMediaRequests(mediaRequests);
   }
 
   async function buildMediaRequestSummary({ requestedForUserId = null } = {}) {
-    const [counts, recentRequests] = await Promise.all([
+    const [counts, mediaRequests] = await Promise.all([
       mediaRequestStore.getMediaRequestCounts({ requestedForUserId }),
-      mediaRequestStore.listMediaRequests({ requestedForUserId }),
+      listMediaRequests({ requestedForUserId }),
     ]);
+    const fulfillmentCounts = mediaRequestFulfillmentService.buildMediaRequestFulfillmentCounts(mediaRequests);
 
     return {
       counts,
-      recentRequests: recentRequests.slice(0, 5),
-      summary: buildSummaryMessage(counts),
+      fulfillmentCounts,
+      recentRequests: mediaRequests.slice(0, 5),
+      summary: buildSummaryMessage(fulfillmentCounts),
     };
   }
 

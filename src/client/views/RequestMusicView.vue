@@ -135,11 +135,15 @@ function requestStateLabel(requestState) {
   }
 }
 
-function requestStateClass(requestState) {
-  switch (requestState) {
-    case 'already_exists':
+function fulfillmentStatusLabel(fulfillmentStatus) {
+  return fulfillmentStatus?.label ?? 'Queued';
+}
+
+function fulfillmentStatusClass(fulfillmentStatus) {
+  switch (fulfillmentStatus?.tone) {
+    case 'selected':
       return 'review-status-selected';
-    case 'needs_review':
+    case 'failed':
       return 'review-status-failed';
     default:
       return 'review-status-held';
@@ -258,7 +262,8 @@ onMounted(() => {
       <h2>Dedicated request intake</h2>
       <p>
         Submit release, track, or external playlist and collection URLs here. Harmoniarr records the request against the current user,
-        checks whether the media already exists locally, and keeps fetch-needed requests out of the import review workspace.
+        checks whether the media already exists locally, and keeps delegated request fulfillment visible here as requests move through review,
+        queueing, downloads, and final import.
       </p>
     </article>
 
@@ -282,19 +287,24 @@ onMounted(() => {
           <p class="metadata-card-copy">Requests visible in the current scope.</p>
         </article>
         <article class="metadata-card">
-          <p class="eyebrow">Needs fetch</p>
-          <strong>{{ summary.counts.needsFetch }}</strong>
-          <p class="metadata-card-copy">Requests that still need provider fetch and import follow-up.</p>
+          <p class="eyebrow">Under review</p>
+          <strong>{{ summary.fulfillmentCounts?.underReview ?? 0 }}</strong>
+          <p class="metadata-card-copy">Requests still waiting on manual review before fulfillment can continue.</p>
         </article>
         <article class="metadata-card">
-          <p class="eyebrow">Already exists</p>
-          <strong>{{ summary.counts.alreadyExists }}</strong>
-          <p class="metadata-card-copy">Requests that already matched fully imported media.</p>
+          <p class="eyebrow">Active</p>
+          <strong>{{ summary.fulfillmentCounts?.active ?? 0 }}</strong>
+          <p class="metadata-card-copy">Requests that are queued, downloading, or waiting for import apply.</p>
         </article>
         <article class="metadata-card">
-          <p class="eyebrow">Needs review</p>
-          <strong>{{ summary.counts.needsReview }}</strong>
-          <p class="metadata-card-copy">Requests that still need operator attention before provider handling.</p>
+          <p class="eyebrow">Satisfied</p>
+          <strong>{{ summary.fulfillmentCounts?.satisfied ?? 0 }}</strong>
+          <p class="metadata-card-copy">Requests that are already available or fully fulfilled in the library.</p>
+        </article>
+        <article class="metadata-card">
+          <p class="eyebrow">Failed</p>
+          <strong>{{ summary.fulfillmentCounts?.failed ?? 0 }}</strong>
+          <p class="metadata-card-copy">Requests that need operator intervention before fulfillment can finish.</p>
         </article>
       </div>
     </article>
@@ -376,7 +386,7 @@ onMounted(() => {
       <div class="section-header">
         <div>
           <h3>{{ selectedScope === 'all' ? 'All visible requests' : 'Your requests' }}</h3>
-          <p class="metadata-card-copy">Requests stay attributable to the requesting user instead of being mixed into the import review queue.</p>
+          <p class="metadata-card-copy">Requests stay attributable to the requesting user while this inbox surfaces the current fulfillment state for the target user.</p>
         </div>
       </div>
 
@@ -394,10 +404,12 @@ onMounted(() => {
               <p class="metadata-card-copy" v-else-if="request.requestedByUser.id !== request.requestedForUser.id">Requested on your behalf by {{ request.requestedByUser.username }}.</p>
               <p class="metadata-card-copy" v-else>Created {{ request.createdAt ?? 'recently' }}</p>
             </div>
-            <span class="review-status-pill" :class="requestStateClass(request.requestState)">{{ requestStateLabel(request.requestState) }}</span>
+            <span class="review-status-pill" :class="fulfillmentStatusClass(request.fulfillmentStatus)">{{ fulfillmentStatusLabel(request.fulfillmentStatus) }}</span>
           </div>
 
           <p class="metadata-card-copy" v-if="request.notes">{{ request.notes }}</p>
+          <p class="metadata-card-copy" v-if="request.fulfillmentStatus?.detail">{{ request.fulfillmentStatus.detail }}</p>
+          <p class="metadata-card-copy">Request classification: {{ requestStateLabel(request.requestState) }}</p>
           <p class="metadata-card-copy" v-if="request.sourceProvider">Source provider: {{ request.sourceProvider }}</p>
           <p class="metadata-card-copy" v-if="request.existingMatch">
             Matched release: {{ request.existingMatch.artistName }} - {{ request.existingMatch.releaseTitle || request.existingMatch.releaseGroupTitle }}

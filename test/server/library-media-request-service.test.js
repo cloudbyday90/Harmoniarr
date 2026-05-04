@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
+import { createLibraryMediaRequestFulfillmentService } from '../../src/server/library/library-media-request-fulfillment-service.js';
 import { createLibraryMediaRequestService } from '../../src/server/library/library-media-request-service.js';
 
 test('createLibraryMediaRequestService marks matched local releases as already existing media', async (t) => {
@@ -222,6 +223,71 @@ test('createLibraryMediaRequestService preserves lock conflicts from external in
     }),
     (error) => error.code === 'recovery_lock_conflict',
   );
+});
+
+test('buildMediaRequestSummary exposes fulfillment counts and recent request statuses', async () => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestFulfillmentService: createLibraryMediaRequestFulfillmentService({
+      listImportCandidatesBySourceMediaRequestIds: async () => ([
+        {
+          id: 'candidate-1',
+          normalizedPayload: {
+            requestOwnership: {
+              sourceMediaRequestId: 'request-2',
+            },
+          },
+          status: 'downloading',
+          updatedAt: '2026-05-04T11:00:00.000Z',
+        },
+      ]),
+    }),
+    mediaRequestStore: {
+      createMediaRequest: async () => {
+        throw new Error('Should not be called');
+      },
+      getMediaRequestCounts: async () => ({ alreadyExists: 1, needsFetch: 1, needsReview: 1, totalRequests: 3 }),
+      listMediaRequests: async () => ([
+        {
+          id: 'request-1',
+          requestState: 'already_exists',
+        },
+        {
+          id: 'request-2',
+          requestState: 'needs_fetch',
+        },
+        {
+          id: 'request-3',
+          requestState: 'needs_review',
+        },
+      ]),
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  const summary = await service.buildMediaRequestSummary({ requestedForUserId: 'user-7' });
+
+  assert.deepEqual(summary.fulfillmentCounts, {
+    active: 1,
+    alreadyAvailable: 1,
+    downloading: 1,
+    failed: 0,
+    fulfilled: 0,
+    importPending: 0,
+    queued: 0,
+    satisfied: 1,
+    totalRequests: 3,
+    underReview: 1,
+  });
+  assert.equal(summary.summary.status, 'active');
+  assert.equal(summary.recentRequests[0].fulfillmentStatus.code, 'already_available');
+  assert.equal(summary.recentRequests[1].fulfillmentStatus.code, 'downloading');
+  assert.equal(summary.recentRequests[2].fulfillmentStatus.code, 'under_review');
 });
 
 test('createLibraryMediaRequestService allows admins to create delegated requests for eligible users', async (t) => {

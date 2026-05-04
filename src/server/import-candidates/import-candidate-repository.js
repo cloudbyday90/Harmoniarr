@@ -148,6 +148,25 @@ export async function listImportCandidates({
   };
 }
 
+export async function listImportCandidatesBySourceMediaRequestIds(sourceMediaRequestIds, queryable) {
+  if (!Array.isArray(sourceMediaRequestIds) || sourceMediaRequestIds.length === 0) {
+    return [];
+  }
+
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      SELECT *
+      FROM import_candidates
+      WHERE normalized_payload -> 'requestOwnership' ->> 'sourceMediaRequestId' = ANY($1::text[])
+      ORDER BY discovered_at DESC, created_at DESC, id ASC
+    `,
+    [sourceMediaRequestIds],
+  );
+
+  return result.rows.map(mapImportCandidate);
+}
+
 export async function getImportCandidateById(importCandidateId, queryable) {
   const db = resolveQueryable(queryable);
   const result = await db.query(
