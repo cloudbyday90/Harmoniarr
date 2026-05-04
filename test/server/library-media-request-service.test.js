@@ -9,6 +9,7 @@ test('createLibraryMediaRequestService marks matched local releases as already e
     requestKind: payload.requestKind,
     requestState: payload.requestState,
     requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
     existingMatch: {
       artistName: 'Daft Punk',
       releaseGroupId: 'release-group-1',
@@ -71,6 +72,7 @@ test('createLibraryMediaRequestService keeps matched releases in needs_fetch whe
     requestKind: payload.requestKind,
     requestState: payload.requestState,
     requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
     existingMatch: {
       artistName: 'Daft Punk',
       releaseGroupId: payload.matchedMetadataReleaseGroupId,
@@ -125,6 +127,7 @@ test('createLibraryMediaRequestService classifies supported external URLs as fet
     requestKind: payload.requestKind,
     requestState: payload.requestState,
     requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
     sourceProvider: payload.sourceProvider,
     sourceUrl: payload.sourceUrl,
   }));
@@ -218,5 +221,133 @@ test('createLibraryMediaRequestService preserves lock conflicts from external in
       },
     }),
     (error) => error.code === 'recovery_lock_conflict',
+  );
+});
+
+test('createLibraryMediaRequestService allows admins to create delegated requests for eligible users', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-10',
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'admin', role: 'admin' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'plex-user', role: 'requester' },
+  }));
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createLibraryMediaRequestService({
+    getAppUserById: t.mock.fn(async () => ({
+      id: 'user-plex-4',
+      isDisabled: false,
+      plexProfile: {
+        accessPolicy: {
+          needsOperatorReview: false,
+          reasonCode: 'plex_shared_library_access',
+          requestTargetingEligible: true,
+        },
+      },
+    })),
+    mediaRequestStore: {
+      createMediaRequest,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn,
+  });
+
+  await service.createMediaRequest({
+    actorUserId: 'admin-1',
+    actorUserRole: 'admin',
+    payload: {
+      artistName: 'Burial',
+      releaseTitle: 'Untrue',
+      requestKind: 'release',
+      requestedForUserId: 'user-plex-4',
+    },
+  });
+
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].requestedByUserId, 'admin-1');
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].requestedForUserId, 'user-plex-4');
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.delegated, true);
+});
+
+test('createLibraryMediaRequestService rejects delegated targets for non-admin users', async () => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest: async () => {
+        throw new Error('Should not be called');
+      },
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.createMediaRequest({
+      actorUserId: 'user-2',
+      actorUserRole: 'requester',
+      payload: {
+        artistName: 'Massive Attack',
+        releaseTitle: 'Mezzanine',
+        requestKind: 'release',
+        requestedForUserId: 'user-3',
+      },
+    }),
+    (error) => error?.code === 'forbidden',
+  );
+});
+
+test('createLibraryMediaRequestService rejects delegated targets that still require Plex access review', async () => {
+  const service = createLibraryMediaRequestService({
+    getAppUserById: async () => ({
+      id: 'user-plex-9',
+      isDisabled: false,
+      plexProfile: {
+        accessPolicy: {
+          needsOperatorReview: true,
+          reasonCode: 'plex_member_access_unconfirmed',
+          requestTargetingEligible: false,
+        },
+      },
+    }),
+    mediaRequestStore: {
+      createMediaRequest: async () => {
+        throw new Error('Should not be called');
+      },
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.createMediaRequest({
+      actorUserId: 'admin-3',
+      actorUserRole: 'admin',
+      payload: {
+        artistName: 'Aphex Twin',
+        releaseTitle: 'Selected Ambient Works 85-92',
+        requestKind: 'release',
+        requestedForUserId: 'user-plex-9',
+      },
+    }),
+    (error) => error?.code === 'media_request_target_ineligible',
   );
 });

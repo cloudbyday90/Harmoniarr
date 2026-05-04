@@ -23,24 +23,34 @@ import {
   fetchMediaRequests,
   fetchMediaRequestSummary,
 } from '../lib/library-api.js';
+import { fetchUsers } from '../lib/users-api.js';
 import { sessionStore } from '../state/session.js';
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+const currentUserId = computed(() => sessionStore.state.user?.id ?? '');
 const mediaRequests = ref([]);
+const requestTargets = ref([]);
 const selectedScope = ref(isAdmin.value ? 'all' : 'mine');
 const summary = ref(null);
 const isLoading = ref(false);
+const isLoadingTargets = ref(false);
 const isSubmitting = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
+const targetErrorMessage = ref('');
 
 const form = reactive({
   artistName: '',
   notes: '',
   releaseTitle: '',
   requestKind: 'release',
+  requestedForUserId: '',
   sourceUrl: '',
   trackTitle: '',
+});
+
+const selectedTargetUser = computed(() => {
+  return requestTargets.value.find((user) => user.id === form.requestedForUserId) ?? null;
 });
 
 const canSubmit = computed(() => {
@@ -55,11 +65,37 @@ const canSubmit = computed(() => {
   return form.artistName.trim().length > 0 && form.releaseTitle.trim().length > 0;
 });
 
+function requestTargetLabel(user) {
+  if (!user) {
+    return '';
+  }
+
+  if (user.id === currentUserId.value) {
+    return `${user.username} (${user.role}, you)`;
+  }
+
+  return `${user.username} (${user.role})`;
+}
+
+function applyDefaultRequestTarget() {
+  if (!isAdmin.value) {
+    form.requestedForUserId = '';
+    return;
+  }
+
+  const preferredTarget = requestTargets.value.find((user) => user.id === currentUserId.value);
+  form.requestedForUserId = preferredTarget?.id ?? requestTargets.value[0]?.id ?? '';
+}
+
 function buildPayload() {
   const payload = {
     notes: form.notes,
     requestKind: form.requestKind,
   };
+
+  if (isAdmin.value && form.requestedForUserId) {
+    payload.requestedForUserId = form.requestedForUserId;
+  }
 
   if (form.requestKind === 'external_url') {
     payload.sourceUrl = form.sourceUrl;
@@ -83,6 +119,7 @@ function resetForm() {
   form.notes = '';
   form.releaseTitle = '';
   form.requestKind = 'release';
+  applyDefaultRequestTarget();
   form.sourceUrl = '';
   form.trackTitle = '';
 }
@@ -151,6 +188,29 @@ async function loadRequestDashboard() {
   }
 }
 
+async function loadRequestTargets() {
+  if (!isAdmin.value) {
+    requestTargets.value = [];
+    form.requestedForUserId = '';
+    return;
+  }
+
+  isLoadingTargets.value = true;
+  targetErrorMessage.value = '';
+
+  try {
+    const payload = await fetchUsers();
+    requestTargets.value = (payload.users ?? []).filter((user) => user.mediaRequestTarget?.eligible);
+    applyDefaultRequestTarget();
+  } catch (error) {
+    requestTargets.value = [];
+    applyDefaultRequestTarget();
+    targetErrorMessage.value = error instanceof Error ? error.message : 'Eligible request targets could not be loaded';
+  } finally {
+    isLoadingTargets.value = false;
+  }
+}
+
 async function submitRequest() {
   isSubmitting.value = true;
   errorMessage.value = '';
@@ -158,9 +218,15 @@ async function submitRequest() {
 
   try {
     const payload = await createMediaRequest(buildPayload());
+    const targetUser = payload.mediaRequest.requestedForUser;
+    const delegated = Boolean(targetUser && targetUser.id !== currentUserId.value);
     successMessage.value = payload.mediaRequest.requestState === 'already_exists'
-      ? 'This request already maps to imported media and has been added to your request profile.'
-      : 'Music request submitted and added to your request profile.';
+      ? delegated
+        ? `This request already maps to imported media and has been added for ${targetUser.username}.`
+        : 'This request already maps to imported media and has been added to your request profile.'
+      : delegated
+        ? `Music request submitted for ${targetUser.username}.`
+        : 'Music request submitted and added to your request profile.';
     resetForm();
     await loadRequestDashboard();
   } catch (error) {
@@ -181,6 +247,7 @@ async function switchScope(scope) {
 
 onMounted(() => {
   void loadRequestDashboard();
+  void loadRequestTargets();
 });
 </script>
 
@@ -241,6 +308,20 @@ onMounted(() => {
       </div>
 
       <form class="metadata-search-form request-music-form" @submit.prevent="submitRequest">
+        <label v-if="isAdmin">
+          Request for
+          <select v-model="form.requestedForUserId" :disabled="isLoadingTargets || requestTargets.length === 0">
+            <option v-for="user in requestTargets" :key="user.id" :value="user.id">{{ requestTargetLabel(user) }}</option>
+          </select>
+        </label>
+
+        <p class="metadata-card-copy" v-if="isAdmin && selectedTargetUser">
+          Requests created here are owned by {{ selectedTargetUser.username }} for inbox and fulfillment targeting, while audit still records the acting admin separately.
+        </p>
+        <p class="metadata-card-copy" v-if="isAdmin && isLoadingTargets">Loading eligible request targets.</p>
+        <p class="metadata-card-copy" v-else-if="isAdmin && requestTargets.length === 0 && !targetErrorMessage">No eligible request targets are currently available.</p>
+        <p class="error-copy" v-if="targetErrorMessage">{{ targetErrorMessage }}</p>
+
         <label>
           Request type
           <select v-model="form.requestKind">
@@ -306,7 +387,11 @@ onMounted(() => {
             <div>
               <p class="eyebrow">{{ requestKindLabel(request.requestKind) }}</p>
               <h3>{{ requestHeadline(request) }}</h3>
-              <p class="metadata-card-copy" v-if="selectedScope === 'all'">Requested by {{ request.requestedByUser.username }} ({{ request.requestedByUser.role }})</p>
+              <p class="metadata-card-copy" v-if="selectedScope === 'all' && request.requestedByUser.id !== request.requestedForUser.id">
+                Requested by {{ request.requestedByUser.username }} ({{ request.requestedByUser.role }}) for {{ request.requestedForUser.username }} ({{ request.requestedForUser.role }})
+              </p>
+              <p class="metadata-card-copy" v-else-if="selectedScope === 'all'">Requested by {{ request.requestedByUser.username }} ({{ request.requestedByUser.role }})</p>
+              <p class="metadata-card-copy" v-else-if="request.requestedByUser.id !== request.requestedForUser.id">Requested on your behalf by {{ request.requestedByUser.username }}.</p>
               <p class="metadata-card-copy" v-else>Created {{ request.createdAt ?? 'recently' }}</p>
             </div>
             <span class="review-status-pill" :class="requestStateClass(request.requestState)">{{ requestStateLabel(request.requestState) }}</span>

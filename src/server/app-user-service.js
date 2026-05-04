@@ -19,6 +19,7 @@
 import { createApiError } from './auth.js';
 import { recordAuditEvent } from './audit.js';
 import { getPool } from './database.js';
+import { buildMediaRequestTargetEligibility } from './media-request-target-eligibility.js';
 import { createAppUserPermissionService } from './app-user-permission-service.js';
 import { buildLocalAuthStatus } from './local-auth-readiness.js';
 import { buildPlexLibraryAccessPolicy } from './plex-library-access-policy.js';
@@ -35,6 +36,24 @@ function normalizeUserId(value) {
 }
 
 function mapAppUserRow(row, permissionService) {
+  const plexProfile = row.plex_user_id ? {
+    accessPolicy: buildPlexLibraryAccessPolicy({
+      homeRole: row.plex_home_role,
+      libraryAccessDetails: row.plex_library_access_details ?? {},
+      libraryAccessState: row.plex_library_access_state ?? 'unknown',
+    }),
+    homeRole: row.plex_home_role,
+    libraryAccessDetails: row.plex_library_access_details ?? {},
+    libraryAccessState: row.plex_library_access_state ?? 'unknown',
+    plexEmail: row.plex_email ?? null,
+    plexTitle: row.plex_title,
+    plexUserId: row.plex_user_id,
+    plexUsername: row.plex_username ?? null,
+    plexUuid: row.plex_uuid ?? null,
+    thumbUrl: row.plex_thumb_url ?? null,
+    syncedAt: row.plex_synced_at ?? null,
+  } : null;
+
   return {
     authProvider: row.auth_provider ?? 'local',
     authSubject: row.auth_subject ?? null,
@@ -45,25 +64,13 @@ function mapAppUserRow(row, permissionService) {
     lastLoginAt: row.last_login_at,
     localAuth: buildLocalAuthStatus(row),
     managedLibraryRelativeRoot: row.managed_library_relative_root ?? null,
+    mediaRequestTarget: buildMediaRequestTargetEligibility({
+      isDisabled: row.is_disabled,
+      plexProfile,
+    }),
     mustChangePassword: row.must_change_password,
     permissions: permissionService.listPermissionsForRole(row.role),
-    plexProfile: row.plex_user_id ? {
-      accessPolicy: buildPlexLibraryAccessPolicy({
-        homeRole: row.plex_home_role,
-        libraryAccessDetails: row.plex_library_access_details ?? {},
-        libraryAccessState: row.plex_library_access_state ?? 'unknown',
-      }),
-      homeRole: row.plex_home_role,
-      libraryAccessDetails: row.plex_library_access_details ?? {},
-      libraryAccessState: row.plex_library_access_state ?? 'unknown',
-      plexEmail: row.plex_email ?? null,
-      plexTitle: row.plex_title,
-      plexUserId: row.plex_user_id,
-      plexUsername: row.plex_username ?? null,
-      plexUuid: row.plex_uuid ?? null,
-      thumbUrl: row.plex_thumb_url ?? null,
-      syncedAt: row.plex_synced_at ?? null,
-    } : null,
+    plexProfile,
     role: row.role,
     updatedAt: row.updated_at,
     username: row.username,

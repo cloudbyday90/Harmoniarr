@@ -220,6 +220,7 @@ export function createApp({
   const libraryModule = buildLibraryModule({
     artworkAssignmentService: artworkModule.artworkAssignmentService,
     artworkIngestionService: artworkModule.artworkIngestionService,
+    getAppUserById: appUserModule.appUserService.getAppUserById,
     importCandidateService: importCandidateModule.importCandidateService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,

@@ -18,6 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
 import { createMetadataSearchService } from '../metadata/metadata-search-service.js';
 import { normalizeExternalMediaSource } from './external-media-source-parser.js';
 import { createLibraryReleaseAvailabilityStore } from './library-release-availability-store.js';
@@ -66,6 +67,23 @@ function normalizeRequestKind(value) {
   const normalized = value.trim().toLowerCase();
   if (!['release', 'track', 'external_url'].includes(normalized)) {
     throw createApiError(400, 'validation_error', 'requestKind must be one of: release, track, external_url');
+  }
+
+  return normalized;
+}
+
+function normalizeOptionalUserId(value, fieldName) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw createApiError(400, 'validation_error', `${fieldName} must be a string`);
+  }
+
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return null;
   }
 
   return normalized;
@@ -190,14 +208,48 @@ function findExistingRelease(results, { artistName, releaseTitle }) {
 
 export function createLibraryMediaRequestService({
   externalIntakeService = null,
+  getAppUserById = null,
   mediaRequestStore = createLibraryMediaRequestStore(),
   metadataSearchService = createMetadataSearchService(),
   releaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
   recordAuditEventFn = recordAuditEvent,
 } = {}) {
-  async function createMediaRequest({ actorUserId, payload, requestMetadata }) {
+  async function resolveRequestedForUserId({ actorUserId, actorUserRole, requestedForUserId }) {
+    const normalizedRequestedForUserId = normalizeOptionalUserId(requestedForUserId, 'requestedForUserId');
+
+    if (!normalizedRequestedForUserId || normalizedRequestedForUserId === actorUserId) {
+      return actorUserId;
+    }
+
+    if (actorUserRole !== 'admin') {
+      throw createApiError(403, 'forbidden', 'Only administrators can submit music requests for another user');
+    }
+
+    if (typeof getAppUserById !== 'function') {
+      throw new Error('Delegated media request targeting requires getAppUserById');
+    }
+
+    const targetUser = await getAppUserById({ userId: normalizedRequestedForUserId });
+    if (!targetUser) {
+      throw createApiError(404, 'app_user_not_found', 'The requested request-target user could not be found');
+    }
+
+    const targetEligibility = buildMediaRequestTargetEligibility(targetUser);
+    if (!targetEligibility.eligible) {
+      throw createApiError(409, 'media_request_target_ineligible', 'The requested user is not currently eligible for delegated music requests');
+    }
+
+    return targetUser.id;
+  }
+
+  async function createMediaRequest({ actorUserId, actorUserRole = null, payload, requestMetadata }) {
     const draft = validateDraft(payload ?? {});
     const normalizedQuery = buildNormalizedQuery(draft);
+    const requestedForUserId = await resolveRequestedForUserId({
+      actorUserId,
+      actorUserRole,
+      requestedForUserId: payload?.requestedForUserId,
+    });
 
     let matchedMetadataReleaseGroupId = null;
     let matchedMetadataReleaseId = null;
@@ -260,6 +312,7 @@ export function createLibraryMediaRequestService({
       requestKind: draft.requestKind,
       requestState,
       requestedByUserId: actorUserId,
+      requestedForUserId,
       sourceProvider,
       sourceUrl: draft.sourceUrl,
       trackTitle: draft.trackTitle,
@@ -269,9 +322,11 @@ export function createLibraryMediaRequestService({
       actorType: 'app_user',
       actorUserId,
       details: {
+        delegated: requestedForUserId !== actorUserId,
         requestId: mediaRequest.id,
         requestKind: mediaRequest.requestKind,
         requestState: mediaRequest.requestState,
+        requestedForUserId,
       },
       entityId: mediaRequest.id,
       entityType: 'media_request',
@@ -302,14 +357,14 @@ export function createLibraryMediaRequestService({
     return mediaRequest;
   }
 
-  async function listMediaRequests({ requestedByUserId = null } = {}) {
-    return mediaRequestStore.listMediaRequests({ requestedByUserId });
+  async function listMediaRequests({ requestedForUserId = null } = {}) {
+    return mediaRequestStore.listMediaRequests({ requestedForUserId });
   }
 
-  async function buildMediaRequestSummary({ requestedByUserId = null } = {}) {
+  async function buildMediaRequestSummary({ requestedForUserId = null } = {}) {
     const [counts, recentRequests] = await Promise.all([
-      mediaRequestStore.getMediaRequestCounts({ requestedByUserId }),
-      mediaRequestStore.listMediaRequests({ requestedByUserId }),
+      mediaRequestStore.getMediaRequestCounts({ requestedForUserId }),
+      mediaRequestStore.listMediaRequests({ requestedForUserId }),
     ]);
 
     return {

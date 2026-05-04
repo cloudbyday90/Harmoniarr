@@ -117,6 +117,11 @@ function createLibraryRouteTestApp(overrides = {}) {
           role: 'requester',
           username: 'listener',
         },
+        requestedForUser: {
+          id: payload.requestedForUserId ?? actorUserId,
+          role: 'requester',
+          username: 'listener',
+        },
       }),
       getRequestMetadata: (request) => ({
         ipAddress: request.headers['x-forwarded-for'] ?? '127.0.0.1',
@@ -129,6 +134,7 @@ function createLibraryRouteTestApp(overrides = {}) {
         requestKind: 'release',
         requestState: 'needs_fetch',
         requestedByUser: { id: 'user-1', role: 'requester', username: 'listener' },
+        requestedForUser: { id: 'user-1', role: 'requester', username: 'listener' },
       }],
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
@@ -220,7 +226,7 @@ test('library discovery summary route requires a session and returns the shared 
 
 test('media request summary route resolves authenticated scope and returns the shared summary payload', async (t) => {
   const requireSession = t.mock.fn(async () => ({ appUserId: 'user-50', csrfToken: 'csrf-50', user: { role: 'requester' } }));
-  const buildMediaRequestSummary = t.mock.fn(async ({ requestedByUserId }) => ({
+  const buildMediaRequestSummary = t.mock.fn(async ({ requestedForUserId }) => ({
     counts: {
       alreadyExists: 1,
       needsFetch: 2,
@@ -229,7 +235,7 @@ test('media request summary route resolves authenticated scope and returns the s
     },
     recentRequests: [],
     summary: {
-      message: `Summary for ${requestedByUserId}`,
+      message: `Summary for ${requestedForUserId}`,
       status: 'active',
     },
   }));
@@ -240,7 +246,7 @@ test('media request summary route resolves authenticated scope and returns the s
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(buildMediaRequestSummary.mock.calls[0].arguments, [{ requestedByUserId: 'user-50' }]);
+    assert.deepEqual(buildMediaRequestSummary.mock.calls[0].arguments, [{ requestedForUserId: 'user-50' }]);
     assert.equal(payload.scope, 'mine');
     assert.equal(payload.summary.message, 'Summary for user-50');
   });
@@ -301,7 +307,7 @@ test('media request list route allows admins to read all requests', async (t) =>
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(listMediaRequests.mock.calls[0].arguments, [{ requestedByUserId: null }]);
+    assert.deepEqual(listMediaRequests.mock.calls[0].arguments, [{ requestedForUserId: null }]);
     assert.equal(payload.scope, 'all');
     assert.deepEqual(payload.mediaRequests, [{ id: 'request-2' }]);
   });
@@ -344,6 +350,7 @@ test('media request create route passes session ownership and request metadata t
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.deepEqual(createMediaRequest.mock.calls[0].arguments, [{
       actorUserId: 'user-51',
+      actorUserRole: 'requester',
       payload: {
         artistName: 'Daft Punk',
         releaseTitle: 'Discovery',
@@ -356,6 +363,61 @@ test('media request create route passes session ownership and request metadata t
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.mediaRequest.id, 'request-3');
+  });
+});
+
+test('media request create route lets admins submit a request for an eligible target user', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-8', csrfToken: 'csrf-8', user: { role: 'admin' } }));
+  const requireCsrf = t.mock.fn();
+  const createMediaRequest = t.mock.fn(async ({ actorUserId, payload }) => ({
+    id: 'request-8',
+    requestKind: payload.requestKind,
+    requestState: 'needs_fetch',
+    requestedByUser: {
+      id: actorUserId,
+      role: 'admin',
+      username: 'owner',
+    },
+    requestedForUser: {
+      id: payload.requestedForUserId,
+      role: 'requester',
+      username: 'plex-user',
+    },
+  }));
+  const app = createLibraryRouteTestApp({ createMediaRequest, requireCsrf, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-8',
+      },
+      body: JSON.stringify({
+        artistName: 'Boards of Canada',
+        releaseTitle: 'Music Has the Right to Children',
+        requestKind: 'release',
+        requestedForUserId: 'user-plex-8',
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.deepEqual(createMediaRequest.mock.calls[0].arguments, [{
+      actorUserId: 'admin-8',
+      actorUserRole: 'admin',
+      payload: {
+        artistName: 'Boards of Canada',
+        releaseTitle: 'Music Has the Right to Children',
+        requestKind: 'release',
+        requestedForUserId: 'user-plex-8',
+      },
+      requestMetadata: {
+        ipAddress: '127.0.0.1',
+        userAgent: 'node',
+      },
+    }]);
+    assert.equal(payload.mediaRequest.requestedForUser.id, 'user-plex-8');
   });
 });
 

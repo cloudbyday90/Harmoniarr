@@ -357,10 +357,11 @@ Status note:
   - Migration `20260502_000011_provider_ingest_request_intents.sql` adds the `provider_ingest_requests` table with provider, resource type, ingest target, identifier, canonical URL, pagination state, status, and evidence columns.
 - [x] Model playlist import expansion policy so operators can keep selection bounded to playlist albums or opt into additional album discovery for artists referenced by the playlist.
 - [x] Add a dedicated Request Music dashboard and persisted user-owned media request inbox for release, track, and provider URL submissions, with requester-scoped history and admin all-request visibility separate from import review.
-- [ ] Split Request Music ownership into acting user vs target user so admins can submit requests for another Harmoniarr user.
+- [x] Split Request Music ownership into acting user vs target user so admins can submit requests for another Harmoniarr user.
   - Decision: request persistence should distinguish `requestedByUserId` from `requestedForUserId` instead of overloading one field to mean both.
   - Decision: non-admin users remain self-only, while admins can choose any eligible user as the request target.
   - Decision: request history and detail views should show both "requested by" and "requested for", and import or apply ownership plus managed-library routing should follow `requestedForUserId`.
+  - Progress: media requests now persist both acting and target users, the shared request service validates delegated targets against a server-owned eligibility contract, and Request Music intake plus history now surface delegated "requested by" versus target-owned "requested for" behavior without introducing a second request model.
   - Decision: initial implementation should land the single-target ownership split first, then extend into multi-user fan-out through explicit per-target child requests or equivalent durable target-owned records rather than one ambiguous request shared across many users.
   - Decision: target users should receive explicit inbox and notification visibility for admin-on-behalf request creation, review, queueing, fulfillment, and failure states.
 - [ ] Extend admin-targeted Request Music into explicit per-target fan-out records so a single admin action can materialize durable target-owned requests for multiple users without collapsing ownership or audit history.

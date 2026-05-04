@@ -70,6 +70,7 @@ import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-
 export function createLibraryModule({
   artworkAssignmentService = null,
   artworkIngestionService = null,
+  getAppUserById = null,
   importCandidateService = null,
   settingsService = createSettingsService(),
   slskdService = null,
@@ -149,6 +150,7 @@ export function createLibraryModule({
   }),
   libraryMediaRequestService = createLibraryMediaRequestService({
     externalIntakeService: libraryExternalIntakeService,
+    getAppUserById,
     mediaRequestStore: libraryMediaRequestStore,
     releaseAvailabilityStore: libraryReleaseAvailabilityStore,
   }),

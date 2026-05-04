@@ -45,6 +45,11 @@ function mapMediaRequestRow(row) {
       role: row.requested_by_role ?? null,
       username: row.requested_by_username ?? null,
     },
+    requestedForUser: {
+      id: row.requested_for_user_id,
+      role: row.requested_for_role ?? null,
+      username: row.requested_for_username ?? null,
+    },
     existingMatch: matchedReleaseId || matchedReleaseGroupId
       ? {
           artistName: row.matched_artist_name ?? null,
@@ -66,8 +71,8 @@ function mapSummaryCounts(row) {
   };
 }
 
-function buildVisibilityFilter({ requestedByUserId }) {
-  if (!requestedByUserId) {
+function buildVisibilityFilter({ requestedForUserId }) {
+  if (!requestedForUserId) {
     return {
       params: [],
       sql: '',
@@ -75,8 +80,8 @@ function buildVisibilityFilter({ requestedByUserId }) {
   }
 
   return {
-    params: [requestedByUserId],
-    sql: 'WHERE media_requests.requested_by_user_id = $1',
+    params: [requestedForUserId],
+    sql: 'WHERE media_requests.requested_for_user_id = $1',
   };
 }
 
@@ -84,6 +89,7 @@ const baseSelect = `
   SELECT
     media_requests.id,
     media_requests.requested_by_user_id,
+    media_requests.requested_for_user_id,
     media_requests.request_kind,
     media_requests.request_state,
     media_requests.artist_name,
@@ -100,6 +106,8 @@ const baseSelect = `
     media_requests.updated_at,
     request_users.username AS requested_by_username,
     request_users.role AS requested_by_role,
+    target_users.username AS requested_for_username,
+    target_users.role AS requested_for_role,
     matched_release_groups.id AS matched_release_group_id,
     matched_release_groups.title AS matched_release_group_title,
     matched_releases.title AS matched_release_title,
@@ -107,6 +115,8 @@ const baseSelect = `
   FROM media_requests
   JOIN app_users AS request_users
     ON request_users.id = media_requests.requested_by_user_id
+  JOIN app_users AS target_users
+    ON target_users.id = media_requests.requested_for_user_id
   LEFT JOIN metadata_releases AS matched_releases
     ON matched_releases.id = media_requests.matched_metadata_release_id
   LEFT JOIN metadata_release_groups AS matched_release_groups
@@ -135,6 +145,7 @@ export function createLibraryMediaRequestStore({
     requestKind,
     requestState,
     requestedByUserId,
+    requestedForUserId,
     sourceProvider,
     sourceUrl,
     trackTitle,
@@ -145,6 +156,7 @@ export function createLibraryMediaRequestStore({
         WITH inserted AS (
           INSERT INTO media_requests (
             requested_by_user_id,
+            requested_for_user_id,
             request_kind,
             request_state,
             artist_name,
@@ -172,7 +184,8 @@ export function createLibraryMediaRequestStore({
             $10,
             $11,
             $12,
-            $13::jsonb,
+            $13,
+            $14::jsonb,
             NOW()
           )
           RETURNING id
@@ -183,6 +196,7 @@ export function createLibraryMediaRequestStore({
       `,
       [
         requestedByUserId,
+        requestedForUserId,
         requestKind,
         requestState,
         artistName,
@@ -201,9 +215,9 @@ export function createLibraryMediaRequestStore({
     return mapMediaRequestRow(result.rows[0]);
   }
 
-  async function listMediaRequests({ requestedByUserId = null } = {}) {
+  async function listMediaRequests({ requestedForUserId = null } = {}) {
     const pool = getPoolFn();
-    const filter = buildVisibilityFilter({ requestedByUserId });
+    const filter = buildVisibilityFilter({ requestedForUserId });
     const result = await pool.query(
       `
         ${baseSelect}
@@ -216,9 +230,9 @@ export function createLibraryMediaRequestStore({
     return result.rows.map(mapMediaRequestRow);
   }
 
-  async function getMediaRequestCounts({ requestedByUserId = null } = {}) {
+  async function getMediaRequestCounts({ requestedForUserId = null } = {}) {
     const pool = getPoolFn();
-    const filter = buildVisibilityFilter({ requestedByUserId });
+    const filter = buildVisibilityFilter({ requestedForUserId });
     const result = await pool.query(
       `
         SELECT

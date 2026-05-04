@@ -41,6 +41,11 @@ test('createAppUserService lists users with resolved permission sets', async (t)
       unlinkPlexReady: true,
     },
     managedLibraryRelativeRoot: 'listeners/listener',
+    mediaRequestTarget: {
+      eligible: true,
+      needsOperatorReview: false,
+      reasonCode: 'media_request_target_local_user',
+    },
     mustChangePassword: true,
     permissions: ['import.preview.self', 'media.request', 'playlist.submit'],
     plexProfile: null,
@@ -118,6 +123,11 @@ test('createAppUserService creates a user with the requested role and audit evid
       unlinkPlexReady: true,
     },
     managedLibraryRelativeRoot: 'owned/curator',
+    mediaRequestTarget: {
+      eligible: true,
+      needsOperatorReview: false,
+      reasonCode: 'media_request_target_local_user',
+    },
     mustChangePassword: true,
     permissions: ['import.execute', 'import.review', 'library.discovery', 'library.scan', 'media.request', 'playlist.submit'],
     plexProfile: null,
@@ -206,6 +216,11 @@ test('createAppUserService maps Plex library access policy for linked users', as
   assert.equal(user.plexProfile.accessPolicy.classification, 'eligible');
   assert.equal(user.plexProfile.accessPolicy.requestTargetingEligible, true);
   assert.equal(user.plexProfile.accessPolicy.serverCount, 1);
+  assert.deepEqual(user.mediaRequestTarget, {
+    eligible: true,
+    needsOperatorReview: false,
+    reasonCode: 'plex_shared_library_access',
+  });
 });
 
 test('createAppUserService resolves users by id for import target ownership lookups', async (t) => {

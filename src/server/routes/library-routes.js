@@ -71,7 +71,7 @@ export function registerLibraryRoutes(app, {
       ok: true,
       scope,
       ...(await buildMediaRequestSummary({
-        requestedByUserId: scope === 'mine' ? session.appUserId : null,
+        requestedForUserId: scope === 'mine' ? session.appUserId : null,
       })),
     });
   }));
@@ -81,7 +81,7 @@ export function registerLibraryRoutes(app, {
     const scope = resolveMediaRequestScope(session, request.query.scope);
     response.json({
       mediaRequests: await listMediaRequests({
-        requestedByUserId: scope === 'mine' ? session.appUserId : null,
+        requestedForUserId: scope === 'mine' ? session.appUserId : null,
       }),
       ok: true,
       scope,
@@ -124,6 +124,7 @@ export function registerLibraryRoutes(app, {
 
     const mediaRequest = await createMediaRequest({
       actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
       payload: request.body,
       requestMetadata: getRequestMetadata(request),
     });
