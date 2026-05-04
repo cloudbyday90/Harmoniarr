@@ -51,6 +51,7 @@ function mapCandidateFulfillmentStatus(candidate) {
         code: 'fulfilled',
         detail: 'Imported media has been applied to the library.',
         label: 'Fulfilled',
+        occurredAt: candidate?.updatedAt ?? candidate?.discoveredAt ?? candidate?.createdAt ?? null,
         tone: 'selected',
       };
     case 'import_pending':
@@ -58,6 +59,7 @@ function mapCandidateFulfillmentStatus(candidate) {
         code: 'import_pending',
         detail: 'Download completed and is waiting for import apply.',
         label: 'Import pending',
+        occurredAt: candidate?.updatedAt ?? candidate?.discoveredAt ?? candidate?.createdAt ?? null,
         tone: 'held',
       };
     case 'downloading':
@@ -65,6 +67,7 @@ function mapCandidateFulfillmentStatus(candidate) {
         code: 'downloading',
         detail: 'Files are currently downloading.',
         label: 'Downloading',
+        occurredAt: candidate?.updatedAt ?? candidate?.discoveredAt ?? candidate?.createdAt ?? null,
         tone: 'held',
       };
     case 'selected':
@@ -72,6 +75,7 @@ function mapCandidateFulfillmentStatus(candidate) {
         code: 'queued',
         detail: 'Reviewed and queued for import execution.',
         label: 'Queued',
+        occurredAt: candidate?.updatedAt ?? candidate?.discoveredAt ?? candidate?.createdAt ?? null,
         tone: 'held',
       };
     case 'held':
@@ -79,6 +83,7 @@ function mapCandidateFulfillmentStatus(candidate) {
         code: 'under_review',
         detail: 'Held for additional review before execution.',
         label: 'Under review',
+        occurredAt: candidate?.updatedAt ?? candidate?.discoveredAt ?? candidate?.createdAt ?? null,
         tone: 'held',
       };
     case 'rejected':
@@ -86,6 +91,7 @@ function mapCandidateFulfillmentStatus(candidate) {
         code: 'failed',
         detail: 'Review rejected this request.',
         label: 'Not proceeding',
+        occurredAt: candidate?.updatedAt ?? candidate?.discoveredAt ?? candidate?.createdAt ?? null,
         tone: 'failed',
       };
     case 'failed':
@@ -93,6 +99,7 @@ function mapCandidateFulfillmentStatus(candidate) {
         code: 'failed',
         detail: 'Import execution failed and needs operator attention.',
         label: 'Failed',
+        occurredAt: candidate?.updatedAt ?? candidate?.discoveredAt ?? candidate?.createdAt ?? null,
         tone: 'failed',
       };
     default:
@@ -100,6 +107,7 @@ function mapCandidateFulfillmentStatus(candidate) {
         code: 'under_review',
         detail: 'Waiting for import review.',
         label: 'Under review',
+        occurredAt: candidate?.updatedAt ?? candidate?.discoveredAt ?? candidate?.createdAt ?? null,
         tone: 'held',
       };
   }
@@ -112,6 +120,7 @@ export function buildFallbackMediaRequestFulfillmentStatus(request) {
         code: 'already_available',
         detail: 'This request already matched imported media.',
         label: 'Already available',
+        occurredAt: request?.updatedAt ?? request?.createdAt ?? null,
         tone: 'selected',
       };
     case 'needs_review':
@@ -119,6 +128,7 @@ export function buildFallbackMediaRequestFulfillmentStatus(request) {
         code: 'under_review',
         detail: 'Needs operator review before fetch can continue.',
         label: 'Needs review',
+        occurredAt: request?.updatedAt ?? request?.createdAt ?? null,
         tone: 'held',
       };
     default:
@@ -126,6 +136,7 @@ export function buildFallbackMediaRequestFulfillmentStatus(request) {
         code: 'queued',
         detail: 'Waiting for fetch and discovery follow-up.',
         label: 'Queued',
+        occurredAt: request?.updatedAt ?? request?.createdAt ?? null,
         tone: 'held',
       };
   }

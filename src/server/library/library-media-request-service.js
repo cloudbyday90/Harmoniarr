@@ -22,6 +22,7 @@ import { buildMediaRequestTargetEligibility } from '../media-request-target-elig
 import { createMetadataSearchService } from '../metadata/metadata-search-service.js';
 import { normalizeExternalMediaSource } from './external-media-source-parser.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
+import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
 import { createLibraryReleaseAvailabilityStore } from './library-release-availability-store.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
 
@@ -219,6 +220,7 @@ export function createLibraryMediaRequestService({
   getAppUserById = null,
   mediaRequestStore = createLibraryMediaRequestStore(),
   mediaRequestFulfillmentService = createLibraryMediaRequestFulfillmentService(),
+  mediaRequestNotificationService = createLibraryMediaRequestNotificationService(),
   metadataSearchService = createMetadataSearchService(),
   releaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
   recordAuditEventFn = recordAuditEvent,
@@ -377,10 +379,14 @@ export function createLibraryMediaRequestService({
       listMediaRequests({ requestedForUserId }),
     ]);
     const fulfillmentCounts = mediaRequestFulfillmentService.buildMediaRequestFulfillmentCounts(mediaRequests);
+    const notificationFeed = mediaRequestNotificationService.buildNotifications({
+      mediaRequests,
+    });
 
     return {
       counts,
       fulfillmentCounts,
+      notificationFeed,
       recentRequests: mediaRequests.slice(0, 5),
       summary: buildSummaryMessage(fulfillmentCounts),
     };

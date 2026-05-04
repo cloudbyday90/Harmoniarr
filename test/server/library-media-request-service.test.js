@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
 import { createLibraryMediaRequestFulfillmentService } from '../../src/server/library/library-media-request-fulfillment-service.js';
+import { createLibraryMediaRequestNotificationService } from '../../src/server/library/library-media-request-notification-service.js';
 import { createLibraryMediaRequestService } from '../../src/server/library/library-media-request-service.js';
 
 test('createLibraryMediaRequestService marks matched local releases as already existing media', async (t) => {
@@ -249,18 +250,48 @@ test('buildMediaRequestSummary exposes fulfillment counts and recent request sta
       listMediaRequests: async () => ([
         {
           id: 'request-1',
+          requestedByUser: {
+            id: 'admin-1',
+            username: 'owner',
+          },
+          requestedForUser: {
+            id: 'user-7',
+            username: 'listener',
+          },
           requestState: 'already_exists',
+          updatedAt: '2026-05-04T10:00:00.000Z',
         },
         {
           id: 'request-2',
+          requestedByUser: {
+            id: 'admin-1',
+            username: 'owner',
+          },
+          requestedForUser: {
+            id: 'user-7',
+            username: 'listener',
+          },
           requestState: 'needs_fetch',
+          updatedAt: '2026-05-04T11:00:00.000Z',
         },
         {
           id: 'request-3',
+          requestedByUser: {
+            id: 'user-7',
+            username: 'listener',
+          },
+          requestedForUser: {
+            id: 'user-7',
+            username: 'listener',
+          },
           requestState: 'needs_review',
+          updatedAt: '2026-05-04T12:00:00.000Z',
         },
       ]),
     },
+    mediaRequestNotificationService: createLibraryMediaRequestNotificationService({
+      nowFn: () => new Date('2026-05-04T12:30:00.000Z'),
+    }),
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
     },
@@ -285,6 +316,10 @@ test('buildMediaRequestSummary exposes fulfillment counts and recent request sta
     underReview: 1,
   });
   assert.equal(summary.summary.status, 'active');
+  assert.equal(summary.notificationFeed.checkedAt, '2026-05-04T12:30:00.000Z');
+  assert.equal(summary.notificationFeed.counts.total, 5);
+  assert.equal(summary.notificationFeed.counts.byCategory.delegated_request, 2);
+  assert.equal(summary.notificationFeed.notifications[0].title, 'Request under review');
   assert.equal(summary.recentRequests[0].fulfillmentStatus.code, 'already_available');
   assert.equal(summary.recentRequests[1].fulfillmentStatus.code, 'downloading');
   assert.equal(summary.recentRequests[2].fulfillmentStatus.code, 'under_review');

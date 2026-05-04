@@ -23,6 +23,7 @@ import {
   fetchMediaRequests,
   fetchMediaRequestSummary,
 } from '../lib/library-api.js';
+import RequestNotificationsPanel from '../components/RequestNotificationsPanel.vue';
 import { fetchUsers } from '../lib/users-api.js';
 import { sessionStore } from '../state/session.js';
 
@@ -308,6 +309,13 @@ onMounted(() => {
         </article>
       </div>
     </article>
+
+    <RequestNotificationsPanel
+      v-if="summary?.notificationFeed"
+      :checked-at="summary.notificationFeed.checkedAt"
+      :counts="summary.notificationFeed.counts"
+      :notifications="summary.notificationFeed.notifications"
+    />
 
     <article class="panel-light">
       <div class="section-header">

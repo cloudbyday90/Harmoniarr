@@ -12,6 +12,7 @@ test('buildMediaRequestFulfillmentStatus falls back to request classification wh
     code: 'already_available',
     detail: 'This request already matched imported media.',
     label: 'Already available',
+    occurredAt: null,
     tone: 'selected',
   });
   assert.deepEqual(buildMediaRequestFulfillmentStatus({
@@ -21,6 +22,7 @@ test('buildMediaRequestFulfillmentStatus falls back to request classification wh
     code: 'queued',
     detail: 'Waiting for fetch and discovery follow-up.',
     label: 'Queued',
+    occurredAt: null,
     tone: 'held',
   });
 });
@@ -74,6 +76,7 @@ test('createLibraryMediaRequestFulfillmentService promotes the most advanced lin
       importCandidateId: 'candidate-applied',
       importCandidateStatus: 'applied',
       label: 'Fulfilled',
+      occurredAt: '2026-05-04T11:00:00.000Z',
       tone: 'selected',
     },
     {
@@ -82,12 +85,14 @@ test('createLibraryMediaRequestFulfillmentService promotes the most advanced lin
       importCandidateId: 'candidate-import-pending',
       importCandidateStatus: 'import_pending',
       label: 'Import pending',
+      occurredAt: '2026-05-04T12:00:00.000Z',
       tone: 'held',
     },
     {
       code: 'under_review',
       detail: 'Needs operator review before fetch can continue.',
       label: 'Needs review',
+      occurredAt: null,
       tone: 'held',
     },
   ]);

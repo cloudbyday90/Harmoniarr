@@ -41,6 +41,7 @@ import { createLibraryEmbeddedArtworkService } from './library-embedded-artwork-
 import { createLibraryFileMatcherService } from './library-file-matcher-service.js';
 import { createLibraryFileMatchStore } from './library-file-match-store.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
+import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
 import { createLibraryMediaRequestService } from './library-media-request-service.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
 import { createLibraryOrganizeApplyRunStore } from './library-organize-apply-run-store.js';
@@ -90,6 +91,7 @@ export function createLibraryModule({
   libraryMediaRequestFulfillmentService = createLibraryMediaRequestFulfillmentService({
     listImportCandidatesBySourceMediaRequestIds: importCandidateService?.listImportCandidatesBySourceMediaRequestIds,
   }),
+  libraryMediaRequestNotificationService = createLibraryMediaRequestNotificationService(),
   providerClientResolverService = createProviderClientResolverService(),
   libraryProviderIngestRequestStore = createLibraryProviderIngestRequestStore(),
   libraryExternalIntakeRunStore = createLibraryExternalIntakeRunStore(),
@@ -156,6 +158,7 @@ export function createLibraryModule({
     externalIntakeService: libraryExternalIntakeService,
     getAppUserById,
     mediaRequestFulfillmentService: libraryMediaRequestFulfillmentService,
+    mediaRequestNotificationService: libraryMediaRequestNotificationService,
     mediaRequestStore: libraryMediaRequestStore,
     releaseAvailabilityStore: libraryReleaseAvailabilityStore,
   }),
