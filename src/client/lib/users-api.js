@@ -55,3 +55,14 @@ export function applyPlexUserImport() {
     includeCsrf: true,
   });
 }
+
+export function relinkPlexUserConflict({ plexUserId, userId }) {
+  return apiRequest('/api/v1/users/imports/plex/relink', {
+    method: 'POST',
+    includeCsrf: true,
+    body: {
+      plexUserId,
+      userId,
+    },
+  });
+}

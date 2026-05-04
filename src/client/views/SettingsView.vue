@@ -33,6 +33,7 @@ import {
   createUser,
   fetchUsers,
   previewPlexUserImport,
+  relinkPlexUserConflict,
   provisionUserManagedLibraryRoot,
   updateUser,
 } from '../lib/users-api.js';
@@ -60,6 +61,7 @@ const isUsersLoading = ref(true);
 const isCreatingUser = ref(false);
 const isPreviewingPlexUsers = ref(false);
 const isImportingPlexUsers = ref(false);
+const activePlexRelinkProfileId = ref('');
 const userManagementErrorMessage = ref('');
 const userManagementSuccessMessage = ref('');
 const roleOptions = ref(['admin', 'operator', 'requester']);
@@ -540,6 +542,44 @@ async function importPlexUsersNow() {
     userManagementErrorMessage.value = error instanceof Error ? error.message : 'Plex user import failed';
   } finally {
     isImportingPlexUsers.value = false;
+  }
+}
+
+async function relinkPlexConflict(profile) {
+  if (!profile?.existingUser?.id || !profile?.id) {
+    return;
+  }
+
+  activePlexRelinkProfileId.value = profile.id;
+  userManagementErrorMessage.value = '';
+  userManagementSuccessMessage.value = '';
+
+  try {
+    const payload = await relinkPlexUserConflict({
+      plexUserId: profile.id,
+      userId: profile.existingUser.id,
+    });
+
+    if (plexUserImportPreview.value?.profiles) {
+      plexUserImportPreview.value = {
+        ...plexUserImportPreview.value,
+        profiles: plexUserImportPreview.value.profiles.map((candidate) => (
+          candidate.id === payload.profile.id ? payload.profile : candidate
+        )),
+        summary: {
+          ...plexUserImportPreview.value.summary,
+          conflicts: Math.max(0, (plexUserImportPreview.value.summary?.conflicts ?? 0) - 1),
+          linked: (plexUserImportPreview.value.summary?.linked ?? 0) + 1,
+        },
+      };
+    }
+
+    await loadUsers();
+    userManagementSuccessMessage.value = `Linked Plex profile ${payload.profile.title} to ${payload.user.username}.`;
+  } catch (error) {
+    userManagementErrorMessage.value = error instanceof Error ? error.message : 'Plex conflict relink failed';
+  } finally {
+    activePlexRelinkProfileId.value = '';
   }
 }
 
@@ -1119,6 +1159,16 @@ onMounted(() => {
                 <p class="metadata-card-copy">Library access: {{ profile.libraryAccessState }}</p>
                 <p class="metadata-card-copy" v-if="profile.suggestedUsername">Suggested username: {{ profile.suggestedUsername }}</p>
                 <p class="metadata-card-copy" v-if="profile.existingUser">Existing user: {{ profile.existingUser.username }}<span v-if="profile.conflictReason"> ({{ profile.conflictReason }})</span></p>
+                <div class="settings-button-row" v-if="profile.classification === 'conflict' && profile.existingUser?.id">
+                  <button
+                    type="button"
+                    class="review-reset-button"
+                    @click="relinkPlexConflict(profile)"
+                    :disabled="activePlexRelinkProfileId === profile.id"
+                  >
+                    {{ activePlexRelinkProfileId === profile.id ? 'Linking...' : `Link to ${profile.existingUser.username}` }}
+                  </button>
+                </div>
               </article>
             </div>
           </template>
