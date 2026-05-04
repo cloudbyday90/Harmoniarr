@@ -60,6 +60,9 @@ Security source: `docs/SECURITY_POLICY.md`
 	- Native integration coverage now also proves restore-apply rejection under a blocking maintenance lock and successful backed-up settings restoration after the lock is released, including completed `backup_restore_apply` run persistence and released maintenance-lock state through the real HTTP and database-backed recovery graph.
 	- Remaining work is one live Docker-capable execution to capture the same evidence from the packaged runtime and operator filesystem layout.
 - [ ] Validate admin recovery flow against the documented runbook.
+	- Native integration coverage now also proves the documented recovery runbook seam through the real database-backed `harmoniarrctl` arm/status/cancel commands, including force-required cancel behavior, force replacement of an armed run, and stable no-code status reads.
+	- The public recovery lifecycle coverage now also verifies the documented post-recovery behavior that completion does not auto-login and that a fresh normal login succeeds afterward with the recovered credentials.
+	- Remaining work is one live Docker-capable execution using the shipped `docker exec ... harmoniarrctl` wrapper so release evidence covers the packaged runtime rather than only the native server graph.
 - [ ] Validate destructive filesystem actions stay preview-first and operator-gated.
 
 ## Security And Operational Validation

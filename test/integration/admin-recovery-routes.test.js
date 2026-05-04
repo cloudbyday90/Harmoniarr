@@ -136,6 +136,20 @@ suite('integration admin recovery routes', () => {
       assert.equal(recoveredUserRows.rows[0]?.role, 'admin');
       assert.equal(recoveredUserRows.rows[0]?.is_disabled, false);
 
+      const recoveredLoginResponse = await client.requestJson('/api/v1/auth/login', {
+        json: {
+          password: 'RecoveredPass123!',
+          username: 'recoveredadmin',
+        },
+        method: 'POST',
+      });
+      assert.equal(recoveredLoginResponse.response.status, 200);
+      assert.equal(recoveredLoginResponse.payload.user.username, 'recoveredadmin');
+
+      const recoveredSessionResponse = await client.requestJson('/api/v1/auth/session');
+      assert.equal(recoveredSessionResponse.response.status, 200);
+      assert.equal(recoveredSessionResponse.payload.user.username, 'recoveredadmin');
+
       const auditRows = await getPoolFn().query(
         `
           SELECT event_type
