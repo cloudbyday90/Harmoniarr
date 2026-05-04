@@ -57,6 +57,7 @@
     "update:schema-snapshot": "node scripts/update-schema-snapshot.js",
     "validate": "npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:esm && npm run check:image-tags && npm test && npm run build",
     "validate:docker-fresh-install": "node scripts/validate-docker-fresh-install.js",
+    "validate:docker-upgrade": "node scripts/validate-docker-upgrade.js",
     "validate:docker-released-image": "node scripts/validate-docker-released-image.js",
     "validate:release-contract": "node scripts/verify-release-contract.js",
     "validate:release-mirror-referrers": "node scripts/verify-release-mirror-referrers.js",

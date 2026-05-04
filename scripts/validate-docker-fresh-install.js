@@ -14,9 +14,12 @@ const evidencePath = getOptionalDockerSmokeEvidencePath();
 
 await runDirectScriptTask(import.meta, {
     prefix: 'harmoniarr-validate-docker-fresh-install',
-    renderSuccessMessage: ({ embeddedPostgresPersistence, evidencePath: resolvedEvidencePath, freshInstall, existingDataRestart, port, projectName, startupFailure }) => {
+    renderSuccessMessage: ({ backupRestoreFlow, embeddedPostgresPersistence, evidencePath: resolvedEvidencePath, freshInstall, existingDataRestart, port, projectName, startupFailure }) => {
       const healthSummary = freshInstall.healthBody.service ?? (freshInstall.healthBody.ok === true ? 'ok' : 'unknown');
       const restartSummary = existingDataRestart?.healthBody.service ?? (existingDataRestart?.healthBody.ok === true ? 'ok' : 'unknown');
+      const recoverySummary = backupRestoreFlow
+        ? `backup artifact ${backupRestoreFlow.backupArtifactId} restore-apply ${backupRestoreFlow.restoreApplyStatus}`
+        : 'backup and restore validation skipped';
       const persistenceSummary = embeddedPostgresPersistence
         ? `embedded PostgreSQL persisted probe ${embeddedPostgresPersistence.probeKey}`
         : 'embedded PostgreSQL persistence verification skipped';
@@ -24,10 +27,11 @@ await runDirectScriptTask(import.meta, {
         ? `startup refusal verified (${startupFailure.serviceStatus}; exit ${startupFailure.serviceExitCode})`
         : 'startup refusal verification skipped';
       const evidenceSummary = resolvedEvidencePath ? `; evidence ${resolvedEvidencePath}` : '';
-      return `Docker fresh-install smoke passed for project ${projectName} on http://127.0.0.1:${port}/healthz (${healthSummary} fresh install; ${restartSummary} existing-data restart; read-only rootfs verified; ${freshInstall.mediaTooling.ffmpegVersion}; ${freshInstall.mediaTooling.ffprobeVersion}; embedded PostgreSQL ready as ${freshInstall.embeddedPostgres.databaseName}/${freshInstall.embeddedPostgres.user}; pending migrations ${freshInstall.healthBody.pendingMigrations}; ${freshInstall.migrationCheckOutput}; ${persistenceSummary}; ${startupFailureSummary}${evidenceSummary})`;
+      return `Docker fresh-install smoke passed for project ${projectName} on http://127.0.0.1:${port}/healthz (${healthSummary} fresh install; ${restartSummary} existing-data restart; read-only rootfs verified; ${freshInstall.mediaTooling.ffmpegVersion}; ${freshInstall.mediaTooling.ffprobeVersion}; embedded PostgreSQL ready as ${freshInstall.embeddedPostgres.databaseName}/${freshInstall.embeddedPostgres.user}; pending migrations ${freshInstall.healthBody.pendingMigrations}; ${freshInstall.migrationCheckOutput}; ${recoverySummary}; ${persistenceSummary}; ${startupFailureSummary}${evidenceSummary})`;
     },
     run: async () => {
       const result = await validateDockerFreshInstall({
+        verifyBackupRestoreFlow: true,
         verifyExistingDataRestart: true,
       });
       const evidence = await writeDockerSmokeEvidence({

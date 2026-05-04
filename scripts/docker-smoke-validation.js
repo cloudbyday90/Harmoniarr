@@ -12,6 +12,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createSessionHttpClient } from '../src/shared/http-session-client.js';
 import { runBufferedCommand } from './process-runtime.js';
 
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
@@ -20,6 +21,16 @@ const embeddedPostgresPrepareLogSnippet = 'preparing database state';
 const embeddedPostgresStartLogSnippet = 'starting embedded PostgreSQL on 127.0.0.1:';
 const schemaBootstrapLogSnippet = 'loaded schema snapshot from';
 const harmoniarrServiceName = 'harmoniarr';
+const defaultSessionRequestTimeoutMs = 15_000;
+const defaultSmokeAdminCredentials = Object.freeze({
+  password: 'DockerSmokePass123!',
+  username: 'smoke-admin',
+});
+const defaultUpgradeSettingsProbe = Object.freeze({
+  system: {
+    logLevel: 'debug',
+  },
+});
 const defaultStartupValidationFailureScenario = Object.freeze({
   env: {
     HARMONIARR_BOOTSTRAP_OWNER_CLAIM_CODE: '',
@@ -31,6 +42,434 @@ const defaultStartupValidationFailureScenario = Object.freeze({
 
 function createProjectName(prefix = 'harmoniarrsmoke') {
   return `${prefix}${Date.now()}`;
+}
+
+function buildValidationBaseUrl(port) {
+  return `http://127.0.0.1:${port}`;
+}
+
+function getPayloadErrorSummary(payload) {
+  const errorCode = typeof payload?.error?.code === 'string' ? payload.error.code : null;
+  const errorMessage = typeof payload?.error?.message === 'string' ? payload.error.message : null;
+
+  if (!errorCode && !errorMessage) {
+    return '';
+  }
+
+  if (errorCode && errorMessage) {
+    return ` (${errorCode}: ${errorMessage})`;
+  }
+
+  return ` (${errorCode ?? errorMessage})`;
+}
+
+function assertJsonResponseStatus({ expectedStatus, label, payload, response }) {
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Docker smoke validation expected ${label} to return HTTP ${expectedStatus}, but received ${response.status}${getPayloadErrorSummary(payload)}`,
+    );
+  }
+}
+
+function createValidationSessionClient({ fetchFn, port, requestTimeoutMs = defaultSessionRequestTimeoutMs } = {}) {
+  return createSessionHttpClient(buildValidationBaseUrl(port), {
+    fetchFn,
+    requestTimeoutMs,
+  });
+}
+
+function buildValidationIdempotencyKey(projectName, scope) {
+  return `docker-smoke-${scope}-${projectName}`;
+}
+
+async function bootstrapSmokeAdminSession({
+  client,
+  credentials = defaultSmokeAdminCredentials,
+} = {}) {
+  const response = await client.requestJson('/api/v1/bootstrap/admin', {
+    json: {
+      password: credentials.password,
+      username: credentials.username,
+    },
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 201,
+    label: 'bootstrap-admin session creation',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || response.payload?.user?.username !== credentials.username) {
+    throw new Error('Docker smoke validation did not receive the expected bootstrap-admin session payload');
+  }
+
+  return response;
+}
+
+async function loginSmokeAdminSession({
+  client,
+  credentials = defaultSmokeAdminCredentials,
+} = {}) {
+  const response = await client.requestJson('/api/v1/auth/login', {
+    json: {
+      password: credentials.password,
+      username: credentials.username,
+    },
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'admin login',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || response.payload?.user?.username !== credentials.username) {
+    throw new Error('Docker smoke validation did not receive the expected admin login payload');
+  }
+
+  return response;
+}
+
+async function getSettingsSnapshot({ client } = {}) {
+  const response = await client.requestJson('/api/v1/settings');
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'settings read',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || typeof response.payload?.settings !== 'object' || !response.payload.settings) {
+    throw new Error('Docker smoke validation did not receive the expected settings payload');
+  }
+
+  return response.payload.settings;
+}
+
+async function updateSettingsProbe({ client, settingsPatch = defaultUpgradeSettingsProbe } = {}) {
+  const response = await client.requestJson('/api/v1/settings', {
+    json: settingsPatch,
+    method: 'PUT',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'settings update',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || typeof response.payload?.settings !== 'object' || !response.payload.settings) {
+    throw new Error('Docker smoke validation did not receive the expected settings update payload');
+  }
+
+  return response.payload.settings;
+}
+
+async function getMaintenanceLockStatus({ client } = {}) {
+  const response = await client.requestJson('/api/v1/recovery/maintenance-locks');
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'maintenance lock status read',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  return response.payload;
+}
+
+async function enterMaintenanceLock({ client, projectName } = {}) {
+  const response = await client.requestJson('/api/v1/recovery/maintenance-locks', {
+    headers: {
+      'idempotency-key': buildValidationIdempotencyKey(projectName, 'maintenance-enter'),
+    },
+    json: {
+      lockType: 'maintenance',
+      reason: 'Docker smoke restore conflict validation',
+    },
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 202,
+    label: 'maintenance lock entry',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || typeof response.payload?.lock?.id !== 'string') {
+    throw new Error('Docker smoke validation did not receive the expected maintenance lock payload');
+  }
+
+  return response.payload.lock;
+}
+
+async function releaseMaintenanceLock({ client, lockId, projectName } = {}) {
+  const response = await client.requestJson(`/api/v1/recovery/maintenance-locks/${encodeURIComponent(lockId)}/release`, {
+    headers: {
+      'idempotency-key': buildValidationIdempotencyKey(projectName, 'maintenance-release'),
+    },
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'maintenance lock release',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || response.payload?.lock?.status !== 'released') {
+    throw new Error('Docker smoke validation did not observe the expected maintenance lock release payload');
+  }
+
+  return response.payload.lock;
+}
+
+async function createBackupArtifact({ client, projectName } = {}) {
+  const response = await client.requestJson('/api/v1/recovery/backups', {
+    headers: {
+      'idempotency-key': buildValidationIdempotencyKey(projectName, 'backup-create'),
+    },
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 202,
+    label: 'backup export creation',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || typeof response.payload?.backupArtifact?.id !== 'string') {
+    throw new Error('Docker smoke validation did not receive the expected backup artifact payload');
+  }
+
+  return response.payload.backupArtifact;
+}
+
+async function getBackupArtifacts({ client } = {}) {
+  const response = await client.requestJson('/api/v1/recovery/backups?limit=10');
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'backup export list',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  return Array.isArray(response.payload?.backupArtifacts) ? response.payload.backupArtifacts : [];
+}
+
+async function getBackupArtifactDetail({ backupArtifactId, client } = {}) {
+  const response = await client.requestJson(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifactId)}`);
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'backup export detail',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || response.payload?.backupArtifact?.id !== backupArtifactId) {
+    throw new Error('Docker smoke validation did not receive the expected backup artifact detail payload');
+  }
+
+  return response.payload.backupArtifact;
+}
+
+async function getBackupRestorePreview({ backupArtifactId, client } = {}) {
+  const response = await client.requestJson(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifactId)}/restore-preview`);
+
+  assertJsonResponseStatus({
+    expectedStatus: 200,
+    label: 'backup restore preview',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (response.payload?.ok !== true || response.payload?.backupArtifact?.id !== backupArtifactId) {
+    throw new Error('Docker smoke validation did not receive the expected restore preview payload');
+  }
+
+  return response.payload;
+}
+
+async function startBackupRestoreApply({ backupArtifactId, client, expectedPayloadSha256, projectName } = {}) {
+  const response = await client.requestJson(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifactId)}/restore-apply`, {
+    headers: {
+      'idempotency-key': buildValidationIdempotencyKey(projectName, 'restore-apply'),
+    },
+    json: {
+      expectedPayloadSha256,
+    },
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 202,
+    label: 'backup restore apply',
+    payload: response.payload,
+    response: response.response,
+  });
+
+  if (
+    response.payload?.ok !== true
+    || response.payload?.accepted !== true
+    || typeof response.payload?.run?.id !== 'string'
+  ) {
+    throw new Error('Docker smoke validation did not receive the expected restore-apply payload');
+  }
+
+  return response.payload;
+}
+
+async function validateBackupRestoreFlow({
+  fetchFn,
+  port,
+  projectName,
+  requestTimeoutMs = defaultSessionRequestTimeoutMs,
+  smokeAdminCredentials = defaultSmokeAdminCredentials,
+} = {}) {
+  const client = createValidationSessionClient({
+    fetchFn,
+    port,
+    requestTimeoutMs,
+  });
+
+  await bootstrapSmokeAdminSession({
+    client,
+    credentials: smokeAdminCredentials,
+  });
+
+  const initialLockStatus = await getMaintenanceLockStatus({ client });
+  const backupArtifact = await createBackupArtifact({ client, projectName });
+  const backupArtifacts = await getBackupArtifacts({ client });
+  const backupDetail = await getBackupArtifactDetail({
+    backupArtifactId: backupArtifact.id,
+    client,
+  });
+  const restorePreview = await getBackupRestorePreview({
+    backupArtifactId: backupArtifact.id,
+    client,
+  });
+
+  if (!backupArtifacts.some((artifact) => artifact?.id === backupArtifact.id)) {
+    throw new Error(`Docker smoke validation did not observe backup artifact ${backupArtifact.id} in the backup inventory`);
+  }
+
+  if (restorePreview.integrity?.status !== 'passed' || restorePreview.compatibility?.compatible !== true || restorePreview.canApplyRestore !== true) {
+    throw new Error('Docker smoke validation expected restore preview to be applicable before lock conflict injection');
+  }
+
+  const blockingLock = await enterMaintenanceLock({ client, projectName });
+  const blockedRestorePreview = await getBackupRestorePreview({
+    backupArtifactId: backupArtifact.id,
+    client,
+  });
+
+  if (blockedRestorePreview.restoreReadiness?.blockedByLock !== true || blockedRestorePreview.canApplyRestore !== false) {
+    throw new Error('Docker smoke validation expected restore preview to surface the injected maintenance-lock conflict');
+  }
+
+  const blockedRestoreApply = await client.requestJson(`/api/v1/recovery/backups/${encodeURIComponent(backupArtifact.id)}/restore-apply`, {
+    headers: {
+      'idempotency-key': buildValidationIdempotencyKey(projectName, 'restore-apply-blocked'),
+    },
+    json: {
+      expectedPayloadSha256: restorePreview.integrity?.expectedPayloadSha256 ?? null,
+    },
+    method: 'POST',
+  });
+
+  assertJsonResponseStatus({
+    expectedStatus: 409,
+    label: 'blocked backup restore apply',
+    payload: blockedRestoreApply.payload,
+    response: blockedRestoreApply.response,
+  });
+
+  if (blockedRestoreApply.payload?.error?.code !== 'recovery_lock_conflict') {
+    throw new Error('Docker smoke validation expected blocked restore apply to fail with recovery_lock_conflict');
+  }
+
+  await releaseMaintenanceLock({
+    client,
+    lockId: blockingLock.id,
+    projectName,
+  });
+
+  const appliedRestore = await startBackupRestoreApply({
+    backupArtifactId: backupArtifact.id,
+    client,
+    expectedPayloadSha256: restorePreview.integrity?.expectedPayloadSha256 ?? null,
+    projectName,
+  });
+  const finalLockStatus = await getMaintenanceLockStatus({ client });
+  const appliedScopes = Array.isArray(appliedRestore.restoreResult?.appliedScopes)
+    ? appliedRestore.restoreResult.appliedScopes
+    : [];
+
+  if (appliedScopes.length === 0) {
+    throw new Error('Docker smoke validation expected restore apply to report at least one applied scope');
+  }
+
+  if ((finalLockStatus.lockCount ?? finalLockStatus.activeLocks?.length ?? 0) !== 0) {
+    throw new Error('Docker smoke validation expected restore apply and injected maintenance locks to be fully released');
+  }
+
+  return {
+    appliedScopes,
+    backupArtifactFilename: backupDetail.filename ?? backupArtifact.filename ?? null,
+    backupArtifactId: backupArtifact.id,
+    blockedRestoreApplyCode: blockedRestoreApply.payload?.error?.code ?? null,
+    createdArtifactCount: backupArtifacts.length,
+    initialLockCount: initialLockStatus.lockCount ?? initialLockStatus.activeLocks?.length ?? 0,
+    postApplyLockCount: finalLockStatus.lockCount ?? finalLockStatus.activeLocks?.length ?? 0,
+    restoreApplyRunId: appliedRestore.run.id,
+    restoreApplyStatus: appliedRestore.run.status ?? null,
+    restorePreviewChecksum: restorePreview.integrity?.expectedPayloadSha256 ?? null,
+    restorePreviewCompatibility: restorePreview.compatibility?.compatible ?? false,
+  };
+}
+
+async function validateUpgradeSettingsPersistence({
+  fetchFn,
+  port,
+  requestTimeoutMs = defaultSessionRequestTimeoutMs,
+  settingsProbe = defaultUpgradeSettingsProbe,
+  smokeAdminCredentials = defaultSmokeAdminCredentials,
+} = {}) {
+  const client = createValidationSessionClient({
+    fetchFn,
+    port,
+    requestTimeoutMs,
+  });
+
+  await loginSmokeAdminSession({
+    client,
+    credentials: smokeAdminCredentials,
+  });
+
+  const settings = await getSettingsSnapshot({ client });
+  const expectedLogLevel = settingsProbe?.system?.logLevel ?? null;
+  const observedLogLevel = settings?.system?.logLevel ?? null;
+
+  if (expectedLogLevel !== observedLogLevel) {
+    throw new Error(`Docker smoke validation expected upgraded settings log level ${expectedLogLevel}, but observed ${observedLogLevel}`);
+  }
+
+  return {
+    expectedLogLevel,
+    observedLogLevel,
+    persisted: true,
+  };
 }
 
 async function getAvailablePort() {
@@ -645,9 +1084,12 @@ export async function validateDockerFreshInstall({
   processEnv = process.env,
   projectName = createProjectName(),
   removeFn = rm,
+  requestTimeoutMs = defaultSessionRequestTimeoutMs,
   runCommandFn = runCommand,
+  smokeAdminCredentials = defaultSmokeAdminCredentials,
   startupValidationFailureScenario = defaultStartupValidationFailureScenario,
   tempRootDir = tmpdir(),
+  verifyBackupRestoreFlow = false,
   verifyExistingDataRestart = false,
 } = {}) {
   const workspaceRoot = await mkdtempFn(resolve(tempRootDir, 'harmoniarr-docker-smoke-'));
@@ -679,9 +1121,20 @@ export async function validateDockerFreshInstall({
       runCommandFn,
     });
 
+    let backupRestoreFlow = null;
     let embeddedPostgresPersistence = null;
     let existingDataRestart = null;
     let startupFailure = null;
+
+    if (verifyBackupRestoreFlow) {
+      backupRestoreFlow = await validateBackupRestoreFlow({
+        fetchFn,
+        port,
+        projectName,
+        requestTimeoutMs,
+        smokeAdminCredentials,
+      });
+    }
 
     if (verifyExistingDataRestart) {
       const probeKey = `probe_${projectName}`;
@@ -741,6 +1194,7 @@ export async function validateDockerFreshInstall({
     }
 
     return {
+      backupRestoreFlow,
       embeddedPostgresPersistence,
       existingDataRestart,
       freshInstall,
@@ -755,6 +1209,139 @@ export async function validateDockerFreshInstall({
       await stopComposeProject({
         composeArgs,
         env,
+        removeVolumes: true,
+        runCommandFn,
+      });
+    } catch {
+      // Best-effort cleanup keeps the validation idempotent without masking the original failure.
+    }
+
+    await removeFn(workspaceRoot, { force: true, recursive: true });
+  }
+}
+
+export async function validateDockerUpgradePath({
+  baselineImageRef,
+  buildCandidateImage = true,
+  candidateImageRef = null,
+  composeFilePath = resolve(rootDir, 'compose.yaml'),
+  fetchFn = fetch,
+  getAvailablePortFn = getAvailablePort,
+  makeDirectoryLayoutFn = ensureDirectoryLayout,
+  mkdtempFn = mkdtemp,
+  processEnv = process.env,
+  projectName = createProjectName('harmoniarrupgrade'),
+  removeFn = rm,
+  requestTimeoutMs = defaultSessionRequestTimeoutMs,
+  runCommandFn = runCommand,
+  settingsProbe = defaultUpgradeSettingsProbe,
+  smokeAdminCredentials = defaultSmokeAdminCredentials,
+  tempRootDir = tmpdir(),
+} = {}) {
+  if (typeof baselineImageRef !== 'string' || baselineImageRef.trim().length === 0) {
+    throw new Error('baselineImageRef is required to validate the Docker upgrade path');
+  }
+
+  const workspaceRoot = await mkdtempFn(resolve(tempRootDir, 'harmoniarr-docker-upgrade-'));
+  const port = await getAvailablePortFn();
+  const directories = await makeDirectoryLayoutFn({ baseDir: workspaceRoot });
+  const composeArgs = ['compose', '-f', composeFilePath, '-p', projectName];
+  const baselineEnv = buildValidationEnvironment({
+    directories,
+    imageRef: baselineImageRef,
+    port,
+    processEnv,
+  });
+  const candidateEnv = buildValidationEnvironment({
+    directories,
+    imageRef: candidateImageRef,
+    port,
+    processEnv,
+  });
+
+  try {
+    await startComposeProject({
+      buildImage: false,
+      composeArgs,
+      env: baselineEnv,
+      runCommandFn,
+    });
+
+    const baselineRuntime = await validateRunningStack({
+      composeArgs,
+      env: baselineEnv,
+      expectEmbeddedPostgresInitialization: true,
+      expectBootstrapLog: true,
+      fetchFn,
+      port,
+      runCommandFn,
+    });
+
+    const baselineClient = createValidationSessionClient({
+      fetchFn,
+      port,
+      requestTimeoutMs,
+    });
+
+    await bootstrapSmokeAdminSession({
+      client: baselineClient,
+      credentials: smokeAdminCredentials,
+    });
+
+    const baselineSettings = await updateSettingsProbe({
+      client: baselineClient,
+      settingsPatch: settingsProbe,
+    });
+
+    await stopComposeProject({
+      composeArgs,
+      env: baselineEnv,
+      removeVolumes: false,
+      runCommandFn,
+    });
+
+    await startComposeProject({
+      buildImage: candidateImageRef ? false : buildCandidateImage,
+      composeArgs,
+      env: candidateEnv,
+      runCommandFn,
+    });
+
+    const upgradedRuntime = await validateRunningStack({
+      composeArgs,
+      env: candidateEnv,
+      expectEmbeddedPostgresInitialization: false,
+      expectBootstrapLog: false,
+      fetchFn,
+      port,
+      runCommandFn,
+    });
+    const settingsPersistence = await validateUpgradeSettingsPersistence({
+      fetchFn,
+      port,
+      requestTimeoutMs,
+      settingsProbe,
+      smokeAdminCredentials,
+    });
+
+    return {
+      baselineImageRef,
+      baselineRuntime,
+      candidateImageRef: candidateImageRef ?? null,
+      port,
+      projectName,
+      settingsPersistence: {
+        ...settingsPersistence,
+        baselineLogLevel: baselineSettings?.system?.logLevel ?? null,
+      },
+      upgradedRuntime,
+      workspaceRoot,
+    };
+  } finally {
+    try {
+      await stopComposeProject({
+        composeArgs,
+        env: candidateEnv,
         removeVolumes: true,
         runCommandFn,
       });

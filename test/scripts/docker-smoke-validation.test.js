@@ -1,15 +1,256 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { validateDockerFreshInstall } from '../../scripts/docker-smoke-validation.js';
+import { validateDockerFreshInstall, validateDockerUpgradePath } from '../../scripts/docker-smoke-validation.js';
 
-function createFetchResponse(body, status = 200) {
+function createResponseHeaders({ setCookie } = {}) {
   return {
+    get(name) {
+      return String(name).toLowerCase() === 'set-cookie' ? (setCookie ?? null) : null;
+    },
+    getSetCookie() {
+      return setCookie ? [setCookie] : [];
+    },
+  };
+}
+
+function createFetchResponse(body, status = 200, { setCookie } = {}) {
+  return {
+    headers: createResponseHeaders({ setCookie }),
     ok: status >= 200 && status < 300,
     status,
     async json() {
       return body;
     },
+  };
+}
+
+function mergeSettings(currentSettings, patch) {
+  return {
+    ...currentSettings,
+    ...patch,
+    providers: {
+      ...(currentSettings.providers ?? {}),
+      ...(patch?.providers ?? {}),
+    },
+    system: {
+      ...(currentSettings.system ?? {}),
+      ...(patch?.system ?? {}),
+    },
+  };
+}
+
+function createSmokeApiFetchStub({
+  initialSettings = {
+    providers: {
+      requestTimeoutMs: 15000,
+    },
+    system: {
+      logLevel: 'info',
+    },
+  },
+} = {}) {
+  const calls = [];
+  const activeLocks = [];
+  const backupArtifacts = [];
+  let nextLockId = 1;
+  let nextRunId = 1;
+  let settings = structuredClone(initialSettings);
+
+  async function fetchFn(url, options = {}) {
+    const method = String(options.method ?? 'GET').toUpperCase();
+    const parsedUrl = new URL(url);
+    const headers = new Headers(options.headers ?? {});
+    const body = typeof options.body === 'string' && options.body.length > 0
+      ? JSON.parse(options.body)
+      : null;
+
+    calls.push({
+      body,
+      headers,
+      method,
+      path: `${parsedUrl.pathname}${parsedUrl.search}`,
+    });
+
+    if (parsedUrl.pathname === '/healthz') {
+      return createFetchResponse({
+        ok: true,
+        pendingMigrations: 0,
+        service: 'ok',
+      });
+    }
+
+    if (parsedUrl.pathname === '/api/v1/bootstrap/admin' && method === 'POST') {
+      return createFetchResponse({
+        csrfToken: 'csrf-bootstrap',
+        ok: true,
+        user: {
+          username: body?.username ?? 'smoke-admin',
+        },
+      }, 201, {
+        setCookie: 'sid=bootstrap-session; Path=/; HttpOnly',
+      });
+    }
+
+    if (parsedUrl.pathname === '/api/v1/auth/login' && method === 'POST') {
+      return createFetchResponse({
+        csrfToken: 'csrf-login',
+        ok: true,
+        user: {
+          username: body?.username ?? 'smoke-admin',
+        },
+      }, 200, {
+        setCookie: 'sid=login-session; Path=/; HttpOnly',
+      });
+    }
+
+    if (!headers.get('cookie')) {
+      return createFetchResponse({
+        error: {
+          code: 'auth_required',
+          message: 'Auth required',
+        },
+        ok: false,
+      }, 401);
+    }
+
+    if (parsedUrl.pathname === '/api/v1/settings' && method === 'GET') {
+      return createFetchResponse({
+        ok: true,
+        settings,
+      });
+    }
+
+    if (parsedUrl.pathname === '/api/v1/settings' && method === 'PUT') {
+      settings = mergeSettings(settings, body ?? {});
+      return createFetchResponse({
+        ok: true,
+        settings,
+        updates: [],
+      });
+    }
+
+    if (parsedUrl.pathname === '/api/v1/recovery/backups' && method === 'POST') {
+      const artifact = {
+        filename: 'harmoniarr_backup_2026-05-04T12-00-00-000Z.json',
+        formatVersion: '1',
+        id: `backup-${backupArtifacts.length + 1}`,
+      };
+      backupArtifacts.push(artifact);
+      return createFetchResponse({
+        accepted: true,
+        backupArtifact: artifact,
+        ok: true,
+      }, 202);
+    }
+
+    if (parsedUrl.pathname === '/api/v1/recovery/backups' && method === 'GET') {
+      return createFetchResponse({
+        backupArtifacts,
+        checkedAt: '2026-05-04T12:01:00.000Z',
+        ok: true,
+      });
+    }
+
+    if (parsedUrl.pathname === '/api/v1/recovery/maintenance-locks' && method === 'GET') {
+      return createFetchResponse({
+        activeLocks,
+        lockCount: activeLocks.length,
+        ok: true,
+      });
+    }
+
+    if (parsedUrl.pathname === '/api/v1/recovery/maintenance-locks' && method === 'POST') {
+      const lock = {
+        id: `lock-${nextLockId++}`,
+        lockType: body?.lockType ?? 'maintenance',
+        reason: body?.reason ?? null,
+        status: 'active',
+      };
+      activeLocks.push(lock);
+      return createFetchResponse({
+        lock,
+        ok: true,
+      }, 202);
+    }
+
+    if (parsedUrl.pathname.startsWith('/api/v1/recovery/maintenance-locks/') && parsedUrl.pathname.endsWith('/release') && method === 'POST') {
+      const lockId = parsedUrl.pathname.split('/')[5];
+      const activeLockIndex = activeLocks.findIndex((lock) => lock.id === lockId);
+      const [releasedLock] = activeLockIndex >= 0 ? activeLocks.splice(activeLockIndex, 1) : [null];
+
+      return createFetchResponse({
+        lock: {
+          ...(releasedLock ?? { id: lockId, lockType: 'maintenance' }),
+          status: 'released',
+        },
+        ok: true,
+      });
+    }
+
+    if (parsedUrl.pathname.startsWith('/api/v1/recovery/backups/') && parsedUrl.pathname.endsWith('/restore-preview') && method === 'GET') {
+      const backupArtifactId = parsedUrl.pathname.split('/')[5];
+      const artifact = backupArtifacts.find((entry) => entry.id === backupArtifactId);
+      return createFetchResponse({
+        backupArtifact: artifact,
+        canApplyRestore: activeLocks.length === 0,
+        compatibility: {
+          checks: [],
+          compatible: true,
+        },
+        integrity: {
+          actualPayloadSha256: `sha-${backupArtifactId}`,
+          expectedPayloadSha256: `sha-${backupArtifactId}`,
+          status: 'passed',
+        },
+        ok: true,
+        restoreReadiness: {
+          blockedByLock: activeLocks.length > 0,
+          blockingLocks: activeLocks,
+        },
+      });
+    }
+
+    if (parsedUrl.pathname.startsWith('/api/v1/recovery/backups/') && parsedUrl.pathname.endsWith('/restore-apply') && method === 'POST') {
+      if (activeLocks.length > 0) {
+        return createFetchResponse({
+          error: {
+            code: 'recovery_lock_conflict',
+            message: 'A conflicting maintenance lock prevents restore apply',
+          },
+          ok: false,
+        }, 409);
+      }
+
+      return createFetchResponse({
+        accepted: true,
+        ok: true,
+        restoreResult: {
+          appliedScopes: ['settings'],
+          settingsUpdated: true,
+        },
+        run: {
+          id: `run-${nextRunId++}`,
+          status: 'completed',
+        },
+      }, 202);
+    }
+
+    if (parsedUrl.pathname.startsWith('/api/v1/recovery/backups/') && method === 'GET') {
+      const backupArtifactId = parsedUrl.pathname.split('/')[5];
+      const artifact = backupArtifacts.find((entry) => entry.id === backupArtifactId);
+      return createFetchResponse({
+        backupArtifact: artifact,
+        ok: true,
+      });
+    }
+
+    throw new Error(`Unexpected fetch invocation: ${method} ${parsedUrl.pathname}${parsedUrl.search}`);
+  }
+
+  return {
+    calls,
+    fetchFn,
   };
 }
 
@@ -298,4 +539,82 @@ test('validateDockerFreshInstall fails when the invalid-startup scenario does no
     }),
     /did not observe the expected startup-refusal log/,
   );
+});
+
+test('validateDockerFreshInstall validates backup export and restore preview/apply through the running control plane', async () => {
+  const { fetchFn } = createSmokeApiFetchStub();
+  const { runCommandFn } = createRunCommandStub();
+
+  const result = await validateDockerFreshInstall({
+    fetchFn,
+    getAvailablePortFn: async () => 4304,
+    makeDirectoryLayoutFn: async () => ({
+      appData: '/tmp/appdata',
+      downloads: '/tmp/downloads',
+      music: '/tmp/music',
+      staging: '/tmp/staging',
+      transcodeTemp: '/tmp/transcode-temp',
+    }),
+    mkdtempFn: async () => '/tmp/harmoniarr-smoke',
+    processEnv: {},
+    projectName: 'harmoniarrsmoke-test',
+    removeFn: async () => {},
+    runCommandFn,
+    tempRootDir: '/tmp',
+    verifyBackupRestoreFlow: true,
+  });
+
+  assert.deepEqual(result.backupRestoreFlow, {
+    appliedScopes: ['settings'],
+    backupArtifactFilename: 'harmoniarr_backup_2026-05-04T12-00-00-000Z.json',
+    backupArtifactId: 'backup-1',
+    blockedRestoreApplyCode: 'recovery_lock_conflict',
+    createdArtifactCount: 1,
+    initialLockCount: 0,
+    postApplyLockCount: 0,
+    restoreApplyRunId: 'run-1',
+    restoreApplyStatus: 'completed',
+    restorePreviewChecksum: 'sha-backup-1',
+    restorePreviewCompatibility: true,
+  });
+});
+
+test('validateDockerUpgradePath validates persisted settings across a baseline-to-candidate upgrade', async () => {
+  const { fetchFn } = createSmokeApiFetchStub();
+  const { calls, runCommandFn } = createRunCommandStub();
+
+  const result = await validateDockerUpgradePath({
+    baselineImageRef: 'ghcr.io/example/harmoniarr:v0.0.9',
+    fetchFn,
+    getAvailablePortFn: async () => 4305,
+    makeDirectoryLayoutFn: async () => ({
+      appData: '/tmp/appdata',
+      downloads: '/tmp/downloads',
+      music: '/tmp/music',
+      staging: '/tmp/staging',
+      transcodeTemp: '/tmp/transcode-temp',
+    }),
+    mkdtempFn: async () => '/tmp/harmoniarr-upgrade',
+    processEnv: {},
+    projectName: 'harmoniarrupgrade-test',
+    removeFn: async () => {},
+    runCommandFn,
+    tempRootDir: '/tmp',
+  });
+
+  assert.equal(result.baselineImageRef, 'ghcr.io/example/harmoniarr:v0.0.9');
+  assert.equal(result.candidateImageRef, null);
+  assert.deepEqual(result.settingsPersistence, {
+    baselineLogLevel: 'debug',
+    expectedLogLevel: 'debug',
+    observedLogLevel: 'debug',
+    persisted: true,
+  });
+  assert.equal(result.baselineRuntime.sawBootstrapLog, true);
+  assert.equal(result.upgradedRuntime.sawBootstrapLog, false);
+
+  const composeUpCalls = calls.filter(({ args }) => args.includes('up'));
+  assert.equal(composeUpCalls.length, 2);
+  assert.ok(composeUpCalls[0].args.includes('--no-build'));
+  assert.ok(composeUpCalls[1].args.includes('--build'));
 });

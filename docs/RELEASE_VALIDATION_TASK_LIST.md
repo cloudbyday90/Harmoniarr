@@ -30,6 +30,8 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Validate fresh install on the standard Docker deployment path.
 - [x] Validate fresh-install schema bootstrap against a disposable PostgreSQL database.
 - [ ] Validate upgrade from the prior accepted state or baseline image.
+	- `npm run validate:docker-upgrade` now drives a baseline image followed by the candidate image against the same bind-mounted state, proving post-upgrade startup plus persisted settings continuity through the shared smoke contract.
+	- Remaining work is one live Docker-capable execution with `HARMONIARR_BASELINE_IMAGE` set to the prior accepted immutable image reference, plus any extra rollback-specific assertions the release wants beyond the current continuity probe.
 - [ ] Validate startup refusal on incompatible or unsafe configuration states.
 	- The shared Docker smoke contract now includes a fail-closed invalid-startup scenario using `docker compose up --abort-on-container-failure --exit-code-from harmoniarr`, asserting both service exit code `1` and the expected startup-refusal log message for an invalid bootstrap-owner configuration.
 	- Remaining work is one live Docker-capable execution of `npm run validate:docker-fresh-install` or the released-image equivalent in an environment with a running Docker daemon.
@@ -41,8 +43,14 @@ Security source: `docs/SECURITY_POLICY.md`
 ## Recovery And Safety Validation
 
 - [ ] Validate backup/export creation and artifact inspection.
+	- `npm run validate:docker-fresh-install` and `npm run validate:docker-released-image` now bootstrap an admin session inside the running container, create a backup artifact, and verify inventory plus detail reads through the shipped recovery routes.
+	- Remaining work is one live Docker-capable execution so the release evidence includes the real persisted artifact path and runtime-side payload handling.
 - [ ] Validate restore preview without unsafe side effects.
+	- The shared smoke contract now verifies restore preview on the real running container both before and during an injected maintenance-lock conflict, asserting that the lock flips `blockedByLock` and prevents unsafe apply.
+	- Remaining work is one live Docker-capable execution to capture evidence from the actual packaged runtime and operator filesystem layout.
 - [ ] Validate restore apply with maintenance locking and job pausing behavior.
+	- The shared smoke contract now proves restore-apply rejection under an injected maintenance lock and then completes a successful restore-apply run after the lock is released, asserting the returned run metadata and that no active locks remain afterward.
+	- Remaining work is one live Docker-capable execution plus any deeper whole-system job-pause assertions beyond the current lock-conflict and completion proof.
 - [ ] Validate admin recovery flow against the documented runbook.
 - [ ] Validate destructive filesystem actions stay preview-first and operator-gated.
 

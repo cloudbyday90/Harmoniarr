@@ -520,15 +520,16 @@ Status note:
 - [ ] Add end-to-end UI coverage for bootstrap, login, settings, review queue, job feedback, and recovery-sensitive flows where practical.
 - [ ] Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and restore/recovery scenarios.
 - [ ] Validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior.
-  - The shared Docker smoke validator now covers fresh-install schema bootstrap, fail-closed startup refusal, FFmpeg/FFprobe availability, embedded PostgreSQL readiness plus persistence, existing-data restart behavior, and optional machine-readable evidence output through `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH`.
-  - Remaining work is live execution in a Docker-capable environment plus explicit upgrade, restore preview/apply, and rollback-oriented scenarios against prior accepted state or released-image baselines.
+  - The shared Docker smoke validator now covers fresh-install schema bootstrap, fail-closed startup refusal, FFmpeg/FFprobe availability, embedded PostgreSQL readiness plus persistence, backup export plus restore preview/apply validation, existing-data restart behavior, and optional machine-readable evidence output through `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH`.
+  - A dedicated `npm run validate:docker-upgrade` wrapper now also validates a baseline-to-candidate image upgrade path against the same bind-mounted state, proving post-upgrade startup plus persisted settings continuity without introducing a separate validation harness.
+  - Remaining work is live execution in a Docker-capable environment plus any additional rollback-oriented scenarios that go beyond the current baseline-upgrade and restore-apply seam.
 - [ ] Finalize Docker artifacts, README/doc index updates, compose examples, and operator setup guidance.
 - [ ] Record V1 no-go conditions, smoke-test checklist, and release sign-off criteria.
 
 Recommended next execution slice:
 
 1. Execute the shared Docker smoke contract in a live Docker-capable environment and use its evidence output to close the remaining fresh-install, startup-refusal, FFmpeg/tooling, and embedded-Postgres release-validation items.
-2. Extend that same deployment-path seam to cover upgrade from the last accepted baseline plus restore preview/apply and rollback-aware behavior, so migration safety and recovery operability are proven on the supported container path instead of inferred from unit-level coverage.
+2. Execute the new recovery and upgrade smoke commands in that same Docker-capable environment to close the remaining backup/export, restore preview/apply, and baseline-upgrade validation items with machine-readable evidence instead of checklist-only intent.
 3. After the deployment-path slice is green, close the remaining whole-system maintenance-lock pause proof, fixture-pack, E2E, and release-doc items as the immediate release-closure wave.
 
 ## Dependencies
