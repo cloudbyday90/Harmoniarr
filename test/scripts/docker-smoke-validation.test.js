@@ -19,10 +19,15 @@ function createRunCommandStub({
   failureServiceState = { ExitCode: 1, Status: 'exited' },
   ffmpegVersion = 'ffmpeg version 7.1.1',
   ffprobeVersion = 'ffprobe version 7.1.1',
-  logs = 'loaded schema snapshot from src/server/schema-snapshot.sql',
+  logs = '[harmoniarr-entrypoint] initializing embedded PostgreSQL cluster at /app/data/postgres/18/data\n[harmoniarr-entrypoint] starting embedded PostgreSQL on 127.0.0.1:5432\n[harmoniarr-entrypoint] preparing database state\n[harmoniarr] loaded schema snapshot from src/server/schema-snapshot.sql',
   migrationCheckOutput = 'No pending migrations remain.',
+  postgresIdentity = 'harmoniarr|harmoniarr',
+  postgresPersistenceCount = '1',
+  postgresReadyMessage = '127.0.0.1:5432 - accepting connections',
+  restartLogs = '[harmoniarr-entrypoint] starting embedded PostgreSQL on 127.0.0.1:5432\n[harmoniarr-entrypoint] preparing database state',
 } = {}) {
   const calls = [];
+  let successfulStartupCount = 0;
 
   async function runCommandFn({ args, command, cwd, env }) {
     calls.push({ args, command, cwd, env });
@@ -38,6 +43,8 @@ function createRunCommandStub({
       if (args.includes('--abort-on-container-failure')) {
         return { exitCode: failureComposeExitCode, stderr: '', stdout: '' };
       }
+
+      successfulStartupCount += 1;
 
       return { exitCode: 0, stderr: '', stdout: '' };
     }
@@ -74,11 +81,45 @@ function createRunCommandStub({
       };
     }
 
+    if (isComposeCommand && args.includes('pg_isready')) {
+      return {
+        exitCode: 0,
+        stderr: '',
+        stdout: `${postgresReadyMessage}\n`,
+      };
+    }
+
+    if (isComposeCommand && args.includes('psql')) {
+      const sql = args.at(-1) ?? '';
+
+      if (sql.includes("SELECT current_database() || '|' || current_user")) {
+        return {
+          exitCode: 0,
+          stderr: '',
+          stdout: `${postgresIdentity}\n`,
+        };
+      }
+
+      if (sql.includes('CREATE TABLE IF NOT EXISTS docker_smoke_persistence_probe')) {
+        return { exitCode: 0, stderr: '', stdout: '' };
+      }
+
+      if (sql.includes('SELECT COUNT(*) FROM docker_smoke_persistence_probe')) {
+        return {
+          exitCode: 0,
+          stderr: '',
+          stdout: `${postgresPersistenceCount}\n`,
+        };
+      }
+    }
+
     if (isComposeCommand && args.includes('logs')) {
       return {
         exitCode: 0,
         stderr: '',
-        stdout: env?.HARMONIARR_BOOTSTRAP_OWNER_USERNAME === 'docker-smoke-owner' ? failureLogs : logs,
+        stdout: env?.HARMONIARR_BOOTSTRAP_OWNER_USERNAME === 'docker-smoke-owner'
+          ? failureLogs
+          : (successfulStartupCount > 1 ? restartLogs : logs),
       };
     }
 
@@ -124,8 +165,19 @@ test('validateDockerFreshInstall verifies ffmpeg and ffprobe in the running imag
     },
     runCommandFn,
     tempRootDir: '/tmp',
+    verifyExistingDataRestart: true,
   });
 
+  assert.deepEqual(result.existingDataRestart?.embeddedPostgres, {
+    databaseName: 'harmoniarr',
+    readyMessage: '127.0.0.1:5432 - accepting connections',
+    user: 'harmoniarr',
+  });
+  assert.deepEqual(result.embeddedPostgresPersistence, {
+    persisted: true,
+    probeKey: 'probe_harmoniarrsmoke-test',
+    rowCount: 1,
+  });
   assert.deepEqual(result.freshInstall.mediaTooling, {
     ffmpegVersion: 'ffmpeg version 7.2.0-static',
     ffprobeVersion: 'ffprobe version 7.2.0-static',
@@ -138,15 +190,17 @@ test('validateDockerFreshInstall verifies ffmpeg and ffprobe in the running imag
   });
   assert.equal(removedDirectories[0], '/tmp/harmoniarr-smoke');
 
-  const execCommands = calls
+  const execCalls = calls
     .filter(({ args }) => args.includes('exec'))
-    .map(({ args }) => args.slice(-2).join(' '));
+    .map(({ args }) => args.join(' '));
 
-  assert.deepEqual(execCommands, [
-    'ffmpeg -version',
-    'ffprobe -version',
-    'node /app/server-dist/check-migrations.js',
-  ]);
+  assert.ok(execCalls.some((command) => command.includes(' ffmpeg -version')));
+  assert.ok(execCalls.some((command) => command.includes(' ffprobe -version')));
+  assert.ok(execCalls.filter((command) => command.includes(' pg_isready ')).length >= 2);
+  assert.ok(execCalls.filter((command) => command.includes("SELECT current_database() || '|' || current_user")).length >= 2);
+  assert.ok(execCalls.some((command) => command.includes('node /app/server-dist/check-migrations.js')));
+  assert.ok(execCalls.some((command) => command.includes('CREATE TABLE IF NOT EXISTS docker_smoke_persistence_probe')));
+  assert.ok(execCalls.some((command) => command.includes("SELECT COUNT(*) FROM docker_smoke_persistence_probe WHERE probe_key = 'probe_harmoniarrsmoke-test'")));
 
   assert.ok(calls.some(({ args }) => args.includes('--abort-on-container-failure')));
   assert.ok(calls.some(({ args }) => args.includes('{{json .State}}')));
@@ -180,6 +234,38 @@ test('validateDockerFreshInstall fails when a tooling version probe returns no v
       tempRootDir: '/tmp',
     }),
     /could not read a version line from ffprobe -version/,
+  );
+});
+
+test('validateDockerFreshInstall fails when the existing-data restart reinitializes embedded PostgreSQL', async () => {
+  const { runCommandFn } = createRunCommandStub({
+    restartLogs: '[harmoniarr-entrypoint] initializing embedded PostgreSQL cluster at /app/data/postgres/18/data\n[harmoniarr-entrypoint] starting embedded PostgreSQL on 127.0.0.1:5432\n[harmoniarr-entrypoint] preparing database state',
+  });
+
+  await assert.rejects(
+    () => validateDockerFreshInstall({
+      fetchFn: async () => createFetchResponse({
+        ok: true,
+        pendingMigrations: 0,
+        service: 'ok',
+      }),
+      getAvailablePortFn: async () => 4303,
+      makeDirectoryLayoutFn: async () => ({
+        appData: '/tmp/appdata',
+        downloads: '/tmp/downloads',
+        music: '/tmp/music',
+        staging: '/tmp/staging',
+        transcodeTemp: '/tmp/transcode-temp',
+      }),
+      mkdtempFn: async () => '/tmp/harmoniarr-smoke',
+      processEnv: {},
+      projectName: 'harmoniarrsmoke-test',
+      removeFn: async () => {},
+      runCommandFn,
+      tempRootDir: '/tmp',
+      verifyExistingDataRestart: true,
+    }),
+    /unexpectedly reinitialized the embedded PostgreSQL cluster/,
   );
 });
 

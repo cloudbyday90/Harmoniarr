@@ -35,6 +35,8 @@ Security source: `docs/SECURITY_POLICY.md`
 	- The shared Docker smoke contract now includes a fail-closed invalid-startup scenario using `docker compose up --abort-on-container-failure --exit-code-from harmoniarr`, asserting both service exit code `1` and the expected startup-refusal log message for an invalid bootstrap-owner configuration.
 	- Remaining work is one live Docker-capable execution of `npm run validate:docker-fresh-install` or the released-image equivalent in an environment with a running Docker daemon.
 - [ ] Validate embedded Postgres initialization, health reporting, and persistence behavior.
+	- The shared Docker smoke contract now also asserts embedded PostgreSQL startup and database-preparation logs, runs in-container `pg_isready` plus `psql` identity checks while `/healthz` is passing, and verifies restart persistence with a disposable SQL probe row before accepting the existing-data restart path.
+	- Remaining work is one live Docker-capable execution of the smoke contract in an environment with a running Docker daemon.
 - [x] Validate FFmpeg/tooling availability in the running image.
 
 ## Recovery And Safety Validation
@@ -61,6 +63,7 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Update README and documentation index to match shipped V1 behavior.
 - [ ] Prepare release notes and technical change summary.
 - [ ] Record smoke-test commands and manual verification notes.
+	- The Docker smoke scripts now optionally emit a machine-readable JSON evidence file when `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH` is set, so release workflows and support diagnostics can archive the exact validated result instead of scraping console output.
 - [x] Document native local replay for release-image and container-maintenance workflow scripts with Node `--env-file` layering, local `GITHUB_OUTPUT`/`GITHUB_STEP_SUMMARY` files, and trusted-mirror preflight commands.
 - [ ] Document the promoted Docker Hub trusted-mirror flow, including the ORAS discovery probe, recursive artifact-copy step, and any OCI 1.1 referrers API versus referrers-tag behavior observed in the live release run.
 
