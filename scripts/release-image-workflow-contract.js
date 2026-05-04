@@ -88,6 +88,19 @@ export const releaseImageUpgradeEvidenceVerificationStep = Object.freeze({
   name: 'Verify upgrade-path smoke evidence artifact',
 });
 
+export const releaseImageUpgradeEvidenceDownloadStep = Object.freeze({
+  action: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0',
+  artifactName: 'harmoniarr-docker-smoke-upgrade-path.json',
+  name: 'Download upgrade-path smoke evidence artifact',
+  path: 'supply-chain',
+});
+
+export const releaseImageUpgradeEvidenceReleaseContractVerificationStep = Object.freeze({
+  command: 'npm run validate:docker-smoke-evidence',
+  name: 'Verify archived upgrade-path smoke evidence artifact',
+  path: 'supply-chain/harmoniarr-docker-smoke-upgrade-path.json',
+});
+
 export const trustedMirrorWorkflowEnvKeys = [
   'DOCKERHUB_TOKEN',
   'DOCKERHUB_USERNAME',
@@ -309,6 +322,10 @@ export function validateReleaseImageWorkflowContract(source) {
     issues.push('verify-release-contract summary must report archived smoke evidence verification status');
   }
 
+  if (!normalizedSource.includes('needs.verify-upgrade-path.result')) {
+    issues.push('verify-release-contract job must consider needs.verify-upgrade-path.result when upgrade validation is optional');
+  }
+
   if (!normalizedSource.includes(`${releaseImageUpgradeWorkflow.baselineInputName}:`)) {
     issues.push(`workflow_dispatch inputs must expose ${releaseImageUpgradeWorkflow.baselineInputName}`);
   }
@@ -326,6 +343,20 @@ export function validateReleaseImageWorkflowContract(source) {
 
     if (!block.includes('needs:') || !block.includes('- publish-image') || !block.includes('- verify-published-image')) {
       issues.push('verify-upgrade-path job must depend on publish-image and verify-published-image');
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  try {
+    const block = getWorkflowJobBlock(normalizedSource, 'verify-release-contract');
+
+    if (!block.includes('- verify-upgrade-path')) {
+      issues.push('verify-release-contract job must depend on verify-upgrade-path');
+    }
+
+    if (!block.includes("always()") || !block.includes("needs.verify-upgrade-path.result == 'success'") || !block.includes("needs.verify-upgrade-path.result == 'skipped'")) {
+      issues.push('verify-release-contract job must use always() and allow verify-upgrade-path to be either success or skipped');
     }
   } catch (error) {
     issues.push(error.message);
@@ -381,8 +412,52 @@ export function validateReleaseImageWorkflowContract(source) {
     issues.push(error.message);
   }
 
-  if (!/name:\s+Verify Release Contract[\s\S]*needs:[\s\S]*- publish-image[\s\S]*- verify-published-image/.test(normalizedSource)) {
-    issues.push('verify-release-contract job must depend on publish-image and verify-published-image');
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageUpgradeEvidenceDownloadStep.name);
+
+    if (!block.includes(`uses: ${releaseImageUpgradeEvidenceDownloadStep.action}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceDownloadStep.name} must use ${releaseImageUpgradeEvidenceDownloadStep.action}`);
+    }
+
+    if (!block.includes(`name: ${releaseImageUpgradeEvidenceDownloadStep.artifactName}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceDownloadStep.name} must download ${releaseImageUpgradeEvidenceDownloadStep.artifactName}`);
+    }
+
+    if (!block.includes(`path: ${releaseImageUpgradeEvidenceDownloadStep.path}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceDownloadStep.name} must extract to ${releaseImageUpgradeEvidenceDownloadStep.path}`);
+    }
+
+    if (!block.includes("if: ${{ needs.verify-upgrade-path.result == 'success' }}")) {
+      issues.push(`${releaseImageUpgradeEvidenceDownloadStep.name} must only run when verify-upgrade-path succeeded`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageUpgradeEvidenceReleaseContractVerificationStep.name);
+
+    if (!block.includes(`run: ${releaseImageUpgradeEvidenceReleaseContractVerificationStep.command}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceReleaseContractVerificationStep.name} must run ${releaseImageUpgradeEvidenceReleaseContractVerificationStep.command}`);
+    }
+
+    if (!block.includes(`HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: ${releaseImageUpgradeEvidenceReleaseContractVerificationStep.path}`)) {
+      issues.push(`${releaseImageUpgradeEvidenceReleaseContractVerificationStep.name} must verify ${releaseImageUpgradeEvidenceReleaseContractVerificationStep.path}`);
+    }
+
+    if (!block.includes("if: ${{ needs.verify-upgrade-path.result == 'success' }}")) {
+      issues.push(`${releaseImageUpgradeEvidenceReleaseContractVerificationStep.name} must only run when verify-upgrade-path succeeded`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
+  if (!normalizedSource.includes('HARMONIARR_SUMMARY_UPGRADE_SMOKE_EVIDENCE_STATUS: ${{ needs.verify-upgrade-path.result == \'success\' && \'upgrade-path artifact passed\' || \'skipped\' }}')) {
+    issues.push('verify-release-contract summary must report archived upgrade smoke evidence verification status');
+  }
+
+  if (!/name:\s+Verify Release Contract[\s\S]*needs:[\s\S]*- publish-image[\s\S]*- verify-published-image[\s\S]*- verify-upgrade-path/.test(normalizedSource)) {
+    issues.push('verify-release-contract job must depend on publish-image, verify-published-image, and verify-upgrade-path');
   }
 
   return issues;

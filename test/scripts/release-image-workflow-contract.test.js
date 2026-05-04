@@ -9,7 +9,9 @@ import {
   releaseImageEvidenceStep,
   releaseImageEvidenceReleaseContractVerificationStep,
   releaseImageEvidenceVerificationStep,
+  releaseImageUpgradeEvidenceDownloadStep,
   releaseImageUpgradeEvidenceStep,
+  releaseImageUpgradeEvidenceReleaseContractVerificationStep,
   releaseImageUpgradeEvidenceVerificationStep,
   releaseImageUpgradeValidationStep,
   releaseImageUpgradeWorkflow,
@@ -89,4 +91,19 @@ test('release-image workflow supports optional published-image upgrade validatio
   assert.match(evidenceBlock, new RegExp(releaseImageUpgradeEvidenceStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(evidenceBlock, new RegExp(releaseImageUpgradeEvidenceStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(evidenceBlock, new RegExp(releaseImageUpgradeEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('release-image workflow optionally downloads and re-verifies archived upgrade smoke evidence during release-contract verification', async () => {
+  const workflowSource = await readFile(workflowPath, 'utf8');
+
+  const downloadBlock = getWorkflowStepBlock(workflowSource, releaseImageUpgradeEvidenceDownloadStep.name);
+  const verificationBlock = getWorkflowStepBlock(workflowSource, releaseImageUpgradeEvidenceReleaseContractVerificationStep.name);
+
+  assert.match(downloadBlock, new RegExp(releaseImageUpgradeEvidenceDownloadStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(downloadBlock, new RegExp(releaseImageUpgradeEvidenceDownloadStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(downloadBlock, new RegExp(releaseImageUpgradeEvidenceDownloadStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(downloadBlock, /if: \$\{\{ needs\.verify-upgrade-path\.result == 'success' \}\}/);
+  assert.match(verificationBlock, new RegExp(releaseImageUpgradeEvidenceReleaseContractVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verificationBlock, new RegExp(releaseImageUpgradeEvidenceReleaseContractVerificationStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verificationBlock, /if: \$\{\{ needs\.verify-upgrade-path\.result == 'success' \}\}/);
 });

@@ -61,6 +61,7 @@ test('renderReleaseContractVerificationSummaryLines formats the contract summary
     smokeEvidenceStatus: 'published-image artifact passed',
     trustedMirrorProbeStatus: 'passed via v1.1-referrers-api',
     trustedMirrorReferrerStatus: 'passed',
+    upgradeSmokeEvidenceStatus: 'upgrade-path artifact passed',
   }), [
     '## Release Contract Verification',
     '',
@@ -68,6 +69,7 @@ test('renderReleaseContractVerificationSummaryLines formats the contract summary
     '- Release manifest checked against GitHub release assets',
     '- Compose override asset checked against the immutable image reference',
     '- Archived smoke evidence verification: published-image artifact passed',
+    '- Archived upgrade smoke evidence verification: upgrade-path artifact passed',
     '- Docker Hub mirror verification: passed',
     '- Docker Hub trusted mirror capability probe: passed via v1.1-referrers-api',
     '- Docker Hub trusted mirror referrer verification: passed',
@@ -91,6 +93,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for release-contract sum
         '--smoke-evidence-status', 'published-image artifact passed',
         '--trusted-mirror-probe-status', 'passed via v1.1-referrers-api',
         '--trusted-mirror-referrer-status', 'passed',
+        '--upgrade-smoke-evidence-status', 'upgrade-path artifact passed',
       ],
       env: {},
     });
@@ -98,6 +101,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for release-contract sum
     const summary = await readFile(summaryPath, 'utf8');
     assert.match(summary, /Release Contract Verification/);
     assert.match(summary, /Archived smoke evidence verification: published-image artifact passed/);
+    assert.match(summary, /Archived upgrade smoke evidence verification: upgrade-path artifact passed/);
   } finally {
     await rm(tempDirectory, { force: true, recursive: true });
   }

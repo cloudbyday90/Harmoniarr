@@ -22,6 +22,7 @@ export const releaseWorkflowSummaryCliOptions = Object.freeze({
   'metadata-asset-name': { type: 'string' },
   'release-tag': { type: 'string' },
   'sbom-asset-name': { type: 'string' },
+  'upgrade-smoke-evidence-status': { type: 'string' },
   'smoke-evidence-artifact-name': { type: 'string' },
   'smoke-evidence-status': { type: 'string' },
   'smoke-contract-status': { type: 'string' },
@@ -88,6 +89,7 @@ export function resolveReleaseWorkflowSummaryInputs(summaryKind, {
         summaryPath,
         trustedMirrorProbeStatus: getRequiredStringInput(resolvedValues, 'trusted-mirror-probe-status', 'HARMONIARR_SUMMARY_TRUSTED_MIRROR_PROBE_STATUS', env),
         trustedMirrorReferrerStatus: getRequiredStringInput(resolvedValues, 'trusted-mirror-referrer-status', 'HARMONIARR_SUMMARY_TRUSTED_MIRROR_REFERRER_STATUS', env),
+        upgradeSmokeEvidenceStatus: getOptionalStringInput(resolvedValues, 'upgrade-smoke-evidence-status', 'HARMONIARR_SUMMARY_UPGRADE_SMOKE_EVIDENCE_STATUS', env),
       };
     default:
       throw new Error(`Unsupported release summary kind: ${summaryKind}`);

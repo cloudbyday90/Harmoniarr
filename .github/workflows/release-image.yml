@@ -326,11 +326,12 @@ jobs:
           if-no-files-found: error
 
   verify-release-contract:
-    if: github.event_name == 'release'
+    if: ${{ always() && github.event_name == 'release' && needs.publish-image.result == 'success' && needs.verify-published-image.result == 'success' && (needs.verify-upgrade-path.result == 'success' || needs.verify-upgrade-path.result == 'skipped') }}
     name: Verify Release Contract
     needs:
       - publish-image
       - verify-published-image
+      - verify-upgrade-path
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -370,6 +371,19 @@ jobs:
       - name: Verify archived published-image smoke evidence artifact
         env:
           HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-released-image.json
+        run: npm run validate:docker-smoke-evidence
+
+      - name: Download upgrade-path smoke evidence artifact
+        if: ${{ needs.verify-upgrade-path.result == 'success' }}
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: harmoniarr-docker-smoke-upgrade-path.json
+          path: supply-chain
+
+      - name: Verify archived upgrade-path smoke evidence artifact
+        if: ${{ needs.verify-upgrade-path.result == 'success' }}
+        env:
+          HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-upgrade-path.json
         run: npm run validate:docker-smoke-evidence
 
       - name: Verify release metadata and Compose override assets
@@ -461,6 +475,7 @@ jobs:
           HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && 'passed' || 'skipped' }}
           HARMONIARR_SUMMARY_RELEASE_TAG: ${{ needs.publish-image.outputs.release_tag }}
           HARMONIARR_SUMMARY_SMOKE_EVIDENCE_STATUS: published-image artifact passed
+          HARMONIARR_SUMMARY_UPGRADE_SMOKE_EVIDENCE_STATUS: ${{ needs.verify-upgrade-path.result == 'success' && 'upgrade-path artifact passed' || 'skipped' }}
           HARMONIARR_SUMMARY_TRUSTED_MIRROR_PROBE_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' && format('passed via {0}', steps.probe_trusted_mirror.outputs.target_distribution_spec) || 'skipped' }}
           HARMONIARR_SUMMARY_TRUSTED_MIRROR_REFERRER_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' && 'passed' || 'skipped' }}
         run: node scripts/release-workflow-summary.js verify-release-contract
