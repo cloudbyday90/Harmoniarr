@@ -6,6 +6,7 @@ import {
   dockerDeploymentPathEvidenceFileNames,
   runDockerDeploymentPathValidation,
 } from '../../scripts/docker-deployment-validation.js';
+import { dockerDeploymentSummaryPathEnvVar } from '../../scripts/docker-deployment-manifest.js';
 import { resolveDockerDeploymentPathValidationInputs } from '../../scripts/validate-docker-deployment-path.js';
 
 function createFreshInstallValidationResult(projectName) {
@@ -41,6 +42,7 @@ test('resolveDockerDeploymentPathValidationInputs accepts CLI overrides', () => 
       '--image-ref', 'ghcr.io/cloudbyday90/harmoniarr@sha256:candidate',
       '--baseline-image-ref', 'ghcr.io/cloudbyday90/harmoniarr@sha256:baseline',
       '--evidence-dir', 'artifacts/docker',
+      '--summary-path', 'artifacts/docker/deployment-summary.json',
     ],
     env: {},
   });
@@ -49,6 +51,23 @@ test('resolveDockerDeploymentPathValidationInputs accepts CLI overrides', () => 
     baselineImageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:baseline',
     evidenceDir: 'artifacts/docker',
     imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:candidate',
+    summaryPath: 'artifacts/docker/deployment-summary.json',
+  });
+});
+
+test('resolveDockerDeploymentPathValidationInputs accepts summary-path from the environment', () => {
+  const inputs = resolveDockerDeploymentPathValidationInputs({
+    args: [],
+    env: {
+      [dockerDeploymentSummaryPathEnvVar]: 'artifacts/docker/deployment-summary.json',
+    },
+  });
+
+  assert.deepEqual(inputs, {
+    baselineImageRef: null,
+    evidenceDir: null,
+    imageRef: null,
+    summaryPath: 'artifacts/docker/deployment-summary.json',
   });
 });
 
@@ -56,6 +75,7 @@ test('runDockerDeploymentPathValidation always runs fresh-install and skips opti
   const freshInstallCalls = [];
   const upgradeCalls = [];
   const evidenceCalls = [];
+  const summaryCalls = [];
 
   const result = await runDockerDeploymentPathValidation({
     validateDockerFreshInstallFn: async (options) => {
@@ -80,6 +100,10 @@ test('runDockerDeploymentPathValidation always runs fresh-install and skips opti
       evidenceCalls.push(options);
       return null;
     },
+    writeDockerDeploymentManifestFn: async (options) => {
+      summaryCalls.push(options);
+      return null;
+    },
   });
 
   assert.deepEqual(freshInstallCalls, [{
@@ -93,9 +117,39 @@ test('runDockerDeploymentPathValidation always runs fresh-install and skips opti
     validationKind: 'fresh-install',
     validationResult: createFreshInstallValidationResult('fresh-install'),
   }]);
+  assert.deepEqual(summaryCalls, [{
+    summaryPath: null,
+    validationResult: {
+      baselineImageRef: null,
+      evidenceDir: null,
+      freshInstall: {
+        evidencePath: null,
+        reason: null,
+        status: 'passed',
+        validationKind: 'fresh-install',
+        validationResult: createFreshInstallValidationResult('fresh-install'),
+      },
+      imageRef: null,
+      releasedImage: {
+        evidencePath: null,
+        reason: 'HARMONIARR_IMAGE is not configured',
+        status: 'skipped',
+        validationKind: null,
+        validationResult: null,
+      },
+      upgradePath: {
+        evidencePath: null,
+        reason: 'HARMONIARR_BASELINE_IMAGE is not configured',
+        status: 'skipped',
+        validationKind: null,
+        validationResult: null,
+      },
+    },
+  }]);
   assert.equal(result.freshInstall.status, 'passed');
   assert.equal(result.releasedImage.status, 'skipped');
   assert.equal(result.releasedImage.reason, 'HARMONIARR_IMAGE is not configured');
+  assert.equal(result.summaryPath, null);
   assert.equal(result.upgradePath.status, 'skipped');
   assert.equal(result.upgradePath.reason, 'HARMONIARR_BASELINE_IMAGE is not configured');
 });
@@ -104,11 +158,13 @@ test('runDockerDeploymentPathValidation reuses immutable image refs and writes s
   const freshInstallCalls = [];
   const upgradeCalls = [];
   const evidenceCalls = [];
+  const summaryCalls = [];
 
   const result = await runDockerDeploymentPathValidation({
     baselineImageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:baseline',
     evidenceDir: 'artifacts/docker',
     imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:candidate',
+    summaryPath: 'artifacts/docker/deployment-summary.json',
     validateDockerFreshInstallFn: async (options) => {
       freshInstallCalls.push(options);
       return createFreshInstallValidationResult(`run-${freshInstallCalls.length}`);
@@ -132,6 +188,12 @@ test('runDockerDeploymentPathValidation reuses immutable image refs and writes s
       evidenceCalls.push(options);
       return {
         evidencePath: options.evidencePath,
+      };
+    },
+    writeDockerDeploymentManifestFn: async (options) => {
+      summaryCalls.push(options);
+      return {
+        summaryPath: options.summaryPath,
       };
     },
   });
@@ -172,7 +234,13 @@ test('runDockerDeploymentPathValidation reuses immutable image refs and writes s
       validationKind: 'upgrade-path',
     },
   ]);
+  assert.equal(summaryCalls.length, 1);
+  assert.equal(summaryCalls[0].summaryPath, 'artifacts/docker/deployment-summary.json');
+  assert.equal(summaryCalls[0].validationResult.freshInstall.status, 'passed');
+  assert.equal(summaryCalls[0].validationResult.releasedImage.status, 'passed');
+  assert.equal(summaryCalls[0].validationResult.upgradePath.status, 'passed');
   assert.equal(result.evidenceDir, resolve('artifacts/docker'));
   assert.equal(result.releasedImage.status, 'passed');
+  assert.equal(result.summaryPath, 'artifacts/docker/deployment-summary.json');
   assert.equal(result.upgradePath.status, 'passed');
 });

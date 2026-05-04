@@ -95,6 +95,11 @@ Expected local evidence files when the command runs successfully:
 - `harmoniarr-docker-smoke-released-image.json` when `HARMONIARR_IMAGE` is set
 - `harmoniarr-docker-smoke-upgrade-path.json` when `HARMONIARR_BASELINE_IMAGE` is set
 
+Optional top-level summary artifact:
+
+- Set `HARMONIARR_DOCKER_VALIDATION_SUMMARY_PATH` when you want one machine-readable record of the deployment-path run in addition to the per-step smoke evidence files.
+- The summary artifact records which checks ran, which were skipped, and the exact evidence file paths produced by the run.
+
 If no working Docker daemon is available, do not mark deployment-path or packaged-runtime release evidence items complete. Capture that as an environment limitation, not a passed check.
 
 ## Release Execution

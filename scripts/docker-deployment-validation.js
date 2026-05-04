@@ -8,6 +8,7 @@
 
 import { resolve } from 'node:path';
 
+import { writeDockerDeploymentManifest } from './docker-deployment-manifest.js';
 import { writeDockerSmokeEvidence } from './docker-smoke-evidence.js';
 import { validateDockerFreshInstall, validateDockerUpgradePath } from './docker-smoke-validation.js';
 import { normalizeOptionalString } from './script-input-resolution.js';
@@ -76,6 +77,7 @@ export function renderDockerDeploymentPathValidationSuccessMessage({
   evidenceDir,
   imageRef,
   releasedImage,
+  summaryPath,
   upgradePath,
 } = {}) {
   const releasedImageSummary = releasedImage?.status === 'passed'
@@ -88,16 +90,21 @@ export function renderDockerDeploymentPathValidationSuccessMessage({
   const evidenceSummary = normalizeOptionalString(evidenceDir)
     ? `; evidence directory ${resolve(evidenceDir)}`
     : '';
+  const summaryManifest = normalizeOptionalString(summaryPath)
+    ? `; summary manifest ${summaryPath}`
+    : '';
 
-  return `Docker deployment-path validation passed (fresh install passed; ${releasedImageSummary}; ${upgradePathSummary}${evidenceSummary})`;
+  return `Docker deployment-path validation passed (fresh install passed; ${releasedImageSummary}; ${upgradePathSummary}${evidenceSummary}${summaryManifest})`;
 }
 
 export async function runDockerDeploymentPathValidation({
   baselineImageRef = null,
   evidenceDir = null,
   imageRef = null,
+  summaryPath = null,
   validateDockerFreshInstallFn = validateDockerFreshInstall,
   validateDockerUpgradePathFn = validateDockerUpgradePath,
+  writeDockerDeploymentManifestFn = writeDockerDeploymentManifest,
   writeDockerSmokeEvidenceFn = writeDockerSmokeEvidence,
 } = {}) {
   const normalizedImageRef = normalizeOptionalString(imageRef);
@@ -163,7 +170,7 @@ export async function runDockerDeploymentPathValidation({
     });
   }
 
-  return {
+  const result = {
     baselineImageRef: normalizedBaselineImageRef,
     evidenceDir: normalizedEvidenceDir ? resolve(normalizedEvidenceDir) : null,
     freshInstall: createPassedValidationStatus({
@@ -174,5 +181,15 @@ export async function runDockerDeploymentPathValidation({
     imageRef: normalizedImageRef,
     releasedImage,
     upgradePath,
+  };
+
+  const summary = await writeDockerDeploymentManifestFn({
+    summaryPath,
+    validationResult: result,
+  });
+
+  return {
+    ...result,
+    summaryPath: summary?.summaryPath ?? null,
   };
 }

@@ -11,6 +11,7 @@ import {
   renderDockerDeploymentPathValidationSuccessMessage,
   runDockerDeploymentPathValidation,
 } from './docker-deployment-validation.js';
+import { dockerDeploymentSummaryPathEnvVar } from './docker-deployment-manifest.js';
 import { getOptionalStringInput, parseStrictScriptOptions } from './script-input-resolution.js';
 import { runDirectScriptTask } from './script-runtime.js';
 
@@ -18,6 +19,7 @@ export const validateDockerDeploymentPathCliOptions = Object.freeze({
   'baseline-image-ref': { type: 'string' },
   'evidence-dir': { type: 'string' },
   'image-ref': { type: 'string' },
+  'summary-path': { type: 'string' },
 });
 
 export function resolveDockerDeploymentPathValidationInputs({
@@ -33,6 +35,7 @@ export function resolveDockerDeploymentPathValidationInputs({
     baselineImageRef: getOptionalStringInput(values, 'baseline-image-ref', 'HARMONIARR_BASELINE_IMAGE', env),
     evidenceDir: getOptionalStringInput(values, 'evidence-dir', dockerDeploymentEvidenceDirEnvVar, env),
     imageRef: getOptionalStringInput(values, 'image-ref', 'HARMONIARR_IMAGE', env),
+    summaryPath: getOptionalStringInput(values, 'summary-path', dockerDeploymentSummaryPathEnvVar, env),
   };
 }
 
