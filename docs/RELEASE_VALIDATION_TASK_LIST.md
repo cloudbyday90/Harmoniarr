@@ -22,7 +22,6 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Run unit tests for validators, service logic, and normalization helpers.
 - [ ] Run integration tests for auth/session, settings, import review, jobs, and recovery-sensitive operations.
 - [ ] Run route-contract validation for normalized payloads and permission failures.
-- [ ] Run migration replay and schema snapshot validation.
 - [x] Run migration replay and schema snapshot validation.
 - [ ] Run UI/end-to-end coverage for bootstrap, login, settings, review queue, jobs/history, and restore preview/apply where practical.
 

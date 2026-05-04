@@ -6,7 +6,7 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
-## Current Status (2026-05-03)
+## Current Status (2026-05-04)
 
 - Initial implementation planning exists in `docs/harmoniarr.md`.
 - Execution phases are defined, but no phase is complete yet.
@@ -19,6 +19,7 @@ Database model source: `docs/DATABASE_MODEL.md`
 - Operator-visible control-plane reads now also pass through a shared server-side redaction boundary, so recovery diagnostics, operation history, maintenance-lock responses, restore-preview lock conflicts, and recent audit detail reads omit or sanitize secret-bearing values, emails, bearer tokens, and filesystem paths before they reach the UI.
 - Structured runtime and security log rendering now also pass through the same shared redaction policy, and an admin-only diagnostics export route now emits compact redacted JSON evidence bundles for support-oriented sharing without exposing plaintext recovery codes, session material, or filesystem paths.
 - Runtime operations now also flow through shared resource and monitoring boundaries, so sharp concurrency/cache tuning, ffmpeg/ffprobe timeout-plus-kill behavior, stale-heartbeat detection, memory-pressure diagnostics, and prefixed warning logging are owned centrally instead of drifting across workers and route-local command calls.
+- Deployment-path validation now also routes through a shared Docker smoke validator that proves read-only-rootfs posture, fail-closed startup refusal, FFmpeg/FFprobe availability, embedded PostgreSQL startup plus restart persistence, and optional machine-readable evidence emission without introducing workflow-local shell composition.
 - Remaining delivery risk is now concentrated more in deployment-path validation and release closure than in first-pass feature construction.
 - The unchecked start-gate and Phase 0 alignment items are now mostly documentation-governance follow-through, not evidence that the core implementation is still blocked from progressing.
 - The Docker runtime now boots a real minimal Express plus Vue application instead of a placeholder-only shell.
@@ -169,13 +170,13 @@ Database model source: `docs/DATABASE_MODEL.md`
 - A native Node.js test runner is now wired into the repo, with executable coverage around the shared local metadata search service, local-search workflow modules, the artist and release workflow local-first behaviors, and broader route-level metadata HTTP contracts backed by a shared native HTTP test helper.
 - This file is the operational execution tracker for the initial V1 build.
 
-## Remaining Priority Snapshot (2026-05-03)
+## Remaining Priority Snapshot (2026-05-04)
 
 Highest-priority remaining product-risk slices:
 
 1. Validate the supported deployment path end to end: fresh install, upgrade, restore preview/apply, and rollback-aware behavior.
 2. Finish the remaining critical-path validation depth: broader integration scenarios, fixture packs, and practical UI end-to-end coverage for the operator workflows already implemented.
-3. Close the remaining runtime/deployment hardening gaps that still affect operability, such as fail-closed startup checks, standard-image FFmpeg verification, and full maintenance-lock pause validation across unsafe background work.
+3. Close the remaining runtime/deployment hardening gaps that still affect operability, especially whole-system maintenance-lock pause proof and upgrade plus restore safety under realistic containerized startup conditions.
 
 Highest-priority product-value slices if feature work is intentionally pulled forward:
 
@@ -274,7 +275,9 @@ Status note:
 ## Phase 1 - Bootstrap, Packaging, And Schema Foundation
 
 - [x] Create server bootstrap skeleton with config loading, startup validation, logger wiring, and HTTP app construction.
-- [ ] Add fail-closed startup checks for required directories, secrets, database reachability, and invalid configuration combinations.
+- [x] Add fail-closed startup checks for required directories, secrets, database reachability, and invalid configuration combinations.
+  - Startup now routes through a dedicated `startup-validation-service.js` boundary before the server begins listening, so invalid bootstrap-owner configuration, invalid secret-encryption-key configuration, database reachability failure, and unhealthy runtime roots all fail closed before any HTTP listener is exposed.
+  - The startup gate reuses the existing path-validation boundary for app-data, downloads, staging, music, and transcode-temp roots instead of adding route-local or module-local filesystem checks.
 - [x] Add fail-closed HTTP perimeter defaults for body-size limits, supported content types, safe browser-facing security headers, and generic error/not-found behavior.
 - [x] Create base repository/module structure for routes, validators, services, repositories, jobs, adapters, and shared utilities.
 - [x] Add initial database connection layer and migration runner.
@@ -285,7 +288,7 @@ Status note:
 - [ ] Verify FFmpeg and required media inspection tooling are present in the standard image.
   - A shared `media-tooling-status-service.js` now probes `ffmpeg -version` and `ffprobe -version` and publishes safe availability flags (`ffmpegAvailable`, `ffprobeAvailable`) through the existing dependency-health surface.
   - App composition now includes a `media_tooling` dependency check alongside `slskd`, so system overview and diagnostics can expose tooling readiness before media inspection/transcoding execution paths are enabled.
-  - Remaining work is Docker-path proof that the standard runtime image actually contains and exposes the expected binaries, not just app-level probing support.
+  - The shared Docker smoke validator now also executes `ffmpeg -version` and `ffprobe -version` inside the running container and can emit machine-readable evidence for release workflows, but the task remains open until one live Docker-capable execution proves the standard image path end to end.
 - [x] Update schema snapshot/documentation once the initial migration package is stable.
 
 ## Phase 2 - Auth, Sessions, And Settings Contracts
@@ -517,14 +520,16 @@ Status note:
 - [ ] Add end-to-end UI coverage for bootstrap, login, settings, review queue, job feedback, and recovery-sensitive flows where practical.
 - [ ] Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and restore/recovery scenarios.
 - [ ] Validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior.
+  - The shared Docker smoke validator now covers fresh-install schema bootstrap, fail-closed startup refusal, FFmpeg/FFprobe availability, embedded PostgreSQL readiness plus persistence, existing-data restart behavior, and optional machine-readable evidence output through `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH`.
+  - Remaining work is live execution in a Docker-capable environment plus explicit upgrade, restore preview/apply, and rollback-oriented scenarios against prior accepted state or released-image baselines.
 - [ ] Finalize Docker artifacts, README/doc index updates, compose examples, and operator setup guidance.
 - [ ] Record V1 no-go conditions, smoke-test checklist, and release sign-off criteria.
 
 Recommended next execution slice:
 
-1. Validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior.
-2. Use that deployment-path work to prove standard-image FFmpeg/tooling presence, fail-closed startup assumptions, migration safety, backup/restore operability, and maintenance-lock behavior under realistic containerized startup conditions.
-3. Treat the remaining fixture-pack, E2E, and release-doc items as the immediate follow-on closure wave once that deployment-path slice is green.
+1. Execute the shared Docker smoke contract in a live Docker-capable environment and use its evidence output to close the remaining fresh-install, startup-refusal, FFmpeg/tooling, and embedded-Postgres release-validation items.
+2. Extend that same deployment-path seam to cover upgrade from the last accepted baseline plus restore preview/apply and rollback-aware behavior, so migration safety and recovery operability are proven on the supported container path instead of inferred from unit-level coverage.
+3. After the deployment-path slice is green, close the remaining whole-system maintenance-lock pause proof, fixture-pack, E2E, and release-doc items as the immediate release-closure wave.
 
 ## Dependencies
 
