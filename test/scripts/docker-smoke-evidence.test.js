@@ -2,11 +2,38 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  assertDockerSmokeValidationResultContract,
   createDockerSmokeEvidence,
   dockerSmokeEvidencePathEnvVar,
   getOptionalDockerSmokeEvidencePath,
   writeDockerSmokeEvidence,
 } from '../../scripts/docker-smoke-evidence.js';
+
+function createFreshInstallValidationResult() {
+  return {
+    backupRestoreFlow: {
+      backupArtifactId: 'backup-1',
+      restoreApplyStatus: 'completed',
+    },
+    existingDataRestart: {
+      healthBody: {
+        service: 'ok',
+      },
+    },
+    freshInstall: {
+      healthBody: {
+        service: 'ok',
+      },
+    },
+    projectName: 'harmoniarrsmoke-test',
+    requestMusicFlow: {
+      delegatedRequestId: 'request-1',
+      requestedForUsername: 'smoke-listener',
+      summaryScope: 'mine',
+    },
+    workspaceRoot: '/tmp/harmoniarrsmoke-test',
+  };
+}
 
 test('getOptionalDockerSmokeEvidencePath reads the configured environment path', () => {
   assert.equal(
@@ -22,15 +49,7 @@ test('createDockerSmokeEvidence omits workspaceRoot from the machine-readable pa
   const evidence = createDockerSmokeEvidence({
     generatedAt: '2026-05-04T00:00:00.000Z',
     validationKind: 'fresh-install',
-    validationResult: {
-      freshInstall: {
-        healthBody: {
-          service: 'ok',
-        },
-      },
-      projectName: 'harmoniarrsmoke-test',
-      workspaceRoot: '/tmp/harmoniarrsmoke-test',
-    },
+    validationResult: createFreshInstallValidationResult(),
   });
 
   assert.deepEqual(evidence, {
@@ -38,14 +57,49 @@ test('createDockerSmokeEvidence omits workspaceRoot from the machine-readable pa
     schemaVersion: 1,
     validationKind: 'fresh-install',
     validationResult: {
+      backupRestoreFlow: {
+        backupArtifactId: 'backup-1',
+        restoreApplyStatus: 'completed',
+      },
+      existingDataRestart: {
+        healthBody: {
+          service: 'ok',
+        },
+      },
       freshInstall: {
         healthBody: {
           service: 'ok',
         },
       },
       projectName: 'harmoniarrsmoke-test',
+      requestMusicFlow: {
+        delegatedRequestId: 'request-1',
+        requestedForUsername: 'smoke-listener',
+        summaryScope: 'mine',
+      },
     },
   });
+});
+
+test('assertDockerSmokeValidationResultContract rejects fresh-install evidence without delegated request music proof', () => {
+  assert.throws(() => assertDockerSmokeValidationResultContract({
+    validationKind: 'fresh-install',
+    validationResult: {
+      backupRestoreFlow: {
+        backupArtifactId: 'backup-1',
+      },
+      existingDataRestart: {
+        healthBody: {
+          service: 'ok',
+        },
+      },
+      freshInstall: {
+        healthBody: {
+          service: 'ok',
+        },
+      },
+    },
+  }), /fresh-install\.requestMusicFlow must be an object/);
 });
 
 test('writeDockerSmokeEvidence writes a JSON file when configured', async () => {
@@ -60,8 +114,27 @@ test('writeDockerSmokeEvidence writes a JSON file when configured', async () => 
     },
     validationKind: 'released-image',
     validationResult: {
+      backupRestoreFlow: {
+        backupArtifactId: 'backup-1',
+        restoreApplyStatus: 'completed',
+      },
+      existingDataRestart: {
+        healthBody: {
+          service: 'ok',
+        },
+      },
+      freshInstall: {
+        healthBody: {
+          service: 'ok',
+        },
+      },
       imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
       projectName: 'harmoniarrsmoke-test',
+      requestMusicFlow: {
+        delegatedRequestId: 'request-1',
+        requestedForUsername: 'smoke-listener',
+        summaryScope: 'mine',
+      },
     },
     writeFileFn: async (filePath, content, encoding) => {
       writes.push({ content, encoding, filePath });
@@ -79,4 +152,6 @@ test('writeDockerSmokeEvidence writes a JSON file when configured', async () => 
   assert.equal(writes[0].filePath, result.evidencePath);
   assert.match(writes[0].content, /"validationKind": "released-image"/);
   assert.match(writes[0].content, /"imageRef": "ghcr.io\/cloudbyday90\/harmoniarr@sha256:abc"/);
+  assert.match(writes[0].content, /"requestMusicFlow": \{/);
+  assert.match(writes[0].content, /"delegatedRequestId": "request-1"/);
 });
