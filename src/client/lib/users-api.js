@@ -82,3 +82,10 @@ export function relinkPlexUserConflict({ plexUserId, userId }) {
     },
   });
 }
+
+export function unlinkPlexUser(userId) {
+  return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/unlink-plex`, {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}

@@ -180,14 +180,13 @@ export function createApp({
     listAppUsers: baseAppUserModule.appUserService.listAppUsers,
     plexOwnerLinkService: providerModule.plexOwnerLinkService,
   });
-  const appUserModule = {
-    ...baseAppUserModule,
-    routeDependencies: {
-      ...baseAppUserModule.routeDependencies,
-      applyPlexDirectoryImport: plexDirectoryImportService.applyImport,
-      buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
-    },
-  };
+  const appUserModule = buildAppUserModule({
+    accountClaimService: baseAppUserModule.accountClaimService,
+    appUserProvisioningService: baseAppUserModule.appUserProvisioningService,
+    appUserService: baseAppUserModule.appUserService,
+    permissionService: baseAppUserModule.permissionService,
+    plexDirectoryImportService,
+  });
   const artworkModule = buildArtworkModule({
     maintenanceLockOperationPauseService,
     maintenanceLockService,

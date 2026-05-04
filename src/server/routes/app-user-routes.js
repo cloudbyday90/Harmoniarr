@@ -38,6 +38,7 @@ export function registerAppUserRoutes(app, {
   relinkPlexDirectoryConflict = null,
   resetAppUserPassword = defaultAppUserService.resetAppUserPassword,
   provisionManagedLibraryRoot = defaultAppUserProvisioningService.provisionManagedLibraryRoot,
+  unlinkPlexAppUser = null,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
@@ -205,6 +206,22 @@ export function registerAppUserRoutes(app, {
           plexUserId: request.body?.plexUserId,
           requestMetadata: getRequestMetadata(request),
           userId: request.body?.userId,
+        })),
+      });
+    }));
+  }
+
+  if (typeof unlinkPlexAppUser === 'function') {
+    app.post('/api/v1/users/:userId/unlink-plex', asyncRoute(async (request, response) => {
+      const session = await requireFreshAdminSession(request);
+      requireCsrf(request, session);
+
+      response.status(201).json({
+        ok: true,
+        ...(await unlinkPlexAppUser({
+          actorUserId: session.appUserId,
+          requestMetadata: getRequestMetadata(request),
+          userId: request.params.userId,
         })),
       });
     }));

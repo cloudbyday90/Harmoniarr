@@ -36,6 +36,7 @@ import {
   previewPlexUserImport,
   relinkPlexUserConflict,
   resetUserPassword,
+  unlinkPlexUser,
   provisionUserManagedLibraryRoot,
   updateUser,
 } from '../lib/users-api.js';
@@ -152,7 +153,23 @@ function toEditableUser(user, overrides = {}) {
     provisioning: false,
     resettingPassword: false,
     saving: false,
+    unlinkingPlex: false,
   };
+}
+
+function describePlexLocalAuthStatus(user) {
+  if (user?.localAuth?.unlinkPlexReady) {
+    const changedAt = user.localAuth.passwordChangedAt
+      ? ` since ${new Date(user.localAuth.passwordChangedAt).toLocaleString()}`
+      : '';
+    const changeNotice = user.localAuth.mustChangePassword
+      ? ' The user will still be prompted to change that password on next login.'
+      : '';
+
+    return `Local sign-in is ready${changedAt}. You can safely remove the Plex link without deleting the app user.${changeNotice}`;
+  }
+
+  return 'Unlink is blocked until a temporary password is set or the user completes account claim with a local password.';
 }
 
 function formatCommaSeparatedList(value) {
@@ -621,6 +638,29 @@ async function relinkPlexConflict(profile) {
     userManagementErrorMessage.value = error instanceof Error ? error.message : 'Plex conflict relink failed';
   } finally {
     activePlexRelinkProfileId.value = '';
+  }
+}
+
+async function unlinkManagedPlexUser(user) {
+  user.unlinkingPlex = true;
+  userManagementErrorMessage.value = '';
+  userManagementSuccessMessage.value = '';
+
+  try {
+    const payload = await unlinkPlexUser(user.id);
+    Object.assign(user, toEditableUser(payload.user, {
+      claimCode: user.claimCode,
+      claimCodeExpiresAt: user.claimCodeExpiresAt,
+    }));
+
+    if (plexUserImportPreview.value) {
+      await loadPlexUserImportPreview();
+    }
+
+    userManagementSuccessMessage.value = `Plex link removed for ${payload.user.username}. Local sign-in remains available.`;
+  } catch (error) {
+    user.unlinkingPlex = false;
+    userManagementErrorMessage.value = error instanceof Error ? error.message : 'Plex unlink failed';
   }
 }
 
@@ -1329,8 +1369,18 @@ onMounted(() => {
             >
               {{ user.issuingClaimCode ? 'Issuing claim code...' : 'Issue claim code' }}
             </button>
+            <button
+              v-if="user.authProvider === 'plex'"
+              type="button"
+              class="secondary-button"
+              @click="unlinkManagedPlexUser(user)"
+              :disabled="user.unlinkingPlex || !user.localAuth?.unlinkPlexReady"
+            >
+              {{ user.unlinkingPlex ? 'Removing Plex link...' : 'Unlink Plex account' }}
+            </button>
             <p class="metadata-card-copy" v-if="hasPendingManagedLibraryRootChanges(user)">Save the managed library subdirectory change before provisioning the folder.</p>
             <p class="metadata-card-copy" v-if="user.authProvider === 'plex'">Use a temporary password here to provide local fallback access for a Plex-linked user without removing the Plex binding.</p>
+            <p class="metadata-card-copy" v-if="user.authProvider === 'plex'">{{ describePlexLocalAuthStatus(user) }}</p>
             <p class="metadata-card-copy" v-if="user.claimCode">Current claim code: {{ user.claimCode }}</p>
             <p class="metadata-card-copy" v-if="user.claimCodeExpiresAt">Claim code expires {{ new Date(user.claimCodeExpiresAt).toLocaleString() }}. The user can complete setup on the public /claim-account screen with username {{ user.username }}.</p>
           </article>

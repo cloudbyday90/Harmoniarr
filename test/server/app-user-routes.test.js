@@ -92,6 +92,25 @@ function createAppUserRouteTestApp(overrides = {}) {
           permissions: ['media.request'],
         },
       }),
+      unlinkPlexAppUser: async ({ userId }) => ({
+        unlinkedAt: '2026-05-04T10:30:00.000Z',
+        user: {
+          id: userId,
+          username: 'listener',
+          role: 'requester',
+          authProvider: 'local',
+          authSubject: null,
+          localAuth: {
+            hasConfiguredPassword: true,
+            mustChangePassword: true,
+            passwordChangedAt: '2026-05-04T18:00:00.000Z',
+            unlinkPlexBlockedReason: null,
+            unlinkPlexReady: true,
+          },
+          managedLibraryRelativeRoot: 'listeners/listener',
+          permissions: ['media.request'],
+        },
+      }),
       provisionManagedLibraryRoot: async ({ userId }) => ({
         provisioning: {
           authProvider: 'local',
@@ -593,5 +612,55 @@ test('app user Plex relink route resolves a conflict through the shared service'
     assert.equal(payload.ok, true);
     assert.equal(payload.user.authProvider, 'plex');
     assert.equal(payload.profile.classification, 'linked');
+  });
+});
+
+test('app user Plex unlink route passes actor and request metadata to the shared service', async (t) => {
+  const unlinkPlexAppUser = t.mock.fn(async ({ actorUserId, requestMetadata, userId }) => ({
+    unlinkedAt: '2026-05-04T10:30:00.000Z',
+    user: {
+      authProvider: 'local',
+      authSubject: null,
+      id: userId,
+      localAuth: {
+        hasConfiguredPassword: true,
+        mustChangePassword: true,
+        passwordChangedAt: '2026-05-04T18:00:00.000Z',
+        unlinkPlexBlockedReason: null,
+        unlinkPlexReady: true,
+      },
+      username: 'conflict-user',
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-users', user: { role: 'admin' } }));
+  const app = createAppUserRouteTestApp({ requireCsrf, requireFreshAdminSession, unlinkPlexAppUser });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/user-conflict/unlink-plex`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-users',
+        'x-forwarded-for': '198.51.100.22',
+        'user-agent': 'HarmoniarrUsersTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(unlinkPlexAppUser.mock.calls[0].arguments, [{
+      actorUserId: 'admin-1',
+      requestMetadata: {
+        ipAddress: '198.51.100.22',
+        userAgent: 'HarmoniarrUsersTest/1.0',
+      },
+      userId: 'user-conflict',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.user.authProvider, 'local');
+    assert.equal(payload.user.localAuth.unlinkPlexReady, true);
   });
 });

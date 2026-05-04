@@ -20,6 +20,7 @@ import { createApiError } from './auth.js';
 import { recordAuditEvent } from './audit.js';
 import { getPool } from './database.js';
 import { createAppUserPermissionService } from './app-user-permission-service.js';
+import { buildLocalAuthStatus } from './local-auth-readiness.js';
 import { normalizeOptionalManagedLibraryRelativeRoot } from './paths/user-music-root-service.js';
 import { hashPassword } from './security.js';
 import { normalizeUsername, validatePassword } from './validators/auth-validator.js';
@@ -41,6 +42,7 @@ function mapAppUserRow(row, permissionService) {
     id: row.id,
     isDisabled: row.is_disabled,
     lastLoginAt: row.last_login_at,
+    localAuth: buildLocalAuthStatus(row),
     managedLibraryRelativeRoot: row.managed_library_relative_root ?? null,
     mustChangePassword: row.must_change_password,
     permissions: permissionService.listPermissionsForRole(row.role),

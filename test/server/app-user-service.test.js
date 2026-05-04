@@ -14,6 +14,7 @@ test('createAppUserService lists users with resolved permission sets', async (t)
         last_login_at: null,
         managed_library_relative_root: 'listeners/listener',
         must_change_password: true,
+        password_changed_at: '2026-05-01T14:00:00.000Z',
         role: 'requester',
         updated_at: '2026-05-02T15:00:00.000Z',
         username: 'listener',
@@ -32,6 +33,13 @@ test('createAppUserService lists users with resolved permission sets', async (t)
     id: 'user-1',
     isDisabled: false,
     lastLoginAt: null,
+    localAuth: {
+      hasConfiguredPassword: true,
+      mustChangePassword: true,
+      passwordChangedAt: '2026-05-01T14:00:00.000Z',
+      unlinkPlexBlockedReason: null,
+      unlinkPlexReady: true,
+    },
     managedLibraryRelativeRoot: 'listeners/listener',
     mustChangePassword: true,
     permissions: ['import.preview.self', 'media.request', 'playlist.submit'],
@@ -53,6 +61,7 @@ test('createAppUserService creates a user with the requested role and audit evid
       last_login_at: null,
       managed_library_relative_root: 'owned/curator',
       must_change_password: true,
+      password_changed_at: '2026-05-02T15:05:00.000Z',
       role: 'operator',
       updated_at: '2026-05-02T15:05:00.000Z',
       username: 'curator',
@@ -101,6 +110,13 @@ test('createAppUserService creates a user with the requested role and audit evid
     id: 'user-2',
     isDisabled: false,
     lastLoginAt: null,
+    localAuth: {
+      hasConfiguredPassword: true,
+      mustChangePassword: true,
+      passwordChangedAt: '2026-05-02T15:05:00.000Z',
+      unlinkPlexBlockedReason: null,
+      unlinkPlexReady: true,
+    },
     managedLibraryRelativeRoot: 'owned/curator',
     mustChangePassword: true,
     permissions: ['import.execute', 'import.review', 'library.discovery', 'library.scan', 'media.request', 'playlist.submit'],
@@ -125,6 +141,7 @@ test('createAppUserService updates user role and disabled state', async (t) => {
       last_login_at: null,
       managed_library_relative_root: 'owned/listener',
       must_change_password: true,
+      password_changed_at: '2026-05-02T15:05:00.000Z',
       role: 'requester',
       updated_at: '2026-05-02T16:00:00.000Z',
       username: 'curator',
@@ -166,6 +183,7 @@ test('createAppUserService resolves users by id for import target ownership look
           last_login_at: null,
           managed_library_relative_root: 'listeners/listener',
           must_change_password: true,
+          password_changed_at: '2026-05-01T14:00:00.000Z',
           role: 'requester',
           updated_at: '2026-05-02T15:00:00.000Z',
           username: 'listener',
@@ -198,6 +216,7 @@ test('createAppUserService resets a user password, requires password change, and
           last_login_at: null,
           managed_library_relative_root: null,
           must_change_password: true,
+          password_changed_at: '2026-05-04T18:00:00.000Z',
           role: 'requester',
           updated_at: '2026-05-04T18:00:00.000Z',
           username: 'plex-friend',
@@ -232,6 +251,7 @@ test('createAppUserService resets a user password, requires password change, and
   assert.equal(result.user.id, 'user-2');
   assert.equal(result.user.mustChangePassword, true);
   assert.equal(result.user.authProvider, 'plex');
+  assert.equal(result.user.localAuth.unlinkPlexReady, true);
   assert.equal(result.revokedSessionCount, 3);
   assert.equal(client.release.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);

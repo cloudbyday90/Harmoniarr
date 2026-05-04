@@ -19,6 +19,7 @@
 import { createApiError } from '../../auth.js';
 import { recordAuditEvent } from '../../audit.js';
 import { getPool } from '../../database.js';
+import { buildLocalAuthStatus, isLocalAuthReadyForPlexUnlink } from '../../local-auth-readiness.js';
 import { hashPassword } from '../../security.js';
 import { normalizeOptionalEmail } from '../../validators/auth-validator.js';
 import { createPlexHttpClient } from './plex-http-client.js';
@@ -292,22 +293,28 @@ function summarizeProfiles(profiles) {
   return summary;
 }
 
+function mapAppUserSummary(user) {
+  return {
+    authProvider: user.authProvider ?? user.auth_provider ?? 'local',
+    authSubject: user.authSubject ?? user.auth_subject ?? null,
+    email: user.email ?? null,
+    id: user.id,
+    isDisabled: user.isDisabled ?? user.is_disabled ?? false,
+    localAuth: buildLocalAuthStatus(user),
+    managedLibraryRelativeRoot: user.managedLibraryRelativeRoot ?? user.managed_library_relative_root ?? null,
+    mustChangePassword: user.mustChangePassword ?? user.must_change_password ?? false,
+    plexProfile: user.plexProfile ?? null,
+    role: user.role,
+    username: user.username,
+  };
+}
+
 function mapPreviewProfile(profile) {
   return {
     classification: profile.classification,
     conflictReason: profile.conflictReason ?? null,
     email: profile.email,
-    existingUser: profile.existingUser ? {
-      authProvider: profile.existingUser.authProvider,
-      authSubject: profile.existingUser.authSubject,
-      email: profile.existingUser.email,
-      id: profile.existingUser.id,
-      isDisabled: profile.existingUser.isDisabled,
-      managedLibraryRelativeRoot: profile.existingUser.managedLibraryRelativeRoot,
-      plexProfile: profile.existingUser.plexProfile ?? null,
-      role: profile.existingUser.role,
-      username: profile.existingUser.username,
-    } : null,
+    existingUser: profile.existingUser ? mapAppUserSummary(profile.existingUser) : null,
     homeRole: profile.homeRole,
     id: profile.id,
     isManaged: profile.isManaged,
@@ -323,6 +330,14 @@ function mapPreviewProfile(profile) {
 
 function resolvePlexSubject(profile) {
   return profile.uuid ?? profile.id ?? null;
+}
+
+function normalizeUserId(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw createApiError(400, 'validation_error', 'User id must be provided');
+  }
+
+  return value.trim();
 }
 
 export function createPlexDirectoryImportService({
@@ -414,7 +429,7 @@ export function createPlexDirectoryImportService({
               password_changed_at
             )
             VALUES ($1, $2, $3, 'requester', 'plex', $4, FALSE, NULL)
-            RETURNING id, username, email, role, auth_provider, auth_subject, is_disabled, must_change_password, managed_library_relative_root, created_at, updated_at, last_login_at
+            RETURNING id, username, email, role, auth_provider, auth_subject, is_disabled, must_change_password, managed_library_relative_root, created_at, updated_at, last_login_at, password_changed_at
           `,
           [profile.suggestedUsername, profile.email, placeholderPasswordHash, profile.uuid ?? profile.id],
         );
@@ -455,14 +470,7 @@ export function createPlexDirectoryImportService({
           ],
         );
 
-        importedUsers.push({
-          authProvider: user.auth_provider,
-          authSubject: user.auth_subject,
-          email: user.email,
-          id: user.id,
-          role: user.role,
-          username: user.username,
-        });
+        importedUsers.push(mapAppUserSummary(user));
       }
 
       for (const profile of refreshProfiles) {
@@ -540,13 +548,9 @@ export function createPlexDirectoryImportService({
       throw createApiError(400, 'validation_error', 'Plex user id must be provided');
     }
 
-    if (typeof userId !== 'string' || userId.trim().length === 0) {
-      throw createApiError(400, 'validation_error', 'User id must be provided');
-    }
-
     const preview = await buildPreview();
     const targetPlexUserId = plexUserId.trim();
-    const targetUserId = userId.trim();
+    const targetUserId = normalizeUserId(userId);
     const profile = preview.profiles.find((candidate) => candidate.id === targetPlexUserId);
 
     if (!profile) {
@@ -579,7 +583,7 @@ export function createPlexDirectoryImportService({
               auth_subject = $2,
               updated_at = NOW()
           WHERE id = $1
-          RETURNING id, username, email, role, auth_provider, auth_subject, is_disabled, must_change_password, managed_library_relative_root, created_at, updated_at, last_login_at
+          RETURNING id, username, email, role, auth_provider, auth_subject, is_disabled, must_change_password, managed_library_relative_root, created_at, updated_at, last_login_at, password_changed_at
         `,
         [targetUserId, subject],
       );
@@ -660,6 +664,7 @@ export function createPlexDirectoryImportService({
       await client.query('COMMIT');
 
       const user = updatedUserResult.rows[0];
+  const mappedUser = mapAppUserSummary(user);
 
       await recordAuditEventFn({
         actorType: 'user',
@@ -687,22 +692,123 @@ export function createPlexDirectoryImportService({
           conflictReason: null,
           existingUser: {
             ...profile.existingUser,
-            authProvider: user.auth_provider,
-            authSubject: user.auth_subject,
-            email: user.email,
-            id: user.id,
-            role: user.role,
-            username: user.username,
+            ...mappedUser,
+            plexProfile: {
+              homeRole: profile.homeRole,
+              libraryAccessDetails: profile.libraryAccessDetails,
+              libraryAccessState: profile.libraryAccessState,
+              plexEmail: profile.email ?? null,
+              plexTitle: profile.title,
+              plexUserId: profile.id,
+              plexUsername: profile.username ?? null,
+              plexUuid: profile.uuid ?? null,
+              syncedAt: getNow().toISOString(),
+              thumbUrl: profile.thumbUrl ?? null,
+            },
           },
         }),
-        user: {
-          authProvider: user.auth_provider,
-          authSubject: user.auth_subject,
-          email: user.email,
-          id: user.id,
-          role: user.role,
-          username: user.username,
+        user: mappedUser,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async function unlinkUser({ actorUserId, requestMetadata, userId }) {
+    const normalizedUserId = normalizeUserId(userId);
+    const pool = getPoolFn();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const currentUserResult = await client.query(
+        `
+          SELECT
+            app_users.id,
+            app_users.username,
+            app_users.email,
+            app_users.role,
+            app_users.auth_provider,
+            app_users.auth_subject,
+            app_users.is_disabled,
+            app_users.must_change_password,
+            app_users.password_changed_at,
+            app_users.managed_library_relative_root,
+            app_users.created_at,
+            app_users.updated_at,
+            app_users.last_login_at,
+            app_user_plex_profiles.plex_user_id,
+            app_user_plex_profiles.plex_uuid
+          FROM app_users
+          LEFT JOIN app_user_plex_profiles
+            ON app_user_plex_profiles.app_user_id = app_users.id
+          WHERE app_users.id = $1
+          LIMIT 1
+          FOR UPDATE OF app_users
+        `,
+        [normalizedUserId],
+      );
+
+      if ((currentUserResult.rowCount ?? 0) === 0) {
+        throw createApiError(404, 'app_user_not_found', 'The requested user could not be found');
+      }
+
+      const currentUser = currentUserResult.rows[0];
+      if (currentUser.auth_provider !== 'plex' || !currentUser.auth_subject) {
+        throw createApiError(409, 'plex_directory_user_not_linked', 'The requested user is not currently linked to Plex');
+      }
+
+      if (!isLocalAuthReadyForPlexUnlink(currentUser)) {
+        throw createApiError(409, 'plex_directory_unlink_local_auth_required', 'Configure local sign-in before unlinking this Plex account');
+      }
+
+      await client.query(
+        `
+          DELETE FROM app_user_plex_profiles
+          WHERE app_user_id = $1
+        `,
+        [normalizedUserId],
+      );
+
+      const updatedUserResult = await client.query(
+        `
+          UPDATE app_users
+          SET auth_provider = 'local',
+              auth_subject = NULL,
+              updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, username, email, role, auth_provider, auth_subject, is_disabled, must_change_password, managed_library_relative_root, created_at, updated_at, last_login_at, password_changed_at
+        `,
+        [normalizedUserId],
+      );
+
+      await client.query('COMMIT');
+
+      const mappedUser = mapAppUserSummary(updatedUserResult.rows[0]);
+      await recordAuditEventFn({
+        actorType: 'user',
+        actorUserId,
+        details: {
+          localAuthReady: true,
+          plexSubject: currentUser.auth_subject,
+          plexUserId: currentUser.plex_user_id ?? null,
+          username: currentUser.username,
         },
+        entityId: mappedUser.id,
+        entityType: 'app_user',
+        eventType: 'plex_directory_user_unlinked',
+        ipAddress: requestMetadata?.ipAddress ?? null,
+        summary: 'Plex link removed from app user',
+        userAgent: requestMetadata?.userAgent ?? null,
+      });
+
+      return {
+        unlinkedAt: getNow().toISOString(),
+        user: mappedUser,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -716,5 +822,6 @@ export function createPlexDirectoryImportService({
     applyImport,
     buildPreview,
     relinkConflict,
+    unlinkUser,
   };
 }

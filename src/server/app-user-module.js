@@ -59,6 +59,7 @@ export function createAppUserModule({
           applyPlexDirectoryImport: plexDirectoryImportService.applyImport,
           buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
           relinkPlexDirectoryConflict: plexDirectoryImportService.relinkConflict,
+          unlinkPlexAppUser: plexDirectoryImportService.unlinkUser,
         }
         : {}),
       provisionManagedLibraryRoot: resolvedAppUserProvisioningService.provisionManagedLibraryRoot,
