@@ -89,6 +89,7 @@ export async function listImportCandidates({
   folderPath = null,
   limit,
   offset,
+  requestedForUserId = null,
   sourceSearchId = null,
   status = null,
   username = null,
@@ -116,6 +117,10 @@ export async function listImportCandidates({
 
   if (folderPath) {
     addClause("folder_path ILIKE $value ESCAPE '\\'", `%${escapeLikePattern(folderPath)}%`);
+  }
+
+  if (requestedForUserId) {
+    addClause("normalized_payload -> 'requestOwnership' ->> 'sourceRequestedForUserId' = $value", requestedForUserId);
   }
 
   values.push(limit);

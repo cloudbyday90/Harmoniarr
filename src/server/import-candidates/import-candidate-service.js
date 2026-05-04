@@ -317,6 +317,7 @@ export function createImportCandidateService({
     folderPath,
     limit,
     offset,
+    requestedForUserId,
     sourceSearchId,
     status,
     username,
@@ -325,6 +326,10 @@ export function createImportCandidateService({
       folderPath: normalizeOptionalString(folderPath, {
         fieldName: 'folderPath',
         maxLength: 500,
+      }),
+      requestedForUserId: normalizeOptionalString(requestedForUserId, {
+        fieldName: 'requestedForUserId',
+        maxLength: 100,
       }),
       sourceSearchId: normalizeOptionalString(sourceSearchId, {
         fieldName: 'sourceSearchId',

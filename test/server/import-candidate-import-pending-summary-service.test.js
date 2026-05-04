@@ -3,38 +3,44 @@ import test from 'node:test';
 import { createImportCandidateImportPendingSummaryService } from '../../src/server/import-candidates/import-candidate-import-pending-summary-service.js';
 
 test('buildImportPendingCandidateSummary resolves import readiness over completed download candidates', async () => {
-  const service = createImportCandidateImportPendingSummaryService({
-    listImportCandidates: async () => ({
-      candidates: [
-        {
-          fileCount: 2,
-          folderPath: 'Ready Folder',
-          id: 'candidate-ready',
-          lockedFileCount: 0,
-          sourceProvider: 'slskd',
-          sourceSearchId: 'search-1',
-          totalSizeBytes: 2048,
-          updatedAt: '2026-04-30T18:00:00.000Z',
-          username: 'ready-user',
+  const listImportCandidates = async (filters) => ({
+    candidates: [
+      {
+        fileCount: 2,
+        folderPath: 'Ready Folder',
+        id: 'candidate-ready',
+        lockedFileCount: 0,
+        normalizedPayload: {
+          requestOwnership: {
+            sourceRequestedForUserId: filters.requestedForUserId,
+          },
         },
-        {
-          fileCount: 1,
-          folderPath: 'Warning Folder',
-          id: 'candidate-warning',
-          lockedFileCount: 0,
-          sourceProvider: 'slskd',
-          sourceSearchId: 'search-2',
-          totalSizeBytes: 1024,
-          updatedAt: '2026-04-30T19:00:00.000Z',
-          username: 'warning-user',
-        },
-      ],
-      pagination: {
-        limit: 25,
-        offset: 0,
-        total: 2,
+        sourceProvider: 'slskd',
+        sourceSearchId: 'search-1',
+        totalSizeBytes: 2048,
+        updatedAt: '2026-04-30T18:00:00.000Z',
+        username: 'ready-user',
       },
-    }),
+      {
+        fileCount: 1,
+        folderPath: 'Warning Folder',
+        id: 'candidate-warning',
+        lockedFileCount: 0,
+        sourceProvider: 'slskd',
+        sourceSearchId: 'search-2',
+        totalSizeBytes: 1024,
+        updatedAt: '2026-04-30T19:00:00.000Z',
+        username: 'warning-user',
+      },
+    ],
+    pagination: {
+      limit: 25,
+      offset: 0,
+      total: 2,
+    },
+  });
+  const service = createImportCandidateImportPendingSummaryService({
+    listImportCandidates,
     previewImportCandidateApply: async ({ importCandidateId }) => {
       if (importCandidateId === 'candidate-warning') {
         return {
@@ -104,7 +110,10 @@ test('buildImportPendingCandidateSummary resolves import readiness over complete
     },
   });
 
-  const summary = await service.buildImportPendingCandidateSummary();
+  const summary = await service.buildImportPendingCandidateSummary({
+    actorUserId: 'user-7',
+    actorUserRole: 'user',
+  });
 
   assert.equal(summary.counts.totalImportPending, 2);
   assert.equal(summary.counts.ready, 1);
@@ -112,6 +121,9 @@ test('buildImportPendingCandidateSummary resolves import readiness over complete
   assert.equal(summary.summary.status, 'attention');
   assert.equal(summary.importPendingCandidates[0].importStatus.code, 'ready');
   assert.equal(summary.importPendingCandidates[1].importStatus.code, 'ready_with_warnings');
+  assert.deepEqual(summary.importPendingCandidates[0].requestOwnership, {
+    sourceRequestedForUserId: 'user-7',
+  });
 });
 
 test('buildImportPendingCandidateSummary returns an empty summary when nothing is import pending', async () => {

@@ -237,6 +237,7 @@ test('createImportCandidateService lists candidates with normalized filters and 
     folderPath: '  Autechre   Amber ',
     limit: '10',
     offset: '5',
+    requestedForUserId: ' user-9 ',
     sourceSearchId: ' search-1 ',
     status: 'pending',
     username: ' source-user ',
@@ -246,6 +247,7 @@ test('createImportCandidateService lists candidates with normalized filters and 
     folderPath: 'Autechre Amber',
     limit: 10,
     offset: 5,
+    requestedForUserId: 'user-9',
     sourceSearchId: 'search-1',
     status: 'pending',
     username: 'source-user',
@@ -258,6 +260,7 @@ test('createImportCandidateService lists candidates with normalized filters and 
     }],
     filters: {
       folderPath: 'Autechre Amber',
+      requestedForUserId: 'user-9',
       sourceSearchId: 'search-1',
       status: 'pending',
       username: 'source-user',

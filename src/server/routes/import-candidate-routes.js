@@ -19,6 +19,10 @@
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import {
+  assertImportCandidateVisible,
+  buildImportCandidateVisibilityFilter,
+} from '../import-candidates/import-candidate-visibility.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies({
@@ -60,6 +64,7 @@ export function registerImportCandidateRoutes(app, {
   buildImportPendingCandidateSummary,
   buildSelectedImportCandidateSummary,
   clearImportCandidateFileDecision,
+  requireAdminSession: requireAdminSessionFn = defaultRequestAuthDependencies.requireAdminSession,
   getRequestMetadata: getRequestMetadataFn = defaultRequestAuthDependencies.getRequestMetadata,
   getImportCandidate,
   holdImportCandidate,
@@ -87,8 +92,16 @@ export function registerImportCandidateRoutes(app, {
   startImportCandidateTranscodeRun,
   startImportCandidateExecutionRun,
 }) {
+  function buildReadVisibility(session) {
+    return buildImportCandidateVisibilityFilter({
+      actorUserId: session?.appUserId ?? null,
+      actorUserRole: session?.user?.role ?? null,
+    });
+  }
+
   app.get('/api/v1/import-candidates', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    const session = await requireSessionFn(request);
+    const visibility = buildReadVisibility(session);
 
     response.json({
       ok: true,
@@ -96,6 +109,7 @@ export function registerImportCandidateRoutes(app, {
         folderPath: request.query.folderPath,
         limit: request.query.limit,
         offset: request.query.offset,
+        requestedForUserId: visibility.requestedForUserId,
         sourceSearchId: request.query.sourceSearchId,
         status: request.query.status,
         username: request.query.username,
@@ -104,7 +118,7 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/execution-summary', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    await requireAdminSessionFn(request);
 
     response.json({
       ok: true,
@@ -113,7 +127,7 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/execution-runs/:runId', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    await requireAdminSessionFn(request);
 
     response.json({
       ok: true,
@@ -124,7 +138,7 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/apply-summary', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    await requireAdminSessionFn(request);
 
     response.json({
       ok: true,
@@ -133,7 +147,7 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/apply-runs/:runId', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    await requireAdminSessionFn(request);
 
     response.json({
       ok: true,
@@ -214,6 +228,8 @@ export function registerImportCandidateRoutes(app, {
     response.json({
       ok: true,
       selectedImportCandidates: await buildSelectedImportCandidateSummary({
+        actorUserId: session.appUserId,
+        actorUserRole: session.user?.role ?? null,
         limit: request.query.limit,
         targetUser: { id: session.appUserId },
       }),
@@ -226,6 +242,8 @@ export function registerImportCandidateRoutes(app, {
     response.json({
       ok: true,
       importPendingCandidates: await buildImportPendingCandidateSummary({
+        actorUserId: session.appUserId,
+        actorUserRole: session.user?.role ?? null,
         limit: request.query.limit,
         targetUser: { id: session.appUserId },
       }),
@@ -233,18 +251,32 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/:importCandidateId', importCandidateRoute(async (request, response) => {
-    await requireSessionFn(request);
+    const session = await requireSessionFn(request);
+    const importCandidate = await getImportCandidate({
+      importCandidateId: request.params.importCandidateId,
+    });
+    assertImportCandidateVisible({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
+      candidate: importCandidate,
+    });
 
     response.json({
       ok: true,
-      importCandidate: await getImportCandidate({
-        importCandidateId: request.params.importCandidateId,
-      }),
+      importCandidate,
     });
   }));
 
   app.get('/api/v1/import-candidates/:importCandidateId/preview', importCandidateRoute(async (request, response) => {
     const session = await requireSessionFn(request);
+    const importCandidate = await getImportCandidate({
+      importCandidateId: request.params.importCandidateId,
+    });
+    assertImportCandidateVisible({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
+      candidate: importCandidate,
+    });
 
     response.json({
       ok: true,
@@ -257,6 +289,14 @@ export function registerImportCandidateRoutes(app, {
 
   app.get('/api/v1/import-candidates/:importCandidateId/apply-preview', importCandidateRoute(async (request, response) => {
     const session = await requireSessionFn(request);
+    const importCandidate = await getImportCandidate({
+      importCandidateId: request.params.importCandidateId,
+    });
+    assertImportCandidateVisible({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
+      candidate: importCandidate,
+    });
 
     response.json({
       ok: true,

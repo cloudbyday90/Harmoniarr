@@ -53,6 +53,7 @@ export function buildStageCandidateBase(candidate, preview) {
     id: candidate.id,
     lockedFileCount: candidate.lockedFileCount,
     planning: buildCandidatePlanningSummary(preview),
+    requestOwnership: candidate.normalizedPayload?.requestOwnership ?? null,
     sourceProvider: candidate.sourceProvider,
     sourceSearchId: candidate.sourceSearchId,
     totalSizeBytes: candidate.totalSizeBytes,

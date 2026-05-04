@@ -21,6 +21,7 @@ import {
   normalizeStageSummaryLimit,
 } from './import-candidate-stage-summary.js';
 import { createImportCandidateApplyPreviewService } from './import-candidate-apply-preview-service.js';
+import { buildImportCandidateVisibilityFilter } from './import-candidate-visibility.js';
 
 function createEmptyImportPendingSummary(limit) {
   return {
@@ -106,11 +107,21 @@ export function createImportCandidateImportPendingSummaryService({
       ? createImportCandidateApplyPreviewService({ previewImportCandidate }).previewImportCandidateApply
       : null);
 
-  async function buildImportPendingCandidateSummary({ limit, targetUser = null } = {}) {
+  async function buildImportPendingCandidateSummary({
+    actorUserId = null,
+    actorUserRole = null,
+    limit,
+    targetUser = null,
+  } = {}) {
     const normalizedLimit = normalizeStageSummaryLimit(limit);
+    const visibilityFilter = buildImportCandidateVisibilityFilter({
+      actorUserId,
+      actorUserRole,
+    });
     const importPendingQueue = await listImportCandidates({
       limit: normalizedLimit,
       offset: 0,
+      requestedForUserId: visibilityFilter.requestedForUserId,
       status: 'import_pending',
     });
 

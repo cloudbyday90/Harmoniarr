@@ -375,9 +375,10 @@ function createImportCandidateRouteTestApp(overrides = {}) {
       limitImportCandidateExecutionReconcile: (_request, _response, next) => next(),
       limitImportCandidateExecutionRun: (_request, _response, next) => next(),
       limitImportCandidateSlskdIngest: (_request, _response, next) => next(),
+      requireAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
-      requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
+      requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
       reopenImportCandidate: async ({ importCandidateId, actorUserId, reason, requestMetadata }) => ({
         candidate: {
           id: importCandidateId,
@@ -444,7 +445,7 @@ function createImportCandidateRouteTestApp(overrides = {}) {
 }
 
 test('import candidate list route returns filtered review queue results', async (t) => {
-  const listImportCandidates = t.mock.fn(async ({ folderPath, limit, offset, sourceSearchId, status, username }) => ({
+  const listImportCandidates = t.mock.fn(async ({ folderPath, limit, offset, requestedForUserId, sourceSearchId, status, username }) => ({
     candidates: [{
       id: 'candidate-1',
       username: 'source-user',
@@ -453,6 +454,7 @@ test('import candidate list route returns filtered review queue results', async 
     }],
     filters: {
       folderPath,
+      requestedForUserId,
       sourceSearchId,
       status,
       username,
@@ -463,7 +465,7 @@ test('import candidate list route returns filtered review queue results', async 
       total: 1,
     },
   }));
-  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-8' }));
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-8', user: { role: 'admin' } }));
   const app = createImportCandidateRouteTestApp({
     listImportCandidates,
     requireSession,
@@ -479,6 +481,7 @@ test('import candidate list route returns filtered review queue results', async 
       folderPath: 'Amber',
       limit: '10',
       offset: '5',
+      requestedForUserId: null,
       sourceSearchId: 'search-1',
       status: 'pending',
       username: 'source',
@@ -494,6 +497,7 @@ test('import candidate list route returns filtered review queue results', async 
         }],
         filters: {
           folderPath: 'Amber',
+          requestedForUserId: null,
           sourceSearchId: 'search-1',
           status: 'pending',
           username: 'source',
@@ -505,6 +509,39 @@ test('import candidate list route returns filtered review queue results', async 
         },
       },
     });
+  });
+});
+
+test('import candidate list route scopes non-admin reads to delegated target ownership', async (t) => {
+  const listImportCandidates = t.mock.fn(async () => ({
+    candidates: [],
+    filters: {},
+    pagination: {
+      limit: 25,
+      offset: 0,
+      total: 0,
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({
+    listImportCandidates,
+    requireSession: async () => ({ appUserId: 'user-target', csrfToken: 'csrf-token', user: { role: 'user' } }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates?status=selected`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(listImportCandidates.mock.calls[0].arguments, [{
+      folderPath: undefined,
+      limit: undefined,
+      offset: undefined,
+      requestedForUserId: 'user-target',
+      sourceSearchId: undefined,
+      status: 'selected',
+      username: undefined,
+    }]);
+    assert.equal(payload.ok, true);
   });
 });
 
@@ -542,6 +579,30 @@ test('import candidate detail route returns candidate files', async (t) => {
         }],
       },
     });
+  });
+});
+
+test('import candidate detail route fails closed when the session user does not own the delegated target', async (t) => {
+  const getImportCandidate = t.mock.fn(async ({ importCandidateId }) => ({
+    id: importCandidateId,
+    normalizedPayload: {
+      requestOwnership: {
+        sourceRequestedByUserId: 'admin-1',
+        sourceRequestedForUserId: 'user-target',
+      },
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({
+    getImportCandidate,
+    requireSession: async () => ({ appUserId: 'other-user', csrfToken: 'csrf-token', user: { role: 'user' } }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.equal(payload.error.code, 'import_candidate_not_found');
   });
 });
 
@@ -583,6 +644,8 @@ test('import candidate selected summary route returns operator-facing execution 
 
     assert.equal(response.status, 200);
     assert.deepEqual(buildSelectedImportCandidateSummary.mock.calls[0].arguments, [{
+      actorUserId: 'user-1',
+      actorUserRole: 'admin',
       limit: '10',
       targetUser: { id: 'user-1' },
     }]);
@@ -626,6 +689,8 @@ test('import candidate import-pending summary route returns completed-download i
 
     assert.equal(response.status, 200);
     assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{
+      actorUserId: 'user-1',
+      actorUserRole: 'admin',
       limit: '10',
       targetUser: { id: 'user-1' },
     }]);
@@ -663,6 +728,22 @@ test('import candidate execution summary route returns latest durable planning s
     assert.equal(buildImportCandidateExecutionSummary.mock.callCount(), 1);
     assert.equal(payload.importCandidateExecution.currentRun.id, 'run-1');
     assert.equal(payload.importCandidateExecution.summary.status, 'ready');
+  });
+});
+
+test('import candidate execution summary route requires administrator access', async () => {
+  const app = createImportCandidateRouteTestApp({
+    requireAdminSession: async () => {
+      throw createApiError(403, 'admin_required', 'Administrator access is required');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.equal(payload.error.code, 'admin_required');
   });
 });
 
@@ -958,6 +1039,33 @@ test('import candidate preview route returns read-only planning preview data', a
     assert.equal(payload.importCandidatePreview.candidate.id, 'candidate-1');
     assert.equal(payload.importCandidatePreview.source.resolvedFolderPath, '/data/downloads/Autechre/Amber');
     assert.equal(payload.importCandidatePreview.naming.filePreviews[0].libraryPath, '/data/music/users/user-1/Autechre/Amber/01 Foil.flac');
+  });
+});
+
+test('import candidate preview route fails closed when the session user does not own the delegated target', async (t) => {
+  const getImportCandidate = t.mock.fn(async ({ importCandidateId }) => ({
+    id: importCandidateId,
+    normalizedPayload: {
+      requestOwnership: {
+        sourceRequestedByUserId: 'admin-1',
+        sourceRequestedForUserId: 'user-target',
+      },
+    },
+  }));
+  const previewImportCandidate = t.mock.fn(async () => ({ ok: true }));
+  const app = createImportCandidateRouteTestApp({
+    getImportCandidate,
+    previewImportCandidate,
+    requireSession: async () => ({ appUserId: 'other-user', csrfToken: 'csrf-token', user: { role: 'user' } }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/preview`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.equal(payload.error.code, 'import_candidate_not_found');
+    assert.equal(previewImportCandidate.mock.callCount(), 0);
   });
 });
 

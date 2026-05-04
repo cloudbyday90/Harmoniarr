@@ -39,6 +39,7 @@ test('listImportCandidates applies bounded filters and deterministic ordering', 
     folderPath: 'Autechre\\Amber',
     limit: 25,
     offset: 0,
+    requestedForUserId: 'user-7',
     sourceSearchId: 'search-1',
     status: 'pending',
     username: 'source_%',
@@ -49,14 +50,16 @@ test('listImportCandidates applies bounded filters and deterministic ordering', 
   assert.match(sql, /source_search_id = \$2/);
   assert.match(sql, /username ILIKE \$3 ESCAPE/);
   assert.match(sql, /folder_path ILIKE \$4 ESCAPE/);
+  assert.match(sql, /normalized_payload -> 'requestOwnership' ->> 'sourceRequestedForUserId' = \$5/);
   assert.match(sql, /ORDER BY discovered_at DESC, created_at DESC, id ASC/);
-  assert.match(sql, /LIMIT \$5/);
-  assert.match(sql, /OFFSET \$6/);
+  assert.match(sql, /LIMIT \$6/);
+  assert.match(sql, /OFFSET \$7/);
   assert.deepEqual(values, [
     'pending',
     'search-1',
     '%source\\_\\%%',
     '%Autechre\\\\Amber%',
+    'user-7',
     25,
     0,
   ]);

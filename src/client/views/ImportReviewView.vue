@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { nextTick, watch } from 'vue';
+import { computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ImportCandidateApplyPanel from '../components/ImportCandidateApplyPanel.vue';
 import ImportCandidateExecutionPanel from '../components/ImportCandidateExecutionPanel.vue';
@@ -34,9 +34,11 @@ import { useImportCandidateApplySummary } from '../composables/useImportCandidat
 import SelectedImportCandidateStatusPanel from '../components/SelectedImportCandidateStatusPanel.vue';
 import { useImportCandidateExecutionSummary } from '../composables/useImportCandidateExecutionSummary.js';
 import { useImportReviewWorkspace } from '../composables/useImportReviewWorkspace.js';
+import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 const router = useRouter();
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 
 const {
   actionError,
@@ -191,6 +193,10 @@ async function handleStartApplyRun() {
 watch(
   () => selectedSummaryCounts.value.totalSelected,
   () => {
+    if (!isAdmin.value) {
+      return;
+    }
+
     void loadImportCandidateExecutionSummary();
   },
   { immediate: true },
@@ -199,14 +205,28 @@ watch(
 watch(
   () => importPendingSummaryCounts.value.totalImportPending,
   () => {
+    if (!isAdmin.value) {
+      return;
+    }
+
     void loadImportCandidateApplySummary();
   },
   { immediate: true },
 );
 
+onMounted(() => {
+  if (!isAdmin.value && !route.query.status) {
+    void replaceImportReviewRouteState({ status: '' });
+  }
+});
+
 watch(
   () => importReviewRouteState().executionRunId,
   (nextRunId, previousRunId) => {
+    if (!isAdmin.value) {
+      return;
+    }
+
     if (nextRunId === previousRunId) {
       return;
     }
@@ -226,6 +246,10 @@ watch(
 watch(
   () => importReviewRouteState().applyRunId,
   (nextRunId, previousRunId) => {
+    if (!isAdmin.value) {
+      return;
+    }
+
     if (nextRunId === previousRunId) {
       return;
     }
@@ -248,7 +272,8 @@ watch(
     <article class="panel-dark hero-card compact">
       <p class="eyebrow">Import review</p>
       <h2>Persisted slskd candidates</h2>
-      <p>Review stored discovery results, inspect persisted files, and move candidates through the hold, select, reject, and reopen workflow before apply behavior lands.</p>
+      <p v-if="isAdmin">Review stored discovery results, inspect persisted files, and move candidates through the hold, select, reject, and reopen workflow before apply behavior lands.</p>
+      <p v-else>Track the delegated import candidates, download progress, and import-ready items currently being fulfilled on your behalf.</p>
       <div class="pill-row" v-if="summaryPills.length">
         <div class="pill" v-for="pill in summaryPills" :key="pill.label">
           <span>{{ pill.label }}</span>
@@ -257,7 +282,12 @@ watch(
       </div>
     </article>
 
+    <article class="panel-light" v-if="!isAdmin">
+      <p class="metadata-card-copy">This read-only view only shows import candidates delegated to your app user. Operator review transitions and import-run controls remain admin-only.</p>
+    </article>
+
     <ImportCandidateFilters
+      v-if="isAdmin"
       :active-filter-count="activeFilterCount"
       :folder-path="folderPathFilter"
       :is-loading-queue="isLoadingQueue"
@@ -290,6 +320,7 @@ watch(
         :apply-preview="applyPreview"
         :apply-preview-error="applyPreviewError"
         :candidate="selectedCandidate"
+        :can-manage-candidates="isAdmin"
         :detail-error="detailError"
         :file-decision-error="decisionError"
         :is-loading-apply-preview="isLoadingApplyPreview"
@@ -319,6 +350,7 @@ watch(
     />
 
     <ImportCandidateExecutionPanel
+      v-if="isAdmin"
       id="import-execution-run-panel"
       :action-error-message="executionActionErrorMessage"
       :current-run="currentRun"
@@ -335,6 +367,7 @@ watch(
     />
 
     <ImportCandidateApplyPanel
+      v-if="isAdmin"
       id="import-apply-run-panel"
       :action-error-message="applyActionErrorMessage"
       :current-run="currentApplyRun"

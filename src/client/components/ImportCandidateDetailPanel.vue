@@ -34,6 +34,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  canManageCandidates: {
+    type: Boolean,
+    default: true,
+  },
   fileDecisionError: {
     type: String,
     default: '',
@@ -281,7 +285,7 @@ function fileDecisionButtonLabel(filePreview) {
         </div>
       </dl>
 
-      <article class="review-action-panel">
+      <article class="review-action-panel" v-if="canManageCandidates">
         <label>
           Review note
           <textarea

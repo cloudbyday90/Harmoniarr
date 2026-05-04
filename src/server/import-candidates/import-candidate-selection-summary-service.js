@@ -20,6 +20,7 @@ import {
   buildStageCandidateBase,
   normalizeStageSummaryLimit,
 } from './import-candidate-stage-summary.js';
+import { buildImportCandidateVisibilityFilter } from './import-candidate-visibility.js';
 
 function createEmptySelectedSummary(limit) {
   return {
@@ -102,11 +103,21 @@ export function createImportCandidateSelectionSummaryService({
   }),
   previewImportCandidate = async () => null,
 } = {}) {
-  async function buildSelectedImportCandidateSummary({ limit, targetUser = null } = {}) {
+  async function buildSelectedImportCandidateSummary({
+    actorUserId = null,
+    actorUserRole = null,
+    limit,
+    targetUser = null,
+  } = {}) {
     const normalizedLimit = normalizeStageSummaryLimit(limit);
+    const visibilityFilter = buildImportCandidateVisibilityFilter({
+      actorUserId,
+      actorUserRole,
+    });
     const selectedQueue = await listImportCandidates({
       limit: normalizedLimit,
       offset: 0,
+      requestedForUserId: visibilityFilter.requestedForUserId,
       status: 'selected',
     });
 
