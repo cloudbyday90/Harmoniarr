@@ -169,6 +169,45 @@ test('createAppUserService updates user role and disabled state', async (t) => {
   assert.deepEqual(user.permissions, ['import.preview.self', 'media.request', 'playlist.submit']);
 });
 
+test('createAppUserService maps Plex library access policy for linked users', async (t) => {
+  const service = createAppUserService({
+    getPoolFn: () => ({
+      query: t.mock.fn(async () => ({
+        rowCount: 1,
+        rows: [{
+          auth_provider: 'plex',
+          auth_subject: 'plex-user-1',
+          created_at: '2026-05-02T15:00:00.000Z',
+          id: 'user-plex-1',
+          is_disabled: false,
+          last_login_at: null,
+          managed_library_relative_root: 'listeners/plex-user',
+          must_change_password: false,
+          password_changed_at: null,
+          plex_email: 'plex@example.com',
+          plex_home_role: 'home_member',
+          plex_library_access_details: { allowSync: true, serverIds: ['server-1'] },
+          plex_library_access_state: 'shared',
+          plex_title: 'Plex User',
+          plex_user_id: 'plex-remote-1',
+          plex_username: 'plex-user',
+          plex_uuid: 'plex-uuid-1',
+          plex_synced_at: '2026-05-04T18:00:00.000Z',
+          role: 'requester',
+          updated_at: '2026-05-04T18:00:00.000Z',
+          username: 'plex-user',
+        }],
+      })),
+    }),
+  });
+
+  const user = await service.getAppUserById({ userId: 'user-plex-1' });
+
+  assert.equal(user.plexProfile.accessPolicy.classification, 'eligible');
+  assert.equal(user.plexProfile.accessPolicy.requestTargetingEligible, true);
+  assert.equal(user.plexProfile.accessPolicy.serverCount, 1);
+});
+
 test('createAppUserService resolves users by id for import target ownership lookups', async (t) => {
   const service = createAppUserService({
     getPoolFn: () => ({

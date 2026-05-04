@@ -337,6 +337,7 @@ Status note:
   - Progress: Plex-linked users now expose a shared local-auth readiness summary keyed to real local password establishment instead of the imported placeholder hash, and admins can remove a Plex link only when that fallback path is ready, preserving the `app_users` record while clearing the linked Plex profile metadata.
 - [ ] Extend Plex library-access awareness on imported users so Harmoniarr can distinguish which Plex-linked users have relevant server or library visibility when presenting request-targeting, provisioning, and fulfillment affordances.
   - Progress: imported Plex profiles now persist coarse access-state metadata and raw evidence; follow-on work should turn that into stricter request-targeting and fulfillment policy.
+  - Progress: imported and linked Plex profiles now also expose a shared derived access-policy summary that distinguishes confirmed owner or shared-library visibility from review-required Plex Home membership, giving future request-targeting and fulfillment UI a stable server-owned eligibility contract without another schema change.
 - [ ] Verify admin recovery assumptions remain compatible with `docs/ADMIN_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 - Canonical Model And Import Review

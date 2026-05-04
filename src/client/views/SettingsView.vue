@@ -256,6 +256,43 @@ function statusClass(status) {
   }
 }
 
+function plexLibraryAccessPolicyLabel(policy) {
+  switch (policy?.classification) {
+    case 'eligible':
+      return 'Eligible';
+    case 'review_required':
+      return 'Needs review';
+    default:
+      return 'Unknown';
+  }
+}
+
+function plexLibraryAccessPolicyClass(policy) {
+  switch (policy?.classification) {
+    case 'eligible':
+      return 'review-status-selected';
+    case 'review_required':
+      return 'review-status-held';
+    default:
+      return 'review-status-failed';
+  }
+}
+
+function describePlexLibraryAccessPolicy(policy) {
+  switch (policy?.reasonCode) {
+    case 'plex_owner_access':
+      return 'This Plex owner profile has confirmed server access and can be treated as request-targetable without additional review.';
+    case 'plex_shared_library_access':
+      return `This Plex profile exposes shared server or library evidence${policy.serverCount > 0 ? ` across ${policy.serverCount} server assignment${policy.serverCount === 1 ? '' : 's'}` : ''}, so request-targeting and fulfillment visibility can assume Plex access.`;
+    case 'plex_managed_access_unconfirmed':
+      return 'Managed Plex home membership alone does not confirm actual library sharing. Keep request-targeting and fulfillment affordances behind operator review until Plex access is verified.';
+    case 'plex_member_access_unconfirmed':
+      return 'Plex home membership exists, but the current preview does not confirm shared library visibility. Treat request-targeting as review-required until access is verified.';
+    default:
+      return 'Plex access details are incomplete, so operator review is still required before relying on this profile for request-targeting or fulfillment decisions.';
+  }
+}
+
 function addDownloadMapping() {
   form.paths.downloadMappings.push(createEmptyDownloadMapping());
 }
@@ -1238,6 +1275,8 @@ onMounted(() => {
                   </span>
                 </div>
                 <p class="metadata-card-copy">Library access: {{ profile.libraryAccessState }}</p>
+                <p class="metadata-card-copy">Access policy: <span class="review-status-pill" :class="plexLibraryAccessPolicyClass(profile.accessPolicy)">{{ plexLibraryAccessPolicyLabel(profile.accessPolicy) }}</span></p>
+                <p class="metadata-card-copy">{{ describePlexLibraryAccessPolicy(profile.accessPolicy) }}</p>
                 <p class="metadata-card-copy" v-if="profile.suggestedUsername">Suggested username: {{ profile.suggestedUsername }}</p>
                 <p class="metadata-card-copy" v-if="profile.existingUser">Existing user: {{ profile.existingUser.username }}<span v-if="profile.conflictReason"> ({{ profile.conflictReason }})</span></p>
                 <div class="settings-button-row" v-if="profile.classification === 'conflict' && profile.existingUser?.id">
@@ -1342,6 +1381,8 @@ onMounted(() => {
             <p class="metadata-card-copy">Resolved permissions: {{ user.permissions.join(', ') }}</p>
             <p class="metadata-card-copy" v-if="user.managedLibraryRelativeRoot">Managed library subdirectory: {{ user.managedLibraryRelativeRoot }}</p>
             <p class="metadata-card-copy" v-else>No managed library subdirectory configured yet.</p>
+            <p class="metadata-card-copy" v-if="user.plexProfile">Plex access policy: <span class="review-status-pill" :class="plexLibraryAccessPolicyClass(user.plexProfile.accessPolicy)">{{ plexLibraryAccessPolicyLabel(user.plexProfile.accessPolicy) }}</span></p>
+            <p class="metadata-card-copy" v-if="user.plexProfile">{{ describePlexLibraryAccessPolicy(user.plexProfile.accessPolicy) }}</p>
             <button type="button" @click="saveManagedUser(user)" :disabled="user.saving">
               {{ user.saving ? 'Saving...' : 'Save user' }}
             </button>

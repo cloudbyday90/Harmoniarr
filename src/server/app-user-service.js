@@ -21,6 +21,7 @@ import { recordAuditEvent } from './audit.js';
 import { getPool } from './database.js';
 import { createAppUserPermissionService } from './app-user-permission-service.js';
 import { buildLocalAuthStatus } from './local-auth-readiness.js';
+import { buildPlexLibraryAccessPolicy } from './plex-library-access-policy.js';
 import { normalizeOptionalManagedLibraryRelativeRoot } from './paths/user-music-root-service.js';
 import { hashPassword } from './security.js';
 import { normalizeUsername, validatePassword } from './validators/auth-validator.js';
@@ -47,6 +48,11 @@ function mapAppUserRow(row, permissionService) {
     mustChangePassword: row.must_change_password,
     permissions: permissionService.listPermissionsForRole(row.role),
     plexProfile: row.plex_user_id ? {
+      accessPolicy: buildPlexLibraryAccessPolicy({
+        homeRole: row.plex_home_role,
+        libraryAccessDetails: row.plex_library_access_details ?? {},
+        libraryAccessState: row.plex_library_access_state ?? 'unknown',
+      }),
       homeRole: row.plex_home_role,
       libraryAccessDetails: row.plex_library_access_details ?? {},
       libraryAccessState: row.plex_library_access_state ?? 'unknown',

@@ -73,6 +73,9 @@ test('createPlexDirectoryImportService buildPreview classifies owner, linked, co
   assert.equal(conflictProfile.conflictReason, 'email_match');
   assert.equal(linkedProfile.existingUser.localAuth.unlinkPlexReady, false);
   assert.equal(conflictProfile.existingUser.localAuth.unlinkPlexReady, true);
+  assert.equal(ownerProfile.accessPolicy.reasonCode, 'plex_owner_access');
+  assert.equal(importableProfile.accessPolicy.requestTargetingEligible, true);
+  assert.equal(importableProfile.accessPolicy.classification, 'eligible');
   assert.equal(importableProfile.classification, 'create');
   assert.equal(importableProfile.suggestedUsername, 'importable.user');
   assert.equal(importableProfile.libraryAccessState, 'shared');

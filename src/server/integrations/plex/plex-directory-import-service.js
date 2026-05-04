@@ -20,6 +20,7 @@ import { createApiError } from '../../auth.js';
 import { recordAuditEvent } from '../../audit.js';
 import { getPool } from '../../database.js';
 import { buildLocalAuthStatus, isLocalAuthReadyForPlexUnlink } from '../../local-auth-readiness.js';
+import { buildPlexLibraryAccessPolicy } from '../../plex-library-access-policy.js';
 import { hashPassword } from '../../security.js';
 import { normalizeOptionalEmail } from '../../validators/auth-validator.js';
 import { createPlexHttpClient } from './plex-http-client.js';
@@ -311,6 +312,11 @@ function mapAppUserSummary(user) {
 
 function mapPreviewProfile(profile) {
   return {
+    accessPolicy: buildPlexLibraryAccessPolicy({
+      homeRole: profile.homeRole,
+      libraryAccessDetails: profile.libraryAccessDetails,
+      libraryAccessState: profile.libraryAccessState,
+    }),
     classification: profile.classification,
     conflictReason: profile.conflictReason ?? null,
     email: profile.email,
@@ -694,6 +700,11 @@ export function createPlexDirectoryImportService({
             ...profile.existingUser,
             ...mappedUser,
             plexProfile: {
+              accessPolicy: buildPlexLibraryAccessPolicy({
+                homeRole: profile.homeRole,
+                libraryAccessDetails: profile.libraryAccessDetails,
+                libraryAccessState: profile.libraryAccessState,
+              }),
               homeRole: profile.homeRole,
               libraryAccessDetails: profile.libraryAccessDetails,
               libraryAccessState: profile.libraryAccessState,
