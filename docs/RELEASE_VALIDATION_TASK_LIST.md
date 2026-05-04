@@ -22,8 +22,10 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Run unit tests for validators, service logic, and normalization helpers.
 - [ ] Run integration tests for auth/session, settings, import review, jobs, and recovery-sensitive operations.
 	- Native integration coverage now also exercises the public app-user claim completion route end to end against the real HTTP and database-backed server graph, including admin-issued claim code creation, no auto-login on completion, and a subsequent normal login with the claimed password.
+	- Native integration coverage now also proves delegated Request Music creation, target-user scoped inbox summary and list reads, linked import-candidate fulfillment projection, notification feed derivation, and delegated import-candidate visibility through the real HTTP and database-backed server graph.
 	- Remaining work is packaged or CI-backed execution in an environment with a working PostgreSQL integration runtime so this coverage contributes live release evidence instead of existing only as committed test coverage.
 - [ ] Run route-contract validation for normalized payloads and permission failures.
+	- Native integration coverage now also exercises the delegated Request Music scope contract end to end by showing that non-admin `scope=all` requests are forced back to `mine`, linked import candidates stay target-user visible, and unrelated import candidates fail closed as not found.
 - [x] Run migration replay and schema snapshot validation.
 - [ ] Run UI/end-to-end coverage for bootstrap, login, settings, review queue, jobs/history, and restore preview/apply where practical.
 

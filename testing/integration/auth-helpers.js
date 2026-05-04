@@ -16,3 +16,16 @@ export async function bootstrapAdminSession(client, overrides = {}) {
     method: 'POST',
   });
 }
+
+export async function loginWithPassword(client, {
+  password = 'IntegrationPass123!',
+  username,
+} = {}) {
+  return client.requestJson('/api/v1/auth/login', {
+    json: {
+      password,
+      username,
+    },
+    method: 'POST',
+  });
+}
