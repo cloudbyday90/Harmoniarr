@@ -120,3 +120,89 @@ test('import execution worker enqueues ready candidates and persists per-item ou
     },
   }]);
 });
+
+test('import execution worker requeues the run when a maintenance pause is requested', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const enqueueDownloads = t.mock.fn(async () => ({
+    enqueued: [],
+    failed: [],
+  }));
+  const isCancellationRequested = t.mock.fn(async () => ({
+    kind: 'paused',
+    nextRetryAt: '2026-05-04T12:30:00.000Z',
+    pauseCode: 'recovery_lock_conflict',
+    pauseMessage: 'Import execution is paused while the restore maintenance lock is active.',
+    pauseProvider: 'restore',
+  }));
+  const markImportCandidateDownloadFailed = t.mock.fn(async () => ({}));
+  const markImportCandidateDownloading = t.mock.fn(async () => ({}));
+  const markRunCancelled = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunPaused = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const replaceImportExecutionRunItems = t.mock.fn(async () => []);
+  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  const worker = createImportCandidateExecutionWorker({
+    acquireLease,
+    enqueueDownloads,
+    getImportCandidate: t.mock.fn(async () => null),
+    isCancellationRequested,
+    markImportCandidateDownloadFailed,
+    markImportCandidateDownloading,
+    markRunCancelled,
+    markRunCompleted,
+    markRunFailed,
+    markRunPaused,
+    markRunStarted,
+    releaseLease,
+    replaceImportExecutionRunItems,
+    updateImportExecutionRunItem,
+  });
+
+  const paused = new Promise((resolve) => {
+    markRunPaused.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+  const leaseReleased = new Promise((resolve) => {
+    releaseLease.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({
+    requestedCandidateCount: 4,
+    runId: 'run-paused',
+  });
+
+  const pausedArgs = await paused;
+  const releasedLeaseArgs = await leaseReleased;
+
+  assert.equal(markRunStarted.mock.callCount(), 0);
+  assert.equal(replaceImportExecutionRunItems.mock.callCount(), 0);
+  assert.equal(updateImportExecutionRunItem.mock.callCount(), 0);
+  assert.equal(enqueueDownloads.mock.callCount(), 0);
+  assert.equal(markImportCandidateDownloading.mock.callCount(), 0);
+  assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 0);
+  assert.equal(markRunCompleted.mock.callCount(), 0);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.equal(markRunCancelled.mock.callCount(), 0);
+  assert.deepEqual(pausedArgs, {
+    nextAttemptAt: '2026-05-04T12:30:00.000Z',
+    runId: 'run-paused',
+    summary: {
+      currentStep: 'Download enqueue paused by maintenance lock',
+      executionMode: 'download_enqueue',
+      pauseCode: 'recovery_lock_conflict',
+      pauseMessage: 'Import execution is paused while the restore maintenance lock is active.',
+      pauseProvider: 'restore',
+      requestedCandidateCount: 4,
+    },
+  });
+  assert.deepEqual(releasedLeaseArgs, {
+    runId: 'run-paused',
+    status: 'paused',
+  });
+});

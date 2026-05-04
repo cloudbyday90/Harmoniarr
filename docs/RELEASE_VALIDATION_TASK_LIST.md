@@ -53,6 +53,7 @@ Security source: `docs/SECURITY_POLICY.md`
 	- Automatic import-reconciliation, library-discovery, and metadata-refresh heartbeats now also pause under blocking maintenance locks and surface that paused state through the existing operator heartbeat diagnostics.
 	- The shared startup queue dispatcher now also pauses new operation-run claims under blocking maintenance locks and surfaces that paused dispatcher state through queue diagnostics.
 	- In-flight queue workers now also pause and requeue safely under blocking maintenance locks, releasing their leases as `paused` and preserving retry budget while the lock remains active.
+	- Focused native `node:test` coverage now proves the shared operation-pause readiness contract plus representative import-execution and library-scan worker requeue behavior in addition to the earlier discovery-worker proof.
 	- Remaining work is one live Docker-capable execution to capture the same evidence from the packaged runtime and operator filesystem layout.
 - [ ] Validate admin recovery flow against the documented runbook.
 - [ ] Validate destructive filesystem actions stay preview-first and operator-gated.

@@ -239,3 +239,76 @@ test('createLibraryScanWorker ignores sidecar artwork failures and still complet
   assert.equal(markRunFailed.mock.callCount(), 0);
   assert.equal(completionArgs.runId, 'run-2');
 });
+
+test('createLibraryScanWorker requeues the run when a maintenance pause is requested', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const createOperationRunLeaseHeartbeatFn = t.mock.fn(() => ({
+    start: t.mock.fn(() => {}),
+    stop: t.mock.fn(() => {}),
+  }));
+  const isCancellationRequested = t.mock.fn(async () => ({
+    kind: 'paused',
+    nextRetryAt: '2026-05-04T12:30:00.000Z',
+    pauseCode: 'recovery_lock_conflict',
+    pauseMessage: 'Library scan is paused while the restore maintenance lock is active.',
+    pauseProvider: 'restore',
+  }));
+  const markRunCancelled = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunPaused = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const renewLease = t.mock.fn(async () => {});
+  const worker = createLibraryScanWorker({
+    acquireLease,
+    createOperationRunLeaseHeartbeatFn,
+    isCancellationRequested,
+    markRunCancelled,
+    markRunCompleted,
+    markRunFailed,
+    markRunPaused,
+    markRunStarted,
+    releaseLease,
+    renewLease,
+  });
+
+  const paused = new Promise((resolve) => {
+    markRunPaused.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+  const leaseReleased = new Promise((resolve) => {
+    releaseLease.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({
+    libraryRoot: '/library',
+    runId: 'run-paused',
+  });
+
+  const pausedArgs = await paused;
+  const releasedLeaseArgs = await leaseReleased;
+
+  assert.equal(markRunStarted.mock.callCount(), 0);
+  assert.equal(markRunCompleted.mock.callCount(), 0);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.equal(markRunCancelled.mock.callCount(), 0);
+  assert.deepEqual(pausedArgs, {
+    nextAttemptAt: '2026-05-04T12:30:00.000Z',
+    runId: 'run-paused',
+    summary: {
+      currentStep: 'Library scan paused by maintenance lock',
+      libraryRoot: '/library',
+      pauseCode: 'recovery_lock_conflict',
+      pauseMessage: 'Library scan is paused while the restore maintenance lock is active.',
+      pauseProvider: 'restore',
+    },
+  });
+  assert.deepEqual(releasedLeaseArgs, {
+    runId: 'run-paused',
+    status: 'paused',
+  });
+});

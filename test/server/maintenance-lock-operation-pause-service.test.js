@@ -50,3 +50,49 @@ test('resolveDispatchReadiness returns paused metadata when a blocking maintenan
     pausedOperationTypes: ['library_scan'],
   });
 });
+
+test('resolveOperationReadiness returns allowed when no blocking maintenance locks are active', async () => {
+  const service = createMaintenanceLockOperationPauseService({
+    listActiveMaintenanceLocks: async () => [],
+  });
+
+  const result = await service.resolveOperationReadiness({
+    operationLabel: 'Library scan',
+  });
+
+  assert.deepEqual(result, {
+    allowed: true,
+  });
+});
+
+test('resolveOperationReadiness returns paused metadata when a blocking maintenance lock is active', async () => {
+  const service = createMaintenanceLockOperationPauseService({
+    listActiveMaintenanceLocks: async () => [{
+      expiresAt: '2026-05-04T12:30:00.000Z',
+      id: 'lock-11',
+      lockType: 'restore',
+    }],
+  });
+
+  const result = await service.resolveOperationReadiness({
+    operationLabel: 'Library scan',
+  });
+
+  assert.deepEqual(result, {
+    allowed: false,
+    blockingLock: {
+      expiresAt: '2026-05-04T12:30:00.000Z',
+      id: 'lock-11',
+      lockType: 'restore',
+    },
+    blockingLocks: [{
+      expiresAt: '2026-05-04T12:30:00.000Z',
+      id: 'lock-11',
+      lockType: 'restore',
+    }],
+    nextRetryAt: '2026-05-04T12:30:00.000Z',
+    pauseCode: 'recovery_lock_conflict',
+    pauseMessage: 'Library scan is paused while the restore maintenance lock is active.',
+    pauseProvider: 'restore',
+  });
+});
