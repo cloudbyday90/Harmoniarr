@@ -122,7 +122,7 @@ async function openAccount() {
 }
 
 const operatorNav = [
-  { name: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { name: 'dashboard', label: 'Home', icon: 'dashboard' },
   { name: 'missing', label: 'Missing', icon: 'missing' },
   { name: 'activity', label: 'Activity', icon: 'activity' },
   { name: 'search', label: 'Search', icon: 'search' },

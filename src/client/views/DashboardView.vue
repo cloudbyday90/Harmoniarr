@@ -17,595 +17,454 @@
 -->
 
 <script setup>
-import { computed, nextTick, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import ArtworkSummaryPanel from '../components/ArtworkSummaryPanel.vue';
-import ActivityFeedPanel from '../components/ActivityFeedPanel.vue';
-import DependencyStatusPanel from '../components/DependencyStatusPanel.vue';
-import HeartbeatSummaryPanel from '../components/HeartbeatSummaryPanel.vue';
-import OperatorNotificationsPanel from '../components/OperatorNotificationsPanel.vue';
-import ProviderStatusPanel from '../components/ProviderStatusPanel.vue';
-import {
-  buildDashboardRouteQuery,
-  getDashboardRouteStateKey,
-  normalizeDashboardRouteState,
-} from '../lib/dashboard-route-state.js';
-import { getArtworkMaintenanceStatusClass, getArtworkMaintenanceStatusLabel } from '../lib/artwork-maintenance-status.js';
-import LibraryDiscoverySummaryPanel from '../components/LibraryDiscoverySummaryPanel.vue';
-import LibraryReconciliationSummaryPanel from '../components/LibraryReconciliationSummaryPanel.vue';
-import LibraryScanSummaryPanel from '../components/LibraryScanSummaryPanel.vue';
-import LibraryWantedSummaryPanel from '../components/LibraryWantedSummaryPanel.vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import OnboardingSummaryPanel from '../components/OnboardingSummaryPanel.vue';
-import { useArtworkSummary } from '../composables/useArtworkSummary.js';
-import { useLibraryDiscoverySummary } from '../composables/useLibraryDiscoverySummary.js';
-import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
-import { useLibraryScanSummary } from '../composables/useLibraryScanSummary.js';
+import { useAsyncResource } from '../composables/useAsyncResource.js';
+import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useOnboardingSummary } from '../composables/useOnboardingSummary.js';
-import { useSystemOverview } from '../composables/useSystemOverview.js';
+import {
+  createMediaRequest,
+  fetchMediaRequests,
+  fetchMediaRequestSummary,
+} from '../lib/library-api.js';
+import { fetchSlskdDownloads } from '../lib/slskd-search-api.js';
 
-const route = useRoute();
-const router = useRouter();
-const artworkMaintenancePanelHash = '#artwork-maintenance-panel';
-const libraryDiscoveryPanelHash = '#library-discovery-panel';
-const libraryScanPanelHash = '#library-scan-panel';
-
-const {
-  actionErrorMessage: artworkActionErrorMessage,
-  artworkCleanupHistory,
-  artworkSummary,
-  errorMessage: artworkErrorMessage,
-  inventory: artworkInventory,
-  isLoading: isLoadingArtwork,
-  isLoadingRunDetail: isLoadingArtworkRunDetail,
-  isStarting: isStartingArtworkCleanup,
-  latestRun: latestArtworkRun,
-  loadArtworkSummary,
-  recentRuns,
-  runDetailErrorMessage: artworkRunDetailErrorMessage,
-  selectArtworkCleanupRun,
-  selectedRunDetail,
-  selectedRunId,
-  startArtworkCleanup,
-  summary: artworkMaintenanceSummary,
-} = useArtworkSummary();
-const {
-  artworkMaintenanceSummary: overviewArtworkMaintenanceSummary,
-  activityFeedCheckedAt,
-  activityFeedErrorMessage,
-  activityFeedEntries,
-  hasMoreActivityFeedEntries,
-  dependencyStatuses,
-  errorMessage,
-  heartbeatSummaries,
-  isLoading,
-  isLoadingMoreActivityFeed,
-  operatorNotificationCheckedAt,
-  operatorNotificationCounts,
-  operatorNotifications,
-  loadMoreActivityFeed,
-  loadOverview,
-  overview,
-  pathCards,
-  pathValidationSummary,
-  providerStatus,
-} = useSystemOverview();
-const {
-  actionErrorMessage: libraryDiscoveryActionErrorMessage,
-  currentRun: currentLibraryDiscoveryRun,
-  errorMessage: libraryDiscoveryErrorMessage,
-  isLoading: isLoadingLibraryDiscovery,
-  isStarting: isStartingLibraryDiscovery,
-  libraryDiscoverySummary,
-  loadLibraryDiscoverySummary,
-  runDetailErrorMessage: libraryDiscoveryRunDetailErrorMessage,
-  selectedRunId: selectedLibraryDiscoveryRunId,
-  startDiscoveryRun,
-} = useLibraryDiscoverySummary();
-const {
-  actionErrorMessage,
-  currentRun: currentLibraryScanRun,
-  errorMessage: libraryScanErrorMessage,
-  isLoading: isLoadingLibraryScan,
-  isStarting: isStartingLibraryScan,
-  libraryScanSummary,
-  loadLibraryScanSummary,
-  runDetailErrorMessage: libraryScanRunDetailErrorMessage,
-  selectedRunId: selectedLibraryScanRunId,
-  startLibraryScan,
-} = useLibraryScanSummary();
-const {
-  errorMessage: libraryReconciliationErrorMessage,
-  isLoading: isLoadingLibraryReconciliation,
-  libraryReconciliationSummary,
-  loadLibraryReconciliationSummary,
-} = useLibraryReconciliationSummary();
+// ── Onboarding ──────────────────────────────────────────────────────────────
 const {
   errorMessage: onboardingErrorMessage,
   isLoading: isLoadingOnboarding,
   loadOnboardingSummary,
   nextAction,
   steps,
-  summary,
+  summary: onboardingSummary,
 } = useOnboardingSummary();
-const {
-  errorMessage: libraryWantedErrorMessage,
-  isLoading: isLoadingLibraryWanted,
-  libraryWantedSummary,
-  loadLibraryWantedSummary,
-} = useLibraryWantedSummary();
 
-const dashboardRouteState = computed(() => normalizeDashboardRouteState(route.query));
-const isSetupMode = computed(() => dashboardRouteState.value.onboardingMode === 'setup');
-const showOnboardingSummary = computed(() => (
-  isSetupMode.value || (summary.value?.issueCount ?? 0) > 0
-));
-const showLibraryScanSummary = computed(() => (
-  isSetupMode.value
-  || isLoadingLibraryScan.value
-  || libraryScanErrorMessage.value.length > 0
-  || libraryScanSummary.value?.summary?.status !== 'completed'
-));
-const showLibraryReconciliationSummary = computed(() => (
-  isSetupMode.value
-  || isLoadingLibraryReconciliation.value
-  || libraryReconciliationErrorMessage.value.length > 0
-  || (libraryReconciliationSummary.value?.fileCounts?.observed ?? 0) > 0
-));
-const showLibraryDiscoverySummary = computed(() => (
-  isSetupMode.value
-  || isLoadingLibraryDiscovery.value
-  || libraryDiscoveryErrorMessage.value.length > 0
-  || (libraryDiscoverySummary.value?.requestCounts?.totalRequests ?? 0) > 0
-));
-const showLibraryWantedSummary = computed(() => (
-  isSetupMode.value
-  || isLoadingLibraryWanted.value
-  || libraryWantedErrorMessage.value.length > 0
-  || (libraryWantedSummary.value?.monitoredArtistCount ?? 0) > 0
-));
-const showArtworkSummary = computed(() => (
-  isSetupMode.value
-  || isLoadingArtwork.value
-  || artworkErrorMessage.value.length > 0
-  || (artworkInventory.value?.unassignedAssetCount ?? 0) > 0
-  || latestArtworkRun.value !== null
-  || recentRuns.value.length > 0
-  || artworkMaintenanceSummary.value?.status === 'ready'
-));
-const showOverviewArtworkMaintenance = computed(() => (
-  Boolean(overviewArtworkMaintenanceSummary.value)
-  && (isSetupMode.value || overviewArtworkMaintenanceSummary.value.status !== 'empty')
-));
+const showOnboardingSummary = computed(() => (onboardingSummary.value?.issueCount ?? 0) > 0);
 
-function statusLabel(status) {
-  switch (status) {
-    case 'healthy':
-      return 'Healthy';
-    case 'unavailable':
-      return 'Unavailable';
-    default:
-      return 'Needs attention';
-  }
-}
+// ── Requests ─────────────────────────────────────────────────────────────────
+const mediaRequests = ref([]);
+const requestSummary = ref(null);
+const isLoadingRequests = ref(false);
+const requestErrorMessage = ref('');
+const requestSuccessMessage = ref('');
+const isSubmitting = ref(false);
 
-function buildMergedDashboardRouteQuery(nextState) {
-  const query = { ...route.query };
-  delete query.artworkRunId;
-  delete query.libraryDiscoveryRunId;
-  delete query.libraryScanRunId;
-  delete query.onboarding;
-
-  return {
-    ...query,
-    ...buildDashboardRouteQuery({
-      ...dashboardRouteState.value,
-      ...nextState,
-    }),
-  };
-}
-
-async function replaceDashboardRouteState(nextState, { hash = route.hash } = {}) {
-  const normalizedNextState = normalizeDashboardRouteState({
-    ...dashboardRouteState.value,
-    ...nextState,
-  });
-
-  if (
-    getDashboardRouteStateKey(normalizedNextState) === getDashboardRouteStateKey(dashboardRouteState.value)
-    && hash === route.hash
-  ) {
-    return;
-  }
-
-  await router.replace({
-    hash,
-    query: buildMergedDashboardRouteQuery(normalizedNextState),
-  });
-}
-
-function scrollPanelIntoView(panelId) {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  document.getElementById(panelId)?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-  });
-}
-
-async function dismissSetupMode() {
-  await replaceDashboardRouteState({ onboardingMode: '' });
-}
-
-async function handleSelectArtworkCleanupRun(runId, { focus = true } = {}) {
-  await selectArtworkCleanupRun(runId);
-  await replaceDashboardRouteState(
-    { artworkRunId: runId ?? '' },
-    { hash: focus ? artworkMaintenancePanelHash : route.hash },
-  );
-
-  if (focus) {
-    await nextTick();
-    scrollPanelIntoView('artwork-maintenance-panel');
-  }
-}
-
-async function handleStartLibraryScan() {
-  await replaceDashboardRouteState({ libraryScanRunId: '' }, { hash: libraryScanPanelHash });
-  await startLibraryScan();
-}
-
-async function handleStartLibraryDiscoveryRun() {
-  await replaceDashboardRouteState({ libraryDiscoveryRunId: '' }, { hash: libraryDiscoveryPanelHash });
-  await startDiscoveryRun();
-}
-
-async function openArtworkMaintenanceFromOverview() {
-  const runId = overviewArtworkMaintenanceSummary.value?.latestRunId ?? selectedRunId.value ?? '';
-
-  if (runId) {
-    await handleSelectArtworkCleanupRun(runId, { focus: true });
-    return;
-  }
-
-  await replaceDashboardRouteState({}, { hash: artworkMaintenancePanelHash });
-  await nextTick();
-  scrollPanelIntoView('artwork-maintenance-panel');
-}
-
-onMounted(() => {
-  void loadArtworkSummary({ preferredRunId: dashboardRouteState.value.artworkRunId || null });
-  void loadOverview();
-  void loadLibraryDiscoverySummary({ preferredRunId: dashboardRouteState.value.libraryDiscoveryRunId || null });
-  void loadLibraryScanSummary({ preferredRunId: dashboardRouteState.value.libraryScanRunId || null });
-  void loadLibraryReconciliationSummary();
-  void loadLibraryWantedSummary();
-  void loadOnboardingSummary();
+const form = reactive({
+  artistName: '',
+  releaseTitle: '',
+  requestKind: 'release',
 });
 
-watch(
-  () => dashboardRouteState.value.artworkRunId,
-  (nextRunId, previousRunId) => {
-    if (nextRunId === previousRunId) {
-      return;
-    }
+const canSubmit = computed(() => (
+  form.artistName.trim().length > 0 && form.releaseTitle.trim().length > 0
+));
 
-    if (!nextRunId) {
-      if (selectedRunId.value !== null) {
-        void loadArtworkSummary({ preferredRunId: null });
+async function loadRequests() {
+  isLoadingRequests.value = true;
+  requestErrorMessage.value = '';
+  try {
+    const [summaryPayload, requestsPayload] = await Promise.all([
+      fetchMediaRequestSummary({ scope: 'mine' }),
+      fetchMediaRequests({ scope: 'mine' }),
+    ]);
+    requestSummary.value = summaryPayload;
+    mediaRequests.value = requestsPayload.mediaRequests ?? [];
+  } catch (error) {
+    requestErrorMessage.value = error instanceof Error ? error.message : 'Could not load requests';
+  } finally {
+    isLoadingRequests.value = false;
+  }
+}
+
+async function submitRequest() {
+  isSubmitting.value = true;
+  requestSuccessMessage.value = '';
+  requestErrorMessage.value = '';
+  try {
+    const payload = await createMediaRequest({
+      artistName: form.artistName,
+      releaseTitle: form.releaseTitle,
+      requestKind: form.requestKind,
+    });
+    requestSuccessMessage.value = payload.mediaRequest.requestState === 'already_exists'
+      ? 'This release already exists in your library and has been added to your requests.'
+      : 'Request submitted.';
+    form.artistName = '';
+    form.releaseTitle = '';
+    await loadRequests();
+  } catch (error) {
+    requestErrorMessage.value = error instanceof Error ? error.message : 'Request failed';
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+function requestHeadline(request) {
+  if (request.requestKind === 'track') return `${request.artistName} — ${request.trackTitle}`;
+  if (request.requestKind === 'external_url') return request.sourceUrl;
+  return `${request.artistName} — ${request.releaseTitle}`;
+}
+
+function fulfillmentTone(fulfillmentStatus) {
+  switch (fulfillmentStatus?.tone) {
+    case 'selected': return 'success';
+    case 'failed': return 'danger';
+    default: return 'info';
+  }
+}
+
+function fulfillmentLabel(fulfillmentStatus) {
+  return fulfillmentStatus?.label ?? 'Queued';
+}
+
+// ── Wanted releases ───────────────────────────────────────────────────────────
+const wantedSummary = useLibraryWantedSummary();
+const wantedReleases = useLibraryWantedReleases();
+
+const displayWanted = computed(() => wantedReleases.wantedReleases.value.slice(0, 8));
+const hasWanted = computed(() => wantedReleases.wantedReleases.value.length > 0);
+
+// ── Downloads ─────────────────────────────────────────────────────────────────
+const {
+  data: downloadGroups,
+  isLoading: isLoadingDownloads,
+  load: loadDownloads,
+} = useAsyncResource({
+  fetcher: () => fetchSlskdDownloads({ includeRemoved: false }),
+  project: (payload) => (Array.isArray(payload) ? payload : []),
+  initialData: [],
+  pollIntervalMs: 8000,
+  fallbackErrorMessage: 'Failed to load downloads',
+});
+
+const activeDownloadFiles = computed(() => {
+  const out = [];
+  for (const group of downloadGroups.value ?? []) {
+    const username = group.username ?? '\u2014';
+    for (const dir of group.directories ?? []) {
+      for (const file of dir.files ?? []) {
+        if (/InProgress|Queued|Initializing|Negotiating/i.test(file.state ?? '')) {
+          out.push({ ...file, username });
+        }
       }
-      return;
     }
+  }
+  return out.slice(0, 8);
+});
 
-    if (nextRunId !== selectedRunId.value) {
-      void selectArtworkCleanupRun(nextRunId);
-    }
-
-    void nextTick().then(() => scrollPanelIntoView('artwork-maintenance-panel'));
-  },
-);
-
-watch(
-  () => dashboardRouteState.value.libraryScanRunId,
-  (nextRunId, previousRunId) => {
-    if (nextRunId === previousRunId) {
-      return;
-    }
-
-    if (!nextRunId) {
-      if (selectedLibraryScanRunId.value !== null) {
-        void loadLibraryScanSummary({ preferredRunId: null });
-      }
-      return;
-    }
-
-    void loadLibraryScanSummary({ preferredRunId: nextRunId });
-    void nextTick().then(() => scrollPanelIntoView('library-scan-panel'));
-  },
-);
-
-watch(
-  () => dashboardRouteState.value.libraryDiscoveryRunId,
-  (nextRunId, previousRunId) => {
-    if (nextRunId === previousRunId) {
-      return;
-    }
-
-    if (!nextRunId) {
-      if (selectedLibraryDiscoveryRunId.value !== null) {
-        void loadLibraryDiscoverySummary({ preferredRunId: null });
-      }
-      return;
-    }
-
-    void loadLibraryDiscoverySummary({ preferredRunId: nextRunId });
-    void nextTick().then(() => scrollPanelIntoView('library-discovery-panel'));
-  },
-);
+// ── Boot ──────────────────────────────────────────────────────────────────────
+onMounted(() => {
+  void loadOnboardingSummary();
+  void loadRequests();
+  void wantedSummary.loadLibraryWantedSummary();
+  void wantedReleases.loadWantedReleases();
+  void loadDownloads();
+});
 </script>
 
 <template>
-  <section class="hx-page page-stack">
+  <section class="hx-page hx-media-hub">
+
+    <!-- Setup alert ─────────────────────────────────────────────────────── -->
     <OnboardingSummaryPanel
       v-if="showOnboardingSummary"
       :error-message="onboardingErrorMessage"
       :is-loading="isLoadingOnboarding"
-      :is-setup-mode="isSetupMode"
+      :is-setup-mode="false"
       :next-action="nextAction"
       :steps="steps"
-      :summary="summary"
-      @dismiss="dismissSetupMode"
+      :summary="onboardingSummary"
       @refresh="loadOnboardingSummary"
     />
 
-    <LibraryScanSummaryPanel
-      id="library-scan-panel"
-      v-if="showLibraryScanSummary"
-      :action-error-message="actionErrorMessage"
-      :current-run="currentLibraryScanRun"
-      :error-message="libraryScanErrorMessage"
-      :is-loading="isLoadingLibraryScan"
-      :is-setup-mode="isSetupMode"
-      :is-starting="isStartingLibraryScan"
-      :run-detail-error-message="libraryScanRunDetailErrorMessage"
-      :scan-summary="libraryScanSummary"
-      @refresh="loadLibraryScanSummary"
-      @start="handleStartLibraryScan"
-    />
-
-    <LibraryReconciliationSummaryPanel
-      v-if="showLibraryReconciliationSummary"
-      :error-message="libraryReconciliationErrorMessage"
-      :is-loading="isLoadingLibraryReconciliation"
-      :summary-payload="libraryReconciliationSummary"
-      @refresh="loadLibraryReconciliationSummary"
-    />
-
-    <LibraryDiscoverySummaryPanel
-      id="library-discovery-panel"
-      :action-error-message="libraryDiscoveryActionErrorMessage"
-      :current-run="currentLibraryDiscoveryRun"
-      v-if="showLibraryDiscoverySummary"
-      :error-message="libraryDiscoveryErrorMessage"
-      :is-loading="isLoadingLibraryDiscovery"
-      :is-starting="isStartingLibraryDiscovery"
-      :run-detail-error-message="libraryDiscoveryRunDetailErrorMessage"
-      :summary-payload="libraryDiscoverySummary"
-      @refresh="loadLibraryDiscoverySummary"
-      @start="handleStartLibraryDiscoveryRun"
-    />
-
-    <LibraryWantedSummaryPanel
-      v-if="showLibraryWantedSummary"
-      :error-message="libraryWantedErrorMessage"
-      :is-loading="isLoadingLibraryWanted"
-      :summary-payload="libraryWantedSummary"
-      @refresh="loadLibraryWantedSummary"
-    />
-
-    <ArtworkSummaryPanel
-      id="artwork-maintenance-panel"
-      v-if="showArtworkSummary"
-      :action-error-message="artworkActionErrorMessage"
-      :error-message="artworkErrorMessage"
-      :is-loading="isLoadingArtwork"
-      :is-loading-run-detail="isLoadingArtworkRunDetail"
-      :is-starting="isStartingArtworkCleanup"
-      :run-detail-error-message="artworkRunDetailErrorMessage"
-      :run-history-payload="artworkCleanupHistory"
-      :selected-run-detail-payload="selectedRunDetail"
-      :selected-run-id="selectedRunId"
-      :summary-payload="artworkSummary"
-      @refresh="loadArtworkSummary"
-      @select-run="handleSelectArtworkCleanupRun"
-      @start="startArtworkCleanup"
-    />
-
-    <article class="hx-card hx-dashboard-header">
-      <div class="hx-dashboard-header-row">
+    <!-- Request intake ──────────────────────────────────────────────────── -->
+    <article class="hx-card hx-request-intake">
+      <header class="hx-card-header">
         <div>
-          <p class="eyebrow">{{ isSetupMode ? 'First login workspace' : 'Operations dashboard' }}</p>
-          <h2>Runtime overview</h2>
-          <p class="hx-text-muted">
-            {{ isSetupMode
-              ? 'Continue setup with contextual next steps instead of a separate onboarding wizard.'
-              : 'Live status pulled from the protected overview API.' }}
-          </p>
+          <h2 class="hx-card-title">What do you want to listen to?</h2>
+          <p class="hx-card-subtitle">Harmoniarr will find it on Soulseek and import it to your library.</p>
         </div>
-        <div class="hx-dashboard-header-actions">
-          <button type="button" class="hx-btn" @click="loadOverview" :disabled="isLoading">
-            {{ isLoading ? 'Refreshing…' : 'Refresh overview' }}
-          </button>
-        </div>
-      </div>
-
-      <div class="hx-stat-grid" v-if="overview">
-        <article class="hx-stat-card">
-          <span class="hx-stat-label">Service</span>
-          <span class="hx-stat-value">{{ overview.service.name }}</span>
-          <span class="hx-stat-meta">v{{ overview.service.version }}</span>
-        </article>
-        <article class="hx-stat-card">
-          <span class="hx-stat-label">Pending migrations</span>
-          <span class="hx-stat-value">{{ overview.database.pendingMigrations }}</span>
-          <span class="hx-stat-meta">Applied {{ overview.database.appliedMigrations }}</span>
-        </article>
-        <article class="hx-stat-card" v-if="pathValidationSummary">
-          <span class="hx-stat-label">Path validation</span>
-          <span class="hx-stat-value">
-            <span class="hx-pill" :data-tone="pathValidationSummary.status === 'healthy' ? 'success' : pathValidationSummary.status === 'unavailable' ? 'danger' : 'warning'">
-              {{ statusLabel(pathValidationSummary.status) }}
-            </span>
-          </span>
-          <span class="hx-stat-meta">{{ pathValidationSummary.configuredDownloadMappings }} mapping{{ pathValidationSummary.configuredDownloadMappings === 1 ? '' : 's' }}</span>
-        </article>
-        <article class="hx-stat-card" v-if="overview.discoveryHeartbeat">
-          <span class="hx-stat-label">Discovery cadence</span>
-          <span class="hx-stat-value">{{ overview.discoveryHeartbeat?.intervalLabel ?? '—' }}</span>
-          <span class="hx-stat-meta">Library scans</span>
-        </article>
-        <article class="hx-stat-card" v-if="overview.importExecutionHeartbeat">
-          <span class="hx-stat-label">Import cadence</span>
-          <span class="hx-stat-value">{{ overview.importExecutionHeartbeat?.intervalLabel ?? '—' }}</span>
-          <span class="hx-stat-meta">Apply runs</span>
-        </article>
-        <article class="hx-stat-card" v-if="overview.metadataRefreshHeartbeat">
-          <span class="hx-stat-label">Metadata cadence</span>
-          <span class="hx-stat-value">{{ overview.metadataRefreshHeartbeat?.intervalLabel ?? '—' }}</span>
-          <span class="hx-stat-meta">MusicBrainz refresh</span>
-        </article>
-      </div>
-    </article>
-
-    <article class="panel-light" v-if="isLoading">
-      <h3>Loading overview</h3>
-      <p>Fetching the current runtime and database state.</p>
-    </article>
-
-    <article class="panel-light error-panel" v-else-if="errorMessage">
-      <h3>Overview unavailable</h3>
-      <p>{{ errorMessage }}</p>
-    </article>
-
-    <template v-else-if="overview">
-      <section class="stats-grid" v-if="showOverviewArtworkMaintenance">
-        <article class="panel-light" v-if="showOverviewArtworkMaintenance">
-          <div class="section-header">
-            <div>
-              <h3>Artwork maintenance</h3>
-              <p class="metadata-card-copy">{{ overviewArtworkMaintenanceSummary.message }}</p>
+      </header>
+      <div class="hx-card-body">
+        <form @submit.prevent="submitRequest" class="hx-request-form">
+          <div class="hx-form-row">
+            <div class="hx-field">
+              <label class="hx-field-label" for="req-artist">Artist</label>
+              <input
+                id="req-artist"
+                class="hx-input"
+                type="text"
+                v-model="form.artistName"
+                placeholder="e.g. Radiohead"
+                autocomplete="off"
+              />
             </div>
-            <span class="review-status-pill" :class="getArtworkMaintenanceStatusClass(overviewArtworkMaintenanceSummary.status)">
-              {{ getArtworkMaintenanceStatusLabel(overviewArtworkMaintenanceSummary.status) }}
-            </span>
+            <div class="hx-field">
+              <label class="hx-field-label" for="req-release">Album / Release</label>
+              <input
+                id="req-release"
+                class="hx-input"
+                type="text"
+                v-model="form.releaseTitle"
+                placeholder="e.g. OK Computer"
+                autocomplete="off"
+              />
+            </div>
+            <div class="hx-request-form-action">
+              <button
+                type="submit"
+                class="hx-btn"
+                data-variant="primary"
+                :disabled="isSubmitting || !canSubmit"
+              >
+                {{ isSubmitting ? 'Requesting…' : 'Request' }}
+              </button>
+            </div>
           </div>
-          <dl>
-            <div><dt>Eligible now</dt><dd>{{ overviewArtworkMaintenanceSummary.eligibleAssetCount }}</dd></div>
-            <div><dt>Unassigned assets</dt><dd>{{ overviewArtworkMaintenanceSummary.unassignedAssetCount }}</dd></div>
-            <div><dt>Latest run</dt><dd>{{ overviewArtworkMaintenanceSummary.latestRunStatus ?? 'Not yet recorded' }}</dd></div>
-            <div><dt>Checked</dt><dd>{{ overviewArtworkMaintenanceSummary.checkedAt ?? 'Not yet recorded' }}</dd></div>
-          </dl>
-          <div class="library-scan-actions">
-            <button type="button" class="review-reset-button" @click="openArtworkMaintenanceFromOverview">
-              {{ overviewArtworkMaintenanceSummary.latestRunId ? 'Open latest run' : 'Open artwork maintenance' }}
-            </button>
+          <div class="hx-request-form-feedback" v-if="requestSuccessMessage || requestErrorMessage">
+            <span v-if="requestSuccessMessage" class="hx-pill" data-tone="success">{{ requestSuccessMessage }}</span>
+            <span v-if="requestErrorMessage" class="hx-pill" data-tone="danger">{{ requestErrorMessage }}</span>
           </div>
-        </article>
-      </section>
-
-      <HeartbeatSummaryPanel
-        :heartbeats="heartbeatSummaries"
-        @refresh="loadOverview"
-      />
-
-      <OperatorNotificationsPanel
-        :checked-at="operatorNotificationCheckedAt"
-        :counts="operatorNotificationCounts"
-        :notifications="operatorNotifications"
-        @refresh="loadOverview"
-      />
-
-      <ActivityFeedPanel
-        :checked-at="activityFeedCheckedAt"
-        :entries="activityFeedEntries"
-        :error-message="activityFeedErrorMessage"
-        :has-more="hasMoreActivityFeedEntries"
-        :is-loading-more="isLoadingMoreActivityFeed"
-        @load-more="loadMoreActivityFeed"
-        @refresh="loadOverview"
-      />
-
-      <ProviderStatusPanel
-        v-if="providerStatus"
-        :provider-status="providerStatus"
-        @refresh="loadOverview"
-      />
-
-      <DependencyStatusPanel
-        :dependencies="dependencyStatuses"
-        @refresh="loadOverview"
-      />
-
-      <article class="panel-light">
-        <div class="section-header">
-          <div>
-            <p class="eyebrow">Container paths</p>
-            <h3>Path contract</h3>
+          <div class="hx-request-form-links">
+            <RouterLink :to="{ name: 'search' }" class="hx-link">Search Soulseek directly</RouterLink>
+            <span class="hx-link-sep" aria-hidden="true">·</span>
+            <RouterLink :to="{ name: 'request-music' }" class="hx-link">Advanced requests &amp; request history</RouterLink>
           </div>
-          <button type="button" @click="loadOverview">Refresh</button>
-        </div>
-        <div class="path-grid">
-          <article class="path-card" v-for="path in pathCards" :key="path.label">
-            <p>{{ path.label }}</p>
-            <strong>{{ path.value }}</strong>
-            <span>{{ path.description }}</span>
-          </article>
-        </div>
+        </form>
+      </div>
+    </article>
+
+    <!-- Stats row ───────────────────────────────────────────────────────── -->
+    <section class="hx-stat-grid" v-if="requestSummary || wantedSummary.libraryWantedSummary.value">
+      <article class="hx-stat-card" v-if="requestSummary">
+        <span class="hx-stat-label">My requests</span>
+        <span class="hx-stat-value">{{ requestSummary.counts?.totalRequests ?? 0 }}</span>
+        <span class="hx-stat-meta">Total submitted</span>
       </article>
-    </template>
+      <article class="hx-stat-card" v-if="requestSummary">
+        <span class="hx-stat-label">Active</span>
+        <span class="hx-stat-value">{{ requestSummary.fulfillmentCounts?.active ?? 0 }}</span>
+        <span class="hx-stat-meta">Queued, downloading, or pending import</span>
+      </article>
+      <article class="hx-stat-card" v-if="wantedSummary.libraryWantedSummary.value">
+        <span class="hx-stat-label">Missing</span>
+        <span class="hx-stat-value">{{ wantedSummary.releaseCounts.value?.missing ?? 0 }}</span>
+        <span class="hx-stat-meta">Monitored releases not yet acquired</span>
+      </article>
+      <article class="hx-stat-card" v-if="wantedSummary.libraryWantedSummary.value">
+        <span class="hx-stat-label">Partial</span>
+        <span class="hx-stat-value">{{ wantedSummary.releaseCounts.value?.partial ?? 0 }}</span>
+        <span class="hx-stat-meta">Releases with gaps in the library</span>
+      </article>
+      <article class="hx-stat-card" v-if="activeDownloadFiles.length > 0">
+        <span class="hx-stat-label">Downloading</span>
+        <span class="hx-stat-value">{{ activeDownloadFiles.length }}</span>
+        <span class="hx-stat-meta">Active transfers from Soulseek</span>
+      </article>
+    </section>
+
+    <!-- Recent requests ─────────────────────────────────────────────────── -->
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">My requests</h3>
+          <p class="hx-card-subtitle" v-if="requestSummary">{{ requestSummary.summary?.message }}</p>
+        </div>
+        <div class="hx-card-actions">
+          <RouterLink :to="{ name: 'request-music' }" class="hx-btn">All requests</RouterLink>
+        </div>
+      </header>
+
+      <div class="hx-card-body" v-if="isLoadingRequests && mediaRequests.length === 0">
+        <div class="hx-skeleton-stack">
+          <span class="hx-skeleton" v-for="i in 3" :key="i"></span>
+        </div>
+      </div>
+
+      <div class="hx-card-body hx-card-body--flush" v-else-if="mediaRequests.length > 0">
+        <table class="hx-table">
+          <thead>
+            <tr>
+              <th>Request</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="request in mediaRequests.slice(0, 10)" :key="request.id">
+              <td>{{ requestHeadline(request) }}</td>
+              <td>
+                <span class="hx-pill" :data-tone="fulfillmentTone(request.fulfillmentStatus)">
+                  {{ fulfillmentLabel(request.fulfillmentStatus) }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="hx-empty" v-else>
+        <p class="hx-empty-title">No requests yet</p>
+        <p class="hx-empty-copy">Use the form above to request your first release.</p>
+      </div>
+    </article>
+
+    <!-- Wanted releases ─────────────────────────────────────────────────── -->
+    <article class="hx-card" v-if="hasWanted || wantedReleases.isLoading.value">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Wanted</h3>
+          <p class="hx-card-subtitle">Monitored releases not yet fully acquired.</p>
+        </div>
+        <div class="hx-card-actions">
+          <RouterLink :to="{ name: 'missing' }" class="hx-btn">View all</RouterLink>
+        </div>
+      </header>
+
+      <div class="hx-card-body" v-if="wantedReleases.isLoading.value && !hasWanted">
+        <div class="hx-skeleton-stack">
+          <span class="hx-skeleton" v-for="i in 4" :key="i"></span>
+        </div>
+      </div>
+
+      <div class="hx-card-body hx-card-body--flush" v-else-if="hasWanted">
+        <table class="hx-table">
+          <thead>
+            <tr>
+              <th>Artist</th>
+              <th>Release</th>
+              <th>Type</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="release in displayWanted" :key="release.id">
+              <td>{{ release.artistName }}</td>
+              <td>
+                {{ release.releaseTitle }}
+                <span v-if="release.releaseDisambiguation" class="hx-text-muted"> ({{ release.releaseDisambiguation }})</span>
+              </td>
+              <td>{{ release.releaseGroupType ?? '—' }}</td>
+              <td>
+                <span class="hx-pill" :data-tone="release.wantedStatus === 'missing' ? 'danger' : 'warning'">
+                  {{ release.wantedStatus }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <!-- Active downloads ────────────────────────────────────────────────── -->
+    <article class="hx-card" v-if="activeDownloadFiles.length > 0">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Active downloads</h3>
+          <p class="hx-card-subtitle">Files currently transferring from Soulseek.</p>
+        </div>
+        <div class="hx-card-actions">
+          <RouterLink :to="{ name: 'activity-downloads' }" class="hx-btn">Open downloads</RouterLink>
+        </div>
+      </header>
+      <div class="hx-card-body hx-card-body--flush">
+        <table class="hx-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>File</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="file in activeDownloadFiles" :key="file.id ?? file.filename">
+              <td class="hx-table-mono">{{ file.username }}</td>
+              <td class="hx-table-truncate">{{ file.filename?.split(/[/\\]/).pop() ?? file.filename }}</td>
+              <td>
+                <span class="hx-pill" data-tone="warning">{{ file.state?.split(',')[0] ?? 'Active' }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
   </section>
 </template>
 
 <style scoped>
-.hx-dashboard-header {
+.hx-media-hub {
   display: grid;
-  gap: var(--hx-space-4);
-  padding: var(--hx-space-5);
+  gap: var(--hx-space-5);
+  align-content: start;
 }
 
-.hx-dashboard-header-row {
+.hx-request-intake .hx-card-title {
+  font-size: var(--hx-text-xl);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.hx-request-form {
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.hx-request-form .hx-form-row {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--hx-space-3);
+}
+
+.hx-request-form-action {
+  padding-top: 22px;
+}
+
+.hx-request-form-action .hx-btn {
+  white-space: nowrap;
+}
+
+.hx-request-form-feedback {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--hx-space-4);
+  gap: var(--hx-space-2);
   flex-wrap: wrap;
 }
 
-.hx-dashboard-header-row h2 {
-  margin: 0;
-  font-size: var(--hx-text-xl);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--hx-text-strong);
-}
-
-.hx-dashboard-header-row p {
-  margin: var(--hx-space-1) 0 0;
-  color: var(--hx-text-muted);
+.hx-request-form-links {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
   font-size: var(--hx-text-sm);
 }
 
-.hx-dashboard-header-actions {
-  display: flex;
-  gap: var(--hx-space-2);
-  align-items: center;
+.hx-link {
+  color: var(--hx-accent-strong);
+  text-decoration: none;
+  font-weight: 500;
 }
 
-.hx-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--hx-space-3);
+.hx-link:hover {
+  text-decoration: underline;
+}
+
+.hx-link-sep {
+  color: var(--hx-text-faint);
+}
+
+.hx-table-mono {
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+}
+
+.hx-table-truncate {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hx-text-muted {
+  color: var(--hx-text-muted);
 }
 </style>
