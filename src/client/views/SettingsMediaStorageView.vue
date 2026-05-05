@@ -216,140 +216,174 @@ onMounted(() => { void loadSettings(); });
     <form @submit.prevent="saveSettings" v-else>
       <div class="cfg-2col">
 
-        <!-- Artwork behaviour -->
+        <!-- Cover art -->
         <article class="hx-card">
           <header class="hx-card-header">
             <div>
-              <h3 class="hx-card-title">Artwork</h3>
-              <p class="hx-card-subtitle">Fetch, extraction, derivative generation, and automatic refresh triggers.</p>
+              <h3 class="hx-card-title">Cover art</h3>
+              <p class="hx-card-subtitle">How Harmoniarr finds and stores album artwork.</p>
             </div>
           </header>
           <div class="hx-card-body">
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.artwork.fetchEnabled" />
-              <span>Enable external artwork fetching</span>
-            </label>
-            <div class="hx-field">
-              <label class="hx-field-label">Preferred provider order</label>
-              <input class="hx-input" v-model="form.artwork.providerOrderText" placeholder="coverArtArchive, discogs, theAudioDb" />
+
+            <div class="cfg-group">
+              <p class="cfg-group-title">Finding art</p>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.artwork.fetchEnabled" />
+                <span>Download cover art from the internet</span>
+              </label>
+              <p class="cfg-field-hint">Searches online sources for album covers automatically.</p>
+              <div class="hx-field" v-if="form.artwork.fetchEnabled">
+                <label class="hx-field-label">Sources to try</label>
+                <input class="hx-input" v-model="form.artwork.providerOrderText" placeholder="coverArtArchive" />
+                <p class="cfg-field-hint">Try these sources in order, separated by commas. <code>coverArtArchive</code> is the main free source.</p>
+              </div>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.artwork.captureEmbedded" />
+                <span>Pull art from inside your audio files</span>
+              </label>
+              <p class="cfg-field-hint">Extracts cover art embedded in .flac, .mp3, .m4a, and similar files.</p>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.artwork.captureFolderArtwork" />
+                <span>Use cover images found in download folders</span>
+              </label>
+              <p class="cfg-field-hint">Picks up cover.jpg or folder.jpg files sitting alongside your music.</p>
             </div>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.artwork.captureEmbedded" />
-              <span>Let embedded artwork become durable app-owned artwork</span>
-            </label>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.artwork.captureFolderArtwork" />
-              <span>Let candidate-folder artwork become durable app-owned artwork</span>
-            </label>
-            <div class="hx-form-row">
-              <div class="hx-field">
-                <label class="hx-field-label">Derivative format</label>
-                <select class="hx-select" v-model="form.artwork.derivativeFormat">
-                  <option value="webp">webp</option>
-                  <option value="jpeg">jpeg</option>
-                  <option value="png">png</option>
-                </select>
+
+            <div class="cfg-group">
+              <p class="cfg-group-title">Thumbnails</p>
+              <p class="hx-text-muted">Harmoniarr generates smaller copies of each cover for fast loading in the app.</p>
+              <div class="hx-form-row">
+                <div class="hx-field">
+                  <label class="hx-field-label">Image format</label>
+                  <select class="hx-select" v-model="form.artwork.derivativeFormat">
+                    <option value="webp">WebP — smallest file size</option>
+                    <option value="jpeg">JPEG — most compatible</option>
+                    <option value="png">PNG — lossless</option>
+                  </select>
+                </div>
+                <div class="hx-field">
+                  <label class="hx-field-label">Sizes to generate (pixels)</label>
+                  <input class="hx-input" v-model="form.artwork.derivativeSizesText" placeholder="256, 512" />
+                  <p class="cfg-field-hint">Pixel widths, separated by commas. The app picks the best size for each context.</p>
+                </div>
               </div>
-              <div class="hx-field">
-                <label class="hx-field-label">Derivative sizes</label>
-                <input class="hx-input" v-model="form.artwork.derivativeSizesText" placeholder="256, 512" />
+              <div class="hx-form-row">
+                <div class="hx-field">
+                  <label class="hx-field-label">Max thumbnail storage (MB)</label>
+                  <input class="hx-input" v-model.number="form.artwork.derivativeCacheSizeMb" type="number" min="64" max="16384" step="64" />
+                  <p class="cfg-field-hint">Thumbnails are deleted when this cap is reached.</p>
+                </div>
+                <div class="hx-field">
+                  <label class="hx-field-label">Keep thumbnails for (days)</label>
+                  <input class="hx-input" v-model.number="form.artwork.derivativeRetentionDays" type="number" min="1" max="3650" />
+                  <p class="cfg-field-hint">Expired ones are regenerated automatically when needed.</p>
+                </div>
               </div>
             </div>
-            <div class="hx-form-row">
-              <div class="hx-field">
-                <label class="hx-field-label">Max original size (bytes)</label>
-                <input class="hx-input" v-model.number="form.artwork.maxOriginalFileSizeBytes" type="number" min="1048576" max="104857600" step="1048576" />
+
+            <div class="cfg-group">
+              <p class="cfg-group-title">Full-size originals</p>
+              <p class="hx-text-muted">The original image is kept separately from the thumbnails.</p>
+              <div class="hx-form-row">
+                <div class="hx-field">
+                  <label class="hx-field-label">Skip images larger than (bytes)</label>
+                  <input class="hx-input" v-model.number="form.artwork.maxOriginalFileSizeBytes" type="number" min="1048576" max="104857600" step="1048576" />
+                  <p class="cfg-field-hint">20,971,520 = 20 MB. Images over this size won't be saved.</p>
+                </div>
+                <div class="hx-field">
+                  <label class="hx-field-label">Skip images wider than (pixels)</label>
+                  <input class="hx-input" v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="64" />
+                  <p class="cfg-field-hint">Applies to both width and height.</p>
+                </div>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Max original dimension (px)</label>
-                <input class="hx-input" v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="64" />
-              </div>
-            </div>
-            <div class="hx-form-row">
-              <div class="hx-field">
-                <label class="hx-field-label">Derivative cache cap (MB)</label>
-                <input class="hx-input" v-model.number="form.artwork.derivativeCacheSizeMb" type="number" min="64" max="16384" step="64" />
-              </div>
-              <div class="hx-field">
-                <label class="hx-field-label">Derivative retention (days)</label>
-                <input class="hx-input" v-model.number="form.artwork.derivativeRetentionDays" type="number" min="1" max="3650" />
-              </div>
-              <div class="hx-field">
-                <label class="hx-field-label">Unassigned originals retention (days)</label>
+                <label class="hx-field-label">Delete unlinked art after (days)</label>
                 <input class="hx-input" v-model.number="form.artwork.unassignedRetentionDays" type="number" min="1" max="3650" />
+                <p class="cfg-field-hint">Art that isn't attached to any album is cleared after this many days.</p>
               </div>
             </div>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.artwork.refreshAfterMetadataRefresh" />
-              <span>Refresh artwork after metadata refresh</span>
-            </label>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.artwork.refreshAfterImport" />
-              <span>Refresh artwork after import acceptance</span>
-            </label>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.artwork.refreshAfterLibraryScan" />
-              <span>Refresh artwork after library scans</span>
-            </label>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.artwork.refetchMissingAutomatically" />
-              <span>Refetch missing artwork automatically</span>
-            </label>
+
+            <div class="cfg-group">
+              <p class="cfg-group-title">Automatic refresh</p>
+              <p class="hx-text-muted">Choose when Harmoniarr should look for better artwork on its own.</p>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.artwork.refreshAfterMetadataRefresh" />
+                <span>After metadata is refreshed</span>
+              </label>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.artwork.refreshAfterImport" />
+                <span>When an album is imported</span>
+              </label>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.artwork.refreshAfterLibraryScan" />
+                <span>During library scans</span>
+              </label>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.artwork.refetchMissingAutomatically" />
+                <span>Keep looking for missing art automatically</span>
+              </label>
+              <p class="cfg-field-hint" v-if="form.artwork.refetchMissingAutomatically">Harmoniarr will periodically retry albums that don't have any artwork yet.</p>
+            </div>
+
           </div>
         </article>
 
-        <!-- Paths -->
+        <!-- Folder locations -->
         <article class="hx-card">
           <header class="hx-card-header">
             <div>
-              <h3 class="hx-card-title">Paths</h3>
-              <p class="hx-card-subtitle">Core filesystem roots, download translation mappings, and per-user placement.</p>
+              <h3 class="hx-card-title">Folder locations</h3>
+              <p class="hx-card-subtitle">Tell Harmoniarr where your files live on disk.</p>
             </div>
           </header>
           <div class="hx-card-body">
-            <div class="hx-form-row">
+
+            <div class="cfg-group" style="padding-top: 0; border-top: none">
               <div class="hx-field">
-                <label class="hx-field-label">Downloads</label>
+                <label class="hx-field-label">Downloads folder</label>
                 <input class="hx-input" v-model="form.paths.downloads" />
+                <p class="cfg-field-hint">Where slskd puts completed downloads. Harmoniarr reads from here.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Music</label>
+                <label class="hx-field-label">Music library</label>
                 <input class="hx-input" v-model="form.paths.music" />
+                <p class="cfg-field-hint">Your organized music collection. Accepted imports are moved here.</p>
               </div>
-            </div>
-            <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Staging</label>
+                <label class="hx-field-label">Staging area</label>
                 <input class="hx-input" v-model="form.paths.staging" />
+                <p class="cfg-field-hint">A holding area where files wait while an import is being reviewed.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Transcode temp</label>
+                <label class="hx-field-label">Transcode workspace</label>
                 <input class="hx-input" v-model="form.paths.transcodeTemp" />
+                <p class="cfg-field-hint">Temporary space used when converting audio formats. Can point to fast storage.</p>
               </div>
             </div>
 
-            <!-- Download mappings -->
-            <div class="cfg-subsection">
+            <!-- Path translations -->
+            <div class="cfg-group">
               <div class="cfg-subsection-header">
                 <div>
-                  <p class="cfg-subsection-label">Download path mappings</p>
-                  <p class="hx-text-muted">Map slskd completed-download paths into Harmoniarr's local namespace.</p>
+                  <p class="cfg-group-title">Path translations</p>
+                  <p class="hx-text-muted">slskd and Harmoniarr may run in separate containers with different folder names pointing to the same place on disk. Add a translation for each mismatch.</p>
                 </div>
-                <button type="button" class="hx-btn" @click="addDownloadMapping">Add mapping</button>
+                <button type="button" class="hx-btn" @click="addDownloadMapping">Add</button>
               </div>
               <div class="hx-empty" v-if="!form.paths.downloadMappings.length">
-                <p class="hx-empty-copy">Without explicit mappings, preview resolution falls back to the downloads root with a warning.</p>
+                <p class="hx-empty-copy">Not needed if slskd and Harmoniarr share the same folder paths.</p>
               </div>
               <div class="cfg-mapping-list" v-else>
                 <div class="cfg-mapping-card" v-for="(mapping, index) in form.paths.downloadMappings" :key="index">
                   <div class="hx-form-row">
                     <div class="hx-field">
-                      <label class="hx-field-label">slskd prefix</label>
-                      <input class="hx-input" v-model="mapping.slskdPrefix" placeholder="/downloads/completed" />
+                      <label class="hx-field-label">slskd sees this path</label>
+                      <input class="hx-input" v-model="mapping.slskdPrefix" placeholder="/downloads/complete" />
                     </div>
                     <div class="hx-field">
-                      <label class="hx-field-label">Harmoniarr prefix</label>
-                      <input class="hx-input" v-model="mapping.harmoniarrPrefix" placeholder="/data/downloads/completed" />
+                      <label class="hx-field-label">Harmoniarr sees it as</label>
+                      <input class="hx-input" v-model="mapping.harmoniarrPrefix" placeholder="/data/downloads/complete" />
                     </div>
                   </div>
                   <button type="button" class="hx-btn" data-variant="ghost" @click="removeDownloadMapping(index)">Remove</button>
@@ -357,27 +391,27 @@ onMounted(() => { void loadSettings(); });
               </div>
             </div>
 
-            <!-- Per-user music roots -->
-            <div class="cfg-subsection">
+            <!-- Per-user library folders -->
+            <div class="cfg-group">
               <div class="cfg-subsection-header">
                 <div>
-                  <p class="cfg-subsection-label">Per-user music roots</p>
-                  <p class="hx-text-muted">Map user IDs onto subdirectories under the shared music root.</p>
+                  <p class="cfg-group-title">Per-user library folders</p>
+                  <p class="hx-text-muted">Give each user their own subfolder inside the music library. Their imports go into that folder instead of the shared root.</p>
                 </div>
-                <button type="button" class="hx-btn" @click="addUserMusicRoot">Add user root</button>
+                <button type="button" class="hx-btn" @click="addUserMusicRoot">Add</button>
               </div>
               <div class="hx-empty" v-if="!form.paths.userMusicRoots.length">
-                <p class="hx-empty-copy">Preview falls back to the shared library root until a user-specific destination is configured.</p>
+                <p class="hx-empty-copy">Without a personal folder, everyone's imports land in the shared library root.</p>
               </div>
               <div class="cfg-mapping-list" v-else>
                 <div class="cfg-mapping-card" v-for="(userMusicRoot, index) in form.paths.userMusicRoots" :key="`user-music-root-${index}`">
                   <div class="hx-form-row">
                     <div class="hx-field">
-                      <label class="hx-field-label">App user ID</label>
-                      <input class="hx-input" v-model="userMusicRoot.userId" placeholder="user-1" />
+                      <label class="hx-field-label">User</label>
+                      <input class="hx-input" v-model="userMusicRoot.userId" placeholder="alice" />
                     </div>
                     <div class="hx-field">
-                      <label class="hx-field-label">Relative subdirectory</label>
+                      <label class="hx-field-label">Subfolder</label>
                       <input class="hx-input" v-model="userMusicRoot.relativeRoot" placeholder="household/alice" />
                     </div>
                   </div>
@@ -385,6 +419,7 @@ onMounted(() => { void loadSettings(); });
                 </div>
               </div>
             </div>
+
           </div>
         </article>
       </div>

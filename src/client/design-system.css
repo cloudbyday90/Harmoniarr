@@ -1699,3 +1699,32 @@ body {
   gap: var(--hx-space-2);
   flex-wrap: wrap;
 }
+
+.cfg-group {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding-top: var(--hx-space-4);
+  border-top: 1px solid var(--hx-border-subtle);
+}
+.cfg-group-title {
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--hx-text-muted);
+  margin: 0;
+}
+.cfg-field-hint {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+  margin-top: calc(var(--hx-space-1) * -0.5);
+  line-height: 1.45;
+}
+.cfg-field-hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--hx-bg-surface-muted);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: 3px;
+  padding: 0 3px;
+}
