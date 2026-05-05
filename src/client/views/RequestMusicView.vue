@@ -431,7 +431,8 @@ onMounted(() => {
 
 <style scoped>
 .request-music-form {
-  align-items: end;
+  grid-template-columns: 1fr;
+  align-items: stretch;
 }
 
 .request-list {

@@ -19,9 +19,17 @@
 <script setup>
 import { onMounted } from 'vue';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
+import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 
 const wanted = useLibraryWantedSummary();
-onMounted(() => wanted.loadLibraryWantedSummary());
+const releases = useLibraryWantedReleases();
+
+function refresh() {
+  wanted.loadLibraryWantedSummary();
+  releases.loadWantedReleases();
+}
+
+onMounted(() => refresh());
 </script>
 
 <template>
@@ -32,15 +40,16 @@ onMounted(() => wanted.loadLibraryWantedSummary());
         <p class="hx-page-subtitle">Monitored releases pending acquisition.</p>
       </div>
       <div class="hx-page-actions">
-        <button type="button" class="hx-btn" @click="wanted.loadLibraryWantedSummary" :disabled="wanted.isLoading.value">
-          {{ wanted.isLoading.value ? 'Loading…' : 'Refresh' }}
+        <button type="button" class="hx-btn" @click="refresh" :disabled="wanted.isLoading.value || releases.isLoading.value">
+          {{ (wanted.isLoading.value || releases.isLoading.value) ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
     </header>
 
-    <article v-if="wanted.errorMessage.value" class="hx-card">
+    <article v-if="wanted.errorMessage.value || releases.errorMessage.value" class="hx-card">
       <div class="hx-card-body">
-        <span class="hx-pill" data-tone="danger">{{ wanted.errorMessage.value }}</span>
+        <span v-if="wanted.errorMessage.value" class="hx-pill" data-tone="danger">{{ wanted.errorMessage.value }}</span>
+        <span v-if="releases.errorMessage.value" class="hx-pill" data-tone="danger">{{ releases.errorMessage.value }}</span>
       </div>
     </article>
 
@@ -72,9 +81,61 @@ onMounted(() => wanted.loadLibraryWantedSummary());
       </header>
       <div class="hx-card-body">
         <p>{{ wanted.summary.value.message }}</p>
-        <p class="hx-page-subtitle">
-          A per-release listing endpoint is not yet exposed. See the Missing workspace for additional reconciliation buckets.
-        </p>
+      </div>
+    </article>
+
+    <article class="hx-card" v-if="releases.wantedReleases.value.length > 0">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Wanted releases</h3>
+          <p class="hx-card-subtitle">{{ releases.totalCount.value }} release{{ releases.totalCount.value === 1 ? '' : 's' }} pending acquisition</p>
+        </div>
+      </header>
+      <div class="hx-card-body hx-card-body--flush">
+        <table class="hx-table">
+          <thead>
+            <tr>
+              <th>Artist</th>
+              <th>Release group</th>
+              <th>Release</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th class="hx-table-num">Expected</th>
+              <th class="hx-table-num">Matched</th>
+              <th class="hx-table-num">Missing</th>
+              <th>Release date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="release in releases.wantedReleases.value" :key="release.id">
+              <td>{{ release.artistName }}</td>
+              <td>{{ release.releaseGroupTitle }}</td>
+              <td>
+                {{ release.releaseTitle }}
+                <span v-if="release.releaseDisambiguation" class="hx-muted"> ({{ release.releaseDisambiguation }})</span>
+              </td>
+              <td>{{ release.releaseGroupType ?? '—' }}</td>
+              <td>
+                <span class="hx-pill" :data-tone="release.wantedStatus === 'missing' ? 'danger' : 'warning'">
+                  {{ release.wantedStatus }}
+                </span>
+              </td>
+              <td class="hx-table-num">{{ release.expectedTrackCount }}</td>
+              <td class="hx-table-num">{{ release.matchedTrackCount }}</td>
+              <td class="hx-table-num">{{ release.missingTrackCount }}</td>
+              <td>{{ release.releaseDate ?? '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="hx-card" v-if="!wanted.libraryWantedSummary.value && !wanted.isLoading.value && !releases.isLoading.value">
+      <div class="hx-card-body">
+        <div class="hx-empty">
+          <p class="hx-empty-title">No wanted data yet</p>
+          <p class="hx-empty-copy">Trigger a library scan and reconciliation from Settings → Library to populate this view.</p>
+        </div>
       </div>
     </article>
   </section>

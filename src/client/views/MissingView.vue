@@ -19,17 +19,20 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
+import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
 
 const wanted = useLibraryWantedSummary();
+const releases = useLibraryWantedReleases();
 const reconciliation = useLibraryReconciliationSummary();
 
 onMounted(() => {
   wanted.loadLibraryWantedSummary();
+  releases.loadWantedReleases();
   reconciliation.loadLibraryReconciliationSummary();
 });
 
-const isLoading = computed(() => wanted.isLoading.value || reconciliation.isLoading.value);
+const isLoading = computed(() => wanted.isLoading.value || releases.isLoading.value || reconciliation.isLoading.value);
 
 function summaryTone(status) {
   if (status === 'healthy' || status === 'complete') return 'success';
@@ -43,6 +46,7 @@ function shouldShowSummaryPill(status) {
 
 function refreshAll() {
   wanted.loadLibraryWantedSummary();
+  releases.loadWantedReleases();
   reconciliation.loadLibraryReconciliationSummary();
 }
 </script>
@@ -118,6 +122,52 @@ function refreshAll() {
       </header>
       <div class="hx-card-body">
         <p>{{ wanted.summary.value.message }}</p>
+      </div>
+    </article>
+
+    <article class="hx-card" v-if="releases.wantedReleases.value.length > 0">
+      <header class="hx-card-header">
+        <div>
+          <h2 class="hx-card-title">Wanted releases</h2>
+          <p class="hx-card-subtitle">{{ releases.totalCount.value }} release{{ releases.totalCount.value === 1 ? '' : 's' }} pending acquisition</p>
+        </div>
+      </header>
+      <div class="hx-card-body hx-card-body--flush">
+        <table class="hx-table">
+          <thead>
+            <tr>
+              <th>Artist</th>
+              <th>Release group</th>
+              <th>Release</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th class="hx-table-num">Expected</th>
+              <th class="hx-table-num">Matched</th>
+              <th class="hx-table-num">Missing</th>
+              <th>Release date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="release in releases.wantedReleases.value" :key="release.id">
+              <td>{{ release.artistName }}</td>
+              <td>{{ release.releaseGroupTitle }}</td>
+              <td>
+                {{ release.releaseTitle }}
+                <span v-if="release.releaseDisambiguation" class="hx-muted"> ({{ release.releaseDisambiguation }})</span>
+              </td>
+              <td>{{ release.releaseGroupType ?? '—' }}</td>
+              <td>
+                <span class="hx-pill" :data-tone="release.wantedStatus === 'missing' ? 'danger' : 'warning'">
+                  {{ release.wantedStatus }}
+                </span>
+              </td>
+              <td class="hx-table-num">{{ release.expectedTrackCount }}</td>
+              <td class="hx-table-num">{{ release.matchedTrackCount }}</td>
+              <td class="hx-table-num">{{ release.missingTrackCount }}</td>
+              <td>{{ release.releaseDate ?? '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </article>
 

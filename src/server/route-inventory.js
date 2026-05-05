@@ -110,6 +110,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/library/reconciliation-summary', access: 'authenticated', area: 'library', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/library/organize-preview', access: 'authenticated', area: 'library', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/library/wanted-summary', access: 'authenticated', area: 'library', kind: 'diagnostic' },
+  { method: 'GET', path: '/api/v1/library/wanted-releases', access: 'authenticated', area: 'library', kind: 'read' },
   { method: 'POST', path: '/api/v1/library/media-requests', access: 'authenticated', area: 'requests', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/library/discovery-runs', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/library/organize-runs', access: 'admin', area: 'library', kind: 'mutation' },

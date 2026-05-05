@@ -60,6 +60,18 @@ export function fetchLibraryWantedSummary() {
   return apiRequest('/api/v1/library/wanted-summary');
 }
 
+export function fetchLibraryWantedReleases({ wantedStatus = null, limit = 500 } = {}) {
+  const params = new URLSearchParams();
+  if (wantedStatus === 'missing' || wantedStatus === 'partial') {
+    params.set('status', wantedStatus);
+  }
+  if (limit && limit !== 500) {
+    params.set('limit', String(limit));
+  }
+  const query = params.toString();
+  return apiRequest(query ? `/api/v1/library/wanted-releases?${query}` : '/api/v1/library/wanted-releases');
+}
+
 export function fetchLibraryScanRunDetail(runId) {
   return apiRequest(`/api/v1/library/scan-runs/${encodeURIComponent(runId)}`);
 }

@@ -446,7 +446,9 @@ body,
   min-width: 0;
   min-height: calc(100vh - var(--hx-topbar-height));
   background: var(--hx-bg-canvas);
-  overflow-x: hidden;
+  /* Use clip instead of hidden: hidden coerces overflow-y to auto, which
+     creates a scroll container that breaks position:sticky for children. */
+  overflow-x: clip;
 }
 
 .hx-page {
@@ -1303,4 +1305,41 @@ body {
 @keyframes hx-skeleton-pulse {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ---------- Sticky settings save bar ---------- */
+/* The settings form is long (~7000px). Make the save bar sticky at the bottom
+   so users can commit changes without scrolling to the end of the page. */
+.settings-save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--hx-bg-surface);
+  border-top: 1px solid var(--hx-border-subtle);
+  box-shadow: 0 -2px 8px rgba(15, 28, 36, 0.06);
+  /* Extend to the edges of the parent panel (panel has var(--hx-space-5) padding) */
+  margin-left: calc(-1 * var(--hx-space-5));
+  margin-right: calc(-1 * var(--hx-space-5));
+  margin-bottom: calc(-1 * var(--hx-space-5));
+  padding: var(--hx-space-3) var(--hx-space-5);
+  border-radius: 0 0 var(--hx-radius-lg) var(--hx-radius-lg);
+}
+
+/* Subtle shadow on the nav panel to give it visual lift over content
+   that scrolls beneath it. */
+.settings-nav-panel,
+.workspace-nav-panel {
+  box-shadow: var(--hx-shadow-md);
+}
+
+/* Prevent orphaned last card in auto-fit 2-column grids.
+   When 5 (or any odd-count) items fill a 2-col grid, the last item
+   sits alone in its row. Span it full-width so the row looks intentional. */
+.settings-nav-list > :last-child:nth-child(odd):not(:nth-child(1)),
+.workspace-nav-list > :last-child:nth-child(odd):not(:nth-child(1)),
+.path-grid > :last-child:nth-child(odd):not(:nth-child(1)),
+.stats-grid > :last-child:nth-child(odd):not(:nth-child(1)),
+.metadata-card-grid > :last-child:nth-child(odd):not(:nth-child(1)),
+.operations-insight-grid > :last-child:nth-child(odd):not(:nth-child(1)) {
+  grid-column: 1 / -1;
 }

@@ -28,6 +28,7 @@ export function registerLibraryRoutes(app, {
   buildLibraryDiscoveryRunDetail,
   buildLibraryDiscoverySummary,
   buildLibraryOrganizePreview,
+  buildLibraryWantedReleases,
   buildMediaRequestSummary,
   buildLibraryReconciliationSummary,
   buildLibraryScanRunDetail,
@@ -111,6 +112,15 @@ export function registerLibraryRoutes(app, {
   app.get('/api/v1/library/wanted-summary', asyncRoute(async (request, response) => {
     await requireSession(request);
     response.json(await buildLibraryWantedSummary());
+  }));
+
+  app.get('/api/v1/library/wanted-releases', asyncRoute(async (request, response) => {
+    await requireSession(request);
+    const { status: wantedStatus = null, limit = '500' } = request.query;
+    response.json(await buildLibraryWantedReleases({
+      limit: Number.parseInt(String(limit), 10) || 500,
+      wantedStatus: wantedStatus === 'missing' || wantedStatus === 'partial' ? wantedStatus : null,
+    }));
   }));
 
   app.post('/api/v1/library/media-requests', asyncRoute(async (request, response) => {

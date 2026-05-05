@@ -145,8 +145,77 @@ export function createLibraryWantedReleaseStore({
     }
   }
 
+  async function listWantedReleasesWithMetadata({ wantedStatus = null, limit = 500 } = {}) {
+    const params = [];
+    const conditions = [];
+
+    if (wantedStatus === 'missing' || wantedStatus === 'partial') {
+      params.push(wantedStatus);
+      conditions.push(`lwr.wanted_status = $${params.length}`);
+    }
+
+    params.push(Math.min(Math.max(1, Number.parseInt(String(limit ?? 500), 10) || 500), 2000));
+    const limitClause = `LIMIT $${params.length}`;
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const result = await getPoolFn().query(
+      `
+        SELECT
+          lwr.id,
+          lwr.wanted_status,
+          lwr.expected_track_count,
+          lwr.matched_track_count,
+          lwr.missing_track_count,
+          lwr.release_date,
+          lwr.release_status,
+          lwr.last_reconciled_at,
+          lwr.metadata_artist_id,
+          lwr.metadata_release_group_id,
+          lwr.metadata_release_id,
+          ma.name AS artist_name,
+          ma.sort_name AS artist_sort_name,
+          mrg.title AS release_group_title,
+          mrg.primary_type AS release_group_type,
+          mr.title AS release_title,
+          mr.disambiguation AS release_disambiguation,
+          mr.country AS release_country
+        FROM library_wanted_releases lwr
+        JOIN metadata_artists ma ON ma.id = lwr.metadata_artist_id
+        JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
+        JOIN metadata_releases mr ON mr.id = lwr.metadata_release_id
+        ${whereClause}
+        ORDER BY ma.sort_name ASC NULLS LAST, ma.name ASC, mrg.first_release_date ASC NULLS LAST, mr.release_date ASC NULLS LAST
+        ${limitClause}
+      `,
+      params,
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      artistName: row.artist_name,
+      artistSortName: row.artist_sort_name ?? row.artist_name,
+      expectedTrackCount: Number.parseInt(String(row.expected_track_count ?? 0), 10) || 0,
+      lastReconciledAt: row.last_reconciled_at ?? null,
+      matchedTrackCount: Number.parseInt(String(row.matched_track_count ?? 0), 10) || 0,
+      metadataArtistId: row.metadata_artist_id,
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id,
+      missingTrackCount: Number.parseInt(String(row.missing_track_count ?? 0), 10) || 0,
+      releaseCountry: row.release_country ?? null,
+      releaseDate: row.release_date ?? null,
+      releaseDisambiguation: row.release_disambiguation ?? null,
+      releaseGroupTitle: row.release_group_title,
+      releaseGroupType: row.release_group_type ?? null,
+      releaseStatus: row.release_status ?? null,
+      releaseTitle: row.release_title,
+      wantedStatus: row.wanted_status,
+    }));
+  }
+
   return {
     listLibraryWantedReleases,
+    listWantedReleasesWithMetadata,
     listWantedStatusesForReleaseGroups,
     replaceLibraryWantedReleases,
   };

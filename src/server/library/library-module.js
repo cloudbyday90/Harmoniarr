@@ -253,6 +253,7 @@ export function createLibraryModule({
   }),
   libraryWantedSummaryStore = createLibraryWantedSummaryStore(),
   libraryWantedSummaryService = createLibraryWantedSummaryService({
+    libraryWantedReleaseStore,
     libraryWantedSummaryStore,
   }),
   libraryScanRunStore = createLibraryScanRunStore(),
@@ -356,6 +357,7 @@ export function createLibraryModule({
       buildLibraryDiscoveryRunDetail: libraryDiscoverySummaryService.buildLibraryDiscoveryRunDetail,
       buildLibraryDiscoverySummary: libraryDiscoverySummaryService.buildLibraryDiscoverySummary,
       buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
+      buildLibraryWantedReleases: libraryWantedSummaryService.buildLibraryWantedReleases,
       buildMediaRequestSummary: libraryMediaRequestService.buildMediaRequestSummary,
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,
       buildLibraryScanRunDetail: libraryScanSummaryService.buildLibraryScanRunDetail,

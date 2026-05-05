@@ -356,7 +356,7 @@ label {
 .settings-nav-panel,
 .workspace-nav-panel {
   position: sticky;
-  top: 24px;
+  top: calc(var(--hx-topbar-height) + var(--hx-space-4));
   z-index: 4;
 }
 

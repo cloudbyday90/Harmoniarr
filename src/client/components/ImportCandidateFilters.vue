@@ -65,7 +65,7 @@ function updateField(event, eventName) {
         <p class="eyebrow">Import review</p>
         <h3>Review queue filters</h3>
       </div>
-      <p class="review-filter-summary">{{ activeFilterCount }} active filters</p>
+      <p class="review-filter-summary">{{ activeFilterCount }} active {{ activeFilterCount === 1 ? 'filter' : 'filters' }}</p>
     </div>
 
     <form class="review-filter-grid" @submit.prevent="$emit('apply-filters')">

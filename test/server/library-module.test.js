@@ -15,6 +15,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const buildMediaRequestSummary = () => {};
   const buildLibraryReconciliationSummary = () => {};
   const buildLibraryWantedSummary = () => {};
+  const buildLibraryWantedReleases = () => {};
   const buildLibraryScanRunDetail = () => {};
   const buildLibraryScanSummary = () => {};
   const captureEmbeddedArtwork = () => {};
@@ -65,7 +66,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryTagSnapshotStore = {};
   const libraryWantedReleaseService = { reconcileWantedReleases };
   const libraryWantedReleaseStore = {};
-  const libraryWantedSummaryService = { buildLibraryWantedSummary };
+  const libraryWantedSummaryService = { buildLibraryWantedReleases, buildLibraryWantedSummary };
   const libraryWantedSummaryStore = {};
   const libraryScanWorker = {};
 
@@ -161,6 +162,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     buildLibraryDiscoveryRunDetail,
     buildLibraryDiscoverySummary,
     buildLibraryOrganizePreview,
+    buildLibraryWantedReleases,
     buildMediaRequestSummary,
     buildLibraryReconciliationSummary,
     buildLibraryScanRunDetail,

@@ -78,6 +78,34 @@ onMounted(() => {
   void loadSessions();
   void loadRecentActivity();
 });
+
+function formatUserAgent(ua) {
+  if (!ua) return 'Unknown client';
+  // Non-browser identifiers (short service names like "node" or custom agents) — show as-is
+  if (!ua.startsWith('Mozilla/')) return ua;
+  // VS Code / Electron shell
+  if (/Electron\//.test(ua)) {
+    const appLabel = /Code\//.test(ua) ? 'VS Code' : 'Electron app';
+    const ver = ua.match(/Electron\/([\d.]+)/);
+    return ver ? `${appLabel} \u00b7 Electron ${ver[1]}` : appLabel;
+  }
+  // Edge (check before Chrome since Edge also includes Chrome token)
+  if (/Edg\//.test(ua)) {
+    const ver = ua.match(/Edg\/([\d.]+)/);
+    return ver ? `Microsoft Edge ${ver[1]}` : 'Microsoft Edge';
+  }
+  // Chrome / Chromium
+  const chromeVer = ua.match(/Chrome\/([\d.]+)/);
+  if (chromeVer) return `Chrome ${chromeVer[1]}`;
+  // Firefox
+  const ffVer = ua.match(/Firefox\/([\d.]+)/);
+  if (ffVer) return `Firefox ${ffVer[1]}`;
+  // Safari
+  const safariVer = ua.match(/Version\/([\d.]+).*Safari\//);
+  if (safariVer) return `Safari ${safariVer[1]}`;
+  // Unknown browser UA — truncate to avoid wall of text
+  return ua.length > 60 ? `${ua.slice(0, 57)}\u2026` : ua;
+}
 </script>
 
 <template>
@@ -142,7 +170,7 @@ onMounted(() => {
         <article class="session-row" v-for="session in sessions" :key="session.id">
           <div>
             <p class="eyebrow">{{ session.isCurrent ? 'Current session' : 'Active session' }}</p>
-            <strong>{{ session.issuedUserAgent || 'Unknown user agent' }}</strong>
+            <strong :title="session.issuedUserAgent || undefined">{{ formatUserAgent(session.issuedUserAgent) }}</strong>
             <p class="metadata-card-copy">Issued from {{ session.issuedIp || 'unknown address' }}</p>
             <p class="muted-copy">Issued {{ session.issuedAt }} | Last used {{ session.lastUsedAt || 'never' }}</p>
             <p class="muted-copy">Expires {{ session.expiresAt }}</p>

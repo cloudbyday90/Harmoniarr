@@ -17,6 +17,7 @@
  */
 
 import { createLibraryWantedSummaryStore } from './library-wanted-summary-store.js';
+import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
 
 function buildSummary({ monitoredArtistCount, releaseCounts }) {
   if (monitoredArtistCount === 0) {
@@ -54,8 +55,20 @@ function buildSummary({ monitoredArtistCount, releaseCounts }) {
 }
 
 export function createLibraryWantedSummaryService({
+  libraryWantedReleaseStore = createLibraryWantedReleaseStore(),
   libraryWantedSummaryStore = createLibraryWantedSummaryStore(),
 } = {}) {
+  async function buildLibraryWantedReleases({ limit = 500, wantedStatus = null } = {}) {
+    const checkedAt = new Date().toISOString();
+    const releases = await libraryWantedReleaseStore.listWantedReleasesWithMetadata({ limit, wantedStatus });
+
+    return {
+      checkedAt,
+      total: releases.length,
+      wantedReleases: releases,
+    };
+  }
+
   async function buildLibraryWantedSummary() {
     const checkedAt = new Date().toISOString();
     const snapshot = await libraryWantedSummaryStore.getLibraryWantedSnapshot();
@@ -70,6 +83,7 @@ export function createLibraryWantedSummaryService({
   }
 
   return {
+    buildLibraryWantedReleases,
     buildLibraryWantedSummary,
   };
 }
