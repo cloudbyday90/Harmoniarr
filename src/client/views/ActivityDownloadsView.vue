@@ -17,21 +17,30 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { fetchSlskdDownloads } from '../lib/slskd-search-api.js';
+import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const POLL_INTERVAL_MS = 5000;
 
-const isLoading = ref(true);
-const errorMessage = ref('');
-const groups = ref([]);
-const lastRefreshedAt = ref(null);
-let pollTimer = null;
+const {
+  data: groups,
+  errorMessage,
+  isLoading,
+  lastRefreshedAt,
+  load,
+} = useAsyncResource({
+  fetcher: () => fetchSlskdDownloads({ includeRemoved: false }),
+  project: (payload) => (Array.isArray(payload) ? payload : []),
+  initialData: [],
+  pollIntervalMs: POLL_INTERVAL_MS,
+  fallbackErrorMessage: 'Failed to load downloads',
+});
 
 const allFiles = computed(() => {
   const out = [];
-  for (const group of groups.value) {
-    const username = group.username ?? '—';
+  for (const group of groups.value ?? []) {
+    const username = group.username ?? '\u2014';
     for (const directory of group.directories ?? []) {
       for (const file of directory.files ?? []) {
         out.push({ ...file, username, directory: directory.directory ?? file.directory ?? null });
@@ -66,8 +75,7 @@ function stateTone(state) {
 }
 
 function shortState(state) {
-  if (typeof state !== 'string') return '—';
-  // slskd returns e.g. "InProgress, Connecting" - keep just the leading token.
+  if (typeof state !== 'string') return '\u2014';
   return state.split(',')[0]?.trim() || state;
 }
 
@@ -81,7 +89,7 @@ function progress(file) {
 
 function formatBytes(bytes) {
   const value = Number(bytes);
-  if (!Number.isFinite(value) || value <= 0) return '—';
+  if (!Number.isFinite(value) || value <= 0) return '\u2014';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let v = value;
   let i = 0;
@@ -94,50 +102,15 @@ function formatBytes(bytes) {
 
 function formatSpeed(bytesPerSecond) {
   const value = Number(bytesPerSecond);
-  if (!Number.isFinite(value) || value <= 0) return '—';
+  if (!Number.isFinite(value) || value <= 0) return '\u2014';
   return `${formatBytes(value)}/s`;
 }
 
 function basename(filename) {
-  if (typeof filename !== 'string') return '—';
+  if (typeof filename !== 'string') return '\u2014';
   const i = Math.max(filename.lastIndexOf('/'), filename.lastIndexOf('\\'));
   return i >= 0 ? filename.slice(i + 1) : filename;
 }
-
-async function load() {
-  errorMessage.value = '';
-  try {
-    groups.value = await fetchSlskdDownloads({ includeRemoved: false });
-    lastRefreshedAt.value = new Date().toISOString();
-  } catch (error) {
-    errorMessage.value = error?.message ?? 'Failed to load downloads';
-    groups.value = [];
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-function schedulePoll() {
-  clearPollTimer();
-  pollTimer = setTimeout(async () => {
-    await load();
-    schedulePoll();
-  }, POLL_INTERVAL_MS);
-}
-
-function clearPollTimer() {
-  if (pollTimer !== null) {
-    clearTimeout(pollTimer);
-    pollTimer = null;
-  }
-}
-
-onMounted(async () => {
-  await load();
-  schedulePoll();
-});
-
-onBeforeUnmount(clearPollTimer);
 </script>
 
 <template>

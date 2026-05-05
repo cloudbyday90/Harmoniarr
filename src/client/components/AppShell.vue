@@ -22,6 +22,8 @@ import { useRouter } from 'vue-router';
 import harmoniarrIcon from '../assets/harmoniarr-icon.svg';
 import { sessionStore } from '../state/session.js';
 import { useShellHeartbeat } from '../composables/useShellHeartbeat.js';
+import { useAsyncResource } from '../composables/useAsyncResource.js';
+import { fetchSystemOperatorNotifications } from '../lib/system-api.js';
 
 const router = useRouter();
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
@@ -31,6 +33,56 @@ const userInitial = computed(() => {
 });
 
 const { status: healthStatus, label: healthLabel, detail: healthDetail, activeJobs } = useShellHeartbeat();
+
+const {
+  data: notificationsPayload,
+  isLoading: notificationsLoading,
+  load: refreshNotifications,
+} = useAsyncResource({
+  fetcher: () => fetchSystemOperatorNotifications({ limit: 25 }),
+  project: (payload) => ({
+    notifications: Array.isArray(payload?.notifications) ? payload.notifications : [],
+    counts: payload?.counts ?? { actionable: 0, total: 0 },
+  }),
+  initialData: { notifications: [], counts: { actionable: 0, total: 0 } },
+  immediate: !isRequester.value,
+  pollIntervalMs: isRequester.value ? null : 60000,
+  fallbackErrorMessage: 'Failed to load notifications',
+});
+
+const actionableCount = computed(() => notificationsPayload.value?.counts?.actionable ?? 0);
+const totalNotificationCount = computed(() => notificationsPayload.value?.counts?.total ?? 0);
+const notifications = computed(() => notificationsPayload.value?.notifications ?? []);
+
+const notificationsOpen = ref(false);
+const notificationsAnchor = ref(null);
+function toggleNotifications() {
+  notificationsOpen.value = !notificationsOpen.value;
+  if (notificationsOpen.value) refreshNotifications();
+}
+function closeNotificationsOnDocument(event) {
+  if (!notificationsOpen.value) return;
+  const anchor = notificationsAnchor.value;
+  if (anchor && event.target instanceof Node && anchor.contains(event.target)) return;
+  notificationsOpen.value = false;
+}
+
+function notificationTone(category) {
+  if (category === 'failure') return 'danger';
+  if (category === 'manual_intervention') return 'warning';
+  if (category === 'recovery') return 'info';
+  return 'info';
+}
+
+async function openNotificationTarget(notification) {
+  notificationsOpen.value = false;
+  const runId = notification?.run?.id ?? notification?.runId ?? null;
+  if (runId) {
+    await router.push({ name: 'activity-queue', query: { run: runId } });
+    return;
+  }
+  await router.push({ name: 'activity-history' });
+}
 
 const userMenuOpen = ref(false);
 const userMenuAnchor = ref(null);
@@ -50,10 +102,12 @@ function closeUserMenuOnDocument(event) {
 
 onMounted(() => {
   document.addEventListener('click', closeUserMenuOnDocument);
+  document.addEventListener('click', closeNotificationsOnDocument);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeUserMenuOnDocument);
+  document.removeEventListener('click', closeNotificationsOnDocument);
 });
 
 async function logout() {
@@ -122,7 +176,55 @@ const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNa
           <span class="hx-topbar-pill-dot" aria-hidden="true"></span>
           {{ activeJobs }} {{ activeJobs === 1 ? 'job' : 'jobs' }}
         </RouterLink>
+        <div v-if="!isRequester" class="hx-topbar-notifications-wrap" ref="notificationsAnchor">
+          <button
+            type="button"
+            class="hx-topbar-iconbtn"
+            :aria-expanded="notificationsOpen"
+            aria-haspopup="menu"
+            :aria-label="`Notifications (${actionableCount} actionable)`"
+            @click.stop="toggleNotifications"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9z"/>
+              <path d="M10 21a2 2 0 0 0 4 0"/>
+            </svg>
+            <span
+              v-if="actionableCount > 0"
+              class="hx-topbar-iconbtn-badge"
+              :data-tone="actionableCount > 0 ? 'danger' : 'info'"
+            >{{ actionableCount }}</span>
+          </button>
 
+          <div v-if="notificationsOpen" class="hx-topbar-notifications-panel" role="menu">
+            <div class="hx-topbar-notifications-header">
+              <strong>Notifications</strong>
+              <span class="hx-pill" :data-tone="actionableCount > 0 ? 'warning' : undefined">
+                {{ actionableCount }} actionable / {{ totalNotificationCount }} total
+              </span>
+            </div>
+            <div v-if="notificationsLoading && !notifications.length" class="hx-topbar-notifications-empty">
+              Loading\u2026
+            </div>
+            <div v-else-if="!notifications.length" class="hx-topbar-notifications-empty">
+              No active notifications.
+            </div>
+            <ul v-else class="hx-topbar-notifications-list" role="none">
+              <li v-for="notification in notifications" :key="notification.id ?? notification.eventId ?? notification.title">
+                <button
+                  type="button"
+                  class="hx-topbar-notifications-item"
+                  role="menuitem"
+                  @click="openNotificationTarget(notification)"
+                >
+                  <span class="hx-pill" :data-tone="notificationTone(notification.category)">{{ notification.category }}</span>
+                  <span class="hx-topbar-notifications-item-title">{{ notification.title ?? notification.message ?? '\u2014' }}</span>
+                  <span v-if="notification.occurredAt" class="hx-topbar-notifications-item-time">{{ notification.occurredAt }}</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
         <div class="hx-topbar-user-wrap" ref="userMenuAnchor">
           <button
             type="button"
@@ -197,5 +299,110 @@ const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNa
 <style scoped>
 .hx-topbar-user-wrap {
   position: relative;
+}
+.hx-topbar-notifications-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.hx-topbar-iconbtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.hx-topbar-iconbtn:hover,
+.hx-topbar-iconbtn:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.hx-topbar-iconbtn svg {
+  width: 18px;
+  height: 18px;
+}
+.hx-topbar-iconbtn-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--hx-color-danger, #c2410c);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.hx-topbar-notifications-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 360px;
+  max-height: 480px;
+  overflow: auto;
+  background: var(--hx-color-surface, #161821);
+  border: 1px solid var(--hx-color-border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+}
+.hx-topbar-notifications-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hx-color-border, rgba(255, 255, 255, 0.08));
+}
+.hx-topbar-notifications-empty {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--hx-color-muted, rgba(255, 255, 255, 0.55));
+  font-size: 13px;
+}
+.hx-topbar-notifications-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hx-topbar-notifications-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--hx-color-border, rgba(255, 255, 255, 0.04));
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+.hx-topbar-notifications-item:hover,
+.hx-topbar-notifications-item:focus-visible {
+  background: rgba(255, 255, 255, 0.04);
+}
+.hx-topbar-notifications-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-topbar-notifications-item-time {
+  font-size: 11px;
+  color: var(--hx-color-muted, rgba(255, 255, 255, 0.45));
+  white-space: nowrap;
 }
 </style>
