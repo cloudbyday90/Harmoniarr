@@ -20,6 +20,11 @@ import { createRouter, createWebHistory } from 'vue-router';
 import AppShell from './components/AppShell.vue';
 import AccountSecurityView from './views/AccountSecurityView.vue';
 import ActivityComingSoonView from './views/ActivityComingSoonView.vue';
+import ActivityHistoryView from './views/ActivityHistoryView.vue';
+import ActivityImportsView from './views/ActivityImportsView.vue';
+import ActivityQueueView from './views/ActivityQueueView.vue';
+import ActivityUsersView from './views/ActivityUsersView.vue';
+import ActivityWantedView from './views/ActivityWantedView.vue';
 import ActivityWorkspaceView from './views/ActivityWorkspaceView.vue';
 import BootstrapSetupView from './views/BootstrapSetupView.vue';
 import ClaimAccountView from './views/ClaimAccountView.vue';
@@ -90,15 +95,15 @@ const router = createRouter({
             { path: 'operations', name: 'activity-operations', component: OperationsView },
             { path: 'candidates', name: 'activity-candidates', component: ImportReviewView },
             { path: 'requests', name: 'activity-requests', component: RequestMusicView },
-            { path: 'queue', name: 'activity-queue', component: ActivityComingSoonView, props: { section: 'queue' } },
-            { path: 'wanted', name: 'activity-wanted', component: ActivityComingSoonView, props: { section: 'wanted' } },
+            { path: 'queue', name: 'activity-queue', component: ActivityQueueView },
+            { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
             { path: 'downloads', name: 'activity-downloads', component: ActivityComingSoonView, props: { section: 'downloads' } },
-            { path: 'imports', name: 'activity-imports', component: ActivityComingSoonView, props: { section: 'imports' } },
+            { path: 'imports', name: 'activity-imports', component: ActivityImportsView },
             { path: 'releases', name: 'activity-releases', component: ActivityComingSoonView, props: { section: 'releases' } },
-            { path: 'users', name: 'activity-users', component: ActivityComingSoonView, props: { section: 'users' } },
-            { path: 'history', name: 'activity-history', component: ActivityComingSoonView, props: { section: 'history' } },
+            { path: 'users', name: 'activity-users', component: ActivityUsersView },
+            { path: 'history', name: 'activity-history', component: ActivityHistoryView },
             { path: 'blocklist', name: 'activity-blocklist', component: ActivityComingSoonView, props: { section: 'blocklist' } },
-            { path: 'failed', name: 'activity-failed', component: ActivityComingSoonView, props: { section: 'failed' } },
+            { path: 'failed', name: 'activity-failed', component: ActivityImportsView, props: { status: 'failed', title: 'Failed', subtitle: 'Failed import candidates.', emptyTitle: 'No failed import candidates', emptyCopy: 'Imports that fail will surface here once the apply worker reports them.' } },
           ],
         },
 
