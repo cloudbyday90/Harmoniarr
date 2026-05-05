@@ -57,23 +57,24 @@ suite('browser operator workflow smoke coverage', () => {
       await page.getByRole('button', { name: 'Create bootstrap admin' }).click();
 
       await page.waitForURL(/\/app(?:\?.*)?$/);
-      await page.getByText('Signed in as').waitFor();
       await page.locator('.session-username').filter({ hasText: 'admin' }).waitFor();
 
-      await page.getByRole('link', { name: 'Configuration' }).click();
+      await page.getByRole('link', { name: 'Settings' }).click();
       await page.waitForURL(/\/app\/settings(?:\?.*)?(?:#.*)?$/);
       await waitForHeading(page, 'Configuration workspace');
 
-      await page.getByRole('link', { name: 'Candidates' }).click();
-      await page.waitForURL(/\/app\/review-queue(?:\?.*)?(?:#.*)?$/);
-      await waitForHeading(page, 'Persisted slskd candidates');
-
-      await page.getByRole('link', { name: 'Operations' }).click();
-      await page.waitForURL(/\/app\/jobs(?:\?.*)?(?:#.*)?$/);
+      await page.getByRole('link', { name: 'Activity' }).click();
+      await page.waitForURL(/\/app\/activity(?:\/operations)?(?:\?.*)?(?:#.*)?$/);
       await waitForHeading(page, 'Queued, active, and completed automation');
 
+      await page.getByRole('link', { name: 'Candidates' }).click();
+      await page.waitForURL(/\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/);
+      await waitForHeading(page, 'Persisted slskd candidates');
+
+      await page.getByRole('link', { name: 'Settings' }).click();
+      await page.waitForURL(/\/app\/settings(?:\?.*)?(?:#.*)?$/);
       await page.getByRole('link', { name: 'Backup & Restore' }).click();
-      await page.waitForURL(/\/app\/recovery(?:\?.*)?(?:#.*)?$/);
+      await page.waitForURL(/\/app\/settings\/recovery(?:\?.*)?(?:#.*)?$/);
       await waitForHeading(page, 'Backups, restore checks, and safe maintenance');
 
       await page.getByRole('button', { name: 'Create backup' }).click();
@@ -86,7 +87,8 @@ suite('browser operator workflow smoke coverage', () => {
       await page.getByLabel('I have reviewed this backup and understand that restore apply changes current state immediately.').check();
       assert.equal(await applyRestoreButton.isDisabled(), false);
 
-      await page.getByRole('button', { name: 'Log out' }).click();
+      await page.locator('.hx-topbar-user').click();
+      await page.getByRole('menuitem', { name: 'Log out' }).click();
       await page.waitForURL(/\/login(?:\?.*)?$/);
       await waitForHeading(page, 'Log in to Harmoniarr');
 
@@ -95,7 +97,6 @@ suite('browser operator workflow smoke coverage', () => {
       await page.getByRole('button', { name: 'Log in' }).click();
 
       await page.waitForURL(/\/app(?:\?.*)?$/);
-      await page.getByText('Signed in as').waitFor();
       await page.locator('.session-username').filter({ hasText: 'admin' }).waitFor();
     }, {
       scenarioName: 'operator_ui_smoke',

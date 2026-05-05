@@ -353,19 +353,19 @@ label {
   gap: 14px;
 }
 
-.settings-nav-panel {
+.settings-nav-panel,
 .workspace-nav-panel {
   position: sticky;
   top: 24px;
   z-index: 4;
 }
 
-.settings-nav-list {
+.settings-nav-list,
 .workspace-nav-list {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-.settings-nav-link {
+.settings-nav-link,
 .workspace-nav-link {
   display: grid;
   gap: 6px;
@@ -384,20 +384,20 @@ label {
   background: rgba(236, 242, 235, 0.92);
 }
 
-.settings-nav-link-label {
+.settings-nav-link-label,
 .workspace-nav-link-label {
   font-weight: 600;
   color: #183936;
 }
 
-.settings-nav-link-copy {
+.settings-nav-link-copy,
 .workspace-nav-link-copy {
   color: #435753;
   font-size: 0.92rem;
   line-height: 1.45;
 }
 
-.settings-anchor-section {
+.settings-anchor-section,
 .workspace-anchor-section {
   scroll-margin-top: 120px;
 }
@@ -565,6 +565,7 @@ label {
 }
 
 .nav-link {
+  display: block;
   padding: 12px 14px;
   border-radius: 16px;
   background: rgba(247, 241, 223, 0.08);
@@ -613,6 +614,7 @@ label {
 }
 
 .session-role {
+  display: block;
   color: rgba(247, 241, 223, 0.6);
   font-size: 0.85rem;
   text-transform: capitalize;
@@ -1119,6 +1121,56 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .shell-layout {
+    gap: 16px;
+    padding: 16px 0 28px;
+  }
+
+  .sidebar {
+    position: static;
+    top: auto;
+    max-height: none;
+    gap: 18px;
+  }
+
+  .sidebar-brand {
+    padding-bottom: 16px;
+  }
+
+  .nav-list {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .nav-group {
+    gap: 10px;
+    padding: 12px;
+    border-radius: 18px;
+    background: rgba(247, 241, 223, 0.06);
+    border: 1px solid rgba(247, 241, 223, 0.1);
+  }
+
+  .nav-group-label {
+    padding: 0;
+  }
+
+  .nav-sub-link {
+    padding-left: 14px;
+  }
+
+  .session-card {
+    margin-top: 0;
+    padding: 16px;
+    border-top: 0;
+    border-radius: 18px;
+    background: rgba(247, 241, 223, 0.06);
+    border: 1px solid rgba(247, 241, 223, 0.1);
+  }
+
+  .page-stack {
+    gap: 16px;
+  }
+
   .review-layout {
     grid-template-columns: 1fr;
   }
@@ -1145,6 +1197,18 @@ dd {
 
   .metadata-search-form {
     grid-template-columns: 1fr;
+  }
+
+  .nav-list {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-group {
+    padding: 10px;
+  }
+
+  .nav-sub-link {
+    padding-left: 12px;
   }
 
   .settings-subsection-grid,

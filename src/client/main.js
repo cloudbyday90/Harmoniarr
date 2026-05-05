@@ -23,6 +23,7 @@ import { setAuthFailureHandler } from './lib/api.js';
 import router from './router.js';
 import { sessionStore } from './state/session.js';
 import './styles.css';
+import './design-system.css';
 
 setAuthFailureHandler(createAuthFailureHandler({ router, sessionStore }));
 

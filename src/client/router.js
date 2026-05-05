@@ -19,21 +19,45 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import AppShell from './components/AppShell.vue';
 import AccountSecurityView from './views/AccountSecurityView.vue';
+import ActivityComingSoonView from './views/ActivityComingSoonView.vue';
+import ActivityWorkspaceView from './views/ActivityWorkspaceView.vue';
 import BootstrapSetupView from './views/BootstrapSetupView.vue';
 import ClaimAccountView from './views/ClaimAccountView.vue';
 import DashboardView from './views/DashboardView.vue';
 import ImportReviewView from './views/ImportReviewView.vue';
 import LoginView from './views/LoginView.vue';
 import MetadataView from './views/MetadataView.vue';
+import MissingView from './views/MissingView.vue';
+import OperationsView from './views/OperationsView.vue';
 import RecoveryView from './views/RecoveryView.vue';
 import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
-import OperationsView from './views/OperationsView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
-import { resolveRouterScroll } from './lib/router-scroll.js';
+import SearchView from './views/SearchView.vue';
 import SettingsView from './views/SettingsView.vue';
+import SettingsWorkspaceView from './views/SettingsWorkspaceView.vue';
+import { resolveRouterScroll } from './lib/router-scroll.js';
 import { sessionStore } from './state/session.js';
 
-const requesterRestrictedRouteNames = new Set(['dashboard', 'jobs', 'metadata', 'recovery-workspace', 'review-queue', 'settings']);
+const requesterRestrictedRouteNames = new Set([
+  'dashboard',
+  'missing',
+  'search',
+  'activity',
+  'activity-operations',
+  'activity-candidates',
+  'activity-queue',
+  'activity-wanted',
+  'activity-downloads',
+  'activity-imports',
+  'activity-releases',
+  'activity-users',
+  'activity-history',
+  'activity-blocklist',
+  'activity-failed',
+  'settings',
+  'settings-recovery',
+  'settings-library-browser',
+]);
 
 function defaultAuthenticatedRouteName() {
   return sessionStore.state.user?.role === 'requester' ? 'request-music' : 'dashboard';
@@ -53,14 +77,51 @@ const router = createRouter({
       component: AppShell,
       meta: { requiresAuth: true },
       children: [
-        { path: 'account-security', name: 'account-security', component: AccountSecurityView },
         { path: '', name: 'dashboard', component: DashboardView },
-        { path: 'jobs', name: 'jobs', component: OperationsView },
-        { path: 'metadata', name: 'metadata', component: MetadataView },
-        { path: 'recovery', name: 'recovery-workspace', component: RecoveryWorkspaceView },
+        { path: 'missing', name: 'missing', component: MissingView },
+        { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
-        { path: 'review-queue', name: 'review-queue', component: ImportReviewView },
-        { path: 'settings', name: 'settings', component: SettingsView },
+
+        {
+          path: 'activity',
+          component: ActivityWorkspaceView,
+          children: [
+            { path: '', name: 'activity', redirect: { name: 'activity-operations' } },
+            { path: 'operations', name: 'activity-operations', component: OperationsView },
+            { path: 'candidates', name: 'activity-candidates', component: ImportReviewView },
+            { path: 'requests', name: 'activity-requests', component: RequestMusicView },
+            { path: 'queue', name: 'activity-queue', component: ActivityComingSoonView, props: { section: 'queue' } },
+            { path: 'wanted', name: 'activity-wanted', component: ActivityComingSoonView, props: { section: 'wanted' } },
+            { path: 'downloads', name: 'activity-downloads', component: ActivityComingSoonView, props: { section: 'downloads' } },
+            { path: 'imports', name: 'activity-imports', component: ActivityComingSoonView, props: { section: 'imports' } },
+            { path: 'releases', name: 'activity-releases', component: ActivityComingSoonView, props: { section: 'releases' } },
+            { path: 'users', name: 'activity-users', component: ActivityComingSoonView, props: { section: 'users' } },
+            { path: 'history', name: 'activity-history', component: ActivityComingSoonView, props: { section: 'history' } },
+            { path: 'blocklist', name: 'activity-blocklist', component: ActivityComingSoonView, props: { section: 'blocklist' } },
+            { path: 'failed', name: 'activity-failed', component: ActivityComingSoonView, props: { section: 'failed' } },
+          ],
+        },
+
+        {
+          path: 'settings',
+          component: SettingsWorkspaceView,
+          children: [
+            { path: '', name: 'settings', component: SettingsView },
+            { path: 'account', name: 'settings-account', component: AccountSecurityView },
+            { path: 'recovery', name: 'settings-recovery', component: RecoveryWorkspaceView },
+            { path: 'library-browser', name: 'settings-library-browser', component: MetadataView },
+          ],
+        },
+
+        // Backwards-compatible aliases for old deep links and existing route-name lookups.
+        // Function form preserves query/hash so existing scroll anchors keep working.
+        { path: 'jobs', name: 'jobs', redirect: (to) => ({ name: 'activity-operations', query: to.query, hash: to.hash }) },
+        { path: 'review-queue', name: 'review-queue', redirect: (to) => ({ name: 'activity-candidates', query: to.query, hash: to.hash }) },
+        { path: 'metadata', name: 'metadata', redirect: (to) => ({ name: 'settings-library-browser', query: to.query, hash: to.hash }) },
+        { path: 'recovery', name: 'recovery-workspace', redirect: (to) => ({ name: 'settings-recovery', query: to.query, hash: to.hash }) },
+        // Keep account-security as a top-level alias because the must-change-password guard
+        // and existing recovery/claim flows route to it by name.
+        { path: 'account-security', name: 'account-security', component: AccountSecurityView },
       ],
     },
   ],
@@ -79,7 +140,12 @@ router.beforeEach(async (to) => {
     return sessionStore.state.authenticated ? { name: defaultAuthenticatedRouteName() } : { name: 'login' };
   }
 
-  if (sessionStore.state.authenticated && sessionStore.state.user?.mustChangePassword && to.name !== 'account-security') {
+  if (
+    sessionStore.state.authenticated
+    && sessionStore.state.user?.mustChangePassword
+    && to.name !== 'account-security'
+    && to.name !== 'settings-account'
+  ) {
     return {
       name: 'account-security',
       query: to.fullPath === '/app/account-security' ? {} : { redirect: to.fullPath },

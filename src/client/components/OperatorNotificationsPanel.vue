@@ -77,7 +77,7 @@ function notificationLink(notification) {
       label: 'Open run detail',
       to: {
         hash: '#operation-run-detail-panel',
-        name: 'operations',
+        name: 'activity-operations',
         query: {
           runId: notification.reference.runId,
         },
