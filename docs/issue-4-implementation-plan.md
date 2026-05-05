@@ -24,7 +24,7 @@
 
 **Step 5 — Not Started:** Artwork infrastructure — wire MusicBrainz Cover Art Archive (CAA) as a fallback artwork source for artist and release cards. Local stored artwork takes precedence. Add a shared `<ArtworkImage>` component that handles load → fallback → placeholder progression.
 
-**Step 6 — Not Started:** Requests screen reimagine — direction TBD (under discussion). Current `RequestMusicView.vue` to be replaced with a reimagined experience. See Open Questions §7.1.
+**Step 6 — Not Started:** "My Requests" screen — request history and fulfillment status. The home page IS where you request music (search → card → request). `RequestMusicView.vue` becomes a read-only status view: artwork cards of what you've requested, current fulfillment state (Pending, Downloading, Fulfilled, Failed), with a cancel action where applicable. No request intake form here.
 
 **Step 7 — Not Started:** Search screen — update `SearchView.vue` to artwork-first card results for both artist and release search. Replace the current text-list output with album art cards and artist cards consistent with the rest of the redesign.
 
@@ -154,11 +154,9 @@ Required:
 - Both use the same `AppShell.vue` but the nav section renders differently based on role
 - Remove "Activity" as a top-level item from requester nav entirely
 
-### 3.6 Requests Screen Has No Clear Identity
+### 3.6 Requests Screen Has No Request Intake
 
-`RequestMusicView.vue` is the only screen a requester currently sees. It's a form + a table. Neither the form (two text fields) nor the table (a generic list with status pills) reflects a considered design. In the reimagined app this screen needs a clear purpose — it's not just "the screen requesters are stuck on."
-
-Direction is TBD (see Open Questions §7.1). This is a dedicated implementation step once direction is confirmed.
+`RequestMusicView.vue` is currently a form + a table — but in the redesigned app the request intake lives on the home page (search → card → request). The dedicated requests screen becomes a pure status view: artwork cards of the user's submitted requests, fulfillment state, and a cancel action. The two-field form and its submit logic are removed entirely. The table becomes an artwork-first card grid consistent with the rest of the redesign.
 
 ### 3.7 Missing Screen Is a Table
 
@@ -330,15 +328,9 @@ Not required for this re-scope, but noted: adding `musicbrainz_release_id TEXT` 
 
 ## 7. Open Questions
 
-### 7.1 What Is the Requests Screen?
+### 7.1 ~~What Is the Requests Screen?~~ — Resolved
 
-The current `RequestMusicView.vue` is underpowered and has no clear identity in the redesigned app. Candidates under consideration:
-
-- **Request inbox** — cards showing the user's requests with status, fulfillment progress, cancel action. Artwork-first (release art on each card).
-- **Per-artist grouped view** — requests grouped by artist, drill into an artist to see their requested releases and statuses.
-- **Combined discovery + requests** — a single screen where you can both browse your existing requests and add new ones from search.
-
-Decision needed before Step 6 can be designed.
+The home page IS the request screen. "My Requests" (`RequestMusicView.vue`) is a read-only status view: artwork cards of submitted requests with fulfillment state and a cancel action. No intake form. Search and requesting happen on the home page.
 
 ### 7.2 Should the Discover Graph Show Artwork for Suggestions?
 
