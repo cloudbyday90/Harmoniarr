@@ -70,7 +70,16 @@ onMounted(load);
 
     <article class="hx-card">
       <div class="hx-card-body is-flush">
-        <div v-if="!entries.length && !isLoading" class="hx-empty">
+        <div v-if="isLoading && !entries.length" class="hx-card-body">
+          <div class="hx-skeleton-stack">
+            <span class="hx-skeleton" data-size="lg"></span>
+            <span class="hx-skeleton"></span>
+            <span class="hx-skeleton"></span>
+            <span class="hx-skeleton"></span>
+            <span class="hx-skeleton"></span>
+          </div>
+        </div>
+        <div v-else-if="!entries.length" class="hx-empty">
           <p class="hx-empty-title">No recent activity</p>
           <p class="hx-empty-copy">Activity events will appear here as the system performs work.</p>
         </div>

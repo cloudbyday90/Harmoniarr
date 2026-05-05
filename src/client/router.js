@@ -20,6 +20,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import AppShell from './components/AppShell.vue';
 import AccountSecurityView from './views/AccountSecurityView.vue';
 import ActivityComingSoonView from './views/ActivityComingSoonView.vue';
+import ActivityDownloadsView from './views/ActivityDownloadsView.vue';
 import ActivityHistoryView from './views/ActivityHistoryView.vue';
 import ActivityImportsView from './views/ActivityImportsView.vue';
 import ActivityQueueView from './views/ActivityQueueView.vue';
@@ -97,7 +98,7 @@ const router = createRouter({
             { path: 'requests', name: 'activity-requests', component: RequestMusicView },
             { path: 'queue', name: 'activity-queue', component: ActivityQueueView },
             { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
-            { path: 'downloads', name: 'activity-downloads', component: ActivityComingSoonView, props: { section: 'downloads' } },
+            { path: 'downloads', name: 'activity-downloads', component: ActivityDownloadsView },
             { path: 'imports', name: 'activity-imports', component: ActivityImportsView },
             { path: 'releases', name: 'activity-releases', component: ActivityComingSoonView, props: { section: 'releases' } },
             { path: 'users', name: 'activity-users', component: ActivityUsersView },

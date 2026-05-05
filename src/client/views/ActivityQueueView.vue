@@ -95,7 +95,16 @@ function formatDuration(start, end) {
 
     <article class="hx-card">
       <div class="hx-card-body is-flush">
-        <div v-if="!recentRuns.length && !isLoading" class="hx-empty">
+        <div v-if="isLoading && !recentRuns.length" class="hx-card-body">
+          <div class="hx-skeleton-stack">
+            <span class="hx-skeleton" data-size="lg"></span>
+            <span class="hx-skeleton"></span>
+            <span class="hx-skeleton"></span>
+            <span class="hx-skeleton"></span>
+            <span class="hx-skeleton"></span>
+          </div>
+        </div>
+        <div v-else-if="!recentRuns.length" class="hx-empty">
           <p class="hx-empty-title">No operation history</p>
           <p class="hx-empty-copy">Operation runs (scans, reconciliation, import workers) will appear here once dispatched.</p>
         </div>

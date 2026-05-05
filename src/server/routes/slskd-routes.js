@@ -49,6 +49,7 @@ function slskdRoute(handler) {
 
 export function registerSlskdRoutes(app, {
   getConnectionStatus,
+  getDownloads,
   getSearchResponses,
   getSearchState,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
@@ -62,6 +63,16 @@ export function registerSlskdRoutes(app, {
       ok: true,
       provider: 'slskd',
       status: await getConnectionStatus(),
+    });
+  }));
+
+  app.get('/api/v1/slskd/downloads', slskdRoute(async (request, response) => {
+    await requireAdminSession(request);
+    const includeRemoved = request.query.includeRemoved === 'true' || request.query.includeRemoved === '1';
+    response.json({
+      ok: true,
+      provider: 'slskd',
+      downloads: await getDownloads({ includeRemoved }),
     });
   }));
 

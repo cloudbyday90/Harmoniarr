@@ -43,3 +43,9 @@ export async function fetchSlskdSearchResponses({ searchId, signal } = {}) {
   const payload = await apiRequest(`/api/v1/slskd/searches/${encodeURIComponent(searchId)}/responses`, { signal });
   return Array.isArray(payload?.responses) ? payload.responses : [];
 }
+
+export async function fetchSlskdDownloads({ includeRemoved = false, signal } = {}) {
+  const query = includeRemoved ? '?includeRemoved=true' : '';
+  const payload = await apiRequest(`/api/v1/slskd/downloads${query}`, { signal });
+  return Array.isArray(payload?.downloads) ? payload.downloads : [];
+}

@@ -95,6 +95,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/metadata/musicbrainz/artists/:artistId/import', access: 'admin', area: 'metadata', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/metadata/musicbrainz/releases/:releaseId/import', access: 'admin', area: 'metadata', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/slskd/status', access: 'admin', area: 'slskd', kind: 'diagnostic' },
+  { method: 'GET', path: '/api/v1/slskd/downloads', access: 'admin', area: 'slskd', kind: 'read' },
   { method: 'POST', path: '/api/v1/slskd/searches', access: 'admin', area: 'slskd', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/slskd/searches/:searchId', access: 'admin', area: 'slskd', kind: 'read' },
   { method: 'GET', path: '/api/v1/slskd/searches/:searchId/responses', access: 'admin', area: 'slskd', kind: 'read' },
