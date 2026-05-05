@@ -1281,3 +1281,26 @@ body {
 }
 
 .hx-form-row > .hx-field { flex: 1 1 200px; }
+/* ---------- Skeleton loaders ---------- */
+.hx-skeleton {
+  display: block;
+  background: linear-gradient(90deg, var(--hx-bg-surface-muted) 0%, var(--hx-bg-surface-sunken) 50%, var(--hx-bg-surface-muted) 100%);
+  background-size: 200% 100%;
+  border-radius: var(--hx-radius-sm);
+  animation: hx-skeleton-pulse 1.4s ease-in-out infinite;
+  height: 14px;
+  width: 100%;
+}
+
+.hx-skeleton[data-size='lg'] { height: 26px; }
+.hx-skeleton[data-size='sm'] { height: 10px; }
+
+.hx-skeleton-stack {
+  display: grid;
+  gap: 8px;
+}
+
+@keyframes hx-skeleton-pulse {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

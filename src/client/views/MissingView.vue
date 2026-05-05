@@ -37,6 +37,10 @@ function summaryTone(status) {
   return 'warning';
 }
 
+function shouldShowSummaryPill(status) {
+  return Boolean(status) && status !== 'empty';
+}
+
 function refreshAll() {
   wanted.loadLibraryWantedSummary();
   reconciliation.loadLibraryReconciliationSummary();
@@ -64,6 +68,14 @@ function refreshAll() {
         </span>
       </div>
     </article>
+
+    <section class="hx-stat-grid" v-if="isLoading && !wanted.libraryWantedSummary.value">
+      <article class="hx-stat-card" v-for="i in 4" :key="i">
+        <span class="hx-skeleton" data-size="sm" style="width: 60%"></span>
+        <span class="hx-skeleton" data-size="lg" style="width: 40%"></span>
+        <span class="hx-skeleton" data-size="sm" style="width: 75%"></span>
+      </article>
+    </section>
 
     <section class="hx-stat-grid" v-if="wanted.libraryWantedSummary.value">
       <article class="hx-stat-card">
@@ -95,7 +107,11 @@ function refreshAll() {
           <p class="hx-card-subtitle">Last reconciled {{ wanted.libraryWantedSummary.value?.lastReconciledAt ?? 'never' }}</p>
         </div>
         <div class="hx-card-actions">
-          <span class="hx-pill" :data-tone="summaryTone(wanted.summary.value.status)">
+          <span
+            v-if="shouldShowSummaryPill(wanted.summary.value.status)"
+            class="hx-pill"
+            :data-tone="summaryTone(wanted.summary.value.status)"
+          >
             {{ wanted.summary.value.status }}
           </span>
         </div>
@@ -114,7 +130,7 @@ function refreshAll() {
             {{ reconciliation.libraryReconciliationSummary.value?.lastReconciledAt ?? 'never' }}
           </p>
         </div>
-        <div class="hx-card-actions" v-if="reconciliation.summary.value">
+        <div class="hx-card-actions" v-if="reconciliation.summary.value && shouldShowSummaryPill(reconciliation.summary.value.status)">
           <span class="hx-pill" :data-tone="summaryTone(reconciliation.summary.value.status)">
             {{ reconciliation.summary.value.status }}
           </span>
