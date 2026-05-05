@@ -18,10 +18,13 @@
 
 <script setup>
 const tabs = [
-  { name: 'settings', label: 'Configuration' },
+  { name: 'settings', label: 'General' },
+  { name: 'settings-connections', label: 'Connections' },
+  { name: 'settings-media-storage', label: 'Media & storage' },
+  { name: 'settings-users', label: 'Users & access' },
   { name: 'settings-account', label: 'Account' },
-  { name: 'settings-recovery', label: 'Backup & Restore' },
-  { name: 'settings-library-browser', label: 'Metadata Browser' },
+  { name: 'settings-recovery', label: 'Backup & restore' },
+  { name: 'settings-library-browser', label: 'Metadata browser' },
 ];
 </script>
 

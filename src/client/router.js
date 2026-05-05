@@ -39,7 +39,10 @@ import RecoveryView from './views/RecoveryView.vue';
 import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
 import SearchView from './views/SearchView.vue';
-import SettingsView from './views/SettingsView.vue';
+import SettingsConnectionsView from './views/SettingsConnectionsView.vue';
+import SettingsGeneralView from './views/SettingsGeneralView.vue';
+import SettingsMediaStorageView from './views/SettingsMediaStorageView.vue';
+import SettingsUsersView from './views/SettingsUsersView.vue';
 import SettingsWorkspaceView from './views/SettingsWorkspaceView.vue';
 import { resolveRouterScroll } from './lib/router-scroll.js';
 import { sessionStore } from './state/session.js';
@@ -61,6 +64,9 @@ const requesterRestrictedRouteNames = new Set([
   'activity-blocklist',
   'activity-failed',
   'settings',
+  'settings-connections',
+  'settings-media-storage',
+  'settings-users',
   'settings-recovery',
   'settings-library-browser',
 ]);
@@ -112,7 +118,10 @@ const router = createRouter({
           path: 'settings',
           component: SettingsWorkspaceView,
           children: [
-            { path: '', name: 'settings', component: SettingsView },
+            { path: '', name: 'settings', component: SettingsGeneralView },
+            { path: 'connections', name: 'settings-connections', component: SettingsConnectionsView },
+            { path: 'media-storage', name: 'settings-media-storage', component: SettingsMediaStorageView },
+            { path: 'users', name: 'settings-users', component: SettingsUsersView },
             { path: 'account', name: 'settings-account', component: AccountSecurityView },
             { path: 'recovery', name: 'settings-recovery', component: RecoveryWorkspaceView },
             { path: 'library-browser', name: 'settings-library-browser', component: MetadataView },
