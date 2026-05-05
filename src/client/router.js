@@ -29,6 +29,7 @@ import RecoveryView from './views/RecoveryView.vue';
 import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
 import OperationsView from './views/OperationsView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
+import { resolveRouterScroll } from './lib/router-scroll.js';
 import SettingsView from './views/SettingsView.vue';
 import { sessionStore } from './state/session.js';
 
@@ -40,6 +41,7 @@ function defaultAuthenticatedRouteName() {
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior: resolveRouterScroll,
   routes: [
     { path: '/', redirect: '/app' },
     { path: '/bootstrap', name: 'bootstrap', component: BootstrapSetupView, meta: { anonymousOnly: true } },

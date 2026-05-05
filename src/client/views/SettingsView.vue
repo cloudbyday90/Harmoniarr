@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   clearPlexLink,
   clearSpotifyOAuth,
@@ -47,7 +48,13 @@ import {
   normalizeDownloadMappings,
   normalizeUserMusicRoots,
 } from '../lib/settings-form.js';
+import {
+  buildSettingsSectionHash,
+  normalizeSettingsSectionId,
+  settingsNavigationItems,
+} from '../lib/settings-navigation.js';
 
+const route = useRoute();
 const isLoading = ref(true);
 const isSaving = ref(false);
 const isStartingSpotifyOAuth = ref(false);
@@ -70,6 +77,23 @@ const userManagementSuccessMessage = ref('');
 const roleOptions = ref(['admin', 'operator', 'requester']);
 const users = ref([]);
 const plexUserImportPreview = ref(null);
+const activeSettingsSectionId = computed(() => normalizeSettingsSectionId(route.hash));
+const settingsNavigationEntries = computed(() => settingsNavigationItems.map((item) => (
+  item.type === 'section'
+    ? {
+        ...item,
+        to: {
+          name: 'settings',
+          hash: buildSettingsSectionHash(item.id),
+        },
+      }
+    : {
+        ...item,
+        to: {
+          name: item.routeName,
+        },
+      }
+)));
 const form = reactive({
   artwork: {
     captureEmbedded: true,
@@ -709,9 +733,9 @@ onMounted(() => {
 <template>
   <section class="page-stack">
     <article class="panel-dark hero-card compact">
-      <p class="eyebrow">System configuration</p>
-      <h2>Settings contract</h2>
-      <p>The first protected settings surface now persists allowlisted path and runtime keys.</p>
+      <p class="eyebrow">System settings</p>
+      <h2>Configuration workspace</h2>
+      <p>Group runtime policy, provider connections, storage paths, and user access into durable sections instead of one long contract form.</p>
     </article>
 
     <article class="panel-light" v-if="isLoading">
@@ -724,472 +748,545 @@ onMounted(() => {
       <p>{{ errorMessage }}</p>
     </article>
 
-    <article class="panel-light" v-else>
-      <form class="settings-grid" @submit.prevent="saveSettings">
-        <section>
-          <p class="eyebrow">Deployment security</p>
-          <label>
-            CSRF protection
-            <select v-model="form.security.csrfProtectionMode">
-              <option value="disabled">disabled</option>
-              <option value="required">required</option>
-            </select>
-          </label>
-          <label>
-            <input v-model="form.security.secureCookies" type="checkbox" />
-            Mark auth cookies as Secure
-          </label>
-          <label>
-            <input v-model="form.security.enforceHttps" type="checkbox" />
-            Redirect HTTP traffic to HTTPS for safe requests and require HTTPS for writes
-          </label>
-          <label>
-            <input v-model="form.security.strictTransportSecurity" type="checkbox" />
-            Send Strict-Transport-Security headers
-          </label>
-          <p class="metadata-card-copy">Leave these disabled for local-only HTTP installs. Enable them explicitly when Harmoniarr runs behind TLS or a reverse proxy that forwards HTTPS traffic.</p>
+    <template v-else>
+      <article class="panel-light settings-nav-panel">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Configuration areas</p>
+            <h3>Jump to the section you need</h3>
+            <p class="metadata-card-copy">Keep system policy, provider connectivity, media storage, and user access in separate sections. Personal password and session controls stay in Account Security.</p>
+          </div>
+        </div>
 
-          <section class="settings-validation-section">
+        <div class="settings-nav-list">
+          <RouterLink
+            v-for="item in settingsNavigationEntries"
+            :key="item.id"
+            :to="item.to"
+            class="settings-nav-link"
+            :class="{ 'is-active': item.type === 'section' ? activeSettingsSectionId === item.id : route.name === item.routeName }"
+          >
+            <span class="settings-nav-link-label">{{ item.label }}</span>
+            <span class="settings-nav-link-copy">{{ item.description }}</span>
+          </RouterLink>
+        </div>
+      </article>
+
+      <article class="panel-light">
+        <form class="settings-form-stack" @submit.prevent="saveSettings">
+          <section id="general" class="settings-anchor-section settings-workspace-section">
             <div class="section-header">
               <div>
-                <p class="eyebrow">System</p>
-                <p class="metadata-card-copy">Base URL, logging, and deployment posture stay in the same allowlisted settings contract.</p>
+                <p class="eyebrow">General</p>
+                <h3>Security and system</h3>
+                <p class="metadata-card-copy">Cookie posture, HTTPS handling, base URL, and logging stay in the core runtime boundary.</p>
               </div>
             </div>
-          <p class="eyebrow">System</p>
-          <label>
-            Base URL
-            <input v-model="form.system.baseUrl" placeholder="https://harmoniarr.example" />
-          </label>
-          <label>
-            Log level
-            <select v-model="form.system.logLevel">
-              <option value="debug">debug</option>
-              <option value="info">info</option>
-              <option value="warn">warn</option>
-              <option value="error">error</option>
-            </select>
-          </label>
+
+            <div class="settings-subsection-grid">
+              <section class="settings-validation-section settings-subsection-card">
+                <div class="section-header">
+                  <div>
+                    <p class="eyebrow">Deployment security</p>
+                    <p class="metadata-card-copy">Keep local-only installs simple, then enable HTTPS-specific protections explicitly when the deployment boundary is ready.</p>
+                  </div>
+                </div>
+                <label>
+                  CSRF protection
+                  <select v-model="form.security.csrfProtectionMode">
+                    <option value="disabled">disabled</option>
+                    <option value="required">required</option>
+                  </select>
+                </label>
+                <label>
+                  <input v-model="form.security.secureCookies" type="checkbox" />
+                  Mark auth cookies as Secure
+                </label>
+                <label>
+                  <input v-model="form.security.enforceHttps" type="checkbox" />
+                  Redirect HTTP traffic to HTTPS for safe requests and require HTTPS for writes
+                </label>
+                <label>
+                  <input v-model="form.security.strictTransportSecurity" type="checkbox" />
+                  Send Strict-Transport-Security headers
+                </label>
+                <p class="metadata-card-copy">Leave these disabled for local-only HTTP installs. Enable them explicitly when Harmoniarr runs behind TLS or a reverse proxy that forwards HTTPS traffic.</p>
+              </section>
+
+              <section class="settings-validation-section settings-subsection-card">
+                <div class="section-header">
+                  <div>
+                    <p class="eyebrow">System</p>
+                    <p class="metadata-card-copy">Base URL, logging, and deployment posture stay in the same allowlisted runtime contract.</p>
+                  </div>
+                </div>
+                <label>
+                  Base URL
+                  <input v-model="form.system.baseUrl" placeholder="https://harmoniarr.example" />
+                </label>
+                <label>
+                  Log level
+                  <select v-model="form.system.logLevel">
+                    <option value="debug">debug</option>
+                    <option value="info">info</option>
+                    <option value="warn">warn</option>
+                    <option value="error">error</option>
+                  </select>
+                </label>
+              </section>
+            </div>
           </section>
 
-          <section class="settings-validation-section">
+          <section id="connections" class="settings-anchor-section settings-workspace-section">
             <div class="section-header">
               <div>
-                <p class="eyebrow">slskd connectivity</p>
-                <p class="metadata-card-copy">Persist the non-secret connection settings here and update or clear the API key without ever round-tripping the plaintext value back to the browser.</p>
-              </div>
-              <span class="review-status-pill" :class="secretStatus?.slskd?.apiKeyConfigured ? 'review-status-selected' : 'review-status-held'">
-                {{ slskdApiKeyStatusLabel() }}
-              </span>
-            </div>
-            <label>
-              slskd base URL
-              <input v-model="form.slskd.baseUrl" placeholder="http://slskd:5030" />
-            </label>
-            <label>
-              Request timeout (ms)
-              <input v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />
-            </label>
-            <label>
-              API key
-              <input v-model="form.slskd.apiKey" type="password" autocomplete="new-password" :disabled="form.slskd.clearApiKey" placeholder="Leave blank to keep the current key" />
-            </label>
-            <label>
-              <input v-model="form.slskd.clearApiKey" type="checkbox" />
-              Clear the stored API key on save
-            </label>
-          </section>
-
-          <section class="settings-validation-section">
-            <div class="section-header">
-              <div>
-                <p class="eyebrow">Provider intake</p>
-                <p class="metadata-card-copy">External playlist requests use these credentials and policy controls to fetch provider metadata before Harmoniarr creates reviewable discovery work.</p>
+                <p class="eyebrow">Connections</p>
+                <h3>slskd and provider intake</h3>
+                <p class="metadata-card-copy">Keep Soulseek connectivity and third-party provider credentials together so import and request automation use one consistent integration boundary.</p>
               </div>
             </div>
-            <label>
-              Playlist expansion policy
-              <select v-model="form.providers.playlistExpansionPolicy">
-                <option value="bounded">Bounded to playlist albums</option>
-                <option value="artist_discovery">Include artist album discovery</option>
-              </select>
-            </label>
-            <label>
-              Provider request timeout (ms)
-              <input v-model.number="form.providers.requestTimeoutMs" type="number" min="1000" max="60000" step="1000" />
-            </label>
 
-            <div class="settings-mapping-list">
-              <article class="settings-mapping-card">
+            <div class="settings-subsection-grid">
+              <section class="settings-validation-section settings-subsection-card">
                 <div class="section-header">
                   <div>
-                    <p class="eyebrow">Spotify</p>
-                    <h3>Client credentials</h3>
+                    <p class="eyebrow">slskd connectivity</p>
+                    <p class="metadata-card-copy">Persist the non-secret connection settings here and update or clear the API key without ever round-tripping the plaintext value back to the browser.</p>
                   </div>
-                  <span class="review-status-pill" :class="secretStatus?.providers?.spotify?.clientSecretConfigured ? 'review-status-selected' : 'review-status-held'">
-                    {{ providerSecretStatusLabel('spotify', 'clientSecretConfigured', 'clientSecretSource') }}
+                  <span class="review-status-pill" :class="secretStatus?.slskd?.apiKeyConfigured ? 'review-status-selected' : 'review-status-held'">
+                    {{ slskdApiKeyStatusLabel() }}
                   </span>
                 </div>
                 <label>
-                  <input v-model="form.providers.spotifyEnabled" type="checkbox" />
-                  Enable Spotify provider intake
+                  slskd base URL
+                  <input v-model="form.slskd.baseUrl" placeholder="http://slskd:5030" />
                 </label>
                 <label>
-                  Client ID
-                  <input v-model="form.providers.spotifyClientId" autocomplete="off" />
-                </label>
-                <label>
-                  Client secret
-                  <input v-model="form.providers.spotifyClientSecret" type="password" autocomplete="new-password" :disabled="form.providers.clearSpotifyClientSecret" placeholder="Leave blank to keep the current secret" />
-                </label>
-                <label>
-                  <input v-model="form.providers.clearSpotifyClientSecret" type="checkbox" />
-                  Clear the stored Spotify client secret on save
-                </label>
-                <div class="section-header">
-                  <div>
-                    <p class="eyebrow">User authorization</p>
-                    <p class="metadata-card-copy">{{ spotifyOAuthStatusLabel() }}</p>
-                  </div>
-                  <span class="review-status-pill" :class="secretStatus?.providers?.spotifyOAuth?.linked ? 'review-status-selected' : 'review-status-held'">
-                    {{ secretStatus?.providers?.spotifyOAuth?.linked ? 'Linked' : 'Not linked' }}
-                  </span>
-                </div>
-                <button type="button" class="review-reset-button" @click="connectSpotifyOAuth" :disabled="isStartingSpotifyOAuth">
-                  {{ isStartingSpotifyOAuth ? 'Starting...' : 'Connect Spotify' }}
-                </button>
-                <button type="button" class="review-reset-button" @click="disconnectSpotifyOAuth" :disabled="isClearingSpotifyOAuth || !secretStatus?.providers?.spotifyOAuth?.linked">
-                  {{ isClearingSpotifyOAuth ? 'Clearing...' : 'Clear Spotify authorization' }}
-                </button>
-              </article>
-
-              <article class="settings-mapping-card">
-                <div class="section-header">
-                  <div>
-                    <p class="eyebrow">YouTube</p>
-                    <h3>Data API credentials</h3>
-                  </div>
-                  <span class="review-status-pill" :class="secretStatus?.providers?.youtube?.apiKeyConfigured ? 'review-status-selected' : 'review-status-held'">
-                    {{ providerSecretStatusLabel('youtube', 'apiKeyConfigured', 'apiKeySource') }}
-                  </span>
-                </div>
-                <label>
-                  <input v-model="form.providers.youtubeEnabled" type="checkbox" />
-                  Enable YouTube provider intake
+                  Request timeout (ms)
+                  <input v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />
                 </label>
                 <label>
                   API key
-                  <input v-model="form.providers.youtubeApiKey" type="password" autocomplete="new-password" :disabled="form.providers.clearYoutubeApiKey" placeholder="Leave blank to keep the current key" />
+                  <input v-model="form.slskd.apiKey" type="password" autocomplete="new-password" :disabled="form.slskd.clearApiKey" placeholder="Leave blank to keep the current key" />
                 </label>
                 <label>
-                  <input v-model="form.providers.clearYoutubeApiKey" type="checkbox" />
-                  Clear the stored YouTube API key on save
+                  <input v-model="form.slskd.clearApiKey" type="checkbox" />
+                  Clear the stored API key on save
                 </label>
+              </section>
+
+              <section class="settings-validation-section settings-subsection-card">
                 <div class="section-header">
                   <div>
-                    <p class="eyebrow">User authorization</p>
-                    <p class="metadata-card-copy">{{ youtubeOAuthStatusLabel() }}</p>
+                    <p class="eyebrow">Provider intake</p>
+                    <p class="metadata-card-copy">External playlist requests use these credentials and policy controls to fetch provider metadata before Harmoniarr creates reviewable discovery work.</p>
                   </div>
-                  <span class="review-status-pill" :class="secretStatus?.providers?.youtubeOAuth?.linked ? 'review-status-selected' : 'review-status-held'">
-                    {{ secretStatus?.providers?.youtubeOAuth?.linked ? 'Linked' : 'Not linked' }}
-                  </span>
                 </div>
                 <label>
-                  OAuth client ID
-                  <input v-model="form.providers.youtubeClientId" autocomplete="off" />
+                  Playlist expansion policy
+                  <select v-model="form.providers.playlistExpansionPolicy">
+                    <option value="bounded">Bounded to playlist albums</option>
+                    <option value="artist_discovery">Include artist album discovery</option>
+                  </select>
                 </label>
                 <label>
-                  OAuth client secret
-                  <input v-model="form.providers.youtubeClientSecret" type="password" autocomplete="new-password" :disabled="form.providers.clearYoutubeClientSecret" placeholder="Leave blank to keep the current secret" />
+                  Provider request timeout (ms)
+                  <input v-model.number="form.providers.requestTimeoutMs" type="number" min="1000" max="60000" step="1000" />
                 </label>
-                <label>
-                  <input v-model="form.providers.clearYoutubeClientSecret" type="checkbox" />
-                  Clear the stored YouTube OAuth client secret on save
-                </label>
-                <button type="button" class="review-reset-button" @click="connectYouTubeOAuth" :disabled="isStartingYouTubeOAuth">
-                  {{ isStartingYouTubeOAuth ? 'Starting...' : 'Connect YouTube' }}
-                </button>
-                <button type="button" class="review-reset-button" @click="disconnectYouTubeOAuth" :disabled="isClearingYouTubeOAuth || !secretStatus?.providers?.youtubeOAuth?.linked">
-                  {{ isClearingYouTubeOAuth ? 'Clearing...' : 'Clear YouTube authorization' }}
-                </button>
-              </article>
 
-              <article class="settings-mapping-card">
+                <div class="settings-mapping-list">
+                  <article class="settings-mapping-card">
+                    <div class="section-header">
+                      <div>
+                        <p class="eyebrow">Spotify</p>
+                        <h3>Client credentials</h3>
+                      </div>
+                      <span class="review-status-pill" :class="secretStatus?.providers?.spotify?.clientSecretConfigured ? 'review-status-selected' : 'review-status-held'">
+                        {{ providerSecretStatusLabel('spotify', 'clientSecretConfigured', 'clientSecretSource') }}
+                      </span>
+                    </div>
+                    <label>
+                      <input v-model="form.providers.spotifyEnabled" type="checkbox" />
+                      Enable Spotify provider intake
+                    </label>
+                    <label>
+                      Client ID
+                      <input v-model="form.providers.spotifyClientId" autocomplete="off" />
+                    </label>
+                    <label>
+                      Client secret
+                      <input v-model="form.providers.spotifyClientSecret" type="password" autocomplete="new-password" :disabled="form.providers.clearSpotifyClientSecret" placeholder="Leave blank to keep the current secret" />
+                    </label>
+                    <label>
+                      <input v-model="form.providers.clearSpotifyClientSecret" type="checkbox" />
+                      Clear the stored Spotify client secret on save
+                    </label>
+                    <div class="section-header">
+                      <div>
+                        <p class="eyebrow">User authorization</p>
+                        <p class="metadata-card-copy">{{ spotifyOAuthStatusLabel() }}</p>
+                      </div>
+                      <span class="review-status-pill" :class="secretStatus?.providers?.spotifyOAuth?.linked ? 'review-status-selected' : 'review-status-held'">
+                        {{ secretStatus?.providers?.spotifyOAuth?.linked ? 'Linked' : 'Not linked' }}
+                      </span>
+                    </div>
+                    <button type="button" class="review-reset-button" @click="connectSpotifyOAuth" :disabled="isStartingSpotifyOAuth">
+                      {{ isStartingSpotifyOAuth ? 'Starting...' : 'Connect Spotify' }}
+                    </button>
+                    <button type="button" class="review-reset-button" @click="disconnectSpotifyOAuth" :disabled="isClearingSpotifyOAuth || !secretStatus?.providers?.spotifyOAuth?.linked">
+                      {{ isClearingSpotifyOAuth ? 'Clearing...' : 'Clear Spotify authorization' }}
+                    </button>
+                  </article>
+
+                  <article class="settings-mapping-card">
+                    <div class="section-header">
+                      <div>
+                        <p class="eyebrow">YouTube</p>
+                        <h3>Data API credentials</h3>
+                      </div>
+                      <span class="review-status-pill" :class="secretStatus?.providers?.youtube?.apiKeyConfigured ? 'review-status-selected' : 'review-status-held'">
+                        {{ providerSecretStatusLabel('youtube', 'apiKeyConfigured', 'apiKeySource') }}
+                      </span>
+                    </div>
+                    <label>
+                      <input v-model="form.providers.youtubeEnabled" type="checkbox" />
+                      Enable YouTube provider intake
+                    </label>
+                    <label>
+                      API key
+                      <input v-model="form.providers.youtubeApiKey" type="password" autocomplete="new-password" :disabled="form.providers.clearYoutubeApiKey" placeholder="Leave blank to keep the current key" />
+                    </label>
+                    <label>
+                      <input v-model="form.providers.clearYoutubeApiKey" type="checkbox" />
+                      Clear the stored YouTube API key on save
+                    </label>
+                    <div class="section-header">
+                      <div>
+                        <p class="eyebrow">User authorization</p>
+                        <p class="metadata-card-copy">{{ youtubeOAuthStatusLabel() }}</p>
+                      </div>
+                      <span class="review-status-pill" :class="secretStatus?.providers?.youtubeOAuth?.linked ? 'review-status-selected' : 'review-status-held'">
+                        {{ secretStatus?.providers?.youtubeOAuth?.linked ? 'Linked' : 'Not linked' }}
+                      </span>
+                    </div>
+                    <label>
+                      OAuth client ID
+                      <input v-model="form.providers.youtubeClientId" autocomplete="off" />
+                    </label>
+                    <label>
+                      OAuth client secret
+                      <input v-model="form.providers.youtubeClientSecret" type="password" autocomplete="new-password" :disabled="form.providers.clearYoutubeClientSecret" placeholder="Leave blank to keep the current secret" />
+                    </label>
+                    <label>
+                      <input v-model="form.providers.clearYoutubeClientSecret" type="checkbox" />
+                      Clear the stored YouTube OAuth client secret on save
+                    </label>
+                    <button type="button" class="review-reset-button" @click="connectYouTubeOAuth" :disabled="isStartingYouTubeOAuth">
+                      {{ isStartingYouTubeOAuth ? 'Starting...' : 'Connect YouTube' }}
+                    </button>
+                    <button type="button" class="review-reset-button" @click="disconnectYouTubeOAuth" :disabled="isClearingYouTubeOAuth || !secretStatus?.providers?.youtubeOAuth?.linked">
+                      {{ isClearingYouTubeOAuth ? 'Clearing...' : 'Clear YouTube authorization' }}
+                    </button>
+                  </article>
+
+                  <article class="settings-mapping-card">
+                    <div class="section-header">
+                      <div>
+                        <p class="eyebrow">Apple Music</p>
+                        <h3>Developer token signing</h3>
+                      </div>
+                      <span class="review-status-pill" :class="secretStatus?.providers?.appleMusic?.privateKeyConfigured ? 'review-status-selected' : 'review-status-held'">
+                        {{ providerSecretStatusLabel('appleMusic', 'privateKeyConfigured', 'privateKeySource') }}
+                      </span>
+                    </div>
+                    <label>
+                      <input v-model="form.providers.appleMusicEnabled" type="checkbox" />
+                      Enable Apple Music provider intake
+                    </label>
+                    <label>
+                      Team ID
+                      <input v-model="form.providers.appleMusicTeamId" autocomplete="off" />
+                    </label>
+                    <label>
+                      Key ID
+                      <input v-model="form.providers.appleMusicKeyId" autocomplete="off" />
+                    </label>
+                    <label>
+                      Storefront
+                      <input v-model="form.providers.appleMusicStorefront" maxlength="5" placeholder="us" />
+                    </label>
+                    <label>
+                      Private key
+                      <textarea v-model="form.providers.appleMusicPrivateKey" autocomplete="new-password" :disabled="form.providers.clearAppleMusicPrivateKey" placeholder="Leave blank to keep the current key"></textarea>
+                    </label>
+                    <label>
+                      <input v-model="form.providers.clearAppleMusicPrivateKey" type="checkbox" />
+                      Clear the stored Apple Music private key on save
+                    </label>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section id="media-storage" class="settings-anchor-section settings-workspace-section">
+            <div class="section-header">
+              <div>
+                <p class="eyebrow">Media &amp; storage</p>
+                <h3>Artwork, paths, and validation</h3>
+                <p class="metadata-card-copy">Keep media processing defaults and filesystem boundaries together so operators can reason about how imports land on disk.</p>
+              </div>
+            </div>
+
+            <div class="settings-subsection-grid">
+              <section class="settings-validation-section settings-subsection-card">
                 <div class="section-header">
                   <div>
-                    <p class="eyebrow">Apple Music</p>
-                    <h3>Developer token signing</h3>
+                    <p class="eyebrow">Artwork behavior</p>
+                    <p class="metadata-card-copy">Configure fetch, extraction, derivative, cleanup, and automatic refresh defaults before artwork workers ship.</p>
                   </div>
-                  <span class="review-status-pill" :class="secretStatus?.providers?.appleMusic?.privateKeyConfigured ? 'review-status-selected' : 'review-status-held'">
-                    {{ providerSecretStatusLabel('appleMusic', 'privateKeyConfigured', 'privateKeySource') }}
-                  </span>
                 </div>
                 <label>
-                  <input v-model="form.providers.appleMusicEnabled" type="checkbox" />
-                  Enable Apple Music provider intake
+                  <input v-model="form.artwork.fetchEnabled" type="checkbox" />
+                  Enable external artwork fetching
                 </label>
                 <label>
-                  Team ID
-                  <input v-model="form.providers.appleMusicTeamId" autocomplete="off" />
+                  Preferred provider order
+                  <input v-model="form.artwork.providerOrderText" placeholder="coverArtArchive, discogs, theAudioDb" />
                 </label>
                 <label>
-                  Key ID
-                  <input v-model="form.providers.appleMusicKeyId" autocomplete="off" />
+                  <input v-model="form.artwork.captureEmbedded" type="checkbox" />
+                  Let embedded artwork become durable app-owned artwork
                 </label>
                 <label>
-                  Storefront
-                  <input v-model="form.providers.appleMusicStorefront" maxlength="5" placeholder="us" />
+                  <input v-model="form.artwork.captureFolderArtwork" type="checkbox" />
+                  Let candidate-folder artwork become durable app-owned artwork
                 </label>
                 <label>
-                  Private key
-                  <textarea v-model="form.providers.appleMusicPrivateKey" autocomplete="new-password" :disabled="form.providers.clearAppleMusicPrivateKey" placeholder="Leave blank to keep the current key"></textarea>
+                  Derivative format
+                  <select v-model="form.artwork.derivativeFormat">
+                    <option value="webp">webp</option>
+                    <option value="jpeg">jpeg</option>
+                    <option value="png">png</option>
+                  </select>
                 </label>
                 <label>
-                  <input v-model="form.providers.clearAppleMusicPrivateKey" type="checkbox" />
-                  Clear the stored Apple Music private key on save
-                </label>
-              </article>
-            </div>
-          </section>
-        </section>
-
-        <section>
-          <section class="settings-validation-section">
-            <div class="section-header">
-              <div>
-                <p class="eyebrow">Artwork behavior</p>
-                <p class="metadata-card-copy">Configure fetch, extraction, derivative, cleanup, and automatic refresh defaults before artwork workers ship.</p>
-              </div>
-            </div>
-            <label>
-              <input v-model="form.artwork.fetchEnabled" type="checkbox" />
-              Enable external artwork fetching
-            </label>
-            <label>
-              Preferred provider order
-              <input v-model="form.artwork.providerOrderText" placeholder="coverArtArchive, discogs, theAudioDb" />
-            </label>
-            <label>
-              <input v-model="form.artwork.captureEmbedded" type="checkbox" />
-              Let embedded artwork become durable app-owned artwork
-            </label>
-            <label>
-              <input v-model="form.artwork.captureFolderArtwork" type="checkbox" />
-              Let candidate-folder artwork become durable app-owned artwork
-            </label>
-            <label>
-              Derivative format
-              <select v-model="form.artwork.derivativeFormat">
-                <option value="webp">webp</option>
-                <option value="jpeg">jpeg</option>
-                <option value="png">png</option>
-              </select>
-            </label>
-            <label>
-              Derivative sizes
-              <input v-model="form.artwork.derivativeSizesText" placeholder="256, 512" />
-            </label>
-            <label>
-              Maximum original image size (bytes)
-              <input v-model.number="form.artwork.maxOriginalFileSizeBytes" type="number" min="1048576" max="104857600" step="1048576" />
-            </label>
-            <label>
-              Maximum original dimension (pixels)
-              <input v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="64" />
-            </label>
-            <label>
-              Derivative cache cap (MB)
-              <input v-model.number="form.artwork.derivativeCacheSizeMb" type="number" min="64" max="16384" step="64" />
-            </label>
-            <label>
-              Derivative retention (days)
-              <input v-model.number="form.artwork.derivativeRetentionDays" type="number" min="1" max="3650" />
-            </label>
-            <label>
-              Unassigned originals retention (days)
-              <input v-model.number="form.artwork.unassignedRetentionDays" type="number" min="1" max="3650" />
-            </label>
-            <label>
-              <input v-model="form.artwork.refreshAfterMetadataRefresh" type="checkbox" />
-              Refresh artwork automatically after metadata refresh
-            </label>
-            <label>
-              <input v-model="form.artwork.refreshAfterImport" type="checkbox" />
-              Refresh artwork automatically after import acceptance
-            </label>
-            <label>
-              <input v-model="form.artwork.refreshAfterLibraryScan" type="checkbox" />
-              Refresh artwork automatically after library scans
-            </label>
-            <label>
-              <input v-model="form.artwork.refetchMissingAutomatically" type="checkbox" />
-              Refetch missing artwork automatically
-            </label>
-          </section>
-
-          <p class="eyebrow">Paths</p>
-          <label>
-            Downloads
-            <input v-model="form.paths.downloads" />
-          </label>
-          <label>
-            Music
-            <input v-model="form.paths.music" />
-          </label>
-          <label>
-            Staging
-            <input v-model="form.paths.staging" />
-          </label>
-          <label>
-            Transcode temp
-            <input v-model="form.paths.transcodeTemp" />
-          </label>
-
-          <section class="settings-mapping-section">
-            <div class="section-header">
-              <div>
-                <p class="eyebrow">Download path mappings</p>
-                <p class="metadata-card-copy">Map the slskd completed-download namespace into Harmoniarr's local downloads namespace. This preview stays explicit and avoids guessing when multiple mappings could apply.</p>
-              </div>
-              <button type="button" class="review-reset-button" @click="addDownloadMapping">Add mapping</button>
-            </div>
-
-            <article class="panel-light review-empty-state" v-if="!form.paths.downloadMappings.length">
-              <h3>No mappings configured</h3>
-              <p>Without explicit mappings, preview resolution falls back to the configured downloads root and marks that assumption as a warning.</p>
-            </article>
-
-            <div class="settings-mapping-list" v-else>
-              <article class="settings-mapping-card" v-for="(mapping, index) in form.paths.downloadMappings" :key="index">
-                <label>
-                  slskd prefix
-                  <input v-model="mapping.slskdPrefix" placeholder="/downloads/completed" />
+                  Derivative sizes
+                  <input v-model="form.artwork.derivativeSizesText" placeholder="256, 512" />
                 </label>
                 <label>
-                  Harmoniarr prefix
-                  <input v-model="mapping.harmoniarrPrefix" placeholder="/data/downloads/completed" />
-                </label>
-                <button type="button" class="review-reset-button" @click="removeDownloadMapping(index)">Remove mapping</button>
-              </article>
-            </div>
-          </section>
-
-          <section class="settings-mapping-section">
-            <div class="section-header">
-              <div>
-                <p class="eyebrow">Per-user music roots</p>
-                <p class="metadata-card-copy">Map app user ids onto durable subdirectories under the shared music root. Import preview stops deriving folder names from session ids once a mapping is configured here.</p>
-              </div>
-              <button type="button" class="review-reset-button" @click="addUserMusicRoot">Add user root</button>
-            </div>
-
-            <article class="panel-light review-empty-state" v-if="!form.paths.userMusicRoots.length">
-              <h3>No per-user destinations configured</h3>
-              <p>Preview falls back to the shared library root until a user-specific destination is configured.</p>
-            </article>
-
-            <div class="settings-mapping-list" v-else>
-              <article class="settings-mapping-card" v-for="(userMusicRoot, index) in form.paths.userMusicRoots" :key="`user-music-root-${index}`">
-                <label>
-                  App user id
-                  <input v-model="userMusicRoot.userId" placeholder="user-1" />
+                  Maximum original image size (bytes)
+                  <input v-model.number="form.artwork.maxOriginalFileSizeBytes" type="number" min="1048576" max="104857600" step="1048576" />
                 </label>
                 <label>
-                  Relative subdirectory
-                  <input v-model="userMusicRoot.relativeRoot" placeholder="household/alice" />
+                  Maximum original dimension (pixels)
+                  <input v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="64" />
                 </label>
-                <button type="button" class="review-reset-button" @click="removeUserMusicRoot(index)">Remove user root</button>
-              </article>
-            </div>
-          </section>
+                <label>
+                  Derivative cache cap (MB)
+                  <input v-model.number="form.artwork.derivativeCacheSizeMb" type="number" min="64" max="16384" step="64" />
+                </label>
+                <label>
+                  Derivative retention (days)
+                  <input v-model.number="form.artwork.derivativeRetentionDays" type="number" min="1" max="3650" />
+                </label>
+                <label>
+                  Unassigned originals retention (days)
+                  <input v-model.number="form.artwork.unassignedRetentionDays" type="number" min="1" max="3650" />
+                </label>
+                <label>
+                  <input v-model="form.artwork.refreshAfterMetadataRefresh" type="checkbox" />
+                  Refresh artwork automatically after metadata refresh
+                </label>
+                <label>
+                  <input v-model="form.artwork.refreshAfterImport" type="checkbox" />
+                  Refresh artwork automatically after import acceptance
+                </label>
+                <label>
+                  <input v-model="form.artwork.refreshAfterLibraryScan" type="checkbox" />
+                  Refresh artwork automatically after library scans
+                </label>
+                <label>
+                  <input v-model="form.artwork.refetchMissingAutomatically" type="checkbox" />
+                  Refetch missing artwork automatically
+                </label>
+              </section>
 
-          <section class="settings-validation-section" v-if="pathValidation">
-            <div class="section-header">
-              <div>
-                <p class="eyebrow">Path validation</p>
-                <p class="metadata-card-copy">{{ pathValidation.summary.message }}</p>
-              </div>
-              <span class="review-status-pill" :class="statusClass(pathValidation.summary.status)">
-                {{ statusLabel(pathValidation.summary.status) }}
-              </span>
-            </div>
-
-            <div class="dependency-grid" v-if="pathValidation.roots?.length">
-              <article class="dependency-card" :class="`dependency-card-${root.status}`" v-for="root in pathValidation.roots" :key="root.key">
-                <div class="dependency-card-header">
-                  <div>
-                    <p>{{ root.label }}</p>
-                    <strong>{{ root.path }}</strong>
-                  </div>
-                  <span class="dependency-status-dot" />
-                </div>
-                <p class="dependency-message">{{ root.message }}</p>
-                <p class="dependency-observed" v-if="root.resolvedPath && root.resolvedPath !== root.path">Resolved {{ root.resolvedPath }}</p>
-              </article>
-            </div>
-
-            <div class="settings-mapping-list" v-if="pathValidation.downloadMappings?.length">
-              <article class="settings-mapping-card" v-for="mapping in pathValidation.downloadMappings" :key="mapping.index">
+              <section class="settings-validation-section settings-subsection-card">
                 <div class="section-header">
                   <div>
-                    <p class="eyebrow">Mapping {{ mapping.index + 1 }}</p>
-                    <h3>{{ mapping.slskdPrefix }} -> {{ mapping.harmoniarrPrefix }}</h3>
+                    <p class="eyebrow">Paths</p>
+                    <p class="metadata-card-copy">Set the core roots first, then make download translation and per-user placement explicit instead of relying on path guesses.</p>
                   </div>
-                  <span class="review-status-pill" :class="statusClass(mapping.status)">{{ statusLabel(mapping.status) }}</span>
                 </div>
-                <p class="metadata-card-copy">{{ mapping.message }}</p>
-                <dl class="review-meta-grid review-meta-grid-wide">
-                  <div>
-                    <dt>Example source</dt>
-                    <dd>{{ mapping.exampleSourcePath }}</dd>
+                <label>
+                  Downloads
+                  <input v-model="form.paths.downloads" />
+                </label>
+                <label>
+                  Music
+                  <input v-model="form.paths.music" />
+                </label>
+                <label>
+                  Staging
+                  <input v-model="form.paths.staging" />
+                </label>
+                <label>
+                  Transcode temp
+                  <input v-model="form.paths.transcodeTemp" />
+                </label>
+
+                <section class="settings-mapping-section">
+                  <div class="section-header">
+                    <div>
+                      <p class="eyebrow">Download path mappings</p>
+                      <p class="metadata-card-copy">Map the slskd completed-download namespace into Harmoniarr's local downloads namespace. This preview stays explicit and avoids guessing when multiple mappings could apply.</p>
+                    </div>
+                    <button type="button" class="review-reset-button" @click="addDownloadMapping">Add mapping</button>
                   </div>
-                  <div>
-                    <dt>Example translated</dt>
-                    <dd>{{ mapping.exampleTranslatedPath }}</dd>
+
+                  <article class="panel-light review-empty-state" v-if="!form.paths.downloadMappings.length">
+                    <h3>No mappings configured</h3>
+                    <p>Without explicit mappings, preview resolution falls back to the configured downloads root and marks that assumption as a warning.</p>
+                  </article>
+
+                  <div class="settings-mapping-list" v-else>
+                    <article class="settings-mapping-card" v-for="(mapping, index) in form.paths.downloadMappings" :key="index">
+                      <label>
+                        slskd prefix
+                        <input v-model="mapping.slskdPrefix" placeholder="/downloads/completed" />
+                      </label>
+                      <label>
+                        Harmoniarr prefix
+                        <input v-model="mapping.harmoniarrPrefix" placeholder="/data/downloads/completed" />
+                      </label>
+                      <button type="button" class="review-reset-button" @click="removeDownloadMapping(index)">Remove mapping</button>
+                    </article>
                   </div>
-                </dl>
-              </article>
+                </section>
+
+                <section class="settings-mapping-section">
+                  <div class="section-header">
+                    <div>
+                      <p class="eyebrow">Per-user music roots</p>
+                      <p class="metadata-card-copy">Map app user ids onto durable subdirectories under the shared music root. Import preview stops deriving folder names from session ids once a mapping is configured here.</p>
+                    </div>
+                    <button type="button" class="review-reset-button" @click="addUserMusicRoot">Add user root</button>
+                  </div>
+
+                  <article class="panel-light review-empty-state" v-if="!form.paths.userMusicRoots.length">
+                    <h3>No per-user destinations configured</h3>
+                    <p>Preview falls back to the shared library root until a user-specific destination is configured.</p>
+                  </article>
+
+                  <div class="settings-mapping-list" v-else>
+                    <article class="settings-mapping-card" v-for="(userMusicRoot, index) in form.paths.userMusicRoots" :key="`user-music-root-${index}`">
+                      <label>
+                        App user id
+                        <input v-model="userMusicRoot.userId" placeholder="user-1" />
+                      </label>
+                      <label>
+                        Relative subdirectory
+                        <input v-model="userMusicRoot.relativeRoot" placeholder="household/alice" />
+                      </label>
+                      <button type="button" class="review-reset-button" @click="removeUserMusicRoot(index)">Remove user root</button>
+                    </article>
+                  </div>
+                </section>
+              </section>
             </div>
 
-            <div class="settings-mapping-list" v-if="pathValidation.userMusicRoots?.length">
-              <article class="settings-mapping-card" v-for="userMusicRoot in pathValidation.userMusicRoots" :key="`validated-user-root-${userMusicRoot.index}`">
-                <div class="section-header">
-                  <div>
-                    <p class="eyebrow">Per-user root {{ userMusicRoot.index + 1 }}</p>
-                    <h3>{{ userMusicRoot.userId }} -> {{ userMusicRoot.relativeRoot }}</h3>
-                  </div>
-                  <span class="review-status-pill" :class="statusClass(userMusicRoot.status)">{{ statusLabel(userMusicRoot.status) }}</span>
+            <section class="settings-validation-section settings-workspace-section settings-subsection-card" v-if="pathValidation">
+              <div class="section-header">
+                <div>
+                  <p class="eyebrow">Path validation</p>
+                  <p class="metadata-card-copy">{{ pathValidation.summary.message }}</p>
                 </div>
-                <p class="metadata-card-copy">{{ userMusicRoot.message }}</p>
-                <dl class="review-meta-grid review-meta-grid-wide">
-                  <div>
-                    <dt>Resolved root</dt>
-                    <dd>{{ userMusicRoot.path }}</dd>
-                  </div>
-                  <div v-if="userMusicRoot.resolvedPath && userMusicRoot.resolvedPath !== userMusicRoot.path">
-                    <dt>Canonical path</dt>
-                    <dd>{{ userMusicRoot.resolvedPath }}</dd>
-                  </div>
-                </dl>
-              </article>
-            </div>
+                <span class="review-status-pill" :class="statusClass(pathValidation.summary.status)">
+                  {{ statusLabel(pathValidation.summary.status) }}
+                </span>
+              </div>
 
-            <article class="panel-light review-empty-state" v-if="!pathValidation.downloadMappings?.length && !pathValidation.userMusicRoots?.length">
-              <h3>No mapping validation rows</h3>
-              <p>{{ pathValidation.notes.remoteSlskdValidation }}</p>
-            </article>
+              <div class="dependency-grid" v-if="pathValidation.roots?.length">
+                <article class="dependency-card" :class="`dependency-card-${root.status}`" v-for="root in pathValidation.roots" :key="root.key">
+                  <div class="dependency-card-header">
+                    <div>
+                      <p>{{ root.label }}</p>
+                      <strong>{{ root.path }}</strong>
+                    </div>
+                    <span class="dependency-status-dot" />
+                  </div>
+                  <p class="dependency-message">{{ root.message }}</p>
+                  <p class="dependency-observed" v-if="root.resolvedPath && root.resolvedPath !== root.path">Resolved {{ root.resolvedPath }}</p>
+                </article>
+              </div>
+
+              <div class="settings-mapping-list" v-if="pathValidation.downloadMappings?.length">
+                <article class="settings-mapping-card" v-for="mapping in pathValidation.downloadMappings" :key="mapping.index">
+                  <div class="section-header">
+                    <div>
+                      <p class="eyebrow">Mapping {{ mapping.index + 1 }}</p>
+                      <h3>{{ mapping.slskdPrefix }} -> {{ mapping.harmoniarrPrefix }}</h3>
+                    </div>
+                    <span class="review-status-pill" :class="statusClass(mapping.status)">{{ statusLabel(mapping.status) }}</span>
+                  </div>
+                  <p class="metadata-card-copy">{{ mapping.message }}</p>
+                  <dl class="review-meta-grid review-meta-grid-wide">
+                    <div>
+                      <dt>Example source</dt>
+                      <dd>{{ mapping.exampleSourcePath }}</dd>
+                    </div>
+                    <div>
+                      <dt>Example translated</dt>
+                      <dd>{{ mapping.exampleTranslatedPath }}</dd>
+                    </div>
+                  </dl>
+                </article>
+              </div>
+
+              <div class="settings-mapping-list" v-if="pathValidation.userMusicRoots?.length">
+                <article class="settings-mapping-card" v-for="userMusicRoot in pathValidation.userMusicRoots" :key="`validated-user-root-${userMusicRoot.index}`">
+                  <div class="section-header">
+                    <div>
+                      <p class="eyebrow">Per-user root {{ userMusicRoot.index + 1 }}</p>
+                      <h3>{{ userMusicRoot.userId }} -> {{ userMusicRoot.relativeRoot }}</h3>
+                    </div>
+                    <span class="review-status-pill" :class="statusClass(userMusicRoot.status)">{{ statusLabel(userMusicRoot.status) }}</span>
+                  </div>
+                  <p class="metadata-card-copy">{{ userMusicRoot.message }}</p>
+                  <dl class="review-meta-grid review-meta-grid-wide">
+                    <div>
+                      <dt>Resolved root</dt>
+                      <dd>{{ userMusicRoot.path }}</dd>
+                    </div>
+                    <div v-if="userMusicRoot.resolvedPath && userMusicRoot.resolvedPath !== userMusicRoot.path">
+                      <dt>Canonical path</dt>
+                      <dd>{{ userMusicRoot.resolvedPath }}</dd>
+                    </div>
+                  </dl>
+                </article>
+              </div>
+
+              <article class="panel-light review-empty-state" v-if="!pathValidation.downloadMappings?.length && !pathValidation.userMusicRoots?.length">
+                <h3>No mapping validation rows</h3>
+                <p>{{ pathValidation.notes.remoteSlskdValidation }}</p>
+              </article>
+            </section>
           </section>
-        </section>
 
-        <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
-        <p class="success-copy" v-if="successMessage">{{ successMessage }}</p>
-        <button type="submit" :disabled="isSaving">
-          {{ isSaving ? 'Saving...' : 'Save settings' }}
-        </button>
-      </form>
-    </article>
+          <div class="settings-save-bar">
+            <div>
+              <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
+              <p class="success-copy" v-if="successMessage">{{ successMessage }}</p>
+            </div>
+            <button type="submit" :disabled="isSaving">
+              {{ isSaving ? 'Saving...' : 'Save settings' }}
+            </button>
+          </div>
+        </form>
+      </article>
 
-    <article class="panel-light">
+      <article id="users-access" class="panel-light settings-anchor-section">
       <div class="section-header">
         <div>
           <p class="eyebrow">Users and permissions</p>
@@ -1427,6 +1524,7 @@ onMounted(() => {
           </article>
         </div>
       </template>
-    </article>
+      </article>
+    </template>
   </section>
 </template>

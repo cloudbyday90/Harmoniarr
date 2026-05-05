@@ -156,6 +156,14 @@ label {
   gap: 16px;
 }
 
+.settings-form-stack,
+.settings-workspace-section,
+.settings-nav-list,
+.settings-save-bar {
+  display: grid;
+  gap: 16px;
+}
+
 .bootstrap-status-card {
   display: grid;
   gap: 14px;
@@ -217,6 +225,65 @@ label {
 .settings-mapping-card {
   display: grid;
   gap: 14px;
+}
+
+.settings-nav-panel {
+  position: sticky;
+  top: 24px;
+  z-index: 4;
+}
+
+.settings-nav-list {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.settings-nav-link {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(250, 244, 228, 0.75);
+  border: 1px solid rgba(17, 37, 36, 0.08);
+}
+
+.settings-nav-link.is-active,
+.settings-nav-link.router-link-active {
+  border-color: rgba(24, 57, 54, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(24, 57, 54, 0.18);
+  background: rgba(236, 242, 235, 0.92);
+}
+
+.settings-nav-link-label {
+  font-weight: 600;
+  color: #183936;
+}
+
+.settings-nav-link-copy {
+  color: #435753;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.settings-anchor-section {
+  scroll-margin-top: 120px;
+}
+
+.settings-subsection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.settings-subsection-card {
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(250, 244, 228, 0.75);
+  border: 1px solid rgba(17, 37, 36, 0.08);
+}
+
+.settings-save-bar {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .settings-mapping-card {
@@ -914,6 +981,16 @@ dd {
 
   .metadata-search-form {
     grid-template-columns: 1fr;
+  }
+
+  .settings-subsection-grid,
+  .settings-save-bar,
+  .settings-nav-list {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-nav-panel {
+    position: static;
   }
 
   .review-filter-grid {
