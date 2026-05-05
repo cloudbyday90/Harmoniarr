@@ -5,12 +5,12 @@ import { createIntegrationAppRuntime } from '../../testing/integration/app-runti
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
 import { createSessionHttpClient } from '../../testing/server/http-session-client.js';
 import {
+  acquireIntegrationLock,
   createBackupExport,
-  enterMaintenanceLock,
   getBackupExportById,
   getBackupRestorePreview,
   listBackupExports,
-  releaseMaintenanceLock,
+  releaseIntegrationLock,
   startBackupRestoreApply,
 } from '../../testing/integration/recovery-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
@@ -329,75 +329,6 @@ suite('integration auth, settings, and recovery routes', () => {
     });
   });
 
-  test('maintenance locks replay idempotently and surface through recovery diagnostics', {
-    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
-  }, async (t) => {
-    if (runtimeUnavailableReason) {
-      t.skip(runtimeUnavailableReason);
-      return;
-    }
-
-    await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
-      await bootstrapAdminSession(client);
-
-      const firstEnter = await enterMaintenanceLock(client, {
-        idempotencyKey: 'integration-lock-enter-1',
-      });
-
-      assert.equal(firstEnter.response.status, 202);
-      assert.equal(firstEnter.payload.ok, true);
-      assert.equal(firstEnter.payload.lock.lockType, 'maintenance');
-      assert.equal(firstEnter.payload.lock.status, 'active');
-      const lockId = firstEnter.payload.lock.id;
-
-      const replayedEnter = await enterMaintenanceLock(client, {
-        idempotencyKey: 'integration-lock-enter-1',
-      });
-
-      assert.equal(replayedEnter.response.status, 202);
-      assert.equal(replayedEnter.payload.lock.id, lockId);
-
-      const activeLockRows = await getPoolFn().query(`
-        SELECT COUNT(*)::integer AS active_count
-        FROM maintenance_locks
-        WHERE status = 'active'
-      `);
-      assert.equal(activeLockRows.rows[0].active_count, 1);
-
-      const maintenanceStatus = await client.requestJson('/api/v1/recovery/maintenance-locks');
-      assert.equal(maintenanceStatus.response.status, 200);
-      assert.equal(maintenanceStatus.payload.lockCount, 1);
-      assert.equal(maintenanceStatus.payload.activeLocks[0].id, lockId);
-
-      const diagnostics = await client.requestJson('/api/v1/system/diagnostics/recovery-state');
-      assert.equal(diagnostics.response.status, 200);
-      assert.equal(diagnostics.payload.maintenance.lockCount, 1);
-      assert.equal(diagnostics.payload.maintenance.activeLocks[0].id, lockId);
-      assert.equal(
-        diagnostics.payload.recentPrivilegedActions.some((entry) => entry.eventType === 'maintenance_lock_entered'),
-        true,
-      );
-
-      const releaseResponse = await releaseMaintenanceLock(client, lockId, {
-        idempotencyKey: 'integration-lock-release-1',
-      });
-
-      assert.equal(releaseResponse.response.status, 200);
-      assert.equal(releaseResponse.payload.ok, true);
-      assert.equal(releaseResponse.payload.lock.id, lockId);
-      assert.equal(releaseResponse.payload.lock.status, 'released');
-
-      const releasedLockRows = await getPoolFn().query(`
-        SELECT COUNT(*)::integer AS released_count
-        FROM maintenance_locks
-        WHERE status = 'released'
-      `);
-      assert.equal(releasedLockRows.rows[0].released_count, 1);
-    }, {
-      scenarioName: 'maintenance_lock_diagnostics',
-    });
-  });
-
   test('backup export, restore preview, and restore apply honor maintenance-lock readiness through the real recovery routes', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
@@ -479,12 +410,11 @@ suite('integration auth, settings, and recovery routes', () => {
       assert.equal(initialPreviewResponse.payload.integrity.actualPayloadSha256, expectedPayloadSha256);
       assert.equal(initialPreviewResponse.payload.compatibility.compatible, true);
 
-      const lockResponse = await enterMaintenanceLock(client, {
-        idempotencyKey: 'integration-backup-restore-lock-1',
+      const lockResponse = await acquireIntegrationLock(getPoolFn(), {
+        lockType: 'restore',
         reason: 'Block restore apply during integration preview',
       });
-      assert.equal(lockResponse.response.status, 202);
-      const lockId = lockResponse.payload.lock.id;
+      const lockId = lockResponse.id;
 
       const blockedPreviewResponse = await getBackupRestorePreview(client, backupArtifactId);
       assert.equal(blockedPreviewResponse.response.status, 200);
@@ -500,10 +430,7 @@ suite('integration auth, settings, and recovery routes', () => {
       assert.equal(blockedApplyResponse.response.status, 409);
       assert.equal(blockedApplyResponse.payload.error.code, 'recovery_lock_conflict');
 
-      const lockReleaseResponse = await releaseMaintenanceLock(client, lockId, {
-        idempotencyKey: 'integration-backup-restore-lock-release-1',
-      });
-      assert.equal(lockReleaseResponse.response.status, 200);
+      await releaseIntegrationLock(getPoolFn(), lockId);
 
       const restoreApplyResponse = await startBackupRestoreApply(client, backupArtifactId, {
         expectedPayloadSha256,

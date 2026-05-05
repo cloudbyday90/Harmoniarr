@@ -37,7 +37,6 @@ import { createAdminRecoveryStore } from './recovery/admin-recovery-store.js';
 import { createControlPlaneIdempotencyService } from './recovery/control-plane-idempotency-service.js';
 import { createControlPlaneIdempotencyStore } from './recovery/control-plane-idempotency-store.js';
 import { createIdempotencyRecordCleanupHeartbeat } from './recovery/idempotency-record-cleanup-heartbeat.js';
-import { createMaintenanceLockControlService } from './recovery/maintenance-lock-control-service.js';
 import { createMaintenanceLockOperationPauseService } from './recovery/maintenance-lock-operation-pause-service.js';
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { createRecoveryDiagnosticsService } from './recovery/recovery-diagnostics-service.js';
@@ -71,7 +70,6 @@ export function createSystemModule({
   controlPlaneIdempotencyService = createControlPlaneIdempotencyService(),
   controlPlaneIdempotencyStore = createControlPlaneIdempotencyStore(),
   idempotencyRecordCleanupHeartbeat = null,
-  maintenanceLockControlService = null,
   maintenanceLockService = createMaintenanceLockService(),
   maintenanceLockOperationPauseService = null,
   metadataMonitoringStore = null,
@@ -131,12 +129,6 @@ export function createSystemModule({
     replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
     releaseMaintenanceLock: maintenanceLockService.releaseMaintenanceLock,
     updateSettingsFn: settingsService.updateSettings,
-  }),
-  systemMaintenanceLockControlService = maintenanceLockControlService ?? createMaintenanceLockControlService({
-    acquireMaintenanceLock: maintenanceLockService.acquireMaintenanceLock,
-    getMaintenanceLockById: maintenanceLockService.getMaintenanceLockById,
-    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
-    releaseMaintenanceLock: maintenanceLockService.releaseMaintenanceLock,
   }),
   systemAdminRecoveryService = adminRecoveryService ?? createAdminRecoveryService({
     adminRecoveryStore,
@@ -271,9 +263,6 @@ export function createSystemModule({
       getBackupExportById: systemBackupExportService.getBackupExportById,
       getBackupExportDownloadById: systemBackupExportService.getBackupExportDownloadById,
       getBackupRestorePreview: systemBackupRestorePreviewService.getBackupRestorePreview,
-      getMaintenanceLockStatus: systemMaintenanceLockControlService.getMaintenanceLockStatus,
-      enterMaintenanceLock: systemMaintenanceLockControlService.enterMaintenanceLock,
-      releaseMaintenanceLockById: systemMaintenanceLockControlService.releaseMaintenanceLockById,
       getQueueDiagnostics: resolvedSystemRecoveryDiagnosticsService.getQueueDiagnostics,
       getRecoveryDiagnostics: resolvedSystemRecoveryDiagnosticsService.getRecoveryDiagnostics,
       getDiagnosticsExportDownload: resolvedSystemDiagnosticsExportService.getDiagnosticsExportDownload,

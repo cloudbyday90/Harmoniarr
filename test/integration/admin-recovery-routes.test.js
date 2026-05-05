@@ -3,7 +3,7 @@ import { after, before, suite, test } from 'node:test';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { armBootstrapAdminRecovery } from '../../testing/integration/admin-recovery-helpers.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
-import { enterMaintenanceLock } from '../../testing/integration/recovery-helpers.js';
+import { acquireIntegrationLock } from '../../testing/integration/recovery-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -190,12 +190,11 @@ suite('integration admin recovery routes', () => {
         reason: 'integration lock conflict test',
       });
 
-      const lockResponse = await enterMaintenanceLock(client, {
-        idempotencyKey: 'admin-recovery-restore-lock-1',
+      const lock = await acquireIntegrationLock(getPoolFn(), {
         lockType: 'restore',
         reason: 'Simulated restore in progress',
       });
-      assert.equal(lockResponse.response.status, 202);
+      assert.ok(lock.id);
 
       const statusResponse = await publicClient.requestJson('/api/v1/recovery/bootstrap-admin/status');
       assert.equal(statusResponse.response.status, 200);

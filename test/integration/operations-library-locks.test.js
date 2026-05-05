@@ -15,7 +15,7 @@ import { operationRunRegistry } from '../../src/shared/operation-run-descriptors
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
 import { seedOperationRunFixture } from '../../testing/integration/operation-run-fixtures.js';
-import { enterMaintenanceLock } from '../../testing/integration/recovery-helpers.js';
+import { acquireIntegrationLock } from '../../testing/integration/recovery-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -219,7 +219,7 @@ suite('integration operations lifecycle and library lock routes', () => {
     });
   });
 
-  test('maintenance locks block library discovery, organize, and scan run starts consistently', {
+  test('locks block library discovery, organize, and scan run starts consistently', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -227,14 +227,13 @@ suite('integration operations lifecycle and library lock routes', () => {
       return;
     }
 
-    await integrationRuntime.runScenario(async ({ client }) => {
+    await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
       await bootstrapAdminSession(client);
 
-      const lockResponse = await enterMaintenanceLock(client, {
-        idempotencyKey: 'library-lock-guard-1',
+      await acquireIntegrationLock(getPoolFn(), {
+        lockType: 'restore',
         reason: 'Pause unsafe library writes',
       });
-      assert.equal(lockResponse.response.status, 202);
 
       const discoveryResponse = await client.requestJson('/api/v1/library/discovery-runs', {
         csrf: true,
@@ -266,7 +265,7 @@ suite('integration operations lifecycle and library lock routes', () => {
     });
   });
 
-  test('maintenance locks pause a claimed library scan run and return it to pending without spending retry budget', {
+  test('a lock pauses a claimed library scan run and returns it to pending without spending retry budget', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -334,11 +333,11 @@ suite('integration operations lifecycle and library lock routes', () => {
       assert.ok(claimedRun?.claimedAt);
       assert.equal(claimedRun?.claimedByInstanceId, 'integration-library-scan-worker');
 
-      const lockResponse = await enterMaintenanceLock(client, {
-        idempotencyKey: 'library-scan-worker-pause-lock',
+      const lock = await acquireIntegrationLock(getPoolFn(), {
+        lockType: 'restore',
         reason: 'Pause claimed library scan worker startup',
       });
-      assert.equal(lockResponse.response.status, 202);
+      assert.ok(lock.id);
 
       await worker.startWorkerRun({
         libraryRoot: '/library/music',
@@ -358,8 +357,8 @@ suite('integration operations lifecycle and library lock routes', () => {
       assert.equal(persistedRun.summary.libraryRoot, '/library/music');
       assert.equal(persistedRun.summary.currentStep, 'Library scan paused by maintenance lock');
       assert.equal(persistedRun.summary.pauseCode, maintenanceLockPauseCode);
-      assert.equal(persistedRun.summary.pauseProvider, 'maintenance');
-      assert.match(persistedRun.summary.pauseMessage, /library scan is paused while the maintenance lock is active/i);
+      assert.equal(persistedRun.summary.pauseProvider, 'restore');
+      assert.match(persistedRun.summary.pauseMessage, /library scan is paused while the restore maintenance lock is active/i);
     }, {
       scenarioName: 'maintenance_lock_library_scan_worker_pause',
     });

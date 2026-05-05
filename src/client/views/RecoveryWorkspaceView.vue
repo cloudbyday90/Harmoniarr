@@ -61,7 +61,6 @@ const {
   applyRestore,
 } = useRecoveryBackups();
 const {
-  actionErrorMessage: diagnosticsActionErrorMessage,
   errorMessage: diagnosticsErrorMessage,
   isLoading: isLoadingDiagnostics,
   loadDiagnostics,
@@ -429,8 +428,8 @@ watch(
         </button>
       </header>
       <div class="hx-card-body">
-        <p style="font-size: var(--hx-text-sm); color: var(--hx-danger)" v-if="diagnosticsActionErrorMessage">{{ diagnosticsActionErrorMessage }}</p>
         <p style="font-size: var(--hx-text-sm); color: var(--hx-danger)" v-if="diagnosticsErrorMessage">{{ diagnosticsErrorMessage }}</p>
+
         <p class="hx-text-muted" v-else-if="isLoadingDiagnostics">Loading…</p>
 
         <template v-else>
