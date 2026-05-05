@@ -19,6 +19,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import AuthEntryShell from '../components/AuthEntryShell.vue';
+import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
 import { useRecoveryStatus } from '../composables/useRecoveryStatus.js';
 
 const router = useRouter();
@@ -41,6 +43,7 @@ const {
   stopPolling,
   submitRecovery,
 } = useRecoveryStatus();
+const supportItems = computed(() => buildAuthEntrySupportItems('recovery', { username: form.username }));
 
 const countdownDisplay = computed(() => {
   const total = secondsRemaining.value;
@@ -114,17 +117,14 @@ function goToLogin() {
 </script>
 
 <template>
-  <section class="auth-layout">
-    <article class="hero-card panel-dark">
-      <p class="eyebrow">Bootstrap-admin recovery</p>
-      <h1>Recover admin access</h1>
-      <p>
-        This page is available only when a recovery run has been armed from the command line
-        using <code>harmoniarrctl recovery arm-bootstrap-admin</code>. Submit the recovery code, choose a new
-        admin username and password, and all existing sessions will be revoked.
-      </p>
-    </article>
-
+  <AuthEntryShell
+    eyebrow="Bootstrap-admin recovery"
+    title="Recover admin access"
+    description="Use this only when an operator armed bootstrap-admin recovery from the command line. Completing recovery revokes existing sessions and restores local admin access."
+    detail="This is an emergency path, not the ordinary account-claim flow. Use the recovery code shown by harmoniarrctl and set a new local admin password."
+    :support-items="supportItems"
+    support-title="Related auth routes"
+  >
     <article class="panel-light bootstrap-status-card" v-if="isLoading">
       <p class="eyebrow">Checking recovery status</p>
       <p>Loading recovery run information...</p>
@@ -153,14 +153,14 @@ function goToLogin() {
         <h2>Admin account recovered successfully</h2>
         <p>
           The bootstrap-admin recovery has been completed. All existing sessions have been
-          revoked. Use your new credentials to sign in.
+          revoked. Use your new credentials to log in.
         </p>
         <ul class="status-metrics" v-if="completionResult.recoveryChecklist?.length">
           <li v-for="item in completionResult.recoveryChecklist" :key="item">
             <span>{{ item }}</span>
           </li>
         </ul>
-        <button type="button" @click="goToLogin">Sign in</button>
+        <button type="button" @click="goToLogin">Go to login</button>
       </article>
     </template>
 
@@ -178,18 +178,18 @@ function goToLogin() {
             <strong :class="{ 'error-copy': remainingAttempts <= 2 }">{{ remainingAttempts }}</strong>
           </li>
           <li v-if="blockedByLock">
-            <span>Lock status</span>
-            <strong class="error-copy">Blocked by active maintenance lock</strong>
+            <span>Safety hold status</span>
+            <strong class="error-copy">Blocked by an active safety hold</strong>
           </li>
         </ul>
         <p class="error-copy" v-if="expired">This recovery run has expired. Arm a new run from the command line.</p>
         <p class="error-copy" v-else-if="remainingAttempts <= 0">Too many invalid attempts. This recovery run has been invalidated.</p>
-        <p class="error-copy" v-else-if="blockedByLock">Recovery cannot complete while a conflicting maintenance lock is active. Wait for the lock to be released or contact an operator.</p>
+        <p class="error-copy" v-else-if="blockedByLock">Recovery cannot complete while a conflicting safety hold is active. Wait for the hold to be released or contact an operator.</p>
       </article>
 
-      <article class="form-card panel-light">
+      <article class="form-card panel-light auth-entry-form-card">
         <h2>Complete recovery</h2>
-        <p class="muted-copy">
+        <p class="auth-entry-form-copy">
           Enter the recovery code displayed by <code>harmoniarrctl recovery arm-bootstrap-admin</code>,
           then choose a username and password for the new admin account.
         </p>
@@ -218,5 +218,5 @@ function goToLogin() {
         </form>
       </article>
     </template>
-  </section>
+    </AuthEntryShell>
 </template>

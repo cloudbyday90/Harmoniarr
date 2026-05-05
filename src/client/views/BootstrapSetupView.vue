@@ -17,8 +17,10 @@
 -->
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import AuthEntryShell from '../components/AuthEntryShell.vue';
+import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
 import { useBootstrapStatus } from '../composables/useBootstrapStatus.js';
 import { sessionStore } from '../state/session.js';
 
@@ -33,6 +35,7 @@ const {
   ownerClaimSummary,
   pathValidationSummary,
 } = useBootstrapStatus();
+const supportItems = computed(() => buildAuthEntrySupportItems('bootstrap'));
 
 function formatCheckedAt(value) {
   if (!value) {
@@ -82,20 +85,14 @@ async function submit() {
 </script>
 
 <template>
-  <section class="auth-layout">
-    <article class="hero-card panel-dark">
-      <p class="eyebrow">First-run setup</p>
-      <h1>{{ ownerClaimSummary?.required ? 'Claim the configured owner account' : 'Bootstrap the first admin' }}</h1>
-      <p>
-        Harmoniarr now has the runtime, migration layer, and protected routes in place.
-        The first step is establishing the initial administrator account.
-      </p>
-      <p v-if="ownerClaimSummary?.required" class="muted-copy">
-        This install was preconfigured with an owner claim secret, so first-run setup must match the configured
-        owner identity before the initial admin account can be created.
-      </p>
-    </article>
-
+  <AuthEntryShell
+    eyebrow="First-run setup"
+    :title="ownerClaimSummary?.required ? 'Claim the configured owner account' : 'Create the first admin account'"
+    description="New installs start here. Harmoniarr already has the runtime, migrations, and protected routes in place, but the first administrator still needs to be established."
+    :detail="ownerClaimSummary?.required ? 'This install was preconfigured with an owner claim secret, so setup must match the expected owner identity before the first admin can be created.' : ''"
+    :support-items="supportItems"
+    support-title="How this setup fits the auth family"
+  >
     <article class="panel-light bootstrap-status-card">
       <p class="eyebrow">Setup preflight</p>
       <h2>Validate shared paths before scan and import</h2>
@@ -126,8 +123,9 @@ async function submit() {
       </template>
     </article>
 
-    <article class="form-card panel-light">
+    <article class="form-card panel-light auth-entry-form-card">
       <h2>{{ ownerClaimSummary?.required ? 'Claim owner account' : 'Create admin account' }}</h2>
+      <p class="auth-entry-form-copy">This form establishes the first durable administrator for the install.</p>
       <form class="stack-form" @submit.prevent="submit">
         <label v-if="ownerClaimSummary?.required">
           Claim code
@@ -171,5 +169,5 @@ async function submit() {
         </button>
       </form>
     </article>
-  </section>
+  </AuthEntryShell>
 </template>

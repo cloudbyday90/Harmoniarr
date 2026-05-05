@@ -17,8 +17,10 @@
 -->
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import AuthEntryShell from '../components/AuthEntryShell.vue';
+import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
@@ -29,22 +31,22 @@ const form = reactive({
 });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
-
-function infoMessage() {
+const infoMessage = computed(() => {
   if (route.query.reason === 'claim-complete') {
-    return 'Your account claim is complete. Sign in with the password you just set.';
+    return 'Your account claim is complete. Log in with the password you just set.';
   }
 
   if (route.query.reason === 'session-expired') {
-    return 'Your session expired. Sign in again to continue.';
+    return 'Your session expired. Log in again to continue.';
   }
 
   if (route.query.reason === 'reauth-required') {
-    return 'A privileged action requires you to re-authenticate before continuing.';
+    return 'A privileged action requires you to confirm your password again before continuing.';
   }
 
   return '';
-}
+});
+const supportItems = computed(() => buildAuthEntrySupportItems('login', { username: form.username }));
 
 async function submit() {
   errorMessage.value = '';
@@ -61,19 +63,25 @@ async function submit() {
 </script>
 
 <template>
-  <section class="auth-layout">
-    <article class="hero-card panel-dark">
-      <p class="eyebrow">Browser auth</p>
-      <h1>Sign in to Harmoniarr</h1>
-      <p>
-        Session cookies and CSRF protection are now active. Login uses the same local
-        auth model planned in the implementation docs.
-      </p>
-    </article>
+  <AuthEntryShell
+    eyebrow="Local access"
+    title="Log in to Harmoniarr"
+    description="Use your local Harmoniarr account to manage requests, imports, diagnostics, and recovery from the same protected browser session."
+    detail="If an administrator issued a claim code, set that password first, then come back here to log in normally."
+    :support-items="supportItems"
+    support-title="Choose the right entry path"
+  >
+    <template #status>
+      <article class="panel-light bootstrap-status-card" v-if="infoMessage">
+        <p class="eyebrow">Session status</p>
+        <h2>Continue with local login</h2>
+        <p class="auth-entry-inline-status">{{ infoMessage }}</p>
+      </article>
+    </template>
 
-    <article class="form-card panel-light">
+    <article class="form-card panel-light auth-entry-form-card">
       <h2>Login</h2>
-      <p class="metadata-card-copy" v-if="infoMessage()">{{ infoMessage() }}</p>
+      <p class="auth-entry-form-copy">Enter the username or email tied to your local Harmoniarr account.</p>
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username or email
@@ -85,13 +93,10 @@ async function submit() {
         </label>
         <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
         <button type="submit" :disabled="isSubmitting">
-          {{ isSubmitting ? 'Signing in...' : 'Login' }}
+          {{ isSubmitting ? 'Logging in...' : 'Log in' }}
         </button>
       </form>
-      <p class="metadata-card-copy">Have a claim code for an existing account? Use the public claim flow first.</p>
-      <RouterLink class="secondary-button" :to="{ name: 'claim-account', query: form.username ? { username: form.username } : {} }">
-        Claim account
-      </RouterLink>
+      <p class="auth-entry-inline-note">Need a first password for an existing account? Use the claim-account path shown in the related entry points.</p>
     </article>
-  </section>
+  </AuthEntryShell>
 </template>

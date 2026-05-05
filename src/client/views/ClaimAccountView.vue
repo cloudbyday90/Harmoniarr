@@ -17,9 +17,11 @@
 -->
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import AuthEntryShell from '../components/AuthEntryShell.vue';
 import { claimAccount } from '../lib/auth-api.js';
+import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -31,6 +33,7 @@ const form = reactive({
 });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
+const supportItems = computed(() => buildAuthEntrySupportItems('claim-account', { username: form.username }));
 
 async function submit() {
   errorMessage.value = '';
@@ -62,18 +65,17 @@ async function submit() {
 </script>
 
 <template>
-  <section class="auth-layout">
-    <article class="hero-card panel-dark">
-      <p class="eyebrow">Account claim</p>
-      <h1>Set your Harmoniarr password</h1>
-      <p>
-        Use the one-time claim code issued by an administrator to set a local password for your existing account.
-        This does not sign you in automatically. After the claim succeeds, return to the login screen and sign in normally.
-      </p>
-    </article>
-
-    <article class="form-card panel-light">
+  <AuthEntryShell
+    eyebrow="Claim access"
+    title="Activate an existing account"
+    description="Use a one-time claim code from an administrator to set the first local password for an existing Harmoniarr account."
+    detail="Claiming an account does not sign you in automatically. After the claim succeeds, return to normal login and continue there."
+    :support-items="supportItems"
+    support-title="Related auth routes"
+  >
+    <article class="form-card panel-light auth-entry-form-card">
       <h2>Claim account</h2>
+      <p class="auth-entry-form-copy">Use the same username or email the administrator assigned to your account.</p>
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username or email
@@ -96,6 +98,7 @@ async function submit() {
           {{ isSubmitting ? 'Claiming...' : 'Claim account' }}
         </button>
       </form>
+      <p class="auth-entry-inline-note">After the claim completes, go back to the login screen and use the password you just set.</p>
     </article>
-  </section>
+  </AuthEntryShell>
 </template>
