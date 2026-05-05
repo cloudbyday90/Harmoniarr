@@ -7,6 +7,7 @@ The current repository contains planning documents while product, architecture, 
 Harmoniarr is being planned as a self-hosted FOSS application with no SLA or operational warranty. The docs in this repository describe intended behavior and design direction, not a hosted-service support commitment.
 
 - [Planning document](docs/harmoniarr.md)
+- [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
 - [Docker deployment baseline](docs/DOCKER_DEPLOYMENT.md)
 - [Backup, restore, and upgrade design](docs/BACKUP_RESTORE_DESIGN.md)
 - [Bootstrap-admin recovery runbook](docs/ADMIN_RECOVERY_RUNBOOK.md)
