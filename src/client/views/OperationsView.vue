@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, nextTick, onMounted, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
 import {
@@ -32,11 +32,9 @@ import {
   getOperationRunDescriptor,
 } from '../lib/operation-run-link-targets.js';
 import {
-  getOperationRunStatusClass,
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
 import {
-  getOperationRunAttentionLabel,
   getOperationRunNextStep,
   getOperationRunOperatorSummary,
   groupOperationRunsForDisplay,
@@ -45,6 +43,8 @@ import {
 const route = useRoute();
 const router = useRouter();
 const operationDetailHash = '#operation-run-detail-panel';
+
+const activeFilter = ref(null);
 
 const {
   cancellationErrorMessage,
@@ -75,10 +75,22 @@ const selectedRunWorkflowTarget = computed(() => buildOperationRunLinkTarget({
   runId: selectedRun.value?.id,
 }));
 
+const filterOptions = computed(() => {
+  const options = [
+    { id: null, label: 'All', count: runs.value.length },
+    ...groupedRuns.value.map((g) => ({ id: g.id, label: g.title, count: g.runs.length })),
+  ];
+  return options.filter((o) => o.id === null || o.count > 0);
+});
+
+const displayGroups = computed(() => {
+  if (!activeFilter.value) return groupedRuns.value;
+  return groupedRuns.value.filter((g) => g.id === activeFilter.value);
+});
+
 function buildMergedOperationsRouteQuery(nextState) {
   const query = { ...route.query };
   delete query.runId;
-
   return {
     ...query,
     ...buildOperationsRouteQuery({
@@ -108,10 +120,7 @@ async function replaceOperationsRouteState(nextState, { hash = route.hash } = {}
 }
 
 function scrollDetailIntoView() {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
+  if (typeof document === 'undefined') return;
   document.getElementById('operation-run-detail-panel')?.scrollIntoView({
     behavior: 'smooth',
     block: 'start',
@@ -119,41 +128,57 @@ function scrollDetailIntoView() {
 }
 
 function formatTimestamp(value) {
-  if (!value) {
-    return 'Not yet recorded';
-  }
+  if (!value) return 'Not yet recorded';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+}
 
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
+function formatTimestampShort(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  const diffMs = Date.now() - d.getTime();
+  if (diffMs < 60_000) return 'Just now';
+  if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
+  if (diffMs < 86_400_000) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString();
 }
 
 function operationTitle(operationType) {
   return getOperationRunDescriptor(operationType).title;
 }
 
-function leaseStateLabel(state) {
-  switch (state) {
-    case 'active':
-      return 'Active';
-    case 'expired':
-      return 'Expired';
-    case 'released':
-      return 'Released';
-    default:
-      return 'Unknown';
+function runStatusTone(status) {
+  switch (status) {
+    case 'failed': return 'danger';
+    case 'cancelled': return 'warning';
+    case 'running': return 'success';
+    default: return null;
   }
 }
 
-function leaseStateClass(state) {
+function groupTone(groupId) {
+  switch (groupId) {
+    case 'needs-attention': return 'danger';
+    case 'in-progress': return 'success';
+    default: return null;
+  }
+}
+
+function leaseStateLabel(state) {
   switch (state) {
-    case 'active':
-      return 'review-status-pending';
-    case 'expired':
-      return 'review-status-failed';
-    case 'released':
-      return 'review-status-selected';
-    default:
-      return 'review-status-held';
+    case 'active': return 'Active';
+    case 'expired': return 'Expired';
+    case 'released': return 'Released';
+    default: return 'Unknown';
+  }
+}
+
+function leaseStateTone(state) {
+  switch (state) {
+    case 'active': return 'success';
+    case 'expired': return 'danger';
+    default: return null;
   }
 }
 
@@ -179,18 +204,9 @@ function formatSummaryLabel(key) {
 }
 
 function formatSummaryValue(value) {
-  if (Array.isArray(value)) {
-    return `${value.length} record${value.length === 1 ? '' : 's'}`;
-  }
-
-  if (typeof value === 'boolean') {
-    return value ? 'Yes' : 'No';
-  }
-
-  if (typeof value === 'object') {
-    return 'Structured data recorded';
-  }
-
+  if (Array.isArray(value)) return `${value.length} record${value.length === 1 ? '' : 's'}`;
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'object') return 'Structured data recorded';
   return String(value);
 }
 
@@ -202,18 +218,12 @@ async function handleSelectRun(runId) {
 }
 
 async function handleRequestCancellation() {
-  if (!selectedRun.value?.id) {
-    return;
-  }
-
+  if (!selectedRun.value?.id) return;
   await requestCancellation({ runId: selectedRun.value.id });
 }
 
 async function handleRequestRetry() {
-  if (!selectedRun.value?.id) {
-    return;
-  }
-
+  if (!selectedRun.value?.id) return;
   await requestRetry({ runId: selectedRun.value.id });
 }
 
@@ -224,9 +234,7 @@ onMounted(() => {
 watch(
   () => operationsRouteState.value.runId,
   (nextRunId, previousRunId) => {
-    if (nextRunId === previousRunId) {
-      return;
-    }
+    if (nextRunId === previousRunId) return;
 
     if (!nextRunId) {
       void loadOperationHistory({ preferredRunId: null });
@@ -243,262 +251,277 @@ watch(
 </script>
 
 <template>
-  <section class="page-stack operations-layout">
-    <article class="panel-dark hero-card compact">
-      <p class="eyebrow">Background work</p>
-      <h2>Queued, active, and completed automation</h2>
-      <p>
-        Start with the runs that need attention, monitor work that is still moving, and open technical detail only when you need deeper diagnostics.
-      </p>
-    </article>
+  <section class="hx-page">
+    <header class="hx-page-header">
+      <div>
+        <h2 class="hx-page-title">Operations</h2>
+        <p class="hx-page-subtitle">Background work — queued, active, and completed runs.</p>
+      </div>
+      <div class="hx-page-actions">
+        <button
+          type="button"
+          class="hx-btn"
+          @click="loadOperationHistory({ preferredRunId: selectedRunId || null })"
+          :disabled="isLoadingHistory"
+        >
+          {{ isLoadingHistory ? 'Refreshing…' : 'Refresh' }}
+        </button>
+      </div>
+    </header>
 
     <div class="operations-grid">
-      <article class="panel-light">
-        <div class="section-header">
-          <div>
-            <p class="eyebrow">Recent jobs</p>
-            <h3>Run monitor</h3>
+
+      <!-- Run monitor -->
+      <article class="hx-card">
+        <header class="hx-card-header ops-monitor-header">
+          <h3 class="hx-card-title">Run monitor</h3>
+          <div class="ops-filter-bar" v-if="filterOptions.length > 1">
+            <button
+              v-for="option in filterOptions"
+              :key="String(option.id)"
+              type="button"
+              class="ops-filter-tab"
+              :data-active="activeFilter === option.id || undefined"
+              @click="activeFilter = option.id"
+            >
+              {{ option.label }}
+              <span class="ops-filter-count">{{ option.count }}</span>
+            </button>
           </div>
-          <button type="button" class="secondary-button" @click="loadOperationHistory({ preferredRunId: selectedRunId || null })" :disabled="isLoadingHistory">
-            {{ isLoadingHistory ? 'Refreshing...' : 'Refresh jobs' }}
-          </button>
+        </header>
+
+        <div v-if="errorMessage" class="hx-card-body">
+          <span class="hx-pill" data-tone="danger">{{ errorMessage }}</span>
         </div>
 
-        <article class="error-panel panel-light" v-if="errorMessage">
-          <h3>Operation history unavailable</h3>
-          <p>{{ errorMessage }}</p>
-        </article>
+        <div v-else-if="isLoadingHistory" class="hx-card-body">
+          <p class="hx-text-muted">Loading background work history…</p>
+        </div>
 
-        <p v-else-if="isLoadingHistory">Loading queued, active, and completed background work.</p>
+        <div v-else-if="!runs.length" class="hx-card-body">
+          <div class="hx-empty">
+            <p class="hx-empty-title">No runs recorded yet</p>
+            <p class="hx-empty-copy">Background operations will appear here once triggered from Settings or an activity view.</p>
+          </div>
+        </div>
 
-        <p class="metadata-card-copy" v-else-if="!runs.length">No background work has been recorded yet.</p>
-
-        <div class="operations-group-list" v-else>
-          <section class="operations-group" v-for="group in groupedRuns" :key="group.id">
-            <div class="section-header">
-              <div>
-                <p class="eyebrow">{{ group.title }}</p>
-                <p class="metadata-card-copy">{{ group.description }}</p>
-              </div>
-            </div>
-
-            <div class="session-list">
-              <article class="session-row" v-for="run in group.runs" :key="run.id">
-                <div>
-                  <p class="eyebrow">{{ getOperationRunAttentionLabel(run) }}</p>
-                  <strong>{{ operationTitle(run.operationType) }}</strong>
-                  <p class="metadata-card-copy">{{ getOperationRunOperatorSummary(run) }}</p>
-                  <p class="muted-copy">Run ID {{ run.id }}</p>
-                  <p class="muted-copy">Started {{ formatTimestamp(run.startedAt) }}</p>
-                  <p class="muted-copy" v-if="run.finishedAt">Finished {{ formatTimestamp(run.finishedAt) }}</p>
-                  <p class="muted-copy" v-if="run.maxAttempts || run.attemptCount">
-                    Attempt {{ run.attemptCount ?? 0 }} of {{ run.maxAttempts ?? 1 }}
-                  </p>
-                  <p class="muted-copy" v-if="run.cancelRequestedAt">
-                    Cancellation requested {{ formatTimestamp(run.cancelRequestedAt) }}
-                  </p>
-                  <p class="muted-copy" v-if="run.status === 'pending' && run.nextAttemptAt">
-                    Next attempt {{ formatTimestamp(run.nextAttemptAt) }}
-                  </p>
-                  <p class="muted-copy" v-if="run.errorMessage && (run.status === 'failed' || run.status === 'cancelled')">
-                    Exact failure detail is available in the selected run panel.
-                  </p>
-                </div>
-                <div class="session-actions operations-actions">
-                  <span class="review-status-pill" :class="getOperationRunStatusClass(run.status)">
-                    {{ getOperationRunStatusLabel(run.status, { defaultLabel: 'Unknown' }) }}
-                  </span>
-                  <button type="button" class="secondary-button" @click="handleSelectRun(run.id)">
-                    View detail
-                  </button>
-                  <RouterLink v-if="runLinkTarget(run)" class="secondary-button" :to="runLinkTarget(run).to">
-                    {{ runLinkTarget(run).label }}
-                  </RouterLink>
-                </div>
-              </article>
-            </div>
-          </section>
+        <div v-else class="hx-card-body is-flush">
+          <table class="hx-table">
+            <thead>
+              <tr>
+                <th>Operation</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="group in displayGroups" :key="group.id">
+                <tr v-if="displayGroups.length > 1" class="ops-group-row">
+                  <td colspan="4">
+                    <span v-if="groupTone(group.id)" class="hx-pill" :data-tone="groupTone(group.id)">{{ group.title }}</span>
+                    <span v-else class="ops-group-label">{{ group.title }}</span>
+                  </td>
+                </tr>
+                <tr
+                  v-for="run in group.runs"
+                  :key="run.id"
+                  class="ops-run-row"
+                  :class="{ 'ops-run-row--selected': run.id === selectedRunId }"
+                  @click="handleSelectRun(run.id)"
+                >
+                  <td class="ops-run-name">
+                    {{ operationTitle(run.operationType) }}
+                    <span v-if="run.attemptCount > 1" class="hx-text-muted"> · attempt {{ run.attemptCount }}</span>
+                  </td>
+                  <td>
+                    <span class="hx-pill" :data-tone="runStatusTone(run.status)">
+                      {{ getOperationRunStatusLabel(run.status, { defaultLabel: 'Unknown' }) }}
+                    </span>
+                  </td>
+                  <td class="hx-text-muted ops-time-cell">{{ formatTimestampShort(run.startedAt) }}</td>
+                  <td class="ops-run-actions">
+                    <RouterLink
+                      v-if="runLinkTarget(run)"
+                      class="hx-btn"
+                      :to="runLinkTarget(run).to"
+                      @click.stop
+                    >
+                      {{ runLinkTarget(run).label }}
+                    </RouterLink>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
         </div>
       </article>
 
-      <article id="operation-run-detail-panel" class="panel-light">
-        <div class="section-header">
+      <!-- Run detail -->
+      <article id="operation-run-detail-panel" class="hx-card">
+        <header class="hx-card-header">
           <div>
-            <p class="eyebrow">Selected job</p>
-            <h3>Run detail</h3>
+            <h3 class="hx-card-title">Run detail</h3>
+            <p class="hx-card-subtitle" v-if="!selectedRun && !isLoadingDetail">Select a run to inspect what happened.</p>
           </div>
-          <div class="operations-actions">
+          <div class="hx-card-actions" v-if="selectedRun">
             <button
               v-if="canRequestCancellation"
               type="button"
-              class="secondary-button"
+              class="hx-btn"
               @click="handleRequestCancellation"
               :disabled="isCancellingRun"
             >
-              {{ isCancellingRun ? 'Requesting cancel...' : 'Request cancel' }}
+              {{ isCancellingRun ? 'Cancelling…' : 'Cancel run' }}
             </button>
             <button
               v-if="canRequestRetry"
               type="button"
-              class="secondary-button"
+              class="hx-btn"
               @click="handleRequestRetry"
               :disabled="isRetryingRun"
             >
-              {{ isRetryingRun ? 'Scheduling retry...' : 'Retry run' }}
+              {{ isRetryingRun ? 'Retrying…' : 'Retry' }}
             </button>
-            <RouterLink v-if="selectedRunWorkflowTarget" class="secondary-button" :to="selectedRunWorkflowTarget.to">
+            <RouterLink v-if="selectedRunWorkflowTarget" class="hx-btn" :to="selectedRunWorkflowTarget.to">
               {{ selectedRunWorkflowTarget.label }}
             </RouterLink>
           </div>
-        </div>
+        </header>
 
-        <p class="error-copy" v-if="cancellationErrorMessage">{{ cancellationErrorMessage }}</p>
-        <p class="error-copy" v-if="retryErrorMessage">{{ retryErrorMessage }}</p>
-        <p class="error-copy" v-if="detailErrorMessage">{{ detailErrorMessage }}</p>
-
-        <p v-else-if="isLoadingDetail">Loading the selected run and its timeline.</p>
-
-        <p class="metadata-card-copy" v-else-if="!selectedRun">Select a run to review what happened, what to do next, and the technical detail behind it.</p>
-
-        <template v-else>
-          <div class="review-detail-header">
-            <div>
-              <p class="eyebrow">{{ getOperationRunAttentionLabel(selectedRun) }}</p>
-              <h3>{{ operationTitle(selectedRun.operationType) }}</h3>
-              <p class="metadata-card-copy">Run ID {{ selectedRun.id }}</p>
-              <p class="metadata-card-copy">Triggered by {{ selectedRun.triggeredByUserId || 'system or unknown actor' }}</p>
-            </div>
-            <span class="review-status-pill" :class="getOperationRunStatusClass(selectedRun.status)">
-              {{ getOperationRunStatusLabel(selectedRun.status, { defaultLabel: 'Unknown' }) }}
-            </span>
+        <div class="hx-card-body">
+          <div v-if="cancellationErrorMessage || retryErrorMessage || detailErrorMessage" class="ops-error-strip">
+            <span v-if="cancellationErrorMessage" class="hx-pill" data-tone="danger">{{ cancellationErrorMessage }}</span>
+            <span v-if="retryErrorMessage" class="hx-pill" data-tone="danger">{{ retryErrorMessage }}</span>
+            <span v-if="detailErrorMessage" class="hx-pill" data-tone="danger">{{ detailErrorMessage }}</span>
           </div>
 
-          <div class="operations-insight-grid">
-            <article class="operations-insight-card">
-              <p class="eyebrow">What happened</p>
-              <strong>{{ getOperationRunOperatorSummary(selectedRun) }}</strong>
-            </article>
-            <article class="operations-insight-card">
-              <p class="eyebrow">What to do next</p>
-              <strong>{{ getOperationRunNextStep(selectedRun) }}</strong>
-            </article>
-            <article class="operations-insight-card">
-              <p class="eyebrow">Owning workflow</p>
-              <RouterLink v-if="selectedRunWorkflowTarget" class="secondary-button" :to="selectedRunWorkflowTarget.to">
-                {{ selectedRunWorkflowTarget.label }}
-              </RouterLink>
-              <strong v-else>No linked workflow surface is registered for this run yet.</strong>
-            </article>
-          </div>
+          <p v-if="isLoadingDetail" class="hx-text-muted">Loading run detail and timeline…</p>
 
-          <article class="operations-detail-card" v-if="selectedRun.errorMessage">
-            <p class="eyebrow">Latest issue</p>
-            <strong>{{ selectedRun.errorMessage }}</strong>
-          </article>
-
-          <dl class="review-meta-grid onboarding-meta-grid">
-            <div>
-              <dt>Started</dt>
-              <dd>{{ formatTimestamp(selectedRun.startedAt) }}</dd>
-            </div>
-            <div>
-              <dt>Finished</dt>
-              <dd>{{ formatTimestamp(selectedRun.finishedAt) }}</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>{{ getOperationRunStatusLabel(selectedRun.status, { defaultLabel: 'Unknown' }) }}</dd>
-            </div>
-            <div v-if="selectedRun.maxAttempts || selectedRun.attemptCount">
-              <dt>Attempts</dt>
-              <dd>{{ selectedRun.attemptCount ?? 0 }} of {{ selectedRun.maxAttempts ?? 1 }}</dd>
-            </div>
-            <div v-if="selectedRun.nextAttemptAt">
-              <dt>Next attempt</dt>
-              <dd>{{ formatTimestamp(selectedRun.nextAttemptAt) }}</dd>
-            </div>
-            <div v-if="selectedRun.cancelRequestedAt">
-              <dt>Cancel requested</dt>
-              <dd>{{ formatTimestamp(selectedRun.cancelRequestedAt) }}</dd>
-            </div>
-            <div v-if="selectedRun.cancelRequestedByUserId">
-              <dt>Cancel requested by</dt>
-              <dd>{{ selectedRun.cancelRequestedByUserId }}</dd>
-            </div>
-          </dl>
-
-          <p class="metadata-card-copy" v-if="!selectedRunLease">
-            No active worker lease is currently recorded for this run.
-          </p>
-
-          <article class="operations-detail-card" v-if="summaryEntries(selectedRun.summary).length">
-            <h3>Recorded outcome</h3>
-            <dl class="review-meta-grid operation-summary-grid">
-              <div v-for="entry in summaryEntries(selectedRun.summary)" :key="entry.key">
-                <dt>{{ formatSummaryLabel(entry.key) }}</dt>
-                <dd>{{ formatSummaryValue(entry.value) }}</dd>
-              </div>
-            </dl>
-          </article>
-
-          <details class="operation-summary-raw" v-if="Object.keys(selectedRun.summary ?? {}).length">
-            <summary>Recorded summary JSON</summary>
-            <pre>{{ JSON.stringify(selectedRun.summary, null, 2) }}</pre>
-          </details>
-
-          <details class="operation-summary-raw" v-if="selectedRun.claimedAt || selectedRun.claimedByInstanceId || selectedRunLease">
-            <summary>Worker and technical detail</summary>
-            <dl class="review-meta-grid onboarding-meta-grid">
+          <template v-else-if="selectedRun">
+            <div class="ops-run-detail-header">
               <div>
-                <dt>Operation type</dt>
-                <dd>{{ selectedRun.operationType }}</dd>
+                <strong class="ops-run-detail-name">{{ operationTitle(selectedRun.operationType) }}</strong>
+                <p class="hx-text-muted">
+                  Triggered by {{ selectedRun.triggeredByUserId || 'system' }} · Run {{ selectedRun.id }}
+                </p>
               </div>
-              <div v-if="selectedRun.claimedAt">
-                <dt>Queue claimed</dt>
-                <dd>{{ formatTimestamp(selectedRun.claimedAt) }}</dd>
-              </div>
-              <div v-if="selectedRun.claimedByInstanceId">
-                <dt>Claimed by</dt>
-                <dd>{{ selectedRun.claimedByInstanceId }}</dd>
-              </div>
-              <div v-if="selectedRunLease">
-                <dt>Lease state</dt>
-                <dd>
-                  <span class="review-status-pill" :class="leaseStateClass(selectedRunLease.state)">
-                    {{ leaseStateLabel(selectedRunLease.state) }}
-                  </span>
-                </dd>
-              </div>
-              <div v-if="selectedRunLease">
-                <dt>Lease owner</dt>
-                <dd>{{ selectedRunLease.ownerInstanceId }}</dd>
-              </div>
-              <div v-if="selectedRunLease">
-                <dt>Last heartbeat</dt>
-                <dd>{{ formatTimestamp(selectedRunLease.heartbeatAt) }}</dd>
-              </div>
-              <div v-if="selectedRunLease">
-                <dt>Lease expiry</dt>
-                <dd>{{ formatTimestamp(selectedRunLease.expiresAt) }}</dd>
-              </div>
-            </dl>
-          </details>
+              <span class="hx-pill" :data-tone="runStatusTone(selectedRun.status)">
+                {{ getOperationRunStatusLabel(selectedRun.status, { defaultLabel: 'Unknown' }) }}
+              </span>
+            </div>
 
-          <article class="operations-detail-card">
-            <h3>Run timeline</h3>
-            <p class="metadata-card-copy" v-if="!selectedRunDetail?.auditEvents?.length">No timeline events were recorded for this run.</p>
-            <div class="session-list" v-else>
-              <article class="session-row" v-for="event in selectedRunDetail.auditEvents" :key="event.id">
-                <div>
-                  <p class="eyebrow">{{ formatTimestamp(event.occurredAt) }}</p>
-                  <strong>{{ event.summary }}</strong>
-                  <p class="muted-copy">{{ event.eventType }}</p>
-                </div>
+            <div class="operations-insight-grid">
+              <article class="operations-insight-card">
+                <p class="eyebrow">What happened</p>
+                <strong>{{ getOperationRunOperatorSummary(selectedRun) }}</strong>
+              </article>
+              <article class="operations-insight-card">
+                <p class="eyebrow">What to do next</p>
+                <strong>{{ getOperationRunNextStep(selectedRun) }}</strong>
+              </article>
+              <article class="operations-insight-card" v-if="selectedRun.errorMessage">
+                <p class="eyebrow">Latest issue</p>
+                <strong>{{ selectedRun.errorMessage }}</strong>
               </article>
             </div>
-          </article>
-        </template>
+
+            <div class="ops-timeline" v-if="selectedRunDetail?.auditEvents?.length">
+              <p class="ops-section-label">Run timeline</p>
+              <div class="ops-timeline-list">
+                <div class="ops-timeline-event" v-for="event in selectedRunDetail.auditEvents" :key="event.id">
+                  <span class="ops-timeline-time">{{ formatTimestampShort(event.occurredAt) }}</span>
+                  <span class="ops-timeline-dot"></span>
+                  <div class="ops-timeline-body">
+                    <strong>{{ event.summary }}</strong>
+                    <span class="hx-text-muted">{{ event.eventType }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <details class="ops-technical-details">
+              <summary>Technical detail</summary>
+              <dl class="ops-meta-dl">
+                <div>
+                  <dt>Operation type</dt>
+                  <dd>{{ selectedRun.operationType }}</dd>
+                </div>
+                <div>
+                  <dt>Started</dt>
+                  <dd>{{ formatTimestamp(selectedRun.startedAt) }}</dd>
+                </div>
+                <div>
+                  <dt>Finished</dt>
+                  <dd>{{ formatTimestamp(selectedRun.finishedAt) }}</dd>
+                </div>
+                <div v-if="selectedRun.attemptCount || selectedRun.maxAttempts">
+                  <dt>Attempts</dt>
+                  <dd>{{ selectedRun.attemptCount ?? 0 }} of {{ selectedRun.maxAttempts ?? 1 }}</dd>
+                </div>
+                <div v-if="selectedRun.nextAttemptAt">
+                  <dt>Next attempt</dt>
+                  <dd>{{ formatTimestamp(selectedRun.nextAttemptAt) }}</dd>
+                </div>
+                <div v-if="selectedRun.cancelRequestedAt">
+                  <dt>Cancellation requested</dt>
+                  <dd>{{ formatTimestamp(selectedRun.cancelRequestedAt) }}</dd>
+                </div>
+                <div v-if="selectedRun.cancelRequestedByUserId">
+                  <dt>Cancelled by</dt>
+                  <dd>{{ selectedRun.cancelRequestedByUserId }}</dd>
+                </div>
+                <div v-if="selectedRun.claimedAt">
+                  <dt>Queue claimed</dt>
+                  <dd>{{ formatTimestamp(selectedRun.claimedAt) }}</dd>
+                </div>
+                <div v-if="selectedRun.claimedByInstanceId">
+                  <dt>Claimed by instance</dt>
+                  <dd>{{ selectedRun.claimedByInstanceId }}</dd>
+                </div>
+                <div v-if="selectedRunLease">
+                  <dt>Lease state</dt>
+                  <dd>
+                    <span class="hx-pill" :data-tone="leaseStateTone(selectedRunLease.state)">
+                      {{ leaseStateLabel(selectedRunLease.state) }}
+                    </span>
+                  </dd>
+                </div>
+                <div v-if="selectedRunLease">
+                  <dt>Lease owner</dt>
+                  <dd>{{ selectedRunLease.ownerInstanceId }}</dd>
+                </div>
+                <div v-if="selectedRunLease">
+                  <dt>Last heartbeat</dt>
+                  <dd>{{ formatTimestamp(selectedRunLease.heartbeatAt) }}</dd>
+                </div>
+                <div v-if="selectedRunLease">
+                  <dt>Lease expiry</dt>
+                  <dd>{{ formatTimestamp(selectedRunLease.expiresAt) }}</dd>
+                </div>
+              </dl>
+
+              <div v-if="summaryEntries(selectedRun.summary).length" class="ops-sub-section">
+                <p class="ops-section-label">Recorded outcome</p>
+                <dl class="ops-meta-dl">
+                  <div v-for="entry in summaryEntries(selectedRun.summary)" :key="entry.key">
+                    <dt>{{ formatSummaryLabel(entry.key) }}</dt>
+                    <dd>{{ formatSummaryValue(entry.value) }}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div v-if="Object.keys(selectedRun.summary ?? {}).length" class="ops-sub-section">
+                <p class="ops-section-label">Raw JSON</p>
+                <pre class="ops-pre">{{ JSON.stringify(selectedRun.summary, null, 2) }}</pre>
+              </div>
+            </details>
+          </template>
+
+          <p v-else class="hx-text-muted">Select a run from the monitor to see what happened, what to do next, and the technical detail behind it.</p>
+        </div>
       </article>
+
     </div>
   </section>
 </template>
