@@ -1,34 +1,36 @@
 # Issue #4 — Home Page: Media Hub Redesign — Search-First Request Flow, Activity Summary & Artist Monitoring
 
-## Status: In Progress — DashboardView.vue rewritten, nav renamed, MusicBrainz release search intake complete, stats row + request/wanted/downloads tables complete. Artist search mode, already-requested cross-reference, and monitored-artist detection not yet implemented.
+## Status: Not Started
 
 ### Implementation Progress
 
-**Step 1 — Completed:** Remove all operator panels from `DashboardView.vue` (library scan, reconciliation, discovery, artwork, runtime overview). Rewrite from scratch as a media-centric landing page.
+**Step 1 — Not Started:** Remove all operator panels from `DashboardView.vue` (library scan, reconciliation, discovery, artwork, runtime overview). Rewrite from scratch as a media-centric landing page.
 
-**Step 2 — Completed:** Rename nav label `Dashboard` → `Home` in `AppShell.vue` `operatorNav` array.
+**Step 2 — Not Started:** Rename nav label `Dashboard` → `Home` in `AppShell.vue` `operatorNav` array.
 
-**Step 3 — Completed:** MusicBrainz release search intake. Single search box queries `searchMusicBrainzReleases` (`/api/v1/metadata/musicbrainz/releases/search`). Results render as a list (artist name, title, year · type · country). Each result has a per-card **Request** button that calls `createMediaRequest` directly. Button transitions: idle → `Requesting…` → `Requested` (success pill). Per-card error message on failure.
+**Step 3 — Not Started:** MusicBrainz release search intake. Single search box queries `searchMusicBrainzReleases` (`/api/v1/metadata/musicbrainz/releases/search`). Results render as a list (artist name, title, year · type · country). Each result has a per-card **Request** button that calls `createMediaRequest` directly. Button transitions: idle → `Requesting…` → `Requested` (success pill). Per-card error message on failure.
 
-**Step 4 — Completed:** Stats row (`hx-stat-grid`) — My requests (total), Active (queued/downloading/pending import), Missing (monitored releases not yet acquired), Partial (releases with gaps), Downloading (active Soulseek transfers). Sourced from `fetchMediaRequestSummary`, `useLibraryWantedSummary`, and `useAsyncResource` polling `fetchSlskdDownloads` at 8 s. Row hidden until at least one data source resolves.
+**Step 4 — Not Started:** Stats row (`hx-stat-grid`) — My requests (total), Active (queued/downloading/pending import), Missing (monitored releases not yet acquired), Partial (releases with gaps), Downloading (active Soulseek transfers). Sourced from `fetchMediaRequestSummary`, `useLibraryWantedSummary`, and `useAsyncResource` polling `fetchSlskdDownloads` at 8 s. Row hidden until at least one data source resolves.
 
-**Step 5 — Completed:** Three activity cards — Recent requests (last 10, status pills), Wanted releases (top 8, links to `/app/missing`), Active downloads (top 8, links to `/app/activity/downloads`). Each card conditionally rendered; all link to their dedicated full-page views.
+**Step 5 — Not Started:** Three activity cards — Recent requests (last 10, status pills), Wanted releases (top 8, links to `/app/missing`), Active downloads (top 8, links to `/app/activity/downloads`). Each card conditionally rendered; all link to their dedicated full-page views.
 
-**Step 6 — Completed:** Reorder `OnboardingSummaryPanel` — moved below the search card so the request intake is always the hero. Only rendered when `onboardingSummary.issueCount > 0`.
+**Step 6 — Not Started:** Reorder `OnboardingSummaryPanel` — moved below the search card so the request intake is always the hero. Only rendered when `onboardingSummary.issueCount > 0`.
 
-**Remaining:**
-- Artist search mode (toggle release/artist, artist cards, discography browse, Monitor button)
-- Cross-reference `requestedIds` on page load (mark already-requested results immediately after `loadRequests()` resolves)
-- Already-monitored artist detection in artist search results
-- Responsive/mobile: collapse search row on narrow viewports
+**Step 7 — Not Started:** Artist search mode (toggle release/artist, artist cards, discography browse, Monitor button).
+
+**Step 8 — Not Started:** Cross-reference `requestedIds` on page load — mark already-requested results immediately after `loadRequests()` resolves.
+
+**Step 9 — Not Started:** Already-monitored artist detection in artist search results.
+
+**Step 10 — Not Started:** Responsive/mobile — collapse search row on narrow viewports.
 
 ---
 
-### Current State Snapshot (Already Landed)
+### Current State Snapshot (Existing Infrastructure)
 
-The original `DashboardView.vue` was an operator control panel surfacing library scan, reconciliation, discovery, artwork maintenance, runtime overview, heartbeat, activity feed, and dependency status. None of that belonged on the landing page for a media consumption app.
+The current `DashboardView.vue` is an operator control panel surfacing library scan, reconciliation, discovery, artwork maintenance, runtime overview, heartbeat, activity feed, and dependency status. None of that belongs on the landing page for a media consumption app.
 
-The following improvements landed before the media hub redesign proper began (in separate commits), providing the composable and API foundations the new view relies on:
+The following composables and API functions already exist in the codebase and will be used by the new view — no new server routes or migrations are required:
 
 - `useLibraryWantedSummary` and `useLibraryWantedReleases` composables expose wanted-release counts and paginated release lists.
 - `fetchMediaRequests` and `fetchMediaRequestSummary` are available in `library-api.js` with `scope` param support.
