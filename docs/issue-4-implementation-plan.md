@@ -51,6 +51,22 @@
 
 **Step 17 — Not Started:** PWA — Progressive Web App manifest + service worker. Add to home screen on mobile, push notifications ("Your request for [album] is ready"). No app store, no native code. Requires a `manifest.webmanifest`, icons, and a notification delivery mechanism (Web Push API + server-side push subscription management).
 
+**Step 18 — Not Started:** Artist detail page — new `ArtistDetailView.vue` at `/app/artists/:id`. Full discography card grid (grouped by type: Albums, EPs, Singles, Other). Each release card shows its acquisition state: Owned, Missing, Requested, Coming Soon. Bio excerpt from MusicBrainz. Related artists strip (from the similarity route). Monitoring toggle. All actions available from the home page card are also available here, in richer context.
+
+**Step 19 — Not Started:** Release detail modal — before requesting a release, show a modal with tracklist (from MusicBrainz), label, year, format, and any existing request state. A "Request" button inside the modal confirms. Same pattern as Overseerr's content detail overlay. Replaces the current inline request action for any search/card context where the user might want to confirm before requesting.
+
+**Step 20 — Not Started:** Library view — new `LibraryView.vue` at `/app/library`. Artwork-first grid of fully acquired artists and releases. Celebrates what you have, not just what you're missing. Sourced from the existing metadata + library state. Toggle between artist view (grouped) and release view (flat grid). Filter by format, year, genre.
+
+**Step 21 — Not Started:** Album art color extraction — extract the dominant color from each card's artwork and apply it as a subtle CSS variable (`--card-accent`) on that specific card. Used as a card border tint or inner glow. Runs client-side via `canvas.getContext('2d')` after `ArtworkImage.vue` loads. Makes each card visually distinct and the grid feel alive rather than uniform.
+
+**Step 22 — Not Started:** Rich empty states — design intentional, on-brand empty state components for: Discover (no seeds yet), Missing (library is complete), My Requests (no requests yet), Library (empty library). Each has a headline, a brief explanation of what should be here, and a contextual CTA. No screen should show a blank or a bare "No items found" message.
+
+**Step 23 — Not Started:** Global toast/snackbar system — a single `<ToastStack>` component mounted in `AppShell.vue`, driven by a composable (`useToast`). Every action in the app — monitor, request, cancel, error — calls `toast.success()` or `toast.error()` rather than setting inline state. Consistent feedback across all screens without per-component state management.
+
+**Step 24 — Not Started:** Filter and sort controls on card grids — a `<GridControls>` component reused on the home page, Missing screen, Library view, and My Requests. Sort options: name (A–Z), missing count, date monitored, release date. Filter options: type (Albums, EPs, Singles), format (FLAC only, any), monitored status. State persisted to `localStorage` per view.
+
+**Step 25 — Not Started:** System-aware dark/light theme — the design system already uses CSS custom properties. Add a light theme variable set (`[data-theme="light"]`). Default to `prefers-color-scheme`. Add a manual override toggle in Settings → Account (stored in `user_preferences` JSONB). No third-party theme library needed.
+
 ---
 
 ### Current State Snapshot (Existing Infrastructure)
@@ -213,11 +229,43 @@ Soulseek search results are heterogeneous — the same album might appear as a 1
 
 Harmoniarr has no `manifest.webmanifest`, no service worker, and no push notification support. Household users on phones cannot add it to their home screen with a native app experience. Push notifications ("your request is ready") would significantly improve the UX for non-operator users who don't check the app constantly.
 
-### 3.9 No Multi-User Attribution on Requests
+### 3.16 No Multi-User Attribution on Requests
 
 Requests exist with a `requestedBy` user association on the server, but the client displays requests as an undifferentiated list. In a multi-user household, you want to know whose request is whose — both for social context ("Alex requested this") and for operator triage.
 
 Required: request cards throughout the app surface the requesting user's display name or avatar.
+
+### 3.17 No Artist Detail Page
+
+There is nowhere to go when you click an artist. The home page expands inline to show missing releases, but there is no dedicated artist page with a full discography, bio, related artists, and monitoring controls. At scale — when a user monitors dozens of artists — the inline expansion pattern breaks down. A dedicated `/app/artists/:id` page provides the depth the card grid cannot.
+
+### 3.18 No Release Detail Confirmation
+
+Requesting a release is currently a single-tap action with no confirmation or context. A release detail modal — showing tracklist, label, year, existing request state — would reduce mis-requests and give the user context before committing. Consistent with how Overseerr handles this.
+
+### 3.19 No Library View ("What You Have")
+
+Every existing screen focuses on what's missing or what's requested. There is no screen that celebrates what the library already contains. A "Library" view — artwork grid of fully acquired artists and albums — completes the three-part picture: Missing, Requested, Owned.
+
+### 3.20 Artwork Cards Are Visually Uniform
+
+Every card in the grid looks the same — same border, same background, same accent. Album artwork varies, but the card chrome does not respond to it. Dominant-color extraction (a standard web technique via canvas) would give each card a unique tint derived from its own artwork, making the grid visually rich and immediately recognizable at a glance.
+
+### 3.21 Empty States Are Not Designed
+
+When a screen has no data — no monitored artists, no missing releases, no requests — it shows either nothing or a bare text message. These states are the first thing new users see. Intentional empty states with a headline, brief explanation, and contextual CTA are a baseline UX requirement for a media consumption app.
+
+### 3.22 No Global Feedback System
+
+Feedback for user actions (monitoring an artist, submitting a request, encountering an error) is handled per-component with inline state. This means inconsistent UX across screens, some actions giving no visible feedback at all. A global toast/snackbar system driven by a shared composable gives every action a consistent, non-disruptive feedback mechanism.
+
+### 3.23 Card Grids Have No Filter or Sort Controls
+
+At small scale (5 artists, 10 missing releases) the grid is browsable. At real scale (50+ artists, 200+ missing releases) it is not. Without sort (by name, by missing count, by date added) and filter (by type, by format, by monitored status) controls, the grid degrades into a wall of cards with no way to find what you're looking for.
+
+### 3.24 No Theme Support
+
+The design system uses CSS custom properties but only defines one theme (dark). There is no light theme and no mechanism to switch. `prefers-color-scheme` support is a baseline expectation. A light/dark toggle in account settings is table stakes in 2026.
 
 ---
 
@@ -368,6 +416,38 @@ Scoring function applied to Soulseek search results before queuing. Inputs: form
 
 Add `public/manifest.webmanifest` with app name, icons (192px + 512px), `start_url: /app`, `display: standalone`, `theme_color`. Register a service worker (`/sw.js`) for offline shell caching. Implement Web Push: server generates VAPID keys, stores push subscriptions (`user_push_subscriptions` table), sends push notifications on `download_completed` and `request_fulfilled` events via the Web Push API. Client: `Notification.requestPermission()` prompt in Settings → Account after login.
 
+### 5.14 `ArtistDetailView.vue` — New Screen
+
+New view at `/app/artists/:id`. Layout (top to bottom): hero row (large artist artwork + name + monitoring toggle + related-artists strip), then a discography card grid (grouped by type: Albums, EPs, Singles, Other). Each release card shows acquisition state via a pill: Owned, Missing, Requested, or Coming Soon. Release cards are clickable (→ release detail modal, Step 5.15). A "Related Artists" strip at the bottom of the page uses the similarity route data. Route is accessible to both requesters and operators. Nav breadcrumb: `Home → Artist Name`.
+
+### 5.15 Release Detail Modal — `ReleaseDetailModal.vue`
+
+Modal component used wherever a release card appears in the app (home page, Missing screen, Search, Library). Props: `releaseGroupMbid`, `releaseTitle`, `artistName`. On open: fetches tracklist and release metadata from MusicBrainz (`/api/v1/metadata/releases/:mbid`). Displays: large artwork, title, artist, year, label, track count, runtime, tracklist table, current request state. Action button: Request (if not requested), Cancel Request (if pending), or status badge (Downloading, Owned). Dispatches the same `createMediaRequest` flow as the inline button.
+
+### 5.16 `LibraryView.vue` — Owned Music Screen
+
+New view at `/app/library`. Artwork-first grid of fully acquired releases (status = `owned`/`complete` from the library model). Toggle between artist grouping (card-per-artist with album count) and release-flat (card-per-release). Sort: by artist name, by date acquired, by release year. Filter: by format (FLAC, MP3, other), by year range, by genre (if available from metadata). Empty state: "Your library is empty. Request some music to get started." Accessible to both roles.
+
+### 5.17 Album Art Color Extraction — `useArtworkColor` Composable
+
+Composable `useArtworkColor(imgElement)` — takes a loaded `<img>` DOM element reference, draws it to an offscreen canvas, samples the center region for dominant color, returns a CSS hex string. `ArtworkImage.vue` exposes the loaded `imgElement` via a ref. Each card component calls `useArtworkColor` after art loads and sets `--card-accent: <hex>` as an inline CSS variable on the card root. Card CSS uses `--card-accent` for a 1px inset border glow or a subtle radial gradient behind the artwork. Falls back to `--hx-accent-strong` if extraction fails.
+
+### 5.18 Rich Empty States — `EmptyState.vue`
+
+New shared component `EmptyState.vue`. Props: `title`, `body`, `ctaLabel`, `ctaTo` (router-link target). Used on: Discover (no seeds: "Start with an artist you love"), Missing (library complete: "Nothing missing. Library is up to date."), My Requests (no requests: "You haven't requested anything yet."), Library (empty library: "Your library is empty."), Activity feed (no events: "No recent activity."). Each instance is visually distinct via a slot-based icon, not generic. Replaces all bare `hx-empty` text strings.
+
+### 5.19 Global Toast System — `useToast` + `<ToastStack>`
+
+Composable `useToast()` exposes: `toast.success(message)`, `toast.error(message)`, `toast.info(message)`. `<ToastStack>` is mounted once in `AppShell.vue` — listens via a shared reactive queue, renders toasts as a fixed-position stack (bottom-right on desktop, bottom-center on mobile). Toasts auto-dismiss after 4 s. Errors persist until dismissed. All existing inline success/error state in individual views is replaced with `toast.*` calls. No global state store required — a module-level `ref` array is sufficient.
+
+### 5.20 `<GridControls>` — Filter and Sort Bar
+
+Reusable component `GridControls.vue`. Props: `sortOptions` (array of `{ value, label }`), `filterGroups` (array of `{ key, label, options[] }`). Emits: `sort-change`, `filter-change`. Used on: home page artist grid, Missing screen, Library view, My Requests. Renders as a single toolbar row above the card grid — sort dropdown on the left, filter pills on the right. On mobile, collapses to a "Filter & Sort" button that opens a bottom sheet. State is stored in `localStorage` per view key. No server-side filtering needed in v1 — filter/sort operates on the already-fetched data.
+
+### 5.21 Dark / Light Theme
+
+New CSS variable set at `[data-theme="light"]` in `design-system.css`, mapping all `--hx-*` props to light-mode equivalents. `AppShell.vue` reads `user_preferences.theme` (from the existing preferences JSONB column, Step 6.4) and sets `data-theme` on `<html>`. If no preference is set, defaults to `prefers-color-scheme` via a `matchMedia` listener. Manual override toggle in Settings → Account: "Appearance — Dark / System / Light" (three-way). Persisted via `PUT /api/v1/users/me/preferences`.
+
 ---
 
 ## 6. DB Migrations Required
@@ -506,3 +586,24 @@ Requesters seeing each other's requests in the feed could feel intrusive in a ho
 ### 7.9 PWA Push — Which Events Send Notifications?
 
 Too many notifications will cause users to disable them immediately. Candidates: `request_fulfilled` (high value, infrequent), `download_completed` (medium value), `new_release_from_monitored_artist` (medium value, potentially frequent for prolific artists). Tentative: only `request_fulfilled` for v1. Expand in settings later.
+
+### 7.10 Artist Detail — What Is the Right URL Shape for Non-MusicBrainz Artists?
+
+`/app/artists/:id` assumes the artist has a MusicBrainz ID. Artists that were added before MusicBrainz import (manual entries, legacy data) may only have a local DB integer ID. The route needs to handle both ID formats, or artist detail should be restricted to artists with a confirmed MBID. Tentative: require MBID; surface a "No detail available" state for legacy-only artists.
+
+### 7.11 Release Detail Modal — Where Does Tracklist Data Come From?
+
+MusicBrainz has tracklist data, but the local metadata store may not cache it. Fetching on modal open introduces latency. Options: (a) fetch from MusicBrainz on open (simplest, adds ~300ms), (b) pre-fetch and cache tracklist data for all monitored artist releases (heavy), (c) show modal immediately with available data (title, art, year) and lazy-load tracklist below the fold. Tentative: option (c) — progressive disclosure.
+
+### 7.12 Library View — What Defines "Owned"?
+
+The library model tracks files on disk, but "owned" state for a release may be partial (some tracks downloaded, not all). Does the Library view show releases that are fully complete, or any release with at least one track? Tentative: show releases with acquisition state `complete` or `partial`, with a visual distinction (complete = full art, partial = art with a progress overlay).
+
+### 7.13 Color Extraction — Performance Budget on Large Grids?
+
+Canvas-based color extraction on 50+ card images simultaneously on page load could cause jank. Options: (a) extract only on intersection (IntersectionObserver — images already use lazy loading so this aligns), (b) extract one at a time via a microtask queue, (c) skip on mobile. Tentative: run extraction inside the `@load` handler of `ArtworkImage.vue` only after the image enters the viewport. Already aligned with `loading="lazy"`.
+
+### 7.14 GridControls — Client-Side vs. Server-Side Filtering?
+
+For large libraries (1000+ releases), filtering and sorting entirely on the client means fetching all records upfront. This is acceptable for v1 where most libraries are small. But filter/sort should be designed so server-side query params can be added later without changing the component API. Tentative: client-side in v1; `GridControls` emits filter/sort state objects structured to mirror future query params.
+
