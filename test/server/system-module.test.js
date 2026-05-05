@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createMaintenanceLockOperationPauseService } from '../../src/server/recovery/maintenance-lock-operation-pause-service.js';
 import { createSystemModule } from '../../src/server/system-module.js';
 
 test('createSystemModule exposes shared route dependencies from injected services', () => {
@@ -146,4 +147,89 @@ test('createSystemModule exposes shared route dependencies from injected service
     getBootstrapAdminRecoveryStatus: systemModule.adminRecoveryService.getBootstrapAdminRecoveryStatus,
     completeBootstrapAdminRecovery: systemModule.adminRecoveryService.completeBootstrapAdminRecovery,
   });
+});
+
+test('createSystemModule builds recovery diagnostics after pause service initialization', () => {
+  const maintenanceLockOperationPauseService = createMaintenanceLockOperationPauseService({
+    listActiveMaintenanceLocks: async () => [],
+  });
+
+  const systemModule = createSystemModule({
+    activityFeedService: {
+      getActivityFeed: () => [],
+    },
+    appPort: 4312,
+    artworkPolicyService: {
+      buildArtworkOverview: () => {},
+    },
+    artworkSummaryService: {
+      buildArtworkSummary: () => {},
+    },
+    auditReadService: {
+      listRecentAuditEvents: async () => [],
+    },
+    backupExportService: {
+      createBackupExport: () => {},
+      deleteBackupExportById: () => {},
+      getBackupExportById: () => {},
+      getBackupExportDownloadById: () => {},
+      listBackupExports: () => [],
+    },
+    backupRestoreApplyService: {
+      startBackupRestoreApply: () => {},
+    },
+    backupRestorePreviewService: {
+      getBackupRestorePreview: () => {},
+    },
+    controlPlaneIdempotencyService: {
+      executeIdempotentMutation: () => {},
+    },
+    dependencyHealthService: {
+      getDependencyHealth: () => [],
+    },
+    diagnosticsExportService: {
+      getDiagnosticsExportDownload: () => {},
+    },
+    libraryScanSummaryService: {
+      buildLibraryScanSummary: () => {},
+    },
+    maintenanceLockControlService: {
+      enterMaintenanceLock: () => {},
+      getMaintenanceLockStatus: () => {},
+      releaseMaintenanceLockById: () => {},
+    },
+    maintenanceLockOperationPauseService,
+    maintenanceLockService: {
+      acquireMaintenanceLock: () => {},
+      getMaintenanceLockById: () => {},
+      listActiveMaintenanceLocks: async () => [],
+      listRestoreApplyBlockingLocks: async () => [],
+      releaseMaintenanceLock: () => {},
+    },
+    onboardingSummaryService: {
+      buildOnboardingSummary: () => {},
+    },
+    operationHistoryService: {
+      listRecentOperationRuns: async () => [],
+    },
+    operatorNotificationFanoutRunStore: {},
+    operatorNotificationFanoutService: {
+      startOperatorNotificationFanoutRun: () => {},
+    },
+    operatorNotificationFanoutWorker: {},
+    packageJsonPath: 'ignored-for-test',
+    settingsService: {
+      buildSettingsPayload: () => ({}),
+      updateSettings: () => {},
+    },
+    startedAt: new Date('2026-04-28T00:00:00.000Z'),
+    systemService: {
+      getActivityFeed: () => [],
+      getOperatorNotifications: () => [],
+      getOverview: () => ({}),
+    },
+  });
+
+  assert.equal(typeof systemModule.routeDependencies.getQueueDiagnostics, 'function');
+  assert.equal(typeof systemModule.routeDependencies.getRecoveryDiagnostics, 'function');
 });

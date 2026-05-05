@@ -49,6 +49,7 @@ function normalizeOperationRun(row) {
     id: row.id,
     maxAttempts: toNumberOrNull(row.max_attempts),
     nextAttemptAt: row.next_attempt_at?.toISOString?.() ?? row.next_attempt_at ?? null,
+    operationType: row.operation_type ?? null,
     startedAt: row.started_at?.toISOString?.() ?? row.started_at ?? null,
     status: row.status,
     summary: normalizeRunSummary(row.summary),
@@ -100,7 +101,7 @@ export function createOperationRunStore({
           max_attempts
         )
         VALUES ($1, $2, NOW(), $3, $4::jsonb, COALESCE($5::timestamptz, NOW()), $6)
-        RETURNING id, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
+        RETURNING id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
       `,
       [operationType, status, triggeredByUserId, JSON.stringify(normalizeRunSummary(summary)), nextAttemptAt, maxAttempts],
     );
@@ -112,7 +113,7 @@ export function createOperationRunStore({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        SELECT id, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
+        SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
         FROM operation_runs
         WHERE operation_type = $1
           AND status IN ('pending', 'running')
@@ -129,7 +130,7 @@ export function createOperationRunStore({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        SELECT id, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
+        SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
         FROM operation_runs
         WHERE operation_type = $1
         ORDER BY started_at DESC, created_at DESC
@@ -145,7 +146,7 @@ export function createOperationRunStore({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        SELECT id, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
+        SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
         FROM operation_runs
         WHERE operation_type = $1
           AND id = $2
@@ -161,7 +162,7 @@ export function createOperationRunStore({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        SELECT id, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
+        SELECT id, operation_type, status, started_at, finished_at, summary, error_message, cancel_requested_at, cancel_requested_by_user_id, cancelled_at, next_attempt_at, attempt_count, max_attempts, claimed_at, claimed_by_instance_id
         FROM operation_runs
         WHERE operation_type = $1
         ORDER BY started_at DESC, created_at DESC

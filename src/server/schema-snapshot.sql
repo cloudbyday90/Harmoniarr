@@ -3088,3 +3088,80 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260504_030000_admin_recovery_schema_compat.sql
+-- Checksum: 8ced5f2e7662c2a04e99c456bf6a7b2e5089a041a91423c287f3f3b7443779bd
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+ALTER TABLE IF EXISTS admin_recovery_runs
+  ADD COLUMN IF NOT EXISTS reason TEXT NULL;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'admin_recovery_runs'
+      AND column_name = 'details'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'admin_recovery_runs'
+      AND column_name = 'details_json'
+  ) THEN
+    EXECUTE 'ALTER TABLE admin_recovery_runs RENAME COLUMN details TO details_json';
+  END IF;
+END $$;
+
+ALTER TABLE IF EXISTS admin_recovery_runs
+  ADD COLUMN IF NOT EXISTS details_json JSONB NULL;
+
+ALTER TABLE IF EXISTS admin_recovery_runs
+  ALTER COLUMN status SET DEFAULT 'armed',
+  ALTER COLUMN armed_via SET DEFAULT 'harmoniarrctl',
+  ALTER COLUMN armed_at SET DEFAULT NOW();
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260504_030000',
+  '20260504_030000_admin_recovery_schema_compat.sql',
+  'admin_recovery_schema_compat',
+  '8ced5f2e7662c2a04e99c456bf6a7b2e5089a041a91423c287f3f3b7443779bd',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

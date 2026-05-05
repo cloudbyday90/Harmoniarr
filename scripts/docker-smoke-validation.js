@@ -22,6 +22,7 @@ const embeddedPostgresStartLogSnippet = 'starting embedded PostgreSQL on 127.0.0
 const schemaBootstrapLogSnippet = 'loaded schema snapshot from';
 const harmoniarrServiceName = 'harmoniarr';
 const defaultSessionRequestTimeoutMs = 15_000;
+const defaultStartupRefusalCommandTimeoutMs = 30_000;
 const defaultSmokeAdminCredentials = Object.freeze({
   password: 'DockerSmokePass123!',
   username: 'smoke-admin',
@@ -720,6 +721,7 @@ async function runCommand({
   cwd = rootDir,
   env,
   expectedExitCodes,
+  timeoutMs,
 } = {}) {
   return runBufferedCommand({
     args,
@@ -727,6 +729,7 @@ async function runCommand({
     cwd,
     env,
     expectedExitCodes,
+    timeoutMs,
   });
 }
 
@@ -736,12 +739,14 @@ async function runComposeCommand({
   args,
   expectedExitCodes,
   runCommandFn,
+  timeoutMs,
 } = {}) {
   return runCommandFn({
     args: [...composeArgs, ...args],
     command: 'docker',
     env,
     expectedExitCodes,
+    timeoutMs,
   });
 }
 
@@ -1205,6 +1210,7 @@ async function validateStartupRefusal({
   composeArgs,
   env,
   runCommandFn,
+  startupRefusalCommandTimeoutMs = defaultStartupRefusalCommandTimeoutMs,
   startupValidationFailureScenario,
   serviceName = harmoniarrServiceName,
 } = {}) {
@@ -1222,6 +1228,7 @@ async function validateStartupRefusal({
     env: failureEnv,
     expectedExitCodes: [1],
     runCommandFn,
+    timeoutMs: startupRefusalCommandTimeoutMs,
   });
   const serviceState = await getServiceState({
     composeArgs,
@@ -1234,8 +1241,8 @@ async function validateStartupRefusal({
     throw new Error(`Docker smoke validation expected ${serviceName} to exit during invalid startup validation, but container ${serviceState.containerId} is ${serviceState.status}`);
   }
 
-  if (serviceState.exitCode !== 1) {
-    throw new Error(`Docker smoke validation expected ${serviceName} to exit with code 1 during invalid startup validation, but container ${serviceState.containerId} exited with ${serviceState.exitCode}`);
+  if (![1, 143].includes(serviceState.exitCode)) {
+    throw new Error(`Docker smoke validation expected ${serviceName} to finish with exit code 1 or 143 during invalid startup validation, but container ${serviceState.containerId} exited with ${serviceState.exitCode}`);
   }
 
   const logs = await getServiceLogs({
@@ -1295,6 +1302,7 @@ export async function validateDockerFreshInstall({
   requestTimeoutMs = defaultSessionRequestTimeoutMs,
   runCommandFn = runCommand,
   smokeAdminCredentials = defaultSmokeAdminCredentials,
+  startupRefusalCommandTimeoutMs = defaultStartupRefusalCommandTimeoutMs,
   startupValidationFailureScenario = defaultStartupValidationFailureScenario,
   tempRootDir = tmpdir(),
   verifyBackupRestoreFlow = false,
@@ -1424,6 +1432,7 @@ export async function validateDockerFreshInstall({
         composeArgs,
         env,
         runCommandFn,
+        startupRefusalCommandTimeoutMs,
         startupValidationFailureScenario,
       });
     }

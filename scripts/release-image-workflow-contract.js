@@ -185,7 +185,7 @@ export function getWorkflowJobBlock(source, jobId) {
   const collected = [];
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index];
-    if (index > startIndex && /^  [a-z0-9][a-z0-9-]*:$/i.test(line)) {
+    if (index > startIndex && /^ {2}[a-z0-9][a-z0-9-]*:$/i.test(line)) {
       break;
     }
 
@@ -386,7 +386,7 @@ export function validateReleaseImageWorkflowContract(source) {
       issues.push(`${releaseImageUpgradeValidationStep.name} must source HARMONIARR_BASELINE_IMAGE from workflow input or repository variable`);
     }
 
-    if (!block.includes("HARMONIARR_IMAGE: ${{ needs.publish-image.outputs.image_ref }}")) {
+    if (!block.includes(`HARMONIARR_IMAGE: \${{ needs.publish-image.outputs.image_ref }}`)) {
       issues.push(`${releaseImageUpgradeValidationStep.name} must validate the published immutable image`);
     }
   } catch (error) {
@@ -440,7 +440,7 @@ export function validateReleaseImageWorkflowContract(source) {
       issues.push(`${releaseImageUpgradeEvidenceDownloadStep.name} must extract to ${releaseImageUpgradeEvidenceDownloadStep.path}`);
     }
 
-    if (!block.includes("if: ${{ needs.verify-upgrade-path.result == 'success' }}")) {
+    if (!block.includes(`if: \${{ needs.verify-upgrade-path.result == 'success' }}`)) {
       issues.push(`${releaseImageUpgradeEvidenceDownloadStep.name} must only run when verify-upgrade-path succeeded`);
     }
   } catch (error) {
@@ -458,14 +458,14 @@ export function validateReleaseImageWorkflowContract(source) {
       issues.push(`${releaseImageUpgradeEvidenceReleaseContractVerificationStep.name} must verify ${releaseImageUpgradeEvidenceReleaseContractVerificationStep.path}`);
     }
 
-    if (!block.includes("if: ${{ needs.verify-upgrade-path.result == 'success' }}")) {
+    if (!block.includes(`if: \${{ needs.verify-upgrade-path.result == 'success' }}`)) {
       issues.push(`${releaseImageUpgradeEvidenceReleaseContractVerificationStep.name} must only run when verify-upgrade-path succeeded`);
     }
   } catch (error) {
     issues.push(error.message);
   }
 
-  if (!normalizedSource.includes('HARMONIARR_SUMMARY_UPGRADE_SMOKE_EVIDENCE_STATUS: ${{ needs.verify-upgrade-path.result == \'success\' && \'upgrade-path artifact passed\' || \'skipped\' }}')) {
+  if (!normalizedSource.includes(`HARMONIARR_SUMMARY_UPGRADE_SMOKE_EVIDENCE_STATUS: \${{ needs.verify-upgrade-path.result == 'success' && 'upgrade-path artifact passed' || 'skipped' }}`)) {
     issues.push('verify-release-contract summary must report archived upgrade smoke evidence verification status');
   }
 

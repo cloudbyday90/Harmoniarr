@@ -494,7 +494,7 @@ function createRunCommandStub({
   let successfulStartupCount = 0;
 
   async function runCommandFn({ args, command, cwd, env }) {
-    calls.push({ args, command, cwd, env });
+    calls.push({ args, command, cwd, env, timeoutMs: arguments[0].timeoutMs ?? null });
 
     if (command !== 'docker') {
       throw new Error(`Unexpected command: ${command}`);
@@ -667,6 +667,10 @@ test('validateDockerFreshInstall verifies ffmpeg and ffprobe in the running imag
   assert.ok(execCalls.some((command) => command.includes("SELECT COUNT(*) FROM docker_smoke_persistence_probe WHERE probe_key = 'probe_harmoniarrsmoke-test'")));
 
   assert.ok(calls.some(({ args }) => args.includes('--abort-on-container-failure')));
+  assert.equal(
+    calls.find(({ args }) => args.includes('--abort-on-container-failure'))?.timeoutMs,
+    30000,
+  );
   assert.ok(calls.some(({ args }) => args.includes('{{json .State}}')));
 });
 
@@ -762,6 +766,38 @@ test('validateDockerFreshInstall fails when the invalid-startup scenario does no
     }),
     /did not observe the expected startup-refusal log/,
   );
+});
+
+test('validateDockerFreshInstall accepts a final 143 exit code for invalid startup when compose restart policy intervenes', async () => {
+  const { runCommandFn } = createRunCommandStub({
+    failureServiceState: { ExitCode: 143, Status: 'exited' },
+  });
+
+  const result = await validateDockerFreshInstall({
+    fetchFn: async () => createFetchResponse({
+      ok: true,
+      pendingMigrations: 0,
+      service: 'ok',
+    }),
+    getAvailablePortFn: async () => 4304,
+    makeDirectoryLayoutFn: async () => ({
+      appData: '/tmp/appdata',
+      downloads: '/tmp/downloads',
+      music: '/tmp/music',
+      staging: '/tmp/staging',
+      transcodeTemp: '/tmp/transcode-temp',
+    }),
+    mkdtempFn: async () => '/tmp/harmoniarr-smoke',
+    processEnv: {},
+    projectName: 'harmoniarrsmoke-test',
+    removeFn: async () => {},
+    runCommandFn,
+    tempRootDir: '/tmp',
+  });
+
+  assert.equal(result.startupFailure?.composeExitCode, 1);
+  assert.equal(result.startupFailure?.serviceExitCode, 143);
+  assert.equal(result.startupFailure?.serviceStatus, 'exited');
 });
 
 test('validateDockerFreshInstall validates backup export and restore preview/apply through the running control plane', async () => {

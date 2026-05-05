@@ -62,3 +62,26 @@ test('admin recovery store skips database reads when run ids are blank', async (
   assert.equal(run, null);
   assert.equal(queryCount, 0);
 });
+
+test('admin recovery store cancels an armed run with the expected placeholder binding', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [createRecoveryRunRow({
+      cancelled_at: new Date('2026-05-03T00:05:00.000Z'),
+      reason: 'operator requested',
+      status: 'cancelled',
+    })],
+  }));
+  const store = createAdminRecoveryStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const run = await store.cancelRecoveryRun({
+    runId: 'recovery-run-1',
+    reason: 'operator requested',
+  });
+
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['recovery-run-1', 'operator requested']);
+  assert.match(query.mock.calls[0].arguments[0], /reason = COALESCE\(\$2, reason\)/);
+  assert.equal(run.status, 'cancelled');
+  assert.equal(run.reason, 'operator requested');
+});

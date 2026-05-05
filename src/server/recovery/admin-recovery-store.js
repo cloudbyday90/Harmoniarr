@@ -176,7 +176,7 @@ export function createAdminRecoveryStore({
         UPDATE admin_recovery_runs
         SET status = 'cancelled',
             cancelled_at = NOW(),
-            reason = COALESCE($3, reason)
+            reason = COALESCE($2, reason)
         WHERE id = $1 AND status = 'armed'
         RETURNING id, status, recovery_code_hash, armed_via, armed_at, expires_at,
                   invalid_attempt_count, max_attempts, completed_at, cancelled_at,

@@ -24,6 +24,17 @@ export function formatBufferedCommandFailure({
   return `${formatCommand(command, args)} failed with exit code ${exitCode}${output ? `\n${output}` : ''}`;
 }
 
+export function formatBufferedCommandTimeoutFailure({
+  args,
+  command,
+  stderr = '',
+  stdout = '',
+  timeoutMs,
+} = {}) {
+  const output = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
+  return `${formatCommand(command, args)} timed out after ${timeoutMs}ms${output ? `\n${output}` : ''}`;
+}
+
 export async function runBufferedCommand({
   args = [],
   command,
@@ -32,6 +43,7 @@ export async function runBufferedCommand({
   expectedExitCodes = [0],
   spawnFn = spawn,
   stdio = ['ignore', 'pipe', 'pipe'],
+  timeoutMs = null,
   windowsHide = true,
 } = {}) {
   if (!command) {
@@ -56,26 +68,48 @@ export async function runBufferedCommand({
     stderr += chunk.toString();
   });
 
-  const { exitCode } = await Promise.race([
-    once(child, 'close').then(([resolvedExitCode]) => ({ exitCode: resolvedExitCode })),
-    once(child, 'error').then(([error]) => {
-      throw error;
-    }),
-  ]);
+  let timeoutHandle = null;
 
-  if (!expectedExitCodes.includes(exitCode)) {
-    throw new Error(formatBufferedCommandFailure({
-      args,
-      command,
+  try {
+    const { exitCode } = await Promise.race([
+      once(child, 'close').then(([resolvedExitCode]) => ({ exitCode: resolvedExitCode })),
+      once(child, 'error').then(([error]) => {
+        throw error;
+      }),
+      ...(Number.isInteger(timeoutMs) && timeoutMs > 0
+        ? [new Promise((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+              child.kill?.('SIGTERM');
+              reject(new Error(formatBufferedCommandTimeoutFailure({
+                args,
+                command,
+                stderr,
+                stdout,
+                timeoutMs,
+              })));
+            }, timeoutMs);
+          })]
+        : []),
+    ]);
+
+    if (!expectedExitCodes.includes(exitCode)) {
+      throw new Error(formatBufferedCommandFailure({
+        args,
+        command,
+        exitCode,
+        stderr,
+        stdout,
+      }));
+    }
+
+    return {
       exitCode,
       stderr,
       stdout,
-    }));
+    };
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
   }
-
-  return {
-    exitCode,
-    stderr,
-    stdout,
-  };
 }

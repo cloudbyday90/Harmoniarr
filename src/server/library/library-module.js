@@ -94,6 +94,11 @@ export function createLibraryModule({
   libraryMediaRequestNotificationService = createLibraryMediaRequestNotificationService(),
   providerClientResolverService = createProviderClientResolverService(),
   libraryProviderIngestRequestStore = createLibraryProviderIngestRequestStore(),
+  maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockOperationPauseService = null,
+  maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
+    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+  }),
   libraryExternalIntakeRunStore = createLibraryExternalIntakeRunStore(),
   libraryProviderIngestPlanningService = createLibraryProviderIngestPlanningService({
     mediaRequestStore: libraryMediaRequestStore,
@@ -212,11 +217,6 @@ export function createLibraryModule({
   libraryWantedReleaseStore = createLibraryWantedReleaseStore(),
   libraryWantedReleaseService = createLibraryWantedReleaseService({
     libraryWantedReleaseStore,
-  }),
-  maintenanceLockService = createMaintenanceLockService(),
-  maintenanceLockOperationPauseService = null,
-  maintenanceLockWriteGuardService = createMaintenanceLockWriteGuardService({
-    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
   }),
   libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState(),
   libraryDiscoveryRunStore = createLibraryDiscoveryRunStore(),

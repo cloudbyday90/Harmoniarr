@@ -124,29 +124,13 @@ export function createOperationQueueStore({
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
-        UPDATE operation_runs
+        UPDATE operation_runs AS runs
         SET claimed_at = NOW(),
             claimed_by_instance_id = $2,
             attempt_count = attempt_count + 1
         FROM candidate
-        WHERE operation_runs.id = candidate.id
-        RETURNING
-          id,
-          operation_type,
-          status,
-          started_at,
-          finished_at,
-          triggered_by_user_id,
-          summary,
-          error_message,
-          cancel_requested_at,
-          cancel_requested_by_user_id,
-          cancelled_at,
-          next_attempt_at,
-          attempt_count,
-          max_attempts,
-          claimed_at,
-          claimed_by_instance_id
+        WHERE runs.id = candidate.id
+        RETURNING runs.*
       `,
       [normalizeOperationTypes(operationTypes), claimOwnerInstanceId, resolvedClaimTimeoutMs],
     );

@@ -146,6 +146,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       maintenanceLockService: {
         listActiveMaintenanceLocks: async () => [],
       },
+      maintenanceLockOperationPauseService: {
+        resolveDispatchReadiness: () => ({ allowed: true }),
+      },
       libraryModule: {
         libraryDiscoveryHeartbeatState: { kind: 'library-state' },
         libraryDiscoveryRunService: {

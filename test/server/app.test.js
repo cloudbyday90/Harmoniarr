@@ -226,6 +226,7 @@ suite('createApp', () => {
   assert.equal(systemModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(systemModuleArgs.musicBrainzSearchService, metadataModule.musicBrainzSearchService);
   assert.equal(systemModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
+  assert.equal(typeof systemModuleArgs.maintenanceLockOperationPauseService.resolveDispatchReadiness, 'function');
   assert.equal(systemModuleArgs.runtimeResourceService, runtimeResourceService);
 
   const providerError = new Error('MusicBrainz is throttled');
@@ -296,6 +297,7 @@ suite('createApp', () => {
     metadataMonitoringStore: metadataModule.metadataMonitoringStore,
     musicBrainzSearchService: metadataModule.musicBrainzSearchService,
     maintenanceLockService: systemModuleArgs.maintenanceLockService,
+    maintenanceLockOperationPauseService: systemModuleArgs.maintenanceLockOperationPauseService,
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: 'C:/virtual/package.json',
     plexOwnerLinkService: providerModule.plexOwnerLinkService,

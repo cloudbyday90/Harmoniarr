@@ -73,6 +73,7 @@ export function createSystemModule({
   idempotencyRecordCleanupHeartbeat = null,
   maintenanceLockControlService = null,
   maintenanceLockService = createMaintenanceLockService(),
+  maintenanceLockOperationPauseService = null,
   metadataMonitoringStore = null,
   recoveryDiagnosticsService = null,
   restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore(),
@@ -137,15 +138,6 @@ export function createSystemModule({
     listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
     releaseMaintenanceLock: maintenanceLockService.releaseMaintenanceLock,
   }),
-  maintenanceLockOperationPauseService = createMaintenanceLockOperationPauseService({
-    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
-  }),
-  systemRecoveryDiagnosticsService = recoveryDiagnosticsService ?? createRecoveryDiagnosticsService({
-    listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
-    listRecentAuditEvents: resolvedAuditReadService.listRecentAuditEvents,
-    listRecentOperationRuns: operationHistoryService?.listRecentOperationRuns,
-    resolveQueueDispatchReadiness: maintenanceLockOperationPauseService.resolveDispatchReadiness,
-  }),
   systemAdminRecoveryService = adminRecoveryService ?? createAdminRecoveryService({
     adminRecoveryStore,
     maintenanceLockService,
@@ -196,24 +188,36 @@ export function createSystemModule({
     dependencyHealthService,
     settingsService,
   }),
-  systemDiagnosticsExportService = diagnosticsExportService ?? createDiagnosticsExportService({
-    getOperatorNotifications: systemService.getOperatorNotifications,
-    getOverview: systemService.getOverview,
-    getQueueDiagnostics: systemRecoveryDiagnosticsService.getQueueDiagnostics,
-    getRecoveryDiagnostics: systemRecoveryDiagnosticsService.getRecoveryDiagnostics,
-  }),
 } = {}) {
+  const resolvedMaintenanceLockOperationPauseService = maintenanceLockOperationPauseService
+    ?? createMaintenanceLockOperationPauseService({
+      listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+    });
+  const resolvedSystemRecoveryDiagnosticsService = recoveryDiagnosticsService
+    ?? createRecoveryDiagnosticsService({
+      listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+      listRecentAuditEvents: resolvedAuditReadService.listRecentAuditEvents,
+      listRecentOperationRuns: operationHistoryService?.listRecentOperationRuns,
+      resolveQueueDispatchReadiness: resolvedMaintenanceLockOperationPauseService.resolveDispatchReadiness,
+    });
+  const resolvedSystemDiagnosticsExportService = diagnosticsExportService
+    ?? createDiagnosticsExportService({
+      getOperatorNotifications: systemService.getOperatorNotifications,
+      getOverview: systemService.getOverview,
+      getQueueDiagnostics: resolvedSystemRecoveryDiagnosticsService.getQueueDiagnostics,
+      getRecoveryDiagnostics: resolvedSystemRecoveryDiagnosticsService.getRecoveryDiagnostics,
+    });
   const resolvedOperatorNotificationFanoutService = operatorNotificationFanoutService
     ?? createOperatorNotificationFanoutService({
       createOperationRun: operatorNotificationFanoutRunStore.createOperationRun,
       getActiveRun: operatorNotificationFanoutRunStore.getActiveRun,
       getOperatorNotifications: systemService.getOperatorNotifications,
     });
-  const operatorNotificationFanoutInterruptionGate = maintenanceLockOperationPauseService
+  const operatorNotificationFanoutInterruptionGate = resolvedMaintenanceLockOperationPauseService
     ? createOperationRunInterruptionGate({
       isCancellationRequested: operatorNotificationFanoutRunStore.isCancellationRequested,
       operationLabel: 'Operator notification fan-out',
-      operationPauseService: maintenanceLockOperationPauseService,
+      operationPauseService: resolvedMaintenanceLockOperationPauseService,
     })
     : operatorNotificationFanoutRunStore.isCancellationRequested;
   const resolvedOperatorNotificationFanoutWorker = operatorNotificationFanoutWorker
@@ -245,7 +249,7 @@ export function createSystemModule({
     artworkPolicyService,
     artworkSummaryService,
     dependencyHealthService,
-    diagnosticsExportService: systemDiagnosticsExportService,
+    diagnosticsExportService: resolvedSystemDiagnosticsExportService,
     idempotencyRecordCleanupHeartbeat: resolvedIdempotencyRecordCleanupHeartbeat,
     operatorNotificationFanoutRunStore,
     operatorNotificationFanoutService: resolvedOperatorNotificationFanoutService,
@@ -270,9 +274,9 @@ export function createSystemModule({
       getMaintenanceLockStatus: systemMaintenanceLockControlService.getMaintenanceLockStatus,
       enterMaintenanceLock: systemMaintenanceLockControlService.enterMaintenanceLock,
       releaseMaintenanceLockById: systemMaintenanceLockControlService.releaseMaintenanceLockById,
-      getQueueDiagnostics: systemRecoveryDiagnosticsService.getQueueDiagnostics,
-      getRecoveryDiagnostics: systemRecoveryDiagnosticsService.getRecoveryDiagnostics,
-      getDiagnosticsExportDownload: systemDiagnosticsExportService.getDiagnosticsExportDownload,
+      getQueueDiagnostics: resolvedSystemRecoveryDiagnosticsService.getQueueDiagnostics,
+      getRecoveryDiagnostics: resolvedSystemRecoveryDiagnosticsService.getRecoveryDiagnostics,
+      getDiagnosticsExportDownload: resolvedSystemDiagnosticsExportService.getDiagnosticsExportDownload,
       startBackupRestoreApply: systemBackupRestoreApplyService.startBackupRestoreApply,
       executeIdempotentMutation: controlPlaneIdempotencyService.executeIdempotentMutation,
       listBackupExports: systemBackupExportService.listBackupExports,

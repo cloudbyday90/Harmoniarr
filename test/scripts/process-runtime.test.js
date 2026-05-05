@@ -4,16 +4,19 @@ import test from 'node:test';
 
 import {
   formatBufferedCommandFailure,
+  formatBufferedCommandTimeoutFailure,
   runBufferedCommand,
 } from '../../scripts/process-runtime.js';
 
 function createSpawnStub({
   exitCode = 0,
+  hang = false,
   stderr = '',
   stdout = '',
   spawnError = null,
 } = {}) {
   const calls = [];
+  const killCalls = [];
 
   function spawnFn(command, args, options) {
     calls.push({ args, command, options });
@@ -21,6 +24,13 @@ function createSpawnStub({
     const child = new EventEmitter();
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
+    child.kill = (signal) => {
+      killCalls.push(signal ?? 'SIGTERM');
+      queueMicrotask(() => {
+        child.emit('close', null);
+      });
+      return true;
+    };
 
     queueMicrotask(() => {
       if (stdout) {
@@ -36,6 +46,10 @@ function createSpawnStub({
         return;
       }
 
+      if (hang) {
+        return;
+      }
+
       child.emit('close', exitCode);
     });
 
@@ -44,6 +58,7 @@ function createSpawnStub({
 
   return {
     calls,
+    killCalls,
     spawnFn,
   };
 }
@@ -58,6 +73,19 @@ test('formatBufferedCommandFailure includes command, exit code, and output', () 
       stdout: 'partial',
     }),
     'docker inspect image failed with exit code 2\npartial\nfailed',
+  );
+});
+
+test('formatBufferedCommandTimeoutFailure includes command, timeout, and output', () => {
+  assert.equal(
+    formatBufferedCommandTimeoutFailure({
+      args: ['compose', 'up'],
+      command: 'docker',
+      stderr: 'still running',
+      stdout: 'partial logs',
+      timeoutMs: 30000,
+    }),
+    'docker compose up timed out after 30000ms\npartial logs\nstill running',
   );
 });
 
@@ -133,4 +161,23 @@ test('runBufferedCommand surfaces spawn errors', async () => {
     }),
     /spawn failed/,
   );
+});
+
+test('runBufferedCommand kills hung commands when timeout expires', async () => {
+  const { killCalls, spawnFn } = createSpawnStub({
+    hang: true,
+    stdout: 'starting',
+  });
+
+  await assert.rejects(
+    () => runBufferedCommand({
+      args: ['scripts/validate-docker-deployment-path.js'],
+      command: 'node',
+      spawnFn,
+      timeoutMs: 10,
+    }),
+    /node scripts\/validate-docker-deployment-path\.js timed out after 10ms\nstarting/,
+  );
+
+  assert.deepEqual(killCalls, ['SIGTERM']);
 });

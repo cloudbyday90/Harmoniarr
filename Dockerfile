@@ -8,6 +8,7 @@ WORKDIR /build
 
 COPY package.json package-lock.json vite.config.js ./
 COPY src/client ./src/client
+COPY src/shared ./src/shared
 
 RUN npm ci \
     && npm run build:client
@@ -18,6 +19,7 @@ WORKDIR /build
 COPY package.json package-lock.json ./
 COPY scripts/build-server.js ./scripts/build-server.js
 COPY src/server ./src/server
+COPY src/shared ./src/shared
 
 RUN npm ci \
     && npm run build:server
@@ -30,6 +32,7 @@ ARG TARGETPLATFORM
 ENV APP_HOME=/app \
     NODE_ENV=production \
     APP_PORT=3000 \
+    HARMONIARR_CLIENT_DIST=/app/client-dist \
     HARMONIARR_CONTACT_URL=https://github.com/cloudbyday90/harmoniarr \
     TZ=UTC \
     UMASK=0022
@@ -64,6 +67,7 @@ RUN npm ci --omit=dev
 
 COPY --from=client-builder /build/dist/client ./client-dist/
 COPY --from=server-builder /build/dist/server ./server-dist/
+COPY src/shared ./shared/
 COPY docker/entrypoint.sh /usr/local/bin/harmoniarr-entrypoint
 COPY docker/harmoniarrctl /usr/local/bin/harmoniarrctl
 

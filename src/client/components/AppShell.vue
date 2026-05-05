@@ -33,29 +33,43 @@ async function logout() {
 <template>
   <div class="shell-layout">
     <aside class="sidebar panel-dark">
-      <div>
-        <p class="eyebrow">Harmoniarr</p>
-        <h1 class="shell-title">{{ isRequester ? 'Request Desk' : 'Control Plane' }}</h1>
-        <p class="shell-copy">{{ isRequester ? 'Request music, submit provider URLs, and track what is already in the library.' : 'Bootstrap, auth, settings, and startup diagnostics.' }}</p>
+      <div class="sidebar-brand">
+        <img src="../assets/harmoniarr-icon.svg" width="32" height="32" alt="" aria-hidden="true" class="sidebar-logo" />
+        <span class="sidebar-wordmark">Harmoniarr</span>
       </div>
 
-      <nav class="nav-list">
-        <RouterLink v-if="!isRequester" :to="{ name: 'dashboard' }" class="nav-link">Dashboard</RouterLink>
-        <RouterLink :to="{ name: 'request-music' }" class="nav-link">Request Music</RouterLink>
-        <RouterLink v-if="!isRequester" :to="{ name: 'jobs' }" class="nav-link">Jobs</RouterLink>
-        <RouterLink :to="{ name: 'account-security' }" class="nav-link">Account Security</RouterLink>
-        <RouterLink v-if="!isRequester" :to="{ name: 'metadata' }" class="nav-link">Metadata</RouterLink>
-        <RouterLink v-if="!isRequester" :to="{ name: 'recovery-workspace' }" class="nav-link">Recovery</RouterLink>
-        <RouterLink v-if="!isRequester" :to="{ name: 'review-queue' }" class="nav-link">Review Queue</RouterLink>
-        <RouterLink v-if="!isRequester" :to="{ name: 'settings' }" class="nav-link">Settings</RouterLink>
+      <nav class="nav-list" aria-label="Main navigation">
+        <template v-if="!isRequester">
+          <RouterLink :to="{ name: 'dashboard' }" class="nav-link">Dashboard</RouterLink>
+          <RouterLink :to="{ name: 'metadata' }" class="nav-link">Library</RouterLink>
+
+          <div class="nav-group">
+            <span class="nav-group-label">Activity</span>
+            <RouterLink :to="{ name: 'review-queue' }" class="nav-link nav-sub-link">Candidates</RouterLink>
+            <RouterLink :to="{ name: 'jobs' }" class="nav-link nav-sub-link">Operations</RouterLink>
+            <RouterLink :to="{ name: 'request-music' }" class="nav-link nav-sub-link">Requests</RouterLink>
+          </div>
+
+          <div class="nav-group">
+            <span class="nav-group-label">Settings</span>
+            <RouterLink :to="{ name: 'settings' }" class="nav-link nav-sub-link">Configuration</RouterLink>
+            <RouterLink :to="{ name: 'account-security' }" class="nav-link nav-sub-link">Account</RouterLink>
+            <RouterLink :to="{ name: 'recovery-workspace' }" class="nav-link nav-sub-link">Backup &amp; Restore</RouterLink>
+          </div>
+        </template>
+
+        <template v-else>
+          <RouterLink :to="{ name: 'request-music' }" class="nav-link">My Requests</RouterLink>
+          <RouterLink :to="{ name: 'account-security' }" class="nav-link">Account</RouterLink>
+        </template>
       </nav>
 
       <div class="session-card">
         <p class="eyebrow">Signed in as</p>
-        <strong>{{ sessionStore.state.user?.username }}</strong>
-        <span>{{ sessionStore.state.user?.role }}</span>
-        <p class="warning-copy" v-if="sessionStore.state.user?.mustChangePassword">Password change required before fresh-admin actions can continue.</p>
-        <button type="button" class="secondary-button" @click="logout">Logout</button>
+        <strong class="session-username">{{ sessionStore.state.user?.username }}</strong>
+        <span class="session-role">{{ sessionStore.state.user?.role }}</span>
+        <p class="warning-copy" v-if="sessionStore.state.user?.mustChangePassword">Password change required.</p>
+        <button type="button" class="secondary-button" @click="logout">Log out</button>
       </div>
     </aside>
 

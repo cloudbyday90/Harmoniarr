@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createMaintenanceLockOperationPauseService } from '../../src/server/recovery/maintenance-lock-operation-pause-service.js';
 import { createLibraryModule } from '../../src/server/library/library-module.js';
 
 test('createLibraryModule exposes the shared summary services and scan route dependencies', () => {
@@ -170,4 +171,117 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     startLibraryDiscoveryRun,
     startLibraryScan,
   });
+});
+
+test('createLibraryModule initializes the default discovery worker after pause service setup', () => {
+  const maintenanceLockOperationPauseService = createMaintenanceLockOperationPauseService({
+    listActiveMaintenanceLocks: async () => [],
+  });
+
+  const libraryModule = createLibraryModule({
+    artworkAssignmentService: {},
+    artworkIngestionService: {},
+    importCandidateService: {
+      listImportCandidatesBySourceMediaRequestIds: async () => [],
+    },
+    libraryCatalogStore: {},
+    libraryDiscoveryDispatchService: {
+      dispatchReadyDiscoveryRequests: async () => {},
+    },
+    libraryDiscoveryRequestService: {
+      reconcileDiscoveryRequests: async () => {},
+    },
+    libraryDiscoveryRequestStore: {},
+    libraryDiscoveryRunService: {
+      startLibraryDiscoveryRun: () => {},
+    },
+    libraryDiscoveryRunStore: {
+      acquireLease: async () => null,
+      createOperationRun: () => {},
+      getActiveRun: async () => null,
+      isCancellationRequested: async () => false,
+      markRunCancelled: async () => {},
+      markRunCompleted: async () => {},
+      markRunFailed: async () => {},
+      markRunPaused: async () => {},
+      markRunStarted: async () => {},
+      releaseLease: async () => {},
+      renewLease: async () => {},
+    },
+    libraryDiscoverySummaryService: {
+      buildLibraryDiscoveryRunDetail: () => {},
+      buildLibraryDiscoverySummary: () => {},
+    },
+    libraryDiscoverySummaryStore: {},
+    libraryEmbeddedArtworkService: {
+      captureEmbeddedArtwork: async () => {},
+    },
+    libraryExternalIntakeRunStore: {},
+    libraryExternalIntakeService: {},
+    libraryExternalIntakeWorker: {},
+    libraryFileMatcherService: {
+      matchLibraryFiles: async () => {},
+    },
+    libraryFileMatchStore: {},
+    libraryMediaRequestService: {
+      buildMediaRequestSummary: () => {},
+      createMediaRequest: () => {},
+      listMediaRequests: () => [],
+    },
+    libraryMediaRequestStore: {},
+    libraryOrganizeApplyRunStore: {},
+    libraryOrganizeApplyService: {
+      startLibraryOrganizeApplyRun: () => {},
+    },
+    libraryOrganizeApplyWorker: {},
+    libraryOrganizePreviewService: {
+      buildLibraryOrganizePreview: () => {},
+    },
+    libraryOrganizePreviewStore: {},
+    libraryProviderIngestPlanningService: {},
+    libraryProviderIngestRequestStore: {},
+    libraryReconciliationSummaryService: {
+      buildLibraryReconciliationSummary: () => {},
+    },
+    libraryReconciliationSummaryStore: {},
+    libraryReleaseAvailabilityStore: {},
+    libraryReleaseReconciliationService: {
+      reconcileLibraryReleases: async () => {},
+    },
+    libraryReleaseReconciliationStore: {},
+    libraryScanRunStore: {},
+    libraryScanService: {
+      startLibraryScan: () => {},
+    },
+    libraryScanSummaryService: {
+      buildLibraryScanRunDetail: () => {},
+      buildLibraryScanSummary: () => {},
+    },
+    libraryScanWorker: {},
+    librarySidecarArtworkService: {
+      captureSidecarArtwork: async () => {},
+    },
+    libraryTagExtractionService: {
+      extractLibraryFileTags: async () => {},
+    },
+    libraryTagSnapshotStore: {},
+    libraryWantedReleaseService: {
+      reconcileWantedReleases: async () => {},
+    },
+    libraryWantedReleaseStore: {},
+    libraryWantedSummaryService: {
+      buildLibraryWantedSummary: () => {},
+    },
+    libraryWantedSummaryStore: {},
+    maintenanceLockOperationPauseService,
+    maintenanceLockService: {
+      listActiveMaintenanceLocks: async () => [],
+    },
+    providerClientResolverService: {},
+    settingsService: {},
+    slskdService: {},
+  });
+
+  assert.equal(typeof libraryModule.libraryDiscoveryWorker, 'object');
+  assert.equal(typeof libraryModule.routeDependencies.startLibraryDiscoveryRun, 'function');
 });

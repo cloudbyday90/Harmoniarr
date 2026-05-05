@@ -125,10 +125,7 @@ const baseSelect = `
       matched_releases.metadata_release_group_id
     )
   LEFT JOIN metadata_artists AS matched_artists
-    ON matched_artists.id = COALESCE(
-      matched_release_groups.metadata_artist_id,
-      matched_releases.metadata_artist_id
-    )
+    ON matched_artists.id = matched_release_groups.metadata_artist_id
 `;
 
 export function createLibraryMediaRequestStore({
@@ -153,46 +150,41 @@ export function createLibraryMediaRequestStore({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        WITH inserted AS (
-          INSERT INTO media_requests (
-            requested_by_user_id,
-            requested_for_user_id,
-            request_kind,
-            request_state,
-            artist_name,
-            release_title,
-            track_title,
-            source_url,
-            source_provider,
-            normalized_query,
-            matched_metadata_release_group_id,
-            matched_metadata_release_id,
-            notes,
-            evidence,
-            updated_at
-          )
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            $6,
-            $7,
-            $8,
-            $9,
-            $10,
-            $11,
-            $12,
-            $13,
-            $14::jsonb,
-            NOW()
-          )
-          RETURNING id
+        INSERT INTO media_requests (
+          requested_by_user_id,
+          requested_for_user_id,
+          request_kind,
+          request_state,
+          artist_name,
+          release_title,
+          track_title,
+          source_url,
+          source_provider,
+          normalized_query,
+          matched_metadata_release_group_id,
+          matched_metadata_release_id,
+          notes,
+          evidence,
+          updated_at
         )
-        ${baseSelect}
-        JOIN inserted
-          ON inserted.id = media_requests.id
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11,
+          $12,
+          $13,
+          $14::jsonb,
+          NOW()
+        )
+        RETURNING id
       `,
       [
         requestedByUserId,
@@ -212,7 +204,8 @@ export function createLibraryMediaRequestStore({
       ],
     );
 
-    return mapMediaRequestRow(result.rows[0]);
+    const mediaRequestId = result.rows[0]?.id ?? null;
+    return getMediaRequestById({ mediaRequestId });
   }
 
   async function listMediaRequests({ requestedForUserId = null } = {}) {

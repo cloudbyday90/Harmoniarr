@@ -321,23 +321,41 @@ label {
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 24px;
   padding: 24px 0 40px;
+  align-items: start;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 24px;
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(247, 241, 223, 0.12) transparent;
 }
 
-.shell-title {
-  margin: 0;
-  font-size: 2rem;
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(247, 241, 223, 0.1);
+  flex-shrink: 0;
 }
 
-.shell-copy {
-  margin: 14px 0 0;
-  line-height: 1.7;
+.sidebar-logo {
+  flex: 0 0 auto;
+  border-radius: 8px;
+}
+
+.sidebar-wordmark {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #f7f1df;
 }
 
 .nav-list {
@@ -361,17 +379,42 @@ label {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.nav-group {
+  display: grid;
+  gap: 4px;
+}
+
+.nav-group-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(247, 241, 223, 0.38);
+  padding: 8px 14px 2px;
+}
+
+.nav-sub-link {
+  padding-left: 22px;
+  font-size: 0.9rem;
+}
+
 .session-card {
   display: grid;
   gap: 8px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(247, 241, 223, 0.1);
+  flex-shrink: 0;
 }
 
-.session-card strong {
-  font-size: 1.2rem;
+.session-username {
+  font-size: 1.05rem;
 }
 
-.session-card span {
-  color: rgba(247, 241, 223, 0.74);
+.session-role {
+  color: rgba(247, 241, 223, 0.6);
+  font-size: 0.85rem;
+  text-transform: capitalize;
 }
 
 .warning-copy {

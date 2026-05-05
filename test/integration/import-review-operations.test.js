@@ -215,7 +215,7 @@ suite('integration import review and operations routes', () => {
       assert.equal(historyResponse.response.status, 200);
       const executionRun = historyResponse.payload.runs.find((run) => run.id === runId);
       assert.ok(executionRun);
-      assert.equal(executionRun.operationType, 'import_candidate_execution');
+      assert.equal(executionRun.operationType, 'import_candidate_execution_planning');
       assert.equal(executionRun.status, 'running');
       assert.equal(executionRun.summary.currentStep, 'integration worker claimed execution planning run');
       assert.equal(executionRun.lease.leaseKey, lease.leaseKey);
@@ -228,7 +228,7 @@ suite('integration import review and operations routes', () => {
       assert.equal(runDetailResponse.payload.operationRun.run.lease.ownerInstanceId, lease.ownerInstanceId);
       assert.equal(runDetailResponse.payload.operationRun.run.lease.status, 'active');
 
-      const auditEventTypes = runDetailResponse.payload.operationRun.auditEvents.events.map((event) => event.eventType);
+      const auditEventTypes = runDetailResponse.payload.operationRun.auditEvents.map((event) => event.eventType);
       assert.equal(auditEventTypes.includes('import_candidate_execution_started'), true);
     }, {
       scenarioName: 'execution_operation_history',
