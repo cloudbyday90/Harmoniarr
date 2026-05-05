@@ -33,7 +33,7 @@ const tabs = [
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Settings</h1>
-        <p class="hx-page-subtitle">System configuration, providers, paths, account, and recovery.</p>
+        <p class="hx-page-subtitle">General, connections, media & storage, users, account, and backups.</p>
       </div>
     </header>
 
