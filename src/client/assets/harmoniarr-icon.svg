@@ -1,51 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="400" height="400" role="img" aria-label="Harmoniarr icon">
   <defs>
-    <clipPath id="tile-clip">
-      <rect width="100" height="100" rx="18"/>
+    <clipPath id="harmoniarr-tile-clip">
+      <rect width="100" height="100" rx="16"/>
     </clipPath>
   </defs>
 
   <!-- Tile background -->
-  <rect width="100" height="100" rx="18" fill="#131825"/>
+  <rect width="100" height="100" rx="16" fill="#131825"/>
 
-  <g clip-path="url(#tile-clip)" stroke="#2DD4BF" fill="#2DD4BF">
+  <g clip-path="url(#harmoniarr-tile-clip)"
+     stroke="#2DD4BF"
+     stroke-width="3.5"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     fill="none">
 
-    <!-- ═══ SHELF FRAME ════════════════════════════════════ -->
-    <!-- Shelf spans y=10 (top) to y=90 (base), centered x=33–67 -->
+    <!-- ECG waveform: baseline at y=50, sharp spike just left of the   -->
+    <!-- shelf, runs across, small downward notch on the right.          -->
+    <polyline points="0,50 22,50 27,50 30,12 33,50 70,50 74,58 78,50 100,50"/>
 
-    <!-- Left upright -->
-    <rect x="33" y="10" width="4" height="80"/>
-    <!-- Right upright -->
-    <rect x="63" y="10" width="4" height="80"/>
-    <!-- Top board -->
-    <rect x="33" y="10" width="34" height="4"/>
-    <!-- Bottom board -->
-    <rect x="33" y="86" width="34" height="4"/>
+    <!-- Shelf frame and book spines (filled mint, no stroke) -->
+    <g fill="#2DD4BF" stroke="none">
+      <rect x="34" y="14" width="3.5" height="74" rx="0.5"/>
+      <rect x="62.5" y="14" width="3.5" height="74" rx="0.5"/>
+      <rect x="34" y="14" width="32" height="3.5" rx="0.5"/>
+      <rect x="34" y="84.5" width="32" height="3.5" rx="0.5"/>
+      <rect x="40" y="20" width="8" height="28" rx="0.8"/>
+      <rect x="52" y="20" width="8" height="28" rx="0.8"/>
+    </g>
 
-    <!-- ═══ BOOKS: upper section (above waveform at y=50) ══ -->
-    <!-- Two solid blocks, equal width, filling y=16 to y=46  -->
-    <!-- Each book: width=11, height=30. Gap=4 between them.  -->
-    <!-- Left book -->
-    <rect x="38" y="16" width="11" height="30"/>
-    <!-- Right book -->
-    <rect x="53" y="16" width="11" height="30"/>
-
-    <!-- ═══ ACQUISITION ARROW: lower section (below y=50) ══ -->
-    <!-- Shaft: y=54 to y=70, centered x=50 -->
-    <line x1="50" y1="54" x2="50" y2="70" stroke="#2DD4BF" stroke-width="4" stroke-linecap="round" fill="none"/>
-    <!-- Arrowhead chevron -->
-    <polyline points="42,66 50,78 58,66"
-              stroke="#2DD4BF" stroke-width="4" fill="none"
-              stroke-linecap="round" stroke-linejoin="round"/>
-
-    <!-- ═══ ECG WAVEFORM ════════════════════════════════════ -->
-    <!-- Baseline y=50 divides the shelf into upper and lower  -->
-    <!-- Spike: rises from x=27 to peak at (34, 2), back down  -->
-    <!-- to baseline at x=41. The spike overlaps the left      -->
-    <!-- upright and is clipped by the tile at the top.        -->
-    <polyline points="2,50 27,50 34,2 41,50 98,50"
-              stroke="#2DD4BF" stroke-width="4" fill="none"
-              stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Download arrow inside the shelf, below the waveform baseline -->
+    <line x1="50" y1="58" x2="50" y2="76"/>
+    <polyline points="43,69 50,80 57,69"/>
 
   </g>
 </svg>
