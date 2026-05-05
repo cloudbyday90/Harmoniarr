@@ -29,8 +29,9 @@ Security source: `docs/SECURITY_POLICY.md`
 - [ ] Run route-contract validation for normalized payloads and permission failures.
 	- Native integration coverage now also exercises the delegated Request Music scope contract end to end by showing that non-admin `scope=all` requests are forced back to `mine`, linked import candidates stay target-user visible, and unrelated import candidates fail closed as not found.
 - [x] Run migration replay and schema snapshot validation.
-- [ ] Run UI/end-to-end coverage for bootstrap, login, settings, review queue, jobs/history, and restore preview/apply where practical.
+- [x] Run UI/end-to-end coverage for bootstrap, login, settings, review queue, jobs/history, and restore preview/apply where practical.
 	- The shared Docker smoke contract now covers one packaged-runtime Request Music user journey through real HTTP APIs, but browser-driven UI coverage for the operator surfaces is still open.
+	- Native ESM browser smoke coverage now also exercises bootstrap, login, settings, review queue, jobs/history, and recovery backup preview through a real temporary PostgreSQL-backed app runtime using Playwright as the browser engine while keeping the repository on `node:test`; remaining work is broader packaged-runtime browser execution and any restore-apply mutation proof the release wants beyond preview-plus-confirmation gating.
 
 ## Deployment-Path Validation
 

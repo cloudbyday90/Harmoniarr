@@ -48,6 +48,7 @@
     "promote:release-mirror-trust": "node scripts/promote-release-mirror-trust.js",
     "start": "node dist/server/index.js",
     "test": "npm run lint && npm run check:test-hygiene && npm run test:node",
+    "test:browser": "npm run build:client && npx playwright install chromium && node --test --test-concurrency=1 \"test/browser/**/*.test.js\"",
     "test:client": "node --test \"test/client/**/*.test.js\"",
     "test:coverage": "node --test --experimental-test-coverage",
     "test:integration": "node --test --test-concurrency=1 \"test/integration/**/*.test.js\"",
@@ -80,6 +81,7 @@
     "eslint-plugin-vue": "^10.9.0",
     "glob": "^13.0.6",
     "globals": "^17.6.0",
+    "playwright": "^1.59.1",
     "vite": "^8.0.10"
   },
   "dependencies": {

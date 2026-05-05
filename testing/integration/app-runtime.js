@@ -73,12 +73,18 @@ async function createRuntimeWorkspace() {
 }
 
 export async function createIntegrationAppRuntime({
+  clientDistDir = null,
   config = resolveIntegrationTestRuntimeConfig(),
   createAppFn = createApp,
   prepareDatabaseFn = prepareDatabase,
   postgresRuntimeFactory = createPostgresIntegrationRuntime,
 } = {}) {
-  const runtimeWorkspace = await createRuntimeWorkspace();
+  const runtimeWorkspace = clientDistDir
+    ? {
+        clientDistDir,
+        workspaceDir: await mkdtemp(join(tmpdir(), 'harmoniarr-integration-')),
+      }
+    : await createRuntimeWorkspace();
   let postgresRuntime;
 
   try {
