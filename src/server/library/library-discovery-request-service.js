@@ -181,6 +181,7 @@ export function createLibraryDiscoveryRequestService({
             NULL::uuid AS source_media_request_id,
             NULL::text AS source_request_kind,
             NULL::uuid AS source_requested_by_user_id,
+            NULL::uuid AS source_requested_for_user_id,
             current_discovery.search_mode,
             current_discovery.blocked_reason,
             current_discovery.evidence AS prior_evidence,
