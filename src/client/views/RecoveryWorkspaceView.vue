@@ -26,7 +26,19 @@ import {
   getRecoveryRouteStateKey,
   normalizeRecoveryRouteState,
 } from '../lib/recovery-route-state.js';
-import { buildOperationRunLinkTarget } from '../lib/operation-run-link-targets.js';
+import {
+  buildOperationRunLinkTarget,
+  getOperationRunDescriptor,
+} from '../lib/operation-run-link-targets.js';
+import { getOperationRunOperatorSummary } from '../lib/operation-run-presentation.js';
+import {
+  buildRecoverySectionHash,
+  getRecoveryHoldDescription,
+  getRecoveryHoldLabel,
+  normalizeRecoverySectionId,
+  recoveryHoldTypeOptions,
+  recoverySectionNavigationItems,
+} from '../lib/recovery-workspace.js';
 import { useRecoveryBackups } from '../composables/useRecoveryBackups.js';
 import { useRecoveryDiagnostics } from '../composables/useRecoveryDiagnostics.js';
 
@@ -80,6 +92,15 @@ const {
 } = useRecoveryDiagnostics();
 
 const recoveryRouteState = computed(() => normalizeRecoveryRouteState(route.query));
+const activeRecoverySectionId = computed(() => normalizeRecoverySectionId(route.hash));
+const recoveryNavigationEntries = computed(() => recoverySectionNavigationItems.map((item) => ({
+  ...item,
+  to: {
+    name: typeof route.name === 'string' ? route.name : 'recovery',
+    query: route.query,
+    hash: buildRecoverySectionHash(item.id),
+  },
+})));
 const backupStatusPill = computed(() => {
   if (!selectedBackupPreview.value) {
     return null;
@@ -108,6 +129,7 @@ const restoreRunTarget = computed(() => buildOperationRunLinkTarget({
   operationType: lastRestoreRun.value?.operationType,
   runId: lastRestoreRun.value?.id,
 }));
+const selectedHoldTypeDescription = computed(() => getRecoveryHoldDescription(lockForm.lockType));
 
 function buildMergedRecoveryRouteQuery(nextState) {
   const query = { ...route.query };
@@ -134,6 +156,7 @@ async function replaceRecoveryRouteState(nextState) {
 
   await router.replace({
     query: buildMergedRecoveryRouteQuery(normalizedNextState),
+    hash: route.hash,
   });
 }
 
@@ -182,7 +205,7 @@ function checkStatusLabel(status) {
   return status === 'passed' ? 'Passed' : 'Failed';
 }
 
-function lockStatusClass(lockType) {
+function holdStatusClass(lockType) {
   switch (lockType) {
     case 'restore':
       return 'review-status-failed';
@@ -193,6 +216,37 @@ function lockStatusClass(lockType) {
     default:
       return 'review-status-pending';
   }
+}
+
+function operationTitle(operationType) {
+  return getOperationRunDescriptor(operationType).title;
+}
+
+function operationRunTarget(run) {
+  return buildOperationRunLinkTarget({
+    operationType: run?.operationType,
+    runId: run?.id,
+  });
+}
+
+function auditLinkTarget(event) {
+  return buildAuditActivityLinkTarget(event);
+}
+
+function describeRestoreReadiness(preview) {
+  if (!preview) {
+    return 'Select a backup to review whether it is safe to restore.';
+  }
+
+  if (preview.canApplyRestore) {
+    return 'This backup passed the current restore checks and can be applied when you are ready.';
+  }
+
+  if (preview.restoreReadiness?.blockedByLock) {
+    return 'A safety hold is blocking restore apply. Release the hold or wait for it to expire before restoring.';
+  }
+
+  return 'Review the failed checks below before you try to apply this backup.';
 }
 
 function queueStatusClass(status) {
@@ -320,19 +374,42 @@ watch(
 <template>
   <section class="page-stack">
     <article class="panel-dark hero-card compact">
-      <p class="eyebrow">Recovery control plane</p>
-      <h2>Backups, restore readiness, maintenance locks, and diagnostics</h2>
+      <p class="eyebrow">Recovery</p>
+      <h2>Backups, restore checks, and safe maintenance</h2>
       <p>
-        Export logical backups, inspect restore compatibility before applying changes, coordinate maintenance locks, and review recent privileged recovery activity from one authenticated workspace.
+        Create recovery exports, confirm whether a restore is safe, pause risky background work during manual changes, and review recent recovery activity from one workspace.
       </p>
     </article>
 
+    <article class="panel-light workspace-nav-panel">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Workspace sections</p>
+          <h3>Recovery tasks</h3>
+        </div>
+      </div>
+
+      <div class="workspace-nav-list">
+        <RouterLink
+          v-for="item in recoveryNavigationEntries"
+          :key="item.id"
+          class="workspace-nav-link"
+          :class="{ 'is-active': activeRecoverySectionId === item.id }"
+          :to="item.to"
+        >
+          <span class="workspace-nav-link-label">{{ item.label }}</span>
+          <span class="workspace-nav-link-copy">{{ item.description }}</span>
+        </RouterLink>
+      </div>
+    </article>
+
     <div class="operations-grid">
-      <article class="panel-light">
+      <article id="backups" class="panel-light workspace-anchor-section">
         <div class="section-header">
           <div>
-            <p class="eyebrow">Backup inventory</p>
-            <h3>Logical backups</h3>
+            <p class="eyebrow">Backups</p>
+            <h3>Create and inspect recovery exports</h3>
+            <p class="metadata-card-copy">Keep recovery exports current, then pick one backup to inspect before restore work.</p>
           </div>
           <div class="operations-actions">
             <button type="button" class="secondary-button" @click="loadBackups({ preferredBackupArtifactId: selectedBackupId || null })" :disabled="isLoadingBackups">
@@ -346,8 +423,8 @@ watch(
 
         <p class="error-copy" v-if="backupActionErrorMessage">{{ backupActionErrorMessage }}</p>
         <p class="error-copy" v-if="backupErrorMessage">{{ backupErrorMessage }}</p>
-        <p v-else-if="isLoadingBackups">Loading backup artifacts.</p>
-        <p class="metadata-card-copy" v-else-if="!backupArtifacts.length">No logical backup exports have been recorded yet.</p>
+        <p v-else-if="isLoadingBackups">Loading saved backup exports.</p>
+        <p class="metadata-card-copy" v-else-if="!backupArtifacts.length">No recovery exports have been recorded yet.</p>
 
         <div class="session-list" v-else>
           <article class="session-row" v-for="backupArtifact in backupArtifacts" :key="backupArtifact.id">
@@ -369,23 +446,24 @@ watch(
                 {{ backupArtifact.id === selectedBackupId ? 'Selected' : 'Available' }}
               </span>
               <button type="button" class="secondary-button" @click="selectBackupArtifact(backupArtifact.id)">
-                Inspect
+                Inspect backup
               </button>
             </div>
           </article>
         </div>
       </article>
 
-      <article id="recovery-preview-panel" class="panel-light">
+      <article id="restore" class="panel-light workspace-anchor-section">
         <div class="section-header">
           <div>
-            <p class="eyebrow">Restore preview</p>
-            <h3>Selected backup</h3>
+            <p class="eyebrow">Restore checks</p>
+            <h3>Preview a selected backup</h3>
+            <p class="metadata-card-copy">Review checks and safety notes before you apply any restore.</p>
           </div>
           <div class="operations-actions" v-if="selectedBackupId">
             <a class="secondary-button" :href="buildBackupExportDownloadUrl(selectedBackupId)">Download JSON</a>
             <button type="button" class="secondary-button" @click="refreshSelectedBackupPreview" :disabled="isLoadingPreview">
-              {{ isLoadingPreview ? 'Refreshing...' : 'Refresh preview' }}
+              {{ isLoadingPreview ? 'Refreshing...' : 'Refresh checks' }}
             </button>
             <button type="button" class="secondary-button" @click="handleDeleteBackup" :disabled="isDeleting">
               {{ isDeleting ? 'Deleting...' : 'Delete backup' }}
@@ -394,8 +472,8 @@ watch(
         </div>
 
         <p class="error-copy" v-if="previewErrorMessage">{{ previewErrorMessage }}</p>
-        <p v-else-if="isLoadingPreview && !selectedBackupArtifact">Loading backup metadata and restore checks.</p>
-        <p class="metadata-card-copy" v-else-if="!selectedBackupArtifact">Select a backup export to inspect integrity, compatibility, and restore readiness.</p>
+        <p v-else-if="isLoadingPreview && !selectedBackupArtifact">Loading backup detail and restore checks.</p>
+        <p class="metadata-card-copy" v-else-if="!selectedBackupArtifact">Select a backup to review checksum, compatibility, and restore safety before applying it.</p>
 
         <template v-else>
           <div class="review-detail-header">
@@ -407,6 +485,21 @@ watch(
             <span v-if="backupStatusPill" class="review-status-pill" :class="backupStatusPill.className">
               {{ backupStatusPill.label }}
             </span>
+          </div>
+
+          <div class="operations-insight-grid" v-if="selectedBackupPreview">
+            <article class="operations-insight-card">
+              <p class="eyebrow">Restore status</p>
+              <strong>{{ describeRestoreReadiness(selectedBackupPreview) }}</strong>
+            </article>
+            <article class="operations-insight-card">
+              <p class="eyebrow">What changes</p>
+              <strong>Restore apply updates current application state immediately for the scopes included in this backup.</strong>
+            </article>
+            <article class="operations-insight-card">
+              <p class="eyebrow">Before you apply</p>
+              <strong>Keep a current backup, confirm no safety hold is blocking restore work, and make sure you still want to replace current state.</strong>
+            </article>
           </div>
 
           <dl class="review-meta-grid onboarding-meta-grid">
@@ -439,7 +532,7 @@ watch(
           <article class="onboarding-step-card" v-if="selectedBackupPreview">
             <div class="section-header">
               <div>
-                <h3>Integrity and compatibility</h3>
+                <h3>Preview checks</h3>
                 <p class="metadata-card-copy">Checked {{ formatTimestamp(selectedBackupPreview.checkedAt) }}</p>
               </div>
             </div>
@@ -476,15 +569,16 @@ watch(
             </div>
 
             <article class="panel-light review-empty-state" v-if="selectedBackupPreview.restoreReadiness?.blockingLocks?.length">
-              <h3>Blocking maintenance locks</h3>
+              <h3>Safety holds blocking restore</h3>
               <div class="session-list">
                 <article class="session-row" v-for="lock in selectedBackupPreview.restoreReadiness.blockingLocks" :key="lock.id">
                   <div>
-                    <strong>{{ formatScope(lock.lockType) }}</strong>
+                    <strong>{{ getRecoveryHoldLabel(lock.lockType) }}</strong>
+                    <p class="muted-copy">{{ getRecoveryHoldDescription(lock.lockType) }}</p>
                     <p class="muted-copy">{{ lock.reason || 'No reason recorded' }}</p>
                     <p class="metadata-card-copy">Acquired {{ formatTimestamp(lock.acquiredAt) }}</p>
                   </div>
-                  <span class="review-status-pill" :class="lockStatusClass(lock.lockType)">
+                  <span class="review-status-pill" :class="holdStatusClass(lock.lockType)">
                     Active
                   </span>
                 </article>
@@ -493,7 +587,7 @@ watch(
           </article>
 
           <article class="onboarding-step-card">
-            <h3>Restore apply</h3>
+            <h3>Apply restore carefully</h3>
             <p class="metadata-card-copy">
               Restore apply requires a fresh admin session and mutates current application state. Confirm only after the preview and lock state match expectations.
             </p>
@@ -537,11 +631,12 @@ watch(
     </div>
 
     <div class="operations-grid">
-      <article class="panel-light">
+      <article id="safety-holds" class="panel-light workspace-anchor-section">
         <div class="section-header">
           <div>
-            <p class="eyebrow">Maintenance coordination</p>
-            <h3>Active maintenance locks</h3>
+            <p class="eyebrow">Safety holds</p>
+            <h3>Pause risky work before manual changes</h3>
+            <p class="metadata-card-copy">Use a safety hold before restore apply, upgrade work, or manual filesystem changes so background jobs do not race your edits.</p>
           </div>
           <button type="button" class="secondary-button" @click="loadDiagnostics" :disabled="isLoadingDiagnostics">
             {{ isLoadingDiagnostics ? 'Refreshing...' : 'Refresh diagnostics' }}
@@ -550,9 +645,26 @@ watch(
 
         <p class="error-copy" v-if="diagnosticsActionErrorMessage">{{ diagnosticsActionErrorMessage }}</p>
         <p class="error-copy" v-if="diagnosticsErrorMessage">{{ diagnosticsErrorMessage }}</p>
-        <p v-else-if="isLoadingDiagnostics">Loading queue, maintenance, and recovery diagnostics.</p>
+        <p v-else-if="isLoadingDiagnostics">Loading queue, hold, and recovery checks.</p>
 
         <template v-else>
+          <div class="operations-insight-grid">
+            <article class="operations-insight-card">
+              <p class="eyebrow">Current state</p>
+              <strong>
+                {{ activeLocks.length ? `${activeLocks.length} safety hold${activeLocks.length === 1 ? '' : 's'} active right now.` : 'No safety holds are active right now.' }}
+              </strong>
+            </article>
+            <article class="operations-insight-card">
+              <p class="eyebrow">Queue impact</p>
+              <strong>{{ queueState.pending }} waiting, {{ queueState.running }} running, and {{ queueState.failed }} failed background job{{ queueState.failed === 1 ? '' : 's' }}.</strong>
+            </article>
+            <article class="operations-insight-card">
+              <p class="eyebrow">Why this matters</p>
+              <strong>Safety holds keep restore or maintenance work from colliding with background automation that could change the same state.</strong>
+            </article>
+          </div>
+
           <dl class="review-meta-grid onboarding-meta-grid">
             <div>
               <dt>Pending jobs</dt>
@@ -572,11 +684,12 @@ watch(
             </div>
           </dl>
 
-          <p class="metadata-card-copy" v-if="!activeLocks.length">No active maintenance locks are currently blocking restore-sensitive workflows.</p>
+          <p class="metadata-card-copy" v-if="!activeLocks.length">No active safety holds are currently blocking restore-sensitive workflows.</p>
           <div class="session-list" v-else>
             <article class="session-row" v-for="lock in activeLocks" :key="lock.id">
               <div>
-                <strong>{{ formatScope(lock.lockType) }}</strong>
+                <strong>{{ getRecoveryHoldLabel(lock.lockType) }}</strong>
+                <p class="muted-copy">{{ getRecoveryHoldDescription(lock.lockType) }}</p>
                 <p class="muted-copy">{{ lock.reason || 'No reason recorded' }}</p>
                 <p class="metadata-card-copy">
                   Acquired {{ formatTimestamp(lock.acquiredAt) }}
@@ -584,26 +697,23 @@ watch(
                 </p>
               </div>
               <div class="operations-actions">
-                <span class="review-status-pill" :class="lockStatusClass(lock.lockType)">
+                <span class="review-status-pill" :class="holdStatusClass(lock.lockType)">
                   Active
                 </span>
                 <button type="button" class="secondary-button" @click="handleReleaseLock(lock.id)" :disabled="releasingLockId === lock.id">
-                  {{ releasingLockId === lock.id ? 'Releasing...' : 'Release' }}
+                  {{ releasingLockId === lock.id ? 'Releasing...' : 'Release hold' }}
                 </button>
               </div>
             </article>
           </div>
 
           <article class="onboarding-step-card">
-            <h3>Enter maintenance lock</h3>
+            <h3>Start a safety hold</h3>
             <div class="review-form-grid">
               <label>
-                Lock type
+                Hold type
                 <select v-model="lockForm.lockType">
-                  <option value="maintenance">Maintenance</option>
-                  <option value="restore">Restore</option>
-                  <option value="upgrade">Upgrade</option>
-                  <option value="admin_recovery">Admin recovery</option>
+                  <option v-for="option in recoveryHoldTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                 </select>
               </label>
               <label>
@@ -611,43 +721,46 @@ watch(
                 <input v-model="lockForm.expiresAtLocal" type="datetime-local">
               </label>
             </div>
+            <p class="metadata-card-copy">{{ selectedHoldTypeDescription }}</p>
             <label>
               Reason
               <input v-model="lockForm.reason" placeholder="Example: preparing manual filesystem maintenance">
             </label>
             <div class="operations-actions">
               <button type="button" @click="handleEnterLock" :disabled="isEnteringLock || !lockForm.reason.trim()">
-                {{ isEnteringLock ? 'Entering lock...' : 'Enter lock' }}
+                {{ isEnteringLock ? 'Starting hold...' : 'Start hold' }}
               </button>
             </div>
           </article>
         </template>
       </article>
 
-      <article class="panel-light">
+      <article id="diagnostics" class="panel-light workspace-anchor-section">
         <div class="section-header">
           <div>
-            <p class="eyebrow">Diagnostics history</p>
-            <h3>Queue pressure and privileged recovery actions</h3>
+            <p class="eyebrow">Diagnostics</p>
+            <h3>Recent recovery history</h3>
+            <p class="metadata-card-copy">Use this area to spot background-job trouble and review recent recovery actions without digging through logs first.</p>
           </div>
         </div>
 
         <article class="onboarding-step-card">
-          <h3>Recent queue runs</h3>
-          <p class="metadata-card-copy" v-if="!recentQueueRuns.length">No recent durable operations are available.</p>
+          <h3>Recent background work</h3>
+          <p class="metadata-card-copy" v-if="!recentQueueRuns.length">No recent background jobs are available.</p>
           <div class="session-list" v-else>
             <article class="session-row" v-for="run in recentQueueRuns" :key="run.id">
               <div>
-                <strong>{{ run.id }}</strong>
-                <p class="muted-copy">{{ run.operationType }}</p>
+                <strong>{{ operationTitle(run.operationType) }}</strong>
+                <p class="muted-copy">{{ getOperationRunOperatorSummary(run) }}</p>
                 <p class="metadata-card-copy">Started {{ formatTimestamp(run.startedAt) }}</p>
+                <p class="muted-copy">Run ID {{ run.id }}</p>
               </div>
               <div class="operations-actions">
                 <span class="review-status-pill" :class="queueStatusClass(run.status)">
                   {{ formatScope(run.status) }}
                 </span>
-                <RouterLink v-if="buildOperationRunLinkTarget({ operationType: run.operationType, runId: run.id })" class="secondary-button" :to="buildOperationRunLinkTarget({ operationType: run.operationType, runId: run.id }).to">
-                  {{ buildOperationRunLinkTarget({ operationType: run.operationType, runId: run.id }).label }}
+                <RouterLink v-if="operationRunTarget(run)" class="secondary-button" :to="operationRunTarget(run).to">
+                  {{ operationRunTarget(run).label }}
                 </RouterLink>
               </div>
             </article>
@@ -655,19 +768,21 @@ watch(
         </article>
 
         <article class="onboarding-step-card">
-          <h3>Recent failed runs</h3>
+          <h3>Recent recovery-related failures</h3>
           <p class="metadata-card-copy" v-if="!recentFailedRuns.length">No failed recovery-relevant runs were found.</p>
           <div class="session-list" v-else>
             <article class="session-row" v-for="run in recentFailedRuns" :key="run.id">
               <div>
-                <strong>{{ run.errorMessage || 'Run failed' }}</strong>
-                <p class="muted-copy">{{ run.operationType }}</p>
+                <strong>{{ operationTitle(run.operationType) }}</strong>
+                <p class="muted-copy">{{ getOperationRunOperatorSummary(run) }}</p>
+                <p class="muted-copy" v-if="run.errorMessage">Latest issue: {{ run.errorMessage }}</p>
                 <p class="metadata-card-copy">Finished {{ formatTimestamp(run.finishedAt) }}</p>
+                <p class="muted-copy">Run ID {{ run.id }}</p>
               </div>
               <div class="operations-actions">
                 <span class="review-status-pill review-status-failed">Failed</span>
-                <RouterLink v-if="buildOperationRunLinkTarget({ operationType: run.operationType, runId: run.id })" class="secondary-button" :to="buildOperationRunLinkTarget({ operationType: run.operationType, runId: run.id }).to">
-                  {{ buildOperationRunLinkTarget({ operationType: run.operationType, runId: run.id }).label }}
+                <RouterLink v-if="operationRunTarget(run)" class="secondary-button" :to="operationRunTarget(run).to">
+                  {{ operationRunTarget(run).label }}
                 </RouterLink>
               </div>
             </article>
@@ -675,8 +790,8 @@ watch(
         </article>
 
         <article class="onboarding-step-card">
-          <h3>Recent privileged actions</h3>
-          <p class="metadata-card-copy" v-if="!recentPrivilegedActions.length">No privileged recovery actions have been recorded yet.</p>
+          <h3>Recent recovery actions</h3>
+          <p class="metadata-card-copy" v-if="!recentPrivilegedActions.length">No recent recovery actions have been recorded yet.</p>
           <div class="session-list" v-else>
             <article class="session-row" v-for="event in recentPrivilegedActions" :key="event.id">
               <div>
@@ -685,8 +800,8 @@ watch(
                 <p class="metadata-card-copy">Occurred {{ formatTimestamp(event.occurredAt) }}</p>
               </div>
               <div class="operations-actions">
-                <RouterLink v-if="buildAuditActivityLinkTarget(event)" class="secondary-button" :to="buildAuditActivityLinkTarget(event).to">
-                  {{ buildAuditActivityLinkTarget(event).label }}
+                <RouterLink v-if="auditLinkTarget(event)" class="secondary-button" :to="auditLinkTarget(event).to">
+                  {{ auditLinkTarget(event).label }}
                 </RouterLink>
               </div>
             </article>
