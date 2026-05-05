@@ -9,6 +9,9 @@
 - **Artwork-first UI.** Tables become card grids. Text results become artwork cards. The visual identity of albums and artists drives the interface.
 - **Multi-user aware throughout.** Requests carry attribution. Activity surfaces whose requests are whose. The experience is explicitly shared.
 - **Two distinct nav experiences.** Operator items move entirely into Settings. Requesters get a clean, purpose-built nav. The two roles are not just filtered versions of the same nav.
+- **The app finds music for you.** Release Radar surfaces new releases from artists you monitor. The "Coming Soon" watchlist pre-queues upcoming albums. You shouldn't have to check manually.
+- **Smart acquisition.** Download result scoring, per-user format preferences, and cross-user deduplication mean the right file gets downloaded once for everyone.
+- **Installable and notifying.** PWA support makes Harmoniarr a first-class mobile app. Push notifications tell you when your request is ready.
 
 ---
 
@@ -33,6 +36,20 @@
 **Step 9 — Not Started:** Multi-user awareness pass — request attribution (who requested what) shown on request cards throughout. `ActivityUsersView.vue` updated to surface per-user request activity. Operator home page shows all-users activity summary.
 
 **Step 10 — Not Started:** Responsive & mobile — card grids collapse to single-column on narrow viewports. Sidebar collapses to a bottom nav or hamburger on mobile. All touch targets meet minimum size requirements.
+
+**Step 11 — Not Started:** Release Radar — "New this week from artists you monitor." Server-side job scans MusicBrainz for recent releases (last 30 days) from all monitored artists. Surfaces as a dedicated section on the home page above the full artist grid: horizontal scroll strip or top-of-grid section. Each card has a one-click Request button. Requires a scheduled job and a new server route.
+
+**Step 12 — Not Started:** Activity feed — household-level stream of recent events: requests submitted, downloads completed, new releases added to the library. Visible to all users. Shows who did what. Makes the app feel like a shared space rather than an isolated tool. New `ActivityFeedView.vue` or inline panel on the home page.
+
+**Step 13 — Not Started:** Cross-user deduplication — if two users request the same release, one Soulseek search and download serves both. The server detects duplicate requests (by `musicbrainz_release_id` or artist+title match) and links them to the same download job. Both users see the request as fulfilled when the download completes. Requires schema change on `media_requests`.
+
+**Step 14 — Not Started:** "Coming Soon" watchlist — MusicBrainz has announced release dates for upcoming albums. When monitoring an artist, the app checks for releases with a future date and surfaces them as "Coming Soon" cards. User can pre-request; the request stays pending until the release date passes. Requires a scheduled MusicBrainz check per monitored artist.
+
+**Step 15 — Not Started:** Per-user format/quality preferences — each user can set a preferred format (FLAC, MP3 320, MP3 V0, any) and minimum quality floor. Soulseek search filters and ranks results accordingly per requester. Stored in user settings. Operator can set a system-wide default.
+
+**Step 16 — Not Started:** Download result scoring — rank Soulseek search results automatically before queuing: format, bitrate, completeness (track count vs. expected), uploader reputation (past success rate). Reduce the frequency of manual import review by surfacing the best candidate first. Requires scoring logic in the search/queue pipeline.
+
+**Step 17 — Not Started:** PWA — Progressive Web App manifest + service worker. Add to home screen on mobile, push notifications ("Your request for [album] is ready"). No app store, no native code. Requires a `manifest.webmanifest`, icons, and a notification delivery mechanism (Web Push API + server-side push subscription management).
 
 ---
 
@@ -166,6 +183,36 @@ Required:
 
 `SearchView.vue` returns search results as text lists. In the artwork-first redesign, both artist and release search results should render as artwork cards — consistent with the home page, the missing screen, and the discover flow.
 
+### 3.9 No Release Radar
+
+The app has no mechanism for surfacing new releases from monitored artists automatically. A user who monitors Radiohead has no way to know when a new album drops unless they happen to search for it. A Release Radar job — scanning MusicBrainz for releases dated within the last 30 days across all monitored artists — would make the home page genuinely dynamic and reduce the need to actively check for new music.
+
+Required: a scheduled server-side job, a DB table or cache for recent-release results, and a new client route/section on the home page.
+
+### 3.10 No Activity Feed
+
+The app has no shared household view of what's happening. Downloads complete silently. Requests are only visible to the person who made them (or the operator via the Activity sub-nav). A lightweight activity feed — "Alex requested Funeral by Arcade Fire", "Download complete: OK Computer" — would make the app feel like a shared household experience rather than a personal tool that happens to be multi-user.
+
+### 3.11 No Cross-User Deduplication
+
+If two household members request the same release, the current system runs two independent Soulseek searches and downloads. There is no deduplication logic. This wastes bandwidth, clutters the download queue, and results in duplicate files. Detection requires matching by `musicbrainz_release_id` (preferred) or artist name + release title string match. Linking duplicate requests to a single download job requires a schema change.
+
+### 3.12 No "Coming Soon" / Pre-Request Support
+
+MusicBrainz records announced future release dates. When an artist is monitored, their upcoming releases are knowable. The app currently does nothing with this data. A "Coming Soon" section — releases with future dates from monitored artists — allows users to pre-request and have the acquisition run automatically when the date passes.
+
+### 3.13 No Per-User Format/Quality Preferences
+
+All users share the same Soulseek search parameters. A FLAC-only collector and a "anything that plays" casual listener both get the same search behavior. Per-user format and quality preferences would let each person set their floor and have their requests searched accordingly.
+
+### 3.14 No Download Result Scoring
+
+Soulseek search results are heterogeneous — the same album might appear as a 128kbps rip, a FLAC rip with wrong track count, and a perfect FLAC with complete metadata. Currently there is no automated ranking before queuing. A scoring layer (format, bitrate, completeness, uploader history) would surface the best candidate first and reduce manual import review.
+
+### 3.15 Not a PWA
+
+Harmoniarr has no `manifest.webmanifest`, no service worker, and no push notification support. Household users on phones cannot add it to their home screen with a native app experience. Push notifications ("your request is ready") would significantly improve the UX for non-operator users who don't check the app constantly.
+
 ### 3.9 No Multi-User Attribution on Requests
 
 Requests exist with a `requestedBy` user association on the server, but the client displays requests as an undifferentiated list. In a multi-user household, you want to know whose request is whose — both for social context ("Alex requested this") and for operator triage.
@@ -295,6 +342,32 @@ Replace the `hx-table` with an `hx-artwork-grid` card layout. Each release card:
 
 Replace text-list results with `hx-artwork-grid`. Artist search results: artist cards (no release art, just a generated initial/placeholder). Release search results: release cards with CAA artwork. Keep the mode toggle (Artist / Release). Each card carries the same Monitor/Request action as the home page and Discover screen.
 
+### 5.8 Release Radar — Server Job + Home Page Section
+
+New scheduled job (`releaseRadarJob`) runs daily. For each monitored artist, queries MusicBrainz for release groups with `first-release-date` within the last 30 days. Stores results in `release_radar_cache` table. New server route: `GET /api/v1/library/release-radar` → returns recent releases across all monitored artists, sorted by release date descending.
+
+Home page: renders a "New Releases" horizontal strip above the main artist grid when `releaseRadar.length > 0`. Each card: `ArtworkImage` + artist name + release title + release date + Request button (cross-referenced against existing requests). Strip is hidden if no recent releases exist.
+
+### 5.9 Activity Feed
+
+New `ActivityFeedView.vue` or inline panel. Sourced from a new server route `GET /api/v1/activity/feed` that returns a unified event stream: `request_created`, `download_completed`, `release_added`, `artist_monitored`. Each event has `userId`, `userName`, `entityType`, `entityTitle`, `timestamp`. Client polls at 30 s. Events render as a compact list: avatar/icon + description + relative timestamp. Operators see all events; requesters see their own plus download completions.
+
+### 5.10 Cross-User Deduplication
+
+On `POST /api/v1/library/media-requests`, the server checks for an existing active request matching the same `musicbrainz_release_id` (if present) or `artistName + releaseTitle`. If found, the new request is linked to the existing download job (`linked_request_id` FK on `media_requests`). The download serves both. Both users see fulfillment when the single download completes. Requires `linked_request_id` column and `musicbrainz_release_id` on `media_requests`.
+
+### 5.11 Per-User Format/Quality Preferences
+
+New `user_preferences` table (or JSON column on `users`). Fields: `preferredFormat` (enum: `flac`, `mp3-320`, `mp3-v0`, `any`), `minimumBitrate` (integer, nullable). Exposed via `GET/PUT /api/v1/users/me/preferences`. In Settings → Account, a preferences panel lets the user set their floor. Soulseek search queries attach the requesting user's preferences as filter constraints.
+
+### 5.12 Download Result Scoring
+
+Scoring function applied to Soulseek search results before queuing. Inputs: format (FLAC > MP3 320 > MP3 V0 > other), bitrate (higher = better up to format ceiling), track count match (result track count vs. MusicBrainz expected count), file size plausibility, uploader prior success rate (ratio of completed imports from this user). Returns a score 0–100. Results sorted by score descending; top result auto-queued, others surfaced in import review.
+
+### 5.13 PWA
+
+Add `public/manifest.webmanifest` with app name, icons (192px + 512px), `start_url: /app`, `display: standalone`, `theme_color`. Register a service worker (`/sw.js`) for offline shell caching. Implement Web Push: server generates VAPID keys, stores push subscriptions (`user_push_subscriptions` table), sends push notifications on `download_completed` and `request_fulfilled` events via the Web Push API. Client: `Notification.requestPermission()` prompt in Settings → Account after login.
+
 ---
 
 ## 6. DB Migrations Required
@@ -320,9 +393,79 @@ CREATE TABLE IF NOT EXISTS artist_similarity_cache (
 
 In-memory cache (per-process, cleared on restart) is acceptable for v1 of the Discover feature. DB cache enables cross-session reuse and is preferred if the ListenBrainz API has rate limits that affect UX.
 
-### 6.2 `musicbrainz_release_id` on `media_requests` (Future)
+### 6.2 `musicbrainz_release_id` + `linked_request_id` on `media_requests`
 
-Not required for this re-scope, but noted: adding `musicbrainz_release_id TEXT` to `media_requests` would enable exact cross-reference matching between search results and existing requests (instead of artist name + release title string matching).
+Required for cross-user deduplication (Step 13). `musicbrainz_release_id` enables exact match; `linked_request_id` links duplicate requests to the same download job.
+
+```
+20260601_030000_add_musicbrainz_and_dedup_to_media_requests.sql
+```
+
+```sql
+ALTER TABLE media_requests
+  ADD COLUMN IF NOT EXISTS musicbrainz_release_id TEXT,
+  ADD COLUMN IF NOT EXISTS linked_request_id      INTEGER REFERENCES media_requests(id);
+```
+
+### 6.3 `release_radar_cache` Table
+
+Required for Release Radar (Step 11). Caches recent-release results per monitored artist to avoid querying MusicBrainz on every page load.
+
+```
+20260601_040000_create_release_radar_cache.sql
+```
+
+```sql
+CREATE TABLE IF NOT EXISTS release_radar_cache (
+  release_group_mbid  TEXT        NOT NULL PRIMARY KEY,
+  artist_mbid         TEXT        NOT NULL,
+  artist_name         TEXT        NOT NULL,
+  title               TEXT        NOT NULL,
+  first_release_date  DATE,
+  primary_type        TEXT,
+  fetched_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_release_radar_artist
+  ON release_radar_cache(artist_mbid);
+
+CREATE INDEX IF NOT EXISTS idx_release_radar_date
+  ON release_radar_cache(first_release_date DESC);
+```
+
+### 6.4 `user_preferences` Column on `users`
+
+Required for per-user format/quality preferences (Step 15).
+
+```
+20260601_050000_add_preferences_to_users.sql
+```
+
+```sql
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}'::jsonb;
+```
+
+Default `{}` means "no preference" — system default applies. Schema: `{ preferredFormat: 'flac' | 'mp3-320' | 'mp3-v0' | 'any', minimumBitrate: number | null }`.
+
+### 6.5 `user_push_subscriptions` Table
+
+Required for PWA push notifications (Step 17).
+
+```
+20260601_060000_create_user_push_subscriptions.sql
+```
+
+```sql
+CREATE TABLE IF NOT EXISTS user_push_subscriptions (
+  id          SERIAL      PRIMARY KEY,
+  user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint    TEXT        NOT NULL UNIQUE,
+  p256dh      TEXT        NOT NULL,
+  auth        TEXT        NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
 
 ---
 
@@ -347,3 +490,19 @@ If a user deletes all monitored artists, the cold-start CTA would re-appear. Thi
 ### 7.5 ListenBrainz Coverage for Niche Genres?
 
 ListenBrainz similarity is derived from listening patterns of its user base. For very niche genres (black metal sub-genres, obscure jazz, regional folk), the similarity data may be sparse. MusicBrainz relationship data (influenced-by, collaboration) will fill some gaps, but coverage needs to be validated before committing to ListenBrainz-only. Plan: implement ListenBrainz first, add a Last.fm fallback path if coverage is inadequate.
+
+### 7.6 Release Radar — How Far Back Is "Recent"?
+
+30 days is the proposed window. But an artist who releases infrequently (once every 3 years) might have a release that the user monitors 45 days after it drops — they'd miss it in the Radar. Options: extend to 90 days, or surface any release the user doesn't yet have regardless of age (which is closer to the Missing screen). Tentative: 30 days for the Radar strip, link to Missing for the full backlog.
+
+### 7.7 Activity Feed — What Is the Right Scope for Requesters?
+
+Requesters seeing each other's requests in the feed could feel intrusive in a household context ("my partner can see everything I'm requesting"). Options: (a) requesters only see their own events + system events (downloads completed), (b) all household members see everything, (c) per-user privacy setting. Tentative: default to shared (it's a household app), with an operator-controlled option to restrict to own-only.
+
+### 7.8 Download Result Scoring — Where Does Uploader Reputation Come From?
+
+"Uploader prior success rate" requires tracking per-uploader import outcomes over time. This data doesn't exist yet. Short-term: score only on format, bitrate, and track completeness. Long-term: accumulate uploader history in a `slskd_uploader_history` table. Tentative: ship v1 scoring without uploader reputation; add reputation in a follow-up.
+
+### 7.9 PWA Push — Which Events Send Notifications?
+
+Too many notifications will cause users to disable them immediately. Candidates: `request_fulfilled` (high value, infrequent), `download_completed` (medium value), `new_release_from_monitored_artist` (medium value, potentially frequent for prolific artists). Tentative: only `request_fulfilled` for v1. Expand in settings later.
