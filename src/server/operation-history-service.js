@@ -224,6 +224,13 @@ export function createOperationHistoryService({
     };
   }
 
+  async function countActiveOperationRuns() {
+    const result = await getPoolFn().query(
+      `SELECT COUNT(*)::int AS active_count FROM operation_runs WHERE status IN ('pending', 'running')`,
+    );
+    return result.rows[0]?.active_count ?? 0;
+  }
+
   async function buildOperationRunDetail({ runId, auditLimit } = {}) {
     const run = await getOperationRunById(runId);
 
@@ -245,6 +252,7 @@ export function createOperationHistoryService({
   return {
     buildOperationHistory,
     buildOperationRunDetail,
+    countActiveOperationRuns,
     getOperationRunById,
     listRecentActivityRuns,
     listRecentOperationRuns,

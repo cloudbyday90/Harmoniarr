@@ -17,30 +17,27 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { fetchOperationHistory } from '../lib/operations-api.js';
+import { useAsyncResource } from '../composables/useAsyncResource.js';
 
-const isLoading = ref(true);
-const errorMessage = ref('');
-const runs = ref([]);
-const checkedAt = ref(null);
+const {
+  data: history,
+  errorMessage,
+  isLoading,
+  load,
+} = useAsyncResource({
+  fetcher: () => fetchOperationHistory({ limit: 50 }),
+  project: (payload) => ({
+    runs: Array.isArray(payload?.runs) ? payload.runs : [],
+    checkedAt: payload?.checkedAt ?? null,
+  }),
+  initialData: { runs: [], checkedAt: null },
+  fallbackErrorMessage: 'Failed to load operation history',
+});
 
-async function load() {
-  isLoading.value = true;
-  errorMessage.value = '';
-  try {
-    const payload = await fetchOperationHistory({ limit: 50 });
-    runs.value = Array.isArray(payload?.runs) ? payload.runs : [];
-    checkedAt.value = payload?.checkedAt ?? null;
-  } catch (error) {
-    errorMessage.value = error?.message ?? 'Failed to load operation history';
-    runs.value = [];
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-onMounted(load);
+const runs = computed(() => history.value?.runs ?? []);
+const checkedAt = computed(() => history.value?.checkedAt ?? null);
 
 const activeRuns = computed(() => runs.value.filter((run) => {
   const status = run.status;

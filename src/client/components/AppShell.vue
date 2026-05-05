@@ -112,14 +112,16 @@ const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNa
           {{ healthLabel }}
         </span>
 
-        <span
+        <RouterLink
           v-if="activeJobs !== null"
+          :to="{ name: 'activity-queue' }"
           class="hx-topbar-pill"
-          :title="`${activeJobs} active job${activeJobs === 1 ? '' : 's'}`"
+          :data-status="activeJobs > 0 ? 'busy' : 'idle'"
+          :title="`${activeJobs} active job${activeJobs === 1 ? '' : 's'} — open queue`"
         >
           <span class="hx-topbar-pill-dot" aria-hidden="true"></span>
-          {{ activeJobs }} jobs
-        </span>
+          {{ activeJobs }} {{ activeJobs === 1 ? 'job' : 'jobs' }}
+        </RouterLink>
 
         <div class="hx-topbar-user-wrap" ref="userMenuAnchor">
           <button

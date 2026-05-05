@@ -17,12 +17,9 @@
 -->
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { fetchSystemActivityFeed } from '../lib/system-api.js';
-
-const isLoading = ref(true);
-const errorMessage = ref('');
-const entries = ref([]);
+import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 function statusTone(status) {
   if (status === 'success' || status === 'completed' || status === 'ok') return 'success';
@@ -31,21 +28,19 @@ function statusTone(status) {
   return 'info';
 }
 
-async function load() {
-  isLoading.value = true;
-  errorMessage.value = '';
-  try {
-    const payload = await fetchSystemActivityFeed({ limit: 100 });
-    entries.value = Array.isArray(payload?.entries) ? payload.entries : [];
-  } catch (error) {
-    errorMessage.value = error?.message ?? 'Failed to load activity feed';
-    entries.value = [];
-  } finally {
-    isLoading.value = false;
-  }
-}
+const {
+  data: entries,
+  errorMessage,
+  isLoading,
+  load,
+} = useAsyncResource({
+  fetcher: () => fetchSystemActivityFeed({ limit: 100 }),
+  project: (payload) => (Array.isArray(payload?.entries) ? payload.entries : []),
+  initialData: [],
+  fallbackErrorMessage: 'Failed to load activity feed',
+});
 
-onMounted(load);
+const entryCount = computed(() => entries.value?.length ?? 0);
 </script>
 
 <template>
@@ -53,7 +48,7 @@ onMounted(load);
     <header class="hx-page-header">
       <div>
         <h2 class="hx-page-title">History</h2>
-        <p class="hx-page-subtitle">Recent system activity events ({{ entries.length }} entr{{ entries.length === 1 ? 'y' : 'ies' }}).</p>
+        <p class="hx-page-subtitle">Recent system activity events ({{ entryCount }} entr{{ entryCount === 1 ? 'y' : 'ies' }}).</p>
       </div>
       <div class="hx-page-actions">
         <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
@@ -70,7 +65,7 @@ onMounted(load);
 
     <article class="hx-card">
       <div class="hx-card-body is-flush">
-        <div v-if="isLoading && !entries.length" class="hx-card-body">
+        <div v-if="isLoading && !entryCount" class="hx-card-body">
           <div class="hx-skeleton-stack">
             <span class="hx-skeleton" data-size="lg"></span>
             <span class="hx-skeleton"></span>
@@ -79,7 +74,7 @@ onMounted(load);
             <span class="hx-skeleton"></span>
           </div>
         </div>
-        <div v-else-if="!entries.length" class="hx-empty">
+        <div v-else-if="!entryCount" class="hx-empty">
           <p class="hx-empty-title">No recent activity</p>
           <p class="hx-empty-copy">Activity events will appear here as the system performs work.</p>
         </div>

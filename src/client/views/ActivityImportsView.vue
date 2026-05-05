@@ -17,8 +17,9 @@
 -->
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { fetchImportCandidates } from '../lib/import-candidate-api.js';
+import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const props = defineProps({
   status: { type: String, default: 'import_pending' },
@@ -28,12 +29,8 @@ const props = defineProps({
   emptyCopy: { type: String, default: 'Imports awaiting ingestion will appear here once downloads complete.' },
 });
 
-const isLoading = ref(true);
-const errorMessage = ref('');
-const candidates = ref([]);
-
 function formatBytes(bytes) {
-  if (typeof bytes !== 'number' || bytes <= 0) return '—';
+  if (typeof bytes !== 'number' || bytes <= 0) return '\u2014';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let value = bytes;
   let i = 0;
@@ -44,21 +41,19 @@ function formatBytes(bytes) {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`;
 }
 
-async function load() {
-  isLoading.value = true;
-  errorMessage.value = '';
-  try {
-    const payload = await fetchImportCandidates({ status: props.status, limit: 100 });
-    candidates.value = Array.isArray(payload?.importCandidates) ? payload.importCandidates : [];
-  } catch (error) {
-    errorMessage.value = error?.message ?? 'Failed to load import candidates';
-    candidates.value = [];
-  } finally {
-    isLoading.value = false;
-  }
-}
+const {
+  data: candidates,
+  errorMessage,
+  isLoading,
+  load,
+} = useAsyncResource({
+  fetcher: () => fetchImportCandidates({ status: props.status, limit: 100 }),
+  project: (payload) => (Array.isArray(payload?.importCandidates) ? payload.importCandidates : []),
+  initialData: [],
+  fallbackErrorMessage: 'Failed to load import candidates',
+});
 
-onMounted(load);
+const candidateCount = computed(() => candidates.value?.length ?? 0);
 </script>
 
 <template>
@@ -66,11 +61,11 @@ onMounted(load);
     <header class="hx-page-header">
       <div>
         <h2 class="hx-page-title">{{ title }}</h2>
-        <p class="hx-page-subtitle">{{ subtitle }} {{ candidates.length }} candidate{{ candidates.length === 1 ? '' : 's' }}.</p>
+        <p class="hx-page-subtitle">{{ subtitle }} {{ candidateCount }} candidate{{ candidateCount === 1 ? '' : 's' }}.</p>
       </div>
       <div class="hx-page-actions">
         <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
-          {{ isLoading ? 'Loading…' : 'Refresh' }}
+          {{ isLoading ? 'Loading\u2026' : 'Refresh' }}
         </button>
       </div>
     </header>
@@ -83,7 +78,7 @@ onMounted(load);
 
     <article class="hx-card">
       <div class="hx-card-body is-flush">
-        <div v-if="isLoading && !candidates.length" class="hx-card-body">
+        <div v-if="isLoading && !candidateCount" class="hx-card-body">
           <div class="hx-skeleton-stack">
             <span class="hx-skeleton" data-size="lg"></span>
             <span class="hx-skeleton"></span>
@@ -91,7 +86,7 @@ onMounted(load);
             <span class="hx-skeleton"></span>
           </div>
         </div>
-        <div v-else-if="!candidates.length" class="hx-empty">
+        <div v-else-if="!candidateCount" class="hx-empty">
           <p class="hx-empty-title">{{ emptyTitle }}</p>
           <p class="hx-empty-copy">{{ emptyCopy }}</p>
         </div>
@@ -109,12 +104,12 @@ onMounted(load);
             </thead>
             <tbody>
               <tr v-for="candidate in candidates" :key="candidate.id">
-                <td>{{ candidate.folderPath ?? '—' }}</td>
-                <td>{{ candidate.username ?? '—' }}</td>
-                <td>{{ candidate.sourceProvider ?? '—' }}</td>
+                <td>{{ candidate.folderPath ?? '\u2014' }}</td>
+                <td>{{ candidate.username ?? '\u2014' }}</td>
+                <td>{{ candidate.sourceProvider ?? '\u2014' }}</td>
                 <td class="hx-table-num">{{ formatBytes(candidate.totalSizeBytes) }}</td>
                 <td><span class="hx-pill">{{ candidate.status }}</span></td>
-                <td>{{ candidate.importPendingAt ?? candidate.updatedAt ?? candidate.createdAt ?? '—' }}</td>
+                <td>{{ candidate.importPendingAt ?? candidate.updatedAt ?? candidate.createdAt ?? '\u2014' }}</td>
               </tr>
             </tbody>
           </table>

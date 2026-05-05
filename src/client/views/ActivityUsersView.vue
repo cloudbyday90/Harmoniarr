@@ -17,12 +17,9 @@
 -->
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { fetchUsers } from '../lib/users-api.js';
-
-const isLoading = ref(true);
-const errorMessage = ref('');
-const users = ref([]);
+import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 function roleTone(role) {
   if (role === 'admin' || role === 'owner') return 'warning';
@@ -30,21 +27,19 @@ function roleTone(role) {
   return undefined;
 }
 
-async function load() {
-  isLoading.value = true;
-  errorMessage.value = '';
-  try {
-    const payload = await fetchUsers();
-    users.value = Array.isArray(payload?.users) ? payload.users : [];
-  } catch (error) {
-    errorMessage.value = error?.message ?? 'Failed to load users';
-    users.value = [];
-  } finally {
-    isLoading.value = false;
-  }
-}
+const {
+  data: users,
+  errorMessage,
+  isLoading,
+  load,
+} = useAsyncResource({
+  fetcher: () => fetchUsers(),
+  project: (payload) => (Array.isArray(payload?.users) ? payload.users : []),
+  initialData: [],
+  fallbackErrorMessage: 'Failed to load users',
+});
 
-onMounted(load);
+const userCount = computed(() => users.value?.length ?? 0);
 </script>
 
 <template>
@@ -53,7 +48,7 @@ onMounted(load);
       <div>
         <h2 class="hx-page-title">Users</h2>
         <p class="hx-page-subtitle">
-          {{ users.length }} application user{{ users.length === 1 ? '' : 's' }}.
+          {{ userCount }} application user{{ userCount === 1 ? '' : 's' }}.
           Source-side Soulseek peers will land in a future release.
         </p>
       </div>
@@ -72,7 +67,7 @@ onMounted(load);
 
     <article class="hx-card">
       <div class="hx-card-body is-flush">
-        <div v-if="isLoading && !users.length" class="hx-card-body">
+        <div v-if="isLoading && !userCount" class="hx-card-body">
           <div class="hx-skeleton-stack">
             <span class="hx-skeleton" data-size="lg"></span>
             <span class="hx-skeleton"></span>
@@ -80,7 +75,7 @@ onMounted(load);
             <span class="hx-skeleton"></span>
           </div>
         </div>
-        <div v-else-if="!users.length" class="hx-empty">
+        <div v-else-if="!userCount" class="hx-empty">
           <p class="hx-empty-title">No application users</p>
           <p class="hx-empty-copy">Add users from the Settings workspace.</p>
         </div>

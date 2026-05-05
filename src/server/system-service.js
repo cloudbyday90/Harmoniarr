@@ -214,6 +214,9 @@ export function createSystemService({
       ? await dependencyHealthService.getDependencyHealth()
       : [];
     const heartbeats = buildSystemHeartbeats();
+    const activeJobCount = operationHistoryService?.countActiveOperationRuns
+      ? await operationHistoryService.countActiveOperationRuns()
+      : 0;
 
     const [spotifyStatus, youtubeStatus, appleMusicStatus] = includeDependencies
       ? await Promise.all([
@@ -235,6 +238,7 @@ export function createSystemService({
         version: packageJson.version,
         startedAt: startedAt.toISOString(),
       },
+      activeJobCount,
       discoveryHeartbeat: libraryDiscoveryHeartbeatConfig,
       importExecutionHeartbeat: buildRawHeartbeatOverview(
         importCandidateExecutionHeartbeatConfig,
