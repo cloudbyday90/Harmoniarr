@@ -196,29 +196,42 @@ onMounted(() => { void loadSettings(); });
           <header class="hx-card-header">
             <div>
               <h3 class="hx-card-title">Security</h3>
-              <p class="hx-card-subtitle">Cookie posture and HTTPS enforcement. Leave these disabled for local-only HTTP installs.</p>
+              <p class="hx-card-subtitle">Leave everything here off unless Harmoniarr is accessible over HTTPS from outside your network.</p>
             </div>
           </header>
           <div class="hx-card-body">
-            <div class="hx-field">
-              <label class="hx-field-label">CSRF protection</label>
-              <select class="hx-select" v-model="form.security.csrfProtectionMode">
-                <option value="disabled">disabled</option>
-                <option value="required">required</option>
-              </select>
+            <div class="cfg-group" style="padding-top: 0; border-top: none">
+              <p class="cfg-group-title">Cookie security</p>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.security.secureCookies" />
+                <span>Secure cookies</span>
+              </label>
+              <p class="cfg-field-hint">Only sends your login cookie over HTTPS. Turn on if Harmoniarr is behind a reverse proxy with SSL — leave off for plain HTTP installs.</p>
             </div>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.security.secureCookies" />
-              <span>Mark auth cookies as Secure</span>
-            </label>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.security.enforceHttps" />
-              <span>Redirect HTTP traffic to HTTPS and require HTTPS for writes</span>
-            </label>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.security.strictTransportSecurity" />
-              <span>Send Strict-Transport-Security headers</span>
-            </label>
+            <div class="cfg-group">
+              <p class="cfg-group-title">HTTPS enforcement</p>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.security.enforceHttps" />
+                <span>Require HTTPS</span>
+              </label>
+              <p class="cfg-field-hint">Redirects plain HTTP visits to HTTPS and blocks settings changes over unencrypted connections. Leave off for local-only installs.</p>
+              <label class="cfg-check" style="margin-top: var(--hx-space-2)">
+                <input type="checkbox" v-model="form.security.strictTransportSecurity" />
+                <span>Tell browsers to always use HTTPS</span>
+              </label>
+              <p class="cfg-field-hint">Sends a header that tells browsers to never load Harmoniarr over plain HTTP. Only enable after Require HTTPS is already working.</p>
+            </div>
+            <div class="cfg-group">
+              <p class="cfg-group-title">Cross-site protection</p>
+              <div class="hx-field">
+                <label class="hx-field-label">Cross-site request protection</label>
+                <select class="hx-select" v-model="form.security.csrfProtectionMode">
+                  <option value="disabled">Disabled</option>
+                  <option value="required">Required</option>
+                </select>
+              </div>
+              <p class="cfg-field-hint">Prevents other websites from quietly sending requests to Harmoniarr on your behalf. Leave disabled for local use.</p>
+            </div>
           </div>
         </article>
 
@@ -226,22 +239,28 @@ onMounted(() => { void loadSettings(); });
           <header class="hx-card-header">
             <div>
               <h3 class="hx-card-title">System</h3>
-              <p class="hx-card-subtitle">Base URL, logging level, and runtime defaults.</p>
+              <p class="hx-card-subtitle">Base address and log verbosity. Leave at defaults for most installs.</p>
             </div>
           </header>
           <div class="hx-card-body">
-            <div class="hx-field">
-              <label class="hx-field-label">Base URL</label>
-              <input class="hx-input" v-model="form.system.baseUrl" placeholder="https://harmoniarr.example" />
+            <div class="cfg-group" style="padding-top: 0; border-top: none">
+              <div class="hx-field">
+                <label class="hx-field-label">Base URL</label>
+                <input class="hx-input" v-model="form.system.baseUrl" placeholder="https://harmoniarr.example" />
+              </div>
+              <p class="cfg-field-hint">The web address where Harmoniarr is accessible, e.g. <code>https://harmoniarr.home</code>. Used for redirect links and OAuth callbacks. Leave blank if you're only accessing it locally.</p>
             </div>
-            <div class="hx-field">
-              <label class="hx-field-label">Log level</label>
-              <select class="hx-select" v-model="form.system.logLevel">
-                <option value="debug">debug</option>
-                <option value="info">info</option>
-                <option value="warn">warn</option>
-                <option value="error">error</option>
-              </select>
+            <div class="cfg-group">
+              <div class="hx-field">
+                <label class="hx-field-label">Log level</label>
+                <select class="hx-select" v-model="form.system.logLevel">
+                  <option value="debug">debug</option>
+                  <option value="info">info</option>
+                  <option value="warn">warn</option>
+                  <option value="error">error</option>
+                </select>
+              </div>
+              <p class="cfg-field-hint"><code>info</code> is recommended for normal use. Switch to <code>debug</code> temporarily if you need to trace a problem.</p>
             </div>
           </div>
         </article>

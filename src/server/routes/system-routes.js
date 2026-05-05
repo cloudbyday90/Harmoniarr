@@ -19,6 +19,8 @@
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
+import { readdir } from 'node:fs/promises';
+import { resolve, dirname, sep } from 'node:path';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -413,5 +415,37 @@ export function registerSystemRoutes(app, {
   app.get('/api/v1/system/library-scan-summary', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
     response.json(await buildLibraryScanSummary());
+  }));
+
+  app.get('/api/v1/system/fs/browse', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const rawPath = String(request.query.path ?? '/');
+    const safePath = resolve(rawPath);
+    const parentPath = safePath === sep ? null : dirname(safePath);
+
+    let entries = [];
+    let errorMessage = null;
+
+    try {
+      const dirents = await readdir(safePath, { withFileTypes: true });
+      entries = dirents
+        .filter((d) => d.isDirectory())
+        .map((d) => ({ name: d.name, path: resolve(safePath, d.name) }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    } catch (error) {
+      errorMessage = error?.code === 'EACCES' ? 'Permission denied.' :
+        error?.code === 'ENOENT' ? 'Folder not found.' :
+        error?.code === 'ENOTDIR' ? 'That path is a file, not a folder.' :
+        'Could not read this folder.';
+    }
+
+    response.json({
+      ok: errorMessage === null,
+      path: safePath,
+      parent: parentPath,
+      entries,
+      ...(errorMessage ? { error: errorMessage } : {}),
+    });
   }));
 }

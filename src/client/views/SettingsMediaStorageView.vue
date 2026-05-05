@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { fetchSettings, updateSettings } from '../lib/settings-api.js';
 import {
   buildSettingsUpdatePayload,
@@ -26,12 +26,41 @@ import {
   normalizeDownloadMappings,
   normalizeUserMusicRoots,
 } from '../lib/settings-form.js';
+import FolderBrowserModal from '../components/FolderBrowserModal.vue';
 
 const isLoading = ref(true);
 const isSaving = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 const pathValidation = ref(null);
+
+const browseTarget = ref(null); // which form field key is being browsed
+const browseInitial = ref('/');
+const browseLabel = ref('Select a folder');
+const browseOpen = ref(false);
+
+function openBrowse(label, currentValue, callback) {
+  browseLabel.value = label;
+  browseInitial.value = currentValue || '/';
+  browseTarget.value = callback;
+  browseOpen.value = true;
+}
+
+function onBrowseSelect(path) {
+  if (typeof browseTarget.value === 'function') {
+    browseTarget.value(path);
+  }
+  browseOpen.value = false;
+}
+
+function onBrowseClose() {
+  browseOpen.value = false;
+}
+
+const maxOriginalFileSizeMb = computed({
+  get: () => Math.round(form.artwork.maxOriginalFileSizeBytes / 1048576),
+  set: (mb) => { form.artwork.maxOriginalFileSizeBytes = Math.round(mb) * 1048576; },
+});
 
 const form = reactive({
   artwork: {
@@ -252,55 +281,55 @@ onMounted(() => { void loadSettings(); });
 
             <div class="cfg-group">
               <p class="cfg-group-title">Thumbnails</p>
-              <p class="hx-text-muted">Harmoniarr generates smaller copies of each cover for fast loading in the app.</p>
+              <p class="hx-text-muted">The app keeps small display copies of each cover so pages load quickly. These are <strong>cache files only</strong> — your actual artwork is stored separately and is never deleted just because a thumbnail expires. Leave everything in this section at the defaults.</p>
               <div class="hx-form-row">
                 <div class="hx-field">
                   <label class="hx-field-label">Image format</label>
                   <select class="hx-select" v-model="form.artwork.derivativeFormat">
-                    <option value="webp">WebP — smallest file size</option>
-                    <option value="jpeg">JPEG — most compatible</option>
-                    <option value="png">PNG — lossless</option>
+                    <option value="webp">WebP — best choice for most people</option>
+                    <option value="jpeg">JPEG — if you're seeing display issues</option>
+                    <option value="png">PNG — lossless, largest file size</option>
                   </select>
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Sizes to generate (pixels)</label>
+                  <label class="hx-field-label">Thumbnail sizes</label>
                   <input class="hx-input" v-model="form.artwork.derivativeSizesText" placeholder="256, 512" />
-                  <p class="cfg-field-hint">Pixel widths, separated by commas. The app picks the best size for each context.</p>
+                  <p class="cfg-field-hint">Leave this at the default. These are the sizes (in pixels) the app pre-generates so covers load quickly — changing it is rarely needed.</p>
                 </div>
               </div>
               <div class="hx-form-row">
                 <div class="hx-field">
                   <label class="hx-field-label">Max thumbnail storage (MB)</label>
                   <input class="hx-input" v-model.number="form.artwork.derivativeCacheSizeMb" type="number" min="64" max="16384" step="64" />
-                  <p class="cfg-field-hint">Thumbnails are deleted when this cap is reached.</p>
+                  <p class="cfg-field-hint">How much disk space thumbnails can use. 1,024 MB is plenty for most libraries. Old ones are deleted automatically when this limit is hit.</p>
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Keep thumbnails for (days)</label>
+                  <label class="hx-field-label">Regenerate after (days)</label>
                   <input class="hx-input" v-model.number="form.artwork.derivativeRetentionDays" type="number" min="1" max="3650" />
-                  <p class="cfg-field-hint">Expired ones are regenerated automatically when needed.</p>
+                  <p class="cfg-field-hint">When a cached thumbnail is older than this, the app quietly regenerates it from the original. Your artwork is not deleted — only the small display copy is refreshed.</p>
                 </div>
               </div>
             </div>
 
             <div class="cfg-group">
-              <p class="cfg-group-title">Full-size originals</p>
-              <p class="hx-text-muted">The original image is kept separately from the thumbnails.</p>
+              <p class="cfg-group-title">Storage limits</p>
+              <p class="hx-text-muted">These guard against storing absurdly large or corrupt image files. You almost certainly don't need to change any of this.</p>
               <div class="hx-form-row">
                 <div class="hx-field">
-                  <label class="hx-field-label">Skip images larger than (bytes)</label>
-                  <input class="hx-input" v-model.number="form.artwork.maxOriginalFileSizeBytes" type="number" min="1048576" max="104857600" step="1048576" />
-                  <p class="cfg-field-hint">20,971,520 = 20 MB. Images over this size won't be saved.</p>
+                  <label class="hx-field-label">Ignore images over this size (MB)</label>
+                  <input class="hx-input" v-model.number="maxOriginalFileSizeMb" type="number" min="1" max="100" step="1" />
+                  <p class="cfg-field-hint">Leave this at the default (20 MB). Images bigger than this are probably not real album art.</p>
                 </div>
                 <div class="hx-field">
-                  <label class="hx-field-label">Skip images wider than (pixels)</label>
+                  <label class="hx-field-label">Ignore images wider than this (px)</label>
                   <input class="hx-input" v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="64" />
-                  <p class="cfg-field-hint">Applies to both width and height.</p>
+                  <p class="cfg-field-hint">Leave this at the default (4,000 px). Same idea — album art isn't that wide.</p>
                 </div>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Delete unlinked art after (days)</label>
+                <label class="hx-field-label">Remove art with no album attached after (days)</label>
                 <input class="hx-input" v-model.number="form.artwork.unassignedRetentionDays" type="number" min="1" max="3650" />
-                <p class="cfg-field-hint">Art that isn't attached to any album is cleared after this many days.</p>
+                <p class="cfg-field-hint">Art that is linked to an album in your library is <strong>never</strong> automatically deleted. This only removes stray image files that aren't attached to anything — for example leftovers from a failed import.</p>
               </div>
             </div>
 
@@ -342,22 +371,34 @@ onMounted(() => { void loadSettings(); });
             <div class="cfg-group" style="padding-top: 0; border-top: none">
               <div class="hx-field">
                 <label class="hx-field-label">Downloads folder</label>
-                <input class="hx-input" v-model="form.paths.downloads" />
+                <div class="hx-field-with-browse">
+                  <input class="hx-input" v-model="form.paths.downloads" />
+                  <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Downloads folder', form.paths.downloads, v => form.paths.downloads = v)">Browse…</button>
+                </div>
                 <p class="cfg-field-hint">Where slskd puts completed downloads. Harmoniarr reads from here.</p>
               </div>
               <div class="hx-field">
                 <label class="hx-field-label">Music library</label>
-                <input class="hx-input" v-model="form.paths.music" />
+                <div class="hx-field-with-browse">
+                  <input class="hx-input" v-model="form.paths.music" />
+                  <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Music library', form.paths.music, v => form.paths.music = v)">Browse…</button>
+                </div>
                 <p class="cfg-field-hint">Your organized music collection. Accepted imports are moved here.</p>
               </div>
               <div class="hx-field">
                 <label class="hx-field-label">Staging area</label>
-                <input class="hx-input" v-model="form.paths.staging" />
+                <div class="hx-field-with-browse">
+                  <input class="hx-input" v-model="form.paths.staging" />
+                  <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Staging area', form.paths.staging, v => form.paths.staging = v)">Browse…</button>
+                </div>
                 <p class="cfg-field-hint">A holding area where files wait while an import is being reviewed.</p>
               </div>
               <div class="hx-field">
                 <label class="hx-field-label">Transcode workspace</label>
-                <input class="hx-input" v-model="form.paths.transcodeTemp" />
+                <div class="hx-field-with-browse">
+                  <input class="hx-input" v-model="form.paths.transcodeTemp" />
+                  <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Transcode workspace', form.paths.transcodeTemp, v => form.paths.transcodeTemp = v)">Browse…</button>
+                </div>
                 <p class="cfg-field-hint">Temporary space used when converting audio formats. Can point to fast storage.</p>
               </div>
             </div>
@@ -495,5 +536,13 @@ onMounted(() => { void loadSettings(); });
         </button>
       </div>
     </form>
+
+    <FolderBrowserModal
+      v-if="browseOpen"
+      :initial="browseInitial"
+      :label="browseLabel"
+      @select="onBrowseSelect"
+      @close="onBrowseClose"
+    />
   </div>
 </template>

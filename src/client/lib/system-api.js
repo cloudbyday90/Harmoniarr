@@ -37,3 +37,7 @@ export function fetchSystemActivityFeed({ before, limit } = {}) {
 export function fetchSystemOperatorNotifications({ limit } = {}) {
   return apiRequest(`/api/v1/system/operator-notifications${buildQueryString({ limit })}`);
 }
+
+export function browseFsDirectory({ path } = {}) {
+  return apiRequest(`/api/v1/system/fs/browse${buildQueryString({ path })}`);
+}

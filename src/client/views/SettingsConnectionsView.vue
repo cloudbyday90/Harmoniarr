@@ -280,56 +280,70 @@ onMounted(() => { void loadSettings(); });
     <form @submit.prevent="saveSettings" v-else>
       <div class="cfg-2col">
 
-        <!-- slskd connectivity -->
+        <!-- Soulseek connection -->
         <article class="hx-card">
           <header class="hx-card-header">
             <div>
-              <h3 class="hx-card-title">slskd connectivity</h3>
-              <p class="hx-card-subtitle">Soulseek daemon connection. The API key is write-only and never returned to the browser.</p>
+              <h3 class="hx-card-title">Soulseek connection</h3>
+              <p class="hx-card-subtitle">How Harmoniarr talks to slskd, the Soulseek search daemon. You configured this during setup.</p>
             </div>
             <span class="review-status-pill" :class="secretStatus?.slskd?.apiKeyConfigured ? 'review-status-selected' : 'review-status-held'">
               {{ slskdApiKeyStatusLabel() }}
             </span>
           </header>
           <div class="hx-card-body">
-            <div class="hx-field">
-              <label class="hx-field-label">Base URL</label>
-              <input class="hx-input" v-model="form.slskd.baseUrl" placeholder="http://slskd:5030" />
+            <div class="cfg-group" style="padding-top: 0; border-top: none">
+              <div class="hx-field">
+                <label class="hx-field-label">slskd address</label>
+                <input class="hx-input" v-model="form.slskd.baseUrl" placeholder="http://slskd:5030" />
+              </div>
+              <p class="cfg-field-hint">The address slskd is running on. The default (<code>http://slskd:5030</code>) works with the standard Docker Compose setup.</p>
+              <div class="hx-field" style="margin-top: var(--hx-space-3)">
+                <label class="hx-field-label">Request timeout (seconds)</label>
+                <input class="hx-input" v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />
+              </div>
+              <p class="cfg-field-hint">Leave at the default (10,000 ms) unless you're getting frequent timeout errors.</p>
             </div>
-            <div class="hx-field">
-              <label class="hx-field-label">Request timeout (ms)</label>
-              <input class="hx-input" v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />
+            <div class="cfg-group">
+              <p class="cfg-group-title">API key</p>
+              <div class="hx-field">
+                <label class="hx-field-label">API key</label>
+                <input class="hx-input" v-model="form.slskd.apiKey" type="password" autocomplete="new-password" :disabled="form.slskd.clearApiKey" placeholder="Leave blank to keep the current key" />
+              </div>
+              <p class="cfg-field-hint">The API key from your slskd config. Stored securely — this field never shows the saved value. Leave blank to keep the current key.</p>
+              <label class="cfg-check" style="margin-top: var(--hx-space-2)">
+                <input type="checkbox" v-model="form.slskd.clearApiKey" />
+                <span>Remove the stored API key on save</span>
+              </label>
             </div>
-            <div class="hx-field">
-              <label class="hx-field-label">API key</label>
-              <input class="hx-input" v-model="form.slskd.apiKey" type="password" autocomplete="new-password" :disabled="form.slskd.clearApiKey" placeholder="Leave blank to keep the current key" />
-            </div>
-            <label class="cfg-check">
-              <input type="checkbox" v-model="form.slskd.clearApiKey" />
-              <span>Clear the stored API key on save</span>
-            </label>
           </div>
         </article>
 
-        <!-- Provider intake policy -->
+        <!-- How playlist requests work -->
         <article class="hx-card">
           <header class="hx-card-header">
             <div>
-              <h3 class="hx-card-title">Provider intake policy</h3>
-              <p class="hx-card-subtitle">Controls how external playlist requests expand into discovery work.</p>
+              <h3 class="hx-card-title">How playlist requests work</h3>
+              <p class="hx-card-subtitle">Controls how Harmoniarr turns a playlist link into music search work.</p>
             </div>
           </header>
           <div class="hx-card-body">
-            <div class="hx-field">
-              <label class="hx-field-label">Playlist expansion</label>
-              <select class="hx-select" v-model="form.providers.playlistExpansionPolicy">
-                <option value="bounded">Bounded to playlist albums</option>
-                <option value="artist_discovery">Include artist album discovery</option>
-              </select>
+            <div class="cfg-group" style="padding-top: 0; border-top: none">
+              <div class="hx-field">
+                <label class="hx-field-label">Playlist discovery mode</label>
+                <select class="hx-select" v-model="form.providers.playlistExpansionPolicy">
+                  <option value="bounded">Bounded — only albums in the playlist</option>
+                  <option value="artist_discovery">Artist discovery — include other albums by those artists</option>
+                </select>
+              </div>
+              <p class="cfg-field-hint"><strong>Bounded</strong> searches only for the albums listed in the playlist. <strong>Artist discovery</strong> also searches for other albums by those same artists — useful for building out a collection, but creates more download work.</p>
             </div>
-            <div class="hx-field">
-              <label class="hx-field-label">Provider request timeout (ms)</label>
-              <input class="hx-input" v-model.number="form.providers.requestTimeoutMs" type="number" min="1000" max="60000" step="1000" />
+            <div class="cfg-group">
+              <div class="hx-field">
+                <label class="hx-field-label">Provider request timeout (ms)</label>
+                <input class="hx-input" v-model.number="form.providers.requestTimeoutMs" type="number" min="1000" max="60000" step="1000" />
+              </div>
+              <p class="cfg-field-hint">How long to wait for playlist data from Spotify, YouTube, or Apple Music. Leave at the default (15,000 ms).</p>
             </div>
           </div>
         </article>
@@ -339,8 +353,8 @@ onMounted(() => { void loadSettings(); });
       <article class="hx-card" style="margin-top: var(--hx-space-4)">
         <header class="hx-card-header">
           <div>
-            <h3 class="hx-card-title">Provider credentials</h3>
-            <p class="hx-card-subtitle">Secrets are write-only. Entering a new value replaces the stored one; leave blank to keep the current secret.</p>
+            <h3 class="hx-card-title">Streaming service connections</h3>
+            <p class="hx-card-subtitle">Connect Spotify, YouTube, or Apple Music so users can submit playlist links. Secrets are write-only — leave blank to keep the current value.</p>
           </div>
         </header>
         <div class="hx-card-body">
@@ -356,7 +370,7 @@ onMounted(() => { void loadSettings(); });
               </div>
               <label class="cfg-check">
                 <input type="checkbox" v-model="form.providers.spotifyEnabled" />
-                <span>Enable Spotify provider intake</span>
+                <span>Accept Spotify playlist links</span>
               </label>
               <div class="hx-form-row">
                 <div class="hx-field">
@@ -370,7 +384,7 @@ onMounted(() => { void loadSettings(); });
               </div>
               <label class="cfg-check">
                 <input type="checkbox" v-model="form.providers.clearSpotifyClientSecret" />
-                <span>Clear the stored Spotify client secret on save</span>
+                <span>Remove the stored Spotify client secret on save</span>
               </label>
               <div class="cfg-provider-header" style="margin-top: var(--hx-space-2)">
                 <span class="hx-text-muted">User authorization — {{ spotifyOAuthStatusLabel() }}</span>
@@ -398,7 +412,7 @@ onMounted(() => { void loadSettings(); });
               </div>
               <label class="cfg-check">
                 <input type="checkbox" v-model="form.providers.youtubeEnabled" />
-                <span>Enable YouTube provider intake</span>
+                <span>Accept YouTube playlist links</span>
               </label>
               <div class="hx-form-row">
                 <div class="hx-field">
@@ -417,11 +431,11 @@ onMounted(() => { void loadSettings(); });
               <div class="hx-card-actions">
                 <label class="cfg-check">
                   <input type="checkbox" v-model="form.providers.clearYoutubeApiKey" />
-                  <span>Clear API key</span>
+                  <span>Remove API key</span>
                 </label>
                 <label class="cfg-check">
                   <input type="checkbox" v-model="form.providers.clearYoutubeClientSecret" />
-                  <span>Clear OAuth secret</span>
+                  <span>Remove OAuth secret</span>
                 </label>
               </div>
               <div class="cfg-provider-header" style="margin-top: var(--hx-space-2)">
@@ -450,7 +464,7 @@ onMounted(() => { void loadSettings(); });
               </div>
               <label class="cfg-check">
                 <input type="checkbox" v-model="form.providers.appleMusicEnabled" />
-                <span>Enable Apple Music provider intake</span>
+                <span>Accept Apple Music playlist links</span>
               </label>
               <div class="hx-form-row">
                 <div class="hx-field">
@@ -472,7 +486,7 @@ onMounted(() => { void loadSettings(); });
               </div>
               <label class="cfg-check">
                 <input type="checkbox" v-model="form.providers.clearAppleMusicPrivateKey" />
-                <span>Clear the stored Apple Music private key on save</span>
+                <span>Remove the stored Apple Music private key on save</span>
               </label>
             </div>
 

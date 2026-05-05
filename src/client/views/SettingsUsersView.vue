@@ -102,15 +102,15 @@ function plexLibraryAccessPolicyTone(policy) {
 function describePlexLibraryAccessPolicy(policy) {
   switch (policy?.reasonCode) {
     case 'plex_owner_access':
-      return 'This Plex owner profile has confirmed server access and can be treated as request-targetable without additional review.';
+      return 'This is the Plex owner — they have confirmed server access and can be imported without review.';
     case 'plex_shared_library_access':
-      return `This Plex profile exposes shared server or library evidence${policy.serverCount > 0 ? ` across ${policy.serverCount} server assignment${policy.serverCount === 1 ? '' : 's'}` : ''}, so request-targeting and fulfillment visibility can assume Plex access.`;
+      return `This user has confirmed shared library access${policy.serverCount > 0 ? ` across ${policy.serverCount} server${policy.serverCount === 1 ? '' : 's'}` : ''} and can be imported.`;
     case 'plex_managed_access_unconfirmed':
-      return 'Managed Plex home membership alone does not confirm actual library sharing. Keep request-targeting and fulfillment affordances behind operator review until Plex access is verified.';
+      return 'This is a managed Plex home member, but shared library access isn\'t confirmed. Review before importing.';
     case 'plex_member_access_unconfirmed':
-      return 'Plex home membership exists, but the current preview does not confirm shared library visibility. Treat request-targeting as review-required until access is verified.';
+      return 'This Plex home member exists, but shared library visibility isn\'t confirmed in this preview. Review before importing.';
     default:
-      return 'Plex access details are incomplete, so operator review is still required before relying on this profile for request-targeting or fulfillment decisions.';
+      return 'Plex access details are incomplete. Review before importing.';
   }
 }
 
@@ -382,8 +382,8 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
     <article class="hx-card">
       <header class="hx-card-header">
         <div>
-          <h3 class="hx-card-title">Plex directory import</h3>
-          <p class="hx-card-subtitle">Link the Plex owner account, preview home users, then import non-conflicting Plex-linked users into the shared identity boundary.</p>
+          <h3 class="hx-card-title">Plex import</h3>
+          <p class="hx-card-subtitle">Link your Plex account to preview your Plex home users, then import them as Harmoniarr accounts.</p>
         </div>
         <span class="review-status-pill" :class="secretStatus?.providers?.plex?.linked ? 'review-status-selected' : 'review-status-held'">
           {{ secretStatus?.providers?.plex?.linked ? 'Linked' : 'Not linked' }}
@@ -407,15 +407,15 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
         </div>
 
         <div class="hx-empty" v-if="!plexUserImportPreview">
-          <p class="hx-empty-copy">Previewing will classify linked users, importable users, owner-account skips, and conflicts before any new Harmoniarr users are created.</p>
+          <p class="hx-empty-copy">Click Preview to see which Plex home users can be imported, which already exist, and which need attention before importing.</p>
         </div>
 
         <template v-else>
           <dl class="review-meta-grid review-meta-grid-wide">
-            <div><dt>Importable</dt><dd>{{ plexUserImportPreview.summary?.importable ?? 0 }}</dd></div>
-            <div><dt>Linked refresh</dt><dd>{{ plexUserImportPreview.summary?.linked ?? 0 }}</dd></div>
+            <div><dt>Ready to import</dt><dd>{{ plexUserImportPreview.summary?.importable ?? 0 }}</dd></div>
+            <div><dt>Already linked</dt><dd>{{ plexUserImportPreview.summary?.linked ?? 0 }}</dd></div>
             <div><dt>Conflicts</dt><dd>{{ plexUserImportPreview.summary?.conflicts ?? 0 }}</dd></div>
-            <div><dt>Owner skips</dt><dd>{{ plexUserImportPreview.summary?.ownerAccounts ?? 0 }}</dd></div>
+            <div><dt>Owner (skipped)</dt><dd>{{ plexUserImportPreview.summary?.ownerAccounts ?? 0 }}</dd></div>
           </dl>
 
           <div class="cfg-mapping-list" v-if="plexUserImportPreview.profiles?.length">
@@ -456,7 +456,7 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
         <header class="hx-card-header">
           <div>
             <h3 class="hx-card-title">Create user</h3>
-            <p class="hx-card-subtitle">New users are created with a temporary password and must change it on first login.</p>
+            <p class="hx-card-subtitle">New users get a temporary password they must change on first login.</p>
           </div>
         </header>
         <div class="hx-card-body">
@@ -470,8 +470,9 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
               <input class="hx-input" v-model="newUserForm.password" type="password" autocomplete="new-password" placeholder="At least 10 characters" />
             </div>
             <div class="hx-field">
-              <label class="hx-field-label">Managed library subdirectory</label>
+              <label class="hx-field-label">Personal library folder</label>
               <input class="hx-input" v-model="newUserForm.managedLibraryRelativeRoot" placeholder="household/listener" />
+              <p class="cfg-field-hint">A subfolder inside the music library that belongs to this user. Their imports go here instead of the shared library root. Leave blank to use the shared root. Example: <code>family/alice</code></p>
             </div>
             <div class="hx-field">
               <label class="hx-field-label">Role</label>
@@ -479,7 +480,6 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
                 <option v-for="roleOption in roleOptions" :key="roleOption" :value="roleOption">{{ roleOption }}</option>
               </select>
             </div>
-            <p class="hx-text-muted">The managed library subdirectory is resolved under the shared music root and created on first import apply if needed.</p>
             <div class="hx-card-actions" style="margin-top: var(--hx-space-3)">
               <button type="submit" class="hx-btn" data-variant="primary" :disabled="isCreatingUser">
                 {{ isCreatingUser ? 'Creating…' : 'Create user' }}
@@ -493,22 +493,22 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
         <header class="hx-card-header">
           <div>
             <h3 class="hx-card-title">Role reference</h3>
-            <p class="hx-card-subtitle">Permission boundaries for each role preset.</p>
+            <p class="hx-card-subtitle">What each role can and can't do.</p>
           </div>
         </header>
         <div class="hx-card-body">
           <dl class="review-meta-grid">
             <div>
               <dt>admin</dt>
-              <dd>Full system, user, import, and library control.</dd>
+              <dd>Full control — settings, users, imports, library management, everything.</dd>
             </div>
             <div>
               <dt>operator</dt>
-              <dd>Can review and execute imports plus manage discovery and scans, without full admin settings control.</dd>
+              <dd>Can review and run imports, trigger library scans. Cannot change settings or manage users.</dd>
             </div>
             <div>
               <dt>requester</dt>
-              <dd>Self-service request and playlist submission via the dedicated Request Music view.</dd>
+              <dd>Can submit music requests through the Request Music screen. Cannot see or manage other users' content.</dd>
             </div>
           </dl>
         </div>
@@ -543,7 +543,7 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
           <div>
             <p class="hx-text-muted" style="font-size: var(--hx-text-xs); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: var(--hx-space-1)">{{ user.role }}</p>
             <h3 class="hx-card-title">{{ user.username }}</h3>
-            <p class="hx-card-subtitle">Auth provider: {{ user.authProvider ?? 'local' }}</p>
+            <p class="hx-card-subtitle">Signs in with: {{ user.authProvider === 'plex' ? 'Plex' : 'local password' }}</p>
           </div>
           <span class="hx-pill" :data-tone="user.isDisabled ? 'warning' : 'success'">
             {{ user.isDisabled ? 'Disabled' : 'Active' }}
@@ -552,13 +552,13 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
         <div class="hx-card-body">
           <div class="hx-form-row">
             <div class="hx-field">
-              <label class="hx-field-label">Role preset</label>
+              <label class="hx-field-label">Role</label>
               <select class="hx-select" v-model="user.pendingRole">
                 <option v-for="roleOption in roleOptions" :key="`${user.id}-${roleOption}`" :value="roleOption">{{ roleOption }}</option>
               </select>
             </div>
             <div class="hx-field">
-              <label class="hx-field-label">Managed library subdirectory</label>
+              <label class="hx-field-label">Personal library folder</label>
               <input class="hx-input" v-model="user.pendingManagedLibraryRelativeRoot" placeholder="household/listener" />
             </div>
           </div>
@@ -572,21 +572,20 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
             <input type="checkbox" v-model="user.pendingIsDisabled" />
             <span>Disable user access</span>
           </label>
-          <p class="hx-text-muted" style="margin-top: var(--hx-space-2)">Permissions: {{ user.permissions.join(', ') }}</p>
-          <p class="hx-text-muted" v-if="user.managedLibraryRelativeRoot">Managed library root: {{ user.managedLibraryRelativeRoot }}</p>
-          <p class="hx-text-muted" v-else>No managed library subdirectory configured yet.</p>
+          <p class="hx-text-muted" v-if="user.managedLibraryRelativeRoot" style="margin-top: var(--hx-space-2)">Personal library folder: {{ user.managedLibraryRelativeRoot }}</p>
+          <p class="hx-text-muted" v-else style="margin-top: var(--hx-space-2)">No personal library folder — imports go to the shared library root.</p>
           <template v-if="user.plexProfile">
             <p class="hx-text-muted">
-              Plex access policy:
+              Plex access:
               <span class="hx-pill" :data-tone="plexLibraryAccessPolicyTone(user.plexProfile.accessPolicy)">{{ plexLibraryAccessPolicyLabel(user.plexProfile.accessPolicy) }}</span>
             </p>
             <p class="hx-text-muted">{{ describePlexLibraryAccessPolicy(user.plexProfile.accessPolicy) }}</p>
           </template>
-          <p class="hx-text-muted" v-if="hasPendingManagedLibraryRootChanges(user)">Save the managed library subdirectory change before provisioning the folder.</p>
-          <p class="hx-text-muted" v-if="user.authProvider === 'plex'">Use a temporary password here to provide local fallback access for a Plex-linked user without removing the Plex binding.</p>
+          <p class="hx-text-muted" v-if="hasPendingManagedLibraryRootChanges(user)">Save the personal library folder change before provisioning the folder.</p>
+          <p class="hx-text-muted" v-if="user.authProvider === 'plex'">You can set a temporary password to give this user a local sign-in option without removing their Plex link.</p>
           <p class="hx-text-muted" v-if="user.authProvider === 'plex'">{{ describePlexLocalAuthStatus(user) }}</p>
           <p class="hx-text-muted" v-if="user.claimCode">Current claim code: {{ user.claimCode }}</p>
-          <p class="hx-text-muted" v-if="user.claimCodeExpiresAt">Claim code expires {{ new Date(user.claimCodeExpiresAt).toLocaleString() }}. The user can complete setup on the public /claim-account screen with username {{ user.username }}.</p>
+          <p class="hx-text-muted" v-if="user.claimCodeExpiresAt">Claim code expires {{ new Date(user.claimCodeExpiresAt).toLocaleString() }}. The user can complete setup at /claim-account using username {{ user.username }}.</p>
           <div class="hx-card-actions" style="margin-top: var(--hx-space-3)">
             <button type="button" class="hx-btn" data-variant="primary" @click="saveManagedUser(user)" :disabled="user.saving">
               {{ user.saving ? 'Saving…' : 'Save user' }}
