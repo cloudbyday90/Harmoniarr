@@ -17,6 +17,7 @@
  */
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { fetchSystemOverview } from '../lib/system-api.js';
 
 const HEALTH_REFRESH_MS = 30_000;
 
@@ -42,22 +43,7 @@ export function useShellHeartbeat() {
 
   async function fetchOnce() {
     try {
-      const response = await fetch('/api/v1/overview', {
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json' },
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          status.value = 'unknown';
-          detail.value = 'Sign in required';
-          return;
-        }
-        status.value = 'degraded';
-        detail.value = `Overview returned ${response.status}`;
-        return;
-      }
-
-      const payload = await response.json();
+      const payload = await fetchSystemOverview();
       const dependencies = Array.isArray(payload?.dependencies) ? payload.dependencies : [];
       const heartbeats = Array.isArray(payload?.heartbeats) ? payload.heartbeats : [];
       const allStatuses = [
@@ -79,8 +65,13 @@ export function useShellHeartbeat() {
       if (typeof jobs === 'number') {
         activeJobs.value = jobs;
       }
-    } catch {
+    } catch (error) {
       if (aborted) return;
+      if (error?.status === 401) {
+        status.value = 'unknown';
+        detail.value = 'Sign in required';
+        return;
+      }
       status.value = 'unavailable';
       detail.value = 'Unable to reach overview API';
     }

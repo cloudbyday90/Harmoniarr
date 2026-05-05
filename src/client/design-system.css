@@ -774,3 +774,390 @@ body,
   .hx-topbar-brand-name { display: inline; }
   .hx-topbar-search { display: none; }
 }
+
+/* ---------- Legacy primitive overrides — flatten old styles to ops-console aesthetic ---------- */
+
+/* The legacy stylesheet shipped with bubbly cream-coloured panels. We reskin
+   the same class names so existing views (Settings, ImportReview, Operations,
+   Recovery, Metadata, Account) inherit the dense ops console look without
+   needing to be rewritten. */
+
+.panel-light {
+  background: var(--hx-bg-surface);
+  color: var(--hx-text);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-lg);
+  padding: var(--hx-space-5);
+  box-shadow: var(--hx-shadow-sm);
+}
+
+.panel-dark {
+  background: linear-gradient(150deg, #14202a, #0f1820);
+  color: var(--hx-text-on-dark);
+  border: 1px solid var(--hx-border-on-dark);
+  border-radius: var(--hx-radius-lg);
+  padding: var(--hx-space-5);
+  box-shadow: var(--hx-shadow-md);
+}
+
+.panel-dark h2,
+.panel-dark h3,
+.panel-dark h4 { color: var(--hx-text-on-dark); }
+
+.panel-dark p,
+.panel-dark dd { color: var(--hx-text-on-dark-muted); }
+
+.panel-dark dt { color: var(--hx-text-on-dark-faint); }
+
+.panel-light p,
+.panel-light dd { color: var(--hx-text-muted); }
+
+.panel-light h2,
+.panel-light h3,
+.panel-light h4 { color: var(--hx-text-strong); }
+
+.panel-light dl,
+.panel-dark dl {
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) minmax(0, 1fr);
+  gap: 6px var(--hx-space-3);
+  margin: var(--hx-space-3) 0 0;
+}
+
+.panel-light dl > div,
+.panel-dark dl > div {
+  display: contents;
+}
+
+.panel-light dt,
+.panel-dark dt {
+  font-size: var(--hx-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--hx-text-muted);
+  margin: 0;
+  align-self: center;
+}
+
+.panel-light dd,
+.panel-dark dd {
+  font-size: var(--hx-text-sm);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  margin: 0 0 var(--hx-space-2);
+}
+
+.panel-dark .eyebrow { color: var(--hx-text-on-dark-faint); }
+
+/* Hero card — collapse the giant marketing block into a tight section header. */
+.hero-card { padding: var(--hx-space-5); }
+.hero-card h1,
+.hero-card h2 {
+  font-size: var(--hx-text-xl);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.hero-card.compact h2 { font-size: var(--hx-text-lg); }
+.hero-card p:last-child {
+  font-size: var(--hx-text-sm);
+  margin-top: var(--hx-space-2);
+  max-width: 60rem;
+}
+
+/* Section header inside panels. */
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+  margin-bottom: var(--hx-space-3);
+}
+
+.section-header h2,
+.section-header h3 {
+  margin: 0;
+  font-size: var(--hx-text-md);
+  font-weight: 600;
+}
+
+/* Pill row + pill — used heavily by the old panels. Reskin to compact stat chips. */
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-3);
+}
+
+.pill {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  background: var(--hx-bg-surface-muted);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-md);
+  min-width: 120px;
+}
+
+.pill span {
+  font-size: var(--hx-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--hx-text-muted);
+}
+
+.pill strong {
+  font-size: var(--hx-text-md);
+  font-weight: 600;
+  color: var(--hx-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-dark .pill {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--hx-border-on-dark);
+}
+
+.panel-dark .pill span { color: var(--hx-text-on-dark-faint); }
+.panel-dark .pill strong { color: var(--hx-text-on-dark); }
+
+/* Review-status pills — used as status indicators across legacy panels. */
+.review-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--hx-radius-pill);
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--hx-bg-surface-sunken);
+  color: var(--hx-text);
+  border: 1px solid var(--hx-border-subtle);
+}
+
+.review-status-pill.review-status-selected {
+  background: var(--hx-success-soft);
+  color: var(--hx-success);
+  border-color: rgba(47, 158, 107, 0.28);
+}
+.review-status-pill.review-status-held,
+.review-status-pill.review-status-pending {
+  background: var(--hx-warning-soft);
+  color: var(--hx-warning);
+  border-color: rgba(192, 138, 22, 0.28);
+}
+.review-status-pill.review-status-failed {
+  background: var(--hx-danger-soft);
+  color: var(--hx-danger);
+  border-color: rgba(197, 69, 69, 0.28);
+}
+
+/* Status-chip used in dependency / heartbeat panels. */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--hx-radius-pill);
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--hx-bg-surface-sunken);
+  color: var(--hx-text);
+  border: 1px solid var(--hx-border-subtle);
+  width: fit-content;
+}
+
+.status-chip[data-status='healthy'] {
+  background: var(--hx-success-soft);
+  color: var(--hx-success);
+  border-color: rgba(47, 158, 107, 0.28);
+}
+.status-chip[data-status='degraded'] {
+  background: var(--hx-warning-soft);
+  color: var(--hx-warning);
+  border-color: rgba(192, 138, 22, 0.28);
+}
+.status-chip[data-status='unavailable'] {
+  background: var(--hx-danger-soft);
+  color: var(--hx-danger);
+  border-color: rgba(197, 69, 69, 0.28);
+}
+
+/* Buttons — collapse pill-shaped legacy buttons to compact ops controls. */
+button,
+.secondary-button {
+  background: var(--hx-bg-surface);
+  color: var(--hx-text-strong);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  padding: 7px 14px;
+  font-size: var(--hx-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+}
+
+button:hover,
+.secondary-button:hover {
+  background: var(--hx-bg-surface-muted);
+}
+
+button:disabled,
+.secondary-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.panel-dark button,
+.panel-dark .secondary-button {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--hx-text-on-dark);
+  border-color: var(--hx-border-on-dark);
+}
+
+.panel-dark button:hover,
+.panel-dark .secondary-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+  background: var(--hx-bg-surface);
+  color: var(--hx-text-strong);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  padding: 7px 12px;
+  font-size: var(--hx-text-sm);
+  margin-top: 6px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--hx-accent-soft);
+  outline-offset: 0;
+  border-color: var(--hx-accent);
+}
+
+label {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+/* Page stack used by views — convert to compact vertical rhythm. */
+.page-stack {
+  display: grid;
+  gap: var(--hx-space-4);
+}
+
+/* Section headers in workspace tabs */
+.workspace-section h2,
+.workspace-section h3 { color: var(--hx-text-strong); }
+
+/* Stats grid used by Dashboard top */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--hx-space-3);
+}
+
+/* Body global override — page background always uses the canvas, not the
+   warm gradient from the legacy stylesheet. */
+body {
+  background: var(--hx-bg-canvas) !important;
+}
+/* ---------- Step / sub-card overrides ---------- */
+.onboarding-step-card,
+.session-row,
+.settings-nav-link,
+.workspace-nav-link,
+.settings-subsection-card,
+.settings-mapping-card,
+.metadata-card,
+.release-medium-card,
+.activity-feed-entry {
+  background: var(--hx-bg-surface-muted) !important;
+  border: 1px solid var(--hx-border-subtle) !important;
+  border-radius: var(--hx-radius-md) !important;
+  padding: var(--hx-space-4);
+}
+
+.metadata-card-copy,
+.eyebrow + p,
+.muted-copy {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+}
+
+/* Active nav link in legacy settings nav */
+.settings-nav-link.is-active,
+.settings-nav-link.router-link-active,
+.workspace-nav-link.is-active,
+.workspace-nav-link.router-link-active {
+  background: var(--hx-accent-soft) !important;
+  border-color: var(--hx-accent) !important;
+  box-shadow: none !important;
+}
+
+/* Inline status notes in auth flows */
+.auth-entry-inline-note,
+.auth-entry-inline-status {
+  background: var(--hx-bg-surface-muted);
+  border-color: var(--hx-border-subtle);
+  border-radius: var(--hx-radius-md);
+  color: var(--hx-text);
+}
+/* Flatten legacy named buttons */
+.review-reset-button,
+.review-action-button,
+.session-button,
+.workspace-action-button,
+.refresh-button,
+.primary-button {
+  background: var(--hx-bg-surface) !important;
+  color: var(--hx-text-strong) !important;
+  border: 1px solid var(--hx-border) !important;
+  border-radius: var(--hx-radius-md) !important;
+  padding: 7px 14px !important;
+  font-size: var(--hx-text-sm) !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  width: auto !important;
+}
+
+.primary-button,
+.review-action-button.is-primary {
+  background: var(--hx-accent) !important;
+  color: var(--hx-text-on-accent) !important;
+  border-color: var(--hx-accent) !important;
+}
+
+.review-reset-button:hover,
+.review-action-button:hover,
+.session-button:hover,
+.workspace-action-button:hover,
+.refresh-button:hover {
+  background: var(--hx-bg-surface-muted) !important;
+}

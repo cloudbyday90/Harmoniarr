@@ -1,0 +1,70 @@
+name: harmoniarr-walkthrough
+
+services:
+  harmoniarr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: harmoniarr:walkthrough-local
+    pull_policy: build
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    environment:
+      TZ: ${TZ:-UTC}
+      UMASK: ${UMASK:-0022}
+      APP_PORT: 3000
+      HARMONIARR_BASE_URL: http://127.0.0.1:47956
+      HARMONIARR_CONTACT_URL: ${HARMONIARR_CONTACT_URL:-https://github.com/cloudbyday90/harmoniarr}
+      HARMONIARR_CONTACT_EMAIL: ${HARMONIARR_CONTACT_EMAIL:-}
+      HARMONIARR_LOG_LEVEL: ${HARMONIARR_LOG_LEVEL:-info}
+      HARMONIARR_CSRF_PROTECTION: disabled
+    ports:
+      - name: web
+        target: 3000
+        published: "47956"
+        host_ip: 127.0.0.1
+        protocol: tcp
+        app_protocol: http
+        mode: host
+    volumes:
+      - type: bind
+        source: ./.data/walkthrough/appdata
+        target: /app/data
+      - type: bind
+        source: ./.data/walkthrough/downloads
+        target: /data/downloads
+      - type: bind
+        source: ./.data/walkthrough/music
+        target: /data/music
+      - type: bind
+        source: ./.data/walkthrough/staging
+        target: /data/staging
+      - type: bind
+        source: ./.data/walkthrough/transcode-temp
+        target: /data/transcode-temp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /run/postgresql:size=32m,mode=0770,uid=${PUID:-1000},gid=${PGID:-1000}
+
+  walkthrough-bootstrap:
+    image: harmoniarr:walkthrough-local
+    profiles:
+      - bootstrap
+    restart: "no"
+    depends_on:
+      harmoniarr:
+        condition: service_healthy
+    env_file:
+      - ./docker/walkthrough.env
+    environment:
+      HARMONIARR_WALKTHROUGH_BASE_URL: http://harmoniarr:3000
+    entrypoint:
+      - node
+      - /usr/local/bin/harmoniarr-walkthrough-bootstrap.js

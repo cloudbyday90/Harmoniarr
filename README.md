@@ -9,6 +9,7 @@ Harmoniarr is being planned as a self-hosted FOSS application with no SLA or ope
 - [Planning document](docs/harmoniarr.md)
 - [AI workflow and shared Copilot skills](docs/AI_WORKFLOW.md)
 - [Docker deployment baseline](docs/DOCKER_DEPLOYMENT.md)
+- [Local Docker walkthrough](docs/LOCAL_DOCKER_WALKTHROUGH.md)
 - [Backup, restore, and upgrade design](docs/BACKUP_RESTORE_DESIGN.md)
 - [Bootstrap-admin recovery runbook](docs/ADMIN_RECOVERY_RUNBOOK.md)
 - [Security policy and posture](docs/SECURITY_POLICY.md)
@@ -33,6 +34,7 @@ The repository now includes the deployment scaffolding for the planned standard 
 - `Dockerfile`
 - `docker/entrypoint.sh`
 - `compose.yaml`
+- `compose.walkthrough.yaml`
 - `compose.slskd-example.yaml`
 - `.env.example`
 
@@ -102,6 +104,8 @@ Operators who want a release-aligned Compose override can download the published
 Docker defaults `HARMONIARR_CONTACT_URL` to the project URL so the baseline container can start with MusicBrainz enabled. Override it with your own project or operator contact URL, or set `HARMONIARR_CONTACT_EMAIL` instead, if you need a deployment-specific `User-Agent`.
 
 If you want Harmoniarr and `slskd` side by side, start from `compose.slskd-example.yaml` and keep `/data/downloads` identical inside both containers.
+
+If you want a disposable localhost-only walkthrough with a ready-made admin login, use `compose.walkthrough.yaml` and the explicit one-shot bootstrap flow documented in `docs/LOCAL_DOCKER_WALKTHROUGH.md`.
 
 The Docker build context is trimmed with `.dockerignore` so docs, git metadata, logs, and local dependency trees do not get sent into routine image builds.
 

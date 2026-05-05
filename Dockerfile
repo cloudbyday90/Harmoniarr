@@ -10,7 +10,7 @@ COPY package.json package-lock.json vite.config.js ./
 COPY src/client ./src/client
 COPY src/shared ./src/shared
 
-RUN npm ci \
+RUN --mount=type=cache,target=/root/.npm npm ci \
     && npm run build:client
 
 FROM ${NODE_IMAGE} AS server-builder
@@ -21,7 +21,7 @@ COPY scripts/build-server.js ./scripts/build-server.js
 COPY src/server ./src/server
 COPY src/shared ./src/shared
 
-RUN npm ci \
+RUN --mount=type=cache,target=/root/.npm npm ci \
     && npm run build:server
 
 FROM ${RUNTIME_IMAGE} AS runtime
@@ -63,15 +63,19 @@ RUN addgroup -g 1000 -S harmoniarr \
 WORKDIR ${APP_HOME}
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
 COPY --from=client-builder /build/dist/client ./client-dist/
 COPY --from=server-builder /build/dist/server ./server-dist/
 COPY src/shared ./shared/
 COPY docker/entrypoint.sh /usr/local/bin/harmoniarr-entrypoint
 COPY docker/harmoniarrctl /usr/local/bin/harmoniarrctl
+COPY docker/walkthrough-bootstrap.js /usr/local/bin/harmoniarr-walkthrough-bootstrap.js
 
-RUN chmod 0755 /usr/local/bin/harmoniarr-entrypoint /usr/local/bin/harmoniarrctl
+RUN chmod 0755 \
+    /usr/local/bin/harmoniarr-entrypoint \
+    /usr/local/bin/harmoniarrctl \
+    /usr/local/bin/harmoniarr-walkthrough-bootstrap.js
 
 USER harmoniarr
 

@@ -28,6 +28,7 @@ Use these files for the default deployment model:
 - `.dockerignore`
 - `docker/entrypoint.sh`
 - `compose.yaml`
+- `compose.walkthrough.yaml`
 - `compose.slskd-example.yaml`
 - `.env`
 - `.env.example`
@@ -37,6 +38,7 @@ Rules:
 - `Dockerfile` and `docker/entrypoint.sh` define the planned container bootstrap flow.
 - `.dockerignore` keeps docs, git metadata, logs, local dependency trees, and host env files out of the Docker build context.
 - `compose.yaml` is the canonical Compose filename.
+- `compose.walkthrough.yaml` is the disposable localhost-only evaluation stack that builds from the current repository and auto-creates a walkthrough admin through the existing public bootstrap route.
 - `compose.slskd-example.yaml` shows the preferred shared-download-path layout when `slskd` is deployed beside Harmoniarr.
 - `.env` sits beside `compose.yaml` and is host-specific.
 - `.env.example` is committed and documents the supported variables.
@@ -260,6 +262,8 @@ If the paths cannot match, Harmoniarr should rely on explicit path-prefix mappin
 
 For operators who want a one-file example of this layout, `compose.slskd-example.yaml` keeps both services aligned on `/data/downloads` and points Harmoniarr at `http://slskd:5030` by default.
 
+For local exploration of the current repository without hand-preparing `.env` or host `/srv/...` paths, `compose.walkthrough.yaml` keeps all state under `./.data/walkthrough`, binds the app only to `127.0.0.1:47956`, and defines a one-shot bootstrap helper that the walkthrough docs run explicitly so the normal stack stays free of stale setup containers.
+
 ## Release Deployment Assets
 
 Published releases now emit three operator-facing release-contract assets alongside the image itself:
@@ -457,4 +461,5 @@ For v1, the standard supported deployment story should be:
 - embedded Postgres inside that container
 - explicit mounted paths for app data, downloads, music, staging, and future transcoding temp space
 - `compose.yaml` plus `.env` as the deployment configuration surface
+- `compose.walkthrough.yaml` as the disposable repo-local evaluation surface
 - no separate mounted application config file required for normal operation

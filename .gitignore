@@ -4,6 +4,7 @@ dist/
 coverage/
 .ops/
 .tmp/
+.data/
 .eslintcache
 .env
 .env.*

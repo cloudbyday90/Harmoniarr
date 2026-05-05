@@ -89,7 +89,6 @@ const {
   pathCards,
   pathValidationSummary,
   providerStatus,
-  statusPills,
 } = useSystemOverview();
 const {
   actionErrorMessage: libraryDiscoveryActionErrorMessage,
@@ -187,17 +186,6 @@ function statusLabel(status) {
       return 'Unavailable';
     default:
       return 'Needs attention';
-  }
-}
-
-function statusClass(status) {
-  switch (status) {
-    case 'healthy':
-      return 'review-status-selected';
-    case 'unavailable':
-      return 'review-status-failed';
-    default:
-      return 'review-status-held';
   }
 }
 
@@ -359,7 +347,7 @@ watch(
 </script>
 
 <template>
-  <section class="page-stack">
+  <section class="hx-page page-stack">
     <OnboardingSummaryPanel
       v-if="showOnboardingSummary"
       :error-message="onboardingErrorMessage"
@@ -435,19 +423,59 @@ watch(
       @start="startArtworkCleanup"
     />
 
-    <article class="panel-dark hero-card compact">
-      <p class="eyebrow">{{ isSetupMode ? 'First login workspace' : 'Authenticated dashboard' }}</p>
-      <h2>Runtime overview</h2>
-      <p>
-        {{ isSetupMode
-          ? 'Continue setup with contextual next steps instead of a separate onboarding wizard.'
-          : 'The authenticated dashboard now consumes the protected overview API.' }}
-      </p>
-      <div class="pill-row" v-if="statusPills.length">
-        <div class="pill" v-for="pill in statusPills" :key="pill.label">
-          <span>{{ pill.label }}</span>
-          <strong>{{ pill.value }}</strong>
+    <article class="hx-card hx-dashboard-header">
+      <div class="hx-dashboard-header-row">
+        <div>
+          <p class="eyebrow">{{ isSetupMode ? 'First login workspace' : 'Operations dashboard' }}</p>
+          <h2>Runtime overview</h2>
+          <p class="hx-text-muted">
+            {{ isSetupMode
+              ? 'Continue setup with contextual next steps instead of a separate onboarding wizard.'
+              : 'Live status pulled from the protected overview API.' }}
+          </p>
         </div>
+        <div class="hx-dashboard-header-actions">
+          <button type="button" class="hx-btn" @click="loadOverview" :disabled="isLoading">
+            {{ isLoading ? 'Refreshing…' : 'Refresh overview' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="hx-stat-grid" v-if="overview">
+        <article class="hx-stat-card">
+          <span class="hx-stat-label">Service</span>
+          <span class="hx-stat-value">{{ overview.service.name }}</span>
+          <span class="hx-stat-meta">v{{ overview.service.version }}</span>
+        </article>
+        <article class="hx-stat-card">
+          <span class="hx-stat-label">Pending migrations</span>
+          <span class="hx-stat-value">{{ overview.database.pendingMigrations }}</span>
+          <span class="hx-stat-meta">Applied {{ overview.database.appliedMigrations }}</span>
+        </article>
+        <article class="hx-stat-card" v-if="pathValidationSummary">
+          <span class="hx-stat-label">Path validation</span>
+          <span class="hx-stat-value">
+            <span class="hx-pill" :data-tone="pathValidationSummary.status === 'healthy' ? 'success' : pathValidationSummary.status === 'unavailable' ? 'danger' : 'warning'">
+              {{ statusLabel(pathValidationSummary.status) }}
+            </span>
+          </span>
+          <span class="hx-stat-meta">{{ pathValidationSummary.configuredDownloadMappings }} mapping{{ pathValidationSummary.configuredDownloadMappings === 1 ? '' : 's' }}</span>
+        </article>
+        <article class="hx-stat-card" v-if="overview.discoveryHeartbeat">
+          <span class="hx-stat-label">Discovery cadence</span>
+          <span class="hx-stat-value">{{ overview.discoveryHeartbeat?.intervalLabel ?? '—' }}</span>
+          <span class="hx-stat-meta">Library scans</span>
+        </article>
+        <article class="hx-stat-card" v-if="overview.importExecutionHeartbeat">
+          <span class="hx-stat-label">Import cadence</span>
+          <span class="hx-stat-value">{{ overview.importExecutionHeartbeat?.intervalLabel ?? '—' }}</span>
+          <span class="hx-stat-meta">Apply runs</span>
+        </article>
+        <article class="hx-stat-card" v-if="overview.metadataRefreshHeartbeat">
+          <span class="hx-stat-label">Metadata cadence</span>
+          <span class="hx-stat-value">{{ overview.metadataRefreshHeartbeat?.intervalLabel ?? '—' }}</span>
+          <span class="hx-stat-meta">MusicBrainz refresh</span>
+        </article>
       </div>
     </article>
 
@@ -462,38 +490,7 @@ watch(
     </article>
 
     <template v-else-if="overview">
-      <section class="stats-grid">
-        <article class="panel-light">
-          <h3>Service</h3>
-          <dl>
-            <div><dt>Name</dt><dd>{{ overview.service.name }}</dd></div>
-            <div><dt>Version</dt><dd>{{ overview.service.version }}</dd></div>
-            <div><dt>Started</dt><dd>{{ overview.service.startedAt }}</dd></div>
-          </dl>
-        </article>
-        <article class="panel-light">
-          <h3>Database</h3>
-          <dl>
-            <div><dt>Name</dt><dd>{{ overview.database.name }}</dd></div>
-            <div><dt>Applied migrations</dt><dd>{{ overview.database.appliedMigrations }}</dd></div>
-            <div><dt>Pending migrations</dt><dd>{{ overview.database.pendingMigrations }}</dd></div>
-          </dl>
-        </article>
-        <article class="panel-light" v-if="pathValidationSummary">
-          <div class="section-header">
-            <div>
-              <h3>Path validation</h3>
-              <p class="metadata-card-copy">{{ pathValidationSummary.message }}</p>
-            </div>
-            <span class="review-status-pill" :class="statusClass(pathValidationSummary.status)">
-              {{ statusLabel(pathValidationSummary.status) }}
-            </span>
-          </div>
-          <dl>
-            <div><dt>Configured mappings</dt><dd>{{ pathValidationSummary.configuredDownloadMappings }}</dd></div>
-            <div><dt>Checked</dt><dd>{{ pathValidationSummary.checkedAt ?? 'Not yet recorded' }}</dd></div>
-          </dl>
-        </article>
+      <section class="stats-grid" v-if="showOverviewArtworkMaintenance">
         <article class="panel-light" v-if="showOverviewArtworkMaintenance">
           <div class="section-header">
             <div>
@@ -570,3 +567,45 @@ watch(
     </template>
   </section>
 </template>
+
+<style scoped>
+.hx-dashboard-header {
+  display: grid;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-5);
+}
+
+.hx-dashboard-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--hx-space-4);
+  flex-wrap: wrap;
+}
+
+.hx-dashboard-header-row h2 {
+  margin: 0;
+  font-size: var(--hx-text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--hx-text-strong);
+}
+
+.hx-dashboard-header-row p {
+  margin: var(--hx-space-1) 0 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+}
+
+.hx-dashboard-header-actions {
+  display: flex;
+  gap: var(--hx-space-2);
+  align-items: center;
+}
+
+.hx-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--hx-space-3);
+}
+</style>
