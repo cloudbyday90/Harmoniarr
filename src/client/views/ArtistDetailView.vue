@@ -26,9 +26,11 @@ import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistDetail } from '../composables/useArtistDetail.js';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
+import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { buildArtistDetailLocation, groupReleaseGroupsByType, normalizeReleaseGroupForCard } from '../lib/artist-detail-route.js';
 import { getArtistAvatar } from '../lib/artist-avatar.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 
@@ -72,10 +74,14 @@ const confirmModalOpen = ref(false);
 const confirmRelease = ref(null);
 const confirmError = ref(null);
 
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
+
 function openConfirmModal(release) {
   confirmRelease.value = release;
   confirmError.value = null;
   confirmModalOpen.value = true;
+  if (isAdmin.value) void loadRequestForUsers();
 }
 
 function closeConfirmModal() {
@@ -94,10 +100,10 @@ const confirmIsRequested = computed(() =>
   confirmRelease.value ? isRequested(confirmRelease.value) : false,
 );
 
-async function handleConfirmRequest() {
+async function handleConfirmRequest({ requestedForUserId = null } = {}) {
   if (!confirmRelease.value) return;
   confirmError.value = null;
-  const result = await requestRelease(confirmRelease.value);
+  const result = await requestRelease(confirmRelease.value, { requestedForUserId });
   if (result.ok) {
     confirmModalOpen.value = false;
     confirmRelease.value = null;
@@ -297,6 +303,7 @@ watch(mbid, (newMbid, oldMbid) => {
       :loading="confirmIsRequesting"
       :requested="confirmIsRequested"
       :error-message="confirmError"
+      :users="isAdmin ? requestForUsers : []"
       @confirm="handleConfirmRequest"
       @close="closeConfirmModal"
     />

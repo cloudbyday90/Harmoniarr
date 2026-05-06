@@ -24,6 +24,7 @@ import EmptyState from '../components/EmptyState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
+import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
@@ -36,6 +37,7 @@ import {
   fetchSlskdStatus,
   startSlskdSearch,
 } from '../lib/slskd-search-api.js';
+import { sessionStore } from '../state/session.js';
 
 // ── Search mode ──────────────────────────────────────────────────────────────
 
@@ -63,6 +65,9 @@ const {
   requestRelease,
 } = useReleaseRequest();
 
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
+
 // ── Confirm request modal ─────────────────────────────────────────────────────
 
 const confirmModalOpen = ref(false);
@@ -73,6 +78,7 @@ function openConfirmModal(release) {
   confirmRelease.value = release;
   confirmError.value = null;
   confirmModalOpen.value = true;
+  if (isAdmin.value) void loadRequestForUsers();
 }
 
 function closeConfirmModal() {
@@ -91,10 +97,10 @@ const confirmIsRequested = computed(() =>
   confirmRelease.value ? isRequested(confirmRelease.value) : false,
 );
 
-async function handleConfirmRequest() {
+async function handleConfirmRequest({ requestedForUserId = null } = {}) {
   if (!confirmRelease.value) return;
   confirmError.value = null;
-  const result = await requestRelease(confirmRelease.value);
+  const result = await requestRelease(confirmRelease.value, { requestedForUserId });
   if (result.ok) {
     confirmModalOpen.value = false;
     confirmRelease.value = null;
@@ -546,6 +552,7 @@ onBeforeUnmount(() => clearPollTimer());
       :loading="confirmIsRequesting"
       :requested="confirmIsRequested"
       :error-message="confirmError"
+      :users="isAdmin ? requestForUsers : []"
       @confirm="handleConfirmRequest"
       @close="closeConfirmModal"
     />

@@ -116,9 +116,13 @@ export function useReleaseRequest({
    * - `{ ok: false, error }` on failure
    *
    * @param {object} release
+   * @param {object} [options]
+   * @param {string|null} [options.requestedForUserId] - When provided, the
+   *   server targets this user ID as the request beneficiary. Only accepted
+   *   when the session user is an admin.
    * @returns {Promise<object>}
    */
-  async function requestRelease(release) {
+  async function requestRelease(release, { requestedForUserId = null } = {}) {
     const key = getReleaseRequestKey(release);
 
     // Cannot derive a stable key — this release is not requestable.
@@ -140,14 +144,18 @@ export function useReleaseRequest({
       return { ok: false, skipped: true, reason: 'requesting' };
     }
 
-    const payload = normalizeReleaseForRequest(release);
-    if (!payload) {
+    const basePayload = normalizeReleaseForRequest(release);
+    if (!basePayload) {
       const error = new Error('Cannot request this release: missing artist name or release title.');
       if (showToasts) {
         toast.error('Cannot request this release: missing required fields.');
       }
       return { ok: false, error };
     }
+
+    const payload = requestedForUserId
+      ? { ...basePayload, requestedForUserId }
+      : basePayload;
 
     // Mark as in-progress (reassign to trigger reactivity).
     requestingIds.value = new Set([...requestingIds.value, key]);

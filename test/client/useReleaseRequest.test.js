@@ -338,6 +338,61 @@ test('useReleaseRequest isRequested accepts a key string directly', (t) => {
   assert.equal(isRequested('release:other'), false);
 });
 
+// ---------------------------------------------------------------------------
+// requestedForUserId pass-through (multi-user attribution)
+// ---------------------------------------------------------------------------
+
+test('useReleaseRequest requestRelease includes requestedForUserId in payload when provided', async (t) => {
+  const submitRequest = t.mock.fn(makeSubmitDouble());
+  const toast = createToastDouble(t);
+  const { requestRelease } = useReleaseRequest({ submitRequest, toast });
+  const release = makeRelease();
+
+  await requestRelease(release, { requestedForUserId: 'user-42' });
+
+  assert.equal(submitRequest.mock.callCount(), 1);
+  const payload = submitRequest.mock.calls[0].arguments[0];
+  assert.equal(payload.requestedForUserId, 'user-42');
+});
+
+test('useReleaseRequest requestRelease omits requestedForUserId from payload when not provided', async (t) => {
+  const submitRequest = t.mock.fn(makeSubmitDouble());
+  const toast = createToastDouble(t);
+  const { requestRelease } = useReleaseRequest({ submitRequest, toast });
+  const release = makeRelease();
+
+  await requestRelease(release);
+
+  assert.equal(submitRequest.mock.callCount(), 1);
+  const payload = submitRequest.mock.calls[0].arguments[0];
+  assert.equal(Object.hasOwn(payload, 'requestedForUserId'), false);
+});
+
+test('useReleaseRequest requestRelease omits requestedForUserId when explicitly null', async (t) => {
+  const submitRequest = t.mock.fn(makeSubmitDouble());
+  const toast = createToastDouble(t);
+  const { requestRelease } = useReleaseRequest({ submitRequest, toast });
+  const release = makeRelease();
+
+  await requestRelease(release, { requestedForUserId: null });
+
+  assert.equal(submitRequest.mock.callCount(), 1);
+  const payload = submitRequest.mock.calls[0].arguments[0];
+  assert.equal(Object.hasOwn(payload, 'requestedForUserId'), false);
+});
+
+test('useReleaseRequest requestRelease still succeeds and marks requested when requestedForUserId is given', async (t) => {
+  const submitRequest = t.mock.fn(makeSubmitDouble());
+  const toast = createToastDouble(t);
+  const { isRequested, requestRelease } = useReleaseRequest({ submitRequest, toast });
+  const release = makeRelease();
+
+  const result = await requestRelease(release, { requestedForUserId: 'user-42' });
+
+  assert.equal(result.ok, true);
+  assert.equal(isRequested(release), true);
+});
+
 test('useReleaseRequest isRequesting accepts a key string directly', (t) => {
   const toast = createToastDouble(t);
   const { isRequesting, requestingIds } = useReleaseRequest({ toast });

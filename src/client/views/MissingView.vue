@@ -26,6 +26,7 @@ import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
+import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
   formatWantedTrackCounts,
@@ -33,6 +34,7 @@ import {
   getWantedStatusTone,
   normalizeWantedReleaseForCard,
 } from '../lib/wanted-release-normalization.js';
+import { sessionStore } from '../state/session.js';
 
 const wanted = useLibraryWantedSummary();
 const releases = useLibraryWantedReleases();
@@ -43,6 +45,9 @@ const {
   isRequesting,
   requestRelease,
 } = useReleaseRequest();
+
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
 
 // ── Filter state ──────────────────────────────────────────────────────────────
 
@@ -71,6 +76,7 @@ function openConfirmModal(release) {
   confirmRelease.value = release;
   confirmError.value = null;
   confirmModalOpen.value = true;
+  if (isAdmin.value) void loadRequestForUsers();
 }
 
 function closeConfirmModal() {
@@ -89,10 +95,10 @@ const confirmIsRequested = computed(() =>
   confirmRelease.value ? isRequested(confirmRelease.value) : false,
 );
 
-async function handleConfirmRequest() {
+async function handleConfirmRequest({ requestedForUserId = null } = {}) {
   if (!confirmRelease.value) return;
   confirmError.value = null;
-  const result = await requestRelease(confirmRelease.value);
+  const result = await requestRelease(confirmRelease.value, { requestedForUserId });
   if (result.ok) {
     confirmModalOpen.value = false;
     confirmRelease.value = null;
@@ -371,6 +377,7 @@ onMounted(() => {
     :is-requesting="confirmIsRequesting"
     :is-requested="confirmIsRequested"
     :error="confirmError"
+    :users="isAdmin ? requestForUsers : []"
     @confirm="handleConfirmRequest"
     @close="closeConfirmModal"
   />

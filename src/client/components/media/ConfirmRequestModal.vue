@@ -34,6 +34,9 @@ import { getReleaseArtistName, getReleaseTitle, getReleaseYear } from '../../lib
  * - On success, the parent should set `open` to false.
  * - On failure, the modal remains open for retry or cancel.
  * - Uses accessible dialog markup: role="dialog", aria-modal, labelled heading.
+ * - When `users` has two or more entries, a "Request for" selector is shown
+ *   (operator-only feature). The `confirm` event carries `{ requestedForUserId }`
+ *   which is null when "Myself" is selected.
  */
 const props = defineProps({
   /** Whether the modal is visible. */
@@ -61,11 +64,32 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  /**
+   * List of eligible request-target users for the "Request for" selector.
+   * Each item: { id: string, username: string }.
+   * When this array has fewer than two entries the selector is not rendered.
+   * Only pass this prop for admin sessions.
+   */
+  users: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const emit = defineEmits(['confirm', 'close']);
 
 const dialogRef = ref(null);
+
+/**
+ * The selected beneficiary user ID for the "Request for" selector.
+ * null means "myself" (the session user). Reset whenever the modal opens.
+ */
+const selectedForUserId = ref(null);
+
+// Reset the "Request for" selector each time the modal opens with a new release.
+watch(() => props.open, (isOpen) => {
+  if (isOpen) selectedForUserId.value = null;
+});
 
 // Sync the native dialog open state with the `open` prop.
 // onMounted handles the case where `open` is already true before the ref is
@@ -140,7 +164,7 @@ function handleClose() {
 }
 
 function handleConfirm() {
-  emit('confirm');
+  emit('confirm', { requestedForUserId: selectedForUserId.value ?? null });
 }
 </script>
 
@@ -186,6 +210,19 @@ function handleConfirm() {
         <p class="crm-explanation">
           Harmoniarr will add this release to your requests so it can be searched and fulfilled.
         </p>
+
+        <div v-if="users.length >= 2" class="crm-for-user">
+          <label class="crm-for-user__label" for="crm-for-user-select">Request for</label>
+          <select
+            id="crm-for-user-select"
+            v-model="selectedForUserId"
+            class="crm-for-user__select"
+            :disabled="loading"
+          >
+            <option :value="null">Myself</option>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
+          </select>
+        </div>
 
         <p v-if="errorMessage" class="crm-error" role="alert">{{ errorMessage }}</p>
       </div>
@@ -322,6 +359,34 @@ function handleConfirm() {
   font-size: var(--hx-text-sm);
   color: var(--hx-text-muted);
   line-height: 1.55;
+}
+
+.crm-for-user {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+}
+
+.crm-for-user__label {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-text-muted);
+  font-weight: 500;
+}
+
+.crm-for-user__select {
+  width: 100%;
+  padding: var(--hx-space-2) var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-input, var(--hx-bg-surface));
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+
+.crm-for-user__select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .crm-error {

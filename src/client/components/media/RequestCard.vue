@@ -36,7 +36,7 @@ const props = defineProps({
    * Media request object returned from the API.
    * Expected shape: { id, requestState, releaseTitle, artistName, requestKind,
    *   createdAt, updatedAt, existingMatch, matchedMetadataReleaseId,
-   *   matchedMetadataReleaseGroupId }
+   *   matchedMetadataReleaseGroupId, requestedByUser, requestedForUser }
    */
   request: {
     type: Object,
@@ -44,6 +44,16 @@ const props = defineProps({
   },
   /** Optional visual variant forwarded to the card element. */
   variant: {
+    type: String,
+    default: null,
+  },
+  /**
+   * The ID of the user currently viewing this card. When provided, the card
+   * derives and displays an attribution line for delegated requests (where
+   * the submitter and the beneficiary differ). Omitting this prop suppresses
+   * attribution entirely for backward compatibility.
+   */
+  viewerUserId: {
     type: String,
     default: null,
   },
@@ -126,6 +136,40 @@ const kindLabel = computed(() => {
   if (k === 'release') return 'Release';
   return null;
 });
+
+/**
+ * Attribution line for delegated requests — shown when the submitter and the
+ * beneficiary differ and `viewerUserId` is provided.
+ *
+ * Returns null when no attribution should be displayed.
+ *
+ * Cases:
+ * - Viewer is the beneficiary: "Requested by [submitter]" (admin requested for me)
+ * - Viewer is the submitter:   "For [beneficiary]" (I requested on behalf of someone)
+ * - Neither (operator view):   "By [submitter] · For [beneficiary]"
+ */
+const attributionLine = computed(() => {
+  if (!props.viewerUserId) return null;
+
+  const by = props.request.requestedByUser;
+  const forUser = props.request.requestedForUser;
+
+  if (!by?.id || !forUser?.id) return null;
+  if (by.id === forUser.id) return null;
+
+  const byName = by.username ?? 'Unknown';
+  const forName = forUser.username ?? 'Unknown';
+
+  if (props.viewerUserId === forUser.id) {
+    return `Requested by ${byName}`;
+  }
+
+  if (props.viewerUserId === by.id) {
+    return `For ${forName}`;
+  }
+
+  return `By ${byName} · For ${forName}`;
+});
 </script>
 
 <template>
@@ -142,6 +186,7 @@ const kindLabel = computed(() => {
       <p class="hx-media-card__title">{{ releaseTitle }}</p>
       <p class="hx-media-card__meta">{{ artistName }}</p>
       <p v-if="kindLabel" class="hx-media-card__meta request-card__kind">{{ kindLabel }}</p>
+      <p v-if="attributionLine" class="hx-media-card__meta request-card__attribution">{{ attributionLine }}</p>
     </div>
 
     <div class="hx-media-card__actions request-card__status-row">
@@ -195,6 +240,12 @@ const kindLabel = computed(() => {
 .request-card__kind {
   font-size: var(--hx-text-xs, 0.75rem);
   color: var(--hx-text-faint, #666);
+}
+
+.request-card__attribution {
+  font-size: var(--hx-text-xs, 0.75rem);
+  color: var(--hx-text-muted, #888);
+  font-style: italic;
 }
 
 /* Screen-reader-only utility (matches Tailwind's sr-only if present). */

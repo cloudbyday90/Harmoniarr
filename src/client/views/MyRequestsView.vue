@@ -17,10 +17,13 @@
 -->
 
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import RequestCard from '../components/media/RequestCard.vue';
 import { useMyRequests } from '../composables/useMyRequests.js';
+import { sessionStore } from '../state/session.js';
+
+const viewerUserId = computed(() => sessionStore.state.user?.id ?? null);
 
 const { errorMessage, hasRequests, isLoading, loadRequests, requests } = useMyRequests({ limit: 50 });
 
@@ -75,6 +78,7 @@ onMounted(() => {
         v-for="request in requests"
         :key="request.id"
         :request="request"
+        :viewer-user-id="viewerUserId"
       />
     </section>
 
