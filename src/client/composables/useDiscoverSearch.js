@@ -16,27 +16,19 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
-import {
-  importMusicBrainzArtist,
-  searchMusicBrainzArtists,
-  updateMetadataArtistMonitoring,
-} from '../lib/metadata-api.js';
-import { useToast } from './useToast.js';
+import { searchMusicBrainzArtists } from '../lib/metadata-api.js';
 
 /**
- * Focused composable for the Discover search and monitor flow.
+ * Focused composable for the Discover artist search flow.
  *
- * Handles artist search, per-card monitoring state, and toast feedback.
- * Intentionally scoped to Discover only — does not attempt to be a
- * general-purpose artist workflow.
+ * Handles search query state, in-flight status, result population, and error
+ * messaging. Monitoring logic has been extracted into `useArtistMonitoring.js`
+ * so that it can be reused independently across screens.
  */
 export function useDiscoverSearch({
   searchArtists = searchMusicBrainzArtists,
-  importArtist = importMusicBrainzArtist,
-  updateMonitoring = updateMetadataArtistMonitoring,
-  toast = useToast(),
 } = {}) {
 
   /** Current value of the search text input. */
@@ -56,19 +48,6 @@ export function useDiscoverSearch({
    * Used to distinguish "before any search" from "search returned no results".
    */
   const hasSearched = ref(false);
-
-  /**
-   * Per-artist action state map.
-   * Key: artist MusicBrainz ID.
-   * Value: 'monitoring' | 'monitored' | 'error'
-   * Artists absent from this map are in their idle state.
-   */
-  const artistStates = ref(/** @type {Record<string, string>} */ ({}));
-
-  /** Whether at least one artist has been successfully monitored this session. */
-  const hasMonitored = computed(() => {
-    return Object.values(artistStates.value).some((s) => s === 'monitored');
-  });
 
   /**
    * Run an artist search against MusicBrainz.
@@ -93,48 +72,9 @@ export function useDiscoverSearch({
     }
   }
 
-  /**
-   * Import then monitor an artist from a search result card.
-   * Tracks per-card state so multiple cards can be acted on independently.
-   *
-   * @param {{ id: string, name: string }} artist
-   */
-  async function monitorArtist(artist) {
-    const { id, name } = artist;
-
-    // Prevent double-click / re-monitor
-    if (artistStates.value[id] === 'monitoring' || artistStates.value[id] === 'monitored') {
-      return;
-    }
-
-    artistStates.value = { ...artistStates.value, [id]: 'monitoring' };
-
-    try {
-      // Import/upsert the MusicBrainz artist into the local database first.
-      // The route responds with { ok, imported: { artistId, source } }.
-      const importResult = await importArtist(id);
-      const localArtistId = importResult?.imported?.artistId ?? null;
-
-      if (!localArtistId) {
-        throw new Error(`Could not resolve local ID for ${name} after import.`);
-      }
-
-      await updateMonitoring(localArtistId, { monitored: true });
-
-      artistStates.value = { ...artistStates.value, [id]: 'monitored' };
-      toast.success(`Monitoring ${name}.`);
-    } catch (error) {
-      artistStates.value = { ...artistStates.value, [id]: 'error' };
-      toast.error(getErrorMessage(error, `Could not monitor ${name}. Please try again.`));
-    }
-  }
-
   return {
-    artistStates,
-    hasMonitored,
     hasSearched,
     isSearching,
-    monitorArtist,
     query,
     results,
     runSearch,
