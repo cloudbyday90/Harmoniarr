@@ -17,30 +17,26 @@
 -->
 
 <script setup>
-import ArtworkImage from '../components/ArtworkImage.vue';
+import ArtistCard from '../components/media/ArtistCard.vue';
 import EmptyState from '../components/EmptyState.vue';
+import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
 
 const {
-  artistStates,
-  hasMonitored,
   hasSearched,
   isSearching,
-  monitorArtist,
   query,
   results,
   runSearch,
   searchError,
 } = useDiscoverSearch();
 
-/** Build a readable metadata line from artist fields. */
-function artistMeta(artist) {
-  const parts = [];
-  if (artist.type) parts.push(artist.type);
-  if (artist.country) parts.push(artist.country);
-  if (artist.disambiguation) parts.push(artist.disambiguation);
-  return parts.join(' · ');
-}
+const {
+  hasMonitored,
+  isMonitored,
+  isMonitoring,
+  monitorArtist,
+} = useArtistMonitoring();
 </script>
 
 <template>
@@ -144,33 +140,14 @@ function artistMeta(artist) {
       class="hx-artwork-grid discover-grid"
       aria-label="Artist search results"
     >
-      <article
+      <ArtistCard
         v-for="artist in results"
         :key="artist.id"
-        class="hx-media-card"
-      >
-        <div class="hx-media-card__artwork">
-          <ArtworkImage :alt="artist.name" />
-        </div>
-        <div class="hx-media-card__body">
-          <p class="hx-media-card__title">{{ artist.name }}</p>
-          <p v-if="artistMeta(artist)" class="hx-media-card__meta">{{ artistMeta(artist) }}</p>
-        </div>
-        <div class="hx-media-card__actions">
-          <button
-            type="button"
-            class="hx-btn"
-            :data-variant="artistStates[artist.id] === 'monitored' ? 'ghost' : 'primary'"
-            :disabled="artistStates[artist.id] === 'monitoring' || artistStates[artist.id] === 'monitored'"
-            :aria-label="artistStates[artist.id] === 'monitored' ? `${artist.name} — already monitored` : `Monitor ${artist.name}`"
-            @click="monitorArtist(artist)"
-          >
-            <template v-if="artistStates[artist.id] === 'monitoring'">Monitoring…</template>
-            <template v-else-if="artistStates[artist.id] === 'monitored'">Monitored</template>
-            <template v-else>Monitor</template>
-          </button>
-        </div>
-      </article>
+        :artist="artist"
+        :monitored="isMonitored(artist.id)"
+        :monitoring="isMonitoring(artist.id)"
+        @monitor="monitorArtist"
+      />
     </section>
   </div>
 </template>
