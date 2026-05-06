@@ -24,6 +24,7 @@ import { sessionStore } from '../state/session.js';
 import { useShellHeartbeat } from '../composables/useShellHeartbeat.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 import { fetchSystemOperatorNotifications } from '../lib/system-api.js';
+import ToastStack from './ToastStack.vue';
 
 const router = useRouter();
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
@@ -123,15 +124,16 @@ async function openAccount() {
 
 const operatorNav = [
   { name: 'dashboard', label: 'Home', icon: 'dashboard' },
+  { name: 'discover', label: 'Discover', icon: 'discover' },
   { name: 'missing', label: 'Missing', icon: 'missing' },
   { name: 'activity', label: 'Activity', icon: 'activity' },
-  { name: 'search', label: 'Search', icon: 'search' },
   { name: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 const requesterNav = [
+  { name: 'dashboard', label: 'Home', icon: 'dashboard' },
+  { name: 'discover', label: 'Discover', icon: 'discover' },
   { name: 'request-music', label: 'My Requests', icon: 'requests' },
-  { name: 'account-security', label: 'Account', icon: 'user' },
 ];
 
 const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNav));
@@ -273,6 +275,7 @@ const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNa
         >
           <span class="hx-sidebar-link-icon" aria-hidden="true">
             <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+            <svg v-else-if="item.icon === 'discover'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>
             <svg v-else-if="item.icon === 'missing'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6"/><circle cx="12" cy="16.5" r="0.8" fill="currentColor"/></svg>
             <svg v-else-if="item.icon === 'activity'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
             <svg v-else-if="item.icon === 'search'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -293,6 +296,8 @@ const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNa
     <main class="hx-main" id="main-content">
       <RouterView />
     </main>
+
+    <ToastStack />
   </div>
 </template>
 

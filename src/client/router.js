@@ -37,6 +37,7 @@ import MissingView from './views/MissingView.vue';
 import OperationsView from './views/OperationsView.vue';
 import RecoveryView from './views/RecoveryView.vue';
 import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
+import DiscoverView from './views/DiscoverView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
 import SearchView from './views/SearchView.vue';
 import SettingsConnectionsView from './views/SettingsConnectionsView.vue';
@@ -48,7 +49,6 @@ import { resolveRouterScroll } from './lib/router-scroll.js';
 import { sessionStore } from './state/session.js';
 
 const requesterRestrictedRouteNames = new Set([
-  'dashboard',
   'missing',
   'search',
   'activity',
@@ -72,7 +72,7 @@ const requesterRestrictedRouteNames = new Set([
 ]);
 
 function defaultAuthenticatedRouteName() {
-  return sessionStore.state.user?.role === 'requester' ? 'request-music' : 'dashboard';
+  return 'dashboard';
 }
 
 const router = createRouter({
@@ -90,6 +90,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         { path: '', name: 'dashboard', component: DashboardView },
+        { path: 'discover', name: 'discover', component: DiscoverView },
         { path: 'missing', name: 'missing', component: MissingView },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
@@ -176,7 +177,7 @@ router.beforeEach(async (to) => {
   }
 
   if (sessionStore.state.user?.role === 'requester' && requesterRestrictedRouteNames.has(String(to.name ?? ''))) {
-    return { name: 'request-music' };
+    return { name: 'dashboard' };
   }
 
   return true;
