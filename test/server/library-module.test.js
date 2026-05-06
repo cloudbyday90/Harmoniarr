@@ -16,6 +16,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const buildLibraryReconciliationSummary = () => {};
   const buildLibraryWantedSummary = () => {};
   const buildLibraryWantedReleases = () => {};
+  const buildLibraryReleases = async () => {};
   const buildLibraryScanRunDetail = () => {};
   const buildLibraryScanSummary = () => {};
   const captureEmbeddedArtwork = () => {};
@@ -58,6 +59,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryReconciliationSummaryStore = {};
   const libraryReleaseReconciliationService = { reconcileLibraryReleases };
   const libraryReleaseReconciliationStore = {};
+  const libraryReleasesService = { buildLibraryReleases };
   const libraryScanRunStore = {};
   const libraryScanService = { startLibraryScan };
   const libraryScanSummaryService = { buildLibraryScanRunDetail, buildLibraryScanSummary };
@@ -103,6 +105,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryReconciliationSummaryStore,
     libraryReleaseReconciliationService,
     libraryReleaseReconciliationStore,
+    libraryReleasesService,
     libraryScanRunStore,
     libraryScanService,
     libraryScanSummaryService,
@@ -147,6 +150,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.libraryReconciliationSummaryStore, libraryReconciliationSummaryStore);
   assert.equal(libraryModule.libraryReleaseReconciliationService, libraryReleaseReconciliationService);
   assert.equal(libraryModule.libraryReleaseReconciliationStore, libraryReleaseReconciliationStore);
+  assert.equal(libraryModule.libraryReleasesService, libraryReleasesService);
   assert.equal(libraryModule.libraryScanRunStore, libraryScanRunStore);
   assert.equal(libraryModule.libraryScanService, libraryScanService);
   assert.equal(libraryModule.libraryScanSummaryService, libraryScanSummaryService);
@@ -162,6 +166,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     buildLibraryDiscoveryRunDetail,
     buildLibraryDiscoverySummary,
     buildLibraryOrganizePreview,
+    buildLibraryReleases,
     buildLibraryWantedReleases,
     buildMediaRequestSummary,
     buildLibraryReconciliationSummary,

@@ -57,7 +57,7 @@
 
 **Step 19 — In Progress:** Release request confirmation modal — `ConfirmRequestModal.vue` ships a `<dialog>`-based modal showing artwork, release title, artist, and year with a Confirm/Cancel action. Used from `SearchView` and `ReleaseCard`. Outstanding: the full release detail surface (tracklist, label, format, track count from MusicBrainz) is not implemented — the modal is a lightweight confirmation, not a rich detail overlay.
 
-**Step 20 — Not Started:** Library view — new `LibraryView.vue` at `/app/library`. Artwork-first grid of fully acquired artists and releases. Celebrates what you have, not just what you're missing. Sourced from the existing metadata + library state. Toggle between artist view (grouped) and release view (flat grid). Filter by format, year, genre.
+**Step 20 — Complete:** Library view — `LibraryView.vue` at `/app/library`. Artwork-first grid of acquired releases from `library_release_reconciliations` joined with metadata. Filter tabs: All / In Library / Partial / Duplicate. Stats grid. `useLibraryReleases` composable, `library-release-normalization.js` lib, `GET /api/v1/library/releases` route, Library nav item in both operatorNav and requesterNav. Test suites: normalization (54 tests), composable (14 tests), service (8 tests).
 
 **Step 21 — Not Started:** Album art color extraction — extract the dominant color from each card's artwork and apply it as a subtle CSS variable (`--card-accent`) on that specific card. Used as a card border tint or inner glow. Runs client-side via `canvas.getContext('2d')` after `ArtworkImage.vue` loads. Makes each card visually distinct and the grid feel alive rather than uniform.
 

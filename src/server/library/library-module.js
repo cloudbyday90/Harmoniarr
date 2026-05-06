@@ -54,6 +54,7 @@ import { createLibraryReconciliationSummaryService } from './library-reconciliat
 import { createLibraryReconciliationSummaryStore } from './library-reconciliation-summary-store.js';
 import { createLibraryReleaseReconciliationService } from './library-release-reconciliation-service.js';
 import { createLibraryReleaseReconciliationStore } from './library-release-reconciliation-store.js';
+import { createLibraryReleasesService } from './library-releases-service.js';
 import { createLibraryScanRunStore } from './library-scan-run-store.js';
 import { createLibraryScanService } from './library-scan-service.js';
 import { createLibrarySidecarArtworkService } from './library-sidecar-artwork-service.js';
@@ -214,6 +215,9 @@ export function createLibraryModule({
   libraryReleaseReconciliationService = createLibraryReleaseReconciliationService({
     libraryReleaseReconciliationStore,
   }),
+  libraryReleasesService = createLibraryReleasesService({
+    libraryReleaseReconciliationStore,
+  }),
   libraryWantedReleaseStore = createLibraryWantedReleaseStore(),
   libraryWantedReleaseService = createLibraryWantedReleaseService({
     libraryWantedReleaseStore,
@@ -342,6 +346,7 @@ export function createLibraryModule({
     libraryReconciliationSummaryStore,
     libraryReleaseReconciliationService,
     libraryReleaseReconciliationStore,
+    libraryReleasesService,
     libraryScanRunStore,
     libraryScanService,
     libraryScanSummaryService,
@@ -357,6 +362,7 @@ export function createLibraryModule({
       buildLibraryDiscoveryRunDetail: libraryDiscoverySummaryService.buildLibraryDiscoveryRunDetail,
       buildLibraryDiscoverySummary: libraryDiscoverySummaryService.buildLibraryDiscoverySummary,
       buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
+      buildLibraryReleases: libraryReleasesService.buildLibraryReleases,
       buildLibraryWantedReleases: libraryWantedSummaryService.buildLibraryWantedReleases,
       buildMediaRequestSummary: libraryMediaRequestService.buildMediaRequestSummary,
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,

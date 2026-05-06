@@ -39,6 +39,7 @@ import OperationsView from './views/OperationsView.vue';
 import RecoveryView from './views/RecoveryView.vue';
 import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
 import DiscoverView from './views/DiscoverView.vue';
+import LibraryView from './views/LibraryView.vue';
 import MyRequestsView from './views/MyRequestsView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
 import SearchView from './views/SearchView.vue';
@@ -92,6 +93,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'dashboard', component: DashboardView },
         { path: 'discover', name: 'discover', component: DiscoverView },
+        { path: 'library', name: 'library', component: LibraryView },
         { path: 'missing', name: 'missing', component: MissingView },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },

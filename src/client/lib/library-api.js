@@ -72,6 +72,18 @@ export function fetchLibraryWantedReleases({ wantedStatus = null, limit = 500 } 
   return apiRequest(query ? `/api/v1/library/wanted-releases?${query}` : '/api/v1/library/wanted-releases');
 }
 
+export function fetchLibraryReleases({ reconciliationStatus = null, limit = 500 } = {}) {
+  const params = new URLSearchParams();
+  if (['complete', 'partial', 'duplicate'].includes(reconciliationStatus)) {
+    params.set('status', reconciliationStatus);
+  }
+  if (limit && limit !== 500) {
+    params.set('limit', String(limit));
+  }
+  const query = params.toString();
+  return apiRequest(query ? `/api/v1/library/releases?${query}` : '/api/v1/library/releases');
+}
+
 export function fetchLibraryScanRunDetail(runId) {
   return apiRequest(`/api/v1/library/scan-runs/${encodeURIComponent(runId)}`);
 }
