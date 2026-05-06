@@ -31,10 +31,13 @@ export function registerSystemRoutes(app, {
   getActivityFeed,
   getBackupExportById,
   getBackupExportDownloadById,
+  enterMaintenanceLock,
   getBackupRestorePreview,
   getDiagnosticsExportDownload,
+  getMaintenanceLockStatus,
   getQueueDiagnostics,
   getRecoveryDiagnostics,
+  releaseMaintenanceLockById,
   startBackupRestoreApply,
   getOperatorNotifications,
   listBackupExports,
@@ -129,6 +132,77 @@ export function registerSystemRoutes(app, {
     response.json(await getOperatorNotifications({
       limit: request.query.limit,
     }));
+  }));
+
+  app.get('/api/v1/recovery/maintenance-locks', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const lockTypes = typeof request.query.lockTypes === 'string'
+      ? request.query.lockTypes.split(',')
+      : [];
+
+    response.json({
+      ok: true,
+      ...await getMaintenanceLockStatus({ lockTypes }),
+    });
+  }));
+
+  app.post('/api/v1/recovery/maintenance-locks', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await runIdempotentMutation({
+      actorUserId: session.appUserId,
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'recovery.maintenanceLocks.enter',
+      requestPayload: {
+        expiresAt: request.body?.expiresAt ?? null,
+        lockType: request.body?.lockType,
+        reason: request.body?.reason ?? null,
+      },
+      statusCode: 202,
+      executeMutation: async () => ({
+        body: await enterMaintenanceLock({
+          expiresAt: request.body?.expiresAt ?? null,
+          lockType: request.body?.lockType,
+          reason: request.body?.reason ?? null,
+          requestMetadata: getRequestMetadata(request),
+          triggeredByUserId: session.appUserId,
+        }),
+        statusCode: 202,
+      }),
+    });
+
+    response.status(result.statusCode).json({
+      ok: true,
+      ...result.body,
+    });
+  }));
+
+  app.post('/api/v1/recovery/maintenance-locks/:lockId/release', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await runIdempotentMutation({
+      actorUserId: session.appUserId,
+      idempotencyKey: request.headers['idempotency-key'],
+      operationScope: 'recovery.maintenanceLocks.release',
+      requestPayload: { lockId: request.params.lockId },
+      statusCode: 200,
+      executeMutation: async () => ({
+        body: await releaseMaintenanceLockById({
+          lockId: request.params.lockId,
+          requestMetadata: getRequestMetadata(request),
+          triggeredByUserId: session.appUserId,
+        }),
+        statusCode: 200,
+      }),
+    });
+
+    response.json({
+      ok: true,
+      ...result.body,
+    });
   }));
 
   app.get('/api/v1/recovery/backups', asyncRoute(async (request, response) => {

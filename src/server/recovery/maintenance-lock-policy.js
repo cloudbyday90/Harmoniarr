@@ -18,6 +18,7 @@
 
 export const defaultBlockingMaintenanceLockTypes = Object.freeze([
   'admin_recovery',
+  'maintenance',
   'restore',
   'upgrade',
 ]);
