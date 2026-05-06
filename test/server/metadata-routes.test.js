@@ -70,6 +70,7 @@ function createMetadataRouteTestApp(overrides = {}) {
       }),
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed', user: { role: 'admin' } }),
+      requireFreshSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' }),
       requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' }),
       searchLocalMetadataArtists: async ({ query, limit }) => ({ query, limit: Number(limit), results: [{ id: 'artist-1', name: query }] }),
       searchLocalMetadataReleaseGroups: async ({ query, limit }) => ({ query, limit: Number(limit), results: [{ id: 'rg-1', title: query }] }),
@@ -363,12 +364,12 @@ test('metadata import route passes session and request metadata to the shared im
     source: { actorUserId, requestMetadata },
   }));
   const requireCsrf = t.mock.fn();
-  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'user-9', csrfToken: 'csrf-token', csrfTokenHash: 'hashed', user: { role: 'admin' } }));
+  const requireFreshSession = t.mock.fn(async () => ({ appUserId: 'user-9', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' }));
 
   const app = createMetadataRouteTestApp({
     importMusicBrainzArtist,
     requireCsrf,
-    requireFreshAdminSession,
+    requireFreshSession,
   });
 
   await withServer(app, async (baseUrl) => {
@@ -383,7 +384,7 @@ test('metadata import route passes session and request metadata to the shared im
     const payload = await response.json();
 
     assert.equal(response.status, 201);
-  assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+  assert.equal(requireFreshSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.equal(importMusicBrainzArtist.mock.callCount(), 1);
     assert.deepEqual(importMusicBrainzArtist.mock.calls[0].arguments, [{
@@ -464,9 +465,9 @@ test('metadata release import route returns the shared imported release payload'
   });
 });
 
-test('metadata artist monitoring route preserves forced re-auth failures from the injected admin guard', async () => {
+test('metadata artist monitoring route preserves forced re-auth failures from the injected session guard', async () => {
   const app = createMetadataRouteTestApp({
-    requireFreshAdminSession: async () => {
+    requireFreshSession: async () => {
       throw Object.assign(new Error('Re-authentication is required before continuing'), {
         status: 403,
         code: 'reauth_required',
@@ -588,5 +589,83 @@ test('metadata routes normalize shared musicbrainz request failures to 502 respo
         message: 'MusicBrainz release-group release browse request failed with status 502',
       },
     });
+  });
+});
+test('metadata import route preserves auth-guard failures from the injected session guard', async () => {
+  const app = createMetadataRouteTestApp({
+    requireFreshSession: async () => {
+      throw Object.assign(new Error('Re-authentication is required before continuing'), {
+        status: 403,
+        code: 'reauth_required',
+      });
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/musicbrainz/artists/mb-artist-1/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'reauth_required',
+        message: 'Re-authentication is required before continuing',
+      },
+    });
+  });
+});
+
+test('metadata artist monitoring route does not invoke the admin session guard', async (t) => {
+  // Regression guard: if the route regresses back to requireFreshAdminSession,
+  // this mock would throw and the test would fail.
+  const requireFreshAdminSession = t.mock.fn(async () => {
+    throw Object.assign(new Error('Administrator access is required'), {
+      status: 403,
+      code: 'admin_required',
+    });
+  });
+  const app = createMetadataRouteTestApp({ requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/monitoring`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({ isMonitored: true }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 0);
+  });
+});
+
+test('metadata artist import route does not invoke the admin session guard', async (t) => {
+  // Regression guard: if the route regresses back to requireFreshAdminSession,
+  // this mock would throw and the test would fail.
+  const requireFreshAdminSession = t.mock.fn(async () => {
+    throw Object.assign(new Error('Administrator access is required'), {
+      status: 403,
+      code: 'admin_required',
+    });
+  });
+  const app = createMetadataRouteTestApp({ requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/musicbrainz/artists/mb-artist-1/import`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 0);
   });
 });

@@ -75,6 +75,7 @@ export function registerMetadataRoutes(app, {
   updateMetadataArtistMonitoring,
   requireCsrf: requireCsrfFn = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession: requireFreshAdminSessionFn = defaultRequestAuthDependencies.requireFreshAdminSession,
+  requireFreshSession: requireFreshSessionFn = defaultRequestAuthDependencies.requireFreshSession,
   requireSession: requireSessionFn = defaultRequestAuthDependencies.requireSession,
   searchLocalMetadataArtists,
   searchLocalMetadataReleaseGroups,
@@ -95,6 +96,22 @@ export function registerMetadataRoutes(app, {
   function registerImportRoute(path, importEntity, buildImportRequest, buildImportedBody) {
     app.post(path, metadataRoute(async (request, response) => {
       const session = await requireFreshAdminSessionFn(request);
+      requireCsrfFn(request, session);
+
+      const imported = await importEntity(buildImportRequest(request, session));
+
+      response.status(201).json({
+        ok: true,
+        imported: buildImportedBody(imported),
+      });
+    }));
+  }
+
+  // Like registerImportRoute, but requires a fresh authenticated session instead
+  // of a fresh admin session, so that requesters can import/upsert entities.
+  function registerSessionImportRoute(path, importEntity, buildImportRequest, buildImportedBody) {
+    app.post(path, metadataRoute(async (request, response) => {
+      const session = await requireFreshSessionFn(request);
       requireCsrfFn(request, session);
 
       const imported = await importEntity(buildImportRequest(request, session));
@@ -182,7 +199,7 @@ export function registerMetadataRoutes(app, {
   });
 
   app.put('/api/v1/metadata/artists/:artistId/monitoring', metadataRoute(async (request, response) => {
-    const session = await requireFreshAdminSessionFn(request);
+    const session = await requireFreshSessionFn(request);
     requireCsrfFn(request, session);
 
     const updated = await updateMetadataArtistMonitoring({
@@ -315,7 +332,7 @@ export function registerMetadataRoutes(app, {
     }),
   );
 
-  registerImportRoute(
+  registerSessionImportRoute(
     '/api/v1/metadata/musicbrainz/artists/:artistId/import',
     importMusicBrainzArtist,
     (request, session) => ({
