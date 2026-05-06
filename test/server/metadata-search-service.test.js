@@ -187,7 +187,7 @@ test('createMetadataSearchService listMonitoredArtists defaults limit to 25', as
   assert.deepEqual(result.results, []);
 });
 
-test('createMetadataSearchService listMonitoredArtists falls back to musicbrainz_artist_id as id and uses local id when mbid is null', async (t) => {
+test('createMetadataSearchService listMonitoredArtists falls back to string local id as id when musicbrainz_artist_id is null', async (t) => {
   const listMonitoredArtistsQuery = t.mock.fn(async () => [
     {
       id: 7,
