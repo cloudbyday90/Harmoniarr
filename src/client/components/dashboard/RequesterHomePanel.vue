@@ -17,15 +17,19 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import ArtistCard from '../media/ArtistCard.vue';
 import EmptyState from '../EmptyState.vue';
 import { useMonitoredArtists } from '../../composables/useMonitoredArtists.js';
 
-const { artists, errorMessage, isLoading } = useMonitoredArtists({ limit: 25 });
+const { artists, errorMessage, isLoading, loadMonitoredArtists } = useMonitoredArtists({ limit: 25 });
 
 const hasArtists = computed(() => artists.value.length > 0);
+
+onMounted(() => {
+  void loadMonitoredArtists();
+});
 </script>
 
 <template>

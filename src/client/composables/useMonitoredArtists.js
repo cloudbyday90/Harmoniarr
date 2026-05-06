@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchMonitoredArtists as defaultFetchMonitoredArtists } from '../lib/metadata-api.js';
 
@@ -52,10 +52,6 @@ export function useMonitoredArtists({
       isLoading.value = false;
     }
   }
-
-  onMounted(() => {
-    void loadMonitoredArtists();
-  });
 
   return {
     artists,
