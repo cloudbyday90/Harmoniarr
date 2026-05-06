@@ -591,3 +591,81 @@ test('metadata routes normalize shared musicbrainz request failures to 502 respo
     });
   });
 });
+test('metadata import route preserves auth-guard failures from the injected session guard', async () => {
+  const app = createMetadataRouteTestApp({
+    requireFreshSession: async () => {
+      throw Object.assign(new Error('Re-authentication is required before continuing'), {
+        status: 403,
+        code: 'reauth_required',
+      });
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/musicbrainz/artists/mb-artist-1/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'reauth_required',
+        message: 'Re-authentication is required before continuing',
+      },
+    });
+  });
+});
+
+test('metadata artist monitoring route does not invoke the admin session guard', async (t) => {
+  // Regression guard: if the route regresses back to requireFreshAdminSession,
+  // this mock would throw and the test would fail.
+  const requireFreshAdminSession = t.mock.fn(async () => {
+    throw Object.assign(new Error('Administrator access is required'), {
+      status: 403,
+      code: 'admin_required',
+    });
+  });
+  const app = createMetadataRouteTestApp({ requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/monitoring`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({ isMonitored: true }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 0);
+  });
+});
+
+test('metadata artist import route does not invoke the admin session guard', async (t) => {
+  // Regression guard: if the route regresses back to requireFreshAdminSession,
+  // this mock would throw and the test would fail.
+  const requireFreshAdminSession = t.mock.fn(async () => {
+    throw Object.assign(new Error('Administrator access is required'), {
+      status: 403,
+      code: 'admin_required',
+    });
+  });
+  const app = createMetadataRouteTestApp({ requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/musicbrainz/artists/mb-artist-1/import`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 0);
+  });
+});

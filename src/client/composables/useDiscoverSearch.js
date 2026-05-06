@@ -36,8 +36,8 @@ export function useDiscoverSearch({
   searchArtists = searchMusicBrainzArtists,
   importArtist = importMusicBrainzArtist,
   updateMonitoring = updateMetadataArtistMonitoring,
+  toast = useToast(),
 } = {}) {
-  const toast = useToast();
 
   /** Current value of the search text input. */
   const query = ref('');
