@@ -17,10 +17,11 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, toRef, useTemplateRef } from 'vue';
 import { RouterLink } from 'vue-router';
 import ArtworkImage from '../ArtworkImage.vue';
 import MonitorButton from './MonitorButton.vue';
+import { useArtworkColor } from '../../composables/useArtworkColor.js';
 
 /**
  * ArtistCard — presentational artwork-first artist card.
@@ -70,6 +71,19 @@ const props = defineProps({
     type: [String, Object],
     default: null,
   },
+  /**
+   * Server-extracted dominant OKLCH color for accent theming.
+   * Shape: { hue, chroma, lightness, hex } | null
+   */
+  dominantColor: {
+    type: Object,
+    default: null,
+  },
+  /** Artwork asset UUID for client-side color write-back. */
+  artworkAssetId: {
+    type: String,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['monitor']);
@@ -86,15 +100,38 @@ const meta = computed(() => {
 function handleMonitor() {
   emit('monitor', props.artist);
 }
+
+const artworkImageComp = useTemplateRef('artworkImageComp');
+const imgElRef = computed(() => artworkImageComp.value?.imgRef ?? null);
+const isSameOriginFn = () => {
+  const src = artworkImageComp.value?.activeSrc?.value ?? artworkImageComp.value?.activeSrc;
+  if (!src) return false;
+  if (src.startsWith('/')) return true;
+  try { return new URL(src).origin === window.location.origin; } catch { return false; }
+};
+const { accent } = useArtworkColor(imgElRef, {
+  dominantColor: toRef(props, 'dominantColor'),
+  isSameOriginFn,
+  artworkAssetId: toRef(props, 'artworkAssetId'),
+});
+
+const accentStyle = computed(() => {
+  if (!accent.value || accent.value.hue === null) return {};
+  return {
+    '--card-accent-h': accent.value.hue,
+    '--card-accent-c': accent.value.chroma,
+    '--card-accent-ref-l': accent.value.lightness,
+  };
+});
 </script>
 
 <template>
-  <article class="hx-media-card" :data-variant="variant || undefined">
+  <article class="hx-media-card" :data-variant="variant || undefined" :style="accentStyle">
     <!-- When `to` is set, artwork and body are a navigable block link. -->
     <RouterLink v-if="to" :to="to" class="hx-media-card__link-area">
       <div class="hx-media-card__artwork">
         <slot name="artwork">
-          <ArtworkImage :alt="artist.name" />
+          <ArtworkImage ref="artworkImageComp" :alt="artist.name" />
         </slot>
       </div>
       <div class="hx-media-card__body">
@@ -105,7 +142,7 @@ function handleMonitor() {
     <template v-else>
       <div class="hx-media-card__artwork">
         <slot name="artwork">
-          <ArtworkImage :alt="artist.name" />
+          <ArtworkImage ref="artworkImageComp" :alt="artist.name" />
         </slot>
       </div>
       <div class="hx-media-card__body">
@@ -139,5 +176,26 @@ function handleMonitor() {
   gap: var(--hx-space-2);
   text-decoration: none;
   color: inherit;
+}
+
+.hx-media-card {
+  border: 1px solid color-mix(
+    in oklch,
+    oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0)) 40%,
+    transparent
+  );
+  transition: border-color 0.2s ease;
+}
+
+:global([data-theme="light"]) .hx-media-card {
+  border-color: color-mix(
+    in oklch,
+    oklch(0.38 var(--card-accent-c, 0) var(--card-accent-h, 0)) 50%,
+    transparent
+  );
+}
+
+.hx-media-card:hover {
+  border-color: oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0) / 0.85);
 }
 </style>

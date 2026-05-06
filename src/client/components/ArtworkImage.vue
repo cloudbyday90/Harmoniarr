@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, defineExpose, ref, watch } from 'vue';
 
 const props = defineProps({
   /** Local artwork URL — preferred when available. */
@@ -88,6 +88,10 @@ function onError() {
   }
   state.value = 'error';
 }
+
+const imgRef = ref(null);
+
+defineExpose({ imgRef, activeSrc });
 </script>
 
 <template>
@@ -98,6 +102,7 @@ function onError() {
       :alt="alt"
       loading="lazy"
       class="hx-artwork__img"
+      :ref="(el) => { imgRef = el; }"
       @load="onLoad"
       @error="onError"
     />

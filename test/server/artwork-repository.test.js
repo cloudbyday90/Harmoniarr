@@ -68,9 +68,16 @@ test('upsertArtworkAsset writes asset descriptors against the shared artwork tab
     'payload-1',
     '2026-05-01T11:59:00.000Z',
     '2026-05-01T11:59:30.000Z',
+    null,
+    null,
+    null,
   ]);
   assert.deepEqual(asset, {
     createdAt: '2026-05-01T12:00:00.000Z',
+    dominantChroma: null,
+    dominantHex: null,
+    dominantHue: null,
+    dominantLightness: null,
     fetchedAt: '2026-05-01T11:59:00.000Z',
     fileSizeBytes: 123456,
     height: 600,

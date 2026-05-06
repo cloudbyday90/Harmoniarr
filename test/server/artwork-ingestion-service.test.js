@@ -139,3 +139,91 @@ test('createArtworkIngestionService persists sanitized artwork into the configur
   assert.match(result.asset.relativePath, /^extracted\/[a-f0-9]{2}\/[a-f0-9]{2}\/[a-f0-9]{64}\.jpg$/);
   await access(result.absolutePath);
 });
+
+test('prepareArtworkAsset extracts dominant color for vibrant artwork', async () => {
+  const buffer = await sharp({
+    create: {
+      // Pure saturated red — high chroma, well above VIBRANCY_THRESHOLD
+      background: { alpha: 1, b: 0, g: 0, r: 255 },
+      channels: 3,
+      height: 64,
+      width: 64,
+    },
+  }).png().toBuffer();
+
+  const prepared = await prepareArtworkAsset({
+    buffer,
+    policy: {
+      limits: {
+        maxOriginalDimensionPixels: 1024,
+        maxOriginalFileSizeBytes: 1024 * 1024,
+      },
+      storage: { root: '/app/data/artwork' },
+    },
+    sharpStatsFn: async () => ({ dominant: { r: 255, g: 0, b: 0 } }),
+    storageClass: 'provider_original',
+  });
+
+  assert.ok(prepared.asset.dominantHue !== null, 'dominantHue should be set for vibrant color');
+  assert.ok(prepared.asset.dominantChroma !== null, 'dominantChroma should be set for vibrant color');
+  assert.ok(prepared.asset.dominantLightness !== null, 'dominantLightness should be set for vibrant color');
+  assert.ok(prepared.asset.dominantChroma > 0.05, `Expected chroma > 0.05, got ${prepared.asset.dominantChroma}`);
+});
+
+test('prepareArtworkAsset leaves dominant color fields null for achromatic artwork', async () => {
+  const buffer = await sharp({
+    create: {
+      // Pure neutral grey — chroma near zero, below VIBRANCY_THRESHOLD
+      background: { alpha: 1, b: 128, g: 128, r: 128 },
+      channels: 3,
+      height: 64,
+      width: 64,
+    },
+  }).png().toBuffer();
+
+  const prepared = await prepareArtworkAsset({
+    buffer,
+    policy: {
+      limits: {
+        maxOriginalDimensionPixels: 1024,
+        maxOriginalFileSizeBytes: 1024 * 1024,
+      },
+      storage: { root: '/app/data/artwork' },
+    },
+    // Grey: chroma ≈ 0 → below vibrancy threshold → all dominant fields null
+    sharpStatsFn: async () => ({ dominant: { r: 128, g: 128, b: 128 } }),
+    storageClass: 'provider_original',
+  });
+
+  assert.equal(prepared.asset.dominantHue, null, 'dominantHue should be null for grey');
+  assert.equal(prepared.asset.dominantChroma, null, 'dominantChroma should be null for grey');
+  assert.equal(prepared.asset.dominantLightness, null, 'dominantLightness should be null for grey');
+});
+
+test('prepareArtworkAsset leaves dominant color fields null when sharpStatsFn throws (non-fatal)', async () => {
+  const buffer = await sharp({
+    create: {
+      background: { alpha: 1, b: 100, g: 100, r: 100 },
+      channels: 3,
+      height: 64,
+      width: 64,
+    },
+  }).png().toBuffer();
+
+  const prepared = await prepareArtworkAsset({
+    buffer,
+    policy: {
+      limits: {
+        maxOriginalDimensionPixels: 1024,
+        maxOriginalFileSizeBytes: 1024 * 1024,
+      },
+      storage: { root: '/app/data/artwork' },
+    },
+    sharpStatsFn: async () => { throw new Error('stats unavailable'); },
+    storageClass: 'provider_original',
+  });
+
+  assert.equal(prepared.asset.dominantHue, null, 'dominantHue should be null on error');
+  assert.equal(prepared.asset.dominantChroma, null, 'dominantChroma should be null on error');
+  assert.equal(prepared.asset.dominantLightness, null, 'dominantLightness should be null on error');
+});

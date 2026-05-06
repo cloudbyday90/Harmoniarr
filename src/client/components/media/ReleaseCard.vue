@@ -17,10 +17,11 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, toRef, useTemplateRef } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
 import RequestButton from './RequestButton.vue';
 import { canRequestRelease, getReleaseArtistName, getReleaseTitle, getReleaseYear } from '../../lib/release-normalization.js';
+import { useArtworkColor } from '../../composables/useArtworkColor.js';
 
 /**
  * ReleaseCard — presentational artwork-first release card.
@@ -63,6 +64,19 @@ const props = defineProps({
    */
   requestable: {
     type: Boolean,
+    default: null,
+  },
+  /**
+   * Server-extracted dominant OKLCH color for accent theming.
+   * Shape: { hue, chroma, lightness, hex } | null
+   */
+  dominantColor: {
+    type: Object,
+    default: null,
+  },
+  /** Artwork asset UUID for client-side color write-back. */
+  artworkAssetId: {
+    type: String,
     default: null,
   },
 });
@@ -108,12 +122,36 @@ const meta = computed(() => {
 function handleRequest() {
   emit('request', props.release);
 }
+
+const artworkImageComp = useTemplateRef('artworkImageComp');
+const imgElRef = computed(() => artworkImageComp.value?.imgRef ?? null);
+const isSameOriginFn = () => {
+  const src = artworkImageComp.value?.activeSrc?.value ?? artworkImageComp.value?.activeSrc;
+  if (!src) return false;
+  if (src.startsWith('/')) return true;
+  try { return new URL(src).origin === window.location.origin; } catch { return false; }
+};
+const { accent } = useArtworkColor(imgElRef, {
+  dominantColor: toRef(props, 'dominantColor'),
+  isSameOriginFn,
+  artworkAssetId: toRef(props, 'artworkAssetId'),
+});
+
+const accentStyle = computed(() => {
+  if (!accent.value || accent.value.hue === null) return {};
+  return {
+    '--card-accent-h': accent.value.hue,
+    '--card-accent-c': accent.value.chroma,
+    '--card-accent-ref-l': accent.value.lightness,
+  };
+});
 </script>
 
 <template>
-  <article class="hx-media-card" :data-variant="variant || undefined">
+  <article class="hx-media-card" :data-variant="variant || undefined" :style="accentStyle">
     <div class="hx-media-card__artwork">
       <ArtworkImage
+        ref="artworkImageComp"
         :mbid="releaseMbid || releaseGroupMbid || undefined"
         :mbid-type="releaseMbid ? 'release' : 'release-group'"
         :alt="releaseTitle || 'Release artwork'"
@@ -139,3 +177,26 @@ function handleRequest() {
     </div>
   </article>
 </template>
+
+<style scoped>
+.hx-media-card {
+  border: 1px solid color-mix(
+    in oklch,
+    oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0)) 40%,
+    transparent
+  );
+  transition: border-color 0.2s ease;
+}
+
+:global([data-theme="light"]) .hx-media-card {
+  border-color: color-mix(
+    in oklch,
+    oklch(0.38 var(--card-accent-c, 0) var(--card-accent-h, 0)) 50%,
+    transparent
+  );
+}
+
+.hx-media-card:hover {
+  border-color: oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0) / 0.85);
+}
+</style>

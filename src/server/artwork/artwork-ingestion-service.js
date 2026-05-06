@@ -21,6 +21,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { createApiError } from '../auth.js';
+import { rgbToOklch, VIBRANCY_THRESHOLD } from './color-utils.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { getArtworkAssetBySha256, upsertArtworkAsset } from './artwork-repository.js';
 
@@ -114,6 +115,7 @@ export async function prepareArtworkAsset({
   storageClass = 'provider_original',
   inspectArtworkBufferFn = inspectArtworkBuffer,
   sanitizeArtworkBufferFn = sanitizeArtworkBuffer,
+  sharpStatsFn = async (buf) => sharp(buf).stats(),
 } = {}) {
   ensureNonEmptyBuffer(buffer);
 
@@ -168,8 +170,28 @@ export async function prepareArtworkAsset({
     storageClass: normalizedStorageClass,
   });
 
+  let dominantHue = null;
+  let dominantChroma = null;
+  let dominantLightness = null;
+
+  try {
+    const stats = await sharpStatsFn(data);
+    const { r, g, b } = stats.dominant;
+    const { l, c, h } = rgbToOklch(r, g, b);
+    if (c >= VIBRANCY_THRESHOLD) {
+      dominantHue = Math.round(h * 100) / 100;
+      dominantChroma = Math.round(c * 10000) / 10000;
+      dominantLightness = Math.round(l * 10000) / 10000;
+    }
+  } catch {
+    // Non-fatal: dominant color extraction failure never blocks ingest
+  }
+
   return {
     asset: {
+      dominantChroma,
+      dominantHue,
+      dominantLightness,
       fetchedAt,
       fileSizeBytes: info.size,
       height: info.height,

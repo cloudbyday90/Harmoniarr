@@ -42,6 +42,10 @@ function mapArtworkAssetRow(row) {
     sourceUrl: row.source_url,
     storageClass: row.storage_class,
     storageNamespace: row.storage_namespace,
+    dominantChroma: row.dominant_chroma !== null && row.dominant_chroma !== undefined ? Number(row.dominant_chroma) : null,
+    dominantHex: row.dominant_hex ?? null,
+    dominantHue: row.dominant_hue !== null && row.dominant_hue !== undefined ? Number(row.dominant_hue) : null,
+    dominantLightness: row.dominant_lightness !== null && row.dominant_lightness !== undefined ? Number(row.dominant_lightness) : null,
     unassignedAt: row.unassigned_at,
     updatedAt: row.updated_at,
     width: row.width,
@@ -87,9 +91,12 @@ export async function upsertArtworkAsset(asset, queryable) {
         payload_checksum,
         fetched_at,
         last_verified_at,
+        dominant_hue,
+        dominant_chroma,
+        dominant_lightness,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
       ON CONFLICT (sha256) DO UPDATE
       SET storage_namespace = EXCLUDED.storage_namespace,
           relative_path = EXCLUDED.relative_path,
@@ -103,6 +110,9 @@ export async function upsertArtworkAsset(asset, queryable) {
           payload_checksum = EXCLUDED.payload_checksum,
           fetched_at = EXCLUDED.fetched_at,
           last_verified_at = EXCLUDED.last_verified_at,
+          dominant_hue = COALESCE(EXCLUDED.dominant_hue, artwork_assets.dominant_hue),
+          dominant_chroma = COALESCE(EXCLUDED.dominant_chroma, artwork_assets.dominant_chroma),
+          dominant_lightness = COALESCE(EXCLUDED.dominant_lightness, artwork_assets.dominant_lightness),
           updated_at = NOW()
       RETURNING *
     `,
@@ -120,6 +130,9 @@ export async function upsertArtworkAsset(asset, queryable) {
       asset.payloadChecksum ?? null,
       asset.fetchedAt ?? null,
       asset.lastVerifiedAt ?? null,
+      asset.dominantHue ?? null,
+      asset.dominantChroma ?? null,
+      asset.dominantLightness ?? null,
     ],
   );
 
@@ -134,6 +147,29 @@ export async function getArtworkAssetBySha256(sha256, queryable) {
   );
 
   return mapArtworkAssetRow(result.rows[0]);
+}
+
+export async function getArtworkAssetById(id, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    'SELECT * FROM artwork_assets WHERE id = $1 LIMIT 1',
+    [id],
+  );
+
+  return mapArtworkAssetRow(result.rows[0]);
+}
+
+export async function patchArtworkDominantColor({ assetId, hue, chroma, lightness }, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `UPDATE artwork_assets
+     SET dominant_hue = $2, dominant_chroma = $3, dominant_lightness = $4, updated_at = NOW()
+     WHERE id = $1 AND dominant_hue IS NULL
+     RETURNING id`,
+    [assetId, hue, chroma, lightness],
+  );
+
+  return result.rowCount > 0;
 }
 
 export async function listArtworkCleanupCandidates({

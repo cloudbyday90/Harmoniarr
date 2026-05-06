@@ -52,6 +52,7 @@ function createArtworkRouteTestApp(overrides = {}) {
       requireAdminSession: async () => ({ appUserId: 'user-1', user: { role: 'admin' } }),
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
+      requireSession: async () => ({ appUserId: 'user-1', user: { role: 'user' } }),
       startArtworkCleanupRun: async () => ({
         accepted: true,
         run: {
@@ -59,6 +60,7 @@ function createArtworkRouteTestApp(overrides = {}) {
           status: 'pending',
         },
       }),
+      writeDominantColor: async () => ({ ok: true, updated: true }),
       ...overrides,
     });
   });
@@ -261,5 +263,74 @@ test('artwork cleanup run route returns lock conflicts from the run service', as
     assert.equal(response.status, 409);
     assert.equal(payload.ok, false);
     assert.equal(payload.error.code, 'recovery_lock_conflict');
+  });
+});
+
+test('dominant color patch route requires an authenticated session and returns the write result', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-5', user: { role: 'user' } }));
+  const writeDominantColor = t.mock.fn(async () => ({ ok: true, updated: true }));
+  const app = createArtworkRouteTestApp({ requireSession, writeDominantColor });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/assets/asset-xyz/dominant-color`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ hue: 180, chroma: 0.2, lightness: 0.5 }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(writeDominantColor.mock.callCount(), 1);
+    assert.deepEqual(writeDominantColor.mock.calls[0].arguments, [{
+      artworkAssetId: 'asset-xyz',
+      hue: 180,
+      chroma: 0.2,
+      lightness: 0.5,
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.updated, true);
+  });
+});
+
+test('dominant color patch route returns 401 when session is not authenticated', async () => {
+  const app = createArtworkRouteTestApp({
+    requireSession: async () => {
+      throw createApiError(401, 'auth_required', 'Authentication is required');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/assets/asset-xyz/dominant-color`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ hue: 180, chroma: 0.2, lightness: 0.5 }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 401);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.code, 'auth_required');
+  });
+});
+
+test('dominant color patch route propagates 422 from the write service for out-of-range values', async () => {
+  const app = createArtworkRouteTestApp({
+    writeDominantColor: async () => {
+      throw createApiError(422, 'dominant_color_invalid', 'hue must be a number between 0 and 360');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/assets/asset-xyz/dominant-color`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ hue: 999, chroma: 0.2, lightness: 0.5 }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 422);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.code, 'dominant_color_invalid');
   });
 });

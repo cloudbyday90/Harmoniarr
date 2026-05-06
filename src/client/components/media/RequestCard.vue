@@ -17,9 +17,10 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, toRef, useTemplateRef } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
 import RequestStatusPill from './RequestStatusPill.vue';
+import { useArtworkColor } from '../../composables/useArtworkColor.js';
 
 /**
  * RequestCard — presentational artwork-first request tracking card.
@@ -54,6 +55,19 @@ const props = defineProps({
    * attribution entirely for backward compatibility.
    */
   viewerUserId: {
+    type: String,
+    default: null,
+  },
+  /**
+   * Server-extracted dominant OKLCH color for accent theming.
+   * Shape: { hue, chroma, lightness, hex } | null
+   */
+  dominantColor: {
+    type: Object,
+    default: null,
+  },
+  /** Artwork asset UUID for client-side color write-back. */
+  artworkAssetId: {
     type: String,
     default: null,
   },
@@ -170,12 +184,36 @@ const attributionLine = computed(() => {
 
   return `By ${byName} · For ${forName}`;
 });
+
+const artworkImageComp = useTemplateRef('artworkImageComp');
+const imgElRef = computed(() => artworkImageComp.value?.imgRef ?? null);
+const isSameOriginFn = () => {
+  const src = artworkImageComp.value?.activeSrc?.value ?? artworkImageComp.value?.activeSrc;
+  if (!src) return false;
+  if (src.startsWith('/')) return true;
+  try { return new URL(src).origin === window.location.origin; } catch { return false; }
+};
+const { accent } = useArtworkColor(imgElRef, {
+  dominantColor: toRef(props, 'dominantColor'),
+  isSameOriginFn,
+  artworkAssetId: toRef(props, 'artworkAssetId'),
+});
+
+const accentStyle = computed(() => {
+  if (!accent.value || accent.value.hue === null) return {};
+  return {
+    '--card-accent-h': accent.value.hue,
+    '--card-accent-c': accent.value.chroma,
+    '--card-accent-ref-l': accent.value.lightness,
+  };
+});
 </script>
 
 <template>
-  <article class="hx-media-card request-card" :data-variant="variant || undefined">
+  <article class="hx-media-card request-card" :data-variant="variant || undefined" :style="accentStyle">
     <div class="hx-media-card__artwork">
       <ArtworkImage
+        ref="artworkImageComp"
         :mbid="artworkMbid"
         :mbid-type="artworkMbidType"
         :alt="releaseTitle"
@@ -209,6 +247,24 @@ const attributionLine = computed(() => {
 <style scoped>
 .request-card {
   display: grid;
+  border: 1px solid color-mix(
+    in oklch,
+    oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0)) 40%,
+    transparent
+  );
+  transition: border-color 0.2s ease;
+}
+
+:global([data-theme="light"]) .request-card {
+  border-color: color-mix(
+    in oklch,
+    oklch(0.38 var(--card-accent-c, 0) var(--card-accent-h, 0)) 50%,
+    transparent
+  );
+}
+
+.request-card:hover {
+  border-color: oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0) / 0.85);
   grid-template-rows: auto 1fr auto;
 }
 

@@ -44,6 +44,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/artwork/cleanup-runs', access: 'admin', area: 'artwork', kind: 'read' },
   { method: 'GET', path: '/api/v1/artwork/cleanup-runs/:runId', access: 'admin', area: 'artwork', kind: 'read' },
   { method: 'POST', path: '/api/v1/artwork/cleanup-runs', access: 'admin', area: 'artwork', kind: 'mutation' },
+  { method: 'PATCH', path: '/api/v1/artwork/assets/:assetId/dominant-color', access: 'authenticated', area: 'artwork', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/settings', access: 'admin', area: 'system', kind: 'read' },
   { method: 'PUT', path: '/api/v1/settings', access: 'admin', area: 'system', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/system/overview', access: 'admin', area: 'system', kind: 'diagnostic' },

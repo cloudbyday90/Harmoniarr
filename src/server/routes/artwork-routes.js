@@ -31,7 +31,9 @@ export function registerArtworkRoutes(app, {
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
+  requireSession = defaultRequestAuthDependencies.requireSession,
   startArtworkCleanupRun,
+  writeDominantColor,
 }) {
   app.get('/api/v1/artwork/summary', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
@@ -65,5 +67,19 @@ export function registerArtworkRoutes(app, {
       ok: true,
       ...result,
     });
+  }));
+
+  app.patch('/api/v1/artwork/assets/:assetId/dominant-color', asyncRoute(async (request, response) => {
+    await requireSession(request);
+    const { hue, chroma, lightness } = request.body ?? {};
+
+    const result = await writeDominantColor({
+      artworkAssetId: request.params.assetId,
+      hue: Number(hue),
+      chroma: Number(chroma),
+      lightness: Number(lightness),
+    });
+
+    response.json({ ok: result.ok, updated: result.updated });
   }));
 }

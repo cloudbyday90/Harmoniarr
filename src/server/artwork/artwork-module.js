@@ -23,6 +23,7 @@ import { createArtworkCleanupHistoryService } from './artwork-cleanup-history-se
 import { createArtworkCleanupRunService } from './artwork-cleanup-run-service.js';
 import { createArtworkCleanupRunStore } from './artwork-cleanup-run-store.js';
 import { createArtworkCleanupWorker } from './artwork-cleanup-worker.js';
+import { createArtworkDominantColorService } from './artwork-dominant-color-service.js';
 import { createArtworkIngestionService } from './artwork-ingestion-service.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { createArtworkSummaryService } from './artwork-summary-service.js';
@@ -47,6 +48,7 @@ export function createArtworkModule({
   artworkPolicyService = createArtworkPolicyService({ settingsService }),
   artworkIngestionService = createArtworkIngestionService({ artworkPolicyService }),
   artworkAssignmentService = createArtworkAssignmentService(),
+  artworkDominantColorService = createArtworkDominantColorService(),
   artworkSummaryService,
 } = {}) {
   const resolvedArtworkCleanupService = artworkCleanupService
@@ -111,6 +113,7 @@ export function createArtworkModule({
       buildArtworkCleanupHistory: resolvedArtworkCleanupHistoryService.buildArtworkCleanupHistory,
       buildArtworkSummary: resolvedArtworkSummaryService.buildArtworkSummary,
       startArtworkCleanupRun: resolvedArtworkCleanupRunService.startArtworkCleanupRun,
+      writeDominantColor: artworkDominantColorService.writeDominantColor,
     },
   };
 }

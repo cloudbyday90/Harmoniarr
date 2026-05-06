@@ -65,4 +65,5 @@ test('createArtworkModule exposes the shared artwork policy service', () => {
   assert.equal(artworkModule.routeDependencies.buildArtworkCleanupHistory, artworkCleanupHistoryService.buildArtworkCleanupHistory);
   assert.equal(artworkModule.routeDependencies.buildArtworkSummary, artworkSummaryService.buildArtworkSummary);
   assert.equal(artworkModule.routeDependencies.startArtworkCleanupRun, artworkCleanupRunService.startArtworkCleanupRun);
+  assert.equal(typeof artworkModule.routeDependencies.writeDominantColor, 'function');
 });

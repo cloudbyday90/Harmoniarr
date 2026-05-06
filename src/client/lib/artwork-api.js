@@ -36,3 +36,11 @@ export function startArtworkCleanupRun() {
     method: 'POST',
   });
 }
+
+export function patchArtworkDominantColor(assetId, { hue, chroma, lightness }) {
+  return apiRequest(`/api/v1/artwork/assets/${encodeURIComponent(assetId)}/dominant-color`, {
+    body: JSON.stringify({ hue, chroma, lightness }),
+    includeCsrf: true,
+    method: 'PATCH',
+  });
+}
