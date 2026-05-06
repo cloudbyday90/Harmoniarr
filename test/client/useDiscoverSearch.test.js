@@ -67,9 +67,9 @@ test('useDiscoverSearch runSearch clears previous results before each new search
   assert.equal(results.value[0].name, 'Second');
 });
 
-test('useDiscoverSearch runSearch sets hasSearched to true even when the search returns no results', async () => {
+test('useDiscoverSearch runSearch sets hasSearched to true even when the search returns no results', async (t) => {
   const { query, results, hasSearched, runSearch } = useDiscoverSearch({
-    searchArtists: async () => ({ search: { results: [] } }),
+    searchArtists: t.mock.fn(async () => ({ search: { results: [] } })),
   });
 
   query.value = 'unlikely artist name xyzzy';
@@ -79,9 +79,9 @@ test('useDiscoverSearch runSearch sets hasSearched to true even when the search 
   assert.deepEqual(results.value, []);
 });
 
-test('useDiscoverSearch runSearch populates searchError and sets hasSearched on API failure', async () => {
+test('useDiscoverSearch runSearch populates searchError and sets hasSearched on API failure', async (t) => {
   const { query, searchError, hasSearched, results, runSearch } = useDiscoverSearch({
-    searchArtists: async () => { throw new Error('network timeout'); },
+    searchArtists: t.mock.fn(async () => { throw new Error('network timeout'); }),
   });
 
   query.value = 'Björk';
