@@ -177,9 +177,11 @@ export function createLibraryWantedReleaseStore({
           ma.sort_name AS artist_sort_name,
           mrg.title AS release_group_title,
           mrg.primary_type AS release_group_type,
+          mrg.musicbrainz_release_group_id AS musicbrainz_release_group_id,
           mr.title AS release_title,
           mr.disambiguation AS release_disambiguation,
-          mr.country AS release_country
+          mr.country AS release_country,
+          mr.musicbrainz_release_id AS musicbrainz_release_id
         FROM library_wanted_releases lwr
         JOIN metadata_artists ma ON ma.id = lwr.metadata_artist_id
         JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
@@ -202,6 +204,8 @@ export function createLibraryWantedReleaseStore({
       metadataReleaseGroupId: row.metadata_release_group_id,
       metadataReleaseId: row.metadata_release_id,
       missingTrackCount: Number.parseInt(String(row.missing_track_count ?? 0), 10) || 0,
+      musicbrainzReleaseGroupId: row.musicbrainz_release_group_id ?? null,
+      musicbrainzReleaseId: row.musicbrainz_release_id ?? null,
       releaseCountry: row.release_country ?? null,
       releaseDate: row.release_date ?? null,
       releaseDisambiguation: row.release_disambiguation ?? null,

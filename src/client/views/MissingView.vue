@@ -17,20 +17,97 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
+import EmptyState from '../components/EmptyState.vue';
+import ReleaseCard from '../components/media/ReleaseCard.vue';
+import RequestButton from '../components/media/RequestButton.vue';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
+import { useReleaseRequest } from '../composables/useReleaseRequest.js';
+import { getErrorMessage } from '../lib/error-utils.js';
+import {
+  formatWantedTrackCounts,
+  getWantedStatusLabel,
+  getWantedStatusTone,
+  normalizeWantedReleaseForCard,
+} from '../lib/wanted-release-normalization.js';
 
 const wanted = useLibraryWantedSummary();
 const releases = useLibraryWantedReleases();
 const reconciliation = useLibraryReconciliationSummary();
 
-onMounted(() => {
-  wanted.loadLibraryWantedSummary();
-  releases.loadWantedReleases();
-  reconciliation.loadLibraryReconciliationSummary();
-});
+const {
+  isRequested,
+  isRequesting,
+  requestRelease,
+} = useReleaseRequest();
+
+// ── Filter state ──────────────────────────────────────────────────────────────
+
+/** 'all' | 'missing' | 'partial' */
+const activeFilter = ref('all');
+
+const filterOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'missing', label: 'Missing' },
+  { value: 'partial', label: 'Partial' },
+];
+
+function applyFilter(value) {
+  if (activeFilter.value === value) return;
+  activeFilter.value = value;
+  releases.loadWantedReleases({ wantedStatus: value === 'all' ? null : value });
+}
+
+// ── Confirm request modal ─────────────────────────────────────────────────────
+
+const confirmModalOpen = ref(false);
+const confirmRelease = ref(null);
+const confirmError = ref(null);
+
+function openConfirmModal(release) {
+  confirmRelease.value = release;
+  confirmError.value = null;
+  confirmModalOpen.value = true;
+}
+
+function closeConfirmModal() {
+  if (!isRequesting(confirmRelease.value)) {
+    confirmModalOpen.value = false;
+    confirmRelease.value = null;
+    confirmError.value = null;
+  }
+}
+
+const confirmIsRequesting = computed(() =>
+  confirmRelease.value ? isRequesting(confirmRelease.value) : false,
+);
+
+const confirmIsRequested = computed(() =>
+  confirmRelease.value ? isRequested(confirmRelease.value) : false,
+);
+
+async function handleConfirmRequest() {
+  if (!confirmRelease.value) return;
+  confirmError.value = null;
+  const result = await requestRelease(confirmRelease.value);
+  if (result.ok) {
+    confirmModalOpen.value = false;
+    confirmRelease.value = null;
+  } else if (!result.skipped) {
+    confirmError.value = getErrorMessage(result.error, 'Request failed. Please try again.');
+  }
+}
+
+// ── Normalised releases for ReleaseCard ───────────────────────────────────────
+
+const normalizedReleases = computed(() =>
+  releases.wantedReleases.value.map(normalizeWantedReleaseForCard),
+);
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 const isLoading = computed(() => wanted.isLoading.value || releases.isLoading.value || reconciliation.isLoading.value);
 
@@ -46,9 +123,15 @@ function shouldShowSummaryPill(status) {
 
 function refreshAll() {
   wanted.loadLibraryWantedSummary();
-  releases.loadWantedReleases();
+  releases.loadWantedReleases({ wantedStatus: activeFilter.value === 'all' ? null : activeFilter.value });
   reconciliation.loadLibraryReconciliationSummary();
 }
+
+onMounted(() => {
+  wanted.loadLibraryWantedSummary();
+  releases.loadWantedReleases();
+  reconciliation.loadLibraryReconciliationSummary();
+});
 </script>
 
 <template>
@@ -125,49 +208,83 @@ function refreshAll() {
       </div>
     </article>
 
-    <article class="hx-card" v-if="releases.wantedReleases.value.length > 0">
+    <article class="hx-card" v-if="releases.wantedReleases.value.length > 0 || releases.isLoading.value">
       <header class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Wanted releases</h2>
           <p class="hx-card-subtitle">{{ releases.totalCount.value }} release{{ releases.totalCount.value === 1 ? '' : 's' }} pending acquisition</p>
         </div>
+        <div class="hx-card-actions">
+          <div class="hx-filter-tabs" role="group" aria-label="Filter by status">
+            <button
+              v-for="option in filterOptions"
+              :key="option.value"
+              type="button"
+              class="hx-filter-tab"
+              :class="{ 'is-active': activeFilter === option.value }"
+              :aria-pressed="activeFilter === option.value"
+              @click="applyFilter(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
       </header>
-      <div class="hx-card-body hx-card-body--flush">
-        <table class="hx-table">
-          <thead>
-            <tr>
-              <th>Artist</th>
-              <th>Release group</th>
-              <th>Release</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th class="hx-table-num">Expected</th>
-              <th class="hx-table-num">Matched</th>
-              <th class="hx-table-num">Missing</th>
-              <th>Release date</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="release in releases.wantedReleases.value" :key="release.id">
-              <td>{{ release.artistName }}</td>
-              <td>{{ release.releaseGroupTitle }}</td>
-              <td>
-                {{ release.releaseTitle }}
-                <span v-if="release.releaseDisambiguation" class="hx-muted"> ({{ release.releaseDisambiguation }})</span>
-              </td>
-              <td>{{ release.releaseGroupType ?? '—' }}</td>
-              <td>
-                <span class="hx-pill" :data-tone="release.wantedStatus === 'missing' ? 'danger' : 'warning'">
-                  {{ release.wantedStatus }}
-                </span>
-              </td>
-              <td class="hx-table-num">{{ release.expectedTrackCount }}</td>
-              <td class="hx-table-num">{{ release.matchedTrackCount }}</td>
-              <td class="hx-table-num">{{ release.missingTrackCount }}</td>
-              <td>{{ release.releaseDate ?? '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
+
+      <div class="hx-card-body" v-if="releases.isLoading.value && normalizedReleases.length === 0">
+        <div class="hx-skeleton-stack">
+          <span class="hx-skeleton" v-for="i in 6" :key="i"></span>
+        </div>
+      </div>
+
+      <div class="hx-card-body" v-else-if="normalizedReleases.length === 0 && !releases.isLoading.value">
+        <EmptyState
+          title="No releases match this filter"
+          :body="activeFilter === 'missing'
+            ? 'No fully missing releases — all monitored releases have at least some tracks.'
+            : 'No partial releases — monitored releases are either fully missing or fully acquired.'"
+          variant="default"
+        />
+      </div>
+
+      <div v-else class="hx-card-body hx-card-body--flush">
+        <div class="hx-artwork-grid">
+          <ReleaseCard
+            v-for="(release, index) in normalizedReleases"
+            :key="releases.wantedReleases.value[index]?.id ?? index"
+            :release="release"
+            :requested="isRequested(release)"
+            :requesting="isRequesting(release)"
+            @request="openConfirmModal(release)"
+          >
+            <template #actions>
+              <div class="hx-wanted-card-actions">
+                <div class="hx-wanted-card-meta">
+                  <span
+                    class="hx-pill"
+                    :data-tone="getWantedStatusTone(release.wantedStatus)"
+                  >
+                    {{ getWantedStatusLabel(release.wantedStatus) }}
+                  </span>
+                  <span
+                    v-if="formatWantedTrackCounts(release)"
+                    class="hx-text-muted"
+                  >
+                    {{ formatWantedTrackCounts(release) }}
+                  </span>
+                </div>
+                <RequestButton
+                  :requested="isRequested(release)"
+                  :loading="isRequesting(release)"
+                  :aria-label="isRequested(release)
+                    ? `${release.title ?? 'Release'} — already requested`
+                    : `Request ${release.title ?? 'this release'}`"
+                  @request="openConfirmModal(release)"
+                />
+              </div>
+            </template>
+          </ReleaseCard>
+        </div>
       </div>
     </article>
 
@@ -247,4 +364,66 @@ function refreshAll() {
       </div>
     </article>
   </section>
+
+  <ConfirmRequestModal
+    :open="confirmModalOpen"
+    :release="confirmRelease"
+    :is-requesting="confirmIsRequesting"
+    :is-requested="confirmIsRequested"
+    :error="confirmError"
+    @confirm="handleConfirmRequest"
+    @close="closeConfirmModal"
+  />
 </template>
+
+<style scoped>
+/* ── Filter tab strip ─────────────────────────────────────────────────────── */
+.hx-filter-tabs {
+  display: flex;
+  gap: var(--hx-space-1);
+  background: var(--hx-bg-raised);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius);
+  padding: 2px;
+}
+
+.hx-filter-tab {
+  padding: var(--hx-space-1) var(--hx-space-3);
+  font-size: var(--hx-text-sm);
+  font-weight: 500;
+  line-height: 1.4;
+  border: none;
+  border-radius: calc(var(--hx-radius) - 2px);
+  background: transparent;
+  color: var(--hx-text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.hx-filter-tab:hover {
+  background: var(--hx-bg-surface);
+  color: var(--hx-text-base);
+}
+
+.hx-filter-tab.is-active {
+  background: var(--hx-bg-surface);
+  color: var(--hx-text-base);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Wanted card action area ─────────────────────────────────────────────── */
+.hx-wanted-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  width: 100%;
+}
+
+.hx-wanted-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
+}
+</style>
