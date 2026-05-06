@@ -22,6 +22,7 @@ import EmptyState from '../components/EmptyState.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
 import { useDiscoverGraph } from '../composables/useDiscoverGraph.js';
+import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import { getArtistAvatar } from '../lib/artist-avatar.js';
 
 const {
@@ -187,6 +188,7 @@ function artistInitial(artist) {
           :monitored="isMonitored(suggestion.id)"
           :monitoring="isMonitoring(suggestion.id)"
           :disabled="isSeed(suggestion.id)"
+          :to="suggestion.id ? buildArtistDetailLocation(suggestion.id, suggestion.name) : undefined"
           @monitor="handleMonitor"
         >
           <template #artwork>
@@ -275,6 +277,7 @@ function artistInitial(artist) {
           :artist="artist"
           :monitored="isMonitored(artist.id)"
           :monitoring="isMonitoring(artist.id)"
+          :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
           @monitor="handleMonitor"
         />
       </section>

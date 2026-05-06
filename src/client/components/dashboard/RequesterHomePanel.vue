@@ -22,6 +22,7 @@ import { RouterLink } from 'vue-router';
 import ArtistCard from '../media/ArtistCard.vue';
 import EmptyState from '../EmptyState.vue';
 import { useMonitoredArtists } from '../../composables/useMonitoredArtists.js';
+import { buildArtistDetailLocation } from '../../lib/artist-detail-route.js';
 
 const { artists, errorMessage, isLoading, loadMonitoredArtists } = useMonitoredArtists({ limit: 25 });
 
@@ -83,6 +84,7 @@ onMounted(() => {
         :key="artist.id"
         :artist="artist"
         :monitored="true"
+        :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
       />
 
       <!-- "Find more artists" tail card — always visible when artists exist -->

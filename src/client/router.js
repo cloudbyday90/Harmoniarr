@@ -27,6 +27,7 @@ import ActivityQueueView from './views/ActivityQueueView.vue';
 import ActivityUsersView from './views/ActivityUsersView.vue';
 import ActivityWantedView from './views/ActivityWantedView.vue';
 import ActivityWorkspaceView from './views/ActivityWorkspaceView.vue';
+import ArtistDetailView from './views/ArtistDetailView.vue';
 import BootstrapSetupView from './views/BootstrapSetupView.vue';
 import ClaimAccountView from './views/ClaimAccountView.vue';
 import DashboardView from './views/DashboardView.vue';
@@ -95,6 +96,7 @@ const router = createRouter({
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
         { path: 'my-requests', name: 'my-requests', component: MyRequestsView },
+        { path: 'artists/:mbid', name: 'artist-detail', component: ArtistDetailView },
 
         {
           path: 'activity',

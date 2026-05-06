@@ -24,6 +24,7 @@ import EmptyState from '../components/EmptyState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
+import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
   searchMusicBrainzArtists,
@@ -398,6 +399,7 @@ onBeforeUnmount(() => clearPollTimer());
               :artist="artist"
               :monitored="isMonitored(artist.id)"
               :monitoring="isMonitoring(artist.id)"
+              :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
               @monitor="monitorArtist"
             />
           </div>

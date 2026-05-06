@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { RouterLink } from 'vue-router';
 import ArtworkImage from '../ArtworkImage.vue';
 import MonitorButton from './MonitorButton.vue';
 
@@ -26,6 +27,10 @@ import MonitorButton from './MonitorButton.vue';
  *
  * Displays artist artwork, name, and metadata. Exposes a default monitor
  * action via MonitorButton and an `actions` slot for custom action overrides.
+ *
+ * When the optional `to` prop is provided, the artwork and body area are
+ * wrapped in a RouterLink to make the card navigable (e.g. to ArtistDetailView).
+ * The actions area remains outside the link so interactive controls still work.
  *
  * Does not call APIs or show toasts directly. All actions are surfaced as
  * events for the parent to handle.
@@ -56,6 +61,15 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  /**
+   * Optional Vue Router location. When provided, the artwork and body area
+   * are wrapped in a RouterLink. Accepts any value valid for RouterLink's
+   * `to` prop (string or route location object).
+   */
+  to: {
+    type: [String, Object],
+    default: null,
+  },
 });
 
 const emit = defineEmits(['monitor']);
@@ -76,15 +90,29 @@ function handleMonitor() {
 
 <template>
   <article class="hx-media-card" :data-variant="variant || undefined">
-    <div class="hx-media-card__artwork">
-      <slot name="artwork">
-        <ArtworkImage :alt="artist.name" />
-      </slot>
-    </div>
-    <div class="hx-media-card__body">
-      <p class="hx-media-card__title">{{ artist.name }}</p>
-      <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
-    </div>
+    <!-- When `to` is set, artwork and body are a navigable block link. -->
+    <RouterLink v-if="to" :to="to" class="hx-media-card__link-area">
+      <div class="hx-media-card__artwork">
+        <slot name="artwork">
+          <ArtworkImage :alt="artist.name" />
+        </slot>
+      </div>
+      <div class="hx-media-card__body">
+        <p class="hx-media-card__title">{{ artist.name }}</p>
+        <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
+      </div>
+    </RouterLink>
+    <template v-else>
+      <div class="hx-media-card__artwork">
+        <slot name="artwork">
+          <ArtworkImage :alt="artist.name" />
+        </slot>
+      </div>
+      <div class="hx-media-card__body">
+        <p class="hx-media-card__title">{{ artist.name }}</p>
+        <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
+      </div>
+    </template>
     <div class="hx-media-card__actions">
       <slot name="actions">
         <MonitorButton
@@ -98,3 +126,18 @@ function handleMonitor() {
     </div>
   </article>
 </template>
+
+<style scoped>
+/*
+ * When `to` is set, the link area wraps artwork + body as a flex column
+ * so the card's existing gap and layout are preserved. The link itself has
+ * no visible decoration.
+ */
+.hx-media-card__link-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  text-decoration: none;
+  color: inherit;
+}
+</style>

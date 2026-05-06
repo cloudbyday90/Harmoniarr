@@ -53,7 +53,7 @@
 
 **Step 17 — Not Started:** PWA — Progressive Web App manifest + service worker. Add to home screen on mobile, push notifications ("Your request for [album] is ready"). No app store, no native code. Requires a `manifest.webmanifest`, icons, and a notification delivery mechanism (Web Push API + server-side push subscription management).
 
-**Step 18 — Not Started:** Artist detail page — new `ArtistDetailView.vue` at `/app/artists/:mbid` (canonical MBID route) and `/app/artists/local/:id` (degraded fallback for no-MBID artists). Full discography card grid (grouped by type: Albums, EPs, Singles, Other). Each release card shows its acquisition state: Owned, Missing, Requested, Coming Soon. Bio excerpt from MusicBrainz. Related artists strip (from the similarity route). Monitoring toggle. "Open in MusicBrainz" external link. Full mode requires MBID; local mode renders from local data only with a notice. See Q7.10 and section 5.14.
+**Step 18 — Complete:** Artist detail page — `ArtistDetailView.vue` at `/app/artists/:mbid` (canonical MBID route, accessible to requesters). Loads three data sources in parallel: local metadata (monitoring state + artist fields), MusicBrainz release-group browse (discography), and similar artists (related strip). Discography grouped by primary type (Albums, EPs, Singles, Broadcast, Other) via `groupReleaseGroupsByType`, newest first within each section. Each release group rendered as a `ReleaseCard` using `normalizeReleaseGroupForCard` (maps `firstReleaseDate→date`, clears release MBID so artwork loads from CAA release-group endpoint). Related artists strip shows up to 8 similar artists as colored-initial avatar tiles, each navigable to their own detail page. Header: artist name, type/country/disambiguation meta, Monitor button (via `useArtistMonitoring`), "Open in MusicBrainz" external link. Release requests via `useReleaseRequest` + `ConfirmRequestModal`. `useArtistDetail` composable manages parallel loading with independent error surfacing; 404 from local resolve treated as "not imported yet" rather than an error. `setMonitoring(patch)` allows the parent view to update cached monitoring state post-action without a full reload. `ArtistCard` gains an optional `to` prop that wraps the artwork+body area in a `RouterLink` when provided (backward-compatible; existing usages without `to` are unaffected). Navigation wired: RequesterHomePanel, DiscoverView (suggestions + search), SearchView all pass `buildArtistDetailLocation(artist.id, artist.name)` to their `ArtistCard`s. New pure lib `artist-detail-route.js` (route location builder, normalizer, grouper). Test suites: `artist-detail-route.test.js` (27 tests) and `useArtistDetail.test.js` (26 tests). 353 client tests pass, no regressions.
 
 **Step 19 — In Progress:** Release request confirmation modal — `ConfirmRequestModal.vue` ships a `<dialog>`-based modal showing artwork, release title, artist, and year with a Confirm/Cancel action. Used from `SearchView` and `ReleaseCard`. Outstanding: the full release detail surface (tracklist, label, format, track count from MusicBrainz) is not implemented — the modal is a lightweight confirmation, not a rich detail overlay.
 
@@ -100,6 +100,12 @@ The re-scope is in active progress. The screens below have shipped:
 - `src/client/lib/media-request-api.js` — typed wrappers for media request CRUD
 - `src/client/lib/release-normalization.js` — helpers to extract title/artist/year from heterogeneous release shapes
 - `src/client/lib/request-status.js` — status label, tone, and sort-order helpers for `RequestStatusPill`
+- `src/client/lib/artist-avatar.js` — FNV-1a hashed palette + colored initial avatar (Step 3)
+- `src/client/lib/discover-graph.js` — pure `computeSuggestions` for the taste-graph (Step 3)
+- `src/client/lib/artist-detail-route.js` — `buildArtistDetailLocation`, `normalizeReleaseGroupForCard`, `groupReleaseGroupsByType` (Step 18)
+
+**New screens:**
+- `ArtistDetailView.vue` at `/app/artists/:mbid` — full artist page with discography, related artists strip, monitoring, and MusicBrainz link (Step 18)
 
 **Server changes:**
 - `metadata-routes.js` and `metadata-search-service.js` updated (search improvements, monitored-artist fetch support)
@@ -112,7 +118,8 @@ The re-scope is in active progress. The screens below have shipped:
 **Router:**
 - `discover` route added at `/app/discover` → `DiscoverView`
 - `my-requests` route added at `/app/my-requests` → `MyRequestsView`
-- Both routes are accessible to requesters
+- `artist-detail` route added at `/app/artists/:mbid` → `ArtistDetailView`
+- All three routes are accessible to requesters
 
 **The following pre-existing foundations carry forward unchanged:**
 
