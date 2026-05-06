@@ -38,6 +38,7 @@ import OperationsView from './views/OperationsView.vue';
 import RecoveryView from './views/RecoveryView.vue';
 import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
 import DiscoverView from './views/DiscoverView.vue';
+import MyRequestsView from './views/MyRequestsView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
 import SearchView from './views/SearchView.vue';
 import SettingsConnectionsView from './views/SettingsConnectionsView.vue';
@@ -50,7 +51,6 @@ import { sessionStore } from './state/session.js';
 
 const requesterRestrictedRouteNames = new Set([
   'missing',
-  'search',
   'activity',
   'activity-operations',
   'activity-candidates',
@@ -94,6 +94,7 @@ const router = createRouter({
         { path: 'missing', name: 'missing', component: MissingView },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
+        { path: 'my-requests', name: 'my-requests', component: MyRequestsView },
 
         {
           path: 'activity',

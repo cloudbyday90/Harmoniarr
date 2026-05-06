@@ -133,7 +133,8 @@ const operatorNav = [
 const requesterNav = [
   { name: 'dashboard', label: 'Home', icon: 'dashboard' },
   { name: 'discover', label: 'Discover', icon: 'discover' },
-  { name: 'request-music', label: 'My Requests', icon: 'requests' },
+  { name: 'search', label: 'Search', icon: 'search' },
+  { name: 'my-requests', label: 'My Requests', icon: 'requests' },
 ];
 
 const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNav));
