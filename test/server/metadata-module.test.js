@@ -43,6 +43,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     searchArtists: () => {},
     searchReleases: () => {},
   };
+  const similarArtistsService = {
+    getSimilarArtists: () => {},
+  };
   const metadataRefreshService = {
     refreshArtistCatalogById: () => {},
   };
@@ -65,6 +68,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     musicBrainzCatalogService,
     musicBrainzImportService,
     musicBrainzSearchService,
+    similarArtistsService,
   });
 
   assert.equal(metadataModule.metadataArtistRefreshRunStore, metadataArtistRefreshRunStore);
@@ -80,6 +84,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.musicBrainzCatalogService, musicBrainzCatalogService);
   assert.equal(metadataModule.musicBrainzImportService, musicBrainzImportService);
   assert.equal(metadataModule.musicBrainzSearchService, musicBrainzSearchService);
+  assert.equal(metadataModule.similarArtistsService, similarArtistsService);
   assert.deepEqual(metadataModule.routeDependencies, {
     browseMusicBrainzArtistReleaseGroups: musicBrainzCatalogService.browseArtistReleaseGroups,
     getMusicBrainzReleaseGroupReleases: musicBrainzCatalogService.getReleaseGroupReleases,
@@ -101,5 +106,6 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     listMonitoredArtists: metadataSearchService.listMonitoredArtists,
     searchMusicBrainzArtists: musicBrainzSearchService.searchArtists,
     searchMusicBrainzReleases: musicBrainzSearchService.searchReleases,
+    getSimilarArtists: similarArtistsService.getSimilarArtists,
   });
 });

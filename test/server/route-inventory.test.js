@@ -113,6 +113,7 @@ function collectRegisteredRoutes() {
     getMusicBrainzReleaseGroupReleases: asyncNoopResult({}),
     getMetadataArtist: asyncNoopResult({}),
     getMetadataArtistByMusicBrainzId: asyncNoopResult({}),
+    getMetadataArtistDetectionEvents: asyncNoopResult({ entries: [], pageInfo: {} }),
     getMetadataRelease: asyncNoopResult({}),
     getMetadataReleaseByMusicBrainzId: asyncNoopResult({}),
     getMetadataReleaseGroup: asyncNoopResult({}),
@@ -128,8 +129,10 @@ function collectRegisteredRoutes() {
     searchLocalMetadataArtists: asyncNoopResult({}),
     searchLocalMetadataReleaseGroups: asyncNoopResult({}),
     searchLocalMetadataReleases: asyncNoopResult({}),
+    listMonitoredArtists: asyncNoopResult({ artists: [] }),
     searchMusicBrainzArtists: asyncNoopResult({}),
     searchMusicBrainzReleases: asyncNoopResult({}),
+    getSimilarArtists: asyncNoopResult({ similar: [] }),
     startMetadataArtistRefresh: asyncNoopResult({}),
     updateMetadataArtistMonitoring: asyncNoopResult({}),
   });

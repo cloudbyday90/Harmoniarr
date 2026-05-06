@@ -315,6 +315,15 @@ export function createMusicBrainzClient({
     });
   }
 
+  async function lookupArtistRelations({ artistId }) {
+    return requestJson(`artist/${artistId}`, {
+      operation: 'artist relations lookup',
+      query: {
+        inc: 'artist-rels',
+      },
+    });
+  }
+
   async function lookupRelease({ releaseId }) {
     return requestJson(`release/${releaseId}`, {
       operation: 'release lookup',
@@ -397,6 +406,7 @@ export function createMusicBrainzClient({
     browseArtistReleaseGroups,
     browseReleaseGroupReleases,
     lookupArtist,
+    lookupArtistRelations,
     lookupReleaseGroup,
     lookupRelease,
     searchArtists,

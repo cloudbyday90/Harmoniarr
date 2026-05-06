@@ -84,6 +84,32 @@ onMounted(() => {
         :artist="artist"
         :monitored="true"
       />
+
+      <!-- "Find more artists" tail card — always visible when artists exist -->
+      <RouterLink
+        :to="{ name: 'discover' }"
+        class="hx-media-card requester-home-discover-card"
+        aria-label="Find more artists"
+      >
+        <div class="hx-artwork hx-artwork--dashed requester-home-discover-art">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+          </svg>
+        </div>
+        <div class="hx-media-card-body">
+          <p class="hx-media-card-title">Find more artists</p>
+        </div>
+      </RouterLink>
     </section>
 
   </section>
@@ -110,5 +136,25 @@ onMounted(() => {
 /* Monitored cards are not interactive at the card level — cursor stays default */
 .requester-home-grid .hx-media-card {
   cursor: default;
+}
+
+/* The tail discover card is a RouterLink and should have pointer cursor */
+.requester-home-discover-card {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+.requester-home-discover-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hx-text-muted);
+}
+
+.requester-home-discover-art svg {
+  width: 40%;
+  height: 40%;
+  max-width: 64px;
 }
 </style>

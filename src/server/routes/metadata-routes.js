@@ -83,6 +83,7 @@ export function registerMetadataRoutes(app, {
   listMonitoredArtists,
   searchMusicBrainzArtists,
   searchMusicBrainzReleases,
+  getSimilarArtists,
 }) {
   function registerSessionGetJsonRoute(path, buildResponseBody) {
     app.get(path, metadataRoute(async (request, response) => {
@@ -184,6 +185,19 @@ export function registerMetadataRoutes(app, {
       detectionEvents: result.entries,
       pageInfo: result.pageInfo,
     };
+  });
+
+  // Note: :artistId here is a MusicBrainz artist MBID, not a local database ID.
+  // The route is keyed on MBID because both external sources (ListenBrainz and
+  // MusicBrainz) require an MBID. The 24-hour per-MBID cache makes this safe to
+  // call with any monitored or searched artist regardless of local import state.
+  registerSessionGetJsonRoute('/api/v1/metadata/artists/:artistId/similar', async (request) => {
+    const result = await getSimilarArtists({
+      artistMbid: request.params.artistId,
+      limit: request.query.limit != null ? Number(request.query.limit) : undefined,
+    });
+
+    return { similar: result.similar };
   });
 
   registerSessionGetJsonRoute('/api/v1/metadata/musicbrainz/artists/:artistId/local', async (request) => {

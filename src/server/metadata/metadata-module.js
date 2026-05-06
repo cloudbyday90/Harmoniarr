@@ -33,6 +33,7 @@ import { createMetadataSearchService } from './metadata-search-service.js';
 import { createMusicBrainzCatalogService } from './musicbrainz-catalog-service.js';
 import { createMusicBrainzImportService } from './musicbrainz-import-service.js';
 import { createMusicBrainzSearchService } from './musicbrainz-search-service.js';
+import { createSimilarArtistsService } from './similar-artists-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 
 export function createMetadataModule({
@@ -56,6 +57,7 @@ export function createMetadataModule({
   musicBrainzCatalogService = null,
   musicBrainzImportService = null,
   musicBrainzSearchService = null,
+  similarArtistsService = null,
 } = {}) {
   const resolvedMetadataMonitoringStore = metadataMonitoringStore ?? createMetadataMonitoringStore();
   const resolvedMetadataReleaseDetectionService = metadataReleaseDetectionService ?? createMetadataReleaseDetectionService();
@@ -111,6 +113,7 @@ export function createMetadataModule({
   const resolvedMusicBrainzCatalogService = musicBrainzCatalogService ?? createMusicBrainzCatalogService({ providerHealthRecorder });
   const resolvedMusicBrainzImportService = musicBrainzImportService ?? createMusicBrainzImportService({ providerHealthRecorder });
   const resolvedMusicBrainzSearchService = musicBrainzSearchService ?? createMusicBrainzSearchService({ providerHealthRecorder });
+  const resolvedSimilarArtistsService = similarArtistsService ?? createSimilarArtistsService();
 
   return {
     metadataArtistRefreshRunStore: resolvedMetadataArtistRefreshRunStore,
@@ -131,6 +134,7 @@ export function createMetadataModule({
     musicBrainzCatalogService: resolvedMusicBrainzCatalogService,
     musicBrainzImportService: resolvedMusicBrainzImportService,
     musicBrainzSearchService: resolvedMusicBrainzSearchService,
+    similarArtistsService: resolvedSimilarArtistsService,
     routeDependencies: {
       browseMusicBrainzArtistReleaseGroups: resolvedMusicBrainzCatalogService.browseArtistReleaseGroups,
       getMetadataArtistDetectionEvents: resolvedMetadataReadService.getArtistDetectionEvents,
@@ -152,6 +156,7 @@ export function createMetadataModule({
       listMonitoredArtists: resolvedMetadataSearchService.listMonitoredArtists,
       searchMusicBrainzArtists: resolvedMusicBrainzSearchService.searchArtists,
       searchMusicBrainzReleases: resolvedMusicBrainzSearchService.searchReleases,
+      getSimilarArtists: resolvedSimilarArtistsService.getSimilarArtists,
     },
   };
 }
