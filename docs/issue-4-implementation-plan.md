@@ -19,7 +19,9 @@
 
 **Step 1 — Not Started:** Navigation & shell — redesign `AppShell.vue` with two distinct nav configurations. Requester nav: Home, Discover, My Requests, Account. Operator nav: Home, Discover, Missing, Activity, Settings (Settings absorbs all operator sub-items). Remove the placeholder global search input from the topbar or wire it to real search.
 
-**Step 2 — Not Started:** Home page — artwork-first artist card grid. Monitored artists displayed as cards with cover art (local first, MusicBrainz CAA fallback). Click an artist card → expands or navigates to their missing releases. Cold-start state (no monitored artists) surfaces the Discover CTA prominently.
+**Step 2 — Not Started:** Requester home page — personal artwork-first artist card grid. Monitored artists displayed as cards with cover art (local first, MusicBrainz CAA fallback). Click an artist card → expands or navigates to their missing releases. Cold-start state (no monitored artists) redirects to Discover. This view is personal — it shows only the current user's monitored artists and their missing releases.
+
+**Step 26 — Not Started:** Operator dashboard — full media state view. `DashboardView.vue` renders a completely different layout for operators: all requests from all users (artwork cards with user attribution pill, filterable by user, by status, by date range), active downloads and processing queue (what is currently in flight), and a library summary panel (owned count, missing count, partial count). This is the triage and dispatch view — it answers "what is the current state of everything in the household," not "what artists do I love."
 
 **Step 3 — Not Started:** Taste-seeding wizard — new `DiscoverView.vue`. Open-ended graph flow: user types or picks a seed artist → related artists surface as cards (MusicBrainz relationships + Last.fm/ListenBrainz) → user picks from related → more related surfaces, narrowing toward their taste → user clicks "Done" to exit. Each pick = monitoring that artist. Re-enterable from "Discover" nav item at any time. First-run: auto-shown after onboarding completes if no artists are monitored.
 
@@ -295,9 +297,15 @@ ListenBrainz uses MusicBrainz IDs natively, requires no API key, and is maintain
 
 All operator-facing controls (library scan, reconciliation, discovery runs, artwork maintenance, import review, job queue, user management, recovery) live under `/app/settings` sub-routes. The top-level "Activity" nav item becomes an operator-only entry point for monitoring the system state — it is not hidden from operators, it is just no longer the default destination. Requesters never see it.
 
-### Decision 7: Requester Home Page = Their Monitored Artists
+### Decision 7: Two Distinct Home Pages, One Route
 
-The home page for a requester is their own monitored artist card grid. It answers: "what artists do I care about, and what am I still missing?" The operator home page adds a system-state summary below the card grid. The card grid is identical between roles — everyone sees the same music-first view.
+`DashboardView.vue` renders two completely different page layouts based on role:
+
+**Requester home page** answers: "what artists do I care about, and what am I still missing?" It is a personal artwork-first card grid of the current user's monitored artists. Cold-start state (no monitored artists) redirects to Discover.
+
+**Operator home page** answers: "what is the current state of everything in the household?" It is a full media state dashboard with three primary panels: all requests across all users (filterable by user, status, and date — each card shows who requested it), active downloads and the processing queue, and a library summary (owned / missing / partial counts). Operators also have access to additional filter controls not visible to requesters.
+
+**Discover is a standalone page for both roles.** It is not embedded in or launched from the home page. It lives at `/app/discover` and is always in the nav. It is the dedicated place to find new artists. The home page does not contain a discovery flow — it surfaces what you've already committed to.
 
 ---
 
@@ -323,14 +331,30 @@ const operatorNav = [
 
 Account link moves to the sidebar footer for both roles (as it is currently). Global search input in the topbar is either removed or wired to `SearchView.vue`.
 
-### 5.2 `DashboardView.vue` — Artwork-First Home Page
+### 5.2 `DashboardView.vue` — Role-Split Home Page
 
-Layout (top to bottom):
-1. **Monitored artist card grid** — `fetchMonitoredArtists()` or `searchLocalMetadataArtists({ monitored: true })`. Each card: `ArtworkImage` + artist name + missing-release count badge. Click → expands inline to show missing releases for that artist as release cards.
-2. **Cold-start state** (v-if no monitored artists) — full-width card with CTA: "Discover artists to monitor → [Start Discover]". Routes to `discover`.
+`DashboardView.vue` uses a top-level `v-if isOperator` to render one of two entirely distinct layouts. No partial overlap — they share only the route and the outer `AppShell`.
+
+**Requester layout** (top to bottom):
+1. **Monitored artist card grid** — `fetchMonitoredArtists()`. Each card: `ArtworkImage` + artist name + missing-release count badge. Click → navigates to `ArtistDetailView` or expands inline to show missing releases.
+2. **Cold-start state** (v-if no monitored artists) — redirects automatically to `/app/discover` on mount. Does not show a CTA inline; Discover is the dedicated place for this.
 3. **Onboarding panel** (v-if issues exist) — `OnboardingSummaryPanel`, below the card grid.
-4. **Stats row** (operator only, v-if operator role) — request counts, download status.
-5. **Active downloads strip** (operator only) — top 5 in-progress downloads.
+
+**Operator layout** (top to bottom):
+1. **Request queue** — all requests from all users as artwork cards. Each card: album art + release title + artist + requesting user pill + status pill (Pending, Downloading, Fulfilled, Failed) + date. Filterable by user (dropdown), by status (pill group), by date range. Sortable by date submitted (default) or by status.
+2. **Active downloads strip** — live list of in-flight Soulseek downloads with progress indicators. Polls `fetchSlskdDownloads()` at 10 s.
+3. **Library summary panel** — stat grid: Owned, Missing, Partial, Requested (total counts). Links to Library view, Missing view.
+4. **Onboarding panel** (v-if issues exist) — `OnboardingSummaryPanel`.
+
+### 5.22 Operator Dashboard Filter Controls
+
+The request queue on the operator dashboard is the primary place operators manage household requests. Filter controls:
+- **User filter**: dropdown listing all household users + "All users" (default). Selecting a user scopes the card grid to that user's requests only.
+- **Status filter**: pill group — All, Pending, Downloading, Fulfilled, Failed. Multi-select.
+- **Date range**: "Last 7 days / 30 days / All time" toggle.
+- **Sort**: Date submitted (newest first), Status (active first), User (A–Z).
+
+Filter state is not persisted — resets on navigate away. Operators also see the same `<GridControls>` filter/sort bar on the Missing and Library screens (Step 24) with operator-specific filter options (e.g., filter missing releases by requesting user).
 
 ### 5.3 `DiscoverView.vue` — New Screen
 
