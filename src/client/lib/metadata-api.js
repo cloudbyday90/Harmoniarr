@@ -73,6 +73,13 @@ export function searchMusicBrainzReleases({ artist, release, limit } = {}) {
   return apiRequest(`/api/v1/metadata/musicbrainz/releases/search${buildQueryString({ artist, release, limit })}`);
 }
 
+export function fetchSimilarArtists(artistId, { limit, signal } = {}) {
+  return apiRequest(
+    `/api/v1/metadata/artists/${encodeURIComponent(artistId)}/similar${buildQueryString({ limit })}`,
+    { signal },
+  );
+}
+
 export function browseMusicBrainzArtistReleaseGroups({ artistId, limit, offset, type, releaseGroupStatus, signal } = {}) {
   return apiRequest(
     `/api/v1/metadata/musicbrainz/artists/${encodeURIComponent(artistId)}/release-groups${buildQueryString({

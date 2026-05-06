@@ -77,7 +77,9 @@ function handleMonitor() {
 <template>
   <article class="hx-media-card" :data-variant="variant || undefined">
     <div class="hx-media-card__artwork">
-      <ArtworkImage :alt="artist.name" />
+      <slot name="artwork">
+        <ArtworkImage :alt="artist.name" />
+      </slot>
     </div>
     <div class="hx-media-card__body">
       <p class="hx-media-card__title">{{ artist.name }}</p>
