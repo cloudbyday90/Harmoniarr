@@ -361,6 +361,7 @@ export function createLibraryModule({
     routeDependencies: {
       buildLibraryDiscoveryRunDetail: libraryDiscoverySummaryService.buildLibraryDiscoveryRunDetail,
       buildLibraryDiscoverySummary: libraryDiscoverySummaryService.buildLibraryDiscoverySummary,
+      buildLibraryFilterOptions: libraryReleasesService.buildLibraryFilterOptions,
       buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
       buildLibraryReleases: libraryReleasesService.buildLibraryReleases,
       buildLibraryWantedReleases: libraryWantedSummaryService.buildLibraryWantedReleases,

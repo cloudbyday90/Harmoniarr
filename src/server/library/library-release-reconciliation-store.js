@@ -172,7 +172,25 @@ export function createLibraryReleaseReconciliationStore({
     }));
   }
 
+  /**
+   * Returns the distinct set of formats (codecs) and genres present in the
+   * library. Used by the GET /api/v1/library/filter-options endpoint.
+   *
+   * `codec_summary` is a future JSONB column (Q7.12) — this query degrades
+   * gracefully when the column doesn't exist by returning empty arrays.
+   * For now it returns a fixed empty structure that the UI handles correctly
+   * (filter panel simply shows no format/genre groups until the column lands).
+   *
+   * @returns {{ formats: string[], genres: string[] }}
+   */
+  async function getFilterOptions() {
+    // When codec_summary column exists this will aggregate across all rows.
+    // For v1 it returns empty lists — the UI renders no filter groups.
+    return { formats: [], genres: [] };
+  }
+
   return {
+    getFilterOptions,
     listLibraryReleasesWithMetadata,
     replaceLibraryReleaseReconciliations,
   };

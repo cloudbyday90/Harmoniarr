@@ -27,6 +27,7 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
 export function registerLibraryRoutes(app, {
   buildLibraryDiscoveryRunDetail,
   buildLibraryDiscoverySummary,
+  buildLibraryFilterOptions,
   buildLibraryOrganizePreview,
   buildLibraryReleases,
   buildLibraryWantedReleases,
@@ -123,6 +124,11 @@ export function registerLibraryRoutes(app, {
       limit: Number.parseInt(String(limit), 10) || 500,
       reconciliationStatus: validStatuses.includes(reconciliationStatus) ? reconciliationStatus : null,
     }));
+  }));
+
+  app.get('/api/v1/library/filter-options', asyncRoute(async (request, response) => {
+    await requireSession(request);
+    response.json(await buildLibraryFilterOptions());
   }));
 
   app.get('/api/v1/library/wanted-releases', asyncRoute(async (request, response) => {

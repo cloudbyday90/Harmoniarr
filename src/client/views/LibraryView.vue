@@ -17,9 +17,12 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
+import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
+import { useGridState } from '../composables/useGridState.js';
+import { useLibraryFilterOptions } from '../composables/useLibraryFilterOptions.js';
 import { useLibraryReleases } from '../composables/useLibraryReleases.js';
 import {
   formatLibraryTrackCounts,
@@ -28,47 +31,94 @@ import {
   normalizeLibraryReleaseForCard,
 } from '../lib/library-release-normalization.js';
 
-const library = useLibraryReleases();
+// ── Sort / filter definitions ─────────────────────────────────────────────────
 
-// ── Filter state ──────────────────────────────────────────────────────────────
+const SORT_OPTIONS = [
+  { value: 'artist', label: 'Artist' },
+  { value: 'title', label: 'Title' },
+  { value: 'date', label: 'Release date' },
+  { value: 'added', label: 'Date added' },
+];
 
-/** 'all' | 'complete' | 'partial' | 'duplicate' */
-const activeFilter = ref('all');
-
-const filterOptions = [
-  { value: 'all', label: 'All' },
+const STATUS_FILTER_OPTIONS = [
   { value: 'complete', label: 'In Library' },
   { value: 'partial', label: 'Partial' },
   { value: 'duplicate', label: 'Duplicate' },
 ];
 
-function applyFilter(value) {
-  if (activeFilter.value === value) return;
-  activeFilter.value = value;
-  library.loadReleases({ reconciliationStatus: value === 'all' ? null : value });
-}
+const FILTER_GROUP_KEYS = ['status'];
+
+const LIBRARY_DEFAULTS = {
+  sort: { field: 'artist', order: 'asc' },
+  filters: {},
+};
+
+// ── Grid state (URL-synced) ───────────────────────────────────────────────────
+
+const {
+  clearAll,
+  clearFilter,
+  filterState,
+  isDefault,
+  toggleSortOrder,
+  updateState,
+} = useGridState(LIBRARY_DEFAULTS, {
+  filterGroupKeys: FILTER_GROUP_KEYS,
+  restoreKey: 'library',
+  sortOptions: SORT_OPTIONS,
+  filterGroups: [{ key: 'status', label: 'Status', options: STATUS_FILTER_OPTIONS }],
+});
+
+// ── Dynamic filter options (60s background poll) ──────────────────────────────
+
+const { options: dynamicFilterOptions } = useLibraryFilterOptions();
+
+// Merge static status filter group with any dynamic format/genre groups from the server
+const filterGroups = computed(() => {
+  const groups = [{ key: 'status', label: 'Status', options: STATUS_FILTER_OPTIONS }];
+  if (dynamicFilterOptions.value?.formats?.length > 0) {
+    groups.push({
+      key: 'format',
+      label: 'Format',
+      options: dynamicFilterOptions.value.formats.map((f) => ({ value: f, label: f.toUpperCase() })),
+    });
+  }
+  return groups;
+});
+
+// ── Library releases (server-side, SWR) ──────────────────────────────────────
+
+const library = useLibraryReleases({ filterState });
 
 // ── Normalised releases for ReleaseCard ───────────────────────────────────────
 
-const normalizedReleases = computed(() =>
-  library.releases.value.map(normalizeLibraryReleaseForCard),
+const displayReleases = computed(() =>
+  (library.isLoading.value && !library.isFirstLoad.value
+    ? library.staleData.value
+    : library.data.value
+  ).map(normalizeLibraryReleaseForCard),
 );
 
-// ── Stats computed from full (all-filter) response ───────────────────────────
+// ── Stats (computed from current data) ────────────────────────────────────────
 
 const completeCount = computed(() => library.completeReleases.value.length);
 const partialCount = computed(() => library.partialReleases.value.length);
 const duplicateCount = computed(() => library.duplicateReleases.value.length);
+const totalCount = computed(() => library.totalCount.value);
 
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
+// ── GridControls v-model bridge ───────────────────────────────────────────────
 
-function refreshAll() {
-  library.loadReleases({ reconciliationStatus: activeFilter.value === 'all' ? null : activeFilter.value });
+const gridControlsValue = computed(() => filterState.value);
+
+function onGridControlsUpdate(newState) {
+  updateState(newState);
 }
 
-onMounted(() => {
-  library.loadReleases();
-});
+// ── Refresh ────────────────────────────────────────────────────────────────────
+
+function refreshAll() {
+  library.retry();
+}
 </script>
 
 <template>
@@ -85,14 +135,21 @@ onMounted(() => {
       </div>
     </header>
 
-    <article v-if="library.errorMessage.value" class="hx-card">
+    <!-- First-load error state -->
+    <article v-if="library.error.value && library.isFirstLoad.value" class="hx-card">
       <div class="hx-card-body">
-        <span class="hx-pill" data-tone="danger">{{ library.errorMessage.value }}</span>
+        <EmptyState
+          title="Could not load library"
+          :body="library.error.value.message"
+          cta-label="Retry"
+          @cta-click="refreshAll"
+          variant="default"
+        />
       </div>
     </article>
 
     <!-- Stats grid — skeleton while loading, populated after first load -->
-    <section class="hx-stat-grid" v-if="library.isLoading.value && !library.releases.value.length">
+    <section class="hx-stat-grid" v-if="library.isFirstLoad.value && library.isLoading.value">
       <article class="hx-stat-card" v-for="i in 4" :key="i">
         <span class="hx-skeleton" data-size="sm" style="width: 60%"></span>
         <span class="hx-skeleton" data-size="lg" style="width: 40%"></span>
@@ -100,10 +157,10 @@ onMounted(() => {
       </article>
     </section>
 
-    <section class="hx-stat-grid" v-else-if="library.totalCount.value > 0 || !library.isLoading.value">
+    <section class="hx-stat-grid" v-else-if="totalCount > 0 || !library.isLoading.value">
       <article class="hx-stat-card">
         <span class="hx-stat-label">Total releases</span>
-        <span class="hx-stat-value">{{ library.totalCount.value }}</span>
+        <span class="hx-stat-value">{{ totalCount }}</span>
         <span class="hx-stat-meta">In library or reconciled</span>
       </article>
       <article class="hx-stat-card">
@@ -123,70 +180,77 @@ onMounted(() => {
       </article>
     </section>
 
-    <!-- Card grid with filter -->
+    <!-- Card grid with GridControls -->
     <article class="hx-card">
       <header class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Releases</h2>
           <p class="hx-card-subtitle">
-            {{ library.totalCount.value }} release{{ library.totalCount.value === 1 ? '' : 's' }}
+            {{ totalCount }} release{{ totalCount === 1 ? '' : 's' }}
           </p>
-        </div>
-        <div class="hx-card-actions">
-          <div class="hx-filter-tabs" role="group" aria-label="Filter by reconciliation status">
-            <button
-              v-for="option in filterOptions"
-              :key="option.value"
-              type="button"
-              class="hx-filter-tab"
-              :class="{ 'is-active': activeFilter === option.value }"
-              :aria-pressed="activeFilter === option.value"
-              @click="applyFilter(option.value)"
-            >
-              {{ option.label }}
-            </button>
-          </div>
         </div>
       </header>
 
-      <div class="hx-card-body" v-if="library.isLoading.value && normalizedReleases.length === 0">
+      <!-- GridControls bar -->
+      <div class="hx-card-body library-controls-bar">
+        <GridControls
+          :model-value="gridControlsValue"
+          :sort-options="SORT_OPTIONS"
+          :filter-groups="filterGroups"
+          :is-default="isDefault"
+          :is-loading="library.isLoading.value && !library.isFirstLoad.value"
+          @update:model-value="onGridControlsUpdate"
+        />
+
+        <!-- Non-first-load error callout above stale data -->
+        <div
+          v-if="library.error.value && !library.isFirstLoad.value"
+          class="library-error-callout"
+          role="alert"
+        >
+          <span class="hx-pill" data-tone="danger">{{ library.error.value.message }}</span>
+          <button type="button" class="hx-btn hx-btn--sm" @click="refreshAll">Retry</button>
+        </div>
+      </div>
+
+      <!-- First load skeleton -->
+      <div class="hx-card-body" v-if="library.isFirstLoad.value && library.isLoading.value">
         <div class="hx-skeleton-stack">
           <span class="hx-skeleton" v-for="i in 6" :key="i"></span>
         </div>
       </div>
 
-      <div class="hx-card-body" v-else-if="normalizedReleases.length === 0 && !library.isLoading.value">
+      <!-- Empty state -->
+      <div
+        class="hx-card-body"
+        v-else-if="library.isEmpty.value && !library.isLoading.value"
+      >
         <EmptyState
-          v-if="activeFilter === 'all'"
+          v-if="isDefault"
           title="No library releases yet"
           body="Once you've run a library scan and reconciliation, your acquired releases will appear here."
           variant="default"
         />
         <EmptyState
-          v-else-if="activeFilter === 'complete'"
-          title="No fully acquired releases"
-          body="Releases become 'In Library' once all expected tracks are matched."
-          variant="default"
-        />
-        <EmptyState
-          v-else-if="activeFilter === 'partial'"
-          title="No partial releases"
-          body="Releases are partial when only some expected tracks are present."
-          variant="default"
-        />
-        <EmptyState
           v-else
-          title="No duplicate releases"
-          body="Duplicate releases are detected when multiple files match the same track."
+          title="No releases match these filters"
+          body="Try adjusting or clearing your filters."
+          cta-label="Clear filters"
+          @cta-click="clearAll"
           variant="default"
         />
       </div>
 
-      <div v-else class="hx-card-body hx-card-body--flush">
+      <!-- Release grid — stale at 60% opacity during subsequent loads -->
+      <div
+        v-else-if="displayReleases.length > 0"
+        class="hx-card-body hx-card-body--flush"
+        :class="{ 'library-grid--stale': library.isLoading.value && !library.isFirstLoad.value }"
+      >
         <div class="hx-artwork-grid">
           <ReleaseCard
-            v-for="(release, index) in normalizedReleases"
-            :key="library.releases.value[index]?.id ?? index"
+            v-for="(release, index) in displayReleases"
+            :key="library.data.value[index]?.id ?? library.staleData.value[index]?.id ?? index"
             :release="release"
             :requestable="false"
           >
@@ -216,37 +280,22 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.hx-filter-tabs {
+.library-controls-bar {
   display: flex;
-  gap: var(--hx-space-1);
-  background: var(--hx-bg-raised);
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius);
-  padding: 2px;
+  flex-direction: column;
+  gap: var(--hx-space-2);
 }
 
-.hx-filter-tab {
-  padding: var(--hx-space-1) var(--hx-space-3);
-  border: none;
-  border-radius: calc(var(--hx-radius) - 2px);
-  background: transparent;
-  color: var(--hx-text-secondary);
-  font-size: var(--hx-font-size-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-  white-space: nowrap;
+.library-error-callout {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  flex-wrap: wrap;
 }
 
-.hx-filter-tab:hover {
-  background: var(--hx-bg-hover);
-  color: var(--hx-text);
-}
-
-.hx-filter-tab.is-active {
-  background: var(--hx-bg-surface);
-  color: var(--hx-text);
-  box-shadow: var(--hx-shadow-xs);
+.library-grid--stale {
+  opacity: 0.6;
+  transition: opacity 0.15s;
 }
 
 .hx-library-card-actions {

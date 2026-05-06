@@ -72,16 +72,33 @@ export function fetchLibraryWantedReleases({ wantedStatus = null, limit = 500 } 
   return apiRequest(query ? `/api/v1/library/wanted-releases?${query}` : '/api/v1/library/wanted-releases');
 }
 
-export function fetchLibraryReleases({ reconciliationStatus = null, limit = 500 } = {}) {
+export function fetchLibraryReleases({
+  reconciliationStatus = null,
+  format = null,
+  sort = null,
+  order = null,
+  limit = 500,
+  signal = null,
+} = {}) {
   const params = new URLSearchParams();
   if (['complete', 'partial', 'duplicate'].includes(reconciliationStatus)) {
     params.set('status', reconciliationStatus);
   }
+  if (format) params.set('format', String(format));
+  if (sort) params.set('sort', String(sort));
+  if (order === 'asc' || order === 'desc') params.set('order', order);
   if (limit && limit !== 500) {
     params.set('limit', String(limit));
   }
   const query = params.toString();
-  return apiRequest(query ? `/api/v1/library/releases?${query}` : '/api/v1/library/releases');
+  return apiRequest(
+    query ? `/api/v1/library/releases?${query}` : '/api/v1/library/releases',
+    signal ? { signal } : {},
+  );
+}
+
+export function fetchLibraryFilterOptions() {
+  return apiRequest('/api/v1/library/filter-options');
 }
 
 export function fetchLibraryScanRunDetail(runId) {

@@ -59,7 +59,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryReconciliationSummaryStore = {};
   const libraryReleaseReconciliationService = { reconcileLibraryReleases };
   const libraryReleaseReconciliationStore = {};
-  const libraryReleasesService = { buildLibraryReleases };
+  const libraryReleasesService = { buildLibraryFilterOptions: async () => {}, buildLibraryReleases };
   const libraryScanRunStore = {};
   const libraryScanService = { startLibraryScan };
   const libraryScanSummaryService = { buildLibraryScanRunDetail, buildLibraryScanSummary };
@@ -165,6 +165,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.deepEqual(libraryModule.routeDependencies, {
     buildLibraryDiscoveryRunDetail,
     buildLibraryDiscoverySummary,
+    buildLibraryFilterOptions: libraryReleasesService.buildLibraryFilterOptions,
     buildLibraryOrganizePreview,
     buildLibraryReleases,
     buildLibraryWantedReleases,

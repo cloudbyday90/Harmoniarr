@@ -20,8 +20,10 @@
 import { computed, onMounted, ref } from 'vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import EmptyState from '../components/EmptyState.vue';
+import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import RequestButton from '../components/media/RequestButton.vue';
+import { useGridState } from '../composables/useGridState.js';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
@@ -49,24 +51,70 @@ const {
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
 
-// ── Filter state ──────────────────────────────────────────────────────────────
+// ── Sort / filter definitions ─────────────────────────────────────────────────
 
-/** 'all' | 'missing' | 'partial' */
-const activeFilter = ref('all');
+const SORT_OPTIONS = [
+  { value: 'artist', label: 'Artist' },
+  { value: 'title', label: 'Title' },
+  { value: 'date', label: 'Release date' },
+];
 
-const filterOptions = [
-  { value: 'all', label: 'All' },
+const STATUS_FILTER_OPTIONS = [
   { value: 'missing', label: 'Missing' },
   { value: 'partial', label: 'Partial' },
 ];
 
-function applyFilter(value) {
-  if (activeFilter.value === value) return;
-  activeFilter.value = value;
-  releases.loadWantedReleases({ wantedStatus: value === 'all' ? null : value });
-}
+const MISSING_DEFAULTS = {
+  sort: { field: 'artist', order: 'asc' },
+  filters: {},
+};
 
-// ── Confirm request modal ─────────────────────────────────────────────────────
+// ── Grid state (URL-synced) ───────────────────────────────────────────────────
+
+const {
+  clearAll,
+  filterState,
+  isDefault,
+  toggleSortOrder,
+  updateState,
+} = useGridState(MISSING_DEFAULTS, {
+  filterGroupKeys: ['status'],
+  sortOptions: SORT_OPTIONS,
+  filterGroups: [{ key: 'status', label: 'Status', options: STATUS_FILTER_OPTIONS }],
+});
+
+// ── Client-side filtered + sorted releases ────────────────────────────────────
+
+const filteredReleases = computed(() => {
+  const all = releases.wantedReleases.value;
+  const statusFilter = filterState.value?.filters?.status;
+  const filtered = statusFilter
+    ? all.filter((r) => r.wantedStatus === statusFilter)
+    : all;
+  const field = filterState.value?.sort?.field ?? 'artist';
+  const order = filterState.value?.sort?.order ?? 'asc';
+  const sorted = [...filtered].sort((a, b) => {
+    let av, bv;
+    if (field === 'title') {
+      av = (a.releaseGroupTitle ?? '').toLowerCase();
+      bv = (b.releaseGroupTitle ?? '').toLowerCase();
+    } else if (field === 'date') {
+      av = a.releaseDate ?? '';
+      bv = b.releaseDate ?? '';
+    } else {
+      av = (a.artistSortName ?? a.artistName ?? '').toLowerCase();
+      bv = (b.artistSortName ?? b.artistName ?? '').toLowerCase();
+    }
+    if (av < bv) return order === 'asc' ? -1 : 1;
+    if (av > bv) return order === 'asc' ? 1 : -1;
+    return 0;
+  });
+  return sorted;
+});
+
+const normalizedReleases = computed(() =>
+  filteredReleases.value.map(normalizeWantedReleaseForCard),
+);
 
 const confirmModalOpen = ref(false);
 const confirmRelease = ref(null);
@@ -109,9 +157,7 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
 
 // ── Normalised releases for ReleaseCard ───────────────────────────────────────
 
-const normalizedReleases = computed(() =>
-  releases.wantedReleases.value.map(normalizeWantedReleaseForCard),
-);
+// normalizedReleases is now defined above in the filter section
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -129,7 +175,7 @@ function shouldShowSummaryPill(status) {
 
 function refreshAll() {
   wanted.loadLibraryWantedSummary();
-  releases.loadWantedReleases({ wantedStatus: activeFilter.value === 'all' ? null : activeFilter.value });
+  releases.loadWantedReleases();
   reconciliation.loadLibraryReconciliationSummary();
 }
 
@@ -214,28 +260,25 @@ onMounted(() => {
       </div>
     </article>
 
-    <article class="hx-card" v-if="releases.wantedReleases.value.length > 0 || releases.isLoading.value">
+    <article class="hx-card" v-if="releases.wantedReleases.value.length > 0 || releases.isLoading.value || !isDefault">
       <header class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Wanted releases</h2>
           <p class="hx-card-subtitle">{{ releases.totalCount.value }} release{{ releases.totalCount.value === 1 ? '' : 's' }} pending acquisition</p>
         </div>
-        <div class="hx-card-actions">
-          <div class="hx-filter-tabs" role="group" aria-label="Filter by status">
-            <button
-              v-for="option in filterOptions"
-              :key="option.value"
-              type="button"
-              class="hx-filter-tab"
-              :class="{ 'is-active': activeFilter === option.value }"
-              :aria-pressed="activeFilter === option.value"
-              @click="applyFilter(option.value)"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
       </header>
+
+      <!-- GridControls -->
+      <div class="hx-card-body">
+        <GridControls
+          :model-value="filterState"
+          :sort-options="SORT_OPTIONS"
+          :filter-groups="[{ key: 'status', label: 'Status', options: STATUS_FILTER_OPTIONS }]"
+          :is-default="isDefault"
+          :is-loading="false"
+          @update:model-value="updateState"
+        />
+      </div>
 
       <div class="hx-card-body" v-if="releases.isLoading.value && normalizedReleases.length === 0">
         <div class="hx-skeleton-stack">
@@ -245,10 +288,17 @@ onMounted(() => {
 
       <div class="hx-card-body" v-else-if="normalizedReleases.length === 0 && !releases.isLoading.value">
         <EmptyState
-          title="No releases match this filter"
-          :body="activeFilter === 'missing'
-            ? 'No fully missing releases — all monitored releases have at least some tracks.'
-            : 'No partial releases — monitored releases are either fully missing or fully acquired.'"
+          v-if="isDefault"
+          title="No wanted releases"
+          body="Releases appear here when monitored releases are missing or only partially acquired."
+          variant="default"
+        />
+        <EmptyState
+          v-else
+          title="No releases match these filters"
+          body="Try adjusting or clearing your filters."
+          cta-label="Clear filters"
+          @cta-click="clearAll"
           variant="default"
         />
       </div>
@@ -257,7 +307,7 @@ onMounted(() => {
         <div class="hx-artwork-grid">
           <ReleaseCard
             v-for="(release, index) in normalizedReleases"
-            :key="releases.wantedReleases.value[index]?.id ?? index"
+            :key="filteredReleases[index]?.id ?? index"
             :release="release"
             :requested="isRequested(release)"
             :requesting="isRequesting(release)"
@@ -384,41 +434,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* ── Filter tab strip ─────────────────────────────────────────────────────── */
-.hx-filter-tabs {
-  display: flex;
-  gap: var(--hx-space-1);
-  background: var(--hx-bg-raised);
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius);
-  padding: 2px;
-}
-
-.hx-filter-tab {
-  padding: var(--hx-space-1) var(--hx-space-3);
-  font-size: var(--hx-text-sm);
-  font-weight: 500;
-  line-height: 1.4;
-  border: none;
-  border-radius: calc(var(--hx-radius) - 2px);
-  background: transparent;
-  color: var(--hx-text-muted);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-  white-space: nowrap;
-}
-
-.hx-filter-tab:hover {
-  background: var(--hx-bg-surface);
-  color: var(--hx-text-base);
-}
-
-.hx-filter-tab.is-active {
-  background: var(--hx-bg-surface);
-  color: var(--hx-text-base);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-}
-
 /* ── Wanted card action area ─────────────────────────────────────────────── */
 .hx-wanted-card-actions {
   display: flex;

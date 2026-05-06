@@ -160,6 +160,10 @@ function createLibraryRouteTestApp(overrides = {}) {
           status: 'pending',
         },
       }),
+      buildLibraryFilterOptions: async () => ({ formats: [], genres: [] }),
+      buildLibraryReleases: async () => ({ releases: [], total: 0 }),
+      buildLibraryWantedReleases: async () => ({ releases: [], total: 0 }),
+      limitLibraryOrganizeApplyRun: (_request, _response, next) => next(),
       ...overrides,
     });
   });
@@ -837,5 +841,36 @@ test('library scan start route forwards service errors to the api error handler'
         message: 'A library scan is already running or queued',
       },
     });
+  });
+});
+
+test('library filter-options route requires a session and returns the filter options payload', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-1', csrfToken: 'csrf-1', user: { role: 'requester' } }));
+  const buildLibraryFilterOptions = t.mock.fn(async () => ({ formats: ['FLAC', 'MP3'], genres: ['Rock'] }));
+
+  const app = createLibraryRouteTestApp({ buildLibraryFilterOptions, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/filter-options`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload, { formats: ['FLAC', 'MP3'], genres: ['Rock'] });
+    assert.equal(buildLibraryFilterOptions.mock.callCount(), 1);
+    assert.equal(requireSession.mock.callCount(), 1);
+  });
+});
+
+test('library filter-options route rejects unauthenticated requests', async (t) => {
+  const requireSession = t.mock.fn(async () => {
+    throw createApiError(401, 'session_required', 'Authentication required');
+  });
+
+  const app = createLibraryRouteTestApp({ requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/filter-options`);
+
+    assert.equal(response.status, 401);
   });
 });

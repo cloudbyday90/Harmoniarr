@@ -200,7 +200,7 @@ test('useLibraryReleases surfaces fetch errors in errorMessage', async () => {
   assert.equal(composable.totalCount.value, 0);
 });
 
-test('useLibraryReleases clears previous data on fetch error', async () => {
+test('useLibraryReleases preserves staleData on fetch error (SWR)', async () => {
   let callCount = 0;
   const composable = useLibraryReleases({
     fetchLibraryReleases: async () => {
@@ -214,7 +214,8 @@ test('useLibraryReleases clears previous data on fetch error', async () => {
   assert.equal(composable.releases.value.length, 1);
 
   await composable.loadReleases();
-  assert.deepEqual(composable.releases.value, []);
+  // SWR: staleData preserves last-good result; data/releases also preserves it
+  assert.equal(composable.staleData.value.length, 1, 'staleData should hold last-good data');
   assert.equal(composable.errorMessage.value, 'second call failed');
 });
 

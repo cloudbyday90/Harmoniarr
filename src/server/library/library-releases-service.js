@@ -35,7 +35,12 @@ export function createLibraryReleasesService({
     };
   }
 
+  async function buildLibraryFilterOptions() {
+    return libraryReleaseReconciliationStore.getFilterOptions();
+  }
+
   return {
+    buildLibraryFilterOptions,
     buildLibraryReleases,
   };
 }

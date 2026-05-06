@@ -21,12 +21,59 @@ import { computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import ArtistCard from '../media/ArtistCard.vue';
 import EmptyState from '../EmptyState.vue';
+import GridControls from '../GridControls.vue';
+import { useGridState } from '../../composables/useGridState.js';
 import { useMonitoredArtists } from '../../composables/useMonitoredArtists.js';
 import { buildArtistDetailLocation } from '../../lib/artist-detail-route.js';
 
 const { artists, errorMessage, isLoading, loadMonitoredArtists } = useMonitoredArtists({ limit: 25 });
 
 const hasArtists = computed(() => artists.value.length > 0);
+
+// ── Sort definitions ──────────────────────────────────────────────────────────
+
+const SORT_OPTIONS = [
+  { value: 'name', label: 'Name' },
+  { value: 'added', label: 'Recently added' },
+];
+
+const ARTIST_DEFAULTS = {
+  sort: { field: 'name', order: 'asc' },
+  filters: {},
+};
+
+// ── Grid state (URL-synced) ───────────────────────────────────────────────────
+
+const {
+  filterState,
+  isDefault,
+  toggleSortOrder,
+  updateState,
+} = useGridState(ARTIST_DEFAULTS, {
+  filterGroupKeys: [],
+  sortOptions: SORT_OPTIONS,
+  filterGroups: [],
+});
+
+// ── Client-side sorted artists ────────────────────────────────────────────────
+
+const sortedArtists = computed(() => {
+  const field = filterState.value?.sort?.field ?? 'name';
+  const order = filterState.value?.sort?.order ?? 'asc';
+  return [...artists.value].sort((a, b) => {
+    let av, bv;
+    if (field === 'added') {
+      av = a.addedAt ?? a.createdAt ?? '';
+      bv = b.addedAt ?? b.createdAt ?? '';
+    } else {
+      av = (a.sortName ?? a.name ?? '').toLowerCase();
+      bv = (b.sortName ?? b.name ?? '').toLowerCase();
+    }
+    if (av < bv) return order === 'asc' ? -1 : 1;
+    if (av > bv) return order === 'asc' ? 1 : -1;
+    return 0;
+  });
+});
 
 onMounted(() => {
   void loadMonitoredArtists();
@@ -74,13 +121,24 @@ onMounted(() => {
     />
 
     <!-- Monitored artists grid -->
-    <section
-      v-else
-      class="hx-artwork-grid requester-home-grid"
-      aria-label="Monitored artists"
-    >
-      <ArtistCard
-        v-for="artist in artists"
+    <template v-else>
+      <div class="requester-home-controls">
+        <GridControls
+          :model-value="filterState"
+          :sort-options="SORT_OPTIONS"
+          :filter-groups="[]"
+          :is-default="isDefault"
+          :is-loading="false"
+          @update:model-value="updateState"
+        />
+      </div>
+
+      <section
+        class="hx-artwork-grid requester-home-grid"
+        aria-label="Monitored artists"
+      >
+        <ArtistCard
+          v-for="artist in sortedArtists"
         :key="artist.id"
         :artist="artist"
         :monitored="true"
@@ -113,6 +171,7 @@ onMounted(() => {
         </div>
       </RouterLink>
     </section>
+    </template>
 
   </section>
 </template>
@@ -129,6 +188,10 @@ onMounted(() => {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
   padding: var(--hx-space-6) 0;
+}
+
+.requester-home-controls {
+  padding: 0;
 }
 
 .requester-home-grid {
