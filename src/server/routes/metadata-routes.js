@@ -80,6 +80,7 @@ export function registerMetadataRoutes(app, {
   searchLocalMetadataArtists,
   searchLocalMetadataReleaseGroups,
   searchLocalMetadataReleases,
+  listMonitoredArtists,
   searchMusicBrainzArtists,
   searchMusicBrainzReleases,
 }) {
@@ -127,6 +128,12 @@ export function registerMetadataRoutes(app, {
     provider: 'local',
     search: await searchLocalMetadataArtists({
       query: request.query.q,
+      limit: request.query.limit,
+    }),
+  }));
+
+  registerSessionGetJsonRoute('/api/v1/metadata/artists/monitored', async (request) => ({
+    ...await listMonitoredArtists({
       limit: request.query.limit,
     }),
   }));

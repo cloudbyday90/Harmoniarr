@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import {
+  listMonitoredMetadataArtists,
   searchMetadataArtists,
   searchMetadataReleaseGroups,
   searchMetadataReleases,
@@ -94,6 +95,7 @@ function mapRelease(row) {
 export function createMetadataSearchService({
   pool = getPool(),
   searchArtistsQuery = searchMetadataArtists,
+  listMonitoredArtistsQuery = listMonitoredMetadataArtists,
   searchReleaseGroupsQuery = searchMetadataReleaseGroups,
   searchReleasesQuery = searchMetadataReleases,
 } = {}) {
@@ -133,7 +135,27 @@ export function createMetadataSearchService({
     };
   }
 
+  async function listMonitoredArtists({ limit } = {}) {
+    const normalizedLimit = normalizeSearchLimit(limit, 25);
+    const results = await listMonitoredArtistsQuery({ limit: normalizedLimit }, pool);
+
+    return {
+      limit: normalizedLimit,
+      results: results.map((row) => ({
+        id: row.musicbrainz_artist_id ?? String(row.id),
+        localId: row.id,
+        name: row.name,
+        sortName: row.sort_name,
+        disambiguation: row.disambiguation,
+        country: row.country,
+        type: row.artist_type,
+        monitored: true,
+      })),
+    };
+  }
+
   return {
+    listMonitoredArtists,
     searchArtists,
     searchReleaseGroups,
     searchReleases,
