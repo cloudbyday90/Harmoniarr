@@ -149,6 +149,7 @@ export function createMetadataModule({
       searchLocalMetadataArtists: resolvedMetadataSearchService.searchArtists,
       searchLocalMetadataReleaseGroups: resolvedMetadataSearchService.searchReleaseGroups,
       searchLocalMetadataReleases: resolvedMetadataSearchService.searchReleases,
+      listMonitoredArtists: resolvedMetadataSearchService.listMonitoredArtists,
       searchMusicBrainzArtists: resolvedMusicBrainzSearchService.searchArtists,
       searchMusicBrainzReleases: resolvedMusicBrainzSearchService.searchReleases,
     },

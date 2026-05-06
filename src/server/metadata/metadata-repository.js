@@ -543,6 +543,31 @@ export async function searchMetadataArtists({ query, limit }, queryable) {
   return result.rows;
 }
 
+export async function listMonitoredMetadataArtists({ limit }, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      SELECT
+        metadata_artists.id,
+        metadata_artists.name,
+        metadata_artists.sort_name,
+        metadata_artists.disambiguation,
+        metadata_artists.country,
+        metadata_artists.artist_type,
+        metadata_artists.musicbrainz_artist_id
+      FROM metadata_artists
+      JOIN metadata_artist_monitoring
+        ON metadata_artist_monitoring.metadata_artist_id = metadata_artists.id
+      WHERE metadata_artist_monitoring.is_monitored = TRUE
+      ORDER BY metadata_artists.name ASC
+      LIMIT $1
+    `,
+    [limit],
+  );
+
+  return result.rows;
+}
+
 export async function searchMetadataReleaseGroups({ query, limit }, queryable) {
   const db = resolveQueryable(queryable);
   const searchPattern = `%${query}%`;
