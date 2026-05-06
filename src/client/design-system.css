@@ -1881,3 +1881,95 @@ body {
   flex-shrink: 0;
   margin-top: 0;
 }
+
+/* ---------- Artwork-first card / grid primitives ---------- */
+
+/*
+ * .hx-artwork-grid — responsive auto-fill grid for artwork cards.
+ * Minimum cell width is configurable via --hx-artwork-grid-min (default 160px).
+ */
+.hx-artwork-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--hx-artwork-grid-min, 160px), 1fr));
+  gap: var(--hx-space-4);
+}
+
+/*
+ * .hx-media-card — clickable artwork-first card used for artists, releases, etc.
+ * Structure:
+ *   .hx-media-card
+ *     .hx-media-card__artwork   (contains ArtworkImage or equivalent)
+ *     .hx-media-card__body
+ *       .hx-media-card__title
+ *       .hx-media-card__meta
+ */
+.hx-media-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  background: var(--hx-bg-surface);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--hx-shadow-sm);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 150ms ease, border-color 150ms ease;
+}
+
+.hx-media-card:hover,
+.hx-media-card:focus-visible {
+  box-shadow: var(--hx-shadow-md);
+  border-color: var(--hx-border);
+  outline: none;
+}
+
+.hx-media-card__artwork {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--hx-bg-surface-sunken);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.hx-media-card__body {
+  padding: var(--hx-space-3) var(--hx-space-3) var(--hx-space-3);
+  display: grid;
+  gap: 4px;
+}
+
+.hx-media-card__title {
+  margin: 0;
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  color: var(--hx-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hx-media-card__meta {
+  margin: 0;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hx-media-card__actions {
+  padding: 0 var(--hx-space-3) var(--hx-space-3);
+  display: flex;
+  gap: var(--hx-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ---------- Toast stack (global, scoped overrides in ToastStack.vue) ---------- */
+
+/*
+ * Global z-index reservation for the toast region. The component uses
+ * z-index: 200 in scoped styles; this comment block documents the intent.
+ * No global rules needed — all toast styles live in ToastStack.vue.
+ */

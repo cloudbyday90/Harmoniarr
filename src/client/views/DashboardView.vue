@@ -141,7 +141,7 @@ const hasWanted = computed(() => wantedReleases.wantedReleases.value.length > 0)
 // ── Downloads ─────────────────────────────────────────────────────────────────
 const {
   data: downloadGroups,
-  isLoading: isLoadingDownloads,
+  isLoading: _isLoadingDownloads,
   load: loadDownloads,
 } = useAsyncResource({
   fetcher: () => fetchSlskdDownloads({ includeRemoved: false }),
