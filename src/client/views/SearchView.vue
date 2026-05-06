@@ -179,10 +179,18 @@ const totalFiles = computed(() => {
 });
 
 const sortedResponses = computed(() => {
-  return [...responses.value].sort((a, b) => {
-    const speedDelta = (b.uploadSpeed ?? 0) - (a.uploadSpeed ?? 0);
-    if (speedDelta !== 0) return speedDelta;
-    return (a.queueLength ?? 0) - (b.queueLength ?? 0);
+  const minFiles = Number(minimumFileCount.value) || 1;
+  return [...responses.value]
+    .filter((r) => {
+      const count = typeof r.fileCount === 'number'
+        ? r.fileCount
+        : (Array.isArray(r.files) ? r.files.length : 0);
+      return count >= minFiles;
+    })
+    .sort((a, b) => {
+      const speedDelta = (b.uploadSpeed ?? 0) - (a.uploadSpeed ?? 0);
+      if (speedDelta !== 0) return speedDelta;
+      return (a.queueLength ?? 0) - (b.queueLength ?? 0);
   });
 });
 
@@ -277,14 +285,13 @@ onBeforeUnmount(() => clearPollTimer());
       </div>
     </header>
 
-    <!-- Mode tabs -->
-    <div class="hx-tabbar search-tabs" role="tablist" aria-label="Search mode">
+    <!-- Mode switcher — plain toggle buttons; no ARIA tab pattern needed -->
+    <div class="hx-tabbar search-tabs">
       <button
         type="button"
         class="hx-tab"
         :class="{ 'is-active': searchMode === 'music' }"
-        role="tab"
-        :aria-selected="searchMode === 'music'"
+        :aria-pressed="searchMode === 'music'"
         @click="searchMode = 'music'"
       >
         Music
@@ -293,8 +300,7 @@ onBeforeUnmount(() => clearPollTimer());
         type="button"
         class="hx-tab"
         :class="{ 'is-active': searchMode === 'network' }"
-        role="tab"
-        :aria-selected="searchMode === 'network'"
+        :aria-pressed="searchMode === 'network'"
         @click="searchMode = 'network'"
       >
         Network

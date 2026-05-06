@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
 import { getReleaseArtistName, getReleaseTitle, getReleaseYear } from '../../lib/release-normalization.js';
 
@@ -68,6 +68,14 @@ const emit = defineEmits(['confirm', 'close']);
 const dialogRef = ref(null);
 
 // Sync the native dialog open state with the `open` prop.
+// onMounted handles the case where `open` is already true before the ref is
+// ready (the watcher's immediate run exits early when dialogRef is null).
+onMounted(() => {
+  if (props.open && dialogRef.value && !dialogRef.value.open) {
+    dialogRef.value.showModal();
+  }
+});
+
 watch(
   () => props.open,
   (isOpen) => {

@@ -67,7 +67,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['request', 'open']);
+const emit = defineEmits(['request']);
 
 /** Whether the release can actually be requested (has required fields). */
 const isRequestable = computed(() => {
@@ -131,8 +131,8 @@ function handleRequest() {
           :disabled="disabled"
           :unavailable="!isRequestable"
           :aria-label="requested
-            ? `${releaseTitle} — already requested`
-            : `Request ${releaseTitle}`"
+            ? `${releaseTitle ?? 'This release'} — already requested`
+            : `Request ${releaseTitle ?? 'this release'}`"
           @request="handleRequest"
         />
       </slot>
