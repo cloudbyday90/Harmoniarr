@@ -19,7 +19,7 @@
 
 **Step 1 — Not Started:** Navigation & shell — redesign `AppShell.vue` with two distinct nav configurations. Requester nav: Home, Discover, My Requests, Account. Operator nav: Home, Discover, Missing, Activity, Settings (Settings absorbs all operator sub-items). Remove the placeholder global search input from the topbar or wire it to real search.
 
-**Step 2 — Not Started:** Requester home page — personal artwork-first artist card grid. Monitored artists displayed as cards with cover art (local first, MusicBrainz CAA fallback). Click an artist card → expands or navigates to their missing releases. Cold-start state (no monitored artists) redirects to Discover. This view is personal — it shows only the current user's monitored artists and their missing releases.
+**Step 2 — Not Started:** Requester home page — personal artwork-first artist card grid. Monitored artists displayed as cards with cover art (local first, MusicBrainz CAA fallback). Click an artist card → expands or navigates to their missing releases. A persistent "Find more artists →" card is appended as the last item in the artist grid at all times, linking to Discover. Cold-start state (no monitored artists) redirects directly to Discover on mount. This view is personal — it shows only the current user's monitored artists and their missing releases.
 
 **Step 26 — Not Started:** Operator dashboard — full media state view. `DashboardView.vue` renders a completely different layout for operators: all requests from all users (artwork cards with user attribution pill, filterable by user, by status, by date range), active downloads and processing queue (what is currently in flight), and a library summary panel (owned count, missing count, partial count). This is the triage and dispatch view — it answers "what is the current state of everything in the household," not "what artists do I love."
 
@@ -336,8 +336,8 @@ Account link moves to the sidebar footer for both roles (as it is currently). Gl
 `DashboardView.vue` uses a top-level `v-if isOperator` to render one of two entirely distinct layouts. No partial overlap — they share only the route and the outer `AppShell`.
 
 **Requester layout** (top to bottom):
-1. **Monitored artist card grid** — `fetchMonitoredArtists()`. Each card: `ArtworkImage` + artist name + missing-release count badge. Click → navigates to `ArtistDetailView` or expands inline to show missing releases.
-2. **Cold-start state** (v-if no monitored artists) — redirects automatically to `/app/discover` on mount. Does not show a CTA inline; Discover is the dedicated place for this.
+1. **Monitored artist card grid** — `fetchMonitoredArtists()`. Each card: `ArtworkImage` + artist name + missing-release count badge. Click → navigates to `ArtistDetailView` or expands inline to show missing releases. The final slot in the grid is always a **"Find more artists" card** — same dimensions as an artist card, dashed border, compass/discover icon, label "Find more artists", routes to `/app/discover`. Visible at all times, not conditional on library size. This gives the home page a persistent, in-context entry point to Discover without relying on the user noticing the nav link.
+2. **Cold-start state** (v-if no monitored artists) — redirects automatically to `/app/discover` on mount. The grid is empty so the "Find more artists" card would be the only item; redirecting immediately is cleaner than showing a single orphaned card.
 3. **Onboarding panel** (v-if issues exist) — `OnboardingSummaryPanel`, below the card grid.
 
 **Operator layout** (top to bottom):
