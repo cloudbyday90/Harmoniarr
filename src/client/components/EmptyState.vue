@@ -35,7 +35,7 @@ defineProps({
   },
   /**
    * When provided, the CTA renders as a `<RouterLink>` pointing to this route
-   * name. When omitted, the default slot is used for custom CTA content.
+   * name. When omitted, the `cta` slot is used for custom CTA content.
    */
   ctaTo: {
     type: [String, Object],
@@ -75,7 +75,7 @@ defineProps({
         class="hx-btn"
         data-variant="primary"
       >
-        {{ ctaLabel }}
+        {{ ctaLabel || 'Get started' }}
       </RouterLink>
       <slot v-else name="cta" />
     </div>

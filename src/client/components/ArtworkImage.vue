@@ -56,29 +56,42 @@ const mbidSrc = computed(() => {
 // State machine: 'loading' | 'loaded' | 'error'
 const state = ref('loading');
 
-// The URL we are currently trying to display.
-const activeSrc = computed(() => props.localSrc || mbidSrc.value || null);
+// Track which source we are currently attempting: 'local' | 'mbid' | null
+const attemptingLocal = ref(true);
 
-// Reset state whenever the effective source changes.
-watch(activeSrc, () => {
-  state.value = activeSrc.value ? 'loading' : 'error';
-}, { immediate: true });
+// The URL currently being displayed — local first, MBID as fallback.
+const activeSrc = computed(() => {
+  if (attemptingLocal.value && props.localSrc) return props.localSrc;
+  return mbidSrc.value || null;
+});
+
+// Reset to local-first whenever the inputs change.
+watch(
+  [() => props.localSrc, mbidSrc],
+  () => {
+    attemptingLocal.value = true;
+    state.value = activeSrc.value ? 'loading' : 'error';
+  },
+  { immediate: true },
+);
 
 function onLoad() {
   state.value = 'loaded';
 }
 
 function onError() {
-  // If local src failed and there is an MBID fallback, the browser will try the
-  // mbidSrc next tick because activeSrc prefers localSrc. Since we're using a
-  // single <img> we only need to track the error state here; the template
-  // conditionally renders the correct src.
+  // If localSrc just failed and an MBID fallback exists, switch to it.
+  if (attemptingLocal.value && props.localSrc && mbidSrc.value) {
+    attemptingLocal.value = false;
+    state.value = 'loading';
+    return;
+  }
   state.value = 'error';
 }
 </script>
 
 <template>
-  <div class="hx-artwork" :data-state="state" aria-hidden="true">
+  <div class="hx-artwork" :data-state="state" :aria-hidden="!alt || undefined">
     <img
       v-if="activeSrc && state !== 'error'"
       :src="activeSrc"

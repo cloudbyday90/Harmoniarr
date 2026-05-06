@@ -43,8 +43,8 @@ import EmptyState from '../components/EmptyState.vue';
       </template>
 
       <template #cta>
-        <RouterLink :to="{ name: 'search' }" class="hx-btn" data-variant="primary">
-          Search for an artist
+        <RouterLink :to="{ name: 'request-music' }" class="hx-btn" data-variant="primary">
+          Find an artist
         </RouterLink>
       </template>
     </EmptyState>
