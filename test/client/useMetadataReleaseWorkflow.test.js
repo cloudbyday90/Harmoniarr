@@ -2,17 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ref } from 'vue';
 import { useMetadataReleaseWorkflow } from '../../src/client/composables/useMetadataReleaseWorkflow.js';
-
-/**
- * Polyfill for withResolvers() (available in Node 22+).
- * Returns { promise, resolve, reject } so callers can manually settle the
- * promise, useful for controlling async timing in tests.
- */
-function withResolvers() {
-  let resolve, reject;
-  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-  return { promise, resolve, reject };
-}
+import { withResolvers } from '../../testing/client/promise-helpers.js';
 
 test('useMetadataReleaseWorkflow loads release-group workspace from injected shared services', async (t) => {
   const resolveReleaseGroupLocal = t.mock.fn(async (releaseGroupId) => ({

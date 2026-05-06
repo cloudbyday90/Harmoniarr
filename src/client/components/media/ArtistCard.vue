@@ -17,6 +17,7 @@
 -->
 
 <script setup>
+import { computed } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
 import MonitorButton from './MonitorButton.vue';
 
@@ -59,14 +60,14 @@ const props = defineProps({
 
 const emit = defineEmits(['monitor']);
 
-/** Build a readable metadata line from available artist fields. */
-function artistMeta(artist) {
+/** Readable metadata line built from available artist fields. Computed once per render. */
+const meta = computed(() => {
   const parts = [];
-  if (artist.type) parts.push(artist.type);
-  if (artist.country) parts.push(artist.country);
-  if (artist.disambiguation) parts.push(artist.disambiguation);
+  if (props.artist.type) parts.push(props.artist.type);
+  if (props.artist.country) parts.push(props.artist.country);
+  if (props.artist.disambiguation) parts.push(props.artist.disambiguation);
   return parts.join(' · ');
-}
+});
 
 function handleMonitor() {
   emit('monitor', props.artist);
@@ -80,7 +81,7 @@ function handleMonitor() {
     </div>
     <div class="hx-media-card__body">
       <p class="hx-media-card__title">{{ artist.name }}</p>
-      <p v-if="artistMeta(artist)" class="hx-media-card__meta">{{ artistMeta(artist) }}</p>
+      <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
     </div>
     <div class="hx-media-card__actions">
       <slot name="actions">

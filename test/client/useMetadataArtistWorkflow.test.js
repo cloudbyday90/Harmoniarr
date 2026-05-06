@@ -1,17 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { useMetadataArtistWorkflow } from '../../src/client/composables/useMetadataArtistWorkflow.js';
-
-/**
- * Polyfill for withResolvers() (available in Node 22+).
- * Returns { promise, resolve, reject } so callers can manually settle the
- * promise, useful for controlling async timing in tests.
- */
-function withResolvers() {
-  let resolve, reject;
-  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-  return { promise, resolve, reject };
-}
+import { withResolvers } from '../../testing/client/promise-helpers.js';
 
 function createReleaseWorkflowDouble(t) {
   return {

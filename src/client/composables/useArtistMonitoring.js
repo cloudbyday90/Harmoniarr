@@ -33,8 +33,9 @@ import { useToast } from './useToast.js';
  * the import/monitor API sequence or toast feedback.
  *
  * @param {object} [options]
- * @param {string[]} [options.initialMonitoredIds] - Artist IDs to treat as
- *   already monitored at construction time.
+ * @param {string[]} [options.initialMonitoredIds] - MusicBrainz artist IDs to
+ *   treat as already monitored at construction time. Must be MusicBrainz IDs
+ *   (not local metadata artist IDs), matching the IDs used by `monitorArtist`.
  * @param {boolean} [options.showToasts] - When true (default), success/error
  *   toasts are shown automatically.
  * @param {function} [options.importArtist] - Override for testing.
