@@ -111,14 +111,15 @@ export function useDiscoverSearch({
 
     try {
       // Import/upsert the MusicBrainz artist into the local database first.
+      // The route responds with { ok, imported: { artistId, source } }.
       const importResult = await importArtist(id);
+      const localArtistId = importResult?.imported?.artistId ?? null;
 
-      // The import returns the local artist object; use its id for monitoring.
-      const localArtistId = importResult?.artist?.id ?? null;
-
-      if (localArtistId) {
-        await updateMonitoring(localArtistId, { monitored: true });
+      if (!localArtistId) {
+        throw new Error(`Could not resolve local ID for ${name} after import.`);
       }
+
+      await updateMonitoring(localArtistId, { monitored: true });
 
       artistStates.value = { ...artistStates.value, [id]: 'monitored' };
       toast.success(`Monitoring ${name}.`);

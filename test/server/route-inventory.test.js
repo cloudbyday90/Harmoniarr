@@ -123,6 +123,7 @@ function collectRegisteredRoutes() {
     importMusicBrainzReleaseGroup: asyncNoopResult({ artist: {}, releaseGroup: {}, source: 'musicbrainz' }),
     requireCsrf: () => {},
     requireFreshAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
+    requireFreshSession: asyncNoopResult({ appUserId: 'user-1' }),
     requireSession: asyncNoopResult({ appUserId: 'user-1' }),
     searchLocalMetadataArtists: asyncNoopResult({}),
     searchLocalMetadataReleaseGroups: asyncNoopResult({}),
