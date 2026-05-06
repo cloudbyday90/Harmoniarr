@@ -103,6 +103,89 @@
   --hx-sidebar-width-collapsed: 64px;
 }
 
+/* ---------- Dark theme tokens ----------
+ * Applied when data-theme="dark" is set on <html>, or automatically via
+ * prefers-color-scheme when no explicit override is in place.
+ * The sidebar / topbar tokens are shared across themes — they are always
+ * dark-chrome — so they are defined once in :root above.
+ */
+
+/* System-preference dark: only activates when no explicit data-theme
+   attribute is set, so user overrides via the toggle always win. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    /* Surface palette — dark content area */
+    --hx-bg-canvas: #0d1117;
+    --hx-bg-surface: #161b22;
+    --hx-bg-surface-muted: #1c2128;
+    --hx-bg-surface-sunken: #10151b;
+    --hx-bg-overlay: rgba(0, 0, 0, 0.65);
+
+    /* Text — light on dark backgrounds */
+    --hx-text-strong: #e6edf3;
+    --hx-text: #c9d1d9;
+    --hx-text-muted: #8b949e;
+    --hx-text-faint: #6e7681;
+
+    /* Border — light-alpha on dark backgrounds */
+    --hx-border-subtle: rgba(240, 246, 252, 0.06);
+    --hx-border: rgba(240, 246, 252, 0.12);
+    --hx-border-strong: rgba(240, 246, 252, 0.20);
+
+    /* Shadows — stronger on dark surfaces for depth */
+    --hx-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.30);
+    --hx-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.40);
+    --hx-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Explicit dark override — set when user selects "Dark" in appearance
+   settings, regardless of system preference. */
+[data-theme="dark"] {
+  /* Surface palette */
+  --hx-bg-canvas: #0d1117;
+  --hx-bg-surface: #161b22;
+  --hx-bg-surface-muted: #1c2128;
+  --hx-bg-surface-sunken: #10151b;
+  --hx-bg-overlay: rgba(0, 0, 0, 0.65);
+
+  /* Text */
+  --hx-text-strong: #e6edf3;
+  --hx-text: #c9d1d9;
+  --hx-text-muted: #8b949e;
+  --hx-text-faint: #6e7681;
+
+  /* Border */
+  --hx-border-subtle: rgba(240, 246, 252, 0.06);
+  --hx-border: rgba(240, 246, 252, 0.12);
+  --hx-border-strong: rgba(240, 246, 252, 0.20);
+
+  /* Shadows */
+  --hx-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.30);
+  --hx-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.40);
+  --hx-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* Explicit light override — set when user selects "Light" in appearance
+   settings; restores :root defaults on a system that prefers dark. */
+[data-theme="light"] {
+  --hx-bg-canvas: #f4f6f8;
+  --hx-bg-surface: #ffffff;
+  --hx-bg-surface-muted: #eef1f4;
+  --hx-bg-surface-sunken: #e6ebef;
+  --hx-bg-overlay: rgba(15, 24, 32, 0.55);
+  --hx-text-strong: #0f1c24;
+  --hx-text: #1f2d35;
+  --hx-text-muted: #5a6b76;
+  --hx-text-faint: #8696a1;
+  --hx-border-subtle: rgba(15, 28, 36, 0.08);
+  --hx-border: rgba(15, 28, 36, 0.14);
+  --hx-border-strong: rgba(15, 28, 36, 0.22);
+  --hx-shadow-sm: 0 1px 2px rgba(15, 28, 36, 0.06);
+  --hx-shadow-md: 0 4px 14px rgba(15, 28, 36, 0.08);
+  --hx-shadow-lg: 0 16px 36px rgba(15, 28, 36, 0.14);
+}
+
 /* ---------- App canvas overrides ---------- */
 
 html,
@@ -1973,3 +2056,42 @@ body {
  * z-index: 200 in scoped styles; this comment block documents the intent.
  * No global rules needed — all toast styles live in ToastStack.vue.
  */
+
+/* ---------- Appearance theme toggle ---------- */
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  overflow: hidden;
+  margin-top: var(--hx-space-3);
+}
+
+.theme-toggle-btn {
+  background: transparent;
+  color: var(--hx-text-muted);
+  border: 0;
+  border-right: 1px solid var(--hx-border);
+  border-radius: 0;
+  padding: 6px 16px;
+  font-size: var(--hx-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.theme-toggle-btn:last-child {
+  border-right: 0;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--hx-bg-surface-muted);
+  color: var(--hx-text);
+}
+
+.theme-toggle-btn.is-active {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent-strong);
+  font-weight: 600;
+}

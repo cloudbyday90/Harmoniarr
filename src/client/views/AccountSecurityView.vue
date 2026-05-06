@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, reactive } from 'vue';
+import { computed, inject, onMounted, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { buildAuditActivityLinkTarget } from '../lib/audit-activity-links.js';
 import { useAccountSecurity } from '../composables/useAccountSecurity.js';
@@ -25,6 +25,13 @@ import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 const router = useRouter();
+
+const themeContext = inject('theme', null);
+const themePref = computed(() => themeContext?.preference?.value ?? 'system');
+function setTheme(value) {
+  themeContext?.setTheme(value);
+}
+
 const form = reactive({
   confirmPassword: '',
   currentPassword: '',
@@ -119,6 +126,39 @@ function formatUserAgent(ua) {
       <p class="warning-copy" v-if="sessionStore.state.user?.mustChangePassword">
         This account is blocked from fresh-admin actions until the password is changed.
       </p>
+    </article>
+
+    <article class="panel-light">
+      <h3>Appearance</h3>
+      <p class="metadata-card-copy">
+        Choose how Harmoniarr looks. "System" follows your operating system's dark/light preference.
+      </p>
+      <div class="theme-toggle" role="group" aria-label="Theme preference">
+        <button
+          type="button"
+          :class="['theme-toggle-btn', { 'is-active': themePref === 'system' }]"
+          @click="setTheme('system')"
+          :aria-pressed="themePref === 'system'"
+        >
+          System
+        </button>
+        <button
+          type="button"
+          :class="['theme-toggle-btn', { 'is-active': themePref === 'light' }]"
+          @click="setTheme('light')"
+          :aria-pressed="themePref === 'light'"
+        >
+          Light
+        </button>
+        <button
+          type="button"
+          :class="['theme-toggle-btn', { 'is-active': themePref === 'dark' }]"
+          @click="setTheme('dark')"
+          :aria-pressed="themePref === 'dark'"
+        >
+          Dark
+        </button>
+      </div>
     </article>
 
     <article class="panel-light">

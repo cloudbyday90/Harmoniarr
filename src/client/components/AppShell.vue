@@ -17,16 +17,26 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import harmoniarrIcon from '../assets/harmoniarr-icon.svg';
 import { sessionStore } from '../state/session.js';
 import { useShellHeartbeat } from '../composables/useShellHeartbeat.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 import { fetchSystemOperatorNotifications } from '../lib/system-api.js';
+import { useTheme } from '../composables/useTheme.js';
 import ToastStack from './ToastStack.vue';
 
 const router = useRouter();
+
+// Theme — applied immediately (composable calls applyToDocument in constructor)
+// and kept reactive. Provided as injection so child views can read/set preference.
+const { preference: themePref, resolvedTheme, setPreference: setTheme } = useTheme();
+provide('theme', { preference: themePref, resolvedTheme, setTheme });
+watch(resolvedTheme, (t) => {
+  document.documentElement.setAttribute('data-theme', t);
+});
+
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
 const userInitial = computed(() => {
   const name = sessionStore.state.user?.username ?? '?';

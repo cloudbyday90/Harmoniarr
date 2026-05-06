@@ -67,7 +67,7 @@
 
 **Step 24 — Not Started:** Filter and sort controls on card grids — a `<GridControls>` component reused on the home page, Missing screen, Library view, and My Requests. Sort options: name (A–Z), missing count, date monitored, release date. Filter options: type (Albums, EPs, Singles), format (FLAC only, any), monitored status. State persisted to `localStorage` per view.
 
-**Step 25 — Not Started:** System-aware dark/light theme — the design system already uses CSS custom properties. Add a light theme variable set (`[data-theme="light"]`). Default to `prefers-color-scheme`. Add a manual override toggle in Settings → Account (stored in `user_preferences` JSONB). No third-party theme library needed.
+**Step 25 — Complete:** System-aware dark/light theme — the design system already uses CSS custom properties. Add a light theme variable set (`[data-theme="light"]`). Default to `prefers-color-scheme`. Add a manual override toggle in Settings → Account (stored in `user_preferences` JSONB). No third-party theme library needed.
 
 ---
 
