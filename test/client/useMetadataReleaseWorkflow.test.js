@@ -3,6 +3,17 @@ import test from 'node:test';
 import { ref } from 'vue';
 import { useMetadataReleaseWorkflow } from '../../src/client/composables/useMetadataReleaseWorkflow.js';
 
+/**
+ * Polyfill for withResolvers() (available in Node 22+).
+ * Returns { promise, resolve, reject } so callers can manually settle the
+ * promise, useful for controlling async timing in tests.
+ */
+function withResolvers() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
 test('useMetadataReleaseWorkflow loads release-group workspace from injected shared services', async (t) => {
   const resolveReleaseGroupLocal = t.mock.fn(async (releaseGroupId) => ({
     releaseGroup: {
@@ -143,10 +154,10 @@ test('useMetadataReleaseWorkflow surfaces import failures through the shared err
 });
 
 test('useMetadataReleaseWorkflow ignores stale release-group workspace responses when a newer selection starts', async () => {
-  const firstLocalReleaseGroup = Promise.withResolvers();
-  const secondLocalReleaseGroup = Promise.withResolvers();
-  const firstProviderReleases = Promise.withResolvers();
-  const secondProviderReleases = Promise.withResolvers();
+  const firstLocalReleaseGroup = withResolvers();
+  const secondLocalReleaseGroup = withResolvers();
+  const firstProviderReleases = withResolvers();
+  const secondProviderReleases = withResolvers();
 
   const resolveReleaseGroupLocal = (releaseGroupId) => (
     releaseGroupId === 'mb-rg-1' ? firstLocalReleaseGroup.promise : secondLocalReleaseGroup.promise
@@ -200,10 +211,10 @@ test('useMetadataReleaseWorkflow ignores stale release-group workspace responses
 });
 
 test('useMetadataReleaseWorkflow aborts superseded release-group reads', async () => {
-  const firstLocalReleaseGroup = Promise.withResolvers();
-  const secondLocalReleaseGroup = Promise.withResolvers();
-  const firstProviderReleases = Promise.withResolvers();
-  const secondProviderReleases = Promise.withResolvers();
+  const firstLocalReleaseGroup = withResolvers();
+  const secondLocalReleaseGroup = withResolvers();
+  const firstProviderReleases = withResolvers();
+  const secondProviderReleases = withResolvers();
   const localSignals = [];
   const providerSignals = [];
 

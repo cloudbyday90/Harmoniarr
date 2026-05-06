@@ -2,6 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { useMetadataArtistWorkflow } from '../../src/client/composables/useMetadataArtistWorkflow.js';
 
+/**
+ * Polyfill for withResolvers() (available in Node 22+).
+ * Returns { promise, resolve, reject } so callers can manually settle the
+ * promise, useful for controlling async timing in tests.
+ */
+function withResolvers() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
 function createReleaseWorkflowDouble(t) {
   return {
     importRelease: t.mock.fn(async () => {}),
@@ -339,10 +350,10 @@ test('useMetadataArtistWorkflow appends paged detection history for the active a
 
 test('useMetadataArtistWorkflow ignores stale local artist responses when a newer artist open starts', async (t) => {
   const releaseWorkflow = createReleaseWorkflowDouble(t);
-  const firstArtist = Promise.withResolvers();
-  const secondArtist = Promise.withResolvers();
-  const firstBrowse = Promise.withResolvers();
-  const secondBrowse = Promise.withResolvers();
+  const firstArtist = withResolvers();
+  const secondArtist = withResolvers();
+  const firstBrowse = withResolvers();
+  const secondBrowse = withResolvers();
   const fetchArtist = t.mock.fn((artistId) => (
     artistId === 'artist-1' ? firstArtist.promise : secondArtist.promise
   ));
@@ -406,8 +417,8 @@ test('useMetadataArtistWorkflow ignores stale local artist responses when a newe
 
 test('useMetadataArtistWorkflow aborts superseded local artist reads', async (t) => {
   const releaseWorkflow = createReleaseWorkflowDouble(t);
-  const firstArtist = Promise.withResolvers();
-  const secondArtist = Promise.withResolvers();
+  const firstArtist = withResolvers();
+  const secondArtist = withResolvers();
   const artistSignals = [];
   const fetchArtist = t.mock.fn((artistId, { signal } = {}) => {
     artistSignals.push({ artistId, signal });
