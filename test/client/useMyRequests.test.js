@@ -89,6 +89,11 @@ test('useMyRequests loadRequests forwards signal to fetchRequests', async (t) =>
   assert.equal(args.signal, controller.signal);
 });
 
+test('useMyRequests isLoading is true before loadRequests is called', () => {
+  const { isLoading } = useMyRequests({ fetchRequests: async () => ({}) });
+  assert.equal(isLoading.value, true);
+});
+
 test('useMyRequests loadRequests sets isLoading false on success', async (t) => {
   const { isLoading, loadRequests } = useMyRequests({
     fetchRequests: t.mock.fn(createFetchDouble([])),

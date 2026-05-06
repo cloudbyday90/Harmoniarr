@@ -36,7 +36,7 @@ export function useMyRequests({
   fetchRequests = defaultFetchMyMediaRequests,
 } = {}) {
   const requests = ref([]);
-  const isLoading = ref(false);
+  const isLoading = ref(true);
   const errorMessage = ref('');
 
   const hasRequests = computed(() => requests.value.length > 0);
