@@ -17,16 +17,86 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import ArtistCard from '../media/ArtistCard.vue';
+import ConfirmRequestModal from '../media/ConfirmRequestModal.vue';
 import EmptyState from '../EmptyState.vue';
 import GridControls from '../GridControls.vue';
+import ReleaseCard from '../media/ReleaseCard.vue';
+import RequestButton from '../media/RequestButton.vue';
 import { useGridState } from '../../composables/useGridState.js';
 import { useMonitoredArtists } from '../../composables/useMonitoredArtists.js';
+import { useReleaseRadar } from '../../composables/useReleaseRadar.js';
+import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
+import { useRequestUsers } from '../../composables/useRequestUsers.js';
 import { buildArtistDetailLocation } from '../../lib/artist-detail-route.js';
+import { getErrorMessage } from '../../lib/error-utils.js';
+import { getRadarWindowLabel } from '../../lib/release-radar-normalization.js';
+import { sessionStore } from '../../state/session.js';
 
 const { artists, errorMessage, isLoading, loadMonitoredArtists } = useMonitoredArtists({ limit: 25 });
+
+const radar = useReleaseRadar();
+const radarStrip = computed(() => [
+  ...radar.recent.value.slice(0, 4),
+  ...radar.upcoming.value.slice(0, 4),
+].slice(0, 8));
+const hasRadar = computed(() => radarStrip.value.length > 0);
+
+const {
+  isRequested,
+  isRequesting,
+  requestRelease,
+} = useReleaseRequest();
+
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
+
+const confirmModalOpen = ref(false);
+const confirmRelease = ref(null);
+const confirmError = ref(null);
+
+function openConfirmModal(release) {
+  confirmRelease.value = release;
+  confirmError.value = null;
+  confirmModalOpen.value = true;
+  if (isAdmin.value) void loadRequestForUsers();
+}
+
+function closeConfirmModal() {
+  if (!isRequesting(confirmRelease.value)) {
+    confirmModalOpen.value = false;
+    confirmRelease.value = null;
+    confirmError.value = null;
+  }
+}
+
+const confirmIsRequesting = computed(() =>
+  confirmRelease.value ? isRequesting(confirmRelease.value) : false,
+);
+
+const confirmIsRequested = computed(() =>
+  confirmRelease.value ? isRequested(confirmRelease.value) : false,
+);
+
+async function handleConfirmRequest({ requestedForUserId = null } = {}) {
+  if (!confirmRelease.value) return;
+  confirmError.value = null;
+  const result = await requestRelease(confirmRelease.value, { requestedForUserId });
+  if (result.ok) {
+    confirmModalOpen.value = false;
+    confirmRelease.value = null;
+  } else if (!result.skipped) {
+    confirmError.value = getErrorMessage(result.error, 'Request failed. Please try again.');
+  }
+}
+
+const radarStripLabel = computed(() => {
+  if (radar.hasRecent.value && radar.hasUpcoming.value) return 'New and upcoming releases';
+  if (radar.hasRecent.value) return getRadarWindowLabel('recent', radar.windows.value.recentDays);
+  return getRadarWindowLabel('upcoming', radar.windows.value.upcomingDays);
+});
 
 const hasArtists = computed(() => artists.value.length > 0);
 
@@ -77,6 +147,7 @@ const sortedArtists = computed(() => {
 
 onMounted(() => {
   void loadMonitoredArtists();
+  void radar.load();
 });
 </script>
 
@@ -122,6 +193,36 @@ onMounted(() => {
 
     <!-- Monitored artists grid -->
     <template v-else>
+
+      <!-- Release Radar strip (shown when radar data exists) -->
+      <section v-if="hasRadar" class="radar-strip" aria-label="Release radar">
+        <div class="radar-strip-header">
+          <h2 class="radar-strip-title">{{ radarStripLabel }}</h2>
+          <RouterLink :to="{ name: 'activity-releases' }" class="radar-strip-link">See all</RouterLink>
+        </div>
+        <div class="radar-strip-scroll">
+          <ReleaseCard
+            v-for="(release, index) in radarStrip"
+            :key="release.metadataReleaseGroupId ?? index"
+            :release="release"
+            :requested="isRequested(release)"
+            :requesting="isRequesting(release)"
+            class="radar-strip-card"
+            @request="openConfirmModal(release)"
+          >
+            <template #actions>
+              <RequestButton
+                :requested="isRequested(release)"
+                :loading="isRequesting(release)"
+                :aria-label="isRequested(release)
+                  ? `${release.title ?? 'Release'} — already requested`
+                  : `Request ${release.title ?? 'this release'}`"
+                @request="openConfirmModal(release)"
+              />
+            </template>
+          </ReleaseCard>
+        </div>
+      </section>
       <div class="requester-home-controls">
         <GridControls
           :model-value="filterState"
@@ -174,6 +275,17 @@ onMounted(() => {
     </template>
 
   </section>
+
+  <ConfirmRequestModal
+    :open="confirmModalOpen"
+    :release="confirmRelease"
+    :is-requesting="confirmIsRequesting"
+    :is-requested="confirmIsRequested"
+    :error="confirmError"
+    :users="isAdmin ? requestForUsers : []"
+    @confirm="handleConfirmRequest"
+    @close="closeConfirmModal"
+  />
 </template>
 
 <style scoped>
@@ -196,6 +308,50 @@ onMounted(() => {
 
 .requester-home-grid {
   --hx-artwork-grid-min: 160px;
+}
+
+/* ── Release Radar strip ─────────────────────────────────────────────────── */
+.radar-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+}
+
+.radar-strip-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+}
+
+.radar-strip-title {
+  font-size: var(--hx-text-base);
+  font-weight: var(--hx-font-semibold, 600);
+  margin: 0;
+}
+
+.radar-strip-link {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-text-muted);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.radar-strip-link:hover {
+  color: var(--hx-text);
+}
+
+.radar-strip-scroll {
+  display: flex;
+  gap: var(--hx-space-4);
+  overflow-x: auto;
+  padding-bottom: var(--hx-space-1);
+  scrollbar-width: thin;
+}
+
+.radar-strip-card {
+  flex: 0 0 160px;
+  min-width: 0;
 }
 
 /* Monitored cards are not interactive at the card level — cursor stays default */

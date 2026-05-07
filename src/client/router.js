@@ -24,6 +24,7 @@ import ActivityDownloadsView from './views/ActivityDownloadsView.vue';
 import ActivityHistoryView from './views/ActivityHistoryView.vue';
 import ActivityImportsView from './views/ActivityImportsView.vue';
 import ActivityQueueView from './views/ActivityQueueView.vue';
+import ActivityReleasesView from './views/ActivityReleasesView.vue';
 import ActivityUsersView from './views/ActivityUsersView.vue';
 import ActivityWantedView from './views/ActivityWantedView.vue';
 import ActivityWorkspaceView from './views/ActivityWorkspaceView.vue';
@@ -112,7 +113,7 @@ const router = createRouter({
             { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
             { path: 'downloads', name: 'activity-downloads', component: ActivityDownloadsView },
             { path: 'imports', name: 'activity-imports', component: ActivityImportsView },
-            { path: 'releases', name: 'activity-releases', component: ActivityComingSoonView, props: { section: 'releases' } },
+            { path: 'releases', name: 'activity-releases', component: ActivityReleasesView },
             { path: 'users', name: 'activity-users', component: ActivityUsersView },
             { path: 'history', name: 'activity-history', component: ActivityHistoryView },
             { path: 'blocklist', name: 'activity-blocklist', component: ActivityComingSoonView, props: { section: 'blocklist' } },

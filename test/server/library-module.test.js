@@ -59,6 +59,9 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryReconciliationSummaryStore = {};
   const libraryReleaseReconciliationService = { reconcileLibraryReleases };
   const libraryReleaseReconciliationStore = {};
+  const buildReleaseRadar = async () => {};
+  const libraryReleaseRadarService = { buildReleaseRadar };
+  const libraryReleaseRadarStore = {};
   const libraryReleasesService = { buildLibraryFilterOptions: async () => {}, buildLibraryReleases };
   const libraryScanRunStore = {};
   const libraryScanService = { startLibraryScan };
@@ -105,6 +108,8 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryReconciliationSummaryStore,
     libraryReleaseReconciliationService,
     libraryReleaseReconciliationStore,
+    libraryReleaseRadarService,
+    libraryReleaseRadarStore,
     libraryReleasesService,
     libraryScanRunStore,
     libraryScanService,
@@ -173,6 +178,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     buildLibraryReconciliationSummary,
     buildLibraryScanRunDetail,
     buildLibraryWantedSummary,
+    buildReleaseRadar,
     createMediaRequest,
     listMediaRequests,
     startLibraryOrganizeApplyRun,

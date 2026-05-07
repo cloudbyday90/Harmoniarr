@@ -163,6 +163,12 @@ function createLibraryRouteTestApp(overrides = {}) {
       buildLibraryFilterOptions: async () => ({ formats: [], genres: [] }),
       buildLibraryReleases: async () => ({ releases: [], total: 0 }),
       buildLibraryWantedReleases: async () => ({ releases: [], total: 0 }),
+      buildReleaseRadar: async () => ({
+        checkedAt: '2026-05-07T12:00:00.000Z',
+        recent: [],
+        upcoming: [],
+        windows: { recentDays: 30, upcomingDays: 90 },
+      }),
       limitLibraryOrganizeApplyRun: (_request, _response, next) => next(),
       ...overrides,
     });
@@ -872,5 +878,68 @@ test('library filter-options route rejects unauthenticated requests', async (t) 
     const response = await fetch(`${baseUrl}/api/v1/library/filter-options`);
 
     assert.equal(response.status, 401);
+  });
+});
+
+test('release radar route requires a session and returns the radar payload', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-1', csrfToken: 'csrf-1', user: { role: 'requester' } }));
+  const buildReleaseRadar = t.mock.fn(async () => ({
+    checkedAt: '2026-05-07T12:00:00.000Z',
+    recent: [{ releaseGroupTitle: 'NTS Sessions', artistName: 'Autechre' }],
+    upcoming: [],
+    windows: { recentDays: 30, upcomingDays: 90 },
+  }));
+
+  const app = createLibraryRouteTestApp({ buildReleaseRadar, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/release-radar`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.checkedAt, '2026-05-07T12:00:00.000Z');
+    assert.equal(payload.recent.length, 1);
+    assert.equal(payload.recent[0].releaseGroupTitle, 'NTS Sessions');
+    assert.deepEqual(payload.upcoming, []);
+    assert.deepEqual(payload.windows, { recentDays: 30, upcomingDays: 90 });
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(buildReleaseRadar.mock.callCount(), 1);
+  });
+});
+
+test('release radar route rejects unauthenticated requests', async (t) => {
+  const requireSession = t.mock.fn(async () => {
+    throw createApiError(401, 'session_required', 'Authentication required');
+  });
+
+  const app = createLibraryRouteTestApp({ requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/release-radar`);
+
+    assert.equal(response.status, 401);
+  });
+});
+
+test('release radar route forwards recentDays, upcomingDays, and limit query params to buildReleaseRadar', async (t) => {
+  const buildReleaseRadar = t.mock.fn(async () => ({
+    checkedAt: '2026-05-07T12:00:00.000Z',
+    recent: [],
+    upcoming: [],
+    windows: { recentDays: 7, upcomingDays: 14 },
+  }));
+
+  const app = createLibraryRouteTestApp({ buildReleaseRadar });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/release-radar?recentDays=7&upcomingDays=14&limit=20`);
+
+    assert.equal(response.status, 200);
+    assert.equal(buildReleaseRadar.mock.callCount(), 1);
+    const [callArgs] = buildReleaseRadar.mock.calls;
+    assert.equal(callArgs.arguments[0].recentDays, 7);
+    assert.equal(callArgs.arguments[0].upcomingDays, 14);
+    assert.equal(callArgs.arguments[0].limit, 20);
   });
 });

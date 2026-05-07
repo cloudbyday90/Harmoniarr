@@ -101,6 +101,18 @@ export function fetchLibraryFilterOptions() {
   return apiRequest('/api/v1/library/filter-options');
 }
 
+export function fetchReleaseRadar({ recentDays, upcomingDays, limit, signal } = {}) {
+  const params = new URLSearchParams();
+  if (recentDays != null) params.set('recentDays', String(recentDays));
+  if (upcomingDays != null) params.set('upcomingDays', String(upcomingDays));
+  if (limit != null) params.set('limit', String(limit));
+  const query = params.toString();
+  return apiRequest(
+    query ? `/api/v1/library/release-radar?${query}` : '/api/v1/library/release-radar',
+    signal ? { signal } : {},
+  );
+}
+
 export function fetchLibraryScanRunDetail(runId) {
   return apiRequest(`/api/v1/library/scan-runs/${encodeURIComponent(runId)}`);
 }

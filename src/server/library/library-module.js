@@ -52,6 +52,8 @@ import { createLibraryOrganizePreviewStore } from './library-organize-preview-st
 import { createLibraryReleaseAvailabilityStore } from './library-release-availability-store.js';
 import { createLibraryReconciliationSummaryService } from './library-reconciliation-summary-service.js';
 import { createLibraryReconciliationSummaryStore } from './library-reconciliation-summary-store.js';
+import { createLibraryReleaseRadarService } from './library-release-radar-service.js';
+import { createLibraryReleaseRadarStore } from './library-release-radar-store.js';
 import { createLibraryReleaseReconciliationService } from './library-release-reconciliation-service.js';
 import { createLibraryReleaseReconciliationStore } from './library-release-reconciliation-store.js';
 import { createLibraryReleasesService } from './library-releases-service.js';
@@ -218,6 +220,10 @@ export function createLibraryModule({
   libraryReleasesService = createLibraryReleasesService({
     libraryReleaseReconciliationStore,
   }),
+  libraryReleaseRadarStore = createLibraryReleaseRadarStore(),
+  libraryReleaseRadarService = createLibraryReleaseRadarService({
+    libraryReleaseRadarStore,
+  }),
   libraryWantedReleaseStore = createLibraryWantedReleaseStore(),
   libraryWantedReleaseService = createLibraryWantedReleaseService({
     libraryWantedReleaseStore,
@@ -365,6 +371,7 @@ export function createLibraryModule({
       buildLibraryOrganizePreview: libraryOrganizePreviewService.buildLibraryOrganizePreview,
       buildLibraryReleases: libraryReleasesService.buildLibraryReleases,
       buildLibraryWantedReleases: libraryWantedSummaryService.buildLibraryWantedReleases,
+      buildReleaseRadar: libraryReleaseRadarService.buildReleaseRadar,
       buildMediaRequestSummary: libraryMediaRequestService.buildMediaRequestSummary,
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,
       buildLibraryScanRunDetail: libraryScanSummaryService.buildLibraryScanRunDetail,
