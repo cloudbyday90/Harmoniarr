@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fetchMyMediaRequests } from '../../src/client/lib/media-request-api.js';
+import { fetchMyMediaRequests, fetchMyRequestSummary } from '../../src/client/lib/media-request-api.js';
 
 function createJsonResponse({ payload = { ok: true, mediaRequests: [], scope: 'mine' }, status = 200 } = {}) {
   return {
@@ -62,4 +62,31 @@ test('media-request-api fetchMyMediaRequests includes limit in URL when overridd
 
   const url = globalThis.fetch.mock.calls[0].arguments[0];
   assert.ok(url.includes('limit=10'), 'should include limit param when overridden');
+});
+
+test('media-request-api fetchMyRequestSummary calls summary endpoint with scope=mine', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-test' };
+  globalThis.fetch = t.mock.fn(async () =>
+    createJsonResponse({
+      payload: {
+        ok: true,
+        scope: 'mine',
+        counts: { totalRequests: 1, alreadyExists: 0, needsFetch: 1, needsReview: 0 },
+        fulfillmentCounts: { active: 0, failed: 0, satisfied: 0, underReview: 0 },
+        notificationFeed: { checkedAt: '2026-05-07T00:00:00Z', counts: { total: 0, byCategory: {} }, notifications: [] },
+        recentRequests: [],
+        summary: { message: 'ok', status: 'active' },
+      },
+    }),
+  );
+
+  const result = await fetchMyRequestSummary();
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.ok(url.includes('/api/v1/library/media-request-summary'), 'should call media-request-summary endpoint');
+  assert.ok(url.includes('scope=mine'), 'should request scope=mine');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'GET');
+  assert.equal(result.scope, 'mine');
+  assert.ok(result.notificationFeed, 'should return notificationFeed');
 });

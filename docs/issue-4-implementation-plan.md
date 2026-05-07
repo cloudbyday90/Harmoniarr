@@ -69,6 +69,8 @@
 
 **Step 25 — Complete:** System-aware dark/light theme — the design system already uses CSS custom properties. Add a light theme variable set (`[data-theme="light"]`). Default to `prefers-color-scheme`. Add a manual override toggle in Settings → Account (stored in `user_preferences` JSONB). No third-party theme library needed.
 
+**Step 27 — Complete:** Target-user inbox & notification visibility — `MyRequestsView` now surfaces the request notification feed for the current user alongside the request grid. `useMyRequestNotifications` composable loads the existing `GET /api/v1/library/media-request-summary?scope=mine` endpoint (no new server route needed — the summary already includes `notificationFeed`), extracts delegated-request receipts, fulfillment progress events, and failure notifications, and exposes `{ notifications, counts, checkedAt, isLoading, errorMessage, load }`. `RequestNotificationsPanel` is rendered above the request grid when `counts.total > 0`, giving requesters a clear view of any music requested on their behalf and its current status. `AppShell.vue` adds a second `useAsyncResource` call for requesters, polling `fetchMyRequestSummary` every 60 s (same cadence as operator notifications) to derive `requesterNotificationCount`; the "My Requests" nav item gains a live badge showing the total count when non-zero, powered by a `visibleNav` computed that maps the badge count onto the nav item. `fetchMyRequestSummary` added to `media-request-api.js`. Test suites: `useMyRequestNotifications.test.js` (9 tests), one new test in `media-request-api.test.js`. 982 server / 568 client tests pass, no regressions.
+
 ---
 
 ### Current State Snapshot (Shipped Infrastructure)

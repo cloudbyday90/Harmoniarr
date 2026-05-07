@@ -24,6 +24,7 @@ import { sessionStore } from '../state/session.js';
 import { useShellHeartbeat } from '../composables/useShellHeartbeat.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 import { fetchSystemOperatorNotifications } from '../lib/system-api.js';
+import { fetchMyRequestSummary } from '../lib/media-request-api.js';
 import { useTheme } from '../composables/useTheme.js';
 import ToastStack from './ToastStack.vue';
 
@@ -64,6 +65,23 @@ const {
 const actionableCount = computed(() => notificationsPayload.value?.counts?.actionable ?? 0);
 const totalNotificationCount = computed(() => notificationsPayload.value?.counts?.total ?? 0);
 const notifications = computed(() => notificationsPayload.value?.notifications ?? []);
+
+// ── Requester: notification count for "My Requests" nav badge ────────────────────
+
+const {
+  data: requesterNotificationsPayload,
+} = useAsyncResource({
+  fetcher: fetchMyRequestSummary,
+  project: (payload) => ({
+    total: payload?.notificationFeed?.counts?.total ?? 0,
+  }),
+  initialData: { total: 0 },
+  immediate: isRequester.value,
+  pollIntervalMs: isRequester.value ? 60000 : null,
+  fallbackErrorMessage: 'Failed to load request notifications',
+});
+
+const requesterNotificationCount = computed(() => requesterNotificationsPayload.value?.total ?? 0);
 
 const notificationsOpen = ref(false);
 const notificationsAnchor = ref(null);
@@ -149,7 +167,13 @@ const requesterNav = [
   { name: 'my-requests', label: 'My Requests', icon: 'requests' },
 ];
 
-const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNav));
+const visibleNav = computed(() => {
+  const base = isRequester.value ? requesterNav : operatorNav;
+  if (!isRequester.value) return base;
+  const count = requesterNotificationCount.value;
+  if (count <= 0) return base;
+  return base.map((item) => (item.name === 'my-requests' ? { ...item, badge: count } : item));
+});
 </script>
 
 <template>
@@ -298,6 +322,7 @@ const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNa
             <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
           </span>
           <span class="hx-sidebar-link-label">{{ item.label }}</span>
+          <span v-if="item.badge" class="hx-sidebar-link-badge" aria-label="`${item.badge} notification${item.badge === 1 ? '' : 's'}`">{{ item.badge }}</span>
         </RouterLink>
       </nav>
 
@@ -423,5 +448,20 @@ const visibleNav = computed(() => (isRequester.value ? requesterNav : operatorNa
   font-size: 11px;
   color: var(--hx-color-muted, rgba(255, 255, 255, 0.45));
   white-space: nowrap;
+}
+.hx-sidebar-link-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--hx-color-accent, #7c6df0);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 </style>

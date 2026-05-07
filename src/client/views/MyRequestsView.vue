@@ -21,13 +21,26 @@ import { computed, onMounted } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import RequestCard from '../components/media/RequestCard.vue';
+import RequestNotificationsPanel from '../components/RequestNotificationsPanel.vue';
 import { useGridState } from '../composables/useGridState.js';
+import { useMyRequestNotifications } from '../composables/useMyRequestNotifications.js';
 import { useMyRequests } from '../composables/useMyRequests.js';
 import { sessionStore } from '../state/session.js';
 
 const viewerUserId = computed(() => sessionStore.state.user?.id ?? null);
 
 const { errorMessage, hasRequests, isLoading, loadRequests, requests } = useMyRequests({ limit: 50 });
+
+// ── Notification feed (delegated requests + fulfillment updates) ─────────────
+
+const {
+  checkedAt: notificationCheckedAt,
+  counts: notificationCounts,
+  load: loadNotifications,
+  notifications,
+} = useMyRequestNotifications();
+
+const hasNotifications = computed(() => (notificationCounts.value?.total ?? 0) > 0);
 
 // ── Sort / filter definitions ─────────────────────────────────────────────────
 
@@ -93,6 +106,7 @@ const displayRequests = computed(() => {
 
 onMounted(() => {
   void loadRequests();
+  void loadNotifications();
 });
 </script>
 
@@ -105,6 +119,14 @@ onMounted(() => {
         <p class="hx-page-subtitle">Track the music you've asked Harmoniarr to find.</p>
       </div>
     </header>
+
+    <!-- Notification feed: delegated-request receipts and fulfillment updates -->
+    <RequestNotificationsPanel
+      v-if="hasNotifications"
+      :checked-at="notificationCheckedAt"
+      :counts="notificationCounts"
+      :notifications="notifications"
+    />
 
     <!-- Loading state -->
     <p

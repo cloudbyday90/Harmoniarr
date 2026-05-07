@@ -33,3 +33,18 @@ export function fetchMyMediaRequests({ limit = 50, signal } = {}) {
   const query = buildQueryString({ scope: 'mine', limit: limit !== 50 ? limit : undefined });
   return apiRequest(`/api/v1/library/media-requests${query}`, { signal });
 }
+
+/**
+ * Fetch a notification-bearing summary of the current user's media requests.
+ *
+ * Returns counts, fulfillment status breakdown, and a notification feed covering
+ * delegated-request receipts, fulfillment progress updates, and failures. Always
+ * scoped to the current session user — no scope parameter is accepted.
+ *
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal] - Optional abort signal.
+ * @returns {Promise<{ ok: boolean, scope: string, notificationFeed: object, fulfillmentCounts: object, counts: object }>}
+ */
+export function fetchMyRequestSummary({ signal } = {}) {
+  return apiRequest('/api/v1/library/media-request-summary?scope=mine', { signal });
+}
