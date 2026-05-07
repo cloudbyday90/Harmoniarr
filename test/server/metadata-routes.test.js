@@ -78,6 +78,16 @@ function createMetadataRouteTestApp(overrides = {}) {
       listMonitoredArtists: async ({ limit }) => ({ limit: Number(limit) || 25, results: [] }),
       searchMusicBrainzArtists: async () => ({ results: [] }),
       searchMusicBrainzReleases: async () => ({ results: [] }),
+      getSimilarArtists: async () => ({ similar: [] }),
+      getReleaseGroupTracklist: async () => ({
+        release: null,
+        media: [],
+        ownership: {},
+        allReleases: [],
+        requestState: {},
+        source: 'local',
+      }),
+      markCanonicalRelease: async () => null,
       ...overrides,
     });
   });
@@ -712,5 +722,94 @@ test('metadata artist import route does not invoke the admin session guard', asy
 
     assert.equal(response.status, 201);
     assert.equal(requireFreshAdminSession.mock.callCount(), 0);
+  });
+});
+
+test('metadata release-group tracklist route returns the shared tracklist payload', async (t) => {
+  const getReleaseGroupTracklist = t.mock.fn(async () => ({
+    release: { id: 'release-1', title: 'Substrata' },
+    media: [{ position: 1, format: 'CD', tracks: [{ id: 'track-1', title: 'Poa Alpina', position: 1 }] }],
+    ownership: { releaseId: 'release-1', ownedTrackCount: 1 },
+    allReleases: [{ id: 'release-1', title: 'Substrata', isCanonical: true }],
+    requestState: { releaseGroupId: 'rg-1' },
+    source: 'local',
+  }));
+  const app = createMetadataRouteTestApp({ getReleaseGroupTracklist });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/metadata/musicbrainz/release-groups/mb-rg-1/tracklist?preferReleaseMbid=mb-release-1`,
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(getReleaseGroupTracklist.mock.callCount(), 1);
+    assert.deepEqual(getReleaseGroupTracklist.mock.calls[0].arguments[0], {
+      releaseGroupMbid: 'mb-rg-1',
+      preferReleaseMbid: 'mb-release-1',
+      preferReleaseId: null,
+      sessionUserId: 'user-1',
+    });
+    assert.deepEqual(payload, {
+      ok: true,
+      release: { id: 'release-1', title: 'Substrata' },
+      media: [{ position: 1, format: 'CD', tracks: [{ id: 'track-1', title: 'Poa Alpina', position: 1 }] }],
+      ownership: { releaseId: 'release-1', ownedTrackCount: 1 },
+      allReleases: [{ id: 'release-1', title: 'Substrata', isCanonical: true }],
+      requestState: { releaseGroupId: 'rg-1' },
+      source: 'local',
+    });
+  });
+});
+
+test('metadata canonical release patch route returns the shared canonical selection payload', async (t) => {
+  const markCanonicalRelease = t.mock.fn(async (releaseId) => ({
+    releaseGroupId: 'rg-1',
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({
+    appUserId: 'user-admin',
+    csrfToken: 'csrf-token',
+    csrfTokenHash: 'hashed',
+    user: { role: 'admin' },
+  }));
+  const app = createMetadataRouteTestApp({ markCanonicalRelease, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/releases/release-7/canonical`, {
+      method: 'PATCH',
+      headers: { 'x-csrf-token': 'csrf-token' },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(markCanonicalRelease.mock.callCount(), 1);
+    assert.deepEqual(markCanonicalRelease.mock.calls[0].arguments, ['release-7']);
+    assert.deepEqual(payload, { ok: true, releaseId: 'release-7', releaseGroupId: 'rg-1' });
+  });
+});
+
+test('metadata canonical release patch route returns 404 when markCanonicalRelease returns null', async () => {
+  const app = createMetadataRouteTestApp({
+    markCanonicalRelease: async () => null,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/releases/missing-release/canonical`, {
+      method: 'PATCH',
+      headers: { 'x-csrf-token': 'csrf-token' },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'metadata_not_found',
+        message: 'Release not found: missing-release',
+      },
+    });
   });
 });

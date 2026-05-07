@@ -95,6 +95,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/metadata/musicbrainz/releases/search', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/musicbrainz/artists/:artistId/release-groups', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/musicbrainz/release-groups/:releaseGroupId/releases', access: 'authenticated', area: 'metadata', kind: 'read' },
+  { method: 'GET', path: '/api/v1/metadata/musicbrainz/release-groups/:releaseGroupId/tracklist', access: 'authenticated', area: 'metadata', kind: 'read' },
+  { method: 'PATCH', path: '/api/v1/metadata/releases/:releaseId/canonical', access: 'admin', area: 'metadata', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/metadata/musicbrainz/release-groups/:releaseGroupId/import', access: 'admin', area: 'metadata', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/metadata/musicbrainz/artists/:artistId/import', access: 'authenticated', area: 'metadata', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/metadata/musicbrainz/releases/:releaseId/import', access: 'admin', area: 'metadata', kind: 'mutation' },

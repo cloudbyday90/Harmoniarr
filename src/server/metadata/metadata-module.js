@@ -34,6 +34,8 @@ import { createMusicBrainzCatalogService } from './musicbrainz-catalog-service.j
 import { createMusicBrainzImportService } from './musicbrainz-import-service.js';
 import { createMusicBrainzSearchService } from './musicbrainz-search-service.js';
 import { createSimilarArtistsService } from './similar-artists-service.js';
+import { createReleaseGroupTracklistService } from './release-group-tracklist-service.js';
+import { markCanonicalRelease, forceCanonicalRelease } from './canonical-release-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 
 export function createMetadataModule({
@@ -58,6 +60,7 @@ export function createMetadataModule({
   musicBrainzImportService = null,
   musicBrainzSearchService = null,
   similarArtistsService = null,
+  releaseGroupTracklistService = null,
 } = {}) {
   const resolvedMetadataMonitoringStore = metadataMonitoringStore ?? createMetadataMonitoringStore();
   const resolvedMetadataReleaseDetectionService = metadataReleaseDetectionService ?? createMetadataReleaseDetectionService();
@@ -114,6 +117,10 @@ export function createMetadataModule({
   const resolvedMusicBrainzImportService = musicBrainzImportService ?? createMusicBrainzImportService({ providerHealthRecorder });
   const resolvedMusicBrainzSearchService = musicBrainzSearchService ?? createMusicBrainzSearchService({ providerHealthRecorder });
   const resolvedSimilarArtistsService = similarArtistsService ?? createSimilarArtistsService();
+  const resolvedReleaseGroupTracklistService = releaseGroupTracklistService ?? createReleaseGroupTracklistService({
+    musicBrainzCatalogService: resolvedMusicBrainzCatalogService,
+    importMusicBrainzReleaseGroup: resolvedMusicBrainzImportService.importReleaseGroupById,
+  });
 
   return {
     metadataArtistRefreshRunStore: resolvedMetadataArtistRefreshRunStore,
@@ -157,6 +164,8 @@ export function createMetadataModule({
       searchMusicBrainzArtists: resolvedMusicBrainzSearchService.searchArtists,
       searchMusicBrainzReleases: resolvedMusicBrainzSearchService.searchReleases,
       getSimilarArtists: resolvedSimilarArtistsService.getSimilarArtists,
+      getReleaseGroupTracklist: resolvedReleaseGroupTracklistService.getReleaseGroupTracklist,
+      markCanonicalRelease: forceCanonicalRelease,
     },
   };
 }

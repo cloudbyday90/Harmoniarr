@@ -104,6 +104,7 @@ function mapRelease(row) {
     disambiguation: row.disambiguation,
     trackCount: row.track_count,
     mediumCount: row.medium_count,
+    isCanonical: row.is_canonical ?? false,
     source: {
       provider: row.source_provider,
       sourceReleaseId: row.source_release_id,

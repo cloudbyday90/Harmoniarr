@@ -131,3 +131,17 @@ export function importMusicBrainzRelease(releaseId) {
     includeCsrf: true,
   });
 }
+
+export function fetchReleaseGroupTracklist(releaseGroupMbid, { preferReleaseMbid, preferReleaseId, signal } = {}) {
+  return apiRequest(
+    `/api/v1/metadata/musicbrainz/release-groups/${encodeURIComponent(releaseGroupMbid)}/tracklist${buildQueryString({ preferReleaseMbid, preferReleaseId })}`,
+    { signal },
+  );
+}
+
+export function markReleaseCanonical(releaseId) {
+  return apiRequest(`/api/v1/metadata/releases/${encodeURIComponent(releaseId)}/canonical`, {
+    method: 'PATCH',
+    includeCsrf: true,
+  });
+}

@@ -20,6 +20,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
+import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import EmptyState from '../components/EmptyState.vue';
 import MonitorButton from '../components/media/MonitorButton.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
@@ -110,6 +111,21 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
   } else if (!result.skipped) {
     confirmError.value = getErrorMessage(result.error, 'Request failed. Please try again.');
   }
+}
+
+// ── Release detail modal ─────────────────────────────────────────────────────
+
+const detailModalOpen = ref(false);
+const detailRelease = ref(null);
+
+function openDetailModal(release) {
+  detailRelease.value = release;
+  detailModalOpen.value = true;
+}
+
+function closeDetailModal() {
+  detailModalOpen.value = false;
+  detailRelease.value = null;
 }
 
 /** Displayed artist name — local metadata preferred, query hint as fallback. */
@@ -257,6 +273,7 @@ watch(mbid, (newMbid, oldMbid) => {
                 :requested="isRequested(release)"
                 :requesting="isRequesting(release)"
                 @request="openConfirmModal"
+                @detail="openDetailModal"
               />
             </div>
           </div>
@@ -306,6 +323,18 @@ watch(mbid, (newMbid, oldMbid) => {
       :users="isAdmin ? requestForUsers : []"
       @confirm="handleConfirmRequest"
       @close="closeConfirmModal"
+    />
+
+    <!-- Release detail modal -->
+    <ReleaseDetailModal
+      v-if="detailRelease"
+      :open="detailModalOpen"
+      :release-group-mbid="detailRelease?.releaseGroup?.id ?? detailRelease?.releaseGroupId ?? ''"
+      :release-title="detailRelease?.title ?? null"
+      :artist-name="artist?.name ?? null"
+      :release-year="detailRelease?.date ? String(detailRelease.date).slice(0, 4) : null"
+      @close="closeDetailModal"
+      @requested="closeDetailModal"
     />
   </div>
 </template>

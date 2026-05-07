@@ -133,6 +133,8 @@ function collectRegisteredRoutes() {
     searchMusicBrainzArtists: asyncNoopResult({}),
     searchMusicBrainzReleases: asyncNoopResult({}),
     getSimilarArtists: asyncNoopResult({ similar: [] }),
+    getReleaseGroupTracklist: asyncNoopResult({}),
+    markCanonicalRelease: asyncNoopResult({}),
     startMetadataArtistRefresh: asyncNoopResult({}),
     updateMetadataArtistMonitoring: asyncNoopResult({}),
   });

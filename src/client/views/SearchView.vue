@@ -20,6 +20,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
 import ArtistCard from '../components/media/ArtistCard.vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
+import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
@@ -67,6 +68,21 @@ const {
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
+
+// ── Release detail modal ─────────────────────────────────────────────────────
+
+const detailModalOpen = ref(false);
+const detailRelease = ref(null);
+
+function openDetailModal(release) {
+  detailRelease.value = release;
+  detailModalOpen.value = true;
+}
+
+function closeDetailModal() {
+  detailModalOpen.value = false;
+  detailRelease.value = null;
+}
 
 // ── Confirm request modal ─────────────────────────────────────────────────────
 
@@ -422,6 +438,7 @@ onBeforeUnmount(() => clearPollTimer());
               :requested="isRequested(release)"
               :requesting="isRequesting(release)"
               @request="openConfirmModal"
+              @detail="openDetailModal"
             />
           </div>
         </section>
@@ -555,6 +572,19 @@ onBeforeUnmount(() => clearPollTimer());
       :users="isAdmin ? requestForUsers : []"
       @confirm="handleConfirmRequest"
       @close="closeConfirmModal"
+    />
+
+    <!-- Release detail modal -->
+    <ReleaseDetailModal
+      v-if="detailRelease"
+      :open="detailModalOpen"
+      :release-group-mbid="detailRelease?.releaseGroup?.id ?? detailRelease?.releaseGroupId ?? ''"
+      :release-title="detailRelease?.title ?? null"
+      :artist-name="detailRelease?.artistCredit?.[0]?.artist?.name ?? detailRelease?.artistCredit ?? null"
+      :release-year="detailRelease?.date ? String(detailRelease.date).slice(0, 4) : null"
+      :prefer-release-mbid="detailRelease?.id ?? null"
+      @close="closeDetailModal"
+      @requested="closeDetailModal"
     />
 
   </section>

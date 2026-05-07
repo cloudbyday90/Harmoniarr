@@ -637,3 +637,34 @@ export async function searchMetadataReleases({ query, limit }, queryable) {
 
   return result.rows;
 }
+
+export async function listReleasesWithCanonicalByReleaseGroupId(metadataReleaseGroupId, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      SELECT *
+      FROM metadata_releases
+      WHERE metadata_release_group_id = $1
+      ORDER BY is_canonical DESC, release_date NULLS LAST, created_at ASC, title ASC
+    `,
+    [metadataReleaseGroupId],
+  );
+
+  return result.rows;
+}
+
+export async function getCanonicalReleaseByReleaseGroupId(metadataReleaseGroupId, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      SELECT *
+      FROM metadata_releases
+      WHERE metadata_release_group_id = $1
+        AND is_canonical = TRUE
+      LIMIT 1
+    `,
+    [metadataReleaseGroupId],
+  );
+
+  return result.rows[0] ?? null;
+}

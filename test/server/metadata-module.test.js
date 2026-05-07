@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createMetadataModule } from '../../src/server/metadata/metadata-module.js';
+import { forceCanonicalRelease } from '../../src/server/metadata/canonical-release-service.js';
 
 test('createMetadataModule exposes shared route dependencies from injected services', () => {
   const metadataArtistRefreshRunStore = {};
@@ -46,6 +47,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const similarArtistsService = {
     getSimilarArtists: () => {},
   };
+  const releaseGroupTracklistService = {
+    getReleaseGroupTracklist: () => {},
+  };
   const metadataRefreshService = {
     refreshArtistCatalogById: () => {},
   };
@@ -69,6 +73,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     musicBrainzImportService,
     musicBrainzSearchService,
     similarArtistsService,
+    releaseGroupTracklistService,
   });
 
   assert.equal(metadataModule.metadataArtistRefreshRunStore, metadataArtistRefreshRunStore);
@@ -107,5 +112,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     searchMusicBrainzArtists: musicBrainzSearchService.searchArtists,
     searchMusicBrainzReleases: musicBrainzSearchService.searchReleases,
     getSimilarArtists: similarArtistsService.getSimilarArtists,
+    getReleaseGroupTracklist: releaseGroupTracklistService.getReleaseGroupTracklist,
+    markCanonicalRelease: forceCanonicalRelease,
   });
 });

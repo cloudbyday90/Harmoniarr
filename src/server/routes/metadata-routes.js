@@ -84,6 +84,8 @@ export function registerMetadataRoutes(app, {
   searchMusicBrainzArtists,
   searchMusicBrainzReleases,
   getSimilarArtists,
+  getReleaseGroupTracklist,
+  markCanonicalRelease,
 }) {
   function registerSessionGetJsonRoute(path, buildResponseBody) {
     app.get(path, metadataRoute(async (request, response) => {
@@ -382,4 +384,38 @@ export function registerMetadataRoutes(app, {
       source: imported.source,
     }),
   );
+
+  app.get('/api/v1/metadata/musicbrainz/release-groups/:releaseGroupId/tracklist', metadataRoute(async (request, response) => {
+    const session = await requireSessionFn(request);
+    const result = await getReleaseGroupTracklist({
+      releaseGroupMbid: request.params.releaseGroupId,
+      preferReleaseMbid: request.query.preferReleaseMbid ?? null,
+      preferReleaseId: request.query.preferReleaseId ?? null,
+      sessionUserId: session.appUserId,
+    });
+
+    response.json({
+      ok: true,
+      release: result.release,
+      media: result.media,
+      ownership: result.ownership,
+      allReleases: result.allReleases,
+      requestState: result.requestState,
+      source: result.source,
+    });
+  }));
+
+  app.patch('/api/v1/metadata/releases/:releaseId/canonical', metadataRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
+    requireCsrfFn(request, session);
+
+    const releaseId = request.params.releaseId;
+    const result = await markCanonicalRelease(releaseId);
+
+    if (!result) {
+      throw createApiError(404, 'metadata_not_found', `Release not found: ${releaseId}`);
+    }
+
+    response.json({ ok: true, releaseId, releaseGroupId: result.releaseGroupId });
+  }));
 }

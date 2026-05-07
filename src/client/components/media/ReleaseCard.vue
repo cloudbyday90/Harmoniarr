@@ -81,7 +81,8 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['request']);
+const emit = defineEmits(['request', 'detail']);
+
 
 /** Whether the release can actually be requested (has required fields). */
 const isRequestable = computed(() => {
@@ -123,6 +124,10 @@ function handleRequest() {
   emit('request', props.release);
 }
 
+function handleDetail() {
+  emit('detail', props.release);
+}
+
 const artworkImageComp = useTemplateRef('artworkImageComp');
 const imgElRef = computed(() => artworkImageComp.value?.imgRef ?? null);
 const isSameOriginFn = () => {
@@ -148,7 +153,7 @@ const accentStyle = computed(() => {
 </script>
 
 <template>
-  <article class="hx-media-card" :data-variant="variant || undefined" :style="accentStyle">
+  <article class="hx-media-card" :data-variant="variant || undefined" :style="accentStyle" @click="handleDetail">
     <div class="hx-media-card__artwork">
       <ArtworkImage
         ref="artworkImageComp"
@@ -161,7 +166,7 @@ const accentStyle = computed(() => {
       <p class="hx-media-card__title">{{ releaseTitle || '—' }}</p>
       <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
     </div>
-    <div class="hx-media-card__actions">
+    <div class="hx-media-card__actions" @click.stop>
       <slot name="actions">
         <RequestButton
           :requested="requested"
@@ -180,6 +185,7 @@ const accentStyle = computed(() => {
 
 <style scoped>
 .hx-media-card {
+  cursor: pointer;
   border: 1px solid color-mix(
     in oklch,
     oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0)) 40%,
