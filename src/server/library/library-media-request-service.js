@@ -223,6 +223,7 @@ export function createLibraryMediaRequestService({
   mediaRequestNotificationService = createLibraryMediaRequestNotificationService(),
   metadataSearchService = createMetadataSearchService(),
   releaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
+  recordActivityEventFn = null,
   recordAuditEventFn = recordAuditEvent,
 } = {}) {
   async function resolveRequestedForUserId({ actorUserId, actorUserRole, requestedForUserId }) {
@@ -346,6 +347,17 @@ export function createLibraryMediaRequestService({
       summary: `Created ${mediaRequest.requestKind} music request as ${mediaRequest.requestState}`,
       userAgent: requestMetadata?.userAgent ?? null,
     });
+
+    if (typeof recordActivityEventFn === 'function') {
+      void recordActivityEventFn({
+        actorUserId,
+        entityArtist: draft.artistName ?? null,
+        entityId: mediaRequest.id,
+        entityTitle: draft.releaseTitle ?? draft.artistName ?? null,
+        entityType: 'media_request',
+        eventType: 'request_created',
+      }).catch(() => {});
+    }
 
     if (
       mediaRequest.requestKind === 'external_url'

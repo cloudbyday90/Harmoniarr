@@ -226,6 +226,7 @@ export function registerMetadataRoutes(app, {
     requireCsrfFn(request, session);
 
     const updated = await updateMetadataArtistMonitoring({
+      actorUserId: session.appUserId,
       metadataArtistId: request.params.artistId,
       patch: request.body,
     });

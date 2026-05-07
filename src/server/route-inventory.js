@@ -17,6 +17,7 @@
  */
 
 export const serverRouteInventory = Object.freeze([
+  { method: 'GET', path: '/api/v1/activity/feed', access: 'authenticated', area: 'activity', kind: 'read' },
   { method: 'GET', path: '/healthz', access: 'public', area: 'system', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/bootstrap/status', access: 'public', area: 'auth', kind: 'diagnostic' },
   { method: 'POST', path: '/api/v1/bootstrap/admin', access: 'public', area: 'auth', kind: 'mutation' },

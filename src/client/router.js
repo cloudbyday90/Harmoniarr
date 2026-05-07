@@ -21,6 +21,7 @@ import AppShell from './components/AppShell.vue';
 import AccountSecurityView from './views/AccountSecurityView.vue';
 import ActivityComingSoonView from './views/ActivityComingSoonView.vue';
 import ActivityDownloadsView from './views/ActivityDownloadsView.vue';
+import ActivityFeedView from './views/ActivityFeedView.vue';
 import ActivityHistoryView from './views/ActivityHistoryView.vue';
 import ActivityImportsView from './views/ActivityImportsView.vue';
 import ActivityQueueView from './views/ActivityQueueView.vue';
@@ -55,6 +56,7 @@ import { sessionStore } from './state/session.js';
 const requesterRestrictedRouteNames = new Set([
   'missing',
   'activity',
+  'activity-feed',
   'activity-operations',
   'activity-candidates',
   'activity-queue',
@@ -114,6 +116,7 @@ const router = createRouter({
             { path: 'downloads', name: 'activity-downloads', component: ActivityDownloadsView },
             { path: 'imports', name: 'activity-imports', component: ActivityImportsView },
             { path: 'releases', name: 'activity-releases', component: ActivityReleasesView },
+            { path: 'feed', name: 'activity-feed', component: ActivityFeedView },
             { path: 'users', name: 'activity-users', component: ActivityUsersView },
             { path: 'history', name: 'activity-history', component: ActivityHistoryView },
             { path: 'blocklist', name: 'activity-blocklist', component: ActivityComingSoonView, props: { section: 'blocklist' } },

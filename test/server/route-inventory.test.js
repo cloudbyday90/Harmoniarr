@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { registerArtworkRoutes } from '../../src/server/routes/artwork-routes.js';
+import { registerActivityRoutes } from '../../src/server/routes/activity-routes.js';
 import { registerAppUserRoutes } from '../../src/server/routes/app-user-routes.js';
 import { registerAuthRoutes } from '../../src/server/routes/auth-routes.js';
 import { registerAdminRecoveryRoutes } from '../../src/server/routes/admin-recovery-routes.js';
@@ -36,6 +37,11 @@ function asyncNoopResult(result = {}) {
 
 function collectRegisteredRoutes() {
   const { app, routes } = createRecordingApp();
+
+  registerActivityRoutes(app, {
+    buildActivityFeed: asyncNoopResult({}),
+    requireSession: asyncNoopResult({ appUserId: 'user-1' }),
+  });
 
   registerAuthRoutes(app, {
     completeAppUserClaim: asyncNoopResult({ requiresLogin: true }),

@@ -19,6 +19,7 @@
 import express from 'express';
 import { resolve } from 'node:path';
 import { createAppUserModule } from './app-user-module.js';
+import { createActivityModule } from './activity/activity-module.js';
 import { createArtworkModule } from './artwork/artwork-module.js';
 import { createAuthModule } from './auth-module.js';
 import { createDeploymentSecurityService } from './deployment-security-service.js';
@@ -46,6 +47,7 @@ import { createControlPlaneRedactionService } from './control-plane-redaction-se
 import { createMaintenanceLockOperationPauseService } from './recovery/maintenance-lock-operation-pause-service.js';
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { registerArtworkRoutes } from './routes/artwork-routes.js';
+import { registerActivityRoutes } from './routes/activity-routes.js';
 import { registerAppUserRoutes } from './routes/app-user-routes.js';
 import { registerAuthRoutes } from './routes/auth-routes.js';
 import { registerAdminRecoveryRoutes } from './routes/admin-recovery-routes.js';
@@ -116,6 +118,7 @@ export function createApp({
   packageJsonPath,
   startedAt = new Date(),
   createArtworkModule: buildArtworkModule = createArtworkModule,
+  createActivityModule: buildActivityModule = createActivityModule,
   createAppUserModule: buildAppUserModule = createAppUserModule,
   createAuthModule: buildAuthModule = createAuthModule,
   createDeploymentSecurityService: buildDeploymentSecurityService = createDeploymentSecurityService,
@@ -130,6 +133,7 @@ export function createApp({
   createSlskdModule: buildSlskdModule = createSlskdModule,
   createSystemModule: buildSystemModule = createSystemModule,
   registerArtworkRoutes: mountArtworkRoutes = registerArtworkRoutes,
+  registerActivityRoutes: mountActivityRoutes = registerActivityRoutes,
   registerAppUserRoutes: mountAppUserRoutes = registerAppUserRoutes,
   registerAuthRoutes: mountAuthRoutes = registerAuthRoutes,
   registerAdminRecoveryRoutes: mountAdminRecoveryRoutes = registerAdminRecoveryRoutes,
@@ -198,6 +202,7 @@ export function createApp({
   });
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
+  const activityModule = buildActivityModule();
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
@@ -228,6 +233,7 @@ export function createApp({
       spotifyOAuthService: providerModule.spotifyOAuthService,
       youtubeOAuthService: providerModule.youtubeOAuthService,
     }),
+    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     settingsService,
     slskdService: slskdModule.slskdService,
   });
@@ -235,6 +241,7 @@ export function createApp({
     maintenanceLockOperationPauseService,
     providerHealthRecorder,
     reconcileWantedReleases: libraryModule.libraryWantedReleaseService.reconcileWantedReleases,
+    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
   });
   const dependencyHealthService = createDependencyHealthService({
     recorder: providerHealthRecorder,
@@ -339,6 +346,9 @@ export function createApp({
   });
   mountAppUserRoutes(app, {
     ...appUserModule.routeDependencies,
+  });
+  mountActivityRoutes(app, {
+    ...activityModule.routeDependencies,
   });
   mountArtworkRoutes(app, {
     ...artworkModule.routeDependencies,

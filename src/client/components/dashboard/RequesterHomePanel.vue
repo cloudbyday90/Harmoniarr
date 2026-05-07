@@ -26,16 +26,36 @@ import GridControls from '../GridControls.vue';
 import ReleaseCard from '../media/ReleaseCard.vue';
 import RequestButton from '../media/RequestButton.vue';
 import { useGridState } from '../../composables/useGridState.js';
+import { useActivityFeed } from '../../composables/useActivityFeed.js';
 import { useMonitoredArtists } from '../../composables/useMonitoredArtists.js';
 import { useReleaseRadar } from '../../composables/useReleaseRadar.js';
 import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../../composables/useRequestUsers.js';
 import { buildArtistDetailLocation } from '../../lib/artist-detail-route.js';
 import { getErrorMessage } from '../../lib/error-utils.js';
+import { getActivityEventLabel } from '../../lib/activity-event-normalization.js';
 import { getRadarWindowLabel } from '../../lib/release-radar-normalization.js';
 import { sessionStore } from '../../state/session.js';
 
 const { artists, errorMessage, isLoading, loadMonitoredArtists } = useMonitoredArtists({ limit: 25 });
+
+const activityFeed = useActivityFeed({ limit: 10 });
+const currentUserId = sessionStore.state.user?.id ?? null;
+
+function formatActivityTime(value) {
+  if (!value) return '';
+  try {
+    const d = new Date(value);
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return value;
+  }
+}
 
 const radar = useReleaseRadar();
 const radarStrip = computed(() => [
@@ -148,6 +168,7 @@ const sortedArtists = computed(() => {
 onMounted(() => {
   void loadMonitoredArtists();
   void radar.load();
+  void activityFeed.load();
 });
 </script>
 
@@ -272,6 +293,43 @@ onMounted(() => {
         </div>
       </RouterLink>
     </section>
+
+      <!-- Recent Household Activity (compact, last 10 events) -->
+      <section
+        v-if="activityFeed.hasEvents.value || activityFeed.isLoading.value"
+        class="requester-home-activity"
+        aria-label="Recent household activity"
+      >
+        <h2 class="requester-home-activity-title">Recent Activity</h2>
+        <p
+          v-if="activityFeed.isLoading.value"
+          class="requester-home-activity-loading"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          Loading activity…
+        </p>
+        <ul v-else class="requester-home-activity-list">
+          <li
+            v-for="event in activityFeed.events.value"
+            :key="event.id"
+            class="requester-home-activity-item"
+          >
+            <span class="requester-home-activity-dot" aria-hidden="true" />
+            <span class="requester-home-activity-label">
+              {{ getActivityEventLabel(event, currentUserId) }}
+            </span>
+            <time
+              v-if="event.occurredAt"
+              :datetime="event.occurredAt"
+              class="requester-home-activity-time"
+            >
+              {{ formatActivityTime(event.occurredAt) }}
+            </time>
+          </li>
+        </ul>
+      </section>
+
     </template>
 
   </section>
@@ -377,5 +435,62 @@ onMounted(() => {
   width: 40%;
   height: 40%;
   max-width: 64px;
+}
+
+/* ── Recent Activity panel ───────────────────────────────────────────────── */
+.requester-home-activity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+}
+
+.requester-home-activity-title {
+  font-size: var(--hx-text-base);
+  font-weight: var(--hx-font-semibold, 600);
+  margin: 0;
+}
+
+.requester-home-activity-loading {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-text-muted);
+}
+
+.requester-home-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.requester-home-activity-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: var(--hx-surface-raised, #1e1e1e);
+}
+
+.requester-home-activity-dot {
+  flex-shrink: 0;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: var(--hx-accent, #6ea8fe);
+  align-self: center;
+}
+
+.requester-home-activity-label {
+  flex: 1;
+  font-size: var(--hx-text-sm);
+}
+
+.requester-home-activity-time {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--hx-text-muted);
+  white-space: nowrap;
 }
 </style>

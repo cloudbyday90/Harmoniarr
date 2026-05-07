@@ -284,6 +284,7 @@ test('metadata artist monitoring route updates the shared monitoring payload', a
     assert.equal(response.status, 200);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.deepEqual(updateMetadataArtistMonitoring.mock.calls[0].arguments[0], {
+      actorUserId: 'user-1',
       metadataArtistId: 'local-artist-1',
       patch: {
         isMonitored: true,

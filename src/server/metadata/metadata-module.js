@@ -56,6 +56,7 @@ export function createMetadataModule({
   metadataRefreshService = null,
   metadataSearchService = null,
   providerHealthRecorder = null,
+  recordActivityEventFn = null,
   musicBrainzCatalogService = null,
   musicBrainzImportService = null,
   musicBrainzSearchService = null,
@@ -77,6 +78,7 @@ export function createMetadataModule({
   const resolvedMetadataMonitoringService = metadataMonitoringService ?? createMetadataMonitoringService({
     metadataMonitoringStore: resolvedMetadataMonitoringStore,
     metadataRefreshSchedulerService: resolvedMetadataRefreshSchedulerService,
+    recordActivityEventFn,
   });
   const resolvedMetadataRefreshService = metadataRefreshService ?? createMetadataRefreshService({
     getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,

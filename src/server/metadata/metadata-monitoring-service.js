@@ -69,17 +69,20 @@ export function createMetadataMonitoringService({
   getPoolFn = getPool,
   metadataMonitoringStore = createMetadataMonitoringStore(),
   metadataRefreshSchedulerService = createMetadataRefreshSchedulerService({ metadataMonitoringStore }),
+  recordActivityEventFn = null,
 } = {}) {
   async function ensureArtistExists(metadataArtistId) {
     const pool = getPoolFn();
     const result = await pool.query(
-      'SELECT id FROM metadata_artists WHERE id = $1 LIMIT 1',
+      'SELECT id, name FROM metadata_artists WHERE id = $1 LIMIT 1',
       [metadataArtistId],
     );
 
     if (result.rows.length === 0) {
       throw createMetadataNotFoundError('artist', metadataArtistId);
     }
+
+    return result.rows[0];
   }
 
   async function getArtistMonitoring({ metadataArtistId }) {
@@ -87,8 +90,8 @@ export function createMetadataMonitoringService({
     return metadataMonitoringStore.getArtistMonitoring(metadataArtistId);
   }
 
-  async function updateArtistMonitoring({ metadataArtistId, patch }) {
-    await ensureArtistExists(metadataArtistId);
+  async function updateArtistMonitoring({ metadataArtistId, patch, actorUserId = null }) {
+    const artist = await ensureArtistExists(metadataArtistId);
     const normalizedPatch = normalizeArtistMonitoringPatch(patch ?? {});
 
     await metadataMonitoringStore.upsertArtistMonitoring({
@@ -100,6 +103,16 @@ export function createMetadataMonitoringService({
       await metadataRefreshSchedulerService.ensureArtistRefreshScheduled({ metadataArtistId });
     } else {
       await metadataRefreshSchedulerService.clearArtistRefreshSchedule({ metadataArtistId });
+    }
+
+    if (normalizedPatch.isMonitored && typeof recordActivityEventFn === 'function') {
+      void recordActivityEventFn({
+        actorUserId,
+        entityId: metadataArtistId,
+        entityTitle: artist.name ?? null,
+        entityType: 'artist',
+        eventType: 'artist_monitored',
+      }).catch(() => {});
     }
 
     return {
