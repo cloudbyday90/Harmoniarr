@@ -101,6 +101,7 @@
   --hx-topbar-height: 56px;
   --hx-sidebar-width: 220px;
   --hx-sidebar-width-collapsed: 64px;
+  --hx-bottom-nav-height: 60px;
 }
 
 /* ---------- Dark theme tokens ----------
@@ -813,6 +814,170 @@ body,
   line-height: 1.55;
 }
 
+/* ---------- Mobile navigation shell ---------- */
+
+/*
+ * Hamburger toggle — shown only on mobile via the 640px media query.
+ * Hidden by default on desktop so there is no layout shift.
+ */
+.hx-topbar-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--hx-radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--hx-text-on-dark);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.hx-topbar-hamburger:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--hx-border-on-dark);
+}
+
+.hx-topbar-hamburger svg {
+  width: 18px;
+  height: 18px;
+}
+
+/*
+ * Sidebar backdrop — full-screen dark overlay behind the drawer on mobile.
+ * CSS sets display: none globally; the media query allows it to appear on
+ * narrow viewports.  Vue v-show (set by AppShell) controls actual visibility,
+ * so on desktop the backdrop never renders even if sidebarOpen is true.
+ */
+.hx-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: var(--hx-topbar-height) 0 0 0;
+  background: var(--hx-bg-overlay);
+  z-index: 45;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/*
+ * Bottom navigation — fixed tab bar replacing the sidebar on mobile.
+ * Hidden on desktop; shown via the 640px media query.
+ * Height includes the iOS safe-area-inset-bottom so content is not
+ * obscured by the home indicator on notched devices.
+ */
+.hx-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--hx-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--hx-bg-sidebar);
+  border-top: 1px solid rgba(0, 0, 0, 0.5);
+  z-index: 30;
+}
+
+.hx-bottom-nav-list {
+  display: flex;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hx-bottom-nav-list li {
+  flex: 1;
+  display: flex;
+}
+
+.hx-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  color: var(--hx-text-on-dark-muted);
+  text-decoration: none;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  position: relative;
+  min-height: 44px;
+}
+
+/* Active-tab indicator: top line drawn with a pseudo-element */
+.hx-bottom-nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.hx-bottom-nav-item.router-link-active,
+.hx-bottom-nav-item.is-active {
+  color: var(--hx-accent);
+}
+
+.hx-bottom-nav-item.router-link-active::before,
+.hx-bottom-nav-item.is-active::before {
+  background: var(--hx-accent);
+}
+
+.hx-bottom-nav-item-icon {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hx-bottom-nav-item-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hx-bottom-nav-item-label {
+  font-size: 0.65rem;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
+}
+
+.hx-bottom-nav-badge {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 20px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--hx-danger);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 960px) {
@@ -838,16 +1003,25 @@ body,
 }
 
 @media (max-width: 640px) {
+  /* Show mobile-only elements */
+  .hx-bottom-nav { display: block; }
+  .hx-topbar-hamburger { display: inline-flex; }
+  /* Backdrop: CSS allows it to render; v-show controls actual visibility */
+  .hx-sidebar-backdrop { display: block; }
+
+  /* Remove sidebar column — main content fills the full width */
   .hx-app {
     grid-template-columns: 1fr;
   }
 
+  /* Sidebar becomes a fixed drawer that slides in from the left */
   .hx-sidebar {
     position: fixed;
     inset: var(--hx-topbar-height) auto 0 0;
     width: 240px;
     transform: translateX(-100%);
     transition: transform 160ms ease;
+    z-index: 50;
   }
 
   .hx-sidebar.is-open { transform: translateX(0); }
@@ -859,6 +1033,12 @@ body,
   .hx-topbar-brand { padding: 0 var(--hx-space-3); border-right: 0; }
   .hx-topbar-brand-name { display: inline; }
   .hx-topbar-search { display: none; }
+
+  /* Status pills are operator-only diagnostics — hide on mobile */
+  .hx-topbar-pill { display: none; }
+
+  /* Main content: lift above the fixed bottom nav */
+  .hx-main { padding-bottom: var(--hx-bottom-nav-height); }
 }
 
 /* ---------- Legacy primitive overrides — flatten old styles to ops-console aesthetic ---------- */

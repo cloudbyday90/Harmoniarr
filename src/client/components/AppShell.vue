@@ -18,7 +18,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import harmoniarrIcon from '../assets/harmoniarr-icon.svg';
 import { sessionStore } from '../state/session.js';
 import { useShellHeartbeat } from '../composables/useShellHeartbeat.js';
@@ -29,6 +29,22 @@ import { useTheme } from '../composables/useTheme.js';
 import ToastStack from './ToastStack.vue';
 
 const router = useRouter();
+const route = useRoute();
+
+// ── Mobile sidebar drawer ─────────────────────────────────────────────────────
+
+const sidebarOpen = ref(false);
+
+function toggleSidebar() {
+  sidebarOpen.value = !sidebarOpen.value;
+}
+
+function closeSidebar() {
+  sidebarOpen.value = false;
+}
+
+// Close the drawer automatically when the user navigates to a new route.
+watch(() => route.path, () => { sidebarOpen.value = false; });
 
 // Theme — applied immediately (composable calls applyToDocument in constructor)
 // and kept reactive. Provided as injection so child views can read/set preference.
@@ -195,6 +211,21 @@ const visibleNav = computed(() => {
       </div>
 
       <div class="hx-topbar-actions">
+        <!-- Hamburger: hidden on desktop via CSS, visible at ≤640px -->
+        <button
+          type="button"
+          class="hx-topbar-hamburger"
+          :aria-label="sidebarOpen ? 'Close menu' : 'Open menu'"
+          :aria-expanded="sidebarOpen"
+          @click="toggleSidebar"
+        >
+          <svg v-if="!sidebarOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M3 6h18M3 12h18M3 18h18"/>
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
         <span
           class="hx-topbar-pill"
           :data-status="healthStatus"
@@ -302,7 +333,7 @@ const visibleNav = computed(() => {
       </div>
     </header>
 
-    <aside class="hx-sidebar" aria-label="Primary">
+    <aside class="hx-sidebar" :class="{ 'is-open': sidebarOpen }" aria-label="Primary">
       <nav class="hx-sidebar-nav">
         <RouterLink
           v-for="item in visibleNav"
@@ -335,6 +366,38 @@ const visibleNav = computed(() => {
     <main class="hx-main" id="main-content">
       <RouterView />
     </main>
+
+    <!-- Mobile: backdrop behind the sidebar drawer (v-show + CSS media query) -->
+    <button
+      v-show="sidebarOpen"
+      class="hx-sidebar-backdrop"
+      aria-hidden="true"
+      tabindex="-1"
+      @click="closeSidebar"
+    />
+
+    <!-- Mobile: bottom tab bar (hidden on desktop via CSS) -->
+    <nav class="hx-bottom-nav" aria-label="Mobile navigation">
+      <ul class="hx-bottom-nav-list" role="list">
+        <li v-for="item in visibleNav" :key="item.name">
+          <RouterLink :to="{ name: item.name }" class="hx-bottom-nav-item" :aria-label="item.badge ? `${item.label} (${item.badge} notifications)` : item.label">
+            <span class="hx-bottom-nav-item-icon" aria-hidden="true">
+              <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+              <svg v-else-if="item.icon === 'discover'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>
+              <svg v-else-if="item.icon === 'missing'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6"/><circle cx="12" cy="16.5" r="0.8" fill="currentColor"/></svg>
+              <svg v-else-if="item.icon === 'library'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="4" width="10" height="5" rx="1.5"/><rect x="5" y="10" width="14" height="5" rx="1.5"/><rect x="3" y="16" width="18" height="5" rx="1.5"/></svg>
+              <svg v-else-if="item.icon === 'activity'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+              <svg v-else-if="item.icon === 'search'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <svg v-else-if="item.icon === 'settings'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+              <svg v-else-if="item.icon === 'requests'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H7l-3 3z"/></svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            </span>
+            <span class="hx-bottom-nav-item-label">{{ item.label }}</span>
+            <span v-if="item.badge" class="hx-bottom-nav-badge" aria-hidden="true">{{ item.badge }}</span>
+          </RouterLink>
+        </li>
+      </ul>
+    </nav>
 
     <ToastStack />
   </div>
