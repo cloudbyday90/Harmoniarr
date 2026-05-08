@@ -197,3 +197,70 @@ async function cacheFirstShell(request) {
     return Response.error();
   }
 }
+
+// ── Push notifications ────────────────────────────────────────────────────────
+
+/**
+ * Push event: received a push message from the server.
+ *
+ * The payload is a JSON object: { title, body, icon?, url? }
+ * Defaults are used if the payload is absent or malformed.
+ */
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    if (event.data) {
+      data = event.data.json();
+    }
+  } catch {
+    // Malformed JSON — use defaults.
+  }
+
+  const title = typeof data.title === 'string' && data.title ? data.title : 'Harmoniarr';
+  const body = typeof data.body === 'string' && data.body ? data.body : 'You have a new notification.';
+  const icon = typeof data.icon === 'string' && data.icon ? data.icon : '/icons/icon-192.png';
+  const badge = '/icons/icon-192.png';
+  const url = typeof data.url === 'string' && data.url ? data.url : '/app/my-requests';
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      badge,
+      body,
+      data: { url },
+      icon,
+    }),
+  );
+});
+
+/**
+ * Notification click: open / focus the app and navigate to the linked route.
+ *
+ * Iterates over open clients first to avoid opening a duplicate tab.
+ */
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url ?? '/app/my-requests';
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ includeUncontrolled: true, type: 'window' })
+      .then((clientList) => {
+        // If the app is already open, focus it and navigate.
+        for (const client of clientList) {
+          if ('focus' in client) {
+            client.focus();
+            if ('navigate' in client) {
+              client.navigate(targetUrl);
+            }
+            return;
+          }
+        }
+
+        // No open window — open a new one.
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl);
+        }
+      }),
+  );
+});

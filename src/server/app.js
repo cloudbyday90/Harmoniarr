@@ -207,9 +207,18 @@ export function createApp({
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const activityModule = buildActivityModule();
+  const pushModule = buildPushModule();
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
+    sendFulfillmentNotificationFn: ({ userId }) => pushModule.pushNotificationService.sendNotificationToUser({
+      payload: JSON.stringify({
+        body: 'Your requested music has been added to your library.',
+        title: 'Music request ready',
+        url: '/app/my-requests',
+      }),
+      userId,
+    }),
     mediaInspectionService: createMediaInspectionService({
       ffprobeBin: ffprobeBinary,
       getMediaToolingStatus: mediaToolingStatusService.getStatus,
@@ -260,7 +269,6 @@ export function createApp({
       },
     ],
   });
-  const pushModule = buildPushModule();
 
   const systemModule = buildSystemModule({
     appleMusicStatusService: providerModule.appleMusicStatusService,

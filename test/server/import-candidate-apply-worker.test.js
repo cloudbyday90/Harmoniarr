@@ -216,3 +216,143 @@ test('import apply worker upgrades skipped-file applies to applied_with_warnings
   assert.equal(updateImportApplyRunItem.mock.calls[0].arguments[0].itemStatus, 'applied_with_warnings');
   assert.match(updateImportApplyRunItem.mock.calls[0].arguments[0].statusMessage, /skipped by saved operator decision/);
 });
+
+test('import apply worker fires sendFulfillmentNotificationFn fire-and-forget when candidate has requestOwnership', async (t) => {
+  let notifiedUserId = null;
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview: async () => ({
+      executionMode: 'move',
+      fileOperations: [{ status: 'applied' }],
+      summary: {
+        appliedFileCount: 1,
+        failedFileCount: 0,
+        notAttemptedCount: 0,
+        stagedFromSourceCount: 1,
+        totalFiles: 1,
+      },
+    }),
+    buildImportPendingCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
+      importPendingCandidates: [{
+        applyPreview: {
+          counts: { totalFiles: 1 },
+          summary: { status: 'ready' },
+        },
+        fileCount: 1,
+        folderPath: 'Artist/Album',
+        id: 'candidate-notify-1',
+        importPendingAt: '2026-04-30T12:00:00.000Z',
+        importStatus: { code: 'ready', message: 'Ready.' },
+        lockedFileCount: 0,
+        planning: {},
+        requestOwnership: {
+          sourceMediaRequestId: 'request-uuid-1',
+          sourceRequestedByUserId: 'user-by-uuid',
+          sourceRequestedForUserId: 'user-for-uuid',
+          sourceType: 'media_request',
+        },
+        sourceProvider: 'slskd',
+        sourceSearchId: 'search-notify-1',
+        totalSizeBytes: 50000,
+        username: 'source-user',
+      }],
+    }),
+    markImportCandidateApplied: async () => ({}),
+    markRunCompleted: async () => { resolveCompleted(); },
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => ({
+      counts: { totalFiles: 1 },
+      files: [],
+      summary: { status: 'ready' },
+    }),
+    releaseLease: async () => {},
+    replaceImportApplyRunItems: async () => [],
+    sendFulfillmentNotificationFn: async ({ userId }) => {
+      notifiedUserId = userId;
+    },
+    updateImportApplyRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId: 'run-notify-1',
+  });
+
+  await completed;
+
+  assert.equal(notifiedUserId, 'user-for-uuid', 'should notify sourceRequestedForUserId');
+});
+
+test('import apply worker does not call sendFulfillmentNotificationFn when candidate has no requestOwnership', async (t) => {
+  let notifyCallCount = 0;
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview: async () => ({
+      executionMode: 'move',
+      fileOperations: [{ status: 'applied' }],
+      summary: {
+        appliedFileCount: 1,
+        failedFileCount: 0,
+        notAttemptedCount: 0,
+        stagedFromSourceCount: 1,
+        totalFiles: 1,
+      },
+    }),
+    buildImportPendingCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
+      importPendingCandidates: [{
+        applyPreview: { counts: { totalFiles: 1 }, summary: { status: 'ready' } },
+        fileCount: 1,
+        folderPath: 'Artist/Album',
+        id: 'candidate-no-ownership',
+        importPendingAt: '2026-04-30T12:00:00.000Z',
+        importStatus: { code: 'ready', message: 'Ready.' },
+        lockedFileCount: 0,
+        planning: {},
+        requestOwnership: null,
+        sourceProvider: 'slskd',
+        sourceSearchId: 'search-no-own',
+        totalSizeBytes: 50000,
+        username: 'source-user',
+      }],
+    }),
+    markImportCandidateApplied: async () => ({}),
+    markRunCompleted: async () => { resolveCompleted(); },
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => ({
+      counts: { totalFiles: 1 },
+      files: [],
+      summary: { status: 'ready' },
+    }),
+    releaseLease: async () => {},
+    replaceImportApplyRunItems: async () => [],
+    sendFulfillmentNotificationFn: async () => {
+      notifyCallCount += 1;
+    },
+    updateImportApplyRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId: 'run-no-notify-1',
+  });
+
+  await completed;
+
+  assert.equal(notifyCallCount, 0, 'should not call sendFulfillmentNotificationFn when no requestOwnership');
+});

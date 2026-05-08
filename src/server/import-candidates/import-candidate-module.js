@@ -61,6 +61,7 @@ export function createImportCandidateModule({
     status: 'healthy',
   }),
   getAppUserById = null,
+  sendFulfillmentNotificationFn = null,
   slskdService,
   mediaInspectionService = createMediaInspectionService({
     getMediaToolingStatus,
@@ -155,6 +156,7 @@ export function createImportCandidateModule({
     releaseLease: importCandidateApplyRunStore.releaseLease,
     renewLease: importCandidateApplyRunStore.renewLease,
     replaceImportApplyRunItems,
+    sendFulfillmentNotificationFn,
     updateImportApplyRunItem,
   }),
   importCandidateMediaInspectionWorker = createImportCandidateMediaInspectionWorker({

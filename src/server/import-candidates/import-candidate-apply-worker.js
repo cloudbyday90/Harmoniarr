@@ -131,6 +131,7 @@ export function createImportCandidateApplyWorker({
   releaseLease,
   renewLease,
   replaceImportApplyRunItems = async () => [],
+  sendFulfillmentNotificationFn = null,
   updateImportApplyRunItem = async () => null,
 } = {}) {
   const activeRunIds = new Set();
@@ -243,6 +244,13 @@ export function createImportCandidateApplyWorker({
               importCandidateId: summaryCandidate.id,
               reason: statusMessage,
             });
+
+            const notifyUserId = summaryCandidate.requestOwnership?.sourceRequestedForUserId
+              ?? summaryCandidate.requestOwnership?.sourceRequestedByUserId
+              ?? null;
+            if (notifyUserId && typeof sendFulfillmentNotificationFn === 'function') {
+              void sendFulfillmentNotificationFn({ userId: notifyUserId }).catch(() => {});
+            }
           }
         } catch (error) {
           counts.applyFailed += 1;

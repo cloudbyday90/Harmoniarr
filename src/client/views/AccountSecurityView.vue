@@ -21,6 +21,7 @@ import { computed, inject, onMounted, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { buildAuditActivityLinkTarget } from '../lib/audit-activity-links.js';
 import { useAccountSecurity } from '../composables/useAccountSecurity.js';
+import { usePushNotifications } from '../composables/usePushNotifications.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
@@ -55,6 +56,17 @@ const {
   successMessage,
 } = useAccountSecurity();
 
+const {
+  checkSubscriptionStatus: checkPushStatus,
+  errorMessage: pushErrorMessage,
+  isLoading: isPushLoading,
+  isSubscribed: isPushSubscribed,
+  isSupported: isPushSupported,
+  permissionState: pushPermissionState,
+  subscribe: subscribePush,
+  unsubscribe: unsubscribePush,
+} = usePushNotifications();
+
 const isPasswordMismatch = computed(() => form.newPassword !== form.confirmPassword);
 const linkedRecentActivity = computed(() => recentActivity.value.map((event) => ({
   ...event,
@@ -82,6 +94,7 @@ async function submitPasswordChange() {
 }
 
 onMounted(() => {
+  void checkPushStatus();
   void loadSessions();
   void loadRecentActivity();
 });
@@ -159,6 +172,47 @@ function formatUserAgent(ua) {
           Dark
         </button>
       </div>
+    </article>
+
+    <article class="panel-light">
+      <h3>Push notifications</h3>
+      <p class="metadata-card-copy">
+        Get notified when your music requests are ready, even when Harmoniarr isn't open.
+      </p>
+      <p class="muted-copy" v-if="!isPushSupported">
+        Push notifications are not supported in this browser.
+      </p>
+      <template v-else>
+        <p class="error-copy" v-if="pushPermissionState === 'denied'">
+          Notification permission was blocked. Enable notifications in your browser settings to receive alerts.
+        </p>
+        <template v-else>
+          <p class="metadata-card-copy" v-if="isPushSubscribed">
+            Notifications are enabled on this device.
+          </p>
+          <p class="metadata-card-copy" v-else>
+            Notifications are not enabled on this device.
+          </p>
+          <p class="error-copy" v-if="pushErrorMessage">{{ pushErrorMessage }}</p>
+          <button
+            v-if="!isPushSubscribed"
+            type="button"
+            :disabled="isPushLoading"
+            @click="subscribePush"
+          >
+            {{ isPushLoading ? 'Enabling\u2026' : 'Enable notifications' }}
+          </button>
+          <button
+            v-else
+            type="button"
+            class="secondary-button"
+            :disabled="isPushLoading"
+            @click="unsubscribePush"
+          >
+            {{ isPushLoading ? 'Disabling\u2026' : 'Disable notifications' }}
+          </button>
+        </template>
+      </template>
     </article>
 
     <article class="panel-light">
