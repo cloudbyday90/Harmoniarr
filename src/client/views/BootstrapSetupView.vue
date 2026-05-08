@@ -28,33 +28,8 @@ const router = useRouter();
 const form = reactive({ claimCode: '', email: '', password: '', confirmPassword: '', username: '' });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
-const {
-  errorMessage: bootstrapStatusError,
-  isLoading: isLoadingBootstrapStatus,
-  loadStatus,
-  ownerClaimSummary,
-  pathValidationSummary,
-} = useBootstrapStatus();
+const { loadStatus, ownerClaimSummary } = useBootstrapStatus();
 const supportItems = computed(() => buildAuthEntrySupportItems('bootstrap'));
-
-function formatCheckedAt(value) {
-  if (!value) {
-    return 'Unavailable';
-  }
-
-  return new Date(value).toLocaleString();
-}
-
-function statusLabel(status) {
-  switch (status) {
-    case 'healthy':
-      return 'Ready';
-    case 'degraded':
-      return 'Needs attention';
-    default:
-      return 'Unavailable';
-  }
-}
 
 onMounted(() => {
   void loadStatus();
@@ -91,36 +66,6 @@ async function submit() {
     description="New installs start here. Harmoniarr already has the runtime, migrations, and protected routes in place, but the first administrator still needs to be established."
     :support-items="supportItems"
   >
-    <article class="panel-light bootstrap-status-card">
-      <p class="eyebrow">Setup preflight</p>
-      <h2>Validate shared paths before scan and import</h2>
-      <p class="muted-copy">
-        Harmoniarr reuses the same non-destructive path checks from settings and system health
-        so first-run setup can surface local filesystem issues early.
-      </p>
-      <p v-if="isLoadingBootstrapStatus">Checking the current shared path validation summary...</p>
-      <p class="error-copy" v-else-if="bootstrapStatusError">{{ bootstrapStatusError }}</p>
-      <template v-else-if="pathValidationSummary">
-        <p class="status-chip" :data-status="pathValidationSummary.status">
-          {{ statusLabel(pathValidationSummary.status) }}
-        </p>
-        <p>{{ pathValidationSummary.message }}</p>
-        <ul class="status-metrics">
-          <li>
-            <span>Configured download mappings</span>
-            <strong>{{ pathValidationSummary.configuredDownloadMappings }}</strong>
-          </li>
-          <li>
-            <span>Last checked</span>
-            <strong>{{ formatCheckedAt(pathValidationSummary.checkedAt) }}</strong>
-          </li>
-        </ul>
-        <p class="muted-copy">
-          Resolve setup issues in Settings after creating the admin account, before scans or imports.
-        </p>
-      </template>
-    </article>
-
     <article class="form-card panel-light auth-entry-form-card">
       <h2>{{ ownerClaimSummary?.required ? 'Claim owner account' : 'Create admin account' }}</h2>
       <p class="auth-entry-form-copy">This form establishes the first durable administrator for the install.</p>

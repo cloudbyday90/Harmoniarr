@@ -60,3 +60,74 @@ test('useBootstrapStatus clears stale state on bootstrap status failures', async
   assert.equal(workflow.ownerClaimSummary.value, null);
   assert.equal(workflow.isLoading.value, false);
 });
+
+test('useBootstrapStatus ownerClaimSummary is null when ownerClaim is absent from response', async () => {
+  const workflow = useBootstrapStatus({
+    fetchBootstrapStatus: async () => ({
+      bootstrapRequired: true,
+      pathValidation: {
+        checkedAt: '2026-05-01T10:00:00.000Z',
+        configuredDownloadMappings: 1,
+        summary: { status: 'healthy', message: 'All paths accessible' },
+      },
+    }),
+  });
+
+  await workflow.loadStatus();
+
+  assert.equal(workflow.ownerClaimSummary.value, null);
+});
+
+test('useBootstrapStatus ownerClaimSummary reflects non-required owner claim installs', async () => {
+  const workflow = useBootstrapStatus({
+    fetchBootstrapStatus: async () => ({
+      bootstrapRequired: true,
+      ownerClaim: {
+        required: false,
+        authMethods: ['local'],
+        usernameHint: null,
+        emailHint: null,
+        emailRequired: false,
+      },
+    }),
+  });
+
+  await workflow.loadStatus();
+
+  assert.deepEqual(workflow.ownerClaimSummary.value, {
+    required: false,
+    authMethods: ['local'],
+    usernameHint: null,
+    emailHint: null,
+    emailRequired: false,
+  });
+});
+
+test('useBootstrapStatus pathValidationSummary status defaults to unavailable when summary is absent', async () => {
+  const workflow = useBootstrapStatus({
+    fetchBootstrapStatus: async () => ({
+      bootstrapRequired: true,
+      pathValidation: {
+        checkedAt: null,
+        configuredDownloadMappings: 0,
+      },
+    }),
+  });
+
+  await workflow.loadStatus();
+
+  assert.equal(workflow.pathValidationSummary.value.status, 'unavailable');
+  assert.equal(workflow.pathValidationSummary.value.message, '');
+});
+
+test('useBootstrapStatus pathValidationSummary is null when pathValidation is absent from response', async () => {
+  const workflow = useBootstrapStatus({
+    fetchBootstrapStatus: async () => ({
+      bootstrapRequired: true,
+    }),
+  });
+
+  await workflow.loadStatus();
+
+  assert.equal(workflow.pathValidationSummary.value, null);
+});
