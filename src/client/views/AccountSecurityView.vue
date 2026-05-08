@@ -17,10 +17,11 @@
 -->
 
 <script setup>
-import { computed, inject, onMounted, reactive } from 'vue';
+import { computed, inject, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { buildAuditActivityLinkTarget } from '../lib/audit-activity-links.js';
 import { useAccountSecurity } from '../composables/useAccountSecurity.js';
+import { useAccountPreferences } from '../composables/useAccountPreferences.js';
 import { usePushNotifications } from '../composables/usePushNotifications.js';
 import { sessionStore } from '../state/session.js';
 
@@ -57,6 +58,31 @@ const {
 } = useAccountSecurity();
 
 const {
+  errorMessage: preferencesErrorMessage,
+  isLoading: isPreferencesLoading,
+  loadPreferences,
+  preferences,
+  savePreferences,
+} = useAccountPreferences();
+
+// Local draft for the preferences form — avoids touching shared state mid-edit.
+const preferencesDraft = reactive({ preferredFormat: 'any', minimumQuality: 'any' });
+
+function syncDraftFromPreferences() {
+  preferencesDraft.preferredFormat = preferences.value.preferredFormat;
+  preferencesDraft.minimumQuality = preferences.value.minimumQuality;
+}
+
+async function submitPreferences() {
+  await savePreferences({
+    preferredFormat: preferencesDraft.preferredFormat,
+    minimumQuality: preferencesDraft.minimumQuality,
+  });
+  // Keep draft in sync if the server normalised any value.
+  syncDraftFromPreferences();
+}
+
+const {
   checkSubscriptionStatus: checkPushStatus,
   errorMessage: pushErrorMessage,
   isLoading: isPushLoading,
@@ -72,6 +98,7 @@ const linkedRecentActivity = computed(() => recentActivity.value.map((event) => 
   ...event,
   linkTarget: buildAuditActivityLinkTarget(event),
 })));
+  void loadPreferences().then(syncDraftFromPreferences);
 const redirectTarget = computed(() => typeof route.query.redirect === 'string' ? route.query.redirect : '');
 
 async function submitPasswordChange() {
@@ -174,7 +201,37 @@ function formatUserAgent(ua) {
       </div>
     </article>
 
+    <articImport preferences</h3>
+      <p class="metadata-card-copy">
+        Set your preferred audio format and minimum quality for media requests. These are used as defaults when submitting new requests.
+      </p>
+      <form class="stack-form" @submit.prevent="submitPreferences">
+        <label>
+          Preferred format
+          <select v-model="preferencesDraft.preferredFormat" :disabled="isPreferencesLoading">
+            <option value="any">Any format</option>
+            <option value="flac">FLAC (lossless)</option>
+            <option value="mp3_320">MP3 320 kbps</option>
+            <option value="mp3_v0">MP3 V0 (variable)</option>
+          </select>
+        </label>
+        <label>
+          Minimum quality
+          <select v-model="preferencesDraft.minimumQuality" :disabled="isPreferencesLoading">
+            <option value="any">Any quality</option>
+            <option value="lossless">Lossless only</option>
+            <option value="high">High quality (320+ / lossless)</option>
+          </select>
+        </label>
+        <p class="error-copy" v-if="preferencesErrorMessage">{{ preferencesErrorMessage }}</p>
+        <button type="submit" :disabled="isPreferencesLoading">
+          {{ isPreferencesLoading ? 'Saving\u2026' : 'Save preferences' }}
+        </button>
+      </form>
+    </article>
+
     <article class="panel-light">
+      <h3>le class="panel-light">
       <h3>Push notifications</h3>
       <p class="metadata-card-copy">
         Get notified when your music requests are ready, even when Harmoniarr isn't open.
