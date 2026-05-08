@@ -51,6 +51,7 @@ test('createAppUserService lists users with resolved permission sets', async (t)
     plexProfile: null,
     role: 'requester',
     updatedAt: '2026-05-02T15:00:00.000Z',
+    userPreferences: { preferredFormat: 'any', minimumQuality: 'any' },
     username: 'listener',
   }]);
 });
@@ -133,6 +134,7 @@ test('createAppUserService creates a user with the requested role and audit evid
     plexProfile: null,
     role: 'operator',
     updatedAt: '2026-05-02T15:05:00.000Z',
+    userPreferences: { preferredFormat: 'any', minimumQuality: 'any' },
     username: 'curator',
   });
   assert.equal(recordAuditEventFn.mock.callCount(), 1);

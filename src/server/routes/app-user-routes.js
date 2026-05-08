@@ -33,6 +33,7 @@ export function registerAppUserRoutes(app, {
   claimManagedLibraryRoot = defaultAppUserProvisioningService.claimManagedLibraryRoot,
   createAppUser = defaultAppUserService.createAppUser,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
+  getUserPreferences = defaultAppUserService.getUserPreferences,
   issueAppUserClaimCode = null,
   listAppUsers = defaultAppUserService.listAppUsers,
   relinkPlexDirectoryConflict = null,
@@ -45,6 +46,7 @@ export function registerAppUserRoutes(app, {
   requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
   roleOptions = defaultAppUserService.roleOptions,
   updateAppUser = defaultAppUserService.updateAppUser,
+  updateUserPreferences = defaultAppUserService.updateUserPreferences,
 } = {}) {
   app.get('/api/v1/users', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
@@ -149,6 +151,28 @@ export function registerAppUserRoutes(app, {
       provisioning: result.provisioning,
       user: result.user,
     });
+  }));
+
+  app.get('/api/v1/users/me/preferences', asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+
+    const preferences = await getUserPreferences({ userId: session.appUserId });
+
+    response.json({ ok: true, preferences });
+  }));
+
+  app.patch('/api/v1/users/me/preferences', asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+
+    const preferences = await updateUserPreferences({
+      actorUserId: session.appUserId,
+      preferences: request.body,
+      requestMetadata: getRequestMetadata(request),
+      userId: session.appUserId,
+    });
+
+    response.json({ ok: true, preferences });
   }));
 
   app.post('/api/v1/users/me/claim-managed-library-root', asyncRoute(async (request, response) => {

@@ -27,12 +27,78 @@ import { normalizeOptionalManagedLibraryRelativeRoot } from './paths/user-music-
 import { hashPassword } from './security.js';
 import { normalizeUsername, validatePassword } from './validators/auth-validator.js';
 
+/** Allowed values for the per-user preferred audio format preference. */
+export const VALID_PREFERRED_FORMATS = /** @type {const} */ (['any', 'flac', 'mp3_320', 'mp3_v0']);
+
+/** Allowed values for the per-user minimum quality floor preference. */
+export const VALID_MINIMUM_QUALITIES = /** @type {const} */ (['any', 'lossless', 'high']);
+
 function normalizeUserId(value) {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw createApiError(400, 'validation_error', 'User id must be a non-empty string');
   }
 
   return value.trim();
+}
+
+/**
+ * Produce a fully-normalised preferences object from a raw JSONB value.
+ * Missing or invalid keys fall back to the safe default 'any'.
+ *
+ * @param {unknown} raw - the raw value stored in the database column (may be null or partial)
+ * @returns {{ preferredFormat: string, minimumQuality: string }}
+ */
+export function normalizeUserPreferences(raw) {
+  const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+
+  return {
+    preferredFormat: VALID_PREFERRED_FORMATS.includes(obj.preferredFormat)
+      ? obj.preferredFormat
+      : 'any',
+    minimumQuality: VALID_MINIMUM_QUALITIES.includes(obj.minimumQuality)
+      ? obj.minimumQuality
+      : 'any',
+  };
+}
+
+/**
+ * Validate a preferences patch from an API request body.
+ * Returns a clean object containing only recognised, valid keys.
+ * Throws a 400 API error for any invalid field value.
+ *
+ * @param {unknown} patch - raw request body
+ * @returns {{ preferredFormat?: string, minimumQuality?: string }}
+ */
+function validatePreferencesPatch(patch) {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    throw createApiError(400, 'validation_error', 'Preferences must be an object');
+  }
+
+  const cleaned = {};
+
+  if ('preferredFormat' in patch) {
+    if (!VALID_PREFERRED_FORMATS.includes(patch.preferredFormat)) {
+      throw createApiError(
+        400,
+        'validation_error',
+        `preferredFormat must be one of: ${VALID_PREFERRED_FORMATS.join(', ')}`,
+      );
+    }
+    cleaned.preferredFormat = patch.preferredFormat;
+  }
+
+  if ('minimumQuality' in patch) {
+    if (!VALID_MINIMUM_QUALITIES.includes(patch.minimumQuality)) {
+      throw createApiError(
+        400,
+        'validation_error',
+        `minimumQuality must be one of: ${VALID_MINIMUM_QUALITIES.join(', ')}`,
+      );
+    }
+    cleaned.minimumQuality = patch.minimumQuality;
+  }
+
+  return cleaned;
 }
 
 function mapAppUserRow(row, permissionService) {
@@ -73,6 +139,7 @@ function mapAppUserRow(row, permissionService) {
     plexProfile,
     role: row.role,
     updatedAt: row.updated_at,
+    userPreferences: normalizeUserPreferences(row.user_preferences),
     username: row.username,
   };
 }
@@ -332,12 +399,71 @@ export function createAppUserService({
     }
   }
 
+  async function getUserPreferences({ userId }) {
+    const normalizedUserId = normalizeUserId(userId);
+    const result = await getPoolFn().query(
+      `SELECT user_preferences FROM app_users WHERE id = $1 LIMIT 1`,
+      [normalizedUserId],
+    );
+
+    if ((result.rowCount ?? result.rows.length ?? 0) === 0) {
+      throw createApiError(404, 'app_user_not_found', 'The requested user could not be found');
+    }
+
+    return normalizeUserPreferences(result.rows[0].user_preferences);
+  }
+
+  async function updateUserPreferences({ actorUserId, requestMetadata, userId, preferences }) {
+    const normalizedActorUserId = normalizeUserId(actorUserId);
+    const normalizedUserId = normalizeUserId(userId);
+
+    const cleanedPatch = validatePreferencesPatch(preferences);
+
+    if (Object.keys(cleanedPatch).length === 0) {
+      throw createApiError(400, 'validation_error', 'At least one preference field must be provided');
+    }
+
+    // Merge the patch into the existing JSONB value so unspecified keys are preserved.
+    const result = await getPoolFn().query(
+      `
+        UPDATE app_users
+        SET user_preferences = user_preferences || $2::jsonb,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING user_preferences
+      `,
+      [normalizedUserId, JSON.stringify(cleanedPatch)],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw createApiError(404, 'app_user_not_found', 'The requested user could not be found');
+    }
+
+    const updatedPreferences = normalizeUserPreferences(result.rows[0].user_preferences);
+
+    await recordAuditEventFn({
+      actorUserId: normalizedActorUserId,
+      actorType: 'user',
+      details: { preferences: updatedPreferences },
+      entityId: normalizedUserId,
+      entityType: 'app_user',
+      eventType: 'app_user_preferences_updated',
+      ipAddress: requestMetadata?.ipAddress ?? null,
+      summary: 'App user preferences updated',
+      userAgent: requestMetadata?.userAgent ?? null,
+    });
+
+    return updatedPreferences;
+  }
+
   return {
     createAppUser,
     getAppUserById,
+    getUserPreferences,
     listAppUsers,
     resetAppUserPassword,
     roleOptions: [...permissionService.roleOptions],
     updateAppUser,
+    updateUserPreferences,
   };
 }

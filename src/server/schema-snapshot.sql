@@ -3560,3 +3560,40 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260603_010000_add_user_preferences.sql
+-- Checksum: 94709b598bc58d15c7c59348eed557b67455ee95d30b326327d96bfa54ff6a30
+-- Add user_preferences JSONB column to app_users.
+-- Stores per-user format and quality preferences used during import candidate
+-- evaluation and download result scoring.
+--
+-- Default: empty object.  Application layer normalises missing keys to 'any'.
+
+ALTER TABLE app_users
+  ADD COLUMN IF NOT EXISTS user_preferences JSONB NOT NULL DEFAULT '{}';
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260603_010000',
+  '20260603_010000_add_user_preferences.sql',
+  'add_user_preferences',
+  '94709b598bc58d15c7c59348eed557b67455ee95d30b326327d96bfa54ff6a30',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

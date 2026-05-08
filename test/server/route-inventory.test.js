@@ -80,6 +80,7 @@ function collectRegisteredRoutes() {
     claimManagedLibraryRoot: asyncNoopResult({}),
     createAppUser: asyncNoopResult({}),
     getRequestMetadata: () => ({}),
+    getUserPreferences: asyncNoopResult({ preferredFormat: 'any', minimumQuality: 'any' }),
     issueAppUserClaimCode: asyncNoopResult({}),
     listAppUsers: asyncNoopResult([]),
     relinkPlexDirectoryConflict: asyncNoopResult({}),
@@ -92,6 +93,7 @@ function collectRegisteredRoutes() {
     requireFreshSession: asyncNoopResult({ appUserId: 'user-1' }),
     roleOptions: ['admin', 'operator', 'requester'],
     updateAppUser: asyncNoopResult({}),
+    updateUserPreferences: asyncNoopResult({ preferredFormat: 'any', minimumQuality: 'any' }),
   });
 
   registerArtworkRoutes(app, {
