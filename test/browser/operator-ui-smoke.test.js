@@ -61,11 +61,11 @@ suite('browser operator workflow smoke coverage', () => {
 
       await page.getByRole('link', { name: 'Settings' }).click();
       await page.waitForURL(/\/app\/settings(?:\?.*)?(?:#.*)?$/);
-      await waitForHeading(page, 'Configuration workspace');
+      await waitForHeading(page, 'Settings');
 
       await page.getByRole('link', { name: 'Activity' }).click();
       await page.waitForURL(/\/app\/activity(?:\/operations)?(?:\?.*)?(?:#.*)?$/);
-      await waitForHeading(page, 'Queued, active, and completed automation');
+      await waitForHeading(page, 'Operations');
 
       await page.getByRole('link', { name: 'Candidates' }).click();
       await page.waitForURL(/\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/);
@@ -75,16 +75,16 @@ suite('browser operator workflow smoke coverage', () => {
       await page.waitForURL(/\/app\/settings(?:\?.*)?(?:#.*)?$/);
       await page.getByRole('link', { name: 'Backup & Restore' }).click();
       await page.waitForURL(/\/app\/settings\/recovery(?:\?.*)?(?:#.*)?$/);
-      await waitForHeading(page, 'Backups, restore checks, and safe maintenance');
+      await waitForHeading(page, 'Backups');
 
       await page.getByRole('button', { name: 'Create backup' }).click();
-      await page.getByRole('link', { name: 'Download JSON' }).waitFor();
-      await page.getByText('This backup passed the current restore checks and can be applied when you are ready.').waitFor();
+      await page.getByRole('link', { name: 'Download' }).waitFor();
+      await page.getByText('This backup passed all checks and can be applied.').waitFor();
 
       const applyRestoreButton = page.getByRole('button', { name: 'Apply restore' });
       assert.equal(await applyRestoreButton.isDisabled(), true);
 
-      await page.getByLabel('I have reviewed this backup and understand that restore apply changes current state immediately.').check();
+      await page.getByLabel("I've reviewed this backup and understand it will change current data immediately.").check();
       assert.equal(await applyRestoreButton.isDisabled(), false);
 
       await page.locator('.hx-topbar-user').click();
