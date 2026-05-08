@@ -130,7 +130,7 @@ function closeDetailModal() {
 
 /** Displayed artist name — local metadata preferred, query hint as fallback. */
 const artistName = computed(() => {
-  return artist.value?.name ?? nameHint.value || 'Artist';
+  return (artist.value?.name ?? nameHint.value) || 'Artist';
 });
 
 /** Short metadata line under the artist name. */

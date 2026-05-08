@@ -1,0 +1,33 @@
+{
+  "name": "Harmoniarr",
+  "short_name": "Harmoniarr",
+  "description": "Soulseek-native music library manager. Find, request, and track your music collection.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#131825",
+  "theme_color": "#131825",
+  "lang": "en",
+  "categories": ["music", "entertainment", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
