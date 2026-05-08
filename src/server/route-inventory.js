@@ -18,6 +18,9 @@
 
 export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/activity/feed', access: 'authenticated', area: 'activity', kind: 'read' },
+  { method: 'GET', path: '/api/v1/push/vapid-public-key', access: 'public', area: 'push', kind: 'read' },
+  { method: 'POST', path: '/api/v1/push/subscribe', access: 'authenticated', area: 'push', kind: 'mutation' },
+  { method: 'DELETE', path: '/api/v1/push/subscribe', access: 'authenticated', area: 'push', kind: 'mutation' },
   { method: 'GET', path: '/healthz', access: 'public', area: 'system', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/bootstrap/status', access: 'public', area: 'auth', kind: 'diagnostic' },
   { method: 'POST', path: '/api/v1/bootstrap/admin', access: 'public', area: 'auth', kind: 'mutation' },

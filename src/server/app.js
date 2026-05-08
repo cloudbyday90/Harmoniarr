@@ -33,6 +33,7 @@ import {
 } from './http-hardening.js';
 import { createImportCandidateModule } from './import-candidates/import-candidate-module.js';
 import { createLibraryModule } from './library/library-module.js';
+import { createPushModule } from './push/push-module.js';
 import { createMediaCommandService } from './media/media-command-service.js';
 import { createMediaInspectionService } from './media/media-inspection-service.js';
 import { createMetadataModule } from './metadata/metadata-module.js';
@@ -56,6 +57,7 @@ import { registerLibraryRoutes } from './routes/library-routes.js';
 import { registerMetadataRoutes } from './routes/metadata-routes.js';
 import { registerOperationsRoutes } from './routes/operations-routes.js';
 import { registerProviderRoutes } from './routes/provider-routes.js';
+import { registerPushRoutes } from './routes/push-routes.js';
 import { registerSlskdRoutes } from './routes/slskd-routes.js';
 import { registerSystemRoutes } from './routes/system-routes.js';
 import { createRuntimeResourceService } from './runtime-resource-service.js';
@@ -124,6 +126,7 @@ export function createApp({
   createDeploymentSecurityService: buildDeploymentSecurityService = createDeploymentSecurityService,
   createImportCandidateModule: buildImportCandidateModule = createImportCandidateModule,
   createLibraryModule: buildLibraryModule = createLibraryModule,
+  createPushModule: buildPushModule = createPushModule,
   createMediaToolingStatusService: buildMediaToolingStatusService = createMediaToolingStatusService,
   createMetadataModule: buildMetadataModule = createMetadataModule,
   createOperationsModule: buildOperationsModule = createOperationsModule,
@@ -142,6 +145,7 @@ export function createApp({
   registerMetadataRoutes: mountMetadataRoutes = registerMetadataRoutes,
   registerOperationsRoutes: mountOperationsRoutes = registerOperationsRoutes,
   registerProviderRoutes: mountProviderRoutes = registerProviderRoutes,
+  registerPushRoutes: mountPushRoutes = registerPushRoutes,
   registerSlskdRoutes: mountSlskdRoutes = registerSlskdRoutes,
   registerSystemRoutes: mountSystemRoutes = registerSystemRoutes,
 } = {}) {
@@ -256,6 +260,8 @@ export function createApp({
       },
     ],
   });
+  const pushModule = buildPushModule();
+
   const systemModule = buildSystemModule({
     appleMusicStatusService: providerModule.appleMusicStatusService,
     appPort,
@@ -349,6 +355,9 @@ export function createApp({
   });
   mountActivityRoutes(app, {
     ...activityModule.routeDependencies,
+  });
+  mountPushRoutes(app, {
+    ...pushModule.routeDependencies,
   });
   mountArtworkRoutes(app, {
     ...artworkModule.routeDependencies,
