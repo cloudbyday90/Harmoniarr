@@ -659,4 +659,18 @@ onBeforeUnmount(() => clearPollTimer());
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /*
+   * The music search form row is: [input flex:1] [submit button].
+   * On narrow screens the button compresses the input.  Stack them so
+   * the input takes full width and the button sits below.
+   */
+  .search-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 </style>

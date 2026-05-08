@@ -629,4 +629,22 @@ const sortOrderLabel = computed(() =>
   from { stroke-dashoffset: 0; }
   to { stroke-dashoffset: -40; }
 }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+
+/*
+ * The filter panel is position: absolute; right: 0.  On a narrow phone the
+ * parent .grid-controls-filter-trigger-wrap may be near the left edge of the
+ * screen, so "right: 0" aligns the panel's right edge to the trigger — but
+ * the panel's min-width (220px) then pushes it off the left edge.
+ *
+ * Fix: switch to left: 0 alignment so the panel grows rightward from the
+ * trigger, which always has space to the right on mobile.
+ */
+@media (max-width: 640px) {
+  .grid-controls-panel {
+    right: auto;
+    left: 0;
+  }
+}
 </style>

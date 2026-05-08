@@ -1096,6 +1096,31 @@ body,
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* ── Tab bar ─────────────────────────────────────────────────────────── */
+
+  /*
+   * Make each tab a proper touch target (min 44px) and slightly smaller text
+   * so more tabs fit across a 360px phone without truncation.
+   */
+  .hx-tab {
+    font-size: var(--hx-text-sm);
+    padding: 11px var(--hx-space-3);
+    min-height: 44px;
+  }
+
+  /* ── Form rows ───────────────────────────────────────────────────────── */
+
+  /*
+   * .hx-form-row (used in Settings, SearchView network form, etc.) uses
+   * flex with flex: 1 1 200px fields — on narrow screens those fields will
+   * wrap but still try to reach 200px.  Override to always full-width.
+   */
+  .hx-form-row {
+    flex-direction: column;
+  }
+
+  .hx-form-row > .hx-field { flex: 1 1 auto; }
 }
 
 /* ---------- Legacy primitive overrides — flatten old styles to ops-console aesthetic ---------- */
