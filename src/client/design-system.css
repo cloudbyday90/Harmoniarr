@@ -1121,6 +1121,26 @@ body,
   }
 
   .hx-form-row > .hx-field { flex: 1 1 auto; }
+
+  /* ── Touch targets ───────────────────────────────────────────────────── */
+
+  /*
+   * WCAG 2.5.5 recommends a minimum 44×44 CSS px touch target size.
+   * .hx-btn defaults to height: 32px on desktop — fine with a pointer, but
+   * uncomfortably small for a finger on mobile.
+   *
+   * min-height (not height) lets the button grow when its label wraps; the
+   * 32px desktop height is preserved on wider viewports.
+   */
+  .hx-btn {
+    min-height: 44px;
+  }
+
+  /* Icon buttons are square — raise both dimensions together */
+  .hx-btn-icon {
+    width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* ---------- Legacy primitive overrides — flatten old styles to ops-console aesthetic ---------- */

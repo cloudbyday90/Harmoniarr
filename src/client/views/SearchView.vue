@@ -672,5 +672,14 @@ onBeforeUnmount(() => clearPollTimer());
     flex-direction: column;
     align-items: stretch;
   }
+
+  /*
+   * .search-grid sets --hx-artwork-grid-min: 160px via scoped styles, which
+   * wins over the global 640px rule due to scoped-attribute specificity.
+   * Re-override here so two columns still render on narrow phones.
+   */
+  .search-grid {
+    --hx-artwork-grid-min: 140px;
+  }
 }
 </style>

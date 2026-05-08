@@ -207,4 +207,17 @@ onMounted(() => {
 .my-requests-grid {
   --hx-artwork-grid-min: 160px;
 }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /*
+   * .my-requests-grid sets --hx-artwork-grid-min: 160px via scoped styles,
+   * which wins over the global 640px rule due to scoped-attribute specificity.
+   * Re-override here so two columns still render on narrow phones.
+   */
+  .my-requests-grid {
+    --hx-artwork-grid-min: 140px;
+  }
+}
 </style>
