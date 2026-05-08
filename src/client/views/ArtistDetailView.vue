@@ -479,4 +479,19 @@ watch(mbid, (newMbid, oldMbid) => {
   white-space: nowrap;
   width: 100%;
 }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /* Stack artwork above the text + actions so neither element is squished */
+  .artist-detail-header {
+    flex-direction: column;
+    gap: var(--hx-space-4);
+  }
+
+  /* Let the actions row fill the full width so buttons wrap naturally */
+  .artist-detail-header-actions {
+    width: 100%;
+  }
+}
 </style>

@@ -1039,6 +1039,49 @@ body,
 
   /* Main content: lift above the fixed bottom nav */
   .hx-main { padding-bottom: var(--hx-bottom-nav-height); }
+
+  /* ── Page layout ─────────────────────────────────────────────────────── */
+
+  /* Tighter page gutter so content reaches closer to the screen edges */
+  .hx-page {
+    padding: var(--hx-space-3) var(--hx-space-3) var(--hx-space-6);
+    gap: var(--hx-space-4);
+  }
+
+  /* Stack title and actions so neither is compressed by the other */
+  .hx-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--hx-space-2);
+  }
+
+  /* Scale the page title down one step (1.4rem → 1.15rem) */
+  .hx-page-title { font-size: var(--hx-text-lg); }
+
+  /* ── Card grids ──────────────────────────────────────────────────────── */
+
+  /*
+   * Force the minimum column width down so cards auto-fill at 2-per-row on
+   * a typical 360px phone.  The custom property can still be overridden per
+   * view (e.g. search sets --hx-artwork-grid-min: 160px).
+   */
+  .hx-artwork-grid {
+    --hx-artwork-grid-min: 140px;
+    gap: var(--hx-space-3);
+  }
+
+  /* ── Stat blocks ─────────────────────────────────────────────────────── */
+
+  /* 2 columns fit comfortably at 360px+ and avoid wasted space */
+  .hx-stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--hx-space-3);
+  }
+
+  /* ── Settings 2-col ─────────────────────────────────────────────────── */
+
+  /* Collapse side-by-side setting sections into a single column */
+  .cfg-2col { grid-template-columns: 1fr; }
 }
 
 /* ---------- Legacy primitive overrides — flatten old styles to ops-console aesthetic ---------- */
