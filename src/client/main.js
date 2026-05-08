@@ -20,6 +20,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import { createAuthFailureHandler } from './lib/auth-failure-handler.js';
 import { setAuthFailureHandler } from './lib/api.js';
+import { createPwaRegistration } from './lib/pwa-registration.js';
 import router from './router.js';
 import { sessionStore } from './state/session.js';
 import './styles.css';
@@ -27,4 +28,11 @@ import './design-system.css';
 
 setAuthFailureHandler(createAuthFailureHandler({ router, sessionStore }));
 
-createApp(App).use(router).mount('#app');
+const app = createApp(App).use(router);
+app.mount('#app');
+
+// Register the service worker after the app mounts so the critical render path
+// is never blocked. Only runs in production builds.
+if (import.meta.env.PROD) {
+  createPwaRegistration().init();
+}

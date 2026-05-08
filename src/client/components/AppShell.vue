@@ -27,6 +27,7 @@ import { fetchSystemOperatorNotifications } from '../lib/system-api.js';
 import { fetchMyRequestSummary } from '../lib/media-request-api.js';
 import { useTheme } from '../composables/useTheme.js';
 import ToastStack from './ToastStack.vue';
+import PwaUpdateBanner from './PwaUpdateBanner.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -400,6 +401,7 @@ const visibleNav = computed(() => {
     </nav>
 
     <ToastStack />
+    <PwaUpdateBanner />
   </div>
 </template>
 
