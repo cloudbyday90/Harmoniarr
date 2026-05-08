@@ -21,10 +21,6 @@ import { RouterLink } from 'vue-router';
 
 defineProps({
   description: {
-    required: true,
-    type: String,
-  },
-  detail: {
     default: '',
     type: String,
   },
@@ -32,21 +28,9 @@ defineProps({
     required: true,
     type: String,
   },
-  supportCopy: {
-    default: 'Choose the path that matches your current task. Related access routes stay outside the primary form so the main action remains clear.',
-    type: String,
-  },
   supportItems: {
     default: () => [],
     type: Array,
-  },
-  supportLabel: {
-    default: 'Access paths',
-    type: String,
-  },
-  supportTitle: {
-    default: 'Related entry points',
-    type: String,
   },
   title: {
     required: true,
@@ -56,40 +40,26 @@ defineProps({
 </script>
 
 <template>
-  <section class="auth-layout auth-entry-layout">
-    <aside class="panel-dark auth-entry-hero">
-      <div class="auth-entry-copy">
+  <div class="auth-page">
+    <div class="auth-shell">
+      <div class="auth-shell-wordmark" aria-label="Harmoniarr">Harmoniarr</div>
+
+      <header class="auth-shell-heading">
         <p class="eyebrow">{{ eyebrow }}</p>
         <h1>{{ title }}</h1>
-        <p class="auth-entry-body-copy">{{ description }}</p>
-        <p v-if="detail" class="auth-entry-detail-copy">{{ detail }}</p>
-      </div>
+        <p v-if="description">{{ description }}</p>
+      </header>
 
-      <article class="auth-entry-context-card">
-        <p class="eyebrow">{{ supportLabel }}</p>
-        <strong class="auth-entry-context-title">{{ supportTitle }}</strong>
-        <p class="auth-entry-context-copy">{{ supportCopy }}</p>
-
-        <div class="auth-entry-support-list" v-if="supportItems.length">
-          <template v-for="item in supportItems" :key="item.id">
-            <RouterLink v-if="item.to" class="auth-entry-support-item" :to="item.to">
-              <strong>{{ item.label }}</strong>
-              <p>{{ item.description }}</p>
-            </RouterLink>
-            <article v-else class="auth-entry-support-item">
-              <strong>{{ item.label }}</strong>
-              <p>{{ item.description }}</p>
-            </article>
-          </template>
-        </div>
-      </article>
-
-      <slot name="hero-footer" />
-    </aside>
-
-    <main class="auth-entry-content">
       <slot name="status" />
+
       <slot />
-    </main>
-  </section>
+
+      <nav v-if="supportItems.length" class="auth-footer-links" aria-label="Related entry points">
+        <template v-for="item in supportItems" :key="item.id">
+          <RouterLink v-if="item.to" class="auth-footer-link" :to="item.to">{{ item.label }}</RouterLink>
+          <span v-else class="auth-footer-link auth-footer-link--static">{{ item.label }}</span>
+        </template>
+      </nav>
+    </div>
+  </div>
 </template>

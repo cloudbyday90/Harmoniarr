@@ -69,9 +69,7 @@ async function submit() {
     eyebrow="Claim access"
     title="Activate an existing account"
     description="Use a one-time claim code from an administrator to set the first local password for an existing Harmoniarr account."
-    detail="Claiming an account does not sign you in automatically. After the claim succeeds, return to normal login and continue there."
     :support-items="supportItems"
-    support-title="Related auth routes"
   >
     <article class="form-card panel-light auth-entry-form-card">
       <h2>Claim account</h2>

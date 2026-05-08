@@ -43,3 +43,32 @@ test('bootstrap auth entry support uses informational notes instead of dead-end 
     ],
   );
 });
+
+test('recovery auth entry support returns login and claim-account paths', () => {
+  assert.deepEqual(
+    buildAuthEntrySupportItems('recovery').map((item) => item.id),
+    ['login', 'claim-account'],
+  );
+});
+
+test('all auth entry surface items carry a non-empty label for footer link rendering', () => {
+  const surfaces = ['login', 'claim-account', 'bootstrap', 'recovery'];
+  for (const surface of surfaces) {
+    const items = buildAuthEntrySupportItems(surface);
+    for (const item of items) {
+      assert.ok(typeof item.label === 'string' && item.label.length > 0,
+        `${surface}/${item.id} must have a non-empty label`);
+    }
+  }
+});
+
+test('unknown surface returns an empty array', () => {
+  assert.deepEqual(buildAuthEntrySupportItems('nonexistent'), []);
+});
+
+test('auth entry support ignores whitespace-only username when building prefill routes', () => {
+  const items = buildAuthEntrySupportItems('login', { username: '   ' });
+  const claimItem = items.find((item) => item.id === 'claim-account');
+
+  assert.deepEqual(claimItem.to, { name: 'claim-account' });
+});

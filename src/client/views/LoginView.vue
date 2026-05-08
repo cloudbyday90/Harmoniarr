@@ -67,9 +67,7 @@ async function submit() {
     eyebrow="Local access"
     title="Log in to Harmoniarr"
     description="Use your local Harmoniarr account to manage requests, imports, diagnostics, and recovery from the same protected browser session."
-    detail="If an administrator issued a claim code, set that password first, then come back here to log in normally."
     :support-items="supportItems"
-    support-title="Choose the right entry path"
   >
     <template #status>
       <article class="panel-light bootstrap-status-card" v-if="infoMessage">

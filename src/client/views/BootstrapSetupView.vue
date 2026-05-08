@@ -89,9 +89,7 @@ async function submit() {
     eyebrow="First-run setup"
     :title="ownerClaimSummary?.required ? 'Claim the configured owner account' : 'Create the first admin account'"
     description="New installs start here. Harmoniarr already has the runtime, migrations, and protected routes in place, but the first administrator still needs to be established."
-    :detail="ownerClaimSummary?.required ? 'This install was preconfigured with an owner claim secret, so setup must match the expected owner identity before the first admin can be created.' : ''"
     :support-items="supportItems"
-    support-title="How this setup fits the auth family"
   >
     <article class="panel-light bootstrap-status-card">
       <p class="eyebrow">Setup preflight</p>

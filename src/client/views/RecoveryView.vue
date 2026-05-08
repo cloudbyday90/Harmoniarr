@@ -121,9 +121,7 @@ function goToLogin() {
     eyebrow="Bootstrap-admin recovery"
     title="Recover admin access"
     description="Use this only when an operator armed bootstrap-admin recovery from the command line. Completing recovery revokes existing sessions and restores local admin access."
-    detail="This is an emergency path, not the ordinary account-claim flow. Use the recovery code shown by harmoniarrctl and set a new local admin password."
     :support-items="supportItems"
-    support-title="Related auth routes"
   >
     <article class="panel-light bootstrap-status-card" v-if="isLoading">
       <p class="eyebrow">Checking recovery status</p>
