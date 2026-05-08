@@ -153,4 +153,24 @@ const { toasts, dismiss } = useToast();
 .hx-toast-move {
   transition: transform 200ms ease;
 }
+
+/* ── Mobile: lift toasts above the bottom navigation bar ────────────────── */
+@media (max-width: 640px) {
+  .hx-toast-stack {
+    /* Sit just above the bottom nav so toasts are never hidden behind it */
+    bottom: calc(var(--hx-bottom-nav-height, 60px) + var(--hx-space-3, 12px));
+    /* Full-width with symmetric gutters */
+    left: var(--hx-space-3, 12px);
+    right: var(--hx-space-3, 12px);
+    width: auto;
+    max-width: none;
+  }
+
+  /* Slide in from bottom on mobile instead of from the right */
+  .hx-toast-enter-from,
+  .hx-toast-leave-to {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
 </style>

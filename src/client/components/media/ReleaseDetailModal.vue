@@ -753,4 +753,27 @@ function formatDuration(ms) {
   gap: var(--hx-space-2);
   flex-wrap: wrap;
 }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+
+/*
+ * The dialog is width: min(640px, 96vw).  On a phone (≤~430px) that equals
+ * ~96vw, leaving the body ~96vw - 40px of usable width after padding.
+ * Stack artwork above the info text so neither is cramped.
+ */
+@media (max-width: 640px) {
+  .rdm-hero {
+    flex-direction: column;
+    gap: var(--hx-space-3);
+  }
+
+  .rdm-artwork {
+    width: 5rem;
+    height: 5rem;
+  }
+
+  .rdm-body {
+    padding: var(--hx-space-4);
+  }
+}
 </style>

@@ -1082,6 +1082,20 @@ body,
 
   /* Collapse side-by-side setting sections into a single column */
   .cfg-2col { grid-template-columns: 1fr; }
+
+  /* ── Tables ──────────────────────────────────────────────────────────── */
+
+  /*
+   * Tables in cards (e.g. OperatorDashboardPanel) are not wrapped in the
+   * .hx-table-scroll helper.  At mobile widths they would overflow the
+   * viewport.  Setting display: block allows the table element itself to
+   * scroll horizontally without altering how cells are rendered inside.
+   */
+  .hx-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* ---------- Legacy primitive overrides — flatten old styles to ops-console aesthetic ---------- */
