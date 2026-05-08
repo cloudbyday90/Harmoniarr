@@ -493,4 +493,37 @@ onMounted(() => {
   color: var(--hx-text-muted);
   white-space: nowrap;
 }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /*
+   * .requester-home-grid overrides --hx-artwork-grid-min: 160px via scoped
+   * styles, winning over the global 640px rule.  Re-override so two columns
+   * still fit on narrow phones.
+   */
+  .requester-home-grid {
+    --hx-artwork-grid-min: 140px;
+  }
+
+  /*
+   * The radar strip scrolls horizontally.  Hide the scrollbar on mobile
+   * (the scroll affordance is implied by the card edge peeking at the right).
+   */
+  .radar-strip-scroll {
+    scrollbar-width: none;
+  }
+
+  .radar-strip-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+   * Slightly narrower cards so two-and-a-half cards peek on a 360px phone,
+   * giving a clear horizontal-scroll affordance.
+   */
+  .radar-strip-card {
+    flex: 0 0 140px;
+  }
+}
 </style>

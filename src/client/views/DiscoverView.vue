@@ -476,4 +476,26 @@ function artistInitial(artist) {
   padding-top: var(--hx-space-2);
   border-top: 1px solid var(--hx-border);
 }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /*
+   * Stack the search input + button vertically on narrow screens.
+   * Mirrors the same fix applied to SearchView in chunk 4.
+   */
+  .discover-search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /*
+   * .discover-grid overrides --hx-artwork-grid-min: 160px via scoped styles,
+   * which wins over the global 640px rule due to scoped-attribute specificity.
+   * Re-override here so two columns still render on narrow phones.
+   */
+  .discover-grid {
+    --hx-artwork-grid-min: 140px;
+  }
+}
 </style>
