@@ -14,3 +14,8 @@ coverage/
 # Playwright MCP preview output
 .playwright-mcp/
 harmoniarr-icon-preview.png
+artifacts/
+test-error.png
+test-icon.png
+test-icon.mjs
+test.html
