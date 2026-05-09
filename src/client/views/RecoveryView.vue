@@ -21,6 +21,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
+import { usePasswordMatch } from '../composables/usePasswordMatch.js';
 import { useRecoveryStatus } from '../composables/useRecoveryStatus.js';
 
 const router = useRouter();
@@ -44,6 +45,10 @@ const {
   submitRecovery,
 } = useRecoveryStatus();
 const supportItems = computed(() => buildAuthEntrySupportItems('recovery', { username: form.username }));
+const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch } = usePasswordMatch(
+  () => form.password,
+  () => form.confirmPassword,
+);
 
 const countdownDisplay = computed(() => {
   const total = secondsRemaining.value;
@@ -206,8 +211,10 @@ function goToLogin() {
           </label>
           <label>
             Confirm password
-            <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required :disabled="formDisabled" />
+            <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required :disabled="formDisabled" @input="markConfirmTouched" />
           </label>
+          <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
+          <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
           <p class="error-copy" v-if="validationError">{{ validationError }}</p>
           <p class="error-copy" v-else-if="errorMessage">{{ errorMessage }}</p>
           <button type="submit" :disabled="formDisabled">

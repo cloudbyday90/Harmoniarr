@@ -22,9 +22,12 @@ import { useRoute, useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
 import { claimAccount } from '../lib/auth-api.js';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
+import { useAutoFocus } from '../composables/useAutoFocus.js';
+import { usePasswordMatch } from '../composables/usePasswordMatch.js';
 
 const route = useRoute();
 const router = useRouter();
+const firstInput = ref(null);
 const form = reactive({
   claimCode: '',
   confirmPassword: '',
@@ -34,6 +37,11 @@ const form = reactive({
 const errorMessage = ref('');
 const isSubmitting = ref(false);
 const supportItems = computed(() => buildAuthEntrySupportItems('claim-account', { username: form.username }));
+useAutoFocus(firstInput);
+const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch } = usePasswordMatch(
+  () => form.password,
+  () => form.confirmPassword,
+);
 
 async function submit() {
   errorMessage.value = '';
@@ -77,7 +85,7 @@ async function submit() {
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username or email
-          <input v-model="form.username" autocomplete="username" required />
+          <input ref="firstInput" v-model="form.username" autocomplete="username" required />
         </label>
         <label>
           Claim code
@@ -89,8 +97,10 @@ async function submit() {
         </label>
         <label>
           Confirm password
-          <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required />
+          <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required @input="markConfirmTouched" />
         </label>
+        <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
+        <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
         <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
         <button type="submit" :disabled="isSubmitting">
           {{ isSubmitting ? 'Claiming...' : 'Claim account' }}

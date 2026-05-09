@@ -21,10 +21,12 @@ import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
+import { useAutoFocus } from '../composables/useAutoFocus.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 const router = useRouter();
+const firstInput = ref(null);
 const form = reactive({
   username: typeof route.query.username === 'string' ? route.query.username : '',
   password: '',
@@ -47,6 +49,7 @@ const infoMessage = computed(() => {
   return '';
 });
 const supportItems = computed(() => buildAuthEntrySupportItems('login', { username: form.username }));
+useAutoFocus(firstInput);
 
 async function submit() {
   errorMessage.value = '';
@@ -83,7 +86,7 @@ async function submit() {
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username or email
-          <input v-model="form.username" autocomplete="username" required />
+          <input ref="firstInput" v-model="form.username" autocomplete="username" required />
         </label>
         <label>
           Password

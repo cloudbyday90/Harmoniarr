@@ -21,15 +21,23 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
+import { useAutoFocus } from '../composables/useAutoFocus.js';
 import { useBootstrapStatus } from '../composables/useBootstrapStatus.js';
+import { usePasswordMatch } from '../composables/usePasswordMatch.js';
 import { sessionStore } from '../state/session.js';
 
 const router = useRouter();
+const firstInput = ref(null);
 const form = reactive({ claimCode: '', email: '', password: '', confirmPassword: '', username: '' });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
 const { loadStatus, ownerClaimSummary } = useBootstrapStatus();
 const supportItems = computed(() => buildAuthEntrySupportItems('bootstrap'));
+useAutoFocus(firstInput);
+const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch } = usePasswordMatch(
+  () => form.password,
+  () => form.confirmPassword,
+);
 
 onMounted(() => {
   void loadStatus();
@@ -77,6 +85,7 @@ async function submit() {
         <label>
           Username
           <input
+            ref="firstInput"
             v-model="form.username"
             :placeholder="ownerClaimSummary?.usernameHint ?? ''"
             autocomplete="username"
@@ -104,8 +113,10 @@ async function submit() {
         </label>
         <label>
           Confirm password
-          <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required />
+          <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required @input="markConfirmTouched" />
         </label>
+        <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
+        <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>
         <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
         <button type="submit" :disabled="isSubmitting">
           {{ isSubmitting ? 'Creating account...' : 'Create bootstrap admin' }}

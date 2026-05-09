@@ -282,6 +282,20 @@ label {
   color: #445754;
 }
 
+.auth-pw-hint {
+  margin: -4px 0 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.auth-pw-hint--mismatch {
+  color: #9a2f2d;
+}
+
+.auth-pw-hint--match {
+  color: #1c6246;
+}
+
 .status-chip {
   display: inline-flex;
   width: fit-content;
