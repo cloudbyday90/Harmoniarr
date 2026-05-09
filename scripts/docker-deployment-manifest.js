@@ -56,6 +56,16 @@ function createValidationSummary(validation) {
   };
 }
 
+function createSkippedValidationSummary(reason) {
+  return {
+    evidencePath: null,
+    projectName: null,
+    reason,
+    status: 'skipped',
+    validationKind: null,
+  };
+}
+
 export function createDockerDeploymentManifest({
   generatedAt = new Date().toISOString(),
   validationResult,
@@ -71,6 +81,9 @@ export function createDockerDeploymentManifest({
     imageRef: validationResult.imageRef ?? null,
     schemaVersion: 1,
     validations: {
+      browserSmoke: validationResult.browserSmoke
+        ? createValidationSummary(validationResult.browserSmoke)
+        : createSkippedValidationSummary('browser smoke evidence was not requested for this run'),
       freshInstall: createValidationSummary(validationResult.freshInstall),
       releasedImage: createValidationSummary(validationResult.releasedImage),
       upgradePath: createValidationSummary(validationResult.upgradePath),

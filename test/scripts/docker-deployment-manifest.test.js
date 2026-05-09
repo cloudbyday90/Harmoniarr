@@ -30,6 +30,15 @@ function createValidationResult() {
         projectName: 'harmoniarrsmoke-release',
       },
     },
+    browserSmoke: {
+      evidencePath: resolve('artifacts/docker', 'harmoniarr-docker-browser-smoke.json'),
+      reason: null,
+      status: 'passed',
+      validationKind: 'browser-operator-smoke',
+      validationResult: {
+        checkpoints: ['login_completed', 'recovery_loaded'],
+      },
+    },
     upgradePath: {
       evidencePath: null,
       reason: 'HARMONIARR_BASELINE_IMAGE is not configured',
@@ -53,6 +62,13 @@ test('createDockerDeploymentManifest summarizes the deployment validation result
     imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:candidate',
     schemaVersion: 1,
     validations: {
+      browserSmoke: {
+        evidencePath: resolve('artifacts/docker', 'harmoniarr-docker-browser-smoke.json'),
+        projectName: null,
+        reason: null,
+        status: 'passed',
+        validationKind: 'browser-operator-smoke',
+      },
       freshInstall: {
         evidencePath: resolve('artifacts/docker', 'harmoniarr-docker-smoke-fresh-install.json'),
         projectName: 'harmoniarrsmoke-fresh',
@@ -75,6 +91,24 @@ test('createDockerDeploymentManifest summarizes the deployment validation result
         validationKind: null,
       },
     },
+  });
+});
+
+test('createDockerDeploymentManifest sets skipped browser summary when browser evidence is absent', () => {
+  const validationResult = createValidationResult();
+  delete validationResult.browserSmoke;
+
+  const manifest = createDockerDeploymentManifest({
+    generatedAt: '2026-05-04T00:00:00.000Z',
+    validationResult,
+  });
+
+  assert.deepEqual(manifest.validations.browserSmoke, {
+    evidencePath: null,
+    projectName: null,
+    reason: 'browser smoke evidence was not requested for this run',
+    status: 'skipped',
+    validationKind: null,
   });
 });
 
