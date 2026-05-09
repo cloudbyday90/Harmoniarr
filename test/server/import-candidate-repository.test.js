@@ -52,7 +52,7 @@ test('listImportCandidates applies bounded filters and deterministic ordering', 
   assert.match(sql, /username ILIKE \$3 ESCAPE/);
   assert.match(sql, /folder_path ILIKE \$4 ESCAPE/);
   assert.match(sql, /normalized_payload -> 'requestOwnership' ->> 'sourceRequestedForUserId' = \$5/);
-  assert.match(sql, /ORDER BY discovered_at DESC, created_at DESC, id ASC/);
+  assert.match(sql, /ORDER BY \(normalized_payload->>'compositeScore'\)::numeric DESC NULLS LAST, discovered_at DESC, created_at DESC, id ASC/);
   assert.match(sql, /LIMIT \$6/);
   assert.match(sql, /OFFSET \$7/);
   assert.deepEqual(values, [

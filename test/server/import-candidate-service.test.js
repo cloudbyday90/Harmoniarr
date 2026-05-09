@@ -718,3 +718,125 @@ test('createImportCandidateService rolls back candidate ingestion failures', asy
   assert.deepEqual(client.query.mock.calls.map((call) => call.arguments[0]), ['BEGIN', 'ROLLBACK']);
   assert.equal(client.release.mock.callCount(), 1);
 });
+
+test('createImportCandidateService applies composite scoring during ingestion', async (t) => {
+  const { pool } = createPool(t);
+  const slskdService = {
+    getSearchResponses: t.mock.fn(async () => ({
+      searchId: 'search-1',
+      responses: [{
+        username: 'source-user',
+        hasFreeUploadSlot: true,
+        queueLength: 0,
+        uploadSpeed: 10_000_000,
+        files: [{
+          filename: 'Artist\\Album\\01 Track.flac',
+          size: 1000,
+          bitRate: 900,
+          bitDepth: 16,
+          sampleRate: 44100,
+          length: 300,
+        }],
+      }],
+    })),
+  };
+  const upsertImportCandidateFn = t.mock.fn(async (candidate) => ({
+    id: 'candidate-1',
+    ...candidate,
+  }));
+  const replaceImportCandidateFilesFn = t.mock.fn(async (_, files) => files);
+  const recordAuditEventFn = t.mock.fn();
+  const service = createImportCandidateService({
+    pool,
+    recordAuditEventFn,
+    replaceImportCandidateFilesFn,
+    slskdService,
+    upsertImportCandidateFn,
+  });
+
+  const result = await service.ingestSlskdSearchResponses({
+    actorUserId: 'user-1',
+    formatPreferences: { preferredFormat: 'flac', minimumQuality: 'any' },
+    expectedTrackCount: 1,
+    expectedDurationSeconds: 300,
+    searchId: 'search-1',
+  });
+
+  assert.equal(result.candidateCount, 1);
+  const storedCandidate = upsertImportCandidateFn.mock.calls[0].arguments[0];
+  assert.ok(typeof storedCandidate.normalizedPayload.compositeScore === 'number');
+  assert.ok(storedCandidate.normalizedPayload.compositeScore > 0);
+  assert.ok(Array.isArray(storedCandidate.normalizedPayload.scoreBreakdown));
+  assert.ok(storedCandidate.normalizedPayload.scoreBreakdown.length > 0);
+});
+
+test('createImportCandidateService applies composite scoring without formatPreferences or expected counts', async (t) => {
+  const { pool } = createPool(t);
+  const slskdService = {
+    getSearchResponses: t.mock.fn(async () => ({
+      searchId: 'search-1',
+      responses: [{
+        username: 'source-user',
+        files: [{
+          filename: 'Artist\\Album\\01 Track.mp3',
+          size: 500,
+        }],
+      }],
+    })),
+  };
+  const upsertImportCandidateFn = t.mock.fn(async (candidate) => ({
+    id: 'candidate-1',
+    ...candidate,
+  }));
+  const replaceImportCandidateFilesFn = t.mock.fn(async (_, files) => files);
+  const recordAuditEventFn = t.mock.fn();
+  const service = createImportCandidateService({
+    pool,
+    recordAuditEventFn,
+    replaceImportCandidateFilesFn,
+    slskdService,
+    upsertImportCandidateFn,
+  });
+
+  await service.ingestSlskdSearchResponses({ searchId: 'search-1' });
+
+  const storedCandidate = upsertImportCandidateFn.mock.calls[0].arguments[0];
+  assert.ok(typeof storedCandidate.normalizedPayload.compositeScore === 'number');
+});
+
+test('createImportCandidateService uses injectable scoreDownloadResultFn', async (t) => {
+  const { pool } = createPool(t);
+  const mockScoreFn = t.mock.fn(({ candidate }) => ({
+    compositeScore: 42,
+    breakdown: [{ name: 'mock', score: 42, weight: 1 }],
+  }));
+  const slskdService = {
+    getSearchResponses: t.mock.fn(async () => ({
+      searchId: 'search-1',
+      responses: [{
+        username: 'source-user',
+        files: [{ filename: 'Artist\\Album\\01 Track.flac', size: 100 }],
+      }],
+    })),
+  };
+  const upsertImportCandidateFn = t.mock.fn(async (candidate) => ({
+    id: 'candidate-1',
+    ...candidate,
+  }));
+  const replaceImportCandidateFilesFn = t.mock.fn(async (_, files) => files);
+  const recordAuditEventFn = t.mock.fn();
+  const service = createImportCandidateService({
+    pool,
+    recordAuditEventFn,
+    replaceImportCandidateFilesFn,
+    scoreDownloadResultFn: mockScoreFn,
+    slskdService,
+    upsertImportCandidateFn,
+  });
+
+  await service.ingestSlskdSearchResponses({ searchId: 'search-1' });
+
+  assert.equal(mockScoreFn.mock.callCount(), 1);
+  const storedCandidate = upsertImportCandidateFn.mock.calls[0].arguments[0];
+  assert.equal(storedCandidate.normalizedPayload.compositeScore, 42);
+});

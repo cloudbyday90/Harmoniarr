@@ -135,7 +135,7 @@ export async function listImportCandidates({
         COUNT(*) OVER()::integer AS total_count
       FROM import_candidates
       ${whereSql}
-      ORDER BY discovered_at DESC, created_at DESC, id ASC
+      ORDER BY (normalized_payload->>'compositeScore')::numeric DESC NULLS LAST, discovered_at DESC, created_at DESC, id ASC
       LIMIT ${limitPlaceholder}
       OFFSET ${offsetPlaceholder}
     `,
@@ -159,7 +159,7 @@ export async function listImportCandidatesBySourceMediaRequestIds(sourceMediaReq
       SELECT *
       FROM import_candidates
       WHERE normalized_payload -> 'requestOwnership' ->> 'sourceMediaRequestId' = ANY($1::text[])
-      ORDER BY discovered_at DESC, created_at DESC, id ASC
+      ORDER BY (normalized_payload->>'compositeScore')::numeric DESC NULLS LAST, discovered_at DESC, created_at DESC, id ASC
     `,
     [sourceMediaRequestIds],
   );

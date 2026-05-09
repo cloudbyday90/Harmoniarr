@@ -19,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { scoreDownloadResult } from '../library/download-result-scoring.js';
 import { scoreCandidateFormatMatch } from '../library/format-preference-scoring.js';
 import { getPool } from '../database.js';
 import {
@@ -313,6 +314,7 @@ export function createImportCandidateService({
   pool = getPool(),
   recordAuditEventFn = recordAuditEvent,
   replaceImportCandidateFilesFn = replaceImportCandidateFiles,
+  scoreDownloadResultFn = scoreDownloadResult,
   slskdService,
   transitionImportCandidateStatusFn = transitionImportCandidateStatus,
   upsertImportCandidateFn = upsertImportCandidate,
@@ -653,6 +655,8 @@ export function createImportCandidateService({
 
   async function ingestSlskdSearchResponses({
     actorUserId = null,
+    expectedTrackCount = null,
+    expectedDurationSeconds = null,
     formatPreferences = null,
     requestOwnership = null,
     requestMetadata = null,
@@ -665,6 +669,20 @@ export function createImportCandidateService({
       responses: searchResponses.responses,
       searchId: searchResponses.searchId,
     });
+
+    for (const candidate of candidates) {
+      const scoring = scoreDownloadResultFn({
+        candidate,
+        formatPreferences,
+        expectedTrackCount,
+        expectedDurationSeconds,
+      });
+
+      if (scoring.compositeScore !== null) {
+        candidate.normalizedPayload.compositeScore = scoring.compositeScore;
+        candidate.normalizedPayload.scoreBreakdown = scoring.breakdown;
+      }
+    }
 
     const storedCandidates = await withTransaction(async (client) => {
       const stored = [];
