@@ -39,6 +39,7 @@ test('renderReleaseImageSummaryLines formats release assets and tags', () => {
 
 test('renderPublishedImageVerificationSummaryLines formats the smoke summary', () => {
   assert.deepEqual(renderPublishedImageVerificationSummaryLines({
+    browserSmokeEvidenceArtifactName: 'harmoniarr-docker-smoke-browser-operator.json',
     imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
     smokeContractStatus: 'passed',
     smokeEvidenceArtifactName: 'harmoniarr-docker-smoke-released-image.json',
@@ -49,6 +50,7 @@ test('renderPublishedImageVerificationSummaryLines formats the smoke summary', (
     '- Smoke contract: fresh install bootstrap plus existing-data restart',
     '- Smoke evidence contract: passed',
     '- Smoke evidence artifact: harmoniarr-docker-smoke-released-image.json',
+    '- Browser smoke evidence artifact: harmoniarr-docker-smoke-browser-operator.json',
     '',
   ]);
 });
@@ -56,6 +58,7 @@ test('renderPublishedImageVerificationSummaryLines formats the smoke summary', (
 test('renderReleaseContractVerificationSummaryLines formats the contract summary', () => {
   assert.deepEqual(renderReleaseContractVerificationSummaryLines({
     attestationVerificationStatus: 'passed',
+    browserSmokeEvidenceStatus: 'published-image browser-smoke artifact passed',
     deploymentSummaryArtifactName: 'harmoniarr-docker-deployment-summary.json',
     dockerHubMirrorStatus: 'passed',
     releaseTag: 'v0.1.0-beta',
@@ -70,6 +73,7 @@ test('renderReleaseContractVerificationSummaryLines formats the contract summary
     '- Release manifest checked against GitHub release assets',
     '- Compose override asset checked against the immutable image reference',
     '- Archived smoke evidence verification: published-image artifact passed',
+    '- Archived browser smoke evidence verification: published-image browser-smoke artifact passed',
     '- Archived upgrade smoke evidence verification: upgrade-path artifact passed',
     '- Deployment summary artifact: harmoniarr-docker-deployment-summary.json',
     '- Docker Hub mirror verification: passed',
@@ -90,6 +94,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for release-contract sum
         'verify-release-contract',
         '--summary-path', summaryPath,
         '--attestation-status', 'passed',
+        '--browser-smoke-evidence-status', 'published-image browser-smoke artifact passed',
         '--deployment-summary-artifact-name', 'harmoniarr-docker-deployment-summary.json',
         '--dockerhub-mirror-status', 'passed',
         '--release-tag', 'v0.1.0-beta',
@@ -104,6 +109,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for release-contract sum
     const summary = await readFile(summaryPath, 'utf8');
     assert.match(summary, /Release Contract Verification/);
     assert.match(summary, /Archived smoke evidence verification: published-image artifact passed/);
+    assert.match(summary, /Archived browser smoke evidence verification: published-image browser-smoke artifact passed/);
     assert.match(summary, /Archived upgrade smoke evidence verification: upgrade-path artifact passed/);
     assert.match(summary, /Deployment summary artifact: harmoniarr-docker-deployment-summary.json/);
   } finally {
@@ -152,6 +158,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for published-image veri
         'verify-published-image',
         '--summary-path', summaryPath,
         '--image-ref', 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
+        '--browser-smoke-evidence-artifact-name', 'harmoniarr-docker-smoke-browser-operator.json',
         '--smoke-contract-status', 'passed',
         '--smoke-evidence-artifact-name', 'harmoniarr-docker-smoke-released-image.json',
       ],
@@ -162,6 +169,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for published-image veri
     assert.match(summary, /Published Image Verification/);
     assert.match(summary, /Smoke evidence contract: passed/);
     assert.match(summary, /Smoke evidence artifact: harmoniarr-docker-smoke-released-image.json/);
+    assert.match(summary, /Browser smoke evidence artifact: harmoniarr-docker-smoke-browser-operator.json/);
   } finally {
     await rm(tempDirectory, { force: true, recursive: true });
   }

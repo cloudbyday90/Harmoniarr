@@ -44,6 +44,7 @@ export function renderReleaseImageSummaryLines({
 }
 
 export function renderPublishedImageVerificationSummaryLines({
+  browserSmokeEvidenceArtifactName = null,
   imageRef,
   smokeContractStatus = null,
   smokeEvidenceArtifactName = null,
@@ -55,12 +56,14 @@ export function renderPublishedImageVerificationSummaryLines({
     '- Smoke contract: fresh install bootstrap plus existing-data restart',
     ...(smokeContractStatus ? [`- Smoke evidence contract: ${smokeContractStatus}`] : []),
     ...(smokeEvidenceArtifactName ? [`- Smoke evidence artifact: ${smokeEvidenceArtifactName}`] : []),
+    ...(browserSmokeEvidenceArtifactName ? [`- Browser smoke evidence artifact: ${browserSmokeEvidenceArtifactName}`] : []),
     '',
   ];
 }
 
 export function renderReleaseContractVerificationSummaryLines({
   attestationVerificationStatus,
+  browserSmokeEvidenceStatus = null,
   deploymentSummaryArtifactName = null,
   dockerHubMirrorStatus,
   releaseTag,
@@ -76,6 +79,7 @@ export function renderReleaseContractVerificationSummaryLines({
     '- Release manifest checked against GitHub release assets',
     '- Compose override asset checked against the immutable image reference',
     ...(smokeEvidenceStatus ? [`- Archived smoke evidence verification: ${smokeEvidenceStatus}`] : []),
+    ...(browserSmokeEvidenceStatus ? [`- Archived browser smoke evidence verification: ${browserSmokeEvidenceStatus}`] : []),
     ...(upgradeSmokeEvidenceStatus ? [`- Archived upgrade smoke evidence verification: ${upgradeSmokeEvidenceStatus}`] : []),
     ...(deploymentSummaryArtifactName ? [`- Deployment summary artifact: ${deploymentSummaryArtifactName}`] : []),
     `- Docker Hub mirror verification: ${dockerHubMirrorStatus}`,

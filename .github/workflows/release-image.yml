@@ -51,6 +51,9 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      - name: Install Playwright Chromium runtime
+        run: npx playwright install chromium --with-deps
+
       - name: Resolve release publish plan
         id: release
         env:
@@ -269,8 +272,32 @@ jobs:
           path: supply-chain/harmoniarr-docker-smoke-released-image.json
           if-no-files-found: error
 
+      - name: Validate published image browser smoke workflow
+        env:
+          HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-browser-operator.json
+          HARMONIARR_WALKTHROUGH_PASSWORD: HarmoniarrLocal123!
+          HARMONIARR_WALKTHROUGH_USERNAME: walkthrough-admin
+        run: docker tag "${{ needs.publish-image.outputs.image_ref }}" harmoniarr:walkthrough-local && docker compose -f compose.walkthrough.yaml up -d --no-build harmoniarr && docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm walkthrough-bootstrap && npm run validate:docker-browser-smoke
+
+      - name: Verify published-image browser smoke evidence artifact
+        env:
+          HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-browser-operator.json
+        run: npm run validate:docker-smoke-evidence
+
+      - name: Upload published-image browser smoke evidence artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harmoniarr-docker-smoke-browser-operator.json
+          path: supply-chain/harmoniarr-docker-smoke-browser-operator.json
+          if-no-files-found: error
+
+      - name: Stop walkthrough compose stack
+        if: ${{ always() }}
+        run: docker compose -f compose.walkthrough.yaml down --remove-orphans
+
       - name: Publish verification summary
         env:
+          HARMONIARR_SUMMARY_BROWSER_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-browser-operator.json
           HARMONIARR_SUMMARY_IMAGE_REF: ${{ needs.publish-image.outputs.image_ref }}
           HARMONIARR_SUMMARY_SMOKE_CONTRACT_STATUS: passed
           HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-released-image.json
@@ -371,6 +398,17 @@ jobs:
       - name: Verify archived published-image smoke evidence artifact
         env:
           HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-released-image.json
+        run: npm run validate:docker-smoke-evidence
+
+      - name: Download published-image browser smoke evidence artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: harmoniarr-docker-smoke-browser-operator.json
+          path: supply-chain
+
+      - name: Verify archived published-image browser smoke evidence artifact
+        env:
+          HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-browser-operator.json
         run: npm run validate:docker-smoke-evidence
 
       - name: Download upgrade-path smoke evidence artifact
@@ -488,6 +526,7 @@ jobs:
       - name: Publish release-contract summary
         env:
           HARMONIARR_SUMMARY_ATTESTATION_STATUS: ${{ github.event.repository.private && 'skipped for private repository' || 'passed' }}
+          HARMONIARR_SUMMARY_BROWSER_SMOKE_EVIDENCE_STATUS: published-image browser-smoke artifact passed
           HARMONIARR_SUMMARY_DEPLOYMENT_SUMMARY_ARTIFACT_NAME: harmoniarr-docker-deployment-summary.json
           HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && 'passed' || 'skipped' }}
           HARMONIARR_SUMMARY_RELEASE_TAG: ${{ needs.publish-image.outputs.release_tag }}

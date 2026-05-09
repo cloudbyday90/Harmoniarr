@@ -5,6 +5,11 @@ import test from 'node:test';
 import {
   assertReleaseImageWorkflowContract,
   getWorkflowStepBlock,
+  releaseImageBrowserSmokeEvidenceDownloadStep,
+  releaseImageBrowserSmokeEvidenceReleaseContractVerificationStep,
+  releaseImageBrowserSmokeEvidenceStep,
+  releaseImageBrowserSmokeEvidenceVerificationStep,
+  releaseImageBrowserSmokeRuntimeStep,
   releaseImageDeploymentSummaryArtifactStep,
   releaseImageDeploymentSummaryStep,
   releaseImageEvidenceDownloadStep,
@@ -62,6 +67,22 @@ test('release-image workflow uploads the published-image smoke evidence artifact
   assert.match(block, new RegExp(releaseImageEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
+test('release-image workflow runs browser smoke verification and uploads browser smoke evidence artifact', async () => {
+  const workflowSource = await readFile(workflowPath, 'utf8');
+
+  const runtimeBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeRuntimeStep.name);
+  const verifyBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeEvidenceVerificationStep.name);
+  const uploadBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeEvidenceStep.name);
+
+  assert.match(runtimeBlock, new RegExp(releaseImageBrowserSmokeRuntimeStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(runtimeBlock, new RegExp(releaseImageBrowserSmokeRuntimeStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verifyBlock, new RegExp(releaseImageBrowserSmokeEvidenceVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verifyBlock, new RegExp(releaseImageBrowserSmokeEvidenceVerificationStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(uploadBlock, new RegExp(releaseImageBrowserSmokeEvidenceStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(uploadBlock, new RegExp(releaseImageBrowserSmokeEvidenceStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(uploadBlock, new RegExp(releaseImageBrowserSmokeEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
 test('release-image workflow downloads and re-verifies archived published-image smoke evidence during release-contract verification', async () => {
   const workflowSource = await readFile(workflowPath, 'utf8');
 
@@ -73,6 +94,19 @@ test('release-image workflow downloads and re-verifies archived published-image 
   assert.match(downloadBlock, new RegExp(releaseImageEvidenceDownloadStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(verificationBlock, new RegExp(releaseImageEvidenceReleaseContractVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(verificationBlock, new RegExp(releaseImageEvidenceReleaseContractVerificationStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('release-image workflow downloads and re-verifies archived published-image browser smoke evidence during release-contract verification', async () => {
+  const workflowSource = await readFile(workflowPath, 'utf8');
+
+  const downloadBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeEvidenceDownloadStep.name);
+  const verificationBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeEvidenceReleaseContractVerificationStep.name);
+
+  assert.match(downloadBlock, new RegExp(releaseImageBrowserSmokeEvidenceDownloadStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(downloadBlock, new RegExp(releaseImageBrowserSmokeEvidenceDownloadStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(downloadBlock, new RegExp(releaseImageBrowserSmokeEvidenceDownloadStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verificationBlock, new RegExp(releaseImageBrowserSmokeEvidenceReleaseContractVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(verificationBlock, new RegExp(releaseImageBrowserSmokeEvidenceReleaseContractVerificationStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
 test('release-image workflow supports optional published-image upgrade validation evidence', async () => {

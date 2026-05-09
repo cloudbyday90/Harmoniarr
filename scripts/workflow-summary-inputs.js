@@ -15,6 +15,8 @@ import {
 
 export const releaseWorkflowSummaryCliOptions = Object.freeze({
   'attestation-status': { type: 'string' },
+  'browser-smoke-evidence-artifact-name': { type: 'string' },
+  'browser-smoke-evidence-status': { type: 'string' },
   'compose-asset-name': { type: 'string' },
   'deployment-summary-artifact-name': { type: 'string' },
   'dockerhub-image-name': { type: 'string' },
@@ -76,6 +78,12 @@ export function resolveReleaseWorkflowSummaryInputs(summaryKind, {
       };
     case 'verify-published-image':
       return {
+        browserSmokeEvidenceArtifactName: getOptionalStringInput(
+          resolvedValues,
+          'browser-smoke-evidence-artifact-name',
+          'HARMONIARR_SUMMARY_BROWSER_SMOKE_EVIDENCE_ARTIFACT_NAME',
+          env,
+        ),
         imageRef: getRequiredStringInput(resolvedValues, 'image-ref', 'HARMONIARR_SUMMARY_IMAGE_REF', env),
         smokeContractStatus: getOptionalStringInput(resolvedValues, 'smoke-contract-status', 'HARMONIARR_SUMMARY_SMOKE_CONTRACT_STATUS', env),
         smokeEvidenceArtifactName: getOptionalStringInput(resolvedValues, 'smoke-evidence-artifact-name', 'HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME', env),
@@ -84,6 +92,12 @@ export function resolveReleaseWorkflowSummaryInputs(summaryKind, {
     case 'verify-release-contract':
       return {
         attestationVerificationStatus: getRequiredStringInput(resolvedValues, 'attestation-status', 'HARMONIARR_SUMMARY_ATTESTATION_STATUS', env),
+        browserSmokeEvidenceStatus: getOptionalStringInput(
+          resolvedValues,
+          'browser-smoke-evidence-status',
+          'HARMONIARR_SUMMARY_BROWSER_SMOKE_EVIDENCE_STATUS',
+          env,
+        ),
         deploymentSummaryArtifactName: getOptionalStringInput(resolvedValues, 'deployment-summary-artifact-name', 'HARMONIARR_SUMMARY_DEPLOYMENT_SUMMARY_ARTIFACT_NAME', env),
         dockerHubMirrorStatus: getRequiredStringInput(resolvedValues, 'dockerhub-mirror-status', 'HARMONIARR_SUMMARY_DOCKERHUB_MIRROR_STATUS', env),
         releaseTag: getRequiredStringInput(resolvedValues, 'release-tag', 'HARMONIARR_SUMMARY_RELEASE_TAG', env),
