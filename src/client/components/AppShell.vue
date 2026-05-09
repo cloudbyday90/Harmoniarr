@@ -251,6 +251,7 @@ const visibleNav = computed(() => {
           <button
             type="button"
             class="hx-topbar-iconbtn"
+            :class="{ 'is-alert': actionableCount > 0 }"
             :aria-expanded="notificationsOpen"
             aria-haspopup="menu"
             :aria-label="`Notifications (${actionableCount} actionable)`"
@@ -260,6 +261,7 @@ const visibleNav = computed(() => {
               <path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9z"/>
               <path d="M10 21a2 2 0 0 0 4 0"/>
             </svg>
+            <span class="hx-topbar-iconbtn-label" aria-hidden="true">Alerts</span>
             <span
               v-if="actionableCount > 0"
               class="hx-topbar-iconbtn-badge"
@@ -419,39 +421,65 @@ const visibleNav = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  gap: 7px;
+  min-width: 42px;
+  height: 34px;
+  padding: 0 10px;
   border-radius: 8px;
-  background: transparent;
-  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: inherit;
   cursor: pointer;
 }
 .hx-topbar-iconbtn:hover,
 .hx-topbar-iconbtn:focus-visible {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.hx-topbar-iconbtn.is-alert {
+  background: rgba(194, 65, 12, 0.22);
+  border-color: rgba(251, 146, 60, 0.58);
+  color: #fff7ed;
+  box-shadow: 0 0 0 1px rgba(194, 65, 12, 0.25) inset;
 }
 .hx-topbar-iconbtn svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
+}
+.hx-topbar-iconbtn-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
 }
 .hx-topbar-iconbtn-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
   background: var(--hx-color-danger, #c2410c);
   color: white;
-  font-size: 10px;
-  font-weight: 600;
+  border: 2px solid var(--hx-color-surface, #161821);
+  font-size: 11px;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+}
+@media (max-width: 920px) {
+  .hx-topbar-iconbtn {
+    width: 34px;
+    min-width: 34px;
+    padding: 0;
+    gap: 0;
+  }
+  .hx-topbar-iconbtn-label {
+    display: none;
+  }
 }
 .hx-topbar-notifications-panel {
   position: absolute;
