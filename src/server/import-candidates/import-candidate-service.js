@@ -19,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { scoreCandidateFormatMatch } from '../library/format-preference-scoring.js';
 import { getPool } from '../database.js';
 import {
   getImportCandidateById,
@@ -187,6 +188,7 @@ function normalizeResponseFile(file, {
 }
 
 export function normalizeSlskdResponsesToImportCandidates({
+  formatPreferences = null,
   discoveredAt = new Date(),
   requestOwnership = null,
   responses = [],
@@ -247,6 +249,16 @@ export function normalizeSlskdResponsesToImportCandidates({
   return Array.from(groups.values()).map((group) => {
     const totalSizeBytes = group.files.reduce((total, file) => total + (file.sizeBytes ?? 0), 0);
     const lockedFileCount = group.files.filter((file) => file.isLocked).length;
+    const extensions = Array.from(new Set(group.files.map((file) => file.extension).filter(Boolean))).sort();
+
+    const formatScore = formatPreferences
+      ? scoreCandidateFormatMatch({
+        preferredFormat: formatPreferences.preferredFormat,
+        minimumQuality: formatPreferences.minimumQuality,
+        extensions,
+        files: group.files,
+      })
+      : null;
 
     return {
       sourceProvider: 'slskd',
@@ -279,7 +291,11 @@ export function normalizeSlskdResponsesToImportCandidates({
         fileCount: group.files.length,
         lockedFileCount,
         totalSizeBytes,
-        extensions: Array.from(new Set(group.files.map((file) => file.extension).filter(Boolean))).sort(),
+        extensions,
+        ...(formatScore ? {
+          formatMatchLabel: formatScore.label,
+          formatMatchScore: formatScore.score,
+        } : {}),
       },
       discoveredAt: discoveredAt.toISOString(),
       files: group.files,
@@ -293,6 +309,7 @@ export function createImportCandidateService({
   listImportCandidateFilesFn = listImportCandidateFiles,
   listImportCandidatesFn = listImportCandidatesFromRepository,
   listImportCandidatesBySourceMediaRequestIdsFn = listImportCandidatesBySourceMediaRequestIdsFromRepository,
+  normalizeSlskdResponsesFn = normalizeSlskdResponsesToImportCandidates,
   pool = getPool(),
   recordAuditEventFn = recordAuditEvent,
   replaceImportCandidateFilesFn = replaceImportCandidateFiles,
@@ -636,12 +653,14 @@ export function createImportCandidateService({
 
   async function ingestSlskdSearchResponses({
     actorUserId = null,
+    formatPreferences = null,
     requestOwnership = null,
     requestMetadata = null,
     searchId,
   }) {
     const searchResponses = await slskdService.getSearchResponses({ searchId });
-    const candidates = normalizeSlskdResponsesToImportCandidates({
+    const candidates = normalizeSlskdResponsesFn({
+      formatPreferences,
       requestOwnership,
       responses: searchResponses.responses,
       searchId: searchResponses.searchId,

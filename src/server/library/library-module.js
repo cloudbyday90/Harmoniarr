@@ -76,6 +76,7 @@ export function createLibraryModule({
   artworkAssignmentService = null,
   artworkIngestionService = null,
   getAppUserById = null,
+  getUserPreferencesFn = null,
   importCandidateService = null,
   recordActivityEventFn = null,
   settingsService = createSettingsService(),
@@ -86,6 +87,7 @@ export function createLibraryModule({
     libraryDiscoveryRequestStore,
   }),
   libraryDiscoveryDispatchService = createLibraryDiscoveryDispatchService({
+    getUserPreferencesFn,
     importCandidateService,
     libraryDiscoveryRequestStore,
     slskdService,

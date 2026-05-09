@@ -239,6 +239,7 @@ export function createApp({
     artworkAssignmentService: artworkModule.artworkAssignmentService,
     artworkIngestionService: artworkModule.artworkIngestionService,
     getAppUserById: appUserModule.appUserService.getAppUserById,
+    getUserPreferencesFn: appUserModule.appUserService.getUserPreferences,
     importCandidateService: importCandidateModule.importCandidateService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,

@@ -75,6 +75,7 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
   assert.equal(ingestSlskdSearchResponses.mock.callCount(), 1);
   assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0], {
     actorUserId: 'user-1',
+    formatPreferences: null,
     requestOwnership: {
       sourceMediaRequestId: 'request-1',
       sourceRequestKind: 'release',
@@ -112,6 +113,137 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
     failures: [],
     fileCount: 5,
   });
+});
+
+test('buildDiscoverySearchQuery appends FLAC when preferredFormat is flac', () => {
+  assert.equal(buildDiscoverySearchQuery({
+    artistName: 'Aphex Twin',
+    preferredFormat: 'flac',
+    releaseDate: '2001-10-22',
+    releaseGroupTitle: 'Drukqs',
+    releaseTitle: 'Drukqs',
+  }), 'Aphex Twin Drukqs 2001 FLAC');
+});
+
+test('buildDiscoverySearchQuery appends 320 when preferredFormat is mp3_320', () => {
+  assert.equal(buildDiscoverySearchQuery({
+    artistName: 'Aphex Twin',
+    preferredFormat: 'mp3_320',
+    releaseDate: '2001-10-22',
+    releaseGroupTitle: 'Drukqs',
+  }), 'Aphex Twin Drukqs 2001 320');
+});
+
+test('buildDiscoverySearchQuery does not append format when preferredFormat is any', () => {
+  assert.equal(buildDiscoverySearchQuery({
+    artistName: 'Aphex Twin',
+    preferredFormat: 'any',
+    releaseDate: '2001-10-22',
+    releaseGroupTitle: 'Drukqs',
+  }), 'Aphex Twin Drukqs 2001');
+});
+
+test('buildDiscoverySearchQuery does not append format when preferredFormat is null', () => {
+  assert.equal(buildDiscoverySearchQuery({
+    artistName: 'Aphex Twin',
+    releaseDate: '2001-10-22',
+    releaseGroupTitle: 'Drukqs',
+  }), 'Aphex Twin Drukqs 2001');
+});
+
+test('dispatchReadyDiscoveryRequests looks up user preferences and passes them to query and ingestion', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {
+      sourceMediaRequestId: 'request-1',
+      sourceRequestKind: 'release',
+      sourceRequestedByUserId: 'admin-1',
+      sourceRequestedForUserId: 'user-7',
+    },
+    metadataReleaseId: 'release-1',
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+  }];
+  const claimNextReadyAutomaticDiscoveryRequest = t.mock.fn(async () => claimedRequests.shift() ?? null);
+  const recordDiscoverySearchSuccess = t.mock.fn(async () => {});
+  const startSearch = t.mock.fn(async () => ({ id: 'search-1' }));
+  const ingestSlskdSearchResponses = t.mock.fn(async () => ({
+    candidateCount: 1,
+    fileCount: 3,
+  }));
+  const getUserPreferencesFn = t.mock.fn(async () => ({
+    preferredFormat: 'flac',
+    minimumQuality: 'lossless',
+  }));
+
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 3,
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    getUserPreferencesFn,
+    importCandidateService: { ingestSlskdSearchResponses },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest,
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess,
+    },
+    slskdService: { startSearch },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+
+  assert.equal(getUserPreferencesFn.mock.callCount(), 1);
+  assert.deepEqual(getUserPreferencesFn.mock.calls[0].arguments[0], { userId: 'user-7' });
+
+  assert.equal(startSearch.mock.callCount(), 1);
+  assert.equal(startSearch.mock.calls[0].arguments[0].query, 'Autechre Confield 2001 FLAC');
+
+  assert.equal(ingestSlskdSearchResponses.mock.callCount(), 1);
+  assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0].formatPreferences, {
+    preferredFormat: 'flac',
+    minimumQuality: 'lossless',
+  });
+});
+
+test('dispatchReadyDiscoveryRequests continues when getUserPreferencesFn throws', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {
+      sourceMediaRequestId: 'request-1',
+      sourceRequestedByUserId: 'admin-1',
+    },
+    metadataReleaseId: 'release-1',
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+  }];
+  const claimNextReadyAutomaticDiscoveryRequest = t.mock.fn(async () => claimedRequests.shift() ?? null);
+  const recordDiscoverySearchSuccess = t.mock.fn(async () => {});
+  const startSearch = t.mock.fn(async () => ({ id: 'search-1' }));
+  const ingestSlskdSearchResponses = t.mock.fn(async () => ({
+    candidateCount: 0,
+    fileCount: 0,
+  }));
+  const getUserPreferencesFn = t.mock.fn(async () => { throw new Error('DB unavailable'); });
+
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 3,
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    getUserPreferencesFn,
+    importCandidateService: { ingestSlskdSearchResponses },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest,
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess,
+    },
+    slskdService: { startSearch },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+
+  assert.equal(startSearch.mock.callCount(), 1);
+  assert.equal(startSearch.mock.calls[0].arguments[0].query, 'Autechre Confield 2001');
+  assert.equal(ingestSlskdSearchResponses.mock.calls[0].arguments[0].formatPreferences, null);
 });
 
 test('dispatchReadyDiscoveryRequests records failures without failing the whole batch', async (t) => {

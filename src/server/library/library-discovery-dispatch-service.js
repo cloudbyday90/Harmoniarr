@@ -17,6 +17,7 @@
  */
 
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
+import { buildFormatSearchTerm } from './format-preference-scoring.js';
 
 const defaultAutomaticCooldownMs = 6 * 60 * 60 * 1000;
 const defaultDispatchBatchSize = 5;
@@ -41,6 +42,7 @@ function getReleaseYear(releaseDate) {
 
 export function buildDiscoverySearchQuery({
   artistName,
+  preferredFormat,
   releaseDate,
   releaseGroupTitle,
   releaseTitle,
@@ -52,6 +54,11 @@ export function buildDiscoverySearchQuery({
     getReleaseYear(releaseDate),
   ].filter(Boolean);
 
+  const formatTerm = buildFormatSearchTerm(preferredFormat);
+  if (formatTerm) {
+    queryParts.push(formatTerm);
+  }
+
   return queryParts.join(' ');
 }
 
@@ -59,6 +66,7 @@ export function createLibraryDiscoveryDispatchService({
   automaticCooldownMs = defaultAutomaticCooldownMs,
   dispatchBatchSize = defaultDispatchBatchSize,
   getNow = () => new Date(),
+  getUserPreferencesFn = null,
   importCandidateService = null,
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
   slskdService = null,
@@ -117,7 +125,18 @@ export function createLibraryDiscoveryDispatchService({
 
       attemptedCount += 1;
 
-      const searchQuery = buildDiscoverySearchQuery(claimedRequest);
+      const ownership = buildRequestOwnershipContext(claimedRequest);
+      let userPreferences = null;
+      if (getUserPreferencesFn && ownership?.sourceRequestedForUserId) {
+        try {
+          userPreferences = await getUserPreferencesFn({ userId: ownership.sourceRequestedForUserId });
+        } catch {}
+      }
+
+      const searchQuery = buildDiscoverySearchQuery({
+        ...claimedRequest,
+        preferredFormat: userPreferences?.preferredFormat,
+      });
       if (!searchQuery) {
         const failure = {
           code: 'discovery_search_query_invalid',
@@ -138,9 +157,13 @@ export function createLibraryDiscoveryDispatchService({
         const search = await slskdService.startSearch({
           query: searchQuery,
         });
-        const requestOwnership = buildRequestOwnershipContext(claimedRequest);
+        const requestOwnership = ownership;
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
           actorUserId,
+          formatPreferences: userPreferences ? {
+            minimumQuality: userPreferences.minimumQuality,
+            preferredFormat: userPreferences.preferredFormat,
+          } : null,
           requestOwnership,
           requestMetadata,
           searchId: search.id,

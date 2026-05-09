@@ -125,6 +125,69 @@ test('normalizeSlskdResponsesToImportCandidates groups slskd files by user and f
   });
 });
 
+test('normalizeSlskdResponsesToImportCandidates includes formatMatchScore when formatPreferences provided', () => {
+  const candidates = normalizeSlskdResponsesToImportCandidates({
+    formatPreferences: {
+      preferredFormat: 'flac',
+      minimumQuality: 'any',
+    },
+    discoveredAt: new Date('2026-04-30T14:00:00.000Z'),
+    searchId: 'search-1',
+    responses: [{
+      username: 'source-user',
+      files: [{
+        filename: 'Artist\\Album\\01 Track.flac',
+        size: 100,
+      }],
+    }],
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].normalizedPayload.formatMatchScore, 100);
+  assert.equal(candidates[0].normalizedPayload.formatMatchLabel, 'Format match');
+});
+
+test('normalizeSlskdResponsesToImportCandidates omits formatMatchScore when formatPreferences is null', () => {
+  const candidates = normalizeSlskdResponsesToImportCandidates({
+    formatPreferences: null,
+    discoveredAt: new Date('2026-04-30T14:00:00.000Z'),
+    searchId: 'search-1',
+    responses: [{
+      username: 'source-user',
+      files: [{
+        filename: 'Artist\\Album\\01 Track.flac',
+        size: 100,
+      }],
+    }],
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].normalizedPayload.formatMatchScore, undefined);
+  assert.equal(candidates[0].normalizedPayload.formatMatchLabel, undefined);
+});
+
+test('normalizeSlskdResponsesToImportCandidates scores below quality floor as 0', () => {
+  const candidates = normalizeSlskdResponsesToImportCandidates({
+    formatPreferences: {
+      preferredFormat: 'any',
+      minimumQuality: 'lossless',
+    },
+    discoveredAt: new Date('2026-04-30T14:00:00.000Z'),
+    searchId: 'search-1',
+    responses: [{
+      username: 'source-user',
+      files: [{
+        filename: 'Artist\\Album\\01 Track.mp3',
+        size: 100,
+      }],
+    }],
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].normalizedPayload.formatMatchScore, 0);
+  assert.equal(candidates[0].normalizedPayload.formatMatchLabel, 'Below quality floor');
+});
+
 test('createImportCandidateService ingests slskd responses in one transaction and records audit', async (t) => {
   const { client, pool } = createPool(t);
   const slskdService = {
