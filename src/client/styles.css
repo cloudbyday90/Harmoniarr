@@ -123,7 +123,7 @@ label {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 56px 16px 80px;
+  padding: clamp(28px, 6vw, 56px) clamp(12px, 3.5vw, 16px) clamp(44px, 8vw, 80px);
   background:
     radial-gradient(circle at top right, rgba(242, 181, 107, 0.18), transparent 40%),
     radial-gradient(circle at bottom left, rgba(112, 178, 150, 0.14), transparent 36%),
@@ -132,7 +132,7 @@ label {
 
 .auth-shell {
   width: 100%;
-  max-width: 440px;
+  max-width: min(440px, 100%);
   display: grid;
   gap: 28px;
 }
@@ -174,10 +174,13 @@ label {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 4px 20px;
+  gap: 8px 16px;
 }
 
 .auth-footer-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
   font-size: 0.82rem;
   color: rgba(247, 241, 223, 0.48);
   text-decoration: none;
@@ -1178,6 +1181,35 @@ dd {
     padding: 20px;
   }
 
+  .auth-shell {
+    gap: 20px;
+  }
+
+  .auth-shell-heading h1 {
+    font-size: clamp(1.45rem, 6vw, 1.8rem);
+  }
+
+  .auth-shell-heading p {
+    font-size: 0.86rem;
+    line-height: 1.55;
+  }
+
+  .auth-entry-form-card {
+    gap: 14px;
+  }
+
+  .auth-entry-inline-note,
+  .auth-entry-inline-status {
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+
+  .auth-pw-hint {
+    margin-top: 0;
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
   .auth-entry-action-row {
     flex-direction: column;
   }
@@ -1238,5 +1270,32 @@ dd {
 
   .session-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 460px) {
+  .auth-page {
+    align-items: stretch;
+    padding-top: 20px;
+    padding-bottom: 28px;
+  }
+
+  .auth-shell {
+    max-width: none;
+    gap: 16px;
+  }
+
+  .auth-shell-wordmark {
+    font-size: 0.98rem;
+  }
+
+  .auth-footer-links {
+    justify-content: flex-start;
+    gap: 6px 12px;
+  }
+
+  .auth-footer-link {
+    font-size: 0.8rem;
+    min-height: 32px;
   }
 }

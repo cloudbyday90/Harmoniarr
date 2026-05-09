@@ -201,7 +201,8 @@ function formatUserAgent(ua) {
       </div>
     </article>
 
-    <articImport preferences</h3>
+    <article class="panel-light">
+      <h3>Import preferences</h3>
       <p class="metadata-card-copy">
         Set your preferred audio format and minimum quality for media requests. These are used as defaults when submitting new requests.
       </p>
@@ -231,7 +232,6 @@ function formatUserAgent(ua) {
     </article>
 
     <article class="panel-light">
-      <h3>le class="panel-light">
       <h3>Push notifications</h3>
       <p class="metadata-card-copy">
         Get notified when your music requests are ready, even when Harmoniarr isn't open.
