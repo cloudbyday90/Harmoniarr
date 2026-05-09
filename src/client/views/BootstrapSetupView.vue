@@ -58,7 +58,7 @@ async function submit() {
       password: form.password,
       username: form.username,
     });
-    await router.push({ name: 'dashboard', query: { onboarding: 'setup' } });
+    await router.push({ name: 'onboarding' });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Bootstrap failed';
   } finally {

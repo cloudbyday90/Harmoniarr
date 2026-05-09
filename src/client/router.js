@@ -37,6 +37,7 @@ import ImportReviewView from './views/ImportReviewView.vue';
 import LoginView from './views/LoginView.vue';
 import MetadataView from './views/MetadataView.vue';
 import MissingView from './views/MissingView.vue';
+import OnboardingView from './views/OnboardingView.vue';
 import OperationsView from './views/OperationsView.vue';
 import RecoveryView from './views/RecoveryView.vue';
 import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
@@ -55,6 +56,7 @@ import { sessionStore } from './state/session.js';
 
 const requesterRestrictedRouteNames = new Set([
   'missing',
+  'onboarding',
   'activity',
   'activity-feed',
   'activity-operations',
@@ -95,6 +97,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         { path: '', name: 'dashboard', component: DashboardView },
+        { path: 'onboarding', name: 'onboarding', component: OnboardingView },
         { path: 'discover', name: 'discover', component: DiscoverView },
         { path: 'library', name: 'library', component: LibraryView },
         { path: 'missing', name: 'missing', component: MissingView },
