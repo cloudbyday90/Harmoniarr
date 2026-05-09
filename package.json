@@ -61,6 +61,7 @@
     "validate:docker-deployment-path": "node scripts/validate-docker-deployment-path.js",
     "validate:docker-upgrade": "node scripts/validate-docker-upgrade.js",
     "validate:docker-released-image": "node scripts/validate-docker-released-image.js",
+    "validate:docker-browser-smoke": "node scripts/validate-docker-browser-smoke.js",
     "validate:release-evidence-pack": "node scripts/validate-release-evidence-pack.js",
     "validate:docker-smoke-evidence": "node scripts/verify-docker-smoke-evidence.js",
     "write:docker-deployment-summary": "node scripts/write-docker-deployment-summary.js",
