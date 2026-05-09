@@ -94,6 +94,7 @@ export function createLibraryModule({
   libraryMediaRequestStore = createLibraryMediaRequestStore(),
   libraryMediaRequestFulfillmentService = createLibraryMediaRequestFulfillmentService({
     listImportCandidatesBySourceMediaRequestIds: importCandidateService?.listImportCandidatesBySourceMediaRequestIds,
+    getMediaRequestById: libraryMediaRequestStore.getMediaRequestById,
   }),
   libraryMediaRequestNotificationService = createLibraryMediaRequestNotificationService(),
   providerClientResolverService = createProviderClientResolverService(),

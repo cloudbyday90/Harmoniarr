@@ -219,6 +219,7 @@ export function buildMediaRequestFulfillmentCounts(mediaRequests) {
 
 export function createLibraryMediaRequestFulfillmentService({
   listImportCandidatesBySourceMediaRequestIds = async () => [],
+  getMediaRequestById = async () => null,
 } = {}) {
   async function enrichMediaRequests(mediaRequests) {
     const requests = Array.isArray(mediaRequests) ? mediaRequests : [];
@@ -226,8 +227,15 @@ export function createLibraryMediaRequestFulfillmentService({
       .map((request) => normalizeMediaRequestId(request?.id))
       .filter(Boolean);
 
-    const importCandidates = sourceMediaRequestIds.length > 0
-      ? await listImportCandidatesBySourceMediaRequestIds({ sourceMediaRequestIds })
+    const linkedRequestIds = requests
+      .filter((request) => request?.linkedRequestId)
+      .map((request) => normalizeMediaRequestId(request.linkedRequestId))
+      .filter((id) => !sourceMediaRequestIds.includes(id));
+
+    const allRequestIds = [...new Set([...sourceMediaRequestIds, ...linkedRequestIds])];
+
+    const importCandidates = allRequestIds.length > 0
+      ? await listImportCandidatesBySourceMediaRequestIds({ sourceMediaRequestIds: allRequestIds })
       : [];
     const candidatesByRequestId = new Map();
 
@@ -242,13 +250,52 @@ export function createLibraryMediaRequestFulfillmentService({
       candidatesByRequestId.set(mediaRequestId, existing);
     }
 
-    return requests.map((request) => ({
-      ...request,
-      fulfillmentStatus: buildMediaRequestFulfillmentStatus({
-        importCandidates: candidatesByRequestId.get(normalizeMediaRequestId(request?.id)) ?? [],
-        request,
-      }),
-    }));
+    const linkedRequestMap = new Map();
+    for (const linkedId of linkedRequestIds) {
+      if (!candidatesByRequestId.has(linkedId)) {
+        const primaryRequest = await getMediaRequestById({ mediaRequestId: linkedId });
+        if (primaryRequest) {
+          linkedRequestMap.set(linkedId, primaryRequest);
+        }
+      }
+    }
+
+    return requests.map((request) => {
+      const directCandidates = candidatesByRequestId.get(normalizeMediaRequestId(request?.id)) ?? [];
+
+      let linked = false;
+      let linkedToUsername = null;
+      let candidates = directCandidates;
+
+      if (request?.linkedRequestId && directCandidates.length === 0) {
+        const primaryCandidates = candidatesByRequestId.get(normalizeMediaRequestId(request.linkedRequestId)) ?? [];
+        if (primaryCandidates.length > 0) {
+          candidates = primaryCandidates;
+        }
+        linked = true;
+        const primary = linkedRequestMap.get(request.linkedRequestId);
+        if (primary?.requestedByUser?.username) {
+          linkedToUsername = primary.requestedByUser.username;
+        } else {
+          const linkedRequest = requests.find((r) => r?.id === request.linkedRequestId);
+          linkedToUsername = linkedRequest?.requestedByUser?.username ?? null;
+        }
+      }
+
+      const fulfillmentStatus = {
+        ...buildMediaRequestFulfillmentStatus({ importCandidates: candidates, request }),
+      };
+
+      if (linked) {
+        fulfillmentStatus.linked = true;
+        fulfillmentStatus.linkedToUsername = linkedToUsername;
+      }
+
+      return {
+        ...request,
+        fulfillmentStatus,
+      };
+    });
   }
 
   return {

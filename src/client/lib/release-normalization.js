@@ -159,8 +159,16 @@ export function normalizeReleaseForRequest(release) {
     return null;
   }
 
+  const mbid = release.id ?? release.musicbrainzReleaseId ?? null;
+  const requestKey = getReleaseRequestKey(release);
+  const releaseGroupId = requestKey?.startsWith('release-group:')
+    ? requestKey.replace('release-group:', '')
+    : (release.releaseGroup?.id ?? release.releaseGroupId ?? null);
+
   return {
     artistName,
+    musicbrainzReleaseId: mbid ?? null,
+    releaseGroupId: typeof releaseGroupId === 'string' ? releaseGroupId : null,
     releaseTitle,
     requestKind: 'release',
   };

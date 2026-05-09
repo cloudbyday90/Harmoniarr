@@ -193,6 +193,7 @@ test('canRequestRelease returns false for null/empty release', () => {
 
 test('normalizeReleaseForRequest returns correct payload for a full release', () => {
   const release = {
+    id: 'mbid-ram',
     artistCredit: 'Daft Punk',
     title: 'Random Access Memories',
     date: '2013-05-17',
@@ -200,9 +201,32 @@ test('normalizeReleaseForRequest returns correct payload for a full release', ()
   const payload = normalizeReleaseForRequest(release);
   assert.deepEqual(payload, {
     artistName: 'Daft Punk',
+    musicbrainzReleaseId: 'mbid-ram',
+    releaseGroupId: null,
     releaseTitle: 'Random Access Memories',
     requestKind: 'release',
   });
+});
+
+test('normalizeReleaseForRequest includes releaseGroupId when available', () => {
+  const release = {
+    releaseGroupId: 'rg-123',
+    artistCredit: 'Boards of Canada',
+    title: 'Geogaddi',
+  };
+  const payload = normalizeReleaseForRequest(release);
+  assert.equal(payload.releaseGroupId, 'rg-123');
+  assert.equal(payload.musicbrainzReleaseId, null);
+});
+
+test('normalizeReleaseForRequest derives releaseGroupId from releaseGroup.id', () => {
+  const release = {
+    releaseGroup: { id: 'rg-from-nested' },
+    artistCredit: 'Burial',
+    title: 'Untrue',
+  };
+  const payload = normalizeReleaseForRequest(release);
+  assert.equal(payload.releaseGroupId, 'rg-from-nested');
 });
 
 test('normalizeReleaseForRequest returns null when artist is missing', () => {

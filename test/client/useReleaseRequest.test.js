@@ -68,6 +68,7 @@ test('useReleaseRequest requestRelease calls submitRequest with normalized paylo
   assert.equal(payload.artistName, 'Test Artist');
   assert.equal(payload.releaseTitle, 'Test Album');
   assert.equal(payload.requestKind, 'release');
+  assert.equal(payload.musicbrainzReleaseId, 'mbid-release-99');
 });
 
 test('useReleaseRequest requestRelease marks release as requested after success', async (t) => {
@@ -399,4 +400,44 @@ test('useReleaseRequest isRequesting accepts a key string directly', (t) => {
   requestingIds.value = new Set(['release:key-2']);
   assert.equal(isRequesting('release:key-2'), true);
   assert.equal(isRequesting('release:other'), false);
+});
+
+test('useReleaseRequest requestRelease shows info toast when response indicates linked request', async (t) => {
+  const submitRequest = t.mock.fn(async () => ({
+    ok: true,
+    mediaRequest: { id: 'req-linked', linked: true },
+  }));
+  const toast = createToastDouble(t);
+  const { requestRelease } = useReleaseRequest({ submitRequest, toast });
+
+  await requestRelease(makeRelease({ title: 'Discovery', artistCredit: 'Daft Punk' }));
+
+  assert.equal(toast.info.mock.callCount(), 1);
+  assert.equal(toast.success.mock.callCount(), 0);
+  assert.match(toast.info.mock.calls[0].arguments[0], /already requested/);
+});
+
+test('useReleaseRequest requestRelease shows success toast when response is not linked', async (t) => {
+  const submitRequest = t.mock.fn(async () => ({
+    ok: true,
+    mediaRequest: { id: 'req-normal', linked: false },
+  }));
+  const toast = createToastDouble(t);
+  const { requestRelease } = useReleaseRequest({ submitRequest, toast });
+
+  await requestRelease(makeRelease({ title: 'Discovery', artistCredit: 'Daft Punk' }));
+
+  assert.equal(toast.success.mock.callCount(), 1);
+  assert.equal(toast.info.mock.callCount(), 0);
+});
+
+test('useReleaseRequest requestRelease handles legacy response format without linked field', async (t) => {
+  const submitRequest = t.mock.fn(async () => ({ ok: true }));
+  const toast = createToastDouble(t);
+  const { requestRelease } = useReleaseRequest({ submitRequest, toast });
+
+  await requestRelease(makeRelease({ title: 'Discovery', artistCredit: 'Daft Punk' }));
+
+  assert.equal(toast.success.mock.callCount(), 1);
+  assert.equal(toast.info.mock.callCount(), 0);
 });

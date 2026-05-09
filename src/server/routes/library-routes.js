@@ -170,8 +170,14 @@ export function registerLibraryRoutes(app, {
       requestMetadata: getRequestMetadata(request),
     });
 
+    const linked = mediaRequest.linked ?? false;
+    const responseBody = { ...mediaRequest, linked };
+    if (linked) {
+      responseBody.linkedMessage = 'Someone has already requested this — you\'ve been added to the queue.';
+    }
+
     response.status(201).json({
-      mediaRequest,
+      mediaRequest: responseBody,
       ok: true,
     });
   }));

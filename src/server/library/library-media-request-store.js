@@ -40,6 +40,8 @@ function mapMediaRequestRow(row) {
     evidence: row.evidence ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    musicbrainzReleaseId: row.musicbrainz_release_id ?? null,
+    linkedRequestId: row.linked_request_id ?? null,
     requestedByUser: {
       id: row.requested_by_user_id,
       role: row.requested_by_role ?? null,
@@ -53,6 +55,7 @@ function mapMediaRequestRow(row) {
     existingMatch: matchedReleaseId || matchedReleaseGroupId
       ? {
           artistName: row.matched_artist_name ?? null,
+          musicbrainzReleaseId: row.matched_musicbrainz_release_id ?? null,
           releaseGroupId: matchedReleaseGroupId,
           releaseGroupTitle: row.matched_release_group_title ?? null,
           releaseId: matchedReleaseId,
@@ -104,6 +107,8 @@ const baseSelect = `
     media_requests.evidence,
     media_requests.created_at,
     media_requests.updated_at,
+    media_requests.musicbrainz_release_id,
+    media_requests.linked_request_id,
     request_users.username AS requested_by_username,
     request_users.role AS requested_by_role,
     target_users.username AS requested_for_username,
@@ -111,6 +116,7 @@ const baseSelect = `
     matched_release_groups.id AS matched_release_group_id,
     matched_release_groups.title AS matched_release_group_title,
     matched_releases.title AS matched_release_title,
+    matched_releases.musicbrainz_release_id AS matched_musicbrainz_release_id,
     matched_artists.name AS matched_artist_name
   FROM media_requests
   JOIN app_users AS request_users
@@ -134,8 +140,10 @@ export function createLibraryMediaRequestStore({
   async function createMediaRequest({
     artistName,
     evidence,
+    linkedRequestId = null,
     matchedMetadataReleaseGroupId,
     matchedMetadataReleaseId,
+    musicbrainzReleaseId = null,
     normalizedQuery,
     notes,
     releaseTitle,
@@ -165,6 +173,8 @@ export function createLibraryMediaRequestStore({
           matched_metadata_release_id,
           notes,
           evidence,
+          musicbrainz_release_id,
+          linked_request_id,
           updated_at
         )
         VALUES (
@@ -182,6 +192,8 @@ export function createLibraryMediaRequestStore({
           $12,
           $13,
           $14::jsonb,
+          $15,
+          $16,
           NOW()
         )
         RETURNING id
@@ -201,6 +213,8 @@ export function createLibraryMediaRequestStore({
         matchedMetadataReleaseId,
         notes,
         JSON.stringify(evidence ?? {}),
+        musicbrainzReleaseId,
+        linkedRequestId,
       ],
     );
 
@@ -269,8 +283,53 @@ export function createLibraryMediaRequestStore({
     );
   }
 
+  async function findActiveDuplicateRequest({ musicbrainzReleaseId = null, artistName = null, releaseTitle = null, excludeRequestedForUserId = null }) {
+    const pool = getPoolFn();
+
+    if (musicbrainzReleaseId) {
+      const result = await pool.query(
+        `
+          ${baseSelect}
+          WHERE media_requests.musicbrainz_release_id = $1
+            AND media_requests.request_state NOT IN ('cancelled', 'failed')
+            AND ($2::uuid IS NULL OR media_requests.requested_for_user_id != $2)
+          ORDER BY media_requests.created_at ASC
+          LIMIT 1
+        `,
+        [musicbrainzReleaseId, excludeRequestedForUserId ?? null],
+      );
+
+      if (result.rows.length > 0) {
+        return mapMediaRequestRow(result.rows[0]);
+      }
+    }
+
+    if (artistName && releaseTitle) {
+      const result = await pool.query(
+        `
+          ${baseSelect}
+          WHERE media_requests.musicbrainz_release_id IS NULL
+            AND lower(trim(media_requests.artist_name)) = lower(trim($1))
+            AND lower(trim(media_requests.release_title)) = lower(trim($2))
+            AND media_requests.request_state NOT IN ('cancelled', 'failed')
+            AND ($3::uuid IS NULL OR media_requests.requested_for_user_id != $3)
+          ORDER BY media_requests.created_at ASC
+          LIMIT 1
+        `,
+        [artistName, releaseTitle, excludeRequestedForUserId ?? null],
+      );
+
+      if (result.rows.length > 0) {
+        return mapMediaRequestRow(result.rows[0]);
+      }
+    }
+
+    return null;
+  }
+
   return {
     createMediaRequest,
+    findActiveDuplicateRequest,
     getMediaRequestById,
     getMediaRequestCounts,
     listMediaRequests,

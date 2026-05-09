@@ -84,6 +84,7 @@ test('createLibraryMediaRequestService keeps matched releases in needs_fetch whe
   const service = createLibraryMediaRequestService({
     mediaRequestStore: {
       createMediaRequest,
+      findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
       listMediaRequests: async () => [],
     },
@@ -348,6 +349,7 @@ test('createLibraryMediaRequestService allows admins to create delegated request
     })),
     mediaRequestStore: {
       createMediaRequest,
+      findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
       listMediaRequests: async () => [],
     },
@@ -451,4 +453,268 @@ test('createLibraryMediaRequestService rejects delegated targets that still requ
     }),
     (error) => error?.code === 'media_request_target_ineligible',
   );
+});
+
+test('createLibraryMediaRequestService links duplicate requests to existing primary by MBID', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-linked',
+    linkedRequestId: payload.linkedRequestId,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener-2', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener-2', role: 'requester' },
+  }));
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: t.mock.fn(async () => ({
+        id: 'request-primary',
+        musicbrainzReleaseId: 'mbid-discovery',
+        requestedForUser: { id: 'user-A' },
+        requestState: 'needs_fetch',
+      })),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn,
+  });
+
+  const mediaRequest = await service.createMediaRequest({
+    actorUserId: 'user-B',
+    payload: {
+      artistName: 'Daft Punk',
+      musicbrainzReleaseId: 'mbid-discovery',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].linkedRequestId, 'request-primary');
+  assert.equal(mediaRequest.linked, true);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.linked, true);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.linkedToRequestId, 'request-primary');
+});
+
+test('createLibraryMediaRequestService links duplicate requests by text match when no MBID', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-linked-text',
+    linkedRequestId: payload.linkedRequestId,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener-3', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener-3', role: 'requester' },
+  }));
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: t.mock.fn(async ({ musicbrainzReleaseId, artistName, releaseTitle }) => {
+        if (!musicbrainzReleaseId && artistName && releaseTitle) {
+          return {
+            id: 'request-primary-text',
+            requestedForUser: { id: 'user-A' },
+            requestState: 'needs_fetch',
+          };
+        }
+        return null;
+      }),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  const mediaRequest = await service.createMediaRequest({
+    actorUserId: 'user-C',
+    payload: {
+      artistName: 'Burial',
+      releaseTitle: 'Untrue',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(mediaRequest.linked, true);
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].linkedRequestId, 'request-primary-text');
+});
+
+test('createLibraryMediaRequestService does not dedup already_exists requests', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-no-dedup',
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+  }));
+  const findActiveDuplicateRequest = t.mock.fn(async () => null);
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest,
+      getMediaRequestCounts: async () => ({ alreadyExists: 1, needsFetch: 0, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: t.mock.fn(async () => ({
+        results: [{
+          artistName: 'Daft Punk',
+          id: 'release-1',
+          releaseGroupId: 'release-group-1',
+          title: 'Discovery',
+        }],
+      })),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: t.mock.fn(async () => ({
+        metadataReleaseGroupId: 'release-group-1',
+        metadataReleaseId: 'release-1',
+        reconciliationStatus: 'complete',
+      })),
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  const mediaRequest = await service.createMediaRequest({
+    actorUserId: 'user-1',
+    payload: {
+      artistName: 'Daft Punk',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(mediaRequest.linked, false);
+  assert.equal(findActiveDuplicateRequest.mock.callCount(), 0);
+});
+
+test('createLibraryMediaRequestService creates unlinked request when no duplicate exists', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-solo',
+    linkedRequestId: payload.linkedRequestId,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+  }));
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: t.mock.fn(async () => null),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  const mediaRequest = await service.createMediaRequest({
+    actorUserId: 'user-1',
+    payload: {
+      artistName: 'Boards of Canada',
+      releaseTitle: 'Music Has the Right to Children',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(mediaRequest.linked, false);
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].linkedRequestId, null);
+});
+
+test('createLibraryMediaRequestService stores musicbrainzReleaseId on request creation', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-mbid',
+    musicbrainzReleaseId: payload.musicbrainzReleaseId,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+  }));
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: t.mock.fn(async () => null),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await service.createMediaRequest({
+    actorUserId: 'user-1',
+    payload: {
+      artistName: 'Radiohead',
+      musicbrainzReleaseId: 'mbid-ok-computer',
+      releaseTitle: 'OK Computer',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].musicbrainzReleaseId, 'mbid-ok-computer');
+});
+
+test('createLibraryMediaRequestService records dedup evidence in request evidence', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-evidence',
+    evidence: payload.evidence,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+  }));
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: t.mock.fn(async () => ({
+        id: 'request-primary',
+        musicbrainzReleaseId: 'mbid-x',
+        requestedForUser: { id: 'user-A' },
+        requestState: 'needs_fetch',
+      })),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await service.createMediaRequest({
+    actorUserId: 'user-B',
+    payload: {
+      artistName: 'Aphex Twin',
+      musicbrainzReleaseId: 'mbid-x',
+      releaseTitle: 'Selected Ambient Works',
+      requestKind: 'release',
+    },
+  });
+
+  const evidence = createMediaRequest.mock.calls[0].arguments[0].evidence;
+  assert.equal(evidence.dedupLinkedToRequestId, 'request-primary');
+  assert.equal(evidence.dedupMatchMethod, 'musicbrainz_release_id');
 });

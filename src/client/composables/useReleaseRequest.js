@@ -161,9 +161,8 @@ export function useReleaseRequest({
     requestingIds.value = new Set([...requestingIds.value, key]);
 
     try {
-      await submitRequest(payload);
+      const result = await submitRequest(payload);
 
-      // Move from in-progress to complete.
       const nextRequesting = new Set(requestingIds.value);
       nextRequesting.delete(key);
       requestingIds.value = nextRequesting;
@@ -171,7 +170,12 @@ export function useReleaseRequest({
       requestedIds.value = new Set([...requestedIds.value, key]);
 
       if (showToasts) {
-        toast.success(`Requested ${payload.releaseTitle} by ${payload.artistName}.`);
+        const linked = result?.mediaRequest?.linked ?? result?.linked ?? false;
+        if (linked) {
+          toast.info(`Someone already requested ${payload.releaseTitle} by ${payload.artistName} — you've been added to the queue.`);
+        } else {
+          toast.success(`Requested ${payload.releaseTitle} by ${payload.artistName}.`);
+        }
       }
 
       return { ok: true };

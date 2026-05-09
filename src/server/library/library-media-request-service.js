@@ -159,6 +159,23 @@ function buildSummaryMessage(fulfillmentCounts) {
   };
 }
 
+function normalizeOptionalMbReleaseId(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function validateDraft(payload) {
   const requestKind = normalizeRequestKind(payload.requestKind);
   const notes = normalizeOptionalText(payload.notes, 'notes', { maxLength: 2000 });
@@ -265,6 +282,7 @@ export function createLibraryMediaRequestService({
 
     let matchedMetadataReleaseGroupId = null;
     let matchedMetadataReleaseId = null;
+    let musicbrainzReleaseId = normalizeOptionalMbReleaseId(payload?.musicbrainzReleaseId);
     let requestState = 'needs_fetch';
     let sourceProvider = null;
     let evidence = {
@@ -313,11 +331,35 @@ export function createLibraryMediaRequestService({
       }
     }
 
+    let linkedRequestId = null;
+    let linked = false;
+
+    if (requestState !== 'already_exists' && draft.requestKind !== 'external_url') {
+      const existingRequest = await mediaRequestStore.findActiveDuplicateRequest({
+        musicbrainzReleaseId,
+        artistName: draft.artistName,
+        releaseTitle: draft.releaseTitle,
+        excludeRequestedForUserId: requestedForUserId,
+      });
+
+      if (existingRequest) {
+        linkedRequestId = existingRequest.id;
+        linked = true;
+        evidence = {
+          ...evidence,
+          dedupLinkedToRequestId: existingRequest.id,
+          dedupMatchMethod: musicbrainzReleaseId ? 'musicbrainz_release_id' : 'artist_title_text',
+        };
+      }
+    }
+
     const mediaRequest = await mediaRequestStore.createMediaRequest({
       artistName: draft.artistName,
       evidence,
+      linkedRequestId,
       matchedMetadataReleaseGroupId,
       matchedMetadataReleaseId,
+      musicbrainzReleaseId,
       normalizedQuery,
       notes: draft.notes,
       releaseTitle: draft.releaseTitle,
@@ -335,6 +377,8 @@ export function createLibraryMediaRequestService({
       actorUserId,
       details: {
         delegated: requestedForUserId !== actorUserId,
+        linked,
+        linkedToRequestId: linkedRequestId,
         requestId: mediaRequest.id,
         requestKind: mediaRequest.requestKind,
         requestState: mediaRequest.requestState,
@@ -344,7 +388,7 @@ export function createLibraryMediaRequestService({
       entityType: 'media_request',
       eventType: 'media_request_created',
       ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: `Created ${mediaRequest.requestKind} music request as ${mediaRequest.requestState}`,
+      summary: `Created ${mediaRequest.requestKind} music request as ${mediaRequest.requestState}${linked ? ' (linked to existing request)' : ''}`,
       userAgent: requestMetadata?.userAgent ?? null,
     });
 
@@ -377,7 +421,7 @@ export function createLibraryMediaRequestService({
       }
     }
 
-    return mediaRequest;
+    return { ...mediaRequest, linked };
   }
 
   async function listMediaRequests({ requestedForUserId = null } = {}) {
