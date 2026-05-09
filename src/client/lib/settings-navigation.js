@@ -41,6 +41,30 @@ export const settingsSectionNavigationItems = Object.freeze([
     description: 'App users, Plex import, and managed library folders.',
     type: 'section',
   },
+  {
+    id: 'library',
+    label: 'Library',
+    description: 'Download scoring, discovery schedule, and reconciliation settings.',
+    type: 'section',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    description: 'Push notification preferences and active browser subscriptions.',
+    type: 'section',
+  },
+  {
+    id: 'library-browser',
+    label: 'Library browser',
+    description: 'Explore and search raw metadata, files, and reconciliation state.',
+    type: 'section',
+  },
+  {
+    id: 'recovery',
+    label: 'Recovery',
+    description: 'Emergency admin recovery tools.',
+    type: 'section',
+  },
 ]);
 
 export const settingsNavigationItems = Object.freeze([

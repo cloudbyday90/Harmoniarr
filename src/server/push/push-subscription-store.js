@@ -64,13 +64,15 @@ export function createPushSubscriptionStore({ getPoolFn = getPool } = {}) {
   async function upsertSubscription({ userId, endpoint, p256dh, auth, userAgent = null }) {
     const pool = getPoolFn();
     const result = await pool.query(
-      `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (user_id, endpoint)
+      `INSERT INTO user_push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, invalidated_at)
+       VALUES ($1, $2, $3, $4, $5, NULL)
+       ON CONFLICT (endpoint)
        DO UPDATE SET
-         p256dh     = EXCLUDED.p256dh,
-         auth       = EXCLUDED.auth,
-         user_agent = EXCLUDED.user_agent
+         user_id        = EXCLUDED.user_id,
+         p256dh         = EXCLUDED.p256dh,
+         auth           = EXCLUDED.auth,
+         user_agent     = EXCLUDED.user_agent,
+         invalidated_at = NULL
        RETURNING *`,
       [userId, endpoint, p256dh, auth, userAgent],
     );
@@ -88,7 +90,7 @@ export function createPushSubscriptionStore({ getPoolFn = getPool } = {}) {
   async function deleteSubscription(userId, endpoint) {
     const pool = getPoolFn();
     await pool.query(
-      'DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2',
+      'DELETE FROM user_push_subscriptions WHERE user_id = $1 AND endpoint = $2',
       [userId, endpoint],
     );
   }
@@ -102,7 +104,7 @@ export function createPushSubscriptionStore({ getPoolFn = getPool } = {}) {
   async function deleteSubscriptionByEndpoint(endpoint) {
     const pool = getPoolFn();
     await pool.query(
-      'DELETE FROM push_subscriptions WHERE endpoint = $1',
+      'UPDATE user_push_subscriptions SET invalidated_at = NOW() WHERE endpoint = $1',
       [endpoint],
     );
   }
@@ -116,7 +118,7 @@ export function createPushSubscriptionStore({ getPoolFn = getPool } = {}) {
   async function listSubscriptionsForUser(userId) {
     const pool = getPoolFn();
     const result = await pool.query(
-      'SELECT * FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at ASC',
+      'SELECT * FROM user_push_subscriptions WHERE user_id = $1 AND invalidated_at IS NULL ORDER BY created_at ASC',
       [userId],
     );
     return result.rows.map(mapSubscriptionRow);
@@ -130,7 +132,7 @@ export function createPushSubscriptionStore({ getPoolFn = getPool } = {}) {
   async function listAllSubscriptions() {
     const pool = getPoolFn();
     const result = await pool.query(
-      'SELECT * FROM push_subscriptions ORDER BY created_at ASC',
+      'SELECT * FROM user_push_subscriptions WHERE invalidated_at IS NULL ORDER BY created_at ASC',
     );
     return result.rows.map(mapSubscriptionRow);
   }

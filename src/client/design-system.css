@@ -196,6 +196,10 @@ body,
   color: var(--hx-text);
   font-family: var(--hx-font-sans);
   font-size: var(--hx-text-base);
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 /* ---------- App shell ---------- */
@@ -204,7 +208,8 @@ body,
   display: grid;
   grid-template-columns: var(--hx-sidebar-width) minmax(0, 1fr);
   grid-template-rows: var(--hx-topbar-height) minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: var(--hx-bg-canvas);
 }
 
@@ -217,8 +222,6 @@ body,
   background: var(--hx-bg-topbar);
   color: var(--hx-text-on-dark);
   border-bottom: 1px solid rgba(0, 0, 0, 0.4);
-  position: sticky;
-  top: 0;
   z-index: 30;
 }
 
@@ -413,9 +416,7 @@ body,
   border-right: 1px solid rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: var(--hx-topbar-height);
-  height: calc(100vh - var(--hx-topbar-height));
+  height: 100%;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
@@ -528,11 +529,11 @@ body,
 
 .hx-main {
   min-width: 0;
-  min-height: calc(100vh - var(--hx-topbar-height));
+  height: 100%;
   background: var(--hx-bg-canvas);
-  /* Use clip instead of hidden: hidden coerces overflow-y to auto, which
-     creates a scroll container that breaks position:sticky for children. */
   overflow-x: clip;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .hx-page {
@@ -1038,7 +1039,7 @@ body,
   .hx-topbar-pill { display: none; }
 
   /* Main content: lift above the fixed bottom nav */
-  .hx-main { padding-bottom: var(--hx-bottom-nav-height); }
+  .hx-main { padding-bottom: calc(var(--hx-bottom-nav-height) + env(safe-area-inset-bottom, 0px)); }
 
   /* ── Page layout ─────────────────────────────────────────────────────── */
 

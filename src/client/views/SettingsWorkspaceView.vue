@@ -20,8 +20,10 @@
 const tabs = [
   { name: 'settings', label: 'General' },
   { name: 'settings-connections', label: 'Connections' },
+  { name: 'settings-library', label: 'Library' },
   { name: 'settings-media-storage', label: 'Media & storage' },
   { name: 'settings-users', label: 'Users & access' },
+  { name: 'settings-notifications', label: 'Notifications' },
   { name: 'settings-account', label: 'Account' },
   { name: 'settings-recovery', label: 'Backup & restore' },
   { name: 'settings-library-browser', label: 'Metadata browser' },
@@ -33,7 +35,7 @@ const tabs = [
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Settings</h1>
-        <p class="hx-page-subtitle">General, connections, media & storage, users, account, and backups.</p>
+        <p class="hx-page-subtitle">Configure system behavior, connections, libraries, and access.</p>
       </div>
     </header>
 

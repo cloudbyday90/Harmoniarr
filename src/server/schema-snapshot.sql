@@ -3343,6 +3343,82 @@ SET migration_key = EXCLUDED.migration_key,
     application_version = NULL,
     updated_at = NOW();
 
+-- Migration: 20260509_133313_create_push_notification_tables.sql
+-- Checksum: 904a47f8c4a9aa3bd7b64ed4abf621d0ba50e905399e51e866913de445cda168
+-- Push subscription registry — one row per browser/device registration.
+-- Soft-deleted on 410/412 (invalidated_at set, never hard-deleted immediately).
+-- Pruned after 30 days via a background maintenance task.
+CREATE TABLE IF NOT EXISTS user_push_subscriptions (
+  id              UUID        PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  user_id         UUID        NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  endpoint        TEXT        NOT NULL UNIQUE,
+  p256dh          TEXT        NOT NULL,
+  auth            TEXT        NOT NULL,
+  user_agent      TEXT        NULL,
+  invalidated_at  TIMESTAMPTZ NULL,   -- set on 410/412; NULL means active
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Active-subscription lookup: used by the notification dispatch path.
+CREATE INDEX IF NOT EXISTS user_push_subscriptions_active_idx
+  ON user_push_subscriptions (user_id, invalidated_at)
+  WHERE invalidated_at IS NULL;
+
+-- Async notification delivery queue — decouples event emitters from webpush I/O.
+-- Background worker polls pending rows and calls webpush.sendNotification().
+CREATE TABLE IF NOT EXISTS notification_queue (
+  id               UUID        PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  user_id          UUID        NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  subscription_id  UUID        NULL REFERENCES user_push_subscriptions(id) ON DELETE CASCADE,
+  event_type       TEXT        NOT NULL,
+  coalesce_key     TEXT        NULL,   -- groups related events within the 2-min coalesce window
+  payload          JSONB       NOT NULL,
+  ttl_seconds      INTEGER     NOT NULL CHECK (ttl_seconds > 0),
+  status           TEXT        NOT NULL DEFAULT 'pending'
+                               CHECK (status IN ('pending', 'sent', 'failed', 'expired')),
+  attempts         INTEGER     NOT NULL DEFAULT 0,
+  next_attempt_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  sent_at          TIMESTAMPTZ NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Primary worker polling index: pending rows ordered by delivery time.
+CREATE INDEX IF NOT EXISTS notification_queue_pending_delivery_idx
+  ON notification_queue (next_attempt_at ASC)
+  WHERE status = 'pending';
+
+-- Coalescing check: find an unprocessed row matching the same (user, type, coalesce_key)
+-- within the last 2 minutes to determine whether to insert or update.
+CREATE INDEX IF NOT EXISTS notification_queue_coalesce_lookup_idx
+  ON notification_queue (user_id, event_type, coalesce_key, created_at DESC)
+  WHERE status = 'pending' AND coalesce_key IS NOT NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260509_133313',
+  '20260509_133313_create_push_notification_tables.sql',
+  'create_push_notification_tables',
+  '904a47f8c4a9aa3bd7b64ed4abf621d0ba50e905399e51e866913de445cda168',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
 -- Migration: 20260601_070000_add_canonical_to_metadata_releases.sql
 -- Checksum: 3cdb7a9ff0a5d86e1a08cb42158aee161e5419fa264057a6e41b9cdf39e47f35
 -- Harmoniarr - Soulseek-native music library management

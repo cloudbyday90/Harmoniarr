@@ -212,11 +212,11 @@ export function createApp({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
     sendFulfillmentNotificationFn: ({ userId }) => pushModule.pushNotificationService.sendNotificationToUser({
-      payload: JSON.stringify({
+      payload: {
         body: 'Your requested music has been added to your library.',
         title: 'Music request ready',
         url: '/app/my-requests',
-      }),
+      },
       userId,
     }),
     mediaInspectionService: createMediaInspectionService({

@@ -11,7 +11,7 @@ import {
 test('settings section navigation keeps a stable section order for the workspace', () => {
   assert.deepEqual(
     settingsSectionNavigationItems.map((item) => item.id),
-    ['general', 'connections', 'media-storage', 'users-access'],
+    ['general', 'connections', 'media-storage', 'users-access', 'library', 'notifications', 'library-browser', 'recovery'],
   );
 });
 
