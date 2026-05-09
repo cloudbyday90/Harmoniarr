@@ -219,7 +219,7 @@ self.addEventListener('push', (event) => {
   const title = typeof data.title === 'string' && data.title ? data.title : 'Harmoniarr';
   const body = typeof data.body === 'string' && data.body ? data.body : 'You have a new notification.';
   const icon = typeof data.icon === 'string' && data.icon ? data.icon : '/icons/icon-192.png';
-  const badge = '/icons/icon-192.png';
+  const badge = '/icons/badge-96.png';
   const url = typeof data.url === 'string' && data.url ? data.url : '/app/my-requests';
 
   event.waitUntil(

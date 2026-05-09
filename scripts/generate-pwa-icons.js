@@ -38,6 +38,7 @@ import sharp from 'sharp';
 
 const rootDir = resolve(fileURLToPath(import.meta.url), '..', '..');
 const svgPath = resolve(rootDir, 'src', 'client', 'assets', 'harmoniarr-icon.svg');
+const badgeSvgPath = resolve(rootDir, 'src', 'client', 'assets', 'harmoniarr-badge.svg');
 const outputDir = resolve(rootDir, 'src', 'client', 'public', 'icons');
 
 /**
@@ -47,10 +48,11 @@ const outputDir = resolve(rootDir, 'src', 'client', 'public', 'icons');
  * references the correct file for each purpose.
  */
 const ICON_SPECS = [
-  { filename: 'icon-192.png', size: 192, purpose: 'any' },
-  { filename: 'icon-512.png', size: 512, purpose: 'any' },
-  { filename: 'icon-maskable-512.png', size: 512, purpose: 'maskable' },
-  { filename: 'apple-touch-icon.png', size: 180, purpose: 'apple' },
+  { filename: 'icon-192.png', size: 192, purpose: 'any', source: svgPath },
+  { filename: 'icon-512.png', size: 512, purpose: 'any', source: svgPath },
+  { filename: 'icon-maskable-512.png', size: 512, purpose: 'maskable', source: svgPath },
+  { filename: 'apple-touch-icon.png', size: 180, purpose: 'apple', source: svgPath },
+  { filename: 'badge-96.png', size: 96, purpose: 'badge', source: badgeSvgPath },
 ];
 
 /**
@@ -68,11 +70,10 @@ async function renderIcon(svgBuffer, outputPath, size) {
 }
 
 async function main() {
-  const svgBuffer = await readFile(svgPath);
-
   await mkdir(outputDir, { recursive: true });
 
   for (const spec of ICON_SPECS) {
+    const svgBuffer = await readFile(spec.source);
     const outputPath = resolve(outputDir, spec.filename);
     await renderIcon(svgBuffer, outputPath, spec.size);
     console.log(`  ✓ ${spec.filename} (${spec.size}×${spec.size}, purpose=${spec.purpose})`);
