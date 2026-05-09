@@ -390,7 +390,7 @@ jobs:
           gh release download "${{ needs.publish-image.outputs.release_tag }}" --repo "${{ github.repository }}" -p "${{ needs.publish-image.outputs.metadata_asset_name }}" -p "${{ needs.publish-image.outputs.compose_asset_name }}" -D supply-chain --clobber
 
       - name: Download published-image smoke evidence artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: harmoniarr-docker-smoke-released-image.json
           path: supply-chain
@@ -401,7 +401,7 @@ jobs:
         run: npm run validate:docker-smoke-evidence
 
       - name: Download published-image browser smoke evidence artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: harmoniarr-docker-smoke-browser-operator.json
           path: supply-chain
@@ -413,7 +413,7 @@ jobs:
 
       - name: Download upgrade-path smoke evidence artifact
         if: ${{ needs.verify-upgrade-path.result == 'success' }}
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: harmoniarr-docker-smoke-upgrade-path.json
           path: supply-chain
