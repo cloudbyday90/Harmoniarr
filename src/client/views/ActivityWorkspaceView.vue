@@ -17,6 +17,9 @@
 -->
 
 <script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useTabbarOverflow } from '../composables/useTabbarOverflow.js';
+
 const tabs = [
   { name: 'activity-operations', label: 'Operations', implemented: true },
   { name: 'activity-candidates', label: 'Candidates', implemented: true },
@@ -31,6 +34,11 @@ const tabs = [
   { name: 'activity-blocklist', label: 'Blocklist', implemented: false },
   { name: 'activity-failed', label: 'Failed', implemented: false },
 ];
+
+const tabbarRef = ref(null);
+const { hasOverflowStart, hasOverflowEnd, attach, cleanup } = useTabbarOverflow();
+onMounted(() => attach(tabbarRef.value));
+onUnmounted(cleanup);
 </script>
 
 <template>
@@ -42,17 +50,22 @@ const tabs = [
       </div>
     </header>
 
-    <nav class="hx-tabbar" aria-label="Activity sections">
-      <RouterLink
-        v-for="tab in tabs"
-        :key="tab.name"
-        :to="{ name: tab.name }"
-        class="hx-tab"
-      >
-        {{ tab.label }}
-        <span v-if="!tab.implemented" class="hx-tab-count" title="Coming soon">soon</span>
-      </RouterLink>
-    </nav>
+    <div
+      class="hx-tabbar-wrap"
+      :class="{ 'has-overflow-start': hasOverflowStart, 'has-overflow-end': hasOverflowEnd }"
+    >
+      <nav class="hx-tabbar" ref="tabbarRef" aria-label="Activity sections">
+        <RouterLink
+          v-for="tab in tabs"
+          :key="tab.name"
+          :to="{ name: tab.name }"
+          class="hx-tab"
+        >
+          {{ tab.label }}
+          <span v-if="!tab.implemented" class="hx-tab-count" title="Coming soon">soon</span>
+        </RouterLink>
+      </nav>
+    </div>
 
     <RouterView />
   </section>

@@ -626,6 +626,58 @@ body,
   font-weight: 600;
 }
 
+/*
+ * .hx-tabbar-wrap — scroll-fade wrapper for overflowing tab bars.
+ *
+ * When tabs overflow horizontally (e.g. Activity with 12 tabs, Settings with
+ * 9), there is no native affordance that signals scrollability.  This wrapper
+ * adds a fade gradient on the start/end edge to indicate hidden content.
+ *
+ * The component drives the classes by reading scroll geometry via the
+ * useTabbarOverflow composable:
+ *   .has-overflow-start  → left-edge fade (user has scrolled right)
+ *   .has-overflow-end    → right-edge fade (more tabs exist to the right)
+ *
+ * The ::before/::after pseudo-elements use pointer-events:none so they do
+ * not block tab clicks, and z-index:1 ensures they sit above the tab text.
+ * The bottom of each pseudo-element stops 1px above the tabbar border so
+ * the active-tab underline indicator remains fully visible at the edges.
+ */
+.hx-tabbar-wrap {
+  position: relative;
+}
+
+.hx-tabbar-wrap::before,
+.hx-tabbar-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 1px; /* above the tabbar border-bottom */
+  width: 3rem;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.hx-tabbar-wrap::before {
+  left: 0;
+  background: linear-gradient(to left, transparent, var(--hx-bg-canvas));
+}
+
+.hx-tabbar-wrap::after {
+  right: 0;
+  background: linear-gradient(to right, transparent, var(--hx-bg-canvas));
+}
+
+.hx-tabbar-wrap.has-overflow-start::before {
+  opacity: 1;
+}
+
+.hx-tabbar-wrap.has-overflow-end::after {
+  opacity: 1;
+}
+
 /* ---------- Card / surface primitives ---------- */
 
 .hx-card {

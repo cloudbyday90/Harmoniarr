@@ -17,6 +17,9 @@
 -->
 
 <script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useTabbarOverflow } from '../composables/useTabbarOverflow.js';
+
 const tabs = [
   { name: 'settings', label: 'General' },
   { name: 'settings-connections', label: 'Connections' },
@@ -28,6 +31,11 @@ const tabs = [
   { name: 'settings-recovery', label: 'Backup & restore' },
   { name: 'settings-library-browser', label: 'Metadata browser' },
 ];
+
+const tabbarRef = ref(null);
+const { hasOverflowStart, hasOverflowEnd, attach, cleanup } = useTabbarOverflow();
+onMounted(() => attach(tabbarRef.value));
+onUnmounted(cleanup);
 </script>
 
 <template>
@@ -39,16 +47,21 @@ const tabs = [
       </div>
     </header>
 
-    <nav class="hx-tabbar" aria-label="Settings sections">
-      <RouterLink
-        v-for="tab in tabs"
-        :key="tab.name"
-        :to="{ name: tab.name }"
-        class="hx-tab"
-      >
-        {{ tab.label }}
-      </RouterLink>
-    </nav>
+    <div
+      class="hx-tabbar-wrap"
+      :class="{ 'has-overflow-start': hasOverflowStart, 'has-overflow-end': hasOverflowEnd }"
+    >
+      <nav class="hx-tabbar" ref="tabbarRef" aria-label="Settings sections">
+        <RouterLink
+          v-for="tab in tabs"
+          :key="tab.name"
+          :to="{ name: tab.name }"
+          class="hx-tab"
+        >
+          {{ tab.label }}
+        </RouterLink>
+      </nav>
+    </div>
 
     <RouterView />
   </section>
