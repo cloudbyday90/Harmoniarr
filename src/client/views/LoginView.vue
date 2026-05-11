@@ -21,6 +21,7 @@ import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
+import { buildLoginDescription, buildLoginInfoMessage } from '../lib/login-presentation.js';
 import { useAutoFocus } from '../composables/useAutoFocus.js';
 import { sessionStore } from '../state/session.js';
 
@@ -33,21 +34,9 @@ const form = reactive({
 });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
-const infoMessage = computed(() => {
-  if (route.query.reason === 'claim-complete') {
-    return 'Your account claim is complete. Log in with the password you just set.';
-  }
-
-  if (route.query.reason === 'session-expired') {
-    return 'Your session expired. Log in again to continue.';
-  }
-
-  if (route.query.reason === 'reauth-required') {
-    return 'A privileged action requires you to confirm your password again before continuing.';
-  }
-
-  return '';
-});
+const infoMessage = computed(() => buildLoginInfoMessage(
+  typeof route.query.reason === 'string' ? route.query.reason : undefined,
+));
 const supportItems = computed(() => buildAuthEntrySupportItems('login', { username: form.username }));
 useAutoFocus(firstInput);
 
@@ -69,7 +58,7 @@ async function submit() {
   <AuthEntryShell
     eyebrow="Local access"
     title="Log in to Harmoniarr"
-    description="Use your local Harmoniarr account to manage requests, imports, diagnostics, and recovery from the same protected browser session."
+    :description="buildLoginDescription()"
     :support-items="supportItems"
   >
     <template #status>
