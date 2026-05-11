@@ -112,8 +112,8 @@ export function getReconciliationStatusTone(status) {
  * Returns a track-count summary string for a library release card.
  *
  * - Returns `null` when there is no meaningful track data.
- * - Returns `'N tracks'` when the release is fully matched.
- * - Returns `'M / N tracks'` when the release is partial or has missing tracks.
+ * - Returns `'N track'` / `'N tracks'` when the release is fully matched.
+ * - Returns `'M of N tracks'` when the release is partial or has missing tracks.
  *
  * @param {object|null} release
  * @returns {string|null}
@@ -123,6 +123,46 @@ export function formatLibraryTrackCounts(release) {
   const expected = release.expectedTrackCount ?? 0;
   if (expected <= 0) return null;
   const matched = release.matchedTrackCount ?? 0;
-  if (matched >= expected) return `${expected} tracks`;
-  return `${matched} / ${expected} tracks`;
+  if (matched >= expected) return `${expected} ${expected === 1 ? 'track' : 'tracks'}`;
+  return `${matched} of ${expected} tracks`;
+}
+
+/**
+ * Returns the page-level subtitle for the Library screen.
+ *
+ * @returns {string}
+ */
+export function buildLibraryPageSubtitle() {
+  return 'All albums and releases found in your library. Status updates after each scan.';
+}
+
+/**
+ * Returns the four stat card display objects for the Library page.
+ * Each card has `label`, `value`, and `meta` fields.
+ *
+ * @param {number} total
+ * @param {number} complete - Releases with status `complete`.
+ * @param {number} partial  - Releases with status `partial`.
+ * @param {number} duplicate - Releases with status `duplicate`.
+ * @returns {ReadonlyArray<Readonly<{label: string, value: number, meta: string}>>}
+ */
+export function buildLibraryStatCards(total, complete, partial, duplicate) {
+  return Object.freeze([
+    Object.freeze({ label: 'Total releases', value: total,    meta: 'Across all statuses' }),
+    Object.freeze({ label: 'In Library',     value: complete, meta: 'Fully matched' }),
+    Object.freeze({ label: 'Partial',        value: partial,  meta: 'Some tracks missing' }),
+    Object.freeze({ label: 'Duplicate',      value: duplicate, meta: 'Duplicate tracks found' }),
+  ]);
+}
+
+/**
+ * Returns the subtitle for the Releases card, or `null` when there are no
+ * releases (suppresses the count in the empty-state view).
+ *
+ * @param {number} count
+ * @returns {string|null}
+ */
+export function buildLibraryReleasesCardSubtitle(count) {
+  if (!count || count <= 0) return null;
+  return `${count} ${count === 1 ? 'release' : 'releases'}`;
 }

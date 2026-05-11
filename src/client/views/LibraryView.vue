@@ -25,6 +25,9 @@ import { useGridState } from '../composables/useGridState.js';
 import { useLibraryFilterOptions } from '../composables/useLibraryFilterOptions.js';
 import { useLibraryReleases } from '../composables/useLibraryReleases.js';
 import {
+  buildLibraryPageSubtitle,
+  buildLibraryReleasesCardSubtitle,
+  buildLibraryStatCards,
   formatLibraryTrackCounts,
   getReconciliationStatusLabel,
   getReconciliationStatusTone,
@@ -101,10 +104,16 @@ const displayReleases = computed(() =>
 
 // ── Stats (computed from current data) ────────────────────────────────────────
 
-const completeCount = computed(() => library.completeReleases.value.length);
-const partialCount = computed(() => library.partialReleases.value.length);
-const duplicateCount = computed(() => library.duplicateReleases.value.length);
 const totalCount = computed(() => library.totalCount.value);
+
+const statCards = computed(() =>
+  buildLibraryStatCards(
+    library.totalCount.value,
+    library.completeReleases.value.length,
+    library.partialReleases.value.length,
+    library.duplicateReleases.value.length,
+  ),
+);
 
 // ── GridControls v-model bridge ───────────────────────────────────────────────
 
@@ -126,7 +135,7 @@ function refreshAll() {
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Library</h1>
-        <p class="hx-page-subtitle">Your music collection — releases acquired and reconciled with the library.</p>
+        <p class="hx-page-subtitle">{{ buildLibraryPageSubtitle() }}</p>
       </div>
       <div class="hx-page-actions">
         <button type="button" class="hx-btn" @click="refreshAll" :disabled="library.isLoading.value">
@@ -158,25 +167,10 @@ function refreshAll() {
     </section>
 
     <section class="hx-stat-grid" v-else-if="totalCount > 0 || !library.isLoading.value">
-      <article class="hx-stat-card">
-        <span class="hx-stat-label">Total releases</span>
-        <span class="hx-stat-value">{{ totalCount }}</span>
-        <span class="hx-stat-meta">In library or reconciled</span>
-      </article>
-      <article class="hx-stat-card">
-        <span class="hx-stat-label">In Library</span>
-        <span class="hx-stat-value">{{ completeCount }}</span>
-        <span class="hx-stat-meta">Fully matched</span>
-      </article>
-      <article class="hx-stat-card">
-        <span class="hx-stat-label">Partial</span>
-        <span class="hx-stat-value">{{ partialCount }}</span>
-        <span class="hx-stat-meta">Some tracks missing</span>
-      </article>
-      <article class="hx-stat-card">
-        <span class="hx-stat-label">Duplicate</span>
-        <span class="hx-stat-value">{{ duplicateCount }}</span>
-        <span class="hx-stat-meta">Duplicate files detected</span>
+      <article class="hx-stat-card" v-for="card in statCards" :key="card.label">
+        <span class="hx-stat-label">{{ card.label }}</span>
+        <span class="hx-stat-value">{{ card.value }}</span>
+        <span class="hx-stat-meta">{{ card.meta }}</span>
       </article>
     </section>
 
@@ -185,8 +179,8 @@ function refreshAll() {
       <header class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Releases</h2>
-          <p class="hx-card-subtitle">
-            {{ totalCount }} release{{ totalCount === 1 ? '' : 's' }}
+          <p v-if="buildLibraryReleasesCardSubtitle(totalCount)" class="hx-card-subtitle">
+            {{ buildLibraryReleasesCardSubtitle(totalCount) }}
           </p>
         </div>
       </header>

@@ -19,6 +19,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildLibraryPageSubtitle,
+  buildLibraryReleasesCardSubtitle,
+  buildLibraryStatCards,
   formatLibraryTrackCounts,
   getReconciliationStatusLabel,
   getReconciliationStatusTone,
@@ -228,6 +231,116 @@ test('getReconciliationStatusTone returns "info" for null', () => {
   assert.equal(getReconciliationStatusTone(null), 'info');
 });
 
+// ── buildLibraryPageSubtitle ──────────────────────────────────────────────────────────────
+
+test('buildLibraryPageSubtitle returns a non-empty string', () => {
+  const result = buildLibraryPageSubtitle();
+  assert.ok(typeof result === 'string' && result.length > 0);
+});
+
+test('buildLibraryPageSubtitle does not contain the word reconcil', () => {
+  const result = buildLibraryPageSubtitle();
+  assert.ok(!result.toLowerCase().includes('reconcil'), 'subtitle must not expose implementation term "reconcil"');
+});
+
+test('buildLibraryPageSubtitle is deterministic across calls', () => {
+  assert.equal(buildLibraryPageSubtitle(), buildLibraryPageSubtitle());
+});
+
+// ── buildLibraryStatCards ────────────────────────────────────────────────────────────────────
+
+test('buildLibraryStatCards returns exactly 4 cards', () => {
+  const cards = buildLibraryStatCards(10, 7, 2, 1);
+  assert.equal(cards.length, 4);
+});
+
+test('buildLibraryStatCards first card is Total releases with total value', () => {
+  const cards = buildLibraryStatCards(10, 7, 2, 1);
+  assert.equal(cards[0].label, 'Total releases');
+  assert.equal(cards[0].value, 10);
+});
+
+test('buildLibraryStatCards second card is In Library with complete count', () => {
+  const cards = buildLibraryStatCards(10, 7, 2, 1);
+  assert.equal(cards[1].label, 'In Library');
+  assert.equal(cards[1].value, 7);
+});
+
+test('buildLibraryStatCards third card is Partial with partial count', () => {
+  const cards = buildLibraryStatCards(10, 7, 2, 1);
+  assert.equal(cards[2].label, 'Partial');
+  assert.equal(cards[2].value, 2);
+});
+
+test('buildLibraryStatCards fourth card is Duplicate with duplicate count', () => {
+  const cards = buildLibraryStatCards(10, 7, 2, 1);
+  assert.equal(cards[3].label, 'Duplicate');
+  assert.equal(cards[3].value, 1);
+});
+
+test('buildLibraryStatCards each card has label, value, and meta fields', () => {
+  const cards = buildLibraryStatCards(5, 3, 1, 1);
+  for (const card of cards) {
+    assert.ok('label' in card, 'card must have a label');
+    assert.ok('value' in card, 'card must have a value');
+    assert.ok('meta' in card, 'card must have a meta');
+    assert.ok(typeof card.label === 'string' && card.label.length > 0, 'label must be a non-empty string');
+    assert.ok(typeof card.meta === 'string' && card.meta.length > 0, 'meta must be a non-empty string');
+  }
+});
+
+test('buildLibraryStatCards Total releases meta does not say "reconcil"', () => {
+  const cards = buildLibraryStatCards(5, 3, 1, 1);
+  assert.ok(!cards[0].meta.toLowerCase().includes('reconcil'));
+});
+
+test('buildLibraryStatCards result and each card are frozen', () => {
+  const cards = buildLibraryStatCards(5, 3, 1, 1);
+  assert.ok(Object.isFrozen(cards), 'result array must be frozen');
+  for (const card of cards) {
+    assert.ok(Object.isFrozen(card), `card "${card.label}" must be frozen`);
+  }
+});
+
+test('buildLibraryStatCards reflects passed values faithfully', () => {
+  const cards = buildLibraryStatCards(0, 0, 0, 0);
+  assert.equal(cards[0].value, 0);
+  assert.equal(cards[1].value, 0);
+  assert.equal(cards[2].value, 0);
+  assert.equal(cards[3].value, 0);
+});
+
+// ── buildLibraryReleasesCardSubtitle ───────────────────────────────────────────────────
+
+test('buildLibraryReleasesCardSubtitle returns null for 0', () => {
+  assert.equal(buildLibraryReleasesCardSubtitle(0), null);
+});
+
+test('buildLibraryReleasesCardSubtitle returns null for negative', () => {
+  assert.equal(buildLibraryReleasesCardSubtitle(-1), null);
+});
+
+test('buildLibraryReleasesCardSubtitle returns null for null', () => {
+  assert.equal(buildLibraryReleasesCardSubtitle(null), null);
+});
+
+test('buildLibraryReleasesCardSubtitle returns null for undefined', () => {
+  assert.equal(buildLibraryReleasesCardSubtitle(undefined), null);
+});
+
+test('buildLibraryReleasesCardSubtitle returns "1 release" for 1', () => {
+  assert.equal(buildLibraryReleasesCardSubtitle(1), '1 release');
+});
+
+test('buildLibraryReleasesCardSubtitle returns "N releases" for N > 1', () => {
+  assert.equal(buildLibraryReleasesCardSubtitle(2), '2 releases');
+  assert.equal(buildLibraryReleasesCardSubtitle(100), '100 releases');
+});
+
+test('buildLibraryReleasesCardSubtitle does not pluralise 1 as "1 releases"', () => {
+  assert.notEqual(buildLibraryReleasesCardSubtitle(1), '1 releases');
+});
+
 // ── formatLibraryTrackCounts ──────────────────────────────────────────────────
 
 test('formatLibraryTrackCounts returns null for null input', () => {
@@ -252,17 +365,22 @@ test('formatLibraryTrackCounts returns "N tracks" when matched exceeds expected'
   assert.equal(result, '10 tracks');
 });
 
-test('formatLibraryTrackCounts returns "M / N tracks" for partial match', () => {
+test('formatLibraryTrackCounts returns "M of N tracks" for partial match', () => {
   const result = formatLibraryTrackCounts({ expectedTrackCount: 12, matchedTrackCount: 8 });
-  assert.equal(result, '8 / 12 tracks');
+  assert.equal(result, '8 of 12 tracks');
 });
 
-test('formatLibraryTrackCounts returns "0 / N tracks" for fully unmatched', () => {
+test('formatLibraryTrackCounts returns "0 of N tracks" for fully unmatched', () => {
   const result = formatLibraryTrackCounts({ expectedTrackCount: 5, matchedTrackCount: 0 });
-  assert.equal(result, '0 / 5 tracks');
+  assert.equal(result, '0 of 5 tracks');
 });
 
-test('formatLibraryTrackCounts handles single track correctly', () => {
+test('formatLibraryTrackCounts returns "1 track" for a single fully-matched track', () => {
   const result = formatLibraryTrackCounts({ expectedTrackCount: 1, matchedTrackCount: 1 });
-  assert.equal(result, '1 tracks');
+  assert.equal(result, '1 track');
+});
+
+test('formatLibraryTrackCounts regression: 1 track is not pluralised as "1 tracks"', () => {
+  const result = formatLibraryTrackCounts({ expectedTrackCount: 1, matchedTrackCount: 1 });
+  assert.notEqual(result, '1 tracks', 'singular track count must not use plural form');
 });

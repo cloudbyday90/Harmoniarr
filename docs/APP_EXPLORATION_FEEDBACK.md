@@ -308,3 +308,31 @@ Critical analysis performed against the live walkthrough. Full findings:
 - **Auth shell redesign** — **Resolved (2026-05-12)** via five targeted fixes that collectively address the actionable parts of the original feedback without requiring a full visual redesign. Changes: (1) Vertical centering — `.auth-page` changed from `align-items: flex-start` to `align-items: center`; the form card group is now centered in the viewport on all screen sizes instead of anchored to the top with empty space below. (2) Redundant h2 removed — `<h2>Login</h2>` inside the form card was removed; the page `<h1>` already provides the heading so the duplicate added no hierarchy value. (3) Inline claim note replaced with a direct `RouterLink` — the opaque *"Use the claim-account path shown in the related entry points"* note replaced with *"First time here? Claim your account with the code from your administrator"* where "Claim your account" is a live `RouterLink` that prefills the username if one has been typed. `buildClaimAccountRoute(username)` extracted to `login-presentation.js` (8 new tests, covers trimming, null/undefined, empty/whitespace, email-format usernames). (4) Emergency recovery link removed from login footer — `authEntrySupportDefinitions['login']` in `auth-entry-support.js` changed from `[claim-account, recovery]` to `[claim-account]` only; the recovery path is operator-only emergency tooling that must not appear on the primary login screen for all users; it remains accessible through its own direct URL. (5) Jargon eyebrow removed — `eyebrow="Local access"` removed from `LoginView.vue`; `eyebrow` made optional with `default: ''` and `v-if="eyebrow"` guard in `AuthEntryShell.vue` so the `<p>` is omitted when not needed. On-brand link colours added to `.auth-entry-inline-note a` so the RouterLink renders in the established green palette rather than browser-default blue. Test count updated to **1180 tests, 0 failures**.
 
 Test suite after this session: **1180 tests, 0 failures** (up from 1172).
+
+### 2026-05-12 - Library Screen
+
+Status: **Resolved** (2026-05-12 — targeted presentation fixes).
+
+Critical analysis performed against `LibraryView.vue` and `library-release-normalization.js`.
+
+**Issues identified and resolved:**
+
+1. **`formatLibraryTrackCounts` used slash separator instead of "of"** — `"8 / 12 tracks"` reads like a file-system ratio; `"8 of 12 tracks"` is the natural human form used throughout the rest of the UI. Fixed in `library-release-normalization.js`. Existing tests that asserted the wrong string were also updated.
+
+2. **`formatLibraryTrackCounts` pluralisation bug for single track** — `"1 tracks"` was returned for a fully-matched single-track release. The pre-existing test even asserted `'1 tracks'` confirming the bug was not caught. Fixed: returns `"1 track"` (singular) when `expectedTrackCount === 1`. Test renamed and corrected; regression guard added asserting the output never equals `'1 tracks'`.
+
+3. **Page subtitle was hardcoded with internal product language** — *"Your music collection — releases acquired and reconciled with the library."* used the internal term "reconciled" which is not user-facing vocabulary. Extracted to `buildLibraryPageSubtitle()` in `library-release-normalization.js` returning operator-friendly copy. A jargon guard test (`does not contain the word 'reconcil'`) prevents regression.
+
+4. **Stat card copy hardcoded inline in the template** — Four separate `<article>` blocks with inline label/value/meta repeated the same structure with no shared logic or testability. Replaced with `buildLibraryStatCards(total, complete, partial, duplicate)` returning a frozen array of `{label, value, meta}` objects. `LibraryView.vue` now drives the grid with `v-for="card in statCards"` using a single `statCards` computed. All three inline `completeCount` / `partialCount` / `duplicateCount` computeds collapsed into the single `statCards` computed call.
+
+5. **Releases card subtitle showed "0 releases" in empty state** — The `<p class="hx-card-subtitle">` was unconditionally rendered including during empty/loading states, showing "0 releases" before any data arrived. Replaced with `buildLibraryReleasesCardSubtitle(count)` which returns `null` for `count ≤ 0` or falsy input; the subtitle `<p>` is conditionally rendered with `v-if`.
+
+**Extractions and tests added:**
+
+- `buildLibraryPageSubtitle()` — pure, deterministic, jargon-free subtitle string. 3 tests.
+- `buildLibraryStatCards(total, complete, partial, duplicate)` — returns frozen array of 4 frozen `{label, value, meta}` objects. 8 tests covering structure, values, freeze, zero-values, and non-jargon meta.
+- `buildLibraryReleasesCardSubtitle(count)` — returns `null` for empty/invalid, `"1 release"` for singular, `"N releases"` for plural. 7 tests including singular regression guard.
+
+Updated 3 pre-existing tests that asserted the old (wrong) format strings; added 1 regression guard for the pluralisation bug.
+
+Test suite after this session: **1200 tests, 0 failures** (up from 1180).
