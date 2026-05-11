@@ -161,28 +161,31 @@ Design direction to revisit:
 
 ### 2026-05-04 - Metadata Page
 
-Status: not intuitive; the screen does not explain the job to be done or when someone should use each search mode.
+Status: **Resolved** (2026-05-11 — Artist Metadata page redesign).
 
-Initial feedback:
+Redesign implemented:
+- Page hero heading changed from "MusicBrainz artist flow" to "Artist Metadata" with operator-facing subtitle.
+- Hero card now includes a two-bullet decision guide explaining when to use each entry point.
+- `MetadataArtistSearchPanel` section header changed from "Provider-first selection" to "Find an artist", with guidance text: "Search MusicBrainz to find an artist you want to import for the first time."
+- `MetadataLocalSearchPanel` section header changed from "Reopen imported metadata" to "Open local artist", with guidance text: "Find an artist, release group, or release you've already imported."
+- Local search field label changed from "Imported metadata" to "Search name" with updated placeholder.
+- Loading/error copy simplified: "Loading local artist workspace" → "Loading artist…"; "Artist flow failed" → "Action failed".
+- Extracted `describeMonitoringDecision`, `describeWantedState`, `buildNextMonitoringPatch`, `detectionEventLinkTarget` from `MetadataArtistSummary.vue` into new shared lib `src/client/lib/metadata-artist-presentation.js`.
+- Added 16 unit tests for the new lib covering all decision branches and edge cases.
+
+Original feedback:
 
 - It is not obvious what the user is supposed to do here on first view.
 - The page is framed as a `MusicBrainz artist flow`, which sounds like an internal implementation concept rather than a user-facing task.
 - The two entry points, `Provider-first selection` and `Reopen imported metadata`, do not clearly explain when the operator should choose one versus the other.
 - The page assumes the user already understands the distinction between provider metadata and local canonical metadata.
 
-What feels unclear:
+What felt unclear:
 
 - Is this page for adding artists, editing metadata, monitoring artists, browsing imported metadata, or troubleshooting metadata state?
 - What does `provider-first` mean in practical terms for the operator?
 - Why would I use `Search MusicBrainz` instead of `Search local metadata`, and what happens after either choice?
 - The screen does not yet establish the primary workflow in plain language.
-
-Design direction to revisit:
-
-- Reframe the page around operator goals such as `Add or import an artist` and `Open existing metadata`.
-- Replace implementation-centric language like `provider-first selection` with user-facing intent.
-- Add short decision guidance near the top so the operator knows which starting path matches their task.
-- Treat metadata as a workspace with clear entry modes, not as a backend flow surface.
 
 ### 2026-05-04 - Recovery Page
 

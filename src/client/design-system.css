@@ -1479,6 +1479,33 @@ body {
   font-size: var(--hx-text-sm);
 }
 
+/* Metadata page — entry-point guidance */
+
+.metadata-entry-guide {
+  list-style: none;
+  padding: 0;
+  margin: var(--hx-space-3) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2) var(--hx-space-5);
+}
+
+.metadata-entry-guide li {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-text-on-dark-muted);
+}
+
+.metadata-entry-guide strong {
+  color: var(--hx-text-on-dark);
+  font-weight: 600;
+}
+
+.metadata-panel-guidance {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-text-muted);
+  margin: 0 0 var(--hx-space-3);
+}
+
 /* Active nav link in legacy settings nav */
 .settings-nav-link.is-active,
 .settings-nav-link.router-link-active,

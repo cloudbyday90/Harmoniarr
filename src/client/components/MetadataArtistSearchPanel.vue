@@ -59,10 +59,12 @@ function updateSearchQuery(event) {
   <article class="panel-light">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Artist search</p>
-        <h3>Provider-first selection</h3>
+        <p class="eyebrow">MusicBrainz</p>
+        <h3>Find an artist</h3>
       </div>
     </div>
+
+    <p class="metadata-panel-guidance">Search MusicBrainz to find an artist you want to import for the first time.</p>
 
     <form class="metadata-search-form" @submit.prevent="$emit('run-search')">
       <label>

@@ -18,7 +18,12 @@
 
 <script setup>
 import { RouterLink } from 'vue-router';
-import { buildMetadataReleaseGroupLocation } from '../lib/metadata-route-state.js';
+import {
+  buildNextMonitoringPatch,
+  describeMonitoringDecision,
+  describeWantedState,
+  detectionEventLinkTarget,
+} from '../lib/metadata-artist-presentation.js';
 
 defineProps({
   detectionEventsErrorMessage: {
@@ -52,53 +57,6 @@ defineProps({
 });
 
 const emit = defineEmits(['load-more-detection-events', 'refresh-metadata', 'update-monitoring']);
-
-function buildNextMonitoringPatch(localArtist) {
-  return {
-    isMonitored: !(localArtist.monitoring?.isMonitored ?? false),
-    monitoredReleaseGroupTypes: localArtist.monitoring?.monitoredReleaseGroupTypes ?? ['album', 'ep'],
-  };
-}
-
-function describeMonitoringDecision(decision) {
-  switch (decision) {
-    case 'wanted_release_detected':
-      return 'Monitored release type triggered wanted reconciliation.';
-    case 'ignored_release_type':
-      return 'Detected release type is outside the monitoring policy.';
-    case 'already_satisfied':
-      return 'Catalog already satisfied the monitored release state.';
-    default:
-      return 'Artist is not currently monitored for automatic wanted detection.';
-  }
-}
-
-function describeWantedState(status) {
-  switch (status) {
-    case 'missing':
-      return 'Missing';
-    case 'partial':
-      return 'Partial';
-    default:
-      return 'None';
-  }
-}
-
-function detectionEventLinkTarget(localArtist, event) {
-  const to = buildMetadataReleaseGroupLocation({
-    artistId: localArtist.artist?.id,
-    releaseGroupId: event.metadataReleaseGroupId,
-  });
-
-  if (!to) {
-    return null;
-  }
-
-  return {
-    label: 'Open release group',
-    to,
-  };
-}
 </script>
 
 <template>

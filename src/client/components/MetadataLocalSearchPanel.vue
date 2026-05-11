@@ -75,18 +75,20 @@ function hasAnyResults() {
   <article class="panel-light">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Local search</p>
-        <h3>Reopen imported metadata</h3>
+        <p class="eyebrow">Local catalog</p>
+        <h3>Open local artist</h3>
       </div>
     </div>
 
+    <p class="metadata-panel-guidance">Find an artist, release group, or release you’ve already imported.</p>
+
     <form class="metadata-search-form" @submit.prevent="$emit('run-search')">
       <label>
-        Imported metadata
-        <input :value="localSearchQuery" placeholder="Search local artists, release groups, or releases" @input="updateSearchQuery" />
+        Search name
+        <input :value="localSearchQuery" placeholder="Artist, release group, or release" @input="updateSearchQuery" />
       </label>
       <button type="submit" :disabled="isSearchingLocal">
-        {{ isSearchingLocal ? 'Searching...' : 'Search local metadata' }}
+        {{ isSearchingLocal ? 'Searching...' : 'Search local' }}
       </button>
     </form>
 

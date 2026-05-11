@@ -201,9 +201,13 @@ watch(
 <template>
   <section class="page-stack">
     <article class="panel-dark hero-card compact">
-      <p class="eyebrow">Canonical metadata</p>
-      <h2>MusicBrainz artist flow</h2>
-      <p>Search an artist, import it once, then operate on local canonical metadata and selected release groups.</p>
+      <p class="eyebrow">Artist metadata</p>
+      <h2>Artist Metadata</h2>
+      <p>Manage artist metadata sourced from MusicBrainz. Import an artist for the first time, or open one you've already imported to review releases and trigger metadata refreshes.</p>
+      <ul class="metadata-entry-guide">
+        <li><strong>First time?</strong> Search MusicBrainz below and import the artist.</li>
+        <li><strong>Already imported?</strong> Use local search to reopen their metadata workspace.</li>
+      </ul>
     </article>
 
     <MetadataArtistSearchPanel
@@ -236,13 +240,13 @@ watch(
     />
 
     <article class="panel-light error-panel" v-if="artistActionError">
-      <h3>Artist flow failed</h3>
+      <h3>Action failed</h3>
       <p>{{ artistActionError }}</p>
     </article>
 
     <article class="panel-light" v-if="isLoadingArtist">
-      <h3>Loading local artist workspace</h3>
-      <p>Resolving the imported artist from local metadata and loading release-group candidates.</p>
+      <h3>Loading artist…</h3>
+      <p>Fetching imported artist data and release groups.</p>
     </article>
 
     <template v-else-if="localArtist">
@@ -287,8 +291,8 @@ watch(
       />
 
       <article class="panel-light" v-if="isLoadingReleaseGroup">
-        <h3>Loading releases</h3>
-        <p>Resolving provider releases for the selected release group and matching them to local data.</p>
+        <h3>Loading releases…</h3>
+        <p>Fetching release information for this release group.</p>
       </article>
 
       <MetadataProviderReleaseList
