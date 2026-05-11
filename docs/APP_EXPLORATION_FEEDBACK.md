@@ -416,3 +416,47 @@ Critical analysis performed against `DiscoverView.vue` and the missing `discover
 - `buildDiscoverArtistInitial(id, name)` — 7 tests
 
 Test suite after this session: **1303 tests, 0 failures** (up from 1255).
+
+---
+
+### 2026-05-11 - Artist Detail Screen
+
+Status: **Resolved** (2026-05-11 — targeted copy, extraction, and deduplication fixes).
+
+Critical analysis performed against `ArtistDetailView.vue`. No `artist-detail-presentation.js` lib existed. All presentation logic was inline in `<script setup>` or directly embedded in the template.
+
+**Issues identified and resolved:**
+
+1. **Raw API validation error leaked to UI** — `{{ discographyError }}` rendered the raw composable error string directly. MusicBrainz parameter validation errors such as `"limit must be an integer between 1 and 25"` were shown verbatim — technical noise that means nothing to a requester. `formatDiscographyError(rawError)` now normalises: messages containing `"must be"`, `"invalid"`, or `"bad request"` are suppressed to a generic fallback; messages containing `"musicbrainz"` (case-insensitive) are normalised to *"Discography is temporarily unavailable. Try again in a moment."*; unknown messages pass through unchanged. A parallel `formatArtistDetailError(rawError)` covers the artist metadata error.
+
+2. **`"Open in MusicBrainz ↗"` exposed an internal data source name** — The MusicBrainz attribution link rendered the service name directly in the UI. Requesters have no reason to know MusicBrainz powers artist lookups. `buildArtistMusicBrainzLabel()` → *"More info ↗"* removes the service name while retaining the external-link signal.
+
+3. **`{{ section.type }}s` naive plural was incorrect for some types** — `"Other"` would render as `"Others"` and the `"EP"` result (`"EPs"`) was coincidentally correct via the generic append, not by explicit intent. `pluralizeReleaseType(type)` uses an explicit map: `Album→Albums`, `Single→Singles`, `EP→EPs`, `Broadcast→Broadcasts`, `Other→Other`; unknown types append `s`; null/undefined/empty → `"Releases"`. A regression guard test confirms `"Other"` is explicitly handled and would not produce `"Others"`.
+
+4. **Inline `avatarStyle`/`artistInitial` functions duplicated Discover's pattern** — Both `ArtistDetailView` and `DiscoverView` had identical inline component functions wrapping `getArtistAvatar`. The canonical shared helpers `buildAvatarStyle(id, name)` and `buildAvatarInitial(id, name)` are now exported from `src/client/lib/artist-avatar.js`. `discover-presentation.js` delegates to them; `artist-detail-presentation.js` exports `buildRelatedArtistAvatarStyle`/`buildRelatedArtistInitial` which also delegate. Inline avatar functions removed from both views.
+
+5. **Inline computed logic cluttered `<script setup>`** — `artistMeta` (8-line join/filter block) and `musicBrainzUrl` (guard + template string) were inlined. Extracted to `buildArtistMetaLine(artist)` and `buildArtistMusicBrainzUrl(mbid)` in `artist-detail-presentation.js`; computeds are now one-liners.
+
+6. **Empty discography body exposed internal service name** — `"MusicBrainz has no release groups listed for this artist."` used `"release groups"` (MusicBrainz internal terminology) and named the data source. Replaced with `buildNoDiscographyBody()` → *"No releases are listed for this artist yet."*
+
+7. **Raw artist error rendered without normalisation** — `{{ artistError }}` passed the raw error string directly into the template for soft (non-fatal) artist metadata errors, with the same leak risk as the discography error. Replaced with `formatArtistDetailError(artistError)`.
+
+**New lib: `src/client/lib/artist-detail-presentation.js`** (10 exports):
+
+- `buildArtistMetaLine(artist)` — 10 tests
+- `buildArtistMusicBrainzUrl(mbid)` — 6 tests
+- `buildArtistMusicBrainzLabel()` — 3 tests (no-MusicBrainz guard)
+- `buildArtistDetailErrorBody()` — 2 tests
+- `formatDiscographyError(rawError)` — 11 tests (validation suppression, service-name normalisation, pass-through)
+- `formatArtistDetailError(rawError)` — 5 tests
+- `pluralizeReleaseType(type)` — 10 tests (EP regression guard, Other explicit mapping)
+- `buildNoDiscographyBody()` — 3 tests (no-MusicBrainz guard)
+- `buildRelatedArtistAvatarStyle(id, name)` — 6 tests (delegation verified)
+- `buildRelatedArtistInitial(id, name)` — 6 tests (delegation verified)
+
+**Shared helpers added to `src/client/lib/artist-avatar.js`** (2 new exports, 14 new tests):
+
+- `buildAvatarStyle(id, name)` → `{ background, color }` (CSS-ready; maps `bg→background`, `fg→color`)
+- `buildAvatarInitial(id, name)` → single uppercase character or `'?'`
+
+Test suite after this session: **1377 tests, 0 failures** (up from 1303).

@@ -71,3 +71,33 @@ export function getArtistAvatar(mbid, name) {
   const initial = name ? name.trim().charAt(0).toUpperCase() : '?';
   return { bg, fg, initial };
 }
+
+/**
+ * CSS style object for an artist avatar element.
+ *
+ * Convenience wrapper around `getArtistAvatar` that re-shapes the `bg`/`fg`
+ * fields into the `background`/`color` property names expected by Vue's
+ * `:style` binding. Shared by any view that renders artist avatar chips.
+ *
+ * @param {string|null} id   - MusicBrainz artist ID.
+ * @param {string|null} name - Artist display name.
+ * @returns {{ background: string, color: string }}
+ */
+export function buildAvatarStyle(id, name) {
+  const { bg, fg } = getArtistAvatar(id, name);
+  return { background: bg, color: fg };
+}
+
+/**
+ * Single uppercase initial character for an artist avatar element.
+ *
+ * Convenience wrapper around `getArtistAvatar` that extracts only the
+ * `initial` field. Shared by any view that renders artist avatar chips.
+ *
+ * @param {string|null} id   - MusicBrainz artist ID.
+ * @param {string|null} name - Artist display name.
+ * @returns {string}
+ */
+export function buildAvatarInitial(id, name) {
+  return getArtistAvatar(id, name).initial;
+}

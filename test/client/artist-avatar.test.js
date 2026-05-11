@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AVATAR_PALETTE, getAvatarPaletteIndex, getArtistAvatar } from '../../src/client/lib/artist-avatar.js';
+import { AVATAR_PALETTE, buildAvatarInitial, buildAvatarStyle, getAvatarPaletteIndex, getArtistAvatar } from '../../src/client/lib/artist-avatar.js';
 
 // ── getAvatarPaletteIndex ────────────────────────────────────────────────────
 
@@ -107,4 +107,72 @@ test('AVATAR_PALETTE entries all have bg and fg string properties', () => {
     assert.ok(entry.bg.startsWith('#'), `entry ${index} bg should be a hex color`);
     assert.ok(entry.fg.startsWith('#'), `entry ${index} fg should be a hex color`);
   }
+});
+
+// ── buildAvatarStyle ─────────────────────────────────────────────────────────
+
+test('buildAvatarStyle returns an object with background and color keys', () => {
+  const style = buildAvatarStyle('a74b1b7f-71a5-4011-9441-d0b5e4122711', 'Radiohead');
+  assert.ok('background' in style, 'should have background key');
+  assert.ok('color' in style, 'should have color key');
+});
+
+test('buildAvatarStyle does not expose raw bg or fg keys', () => {
+  const style = buildAvatarStyle('a74b1b7f-71a5-4011-9441-d0b5e4122711', 'Radiohead');
+  assert.ok(!('bg' in style), 'should not expose bg');
+  assert.ok(!('fg' in style), 'should not expose fg');
+});
+
+test('buildAvatarStyle background matches AVATAR_PALETTE bg for the same mbid', () => {
+  const mbid = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+  const index = getAvatarPaletteIndex(mbid);
+  const style = buildAvatarStyle(mbid, 'Radiohead');
+  assert.equal(style.background, AVATAR_PALETTE[index].bg);
+});
+
+test('buildAvatarStyle color matches AVATAR_PALETTE fg for the same mbid', () => {
+  const mbid = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+  const index = getAvatarPaletteIndex(mbid);
+  const style = buildAvatarStyle(mbid, 'Radiohead');
+  assert.equal(style.color, AVATAR_PALETTE[index].fg);
+});
+
+test('buildAvatarStyle is stable — same inputs produce same output', () => {
+  const mbid = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+  assert.deepEqual(buildAvatarStyle(mbid, 'Radiohead'), buildAvatarStyle(mbid, 'Radiohead'));
+});
+
+test('buildAvatarStyle handles null id without throwing', () => {
+  assert.doesNotThrow(() => buildAvatarStyle(null, 'Test Artist'));
+});
+
+test('buildAvatarStyle handles null name without throwing', () => {
+  assert.doesNotThrow(() => buildAvatarStyle('some-mbid', null));
+});
+
+// ── buildAvatarInitial ────────────────────────────────────────────────────────
+
+test('buildAvatarInitial returns uppercase first letter of name', () => {
+  assert.equal(buildAvatarInitial('some-mbid', 'radiohead'), 'R');
+});
+
+test('buildAvatarInitial returns ? for null name', () => {
+  assert.equal(buildAvatarInitial('some-mbid', null), '?');
+});
+
+test('buildAvatarInitial returns ? for empty name', () => {
+  assert.equal(buildAvatarInitial('some-mbid', ''), '?');
+});
+
+test('buildAvatarInitial returns a single character', () => {
+  assert.equal(buildAvatarInitial('some-mbid', 'Massive Attack').length, 1);
+});
+
+test('buildAvatarInitial handles null id without throwing', () => {
+  assert.doesNotThrow(() => buildAvatarInitial(null, 'Test Artist'));
+});
+
+test('buildAvatarInitial matches getArtistAvatar initial field', () => {
+  const mbid = '72c536dc-7137-4477-a521-567eeb840fa8';
+  assert.equal(buildAvatarInitial(mbid, 'Björk'), getArtistAvatar(mbid, 'Björk').initial);
 });

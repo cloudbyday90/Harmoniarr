@@ -26,7 +26,7 @@
  * consumed by the template: a CSS style object and a single initial character.
  */
 
-import { getArtistAvatar } from './artist-avatar.js';
+import { buildAvatarInitial, buildAvatarStyle } from './artist-avatar.js';
 
 // ── Page-level copy ──────────────────────────────────────────────────────────
 
@@ -124,25 +124,25 @@ export function buildDiscoverNoSimilarArtistsMessage() {
 /**
  * CSS style object for an artist avatar element.
  *
- * Maps the `bg`/`fg` fields from `getArtistAvatar` to `background`/`color`
- * property names expected by Vue's `:style` binding.
+ * Delegates to the shared `buildAvatarStyle` helper in `artist-avatar.js`.
  *
  * @param {string|null} id   - MusicBrainz artist ID.
  * @param {string|null} name - Artist name.
  * @returns {{ background: string, color: string }}
  */
 export function buildDiscoverAvatarStyle(id, name) {
-  const avatar = getArtistAvatar(id, name);
-  return { background: avatar.bg, color: avatar.fg };
+  return buildAvatarStyle(id, name);
 }
 
 /**
  * Single uppercase initial character for an artist avatar.
+ *
+ * Delegates to the shared `buildAvatarInitial` helper in `artist-avatar.js`.
  *
  * @param {string|null} id   - MusicBrainz artist ID.
  * @param {string|null} name - Artist name.
  * @returns {string}
  */
 export function buildDiscoverArtistInitial(id, name) {
-  return getArtistAvatar(id, name).initial;
+  return buildAvatarInitial(id, name);
 }

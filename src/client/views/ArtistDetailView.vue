@@ -29,7 +29,18 @@ import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { buildArtistDetailLocation, groupReleaseGroupsByType, normalizeReleaseGroupForCard } from '../lib/artist-detail-route.js';
-import { getArtistAvatar } from '../lib/artist-avatar.js';
+import {
+  buildArtistDetailErrorBody,
+  buildArtistMetaLine,
+  buildArtistMusicBrainzLabel,
+  buildArtistMusicBrainzUrl,
+  buildNoDiscographyBody,
+  buildRelatedArtistAvatarStyle,
+  buildRelatedArtistInitial,
+  formatArtistDetailError,
+  formatDiscographyError,
+  pluralizeReleaseType,
+} from '../lib/artist-detail-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { sessionStore } from '../state/session.js';
 
@@ -134,20 +145,10 @@ const artistName = computed(() => {
 });
 
 /** Short metadata line under the artist name. */
-const artistMeta = computed(() => {
-  if (!artist.value) return null;
-  const parts = [];
-  if (artist.value.type) parts.push(artist.value.type);
-  if (artist.value.country) parts.push(artist.value.country);
-  if (artist.value.disambiguation) parts.push(`(${artist.value.disambiguation})`);
-  return parts.length ? parts.join(' · ') : null;
-});
+const artistMeta = computed(() => buildArtistMetaLine(artist.value));
 
 /** Whether the artist has a known MusicBrainz page. */
-const musicBrainzUrl = computed(() => {
-  if (!mbid.value) return null;
-  return `https://musicbrainz.org/artist/${mbid.value}`;
-});
+const musicBrainzUrl = computed(() => buildArtistMusicBrainzUrl(mbid.value));
 
 /** Discography grouped into sections by primary type, newest first within each. */
 const discographySections = computed(() => {
@@ -168,15 +169,6 @@ async function handleMonitor() {
   if (result?.success) {
     setMonitoring({ monitored: true });
   }
-}
-
-function avatarStyle(relatedArtist) {
-  const avatar = getArtistAvatar(relatedArtist.id, relatedArtist.name);
-  return { background: avatar.bg, color: avatar.fg };
-}
-
-function artistInitial(relatedArtist) {
-  return getArtistAvatar(relatedArtist.id, relatedArtist.name).initial;
 }
 
 // Load on mount and whenever the MBID changes (e.g. navigating between artists).
@@ -201,8 +193,8 @@ watch(mbid, (newMbid, oldMbid) => {
     <!-- Hard error (discography failed AND no artist name fallback) -->
     <EmptyState
       v-else-if="discographyError && !artist && !nameHint"
-      :title="discographyError"
-      body="Check your connection and try again."
+      :title="formatDiscographyError(discographyError)"
+      :body="buildArtistDetailErrorBody()"
     >
       <template #icon>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -233,7 +225,7 @@ watch(mbid, (newMbid, oldMbid) => {
               class="hx-btn"
               data-variant="ghost"
             >
-              Open in MusicBrainz ↗
+              {{ buildArtistMusicBrainzLabel() }}
             </a>
           </div>
         </div>
@@ -241,7 +233,7 @@ watch(mbid, (newMbid, oldMbid) => {
 
       <!-- Artist error (non-fatal — discography may still be present) -->
       <p v-if="artistError" class="artist-detail-soft-error" role="alert">
-        {{ artistError }}
+        {{ formatArtistDetailError(artistError) }}
       </p>
 
       <!-- ── Discography ────────────────────────────────────────────────── -->
@@ -249,13 +241,13 @@ watch(mbid, (newMbid, oldMbid) => {
         <h2 class="artist-detail-section-heading">Discography</h2>
 
         <p v-if="discographyError" class="artist-detail-soft-error" role="alert">
-          {{ discographyError }}
+          {{ formatDiscographyError(discographyError) }}
         </p>
 
         <EmptyState
           v-else-if="!hasDiscography"
           title="No releases found"
-          body="MusicBrainz has no release groups listed for this artist."
+          :body="buildNoDiscographyBody()"
         />
 
         <template v-else>
@@ -264,7 +256,7 @@ watch(mbid, (newMbid, oldMbid) => {
             :key="section.type"
             class="artist-detail-type-section"
           >
-            <h3 class="artist-detail-type-heading">{{ section.type }}s</h3>
+            <h3 class="artist-detail-type-heading">{{ pluralizeReleaseType(section.type) }}</h3>
             <div class="hx-artwork-grid artist-detail-grid" :aria-label="`${section.type}s`">
               <ReleaseCard
                 v-for="release in section.releases"
@@ -298,10 +290,10 @@ watch(mbid, (newMbid, oldMbid) => {
           >
             <div
               class="artist-detail-related-avatar"
-              :style="avatarStyle(related)"
+              :style="buildRelatedArtistAvatarStyle(related.id, related.name)"
               aria-hidden="true"
             >
-              <span class="artist-detail-related-initial">{{ artistInitial(related) }}</span>
+              <span class="artist-detail-related-initial">{{ buildRelatedArtistInitial(related.id, related.name) }}</span>
             </div>
             <span class="artist-detail-related-name">{{ related.name }}</span>
           </RouterLink>
