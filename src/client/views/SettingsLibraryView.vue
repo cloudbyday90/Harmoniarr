@@ -19,10 +19,20 @@
 </script>
 
 <template>
-  <div class="panel-light">
-    <div class="section-header">
-      <h2>Library</h2>
-    </div>
-    <p class="muted-copy">Download scoring, discovery schedule, and reconciliation settings coming soon.</p>
+  <div class="cfg-page">
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Library settings</h3>
+          <p class="hx-card-subtitle">Download scoring, discovery schedule, and reconciliation behaviour.</p>
+        </div>
+      </header>
+      <div class="hx-card-body">
+        <div class="hx-empty">
+          <p class="hx-empty-title">Coming soon</p>
+          <p class="hx-empty-copy">Library configuration will be available here in a future update.</p>
+        </div>
+      </div>
+    </article>
   </div>
 </template>

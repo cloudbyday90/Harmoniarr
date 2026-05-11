@@ -226,7 +226,7 @@ What was changed:
 
 ### 2026-05-04 - Settings Page
 
-Status: too many unrelated options on one long page, with weak grouping and no durable in-page navigation.
+Status: **Resolved** (2026-05-11)
 
 Initial feedback:
 
@@ -252,3 +252,11 @@ Design direction to revisit:
 - Break settings into tabs, sub-navigation, or durable grouped sections with stronger hierarchy.
 - Replace implementation-centric headings like `Settings contract` with plain configuration language.
 - Make the shell sidebar sticky or otherwise persistent during long-page scrolling.
+
+Resolution:
+
+- The old monolithic `SettingsView.vue` (1,421 lines) was not referenced by the router — confirmed dead code. Deleted along with its hash-anchor navigation helpers (`settings-navigation.js`) and their orphaned test file.
+- `SettingsWorkspaceView.vue` (the tab-split shell already in use) was already correct.
+- `SettingsLibraryView.vue`: replaced `panel-light`/`section-header`/`muted-copy` stubs with `cfg-page`/`hx-card`/`hx-empty` design system placeholder card.
+- `SettingsNotificationsView.vue`: replaced `panel-light`/`section-header`/`hx-form-row`/`hx-btn-primary`/`muted-copy` with `cfg-page`/`hx-card`/`hx-text-muted`/`data-variant="primary"`; renamed heading from "Push Notifications" to "Browser notifications"; fixed `...` → `…`; restructured permission/subscribe/unsubscribe states as clean conditional blocks.
+- Fixed a pre-existing test hang in `useOperationHistory.test.js`: two tests triggered real `setInterval` polling by loading active runs without injecting a fake timer, preventing process exit. Added `setIntervalFn: () => 0` / `clearIntervalFn: () => {}` to both.

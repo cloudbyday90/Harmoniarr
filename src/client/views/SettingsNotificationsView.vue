@@ -36,62 +36,59 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="panel-light">
-    <div class="section-header">
-      <h2>Push Notifications</h2>
-    </div>
-    
-    <div v-if="!isSupported" class="muted-copy">
-      Push notifications are not supported in this browser.
-    </div>
+  <div class="cfg-page">
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Browser notifications</h3>
+          <p class="hx-card-subtitle">Get notified in this browser when your requested music is ready to download.</p>
+        </div>
+      </header>
+      <div class="hx-card-body">
 
-    <div v-else>
-      <div v-if="errorMessage" class="hx-callout hx-callout-error">
-        {{ errorMessage }}
-      </div>
-
-      <div class="hx-form-row">
-        <div class="hx-form-field">
-          <label>Browser Notifications</label>
-          <p class="muted-copy text-sm">
-            Receive push notifications when your requested music is fulfilled.
-          </p>
+        <div v-if="!isSupported" class="hx-empty">
+          <p class="hx-empty-title">Not supported</p>
+          <p class="hx-empty-copy">Push notifications are not available in this browser.</p>
         </div>
 
-        <div class="hx-form-field">
-          <div v-if="permissionState === 'denied'" class="muted-copy text-sm">
-            Notifications are blocked by your browser. Please update your browser settings to allow them.
+        <template v-else>
+          <div v-if="errorMessage" class="hx-callout hx-callout-error" style="margin-bottom: var(--hx-space-3)">
+            {{ errorMessage }}
           </div>
-          <div v-else-if="isSubscribed">
-            <button
-              type="button"
-              class="hx-btn"
-              :disabled="isLoading"
-              @click="unsubscribe"
-            >
-              <span v-if="isLoading">Unsubscribing...</span>
-              <span v-else>Unsubscribe</span>
-            </button>
-            <p class="muted-copy text-sm mt-2">
-              This browser is currently subscribed to notifications.
-            </p>
+
+          <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <div v-if="permissionState === 'denied'">
+              <p class="hx-text-muted">Notifications are blocked by your browser. Open your browser's site settings and allow notifications for this page, then reload.</p>
+            </div>
+
+            <div v-else-if="isSubscribed">
+              <p class="hx-text-muted" style="margin-bottom: var(--hx-space-3)">This browser is subscribed. You will receive a notification when your requested music is fulfilled.</p>
+              <button
+                type="button"
+                class="hx-btn"
+                :disabled="isLoading"
+                @click="unsubscribe"
+              >
+                {{ isLoading ? 'Unsubscribing…' : 'Unsubscribe' }}
+              </button>
+            </div>
+
+            <div v-else>
+              <p class="hx-text-muted" style="margin-bottom: var(--hx-space-3)">Subscribe to receive a notification when your requested music is ready to download.</p>
+              <button
+                type="button"
+                class="hx-btn"
+                data-variant="primary"
+                :disabled="isLoading"
+                @click="subscribe"
+              >
+                {{ isLoading ? 'Subscribing…' : 'Enable notifications' }}
+              </button>
+            </div>
           </div>
-          <div v-else>
-            <button
-              type="button"
-              class="hx-btn hx-btn-primary"
-              :disabled="isLoading"
-              @click="subscribe"
-            >
-              <span v-if="isLoading">Subscribing...</span>
-              <span v-else>Enable Notifications</span>
-            </button>
-            <p class="muted-copy text-sm mt-2">
-              This browser is not subscribed.
-            </p>
-          </div>
-        </div>
+        </template>
+
       </div>
-    </div>
+    </article>
   </div>
 </template>

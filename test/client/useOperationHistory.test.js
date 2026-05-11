@@ -86,6 +86,8 @@ test('useOperationHistory clears stale state when history loading fails', async 
 
 test('useOperationHistory requests cancellation and refreshes the selected run detail', async () => {
   const workflow = useOperationHistory({
+    setIntervalFn: () => 0,
+    clearIntervalFn: () => {},
     fetchOperationHistory: async () => ({
       checkedAt: '2026-05-01T01:00:00.000Z',
       runs: [{
@@ -312,6 +314,8 @@ test('useOperationHistory stopPolling sets isPollingActive to false and removes 
 
 test('useOperationHistory hasActiveRuns reflects pending and running runs', async () => {
   const workflow = useOperationHistory({
+    setIntervalFn: () => 0,
+    clearIntervalFn: () => {},
     fetchOperationHistory: async () => ({
       runs: [
         { id: 'run-e1', operationType: 'library_scan', status: 'completed', summary: {} },
