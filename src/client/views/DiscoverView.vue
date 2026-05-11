@@ -279,7 +279,17 @@ function artistInitial(artist) {
           :monitoring="isMonitoring(artist.id)"
           :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
           @monitor="handleMonitor"
-        />
+        >
+          <template #artwork>
+            <div
+              class="hx-artwork discover-suggestion-avatar"
+              :style="avatarStyle(artist)"
+              aria-hidden="true"
+            >
+              <span class="discover-suggestion-initial">{{ artistInitial(artist) }}</span>
+            </div>
+          </template>
+        </ArtistCard>
       </section>
     </template>
   </div>

@@ -19,8 +19,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  getComingSoonLabel,
   getRequestStatusLabel,
   getRequestStatusVariant,
+  isComingSoon,
   normalizeRequestStatus,
 } from '../../src/client/lib/request-status.js';
 
@@ -143,4 +145,54 @@ test('request-status getRequestStatusVariant returns muted for null', () => {
 
 test('request-status getRequestStatusVariant returns muted for undefined', () => {
   assert.equal(getRequestStatusVariant(undefined), 'muted');
+});
+
+// ---------------------------------------------------------------------------
+// isComingSoon
+// ---------------------------------------------------------------------------
+
+test('request-status isComingSoon returns true for a future YYYY-MM-DD expectedReleaseDate', () => {
+  const request = { expectedReleaseDate: '2099-12-31' };
+  assert.equal(isComingSoon(request), true);
+});
+
+test('request-status isComingSoon returns false for a past expectedReleaseDate', () => {
+  const request = { expectedReleaseDate: '2000-01-01' };
+  assert.equal(isComingSoon(request), false);
+});
+
+test('request-status isComingSoon returns false for a year-only expectedReleaseDate', () => {
+  const request = { expectedReleaseDate: '2099' };
+  assert.equal(isComingSoon(request), false);
+});
+
+test('request-status isComingSoon returns false when expectedReleaseDate is null', () => {
+  const request = { expectedReleaseDate: null };
+  assert.equal(isComingSoon(request), false);
+});
+
+test('request-status isComingSoon returns false when expectedReleaseDate is absent', () => {
+  assert.equal(isComingSoon({}), false);
+  assert.equal(isComingSoon(null), false);
+});
+
+// ---------------------------------------------------------------------------
+// getComingSoonLabel
+// ---------------------------------------------------------------------------
+
+test('request-status getComingSoonLabel returns formatted month-year for a future date', () => {
+  const request = { expectedReleaseDate: '2099-07-15' };
+  const label = getComingSoonLabel(request);
+  assert.equal(label, 'Coming July 2099');
+});
+
+test('request-status getComingSoonLabel returns null for a past date', () => {
+  const request = { expectedReleaseDate: '2000-06-01' };
+  assert.equal(getComingSoonLabel(request), null);
+});
+
+test('request-status getComingSoonLabel returns null when expectedReleaseDate is null', () => {
+  assert.equal(getComingSoonLabel({ expectedReleaseDate: null }), null);
+  assert.equal(getComingSoonLabel({}), null);
+  assert.equal(getComingSoonLabel(null), null);
 });

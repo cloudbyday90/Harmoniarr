@@ -87,7 +87,7 @@ export function useArtistMonitoring({
    *
    * 1. Adds the artist ID to `monitoringIds`.
    * 2. Calls `importArtist(mbid)` to upsert the artist locally.
-   * 3. Calls `updateMonitoring(localId, { monitored: true })`.
+   * 3. Calls `updateMonitoring(localId, { isMonitored: true })`.
    * 4. Moves the ID from `monitoringIds` to `monitoredIds`.
    * 5. Optionally shows a success/error toast.
    *
@@ -114,7 +114,7 @@ export function useArtistMonitoring({
         throw new Error(`Could not resolve local ID for ${name} after import.`);
       }
 
-      await updateMonitoring(localArtistId, { monitored: true });
+      await updateMonitoring(localArtistId, { isMonitored: true });
 
       // Move from in-progress to complete (reassign both for reactivity).
       const nextMonitoring = new Set(monitoringIds.value);

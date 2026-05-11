@@ -718,3 +718,110 @@ test('createLibraryMediaRequestService records dedup evidence in request evidenc
   assert.equal(evidence.dedupLinkedToRequestId, 'request-primary');
   assert.equal(evidence.dedupMatchMethod, 'musicbrainz_release_id');
 });
+
+test('createLibraryMediaRequestService stores expectedReleaseDate for pre-requests', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-prerequest',
+    expectedReleaseDate: payload.expectedReleaseDate,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+  }));
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: t.mock.fn(async () => null),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await service.createMediaRequest({
+    actorUserId: 'user-1',
+    payload: {
+      artistName: 'Radiohead',
+      expectedReleaseDate: '2099-12-01',
+      releaseTitle: 'Future Album',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].expectedReleaseDate, '2099-12-01');
+});
+
+test('createLibraryMediaRequestService passes null expectedReleaseDate when not provided', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-no-date',
+    expectedReleaseDate: payload.expectedReleaseDate,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+  }));
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: t.mock.fn(async () => null),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await service.createMediaRequest({
+    actorUserId: 'user-1',
+    payload: {
+      artistName: 'Portishead',
+      releaseTitle: 'Third',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].expectedReleaseDate, null);
+});
+
+test('createLibraryMediaRequestService rejects malformed expectedReleaseDate', async () => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest: async () => {
+        throw new Error('Should not be called');
+      },
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.createMediaRequest({
+      actorUserId: 'user-1',
+      payload: {
+        artistName: 'Boards of Canada',
+        expectedReleaseDate: 'not-a-date',
+        releaseTitle: 'Geogaddi',
+        requestKind: 'release',
+      },
+    }),
+    (error) => error?.code === 'validation_error',
+  );
+});

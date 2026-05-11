@@ -144,6 +144,43 @@ export function canRequestRelease(release) {
 }
 
 /**
+ * Returns the ISO release date string (YYYY-MM-DD or YYYY-MM or YYYY) for a
+ * release, or null when no date is available.
+ *
+ * @param {object} release
+ * @returns {string|null}
+ */
+export function getReleaseDate(release) {
+  if (!release) return null;
+  const raw = release.firstReleaseDate ?? release.date ?? release.releaseDate ?? null;
+  if (!raw) return null;
+  const str = String(raw).trim();
+  // Accept YYYY-MM-DD, YYYY-MM, or YYYY
+  return /^\d{4}(-\d{2}(-\d{2})?)?$/.test(str) ? str : null;
+}
+
+/**
+ * Returns true if the release date is strictly in the future relative to the
+ * current local date. Dates with only year or year-month precision are treated
+ * as NOT future (we cannot be certain they haven't passed).
+ *
+ * @param {string|null} releaseDate - ISO date string
+ * @returns {boolean}
+ */
+export function isReleaseDateInFuture(releaseDate) {
+  if (!releaseDate) return false;
+  // Only consider full YYYY-MM-DD dates for gating
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) return false;
+  const today = new Date();
+  const todayStr = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
+  return releaseDate > todayStr;
+}
+
+/**
  * Builds the request payload expected by `createMediaRequest` from a release
  * search result.
  *
@@ -165,8 +202,12 @@ export function normalizeReleaseForRequest(release) {
     ? requestKey.replace('release-group:', '')
     : (release.releaseGroup?.id ?? release.releaseGroupId ?? null);
 
+  const releaseDate = getReleaseDate(release);
+  const expectedReleaseDate = isReleaseDateInFuture(releaseDate) ? releaseDate : null;
+
   return {
     artistName,
+    expectedReleaseDate,
     musicbrainzReleaseId: mbid ?? null,
     releaseGroupId: typeof releaseGroupId === 'string' ? releaseGroupId : null,
     releaseTitle,

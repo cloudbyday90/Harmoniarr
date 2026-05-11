@@ -176,6 +176,24 @@ function normalizeOptionalMbReleaseId(value) {
   return normalized;
 }
 
+function normalizeOptionalDate(value, fieldName) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw createApiError(400, 'validation_error', `${fieldName} must be a date string`);
+  }
+
+  const normalized = value.trim();
+  // Accept YYYY, YYYY-MM, or YYYY-MM-DD
+  if (!/^\d{4}(-\d{2}(-\d{2})?)?$/.test(normalized)) {
+    throw createApiError(400, 'validation_error', `${fieldName} must be a date in YYYY, YYYY-MM, or YYYY-MM-DD format`);
+  }
+
+  return normalized;
+}
+
 function validateDraft(payload) {
   const requestKind = normalizeRequestKind(payload.requestKind);
   const notes = normalizeOptionalText(payload.notes, 'notes', { maxLength: 2000 });
@@ -280,6 +298,8 @@ export function createLibraryMediaRequestService({
       requestedForUserId: payload?.requestedForUserId,
     });
 
+    const expectedReleaseDate = normalizeOptionalDate(payload?.expectedReleaseDate, 'expectedReleaseDate');
+
     let matchedMetadataReleaseGroupId = null;
     let matchedMetadataReleaseId = null;
     let musicbrainzReleaseId = normalizeOptionalMbReleaseId(payload?.musicbrainzReleaseId);
@@ -356,6 +376,7 @@ export function createLibraryMediaRequestService({
     const mediaRequest = await mediaRequestStore.createMediaRequest({
       artistName: draft.artistName,
       evidence,
+      expectedReleaseDate,
       linkedRequestId,
       matchedMetadataReleaseGroupId,
       matchedMetadataReleaseId,

@@ -21,6 +21,7 @@ import { computed, toRef, useTemplateRef } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
 import RequestStatusPill from './RequestStatusPill.vue';
 import { useArtworkColor } from '../../composables/useArtworkColor.js';
+import { getComingSoonLabel, isComingSoon } from '../../lib/request-status.js';
 
 /**
  * RequestCard — presentational artwork-first request tracking card.
@@ -207,6 +208,11 @@ const accentStyle = computed(() => {
     '--card-accent-ref-l': accent.value.lightness,
   };
 });
+
+/** True when this is a pre-request for an upcoming album. */
+const comingSoon = computed(() => isComingSoon(props.request));
+/** Human-readable "Coming soon" label for upcoming pre-requests. */
+const comingSoonLabel = computed(() => getComingSoonLabel(props.request));
 </script>
 
 <template>
@@ -228,6 +234,7 @@ const accentStyle = computed(() => {
     </div>
 
     <div class="hx-media-card__actions request-card__status-row">
+      <span v-if="comingSoon" class="hx-pill request-card__coming-soon-pill" data-tone="upcoming" :title="request.expectedReleaseDate">{{ comingSoonLabel }}</span>
       <RequestStatusPill :status="request.requestState" />
 
       <dl class="request-card__dates" aria-label="Request dates">

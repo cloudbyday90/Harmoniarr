@@ -74,3 +74,45 @@ export function getRequestStatusLabel(status) {
 export function getRequestStatusVariant(status) {
   return (STATUS_MAP[normalizeRequestStatus(status)] ?? UNKNOWN).variant;
 }
+
+/**
+ * Returns true when a request has an expected release date strictly in the
+ * future, indicating it is a "pre-request" for an upcoming album.
+ *
+ * Only full YYYY-MM-DD dates are considered future-dated. Partial dates
+ * (year-only or year-month) return false.
+ *
+ * @param {object} request - Media request object from the API.
+ * @returns {boolean}
+ */
+export function isComingSoon(request) {
+  const raw = request?.expectedReleaseDate ?? null;
+  if (!raw || typeof raw !== 'string') return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+  const today = new Date();
+  const todayStr = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
+  return raw > todayStr;
+}
+
+/**
+ * Returns a formatted "Coming Soon" label showing the month and year of the
+ * expected release date, or a generic label when precision is unavailable.
+ *
+ * @param {object} request - Media request object from the API.
+ * @returns {string|null} Display label, or null when not a pre-request.
+ */
+export function getComingSoonLabel(request) {
+  if (!isComingSoon(request)) return null;
+  const raw = request.expectedReleaseDate;
+  try {
+    const date = new Date(`${raw}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime())) return 'Coming soon';
+    return `Coming ${date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', timeZone: 'UTC' })}`;
+  } catch {
+    return 'Coming soon';
+  }
+}

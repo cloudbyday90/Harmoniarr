@@ -21,9 +21,11 @@ import test from 'node:test';
 import {
   canRequestRelease,
   getReleaseArtistName,
+  getReleaseDate,
   getReleaseRequestKey,
   getReleaseTitle,
   getReleaseYear,
+  isReleaseDateInFuture,
   normalizeReleaseForRequest,
 } from '../../src/client/lib/release-normalization.js';
 
@@ -201,6 +203,7 @@ test('normalizeReleaseForRequest returns correct payload for a full release', ()
   const payload = normalizeReleaseForRequest(release);
   assert.deepEqual(payload, {
     artistName: 'Daft Punk',
+    expectedReleaseDate: null,
     musicbrainzReleaseId: 'mbid-ram',
     releaseGroupId: null,
     releaseTitle: 'Random Access Memories',
@@ -246,4 +249,108 @@ test('normalizeReleaseForRequest uses artist.name as fallback for artistName', (
   };
   const payload = normalizeReleaseForRequest(release);
   assert.equal(payload?.artistName, 'Floating Points');
+});
+
+// ---------------------------------------------------------------------------
+// getReleaseDate
+// ---------------------------------------------------------------------------
+
+test('getReleaseDate prefers firstReleaseDate over date', () => {
+  const release = { firstReleaseDate: '2026-08-01', date: '2025-01-01' };
+  assert.equal(getReleaseDate(release), '2026-08-01');
+});
+
+test('getReleaseDate falls back to date when firstReleaseDate is absent', () => {
+  const release = { date: '2026-09-15' };
+  assert.equal(getReleaseDate(release), '2026-09-15');
+});
+
+test('getReleaseDate falls back to releaseDate when both others are absent', () => {
+  const release = { releaseDate: '2027-03-20' };
+  assert.equal(getReleaseDate(release), '2027-03-20');
+});
+
+test('getReleaseDate accepts year-only date strings', () => {
+  assert.equal(getReleaseDate({ date: '2026' }), '2026');
+});
+
+test('getReleaseDate accepts year-month date strings', () => {
+  assert.equal(getReleaseDate({ date: '2026-10' }), '2026-10');
+});
+
+test('getReleaseDate returns null for malformed date strings', () => {
+  assert.equal(getReleaseDate({ date: 'not-a-date' }), null);
+  assert.equal(getReleaseDate({ date: '26-01-01' }), null);
+});
+
+test('getReleaseDate returns null when no date fields are present', () => {
+  assert.equal(getReleaseDate({}), null);
+  assert.equal(getReleaseDate(null), null);
+});
+
+// ---------------------------------------------------------------------------
+// isReleaseDateInFuture
+// ---------------------------------------------------------------------------
+
+test('isReleaseDateInFuture returns true for a full date far in the future', () => {
+  assert.equal(isReleaseDateInFuture('2099-12-31'), true);
+});
+
+test('isReleaseDateInFuture returns false for a date in the past', () => {
+  assert.equal(isReleaseDateInFuture('2000-01-01'), false);
+});
+
+test('isReleaseDateInFuture returns false for a year-only date', () => {
+  assert.equal(isReleaseDateInFuture('2099'), false);
+});
+
+test('isReleaseDateInFuture returns false for a year-month date', () => {
+  assert.equal(isReleaseDateInFuture('2099-12'), false);
+});
+
+test('isReleaseDateInFuture returns false for null', () => {
+  assert.equal(isReleaseDateInFuture(null), false);
+});
+
+// ---------------------------------------------------------------------------
+// normalizeReleaseForRequest — expectedReleaseDate
+// ---------------------------------------------------------------------------
+
+test('normalizeReleaseForRequest includes future date as expectedReleaseDate', () => {
+  const release = {
+    artistCredit: 'Radiohead',
+    title: 'Future Album',
+    date: '2099-06-15',
+  };
+  const payload = normalizeReleaseForRequest(release);
+  assert.equal(payload?.expectedReleaseDate, '2099-06-15');
+});
+
+test('normalizeReleaseForRequest sets expectedReleaseDate null for a past date', () => {
+  const release = {
+    artistCredit: 'Daft Punk',
+    title: 'Homework',
+    date: '1997-01-20',
+  };
+  const payload = normalizeReleaseForRequest(release);
+  assert.equal(payload?.expectedReleaseDate, null);
+});
+
+test('normalizeReleaseForRequest sets expectedReleaseDate null for year-only future date', () => {
+  const release = {
+    artistCredit: 'Portishead',
+    title: 'Upcoming',
+    date: '2099',
+  };
+  const payload = normalizeReleaseForRequest(release);
+  assert.equal(payload?.expectedReleaseDate, null);
+});
+
+test('normalizeReleaseForRequest sets expectedReleaseDate null when no date', () => {
+  const release = {
+    artistCredit: 'Burial',
+    title: 'Unknown',
+  };
+  const payload = normalizeReleaseForRequest(release);
+  assert.equal(payload?.expectedReleaseDate, null);
 });

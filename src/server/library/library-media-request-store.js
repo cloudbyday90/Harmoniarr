@@ -42,6 +42,7 @@ function mapMediaRequestRow(row) {
     updatedAt: row.updated_at,
     musicbrainzReleaseId: row.musicbrainz_release_id ?? null,
     linkedRequestId: row.linked_request_id ?? null,
+    expectedReleaseDate: row.expected_release_date ?? null,
     requestedByUser: {
       id: row.requested_by_user_id,
       role: row.requested_by_role ?? null,
@@ -109,6 +110,7 @@ const baseSelect = `
     media_requests.updated_at,
     media_requests.musicbrainz_release_id,
     media_requests.linked_request_id,
+    media_requests.expected_release_date,
     request_users.username AS requested_by_username,
     request_users.role AS requested_by_role,
     target_users.username AS requested_for_username,
@@ -140,6 +142,7 @@ export function createLibraryMediaRequestStore({
   async function createMediaRequest({
     artistName,
     evidence,
+    expectedReleaseDate = null,
     linkedRequestId = null,
     matchedMetadataReleaseGroupId,
     matchedMetadataReleaseId,
@@ -175,6 +178,7 @@ export function createLibraryMediaRequestStore({
           evidence,
           musicbrainz_release_id,
           linked_request_id,
+          expected_release_date,
           updated_at
         )
         VALUES (
@@ -194,6 +198,7 @@ export function createLibraryMediaRequestStore({
           $14::jsonb,
           $15,
           $16,
+          $17,
           NOW()
         )
         RETURNING id
@@ -215,6 +220,7 @@ export function createLibraryMediaRequestStore({
         JSON.stringify(evidence ?? {}),
         musicbrainzReleaseId,
         linkedRequestId,
+        expectedReleaseDate ?? null,
       ],
     );
 

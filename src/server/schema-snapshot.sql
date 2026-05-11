@@ -3673,3 +3673,84 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260604_010000_media_request_cross_user_dedup.sql
+-- Checksum: bc197f709834354122b1adc3df5420136b9dce93e0c783dd50323687347f8629
+-- Cross-user deduplication: link duplicate requests for the same release to a
+-- single download job. musicbrainz_release_id enables exact MBID-based matching
+-- without JOINing to metadata_releases. linked_request_id points to the primary
+-- (first) request for this release; the linked request shares the same download.
+
+ALTER TABLE media_requests
+  ADD COLUMN IF NOT EXISTS musicbrainz_release_id TEXT NULL,
+  ADD COLUMN IF NOT EXISTS linked_request_id      UUID NULL REFERENCES media_requests(id) ON DELETE SET NULL;
+
+-- Supports exact dedup lookup by MusicBrainz release MBID.
+CREATE INDEX IF NOT EXISTS media_requests_musicbrainz_release_id_idx
+  ON media_requests (musicbrainz_release_id)
+  WHERE musicbrainz_release_id IS NOT NULL;
+
+-- Prevents the same user from being linked to the same primary request twice
+-- (rapid double-submit guard).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_media_requests_linked_per_user
+  ON media_requests (linked_request_id, requested_for_user_id)
+  WHERE linked_request_id IS NOT NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260604_010000',
+  '20260604_010000_media_request_cross_user_dedup.sql',
+  'media_request_cross_user_dedup',
+  'bc197f709834354122b1adc3df5420136b9dce93e0c783dd50323687347f8629',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260604_020000_media_request_expected_release_date.sql
+-- Checksum: 43ba38ffceac56300b4c7369ccf69f458e9497dde5ae39106b26dd22225919b0
+-- Add expected_release_date to media_requests to support pre-requests for
+-- upcoming albums. Stores the anticipated release date so the fulfillment
+-- UI can surface a "Coming Soon" indicator without polling discovery state.
+ALTER TABLE media_requests ADD COLUMN expected_release_date DATE;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260604_020000',
+  '20260604_020000_media_request_expected_release_date.sql',
+  'media_request_expected_release_date',
+  '43ba38ffceac56300b4c7369ccf69f458e9497dde5ae39106b26dd22225919b0',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
