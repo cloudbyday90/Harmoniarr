@@ -11,6 +11,9 @@ coverage/
 !.env.example
 *.log
 
+# Local debug scripts
+debug-*.mjs
+
 # Playwright MCP preview output
 .playwright-mcp/
 harmoniarr-icon-preview.png
