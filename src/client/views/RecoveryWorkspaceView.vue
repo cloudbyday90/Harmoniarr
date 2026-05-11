@@ -19,20 +19,22 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { buildAuditActivityLinkTarget } from '../lib/audit-activity-links.js';
 import { buildBackupExportDownloadUrl } from '../lib/recovery-api.js';
 import {
   buildRecoveryRouteQuery,
   getRecoveryRouteStateKey,
   normalizeRecoveryRouteState,
 } from '../lib/recovery-route-state.js';
+import { buildOperationRunLinkTarget } from '../lib/operation-run-link-targets.js';
 import {
-  buildOperationRunLinkTarget,
-  getOperationRunDescriptor,
-} from '../lib/operation-run-link-targets.js';
-import { getOperationRunOperatorSummary } from '../lib/operation-run-presentation.js';
+  checkStatusClass,
+  checkStatusLabel,
+  describeRestoreReadiness,
+  formatBytes,
+  formatScope,
+  formatTimestamp,
+} from '../lib/backup-restore-presentation.js';
 import { useRecoveryBackups } from '../composables/useRecoveryBackups.js';
-import { useRecoveryDiagnostics } from '../composables/useRecoveryDiagnostics.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -60,16 +62,6 @@ const {
   selectedBackupPreview,
   applyRestore,
 } = useRecoveryBackups();
-const {
-  errorMessage: diagnosticsErrorMessage,
-  isLoading: isLoadingDiagnostics,
-  loadDiagnostics,
-  queueDiagnostics,
-  recentFailedRuns,
-  recentPrivilegedActions,
-  recentQueueRuns,
-  recoveryDiagnostics,
-} = useRecoveryDiagnostics();
 
 const recoveryRouteState = computed(() => normalizeRecoveryRouteState(route.query));
 const backupStatusPill = computed(() => {
@@ -120,71 +112,9 @@ async function replaceRecoveryRouteState(nextState) {
   });
 }
 
-function formatTimestamp(value) {
-  if (!value) return 'Not yet recorded';
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
-}
-
-function formatBytes(value) {
-  if (!Number.isFinite(value) || value < 1) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let unitIndex = 0;
-  let nextValue = value;
-  while (nextValue >= 1024 && unitIndex < units.length - 1) {
-    nextValue /= 1024;
-    unitIndex += 1;
-  }
-  return `${nextValue.toFixed(nextValue >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-}
-
-function formatScope(scope) {
-  if (typeof scope !== 'string' || scope.length === 0) return 'Unknown';
-  return scope
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function checkStatusClass(status) {
-  return status === 'passed' ? 'review-status-selected' : 'review-status-failed';
-}
-
-function checkStatusLabel(status) {
-  return status === 'passed' ? 'Passed' : 'Failed';
-}
-
-function queueStatusClass(status) {
-  switch (status) {
-    case 'failed': return 'review-status-failed';
-    case 'running': return 'review-status-pending';
-    default: return 'review-status-selected';
-  }
-}
-
-function describeRestoreReadiness(preview) {
-  if (!preview) return 'Select a backup to check whether it is safe to restore.';
-  if (preview.canApplyRestore) return 'This backup passed all checks and can be applied.';
-  if (preview.restoreReadiness?.blockedByLock) return 'A system hold is blocking restore. Wait for it to clear before applying.';
-  return 'Review the failed checks below before applying this backup.';
-}
-
-function operationTitle(operationType) {
-  return getOperationRunDescriptor(operationType).title;
-}
-
-function operationRunTarget(run) {
-  return buildOperationRunLinkTarget({ operationType: run?.operationType, runId: run?.id });
-}
-
-function auditLinkTarget(event) {
-  return buildAuditActivityLinkTarget(event);
-}
-
 async function handleCreateBackup() {
   const result = await createBackup();
   if (!result) return;
-  await loadDiagnostics();
   await replaceRecoveryRouteState({ backupArtifactId: selectedBackupId.value ?? '' });
 }
 
@@ -192,7 +122,6 @@ async function handleDeleteBackup() {
   const result = await deleteSelectedBackup();
   if (!result) return;
   restoreConfirmation.value = false;
-  await loadDiagnostics();
   await replaceRecoveryRouteState({ backupArtifactId: selectedBackupId.value ?? '' });
 }
 
@@ -202,15 +131,11 @@ async function handleApplyRestore() {
   });
   if (!result) return;
   restoreConfirmation.value = false;
-  await loadDiagnostics();
   await refreshSelectedBackupPreview();
 }
 
 onMounted(async () => {
-  await Promise.all([
-    loadBackups({ preferredBackupArtifactId: recoveryRouteState.value.backupArtifactId || null }),
-    loadDiagnostics(),
-  ]);
+  await loadBackups({ preferredBackupArtifactId: recoveryRouteState.value.backupArtifactId || null });
 
   if (selectedBackupId.value !== recoveryRouteState.value.backupArtifactId) {
     await replaceRecoveryRouteState({ backupArtifactId: selectedBackupId.value ?? '' });
@@ -364,16 +289,6 @@ watch(
                   </span>
                 </div>
               </div>
-              <div v-if="selectedBackupPreview.restoreReadiness?.blockingLocks?.length" style="margin-top: var(--hx-space-3)">
-                <p class="cfg-group-title">Restore blocked by system hold</p>
-                <div class="cfg-mapping-list">
-                  <div class="cfg-mapping-card" v-for="lock in selectedBackupPreview.restoreReadiness.blockingLocks" :key="lock.id">
-                    <strong>{{ formatScope(lock.lockType) }}</strong>
-                    <p class="hx-text-muted">{{ lock.reason || 'No reason recorded' }}</p>
-                    <p class="hx-text-muted">Acquired {{ formatTimestamp(lock.acquiredAt) }}</p>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div class="cfg-group" v-if="selectedBackupPreview">
@@ -416,92 +331,6 @@ watch(
       </article>
     </div>
 
-    <!-- Diagnostics -->
-    <article class="hx-card" style="margin-top: var(--hx-space-4)">
-      <header class="hx-card-header">
-        <div>
-          <h3 class="hx-card-title">Recent activity</h3>
-          <p class="hx-card-subtitle">Background jobs and recovery actions. Use this to spot failures without digging through logs.</p>
-        </div>
-        <button type="button" class="hx-btn" @click="loadDiagnostics" :disabled="isLoadingDiagnostics">
-          {{ isLoadingDiagnostics ? 'Refreshing…' : 'Refresh' }}
-        </button>
-      </header>
-      <div class="hx-card-body">
-        <p style="font-size: var(--hx-text-sm); color: var(--hx-danger)" v-if="diagnosticsErrorMessage">{{ diagnosticsErrorMessage }}</p>
-
-        <p class="hx-text-muted" v-else-if="isLoadingDiagnostics">Loading…</p>
-
-        <template v-else>
-          <div class="cfg-group" style="padding-top: 0; border-top: none">
-            <p class="cfg-group-title">Background jobs</p>
-            <div class="hx-empty" v-if="!recentQueueRuns.length">
-              <p class="hx-empty-copy">No recent background jobs.</p>
-            </div>
-            <div class="cfg-mapping-list" v-else>
-              <div class="cfg-mapping-card" v-for="run in recentQueueRuns" :key="run.id" style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--hx-space-3)">
-                <div>
-                  <strong>{{ operationTitle(run.operationType) }}</strong>
-                  <p class="hx-text-muted">{{ getOperationRunOperatorSummary(run) }}</p>
-                  <p class="hx-text-muted">Started {{ formatTimestamp(run.startedAt) }}</p>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: var(--hx-space-2); align-items: flex-end; flex-shrink: 0">
-                  <span class="review-status-pill" :class="queueStatusClass(run.status)">
-                    {{ formatScope(run.status) }}
-                  </span>
-                  <RouterLink v-if="operationRunTarget(run)" class="hx-btn" :to="operationRunTarget(run).to">
-                    {{ operationRunTarget(run).label }}
-                  </RouterLink>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="cfg-group" v-if="recentFailedRuns.length">
-            <p class="cfg-group-title">Recent failures</p>
-            <div class="cfg-mapping-list">
-              <div class="cfg-mapping-card" v-for="run in recentFailedRuns" :key="run.id" style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--hx-space-3)">
-                <div>
-                  <strong>{{ operationTitle(run.operationType) }}</strong>
-                  <p class="hx-text-muted">{{ getOperationRunOperatorSummary(run) }}</p>
-                  <p class="hx-text-muted" v-if="run.errorMessage">{{ run.errorMessage }}</p>
-                  <p class="hx-text-muted">Finished {{ formatTimestamp(run.finishedAt) }}</p>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: var(--hx-space-2); align-items: flex-end; flex-shrink: 0">
-                  <span class="review-status-pill review-status-failed">Failed</span>
-                  <RouterLink v-if="operationRunTarget(run)" class="hx-btn" :to="operationRunTarget(run).to">
-                    {{ operationRunTarget(run).label }}
-                  </RouterLink>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="cfg-group">
-            <p class="cfg-group-title">Recovery actions</p>
-            <div class="hx-empty" v-if="!recentPrivilegedActions.length">
-              <p class="hx-empty-copy">No recent recovery actions recorded.</p>
-            </div>
-            <div class="cfg-mapping-list" v-else>
-              <div class="cfg-mapping-card" v-for="event in recentPrivilegedActions" :key="event.id" style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--hx-space-3)">
-                <div>
-                  <strong>{{ event.summary || formatScope(event.eventType) }}</strong>
-                  <p class="hx-text-muted">{{ event.eventType }}</p>
-                  <p class="hx-text-muted">{{ formatTimestamp(event.occurredAt) }}</p>
-                </div>
-                <RouterLink v-if="auditLinkTarget(event)" class="hx-btn" :to="auditLinkTarget(event).to">
-                  {{ auditLinkTarget(event).label }}
-                </RouterLink>
-              </div>
-            </div>
-          </div>
-
-          <p class="hx-text-muted" style="margin-top: var(--hx-space-2); font-size: var(--hx-text-xs)" v-if="queueDiagnostics?.checkedAt || recoveryDiagnostics?.checkedAt">
-            Queue checked {{ formatTimestamp(queueDiagnostics?.checkedAt) }} · Recovery checked {{ formatTimestamp(recoveryDiagnostics?.checkedAt) }}
-          </p>
-        </template>
-      </div>
-    </article>
   </div>
 </template>
 

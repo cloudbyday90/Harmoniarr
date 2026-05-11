@@ -189,34 +189,22 @@ What felt unclear:
 
 ### 2026-05-04 - Recovery Page
 
-Status: too much control-plane noise for a home-lab product, with terminology that is not self-explanatory.
+Status: **Resolved** (2026-05-11 — Backup & Restore page redesign).
 
-Initial feedback:
+Redesign implemented:
+- Removed the "Recent activity" diagnostics panel entirely. Background job history is already surfaced on the Operations page; duplicating it here added noise without value.
+- Removed the `blockingLocks` detail list. When a restore is blocked by a running job, the page now shows a plain operator message: "The app is currently busy with another task. Click 'Refresh checks' in a moment to see if it's ready." No internal lock types or reasons are exposed.
+- The "Blocked" status pill on the Restore card is retained as a quick visual signal.
+- Extracted `formatTimestamp`, `formatBytes`, `formatScope`, `checkStatusClass`, `checkStatusLabel`, `describeRestoreReadiness` from inline functions into the shared lib `src/client/lib/backup-restore-presentation.js`.
+- Added 30 unit tests covering all branches and edge cases.
+- Removed the `useRecoveryDiagnostics` composable import and all associated diagnostics state from the view.
+
+Original feedback:
 
 - A lot of this page reads like enterprise/internal platform language instead of something designed for a home-lab operator.
 - `Recovery control plane`, `restore readiness`, `maintenance locks`, and `privileged recovery activity` all feel too heavy for the context.
 - The page is noisy because it combines backups, restore checks, queue diagnostics, failure history, and lock management at the same time.
 - The terminology does not explain itself well enough for a user who just wants to back up data or avoid breaking the app during maintenance.
-
-Specific confusion:
-
-- `Active maintenance lock` is not intuitive phrasing for a home-lab app.
-- It is not obvious whether a maintenance lock is a pause switch, a safety mode, a restore guard, or just an internal coordination flag.
-- The page currently assumes the user already understands why they would manually enter a lock before doing maintenance.
-
-What the page appears to be trying to do:
-
-- Create and inspect backups.
-- Preview whether a restore is safe to apply.
-- Prevent conflicting operations during manual maintenance or restore work.
-- Show recent failures and recovery-relevant diagnostics.
-
-Design direction to revisit:
-
-- Reframe the page in simpler home-lab language, centered on backup, restore, and safe maintenance.
-- Rename or better explain `maintenance lock` in plain language, such as a temporary safety hold or operation pause mode.
-- Reduce the number of simultaneous concepts visible on first load.
-- Prioritize the common tasks first and move diagnostics/history deeper into the page or behind progressive disclosure.
 
 ### 2026-05-04 - Review Queue / Import Review Page
 
