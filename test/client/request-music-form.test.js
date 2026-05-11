@@ -1,0 +1,316 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  buildMediaRequestPayload,
+  buildMediaRequestSuccessMessage,
+  getFulfillmentStatusLabel,
+  getFulfillmentStatusTone,
+  getRequestHeadline,
+  getRequestKindLabel,
+  getRequestStateLabel,
+  getRequestTargetLabel,
+} from '../../src/client/lib/request-music-form.js';
+
+// ---------------------------------------------------------------------------
+// getRequestKindLabel
+// ---------------------------------------------------------------------------
+
+test('getRequestKindLabel returns Release request for release kind', () => {
+  assert.equal(getRequestKindLabel('release'), 'Release request');
+});
+
+test('getRequestKindLabel returns Track request for track kind', () => {
+  assert.equal(getRequestKindLabel('track'), 'Track request');
+});
+
+test('getRequestKindLabel returns Playlist or collection URL for external_url kind', () => {
+  assert.equal(getRequestKindLabel('external_url'), 'Playlist or collection URL');
+});
+
+test('getRequestKindLabel returns Release request for unknown kind', () => {
+  assert.equal(getRequestKindLabel('unknown'), 'Release request');
+});
+
+test('getRequestKindLabel returns Release request for undefined', () => {
+  assert.equal(getRequestKindLabel(undefined), 'Release request');
+});
+
+// ---------------------------------------------------------------------------
+// getRequestHeadline
+// ---------------------------------------------------------------------------
+
+test('getRequestHeadline returns em-dash separated artist and release for release kind', () => {
+  const request = { requestKind: 'release', artistName: 'Daft Punk', releaseTitle: 'Discovery' };
+  assert.equal(getRequestHeadline(request), 'Daft Punk \u2014 Discovery');
+});
+
+test('getRequestHeadline returns em-dash separated artist and track for track kind', () => {
+  const request = { requestKind: 'track', artistName: 'Daft Punk', trackTitle: 'One More Time' };
+  assert.equal(getRequestHeadline(request), 'Daft Punk \u2014 One More Time');
+});
+
+test('getRequestHeadline returns sourceUrl for external_url kind', () => {
+  const request = { requestKind: 'external_url', sourceUrl: 'https://open.spotify.com/playlist/abc' };
+  assert.equal(getRequestHeadline(request), 'https://open.spotify.com/playlist/abc');
+});
+
+test('getRequestHeadline returns empty string for external_url with no sourceUrl', () => {
+  const request = { requestKind: 'external_url' };
+  assert.equal(getRequestHeadline(request), '');
+});
+
+test('getRequestHeadline handles missing artistName gracefully', () => {
+  const request = { requestKind: 'release', releaseTitle: 'Discovery' };
+  assert.equal(getRequestHeadline(request), ' \u2014 Discovery');
+});
+
+// ---------------------------------------------------------------------------
+// getRequestStateLabel
+// ---------------------------------------------------------------------------
+
+test('getRequestStateLabel returns Already exists for already_exists', () => {
+  assert.equal(getRequestStateLabel('already_exists'), 'Already exists');
+});
+
+test('getRequestStateLabel returns Needs review for needs_review', () => {
+  assert.equal(getRequestStateLabel('needs_review'), 'Needs review');
+});
+
+test('getRequestStateLabel returns Needs fetch for needs_fetch', () => {
+  assert.equal(getRequestStateLabel('needs_fetch'), 'Needs fetch');
+});
+
+test('getRequestStateLabel returns Needs fetch for unknown state', () => {
+  assert.equal(getRequestStateLabel('pending'), 'Needs fetch');
+});
+
+test('getRequestStateLabel returns Needs fetch for undefined', () => {
+  assert.equal(getRequestStateLabel(undefined), 'Needs fetch');
+});
+
+// ---------------------------------------------------------------------------
+// getFulfillmentStatusTone
+// ---------------------------------------------------------------------------
+
+test('getFulfillmentStatusTone returns success for selected tone', () => {
+  assert.equal(getFulfillmentStatusTone({ tone: 'selected' }), 'success');
+});
+
+test('getFulfillmentStatusTone returns danger for failed tone', () => {
+  assert.equal(getFulfillmentStatusTone({ tone: 'failed' }), 'danger');
+});
+
+test('getFulfillmentStatusTone returns info for other tone', () => {
+  assert.equal(getFulfillmentStatusTone({ tone: 'queued' }), 'info');
+});
+
+test('getFulfillmentStatusTone returns info for null fulfillmentStatus', () => {
+  assert.equal(getFulfillmentStatusTone(null), 'info');
+});
+
+test('getFulfillmentStatusTone returns info for undefined fulfillmentStatus', () => {
+  assert.equal(getFulfillmentStatusTone(undefined), 'info');
+});
+
+// ---------------------------------------------------------------------------
+// getFulfillmentStatusLabel
+// ---------------------------------------------------------------------------
+
+test('getFulfillmentStatusLabel returns the label property when present', () => {
+  assert.equal(getFulfillmentStatusLabel({ label: 'Downloading', tone: 'info' }), 'Downloading');
+});
+
+test('getFulfillmentStatusLabel returns Queued for null', () => {
+  assert.equal(getFulfillmentStatusLabel(null), 'Queued');
+});
+
+test('getFulfillmentStatusLabel returns Queued for undefined', () => {
+  assert.equal(getFulfillmentStatusLabel(undefined), 'Queued');
+});
+
+test('getFulfillmentStatusLabel returns Queued for object with no label', () => {
+  assert.equal(getFulfillmentStatusLabel({ tone: 'info' }), 'Queued');
+});
+
+// ---------------------------------------------------------------------------
+// getRequestTargetLabel
+// ---------------------------------------------------------------------------
+
+test('getRequestTargetLabel returns username and role with you marker for current user', () => {
+  const user = { id: 'u1', username: 'alice', role: 'admin' };
+  assert.equal(getRequestTargetLabel(user, 'u1'), 'alice (admin, you)');
+});
+
+test('getRequestTargetLabel returns username and role without you marker for other user', () => {
+  const user = { id: 'u2', username: 'bob', role: 'requester' };
+  assert.equal(getRequestTargetLabel(user, 'u1'), 'bob (requester)');
+});
+
+test('getRequestTargetLabel returns empty string for null user', () => {
+  assert.equal(getRequestTargetLabel(null, 'u1'), '');
+});
+
+test('getRequestTargetLabel returns empty string for undefined user', () => {
+  assert.equal(getRequestTargetLabel(undefined, 'u1'), '');
+});
+
+// ---------------------------------------------------------------------------
+// buildMediaRequestPayload
+// ---------------------------------------------------------------------------
+
+test('buildMediaRequestPayload builds release payload with required fields', () => {
+  const form = {
+    artistName: 'Daft Punk',
+    notes: '',
+    releaseTitle: 'Discovery',
+    requestKind: 'release',
+    requestedForUserId: '',
+    sourceUrl: '',
+    trackTitle: '',
+  };
+  const result = buildMediaRequestPayload({ form, isAdmin: false });
+  assert.deepEqual(result, {
+    notes: '',
+    requestKind: 'release',
+    artistName: 'Daft Punk',
+    releaseTitle: 'Discovery',
+  });
+});
+
+test('buildMediaRequestPayload builds track payload with track and release fields', () => {
+  const form = {
+    artistName: 'Daft Punk',
+    notes: 'please',
+    releaseTitle: 'Discovery',
+    requestKind: 'track',
+    requestedForUserId: '',
+    sourceUrl: '',
+    trackTitle: 'One More Time',
+  };
+  const result = buildMediaRequestPayload({ form, isAdmin: false });
+  assert.deepEqual(result, {
+    notes: 'please',
+    requestKind: 'track',
+    artistName: 'Daft Punk',
+    trackTitle: 'One More Time',
+    releaseTitle: 'Discovery',
+  });
+});
+
+test('buildMediaRequestPayload builds external_url payload with sourceUrl only', () => {
+  const form = {
+    artistName: '',
+    notes: '',
+    releaseTitle: '',
+    requestKind: 'external_url',
+    requestedForUserId: '',
+    sourceUrl: 'https://open.spotify.com/playlist/abc',
+    trackTitle: '',
+  };
+  const result = buildMediaRequestPayload({ form, isAdmin: false });
+  assert.deepEqual(result, {
+    notes: '',
+    requestKind: 'external_url',
+    sourceUrl: 'https://open.spotify.com/playlist/abc',
+  });
+});
+
+test('buildMediaRequestPayload includes requestedForUserId when admin and userId set', () => {
+  const form = {
+    artistName: 'Daft Punk',
+    notes: '',
+    releaseTitle: 'Discovery',
+    requestKind: 'release',
+    requestedForUserId: 'user-99',
+    sourceUrl: '',
+    trackTitle: '',
+  };
+  const result = buildMediaRequestPayload({ form, isAdmin: true });
+  assert.equal(result.requestedForUserId, 'user-99');
+});
+
+test('buildMediaRequestPayload omits requestedForUserId when not admin', () => {
+  const form = {
+    artistName: 'Daft Punk',
+    notes: '',
+    releaseTitle: 'Discovery',
+    requestKind: 'release',
+    requestedForUserId: 'user-99',
+    sourceUrl: '',
+    trackTitle: '',
+  };
+  const result = buildMediaRequestPayload({ form, isAdmin: false });
+  assert.equal('requestedForUserId' in result, false);
+});
+
+test('buildMediaRequestPayload omits requestedForUserId when admin but no userId', () => {
+  const form = {
+    artistName: 'Daft Punk',
+    notes: '',
+    releaseTitle: 'Discovery',
+    requestKind: 'release',
+    requestedForUserId: '',
+    sourceUrl: '',
+    trackTitle: '',
+  };
+  const result = buildMediaRequestPayload({ form, isAdmin: true });
+  assert.equal('requestedForUserId' in result, false);
+});
+
+// ---------------------------------------------------------------------------
+// buildMediaRequestSuccessMessage
+// ---------------------------------------------------------------------------
+
+test('buildMediaRequestSuccessMessage returns profile message for own request', () => {
+  const mediaRequest = {
+    requestState: 'needs_fetch',
+    requestedForUser: { id: 'u1', username: 'alice' },
+  };
+  const result = buildMediaRequestSuccessMessage(mediaRequest, 'u1');
+  assert.equal(result, 'Music request submitted and added to your request profile.');
+});
+
+test('buildMediaRequestSuccessMessage returns delegated message when target differs', () => {
+  const mediaRequest = {
+    requestState: 'needs_fetch',
+    requestedForUser: { id: 'u2', username: 'bob' },
+  };
+  const result = buildMediaRequestSuccessMessage(mediaRequest, 'u1');
+  assert.equal(result, 'Music request submitted for bob.');
+});
+
+test('buildMediaRequestSuccessMessage returns already_exists profile message for own request', () => {
+  const mediaRequest = {
+    requestState: 'already_exists',
+    requestedForUser: { id: 'u1', username: 'alice' },
+  };
+  const result = buildMediaRequestSuccessMessage(mediaRequest, 'u1');
+  assert.equal(result, 'This request already maps to imported media and has been added to your request profile.');
+});
+
+test('buildMediaRequestSuccessMessage returns already_exists delegated message when target differs', () => {
+  const mediaRequest = {
+    requestState: 'already_exists',
+    requestedForUser: { id: 'u2', username: 'bob' },
+  };
+  const result = buildMediaRequestSuccessMessage(mediaRequest, 'u1');
+  assert.equal(result, 'This request already maps to imported media and has been added for bob.');
+});

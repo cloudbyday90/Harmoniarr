@@ -75,7 +75,18 @@ Design direction to revisit:
 
 ### 2026-05-04 - Request Music Page
 
-Status: the page has too many sections with unclear priority and no obvious reading path.
+Status: **Resolved** (2026-05-11 — Request Music Page redesign).
+
+Redesign implemented:
+- Extracted all presentational helpers into `src/client/lib/request-music-form.js` (pure functions, fully tested).
+- Extracted all reactive state and async actions into `src/client/composables/useRequestMusicForm.js` (injectable deps, fully tested).
+- Rewrote `RequestMusicView.vue` to use the design system (`hx-page`, `hx-card`, `hx-stat-grid`, `hx-pill`, `hx-btn`, `hx-field`, `hx-input`, `hx-select`, `hx-empty`) and the new composable.
+- Corrected the information hierarchy: submit form is now first (primary action), stat summary is below (secondary context, only shown when data exists), delegated notifications panel is conditional (only shown when there is activity), request history is last.
+- Admin scope toggle (Mine / All requests) moved to the page header.
+- `RequestNotificationsPanel.vue` ported to the design system — removed all legacy classes (`activity-feed-*`, `pill-row`, `pill`, etc.).
+- All old CSS classes (`panel-dark`, `panel-light`, `section-header`, `metadata-card`, `eyebrow`, `error-copy`, `success-copy`, etc.) removed.
+- Empty-state handling added to the request history section with `hx-empty`.
+- Test suite: `test/client/request-music-form.test.js` (~50 tests) and `test/client/useRequestMusicForm.test.js` (34 tests).
 
 Initial feedback:
 
@@ -85,19 +96,12 @@ Initial feedback:
 - The current labels are descriptive, but they do not establish a clear order of operations.
 - It is not immediately clear which sections are actionable, which are just status, and which are secondary context.
 
-What feels confusing:
+What felt confusing:
 
 - `Request profile` reads like a dashboard summary, but it sits above the actual request form and may distract from the primary action.
 - `Delegated fulfillment updates` appears before the user has even submitted anything, which adds noise in an empty-state experience.
 - The request history list is useful, but its placement after several summary sections makes the whole screen feel long and fragmented.
 - The page reads more like a bundle of related cards than one coherent request workflow.
-
-Design direction to revisit:
-
-- Reframe the screen around the main job to be done: submit a request quickly and understand what happens next.
-- Demote secondary summaries and notifications when the state is empty or low-signal.
-- Make the primary section obvious on first glance, with supporting context progressively disclosed below it.
-- Revisit empty-state handling so the screen feels purposeful even before any requests exist.
 
 ### 2026-05-04 - Jobs / Operations History Page
 
