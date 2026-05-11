@@ -535,3 +535,46 @@ Critical analysis performed against `SearchView.vue` (685 lines). No `search-pre
 - `totalSizeForResponse(response)` — 7 tests (null, totalSize preference, files fallback, missing size)
 
 Test suite after this session: **1457 tests, 0 failures** (up from 1377).
+
+---
+
+### 2026-05-11 - Settings — Users & Access Screen
+
+**Screen:** `SettingsUsersView.vue` (611 lines before changes)
+**Lib:** `src/client/lib/settings-users-presentation.js` (new file)
+**Tests:** `test/client/settings-users-presentation.test.js` (new file)
+
+**Issues identified and resolved:**
+
+1. **Role values were raw lowercase backend enum strings** — The user card header rendered `user.role` with `text-transform: uppercase` CSS to cosmetically fix a data problem. Both the card header badge and inline label showed `admin`, `operator`, `requester` as raw values. The CSS hack was removed; `formatUserRole(role)` now returns `"Admin"`, `"Operator"`, `"Requester"` and falls back to capitalising unknown roles.
+
+2. **"Signs in with: local password" exposed internal auth provider name** — The word `"local"` is the backend auth-provider enum value, meaningless to an admin. The ternary `user.authProvider === 'plex' ? 'Plex' : 'local password'` was replaced with `formatAuthProvider(user.authProvider)` returning `"Plex"` for Plex and `"password"` for local. The colon was also removed so the copy reads naturally as a sentence.
+
+3. **"Import non-conflicting Plex users" button exposed implementation terminology** — `"non-conflicting"` is an internal API term for entries that pass validation. An admin who hasn't run a Preview doesn't know what a conflict means in this context. Button label changed to `"Import ready Plex users"`.
+
+4. **Redundant "Not linked" paragraph when Plex is disconnected** — `plexLinkStatusLabel()` was a closure over `secretStatus` that returned `"Not linked"` when the Plex link was absent — but the card header already displayed a `"Not linked"` pill. The paragraph was only meaningful when linked (it showed *"Linked as [Title] (email)"*). Replaced closure with `formatPlexLinkStatusDetail(plexStatus)` which returns `null` when not linked; the paragraph is guarded with `v-if` so it's hidden until there is something useful to show.
+
+5. **Empty-state copy used developer process language** — *"Create users above, then attach Plex onboarding and folder-provisioning flows as needed."* — `"attach … flows"` is internal task description language. Replaced with `buildUsersEmptyStateBody()` → *"Once you've added users, their accounts will appear here. You can link Plex accounts and set up personal library folders from each user's card."*
+
+6. **Six pure functions inline in `<script setup>` with no tests** — `describePlexLocalAuthStatus`, `plexLibraryAccessPolicyLabel`, `plexLibraryAccessPolicyTone`, `describePlexLibraryAccessPolicy`, `plexLinkStatusLabel`, `hasPendingManagedLibraryRootChanges` were all defined as local functions in the component. All were pure (stateless except the `plexLinkStatusLabel` closure, which was refactored to accept the plex status as a parameter). All moved to `settings-users-presentation.js` and are now tested.
+
+7. **Raw Plex preview enum values in the import preview cards** — When a Plex user preview is loaded, four raw backend values were rendered verbatim: `profile.classification` (e.g. `create`, `linked`, `conflict`), `profile.homeRole` (e.g. `admin`, `managed`), `profile.libraryAccessState` (e.g. `confirmed`, `unconfirmed`, `denied`), and `profile.conflictReason` (e.g. `username_match`). All four now route through formatting functions; the complex ternary CSS class expression was also replaced with `formatPlexProfileClassificationClass(classification)`.
+
+**Extractions and tests added to `settings-users-presentation.js`:**
+
+- `formatUserRole(role)` — 7 tests (admin/operator/requester/unknown/null/empty)
+- `formatAuthProvider(provider)` — 6 tests (local/plex/null/unknown/no-internal-term guard)
+- `buildUsersEmptyStateBody()` — 3 tests (non-empty, no-jargon guard, mentions Plex)
+- `formatPlexLinkStatusDetail(plexStatus)` — 6 tests (null/unlinked returns null, title+email, title-only, Linked fallback)
+- `plexLibraryAccessPolicyLabel(policy)` — 4 tests (eligible/review_required/null/unknown)
+- `plexLibraryAccessPolicyTone(policy)` — 4 tests (eligible/review_required/null/unknown)
+- `describePlexLibraryAccessPolicy(policy)` — 8 tests (all reasonCodes, server count singular/plural, null)
+- `describePlexLocalAuthStatus(user)` — 7 tests (blocked/ready, timestamp, must-change notice)
+- `hasPendingManagedLibraryRootChanges(user)` — 6 tests (equal/changed/empty/null coercion)
+- `formatPlexProfileClassification(classification)` — 7 tests (all values, null, no-raw-enum guards)
+- `formatPlexProfileClassificationClass(classification)` — 4 tests (all values, unknown fallback)
+- `formatPlexHomeRole(homeRole)` — 7 tests (admin/managed/home/friend/null/unknown, no-raw-enum guards)
+- `formatPlexLibraryAccessState(state)` — 6 tests (confirmed/unconfirmed/denied/null/unknown, no-denied guard)
+- `formatPlexConflictReason(reason)` — 7 tests (null/undefined/known codes/underscore replacement, no-raw-enum guard)
+
+Test suite after this session: **1572 tests, 0 failures** (up from 1490).

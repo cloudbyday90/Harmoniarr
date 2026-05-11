@@ -20,6 +20,22 @@
 import { onMounted, reactive, ref } from 'vue';
 import { clearPlexLink, fetchSettings, startPlexLink } from '../lib/settings-api.js';
 import {
+  buildUsersEmptyStateBody,
+  describePlexLibraryAccessPolicy,
+  describePlexLocalAuthStatus,
+  formatAuthProvider,
+  formatPlexConflictReason,
+  formatPlexHomeRole,
+  formatPlexLibraryAccessState,
+  formatPlexLinkStatusDetail,
+  formatPlexProfileClassification,
+  formatPlexProfileClassificationClass,
+  formatUserRole,
+  hasPendingManagedLibraryRootChanges,
+  plexLibraryAccessPolicyLabel,
+  plexLibraryAccessPolicyTone,
+} from '../lib/settings-users-presentation.js';
+import {
   applyPlexUserImport,
   createUser,
   fetchUsers,
@@ -70,60 +86,9 @@ function toEditableUser(user, overrides = {}) {
   };
 }
 
-function describePlexLocalAuthStatus(user) {
-  if (user?.localAuth?.unlinkPlexReady) {
-    const changedAt = user.localAuth.passwordChangedAt
-      ? ` since ${new Date(user.localAuth.passwordChangedAt).toLocaleString()}`
-      : '';
-    const changeNotice = user.localAuth.mustChangePassword
-      ? ' The user will still be prompted to change that password on next login.'
-      : '';
-    return `Local sign-in is ready${changedAt}. You can safely remove the Plex link without deleting the app user.${changeNotice}`;
-  }
-  return 'Unlink is blocked until a temporary password is set or the user completes account claim with a local password.';
-}
 
-function plexLibraryAccessPolicyLabel(policy) {
-  switch (policy?.classification) {
-    case 'eligible': return 'Eligible';
-    case 'review_required': return 'Needs review';
-    default: return 'Unknown';
-  }
-}
 
-function plexLibraryAccessPolicyTone(policy) {
-  switch (policy?.classification) {
-    case 'eligible': return 'success';
-    case 'review_required': return 'warning';
-    default: return 'danger';
-  }
-}
 
-function describePlexLibraryAccessPolicy(policy) {
-  switch (policy?.reasonCode) {
-    case 'plex_owner_access':
-      return 'This is the Plex owner — they have confirmed server access and can be imported without review.';
-    case 'plex_shared_library_access':
-      return `This user has confirmed shared library access${policy.serverCount > 0 ? ` across ${policy.serverCount} server${policy.serverCount === 1 ? '' : 's'}` : ''} and can be imported.`;
-    case 'plex_managed_access_unconfirmed':
-      return 'This is a managed Plex home member, but shared library access isn\'t confirmed. Review before importing.';
-    case 'plex_member_access_unconfirmed':
-      return 'This Plex home member exists, but shared library visibility isn\'t confirmed in this preview. Review before importing.';
-    default:
-      return 'Plex access details are incomplete. Review before importing.';
-  }
-}
-
-function plexLinkStatusLabel() {
-  const status = secretStatus.value?.providers?.plex;
-  if (!status?.linked) return 'Not linked';
-  if (status.linkedUserTitle && status.linkedUserEmail) return `Linked as ${status.linkedUserTitle} (${status.linkedUserEmail})`;
-  return status.linkedUserTitle ? `Linked as ${status.linkedUserTitle}` : 'Linked';
-}
-
-function hasPendingManagedLibraryRootChanges(user) {
-  return (user.pendingManagedLibraryRelativeRoot ?? '') !== (user.managedLibraryRelativeRoot ?? '');
-}
 
 function resetNewUserForm() {
   newUserForm.managedLibraryRelativeRoot = '';
@@ -390,7 +355,7 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
         </span>
       </header>
       <div class="hx-card-body">
-        <p class="hx-text-muted">{{ plexLinkStatusLabel() }}</p>
+        <p class="hx-text-muted" v-if="formatPlexLinkStatusDetail(secretStatus?.providers?.plex)">{{ formatPlexLinkStatusDetail(secretStatus?.providers?.plex) }}</p>
         <div class="hx-card-actions">
           <button type="button" class="hx-btn" @click="connectPlexLink" :disabled="isStartingPlexLink">
             {{ isStartingPlexLink ? 'Starting…' : 'Connect Plex owner account' }}
@@ -402,7 +367,7 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
             {{ isPreviewingPlexUsers ? 'Refreshing…' : 'Preview Plex users' }}
           </button>
           <button type="button" class="hx-btn" data-variant="primary" @click="importPlexUsersNow" :disabled="isImportingPlexUsers || !secretStatus?.providers?.plex?.linked">
-            {{ isImportingPlexUsers ? 'Importing…' : 'Import non-conflicting Plex users' }}
+              {{ isImportingPlexUsers ? 'Importing…' : 'Import ready Plex users' }}
           </button>
         </div>
 
@@ -422,23 +387,22 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
             <div class="cfg-mapping-card" v-for="profile in plexUserImportPreview.profiles" :key="`plex-preview-${profile.uuid ?? profile.id}`">
               <div class="cfg-provider-header">
                 <div>
-                  <p class="hx-text-muted" style="margin-bottom: var(--hx-space-1)">{{ profile.homeRole }}</p>
+                  <p class="hx-text-muted" style="margin-bottom: var(--hx-space-1)">{{ formatPlexHomeRole(profile.homeRole) }}</p>
                   <strong>{{ profile.title }}</strong>
                   <p class="hx-text-muted">{{ profile.email ?? profile.username ?? profile.id }}</p>
                 </div>
-                <span class="review-status-pill"
-                  :class="profile.classification === 'create' ? 'review-status-selected' : (profile.classification === 'linked' ? 'review-status-held' : 'review-status-failed')">
-                  {{ profile.classification }}
+                <span class="review-status-pill" :class="formatPlexProfileClassificationClass(profile.classification)">
+                  {{ formatPlexProfileClassification(profile.classification) }}
                 </span>
               </div>
-              <p class="hx-text-muted">Library access: {{ profile.libraryAccessState }}</p>
+              <p class="hx-text-muted">Library access: {{ formatPlexLibraryAccessState(profile.libraryAccessState) }}</p>
               <p class="hx-text-muted">
                 Access policy:
                 <span class="hx-pill" :data-tone="plexLibraryAccessPolicyTone(profile.accessPolicy)">{{ plexLibraryAccessPolicyLabel(profile.accessPolicy) }}</span>
               </p>
               <p class="hx-text-muted">{{ describePlexLibraryAccessPolicy(profile.accessPolicy) }}</p>
               <p class="hx-text-muted" v-if="profile.suggestedUsername">Suggested username: {{ profile.suggestedUsername }}</p>
-              <p class="hx-text-muted" v-if="profile.existingUser">Existing user: {{ profile.existingUser.username }}<span v-if="profile.conflictReason"> ({{ profile.conflictReason }})</span></p>
+              <p class="hx-text-muted" v-if="profile.existingUser">Existing user: {{ profile.existingUser.username }}<span v-if="profile.conflictReason"> ({{ formatPlexConflictReason(profile.conflictReason) }})</span></p>
               <div v-if="profile.classification === 'conflict' && profile.existingUser?.id">
                 <button type="button" class="hx-btn" @click="relinkPlexConflict(profile)" :disabled="activePlexRelinkProfileId === profile.id">
                   {{ activePlexRelinkProfileId === profile.id ? 'Linking…' : `Link to ${profile.existingUser.username}` }}
@@ -532,7 +496,7 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
       <div class="hx-card-header">
         <div>
           <h3 class="hx-card-title">No users yet</h3>
-          <p class="hx-card-subtitle">Create users above, then attach Plex onboarding and folder-provisioning flows as needed.</p>
+          <p class="hx-card-subtitle">{{ buildUsersEmptyStateBody() }}</p>
         </div>
       </div>
     </article>
@@ -541,9 +505,9 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
       <article class="hx-card" v-for="user in users" :key="user.id">
         <header class="hx-card-header">
           <div>
-            <p class="hx-text-muted" style="font-size: var(--hx-text-xs); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: var(--hx-space-1)">{{ user.role }}</p>
+            <p class="hx-text-muted" style="font-size: var(--hx-text-xs); letter-spacing: 0.08em; margin-bottom: var(--hx-space-1)">{{ formatUserRole(user.role) }}</p>
             <h3 class="hx-card-title">{{ user.username }}</h3>
-            <p class="hx-card-subtitle">Signs in with: {{ user.authProvider === 'plex' ? 'Plex' : 'local password' }}</p>
+            <p class="hx-card-subtitle">Signs in with {{ formatAuthProvider(user.authProvider) }}</p>
           </div>
           <span class="hx-pill" :data-tone="user.isDisabled ? 'warning' : 'success'">
             {{ user.isDisabled ? 'Disabled' : 'Active' }}
