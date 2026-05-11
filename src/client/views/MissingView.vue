@@ -31,10 +31,18 @@ import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
+  buildMissingPageSubtitle,
+  buildMissingStatCards,
+  buildWantedReleasesCardSubtitle,
+  formatLastReconciledAt,
+  formatMissingSummaryStatus,
   formatWantedTrackCounts,
+  getMissingSummaryTone,
   getWantedStatusLabel,
   getWantedStatusTone,
   normalizeWantedReleaseForCard,
+  shouldShowMissingSummaryPill,
+  sortWantedReleases,
 } from '../lib/wanted-release-normalization.js';
 import { sessionStore } from '../state/session.js';
 
@@ -93,23 +101,7 @@ const filteredReleases = computed(() => {
     : all;
   const field = filterState.value?.sort?.field ?? 'artist';
   const order = filterState.value?.sort?.order ?? 'asc';
-  const sorted = [...filtered].sort((a, b) => {
-    let av, bv;
-    if (field === 'title') {
-      av = (a.releaseGroupTitle ?? '').toLowerCase();
-      bv = (b.releaseGroupTitle ?? '').toLowerCase();
-    } else if (field === 'date') {
-      av = a.releaseDate ?? '';
-      bv = b.releaseDate ?? '';
-    } else {
-      av = (a.artistSortName ?? a.artistName ?? '').toLowerCase();
-      bv = (b.artistSortName ?? b.artistName ?? '').toLowerCase();
-    }
-    if (av < bv) return order === 'asc' ? -1 : 1;
-    if (av > bv) return order === 'asc' ? 1 : -1;
-    return 0;
-  });
-  return sorted;
+  return sortWantedReleases(filtered, field, order);
 });
 
 const normalizedReleases = computed(() =>
@@ -163,15 +155,14 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
 
 const isLoading = computed(() => wanted.isLoading.value || releases.isLoading.value || reconciliation.isLoading.value);
 
-function summaryTone(status) {
-  if (status === 'healthy' || status === 'complete') return 'success';
-  if (status === 'unavailable' || status === 'failed') return 'danger';
-  return 'warning';
-}
-
-function shouldShowSummaryPill(status) {
-  return Boolean(status) && status !== 'empty';
-}
+const statCards = computed(() =>
+  buildMissingStatCards(
+    wanted.monitoredArtistCount.value,
+    wanted.releaseCounts.value?.totalWanted ?? 0,
+    wanted.releaseCounts.value?.missing ?? 0,
+    wanted.releaseCounts.value?.partial ?? 0,
+  ),
+);
 
 function refreshAll() {
   wanted.loadLibraryWantedSummary();
@@ -191,7 +182,7 @@ onMounted(() => {
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Missing</h1>
-        <p class="hx-page-subtitle">Wanted releases and reconciliation gaps across the monitored library.</p>
+        <p class="hx-page-subtitle">{{ buildMissingPageSubtitle() }}</p>
       </div>
       <div class="hx-page-actions">
         <button type="button" class="hx-btn" @click="refreshAll" :disabled="isLoading">
@@ -217,41 +208,26 @@ onMounted(() => {
     </section>
 
     <section class="hx-stat-grid" v-if="wanted.libraryWantedSummary.value">
-      <article class="hx-stat-card">
-        <span class="hx-stat-label">Monitored artists</span>
-        <span class="hx-stat-value">{{ wanted.monitoredArtistCount.value }}</span>
-        <span class="hx-stat-meta">Tracked for new releases</span>
-      </article>
-      <article class="hx-stat-card">
-        <span class="hx-stat-label">Wanted releases</span>
-        <span class="hx-stat-value">{{ wanted.releaseCounts.value?.totalWanted ?? 0 }}</span>
-        <span class="hx-stat-meta">Missing + partial</span>
-      </article>
-      <article class="hx-stat-card">
-        <span class="hx-stat-label">Missing</span>
-        <span class="hx-stat-value">{{ wanted.releaseCounts.value?.missing ?? 0 }}</span>
-        <span class="hx-stat-meta">Zero files acquired</span>
-      </article>
-      <article class="hx-stat-card">
-        <span class="hx-stat-label">Partial</span>
-        <span class="hx-stat-value">{{ wanted.releaseCounts.value?.partial ?? 0 }}</span>
-        <span class="hx-stat-meta">Some tracks acquired</span>
+      <article class="hx-stat-card" v-for="card in statCards" :key="card.label">
+        <span class="hx-stat-label">{{ card.label }}</span>
+        <span class="hx-stat-value">{{ card.value }}</span>
+        <span class="hx-stat-meta">{{ card.meta }}</span>
       </article>
     </section>
 
     <article class="hx-card" v-if="wanted.summary.value">
       <header class="hx-card-header">
         <div>
-          <h2 class="hx-card-title">Wanted summary</h2>
-          <p class="hx-card-subtitle">Last reconciled {{ wanted.libraryWantedSummary.value?.lastReconciledAt ?? 'never' }}</p>
+          <h2 class="hx-card-title">Acquisition status</h2>
+          <p class="hx-card-subtitle">Last updated {{ formatLastReconciledAt(wanted.libraryWantedSummary.value?.lastReconciledAt) }}</p>
         </div>
         <div class="hx-card-actions">
           <span
-            v-if="shouldShowSummaryPill(wanted.summary.value.status)"
+            v-if="shouldShowMissingSummaryPill(wanted.summary.value.status)"
             class="hx-pill"
-            :data-tone="summaryTone(wanted.summary.value.status)"
+            :data-tone="getMissingSummaryTone(wanted.summary.value.status)"
           >
-            {{ wanted.summary.value.status }}
+            {{ formatMissingSummaryStatus(wanted.summary.value.status) }}
           </span>
         </div>
       </header>
@@ -264,7 +240,7 @@ onMounted(() => {
       <header class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Wanted releases</h2>
-          <p class="hx-card-subtitle">{{ releases.totalCount.value }} release{{ releases.totalCount.value === 1 ? '' : 's' }} pending acquisition</p>
+          <p v-if="buildWantedReleasesCardSubtitle(releases.totalCount.value)" class="hx-card-subtitle">{{ buildWantedReleasesCardSubtitle(releases.totalCount.value) }}</p>
         </div>
       </header>
 
@@ -349,13 +325,13 @@ onMounted(() => {
         <div>
           <h2 class="hx-card-title">Reconciliation</h2>
           <p class="hx-card-subtitle">
-            Last reconciled
-            {{ reconciliation.libraryReconciliationSummary.value?.lastReconciledAt ?? 'never' }}
+            Last updated
+            {{ formatLastReconciledAt(reconciliation.libraryReconciliationSummary.value?.lastReconciledAt) }}
           </p>
         </div>
-        <div class="hx-card-actions" v-if="reconciliation.summary.value && shouldShowSummaryPill(reconciliation.summary.value.status)">
-          <span class="hx-pill" :data-tone="summaryTone(reconciliation.summary.value.status)">
-            {{ reconciliation.summary.value.status }}
+        <div class="hx-card-actions" v-if="reconciliation.summary.value && shouldShowMissingSummaryPill(reconciliation.summary.value.status)">
+          <span class="hx-pill" :data-tone="getMissingSummaryTone(reconciliation.summary.value.status)">
+            {{ formatMissingSummaryStatus(reconciliation.summary.value.status) }}
           </span>
         </div>
       </header>

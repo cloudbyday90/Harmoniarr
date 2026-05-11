@@ -336,3 +336,44 @@ Critical analysis performed against `LibraryView.vue` and `library-release-norma
 Updated 3 pre-existing tests that asserted the old (wrong) format strings; added 1 regression guard for the pluralisation bug.
 
 Test suite after this session: **1200 tests, 0 failures** (up from 1180).
+
+### 2026-05-12 - Missing Screen
+
+Status: **Resolved** (2026-05-12 — targeted presentation fixes).
+
+Critical analysis performed against `MissingView.vue` and `wanted-release-normalization.js`.
+
+**Issues identified and resolved:**
+
+1. **`formatWantedTrackCounts` used slash separator `" / "` instead of `" of "`** — same issue as Library screen (fixed in same session). `"8 / 12 tracks"` → `"8 of 12 tracks"`. Pre-existing tests that asserted the wrong strings were corrected. Regression guard added.
+
+2. **`formatWantedTrackCounts` pluralisation bug for single-track release** — `"0 / 1 tracks"` for a single missing track. Fixed: returns `"0 of 1 track"` (singular) when `expectedTrackCount === 1`. Existing test was also asserting the wrong string.
+
+3. **Page subtitle used internal jargon `"reconciliation gaps"`** — *"Wanted releases and reconciliation gaps across the monitored library."* Replaced by `buildMissingPageSubtitle()` returning *"Monitored releases not yet fully acquired. Request any release to start filling the gaps."* Jargon guard test prevents regression.
+
+4. **`"Wanted summary"` card title was internal product language** — Renamed to `"Acquisition status"` so the heading is immediately clear to any user, not just those familiar with the internal product model.
+
+5. **Raw lowercase status pills** — `wanted.summary.value.status` and `reconciliation.summary.value.status` were rendered raw (e.g. `complete`, `failed`). Replaced with `formatMissingSummaryStatus(status)` which maps known values to capitalised labels (`"Complete"`, `"Healthy"`, `"Partial"`, `"Unavailable"`, `"Failed"`) and title-cases unknown values.
+
+6. **`"Last reconciled"` subtitle used jargon and raw ISO 8601 timestamps** — Both the "Acquisition status" and "Reconciliation" card subtitles used `lastReconciledAt ?? 'never'` which would show raw ISO 8601 strings if a timestamp was present. Replaced with `formatLastReconciledAt(value)` that returns `"never"` for null/empty, a locale-formatted datetime string for valid ISO 8601, and the raw value as a fallback. Label changed from `"Last reconciled"` to `"Last updated"`.
+
+7. **Inline 15-line sort comparator in `filteredReleases`** — The full sort comparator (field branching + direction logic) was embedded inside the component computed. Extracted to `sortWantedReleases(releases, field, order)` in `wanted-release-normalization.js`. The `filteredReleases` computed is now 4 lines. 10 unit tests added covering sort by artist/title/date, ascending/descending, empty input, null input, immutability, and `artistSortName` fallback.
+
+8. **Stat grid was 4 hardcoded `<article>` blocks** — Same pattern fixed on the Library screen. Replaced with `buildMissingStatCards(monitoredCount, totalWanted, missingCount, partialCount)` returning a frozen array of 4 frozen `{label, value, meta}` objects. View drives the grid with `v-for="card in statCards"` from a single `statCards` computed. 7 unit tests.
+
+9. **Releases card showed `"0 releases pending acquisition"` in empty state** — Replaced with `buildWantedReleasesCardSubtitle(count)` which returns `null` for `count ≤ 0` or falsy input; the subtitle `<p>` is hidden with `v-if`. 7 unit tests including singular regression guard.
+
+**Extractions and tests added to `wanted-release-normalization.js`:**
+
+- `sortWantedReleases(releases, field, order)` — pure sort, 10 tests
+- `buildMissingPageSubtitle()` — 3 tests including jargon guard
+- `buildMissingStatCards(monitoredCount, totalWanted, missingCount, partialCount)` — 7 tests
+- `buildWantedReleasesCardSubtitle(count)` — 7 tests
+- `getMissingSummaryTone(status)` — 7 tests
+- `shouldShowMissingSummaryPill(status)` — 5 tests
+- `formatMissingSummaryStatus(status)` — 8 tests
+- `formatLastReconciledAt(value)` — 6 tests
+
+Updated 3 pre-existing tests asserting old slash-format strings; added 1 regression guard.
+
+Test suite after this session: **1255 tests, 0 failures** (up from 1200).

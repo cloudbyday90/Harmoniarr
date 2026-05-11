@@ -19,10 +19,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildMissingPageSubtitle,
+  buildMissingStatCards,
+  buildWantedReleasesCardSubtitle,
+  formatLastReconciledAt,
+  formatMissingSummaryStatus,
   formatWantedTrackCounts,
+  getMissingSummaryTone,
   getWantedStatusLabel,
   getWantedStatusTone,
   normalizeWantedReleaseForCard,
+  shouldShowMissingSummaryPill,
+  sortWantedReleases,
 } from '../../src/client/lib/wanted-release-normalization.js';
 
 // ── normalizeWantedReleaseForCard ─────────────────────────────────────────────
@@ -215,6 +223,292 @@ test('getWantedStatusTone returns "info" for null', () => {
   assert.equal(getWantedStatusTone(null), 'info');
 });
 
+// ── sortWantedReleases ──────────────────────────────────────────────────────────────────
+
+const sampleReleases = [
+  { artistSortName: 'Radiohead', artistName: 'Radiohead', releaseGroupTitle: 'Kid A', releaseDate: '2000-10-02', wantedStatus: 'missing' },
+  { artistSortName: 'Boards of Canada', artistName: 'Boards of Canada', releaseGroupTitle: 'Music Has the Right to Children', releaseDate: '1998-04-20', wantedStatus: 'partial' },
+  { artistSortName: 'Aphex Twin', artistName: 'Aphex Twin', releaseGroupTitle: 'Selected Ambient Works 85-92', releaseDate: '1992-11-09', wantedStatus: 'missing' },
+];
+
+test('sortWantedReleases sorts by artist ascending', () => {
+  const result = sortWantedReleases(sampleReleases, 'artist', 'asc');
+  assert.equal(result[0].artistSortName, 'Aphex Twin');
+  assert.equal(result[1].artistSortName, 'Boards of Canada');
+  assert.equal(result[2].artistSortName, 'Radiohead');
+});
+
+test('sortWantedReleases sorts by artist descending', () => {
+  const result = sortWantedReleases(sampleReleases, 'artist', 'desc');
+  assert.equal(result[0].artistSortName, 'Radiohead');
+  assert.equal(result[2].artistSortName, 'Aphex Twin');
+});
+
+test('sortWantedReleases sorts by title ascending', () => {
+  const result = sortWantedReleases(sampleReleases, 'title', 'asc');
+  assert.equal(result[0].releaseGroupTitle, 'Kid A');
+  assert.equal(result[1].releaseGroupTitle, 'Music Has the Right to Children');
+  assert.equal(result[2].releaseGroupTitle, 'Selected Ambient Works 85-92');
+});
+
+test('sortWantedReleases sorts by date ascending', () => {
+  const result = sortWantedReleases(sampleReleases, 'date', 'asc');
+  assert.equal(result[0].releaseDate, '1992-11-09');
+  assert.equal(result[1].releaseDate, '1998-04-20');
+  assert.equal(result[2].releaseDate, '2000-10-02');
+});
+
+test('sortWantedReleases sorts by date descending', () => {
+  const result = sortWantedReleases(sampleReleases, 'date', 'desc');
+  assert.equal(result[0].releaseDate, '2000-10-02');
+});
+
+test('sortWantedReleases returns empty array for empty input', () => {
+  assert.deepEqual(sortWantedReleases([], 'artist', 'asc'), []);
+});
+
+test('sortWantedReleases returns same ref for empty array', () => {
+  const empty = [];
+  assert.equal(sortWantedReleases(empty, 'artist', 'asc'), empty);
+});
+
+test('sortWantedReleases returns empty array for non-array input', () => {
+  assert.deepEqual(sortWantedReleases(null, 'artist', 'asc'), []);
+});
+
+test('sortWantedReleases does not mutate the original array', () => {
+  const original = [...sampleReleases];
+  sortWantedReleases(sampleReleases, 'artist', 'asc');
+  assert.deepEqual(sampleReleases, original);
+});
+
+test('sortWantedReleases falls back to artistName when artistSortName is absent', () => {
+  const releases = [
+    { artistName: 'Zombie Nation' },
+    { artistName: 'Autechre' },
+  ];
+  const result = sortWantedReleases(releases, 'artist', 'asc');
+  assert.equal(result[0].artistName, 'Autechre');
+});
+
+// ── buildMissingPageSubtitle ───────────────────────────────────────────────────────────
+
+test('buildMissingPageSubtitle returns a non-empty string', () => {
+  const result = buildMissingPageSubtitle();
+  assert.ok(typeof result === 'string' && result.length > 0);
+});
+
+test('buildMissingPageSubtitle does not contain the word reconcil', () => {
+  const result = buildMissingPageSubtitle();
+  assert.ok(!result.toLowerCase().includes('reconcil'), 'subtitle must not expose internal term "reconcil"');
+});
+
+test('buildMissingPageSubtitle is deterministic across calls', () => {
+  assert.equal(buildMissingPageSubtitle(), buildMissingPageSubtitle());
+});
+
+// ── buildMissingStatCards ───────────────────────────────────────────────────────────────────
+
+test('buildMissingStatCards returns exactly 4 cards', () => {
+  assert.equal(buildMissingStatCards(2, 5, 3, 2).length, 4);
+});
+
+test('buildMissingStatCards first card is Monitored artists with given count', () => {
+  const cards = buildMissingStatCards(2, 5, 3, 2);
+  assert.equal(cards[0].label, 'Monitored artists');
+  assert.equal(cards[0].value, 2);
+});
+
+test('buildMissingStatCards second card is Wanted releases with totalWanted', () => {
+  const cards = buildMissingStatCards(2, 5, 3, 2);
+  assert.equal(cards[1].label, 'Wanted releases');
+  assert.equal(cards[1].value, 5);
+});
+
+test('buildMissingStatCards third card is Missing with missingCount', () => {
+  const cards = buildMissingStatCards(2, 5, 3, 2);
+  assert.equal(cards[2].label, 'Missing');
+  assert.equal(cards[2].value, 3);
+});
+
+test('buildMissingStatCards fourth card is Partial with partialCount', () => {
+  const cards = buildMissingStatCards(2, 5, 3, 2);
+  assert.equal(cards[3].label, 'Partial');
+  assert.equal(cards[3].value, 2);
+});
+
+test('buildMissingStatCards each card has label, value, and meta fields', () => {
+  const cards = buildMissingStatCards(0, 0, 0, 0);
+  for (const card of cards) {
+    assert.ok('label' in card);
+    assert.ok('value' in card);
+    assert.ok('meta' in card);
+    assert.ok(typeof card.label === 'string' && card.label.length > 0);
+  }
+});
+
+test('buildMissingStatCards result and each card are frozen', () => {
+  const cards = buildMissingStatCards(1, 1, 1, 0);
+  assert.ok(Object.isFrozen(cards));
+  for (const card of cards) {
+    assert.ok(Object.isFrozen(card), `card "${card.label}" must be frozen`);
+  }
+});
+
+test('buildMissingStatCards reflects zero values faithfully', () => {
+  const cards = buildMissingStatCards(0, 0, 0, 0);
+  assert.equal(cards[0].value, 0);
+  assert.equal(cards[1].value, 0);
+  assert.equal(cards[2].value, 0);
+  assert.equal(cards[3].value, 0);
+});
+
+// ── buildWantedReleasesCardSubtitle ──────────────────────────────────────────────────
+
+test('buildWantedReleasesCardSubtitle returns null for 0', () => {
+  assert.equal(buildWantedReleasesCardSubtitle(0), null);
+});
+
+test('buildWantedReleasesCardSubtitle returns null for negative', () => {
+  assert.equal(buildWantedReleasesCardSubtitle(-3), null);
+});
+
+test('buildWantedReleasesCardSubtitle returns null for null', () => {
+  assert.equal(buildWantedReleasesCardSubtitle(null), null);
+});
+
+test('buildWantedReleasesCardSubtitle returns null for undefined', () => {
+  assert.equal(buildWantedReleasesCardSubtitle(undefined), null);
+});
+
+test('buildWantedReleasesCardSubtitle returns "1 release pending acquisition" for 1', () => {
+  assert.equal(buildWantedReleasesCardSubtitle(1), '1 release pending acquisition');
+});
+
+test('buildWantedReleasesCardSubtitle returns "N releases pending acquisition" for N > 1', () => {
+  assert.equal(buildWantedReleasesCardSubtitle(7), '7 releases pending acquisition');
+});
+
+test('buildWantedReleasesCardSubtitle does not pluralise 1 as "1 releases"', () => {
+  assert.ok(!buildWantedReleasesCardSubtitle(1)?.includes('releases'));
+});
+
+// ── getMissingSummaryTone ──────────────────────────────────────────────────────────────────
+
+test('getMissingSummaryTone returns "success" for complete', () => {
+  assert.equal(getMissingSummaryTone('complete'), 'success');
+});
+
+test('getMissingSummaryTone returns "success" for healthy', () => {
+  assert.equal(getMissingSummaryTone('healthy'), 'success');
+});
+
+test('getMissingSummaryTone returns "danger" for unavailable', () => {
+  assert.equal(getMissingSummaryTone('unavailable'), 'danger');
+});
+
+test('getMissingSummaryTone returns "danger" for failed', () => {
+  assert.equal(getMissingSummaryTone('failed'), 'danger');
+});
+
+test('getMissingSummaryTone returns "warning" for partial', () => {
+  assert.equal(getMissingSummaryTone('partial'), 'warning');
+});
+
+test('getMissingSummaryTone returns "warning" for unknown status', () => {
+  assert.equal(getMissingSummaryTone('some-other-status'), 'warning');
+});
+
+test('getMissingSummaryTone returns "warning" for null', () => {
+  assert.equal(getMissingSummaryTone(null), 'warning');
+});
+
+// ── shouldShowMissingSummaryPill ───────────────────────────────────────────────────────
+
+test('shouldShowMissingSummaryPill returns true for complete', () => {
+  assert.equal(shouldShowMissingSummaryPill('complete'), true);
+});
+
+test('shouldShowMissingSummaryPill returns true for failed', () => {
+  assert.equal(shouldShowMissingSummaryPill('failed'), true);
+});
+
+test('shouldShowMissingSummaryPill returns false for empty', () => {
+  assert.equal(shouldShowMissingSummaryPill('empty'), false);
+});
+
+test('shouldShowMissingSummaryPill returns false for null', () => {
+  assert.equal(shouldShowMissingSummaryPill(null), false);
+});
+
+test('shouldShowMissingSummaryPill returns false for undefined', () => {
+  assert.equal(shouldShowMissingSummaryPill(undefined), false);
+});
+
+// ── formatMissingSummaryStatus ─────────────────────────────────────────────────────────
+
+test('formatMissingSummaryStatus returns "Complete" for complete', () => {
+  assert.equal(formatMissingSummaryStatus('complete'), 'Complete');
+});
+
+test('formatMissingSummaryStatus returns "Healthy" for healthy', () => {
+  assert.equal(formatMissingSummaryStatus('healthy'), 'Healthy');
+});
+
+test('formatMissingSummaryStatus returns "Partial" for partial', () => {
+  assert.equal(formatMissingSummaryStatus('partial'), 'Partial');
+});
+
+test('formatMissingSummaryStatus returns "Unavailable" for unavailable', () => {
+  assert.equal(formatMissingSummaryStatus('unavailable'), 'Unavailable');
+});
+
+test('formatMissingSummaryStatus returns "Failed" for failed', () => {
+  assert.equal(formatMissingSummaryStatus('failed'), 'Failed');
+});
+
+test('formatMissingSummaryStatus capitalises first letter of unknown values', () => {
+  assert.equal(formatMissingSummaryStatus('scanning'), 'Scanning');
+});
+
+test('formatMissingSummaryStatus returns empty string for null', () => {
+  assert.equal(formatMissingSummaryStatus(null), '');
+});
+
+test('formatMissingSummaryStatus returns empty string for undefined', () => {
+  assert.equal(formatMissingSummaryStatus(undefined), '');
+});
+
+// ── formatLastReconciledAt ───────────────────────────────────────────────────────────────
+
+test('formatLastReconciledAt returns "never" for null', () => {
+  assert.equal(formatLastReconciledAt(null), 'never');
+});
+
+test('formatLastReconciledAt returns "never" for undefined', () => {
+  assert.equal(formatLastReconciledAt(undefined), 'never');
+});
+
+test('formatLastReconciledAt returns "never" for empty string', () => {
+  assert.equal(formatLastReconciledAt(''), 'never');
+});
+
+test('formatLastReconciledAt returns a non-empty string for a valid ISO 8601 datetime', () => {
+  const result = formatLastReconciledAt('2026-05-12T10:30:00.000Z');
+  assert.ok(typeof result === 'string' && result.length > 0);
+  assert.notEqual(result, 'never');
+});
+
+test('formatLastReconciledAt does not return a raw ISO 8601 string for a valid datetime', () => {
+  const iso = '2026-05-12T10:30:00.000Z';
+  const result = formatLastReconciledAt(iso);
+  assert.notEqual(result, iso, 'raw ISO string must be formatted for display');
+});
+
+test('formatLastReconciledAt returns the raw value for an unparseable string', () => {
+  assert.equal(formatLastReconciledAt('not-a-date'), 'not-a-date');
+});
+
 // ── formatWantedTrackCounts ───────────────────────────────────────────────────
 
 test('formatWantedTrackCounts returns null for null input', () => {
@@ -229,17 +523,22 @@ test('formatWantedTrackCounts returns null when expectedTrackCount is absent', (
   assert.equal(formatWantedTrackCounts({ matchedTrackCount: 5 }), null);
 });
 
-test('formatWantedTrackCounts returns "0 / N tracks" for fully missing release', () => {
+test('formatWantedTrackCounts returns "0 of N tracks" for fully missing release', () => {
   const result = formatWantedTrackCounts({ expectedTrackCount: 10, matchedTrackCount: 0 });
-  assert.equal(result, '0 / 10 tracks');
+  assert.equal(result, '0 of 10 tracks');
 });
 
-test('formatWantedTrackCounts returns "M / N tracks" for partial release', () => {
+test('formatWantedTrackCounts returns "M of N tracks" for partial release', () => {
   const result = formatWantedTrackCounts({ expectedTrackCount: 12, matchedTrackCount: 8 });
-  assert.equal(result, '8 / 12 tracks');
+  assert.equal(result, '8 of 12 tracks');
 });
 
-test('formatWantedTrackCounts handles single track correctly', () => {
+test('formatWantedTrackCounts returns "0 of 1 track" for a single missing release', () => {
   const result = formatWantedTrackCounts({ expectedTrackCount: 1, matchedTrackCount: 0 });
-  assert.equal(result, '0 / 1 tracks');
+  assert.equal(result, '0 of 1 track');
+});
+
+test('formatWantedTrackCounts regression: single track is not pluralised as "0 / 1 tracks"', () => {
+  const result = formatWantedTrackCounts({ expectedTrackCount: 1, matchedTrackCount: 0 });
+  assert.notEqual(result, '0 / 1 tracks', 'single-track count must not use old slash format or plural form');
 });
