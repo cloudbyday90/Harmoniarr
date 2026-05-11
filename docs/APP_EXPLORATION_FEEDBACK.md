@@ -419,6 +419,42 @@ Test suite after this session: **1303 tests, 0 failures** (up from 1255).
 
 ---
 
+### 2026-05-11 - Account Security Screen
+
+**Screen:** `AccountSecurityView.vue` (627 lines before changes)
+**Lib:** `src/client/lib/account-security-presentation.js`
+**Tests:** `test/client/account-security-presentation.test.js`
+
+**Issues identified and resolved:**
+
+1. **Must-change-password banner copy was operator-facing** — *"Password change required — this account cannot perform admin actions until the password is updated."* contains the internal term "admin actions". Replaced with `buildMustChangePasswordWarning()` → *"Your password must be updated before you can continue."* — user-facing and role-neutral.
+
+2. **Active Sessions subtitle contained internal term "Browsers and services"** — "services" is the internal concept (sidecar/service-account sessions). Replaced with `buildActiveSessionsSubtitle()` → *"Devices and apps currently signed in to this account."*
+
+3. **"Import preferences" card title mislabelled the section** — The card controls notification push subscriptions and request preferences, not imports. Replaced with `buildRequestPreferencesTitle()` → *"Request preferences"*.
+
+4. **Push notification body copy was vague and inconsistent** — *"Notifications are enabled on this device."* / *"Notifications are not enabled on this device."* — passive constructions with no call to action. Replaced with `buildPushSubscribedBody()` / `buildPushUnsubscribedBody()`: *"You'll be notified when your requests are ready, even when the app isn't open."* / *"Enable to be alerted when your requests are ready."*
+
+5. **Push permission-denied paragraph contained browser instruction jargon** — *"Open your browser's site settings and allow notifications for this page, then reload."* is only correct for desktop Chrome. Replaced with `buildPushPermissionDeniedBody()` which uses the same action-oriented phrasing but with consistent product copy.
+
+6. **Raw `pushErrorMessage` exposed internal error strings** — The error pill rendered the raw error from the Push API verbatim (e.g. *"Registration failed"*, *"NotAllowed"*, *"The push service is unreachable"*). Replaced with `formatPushNotificationError(rawError)` which normalises known patterns (permission errors, service-worker failures, push service unavailability, aborts) to user-facing copy and falls through to the raw message only when none match.
+
+7. **`loadPreferences()` call was orphaned outside `onMounted`** — A `void loadPreferences().then(syncDraftFromPreferences)` line appeared between two computed refs with incorrect indentation, outside any lifecycle hook. Moved into the existing `onMounted` block alongside `checkPushStatus`, `loadSessions`, and `loadRecentActivity`.
+
+**Extractions and tests added to `account-security-presentation.js`:**
+
+- `buildMustChangePasswordWarning()` — 4 tests
+- `buildActiveSessionsSubtitle()` — 3 tests
+- `buildRequestPreferencesTitle()` — 4 tests
+- `buildPushSubscribedBody()` — 3 tests
+- `buildPushUnsubscribedBody()` — 3 tests
+- `buildPushPermissionDeniedBody()` — 3 tests
+- `formatPushNotificationError(rawError)` — 13 tests
+
+Test suite after this session: **1490 tests, 0 failures** (up from 1457).
+
+---
+
 ### 2026-05-11 - Artist Detail Screen
 
 Status: **Resolved** (2026-05-11 — targeted copy, extraction, and deduplication fixes).

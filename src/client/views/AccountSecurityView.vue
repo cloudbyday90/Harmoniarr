@@ -21,6 +21,13 @@ import { computed, inject, onMounted, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { buildAuditActivityLinkTarget } from '../lib/audit-activity-links.js';
 import {
+  buildActiveSessionsSubtitle,
+  buildMustChangePasswordWarning,
+  buildPushPermissionDeniedBody,
+  buildPushSubscribedBody,
+  buildPushUnsubscribedBody,
+  buildRequestPreferencesTitle,
+  formatPushNotificationError,
   formatSessionTimestamp,
   formatUserAgent,
   getActivityEventStatusLabel,
@@ -107,7 +114,6 @@ const securityActivity = computed(() =>
     .map((event) => ({ ...event, linkTarget: buildAuditActivityLinkTarget(event) }))
     .filter(isSecurityRelevantEvent),
 );
-  void loadPreferences().then(syncDraftFromPreferences);
 const redirectTarget = computed(() => typeof route.query.redirect === 'string' ? route.query.redirect : '');
 
 async function submitPasswordChange() {
@@ -133,6 +139,7 @@ onMounted(() => {
   void checkPushStatus();
   void loadSessions();
   void loadRecentActivity();
+  void loadPreferences().then(syncDraftFromPreferences);
 });
 </script>
 
@@ -148,7 +155,7 @@ onMounted(() => {
     <!-- Must-change-password warning -->
     <div v-if="sessionStore.state.user?.mustChangePassword" class="as-notice">
       <span class="hx-pill" data-tone="danger">
-        Password change required — this account cannot perform admin actions until the password is updated.
+        {{ buildMustChangePasswordWarning() }}
       </span>
     </div>
 
@@ -222,7 +229,7 @@ onMounted(() => {
       <header class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Active sessions</h2>
-          <p class="hx-card-subtitle">Browsers and services currently signed in to this account.</p>
+          <p class="hx-card-subtitle">{{ buildActiveSessionsSubtitle() }}</p>
         </div>
         <div class="hx-card-actions">
           <button
@@ -395,7 +402,7 @@ onMounted(() => {
     <article class="hx-card">
       <header class="hx-card-header">
         <div>
-          <h2 class="hx-card-title">Import preferences</h2>
+          <h2 class="hx-card-title">{{ buildRequestPreferencesTitle() }}</h2>
           <p class="hx-card-subtitle">Default audio format and quality used when submitting new requests.</p>
         </div>
       </header>
@@ -458,18 +465,13 @@ onMounted(() => {
         </div>
         <template v-else>
           <div v-if="pushPermissionState === 'denied'">
-            <p class="hx-text-muted">
-              Notification permission was blocked. Open your browser's site settings and allow
-              notifications for this page, then reload.
-            </p>
+            <p class="hx-text-muted">{{ buildPushPermissionDeniedBody() }}</p>
           </div>
           <div v-else class="as-push-body">
             <p class="hx-text-muted">
-              {{ isPushSubscribed
-                ? 'Notifications are enabled on this device.'
-                : 'Notifications are not enabled on this device.' }}
+              {{ isPushSubscribed ? buildPushSubscribedBody() : buildPushUnsubscribedBody() }}
             </p>
-            <span class="hx-pill" data-tone="danger" v-if="pushErrorMessage">{{ pushErrorMessage }}</span>
+            <span class="hx-pill" data-tone="danger" v-if="pushErrorMessage">{{ formatPushNotificationError(pushErrorMessage) }}</span>
             <div class="as-push-actions">
               <button
                 v-if="!isPushSubscribed"

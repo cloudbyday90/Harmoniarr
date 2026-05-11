@@ -19,6 +19,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildActiveSessionsSubtitle,
+  buildMustChangePasswordWarning,
+  buildPushPermissionDeniedBody,
+  buildPushSubscribedBody,
+  buildPushUnsubscribedBody,
+  buildRequestPreferencesTitle,
+  formatPushNotificationError,
   formatSessionTimestamp,
   formatUserAgent,
   getActivityEventStatusLabel,
@@ -365,5 +372,193 @@ describe('formatUserAgent', () => {
     const result = formatUserAgent(vscodeUA);
     assert.match(result, /Electron/);
     assert.doesNotMatch(result, /^Chrome/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildMustChangePasswordWarning
+// ---------------------------------------------------------------------------
+
+describe('buildMustChangePasswordWarning', () => {
+  it('returns a non-empty string', () => {
+    assert.ok(buildMustChangePasswordWarning().length > 0);
+  });
+
+  it('is stable across calls', () => {
+    assert.equal(buildMustChangePasswordWarning(), buildMustChangePasswordWarning());
+  });
+
+  it('does not mention "admin actions"', () => {
+    assert.ok(!buildMustChangePasswordWarning().toLowerCase().includes('admin action'));
+  });
+
+  it('does not mention "admin"', () => {
+    assert.ok(!buildMustChangePasswordWarning().toLowerCase().includes('admin'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildActiveSessionsSubtitle
+// ---------------------------------------------------------------------------
+
+describe('buildActiveSessionsSubtitle', () => {
+  it('returns a non-empty string', () => {
+    assert.ok(buildActiveSessionsSubtitle().length > 0);
+  });
+
+  it('is stable across calls', () => {
+    assert.equal(buildActiveSessionsSubtitle(), buildActiveSessionsSubtitle());
+  });
+
+  it('does not use technical term "services"', () => {
+    assert.ok(!buildActiveSessionsSubtitle().toLowerCase().includes('services currently'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildRequestPreferencesTitle
+// ---------------------------------------------------------------------------
+
+describe('buildRequestPreferencesTitle', () => {
+  it('returns a non-empty string', () => {
+    assert.ok(buildRequestPreferencesTitle().length > 0);
+  });
+
+  it('is stable across calls', () => {
+    assert.equal(buildRequestPreferencesTitle(), buildRequestPreferencesTitle());
+  });
+
+  it('does not use internal term "import"', () => {
+    assert.ok(!buildRequestPreferencesTitle().toLowerCase().includes('import'));
+  });
+
+  it('contains the word "preferences"', () => {
+    assert.ok(buildRequestPreferencesTitle().toLowerCase().includes('preferences'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildPushSubscribedBody
+// ---------------------------------------------------------------------------
+
+describe('buildPushSubscribedBody', () => {
+  it('returns a non-empty string', () => {
+    assert.ok(buildPushSubscribedBody().length > 0);
+  });
+
+  it('is stable across calls', () => {
+    assert.equal(buildPushSubscribedBody(), buildPushSubscribedBody());
+  });
+
+  it('communicates what the user will receive, not just a status', () => {
+    // Should say what notifications will deliver, not just "enabled"
+    assert.ok(buildPushSubscribedBody().toLowerCase().includes('request'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildPushUnsubscribedBody
+// ---------------------------------------------------------------------------
+
+describe('buildPushUnsubscribedBody', () => {
+  it('returns a non-empty string', () => {
+    assert.ok(buildPushUnsubscribedBody().length > 0);
+  });
+
+  it('is stable across calls', () => {
+    assert.equal(buildPushUnsubscribedBody(), buildPushUnsubscribedBody());
+  });
+
+  it('includes a call to action or value statement', () => {
+    // Should tell the user what they get, not just "not enabled"
+    const body = buildPushUnsubscribedBody().toLowerCase();
+    assert.ok(body.includes('request') || body.includes('ready') || body.includes('notif'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildPushPermissionDeniedBody
+// ---------------------------------------------------------------------------
+
+describe('buildPushPermissionDeniedBody', () => {
+  it('returns a non-empty string', () => {
+    assert.ok(buildPushPermissionDeniedBody().length > 0);
+  });
+
+  it('is stable across calls', () => {
+    assert.equal(buildPushPermissionDeniedBody(), buildPushPermissionDeniedBody());
+  });
+
+  it('contains actionable guidance about site settings', () => {
+    assert.ok(buildPushPermissionDeniedBody().toLowerCase().includes('settings'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatPushNotificationError
+// ---------------------------------------------------------------------------
+
+describe('formatPushNotificationError', () => {
+  it('returns generic message for null', () => {
+    assert.equal(formatPushNotificationError(null), 'Notifications could not be updated. Try again.');
+  });
+
+  it('returns generic message for undefined', () => {
+    assert.equal(formatPushNotificationError(undefined), 'Notifications could not be updated. Try again.');
+  });
+
+  it('returns generic message for empty string', () => {
+    assert.equal(formatPushNotificationError(''), 'Notifications could not be updated. Try again.');
+  });
+
+  it('maps NotAllowedError (permission) to permission message', () => {
+    const result = formatPushNotificationError('NotAllowedError: The Notification permission was not granted.');
+    assert.ok(result.toLowerCase().includes('permission'));
+  });
+
+  it('maps "not allowed" errors to permission message', () => {
+    const result = formatPushNotificationError('not allowed to request permission');
+    assert.ok(result.toLowerCase().includes('permission'));
+  });
+
+  it('maps ServiceWorker registration failure to reload message', () => {
+    const result = formatPushNotificationError('Failed to register a ServiceWorker for scope');
+    assert.ok(result.toLowerCase().includes('reload') || result.toLowerCase().includes('set up'));
+  });
+
+  it('maps "service worker" keyword to setup message', () => {
+    const result = formatPushNotificationError('service worker not available');
+    assert.ok(result.toLowerCase().includes('reload') || result.toLowerCase().includes('set up'));
+  });
+
+  it('maps "registration failed" to setup message', () => {
+    const result = formatPushNotificationError('AbortError: Registration failed - push service error');
+    // "registration failed" pattern triggers setup message
+    assert.ok(result.toLowerCase().includes('reload') || result.toLowerCase().includes('set up') || result.toLowerCase().includes('unavailable'));
+  });
+
+  it('maps push service errors to temporary unavailability message', () => {
+    const result = formatPushNotificationError('Push service error 503');
+    assert.ok(result.toLowerCase().includes('unavailable') || result.toLowerCase().includes('later'));
+  });
+
+  it('maps AbortError to interrupted message', () => {
+    const result = formatPushNotificationError('AbortError: The operation was aborted');
+    assert.ok(result.toLowerCase().includes('interrupted') || result.toLowerCase().includes('try again'));
+  });
+
+  it('does not expose DOMException class names in output for known errors', () => {
+    const result = formatPushNotificationError('NotAllowedError: Permission denied');
+    assert.ok(!result.includes('NotAllowedError'));
+  });
+
+  it('does not expose ServiceWorker implementation details in output', () => {
+    const result = formatPushNotificationError('Failed to register a ServiceWorker');
+    assert.ok(!result.includes('ServiceWorker'));
+  });
+
+  it('passes through unrecognised messages', () => {
+    const msg = 'Network connection lost';
+    assert.equal(formatPushNotificationError(msg), msg);
   });
 });

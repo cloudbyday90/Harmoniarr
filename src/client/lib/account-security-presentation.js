@@ -16,6 +16,102 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+// ── Must-change-password warning ─────────────────────────────────────────────
+
+/**
+ * Body copy for the must-change-password warning banner.
+ * Must not reference "admin actions" — the restriction applies to all users.
+ *
+ * @returns {string}
+ */
+export function buildMustChangePasswordWarning() {
+  return 'Your password must be updated before you can continue.';
+}
+
+// ── Active sessions ───────────────────────────────────────────────────────────
+
+/**
+ * Subtitle for the Active Sessions card.
+ * "Services" is a technical term — "apps" is clearer for requesters.
+ *
+ * @returns {string}
+ */
+export function buildActiveSessionsSubtitle() {
+  return 'Devices and apps currently signed in to this account.';
+}
+
+// ── Request preferences ───────────────────────────────────────────────────────
+
+/**
+ * Title for the request/audio preferences card.
+ * "Import" is an internal pipeline term — requesters submit requests.
+ *
+ * @returns {string}
+ */
+export function buildRequestPreferencesTitle() {
+  return 'Request preferences';
+}
+
+// ── Push notification copy ────────────────────────────────────────────────────
+
+/**
+ * Body copy when push notifications are enabled and subscribed.
+ *
+ * @returns {string}
+ */
+export function buildPushSubscribedBody() {
+  return "You'll be notified when your requests are ready, even when the app isn't open.";
+}
+
+/**
+ * Body copy when push notifications are supported but not yet enabled.
+ * Acts as a call-to-action as well as a status description.
+ *
+ * @returns {string}
+ */
+export function buildPushUnsubscribedBody() {
+  return 'Enable to be alerted when your requests are ready.';
+}
+
+/**
+ * Body copy when the browser has blocked notification permission.
+ *
+ * @returns {string}
+ */
+export function buildPushPermissionDeniedBody() {
+  return "Notification permission is blocked. Open your browser's site settings and allow notifications for this page, then reload.";
+}
+
+/**
+ * Normalise a raw browser Push API error message for display.
+ *
+ * Push API errors are highly technical DOMException strings. This function
+ * maps known patterns to user-readable copy and suppresses implementation
+ * details (ServiceWorker, DOMException class names, etc.).
+ *
+ * @param {string|null|undefined} rawError
+ * @returns {string}
+ */
+export function formatPushNotificationError(rawError) {
+  if (!rawError) return 'Notifications could not be updated. Try again.';
+  const lower = rawError.toLowerCase();
+  if (lower.includes('not allowed') || lower.includes('permission')) {
+    return 'Notification permission is required. Allow notifications in your browser settings and try again.';
+  }
+  if (lower.includes('serviceworker') || lower.includes('service worker') || lower.includes('registration failed')) {
+    return 'Notifications could not be set up. Try reloading the page.';
+  }
+  if (lower.includes('push service') || lower.includes('push server')) {
+    return 'The notification service is temporarily unavailable. Try again later.';
+  }
+  if (lower.includes('abort') || lower.includes('aborted')) {
+    return 'The request was interrupted. Try again.';
+  }
+  return rawError;
+}
+
+// ── Security-relevant event types ────────────────────────────────────────────
+
 /**
  * Security-relevant event type prefixes. Only events whose eventType starts
  * with one of these strings are shown on the account security activity feed.
