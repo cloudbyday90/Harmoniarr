@@ -29,6 +29,12 @@ import {
   fetchMediaRequests,
   fetchMediaRequestSummary,
 } from '../../lib/library-api.js';
+import {
+  fulfillmentLabel,
+  fulfillmentTone,
+  releaseYear,
+  requestHeadline,
+} from '../../lib/operator-dashboard-presentation.js';
 import { fetchSlskdDownloads } from '../../lib/slskd-search-api.js';
 import { searchMusicBrainzReleases } from '../../lib/metadata-api.js';
 
@@ -42,7 +48,11 @@ const {
   summary: onboardingSummary,
 } = useOnboardingSummary();
 
+// Show the setup panel whenever there are outstanding issues, or while the
+// first load is in flight (shows a skeleton so operators aren't surprised by
+// the panel appearing below the search widget after data arrives).
 const showOnboardingSummary = computed(() => (onboardingSummary.value?.issueCount ?? 0) > 0);
+const showOnboardingPanel = computed(() => showOnboardingSummary.value || isLoadingOnboarding.value);
 
 // ── Requests ─────────────────────────────────────────────────────────────────
 const mediaRequests = ref([]);
@@ -109,28 +119,6 @@ async function requestRelease(result) {
   }
 }
 
-function releaseYear(date) {
-  return date ? date.slice(0, 4) : null;
-}
-
-function requestHeadline(request) {
-  if (request.requestKind === 'track') return `${request.artistName} — ${request.trackTitle}`;
-  if (request.requestKind === 'external_url') return request.sourceUrl;
-  return `${request.artistName} — ${request.releaseTitle}`;
-}
-
-function fulfillmentTone(fulfillmentStatus) {
-  switch (fulfillmentStatus?.tone) {
-    case 'selected': return 'success';
-    case 'failed': return 'danger';
-    default: return 'info';
-  }
-}
-
-function fulfillmentLabel(fulfillmentStatus) {
-  return fulfillmentStatus?.label ?? 'Queued';
-}
-
 // ── Wanted releases ───────────────────────────────────────────────────────────
 const wantedSummary = useLibraryWantedSummary();
 const wantedReleases = useLibraryWantedReleases();
@@ -178,6 +166,20 @@ onMounted(() => {
 
 <template>
   <section class="hx-page hx-media-hub">
+
+    <!-- Setup status — rendered first so operators see it immediately.
+         Visible while the initial load is in flight (skeleton) and whenever
+         there are outstanding setup issues.  Disappears once setup is clean. -->
+    <OnboardingSummaryPanel
+      v-if="showOnboardingPanel"
+      :error-message="onboardingErrorMessage"
+      :is-loading="isLoadingOnboarding"
+      :is-setup-mode="showOnboardingSummary"
+      :next-action="nextAction"
+      :steps="steps"
+      :summary="onboardingSummary"
+      @refresh="loadOnboardingSummary"
+    />
 
     <!-- Request intake ──────────────────────────────────────────────────── -->
     <article class="hx-card hx-request-intake">
@@ -254,18 +256,6 @@ onMounted(() => {
         </div>
       </div>
     </article>
-
-    <!-- Setup alert ─────────────────────────────────────────────────────── -->
-    <OnboardingSummaryPanel
-      v-if="showOnboardingSummary"
-      :error-message="onboardingErrorMessage"
-      :is-loading="isLoadingOnboarding"
-      :is-setup-mode="false"
-      :next-action="nextAction"
-      :steps="steps"
-      :summary="onboardingSummary"
-      @refresh="loadOnboardingSummary"
-    />
 
     <!-- Stats row ───────────────────────────────────────────────────────── -->
     <section class="hx-stat-grid" v-if="requestSummary || wantedSummary.libraryWantedSummary.value">
