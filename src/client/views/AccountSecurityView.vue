@@ -17,9 +17,17 @@
 -->
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from 'vue';
+import { computed, inject, onMounted, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { buildAuditActivityLinkTarget } from '../lib/audit-activity-links.js';
+import {
+  formatSessionTimestamp,
+  formatUserAgent,
+  getActivityEventStatusLabel,
+  getActivityEventTone,
+  isSecurityRelevantEvent,
+  isServiceSession,
+} from '../lib/account-security-presentation.js';
 import { useAccountSecurity } from '../composables/useAccountSecurity.js';
 import { useAccountPreferences } from '../composables/useAccountPreferences.js';
 import { usePushNotifications } from '../composables/usePushNotifications.js';
@@ -94,10 +102,11 @@ const {
 } = usePushNotifications();
 
 const isPasswordMismatch = computed(() => form.newPassword !== form.confirmPassword);
-const linkedRecentActivity = computed(() => recentActivity.value.map((event) => ({
-  ...event,
-  linkTarget: buildAuditActivityLinkTarget(event),
-})));
+const securityActivity = computed(() =>
+  recentActivity.value
+    .map((event) => ({ ...event, linkTarget: buildAuditActivityLinkTarget(event) }))
+    .filter(isSecurityRelevantEvent),
+);
   void loadPreferences().then(syncDraftFromPreferences);
 const redirectTarget = computed(() => typeof route.query.redirect === 'string' ? route.query.redirect : '');
 
@@ -125,256 +134,494 @@ onMounted(() => {
   void loadSessions();
   void loadRecentActivity();
 });
-
-function formatUserAgent(ua) {
-  if (!ua) return 'Unknown client';
-  // Non-browser identifiers (short service names like "node" or custom agents) — show as-is
-  if (!ua.startsWith('Mozilla/')) return ua;
-  // VS Code / Electron shell
-  if (/Electron\//.test(ua)) {
-    const appLabel = /Code\//.test(ua) ? 'VS Code' : 'Electron app';
-    const ver = ua.match(/Electron\/([\d.]+)/);
-    return ver ? `${appLabel} \u00b7 Electron ${ver[1]}` : appLabel;
-  }
-  // Edge (check before Chrome since Edge also includes Chrome token)
-  if (/Edg\//.test(ua)) {
-    const ver = ua.match(/Edg\/([\d.]+)/);
-    return ver ? `Microsoft Edge ${ver[1]}` : 'Microsoft Edge';
-  }
-  // Chrome / Chromium
-  const chromeVer = ua.match(/Chrome\/([\d.]+)/);
-  if (chromeVer) return `Chrome ${chromeVer[1]}`;
-  // Firefox
-  const ffVer = ua.match(/Firefox\/([\d.]+)/);
-  if (ffVer) return `Firefox ${ffVer[1]}`;
-  // Safari
-  const safariVer = ua.match(/Version\/([\d.]+).*Safari\//);
-  if (safariVer) return `Safari ${safariVer[1]}`;
-  // Unknown browser UA — truncate to avoid wall of text
-  return ua.length > 60 ? `${ua.slice(0, 57)}\u2026` : ua;
-}
 </script>
 
 <template>
-  <section class="page-stack account-security-layout">
-    <article class="panel-dark hero-card compact">
-      <p class="eyebrow">Account security</p>
-      <h2>Password and session controls</h2>
-      <p>
-        Verify the current password before rotating credentials, and review the active browser sessions tied to this account.
-      </p>
-      <p class="warning-copy" v-if="sessionStore.state.user?.mustChangePassword">
-        This account is blocked from fresh-admin actions until the password is changed.
-      </p>
-    </article>
-
-    <article class="panel-light">
-      <h3>Appearance</h3>
-      <p class="metadata-card-copy">
-        Choose how Harmoniarr looks. "System" follows your operating system's dark/light preference.
-      </p>
-      <div class="theme-toggle" role="group" aria-label="Theme preference">
-        <button
-          type="button"
-          :class="['theme-toggle-btn', { 'is-active': themePref === 'system' }]"
-          @click="setTheme('system')"
-          :aria-pressed="themePref === 'system'"
-        >
-          System
-        </button>
-        <button
-          type="button"
-          :class="['theme-toggle-btn', { 'is-active': themePref === 'light' }]"
-          @click="setTheme('light')"
-          :aria-pressed="themePref === 'light'"
-        >
-          Light
-        </button>
-        <button
-          type="button"
-          :class="['theme-toggle-btn', { 'is-active': themePref === 'dark' }]"
-          @click="setTheme('dark')"
-          :aria-pressed="themePref === 'dark'"
-        >
-          Dark
-        </button>
+  <section class="hx-page">
+    <header class="hx-page-header">
+      <div>
+        <h1 class="hx-page-title">My account</h1>
+        <p class="hx-page-subtitle">Password, sessions, and account preferences.</p>
       </div>
-    </article>
+    </header>
 
-    <article class="panel-light">
-      <h3>Import preferences</h3>
-      <p class="metadata-card-copy">
-        Set your preferred audio format and minimum quality for media requests. These are used as defaults when submitting new requests.
-      </p>
-      <form class="stack-form" @submit.prevent="submitPreferences">
-        <label>
-          Preferred format
-          <select v-model="preferencesDraft.preferredFormat" :disabled="isPreferencesLoading">
-            <option value="any">Any format</option>
-            <option value="flac">FLAC (lossless)</option>
-            <option value="mp3_320">MP3 320 kbps</option>
-            <option value="mp3_v0">MP3 V0 (variable)</option>
-          </select>
-        </label>
-        <label>
-          Minimum quality
-          <select v-model="preferencesDraft.minimumQuality" :disabled="isPreferencesLoading">
-            <option value="any">Any quality</option>
-            <option value="lossless">Lossless only</option>
-            <option value="high">High quality (320+ / lossless)</option>
-          </select>
-        </label>
-        <p class="error-copy" v-if="preferencesErrorMessage">{{ preferencesErrorMessage }}</p>
-        <button type="submit" :disabled="isPreferencesLoading">
-          {{ isPreferencesLoading ? 'Saving\u2026' : 'Save preferences' }}
-        </button>
-      </form>
-    </article>
+    <!-- Must-change-password warning -->
+    <div v-if="sessionStore.state.user?.mustChangePassword" class="as-notice">
+      <span class="hx-pill" data-tone="danger">
+        Password change required — this account cannot perform admin actions until the password is updated.
+      </span>
+    </div>
 
-    <article class="panel-light">
-      <h3>Push notifications</h3>
-      <p class="metadata-card-copy">
-        Get notified when your music requests are ready, even when Harmoniarr isn't open.
-      </p>
-      <p class="muted-copy" v-if="!isPushSupported">
-        Push notifications are not supported in this browser.
-      </p>
-      <template v-else>
-        <p class="error-copy" v-if="pushPermissionState === 'denied'">
-          Notification permission was blocked. Enable notifications in your browser settings to receive alerts.
-        </p>
-        <template v-else>
-          <p class="metadata-card-copy" v-if="isPushSubscribed">
-            Notifications are enabled on this device.
-          </p>
-          <p class="metadata-card-copy" v-else>
-            Notifications are not enabled on this device.
-          </p>
-          <p class="error-copy" v-if="pushErrorMessage">{{ pushErrorMessage }}</p>
-          <button
-            v-if="!isPushSubscribed"
-            type="button"
-            :disabled="isPushLoading"
-            @click="subscribePush"
-          >
-            {{ isPushLoading ? 'Enabling\u2026' : 'Enable notifications' }}
-          </button>
-          <button
-            v-else
-            type="button"
-            class="secondary-button"
-            :disabled="isPushLoading"
-            @click="unsubscribePush"
-          >
-            {{ isPushLoading ? 'Disabling\u2026' : 'Disable notifications' }}
-          </button>
-        </template>
-      </template>
-    </article>
+    <!-- Action feedback (password change + session revocation share this state) -->
+    <div v-if="actionErrorMessage || successMessage" class="as-feedback">
+      <span v-if="actionErrorMessage" class="hx-pill" data-tone="danger">{{ actionErrorMessage }}</span>
+      <span v-else-if="successMessage" class="hx-pill" data-tone="success">{{ successMessage }}</span>
+    </div>
 
-    <article class="panel-light">
-      <h3>Change password</h3>
-      <form class="stack-form" @submit.prevent="submitPasswordChange">
-        <label>
-          Current password
-          <input v-model="form.currentPassword" type="password" autocomplete="current-password" />
-        </label>
-        <label>
-          New password
-          <input v-model="form.newPassword" type="password" autocomplete="new-password" />
-        </label>
-        <label>
-          Confirm new password
-          <input v-model="form.confirmPassword" type="password" autocomplete="new-password" />
-        </label>
-
-        <p class="error-copy" v-if="isPasswordMismatch">The new password confirmation must match.</p>
-        <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
-        <p class="success-copy" v-if="successMessage">{{ successMessage }}</p>
-
-        <button type="submit" :disabled="isChangingPassword || isPasswordMismatch">
-          {{ isChangingPassword ? 'Updating...' : 'Update password' }}
-        </button>
-      </form>
-    </article>
-
-    <article class="panel-light">
-      <div class="section-header">
+    <!-- 1. Change password ------------------------------------------------ -->
+    <article class="hx-card">
+      <header class="hx-card-header">
         <div>
-          <p class="eyebrow">Active sessions</p>
-          <h3>Signed-in browsers</h3>
+          <h2 class="hx-card-title">Change password</h2>
+          <p class="hx-card-subtitle">Verify your current password before setting a new one.</p>
         </div>
-        <button type="button" class="secondary-button" @click="loadSessions" :disabled="isLoadingSessions">
-          {{ isLoadingSessions ? 'Refreshing...' : 'Refresh sessions' }}
-        </button>
-      </div>
-
-      <p class="error-copy" v-if="sessionErrorMessage">{{ sessionErrorMessage }}</p>
-
-      <p v-if="isLoadingSessions">Loading active sessions.</p>
-
-      <p class="metadata-card-copy" v-else-if="!sessions.length">
-        No active sessions were returned for this account.
-      </p>
-
-      <div class="session-list" v-else>
-        <article class="session-row" v-for="session in sessions" :key="session.id">
-          <div>
-            <p class="eyebrow">{{ session.isCurrent ? 'Current session' : 'Active session' }}</p>
-            <strong :title="session.issuedUserAgent || undefined">{{ formatUserAgent(session.issuedUserAgent) }}</strong>
-            <p class="metadata-card-copy">Issued from {{ session.issuedIp || 'unknown address' }}</p>
-            <p class="muted-copy">Issued {{ session.issuedAt }} | Last used {{ session.lastUsedAt || 'never' }}</p>
-            <p class="muted-copy">Expires {{ session.expiresAt }}</p>
+      </header>
+      <div class="hx-card-body">
+        <form @submit.prevent="submitPasswordChange" class="as-form">
+          <div class="hx-field">
+            <label class="hx-field-label" for="as-current-password">Current password</label>
+            <input
+              id="as-current-password"
+              class="hx-input"
+              type="password"
+              v-model="form.currentPassword"
+              autocomplete="current-password"
+            />
           </div>
-          <div class="session-actions">
-            <span class="status-chip" data-status="healthy" v-if="session.isCurrent">Current</span>
+          <div class="hx-field">
+            <label class="hx-field-label" for="as-new-password">New password</label>
+            <input
+              id="as-new-password"
+              class="hx-input"
+              type="password"
+              v-model="form.newPassword"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="hx-field">
+            <label class="hx-field-label" for="as-confirm-password">Confirm new password</label>
+            <input
+              id="as-confirm-password"
+              class="hx-input"
+              type="password"
+              v-model="form.confirmPassword"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="as-form-footer">
+            <span
+              class="hx-pill"
+              data-tone="danger"
+              v-if="form.confirmPassword && isPasswordMismatch"
+            >Passwords do not match</span>
             <button
-              v-else
-              type="button"
-              class="secondary-button"
-              :disabled="revokingSessionId === session.id"
-              @click="revokeSession(session.id)"
+              type="submit"
+              class="hx-btn"
+              data-variant="primary"
+              :disabled="isChangingPassword || isPasswordMismatch || !form.currentPassword || !form.newPassword"
             >
-              {{ revokingSessionId === session.id ? 'Revoking...' : 'Revoke session' }}
+              {{ isChangingPassword ? 'Updating\u2026' : 'Update password' }}
             </button>
           </div>
-        </article>
+        </form>
       </div>
     </article>
 
-    <article class="panel-light">
-      <div class="section-header">
+    <!-- 2. Active sessions ----------------------------------------------- -->
+    <article class="hx-card">
+      <header class="hx-card-header">
         <div>
-          <p class="eyebrow">Recent activity</p>
-          <h3>Recent account actions</h3>
+          <h2 class="hx-card-title">Active sessions</h2>
+          <p class="hx-card-subtitle">Browsers and services currently signed in to this account.</p>
         </div>
-        <button type="button" class="secondary-button" @click="loadRecentActivity" :disabled="isLoadingActivity">
-          {{ isLoadingActivity ? 'Refreshing...' : 'Refresh activity' }}
-        </button>
+        <div class="hx-card-actions">
+          <button
+            type="button"
+            class="hx-btn"
+            data-variant="ghost"
+            @click="loadSessions"
+            :disabled="isLoadingSessions"
+          >
+            {{ isLoadingSessions ? 'Refreshing\u2026' : 'Refresh' }}
+          </button>
+        </div>
+      </header>
+
+      <div class="hx-card-body" v-if="sessionErrorMessage">
+        <span class="hx-pill" data-tone="danger">{{ sessionErrorMessage }}</span>
       </div>
 
-      <p class="error-copy" v-if="activityErrorMessage">{{ activityErrorMessage }}</p>
+      <div class="hx-card-body" v-if="isLoadingSessions">
+        <p class="hx-text-muted">Loading sessions\u2026</p>
+      </div>
 
-      <p v-if="isLoadingActivity">Loading recent activity.</p>
+      <div v-else-if="!sessions.length" class="hx-card-body">
+        <div class="hx-empty">
+          <p class="hx-empty-title">No sessions</p>
+          <p class="hx-empty-copy">No active sessions were found for this account.</p>
+        </div>
+      </div>
 
-      <p class="metadata-card-copy" v-else-if="!recentActivity.length">
-        No recent activity was recorded for this account.
-      </p>
+      <div v-else class="hx-card-body hx-card-body--flush">
+        <ul class="as-session-list">
+          <li class="as-session-row" v-for="session in sessions" :key="session.id">
+            <div class="as-session-info">
+              <div class="as-session-client-row">
+                <strong
+                  class="as-session-client"
+                  :title="session.issuedUserAgent || undefined"
+                >{{ formatUserAgent(session.issuedUserAgent) }}</strong>
+                <span
+                  class="hx-pill"
+                  :data-tone="isServiceSession(session) ? 'warning' : 'info'"
+                >{{ isServiceSession(session) ? 'Service' : 'Browser' }}</span>
+              </div>
+              <p class="hx-text-muted as-session-meta">
+                Issued {{ formatSessionTimestamp(session.issuedAt) }}
+                from {{ session.issuedIp || 'unknown address' }}
+              </p>
+              <p class="hx-text-muted as-session-meta">
+                Last used: {{ session.lastUsedAt ? formatSessionTimestamp(session.lastUsedAt) : 'Never' }}
+                &middot;
+                Expires {{ formatSessionTimestamp(session.expiresAt) }}
+              </p>
+            </div>
+            <div class="as-session-action">
+              <span class="hx-pill" data-tone="success" v-if="session.isCurrent">Current</span>
+              <button
+                v-else
+                type="button"
+                class="hx-btn"
+                data-variant="ghost"
+                :disabled="revokingSessionId === session.id"
+                @click="revokeSession(session.id)"
+              >
+                {{ revokingSessionId === session.id ? 'Revoking\u2026' : 'Revoke' }}
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </article>
 
-      <div class="session-list" v-else>
-        <article class="session-row" v-for="event in linkedRecentActivity" :key="event.id">
-          <div>
-            <p class="eyebrow">{{ event.occurredAt }}</p>
-            <strong>{{ event.summary }}</strong>
-            <p class="muted-copy">{{ event.eventType }}</p>
+    <!-- 3. Recent account activity --------------------------------------- -->
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h2 class="hx-card-title">Recent account activity</h2>
+          <p class="hx-card-subtitle">Login attempts, password changes, and session events.</p>
+        </div>
+        <div class="hx-card-actions">
+          <button
+            type="button"
+            class="hx-btn"
+            data-variant="ghost"
+            @click="loadRecentActivity"
+            :disabled="isLoadingActivity"
+          >
+            {{ isLoadingActivity ? 'Refreshing\u2026' : 'Refresh' }}
+          </button>
+        </div>
+      </header>
+
+      <div class="hx-card-body" v-if="activityErrorMessage">
+        <span class="hx-pill" data-tone="danger">{{ activityErrorMessage }}</span>
+      </div>
+
+      <div class="hx-card-body" v-if="isLoadingActivity">
+        <p class="hx-text-muted">Loading activity\u2026</p>
+      </div>
+
+      <div v-else-if="!securityActivity.length" class="hx-card-body">
+        <div class="hx-empty">
+          <p class="hx-empty-title">No activity</p>
+          <p class="hx-empty-copy">No recent security events were recorded for this account.</p>
+        </div>
+      </div>
+
+      <div v-else class="hx-card-body hx-card-body--flush">
+        <ul class="as-activity-list">
+          <li class="as-activity-row" v-for="event in securityActivity" :key="event.id">
+            <div class="as-activity-info">
+              <strong class="as-activity-summary">{{ event.summary }}</strong>
+              <p class="hx-text-muted as-activity-time">{{ formatSessionTimestamp(event.occurredAt) }}</p>
+            </div>
+            <div class="as-activity-meta">
+              <span
+                class="hx-pill"
+                :data-tone="getActivityEventTone(event.eventType)"
+              >{{ getActivityEventStatusLabel(event.eventType) }}</span>
+              <RouterLink
+                v-if="event.linkTarget"
+                class="hx-btn"
+                data-variant="ghost"
+                :to="event.linkTarget.to"
+              >{{ event.linkTarget.label }}</RouterLink>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- Preferences ------------------------------------------------------- -->
+    <p class="hx-text-muted as-prefs-divider">Preferences</p>
+
+    <!-- 4. Appearance -->
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h2 class="hx-card-title">Appearance</h2>
+          <p class="hx-card-subtitle">Choose how Harmoniarr looks. "System" follows your OS preference.</p>
+        </div>
+      </header>
+      <div class="hx-card-body">
+        <div class="as-theme-toggle" role="group" aria-label="Theme preference">
+          <button
+            type="button"
+            class="hx-btn"
+            :data-variant="themePref === 'system' ? 'primary' : 'ghost'"
+            @click="setTheme('system')"
+            :aria-pressed="themePref === 'system'"
+          >System</button>
+          <button
+            type="button"
+            class="hx-btn"
+            :data-variant="themePref === 'light' ? 'primary' : 'ghost'"
+            @click="setTheme('light')"
+            :aria-pressed="themePref === 'light'"
+          >Light</button>
+          <button
+            type="button"
+            class="hx-btn"
+            :data-variant="themePref === 'dark' ? 'primary' : 'ghost'"
+            @click="setTheme('dark')"
+            :aria-pressed="themePref === 'dark'"
+          >Dark</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- 5. Import preferences -->
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h2 class="hx-card-title">Import preferences</h2>
+          <p class="hx-card-subtitle">Default audio format and quality used when submitting new requests.</p>
+        </div>
+      </header>
+      <div class="hx-card-body">
+        <form @submit.prevent="submitPreferences" class="as-form">
+          <div class="hx-field">
+            <label class="hx-field-label" for="as-preferred-format">Preferred format</label>
+            <select
+              id="as-preferred-format"
+              class="hx-select"
+              v-model="preferencesDraft.preferredFormat"
+              :disabled="isPreferencesLoading"
+            >
+              <option value="any">Any format</option>
+              <option value="flac">FLAC (lossless)</option>
+              <option value="mp3_320">MP3 320 kbps</option>
+              <option value="mp3_v0">MP3 V0 (variable)</option>
+            </select>
           </div>
-          <div class="session-actions" v-if="event.linkTarget">
-            <RouterLink class="secondary-button" :to="event.linkTarget.to">
-              {{ event.linkTarget.label }}
-            </RouterLink>
+          <div class="hx-field">
+            <label class="hx-field-label" for="as-minimum-quality">Minimum quality</label>
+            <select
+              id="as-minimum-quality"
+              class="hx-select"
+              v-model="preferencesDraft.minimumQuality"
+              :disabled="isPreferencesLoading"
+            >
+              <option value="any">Any quality</option>
+              <option value="lossless">Lossless only</option>
+              <option value="high">High quality (320+ / lossless)</option>
+            </select>
           </div>
-        </article>
+          <div class="as-form-footer">
+            <span class="hx-pill" data-tone="danger" v-if="preferencesErrorMessage">{{ preferencesErrorMessage }}</span>
+            <button
+              type="submit"
+              class="hx-btn"
+              data-variant="primary"
+              :disabled="isPreferencesLoading"
+            >
+              {{ isPreferencesLoading ? 'Saving\u2026' : 'Save preferences' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </article>
+
+    <!-- 6. Push notifications -->
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h2 class="hx-card-title">Push notifications</h2>
+          <p class="hx-card-subtitle">Get notified when your music requests are ready, even when the app is not open.</p>
+        </div>
+      </header>
+      <div class="hx-card-body">
+        <div class="hx-empty" v-if="!isPushSupported">
+          <p class="hx-empty-title">Not supported</p>
+          <p class="hx-empty-copy">Push notifications are not available in this browser.</p>
+        </div>
+        <template v-else>
+          <div v-if="pushPermissionState === 'denied'">
+            <p class="hx-text-muted">
+              Notification permission was blocked. Open your browser's site settings and allow
+              notifications for this page, then reload.
+            </p>
+          </div>
+          <div v-else class="as-push-body">
+            <p class="hx-text-muted">
+              {{ isPushSubscribed
+                ? 'Notifications are enabled on this device.'
+                : 'Notifications are not enabled on this device.' }}
+            </p>
+            <span class="hx-pill" data-tone="danger" v-if="pushErrorMessage">{{ pushErrorMessage }}</span>
+            <div class="as-push-actions">
+              <button
+                v-if="!isPushSubscribed"
+                type="button"
+                class="hx-btn"
+                data-variant="primary"
+                :disabled="isPushLoading"
+                @click="subscribePush"
+              >
+                {{ isPushLoading ? 'Enabling\u2026' : 'Enable notifications' }}
+              </button>
+              <button
+                v-else
+                type="button"
+                class="hx-btn"
+                :disabled="isPushLoading"
+                @click="unsubscribePush"
+              >
+                {{ isPushLoading ? 'Disabling\u2026' : 'Disable notifications' }}
+              </button>
+            </div>
+          </div>
+        </template>
       </div>
     </article>
   </section>
 </template>
+
+<style scoped>
+.as-notice,
+.as-feedback {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+
+.as-form {
+  display: grid;
+  gap: var(--hx-space-4);
+}
+
+.as-form-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  flex-wrap: wrap;
+}
+
+.as-session-list,
+.as-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.as-session-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-4) var(--hx-space-5);
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+
+.as-session-row:last-child {
+  border-bottom: none;
+}
+
+.as-session-info {
+  display: grid;
+  gap: var(--hx-space-1);
+}
+
+.as-session-client-row {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
+}
+
+.as-session-client {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-text-strong);
+}
+
+.as-session-meta {
+  font-size: var(--hx-text-xs);
+  margin: 0;
+}
+
+.as-session-action {
+  flex-shrink: 0;
+}
+
+.as-activity-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-3) var(--hx-space-5);
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+
+.as-activity-row:last-child {
+  border-bottom: none;
+}
+
+.as-activity-info {
+  display: grid;
+  gap: var(--hx-space-1);
+}
+
+.as-activity-summary {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-text-strong);
+}
+
+.as-activity-time {
+  font-size: var(--hx-text-xs);
+  margin: 0;
+}
+
+.as-activity-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  flex-shrink: 0;
+}
+
+.as-prefs-divider {
+  font-size: var(--hx-text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: var(--hx-space-2) 0 var(--hx-space-1);
+  margin: 0;
+  border-top: 1px solid var(--hx-border-subtle);
+  padding-top: var(--hx-space-4);
+}
+
+.as-theme-toggle {
+  display: flex;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
+}
+
+.as-push-body {
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.as-push-actions {
+  display: flex;
+  gap: var(--hx-space-2);
+}
+</style>

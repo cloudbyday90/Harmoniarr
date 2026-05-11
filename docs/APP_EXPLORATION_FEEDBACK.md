@@ -136,9 +136,21 @@ What felt unclear:
 
 ### 2026-05-04 - Account Security Page
 
-Status: awkwardly placed in navigation and weakly explained.
+Status: **Resolved** (2026-05-11 — Account Security page redesign).
 
-Initial feedback:
+Redesign implemented:
+- Page retitled "My account" with subtitle "Password, sessions, and account preferences."
+- Information hierarchy corrected: Change password is now first (security-critical), followed by Active sessions, then Recent account activity, then a clearly labelled Preferences section (Appearance, Import preferences, Push notifications).
+- Extracted six pure helper functions to new `src/client/lib/account-security-presentation.js`: `isSecurityRelevantEvent`, `getActivityEventTone`, `getActivityEventStatusLabel`, `formatSessionTimestamp`, `isServiceSession`, `formatUserAgent`.
+- Activity feed now filters to security-relevant events only (prefixes: `login_`, `password_`, `session_`, `bootstrap_`, `user_`). Non-security events such as metadata imports are suppressed.
+- Raw ISO 8601 timestamps replaced with locale-formatted strings (e.g. "May 11, 2026, 3:13 PM") throughout sessions and activity.
+- Raw `eventType` keys replaced with status pills using tone (`success` / `danger` / `info`) and compact labels (Succeeded, Failed, Revoked, etc.).
+- Sessions now distinguish browser sessions (Mozilla/ UA) from service tokens, showing a labelled pill ("Browser" / "Service") on each row.
+- Inline mismatch validation pill on the confirm-password field; shared action feedback banner below the page header.
+- All old CSS classes removed and replaced with design system: `hx-page`, `hx-page-header`, `hx-card`, `hx-card-header`, `hx-card-body`, `hx-card-body--flush`, `hx-card-actions`, `hx-field`, `hx-field-label`, `hx-input`, `hx-select`, `hx-btn`, `hx-pill`, `hx-empty`, `hx-text-muted`. Scoped styles use `as-` prefix.
+- Added 64 unit tests covering all six lib helpers.
+
+Original feedback:
 
 - It is not obvious why this is a top-level app destination instead of living under Settings or a user/account menu.
 - The current placement makes the navigation feel flatter and noisier because personal account management is mixed with system/operator sections.
