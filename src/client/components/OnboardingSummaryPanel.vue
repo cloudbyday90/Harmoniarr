@@ -18,6 +18,12 @@
 
 <script setup>
 import { RouterLink } from 'vue-router';
+import {
+  formatMetaLabel,
+  formatMetaValue,
+  getStepStatusClass,
+  getStepStatusLabel,
+} from '../lib/onboarding-presentation.js';
 
 defineProps({
   errorMessage: {
@@ -47,46 +53,6 @@ defineProps({
 });
 
 const emit = defineEmits(['dismiss', 'refresh']);
-
-function formatMetaLabel(key) {
-  return key
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/^./, (value) => value.toUpperCase());
-}
-
-function formatMetaValue(value) {
-  if (typeof value === 'boolean') {
-    return value ? 'Yes' : 'No';
-  }
-
-  if (value == null || value === '') {
-    return 'Unavailable';
-  }
-
-  return String(value);
-}
-
-function statusLabel(status) {
-  switch (status) {
-    case 'complete':
-      return 'Complete';
-    case 'info':
-      return 'Info';
-    default:
-      return 'Needs attention';
-  }
-}
-
-function statusClass(status) {
-  switch (status) {
-    case 'complete':
-      return 'review-status-selected';
-    case 'info':
-      return 'review-status-pending';
-    default:
-      return 'review-status-held';
-  }
-}
 </script>
 
 <template>
@@ -94,7 +60,7 @@ function statusClass(status) {
     <div class="section-header">
       <div>
         <p class="eyebrow">{{ isSetupMode ? 'First login setup' : 'Setup checklist' }}</p>
-        <h3>Contextual onboarding</h3>
+        <h3>{{ isSetupMode ? 'Complete your setup' : 'Setup status' }}</h3>
         <p class="metadata-card-copy" v-if="summary">{{ summary.message }}</p>
       </div>
       <div class="onboarding-panel-actions">
@@ -129,8 +95,8 @@ function statusClass(status) {
               <p>{{ step.title }}</p>
               <strong>{{ step.message }}</strong>
             </div>
-            <span class="review-status-pill" :class="statusClass(step.status)">
-              {{ statusLabel(step.status) }}
+            <span class="review-status-pill" :class="getStepStatusClass(step.status)">
+              {{ getStepStatusLabel(step.status) }}
             </span>
           </div>
           <dl class="review-meta-grid onboarding-meta-grid" v-if="step.meta">

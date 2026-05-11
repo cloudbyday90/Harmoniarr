@@ -276,3 +276,33 @@ Resolution:
 - `SettingsLibraryView.vue`: replaced `panel-light`/`section-header`/`muted-copy` stubs with `cfg-page`/`hx-card`/`hx-empty` design system placeholder card.
 - `SettingsNotificationsView.vue`: replaced `panel-light`/`section-header`/`hx-form-row`/`hx-btn-primary`/`muted-copy` with `cfg-page`/`hx-card`/`hx-text-muted`/`data-variant="primary"`; renamed heading from "Push Notifications" to "Browser notifications"; fixed `...` → `…`; restructured permission/subscribe/unsubscribe states as clean conditional blocks.
 - Fixed a pre-existing test hang in `useOperationHistory.test.js`: two tests triggered real `setInterval` polling by loading active runs without injecting a fake timer, preventing process exit. Added `setIntervalFn: () => 0` / `clearIntervalFn: () => {}` to both.
+
+### 2026-05-11 - Authenticated Dashboard Shell / Sidebar — Critical Analysis
+
+Status: **Partially resolved** (2026-05-11 — shell quick-wins; deeper items tracked below).
+
+Critical analysis performed against the live walkthrough. Full findings:
+
+**Resolved in this session:**
+
+1. **Home nav link permanently active on all screens** — `router-link-active` (prefix-match) fired on `/app/dashboard` for every route under `/app`. Fixed by adding `exact: true` to the dashboard nav item in both `operatorNav` and `requesterNav`, and binding `:active-class="item.exact ? '' : 'router-link-active'"` / `:exact-active-class="item.exact ? 'router-link-active' : 'router-link-exact-active'"` on each `RouterLink` in the sidebar and mobile bottom nav.
+
+2. **No tooltip fallback when sidebar collapses to icon-only (≤960px)** — Added `:title="item.label"` to each sidebar `RouterLink`. Hovering now shows the nav label in a native tooltip.
+
+3. **Sidebar footer duplicates the topbar user button** — The `hx-sidebar-footer` showing username + role was redundant with the topbar user menu. Removed entirely. Dead `session-card`, `session-username`, and `session-role` CSS rules in `styles.css` removed at the same time.
+
+4. **`session-username` is a legacy CSS class, not a design system class** — Removed from the topbar username span in `AppShell.vue`.
+
+5. **"Contextual onboarding" is an internal product term** — Replaced the `<h3>Contextual onboarding</h3>` in `OnboardingSummaryPanel.vue` with a dynamic, user-facing title: "Complete your setup" (setup mode) / "Setup status" (normal mode).
+
+6. **Raw ISO 8601 timestamps in setup-step metadata (e.g. "CHECKED AT 2026-05-11T15:41:42.139Z")** — `formatMetaValue` now detects ISO 8601 datetime strings and formats them as locale strings. `formatMetaLabel`, `formatMetaValue`, `getStepStatusLabel`, and `getStepStatusClass` extracted from `OnboardingSummaryPanel.vue` into `src/client/lib/onboarding-presentation.js` (31 tests in `test/client/onboarding-presentation.test.js`).
+
+**Still open (tracked for follow-up):**
+
+- **"Missing" icon is semantically wrong** — The ⓘ info-circle is universally read as "help/info", not "missing releases". Needs a purpose-built icon (effort: icon design).
+- **Dashboard priority: setup checklist should precede the requester search widget** — When the system is unconfigured, the first thing an operator sees is a music search box meant for requesters. The setup checklist should be the hero card. Effort: design + code.
+- **Login copy excludes requesters** — "manage requests, imports, diagnostics, and recovery" describes operator-only tasks. Needs persona-aware copy. Effort: copywriting.
+- **Tab bar on Activity overflows without scroll affordance** — The last tab ("History") is clipped at 1280px; no fade or arrow cue. Effort: CSS.
+- **Auth shell redesign** — Gated; requires design-direction decision (editorial vs. operational framing for the login screen). No implementation without that decision.
+
+Test suite after this session: **1085 tests, 0 failures** (up from 1054).

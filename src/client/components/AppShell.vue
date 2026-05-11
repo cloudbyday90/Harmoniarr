@@ -168,7 +168,7 @@ async function openAccount() {
 }
 
 const operatorNav = [
-  { name: 'dashboard', label: 'Home', icon: 'dashboard' },
+  { name: 'dashboard', label: 'Home', icon: 'dashboard', exact: true },
   { name: 'discover', label: 'Discover', icon: 'discover' },
   { name: 'library', label: 'Library', icon: 'library' },
   { name: 'missing', label: 'Missing', icon: 'missing' },
@@ -177,7 +177,7 @@ const operatorNav = [
 ];
 
 const requesterNav = [
-  { name: 'dashboard', label: 'Home', icon: 'dashboard' },
+  { name: 'dashboard', label: 'Home', icon: 'dashboard', exact: true },
   { name: 'discover', label: 'Discover', icon: 'discover' },
   { name: 'library', label: 'Library', icon: 'library' },
   { name: 'search', label: 'Search', icon: 'search' },
@@ -307,7 +307,7 @@ const visibleNav = computed(() => {
             @click.stop="toggleUserMenu"
           >
             <span class="hx-topbar-user-avatar" aria-hidden="true">{{ userInitial }}</span>
-            <span class="session-username">{{ sessionStore.state.user?.username }}</span>
+            <span>{{ sessionStore.state.user?.username }}</span>
           </button>
 
           <div v-if="userMenuOpen" class="hx-topbar-user-menu" role="menu">
@@ -343,6 +343,9 @@ const visibleNav = computed(() => {
           :key="item.name"
           :to="{ name: item.name }"
           class="hx-sidebar-link"
+          :title="item.label"
+          :active-class="item.exact ? '' : 'router-link-active'"
+          :exact-active-class="item.exact ? 'router-link-active' : 'router-link-exact-active'"
         >
           <span class="hx-sidebar-link-icon" aria-hidden="true">
             <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
@@ -360,10 +363,6 @@ const visibleNav = computed(() => {
         </RouterLink>
       </nav>
 
-      <div class="hx-sidebar-footer">
-        <span>{{ sessionStore.state.user?.username }}</span>
-        <span style="text-transform: capitalize;">{{ sessionStore.state.user?.role }}</span>
-      </div>
     </aside>
 
     <main class="hx-main" id="main-content">
@@ -383,7 +382,13 @@ const visibleNav = computed(() => {
     <nav class="hx-bottom-nav" aria-label="Mobile navigation">
       <ul class="hx-bottom-nav-list" role="list">
         <li v-for="item in visibleNav" :key="item.name">
-          <RouterLink :to="{ name: item.name }" class="hx-bottom-nav-item" :aria-label="item.badge ? `${item.label} (${item.badge} notifications)` : item.label">
+          <RouterLink
+            :to="{ name: item.name }"
+            class="hx-bottom-nav-item"
+            :aria-label="item.badge ? `${item.label} (${item.badge} notifications)` : item.label"
+            :active-class="item.exact ? '' : 'router-link-active'"
+            :exact-active-class="item.exact ? 'router-link-active' : 'router-link-exact-active'"
+          >
             <span class="hx-bottom-nav-item-icon" aria-hidden="true">
               <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
               <svg v-else-if="item.icon === 'discover'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>

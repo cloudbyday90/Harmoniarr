@@ -594,26 +594,6 @@ label {
   font-size: 0.9rem;
 }
 
-.session-card {
-  display: grid;
-  gap: 8px;
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid rgba(247, 241, 223, 0.1);
-  flex-shrink: 0;
-}
-
-.session-username {
-  font-size: 1.05rem;
-}
-
-.session-role {
-  display: block;
-  color: rgba(247, 241, 223, 0.6);
-  font-size: 0.85rem;
-  text-transform: capitalize;
-}
-
 .warning-copy {
   margin: 0;
   color: #8a5600;
@@ -1149,15 +1129,6 @@ dd {
 
   .nav-sub-link {
     padding-left: 14px;
-  }
-
-  .session-card {
-    margin-top: 0;
-    padding: 16px;
-    border-top: 0;
-    border-radius: 18px;
-    background: rgba(247, 241, 223, 0.06);
-    border: 1px solid rgba(247, 241, 223, 0.1);
   }
 
   .page-stack {
