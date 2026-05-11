@@ -23,7 +23,18 @@ import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
 import { useDiscoverGraph } from '../composables/useDiscoverGraph.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
-import { getArtistAvatar } from '../lib/artist-avatar.js';
+import {
+  buildDiscoverArtistInitial,
+  buildDiscoverAvatarStyle,
+  buildDiscoverGraphSubtitle,
+  buildDiscoverNoSimilarArtistsMessage,
+  buildDiscoverPageSubtitle,
+  buildDiscoverPreSearchBody,
+  buildDiscoverSearchErrorBody,
+  buildDiscoverSeedRemoveAriaLabel,
+  buildDiscoverSeedsAriaLabel,
+  formatDiscoverSearchError,
+} from '../lib/discover-presentation.js';
 
 const {
   hasSearched,
@@ -35,7 +46,6 @@ const {
 } = useDiscoverSearch();
 
 const {
-  hasMonitored,
   isMonitored,
   isMonitoring,
   monitorArtist,
@@ -56,22 +66,13 @@ const {
 
 /**
  * Monitor an artist and, on success, add them as a taste-graph seed so that
- * similar artists are automatically surfaced as suggestions.
+ * similar artists are automatically suggested.
  */
 async function handleMonitor(artist) {
   const result = await monitorArtist(artist);
   if (result?.success) {
     await addSeed(artist);
   }
-}
-
-function avatarStyle(artist) {
-  const avatar = getArtistAvatar(artist.id, artist.name);
-  return { background: avatar.bg, color: avatar.fg };
-}
-
-function artistInitial(artist) {
-  return getArtistAvatar(artist.id, artist.name).initial;
 }
 </script>
 
@@ -80,13 +81,7 @@ function artistInitial(artist) {
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Discover</h1>
-        <p class="hx-page-subtitle">Find artists you love and monitor them for new releases.</p>
-      </div>
-
-      <div v-if="hasMonitored" class="hx-page-actions">
-        <RouterLink :to="{ name: 'dashboard' }" class="hx-btn" data-variant="primary">
-          Done — go to Home
-        </RouterLink>
+        <p class="hx-page-subtitle">{{ buildDiscoverPageSubtitle() }}</p>
       </div>
     </header>
 
@@ -124,7 +119,7 @@ function artistInitial(artist) {
         <div>
           <h2 class="discover-graph-title">Artists you might like</h2>
           <p class="discover-graph-subtitle">
-            Based on artists you've monitored
+            {{ buildDiscoverGraphSubtitle() }}
           </p>
         </div>
         <p
@@ -138,7 +133,7 @@ function artistInitial(artist) {
       </div>
 
       <!-- Seed chips -->
-      <div class="discover-seeds" role="list" aria-label="Your taste seeds">
+      <div class="discover-seeds" role="list" :aria-label="buildDiscoverSeedsAriaLabel()">
         <span
           v-for="seed in seeds"
           :key="seed.id"
@@ -159,7 +154,7 @@ function artistInitial(artist) {
             v-else
             type="button"
             class="discover-seed-chip-remove"
-            :aria-label="`Remove ${seed.name} from taste seeds`"
+            :aria-label="buildDiscoverSeedRemoveAriaLabel(seed.name)"
             @click="removeSeed(seed.id)"
           >
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -194,10 +189,10 @@ function artistInitial(artist) {
           <template #artwork>
             <div
               class="hx-artwork discover-suggestion-avatar"
-              :style="avatarStyle(suggestion)"
+              :style="buildDiscoverAvatarStyle(suggestion.id, suggestion.name)"
               aria-hidden="true"
             >
-              <span class="discover-suggestion-initial">{{ artistInitial(suggestion) }}</span>
+              <span class="discover-suggestion-initial">{{ buildDiscoverArtistInitial(suggestion.id, suggestion.name) }}</span>
             </div>
           </template>
         </ArtistCard>
@@ -208,15 +203,15 @@ function artistInitial(artist) {
         v-else-if="!isAnySeedLoading"
         class="discover-graph-empty"
       >
-        No similar artists found for your current picks.
+        {{ buildDiscoverNoSimilarArtistsMessage() }}
       </p>
     </section>
 
     <!-- ── Search error ───────────────────────────────────────────────────── -->
     <EmptyState
       v-if="searchError"
-      :title="searchError"
-      body="Check your connection or try a different artist name."
+      :title="formatDiscoverSearchError(searchError)"
+      :body="buildDiscoverSearchErrorBody()"
       variant="discover"
     >
       <template #icon>
@@ -231,7 +226,7 @@ function artistInitial(artist) {
     <EmptyState
       v-else-if="!hasSearched && !hasSeeds"
       title="Search for an artist to get started"
-      body="Type an artist name above and press Search. Once you monitor artists, Harmoniarr will surface new releases for you to request."
+      :body="buildDiscoverPreSearchBody()"
       variant="discover"
     >
       <template #icon>
@@ -283,10 +278,10 @@ function artistInitial(artist) {
           <template #artwork>
             <div
               class="hx-artwork discover-suggestion-avatar"
-              :style="avatarStyle(artist)"
+              :style="buildDiscoverAvatarStyle(artist.id, artist.name)"
               aria-hidden="true"
             >
-              <span class="discover-suggestion-initial">{{ artistInitial(artist) }}</span>
+              <span class="discover-suggestion-initial">{{ buildDiscoverArtistInitial(artist.id, artist.name) }}</span>
             </div>
           </template>
         </ArtistCard>

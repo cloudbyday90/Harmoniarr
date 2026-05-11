@@ -377,3 +377,42 @@ Critical analysis performed against `MissingView.vue` and `wanted-release-normal
 Updated 3 pre-existing tests asserting old slash-format strings; added 1 regression guard.
 
 Test suite after this session: **1255 tests, 0 failures** (up from 1200).
+
+---
+
+### 2026-05-11 - Discover Screen
+
+Status: **Resolved** (2026-05-11 — targeted copy and extraction fixes).
+
+Critical analysis performed against `DiscoverView.vue` and the missing `discover-presentation.js` lib.
+
+**Issues identified and resolved:**
+
+1. **No `discover-presentation.js` lib existed** — Unlike every other reviewed screen, Discover had no extracted presentation lib. Two inline component functions (`avatarStyle`, `artistInitial`) wrapped `getArtistAvatar` directly in `<script setup>`. These are now extracted to `buildDiscoverAvatarStyle(id, name)` and `buildDiscoverArtistInitial(id, name)` in `src/client/lib/discover-presentation.js`. The avatar `<div>` in both the suggestions grid and the search results grid now calls the lib functions directly from the template.
+
+2. **"monitor" appeared throughout user-facing copy** — The page subtitle (*"Find artists you love and monitor them for new releases."*), the taste-graph subtitle (*"Based on artists you've monitored"*), and the seed chip `aria-label` (*"Your taste seeds"*) all used operator/internal product language. Requesters expect "follow". Replaced via lib functions: `buildDiscoverPageSubtitle()`, `buildDiscoverGraphSubtitle()`, `buildDiscoverSeedsAriaLabel()`. The seed chip remove button `aria-label` (*"Remove {name} from taste seeds"*) is now `buildDiscoverSeedRemoveAriaLabel(name)` → *"Stop following {name}"*.
+
+3. **Search error title exposed `MusicBrainz` service name** — `:title="searchError"` passed the raw composable error string directly to `EmptyState`. This could render *"MusicBrainz is temporarily unavailable"* — an internal service name that means nothing to a requester. `formatDiscoverSearchError(rawError)` now normalises any message containing `"musicbrainz"` to *"Artist search is temporarily unavailable. Try again in a moment."*, without mentioning the service by name. 10 unit tests cover null/undefined/empty, the exact phrase, case-insensitive match, substring match, and pass-through for unknown messages.
+
+4. **Search error body was factually wrong for service outages** — *"Check your connection or try a different artist name."* is incorrect when MusicBrainz is down (the user's connection is fine). Replaced with `buildDiscoverSearchErrorBody()` → *"Try again or search for a different artist."* which is correct in all failure modes.
+
+5. **Pre-search empty state described UI mechanics instead of value** — *"Type an artist name above and press Search. Once you monitor artists, Harmoniarr will surface new releases for you to request."* Combined "press Search" instructions with "monitor"/"surface" jargon. Replaced with `buildDiscoverPreSearchBody()` → *"Follow an artist and Harmoniarr will automatically watch for their new releases — ready for you to request."*
+
+6. **"Done — go to Home" button was a wizard-exit affordance** — Appeared in the page header when `hasMonitored` was true (session-ephemeral). Discover is a persistent navigation screen, not a modal or setup wizard. Users return to it repeatedly to find more artists. The button was removed; monitoring success is already communicated by the artist card state change and the taste graph section appearing. The now-unused `hasMonitored` destructure was removed from the `useArtistMonitoring` spread.
+
+7. **"No similar artists found for your current picks."** — "picks" is casual and inconsistent with the product's tone. Replaced with `buildDiscoverNoSimilarArtistsMessage()` → *"No similar artists found based on your current selection."*
+
+**Extractions and tests added to `discover-presentation.js`:**
+
+- `buildDiscoverPageSubtitle()` — 3 tests
+- `buildDiscoverPreSearchBody()` — 4 tests including jargon/mechanic guards
+- `formatDiscoverSearchError(rawError)` — 10 tests
+- `buildDiscoverSearchErrorBody()` — 3 tests
+- `buildDiscoverGraphSubtitle()` — 3 tests
+- `buildDiscoverSeedsAriaLabel()` — 3 tests
+- `buildDiscoverSeedRemoveAriaLabel(name)` — 6 tests
+- `buildDiscoverNoSimilarArtistsMessage()` — 3 tests
+- `buildDiscoverAvatarStyle(id, name)` — 7 tests
+- `buildDiscoverArtistInitial(id, name)` — 7 tests
+
+Test suite after this session: **1303 tests, 0 failures** (up from 1255).
