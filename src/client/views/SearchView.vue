@@ -33,6 +33,18 @@ import {
   searchMusicBrainzReleases,
 } from '../lib/metadata-api.js';
 import {
+  buildNetworkNoResultsBody,
+  buildNetworkSearchStateLabel,
+  buildNetworkStatusLabel,
+  buildNetworkStatusTone,
+  buildSearchPreSearchBody,
+  formatBytes,
+  formatMusicSearchError,
+  formatNetworkSearchError,
+  formatSpeed,
+  totalSizeForResponse,
+} from '../lib/search-presentation.js';
+import {
   fetchSlskdSearchResponses,
   fetchSlskdSearchState,
   fetchSlskdStatus,
@@ -177,26 +189,15 @@ async function refreshStatus() {
 
 refreshStatus();
 
-const statusTone = computed(() => {
-  const state = slskdStatus.value?.state ?? slskdStatus.value?.connectionState;
-  if (state === 'connected' || state === 'ready' || state === 'online') return 'success';
-  if (state === 'connecting' || state === 'reconnecting') return 'warning';
-  if (!state) return 'info';
-  return 'danger';
-});
+const statusTone = computed(() => buildNetworkStatusTone(slskdStatus.value));
 
-const statusLabel = computed(() => {
-  if (isProbingStatus.value && !slskdStatus.value) return 'Probing slskd…';
-  const state = slskdStatus.value?.state ?? slskdStatus.value?.connectionState;
-  if (!state) return 'Status unknown';
-  return state.charAt(0).toUpperCase() + state.slice(1);
-});
+const statusLabel = computed(() => buildNetworkStatusLabel(slskdStatus.value, isProbingStatus.value));
 
 const totalFiles = computed(() => {
   let total = 0;
   for (const response of responses.value) {
-    if (Array.isArray(response.files)) total += response.files.length;
-    else if (typeof response.fileCount === 'number') total += response.fileCount;
+    if (typeof response.fileCount === 'number') total += response.fileCount;
+    else if (Array.isArray(response.files)) total += response.files.length;
   }
   return total;
 });
@@ -216,33 +217,6 @@ const sortedResponses = computed(() => {
       return (a.queueLength ?? 0) - (b.queueLength ?? 0);
   });
 });
-
-function formatBytes(bytes) {
-  if (typeof bytes !== 'number' || bytes <= 0) return '—';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let i = 0;
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024;
-    i += 1;
-  }
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`;
-}
-
-function formatSpeed(bytesPerSec) {
-  if (typeof bytesPerSec !== 'number' || bytesPerSec <= 0) return '—';
-  return `${formatBytes(bytesPerSec)}/s`;
-}
-
-function totalSizeForResponse(response) {
-  if (typeof response.totalSize === 'number') return response.totalSize;
-  if (Array.isArray(response.files)) {
-    let sum = 0;
-    for (const file of response.files) sum += file.size ?? 0;
-    return sum;
-  }
-  return 0;
-}
 
 function clearPollTimer() {
   if (pollTimer) {
@@ -364,7 +338,7 @@ onBeforeUnmount(() => clearPollTimer());
       <!-- Error state -->
       <EmptyState
         v-if="musicSearchError"
-        :title="musicSearchError"
+        :title="formatMusicSearchError(musicSearchError)"
         body="Check your connection or try a different search term."
       >
         <template #icon>
@@ -379,7 +353,7 @@ onBeforeUnmount(() => clearPollTimer());
       <EmptyState
         v-else-if="!hasMusicSearched"
         title="Search for an artist or release"
-        body="Type a name above and press Search. Find artists to monitor or releases to request."
+        :body="buildSearchPreSearchBody()">
       >
         <template #icon>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -504,7 +478,7 @@ onBeforeUnmount(() => clearPollTimer());
 
       <article v-if="networkErrorMessage" class="hx-card">
         <div class="hx-card-body">
-          <span class="hx-pill" data-tone="danger">{{ networkErrorMessage }}</span>
+          <span class="hx-pill" data-tone="danger">{{ formatNetworkSearchError(networkErrorMessage) }}</span>
         </div>
       </article>
 
@@ -515,7 +489,7 @@ onBeforeUnmount(() => clearPollTimer());
             <p class="hx-card-subtitle">
               {{ sortedResponses.length }} peer{{ sortedResponses.length === 1 ? '' : 's' }}
               · {{ totalFiles }} file{{ totalFiles === 1 ? '' : 's' }}
-              <span v-if="searchMeta?.state"> · {{ searchMeta.state }}</span>
+              <span v-if="searchMeta?.state"> · {{ buildNetworkSearchStateLabel(searchMeta.state) }}</span>
             </p>
           </div>
           <div class="hx-card-actions" v-if="isNetworkSearching">
@@ -526,7 +500,7 @@ onBeforeUnmount(() => clearPollTimer());
         <div class="hx-card-body is-flush">
           <div v-if="!sortedResponses.length && !isNetworkSearching" class="hx-empty">
             <p class="hx-empty-title">No results yet</p>
-            <p class="hx-empty-copy">Enter a query above and press Search to discover Soulseek peers sharing matching files.</p>
+            <p class="hx-empty-copy">{{ buildNetworkNoResultsBody() }}</p>
           </div>
 
           <div v-else class="hx-table-scroll">

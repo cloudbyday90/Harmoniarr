@@ -460,3 +460,42 @@ Critical analysis performed against `ArtistDetailView.vue`. No `artist-detail-pr
 - `buildAvatarInitial(id, name)` → single uppercase character or `'?'`
 
 Test suite after this session: **1377 tests, 0 failures** (up from 1303).
+
+---
+
+### 2026-05-11 - Search Screen
+
+Status: **Resolved** (2026-05-11 — copy corrections, error normalisation, lib extraction).
+
+Critical analysis performed against `SearchView.vue` (685 lines). No `search-presentation.js` lib existed. Five pure utility functions were inline in `<script setup>` with no tests; all string literals were embedded in the template.
+
+**Issues identified and resolved:**
+
+1. **Raw music search error as `EmptyState :title`** — `:title="musicSearchError"` passed the raw composable error string directly to the page-level heading. API validation errors like `"limit must be an integer between 1 and 25"` or raw service-name errors would render verbatim. `formatMusicSearchError(rawError)` now normalises: `"musicbrainz"` (case-insensitive) → `'Search is temporarily unavailable. Try again in a moment.'`; `"must be"/"invalid"/"bad request"` → generic fallback; unknown messages pass through.
+
+2. **`'Probing slskd…'` rendered in the Network status pill** — The status label computation returned the literal string `'Probing slskd…'` while the connection state was being fetched. "slskd" is an internal service dependency name meaningless to requesters. Extracted to `buildNetworkStatusLabel(statusObj, isProbing)` → `'Checking connection…'` while probing.
+
+3. **Raw `networkErrorMessage` in a danger pill** — Three raw strings could leak: `'slskd did not return a search identifier'`, `'Failed to poll search results'`, and raw `error.message` from fetch failures. `formatNetworkSearchError(rawError)` maps known patterns to user-readable copy and strips service names.
+
+4. **Raw `searchMeta?.state` in the results subtitle** — slskd internal state machine values (`'InProgress'`, `'Completed'`, `'Cancelled'`) rendered verbatim next to the results count. `buildNetworkSearchStateLabel(state)` maps to human-readable labels: `InProgress→Searching`, `Completed→Complete`, `Cancelled→Stopped`, `TimedOut→Timed out`; unknown states are capitalised.
+
+5. **"monitor" in pre-search body copy** — `"Type a name above and press Search. Find artists to monitor or releases to request."` used operator language ("monitor") already corrected on Discover and combined a UI instruction with a value statement. Replaced via `buildSearchPreSearchBody()` → `'Find artists to follow or releases to request.'`
+
+6. **"Soulseek peers" in network empty state body** — `"Enter a query above and press Search to discover Soulseek peers sharing matching files."` exposed "Soulseek" as a network-layer detail. Replaced via `buildNetworkNoResultsBody()` → `'Enter a query and press Search. Results appear as peers respond with matching files.'`
+
+7. **No `search-presentation.js` lib — five untested inline pure functions** — `formatBytes(bytes)`, `formatSpeed(bytesPerSec)`, `totalSizeForResponse(response)`, the `statusTone` computed logic, and the `statusLabel` computed logic were all inline in `<script setup>` with no tests. All extracted to `src/client/lib/search-presentation.js`; `statusTone`/`statusLabel` computeds are now one-liners delegating to `buildNetworkStatusTone`/`buildNetworkStatusLabel`.
+
+**New lib: `src/client/lib/search-presentation.js`** (10 exports):
+
+- `formatMusicSearchError(rawError)` — 11 tests (MusicBrainz normalisation, validation suppression, pass-through)
+- `formatNetworkSearchError(rawError)` — 9 tests (slskd name suppression, known error mapping)
+- `buildNetworkStatusTone(statusObj)` — 11 tests (all tone values, null/undefined, both state fields)
+- `buildNetworkStatusLabel(statusObj, isProbing)` — 8 tests (no-slskd guard, capitalisation, connectionState fallback)
+- `buildNetworkSearchStateLabel(state)` — 10 tests (all mapped states, fallback capitalisation, raw-enum regression guard)
+- `buildSearchPreSearchBody()` — 3 tests (no-monitor guard, non-empty, stable)
+- `buildNetworkNoResultsBody()` — 3 tests (no-Soulseek guard, non-empty, stable)
+- `formatBytes(bytes)` — 13 tests (null/zero/negative/non-number, unit progression, decimal logic)
+- `formatSpeed(bytesPerSec)` — 6 tests (null/zero/negative, /s suffix, KB/s and MB/s)
+- `totalSizeForResponse(response)` — 7 tests (null, totalSize preference, files fallback, missing size)
+
+Test suite after this session: **1457 tests, 0 failures** (up from 1377).
