@@ -26,6 +26,7 @@ import { useAsyncResource } from '../composables/useAsyncResource.js';
 import { fetchSystemOperatorNotifications } from '../lib/system-api.js';
 import { fetchMyRequestSummary } from '../lib/media-request-api.js';
 import { useTheme } from '../composables/useTheme.js';
+import { buildVisibleNav, notificationTone } from '../lib/app-shell-presentation.js';
 import ToastStack from './ToastStack.vue';
 import PwaUpdateBanner from './PwaUpdateBanner.vue';
 
@@ -113,13 +114,6 @@ function closeNotificationsOnDocument(event) {
   notificationsOpen.value = false;
 }
 
-function notificationTone(category) {
-  if (category === 'failure') return 'danger';
-  if (category === 'manual_intervention') return 'warning';
-  if (category === 'recovery') return 'info';
-  return 'info';
-}
-
 async function openNotificationTarget(notification) {
   notificationsOpen.value = false;
   const runId = notification?.run?.id ?? notification?.runId ?? null;
@@ -167,30 +161,7 @@ async function openAccount() {
   await router.push({ name: 'account-security' });
 }
 
-const operatorNav = [
-  { name: 'dashboard', label: 'Home', icon: 'dashboard', exact: true },
-  { name: 'discover', label: 'Discover', icon: 'discover' },
-  { name: 'library', label: 'Library', icon: 'library' },
-  { name: 'missing', label: 'Missing', icon: 'missing' },
-  { name: 'activity', label: 'Activity', icon: 'activity' },
-  { name: 'settings', label: 'Settings', icon: 'settings' },
-];
-
-const requesterNav = [
-  { name: 'dashboard', label: 'Home', icon: 'dashboard', exact: true },
-  { name: 'discover', label: 'Discover', icon: 'discover' },
-  { name: 'library', label: 'Library', icon: 'library' },
-  { name: 'search', label: 'Search', icon: 'search' },
-  { name: 'my-requests', label: 'My Requests', icon: 'requests' },
-];
-
-const visibleNav = computed(() => {
-  const base = isRequester.value ? requesterNav : operatorNav;
-  if (!isRequester.value) return base;
-  const count = requesterNotificationCount.value;
-  if (count <= 0) return base;
-  return base.map((item) => (item.name === 'my-requests' ? { ...item, badge: count } : item));
-});
+const visibleNav = computed(() => buildVisibleNav(isRequester.value, requesterNotificationCount.value));
 </script>
 
 <template>
@@ -350,7 +321,7 @@ const visibleNav = computed(() => {
           <span class="hx-sidebar-link-icon" aria-hidden="true">
             <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
             <svg v-else-if="item.icon === 'discover'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>
-            <svg v-else-if="item.icon === 'missing'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6"/><circle cx="12" cy="16.5" r="0.8" fill="currentColor"/></svg>
+            <svg v-else-if="item.icon === 'missing'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>
             <svg v-else-if="item.icon === 'library'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="4" width="10" height="5" rx="1.5"/><rect x="5" y="10" width="14" height="5" rx="1.5"/><rect x="3" y="16" width="18" height="5" rx="1.5"/></svg>
             <svg v-else-if="item.icon === 'activity'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
             <svg v-else-if="item.icon === 'search'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -392,7 +363,7 @@ const visibleNav = computed(() => {
             <span class="hx-bottom-nav-item-icon" aria-hidden="true">
               <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
               <svg v-else-if="item.icon === 'discover'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>
-              <svg v-else-if="item.icon === 'missing'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6"/><circle cx="12" cy="16.5" r="0.8" fill="currentColor"/></svg>
+              <svg v-else-if="item.icon === 'missing'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>
               <svg v-else-if="item.icon === 'library'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="4" width="10" height="5" rx="1.5"/><rect x="5" y="10" width="14" height="5" rx="1.5"/><rect x="3" y="16" width="18" height="5" rx="1.5"/></svg>
               <svg v-else-if="item.icon === 'activity'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
               <svg v-else-if="item.icon === 'search'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
