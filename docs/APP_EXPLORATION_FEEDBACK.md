@@ -51,9 +51,11 @@ Open follow-up:
 
 ### 2026-05-04 - Authenticated Dashboard Shell / Sidebar
 
-Status: layout behavior is confusing and reads as visually misplaced.
+Status: **Resolved** (2026-05-11 — targeted critical-analysis fixes).
 
-Initial feedback:
+Resolution summary: The specific structural concerns from the original review were addressed by the 2026-05-11 critical analysis. (1) The three-island layout (brand block / nav block / signed-in card) was collapsed by removing the sidebar footer account card entirely — it was a direct duplicate of the topbar user button. (2) With the footer gone, .hx-sidebar-nav is top-anchored and the nav starts immediately from the top of the sidebar. (3) The app shell grid uses height: 100dvh; overflow: hidden with .hx-sidebar { height: 100%; overflow-y: auto } — the sidebar is inherently viewport-locked so it never scrolls off-screen on long pages. Full list of specific fixes is documented in the 2026-05-11 critical analysis section below.
+
+Original feedback:
 
 - The sidebar reads as if it starts halfway down the screen instead of acting like a clear primary navigation rail.
 - The current shell composition makes the navigation feel detached from the top of the app rather than anchored as a stable dashboard frame.
@@ -61,17 +63,17 @@ Initial feedback:
 - On a tall dashboard page, the nav ends up visually centered between the top branding and bottom account block, which makes the whole shell feel oddly suspended.
 - The shell does not yet establish a strong “this is the app frame” feeling; it still reads like a styled mockup rather than a durable operations workspace.
 
-What feels wrong structurally:
+What felt wrong structurally:
 
 - Primary navigation should feel immediately available from the top of the screen, not visually stranded in the middle of a tall rail.
 - The current vertical distribution gives too much weight to decorative spacing and not enough to orientation.
 - The sidebar competes with the content column instead of grounding it.
 
-Design direction to revisit:
+Design direction applied:
 
-- Rework the authenticated shell so navigation is top-anchored and behaves like a persistent application frame.
-- Reconsider whether the brand block, nav, and session info should live in a tighter hierarchy instead of being spread apart across the full sidebar height.
-- Treat the dashboard shell as a control-plane workspace first, not as a marketing or presentation layout.
+- Reworked the authenticated shell so navigation is top-anchored and behaves like a persistent application frame (sidebar footer removal + grid height constraints).
+- Brand block (topbar) and nav (sidebar) now live in a tight two-level hierarchy — no separate session island in the sidebar.
+- Shell sidebar is locked to the viewport via CSS grid constraints; content scrolls independently.
 
 ### 2026-05-04 - Request Music Page
 
