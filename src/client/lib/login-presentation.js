@@ -33,6 +33,22 @@ export function buildLoginDescription() {
 }
 
 /**
+ * Returns the Vue Router `:to` object for the inline claim-account link shown
+ * inside the login form.  Preserves the current username as a prefill query
+ * parameter when one is available, matching the behaviour of the footer links.
+ *
+ * @param {string | null | undefined} username  Current value of the username field.
+ * @returns {{ name: string, query?: { username: string } }}
+ */
+export function buildClaimAccountRoute(username) {
+  const trimmed = typeof username === 'string' ? username.trim() : '';
+  if (trimmed.length > 0) {
+    return { name: 'claim-account', query: { username: trimmed } };
+  }
+  return { name: 'claim-account' };
+}
+
+/**
  * Returns the context-aware status message shown on the login screen when a
  * redirect reason is present — for example after a successful claim, a session
  * expiry, or a privileged re-auth prompt.  Returns an empty string when no

@@ -25,7 +25,7 @@ defineProps({
     type: String,
   },
   eyebrow: {
-    required: true,
+    default: '',
     type: String,
   },
   supportItems: {
@@ -45,7 +45,7 @@ defineProps({
       <div class="auth-shell-wordmark" aria-label="Harmoniarr">Harmoniarr</div>
 
       <header class="auth-shell-heading">
-        <p class="eyebrow">{{ eyebrow }}</p>
+        <p v-if="eyebrow" class="eyebrow">{{ eyebrow }}</p>
         <h1>{{ title }}</h1>
         <p v-if="description">{{ description }}</p>
       </header>

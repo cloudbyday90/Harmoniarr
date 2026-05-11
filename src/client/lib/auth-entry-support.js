@@ -24,12 +24,6 @@ const authEntrySupportDefinitions = Object.freeze({
       label: 'Claim an existing account',
       routeName: 'claim-account',
     }),
-    Object.freeze({
-      description: 'Use this only when an operator armed emergency admin recovery from harmoniarrctl.',
-      id: 'recovery',
-      label: 'Recover bootstrap admin access',
-      routeName: 'recovery',
-    }),
   ]),
   'claim-account': Object.freeze([
     Object.freeze({

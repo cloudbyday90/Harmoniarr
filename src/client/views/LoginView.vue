@@ -18,10 +18,10 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
-import { buildLoginDescription, buildLoginInfoMessage } from '../lib/login-presentation.js';
+import { buildClaimAccountRoute, buildLoginDescription, buildLoginInfoMessage } from '../lib/login-presentation.js';
 import { useAutoFocus } from '../composables/useAutoFocus.js';
 import { sessionStore } from '../state/session.js';
 
@@ -56,7 +56,6 @@ async function submit() {
 
 <template>
   <AuthEntryShell
-    eyebrow="Local access"
     title="Log in to Harmoniarr"
     :description="buildLoginDescription()"
     :support-items="supportItems"
@@ -70,8 +69,7 @@ async function submit() {
     </template>
 
     <article class="form-card panel-light auth-entry-form-card">
-      <h2>Login</h2>
-      <p class="auth-entry-form-copy">Enter the username or email tied to your local Harmoniarr account.</p>
+      <p class="auth-entry-form-copy">Enter your username or email and password to access your account.</p>
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username or email
@@ -86,7 +84,7 @@ async function submit() {
           {{ isSubmitting ? 'Logging in...' : 'Log in' }}
         </button>
       </form>
-      <p class="auth-entry-inline-note">Need a first password for an existing account? Use the claim-account path shown in the related entry points.</p>
+      <p class="auth-entry-inline-note">First time here? <RouterLink :to="buildClaimAccountRoute(form.username)">Claim your account</RouterLink> with the code from your administrator.</p>
     </article>
   </AuthEntryShell>
 </template>

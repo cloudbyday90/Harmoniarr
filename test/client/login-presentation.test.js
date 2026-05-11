@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildLoginDescription, buildLoginInfoMessage } from '../../src/client/lib/login-presentation.js';
+import { buildClaimAccountRoute, buildLoginDescription, buildLoginInfoMessage } from '../../src/client/lib/login-presentation.js';
 
 // ---------------------------------------------------------------------------
 // buildLoginDescription
@@ -86,4 +86,45 @@ test('buildLoginInfoMessage all known reasons return non-empty strings', () => {
     const msg = buildLoginInfoMessage(reason);
     assert.ok(msg.length > 0, `expected non-empty message for reason: ${reason}`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// buildClaimAccountRoute
+// ---------------------------------------------------------------------------
+
+test('buildClaimAccountRoute with non-empty username includes username query param', () => {
+  assert.deepEqual(buildClaimAccountRoute('alice'), {
+    name: 'claim-account',
+    query: { username: 'alice' },
+  });
+});
+
+test('buildClaimAccountRoute trims whitespace from username', () => {
+  assert.deepEqual(buildClaimAccountRoute('  bob  '), {
+    name: 'claim-account',
+    query: { username: 'bob' },
+  });
+});
+
+test('buildClaimAccountRoute with empty string omits query param', () => {
+  assert.deepEqual(buildClaimAccountRoute(''), { name: 'claim-account' });
+});
+
+test('buildClaimAccountRoute with whitespace-only string omits query param', () => {
+  assert.deepEqual(buildClaimAccountRoute('   '), { name: 'claim-account' });
+});
+
+test('buildClaimAccountRoute with null omits query param', () => {
+  assert.deepEqual(buildClaimAccountRoute(null), { name: 'claim-account' });
+});
+
+test('buildClaimAccountRoute with undefined omits query param', () => {
+  assert.deepEqual(buildClaimAccountRoute(undefined), { name: 'claim-account' });
+});
+
+test('buildClaimAccountRoute preserves email address as username', () => {
+  assert.deepEqual(buildClaimAccountRoute('user@example.com'), {
+    name: 'claim-account',
+    query: { username: 'user@example.com' },
+  });
 });

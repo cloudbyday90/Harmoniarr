@@ -121,7 +121,7 @@ label {
 .auth-page {
   min-height: 100vh;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: clamp(28px, 6vw, 56px) clamp(12px, 3.5vw, 16px) clamp(44px, 8vw, 80px);
   background:
@@ -223,6 +223,16 @@ label {
   border-radius: 18px;
   background: rgba(236, 242, 235, 0.78);
   border: 1px solid rgba(17, 37, 36, 0.08);
+}
+
+.auth-entry-inline-note a {
+  color: #1f6b52;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-entry-inline-note a:hover {
+  color: #14503d;
 }
 
 .auth-entry-action-row {

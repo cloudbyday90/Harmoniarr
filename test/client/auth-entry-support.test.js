@@ -2,10 +2,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildAuthEntrySupportItems } from '../../src/client/lib/auth-entry-support.js';
 
-test('login auth entry support keeps claim and recovery paths in a stable order', () => {
+test('login auth entry support exposes only the claim-account path', () => {
   assert.deepEqual(
     buildAuthEntrySupportItems('login').map((item) => item.id),
-    ['claim-account', 'recovery'],
+    ['claim-account'],
+  );
+});
+
+test('login auth entry support does not expose the bootstrap recovery path', () => {
+  const loginItems = buildAuthEntrySupportItems('login');
+  assert.ok(
+    !loginItems.some((item) => item.id === 'recovery'),
+    'recovery link must not appear on the primary login surface',
   );
 });
 
