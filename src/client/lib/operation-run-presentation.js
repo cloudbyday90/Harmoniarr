@@ -139,3 +139,41 @@ export function groupOperationRunsForDisplay(runs) {
     }))
     .filter((group) => group.runs.length > 0);
 }
+
+/**
+ * Returns a human-readable duration string for a run.
+ *
+ * - Running / pending runs: time elapsed from startedAt to now.
+ * - Finished runs: time from startedAt to finishedAt.
+ * - Returns null when startedAt is absent or unparseable.
+ *
+ * @param {object|null} run
+ * @param {{ nowFn?: () => number }} [options]
+ * @returns {string|null}
+ */
+export function getOperationRunDuration(run, { nowFn = () => Date.now() } = {}) {
+  if (!run?.startedAt) return null;
+  const start = new Date(run.startedAt).getTime();
+  if (Number.isNaN(start)) return null;
+
+  const isActive = run.status === 'running' || run.status === 'pending';
+  const end = isActive ? nowFn() : (run.finishedAt ? new Date(run.finishedAt).getTime() : null);
+  if (end === null) return null;
+
+  const ms = end - start;
+  if (ms < 0) return null;
+
+  const totalSeconds = Math.floor(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes < 60) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}

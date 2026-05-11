@@ -77,8 +77,8 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 
 ## Screen Group 5 - Jobs, History, And Notifications
 
-- [ ] Create job queue/history screens with status, timings, and failure reasons.
-- [ ] Create job detail/event views for audit-friendly troubleshooting.
+- [x] Create job queue/history screens with status, timings, and failure reasons.
+- [x] Create job detail/event views for audit-friendly troubleshooting.
 - [ ] Create durable operator-attention or notifications surface if server-backed notifications are accepted.
 - [ ] Define toast-only vs durable-history UI boundaries.
 

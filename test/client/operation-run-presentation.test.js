@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getOperationRunAttentionLabel,
+  getOperationRunDuration,
   getOperationRunNextStep,
   getOperationRunOperatorSummary,
   groupOperationRunsForDisplay,
@@ -56,4 +57,98 @@ test('groupOperationRunsForDisplay prioritizes failed work ahead of active and c
     { id: 'in-progress', runIds: ['run-2'] },
     { id: 'completed', runIds: ['run-1'] },
   ]);
+});
+
+// ---------------------------------------------------------------------------
+// getOperationRunDuration
+// ---------------------------------------------------------------------------
+
+test('getOperationRunDuration returns null when startedAt is absent', () => {
+  assert.equal(getOperationRunDuration({ status: 'completed', finishedAt: '2026-05-04T12:01:00.000Z' }), null);
+});
+
+test('getOperationRunDuration returns null when startedAt is not a valid date', () => {
+  assert.equal(getOperationRunDuration({ startedAt: 'not-a-date', status: 'completed' }), null);
+});
+
+test('getOperationRunDuration formats sub-minute completed runs as seconds', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:00:45.000Z',
+    status: 'completed',
+  };
+  assert.equal(getOperationRunDuration(run), '45s');
+});
+
+test('getOperationRunDuration formats exactly 60 seconds as 1m', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:01:00.000Z',
+    status: 'completed',
+  };
+  assert.equal(getOperationRunDuration(run), '1m');
+});
+
+test('getOperationRunDuration formats minutes-and-seconds completed runs', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:03:25.000Z',
+    status: 'completed',
+  };
+  assert.equal(getOperationRunDuration(run), '3m 25s');
+});
+
+test('getOperationRunDuration formats exactly-whole-minute completed runs without seconds part', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:05:00.000Z',
+    status: 'completed',
+  };
+  assert.equal(getOperationRunDuration(run), '5m');
+});
+
+test('getOperationRunDuration formats hour-long runs with remaining minutes', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T13:15:00.000Z',
+    status: 'completed',
+  };
+  assert.equal(getOperationRunDuration(run), '1h 15m');
+});
+
+test('getOperationRunDuration formats exactly whole-hour runs without minutes part', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T14:00:00.000Z',
+    status: 'completed',
+  };
+  assert.equal(getOperationRunDuration(run), '2h');
+});
+
+test('getOperationRunDuration uses nowFn for running runs', () => {
+  const startedAt = '2026-05-04T12:00:00.000Z';
+  const nowMs = new Date('2026-05-04T12:02:30.000Z').getTime();
+  const run = { startedAt, status: 'running' };
+  assert.equal(getOperationRunDuration(run, { nowFn: () => nowMs }), '2m 30s');
+});
+
+test('getOperationRunDuration uses nowFn for pending runs', () => {
+  const startedAt = '2026-05-04T12:00:00.000Z';
+  const nowMs = new Date('2026-05-04T12:00:10.000Z').getTime();
+  const run = { startedAt, status: 'pending' };
+  assert.equal(getOperationRunDuration(run, { nowFn: () => nowMs }), '10s');
+});
+
+test('getOperationRunDuration returns null for completed runs without finishedAt', () => {
+  const run = { startedAt: '2026-05-04T12:00:00.000Z', status: 'completed' };
+  assert.equal(getOperationRunDuration(run), null);
+});
+
+test('getOperationRunDuration returns null when duration is negative', () => {
+  const run = {
+    startedAt: '2026-05-04T12:01:00.000Z',
+    finishedAt: '2026-05-04T12:00:00.000Z',
+    status: 'completed',
+  };
+  assert.equal(getOperationRunDuration(run), null);
 });

@@ -101,9 +101,21 @@ Design direction to revisit:
 
 ### 2026-05-04 - Jobs / Operations History Page
 
-Status: conceptually opaque; the screen assumes internal system knowledge the operator does not have yet.
+Status: **Resolved** (2026-05-04 — Background Jobs redesign).
 
-Initial feedback:
+Redesign implemented:
+- Page title changed from "Operations" to "Background Jobs" with operator-friendly subtitle.
+- Card title changed from "Run monitor" to "Job queue".
+- Detail panel card title changed from "Run detail" to "Job detail" with a helpful empty-state prompt.
+- Run duration now shown inline in the job queue row (e.g. "3m 25s").
+- Auto-refresh indicator added to page header — shows live pulsing dot when active runs are being polled (15s interval), or "Refreshed Xm ago" otherwise.
+- Detail panel header now shows operation name prominently with start time and duration; raw run UUID demoted to Technical details collapsed section.
+- "Triggered by" label replaced with inline context in the subtitle.
+- Empty state copy updated to explain what kinds of jobs appear here.
+- `onUnmounted` cleanup in `useOperationHistory` prevents timer leaks when navigating away.
+- Backend terminology (`durable operations`, `run detail`, `lease`, `audit timeline`) demoted — lease internals remain accessible only in the collapsed Technical details section.
+
+Original feedback:
 
 - It is not obvious what this page is for on first view.
 - The page uses internal terminology like `durable operations`, `run detail`, `lease`, and `audit timeline` without enough framing.
@@ -111,19 +123,12 @@ Initial feedback:
 - The selected detail panel exposes a lot of low-level run metadata before explaining why any of it matters.
 - The error shown in the example dominates the page, but the user still is not told what kind of job failed, why they should care, or what action is expected next.
 
-What feels unclear:
+What felt unclear:
 
 - The difference between a `job`, a `run`, an `operation`, and a `workflow` is not clear.
 - `Lease owner`, `lease expiry`, and `last heartbeat` are implementation details that currently read as backend jargon.
 - `Audit timeline` is technically descriptive, but not operator-friendly in this context.
 - The page does not explain whether it is mainly for troubleshooting, retrying failed background work, or monitoring active automation.
-
-Design direction to revisit:
-
-- Reframe the page around operator intent, such as active work, failed work, and completed work, rather than backend durability language.
-- Introduce clearer top-level framing for what kinds of jobs appear here and why someone would visit this page.
-- Demote backend implementation details unless the user explicitly drills into diagnostics.
-- Prefer plain-language summaries and next actions before exposing run IDs, lease internals, and raw event history.
 
 ### 2026-05-04 - Account Security Page
 

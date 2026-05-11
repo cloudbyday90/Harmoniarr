@@ -1795,11 +1795,6 @@ body {
   font-weight: 500;
 }
 
-.ops-time-cell {
-  font-size: var(--hx-text-xs);
-  white-space: nowrap;
-}
-
 .ops-run-actions {
   text-align: right;
   white-space: nowrap;
@@ -1957,6 +1952,63 @@ body {
   background: var(--hx-bg-surface-muted);
   font-size: var(--hx-text-xs);
   line-height: 1.65;
+}
+
+/* Job queue — header actions + refresh indicator */
+
+.ops-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+}
+
+.ops-refresh-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ops-refresh-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hx-success, #2f9e6b);
+  animation: ops-pulse 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ops-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.ops-refresh-label {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+  white-space: nowrap;
+}
+
+/* Job queue — duration display */
+
+.ops-time-cell {
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ops-duration {
+  color: var(--hx-text-muted);
+  font-size: 0.7rem;
+}
+
+/* Technical detail — run ID mono display */
+
+.ops-run-id {
+  font-family: var(--hx-font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  word-break: break-all;
 }
 /* ---------- Settings sub-page layout ---------- */
 .cfg-page {

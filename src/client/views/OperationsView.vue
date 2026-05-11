@@ -35,6 +35,7 @@ import {
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
 import {
+  getOperationRunDuration,
   getOperationRunNextStep,
   getOperationRunOperatorSummary,
   groupOperationRunsForDisplay,
@@ -50,10 +51,13 @@ const {
   cancellationErrorMessage,
   detailErrorMessage,
   errorMessage,
+  hasActiveRuns,
   isCancellingRun,
   isLoadingDetail,
   isLoadingHistory,
+  isPollingActive,
   isRetryingRun,
+  lastRefreshedAt,
   loadOperationHistory,
   requestCancellation,
   requestRetry,
@@ -189,6 +193,10 @@ function runLinkTarget(run) {
   });
 }
 
+function runDuration(run) {
+  return getOperationRunDuration(run);
+}
+
 function summaryEntries(summary) {
   return Object.entries(summary ?? {})
     .filter(([, value]) => value !== null && value !== undefined)
@@ -254,10 +262,16 @@ watch(
   <section class="hx-page">
     <header class="hx-page-header">
       <div>
-        <h2 class="hx-page-title">Operations</h2>
-        <p class="hx-page-subtitle">Background work — queued, active, and completed runs.</p>
+        <h2 class="hx-page-title">Background Jobs</h2>
+        <p class="hx-page-subtitle">Automated tasks — scans, discovery, imports, and metadata refreshes.</p>
       </div>
-      <div class="hx-page-actions">
+      <div class="hx-page-actions ops-header-actions">
+        <span v-if="lastRefreshedAt" class="ops-refresh-indicator">
+          <span v-if="isPollingActive" class="ops-refresh-dot" aria-label="Live auto-refresh active"></span>
+          <span class="ops-refresh-label">
+            {{ isPollingActive ? 'Live' : `Refreshed ${formatTimestampShort(lastRefreshedAt)}` }}
+          </span>
+        </span>
         <button
           type="button"
           class="hx-btn"
@@ -271,10 +285,10 @@ watch(
 
     <div class="operations-grid">
 
-      <!-- Run monitor -->
+      <!-- Job queue -->
       <article class="hx-card">
         <header class="hx-card-header ops-monitor-header">
-          <h3 class="hx-card-title">Run monitor</h3>
+          <h3 class="hx-card-title">Job queue</h3>
           <div class="ops-filter-bar" v-if="filterOptions.length > 1">
             <button
               v-for="option in filterOptions"
@@ -295,13 +309,13 @@ watch(
         </div>
 
         <div v-else-if="isLoadingHistory" class="hx-card-body">
-          <p class="hx-text-muted">Loading background work history…</p>
+          <p class="hx-text-muted">Loading background jobs…</p>
         </div>
 
         <div v-else-if="!runs.length" class="hx-card-body">
           <div class="hx-empty">
-            <p class="hx-empty-title">No runs recorded yet</p>
-            <p class="hx-empty-copy">Background operations will appear here once triggered from Settings or an activity view.</p>
+            <p class="hx-empty-title">No jobs recorded yet</p>
+            <p class="hx-empty-copy">Background jobs appear here when triggered — library scans, discovery, imports, metadata refreshes, and more.</p>
           </div>
         </div>
 
@@ -309,7 +323,7 @@ watch(
           <table class="hx-table">
             <thead>
               <tr>
-                <th>Operation</th>
+                <th>Job</th>
                 <th>Status</th>
                 <th>Started</th>
                 <th></th>
@@ -339,7 +353,10 @@ watch(
                       {{ getOperationRunStatusLabel(run.status, { defaultLabel: 'Unknown' }) }}
                     </span>
                   </td>
-                  <td class="hx-text-muted ops-time-cell">{{ formatTimestampShort(run.startedAt) }}</td>
+                  <td class="ops-time-cell">
+                    <span>{{ formatTimestampShort(run.startedAt) }}</span>
+                    <span v-if="runDuration(run)" class="ops-duration">{{ runDuration(run) }}</span>
+                  </td>
                   <td class="ops-run-actions">
                     <RouterLink
                       v-if="runLinkTarget(run)"
@@ -357,12 +374,12 @@ watch(
         </div>
       </article>
 
-      <!-- Run detail -->
+      <!-- Job detail -->
       <article id="operation-run-detail-panel" class="hx-card">
         <header class="hx-card-header">
           <div>
-            <h3 class="hx-card-title">Run detail</h3>
-            <p class="hx-card-subtitle" v-if="!selectedRun && !isLoadingDetail">Select a run to inspect what happened.</p>
+            <h3 class="hx-card-title">Job detail</h3>
+            <p class="hx-card-subtitle" v-if="!selectedRun && !isLoadingDetail">Select a job to see what happened and what to do next.</p>
           </div>
           <div class="hx-card-actions" v-if="selectedRun">
             <button
@@ -403,7 +420,7 @@ watch(
               <div>
                 <strong class="ops-run-detail-name">{{ operationTitle(selectedRun.operationType) }}</strong>
                 <p class="hx-text-muted">
-                  Triggered by {{ selectedRun.triggeredByUserId || 'system' }} · Run {{ selectedRun.id }}
+                  Started {{ formatTimestampShort(selectedRun.startedAt) }}<template v-if="runDuration(selectedRun)"> · {{ runDuration(selectedRun) }}</template><template v-if="selectedRun.triggeredByUserId"> · by {{ selectedRun.triggeredByUserId }}</template>
                 </p>
               </div>
               <span class="hx-pill" :data-tone="runStatusTone(selectedRun.status)">
@@ -446,6 +463,10 @@ watch(
                 <div>
                   <dt>Operation type</dt>
                   <dd>{{ selectedRun.operationType }}</dd>
+                </div>
+                <div>
+                  <dt>Run ID</dt>
+                  <dd class="ops-run-id">{{ selectedRun.id }}</dd>
                 </div>
                 <div>
                   <dt>Started</dt>
@@ -518,7 +539,7 @@ watch(
             </details>
           </template>
 
-          <p v-else class="hx-text-muted">Select a run from the monitor to see what happened, what to do next, and the technical detail behind it.</p>
+          <p v-else class="hx-text-muted">Select a job from the queue to see what happened, what to do next, and the full run detail.</p>
         </div>
       </article>
 
