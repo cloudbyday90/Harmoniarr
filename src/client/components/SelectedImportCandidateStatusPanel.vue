@@ -17,6 +17,12 @@
 -->
 
 <script setup>
+import {
+  formatPath,
+  formatTimestamp,
+  formatTokenLabel,
+} from '../lib/import-candidate-presentation.js';
+
 defineProps({
   counts: {
     type: Object,
@@ -66,31 +72,14 @@ function executionStatusLabel(code) {
       return 'Ready';
   }
 }
-
-function formatTimestamp(value) {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
-}
-
-function formatPath(value) {
-  return value || 'Unavailable';
-}
-
-function formatTokenLabel(value) {
-  return String(value || 'unknown').replaceAll(/[_-]+/g, ' ');
-}
 </script>
 
 <template>
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Selected candidates</p>
-        <h3>Execution readiness</h3>
+        <p class="eyebrow">Candidates selected for download</p>
+        <h3>Download readiness</h3>
       </div>
     </div>
 
@@ -121,13 +110,13 @@ function formatTokenLabel(value) {
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !selectedCandidates.length">
-      <h3>Loading selected status</h3>
-      <p>Resolving current planning readiness for persisted selected candidates.</p>
+      <h3>Loading selected candidates</h3>
+      <p>Loading selected candidates…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!selectedCandidates.length">
-      <h3>No selected candidates</h3>
-      <p>Selected candidates will appear here once operators move items into the next execution stage.</p>
+      <h3>No candidates selected yet</h3>
+      <p>Select candidates from the list above to see their download readiness here.</p>
     </article>
 
     <div class="review-queue-stack" v-else>
@@ -136,7 +125,6 @@ function formatTokenLabel(value) {
           <div>
             <p class="eyebrow">{{ candidate.username }}</p>
             <strong>{{ candidate.folderPath || 'Root-level files' }}</strong>
-            <p class="metadata-card-copy">{{ candidate.sourceProvider }} search {{ candidate.sourceSearchId || 'unknown' }}</p>
           </div>
           <span class="review-status-pill" :class="executionStatusClass(candidate.executionStatus.code)">
             {{ executionStatusLabel(candidate.executionStatus.code) }}

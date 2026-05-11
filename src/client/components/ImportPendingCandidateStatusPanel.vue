@@ -17,6 +17,12 @@
 -->
 
 <script setup>
+import {
+  formatPath,
+  formatTimestamp,
+  formatTokenLabel,
+} from '../lib/import-candidate-presentation.js';
+
 defineProps({
   counts: {
     type: Object,
@@ -66,31 +72,14 @@ function importStatusLabel(code) {
       return 'Ready';
   }
 }
-
-function formatTimestamp(value) {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
-}
-
-function formatPath(value) {
-  return value || 'Unavailable';
-}
-
-function formatTokenLabel(value) {
-  return String(value || 'unknown').replaceAll(/[_-]+/g, ' ');
-}
 </script>
 
 <template>
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Import pending</p>
-        <h3>Import-ready staging queue</h3>
+        <p class="eyebrow">Ready to import</p>
+        <h3>Downloads awaiting import</h3>
       </div>
     </div>
 
@@ -121,13 +110,13 @@ function formatTokenLabel(value) {
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !importPendingCandidates.length">
-      <h3>Loading import-pending status</h3>
-      <p>Resolving completed-download candidates that are ready for the import review stage.</p>
+      <h3>Loading downloads ready for import</h3>
+      <p>Loading downloads ready for import…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!importPendingCandidates.length">
-      <h3>No import-pending candidates</h3>
-      <p>Completed downloads will appear here once transfer reconciliation moves them into the import review stage.</p>
+      <h3>No downloads ready to import</h3>
+      <p>Completed downloads will appear here once they're confirmed received.</p>
     </article>
 
     <div class="review-queue-stack" v-else>
@@ -136,7 +125,6 @@ function formatTokenLabel(value) {
           <div>
             <p class="eyebrow">{{ candidate.username }}</p>
             <strong>{{ candidate.folderPath || 'Root-level files' }}</strong>
-            <p class="metadata-card-copy">{{ candidate.sourceProvider }} search {{ candidate.sourceSearchId || 'unknown' }}</p>
           </div>
           <span class="review-status-pill" :class="importStatusClass(candidate.importStatus.code)">
             {{ importStatusLabel(candidate.importStatus.code) }}
@@ -147,7 +135,7 @@ function formatTokenLabel(value) {
 
         <dl class="review-meta-grid review-meta-grid-wide">
           <div>
-            <dt>Import pending at</dt>
+            <dt>Ready for import at</dt>
             <dd>{{ formatTimestamp(candidate.importPendingAt) }}</dd>
           </div>
           <div>

@@ -270,10 +270,10 @@ watch(
 <template>
   <section class="page-stack">
     <article class="panel-dark hero-card compact">
-      <p class="eyebrow">Import review</p>
-      <h2>Persisted slskd candidates</h2>
-      <p v-if="isAdmin">Review stored discovery results, inspect persisted files, and move candidates through the hold, select, reject, and reopen workflow before apply behavior lands.</p>
-      <p v-else>Track the delegated import candidates, download progress, and import-ready items currently being fulfilled on your behalf.</p>
+      <p class="eyebrow">Import candidates</p>
+      <h2>Download candidates</h2>
+      <p v-if="isAdmin">Review each match, check its files, then select the ones to download. When you're ready, start a download run to queue them — and when downloads finish, run the import to add them to your library.</p>
+      <p v-else>See the download matches found for your account and track their current status.</p>
       <div class="pill-row" v-if="summaryPills.length">
         <div class="pill" v-for="pill in summaryPills" :key="pill.label">
           <span>{{ pill.label }}</span>
@@ -283,7 +283,7 @@ watch(
     </article>
 
     <article class="panel-light" v-if="!isAdmin">
-      <p class="metadata-card-copy">This read-only view only shows import candidates delegated to your app user. Operator review transitions and import-run controls remain admin-only.</p>
+      <p class="metadata-card-copy">You can view candidates assigned to your account. Only admins can approve, reject, or start downloads.</p>
     </article>
 
     <ImportCandidateFilters

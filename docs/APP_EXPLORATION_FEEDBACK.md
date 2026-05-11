@@ -208,25 +208,21 @@ Original feedback:
 
 ### 2026-05-04 - Review Queue / Import Review Page
 
-Status: the page name does not explain the task; the current terminology assumes the operator already understands the import pipeline.
+Status: **Resolved** (2026-05-11)
 
-Initial feedback:
+What was changed:
 
-- `Review Queue` is not self-explanatory as a navigation label.
-- It is not clear whether this page is for downloads waiting to start, items waiting for approval, failed imports, or something else.
-- The page uses internal terms like `persisted slskd candidates`, `execution readiness`, and `durable run state` without first explaining the human workflow.
-
-What the page appears to be trying to do:
-
-- Show discovered download candidates pulled from slskd searches.
-- Let an operator inspect those candidates and decide whether to hold, select, reject, or reopen them.
-- Move selected candidates into the next stages of download and import execution.
-
-Design direction to revisit:
-
-- Rename this area in a more task-oriented way, such as candidate review, download candidates, or import candidates.
-- Explain in plain language that this is where found matches are reviewed before download/import proceeds.
-- Reduce implementation-centric language until the user drills into deeper execution details.
+- Renamed hero heading from "Persisted slskd candidates" to "Download candidates"; updated admin and non-admin descriptions to plain operator language explaining the review-select-download-import flow.
+- Non-admin info panel rewritten: removed "delegated import candidates" and "import-run controls" language; replaced with plain "you can view candidates assigned to your account, only admins can approve or start downloads."
+- `ImportCandidateQueueList`: removed "Operator queue" eyebrow, loading/empty state rewritten to plain language ("Loading candidates…", "No matches found. Run a search or adjust the filters.").
+- `ImportCandidateDetailPanel`: eyebrow renamed "Match detail", heading renamed "Files and actions", empty/loading states rewritten; removed raw `sourceProvider search sourceSearchId` metadata line; loading/preview empty states use plain language.
+- `ImportCandidateExecutionPanel`: renamed to "Download run" / "Queue selected for download"; description rewritten; "Persist transfer state" renamed "Sync transfer state"; empty/loading states use plain language; "Auto reconcile cadence" renamed "Auto-sync interval", "Cadence source" renamed "Interval source"; `formatExecutionMode('download_enqueue')` label changed from "Download enqueue" to "Queue downloads".
+- `ImportCandidateApplyPanel`: renamed to "Library import" / "Move downloads to library"; description rewritten; empty/loading states use plain language.
+- `ImportCandidateFilters`: eyebrow renamed "Filter candidates", heading renamed "Candidate filters".
+- `ImportPendingCandidateStatusPanel`: renamed "Ready to import" / "Downloads awaiting import"; loading/empty states rewritten; removed raw source search ID metadata line; "Import pending at" renamed "Ready for import at".
+- `SelectedImportCandidateStatusPanel`: renamed "Candidates selected for download" / "Download readiness"; loading/empty states rewritten; removed raw source search ID metadata line.
+- Extracted `formatTimestamp`, `formatBytes`, `formatPath`, `formatTokenLabel`, `candidateStatusLabel`, `formatRunStatus`, `formatExecutionMode`, `formatPercent` from inline component functions into `src/client/lib/import-candidate-presentation.js`.
+- Added 52 unit tests in `test/client/import-candidate-presentation.test.js`.
 
 ### 2026-05-04 - Settings Page
 

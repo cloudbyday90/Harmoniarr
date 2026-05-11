@@ -17,6 +17,12 @@
 -->
 
 <script setup>
+import {
+  formatPath,
+  formatRunStatus,
+  formatTimestamp,
+} from '../lib/import-candidate-presentation.js';
+
 defineProps({
   actionErrorMessage: {
     type: String,
@@ -53,32 +59,6 @@ defineProps({
 });
 
 defineEmits(['refresh', 'start']);
-
-function formatTimestamp(value) {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
-}
-
-function formatPath(value) {
-  return value || 'Unavailable';
-}
-
-function formatRunStatus(status) {
-  switch (status) {
-    case 'running':
-      return 'Running';
-    case 'failed':
-      return 'Failed';
-    case 'completed':
-      return 'Completed';
-    default:
-      return 'Pending';
-  }
-}
 
 function statusClass(status) {
   switch (status) {
@@ -213,8 +193,8 @@ function canStartRun(currentRun, importPendingCandidateCount) {
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Import apply</p>
-        <h3>Durable library apply</h3>
+        <p class="eyebrow">Library import</p>
+        <h3>Move downloads to library</h3>
       </div>
       <div class="review-filter-actions">
         <button
@@ -235,11 +215,11 @@ function canStartRun(currentRun, importPendingCandidateCount) {
       </div>
     </div>
 
-    <p class="review-summary-copy">This run snapshots import-pending candidates, stages guarded file moves, and only marks candidates applied after every planned file reaches the library without overwriting an existing target.</p>
+    <p class="review-summary-copy">Moves downloaded files into your library. Files are staged first and only committed once all moves succeed safely.</p>
     <p class="review-summary-copy" v-if="summary">{{ summary.message }}</p>
 
     <article class="panel-light error-panel" v-if="errorMessage">
-      <h3>Import apply summary unavailable</h3>
+      <h3>Import run unavailable</h3>
       <p>{{ errorMessage }}</p>
     </article>
 
@@ -247,13 +227,13 @@ function canStartRun(currentRun, importPendingCandidateCount) {
     <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !currentRun">
-      <h3>Loading import apply summary</h3>
-      <p>Resolving the latest durable import apply run and its item outcomes.</p>
+      <h3>Loading import run</h3>
+      <p>Loading import run…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!currentRun">
-      <h3>No import apply run yet</h3>
-      <p>Start an import apply run to persist guarded library-mutation outcomes for import-pending candidates.</p>
+      <h3>No import run yet</h3>
+      <p>Downloads ready to import will appear above. Start an import run to move them into your library.</p>
     </article>
 
     <template v-else>
@@ -401,8 +381,8 @@ function canStartRun(currentRun, importPendingCandidateCount) {
         </article>
       </div>
       <article class="panel-light review-empty-state" v-else>
-        <h3>No persisted import apply items</h3>
-        <p>This run has not recorded per-candidate apply items yet.</p>
+        <h3>No import items yet</h3>
+        <p>No items have been recorded for this run yet.</p>
       </article>
     </template>
   </article>

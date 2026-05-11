@@ -17,6 +17,14 @@
 -->
 
 <script setup>
+import {
+  candidateStatusLabel,
+  formatBytes,
+  formatPath,
+  formatTimestamp,
+  formatTokenLabel,
+} from '../lib/import-candidate-presentation.js';
+
 const props = defineProps({
   actionError: {
     type: String,
@@ -119,71 +127,6 @@ function canReopen(candidate) {
     || candidate?.status === 'selected';
 }
 
-function formatBytes(value) {
-  if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
-    return 'Unknown size';
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let size = value;
-  let unitIndex = 0;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-
-  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-}
-
-function formatTimestamp(value) {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
-}
-
-function statusLabel(status) {
-  switch (status) {
-    case 'held':
-      return 'Held';
-    case 'rejected':
-      return 'Rejected';
-    case 'selected':
-      return 'Selected';
-    case 'downloading':
-      return 'Downloading';
-    case 'import_pending':
-      return 'Import pending';
-    case 'applied':
-      return 'Applied';
-    case 'failed':
-      return 'Failed';
-    default:
-      return 'Pending';
-  }
-}
-
-function formatDuration(value) {
-  if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
-    return 'Unknown';
-  }
-
-  const minutes = Math.floor(value / 60);
-  const seconds = String(value % 60).padStart(2, '0');
-  return `${minutes}:${seconds}`;
-}
-
-function formatPath(value) {
-  return value || 'Unavailable';
-}
-
-function formatTokenLabel(value) {
-  return String(value || 'unknown').replaceAll(/[_-]+/g, ' ');
-}
-
 function applyFileStatusClass(code) {
   switch (code) {
     case 'blocked':
@@ -230,15 +173,15 @@ function fileDecisionButtonLabel(filePreview) {
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Candidate detail</p>
-        <h3>Review state and files</h3>
+        <p class="eyebrow">Match detail</p>
+        <h3>Files and actions</h3>
       </div>
       <span
         v-if="candidate"
         class="review-status-pill"
         :class="`review-status-${candidate.status}`"
       >
-        {{ statusLabel(candidate.status) }}
+          {{ candidateStatusLabel(candidate.status) }}
       </span>
     </div>
 
@@ -248,13 +191,13 @@ function fileDecisionButtonLabel(filePreview) {
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="isLoadingCandidate && !candidate">
-      <h3>Loading candidate detail</h3>
-      <p>Resolving the stored file list and candidate metadata.</p>
+      <h3>Loading match details</h3>
+      <p>Loading match details…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!candidate">
-      <h3>Select a candidate</h3>
-      <p>Choose a persisted import candidate to inspect its files and review actions.</p>
+      <h3>Select a match</h3>
+      <p>Select a match to see its files and take action.</p>
     </article>
 
     <template v-else>
@@ -262,7 +205,6 @@ function fileDecisionButtonLabel(filePreview) {
         <div>
           <p class="eyebrow">{{ candidate.username }}</p>
           <h3>{{ candidate.folderPath || 'Root-level files' }}</h3>
-          <p class="metadata-card-copy">{{ candidate.sourceProvider }} search {{ candidate.sourceSearchId || 'unknown' }}</p>
         </div>
       </div>
 
@@ -345,8 +287,8 @@ function fileDecisionButtonLabel(filePreview) {
         </div>
 
         <article class="panel-light review-empty-state" v-if="isLoadingPreview && !preview">
-          <h3>Loading preview</h3>
-          <p>Resolving source, staging, and library preview paths from the current candidate and path settings.</p>
+          <h3>Loading path preview</h3>
+          <p>Loading path preview…</p>
         </article>
 
         <article class="panel-light error-panel" v-else-if="previewError">
@@ -420,28 +362,28 @@ function fileDecisionButtonLabel(filePreview) {
             </article>
           </div>
           <article class="panel-light review-empty-state" v-else>
-            <h3>No preview file rows</h3>
-            <p>The selected candidate does not currently expose previewable file rows.</p>
+            <h3>No files to preview</h3>
+            <p>This match doesn't have any previewable files.</p>
           </article>
         </template>
 
         <article class="panel-light review-empty-state" v-else>
-          <h3>Preview not loaded</h3>
-          <p>Select a candidate to resolve source, staging, and library preview paths.</p>
+          <h3>No preview</h3>
+          <p>Select a match to see its paths.</p>
         </article>
       </article>
 
       <article class="panel-light review-preview-panel" v-if="candidate.status === 'import_pending'">
         <div class="section-header">
           <div>
-            <p class="eyebrow">Import apply preview</p>
-            <h3>Filesystem safety and collisions</h3>
+            <p class="eyebrow">Import preview</p>
+            <h3>File safety and collisions</h3>
           </div>
         </div>
 
         <article class="panel-light review-empty-state" v-if="isLoadingApplyPreview && !applyPreview">
-          <h3>Loading apply preview</h3>
-          <p>Checking source availability, staging presence, and library collisions for import-ready files.</p>
+          <h3>Loading import preview</h3>
+          <p>Checking files for collisions and source availability…</p>
         </article>
 
         <article class="panel-light error-panel" v-else-if="applyPreviewError">

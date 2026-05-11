@@ -17,6 +17,14 @@
 -->
 
 <script setup>
+import {
+  formatExecutionMode,
+  formatPath,
+  formatPercent,
+  formatRunStatus,
+  formatTimestamp,
+} from '../lib/import-candidate-presentation.js';
+
 defineProps({
   actionErrorMessage: {
     type: String,
@@ -57,45 +65,6 @@ defineProps({
 });
 
 defineEmits(['reconcile', 'refresh', 'start']);
-
-function formatTimestamp(value) {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
-}
-
-function formatPath(value) {
-  return value || 'Unavailable';
-}
-
-function formatPercent(value) {
-  return Number.isFinite(value) ? `${value}%` : 'Unavailable';
-}
-
-function formatRunStatus(status) {
-  switch (status) {
-    case 'running':
-      return 'Running';
-    case 'failed':
-      return 'Failed';
-    case 'completed':
-      return 'Completed';
-    default:
-      return 'Pending';
-  }
-}
-
-function formatExecutionMode(mode) {
-  switch (mode) {
-    case 'download_enqueue':
-      return 'Download enqueue';
-    default:
-      return mode || 'Execution';
-  }
-}
 
 function statusClass(status) {
   switch (status) {
@@ -230,8 +199,8 @@ function canStartRun(currentRun, selectedCandidateCount) {
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Execution queue</p>
-        <h3>Durable run state</h3>
+        <p class="eyebrow">Download run</p>
+        <h3>Queue selected for download</h3>
       </div>
       <div class="review-filter-actions">
         <button
@@ -248,7 +217,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
           :disabled="isReconciling || isLoading"
           @click="$emit('reconcile')"
         >
-          {{ isReconciling ? 'Reconciling...' : 'Persist transfer state' }}
+          {{ isReconciling ? 'Syncing...' : 'Sync transfer state' }}
         </button>
         <button
           type="button"
@@ -260,16 +229,16 @@ function canStartRun(currentRun, selectedCandidateCount) {
       </div>
     </div>
 
-    <p class="review-summary-copy">This run snapshots selected candidates, enqueues eligible files into slskd, and persists per-candidate queue outcomes without applying imports.</p>
+    <p class="review-summary-copy">Queues your selected candidates for download. Each file is sent to the download queue and the outcome is recorded so you can track progress.</p>
     <p class="review-summary-copy" v-if="summary">{{ summary.message }}</p>
 
     <dl class="review-meta-grid review-meta-grid-wide" v-if="summary?.heartbeat">
       <div>
-        <dt>Auto reconcile cadence</dt>
+        <dt>Auto-sync interval</dt>
         <dd>{{ summary.heartbeat.intervalLabel ?? 'Unavailable' }}</dd>
       </div>
       <div>
-        <dt>Cadence source</dt>
+        <dt>Interval source</dt>
         <dd>{{ summary.heartbeat.source ?? 'Unavailable' }}</dd>
       </div>
       <div>
@@ -295,7 +264,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
     </dl>
 
     <article class="panel-light error-panel" v-if="errorMessage">
-      <h3>Execution summary unavailable</h3>
+      <h3>Download run unavailable</h3>
       <p>{{ errorMessage }}</p>
     </article>
 
@@ -303,13 +272,13 @@ function canStartRun(currentRun, selectedCandidateCount) {
     <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !currentRun">
-      <h3>Loading execution summary</h3>
-      <p>Resolving the latest durable execution run and its item outcomes.</p>
+      <h3>Loading download run</h3>
+      <p>Loading download run…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!currentRun">
-      <h3>No execution run yet</h3>
-      <p>Start a download run to persist selected-candidate enqueue outcomes as durable execution items.</p>
+      <h3>No download run yet</h3>
+      <p>Select candidates from the list above, then start a download run to queue them.</p>
     </article>
 
     <template v-else>
@@ -490,8 +459,8 @@ function canStartRun(currentRun, selectedCandidateCount) {
         </article>
       </div>
       <article class="panel-light review-empty-state" v-else>
-        <h3>No persisted execution items</h3>
-        <p>This run has not recorded per-candidate execution items yet.</p>
+        <h3>No download items yet</h3>
+        <p>No items have been recorded for this run yet.</p>
       </article>
     </template>
   </article>

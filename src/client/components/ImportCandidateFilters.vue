@@ -62,8 +62,8 @@ function updateField(event, eventName) {
   <article class="panel-light">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Import review</p>
-        <h3>Review queue filters</h3>
+        <p class="eyebrow">Filter candidates</p>
+        <h3>Candidate filters</h3>
       </div>
       <p class="review-filter-summary">{{ activeFilterCount }} active {{ activeFilterCount === 1 ? 'filter' : 'filters' }}</p>
     </div>

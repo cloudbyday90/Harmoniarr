@@ -17,6 +17,12 @@
 -->
 
 <script setup>
+import {
+  candidateStatusLabel,
+  formatBytes,
+  formatTimestamp,
+} from '../lib/import-candidate-presentation.js';
+
 defineProps({
   candidates: {
     type: Array,
@@ -45,67 +51,20 @@ defineProps({
 });
 
 defineEmits(['refresh', 'select-candidate']);
-
-function formatBytes(value) {
-  if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
-    return 'Unknown size';
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let size = value;
-  let unitIndex = 0;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-
-  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-}
-
-function statusLabel(status) {
-  switch (status) {
-    case 'held':
-      return 'Held';
-    case 'rejected':
-      return 'Rejected';
-    case 'selected':
-      return 'Selected';
-    case 'downloading':
-      return 'Downloading';
-    case 'import_pending':
-      return 'Import pending';
-    case 'applied':
-      return 'Applied';
-    case 'failed':
-      return 'Failed';
-    default:
-      return 'Pending';
-  }
-}
-
-function formatTimestamp(value) {
-  if (!value) {
-    return 'Not yet refreshed';
-  }
-
-  const timestamp = new Date(value);
-  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toLocaleString();
-}
 </script>
 
 <template>
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Operator queue</p>
-        <h3>Candidate list</h3>
+        <p class="eyebrow">Candidates</p>
+        <h3>All candidates</h3>
       </div>
       <button type="button" class="secondary-button" @click="$emit('refresh')">Refresh</button>
     </div>
 
   <p class="review-summary-copy">{{ totalCandidates }} matching candidates</p>
-  <p class="review-summary-copy">Last refreshed {{ formatTimestamp(lastLoadedAt) }}</p>
+  <p class="review-summary-copy">Last refreshed {{ formatTimestamp(lastLoadedAt, 'Not yet refreshed') }}</p>
 
     <article class="panel-light error-panel" v-if="listError">
       <h3>Queue unavailable</h3>
@@ -113,13 +72,13 @@ function formatTimestamp(value) {
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="isLoadingQueue && !candidates.length">
-      <h3>Loading review queue</h3>
-      <p>Fetching persisted import candidates from the current filters.</p>
+      <h3>Loading candidates</h3>
+      <p>Loading candidates…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!candidates.length">
       <h3>No candidates match the current filters</h3>
-      <p>Persisted slskd responses will appear here once they enter the review queue.</p>
+      <p>No matches found. Run a search or adjust the filters.</p>
     </article>
 
     <div class="review-queue-stack" v-else>
@@ -137,7 +96,7 @@ function formatTimestamp(value) {
             <h3>{{ candidate.folderPath || 'Root-level files' }}</h3>
           </div>
           <span class="review-status-pill" :class="`review-status-${candidate.status}`">
-            {{ statusLabel(candidate.status) }}
+            {{ candidateStatusLabel(candidate.status) }}
           </span>
         </div>
 
