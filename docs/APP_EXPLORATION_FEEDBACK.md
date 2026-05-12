@@ -691,3 +691,32 @@ Test suite after this session: **1680 tests, 0 failures** (up from 1623).
 - `formatDownloadActivitySummary(counts)` — 3 tests (zero counts, mixed counts, separator character)
 
 Test suite after this session: **1763 tests, 0 failures** (up from 1680).
+
+---
+
+### 2026-05-12 - History Screen (ActivityHistoryView)
+
+**Screen:** `ActivityHistoryView.vue` (120 lines before changes)
+**Lib:** `src/client/lib/activity-history-presentation.js` (new file — 4 exports)
+**Tests:** `test/client/activity-history-presentation.test.js` (new file — 55 tests)
+
+**Issues identified and resolved:**
+
+1. **`entry.entryType` rendered with raw `.replace(/_/g, ' ')` in the template** — Produced all-lowercase labels like `library scan completed` and `metadata refresh queued`. Template string manipulation belongs in a lib. Added `formatActivityEntryTypeLabel(entryType)` with a known-type lookup table (21 entries covering all expected Harmoniarr activity types) plus a Title Case fallback for anything unknown.
+
+2. **`entry.status` rendered raw** — The pill displayed the raw backend enum: `success`, `failed`, `in_progress` (with underscore), `ok` (a system-level token). Added `formatActivityEntryStatusLabel(status)` mapping `success/completed/ok → "Succeeded"`, `failed/error → "Failed"`, `in_progress → "In progress"`, etc. The underscore in `in_progress` would otherwise appear literally in the UI.
+
+3. **`entry.occurredAt` was a raw ISO 8601 timestamp** — `2026-05-12T09:41:22.000Z` shown verbatim in the table. Now uses `formatOperationTimestamp(entry.occurredAt)` from the existing operation-run-presentation lib to produce a consistent locale-formatted datetime.
+
+4. **Subtitle used a ternary for pluralisation** — `{{ entryCount }} entr{{ entryCount === 1 ? 'y' : 'ies' }}` embedded branching logic in the template. Replaced with `formatActivityEntryCountLabel(entryCount)` which returns `"1 entry"` or `"N entries"`. Subtitle also simplified from "Recent system activity events" to "Recent system activity" (the word "events" is redundant given the context).
+
+5. **`statusTone()` was an inline function with no tests** — 4-branch function covering 7 status strings; `"ok" → 'success'` and `"in_progress" → 'warning'` had no regression guard. Extracted as `formatActivityEntryStatusTone(status)` with full test coverage.
+
+**New exports in `activity-history-presentation.js`:**
+
+- `formatActivityEntryTypeLabel(entryType)` — 19 tests (null/undefined/empty, 13 known types, no-underscore guard, title-cased fallback, single-word fallback)
+- `formatActivityEntryStatusLabel(status)` — 16 tests (null/undefined/empty, all 8 known statuses, no-raw-ok guard, no-underscore guard, title-cased fallback)
+- `formatActivityEntryStatusTone(status)` — 14 tests (all 3 success aliases, all 3 danger aliases, all 3 warning aliases, null→info, unknown→info, empty→info, no-cross-tone guards)
+- `formatActivityEntryCountLabel(count)` — 6 tests (singular at 1, plural at 0/2/100, count-in-label, no singular for plural)
+
+Test suite after this session: **1818 tests, 0 failures** (up from 1763).

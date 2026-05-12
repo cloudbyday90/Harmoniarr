@@ -18,15 +18,15 @@
 
 <script setup>
 import { computed } from 'vue';
+import {
+  formatActivityEntryCountLabel,
+  formatActivityEntryStatusLabel,
+  formatActivityEntryStatusTone,
+  formatActivityEntryTypeLabel,
+} from '../lib/activity-history-presentation.js';
+import { formatOperationTimestamp } from '../lib/operation-run-presentation.js';
 import { fetchSystemActivityFeed } from '../lib/system-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
-
-function statusTone(status) {
-  if (status === 'success' || status === 'completed' || status === 'ok') return 'success';
-  if (status === 'failed' || status === 'error' || status === 'cancelled') return 'danger';
-  if (status === 'in_progress' || status === 'pending') return 'warning';
-  return 'info';
-}
 
 const {
   data: entries,
@@ -48,7 +48,7 @@ const entryCount = computed(() => entries.value?.length ?? 0);
     <header class="hx-page-header">
       <div>
         <h2 class="hx-page-title">History</h2>
-        <p class="hx-page-subtitle">Recent system activity events ({{ entryCount }} entr{{ entryCount === 1 ? 'y' : 'ies' }}).</p>
+        <p class="hx-page-subtitle">Recent system activity ({{ formatActivityEntryCountLabel(entryCount) }}).</p>
       </div>
       <div class="hx-page-actions">
         <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
@@ -91,14 +91,14 @@ const entryCount = computed(() => entries.value?.length ?? 0);
             </thead>
             <tbody>
               <tr v-for="entry in entries" :key="entry.id">
-                <td>{{ (entry.entryType ?? '').replace(/_/g, ' ') }}</td>
+                <td>{{ formatActivityEntryTypeLabel(entry.entryType) }}</td>
                 <td>{{ entry.title ?? '—' }}</td>
                 <td>
-                  <span v-if="entry.status" class="hx-pill" :data-tone="statusTone(entry.status)">{{ entry.status }}</span>
+                  <span v-if="entry.status" class="hx-pill" :data-tone="formatActivityEntryStatusTone(entry.status)">{{ formatActivityEntryStatusLabel(entry.status) }}</span>
                   <span v-else>—</span>
                 </td>
                 <td>{{ entry.message ?? '' }}</td>
-                <td>{{ entry.occurredAt ?? '—' }}</td>
+                <td>{{ formatOperationTimestamp(entry.occurredAt) }}</td>
               </tr>
             </tbody>
           </table>
