@@ -21,11 +21,14 @@ import assert from 'node:assert/strict';
 
 import {
   candidateStatusLabel,
+  candidateStatusTone,
   formatBytes,
+  formatCandidateCountLabel,
   formatExecutionMode,
   formatPath,
   formatPercent,
   formatRunStatus,
+  formatSourceProvider,
   formatTimestamp,
   formatTokenLabel,
 } from '../../src/client/lib/import-candidate-presentation.js';
@@ -285,5 +288,99 @@ describe('formatPercent', () => {
 
   it('returns Unavailable for null', () => {
     assert.equal(formatPercent(null), 'Unavailable');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// candidateStatusTone
+// ---------------------------------------------------------------------------
+
+describe('candidateStatusTone', () => {
+  it('returns success for applied', () => {
+    assert.equal(candidateStatusTone('applied'), 'success');
+  });
+  it('returns danger for failed', () => {
+    assert.equal(candidateStatusTone('failed'), 'danger');
+  });
+  it('returns danger for rejected', () => {
+    assert.equal(candidateStatusTone('rejected'), 'danger');
+  });
+  it('returns warning for downloading', () => {
+    assert.equal(candidateStatusTone('downloading'), 'warning');
+  });
+  it('returns info for held', () => {
+    assert.equal(candidateStatusTone('held'), 'info');
+  });
+  it('returns info for import_pending', () => {
+    assert.equal(candidateStatusTone('import_pending'), 'info');
+  });
+  it('returns info for selected', () => {
+    assert.equal(candidateStatusTone('selected'), 'info');
+  });
+  it('returns undefined for unknown status', () => {
+    assert.equal(candidateStatusTone('new_state'), undefined);
+  });
+  it('returns undefined for null', () => {
+    assert.equal(candidateStatusTone(null), undefined);
+  });
+  it('applied and rejected never share a tone', () => {
+    assert.notEqual(candidateStatusTone('applied'), candidateStatusTone('rejected'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatSourceProvider
+// ---------------------------------------------------------------------------
+
+describe('formatSourceProvider', () => {
+  it('returns Soulseek for slskd', () => {
+    assert.equal(formatSourceProvider('slskd'), 'Soulseek');
+  });
+  it('returns MusicBrainz for musicbrainz', () => {
+    assert.equal(formatSourceProvider('musicbrainz'), 'MusicBrainz');
+  });
+  it('does not expose raw slskd token', () => {
+    assert.notEqual(formatSourceProvider('slskd'), 'slskd');
+  });
+  it('does not expose raw musicbrainz token', () => {
+    assert.notEqual(formatSourceProvider('musicbrainz'), 'musicbrainz');
+  });
+  it('returns em dash for null', () => {
+    assert.equal(formatSourceProvider(null), '\u2014');
+  });
+  it('returns em dash for undefined', () => {
+    assert.equal(formatSourceProvider(undefined), '\u2014');
+  });
+  it('returns em dash for empty string', () => {
+    assert.equal(formatSourceProvider(''), '\u2014');
+  });
+  it('title-cases unknown providers as fallback', () => {
+    const result = formatSourceProvider('some_provider');
+    assert.equal(result[0], result[0].toUpperCase());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatCandidateCountLabel
+// ---------------------------------------------------------------------------
+
+describe('formatCandidateCountLabel', () => {
+  it('returns singular for 1 candidate', () => {
+    assert.equal(formatCandidateCountLabel(1), '1 candidate');
+  });
+  it('returns plural for 0 candidates', () => {
+    assert.equal(formatCandidateCountLabel(0), '0 candidates');
+  });
+  it('returns plural for 2 candidates', () => {
+    assert.equal(formatCandidateCountLabel(2), '2 candidates');
+  });
+  it('returns plural for 100 candidates', () => {
+    assert.equal(formatCandidateCountLabel(100), '100 candidates');
+  });
+  it('includes the count in the label', () => {
+    assert.ok(formatCandidateCountLabel(5).includes('5'));
+  });
+  it('does not return singular for 0', () => {
+    assert.notEqual(formatCandidateCountLabel(0), '1 candidate');
   });
 });

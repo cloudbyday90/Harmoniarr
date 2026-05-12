@@ -150,3 +150,55 @@ export function formatExecutionMode(mode) {
 export function formatPercent(value) {
   return Number.isFinite(value) ? `${value}%` : 'Unavailable';
 }
+
+/**
+ * Returns a UI tone string for an import candidate status, suitable for the
+ * `data-tone` attribute on a pill component.
+ *
+ * - applied            → 'success'
+ * - failed / rejected  → 'danger'
+ * - downloading        → 'warning'
+ * - held / import_pending / selected → 'info'
+ * - unknown            → undefined
+ *
+ * @param {string|null|undefined} status
+ * @returns {'success'|'danger'|'warning'|'info'|undefined}
+ */
+export function candidateStatusTone(status) {
+  if (status === 'applied') return 'success';
+  if (status === 'failed' || status === 'rejected') return 'danger';
+  if (status === 'downloading') return 'warning';
+  if (status === 'held' || status === 'import_pending' || status === 'selected') return 'info';
+  return undefined;
+}
+
+/**
+ * Returns a human-readable label for an import candidate source provider
+ * token. Hides internal provider identifiers from the UI.
+ *
+ * - slskd       → 'Soulseek'
+ * - musicbrainz → 'MusicBrainz'
+ * - unknown/null → '—'
+ *
+ * @param {string|null|undefined} provider
+ * @returns {string}
+ */
+export function formatSourceProvider(provider) {
+  if (!provider || typeof provider !== 'string') return '\u2014';
+  switch (provider.toLowerCase()) {
+    case 'slskd': return 'Soulseek';
+    case 'musicbrainz': return 'MusicBrainz';
+    default: return provider.charAt(0).toUpperCase() + provider.slice(1).replace(/_/g, ' ');
+  }
+}
+
+/**
+ * Returns a human-readable count label for the number of import candidates,
+ * e.g. "1 candidate" or "4 candidates".
+ *
+ * @param {number} count
+ * @returns {string}
+ */
+export function formatCandidateCountLabel(count) {
+  return count === 1 ? '1 candidate' : `${count} candidates`;
+}

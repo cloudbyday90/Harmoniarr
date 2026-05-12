@@ -61,7 +61,7 @@ const candidateCount = computed(() => candidates.value?.length ?? 0);
     <header class="hx-page-header">
       <div>
         <h2 class="hx-page-title">{{ title }}</h2>
-        <p class="hx-page-subtitle">{{ subtitle }} {{ candidateCount }} candidate{{ candidateCount === 1 ? '' : 's' }}.</p>
+        <p class="hx-page-subtitle">{{ subtitle }} {{ formatCandidateCountLabel(candidateCount) }}.</p>
       </div>
       <div class="hx-page-actions">
         <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
@@ -106,10 +106,10 @@ const candidateCount = computed(() => candidates.value?.length ?? 0);
               <tr v-for="candidate in candidates" :key="candidate.id">
                 <td>{{ candidate.folderPath ?? '\u2014' }}</td>
                 <td>{{ candidate.username ?? '\u2014' }}</td>
-                <td>{{ candidate.sourceProvider ?? '\u2014' }}</td>
+                <td>{{ formatSourceProvider(candidate.sourceProvider) }}</td>
                 <td class="hx-table-num">{{ formatBytes(candidate.totalSizeBytes) }}</td>
-                <td><span class="hx-pill">{{ candidate.status }}</span></td>
-                <td>{{ candidate.importPendingAt ?? candidate.updatedAt ?? candidate.createdAt ?? '\u2014' }}</td>
+                <td><span class="hx-pill" :data-tone="candidateStatusTone(candidate.status)">{{ candidateStatusLabel(candidate.status) }}</span></td>
+                <td>{{ candidate.importPendingAt ?? candidate.updatedAt ?? candidate.createdAt ? formatOperationTimestamp(candidate.importPendingAt ?? candidate.updatedAt ?? candidate.createdAt) : '—' }}</td>
               </tr>
             </tbody>
           </table>

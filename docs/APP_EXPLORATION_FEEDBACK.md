@@ -779,3 +779,31 @@ Test suite: **1852 tests, 0 failures** (up from 1818).
 - `formatUserCountLabel(count)` — 6 tests (singular at 1, plural at 0/2/100, count in label, no singular for 0)
 
 Test suite: **1865 tests, 0 failures** (up from 1852).
+
+---
+
+### 2026-05-12 - Imports Screen (ActivityImportsView)
+
+**Screen:** `ActivityImportsView.vue`
+**Lib extended:** `src/client/lib/import-candidate-presentation.js` (3 new exports appended)
+**Tests extended:** `test/client/import-candidate-presentation.test.js` (24 new tests)
+
+**Issues identified and resolved:**
+
+1. **`candidate.status` rendered raw with no tone** — The Status pill displayed raw backend state machine identifiers: `import_pending` (with underscore), `downloading`, `applied`, `held`, `rejected`. `candidateStatusLabel(status)` already existed in `import-candidate-presentation.js` but was not imported. Added `candidateStatusTone(status)` as a new export and wired both into the view. Pills now read `"Import pending"`, `"Downloading"`, `"Applied"` etc. with appropriate tones (`applied → 'success'`, `failed/rejected → 'danger'`, `downloading → 'warning'`, `held/import_pending/selected → 'info'`).
+
+2. **`candidate.sourceProvider` rendered raw** — The Source column showed internal backend provider tokens: `slskd` (the slskd daemon identifier) and `musicbrainz`. Neither is a user-facing term. Added `formatSourceProvider(provider)` with `slskd → 'Soulseek'`, `musicbrainz → 'MusicBrainz'`, title-case fallback for unknowns, and `'—'` for null/empty.
+
+3. **`formatBytes` duplicated inline** — The view had its own `formatBytes` implementation (identical behaviour to `search-presentation.js::formatBytes`, same `'—'` fallback for `<= 0`). Removed the inline copy; now imports from `search-presentation.js`, consistent with `ActivityDownloadsView`.
+
+4. **Timestamp chain rendered raw ISO string** — `candidate.importPendingAt ?? candidate.updatedAt ?? candidate.createdAt` produced a raw ISO 8601 string. Wrapped with `formatOperationTimestamp()` from `operation-run-presentation.js`, guarded with a ternary so nullish chain still renders `'—'`.
+
+5. **Subtitle inline pluralisation ternary** — `{{ candidateCount }} candidate{{ candidateCount === 1 ? '' : 's' }}` embedded branching in the template. Added `formatCandidateCountLabel(count)` to the lib, returning `"1 candidate"` / `"N candidates"`.
+
+**New exports in `import-candidate-presentation.js`:**
+
+- `candidateStatusTone(status)` — 10 tests (all 5 known tones, unknown→undefined, null→undefined, applied/rejected tone-exclusion guard)
+- `formatSourceProvider(provider)` — 8 tests (slskd→Soulseek, musicbrainz→MusicBrainz, no-raw-token guards, null/undefined/empty→dash, title-case fallback)
+- `formatCandidateCountLabel(count)` — 6 tests (singular at 1, plural at 0/2/100, count in label, no singular for 0)
+
+Test suite: **1889 tests, 0 failures** (up from 1865).
