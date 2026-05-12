@@ -17,6 +17,11 @@
 -->
 
 <script setup>
+import {
+  formatHeartbeatStatus,
+  getHeartbeatStatusClass,
+} from '../lib/heartbeat-presentation.js';
+
 const props = defineProps({
   heartbeats: {
     type: Array,
@@ -25,36 +30,6 @@ const props = defineProps({
 });
 
 defineEmits(['refresh']);
-
-function formatStatus(status) {
-  switch (status) {
-    case 'active':
-      return 'Active';
-    case 'error':
-      return 'Error';
-    case 'idle':
-      return 'Idle';
-    case 'paused':
-      return 'Paused';
-    case 'running':
-      return 'Running';
-    default:
-      return 'Waiting';
-  }
-}
-
-function statusClass(status) {
-  switch (status) {
-    case 'error':
-      return 'review-status-failed';
-    case 'running':
-      return 'review-status-selected';
-    case 'idle':
-      return 'review-status-selected';
-    default:
-      return 'review-status-held';
-  }
-}
 </script>
 
 <template>
@@ -71,10 +46,10 @@ function statusClass(status) {
         <div class="dependency-card-header">
           <div>
             <p>{{ heartbeat.label }}</p>
-            <strong>{{ formatStatus(heartbeat.status) }}</strong>
+            <strong>{{ formatHeartbeatStatus(heartbeat.status) }}</strong>
           </div>
-          <span class="review-status-pill" :class="statusClass(heartbeat.status)">
-            {{ formatStatus(heartbeat.status) }}
+          <span class="review-status-pill" :class="getHeartbeatStatusClass(heartbeat.status)">
+            {{ formatHeartbeatStatus(heartbeat.status) }}
           </span>
         </div>
         <p class="dependency-message">{{ heartbeat.message }}</p>

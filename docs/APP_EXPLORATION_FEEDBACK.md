@@ -1104,3 +1104,53 @@ Test suite: **2067 tests, 0 failures** (up from 2046).
 - `src/client/components/ImportCandidateDetailPanel.vue` — import `formatFileDuration`; fix undefined `formatDuration` call site
 
 Test suite: **2108 tests, 0 failures** (up from 2067).
+
+### 2026-05-12 - HeartbeatSummaryPanel, ProviderStatusPanel, ImportCandidateExecutionPanel Components
+
+**Components affected:**
+- `src/client/components/HeartbeatSummaryPanel.vue` (background service heartbeat display)
+- `src/client/components/ProviderStatusPanel.vue` (OAuth / credentials provider auth status)
+- `src/client/components/ImportCandidateExecutionPanel.vue` (download queue execution panel — largest component with inline presentation logic)
+
+**New libs:** `src/client/lib/heartbeat-presentation.js`, `src/client/lib/provider-status-presentation.js`
+**Extended lib:** `src/client/lib/import-candidate-presentation.js` (+10 exports)
+
+**Issues identified and resolved:**
+
+**HeartbeatSummaryPanel:**
+1. `formatStatus(status)` — heartbeat enum → display label. Extracted as `formatHeartbeatStatus(status)` in `heartbeat-presentation.js`.
+2. `statusClass(status)` — heartbeat status → CSS class. Extracted as `getHeartbeatStatusClass(status)`. Note: `running` and `idle` both map to `review-status-selected` (a single case expression), which the inline version had as two separate cases — consolidated.
+
+**ProviderStatusPanel:**
+3. `providerLabel(provider)` — provider key → display name. Extracted as `getProviderLabel(provider)` in `provider-status-presentation.js`. Unknown keys pass through; null/undefined return `''`.
+4. `oAuthProviderStatus(provider)` → `getOAuthProviderStatus(provider)`
+5. `oAuthProviderStatusClass(provider)` → `getOAuthProviderStatusClass(provider)`
+6. `appleMusicStatusLabel(provider)` → `getAppleMusicStatusLabel(provider)`
+7. `appleMusicStatusClass(provider)` → `getAppleMusicStatusClass(provider)`
+8. `formatTokenExpiry(provider)` → `formatTokenExpiry(provider)` (same name, extracted to shared lib)
+
+**ImportCandidateExecutionPanel:**
+9. `statusClass(status)` — execution run status → CSS class. Identical to the existing `getRunStatusClass` already in `import-candidate-presentation.js` from the apply panel. Removed and replaced with the shared function (no new export needed).
+10. `itemStatusClass(status)` → `getExecutionItemStatusClass(status)` — execution item queue status CSS.
+11. `itemStatusLabel(status)` → `getExecutionItemStatusLabel(status)` — execution item queue status label.
+12. `formatLiveTransferStatus(summary)` → extracted to lib (same name). Handles null/orphaned/missing-remotely branches including `isPastGracePeriod` logic.
+13. `liveTransferStatusClass(summary)` → `getLiveTransferStatusClass(summary)`.
+14. `persistedTransferObservation(item)` → `getPersistedTransferObservation(item)` — pure accessor.
+15. `latestTransferSummary(item)` → `getLatestTransferSummary(item)` — derives from persisted observation.
+16. `persistedMissingTransfer(item)` → `getPersistedMissingTransfer(item)` — pure accessor.
+17. `heartbeatOutcomeLabel(heartbeat)` → `getHeartbeatOutcomeLabel(heartbeat)` — import execution heartbeat outcome label.
+18. `heartbeatSkipReasonLabel(reason)` → `getHeartbeatSkipReasonLabel(reason)` — skip reason with descriptive messages.
+19. `canStartRun(currentRun, selectedCandidateCount)` → `canStartExecutionRun(...)` — parallel to `canStartApplyRun` already in the lib; distinct semantics (uses `selectedCandidateCount` not `importPendingCandidateCount`).
+
+**Files changed:**
+- `src/client/lib/heartbeat-presentation.js` — new file, 2 exports
+- `src/client/lib/provider-status-presentation.js` — new file, 6 exports
+- `src/client/lib/import-candidate-presentation.js` — 10 new exports appended
+- `test/client/heartbeat-presentation.test.js` — new file, 15 tests
+- `test/client/provider-status-presentation.test.js` — new file, 24 tests
+- `test/client/import-candidate-presentation.test.js` — import list updated; 67 tests appended
+- `src/client/components/HeartbeatSummaryPanel.vue` — import lib; remove 2 inline functions; update 3 call sites
+- `src/client/components/ProviderStatusPanel.vue` — import lib; remove 6 inline functions; update all call sites
+- `src/client/components/ImportCandidateExecutionPanel.vue` — extend import; remove 11 inline functions; update all call sites
+
+Test suite: **2214 tests, 0 failures** (up from 2108).

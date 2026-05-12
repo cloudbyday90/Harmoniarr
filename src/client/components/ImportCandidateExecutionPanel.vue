@@ -18,11 +18,22 @@
 
 <script setup>
 import {
+  canStartExecutionRun,
   formatExecutionMode,
+  formatLiveTransferStatus,
   formatPath,
   formatPercent,
   formatRunStatus,
   formatTimestamp,
+  getExecutionItemStatusClass,
+  getExecutionItemStatusLabel,
+  getHeartbeatOutcomeLabel,
+  getHeartbeatSkipReasonLabel,
+  getLatestTransferSummary,
+  getLiveTransferStatusClass,
+  getPersistedMissingTransfer,
+  getPersistedTransferObservation,
+  getRunStatusClass,
 } from '../lib/import-candidate-presentation.js';
 
 defineProps({
@@ -65,134 +76,6 @@ defineProps({
 });
 
 defineEmits(['reconcile', 'refresh', 'start']);
-
-function statusClass(status) {
-  switch (status) {
-    case 'running':
-      return 'review-status-selected';
-    case 'failed':
-      return 'review-status-failed';
-    case 'completed':
-      return 'review-status-held';
-    default:
-      return 'review-status-pending';
-  }
-}
-
-function itemStatusClass(status) {
-  switch (status) {
-    case 'blocked':
-      return 'review-status-failed';
-    case 'queue_failed':
-      return 'review-status-failed';
-    case 'queued_with_warnings':
-      return 'review-status-held';
-    case 'queued':
-      return 'review-status-selected';
-    case 'ready_with_warnings':
-      return 'review-status-held';
-    default:
-      return 'review-status-selected';
-  }
-}
-
-function itemStatusLabel(status) {
-  switch (status) {
-    case 'blocked':
-      return 'Blocked';
-    case 'queue_failed':
-      return 'Queue failed';
-    case 'queued_with_warnings':
-      return 'Queued with warnings';
-    case 'queued':
-      return 'Queued';
-    case 'ready_with_warnings':
-      return 'Ready with warnings';
-    default:
-      return 'Ready';
-  }
-}
-
-
-function formatLiveTransferStatus(summary) {
-  if (!summary) {
-    return 'Not reconciled';
-  }
-
-  switch (summary.status) {
-    case 'active':
-      return 'Active';
-    case 'queued':
-      return 'Queued remotely';
-    case 'completed':
-      return 'Completed';
-    case 'failed':
-      return 'Failed';
-    case 'not_found':
-      return summary.missingTransfer?.isPastGracePeriod ? 'Orphaned' : 'Missing remotely';
-    default:
-      return 'Missing';
-  }
-}
-
-function liveTransferStatusClass(summary) {
-  switch (summary?.status) {
-    case 'active':
-      return 'review-status-selected';
-    case 'queued':
-      return 'review-status-pending';
-    case 'completed':
-      return 'review-status-held';
-    case 'failed':
-      return 'review-status-failed';
-    case 'not_found':
-      return summary?.missingTransfer?.isPastGracePeriod ? 'review-status-failed' : 'review-status-pending';
-    default:
-      return 'review-status-pending';
-  }
-}
-
-function persistedTransferObservation(item) {
-  return item?.persistedTransferObservation ?? null;
-}
-
-function latestTransferSummary(item) {
-  return persistedTransferObservation(item)?.summary ?? null;
-}
-
-function persistedMissingTransfer(item) {
-  return item?.persistedMissingTransfer ?? null;
-}
-
-function heartbeatOutcomeLabel(heartbeat) {
-  switch (heartbeat?.state?.lastOutcome) {
-    case 'started':
-      return 'Reconciled automatically';
-    case 'error':
-      return 'Heartbeat error';
-    case 'skipped':
-      return 'Skipped';
-    default:
-      return 'Not yet recorded';
-  }
-}
-
-function heartbeatSkipReasonLabel(reason) {
-  switch (reason) {
-    case 'not_due':
-      return 'No actionable transfer updates were visible.';
-    case 'tick_in_progress':
-      return 'A previous reconciliation tick was still running.';
-    case 'error':
-      return 'The last heartbeat tick failed.';
-    default:
-      return 'None';
-  }
-}
-
-function canStartRun(currentRun, selectedCandidateCount) {
-  return !currentRun || (currentRun.status !== 'pending' && currentRun.status !== 'running' && selectedCandidateCount > 0);
-}
 </script>
 
 <template>
@@ -221,7 +104,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
         </button>
         <button
           type="button"
-          :disabled="!canStartRun(currentRun, selectedCandidateCount) || isStarting"
+          :disabled="!canStartExecutionRun(currentRun, selectedCandidateCount) || isStarting"
           @click="$emit('start')"
         >
           {{ isStarting ? 'Starting...' : 'Start download run' }}
@@ -243,7 +126,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
       </div>
       <div>
         <dt>Last heartbeat</dt>
-        <dd>{{ heartbeatOutcomeLabel(summary.heartbeat) }}</dd>
+        <dd>{{ getHeartbeatOutcomeLabel(summary.heartbeat) }}</dd>
       </div>
       <div>
         <dt>Last tick</dt>
@@ -251,7 +134,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
       </div>
       <div>
         <dt>Last skip reason</dt>
-        <dd>{{ heartbeatSkipReasonLabel(summary.heartbeat.state?.lastSkipReason) }}</dd>
+        <dd>{{ getHeartbeatSkipReasonLabel(summary.heartbeat.state?.lastSkipReason) }}</dd>
       </div>
       <div>
         <dt>Last transitions</dt>
@@ -288,7 +171,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
           <h3>Run {{ currentRun.id }}</h3>
           <p class="metadata-card-copy">{{ currentRun.currentStep || 'No current step reported' }}</p>
         </div>
-        <span class="review-status-pill" :class="statusClass(currentRun.status)">
+        <span class="review-status-pill" :class="getRunStatusClass(currentRun.status)">
           {{ formatRunStatus(currentRun.status) }}
         </span>
       </div>
@@ -336,8 +219,8 @@ function canStartRun(currentRun, selectedCandidateCount) {
               <strong>{{ item.planningSnapshot?.candidate?.folderPath || 'Root-level files' }}</strong>
               <p class="metadata-card-copy">{{ item.statusMessage }}</p>
             </div>
-            <span class="review-status-pill" :class="itemStatusClass(item.itemStatus)">
-              {{ itemStatusLabel(item.itemStatus) }}
+            <span class="review-status-pill" :class="getExecutionItemStatusClass(item.itemStatus)">
+              {{ getExecutionItemStatusLabel(item.itemStatus) }}
             </span>
           </div>
 
@@ -362,7 +245,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
                 <p class="eyebrow">Live transfer status</p>
                 <strong>{{ item.liveTransferSummary?.message || 'No live slskd transfer summary is available yet.' }}</strong>
               </div>
-              <span class="review-status-pill" :class="liveTransferStatusClass(item.liveTransferSummary)">
+              <span class="review-status-pill" :class="getLiveTransferStatusClass(item.liveTransferSummary)">
                 {{ formatLiveTransferStatus(item.liveTransferSummary) }}
               </span>
             </div>
@@ -398,7 +281,7 @@ function canStartRun(currentRun, selectedCandidateCount) {
                     <strong>{{ transfer.filename || 'Unknown transfer' }}</strong>
                     <p class="metadata-card-copy">{{ transfer.state || 'Unknown state' }}</p>
                   </div>
-                  <span class="review-status-pill" :class="liveTransferStatusClass({ status: transfer.exception ? 'failed' : (String(transfer.state || '').includes('Completed, Succeeded') ? 'completed' : (String(transfer.state || '').includes('Queued') ? 'queued' : 'active')) })">
+                  <span class="review-status-pill" :class="getLiveTransferStatusClass({ status: transfer.exception ? 'failed' : (String(transfer.state || '').includes('Completed, Succeeded') ? 'completed' : (String(transfer.state || '').includes('Queued') ? 'queued' : 'active')) })">
                     {{ transfer.placeInQueue != null ? `Queue ${transfer.placeInQueue}` : formatPercent(Number(transfer.size) > 0 ? Math.round(((Number(transfer.bytesTransferred) || 0) / Number(transfer.size)) * 100) : null) }}
                   </span>
                 </div>
@@ -408,50 +291,50 @@ function canStartRun(currentRun, selectedCandidateCount) {
 
             <article
               class="panel-light review-empty-state"
-              v-if="item.liveTransferSummary?.status === 'not_found' && (latestTransferSummary(item) || persistedMissingTransfer(item))"
+              v-if="item.liveTransferSummary?.status === 'not_found' && (getLatestTransferSummary(item) || getPersistedMissingTransfer(item))"
             >
               <div class="review-file-header">
                 <div>
                   <p class="eyebrow">Last durable transfer observation</p>
-                  <strong>{{ latestTransferSummary(item)?.message || persistedMissingTransfer(item)?.message || 'A previous transfer observation or missing-transfer check was persisted.' }}</strong>
+                  <strong>{{ getLatestTransferSummary(item)?.message || getPersistedMissingTransfer(item)?.message || 'A previous transfer observation or missing-transfer check was persisted.' }}</strong>
                 </div>
-                <span class="review-status-pill" :class="liveTransferStatusClass(latestTransferSummary(item) || item.liveTransferSummary)">
-                  {{ formatLiveTransferStatus(latestTransferSummary(item) || item.liveTransferSummary) }}
+                <span class="review-status-pill" :class="getLiveTransferStatusClass(getLatestTransferSummary(item) || item.liveTransferSummary)">
+                  {{ formatLiveTransferStatus(getLatestTransferSummary(item) || item.liveTransferSummary) }}
                 </span>
               </div>
 
               <dl class="review-meta-grid review-meta-grid-wide">
                 <div>
                   <dt>Last reconciled</dt>
-                  <dd>{{ formatTimestamp(persistedTransferObservation(item)?.lastReconciledAt) }}</dd>
+                  <dd>{{ formatTimestamp(getPersistedTransferObservation(item)?.lastReconciledAt) }}</dd>
                 </div>
                 <div>
                   <dt>Transfers</dt>
-                  <dd>{{ latestTransferSummary(item)?.total ?? 0 }}</dd>
+                  <dd>{{ getLatestTransferSummary(item)?.total ?? 0 }}</dd>
                 </div>
                 <div>
                   <dt>Completed</dt>
-                  <dd>{{ latestTransferSummary(item)?.completed ?? 0 }}</dd>
+                  <dd>{{ getLatestTransferSummary(item)?.completed ?? 0 }}</dd>
                 </div>
                 <div>
                   <dt>Failed</dt>
-                  <dd>{{ latestTransferSummary(item)?.failed ?? 0 }}</dd>
+                  <dd>{{ getLatestTransferSummary(item)?.failed ?? 0 }}</dd>
                 </div>
                 <div>
                   <dt>Progress</dt>
-                  <dd>{{ formatPercent(latestTransferSummary(item)?.percentComplete) }}</dd>
+                  <dd>{{ formatPercent(getLatestTransferSummary(item)?.percentComplete) }}</dd>
                 </div>
                 <div>
                   <dt>Missing since</dt>
-                  <dd>{{ formatTimestamp(persistedMissingTransfer(item)?.missingSince || item.liveTransferSummary?.missingTransfer?.missingSince) }}</dd>
+                  <dd>{{ formatTimestamp(getPersistedMissingTransfer(item)?.missingSince || item.liveTransferSummary?.missingTransfer?.missingSince) }}</dd>
                 </div>
                 <div>
                   <dt>Last missing check</dt>
-                  <dd>{{ formatTimestamp(persistedMissingTransfer(item)?.lastCheckedAt) }}</dd>
+                  <dd>{{ formatTimestamp(getPersistedMissingTransfer(item)?.lastCheckedAt) }}</dd>
                 </div>
                 <div>
                   <dt>Grace deadline</dt>
-                  <dd>{{ formatTimestamp(persistedMissingTransfer(item)?.graceDeadlineAt || item.liveTransferSummary?.missingTransfer?.graceDeadlineAt) }}</dd>
+                  <dd>{{ formatTimestamp(getPersistedMissingTransfer(item)?.graceDeadlineAt || item.liveTransferSummary?.missingTransfer?.graceDeadlineAt) }}</dd>
                 </div>
               </dl>
             </article>

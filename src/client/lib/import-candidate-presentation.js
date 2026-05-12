@@ -404,3 +404,188 @@ export function canStartApplyRun(currentRun, importPendingCandidateCount) {
     importPendingCandidateCount > 0
   );
 }
+
+/**
+ * Return a CSS class suffix for an execution-run item queue status pill.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function getExecutionItemStatusClass(status) {
+  switch (status) {
+    case 'blocked':
+    case 'queue_failed':
+      return 'review-status-failed';
+    case 'queued_with_warnings':
+    case 'ready_with_warnings':
+      return 'review-status-held';
+    case 'queued':
+    default:
+      return 'review-status-selected';
+  }
+}
+
+/**
+ * Return a human-readable label for an execution-run item queue status.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function getExecutionItemStatusLabel(status) {
+  switch (status) {
+    case 'blocked':
+      return 'Blocked';
+    case 'queue_failed':
+      return 'Queue failed';
+    case 'queued_with_warnings':
+      return 'Queued with warnings';
+    case 'queued':
+      return 'Queued';
+    case 'ready_with_warnings':
+      return 'Ready with warnings';
+    default:
+      return 'Ready';
+  }
+}
+
+/**
+ * Return a human-readable label for a live slskd transfer summary.
+ *
+ * Returns 'Not reconciled' when no summary is provided so the UI always has
+ * something to display.
+ *
+ * @param {object|null|undefined} summary
+ * @returns {string}
+ */
+export function formatLiveTransferStatus(summary) {
+  if (!summary) return 'Not reconciled';
+  switch (summary.status) {
+    case 'active':
+      return 'Active';
+    case 'queued':
+      return 'Queued remotely';
+    case 'completed':
+      return 'Completed';
+    case 'failed':
+      return 'Failed';
+    case 'not_found':
+      return summary.missingTransfer?.isPastGracePeriod ? 'Orphaned' : 'Missing remotely';
+    default:
+      return 'Missing';
+  }
+}
+
+/**
+ * Return a CSS class suffix for a live transfer summary status pill.
+ *
+ * @param {object|null|undefined} summary
+ * @returns {string}
+ */
+export function getLiveTransferStatusClass(summary) {
+  switch (summary?.status) {
+    case 'active':
+      return 'review-status-selected';
+    case 'queued':
+      return 'review-status-pending';
+    case 'completed':
+      return 'review-status-held';
+    case 'failed':
+      return 'review-status-failed';
+    case 'not_found':
+      return summary?.missingTransfer?.isPastGracePeriod
+        ? 'review-status-failed'
+        : 'review-status-pending';
+    default:
+      return 'review-status-pending';
+  }
+}
+
+/**
+ * Return the persisted transfer observation for a run item, or null.
+ *
+ * @param {object|null|undefined} item
+ * @returns {object|null}
+ */
+export function getPersistedTransferObservation(item) {
+  return item?.persistedTransferObservation ?? null;
+}
+
+/**
+ * Return the latest transfer summary from a run item's persisted observation,
+ * or null if absent.
+ *
+ * @param {object|null|undefined} item
+ * @returns {object|null}
+ */
+export function getLatestTransferSummary(item) {
+  return getPersistedTransferObservation(item)?.summary ?? null;
+}
+
+/**
+ * Return the persisted missing-transfer record for a run item, or null.
+ *
+ * @param {object|null|undefined} item
+ * @returns {object|null}
+ */
+export function getPersistedMissingTransfer(item) {
+  return item?.persistedMissingTransfer ?? null;
+}
+
+/**
+ * Return a human-readable label for the last outcome of an import execution
+ * heartbeat.
+ *
+ * @param {object|null|undefined} heartbeat
+ * @returns {string}
+ */
+export function getHeartbeatOutcomeLabel(heartbeat) {
+  switch (heartbeat?.state?.lastOutcome) {
+    case 'started':
+      return 'Reconciled automatically';
+    case 'error':
+      return 'Heartbeat error';
+    case 'skipped':
+      return 'Skipped';
+    default:
+      return 'Not yet recorded';
+  }
+}
+
+/**
+ * Return a human-readable label for the last heartbeat skip reason.
+ *
+ * @param {string|null|undefined} reason
+ * @returns {string}
+ */
+export function getHeartbeatSkipReasonLabel(reason) {
+  switch (reason) {
+    case 'not_due':
+      return 'No actionable transfer updates were visible.';
+    case 'tick_in_progress':
+      return 'A previous reconciliation tick was still running.';
+    case 'error':
+      return 'The last heartbeat tick failed.';
+    default:
+      return 'None';
+  }
+}
+
+/**
+ * Return whether a new execution run can be started given the current run
+ * state and the number of selected candidates.
+ *
+ * A run can be started when there is no current run, or the current run has
+ * finished (i.e. is neither pending nor running) and there are selected
+ * candidates waiting.
+ *
+ * @param {object|null|undefined} currentRun
+ * @param {number} selectedCandidateCount
+ * @returns {boolean}
+ */
+export function canStartExecutionRun(currentRun, selectedCandidateCount) {
+  return !currentRun || (
+    currentRun.status !== 'pending' &&
+    currentRun.status !== 'running' &&
+    selectedCandidateCount > 0
+  );
+}

@@ -23,12 +23,14 @@ import {
   candidateStatusLabel,
   candidateStatusTone,
   canStartApplyRun,
+  canStartExecutionRun,
   describeApplyOperation,
   formatApplyFallbackReason,
   formatApplyMutationMode,
   formatBytes,
   formatCandidateCountLabel,
   formatExecutionMode,
+  formatLiveTransferStatus,
   formatPath,
   formatPercent,
   formatRunStatus,
@@ -41,6 +43,14 @@ import {
   getApplyOperationStatusClass,
   getApplyOperationStatusLabel,
   getApplyOperationStepLabel,
+  getExecutionItemStatusClass,
+  getExecutionItemStatusLabel,
+  getHeartbeatOutcomeLabel,
+  getHeartbeatSkipReasonLabel,
+  getLatestTransferSummary,
+  getLiveTransferStatusClass,
+  getPersistedMissingTransfer,
+  getPersistedTransferObservation,
   getRunStatusClass,
 } from '../../src/client/lib/import-candidate-presentation.js';
 
@@ -715,5 +725,327 @@ describe('formatCandidateCountLabel', () => {
   });
   it('does not return singular for 0', () => {
     assert.notEqual(formatCandidateCountLabel(0), '1 candidate');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getExecutionItemStatusClass
+// ---------------------------------------------------------------------------
+
+describe('getExecutionItemStatusClass', () => {
+  it('returns failed class for "blocked"', () => {
+    assert.equal(getExecutionItemStatusClass('blocked'), 'review-status-failed');
+  });
+
+  it('returns failed class for "queue_failed"', () => {
+    assert.equal(getExecutionItemStatusClass('queue_failed'), 'review-status-failed');
+  });
+
+  it('returns held class for "queued_with_warnings"', () => {
+    assert.equal(getExecutionItemStatusClass('queued_with_warnings'), 'review-status-held');
+  });
+
+  it('returns held class for "ready_with_warnings"', () => {
+    assert.equal(getExecutionItemStatusClass('ready_with_warnings'), 'review-status-held');
+  });
+
+  it('returns selected class for "queued"', () => {
+    assert.equal(getExecutionItemStatusClass('queued'), 'review-status-selected');
+  });
+
+  it('returns selected class for unknown value', () => {
+    assert.equal(getExecutionItemStatusClass('other'), 'review-status-selected');
+  });
+
+  it('returns selected class for null', () => {
+    assert.equal(getExecutionItemStatusClass(null), 'review-status-selected');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getExecutionItemStatusLabel
+// ---------------------------------------------------------------------------
+
+describe('getExecutionItemStatusLabel', () => {
+  it('returns "Blocked" for "blocked"', () => {
+    assert.equal(getExecutionItemStatusLabel('blocked'), 'Blocked');
+  });
+
+  it('returns "Queue failed" for "queue_failed"', () => {
+    assert.equal(getExecutionItemStatusLabel('queue_failed'), 'Queue failed');
+  });
+
+  it('returns "Queued with warnings" for "queued_with_warnings"', () => {
+    assert.equal(getExecutionItemStatusLabel('queued_with_warnings'), 'Queued with warnings');
+  });
+
+  it('returns "Queued" for "queued"', () => {
+    assert.equal(getExecutionItemStatusLabel('queued'), 'Queued');
+  });
+
+  it('returns "Ready with warnings" for "ready_with_warnings"', () => {
+    assert.equal(getExecutionItemStatusLabel('ready_with_warnings'), 'Ready with warnings');
+  });
+
+  it('returns "Ready" for unknown value', () => {
+    assert.equal(getExecutionItemStatusLabel('other'), 'Ready');
+  });
+
+  it('returns "Ready" for null', () => {
+    assert.equal(getExecutionItemStatusLabel(null), 'Ready');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatLiveTransferStatus
+// ---------------------------------------------------------------------------
+
+describe('formatLiveTransferStatus', () => {
+  it('returns "Not reconciled" for null', () => {
+    assert.equal(formatLiveTransferStatus(null), 'Not reconciled');
+  });
+
+  it('returns "Not reconciled" for undefined', () => {
+    assert.equal(formatLiveTransferStatus(undefined), 'Not reconciled');
+  });
+
+  it('returns "Active" for status active', () => {
+    assert.equal(formatLiveTransferStatus({ status: 'active' }), 'Active');
+  });
+
+  it('returns "Queued remotely" for status queued', () => {
+    assert.equal(formatLiveTransferStatus({ status: 'queued' }), 'Queued remotely');
+  });
+
+  it('returns "Completed" for status completed', () => {
+    assert.equal(formatLiveTransferStatus({ status: 'completed' }), 'Completed');
+  });
+
+  it('returns "Failed" for status failed', () => {
+    assert.equal(formatLiveTransferStatus({ status: 'failed' }), 'Failed');
+  });
+
+  it('returns "Orphaned" for not_found past grace period', () => {
+    assert.equal(
+      formatLiveTransferStatus({ status: 'not_found', missingTransfer: { isPastGracePeriod: true } }),
+      'Orphaned',
+    );
+  });
+
+  it('returns "Missing remotely" for not_found within grace period', () => {
+    assert.equal(
+      formatLiveTransferStatus({ status: 'not_found', missingTransfer: { isPastGracePeriod: false } }),
+      'Missing remotely',
+    );
+  });
+
+  it('returns "Missing remotely" for not_found with no missingTransfer', () => {
+    assert.equal(formatLiveTransferStatus({ status: 'not_found' }), 'Missing remotely');
+  });
+
+  it('returns "Missing" for unknown status', () => {
+    assert.equal(formatLiveTransferStatus({ status: 'unknown' }), 'Missing');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLiveTransferStatusClass
+// ---------------------------------------------------------------------------
+
+describe('getLiveTransferStatusClass', () => {
+  it('returns pending class for null', () => {
+    assert.equal(getLiveTransferStatusClass(null), 'review-status-pending');
+  });
+
+  it('returns selected class for active', () => {
+    assert.equal(getLiveTransferStatusClass({ status: 'active' }), 'review-status-selected');
+  });
+
+  it('returns pending class for queued', () => {
+    assert.equal(getLiveTransferStatusClass({ status: 'queued' }), 'review-status-pending');
+  });
+
+  it('returns held class for completed', () => {
+    assert.equal(getLiveTransferStatusClass({ status: 'completed' }), 'review-status-held');
+  });
+
+  it('returns failed class for failed', () => {
+    assert.equal(getLiveTransferStatusClass({ status: 'failed' }), 'review-status-failed');
+  });
+
+  it('returns failed class for not_found past grace period', () => {
+    assert.equal(
+      getLiveTransferStatusClass({ status: 'not_found', missingTransfer: { isPastGracePeriod: true } }),
+      'review-status-failed',
+    );
+  });
+
+  it('returns pending class for not_found within grace period', () => {
+    assert.equal(
+      getLiveTransferStatusClass({ status: 'not_found', missingTransfer: { isPastGracePeriod: false } }),
+      'review-status-pending',
+    );
+  });
+
+  it('returns pending class for unknown status', () => {
+    assert.equal(getLiveTransferStatusClass({ status: 'other' }), 'review-status-pending');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getPersistedTransferObservation
+// ---------------------------------------------------------------------------
+
+describe('getPersistedTransferObservation', () => {
+  it('returns null for null item', () => {
+    assert.equal(getPersistedTransferObservation(null), null);
+  });
+
+  it('returns null for undefined item', () => {
+    assert.equal(getPersistedTransferObservation(undefined), null);
+  });
+
+  it('returns null when field is absent', () => {
+    assert.equal(getPersistedTransferObservation({}), null);
+  });
+
+  it('returns the observation when present', () => {
+    const obs = { summary: { status: 'completed' } };
+    assert.deepEqual(getPersistedTransferObservation({ persistedTransferObservation: obs }), obs);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLatestTransferSummary
+// ---------------------------------------------------------------------------
+
+describe('getLatestTransferSummary', () => {
+  it('returns null for null item', () => {
+    assert.equal(getLatestTransferSummary(null), null);
+  });
+
+  it('returns null when persistedTransferObservation is absent', () => {
+    assert.equal(getLatestTransferSummary({}), null);
+  });
+
+  it('returns null when observation has no summary', () => {
+    assert.equal(getLatestTransferSummary({ persistedTransferObservation: {} }), null);
+  });
+
+  it('returns the summary when present', () => {
+    const summary = { status: 'completed', total: 3 };
+    assert.deepEqual(
+      getLatestTransferSummary({ persistedTransferObservation: { summary } }),
+      summary,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getPersistedMissingTransfer
+// ---------------------------------------------------------------------------
+
+describe('getPersistedMissingTransfer', () => {
+  it('returns null for null item', () => {
+    assert.equal(getPersistedMissingTransfer(null), null);
+  });
+
+  it('returns null for undefined item', () => {
+    assert.equal(getPersistedMissingTransfer(undefined), null);
+  });
+
+  it('returns null when field is absent', () => {
+    assert.equal(getPersistedMissingTransfer({}), null);
+  });
+
+  it('returns the missing transfer when present', () => {
+    const mt = { missingSince: '2026-01-01T00:00:00Z' };
+    assert.deepEqual(getPersistedMissingTransfer({ persistedMissingTransfer: mt }), mt);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getHeartbeatOutcomeLabel
+// ---------------------------------------------------------------------------
+
+describe('getHeartbeatOutcomeLabel', () => {
+  it('returns "Reconciled automatically" for "started"', () => {
+    assert.equal(getHeartbeatOutcomeLabel({ state: { lastOutcome: 'started' } }), 'Reconciled automatically');
+  });
+
+  it('returns "Heartbeat error" for "error"', () => {
+    assert.equal(getHeartbeatOutcomeLabel({ state: { lastOutcome: 'error' } }), 'Heartbeat error');
+  });
+
+  it('returns "Skipped" for "skipped"', () => {
+    assert.equal(getHeartbeatOutcomeLabel({ state: { lastOutcome: 'skipped' } }), 'Skipped');
+  });
+
+  it('returns "Not yet recorded" for unknown outcome', () => {
+    assert.equal(getHeartbeatOutcomeLabel({ state: { lastOutcome: 'other' } }), 'Not yet recorded');
+  });
+
+  it('returns "Not yet recorded" for null heartbeat', () => {
+    assert.equal(getHeartbeatOutcomeLabel(null), 'Not yet recorded');
+  });
+
+  it('returns "Not yet recorded" when state is absent', () => {
+    assert.equal(getHeartbeatOutcomeLabel({}), 'Not yet recorded');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getHeartbeatSkipReasonLabel
+// ---------------------------------------------------------------------------
+
+describe('getHeartbeatSkipReasonLabel', () => {
+  it('returns the no-updates message for "not_due"', () => {
+    assert.equal(getHeartbeatSkipReasonLabel('not_due'), 'No actionable transfer updates were visible.');
+  });
+
+  it('returns the tick-in-progress message for "tick_in_progress"', () => {
+    assert.equal(getHeartbeatSkipReasonLabel('tick_in_progress'), 'A previous reconciliation tick was still running.');
+  });
+
+  it('returns the error message for "error"', () => {
+    assert.equal(getHeartbeatSkipReasonLabel('error'), 'The last heartbeat tick failed.');
+  });
+
+  it('returns "None" for unknown reason', () => {
+    assert.equal(getHeartbeatSkipReasonLabel('something_else'), 'None');
+  });
+
+  it('returns "None" for null', () => {
+    assert.equal(getHeartbeatSkipReasonLabel(null), 'None');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// canStartExecutionRun
+// ---------------------------------------------------------------------------
+
+describe('canStartExecutionRun', () => {
+  it('returns true when there is no current run', () => {
+    assert.equal(canStartExecutionRun(null, 0), true);
+  });
+
+  it('returns false when run is pending', () => {
+    assert.equal(canStartExecutionRun({ status: 'pending' }, 5), false);
+  });
+
+  it('returns false when run is running', () => {
+    assert.equal(canStartExecutionRun({ status: 'running' }, 5), false);
+  });
+
+  it('returns true when run is completed and count > 0', () => {
+    assert.equal(canStartExecutionRun({ status: 'completed' }, 3), true);
+  });
+
+  it('returns false when run is completed but count is 0', () => {
+    assert.equal(canStartExecutionRun({ status: 'completed' }, 0), false);
+  });
+
+  it('returns true when run is failed and count > 0', () => {
+    assert.equal(canStartExecutionRun({ status: 'failed' }, 1), true);
   });
 });

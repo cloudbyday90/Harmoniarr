@@ -17,6 +17,15 @@
 -->
 
 <script setup>
+import {
+  formatTokenExpiry,
+  getAppleMusicStatusClass,
+  getAppleMusicStatusLabel,
+  getOAuthProviderStatus,
+  getOAuthProviderStatusClass,
+  getProviderLabel,
+} from '../lib/provider-status-presentation.js';
+
 const props = defineProps({
   providerStatus: {
     type: Object,
@@ -25,59 +34,6 @@ const props = defineProps({
 });
 
 defineEmits(['refresh']);
-
-function providerLabel(provider) {
-  switch (provider) {
-    case 'apple_music':
-      return 'Apple Music';
-    case 'spotify':
-      return 'Spotify';
-    case 'youtube':
-      return 'YouTube';
-    default:
-      return provider;
-  }
-}
-
-function oAuthProviderStatus(provider) {
-  if (!provider) {
-    return 'Unavailable';
-  }
-
-  return provider.linked ? 'Linked' : 'Not linked';
-}
-
-function oAuthProviderStatusClass(provider) {
-  if (!provider) {
-    return 'review-status-failed';
-  }
-
-  return provider.linked ? 'review-status-selected' : 'review-status-held';
-}
-
-function appleMusicStatusClass(provider) {
-  if (!provider) {
-    return 'review-status-failed';
-  }
-
-  return provider.configured ? 'review-status-selected' : 'review-status-held';
-}
-
-function appleMusicStatusLabel(provider) {
-  if (!provider) {
-    return 'Unavailable';
-  }
-
-  return provider.configured ? 'Configured' : 'Not configured';
-}
-
-function formatTokenExpiry(provider) {
-  if (!provider?.linked || !provider.tokenExpiresAt) {
-    return null;
-  }
-
-  return new Date(provider.tokenExpiresAt).toLocaleString();
-}
 
 const providers = (() => {
   const { providerStatus: ps } = props;
@@ -88,15 +44,15 @@ const providers = (() => {
   const result = [];
 
   if (ps.spotify) {
-    result.push({ key: 'spotify', label: providerLabel('spotify'), ...ps.spotify, type: 'oauth' });
+    result.push({ key: 'spotify', label: getProviderLabel('spotify'), ...ps.spotify, type: 'oauth' });
   }
 
   if (ps.youtube) {
-    result.push({ key: 'youtube', label: providerLabel('youtube'), ...ps.youtube, type: 'oauth' });
+    result.push({ key: 'youtube', label: getProviderLabel('youtube'), ...ps.youtube, type: 'oauth' });
   }
 
   if (ps.appleMusic) {
-    result.push({ key: 'apple_music', label: providerLabel('apple_music'), ...ps.appleMusic, type: 'credentials' });
+    result.push({ key: 'apple_music', label: getProviderLabel('apple_music'), ...ps.appleMusic, type: 'credentials' });
   }
 
   return result;
@@ -119,13 +75,13 @@ const providers = (() => {
         v-for="provider in providers"
         :key="provider.key"
         :class="provider.type === 'oauth'
-          ? oAuthProviderStatusClass(provider)
-          : appleMusicStatusClass(provider)"
+          ? getOAuthProviderStatusClass(provider)
+          : getAppleMusicStatusClass(provider)"
       >
         <div class="dependency-card-header">
           <div>
             <p>{{ provider.label }}</p>
-            <strong>{{ provider.type === 'oauth' ? oAuthProviderStatus(provider) : appleMusicStatusLabel(provider) }}</strong>
+            <strong>{{ provider.type === 'oauth' ? getOAuthProviderStatus(provider) : getAppleMusicStatusLabel(provider) }}</strong>
           </div>
           <span class="dependency-status-dot" aria-hidden="true"></span>
         </div>
