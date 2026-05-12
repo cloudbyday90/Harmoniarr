@@ -104,7 +104,7 @@
   --hx-bottom-nav-height: 60px;
 
   /* Scrollbar — light theme */
-  --hx-scrollbar-w: 8px;
+  --hx-scrollbar-w: 12px;
   --hx-scrollbar-thumb: rgba(15, 28, 36, 0.32);
   --hx-scrollbar-thumb-hover: rgba(15, 28, 36, 0.52);
   --hx-scrollbar-track: transparent;
@@ -233,6 +233,7 @@
 
 ::-webkit-scrollbar-track {
   background: var(--hx-scrollbar-track);
+  margin-block: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
