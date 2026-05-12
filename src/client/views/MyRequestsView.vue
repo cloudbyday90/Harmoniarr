@@ -25,6 +25,7 @@ import RequestNotificationsPanel from '../components/RequestNotificationsPanel.v
 import { useGridState } from '../composables/useGridState.js';
 import { useMyRequestNotifications } from '../composables/useMyRequestNotifications.js';
 import { useMyRequests } from '../composables/useMyRequests.js';
+import { sortMyRequests } from '../lib/my-requests-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const viewerUserId = computed(() => sessionStore.state.user?.id ?? null);
@@ -86,22 +87,7 @@ const displayRequests = computed(() => {
     : all;
   const field = filterState.value?.sort?.field ?? 'requested_at';
   const order = filterState.value?.sort?.order ?? 'desc';
-  return [...filtered].sort((a, b) => {
-    let av, bv;
-    if (field === 'title') {
-      av = (a.releaseGroupTitle ?? a.title ?? '').toLowerCase();
-      bv = (b.releaseGroupTitle ?? b.title ?? '').toLowerCase();
-    } else if (field === 'artist') {
-      av = (a.artistSortName ?? a.artistName ?? '').toLowerCase();
-      bv = (b.artistSortName ?? b.artistName ?? '').toLowerCase();
-    } else {
-      av = a.requestedAt ?? a.createdAt ?? '';
-      bv = b.requestedAt ?? b.createdAt ?? '';
-    }
-    if (av < bv) return order === 'asc' ? -1 : 1;
-    if (av > bv) return order === 'asc' ? 1 : -1;
-    return 0;
-  });
+  return sortMyRequests(filtered, { field, order });
 });
 
 onMounted(() => {

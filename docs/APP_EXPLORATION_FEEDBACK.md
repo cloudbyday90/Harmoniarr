@@ -885,3 +885,24 @@ Test suite: **1935 tests, 0 failures** (unchanged — no new exports).
 - `test/client/request-music-form.test.js` — updated 2 `getRequestTargetLabel` assertions to expect `Admin`/`Requester`
 
 Test suite: **1940 tests, 0 failures** (up from 1935).
+
+---
+
+### 2026-05-12 - My Requests Screen
+
+**Screen:** `MyRequestsView.vue` (190 lines before changes)
+
+**Issues identified and resolved:**
+
+1. **Inline sort comparator extracted to `sortMyRequests`** — The `displayRequests` computed contained a 20-line sort body with three field branches, each using fallback chains (`releaseGroupTitle ?? title`, `artistSortName ?? artistName`, `requestedAt ?? createdAt`) and bi-directional comparison. Extracted to `src/client/lib/my-requests-presentation.js` as `sortMyRequests(requests, { field, order })`. The computed now delegates to the lib and reads cleanly.
+
+No raw enum display issues were found — the sort/filter option labels (`'Date requested'`, `'Pending'`, etc.) are already user-facing strings. `RequestCard` handles its own display rendering.
+
+**Files changed:**
+- `src/client/lib/my-requests-presentation.js` — NEW FILE, `sortMyRequests` export
+- `test/client/my-requests-presentation.test.js` — NEW FILE, 13 tests
+- `src/client/views/MyRequestsView.vue` — import `sortMyRequests`; replace inline sort body
+
+**Test coverage for `sortMyRequests`:** empty input, no-mutation, `requested_at` desc (default), `requested_at` asc, `createdAt` fallback, `title` asc (releaseGroupTitle), `title` asc (title fallback), `title` desc, `artist` asc (artistSortName), `artist` asc (artistName fallback), `artist` desc, case-insensitive title sort, case-insensitive artist sort, equal-value order preservation.
+
+Test suite: **1954 tests, 0 failures** (up from 1940).
