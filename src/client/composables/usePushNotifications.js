@@ -18,6 +18,7 @@
 
 import { computed, readonly, ref } from 'vue';
 import { fetchVapidPublicKey, subscribeToPush, unsubscribeFromPush } from '../lib/push-api.js';
+import { urlBase64ToUint8Array } from '../lib/push-encoding.js';
 
 /**
  * Vue composable for Web Push subscription lifecycle.
@@ -55,26 +56,6 @@ const _isLoading = ref(false);
 
 /** Last subscribe/unsubscribe error message, or null when no error. */
 const _errorMessage = ref(null);
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Decode a base64url string into a Uint8Array suitable for
- * `applicationServerKey` in `pushManager.subscribe()`.
- */
-function urlBase64ToUint8Array(base64String) {
-  // Strip any existing padding before computing the correct padding length.
-  const stripped = base64String.replace(/=/g, '');
-  const padding = '='.repeat((4 - (stripped.length % 4)) % 4);
-  const base64 = (stripped + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; i++) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-
-  return outputArray;
-}
 
 // ── Composable ────────────────────────────────────────────────────────────────
 

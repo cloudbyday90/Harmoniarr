@@ -1316,3 +1316,34 @@ All five are now exported from `src/client/lib/import-review-queue-normalization
 - `test/client/import-review-queue-normalization.test.js` — new test file, 34 tests
 
 Test suite: **2346 tests, 0 failures** (up from 2312).
+
+### 2026-05-12 - useTheme + usePushNotifications Pure Function Extraction
+
+**Composables changed:** `src/client/composables/useTheme.js`, `src/client/composables/usePushNotifications.js`
+**Libs created:** `src/client/lib/theme-preference.js`, `src/client/lib/push-encoding.js`
+**Tests created:** `test/client/theme-preference.test.js`, `test/client/push-encoding.test.js`
+
+**What was extracted:**
+
+**`useTheme.js` → `theme-preference.js`**
+
+Three definitions lived inside the composable file with no test coverage:
+- `STORAGE_KEY` (`'hx-theme-preference'`) — the localStorage key. Renamed to `THEME_STORAGE_KEY` on export so its purpose is unambiguous when imported.
+- `VALID_PREFERENCES` — the exhaustive three-value tuple `['system', 'light', 'dark']`. Renamed to `VALID_THEME_PREFERENCES`.
+- `isValidPreference(value)` — guards `setPreference()` and the stored-value load path; if it returns a wrong result, saved preferences are silently discarded on every page load. Renamed to `isValidThemePreference`.
+
+The composable imports and locally aliases both (`STORAGE_KEY = THEME_STORAGE_KEY`, `isValidPreference = isValidThemePreference`) so the composable body is unchanged.
+
+**`usePushNotifications.js` → `push-encoding.js`**
+
+`urlBase64ToUint8Array(base64String)` — converts a VAPID public key from the URL-safe base64 format the server sends into the `Uint8Array` expected by `PushManager.subscribe({ applicationServerKey })`. If this function is broken (off-by-one in padding, missed character substitution), push subscription silently fails in the browser with no visible error — the subscribe flow calls `atob()` which throws, and the composable catches it with a generic "Failed to enable push notifications." message. Testing this function independently ensures the encoding logic is correct regardless of browser API availability.
+
+**Files changed:**
+- `src/client/lib/theme-preference.js` — new file: `THEME_STORAGE_KEY`, `VALID_THEME_PREFERENCES`, `isValidThemePreference`
+- `src/client/lib/push-encoding.js` — new file: `urlBase64ToUint8Array`
+- `src/client/composables/useTheme.js` — import from lib; remove 3 local definitions
+- `src/client/composables/usePushNotifications.js` — import from lib; remove `urlBase64ToUint8Array` function and Helpers section
+- `test/client/theme-preference.test.js` — new test file, 18 tests
+- `test/client/push-encoding.test.js` — new test file, 10 tests
+
+Test suite: **2374 tests, 0 failures** (up from 2346).

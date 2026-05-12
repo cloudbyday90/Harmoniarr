@@ -17,14 +17,13 @@
  */
 
 import { computed, getCurrentInstance, onUnmounted, ref } from 'vue';
+import {
+  isValidThemePreference,
+  THEME_STORAGE_KEY,
+} from '../lib/theme-preference.js';
 
-const STORAGE_KEY = 'hx-theme-preference';
-
-const VALID_PREFERENCES = /** @type {const} */ (['system', 'light', 'dark']);
-
-function isValidPreference(value) {
-  return VALID_PREFERENCES.includes(value);
-}
+const STORAGE_KEY = THEME_STORAGE_KEY;
+const isValidPreference = isValidThemePreference;
 
 /**
  * Factory composable that manages the three-way theme preference.
