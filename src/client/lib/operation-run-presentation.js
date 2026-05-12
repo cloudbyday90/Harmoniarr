@@ -141,6 +141,34 @@ export function groupOperationRunsForDisplay(runs) {
 }
 
 /**
+ * Builds the filter option list for the operations job queue filter bar.
+ *
+ * Each entry represents a display group (needs-attention, in-progress,
+ * recently-completed) plus a leading "All" entry. Only non-empty groups are
+ * included alongside "All".
+ *
+ * Return length semantics:
+ *   - 1 — no runs (All 0 only); bar should be hidden.
+ *   - 2 — all runs fall into a single group; bar should be hidden because
+ *          both tabs would show identical rows.
+ *   - 3+ — runs span multiple groups; bar is worth showing for triage.
+ *
+ * The caller should show the filter bar only when `options.length > 2`.
+ *
+ * @param {Array|null|undefined} runs
+ * @returns {Array<{id: string|null, label: string, count: number}>}
+ */
+export function buildOperationFilterOptions(runs) {
+  const normalizedRuns = runs ?? [];
+  const groups = groupOperationRunsForDisplay(normalizedRuns);
+  const options = [
+    { id: null, label: 'All', count: normalizedRuns.length },
+    ...groups.map((g) => ({ id: g.id, label: g.title, count: g.runs.length })),
+  ];
+  return options.filter((o) => o.id === null || o.count > 0);
+}
+
+/**
  * Returns a human-readable duration string for a run.
  *
  * - Running / pending runs: time elapsed from startedAt to now.

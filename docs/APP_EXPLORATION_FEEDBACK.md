@@ -1374,3 +1374,52 @@ The `tabs` array that drives the Activity tabbar had `implemented: false` for 8 
 **Fix:** Updated `implemented: true` for the 8 implemented tabs (Queue, Wanted, Downloads, Imports, Releases, Users, History, Failed). Blocklist remains `implemented: false` (correctly routes to `ActivityComingSoonView`).
 
 No new tests added — the `implemented` flag is a static data constant in a Vue SFC, not a testable pure function. Visual validation confirmed badges removed in the rebuilt container.
+
+---
+
+### 2026-05-12 - Operations View Filter Bar — Single-Group Noise Suppression
+
+**Screen:** `OperationsView.vue`
+**Lib extended:** `src/client/lib/operation-run-presentation.js` (1 new export)
+**Tests extended:** `test/client/operation-run-presentation.test.js` (10 new tests)
+
+**What was found:**
+
+The filter bar above the Job queue table was rendering even when all operation runs belonged to a single group. In the walkthrough environment, all 20 runs are "Library discovery — Failed", which places every run in the `needs-attention` group. The filter bar showed two tabs — "All 20" and "Needs attention 20" — both displaying the same 20 rows. Neither tab filtered anything, because there was only one group to choose from.
+
+**Why it was useless noise:**
+
+The filter bar is designed for triage: it lets an operator quickly narrow to "what failed" vs "what completed" vs "what is in-progress". When all runs share a single group, both tabs are identical. Showing two clickable tabs that always show the same rows is:
+- Visually distracting (two prominent pills competing for attention above the actual data)
+- Semantically wrong (a filter with only one selectable state is not a filter)
+- Misleading (the bar implies there is something to differentiate when there is not)
+
+**Root cause:** The `filterOptions` computed checked `filterOptions.length > 1` to decide whether to show the bar. A single populated group produces exactly 2 options (`All` + that group) — length 2 satisfies `> 1`, so the bar renders. The threshold `> 1` is only correct when there are no runs at all (length 1 = only the `All` entry). It should be `> 2` to require at least two distinct groups.
+
+**Fix:**
+
+1. **`buildOperationFilterOptions(runs)` extracted to lib** — The `filterOptions` computed body was extracted to a new pure export in `operation-run-presentation.js`. Return semantics:
+   - Length 1: no runs — only the "All 0" entry. Bar should be hidden.
+   - Length 2: all runs share one group — "All N" + one group tab showing the same N rows. Bar should be hidden.
+   - Length 3+: runs span two or more groups — bar provides genuine triage value and should render.
+
+2. **`OperationsView.vue` updated:**
+   - `buildOperationFilterOptions` added to the import.
+   - `filterOptions` computed simplified to a single delegating line: `computed(() => buildOperationFilterOptions(runs.value))`.
+   - Template guard changed from `v-if="filterOptions.length > 1"` to `v-if="filterOptions.length > 2"`.
+
+3. **10 new tests added:**
+   - Empty array → length 1 (All 0 only)
+   - Null input → length 1
+   - All failed → length 2, `needs-attention` group (bar hidden)
+   - All completed → length 2, `completed` group (bar hidden)
+   - All in-progress → length 2, `in-progress` group (bar hidden)
+   - Failed + completed → length 3, both non-All groups present (bar shown)
+   - All three groups populated → length 4
+   - Empty groups omitted — `needs-attention` absent when no failed/cancelled runs
+   - All count always equals total run count (20 failed → All=20, Needs attention=20)
+   - Single-group returns length ≤ 2 (threshold not met); multi-group returns length > 2 (threshold met)
+
+**Visual verification:** After Docker rebuild (no-cache), the Operations view with 20 Library discovery Failed runs shows the full job queue with no filter bar above it. The header reads "Job queue" only — no redundant "All 20 / Needs attention 20" pills.
+
+Test suite: **2385 tests, 0 failures** (up from 2374).

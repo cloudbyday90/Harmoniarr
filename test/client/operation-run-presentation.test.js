@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildOperationFilterOptions,
   buildOperationSummaryEntries,
   formatElapsedDuration,
   formatLeaseStateLabel,
@@ -558,6 +559,121 @@ test('formatQueueRunStatusTone returns undefined for null', () => {
 
 test('formatElapsedDuration returns dash for null start', () => {
   assert.equal(formatElapsedDuration(null), '\u2014');
+});
+
+// ---------------------------------------------------------------------------
+// buildOperationFilterOptions
+// ---------------------------------------------------------------------------
+
+test('buildOperationFilterOptions returns only the All entry for an empty array', () => {
+  const options = buildOperationFilterOptions([]);
+  assert.equal(options.length, 1);
+  assert.equal(options[0].id, null);
+  assert.equal(options[0].label, 'All');
+  assert.equal(options[0].count, 0);
+});
+
+test('buildOperationFilterOptions returns only the All entry for null input', () => {
+  const options = buildOperationFilterOptions(null);
+  assert.equal(options.length, 1);
+  assert.equal(options[0].id, null);
+});
+
+test('buildOperationFilterOptions returns 2 options when all runs are failed', () => {
+  const runs = [
+    { id: 'a', status: 'failed' },
+    { id: 'b', status: 'failed' },
+  ];
+  const options = buildOperationFilterOptions(runs);
+  assert.equal(options.length, 2);
+  assert.equal(options[0].label, 'All');
+  assert.equal(options[0].count, 2);
+  assert.equal(options[1].id, 'needs-attention');
+  assert.equal(options[1].count, 2);
+});
+
+test('buildOperationFilterOptions returns 2 options when all runs are completed', () => {
+  const runs = [
+    { id: 'a', status: 'completed' },
+    { id: 'b', status: 'completed' },
+  ];
+  const options = buildOperationFilterOptions(runs);
+  assert.equal(options.length, 2);
+  assert.equal(options[0].count, 2);
+  assert.equal(options[1].id, 'completed');
+  assert.equal(options[1].count, 2);
+});
+
+test('buildOperationFilterOptions returns 2 options when all runs are in-progress', () => {
+  const runs = [
+    { id: 'a', status: 'running' },
+    { id: 'b', status: 'pending' },
+  ];
+  const options = buildOperationFilterOptions(runs);
+  assert.equal(options.length, 2);
+  assert.equal(options[1].id, 'in-progress');
+});
+
+test('buildOperationFilterOptions returns 3 options when runs span failed and completed groups', () => {
+  const runs = [
+    { id: 'a', status: 'failed' },
+    { id: 'b', status: 'completed' },
+    { id: 'c', status: 'completed' },
+  ];
+  const options = buildOperationFilterOptions(runs);
+  assert.equal(options.length, 3);
+  assert.equal(options[0].label, 'All');
+  assert.equal(options[0].count, 3);
+  assert.equal(options[1].id, 'needs-attention');
+  assert.equal(options[1].count, 1);
+  assert.equal(options[2].id, 'completed');
+  assert.equal(options[2].count, 2);
+});
+
+test('buildOperationFilterOptions returns 4 options when all three groups are populated', () => {
+  const runs = [
+    { id: 'a', status: 'failed' },
+    { id: 'b', status: 'running' },
+    { id: 'c', status: 'completed' },
+  ];
+  const options = buildOperationFilterOptions(runs);
+  assert.equal(options.length, 4);
+  assert.equal(options[0].count, 3);
+  assert.equal(options[1].id, 'needs-attention');
+  assert.equal(options[2].id, 'in-progress');
+  assert.equal(options[3].id, 'completed');
+});
+
+test('buildOperationFilterOptions omits empty non-All groups', () => {
+  const runs = [
+    { id: 'a', status: 'running' },
+    { id: 'b', status: 'completed' },
+  ];
+  const options = buildOperationFilterOptions(runs);
+  assert.equal(options.length, 3);
+  assert.ok(!options.some((o) => o.id === 'needs-attention'));
+  assert.ok(options.some((o) => o.id === 'in-progress'));
+  assert.ok(options.some((o) => o.id === 'completed'));
+});
+
+test('buildOperationFilterOptions All count matches total run count for large set', () => {
+  const runs = Array.from({ length: 20 }, (_, i) => ({ id: String(i), status: 'failed' }));
+  const options = buildOperationFilterOptions(runs);
+  assert.equal(options[0].count, 20);
+  assert.equal(options[1].count, 20);
+  assert.equal(options.length, 2);
+});
+
+test('buildOperationFilterOptions: single group returns length 2, filter bar threshold not met', () => {
+  // All failed → 2 options → length > 2 is false → bar should not render
+  const allFailed = [{ status: 'failed' }, { status: 'cancelled' }];
+  assert.equal(buildOperationFilterOptions(allFailed).length > 2, false);
+});
+
+test('buildOperationFilterOptions: multiple groups returns length 3+, filter bar threshold met', () => {
+  // Mixed → 3 options → length > 2 is true → bar should render
+  const mixed = [{ status: 'failed' }, { status: 'completed' }];
+  assert.equal(buildOperationFilterOptions(mixed).length > 2, true);
 });
 
 test('formatElapsedDuration returns dash for undefined start', () => {

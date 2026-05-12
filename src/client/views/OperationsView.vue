@@ -35,6 +35,7 @@ import {
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
 import {
+  buildOperationFilterOptions,
   buildOperationSummaryEntries,
   formatLeaseStateLabel,
   formatLeaseStateTone,
@@ -89,13 +90,7 @@ const selectedRunWorkflowTarget = computed(() => buildOperationRunLinkTarget({
   runId: selectedRun.value?.id,
 }));
 
-const filterOptions = computed(() => {
-  const options = [
-    { id: null, label: 'All', count: runs.value.length },
-    ...groupedRuns.value.map((g) => ({ id: g.id, label: g.title, count: g.runs.length })),
-  ];
-  return options.filter((o) => o.id === null || o.count > 0);
-});
+const filterOptions = computed(() => buildOperationFilterOptions(runs.value));
 
 const displayGroups = computed(() => {
   if (!activeFilter.value) return groupedRuns.value;
@@ -227,7 +222,7 @@ watch(
       <article class="hx-card">
         <header class="hx-card-header ops-monitor-header">
           <h3 class="hx-card-title">Job queue</h3>
-          <div class="ops-filter-bar" v-if="filterOptions.length > 1">
+          <div class="ops-filter-bar" v-if="filterOptions.length > 2">
             <button
               v-for="option in filterOptions"
               :key="String(option.id)"
