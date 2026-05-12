@@ -26,48 +26,16 @@ import {
   reopenImportCandidate,
   selectImportCandidate,
 } from '../lib/import-candidate-api.js';
+import {
+  createEmptyQueue,
+  defaultImportReviewFilters,
+  normalizeCandidatePayload,
+  normalizeFilterValue,
+  normalizeQueuePayload,
+  normalizeReviewPayload,
+} from '../lib/import-review-queue-normalization.js';
 
-const defaultFilters = Object.freeze({
-  folderPath: '',
-  limit: 25,
-  offset: 0,
-  sourceSearchId: '',
-  status: 'pending',
-  username: '',
-});
-
-function createEmptyQueue() {
-  return {
-    candidates: [],
-    filters: {
-      folderPath: null,
-      sourceSearchId: null,
-      status: null,
-      username: null,
-    },
-    pagination: {
-      limit: defaultFilters.limit,
-      offset: defaultFilters.offset,
-      total: 0,
-    },
-  };
-}
-
-function normalizeFilterValue(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function normalizeQueuePayload(payload) {
-  return payload?.importCandidates ?? payload ?? createEmptyQueue();
-}
-
-function normalizeCandidatePayload(payload) {
-  return payload?.importCandidate ?? payload ?? null;
-}
-
-function normalizeReviewPayload(payload) {
-  return payload?.review ?? payload ?? null;
-}
+const defaultFilters = defaultImportReviewFilters;
 
 export function useImportReviewQueue({
   fetchCandidate = fetchImportCandidate,

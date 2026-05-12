@@ -1288,3 +1288,31 @@ Updated `OperationsView.vue` to import and use `getOperationRunDurationLabel` in
 - `test/client/operation-run-presentation.test.js` — add `getOperationRunDurationLabel` import; 8 new tests
 
 Test suite: **2312 tests, 0 failures** (up from 2304).
+
+### 2026-05-12 - useImportReviewQueue Normalization Function Extraction
+
+**Composable changed:** `src/client/composables/useImportReviewQueue.js`
+**Lib created:** `src/client/lib/import-review-queue-normalization.js`
+**Tests created:** `test/client/import-review-queue-normalization.test.js`
+
+**What was extracted:**
+
+`useImportReviewQueue.js` contained five module-level definitions that were pure (no reactive state, no Vue dependencies, no side effects) but were invisible to the test suite because they lived inside the composable file:
+
+- `defaultFilters` — the frozen constant holding the initial values for all filter fields (`status: 'pending'`, `limit: 25`, etc.). Renamed to `defaultImportReviewFilters` on export so the name is unambiguous when imported elsewhere.
+- `createEmptyQueue()` — returns the zero-state queue structure used on load failure and on first render.
+- `normalizeFilterValue(value)` — trims string filter inputs; coerces non-strings to `''` so filters are always sent to the server as clean strings.
+- `normalizeQueuePayload(payload)` — unwraps `{ importCandidates: [...] }` API responses or passes a pre-shaped payload through; falls back to an empty queue.
+- `normalizeCandidatePayload(payload)` — unwraps `{ importCandidate: {...} }` API responses; returns `null` for absent payloads.
+- `normalizeReviewPayload(payload)` — unwraps `{ review: {...} }` transition API responses; returns `null` for absent payloads.
+
+All five are now exported from `src/client/lib/import-review-queue-normalization.js`. The composable imports them and aliases `defaultImportReviewFilters` as `defaultFilters` for local compat. The composable body is unchanged in behaviour; the extraction is purely structural.
+
+**Why this matters:** These functions are on the critical path of every import candidate page load, filter change, row selection, and status transition. A regression in any of them (e.g. `normalizeFilterValue` accidentally trimming valid content, or `normalizeQueuePayload` missing a new server response shape) is now caught immediately by the test suite instead of only at runtime in the browser.
+
+**Files changed:**
+- `src/client/lib/import-review-queue-normalization.js` — new file, 5 exports
+- `src/client/composables/useImportReviewQueue.js` — import from lib; remove 5 local definitions
+- `test/client/import-review-queue-normalization.test.js` — new test file, 34 tests
+
+Test suite: **2346 tests, 0 failures** (up from 2312).
