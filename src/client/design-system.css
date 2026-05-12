@@ -655,7 +655,11 @@ body,
 }
 
 .hx-tabbar::-webkit-scrollbar {
-  height: 4px;
+  height: 6px;
+}
+
+.hx-tabbar::-webkit-scrollbar-track {
+  margin-inline: 8px;
 }
 
 .hx-tabbar::-webkit-scrollbar-thumb {
