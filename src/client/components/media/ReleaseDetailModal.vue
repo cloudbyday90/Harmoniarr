@@ -24,6 +24,11 @@ import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
 import { useActiveUsers } from '../../composables/useActiveUsers.js';
 import { sessionStore } from '../../state/session.js';
 import { getErrorMessage } from '../../lib/error-utils.js';
+import {
+  computeMediaTotalMs,
+  formatAlbumRuntime,
+  formatTrackDuration,
+} from '../../lib/track-duration.js';
 
 /**
  * ReleaseDetailModal — full release detail modal with tracklist, edition
@@ -127,21 +132,7 @@ const artworkMbidType = computed(() => {
   return release.value?.musicbrainzReleaseId ? 'release' : 'release-group';
 });
 
-const totalRuntime = computed(() => {
-  let totalMs = 0;
-  for (const medium of media.value) {
-    for (const track of medium.tracks ?? []) {
-      if (track.lengthMs) totalMs += track.lengthMs;
-    }
-  }
-  if (totalMs <= 0) return null;
-  const totalSec = Math.round(totalMs / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
-});
+const totalRuntime = computed(() => formatAlbumRuntime(computeMediaTotalMs(media.value)));
 
 const hasMultipleEditions = computed(() => allReleases.value.length > 1);
 
@@ -244,15 +235,6 @@ async function handleSetDefaultEdition(releaseRow) {
   await setDefaultEdition(props.releaseGroupMbid, releaseRow.id);
 }
 
-// ── Formatting helpers ────────────────────────────────────────────────────────
-
-function formatDuration(ms) {
-  if (!ms) return '';
-  const totalSec = Math.round(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
 </script>
 
 <template>
@@ -415,7 +397,7 @@ function formatDuration(ms) {
                   </span>
                   <span class="rdm-track-num">{{ track.numberText ?? track.position }}</span>
                   <span class="rdm-track-title">{{ track.title }}</span>
-                  <span class="rdm-track-duration">{{ formatDuration(track.lengthMs) }}</span>
+                  <span class="rdm-track-duration">{{ formatTrackDuration(track.lengthMs) ?? '' }}</span>
                 </li>
               </ol>
             </div>

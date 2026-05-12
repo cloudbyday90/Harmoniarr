@@ -1070,3 +1070,37 @@ Test suite: **2046 tests, 0 failures** (up from 1995).
 - `src/client/components/media/RequestCard.vue` — import three new lib functions; remove `formatDate` inline function definition; replace `kindLabel`, `requestedDate`/`updatedDate`, and `attributionLine` computed bodies with lib calls
 
 Test suite: **2067 tests, 0 failures** (up from 2046).
+
+### 2026-05-12 - ReleaseDetailModal, MetadataReleaseDetail, ImportCandidateDetailPanel Components
+
+**Components affected:**
+- `src/client/components/media/ReleaseDetailModal.vue` (679 lines — largest component, user-facing release detail modal)
+- `src/client/components/MetadataReleaseDetail.vue` (developer/diagnostic release detail view)
+- `src/client/components/ImportCandidateDetailPanel.vue` (import candidate file metadata display)
+
+**New shared lib:** `src/client/lib/track-duration.js`
+
+**Issues identified and resolved:**
+
+1. **Inline `formatDuration(ms)` in `ReleaseDetailModal`** — Formatted track durations as `m:ss`. No tests. Extracted as `formatTrackDuration(ms)` returning `null` for invalid input (callers use `?? ''` fallback). Template updated to `formatTrackDuration(track.lengthMs) ?? ''`.
+
+2. **Inline `totalRuntime` computed in `ReleaseDetailModal`** — 13-line block that iterated media/tracks to sum `lengthMs`, then formatted the result as `h:mm:ss` or `m:ss`. No tests. Extracted as two separate functions: `computeMediaTotalMs(mediaArray)` (pure aggregation, testable with any array) and `formatAlbumRuntime(totalMs)` (formatting, returns `null` for ≤0). Computed now reads: `formatAlbumRuntime(computeMediaTotalMs(media.value))`.
+
+3. **Inline `formatTrackLength(lengthMs)` in `MetadataReleaseDetail`** — Same m:ss conversion but used `Math.floor` instead of `Math.round` and returned `'Unknown length'` for invalid values. No tests. Replaced with `formatTrackDuration(track.lengthMs) ?? 'Unknown length'` — canonical rounding and null-return contract, fallback label at call site.
+
+4. **`formatDuration` called but never defined in `ImportCandidateDetailPanel`** — A runtime bug: `formatDuration(file.lengthSeconds)` referenced a function that was neither defined in the component script nor imported. This would throw a Vue template error whenever the file list section rendered. Fixed by importing and calling `formatFileDuration(seconds)` from the new lib (takes seconds, not ms — matches the `file.lengthSeconds` data field). Fallback: `?? 'Unknown'`.
+
+**New lib exports in `track-duration.js`:**
+- `formatTrackDuration(ms)` — ms → `m:ss` or `null`; uses `Math.round`
+- `formatFileDuration(seconds)` — seconds → `m:ss` or `null`; for file metadata
+- `computeMediaTotalMs(mediaArray)` — sums `track.lengthMs` across `media[].tracks[]`
+- `formatAlbumRuntime(totalMs)` — ms → `h:mm:ss` or `m:ss` or `null` for ≤0
+
+**Files changed:**
+- `src/client/lib/track-duration.js` — new file with 4 exports
+- `test/client/track-duration.test.js` — new file, 41 tests covering all branches (null/undefined/zero/negative, rounding, padding, hour boundary, multi-medium aggregation)
+- `src/client/components/media/ReleaseDetailModal.vue` — import lib; replace `totalRuntime` computed; remove `formatDuration` function; update call site
+- `src/client/components/MetadataReleaseDetail.vue` — import lib; remove `formatTrackLength`; update call site
+- `src/client/components/ImportCandidateDetailPanel.vue` — import `formatFileDuration`; fix undefined `formatDuration` call site
+
+Test suite: **2108 tests, 0 failures** (up from 2067).

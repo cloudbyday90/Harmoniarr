@@ -17,6 +17,8 @@
 -->
 
 <script setup>
+import { formatTrackDuration } from '../lib/track-duration.js';
+
 defineProps({
   localRelease: {
     type: Object,
@@ -24,16 +26,6 @@ defineProps({
   },
 });
 
-function formatTrackLength(lengthMs) {
-  if (!lengthMs || lengthMs < 0) {
-    return 'Unknown length';
-  }
-
-  const totalSeconds = Math.floor(lengthMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = String(totalSeconds % 60).padStart(2, '0');
-  return `${minutes}:${seconds}`;
-}
 </script>
 
 <template>
@@ -57,7 +49,7 @@ function formatTrackLength(lengthMs) {
         <ol class="track-list">
           <li v-for="track in medium.tracks" :key="track.id">
             <span>{{ track.numberText || track.position }}. {{ track.title }}</span>
-            <strong>{{ formatTrackLength(track.lengthMs) }}</strong>
+            <strong>{{ formatTrackDuration(track.lengthMs) ?? 'Unknown length' }}</strong>
           </li>
         </ol>
       </article>

@@ -24,6 +24,7 @@ import {
   formatTimestamp,
   formatTokenLabel,
 } from '../lib/import-candidate-presentation.js';
+import { formatFileDuration } from '../lib/track-duration.js';
 
 const props = defineProps({
   actionError: {
@@ -502,7 +503,7 @@ function fileDecisionButtonLabel(filePreview) {
             </div>
             <div>
               <dt>Length</dt>
-              <dd>{{ formatDuration(file.lengthSeconds) }}</dd>
+              <dd>{{ formatFileDuration(file.lengthSeconds) ?? 'Unknown' }}</dd>
             </div>
             <div>
               <dt>Bitrate</dt>
