@@ -17,6 +17,12 @@
 -->
 
 <script setup>
+import {
+  formatDependencyDetailKey,
+  formatDependencyProvider,
+  formatDependencyStatus,
+} from '../lib/dependency-status-presentation.js';
+
 const props = defineProps({
   dependencies: {
     type: Array,
@@ -25,35 +31,6 @@ const props = defineProps({
 });
 
 defineEmits(['refresh']);
-
-const statusLabels = {
-  degraded: 'Degraded',
-  healthy: 'Healthy',
-  misconfigured: 'Misconfigured',
-  unavailable: 'Unavailable',
-};
-
-function formatProvider(provider) {
-  if (provider === 'musicbrainz') {
-    return 'MusicBrainz';
-  }
-
-  if (provider === 'slskd') {
-    return 'slskd';
-  }
-
-  return provider;
-}
-
-function formatStatus(status) {
-  return statusLabels[status] ?? status;
-}
-
-function formatDetailKey(key) {
-  return key
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/^./, (letter) => letter.toUpperCase());
-}
 </script>
 
 <template>
@@ -75,8 +52,8 @@ function formatDetailKey(key) {
       >
         <div class="dependency-card-header">
           <div>
-            <p>{{ formatProvider(dependency.provider) }}</p>
-            <strong>{{ formatStatus(dependency.status) }}</strong>
+            <p>{{ formatDependencyProvider(dependency.provider) }}</p>
+            <strong>{{ formatDependencyStatus(dependency.status) }}</strong>
           </div>
           <span class="dependency-status-dot" aria-hidden="true"></span>
         </div>
@@ -85,7 +62,7 @@ function formatDetailKey(key) {
 
         <dl v-if="dependency.details">
           <div v-for="(value, key) in dependency.details" :key="key">
-            <dt>{{ formatDetailKey(key) }}</dt>
+            <dt>{{ formatDependencyDetailKey(key) }}</dt>
             <dd>{{ value }}</dd>
           </div>
         </dl>

@@ -988,3 +988,26 @@ Test suite: **1969 tests, 0 failures** (up from 1959).
 - `src/client/views/BootstrapSetupView.vue` — update import; replace two inline ternaries with lib calls
 
 Test suite: **1979 tests, 0 failures** (up from 1969).
+
+### 2026-05-12 - DependencyStatusPanel Component
+
+**Component:** `DependencyStatusPanel.vue` (operator/admin provider health panel)
+
+**Issues identified and resolved:**
+
+1. **Three inline presentation functions with no tests** — The component defined all display logic directly in `<script setup>`:
+   - `formatProvider(provider)` — maps `'musicbrainz'` → `'MusicBrainz'`; passes `'slskd'` and unknown values through unchanged (technical names are appropriate in this admin-facing health panel)
+   - `formatStatus(status)` — reads from a local `statusLabels` lookup (`degraded` / `healthy` / `misconfigured` / `unavailable`); passes through unrecognised values
+   - `formatDetailKey(key)` — converts camelCase detail keys (e.g. `responseTimeMs`) to space-separated title case (e.g. `Response Time Ms`) by inserting spaces before uppercase letters, then capitalising the first character
+
+   All three extracted to a new `src/client/lib/dependency-status-presentation.js` as `formatDependencyProvider`, `formatDependencyStatus`, and `formatDependencyDetailKey`. The component now imports these; the local `statusLabels` constant and all three inline function bodies are gone.
+
+2. **Duplicate `formatActivityTime` removed from `RequesterHomePanel`** — The component had an identical copy of the function extracted in a prior pass as `formatActivityEventTime` in `activity-event-normalization.js`. Replaced the inline definition and the single template call site with the shared lib function. No new tests needed (coverage already exists).
+
+**Files changed:**
+- `src/client/lib/dependency-status-presentation.js` — new file; exports `formatDependencyProvider`, `formatDependencyStatus`, `formatDependencyDetailKey`
+- `test/client/dependency-status-presentation.test.js` — new file; 16 tests covering all three functions (known values, passthrough, edge cases, empty string)
+- `src/client/components/DependencyStatusPanel.vue` — import the three lib functions; remove inline definitions and local `statusLabels`; update three template call sites
+- `src/client/components/dashboard/RequesterHomePanel.vue` — import `formatActivityEventTime`; remove inline `formatActivityTime`; update the single template call site
+
+Test suite: **1995 tests, 0 failures** (up from 1979).

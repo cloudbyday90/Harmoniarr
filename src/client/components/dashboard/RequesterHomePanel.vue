@@ -33,7 +33,7 @@ import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../../composables/useRequestUsers.js';
 import { buildArtistDetailLocation } from '../../lib/artist-detail-route.js';
 import { getErrorMessage } from '../../lib/error-utils.js';
-import { getActivityEventLabel } from '../../lib/activity-event-normalization.js';
+import { formatActivityEventTime, getActivityEventLabel } from '../../lib/activity-event-normalization.js';
 import { getRadarWindowLabel } from '../../lib/release-radar-normalization.js';
 import { sessionStore } from '../../state/session.js';
 
@@ -41,21 +41,6 @@ const { artists, errorMessage, isLoading, loadMonitoredArtists } = useMonitoredA
 
 const activityFeed = useActivityFeed({ limit: 10 });
 const currentUserId = sessionStore.state.user?.id ?? null;
-
-function formatActivityTime(value) {
-  if (!value) return '';
-  try {
-    const d = new Date(value);
-    return d.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return value;
-  }
-}
 
 const radar = useReleaseRadar();
 const radarStrip = computed(() => [
@@ -324,7 +309,7 @@ onMounted(() => {
               :datetime="event.occurredAt"
               class="requester-home-activity-time"
             >
-              {{ formatActivityTime(event.occurredAt) }}
+              {{ formatActivityEventTime(event.occurredAt) }}
             </time>
           </li>
         </ul>
