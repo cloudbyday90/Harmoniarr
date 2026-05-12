@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildOperationSummaryEntries,
+  formatElapsedDuration,
   formatLeaseStateLabel,
   formatLeaseStateTone,
   formatOperationEventTypeLabel,
@@ -11,6 +12,8 @@ import {
   formatOperationSummaryValue,
   formatOperationTimestamp,
   formatOperationTimestampShort,
+  formatQueueRunStatusLabel,
+  formatQueueRunStatusTone,
   getOperationRunAttentionLabel,
   getOperationRunDuration,
   getOperationRunNextStep,
@@ -454,4 +457,171 @@ test('formatOperationEventTypeLabel title-cases unknown event types as a fallbac
   const result = formatOperationEventTypeLabel('custom_event_type');
   assert.doesNotMatch(result, /_/);
   assert.match(result, /^[A-Z]/);
+});
+
+// formatQueueRunStatusLabel
+
+test('formatQueueRunStatusLabel returns Succeeded for succeeded', () => {
+  assert.equal(formatQueueRunStatusLabel('succeeded'), 'Succeeded');
+});
+
+test('formatQueueRunStatusLabel returns Completed for completed', () => {
+  assert.equal(formatQueueRunStatusLabel('completed'), 'Completed');
+});
+
+test('formatQueueRunStatusLabel returns Failed for failed', () => {
+  assert.equal(formatQueueRunStatusLabel('failed'), 'Failed');
+});
+
+test('formatQueueRunStatusLabel returns Cancelled for cancelled', () => {
+  assert.equal(formatQueueRunStatusLabel('cancelled'), 'Cancelled');
+});
+
+test('formatQueueRunStatusLabel returns Queued for pending', () => {
+  assert.equal(formatQueueRunStatusLabel('pending'), 'Queued');
+});
+
+test('formatQueueRunStatusLabel returns Queued for queued', () => {
+  assert.equal(formatQueueRunStatusLabel('queued'), 'Queued');
+});
+
+test('formatQueueRunStatusLabel returns In progress for in_progress', () => {
+  assert.equal(formatQueueRunStatusLabel('in_progress'), 'In progress');
+});
+
+test('formatQueueRunStatusLabel returns In progress for claimed (worker jargon hidden)', () => {
+  assert.equal(formatQueueRunStatusLabel('claimed'), 'In progress');
+});
+
+test('formatQueueRunStatusLabel title-cases unknown status as fallback', () => {
+  const result = formatQueueRunStatusLabel('some_new_state');
+  assert.doesNotMatch(result, /_/);
+  assert.match(result, /^[A-Z]/);
+});
+
+test('formatQueueRunStatusLabel returns dash for null', () => {
+  assert.equal(formatQueueRunStatusLabel(null), '\u2014');
+});
+
+test('formatQueueRunStatusLabel returns dash for undefined', () => {
+  assert.equal(formatQueueRunStatusLabel(undefined), '\u2014');
+});
+
+test('formatQueueRunStatusLabel does not expose raw underscore for in_progress', () => {
+  assert.doesNotMatch(formatQueueRunStatusLabel('in_progress'), /_/);
+});
+
+// formatQueueRunStatusTone
+
+test('formatQueueRunStatusTone returns success for succeeded', () => {
+  assert.equal(formatQueueRunStatusTone('succeeded'), 'success');
+});
+
+test('formatQueueRunStatusTone returns success for completed', () => {
+  assert.equal(formatQueueRunStatusTone('completed'), 'success');
+});
+
+test('formatQueueRunStatusTone returns danger for failed', () => {
+  assert.equal(formatQueueRunStatusTone('failed'), 'danger');
+});
+
+test('formatQueueRunStatusTone returns danger for cancelled', () => {
+  assert.equal(formatQueueRunStatusTone('cancelled'), 'danger');
+});
+
+test('formatQueueRunStatusTone returns warning for in_progress', () => {
+  assert.equal(formatQueueRunStatusTone('in_progress'), 'warning');
+});
+
+test('formatQueueRunStatusTone returns warning for claimed', () => {
+  assert.equal(formatQueueRunStatusTone('claimed'), 'warning');
+});
+
+test('formatQueueRunStatusTone returns info for pending', () => {
+  assert.equal(formatQueueRunStatusTone('pending'), 'info');
+});
+
+test('formatQueueRunStatusTone returns info for queued', () => {
+  assert.equal(formatQueueRunStatusTone('queued'), 'info');
+});
+
+test('formatQueueRunStatusTone returns undefined for unknown status', () => {
+  assert.equal(formatQueueRunStatusTone('unknown_state'), undefined);
+});
+
+test('formatQueueRunStatusTone returns undefined for null', () => {
+  assert.equal(formatQueueRunStatusTone(null), undefined);
+});
+
+// formatElapsedDuration
+
+test('formatElapsedDuration returns dash for null start', () => {
+  assert.equal(formatElapsedDuration(null), '\u2014');
+});
+
+test('formatElapsedDuration returns dash for undefined start', () => {
+  assert.equal(formatElapsedDuration(undefined), '\u2014');
+});
+
+test('formatElapsedDuration returns dash for unparseable start', () => {
+  assert.equal(formatElapsedDuration('not-a-date'), '\u2014');
+});
+
+test('formatElapsedDuration returns 0s when start equals end', () => {
+  const ts = '2026-05-12T10:00:00.000Z';
+  assert.equal(formatElapsedDuration(ts, ts), '0s');
+});
+
+test('formatElapsedDuration returns seconds-only for sub-60s elapsed', () => {
+  assert.equal(
+    formatElapsedDuration('2026-05-12T10:00:00.000Z', '2026-05-12T10:00:45.000Z'),
+    '45s',
+  );
+});
+
+test('formatElapsedDuration returns minutes and seconds for 2m 15s elapsed', () => {
+  assert.equal(
+    formatElapsedDuration('2026-05-12T10:00:00.000Z', '2026-05-12T10:02:15.000Z'),
+    '2m 15s',
+  );
+});
+
+test('formatElapsedDuration returns 0s for negative elapsed (clock skew guard)', () => {
+  assert.equal(
+    formatElapsedDuration('2026-05-12T10:00:10.000Z', '2026-05-12T10:00:00.000Z'),
+    '0s',
+  );
+});
+
+test('formatElapsedDuration uses nowFn when endIso is null', () => {
+  const start = '2026-05-12T10:00:00.000Z';
+  const nowMs = new Date('2026-05-12T10:00:30.000Z').getTime();
+  assert.equal(formatElapsedDuration(start, null, { nowFn: () => nowMs }), '30s');
+});
+
+test('formatElapsedDuration uses nowFn when endIso is omitted', () => {
+  const start = '2026-05-12T10:00:00.000Z';
+  const nowMs = new Date('2026-05-12T10:01:00.000Z').getTime();
+  assert.equal(formatElapsedDuration(start, undefined, { nowFn: () => nowMs }), '1m 0s');
+});
+
+test('formatElapsedDuration returns hours and minutes for durations over 1 hour', () => {
+  assert.equal(
+    formatElapsedDuration('2026-05-12T08:00:00.000Z', '2026-05-12T10:03:00.000Z'),
+    '2h 3m',
+  );
+});
+
+test('formatElapsedDuration returns 59s for 59-second elapsed', () => {
+  assert.equal(
+    formatElapsedDuration('2026-05-12T10:00:00.000Z', '2026-05-12T10:00:59.000Z'),
+    '59s',
+  );
+});
+
+test('formatElapsedDuration returns 1m 0s for exactly 60s elapsed', () => {
+  assert.equal(
+    formatElapsedDuration('2026-05-12T10:00:00.000Z', '2026-05-12T10:01:00.000Z'),
+    '1m 0s',
+  );
 });

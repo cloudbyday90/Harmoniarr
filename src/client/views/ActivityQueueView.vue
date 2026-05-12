@@ -20,6 +20,13 @@
 import { computed } from 'vue';
 import { fetchOperationHistory } from '../lib/operations-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
+import {
+  formatElapsedDuration,
+  formatOperationTimestampShort,
+  formatQueueRunStatusLabel,
+  formatQueueRunStatusTone,
+} from '../lib/operation-run-presentation.js';
+import { getOperationRunDescriptor } from '../lib/operation-run-link-targets.js';
 
 const {
   data: history,
@@ -45,26 +52,6 @@ const activeRuns = computed(() => runs.value.filter((run) => {
 }));
 
 const recentRuns = computed(() => runs.value.slice(0, 25));
-
-function statusTone(status) {
-  if (status === 'succeeded' || status === 'completed') return 'success';
-  if (status === 'failed' || status === 'cancelled') return 'danger';
-  if (status === 'pending' || status === 'queued') return 'info';
-  if (status === 'in_progress' || status === 'claimed') return 'warning';
-  return undefined;
-}
-
-function formatDuration(start, end) {
-  if (!start) return '—';
-  const startMs = Date.parse(start);
-  const endMs = end ? Date.parse(end) : Date.now();
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return '—';
-  const seconds = Math.max(0, Math.round((endMs - startMs) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remSeconds = seconds % 60;
-  return `${minutes}m ${remSeconds}s`;
-}
 </script>
 
 <template>
@@ -74,7 +61,7 @@ function formatDuration(start, end) {
         <h2 class="hx-page-title">Queue</h2>
         <p class="hx-page-subtitle">
           {{ activeRuns.length }} active · {{ recentRuns.length }} recent operation runs
-          <span v-if="checkedAt"> · checked {{ checkedAt }}</span>
+          <span v-if="checkedAt"> · checked {{ formatOperationTimestampShort(checkedAt) }}</span>
         </p>
       </div>
       <div class="hx-page-actions">
@@ -103,7 +90,7 @@ function formatDuration(start, end) {
         </div>
         <div v-else-if="!recentRuns.length" class="hx-empty">
           <p class="hx-empty-title">No operation history</p>
-          <p class="hx-empty-copy">Operation runs (scans, reconciliation, import workers) will appear here once dispatched.</p>
+          <p class="hx-empty-copy">Scheduled tasks such as library scans and metadata refreshes will appear here once started.</p>
         </div>
         <div v-else class="hx-table-scroll">
           <table class="hx-table">
@@ -111,7 +98,7 @@ function formatDuration(start, end) {
               <tr>
                 <th>Operation</th>
                 <th>Status</th>
-                <th class="hx-table-num">Attempt</th>
+                <th class="hx-table-num">Attempts</th>
                 <th>Started</th>
                 <th>Duration</th>
                 <th>Error</th>
@@ -119,15 +106,15 @@ function formatDuration(start, end) {
             </thead>
             <tbody>
               <tr v-for="run in recentRuns" :key="run.id">
-                <td>{{ run.operationType }}</td>
+                <td>{{ getOperationRunDescriptor(run.operationType).title }}</td>
                 <td>
-                  <span class="hx-pill" :data-tone="statusTone(run.status)">{{ run.status }}</span>
+                  <span class="hx-pill" :data-tone="formatQueueRunStatusTone(run.status)">{{ formatQueueRunStatusLabel(run.status) }}</span>
                 </td>
                 <td class="hx-table-num">
                   {{ run.attemptCount ?? 0 }}<span v-if="run.maxAttempts">/{{ run.maxAttempts }}</span>
                 </td>
-                <td>{{ run.startedAt ?? '—' }}</td>
-                <td>{{ formatDuration(run.startedAt, run.finishedAt) }}</td>
+                <td>{{ formatOperationTimestampShort(run.startedAt) }}</td>
+                <td>{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</td>
                 <td>{{ run.errorMessage ?? '' }}</td>
               </tr>
             </tbody>

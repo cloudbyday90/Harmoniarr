@@ -344,3 +344,90 @@ export function formatOperationEventTypeLabel(eventType) {
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+// ── Queue-specific status helpers ─────────────────────────────────────────────
+
+/**
+ * Status strings used by the operation history / queue endpoint.
+ * These differ from the Operations view statuses: `in_progress` and `claimed`
+ * are used instead of `running`, and `succeeded`/`queued` appear alongside
+ * the shared set.
+ */
+const QUEUE_STATUS_LABELS = Object.freeze({
+  succeeded: 'Succeeded',
+  completed: 'Completed',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  pending: 'Queued',
+  queued: 'Queued',
+  in_progress: 'In progress',
+  claimed: 'In progress',
+});
+
+/**
+ * Returns a plain-English label for an operation queue run status string.
+ * Handles the extended status vocabulary used by the operation history
+ * endpoint (`succeeded`, `queued`, `in_progress`, `claimed`).
+ * Unknown statuses are title-cased as a fallback.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function formatQueueRunStatusLabel(status) {
+  if (typeof status !== 'string' || !status) return '—';
+  if (QUEUE_STATUS_LABELS[status] !== undefined) return QUEUE_STATUS_LABELS[status];
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Returns a UI tone string for an operation queue run status, suitable for
+ * `data-tone` on a pill component.
+ *
+ * - succeeded/completed → 'success'
+ * - failed/cancelled → 'danger'
+ * - in_progress/claimed → 'warning'
+ * - pending/queued → 'info'
+ * - unknown → undefined (no tone applied)
+ *
+ * @param {string|null|undefined} status
+ * @returns {'success'|'danger'|'warning'|'info'|undefined}
+ */
+export function formatQueueRunStatusTone(status) {
+  if (status === 'succeeded' || status === 'completed') return 'success';
+  if (status === 'failed' || status === 'cancelled') return 'danger';
+  if (status === 'in_progress' || status === 'claimed') return 'warning';
+  if (status === 'pending' || status === 'queued') return 'info';
+  return undefined;
+}
+
+// ── Elapsed duration ──────────────────────────────────────────────────────────
+
+/**
+ * Formats the elapsed time between two ISO 8601 timestamps as a concise
+ * human-readable string, e.g. "4s", "2m 15s", "1h 3m".
+ *
+ * - If `endIso` is omitted or null, `nowFn()` is used as the end time so
+ *   the duration reflects the time elapsed so far for a running operation.
+ * - Returns '—' when `startIso` is falsy or unparseable.
+ * - Returns '0s' when the computed duration is zero or negative (clock skew
+ *   guard).
+ *
+ * @param {string|null|undefined} startIso
+ * @param {string|null|undefined} endIso
+ * @param {{ nowFn?: () => number }} [options]
+ * @returns {string}
+ */
+export function formatElapsedDuration(startIso, endIso = null, { nowFn = () => Date.now() } = {}) {
+  if (!startIso) return '—';
+  const startMs = Date.parse(startIso);
+  if (!Number.isFinite(startMs)) return '—';
+  const endMs = endIso ? Date.parse(endIso) : nowFn();
+  if (!Number.isFinite(endMs)) return '—';
+  const totalSeconds = Math.max(0, Math.round((endMs - startMs) / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const hours = Math.floor(totalSeconds / 3600);
+  const remSeconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m ${remSeconds}s`;
+}

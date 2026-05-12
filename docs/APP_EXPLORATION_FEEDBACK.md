@@ -720,3 +720,35 @@ Test suite after this session: **1763 tests, 0 failures** (up from 1680).
 - `formatActivityEntryCountLabel(count)` — 6 tests (singular at 1, plural at 0/2/100, count-in-label, no singular for plural)
 
 Test suite after this session: **1818 tests, 0 failures** (up from 1763).
+
+---
+
+### 2026-05-12 - Queue Screen (ActivityQueueView)
+
+**Screen:** `ActivityQueueView.vue` (unchanged line count — only script-block changes)
+**Lib extended:** `src/client/lib/operation-run-presentation.js` (3 new exports appended)
+**Tests extended:** `test/client/operation-run-presentation.test.js` (34 new tests)
+
+**Issues identified and resolved:**
+
+1. **`run.operationType` rendered raw** — The Operation column displayed internal job identifiers like `library_scan`, `metadata_refresh`, `import_reconciliation` (snake_case, no capitalisation). Replaced with `getOperationRunDescriptor(run.operationType).title`, reusing the existing lookup table from `operation-run-link-targets.js` that the Operations view already uses. Produces labels like `"Library scan"`, `"Metadata refresh"`, with a Title Case fallback for any unrecognised type.
+
+2. **`run.status` rendered raw in the pill** — The pill displayed backend state machine identifiers verbatim: `in_progress` (with underscore), `claimed` (worker-claimed jargon), `queued`, `succeeded`. Added `formatQueueRunStatusLabel(status)` which maps the extended status vocabulary used by the operation history endpoint: `in_progress → "In progress"`, `claimed → "In progress"` (hides worker jargon), `queued/pending → "Queued"`, `succeeded → "Succeeded"`, with a Title Case fallback. Removed the inline `statusTone()` function, replaced with `formatQueueRunStatusTone(status)`.
+
+3. **`run.startedAt` was a raw ISO 8601 timestamp** — `2026-05-12T09:41:22.000Z` shown verbatim in the Started column. Now uses `formatOperationTimestampShort(run.startedAt)` for a consistent relative / locale-formatted display.
+
+4. **`checkedAt` was a raw ISO string in the subtitle** — `checked 2026-05-12T09:41:22.000Z` shown verbatim. Now uses `formatOperationTimestampShort(checkedAt)`.
+
+5. **`formatDuration()` was an inline function with no tests** — Non-trivial branching (3 early-exit guards, integer math, two output formats). Extracted as `formatElapsedDuration(startIso, endIso, { nowFn })` in `operation-run-presentation.js` with injectable `nowFn` for deterministic testing. Handles hours (`2h 3m`), minutes+seconds (`2m 15s`), sub-minute (`45s`), `0s` for clock-skew, and `'—'` for missing/unparseable timestamps.
+
+6. **Empty state copy exposed internal job type names** — "Operation runs (scans, reconciliation, import workers) will appear here once dispatched." used backend terminology. Changed to "Scheduled tasks such as library scans and metadata refreshes will appear here once started."
+
+7. **"Attempt" column header was ambiguous** — Shows `1/3` values (attempt number / max attempts). Header `"Attempt"` reads as a label for the current attempt rather than the count. Renamed to `"Attempts"`.
+
+**New exports in `operation-run-presentation.js`:**
+
+- `formatQueueRunStatusLabel(status)` — 12 tests (succeeded, completed, failed, cancelled, pending→Queued, queued→Queued, in_progress→In progress, claimed→In progress, title-case fallback, null/undefined→dash, no-underscore guard)
+- `formatQueueRunStatusTone(status)` — 10 tests (all tone mappings, unknown→undefined, null→undefined)
+- `formatElapsedDuration(startIso, endIso, { nowFn })` — 12 tests (null/undefined/unparseable start, zero, 45s, 2m 15s, negative clock skew→0s, nowFn for null end, nowFn for omitted end, 2h 3m, 59s boundary, 1m 0s boundary)
+
+Test suite: **1852 tests, 0 failures** (up from 1818).
