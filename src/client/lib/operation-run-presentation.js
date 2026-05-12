@@ -177,3 +177,170 @@ export function getOperationRunDuration(run, { nowFn = () => Date.now() } = {}) 
   const remainingMinutes = minutes % 60;
   return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
+
+/**
+ * Formats a timestamp as a full locale datetime string for technical details.
+ * Returns 'Not yet recorded' for falsy or unparseable values.
+ *
+ * @param {string|null|undefined} value
+ * @returns {string}
+ */
+export function formatOperationTimestamp(value) {
+  if (!value) return 'Not yet recorded';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+}
+
+/**
+ * Formats a timestamp as a short relative or time-of-day string.
+ * Returns '—' for falsy or unparseable values.
+ *
+ * @param {string|null|undefined} value
+ * @param {{ nowFn?: () => number }} [options]
+ * @returns {string}
+ */
+export function formatOperationTimestampShort(value, { nowFn = () => Date.now() } = {}) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  const diffMs = nowFn() - d.getTime();
+  if (diffMs < 60_000) return 'Just now';
+  if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
+  if (diffMs < 86_400_000) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString();
+}
+
+/**
+ * Maps a run status value to a design-system tone token.
+ * Returns null for completed and unknown statuses (no special tone).
+ *
+ * @param {string|null|undefined} status
+ * @returns {'danger'|'warning'|'success'|null}
+ */
+export function formatOperationRunStatusTone(status) {
+  switch (status) {
+    case 'failed': return 'danger';
+    case 'cancelled': return 'warning';
+    case 'running': return 'success';
+    default: return null;
+  }
+}
+
+/**
+ * Maps a run group ID to a design-system tone token.
+ * Returns null for completed group and unknown IDs.
+ *
+ * @param {string|null|undefined} groupId
+ * @returns {'danger'|'success'|null}
+ */
+export function formatOperationGroupTone(groupId) {
+  switch (groupId) {
+    case 'needs-attention': return 'danger';
+    case 'in-progress': return 'success';
+    default: return null;
+  }
+}
+
+/**
+ * Maps a lease state value to a human-readable label.
+ *
+ * @param {string|null|undefined} state
+ * @returns {string}
+ */
+export function formatLeaseStateLabel(state) {
+  switch (state) {
+    case 'active': return 'Active';
+    case 'expired': return 'Expired';
+    case 'released': return 'Released';
+    default: return 'Unknown';
+  }
+}
+
+/**
+ * Maps a lease state value to a design-system tone token.
+ * Returns null for released and unknown states.
+ *
+ * @param {string|null|undefined} state
+ * @returns {'success'|'danger'|null}
+ */
+export function formatLeaseStateTone(state) {
+  switch (state) {
+    case 'active': return 'success';
+    case 'expired': return 'danger';
+    default: return null;
+  }
+}
+
+/**
+ * Converts a run summary object to an array of display entries, filtering
+ * out null/undefined values and capping at 12 items.
+ *
+ * @param {Record<string, unknown>|null|undefined} summary
+ * @returns {Array<{key: string, value: unknown}>}
+ */
+export function buildOperationSummaryEntries(summary) {
+  return Object.entries(summary ?? {})
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([key, value]) => ({ key, value }))
+    .slice(0, 12);
+}
+
+/**
+ * Converts a camelCase or snake_case summary key to a Title Case display label.
+ *
+ * @param {string} key
+ * @returns {string}
+ */
+export function formatOperationSummaryLabel(key) {
+  return String(key)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+/**
+ * Formats a summary entry value for display.
+ *
+ * - Arrays: reports record count
+ * - Booleans: Yes / No
+ * - Objects: generic label
+ * - Everything else: String coercion
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function formatOperationSummaryValue(value) {
+  if (Array.isArray(value)) return `${value.length} record${value.length === 1 ? '' : 's'}`;
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'object' && value !== null) return 'Structured data recorded';
+  return String(value);
+}
+
+/**
+ * Converts a raw operation audit event type identifier to a human-readable
+ * label. Handles snake_case identifiers and falls back to title-casing unknowns.
+ *
+ * @param {string|null|undefined} eventType
+ * @returns {string}
+ */
+export function formatOperationEventTypeLabel(eventType) {
+  if (!eventType || typeof eventType !== 'string') return '';
+  const known = {
+    run_started: 'Run started',
+    run_completed: 'Run completed',
+    run_failed: 'Run failed',
+    run_cancelled: 'Run cancelled',
+    run_cancellation_requested: 'Cancellation requested',
+    run_retried: 'Run retried',
+    run_queued: 'Run queued',
+    step_started: 'Step started',
+    step_completed: 'Step completed',
+    step_failed: 'Step failed',
+    step_skipped: 'Step skipped',
+    run_claimed: 'Processing started',
+    run_heartbeat: 'Progress check-in',
+  };
+  return known[eventType] ?? eventType
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}

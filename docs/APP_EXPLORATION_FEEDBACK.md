@@ -619,3 +619,36 @@ Test suite after this session: **1572 tests, 0 failures** (up from 1490).
 - `buildDownloadMappingSourceLabel()` — 3 tests (non-empty, no-slskd guard, plain language)
 
 Test suite after this session: **1623 tests, 0 failures** (up from 1572).
+
+---
+
+### 2026-05-12 - Background Jobs Screen (OperationsView)
+
+**Screen:** `OperationsView.vue` (556 lines before changes)
+**Lib:** `src/client/lib/operation-run-presentation.js` (extended — 10 new exports)
+**Tests:** `test/client/operation-run-presentation.test.js` (extended — 57 new tests)
+
+**Issues identified and resolved:**
+
+1. **Nine pure functions inline in `<script setup>` with no tests** — `formatTimestamp`, `formatTimestampShort`, `runStatusTone`, `groupTone`, `leaseStateLabel`, `leaseStateTone`, `summaryEntries`, `formatSummaryLabel`, and `formatSummaryValue` were all defined locally in the component. The timestamp and relative-time functions in particular had non-trivial branching logic (4-branch `formatTimestampShort`, NaN-guard `formatTimestamp`) that was completely untested. All nine removed from the view and added as new exports to the existing `operation-run-presentation.js`.
+
+2. **`event.eventType` rendered raw in the run timeline** — The timeline showed each audit event with `event.summary` (human-readable) and `event.eventType` (raw snake_case identifier, e.g. `run_started`, `step_completed`, `run_claimed`) as a grey secondary label. The raw identifiers are internal event names that add noise for an admin. Replaced with `formatOperationEventTypeLabel(eventType)` which maps known identifiers to plain labels and title-cases unknowns. Hidden with `v-if` when the label is empty.
+
+3. **`"Queue claimed"` and `"Claimed by instance"` were distributed-queue jargon** — Inside the collapsed Technical details section, these two labels used internal queue implementation terminology. An admin who expands the detail sees `"Queue claimed"` (the moment a worker dequeued the job) and `"Claimed by instance"` (which worker process took it). Renamed to `"Processing started"` and `"Worker instance"`.
+
+4. **`"Lease state"`, `"Lease owner"`, `"Lease expiry"`, `"Last heartbeat"` were distributed-lock terminology** — Four rows inside Technical details used a `"Lease"` concept (distributed lock pattern) that means nothing to a self-hosting admin. Renamed to `"Lock state"`, `"Lock held by"`, `"Lock expiry"`, and `"Last check-in"`.
+
+**New exports added to `operation-run-presentation.js`:**
+
+- `formatOperationTimestamp(value)` — 5 tests (null/undefined/empty→"Not yet recorded", valid ISO→locale string, unparseable pass-through)
+- `formatOperationTimestampShort(value, { nowFn })` — 7 tests (null/undefined→"—", <60s→"Just now", <1h→"Xm ago", >24h→locale date, boundary guard, unparseable pass-through)
+- `formatOperationRunStatusTone(status)` — 6 tests (failed/cancelled/running, completed→null, null→null)
+- `formatOperationGroupTone(groupId)` — 5 tests (needs-attention/in-progress, completed→null, null→null)
+- `formatLeaseStateLabel(state)` — 5 tests (active/expired/released, null/unknown→"Unknown")
+- `formatLeaseStateTone(state)` — 4 tests (active→success, expired→danger, released→null, null→null)
+- `buildOperationSummaryEntries(summary)` — 5 tests (null, filter, key/value, cap at 12, empty)
+- `formatOperationSummaryLabel(key)` — 4 tests (camelCase, snake_case, single word, PascalCase)
+- `formatOperationSummaryValue(value)` — 7 tests (array/singular/boolean/object/number/string)
+- `formatOperationEventTypeLabel(eventType)` — 9 tests (null/undefined, known mappings, no-underscore guard, title-case fallback)
+
+Test suite after this session: **1680 tests, 0 failures** (up from 1623).

@@ -35,6 +35,16 @@ import {
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
 import {
+  buildOperationSummaryEntries,
+  formatLeaseStateLabel,
+  formatLeaseStateTone,
+  formatOperationEventTypeLabel,
+  formatOperationGroupTone,
+  formatOperationRunStatusTone,
+  formatOperationSummaryLabel,
+  formatOperationSummaryValue,
+  formatOperationTimestamp,
+  formatOperationTimestampShort,
   getOperationRunDuration,
   getOperationRunNextStep,
   getOperationRunOperatorSummary,
@@ -131,59 +141,8 @@ function scrollDetailIntoView() {
   });
 }
 
-function formatTimestamp(value) {
-  if (!value) return 'Not yet recorded';
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
-}
-
-function formatTimestampShort(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  const diffMs = Date.now() - d.getTime();
-  if (diffMs < 60_000) return 'Just now';
-  if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
-  if (diffMs < 86_400_000) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  return d.toLocaleDateString();
-}
-
 function operationTitle(operationType) {
   return getOperationRunDescriptor(operationType).title;
-}
-
-function runStatusTone(status) {
-  switch (status) {
-    case 'failed': return 'danger';
-    case 'cancelled': return 'warning';
-    case 'running': return 'success';
-    default: return null;
-  }
-}
-
-function groupTone(groupId) {
-  switch (groupId) {
-    case 'needs-attention': return 'danger';
-    case 'in-progress': return 'success';
-    default: return null;
-  }
-}
-
-function leaseStateLabel(state) {
-  switch (state) {
-    case 'active': return 'Active';
-    case 'expired': return 'Expired';
-    case 'released': return 'Released';
-    default: return 'Unknown';
-  }
-}
-
-function leaseStateTone(state) {
-  switch (state) {
-    case 'active': return 'success';
-    case 'expired': return 'danger';
-    default: return null;
-  }
 }
 
 function runLinkTarget(run) {
@@ -195,27 +154,6 @@ function runLinkTarget(run) {
 
 function runDuration(run) {
   return getOperationRunDuration(run);
-}
-
-function summaryEntries(summary) {
-  return Object.entries(summary ?? {})
-    .filter(([, value]) => value !== null && value !== undefined)
-    .map(([key, value]) => ({ key, value }))
-    .slice(0, 12);
-}
-
-function formatSummaryLabel(key) {
-  return key
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function formatSummaryValue(value) {
-  if (Array.isArray(value)) return `${value.length} record${value.length === 1 ? '' : 's'}`;
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'object') return 'Structured data recorded';
-  return String(value);
 }
 
 async function handleSelectRun(runId) {
@@ -333,7 +271,7 @@ watch(
               <template v-for="group in displayGroups" :key="group.id">
                 <tr v-if="displayGroups.length > 1" class="ops-group-row">
                   <td colspan="4">
-                    <span v-if="groupTone(group.id)" class="hx-pill" :data-tone="groupTone(group.id)">{{ group.title }}</span>
+                    <span v-if="formatOperationGroupTone(group.id)" class="hx-pill" :data-tone="formatOperationGroupTone(group.id)">{{ group.title }}</span>
                     <span v-else class="ops-group-label">{{ group.title }}</span>
                   </td>
                 </tr>
@@ -349,12 +287,12 @@ watch(
                     <span v-if="run.attemptCount > 1" class="hx-text-muted"> · attempt {{ run.attemptCount }}</span>
                   </td>
                   <td>
-                    <span class="hx-pill" :data-tone="runStatusTone(run.status)">
+                    <span class="hx-pill" :data-tone="formatOperationRunStatusTone(run.status)">
                       {{ getOperationRunStatusLabel(run.status, { defaultLabel: 'Unknown' }) }}
                     </span>
                   </td>
                   <td class="ops-time-cell">
-                    <span>{{ formatTimestampShort(run.startedAt) }}</span>
+                    <span>{{ formatOperationTimestampShort(run.startedAt) }}</span>
                     <span v-if="runDuration(run)" class="ops-duration">{{ runDuration(run) }}</span>
                   </td>
                   <td class="ops-run-actions">
@@ -420,10 +358,10 @@ watch(
               <div>
                 <strong class="ops-run-detail-name">{{ operationTitle(selectedRun.operationType) }}</strong>
                 <p class="hx-text-muted">
-                  Started {{ formatTimestampShort(selectedRun.startedAt) }}<template v-if="runDuration(selectedRun)"> · {{ runDuration(selectedRun) }}</template><template v-if="selectedRun.triggeredByUserId"> · by {{ selectedRun.triggeredByUserId }}</template>
+                  Started {{ formatOperationTimestampShort(selectedRun.startedAt) }}<template v-if="runDuration(selectedRun)"> · {{ runDuration(selectedRun) }}</template><template v-if="selectedRun.triggeredByUserId"> · by {{ selectedRun.triggeredByUserId }}</template>
                 </p>
               </div>
-              <span class="hx-pill" :data-tone="runStatusTone(selectedRun.status)">
+              <span class="hx-pill" :data-tone="formatOperationRunStatusTone(selectedRun.status)">
                 {{ getOperationRunStatusLabel(selectedRun.status, { defaultLabel: 'Unknown' }) }}
               </span>
             </div>
@@ -447,11 +385,11 @@ watch(
               <p class="ops-section-label">Run timeline</p>
               <div class="ops-timeline-list">
                 <div class="ops-timeline-event" v-for="event in selectedRunDetail.auditEvents" :key="event.id">
-                  <span class="ops-timeline-time">{{ formatTimestampShort(event.occurredAt) }}</span>
+                    <span class="ops-timeline-time">{{ formatOperationTimestampShort(event.occurredAt) }}</span>
                   <span class="ops-timeline-dot"></span>
                   <div class="ops-timeline-body">
                     <strong>{{ event.summary }}</strong>
-                    <span class="hx-text-muted">{{ event.eventType }}</span>
+                    <span v-if="formatOperationEventTypeLabel(event.eventType)" class="hx-text-muted">{{ formatOperationEventTypeLabel(event.eventType) }}</span>
                   </div>
                 </div>
               </div>
@@ -470,11 +408,11 @@ watch(
                 </div>
                 <div>
                   <dt>Started</dt>
-                  <dd>{{ formatTimestamp(selectedRun.startedAt) }}</dd>
+                  <dd>{{ formatOperationTimestamp(selectedRun.startedAt) }}</dd>
                 </div>
                 <div>
                   <dt>Finished</dt>
-                  <dd>{{ formatTimestamp(selectedRun.finishedAt) }}</dd>
+                  <dd>{{ formatOperationTimestamp(selectedRun.finishedAt) }}</dd>
                 </div>
                 <div v-if="selectedRun.attemptCount || selectedRun.maxAttempts">
                   <dt>Attempts</dt>
@@ -482,52 +420,52 @@ watch(
                 </div>
                 <div v-if="selectedRun.nextAttemptAt">
                   <dt>Next attempt</dt>
-                  <dd>{{ formatTimestamp(selectedRun.nextAttemptAt) }}</dd>
+                  <dd>{{ formatOperationTimestamp(selectedRun.nextAttemptAt) }}</dd>
                 </div>
                 <div v-if="selectedRun.cancelRequestedAt">
                   <dt>Cancellation requested</dt>
-                  <dd>{{ formatTimestamp(selectedRun.cancelRequestedAt) }}</dd>
+                  <dd>{{ formatOperationTimestamp(selectedRun.cancelRequestedAt) }}</dd>
                 </div>
                 <div v-if="selectedRun.cancelRequestedByUserId">
                   <dt>Cancelled by</dt>
                   <dd>{{ selectedRun.cancelRequestedByUserId }}</dd>
                 </div>
                 <div v-if="selectedRun.claimedAt">
-                  <dt>Queue claimed</dt>
-                  <dd>{{ formatTimestamp(selectedRun.claimedAt) }}</dd>
+                  <dt>Processing started</dt>
+                  <dd>{{ formatOperationTimestamp(selectedRun.claimedAt) }}</dd>
                 </div>
                 <div v-if="selectedRun.claimedByInstanceId">
-                  <dt>Claimed by instance</dt>
+                  <dt>Worker instance</dt>
                   <dd>{{ selectedRun.claimedByInstanceId }}</dd>
                 </div>
                 <div v-if="selectedRunLease">
-                  <dt>Lease state</dt>
+                  <dt>Lock state</dt>
                   <dd>
-                    <span class="hx-pill" :data-tone="leaseStateTone(selectedRunLease.state)">
-                      {{ leaseStateLabel(selectedRunLease.state) }}
+                    <span class="hx-pill" :data-tone="formatLeaseStateTone(selectedRunLease.state)">
+                      {{ formatLeaseStateLabel(selectedRunLease.state) }}
                     </span>
                   </dd>
                 </div>
                 <div v-if="selectedRunLease">
-                  <dt>Lease owner</dt>
+                  <dt>Lock held by</dt>
                   <dd>{{ selectedRunLease.ownerInstanceId }}</dd>
                 </div>
                 <div v-if="selectedRunLease">
-                  <dt>Last heartbeat</dt>
-                  <dd>{{ formatTimestamp(selectedRunLease.heartbeatAt) }}</dd>
+                  <dt>Last check-in</dt>
+                  <dd>{{ formatOperationTimestamp(selectedRunLease.heartbeatAt) }}</dd>
                 </div>
                 <div v-if="selectedRunLease">
-                  <dt>Lease expiry</dt>
-                  <dd>{{ formatTimestamp(selectedRunLease.expiresAt) }}</dd>
+                  <dt>Lock expiry</dt>
+                  <dd>{{ formatOperationTimestamp(selectedRunLease.expiresAt) }}</dd>
                 </div>
               </dl>
 
-              <div v-if="summaryEntries(selectedRun.summary).length" class="ops-sub-section">
+              <div v-if="buildOperationSummaryEntries(selectedRun.summary).length" class="ops-sub-section">
                 <p class="ops-section-label">Recorded outcome</p>
                 <dl class="ops-meta-dl">
-                  <div v-for="entry in summaryEntries(selectedRun.summary)" :key="entry.key">
-                    <dt>{{ formatSummaryLabel(entry.key) }}</dt>
-                    <dd>{{ formatSummaryValue(entry.value) }}</dd>
+                  <div v-for="entry in buildOperationSummaryEntries(selectedRun.summary)" :key="entry.key">
+                    <dt>{{ formatOperationSummaryLabel(entry.key) }}</dt>
+                    <dd>{{ formatOperationSummaryValue(entry.value) }}</dd>
                   </div>
                 </dl>
               </div>
