@@ -39,7 +39,6 @@ import {
   buildOperationSummaryEntries,
   formatLeaseStateLabel,
   formatLeaseStateTone,
-  formatOperationEventTypeLabel,
   formatOperationGroupTone,
   formatOperationRunStatusTone,
   formatOperationSummaryLabel,
@@ -363,19 +362,17 @@ watch(
 
             <div class="operations-insight-grid">
               <article class="operations-insight-card" v-if="selectedRun.errorMessage">
-                <p class="eyebrow">Latest issue</p>
+                <p class="ops-section-label">Error detail</p>
                 <strong>{{ selectedRun.errorMessage }}</strong>
               </article>
-              <template v-if="!selectedRun.errorMessage">
-                <article class="operations-insight-card">
-                  <p class="eyebrow">What happened</p>
-                  <strong>{{ getOperationRunOperatorSummary(selectedRun) }}</strong>
-                </article>
-                <article class="operations-insight-card">
-                  <p class="eyebrow">What to do next</p>
-                  <strong>{{ getOperationRunNextStep(selectedRun) }}</strong>
-                </article>
-              </template>
+              <article class="operations-insight-card" v-if="!selectedRun.errorMessage">
+                <p class="ops-section-label">What happened</p>
+                <strong>{{ getOperationRunOperatorSummary(selectedRun) }}</strong>
+              </article>
+              <article class="operations-insight-card">
+                <p class="ops-section-label">What to do next</p>
+                <strong>{{ getOperationRunNextStep(selectedRun) }}</strong>
+              </article>
             </div>
 
             <div class="ops-timeline" v-if="selectedRunDetail?.auditEvents?.length">
@@ -386,7 +383,6 @@ watch(
                   <span class="ops-timeline-dot"></span>
                   <div class="ops-timeline-body">
                     <strong>{{ event.summary }}</strong>
-                    <span v-if="formatOperationEventTypeLabel(event.eventType)" class="hx-text-muted">{{ formatOperationEventTypeLabel(event.eventType) }}</span>
                   </div>
                 </div>
               </div>
@@ -397,7 +393,7 @@ watch(
               <dl class="ops-meta-dl">
                 <div>
                   <dt>Operation type</dt>
-                  <dd>{{ selectedRun.operationType }}</dd>
+                  <dd>{{ operationTitle(selectedRun.operationType) }}</dd>
                 </div>
                 <div>
                   <dt>Run ID</dt>
@@ -467,7 +463,7 @@ watch(
                 </dl>
               </div>
 
-              <div v-if="Object.keys(selectedRun.summary ?? {}).length" class="ops-sub-section">
+              <div v-if="Object.keys(selectedRun.summary ?? {}).length && !buildOperationSummaryEntries(selectedRun.summary).length" class="ops-sub-section">
                 <p class="ops-section-label">Raw JSON</p>
                 <pre class="ops-pre">{{ JSON.stringify(selectedRun.summary, null, 2) }}</pre>
               </div>

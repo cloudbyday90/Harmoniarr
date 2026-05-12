@@ -1423,3 +1423,54 @@ The filter bar is designed for triage: it lets an operator quickly narrow to "wh
 **Visual verification:** After Docker rebuild (no-cache), the Operations view with 20 Library discovery Failed runs shows the full job queue with no filter bar above it. The header reads "Job queue" only — no redundant "All 20 / Needs attention 20" pills.
 
 Test suite: **2385 tests, 0 failures** (up from 2374).
+
+---
+
+### 2026-05-12 - Operations Detail Panel — Five UX Defects Resolved
+
+**Screen:** `OperationsView.vue`
+**Lib changed:** none (all template-only changes)
+**Tests:** unchanged — 2385 pass, 0 failures
+
+**Defects found and fixed:**
+
+#### 1. "What to do next" guidance hidden when a job fails with an `errorMessage`
+
+The insight grid used a mutually-exclusive `v-if` / `v-else` pattern: when `selectedRun.errorMessage` was truthy, only a single "Latest issue" card rendered; the "What happened" and "What to do next" cards were inside a `<template v-if="!selectedRun.errorMessage">` that was therefore hidden.
+
+For a failed Library discovery run with a raw PostgreSQL error (`"UNION types text and date cannot be matched"`), the operator saw only the error text — no guidance on what to do next. This is the highest-impact failure in the detail panel: the screen that exists to help operators respond to failures was actively suppressing the actionable guidance.
+
+**Fix:** Restructured the insight grid to always show "What to do next":
+- When `errorMessage` exists: show `[Error detail] [What to do next]` side by side.
+- When no `errorMessage`: show `[What happened] [What to do next]` side by side.
+- The two-card layout is preserved in both paths. `getOperationRunNextStep` is always rendered.
+
+**Label rename:** "Latest issue" → "Error detail" — more precise; "Latest issue" implied a list, "Error detail" implies a supplemental data point.
+
+#### 2. Timeline event rendered twice with identical text
+
+Each timeline event had two lines:
+- `event.summary` — the API's human-readable description (e.g., "Library discovery dispatch started")
+- `formatOperationEventTypeLabel(event.eventType)` — a title-cased fallback for unmapped event types (e.g., "Library Discovery Dispatch Started")
+
+For all event types not in the known-types map (including `library_discovery_dispatch_started`), the fallback is simply the snake_case key converted to title case — producing text semantically identical to `event.summary`. The result was two visually adjacent lines with the same words in different capitalisation.
+
+**Fix:** Removed the secondary `<span>` entirely. `event.summary` is the authoritative human-readable description. The event type label added no information for any event type present in the walkthrough data. The unused `formatOperationEventTypeLabel` import was also removed.
+
+#### 3. `eyebrow` legacy CSS class in insight cards
+
+Three `<p class="eyebrow">` elements remained in the insight grid cards ("Latest issue", "What happened", "What to do next"). The project has been systematically replacing `eyebrow` with `ops-section-label`. As part of fixing defect 1, all three were changed to `class="ops-section-label"`, which is already used for the "Run timeline" and "Recorded outcome" / "Raw JSON" section headers in the same template.
+
+#### 4. `operationType` displayed as raw snake_case in Technical details
+
+The Technical details `<dt>Operation type</dt>` row rendered `selectedRun.operationType` verbatim — showing `library_discovery` instead of the human-readable title "Library discovery". The `operationTitle()` helper (a local wrapper around `getOperationRunDescriptor`) was already present in the component and used elsewhere but was not applied here.
+
+**Fix:** Changed `{{ selectedRun.operationType }}` → `{{ operationTitle(selectedRun.operationType) }}`.
+
+#### 5. "Recorded outcome" and "Raw JSON" shown simultaneously for the same data
+
+When `selectedRun.summary` had any keys, both the formatted "Recorded outcome" block (`buildOperationSummaryEntries`) and the raw "Raw JSON" block (`JSON.stringify`) rendered together in Technical details. The raw JSON is identical to the data already displayed in the formatted block.
+
+**Fix:** Changed the "Raw JSON" guard from `Object.keys(selectedRun.summary ?? {}).length` to `Object.keys(selectedRun.summary ?? {}).length && !buildOperationSummaryEntries(selectedRun.summary).length`. "Raw JSON" now serves purely as a fallback when the formatter produces no entries — e.g., if a future summary shape cannot be processed by `buildOperationSummaryEntries`. When the formatted view is present, the raw JSON is suppressed.
+
+**Visual verification:** Failed Library discovery run with `errorMessage` now shows two-card layout "ERROR DETAIL / WHAT TO DO NEXT". Timeline shows one entry per event. Technical detail "Operation type" shows "Library discovery". "Recorded outcome" appears without a redundant Raw JSON block below it.
