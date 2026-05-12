@@ -752,3 +752,30 @@ Test suite after this session: **1818 tests, 0 failures** (up from 1763).
 - `formatElapsedDuration(startIso, endIso, { nowFn })` — 12 tests (null/undefined/unparseable start, zero, 45s, 2m 15s, negative clock skew→0s, nowFn for null end, nowFn for omitted end, 2h 3m, 59s boundary, 1m 0s boundary)
 
 Test suite: **1852 tests, 0 failures** (up from 1818).
+
+---
+
+### 2026-05-12 - Users Screen (ActivityUsersView)
+
+**Screen:** `ActivityUsersView.vue`
+**Lib extended:** `src/client/lib/settings-users-presentation.js` (2 new exports appended)
+**Tests extended:** `test/client/settings-users-presentation.test.js` (13 new tests)
+
+**Issues identified and resolved:**
+
+1. **`user.role` rendered raw in the pill** — The Role column showed the lowercase backend enum verbatim: `admin`, `owner`, `requester`. `formatUserRole(role)` and a role-tone function already existed in `settings-users-presentation.js` (used by SettingsUsersView) but were not imported here. Added `formatUserRoleTone(role)` to the lib and imported both into the view. Pills now read `"Admin"`, `"Requester"` etc.
+
+2. **`user.authProvider ?? 'local'` exposed backend internal token** — The Auth provider column fell back to the raw string `'local'` for password-based accounts. `formatAuthProvider(provider)` already exists in `settings-users-presentation.js` and maps `local → 'password'`, `plex → 'Plex'`. Now used in place of the inline fallback.
+
+3. **`user.lastLoginAt` and `user.createdAt` were raw ISO 8601 timestamps** — `2026-05-12T09:41:22.000Z` shown verbatim in the Last login and Created columns. Now uses `formatOperationTimestamp()` from `operation-run-presentation.js` (same function used by Operations, History, Downloads, and Queue views), guarded with a `? ... : '—'` so null values still render the em dash.
+
+4. **`roleTone()` was an inline function with no tests** — 3-branch function covering 4 role strings. Extracted as `formatUserRoleTone(role)` in `settings-users-presentation.js` with full test coverage. The `owner` role mapping (`'warning'`) was previously present only in this one file with no test; it now has regression coverage.
+
+5. **Subtitle used an inline ternary for pluralisation** — `{{ userCount }} application user{{ userCount === 1 ? '' : 's' }}` embedded branching in the template. Added `formatUserCountLabel(count)` to the lib returning `"1 user"` / `"N users"`. Subtitle simplified from `"N application users."` to `"N users."` — "application" was redundant context.
+
+**New exports in `settings-users-presentation.js`:**
+
+- `formatUserRoleTone(role)` — 7 tests (admin→warning, owner→warning, requester→info, operator→undefined, null→undefined, unknown→undefined, admin/owner same tone)
+- `formatUserCountLabel(count)` — 6 tests (singular at 1, plural at 0/2/100, count in label, no singular for 0)
+
+Test suite: **1865 tests, 0 failures** (up from 1852).

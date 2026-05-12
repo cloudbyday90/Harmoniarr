@@ -143,3 +143,31 @@ export function formatPlexConflictReason(reason) {
     default: return reason.replace(/_/g, ' ');
   }
 }
+
+/**
+ * Returns a UI tone string for a user role, suitable for the `data-tone`
+ * attribute on a pill component.
+ *
+ * - admin/owner → 'warning'  (elevated-privilege roles)
+ * - requester   → 'info'     (limited access)
+ * - other/unknown → undefined (default / no highlight)
+ *
+ * @param {string|null|undefined} role
+ * @returns {'warning'|'info'|undefined}
+ */
+export function formatUserRoleTone(role) {
+  if (role === 'admin' || role === 'owner') return 'warning';
+  if (role === 'requester') return 'info';
+  return undefined;
+}
+
+/**
+ * Returns a human-readable count label for the number of application users,
+ * e.g. "1 user" or "4 users".
+ *
+ * @param {number} count
+ * @returns {string}
+ */
+export function formatUserCountLabel(count) {
+  return count === 1 ? '1 user' : `${count} users`;
+}

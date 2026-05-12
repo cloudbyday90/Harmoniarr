@@ -20,12 +20,13 @@
 import { computed } from 'vue';
 import { fetchUsers } from '../lib/users-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
-
-function roleTone(role) {
-  if (role === 'admin' || role === 'owner') return 'warning';
-  if (role === 'requester') return 'info';
-  return undefined;
-}
+import {
+  formatAuthProvider,
+  formatUserCountLabel,
+  formatUserRole,
+  formatUserRoleTone,
+} from '../lib/settings-users-presentation.js';
+import { formatOperationTimestamp } from '../lib/operation-run-presentation.js';
 
 const {
   data: users,
@@ -48,7 +49,7 @@ const userCount = computed(() => users.value?.length ?? 0);
       <div>
         <h2 class="hx-page-title">Users</h2>
         <p class="hx-page-subtitle">
-          {{ userCount }} application user{{ userCount === 1 ? '' : 's' }}.
+          {{ formatUserCountLabel(userCount) }}.
           Source-side Soulseek peers will land in a future release.
         </p>
       </div>
@@ -95,15 +96,15 @@ const userCount = computed(() => users.value?.length ?? 0);
             <tbody>
               <tr v-for="user in users" :key="user.id">
                 <td>{{ user.username }}</td>
-                <td><span class="hx-pill" :data-tone="roleTone(user.role)">{{ user.role }}</span></td>
-                <td>{{ user.authProvider ?? 'local' }}</td>
+                <td><span class="hx-pill" :data-tone="formatUserRoleTone(user.role)">{{ formatUserRole(user.role) }}</span></td>
+                <td>{{ formatAuthProvider(user.authProvider) }}</td>
                 <td>{{ user.email ?? '—' }}</td>
                 <td>
                   <span v-if="user.isDisabled" class="hx-pill" data-tone="danger">Disabled</span>
                   <span v-else class="hx-pill" data-tone="success">Active</span>
                 </td>
-                <td>{{ user.lastLoginAt ?? '—' }}</td>
-                <td>{{ user.createdAt ?? '—' }}</td>
+                <td>{{ user.lastLoginAt ? formatOperationTimestamp(user.lastLoginAt) : '—' }}</td>
+                <td>{{ user.createdAt ? formatOperationTimestamp(user.createdAt) : '—' }}</td>
               </tr>
             </tbody>
           </table>

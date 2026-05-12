@@ -29,7 +29,9 @@ import {
   formatPlexLinkStatusDetail,
   formatPlexProfileClassification,
   formatPlexProfileClassificationClass,
+  formatUserCountLabel,
   formatUserRole,
+  formatUserRoleTone,
   hasPendingManagedLibraryRootChanges,
   plexLibraryAccessPolicyLabel,
   plexLibraryAccessPolicyTone,
@@ -373,5 +375,50 @@ describe('formatPlexConflictReason', () => {
   });
   it('does not expose raw enum values for known reasons', () => {
     assert.notEqual(formatPlexConflictReason('username_match'), 'username_match');
+  });
+});
+
+describe('formatUserRoleTone', () => {
+  it('returns warning for admin', () => {
+    assert.equal(formatUserRoleTone('admin'), 'warning');
+  });
+  it('returns warning for owner', () => {
+    assert.equal(formatUserRoleTone('owner'), 'warning');
+  });
+  it('returns info for requester', () => {
+    assert.equal(formatUserRoleTone('requester'), 'info');
+  });
+  it('returns undefined for operator (no highlight)', () => {
+    assert.equal(formatUserRoleTone('operator'), undefined);
+  });
+  it('returns undefined for null', () => {
+    assert.equal(formatUserRoleTone(null), undefined);
+  });
+  it('returns undefined for unknown role', () => {
+    assert.equal(formatUserRoleTone('superuser'), undefined);
+  });
+  it('admin and owner both get the same elevated tone', () => {
+    assert.equal(formatUserRoleTone('admin'), formatUserRoleTone('owner'));
+  });
+});
+
+describe('formatUserCountLabel', () => {
+  it('returns singular for 1 user', () => {
+    assert.equal(formatUserCountLabel(1), '1 user');
+  });
+  it('returns plural for 0 users', () => {
+    assert.equal(formatUserCountLabel(0), '0 users');
+  });
+  it('returns plural for 2 users', () => {
+    assert.equal(formatUserCountLabel(2), '2 users');
+  });
+  it('returns plural for 100 users', () => {
+    assert.equal(formatUserCountLabel(100), '100 users');
+  });
+  it('includes the count in the label', () => {
+    assert.ok(formatUserCountLabel(7).includes('7'));
+  });
+  it('does not return singular for 0', () => {
+    assert.notEqual(formatUserCountLabel(0), '1 user');
   });
 });
