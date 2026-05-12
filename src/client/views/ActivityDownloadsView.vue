@@ -18,6 +18,18 @@
 
 <script setup>
 import { computed } from 'vue';
+import {
+  calculateTransferProgress,
+  formatDownloadActivitySummary,
+  formatTransferFilename,
+  formatTransferStateLabel,
+  formatTransferStateTone,
+  isActiveTransferState,
+  isCompletedTransferState,
+  isFailedTransferState,
+} from '../lib/activity-downloads-presentation.js';
+import { formatBytes, formatSpeed } from '../lib/search-presentation.js';
+import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
 import { fetchSlskdDownloads } from '../lib/slskd-search-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
@@ -50,67 +62,21 @@ const allFiles = computed(() => {
   return out;
 });
 
-const activeFiles = computed(() => allFiles.value.filter((file) => isActiveState(file.state)));
-const completedFiles = computed(() => allFiles.value.filter((file) => isCompletedState(file.state)));
-const failedFiles = computed(() => allFiles.value.filter((file) => isFailedState(file.state)));
+const activeFiles = computed(() => allFiles.value.filter((file) => isActiveTransferState(file.state)));
+const completedFiles = computed(() => allFiles.value.filter((file) => isCompletedTransferState(file.state)));
+const failedFiles = computed(() => allFiles.value.filter((file) => isFailedTransferState(file.state)));
 
-function isActiveState(state) {
-  if (typeof state !== 'string') return false;
-  return /InProgress|Queued|Initializing|Negotiating/i.test(state);
-}
+const activitySummary = computed(() =>
+  formatDownloadActivitySummary({
+    active: activeFiles.value.length,
+    completed: completedFiles.value.length,
+    failed: failedFiles.value.length,
+  }),
+);
 
-function isCompletedState(state) {
-  return typeof state === 'string' && /Completed/i.test(state) && !/Errored|Cancelled|Rejected|TimedOut/i.test(state);
-}
-
-function isFailedState(state) {
-  return typeof state === 'string' && /Errored|Cancelled|Rejected|TimedOut|Aborted/i.test(state);
-}
-
-function stateTone(state) {
-  if (isFailedState(state)) return 'danger';
-  if (isCompletedState(state)) return 'success';
-  if (isActiveState(state)) return 'warning';
-  return 'info';
-}
-
-function shortState(state) {
-  if (typeof state !== 'string') return '\u2014';
-  return state.split(',')[0]?.trim() || state;
-}
-
-function progress(file) {
-  const size = Number(file?.size);
-  const transferred = Number(file?.bytesTransferred);
-  if (!Number.isFinite(size) || size <= 0) return null;
-  if (!Number.isFinite(transferred) || transferred < 0) return 0;
-  return Math.min(100, Math.round((transferred / size) * 100));
-}
-
-function formatBytes(bytes) {
-  const value = Number(bytes);
-  if (!Number.isFinite(value) || value <= 0) return '\u2014';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let v = value;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i += 1;
-  }
-  return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
-}
-
-function formatSpeed(bytesPerSecond) {
-  const value = Number(bytesPerSecond);
-  if (!Number.isFinite(value) || value <= 0) return '\u2014';
-  return `${formatBytes(value)}/s`;
-}
-
-function basename(filename) {
-  if (typeof filename !== 'string') return '\u2014';
-  const i = Math.max(filename.lastIndexOf('/'), filename.lastIndexOf('\\'));
-  return i >= 0 ? filename.slice(i + 1) : filename;
-}
+const allFilesWithProgress = computed(() =>
+  allFiles.value.map((file) => ({ ...file, progress: calculateTransferProgress(file) })),
+);
 </script>
 
 <template>
@@ -119,9 +85,9 @@ function basename(filename) {
       <div>
         <h2 class="hx-page-title">Downloads</h2>
         <p class="hx-page-subtitle">
-          Live slskd transfer state.
-          {{ activeFiles.length }} active · {{ completedFiles.length }} complete · {{ failedFiles.length }} failed.
-          <span v-if="lastRefreshedAt"> · refreshed {{ lastRefreshedAt }}</span>
+          Live Soulseek transfer activity.
+          {{ activitySummary }}.
+          <span v-if="lastRefreshedAt"> · Refreshed {{ formatOperationTimestampShort(lastRefreshedAt) }}</span>
         </p>
       </div>
       <div class="hx-page-actions">
@@ -150,30 +116,30 @@ function basename(filename) {
         </div>
         <div v-else-if="!allFiles.length" class="hx-empty">
           <p class="hx-empty-title">No downloads in flight</p>
-          <p class="hx-empty-copy">Files enqueued through Search or import execution will appear here.</p>
+          <p class="hx-empty-copy">Files downloaded via Search or library import will appear here.</p>
         </div>
         <div v-else class="hx-table-scroll">
           <table class="hx-table">
             <thead>
               <tr>
                 <th>File</th>
-                <th>Peer</th>
+                <th>User</th>
                 <th>State</th>
                 <th class="hx-table-num">Progress</th>
                 <th class="hx-table-num">Size</th>
                 <th class="hx-table-num">Speed</th>
-                <th class="hx-table-num">Queue</th>
+                <th class="hx-table-num">Position</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="file in allFiles" :key="`${file.username}::${file.id}`">
-                <td :title="file.filename">{{ basename(file.filename) }}</td>
+              <tr v-for="file in allFilesWithProgress" :key="`${file.username}::${file.id}`">
+                <td :title="file.filename">{{ formatTransferFilename(file.filename) }}</td>
                 <td>{{ file.username }}</td>
                 <td>
-                  <span class="hx-pill" :data-tone="stateTone(file.state)">{{ shortState(file.state) }}</span>
+                  <span class="hx-pill" :data-tone="formatTransferStateTone(file.state)">{{ formatTransferStateLabel(file.state) }}</span>
                 </td>
                 <td class="hx-table-num">
-                  <span v-if="progress(file) !== null">{{ progress(file) }}%</span>
+                  <span v-if="file.progress !== null">{{ file.progress }}%</span>
                   <span v-else>—</span>
                 </td>
                 <td class="hx-table-num">{{ formatBytes(file.size) }}</td>

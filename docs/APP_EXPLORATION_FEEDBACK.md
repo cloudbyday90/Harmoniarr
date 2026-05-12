@@ -652,3 +652,42 @@ Test suite after this session: **1623 tests, 0 failures** (up from 1572).
 - `formatOperationEventTypeLabel(eventType)` — 9 tests (null/undefined, known mappings, no-underscore guard, title-case fallback)
 
 Test suite after this session: **1680 tests, 0 failures** (up from 1623).
+
+---
+
+### 2026-05-12 - Downloads Screen (ActivityDownloadsView)
+
+**Screen:** `ActivityDownloadsView.vue` (218 lines before changes)
+**Lib:** `src/client/lib/activity-downloads-presentation.js` (new file — 8 exports)
+**Tests:** `test/client/activity-downloads-presentation.test.js` (new file — 83 tests)
+
+**Issues identified and resolved:**
+
+1. **"Live slskd transfer state." subtitle named the backend daemon** — The page subtitle read "Live slskd transfer state." which exposes the underlying slskd daemon name to a self-hosting admin who only knows Harmoniarr. Changed to "Live Soulseek transfer activity."
+
+2. **`lastRefreshedAt` rendered as a raw ISO 8601 string** — The subtitle included `refreshed 2026-05-12T12:01:43.291Z` because `lastRefreshedAt` is the raw ISO string from `useAsyncResource`. Replaced with `formatOperationTimestampShort(lastRefreshedAt)` to produce the same relative format used by the Operations screen ("Just now", "3m ago", etc).
+
+3. **Transfer state labels were raw PascalCase slskd enum names** — The table State column showed `InProgress`, `Negotiating`, `Initializing`, `TimedOut` verbatim. `Negotiating` and `Initializing` are internal protocol phases with no meaning to a user; `InProgress` reads like code; `TimedOut` has no word boundary. Added `formatTransferStateLabel()` mapping: `InProgress→Downloading`, `Initializing→Starting`, `Negotiating→Connecting`, `TimedOut→Timed out`. Compound states like `Completed, Succeeded` and `Completed, Errored` are also resolved.
+
+4. **"Peer" column used Soulseek-protocol terminology** — Soulseek calls remote users "peers" internally. For a self-hoster this reads as jargon. Renamed to "User".
+
+5. **"Queue" column header was ambiguous** — Could mean "is this queued?", "queue depth", or "position in queue". The actual value is the file's position in the remote peer's upload queue (i.e. how many files ahead of yours). Renamed to "Position".
+
+6. **Empty state copy used "import execution" jargon** — "Files enqueued through Search or import execution will appear here." used internal terminology. Changed to "Files downloaded via Search or library import will appear here."
+
+7. **Nine pure functions were inline in `<script setup>` with no tests** — `isActiveState`, `isCompletedState`, `isFailedState`, `stateTone`, `shortState`, `progress`, `formatBytes`, `formatSpeed`, and `basename` were all defined locally. The state classifier trio used regex matching against Soulseek enum names — untested logic that would silently break on any slskd state name change. `formatBytes` and `formatSpeed` were also fourth and fifth copies of the same function already exported from `search-presentation.js`. All nine removed; `formatBytes`/`formatSpeed` now imported from `search-presentation.js`.
+
+8. **`calculateTransferProgress` was called twice per table row** — The template evaluated `progress(file) !== null` and then `progress(file)` again for the display value. Replaced with `allFilesWithProgress` computed that augments each file with a pre-calculated `progress` field, eliminating the double evaluation.
+
+**New exports in `activity-downloads-presentation.js`:**
+
+- `isActiveTransferState(state)` — 10 tests (all 4 active states, negative cases, case-insensitive)
+- `isCompletedTransferState(state)` — 9 tests (clean completion, all failed-completion compound states, negative cases)
+- `isFailedTransferState(state)` — 10 tests (all 5 failure states, negative cases, case-insensitive)
+- `formatTransferStateLabel(state)` — 21 tests (all 10 known states, 4 compound states, fallback, no-raw-enum guard, no-underscore guard)
+- `formatTransferStateTone(state)` — 12 tests (all state categories, priority ordering, null)
+- `calculateTransferProgress(file)` — 11 tests (null/missing/zero size, negative transferred, 50%, 100%, cap, rounding, Infinity guard)
+- `formatTransferFilename(path)` — 8 tests (null/undefined, Unix path, Windows path, no-dir, mixed separators, separator-only, deep Soulseek path)
+- `formatDownloadActivitySummary(counts)` — 3 tests (zero counts, mixed counts, separator character)
+
+Test suite after this session: **1763 tests, 0 failures** (up from 1680).
