@@ -11,11 +11,11 @@ import {
 test('operation run link targets resolve shared descriptors by operation type', () => {
   assert.deepEqual(getOperationRunDescriptor('library_scan'), {
     operationType: 'library_scan',
-    openLabel: 'Open library scan run',
+    openLabel: 'View library scan',
     title: 'Library scan',
   });
   assert.deepEqual(buildOperationRunLinkTarget({ operationType: 'library_scan', runId: 'run-11' }), {
-    label: 'Open library scan run',
+    label: 'View library scan',
     to: {
       hash: '#library-scan-panel',
       name: 'dashboard',
@@ -25,7 +25,7 @@ test('operation run link targets resolve shared descriptors by operation type', 
     },
   });
   assert.deepEqual(buildOperationRunLinkTarget({ operationType: 'backup_restore_apply', runId: 'restore-run-1' }), {
-    label: 'Open backup restore run',
+    label: 'View backup restore',
     to: {
       name: 'jobs',
       query: {
@@ -40,7 +40,7 @@ test('operation run link targets resolve shared descriptors by started event typ
     entityId: 'run-44',
     eventType: 'import_candidate_execution_started',
   }), {
-    label: 'Open import execution run',
+    label: 'View download run',
     to: {
       hash: '#import-execution-run-panel',
       name: 'review-queue',
@@ -53,7 +53,7 @@ test('operation run link targets resolve shared descriptors by started event typ
     entityId: 'restore-run-1',
     eventType: 'backup_restore_failed',
   }), {
-    label: 'Open backup restore run',
+    label: 'View backup restore',
     to: {
       name: 'jobs',
       query: {
@@ -66,7 +66,7 @@ test('operation run link targets resolve shared descriptors by started event typ
 test('operation run descriptors preserve fallback behavior for unknown operations', () => {
   assert.deepEqual(getOperationRunDescriptor('metadata_refresh'), {
     operationType: 'metadata_refresh',
-    openLabel: 'Open operation run',
+    openLabel: 'Open run',
     title: 'Metadata Refresh',
   });
   assert.equal(buildOperationRunLinkTarget({ operationType: 'metadata_refresh', runId: 'run-99' }), null);

@@ -1234,3 +1234,28 @@ Test suite: **2272 tests, 0 failures** (up from 2214).
 - `buildShellHeartbeatStatusLabel(status)` — 5 tests (healthy→Healthy, degraded→Degraded, unavailable→Unavailable, unknown→Health, null→Health)
 
 Test suite: **2304 tests, 0 failures** (up from 2272).
+
+### 2026-05-12 - Background Jobs Screen — Detail Panel Information Hierarchy
+
+**Screen:** `OperationsView.vue` (Background Jobs)
+**Lib changed:** `src/client/lib/operation-run-link-targets.js`
+**Tests updated:** `test/client/operation-run-link-targets.test.js`, `test/client/activity-feed-link-targets.test.js`, `test/client/audit-activity-links.test.js`
+
+**Issues identified and resolved:**
+
+1. **Information hierarchy in the detail panel was inverted** — The detail panel showed three insight cards: "What happened" first, then "What to do next", then "Latest issue" last. For a failed run, the actual error message was pushed below two paragraphs of status-keyed boilerplate text that an operator learns to skip after seeing it once. The `errorMessage` — the only content specific to this run — was the last thing they saw. Restructured: "Latest issue" is now first (shown when `errorMessage` is present); "What happened" and "What to do next" are only shown when `errorMessage` is absent (i.e. for running/completed/cancelled runs where context is genuinely useful and there is no specific error to read).
+
+2. **"What happened" and "What to do next" were noise when a real error was present** — Both advisory cards contained status-keyed template strings (e.g. "Library discovery stopped before completion and should be reviewed before it is retried." / "Review the failure details, fix the underlying problem, then retry the run when you are ready."). When an `errorMessage` existed, these cards added no information beyond what the status pill already communicated — but they appeared first and forced the operator to scroll past them. Resolved by the same conditional restructure as issue 1: the advisory cards are suppressed entirely when `errorMessage` is present.
+
+3. **Action labels were action-centric "Open X run" instead of destination-centric** — Every table row and the detail panel header rendered a button labelled "Open library discovery run" / "Open library scan run" / "Open import execution run" etc. These labels describe what the button does (opens something) rather than where it takes you (the destination workflow). On a screen full of 20 identical runs, every row's button read "Open library discovery run" — identical label, identical destination — adding no navigation signal. Renamed all six `openLabel` values in `operation-run-link-targets.js` to destination-centric labels: `"View library scan"`, `"View library discovery"`, `"View download run"`, `"View library import"`, `"View artwork cleanup"`, `"View backup restore"`. Fallback for unknown operation types changed from `"Open operation run"` to `"Open run"`.
+
+4. **The table row action button appeared on the currently selected run** — When a run was selected, the detail panel opened and the row's action button was still visible — two separate links to the same destination (the workflow page for that run) shown simultaneously. Suppressed the row `RouterLink` for the currently selected run with `v-if="runLinkTarget(run) && run.id !== selectedRunId"`.
+
+**Files changed:**
+- `src/client/lib/operation-run-link-targets.js` — rename 6 `openLabel` values; update fallback from `'Open operation run'` to `'Open run'`
+- `src/client/views/OperationsView.vue` — restructure insight grid (latest issue first, advisory cards suppressed when error present); suppress row action button for selected run
+- `test/client/operation-run-link-targets.test.js` — update 4 label assertions
+- `test/client/activity-feed-link-targets.test.js` — update 2 label assertions
+- `test/client/audit-activity-links.test.js` — update 6 label assertions
+
+Test suite: **2304 tests, 0 failures** (unchanged — no new tests added, 12 label assertions updated).

@@ -37,27 +37,27 @@ import { buildOperationRunDetailLocation } from './operations-route-state.js';
 const operationRunLinkDefinitionsByType = new Map([
   [operationRunRegistry.artworkCleanup.operationType, {
     buildLocation: buildArtworkCleanupRunDashboardLocation,
-    openLabel: 'Open artwork cleanup run',
+    openLabel: 'View artwork cleanup',
   }],
   [operationRunRegistry.importCandidateExecutionPlanning.operationType, {
     buildLocation: buildImportReviewExecutionRunLocation,
-    openLabel: 'Open import execution run',
+    openLabel: 'View download run',
   }],
   [operationRunRegistry.importCandidateApply.operationType, {
     buildLocation: buildImportReviewApplyRunLocation,
-    openLabel: 'Open import apply run',
+    openLabel: 'View library import',
   }],
   [operationRunRegistry.libraryScan.operationType, {
     buildLocation: buildLibraryScanRunDashboardLocation,
-    openLabel: 'Open library scan run',
+    openLabel: 'View library scan',
   }],
   [operationRunRegistry.libraryDiscoveryDispatch.operationType, {
     buildLocation: buildLibraryDiscoveryRunDashboardLocation,
-    openLabel: 'Open library discovery run',
+    openLabel: 'View library discovery',
   }],
   [operationRunRegistry.backupRestoreApply.operationType, {
     buildLocation: buildOperationRunDetailLocation,
-    openLabel: 'Open backup restore run',
+    openLabel: 'View backup restore',
   }],
 ]);
 
@@ -117,7 +117,7 @@ export function getOperationRunDescriptor(operationType) {
 
   return {
     operationType,
-    openLabel: routeDefinition?.openLabel ?? 'Open operation run',
+    openLabel: routeDefinition?.openLabel ?? 'Open run',
     title: definition?.title ?? formatOperationTypeFallback(operationType),
   };
 }

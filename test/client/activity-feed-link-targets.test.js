@@ -8,7 +8,7 @@ test('activity feed link targets map operation entries onto existing run drill-t
     operationType: 'library_scan',
     runId: 'run-11',
   }), {
-    label: 'Open library scan run',
+    label: 'View library scan',
     to: {
       hash: '#library-scan-panel',
       name: 'dashboard',
@@ -55,7 +55,7 @@ test('activity feed link targets fall back to metadata artist and operation-even
     entityId: 'run-44',
     eventType: 'import_candidate_execution_started',
   }), {
-    label: 'Open import execution run',
+    label: 'View download run',
     to: {
       hash: '#import-execution-run-panel',
       name: 'review-queue',

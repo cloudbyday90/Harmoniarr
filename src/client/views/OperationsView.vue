@@ -297,7 +297,7 @@ watch(
                   </td>
                   <td class="ops-run-actions">
                     <RouterLink
-                      v-if="runLinkTarget(run)"
+                      v-if="runLinkTarget(run) && run.id !== selectedRunId"
                       class="hx-btn"
                       :to="runLinkTarget(run).to"
                       @click.stop
@@ -367,18 +367,20 @@ watch(
             </div>
 
             <div class="operations-insight-grid">
-              <article class="operations-insight-card">
-                <p class="eyebrow">What happened</p>
-                <strong>{{ getOperationRunOperatorSummary(selectedRun) }}</strong>
-              </article>
-              <article class="operations-insight-card">
-                <p class="eyebrow">What to do next</p>
-                <strong>{{ getOperationRunNextStep(selectedRun) }}</strong>
-              </article>
               <article class="operations-insight-card" v-if="selectedRun.errorMessage">
                 <p class="eyebrow">Latest issue</p>
                 <strong>{{ selectedRun.errorMessage }}</strong>
               </article>
+              <template v-if="!selectedRun.errorMessage">
+                <article class="operations-insight-card">
+                  <p class="eyebrow">What happened</p>
+                  <strong>{{ getOperationRunOperatorSummary(selectedRun) }}</strong>
+                </article>
+                <article class="operations-insight-card">
+                  <p class="eyebrow">What to do next</p>
+                  <strong>{{ getOperationRunNextStep(selectedRun) }}</strong>
+                </article>
+              </template>
             </div>
 
             <div class="ops-timeline" v-if="selectedRunDetail?.auditEvents?.length">

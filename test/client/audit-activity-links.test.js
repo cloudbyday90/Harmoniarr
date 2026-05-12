@@ -8,7 +8,7 @@ test('buildAuditActivityLinkTarget links artwork cleanup audit events into the d
     entityType: 'operation_run',
     eventType: 'artwork_cleanup_started',
   }), {
-    label: 'Open artwork cleanup run',
+    label: 'View artwork cleanup',
     to: {
       hash: '#artwork-maintenance-panel',
       name: 'dashboard',
@@ -25,7 +25,7 @@ test('buildAuditActivityLinkTarget links import execution and apply audit events
     entityType: 'operation_run',
     eventType: 'import_candidate_execution_started',
   }), {
-    label: 'Open import execution run',
+    label: 'View download run',
     to: {
       hash: '#import-execution-run-panel',
       name: 'review-queue',
@@ -40,7 +40,7 @@ test('buildAuditActivityLinkTarget links import execution and apply audit events
     entityType: 'operation_run',
     eventType: 'import_candidate_apply_started',
   }), {
-    label: 'Open import apply run',
+    label: 'View library import',
     to: {
       hash: '#import-apply-run-panel',
       name: 'review-queue',
@@ -57,7 +57,7 @@ test('buildAuditActivityLinkTarget links library scan and discovery audit events
     entityType: 'operation_run',
     eventType: 'library_scan_started',
   }), {
-    label: 'Open library scan run',
+    label: 'View library scan',
     to: {
       hash: '#library-scan-panel',
       name: 'dashboard',
@@ -72,7 +72,7 @@ test('buildAuditActivityLinkTarget links library scan and discovery audit events
     entityType: 'operation_run',
     eventType: 'library_discovery_dispatch_started',
   }), {
-    label: 'Open library discovery run',
+    label: 'View library discovery',
     to: {
       hash: '#library-discovery-panel',
       name: 'dashboard',
@@ -89,7 +89,7 @@ test('buildAuditActivityLinkTarget links backup restore audit events into jobs r
     entityType: 'operation_run',
     eventType: 'backup_restore_failed',
   }), {
-    label: 'Open backup restore run',
+    label: 'View backup restore',
     to: {
       name: 'jobs',
       query: {
