@@ -18,9 +18,18 @@
 
 <script setup>
 import {
+  canStartApplyRun,
+  describeApplyOperation,
   formatPath,
   formatRunStatus,
   formatTimestamp,
+  getApplyItemOperationHistory,
+  getApplyItemStatusClass,
+  getApplyItemStatusLabel,
+  getApplyOperationStatusClass,
+  getApplyOperationStatusLabel,
+  getApplyOperationStepLabel,
+  getRunStatusClass,
 } from '../lib/import-candidate-presentation.js';
 
 defineProps({
@@ -59,134 +68,6 @@ defineProps({
 });
 
 defineEmits(['refresh', 'start']);
-
-function statusClass(status) {
-  switch (status) {
-    case 'running':
-      return 'review-status-selected';
-    case 'failed':
-      return 'review-status-failed';
-    case 'completed':
-      return 'review-status-held';
-    default:
-      return 'review-status-pending';
-  }
-}
-
-function itemStatusClass(status) {
-  switch (status) {
-    case 'blocked':
-      return 'review-status-failed';
-    case 'apply_failed':
-      return 'review-status-failed';
-    case 'applied_with_warnings':
-      return 'review-status-held';
-    case 'applied':
-      return 'review-status-selected';
-    case 'ready_with_warnings':
-      return 'review-status-held';
-    default:
-      return 'review-status-selected';
-  }
-}
-
-function itemStatusLabel(status) {
-  switch (status) {
-    case 'blocked':
-      return 'Blocked';
-    case 'apply_failed':
-      return 'Apply failed';
-    case 'applied_with_warnings':
-      return 'Applied with warnings';
-    case 'applied':
-      return 'Applied';
-    case 'ready_with_warnings':
-      return 'Ready with warnings';
-    default:
-      return 'Ready';
-  }
-}
-
-function operationStatusClass(status) {
-  switch (status) {
-    case 'failed':
-      return 'review-status-failed';
-    case 'not_attempted':
-      return 'review-status-pending';
-    case 'skipped':
-      return 'review-status-held';
-    default:
-      return 'review-status-selected';
-  }
-}
-
-function operationStatusLabel(status) {
-  switch (status) {
-    case 'failed':
-      return 'Failed';
-    case 'not_attempted':
-      return 'Not attempted';
-    case 'skipped':
-      return 'Skipped';
-    default:
-      return 'Applied';
-  }
-}
-
-function operationStepLabel(stepType) {
-  switch (stepType) {
-    case 'finalize':
-      return 'Finalize';
-    default:
-      return 'Stage';
-  }
-}
-
-function formatMutationMode(mode) {
-  switch (mode) {
-    case 'hardlink':
-      return 'hardlink';
-    case 'copy':
-      return 'copy';
-    default:
-      return 'move';
-  }
-}
-
-function formatFallbackReason(reason) {
-  switch (reason) {
-    case 'cross_device':
-      return 'the source and destination were on different filesystem devices';
-    default:
-      return reason || 'the filesystem could not honor the requested mutation mode';
-  }
-}
-
-function describeOperation(operation) {
-  if (operation?.errorMessage) {
-    return operation.errorMessage;
-  }
-
-  if (operation?.fallbackFromMode) {
-    return `${operationStepLabel(operation?.stepType)} ${operation?.status || 'pending'} via ${formatMutationMode(operation.fallbackFromMode)} fallback to ${formatMutationMode(operation?.appliedMode)} because ${formatFallbackReason(operation?.fallbackReason)}`;
-  }
-
-  return `${operationStepLabel(operation?.stepType)} ${operation?.status || 'pending'} via ${operation?.transport || 'planned apply'}`;
-}
-
-function itemOperationHistory(item) {
-  if (Array.isArray(item?.importOperations) && item.importOperations.length > 0) {
-    return item.importOperations;
-  }
-
-  return Array.isArray(item?.applySnapshot?.fileOperations)
-    ? item.applySnapshot.fileOperations
-    : [];
-}
-
-function canStartRun(currentRun, importPendingCandidateCount) {
-  return !currentRun || (currentRun.status !== 'pending' && currentRun.status !== 'running' && importPendingCandidateCount > 0);
-}
 </script>
 
 <template>
@@ -207,7 +88,7 @@ function canStartRun(currentRun, importPendingCandidateCount) {
         </button>
         <button
           type="button"
-          :disabled="!canStartRun(currentRun, importPendingCandidateCount) || isStarting"
+          :disabled="!canStartApplyRun(currentRun, importPendingCandidateCount) || isStarting"
           @click="$emit('start')"
         >
           {{ isStarting ? 'Starting...' : 'Start import apply' }}
@@ -243,7 +124,7 @@ function canStartRun(currentRun, importPendingCandidateCount) {
           <h3>Run {{ currentRun.id }}</h3>
           <p class="metadata-card-copy">{{ currentRun.currentStep || 'No current step reported' }}</p>
         </div>
-        <span class="review-status-pill" :class="statusClass(currentRun.status)">
+        <span class="review-status-pill" :class="getRunStatusClass(currentRun.status)">
           {{ formatRunStatus(currentRun.status) }}
         </span>
       </div>
@@ -291,8 +172,8 @@ function canStartRun(currentRun, importPendingCandidateCount) {
               <strong>{{ item.applySnapshot?.candidate?.folderPath || 'Root-level files' }}</strong>
               <p class="metadata-card-copy">{{ item.statusMessage }}</p>
             </div>
-            <span class="review-status-pill" :class="itemStatusClass(item.itemStatus)">
-              {{ itemStatusLabel(item.itemStatus) }}
+            <span class="review-status-pill" :class="getApplyItemStatusClass(item.itemStatus)">
+              {{ getApplyItemStatusLabel(item.itemStatus) }}
             </span>
           </div>
 
@@ -330,20 +211,20 @@ function canStartRun(currentRun, importPendingCandidateCount) {
             </div>
           </dl>
 
-          <div class="review-queue-stack" v-if="itemOperationHistory(item).length">
+          <div class="review-queue-stack" v-if="getApplyItemOperationHistory(item).length">
             <article
               class="review-file-item"
-              v-for="operation in itemOperationHistory(item)"
+              v-for="operation in getApplyItemOperationHistory(item)"
               :key="operation.id || `${operation.fileId || operation.importCandidateFileId || operation.filename}-${operation.stepType || operation.status}`"
             >
               <div class="review-file-header">
                 <div>
-                  <p class="eyebrow">{{ operationStepLabel(operation.stepType) }} operation</p>
+                  <p class="eyebrow">{{ getApplyOperationStepLabel(operation.stepType) }} operation</p>
                   <strong>{{ operation.filename || operation.stepType || 'Unknown file operation' }}</strong>
-                  <p class="metadata-card-copy">{{ describeOperation(operation) }}</p>
+                  <p class="metadata-card-copy">{{ describeApplyOperation(operation) }}</p>
                 </div>
-                <span class="review-status-pill" :class="operationStatusClass(operation.status)">
-                  {{ operationStatusLabel(operation.status) }}
+                <span class="review-status-pill" :class="getApplyOperationStatusClass(operation.status)">
+                  {{ getApplyOperationStatusLabel(operation.status) }}
                 </span>
               </div>
 

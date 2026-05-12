@@ -205,3 +205,202 @@ export function formatSourceProvider(provider) {
 export function formatCandidateCountLabel(count) {
   return count === 1 ? '1 candidate' : `${count} candidates`;
 }
+
+// ---------------------------------------------------------------------------
+// Apply-run display helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Return a CSS class suffix for an apply-run status.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function getRunStatusClass(status) {
+  switch (status) {
+    case 'running':
+      return 'review-status-selected';
+    case 'failed':
+      return 'review-status-failed';
+    case 'completed':
+      return 'review-status-held';
+    default:
+      return 'review-status-pending';
+  }
+}
+
+/**
+ * Return a CSS class suffix for an apply-item status.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function getApplyItemStatusClass(status) {
+  switch (status) {
+    case 'blocked':
+    case 'apply_failed':
+      return 'review-status-failed';
+    case 'applied_with_warnings':
+    case 'ready_with_warnings':
+      return 'review-status-held';
+    case 'applied':
+    default:
+      return 'review-status-selected';
+  }
+}
+
+/**
+ * Return a display label for an apply-item status.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function getApplyItemStatusLabel(status) {
+  switch (status) {
+    case 'blocked':
+      return 'Blocked';
+    case 'apply_failed':
+      return 'Apply failed';
+    case 'applied_with_warnings':
+      return 'Applied with warnings';
+    case 'applied':
+      return 'Applied';
+    case 'ready_with_warnings':
+      return 'Ready with warnings';
+    default:
+      return 'Ready';
+  }
+}
+
+/**
+ * Return a CSS class suffix for a file-operation status within an apply run.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function getApplyOperationStatusClass(status) {
+  switch (status) {
+    case 'failed':
+      return 'review-status-failed';
+    case 'not_attempted':
+      return 'review-status-pending';
+    case 'skipped':
+      return 'review-status-held';
+    default:
+      return 'review-status-selected';
+  }
+}
+
+/**
+ * Return a display label for a file-operation status within an apply run.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function getApplyOperationStatusLabel(status) {
+  switch (status) {
+    case 'failed':
+      return 'Failed';
+    case 'not_attempted':
+      return 'Not attempted';
+    case 'skipped':
+      return 'Skipped';
+    default:
+      return 'Applied';
+  }
+}
+
+/**
+ * Return a display label for an apply-operation step type.
+ *
+ * @param {string|null|undefined} stepType
+ * @returns {string}
+ */
+export function getApplyOperationStepLabel(stepType) {
+  return stepType === 'finalize' ? 'Finalize' : 'Stage';
+}
+
+/**
+ * Return the display name for a filesystem mutation mode.
+ * Recognised values: 'hardlink', 'copy'. All others (including the default
+ * server mode) render as 'move'.
+ *
+ * @param {string|null|undefined} mode
+ * @returns {string}
+ */
+export function formatApplyMutationMode(mode) {
+  if (mode === 'hardlink') return 'hardlink';
+  if (mode === 'copy') return 'copy';
+  return 'move';
+}
+
+/**
+ * Return a human-readable explanation for a filesystem-level fallback reason.
+ *
+ * @param {string|null|undefined} reason
+ * @returns {string}
+ */
+export function formatApplyFallbackReason(reason) {
+  if (reason === 'cross_device') {
+    return 'the source and destination were on different filesystem devices';
+  }
+  return reason || 'the filesystem could not honor the requested mutation mode';
+}
+
+/**
+ * Build a human-readable description for a single file operation within an
+ * apply run.  Prefers an explicit error message, then describes the fallback
+ * pathway when one occurred, and otherwise summarises the step/status/transport.
+ *
+ * @param {object|null|undefined} operation
+ * @returns {string}
+ */
+export function describeApplyOperation(operation) {
+  if (operation?.errorMessage) {
+    return operation.errorMessage;
+  }
+
+  if (operation?.fallbackFromMode) {
+    return `${getApplyOperationStepLabel(operation?.stepType)} ${operation?.status || 'pending'} via ${formatApplyMutationMode(operation.fallbackFromMode)} fallback to ${formatApplyMutationMode(operation?.appliedMode)} because ${formatApplyFallbackReason(operation?.fallbackReason)}`;
+  }
+
+  return `${getApplyOperationStepLabel(operation?.stepType)} ${operation?.status || 'pending'} via ${operation?.transport || 'planned apply'}`;
+}
+
+/**
+ * Return the relevant list of file operations for a given apply-item.
+ * Prefers live `importOperations` if present; falls back to the snapshotted
+ * `applySnapshot.fileOperations`.
+ *
+ * @param {object|null|undefined} item
+ * @returns {Array}
+ */
+export function getApplyItemOperationHistory(item) {
+  if (Array.isArray(item?.importOperations) && item.importOperations.length > 0) {
+    return item.importOperations;
+  }
+
+  return Array.isArray(item?.applySnapshot?.fileOperations)
+    ? item.applySnapshot.fileOperations
+    : [];
+}
+
+/**
+ * Return whether a new apply run can be started given the current run state
+ * and the number of pending import candidates.
+ *
+ * A run can be started when there is no current run, or the current run has
+ * finished (i.e. is neither pending nor running) and there are candidates
+ * waiting.
+ *
+ * @param {object|null|undefined} currentRun
+ * @param {number} importPendingCandidateCount
+ * @returns {boolean}
+ */
+export function canStartApplyRun(currentRun, importPendingCandidateCount) {
+  return !currentRun || (
+    currentRun.status !== 'pending' &&
+    currentRun.status !== 'running' &&
+    importPendingCandidateCount > 0
+  );
+}

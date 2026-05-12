@@ -1011,3 +1011,38 @@ Test suite: **1979 tests, 0 failures** (up from 1969).
 - `src/client/components/dashboard/RequesterHomePanel.vue` — import `formatActivityEventTime`; remove inline `formatActivityTime`; update the single template call site
 
 Test suite: **1995 tests, 0 failures** (up from 1979).
+
+### 2026-05-12 - ImportCandidateApplyPanel Component
+
+**Component:** `ImportCandidateApplyPanel.vue` (apply-run detail panel — moves staged downloads into the library)
+
+**Issues identified and resolved:**
+
+1. **Nine inline presentation functions with no tests** — The component `<script setup>` contained a full set of status/class/label/describe helpers that belonged in the existing `import-candidate-presentation.js` lib:
+
+   | Old inline function | New lib export | Purpose |
+   |---|---|---|
+   | `statusClass(status)` | `getRunStatusClass` | CSS class for apply-run status pill |
+   | `itemStatusClass(status)` | `getApplyItemStatusClass` | CSS class for per-item status pill |
+   | `itemStatusLabel(status)` | `getApplyItemStatusLabel` | Display label for per-item status |
+   | `operationStatusClass(status)` | `getApplyOperationStatusClass` | CSS class for file-operation status |
+   | `operationStatusLabel(status)` | `getApplyOperationStatusLabel` | Display label for file-operation status |
+   | `operationStepLabel(stepType)` | `getApplyOperationStepLabel` | Step type label (Stage / Finalize) |
+   | `formatMutationMode(mode)` | `formatApplyMutationMode` | Filesystem mutation mode label |
+   | `formatFallbackReason(reason)` | `formatApplyFallbackReason` | Human-readable fallback reason |
+   | `describeOperation(op)` | `describeApplyOperation` | Full operation description (error / fallback / normal) |
+
+   Two helper functions were also extracted:
+   - `itemOperationHistory(item)` → `getApplyItemOperationHistory` — resolves the correct operation list (live vs snapshot)
+   - `canStartRun(currentRun, count)` → `canStartApplyRun` — apply-run start eligibility predicate
+
+   All eleven functions were appended to `src/client/lib/import-candidate-presentation.js`. The component now imports them; all inline definitions and the call sites in the template were updated to use the prefixed names.
+
+2. **`describeApplyOperation` documents complex fallback behavior** — The description builder handles three distinct cases (explicit error, filesystem mode fallback, normal step summary) and composes them from the three lower-level helpers. Tests cover each branch plus the null-safe path.
+
+**Files changed:**
+- `src/client/lib/import-candidate-presentation.js` — append 11 new exports (`getRunStatusClass`, `getApplyItemStatusClass`, `getApplyItemStatusLabel`, `getApplyOperationStatusClass`, `getApplyOperationStatusLabel`, `getApplyOperationStepLabel`, `formatApplyMutationMode`, `formatApplyFallbackReason`, `describeApplyOperation`, `getApplyItemOperationHistory`, `canStartApplyRun`)
+- `test/client/import-candidate-presentation.test.js` — update import list; append 51 tests covering all new functions with known values, defaults, edge cases, null safety, and the full `describeApplyOperation` composition
+- `src/client/components/ImportCandidateApplyPanel.vue` — update import; remove all inline function and constant definitions; update all template call sites to use lib names
+
+Test suite: **2046 tests, 0 failures** (up from 1995).

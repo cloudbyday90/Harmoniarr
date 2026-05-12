@@ -22,6 +22,10 @@ import assert from 'node:assert/strict';
 import {
   candidateStatusLabel,
   candidateStatusTone,
+  canStartApplyRun,
+  describeApplyOperation,
+  formatApplyFallbackReason,
+  formatApplyMutationMode,
   formatBytes,
   formatCandidateCountLabel,
   formatExecutionMode,
@@ -31,6 +35,13 @@ import {
   formatSourceProvider,
   formatTimestamp,
   formatTokenLabel,
+  getApplyItemOperationHistory,
+  getApplyItemStatusClass,
+  getApplyItemStatusLabel,
+  getApplyOperationStatusClass,
+  getApplyOperationStatusLabel,
+  getApplyOperationStepLabel,
+  getRunStatusClass,
 } from '../../src/client/lib/import-candidate-presentation.js';
 
 // ---------------------------------------------------------------------------
@@ -325,6 +336,313 @@ describe('candidateStatusTone', () => {
   });
   it('applied and rejected never share a tone', () => {
     assert.notEqual(candidateStatusTone('applied'), candidateStatusTone('rejected'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getRunStatusClass
+// ---------------------------------------------------------------------------
+
+describe('getRunStatusClass', () => {
+  it('returns review-status-selected for running', () => {
+    assert.equal(getRunStatusClass('running'), 'review-status-selected');
+  });
+
+  it('returns review-status-failed for failed', () => {
+    assert.equal(getRunStatusClass('failed'), 'review-status-failed');
+  });
+
+  it('returns review-status-held for completed', () => {
+    assert.equal(getRunStatusClass('completed'), 'review-status-held');
+  });
+
+  it('returns review-status-pending for unknown status', () => {
+    assert.equal(getRunStatusClass('unknown'), 'review-status-pending');
+  });
+
+  it('returns review-status-pending for null', () => {
+    assert.equal(getRunStatusClass(null), 'review-status-pending');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getApplyItemStatusClass
+// ---------------------------------------------------------------------------
+
+describe('getApplyItemStatusClass', () => {
+  it('returns review-status-failed for blocked', () => {
+    assert.equal(getApplyItemStatusClass('blocked'), 'review-status-failed');
+  });
+
+  it('returns review-status-failed for apply_failed', () => {
+    assert.equal(getApplyItemStatusClass('apply_failed'), 'review-status-failed');
+  });
+
+  it('returns review-status-held for applied_with_warnings', () => {
+    assert.equal(getApplyItemStatusClass('applied_with_warnings'), 'review-status-held');
+  });
+
+  it('returns review-status-held for ready_with_warnings', () => {
+    assert.equal(getApplyItemStatusClass('ready_with_warnings'), 'review-status-held');
+  });
+
+  it('returns review-status-selected for applied', () => {
+    assert.equal(getApplyItemStatusClass('applied'), 'review-status-selected');
+  });
+
+  it('returns review-status-selected for unknown status', () => {
+    assert.equal(getApplyItemStatusClass('unknown'), 'review-status-selected');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getApplyItemStatusLabel
+// ---------------------------------------------------------------------------
+
+describe('getApplyItemStatusLabel', () => {
+  it('returns Blocked for blocked', () => {
+    assert.equal(getApplyItemStatusLabel('blocked'), 'Blocked');
+  });
+
+  it('returns Apply failed for apply_failed', () => {
+    assert.equal(getApplyItemStatusLabel('apply_failed'), 'Apply failed');
+  });
+
+  it('returns Applied with warnings for applied_with_warnings', () => {
+    assert.equal(getApplyItemStatusLabel('applied_with_warnings'), 'Applied with warnings');
+  });
+
+  it('returns Applied for applied', () => {
+    assert.equal(getApplyItemStatusLabel('applied'), 'Applied');
+  });
+
+  it('returns Ready with warnings for ready_with_warnings', () => {
+    assert.equal(getApplyItemStatusLabel('ready_with_warnings'), 'Ready with warnings');
+  });
+
+  it('returns Ready for unknown status', () => {
+    assert.equal(getApplyItemStatusLabel('unknown'), 'Ready');
+  });
+
+  it('returns Ready for null', () => {
+    assert.equal(getApplyItemStatusLabel(null), 'Ready');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getApplyOperationStatusClass
+// ---------------------------------------------------------------------------
+
+describe('getApplyOperationStatusClass', () => {
+  it('returns review-status-failed for failed', () => {
+    assert.equal(getApplyOperationStatusClass('failed'), 'review-status-failed');
+  });
+
+  it('returns review-status-pending for not_attempted', () => {
+    assert.equal(getApplyOperationStatusClass('not_attempted'), 'review-status-pending');
+  });
+
+  it('returns review-status-held for skipped', () => {
+    assert.equal(getApplyOperationStatusClass('skipped'), 'review-status-held');
+  });
+
+  it('returns review-status-selected for applied and unknown', () => {
+    assert.equal(getApplyOperationStatusClass('applied'), 'review-status-selected');
+    assert.equal(getApplyOperationStatusClass('unknown'), 'review-status-selected');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getApplyOperationStatusLabel
+// ---------------------------------------------------------------------------
+
+describe('getApplyOperationStatusLabel', () => {
+  it('returns Failed for failed', () => {
+    assert.equal(getApplyOperationStatusLabel('failed'), 'Failed');
+  });
+
+  it('returns Not attempted for not_attempted', () => {
+    assert.equal(getApplyOperationStatusLabel('not_attempted'), 'Not attempted');
+  });
+
+  it('returns Skipped for skipped', () => {
+    assert.equal(getApplyOperationStatusLabel('skipped'), 'Skipped');
+  });
+
+  it('returns Applied for unknown status', () => {
+    assert.equal(getApplyOperationStatusLabel('unknown'), 'Applied');
+  });
+
+  it('returns Applied for null', () => {
+    assert.equal(getApplyOperationStatusLabel(null), 'Applied');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getApplyOperationStepLabel
+// ---------------------------------------------------------------------------
+
+describe('getApplyOperationStepLabel', () => {
+  it('returns Finalize for finalize', () => {
+    assert.equal(getApplyOperationStepLabel('finalize'), 'Finalize');
+  });
+
+  it('returns Stage for any other value', () => {
+    assert.equal(getApplyOperationStepLabel('stage'), 'Stage');
+    assert.equal(getApplyOperationStepLabel(null), 'Stage');
+    assert.equal(getApplyOperationStepLabel(undefined), 'Stage');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatApplyMutationMode
+// ---------------------------------------------------------------------------
+
+describe('formatApplyMutationMode', () => {
+  it('returns hardlink for hardlink', () => {
+    assert.equal(formatApplyMutationMode('hardlink'), 'hardlink');
+  });
+
+  it('returns copy for copy', () => {
+    assert.equal(formatApplyMutationMode('copy'), 'copy');
+  });
+
+  it('returns move as default for any other value', () => {
+    assert.equal(formatApplyMutationMode('move'), 'move');
+    assert.equal(formatApplyMutationMode(null), 'move');
+    assert.equal(formatApplyMutationMode(undefined), 'move');
+    assert.equal(formatApplyMutationMode('symlink'), 'move');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatApplyFallbackReason
+// ---------------------------------------------------------------------------
+
+describe('formatApplyFallbackReason', () => {
+  it('returns a filesystem message for cross_device', () => {
+    assert.equal(
+      formatApplyFallbackReason('cross_device'),
+      'the source and destination were on different filesystem devices',
+    );
+  });
+
+  it('passes through an unknown reason unchanged', () => {
+    assert.equal(formatApplyFallbackReason('permission_denied'), 'permission_denied');
+  });
+
+  it('returns a default message for null', () => {
+    assert.equal(
+      formatApplyFallbackReason(null),
+      'the filesystem could not honor the requested mutation mode',
+    );
+  });
+
+  it('returns a default message for empty string', () => {
+    assert.equal(
+      formatApplyFallbackReason(''),
+      'the filesystem could not honor the requested mutation mode',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// describeApplyOperation
+// ---------------------------------------------------------------------------
+
+describe('describeApplyOperation', () => {
+  it('returns errorMessage when present', () => {
+    const op = { errorMessage: 'Disk full', stepType: 'stage', status: 'failed' };
+    assert.equal(describeApplyOperation(op), 'Disk full');
+  });
+
+  it('describes a fallback pathway when fallbackFromMode is present', () => {
+    const op = {
+      stepType: 'stage',
+      status: 'completed',
+      fallbackFromMode: 'hardlink',
+      appliedMode: 'copy',
+      fallbackReason: 'cross_device',
+    };
+    const result = describeApplyOperation(op);
+    assert.ok(result.includes('hardlink'), 'should mention fallback-from mode');
+    assert.ok(result.includes('copy'), 'should mention applied mode');
+    assert.ok(result.includes('filesystem devices'), 'should include fallback reason');
+  });
+
+  it('describes a normal step when no error and no fallback', () => {
+    const op = { stepType: 'finalize', status: 'completed', transport: 'direct' };
+    const result = describeApplyOperation(op);
+    assert.ok(result.includes('Finalize'), 'should include step label');
+    assert.ok(result.includes('direct'), 'should include transport');
+  });
+
+  it('uses planned apply when transport is absent', () => {
+    const op = { stepType: 'stage', status: 'pending' };
+    assert.ok(describeApplyOperation(op).includes('planned apply'));
+  });
+
+  it('handles null gracefully', () => {
+    assert.equal(typeof describeApplyOperation(null), 'string');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getApplyItemOperationHistory
+// ---------------------------------------------------------------------------
+
+describe('getApplyItemOperationHistory', () => {
+  it('returns importOperations when non-empty', () => {
+    const ops = [{ id: 1 }, { id: 2 }];
+    const item = { importOperations: ops };
+    assert.deepEqual(getApplyItemOperationHistory(item), ops);
+  });
+
+  it('falls back to applySnapshot fileOperations when importOperations is empty', () => {
+    const ops = [{ id: 3 }];
+    const item = {
+      importOperations: [],
+      applySnapshot: { fileOperations: ops },
+    };
+    assert.deepEqual(getApplyItemOperationHistory(item), ops);
+  });
+
+  it('returns empty array when both sources are absent', () => {
+    assert.deepEqual(getApplyItemOperationHistory({}), []);
+  });
+
+  it('returns empty array for null', () => {
+    assert.deepEqual(getApplyItemOperationHistory(null), []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// canStartApplyRun
+// ---------------------------------------------------------------------------
+
+describe('canStartApplyRun', () => {
+  it('returns true when there is no current run', () => {
+    assert.equal(canStartApplyRun(null, 5), true);
+  });
+
+  it('returns true when run is completed and candidates are waiting', () => {
+    assert.equal(canStartApplyRun({ status: 'completed' }, 3), true);
+  });
+
+  it('returns true when run failed and candidates are waiting', () => {
+    assert.equal(canStartApplyRun({ status: 'failed' }, 1), true);
+  });
+
+  it('returns false when run is pending', () => {
+    assert.equal(canStartApplyRun({ status: 'pending' }, 5), false);
+  });
+
+  it('returns false when run is running', () => {
+    assert.equal(canStartApplyRun({ status: 'running' }, 5), false);
+  });
+
+  it('returns false when run is completed but no candidates are waiting', () => {
+    assert.equal(canStartApplyRun({ status: 'completed' }, 0), false);
   });
 });
 
