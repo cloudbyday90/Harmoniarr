@@ -967,3 +967,24 @@ Both subtitles now read as single clean `{{ helper(count) }}` expressions. The e
 **Test coverage:** zero returns no-releases message, null returns no-releases message, 1 returns singular, 2 returns plural, large count returns plural — for each of the two helpers.
 
 Test suite: **1969 tests, 0 failures** (up from 1959).
+
+### 2026-05-12 - Bootstrap Setup Screen
+
+**Screen:** `BootstrapSetupView.vue` (118 lines before changes)
+
+**Issues identified and resolved:**
+
+1. **Two repeated conditional ternaries with no tests** — The `AuthEntryShell` `:title` prop and the inner form `<h2>` heading both branched on `ownerClaimSummary?.required` with inline string literals. The same conditional appeared twice, with no coverage for either branch. Extracted to two pure functions added to the existing `src/client/lib/auth-entry-support.js`:
+   - `getBootstrapTitle(ownerClaimSummary)` — returns `'Claim the configured owner account'` when `required`, otherwise `'Create the first admin account'`
+   - `getBootstrapHeading(ownerClaimSummary)` — returns `'Claim owner account'` / `'Create admin account'` (the shorter in-card heading)
+
+   Both functions handle `null` and `undefined` gracefully (default to the free-create branch). The view template now calls the lib functions directly — no intermediate computed properties needed.
+
+**Why `auth-entry-support.js` and not a new file:** The lib already owns all other auth-entry display concerns (support-item definitions, route targets) and is already imported by this view. Adding the bootstrap display helpers here avoids a one-function file and keeps all first-run/auth-flow presentation in one tested module.
+
+**Files changed:**
+- `src/client/lib/auth-entry-support.js` — add `getBootstrapTitle` and `getBootstrapHeading` exports
+- `test/client/auth-entry-support.test.js` — update import; append 10 tests covering required/not-required branches, null/undefined fallback, no-internal-term guard, and heading-shorter-than-title invariant
+- `src/client/views/BootstrapSetupView.vue` — update import; replace two inline ternaries with lib calls
+
+Test suite: **1979 tests, 0 failures** (up from 1969).

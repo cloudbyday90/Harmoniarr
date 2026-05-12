@@ -97,3 +97,30 @@ export function buildAuthEntrySupportItems(surfaceId, options = {}) {
     to: item.routeName ? buildRouteTarget(item.routeName, options) : null,
   }));
 }
+
+/**
+ * Returns the AuthEntryShell `:title` prop for the bootstrap setup screen.
+ * When the install has a pre-configured owner that must be claimed, the title
+ * reflects the claim flow; otherwise it reflects the free-create flow.
+ *
+ * @param {{ required?: boolean }|null|undefined} ownerClaimSummary
+ * @returns {string}
+ */
+export function getBootstrapTitle(ownerClaimSummary) {
+  return ownerClaimSummary?.required
+    ? 'Claim the configured owner account'
+    : 'Create the first admin account';
+}
+
+/**
+ * Returns the inner `<h2>` heading for the bootstrap setup form card.
+ * Shorter than the shell title — same required/free-create branching.
+ *
+ * @param {{ required?: boolean }|null|undefined} ownerClaimSummary
+ * @returns {string}
+ */
+export function getBootstrapHeading(ownerClaimSummary) {
+  return ownerClaimSummary?.required
+    ? 'Claim owner account'
+    : 'Create admin account';
+}

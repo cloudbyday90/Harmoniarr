@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildAuthEntrySupportItems } from '../../src/client/lib/auth-entry-support.js';
+import {
+  buildAuthEntrySupportItems,
+  getBootstrapHeading,
+  getBootstrapTitle,
+} from '../../src/client/lib/auth-entry-support.js';
 
 test('login auth entry support exposes only the claim-account path', () => {
   assert.deepEqual(
@@ -79,4 +83,50 @@ test('auth entry support ignores whitespace-only username when building prefill 
   const claimItem = items.find((item) => item.id === 'claim-account');
 
   assert.deepEqual(claimItem.to, { name: 'claim-account' });
+});
+
+// ── getBootstrapTitle ─────────────────────────────────────────────────────────
+
+test('getBootstrapTitle: required=true returns claim copy', () => {
+  assert.equal(getBootstrapTitle({ required: true }), 'Claim the configured owner account');
+});
+
+test('getBootstrapTitle: required=false returns create copy', () => {
+  assert.equal(getBootstrapTitle({ required: false }), 'Create the first admin account');
+});
+
+test('getBootstrapTitle: null summary returns create copy', () => {
+  assert.equal(getBootstrapTitle(null), 'Create the first admin account');
+});
+
+test('getBootstrapTitle: undefined summary returns create copy', () => {
+  assert.equal(getBootstrapTitle(undefined), 'Create the first admin account');
+});
+
+test('getBootstrapTitle: does not expose raw internal terms', () => {
+  assert.ok(!getBootstrapTitle({ required: true }).includes('bootstrap'));
+  assert.ok(!getBootstrapTitle({ required: false }).includes('bootstrap'));
+});
+
+// ── getBootstrapHeading ───────────────────────────────────────────────────────
+
+test('getBootstrapHeading: required=true returns claim heading', () => {
+  assert.equal(getBootstrapHeading({ required: true }), 'Claim owner account');
+});
+
+test('getBootstrapHeading: required=false returns create heading', () => {
+  assert.equal(getBootstrapHeading({ required: false }), 'Create admin account');
+});
+
+test('getBootstrapHeading: null summary returns create heading', () => {
+  assert.equal(getBootstrapHeading(null), 'Create admin account');
+});
+
+test('getBootstrapHeading: undefined summary returns create heading', () => {
+  assert.equal(getBootstrapHeading(undefined), 'Create admin account');
+});
+
+test('getBootstrapHeading is shorter than getBootstrapTitle for the same branch', () => {
+  assert.ok(getBootstrapHeading({ required: true }).length < getBootstrapTitle({ required: true }).length);
+  assert.ok(getBootstrapHeading({ required: false }).length < getBootstrapTitle({ required: false }).length);
 });

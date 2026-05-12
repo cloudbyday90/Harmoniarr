@@ -20,7 +20,11 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
-import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
+import {
+  buildAuthEntrySupportItems,
+  getBootstrapHeading,
+  getBootstrapTitle,
+} from '../lib/auth-entry-support.js';
 import { useAutoFocus } from '../composables/useAutoFocus.js';
 import { useBootstrapStatus } from '../composables/useBootstrapStatus.js';
 import { usePasswordMatch } from '../composables/usePasswordMatch.js';
@@ -70,12 +74,12 @@ async function submit() {
 <template>
   <AuthEntryShell
     eyebrow="First-run setup"
-    :title="ownerClaimSummary?.required ? 'Claim the configured owner account' : 'Create the first admin account'"
+    :title="getBootstrapTitle(ownerClaimSummary)"
     description="New installs start here. Harmoniarr already has the runtime, migrations, and protected routes in place, but the first administrator still needs to be established."
     :support-items="supportItems"
   >
     <article class="form-card panel-light auth-entry-form-card">
-      <h2>{{ ownerClaimSummary?.required ? 'Claim owner account' : 'Create admin account' }}</h2>
+      <h2>{{ getBootstrapHeading(ownerClaimSummary) }}</h2>
       <p class="auth-entry-form-copy">This form establishes the first durable administrator for the install.</p>
       <form class="stack-form" @submit.prevent="submit">
         <label v-if="ownerClaimSummary?.required">
