@@ -300,6 +300,8 @@ async function handleMonitor(artist) {
   font-size: var(--hx-text-sm);
   font-weight: 600;
   color: var(--hx-text-strong);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .discover-search-row {

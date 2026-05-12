@@ -219,7 +219,7 @@ onMounted(() => {
       <header class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Acquisition status</h2>
-          <p class="hx-card-subtitle">Last updated {{ formatLastReconciledAt(wanted.libraryWantedSummary.value?.lastReconciledAt) }}</p>
+          <p class="hx-card-subtitle">{{ formatLastReconciledAt(wanted.libraryWantedSummary.value?.lastReconciledAt) }}</p>
         </div>
         <div class="hx-card-actions">
           <span
@@ -325,7 +325,6 @@ onMounted(() => {
         <div>
           <h2 class="hx-card-title">Reconciliation</h2>
           <p class="hx-card-subtitle">
-            Last updated
             {{ formatLastReconciledAt(reconciliation.libraryReconciliationSummary.value?.lastReconciledAt) }}
           </p>
         </div>
@@ -340,7 +339,7 @@ onMounted(() => {
           <table class="hx-table">
             <thead>
               <tr>
-                <th>Bucket</th>
+                <th>Category</th>
                 <th class="hx-table-num">Count</th>
                 <th>Notes</th>
               </tr>

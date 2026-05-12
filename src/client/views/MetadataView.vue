@@ -201,7 +201,6 @@ watch(
 <template>
   <section class="page-stack">
     <article class="panel-dark hero-card compact">
-      <p class="eyebrow">Artist metadata</p>
       <h2>Artist Metadata</h2>
       <p>Manage artist metadata sourced from MusicBrainz. Import an artist for the first time, or open one you've already imported to review releases and trigger metadata refreshes.</p>
       <ul class="metadata-entry-guide">

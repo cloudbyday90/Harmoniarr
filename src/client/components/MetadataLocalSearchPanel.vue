@@ -72,16 +72,15 @@ function hasAnyResults() {
 </script>
 
 <template>
-  <article class="panel-light">
-    <div class="section-header">
+  <article class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">Local catalog</p>
-        <h3>Open local artist</h3>
+        <h3 class="hx-card-title">Open local artist</h3>
+        <p class="hx-card-subtitle">Find an artist, release group, or release you've already imported.</p>
       </div>
-    </div>
+    </header>
 
-    <p class="metadata-panel-guidance">Find an artist, release group, or release you’ve already imported.</p>
-
+    <div class="hx-card-body">
     <form class="metadata-search-form" @submit.prevent="$emit('run-search')">
       <label>
         Search name
@@ -112,5 +111,6 @@ function hasAnyResults() {
     </div>
 
     <p v-else-if="hasSearchedLocal">No imported metadata matched that search.</p>
+    </div>
   </article>
 </template>

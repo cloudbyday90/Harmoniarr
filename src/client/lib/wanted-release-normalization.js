@@ -237,11 +237,11 @@ export function formatMissingSummaryStatus(status) {
  * @returns {string}
  */
 export function formatLastReconciledAt(value) {
-  if (!value) return 'never';
+  if (!value) return 'Never updated';
   try {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleString();
+    return `Last updated ${d.toLocaleString()}`;
   } catch {
     return value;
   }

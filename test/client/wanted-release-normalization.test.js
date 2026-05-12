@@ -481,22 +481,22 @@ test('formatMissingSummaryStatus returns empty string for undefined', () => {
 
 // ── formatLastReconciledAt ───────────────────────────────────────────────────────────────
 
-test('formatLastReconciledAt returns "never" for null', () => {
-  assert.equal(formatLastReconciledAt(null), 'never');
+test('formatLastReconciledAt returns "Never updated" for null', () => {
+  assert.equal(formatLastReconciledAt(null), 'Never updated');
 });
 
-test('formatLastReconciledAt returns "never" for undefined', () => {
-  assert.equal(formatLastReconciledAt(undefined), 'never');
+test('formatLastReconciledAt returns "Never updated" for undefined', () => {
+  assert.equal(formatLastReconciledAt(undefined), 'Never updated');
 });
 
-test('formatLastReconciledAt returns "never" for empty string', () => {
-  assert.equal(formatLastReconciledAt(''), 'never');
+test('formatLastReconciledAt returns "Never updated" for empty string', () => {
+  assert.equal(formatLastReconciledAt(''), 'Never updated');
 });
 
-test('formatLastReconciledAt returns a non-empty string for a valid ISO 8601 datetime', () => {
+test('formatLastReconciledAt returns a string starting with "Last updated" for a valid ISO 8601 datetime', () => {
   const result = formatLastReconciledAt('2026-05-12T10:30:00.000Z');
   assert.ok(typeof result === 'string' && result.length > 0);
-  assert.notEqual(result, 'never');
+  assert.ok(result.startsWith('Last updated '), `expected result to start with "Last updated ", got: ${result}`);
 });
 
 test('formatLastReconciledAt does not return a raw ISO 8601 string for a valid datetime', () => {

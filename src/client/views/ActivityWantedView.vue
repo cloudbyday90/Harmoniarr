@@ -82,7 +82,7 @@ onMounted(() => refresh());
       <header class="hx-card-header">
         <div>
           <h3 class="hx-card-title">Acquisition status</h3>
-          <p class="hx-card-subtitle">Last updated {{ formatLastReconciledAt(wanted.libraryWantedSummary.value?.lastReconciledAt) }}</p>
+          <p class="hx-card-subtitle">{{ formatLastReconciledAt(wanted.libraryWantedSummary.value?.lastReconciledAt) }}</p>
         </div>
       </header>
       <div class="hx-card-body">

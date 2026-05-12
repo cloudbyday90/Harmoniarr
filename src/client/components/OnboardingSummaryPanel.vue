@@ -56,18 +56,17 @@ const emit = defineEmits(['dismiss', 'refresh']);
 </script>
 
 <template>
-  <article class="panel-light onboarding-panel">
-    <div class="section-header">
+  <article class="hx-card onboarding-panel">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">{{ isSetupMode ? 'First login setup' : 'Setup checklist' }}</p>
-        <h3>{{ isSetupMode ? 'Complete your setup' : 'Setup status' }}</h3>
-        <p class="metadata-card-copy" v-if="summary">{{ summary.message }}</p>
+        <h3 class="hx-card-title">{{ isSetupMode ? 'Complete your setup' : 'Setup status' }}</h3>
+        <p class="hx-card-subtitle" v-if="summary">{{ summary.message }}</p>
       </div>
       <div class="onboarding-panel-actions">
         <button type="button" class="review-reset-button" @click="emit('refresh')">Refresh</button>
         <button v-if="isSetupMode" type="button" class="review-reset-button" @click="emit('dismiss')">Hide setup mode</button>
       </div>
-    </div>
+    </header>
 
     <article class="error-panel panel-light" v-if="errorMessage">
       <h3>Onboarding summary unavailable</h3>

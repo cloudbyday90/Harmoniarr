@@ -273,10 +273,10 @@ onMounted(() => { void loadSettings(); });
           <div class="hx-card-body">
             <div class="cfg-group" style="padding-top: 0; border-top: none">
               <div class="hx-field">
-                <label class="hx-field-label">slskd address</label>
+                <label class="hx-field-label">Service address</label>
                 <input class="hx-input" v-model="form.slskd.baseUrl" placeholder="http://slskd:5030" />
               </div>
-              <p class="cfg-field-hint">The address slskd is running on. The default (<code>http://slskd:5030</code>) works with the standard Docker Compose setup.</p>
+              <p class="cfg-field-hint">The address the download service is running on. The default (<code>http://slskd:5030</code>) works with the standard Docker Compose setup.</p>
               <div class="hx-field" style="margin-top: var(--hx-space-3)">
                 <label class="hx-field-label">Request timeout (seconds)</label>
                 <input class="hx-input" v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />

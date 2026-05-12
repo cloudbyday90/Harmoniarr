@@ -56,47 +56,47 @@ function updateSearchQuery(event) {
 </script>
 
 <template>
-  <article class="panel-light">
-    <div class="section-header">
+  <article class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">MusicBrainz</p>
-        <h3>Find an artist</h3>
+        <h3 class="hx-card-title">Find an artist</h3>
+        <p class="hx-card-subtitle">Search MusicBrainz to find an artist you want to import for the first time.</p>
       </div>
-    </div>
+    </header>
 
-    <p class="metadata-panel-guidance">Search MusicBrainz to find an artist you want to import for the first time.</p>
-
-    <form class="metadata-search-form" @submit.prevent="$emit('run-search')">
-      <label>
-        Artist name
-        <input :value="searchQuery" placeholder="Type an artist name" @input="updateSearchQuery" />
-      </label>
-      <button type="submit" :disabled="isSearching">
-        {{ isSearching ? 'Searching...' : 'Search MusicBrainz' }}
-      </button>
-    </form>
-
-    <p class="error-copy" v-if="searchError">{{ searchError }}</p>
-
-    <div class="metadata-card-grid" v-if="searchResults.length">
-      <article class="metadata-card" v-for="artist in searchResults" :key="artist.id">
-        <div>
-          <p class="eyebrow">{{ artist.type ?? 'Artist' }}</p>
-          <h3>{{ artist.name }}</h3>
-          <p class="metadata-card-copy">{{ artist.disambiguation || 'No disambiguation provided.' }}</p>
-        </div>
-        <dl>
-          <div><dt>Country</dt><dd>{{ artist.country || 'Unknown' }}</dd></div>
-          <div><dt>Score</dt><dd>{{ artist.score ?? 'n/a' }}</dd></div>
-        </dl>
-        <button
-          type="button"
-          @click="$emit('import-artist', artist)"
-          :disabled="isImportingArtist || isLoadingArtist"
-        >
-          {{ isImportingArtist && selectedArtistId === artist.id ? 'Importing...' : 'Import artist' }}
+    <div class="hx-card-body">
+      <form class="metadata-search-form" @submit.prevent="$emit('run-search')">
+        <label>
+          Artist name
+          <input :value="searchQuery" placeholder="Type an artist name" @input="updateSearchQuery" />
+        </label>
+        <button type="submit" :disabled="isSearching">
+          {{ isSearching ? 'Searching...' : 'Search MusicBrainz' }}
         </button>
-      </article>
+      </form>
+
+      <p class="error-copy" v-if="searchError">{{ searchError }}</p>
+
+      <div class="metadata-card-grid" v-if="searchResults.length">
+        <article class="metadata-card" v-for="artist in searchResults" :key="artist.id">
+          <div>
+            <p class="hx-text-muted">{{ artist.type ?? 'Artist' }}</p>
+            <h3>{{ artist.name }}</h3>
+            <p class="hx-text-muted">{{ artist.disambiguation || 'No disambiguation provided.' }}</p>
+          </div>
+          <dl>
+            <div><dt>Country</dt><dd>{{ artist.country || 'Unknown' }}</dd></div>
+            <div><dt>Score</dt><dd>{{ artist.score ?? 'n/a' }}</dd></div>
+          </dl>
+          <button
+            type="button"
+            @click="$emit('import-artist', artist)"
+            :disabled="isImportingArtist || isLoadingArtist"
+          >
+            {{ isImportingArtist && selectedArtistId === artist.id ? 'Importing...' : 'Import artist' }}
+          </button>
+        </article>
+      </div>
     </div>
   </article>
 </template>

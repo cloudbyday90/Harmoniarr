@@ -72,17 +72,17 @@ function createPathValidationStep(pathValidationSummary) {
 function createSlskdConnectionStep(connectionStatus) {
   return createStep({
     id: 'slskd-connection',
-    title: 'Connect to slskd',
+    title: 'Connect to Soulseek',
     status: toChecklistStatus(connectionStatus.status),
-    message: connectionStatus.message ?? 'slskd connection is ready.',
+    message: connectionStatus.message ?? 'Download service connection is ready.',
     action: {
-      label: 'Configure slskd',
+      label: 'Configure connection',
       to: '/app/settings',
     },
     meta: {
-      isConnected: connectionStatus.details?.isConnected ?? false,
-      isLoggedIn: connectionStatus.details?.isLoggedIn ?? false,
-      isTransitioning: connectionStatus.details?.isTransitioning ?? false,
+      connected: connectionStatus.details?.isConnected ?? false,
+      authenticated: connectionStatus.details?.isLoggedIn ?? false,
+      reconnecting: connectionStatus.details?.isTransitioning ?? false,
     },
   });
 }
@@ -90,11 +90,11 @@ function createSlskdConnectionStep(connectionStatus) {
 function createSlskdAuthenticationStep(authenticationStatus) {
   return createStep({
     id: 'slskd-authentication',
-    title: 'Verify slskd authentication',
+    title: 'Verify download service credentials',
     status: authenticationStatus.status,
     message: authenticationStatus.message,
     action: {
-      label: 'Review slskd credentials',
+      label: 'Review credentials',
       to: '/app/settings',
     },
   });
@@ -225,7 +225,7 @@ function createFallbackSlskdStatus(error) {
   const status = classifySlskdDependencyError(error);
   return {
     ...status,
-    message: status.message ?? 'slskd reachability could not be verified.',
+    message: status.message ?? 'Download service reachability could not be verified.',
   };
 }
 
@@ -261,8 +261,8 @@ export function createOnboardingSummaryService({
         authenticationStatus = {
           status: authResult.isValid ? 'complete' : 'attention',
           message: authResult.isValid
-            ? 'slskd authentication is valid.'
-            : 'slskd authentication could not be verified.',
+            ? 'Download service credentials are valid.'
+            : 'Download service credentials could not be verified.',
         };
       } catch (error) {
         const authError = createFallbackSlskdStatus(error);
@@ -274,7 +274,7 @@ export function createOnboardingSummaryService({
     } else {
       authenticationStatus = {
         status: 'attention',
-        message: 'slskd must connect before authentication can be verified.',
+        message: 'Connect to Soulseek before verifying credentials.',
       };
     }
 
