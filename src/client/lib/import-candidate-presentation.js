@@ -188,6 +188,9 @@ export function formatSourceProvider(provider) {
   switch (provider.toLowerCase()) {
     case 'slskd': return 'Soulseek';
     case 'musicbrainz': return 'MusicBrainz';
+    case 'spotify': return 'Spotify';
+    case 'youtube': return 'YouTube';
+    case 'apple_music': return 'Apple Music';
     default: return provider.charAt(0).toUpperCase() + provider.slice(1).replace(/_/g, ' ');
   }
 }

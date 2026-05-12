@@ -862,3 +862,26 @@ Test suite: **1935 tests, 0 failures** (up from 1907).
 No new lib exports or tests were added — `formatCommaSeparatedList` is already fully tested in `test/client/settings-media-storage-presentation.test.js`. The template renders only security checkboxes and system log-level/base-URL fields; all option labels (`Disabled`, `Required`, `debug`, `info`, `warn`, `error`) are appropriate for an admin audience and required no changes.
 
 Test suite: **1935 tests, 0 failures** (unchanged — no new exports).
+
+---
+
+### 2026-05-12 - Request Music Screen
+
+**Screen:** `RequestMusicView.vue` (294 lines before changes)
+
+**Issues identified and resolved:**
+
+1. **`request.sourceProvider` raw in request history list** — The provider line rendered `Source provider: spotify` / `youtube` / `apple_music` verbatim. `formatSourceProvider()` already existed in `import-candidate-presentation.js` but lacked explicit cases for `spotify`, `youtube`, and `apple_music`. The default fallback capitalised only the first character, giving `Youtube` (wrong) and `Apple music` (wrong). Added three explicit `switch` cases: `'spotify' → 'Spotify'`, `'youtube' → 'YouTube'`, `'apple_music' → 'Apple Music'`. Template call site updated to `formatSourceProvider(request.sourceProvider)`.
+
+2. **`request.requestedByUser.role` and `request.requestedForUser.role` raw in admin attribution lines** — Two `<p>` elements showed `(admin)`, `(requester)` etc. as raw backend enum strings. `formatUserRole()` already existed in `settings-users-presentation.js`. Imported it into the view and replaced both raw role interpolations with `formatUserRole(...)` calls.
+
+3. **`getRequestTargetLabel` used raw role in the admin "Request for" dropdown** — The lib function returned `alice (admin, you)` / `bob (requester)`. Updated `request-music-form.js` to import `formatUserRole` from `settings-users-presentation.js` and wrap the role in both branches, now returning `alice (Admin, you)` / `bob (Requester)`.
+
+**Files changed:**
+- `src/client/lib/import-candidate-presentation.js` — 3 new `switch` cases in `formatSourceProvider`
+- `src/client/lib/request-music-form.js` — import `formatUserRole`; use in `getRequestTargetLabel`
+- `src/client/views/RequestMusicView.vue` — import `formatSourceProvider`, `formatUserRole`; fix 3 template call sites
+- `test/client/import-candidate-presentation.test.js` — 5 new tests (`spotify`, `youtube`, `apple_music` returns; `youtube`/`apple_music` do not expose raw tokens)
+- `test/client/request-music-form.test.js` — updated 2 `getRequestTargetLabel` assertions to expect `Admin`/`Requester`
+
+Test suite: **1940 tests, 0 failures** (up from 1935).

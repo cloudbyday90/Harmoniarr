@@ -20,6 +20,7 @@
 import { computed, onMounted } from 'vue';
 import RequestNotificationsPanel from '../components/RequestNotificationsPanel.vue';
 import { useRequestMusicForm } from '../composables/useRequestMusicForm.js';
+import { formatSourceProvider } from '../lib/import-candidate-presentation.js';
 import {
   getFulfillmentStatusLabel,
   getFulfillmentStatusTone,
@@ -28,6 +29,7 @@ import {
   getRequestStateLabel,
   getRequestTargetLabel,
 } from '../lib/request-music-form.js';
+import { formatUserRole } from '../lib/settings-users-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
@@ -229,10 +231,10 @@ onMounted(() => {
                 <p class="rm-request-kind">{{ getRequestKindLabel(request.requestKind) }}</p>
                 <h3 class="rm-request-headline">{{ getRequestHeadline(request) }}</h3>
                 <p class="hx-text-muted" v-if="rm.selectedScope.value === 'all' && request.requestedByUser.id !== request.requestedForUser.id">
-                  Requested by {{ request.requestedByUser.username }} ({{ request.requestedByUser.role }}) for {{ request.requestedForUser.username }} ({{ request.requestedForUser.role }})
+                  Requested by {{ request.requestedByUser.username }} ({{ formatUserRole(request.requestedByUser.role) }}) for {{ request.requestedForUser.username }} ({{ formatUserRole(request.requestedForUser.role) }})
                 </p>
                 <p class="hx-text-muted" v-else-if="rm.selectedScope.value === 'all'">
-                  Requested by {{ request.requestedByUser.username }} ({{ request.requestedByUser.role }})
+                  Requested by {{ request.requestedByUser.username }} ({{ formatUserRole(request.requestedByUser.role) }})
                 </p>
                 <p class="hx-text-muted" v-else-if="request.requestedByUser.id !== request.requestedForUser.id">
                   Requested on your behalf by {{ request.requestedByUser.username }}.
@@ -248,7 +250,7 @@ onMounted(() => {
             <p class="hx-text-muted" v-if="request.notes">{{ request.notes }}</p>
             <p class="hx-text-muted" v-if="request.fulfillmentStatus?.detail">{{ request.fulfillmentStatus.detail }}</p>
             <p class="hx-text-muted">Request classification: {{ getRequestStateLabel(request.requestState) }}</p>
-            <p class="hx-text-muted" v-if="request.sourceProvider">Source provider: {{ request.sourceProvider }}</p>
+            <p class="hx-text-muted" v-if="request.sourceProvider">Source provider: {{ formatSourceProvider(request.sourceProvider) }}</p>
             <p class="hx-text-muted" v-if="request.existingMatch">
               Matched release: {{ request.existingMatch.artistName }} &#x2014; {{ request.existingMatch.releaseTitle || request.existingMatch.releaseGroupTitle }}
             </p>

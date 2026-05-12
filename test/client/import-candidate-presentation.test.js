@@ -358,6 +358,21 @@ describe('formatSourceProvider', () => {
     const result = formatSourceProvider('some_provider');
     assert.equal(result[0], result[0].toUpperCase());
   });
+  it('returns Spotify for spotify', () => {
+    assert.equal(formatSourceProvider('spotify'), 'Spotify');
+  });
+  it('returns YouTube for youtube', () => {
+    assert.equal(formatSourceProvider('youtube'), 'YouTube');
+  });
+  it('returns Apple Music for apple_music', () => {
+    assert.equal(formatSourceProvider('apple_music'), 'Apple Music');
+  });
+  it('does not expose raw youtube token', () => {
+    assert.notEqual(formatSourceProvider('youtube'), 'youtube');
+  });
+  it('does not expose raw apple_music token', () => {
+    assert.notEqual(formatSourceProvider('apple_music'), 'apple_music');
+  });
 });
 
 // ---------------------------------------------------------------------------

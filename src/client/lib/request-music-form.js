@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { formatUserRole } from './settings-users-presentation.js';
+
 /**
  * Pure presentational helpers for the request-music intake view.
  *
@@ -114,10 +116,10 @@ export function getRequestTargetLabel(user, currentUserId) {
   if (!user) return '';
 
   if (user.id === currentUserId) {
-    return `${user.username} (${user.role}, you)`;
+    return `${user.username} (${formatUserRole(user.role)}, you)`;
   }
 
-  return `${user.username} (${user.role})`;
+  return `${user.username} (${formatUserRole(user.role)})`;
 }
 
 /**

@@ -156,12 +156,12 @@ test('getFulfillmentStatusLabel returns Queued for object with no label', () => 
 
 test('getRequestTargetLabel returns username and role with you marker for current user', () => {
   const user = { id: 'u1', username: 'alice', role: 'admin' };
-  assert.equal(getRequestTargetLabel(user, 'u1'), 'alice (admin, you)');
+  assert.equal(getRequestTargetLabel(user, 'u1'), 'alice (Admin, you)');
 });
 
 test('getRequestTargetLabel returns username and role without you marker for other user', () => {
   const user = { id: 'u2', username: 'bob', role: 'requester' };
-  assert.equal(getRequestTargetLabel(user, 'u1'), 'bob (requester)');
+  assert.equal(getRequestTargetLabel(user, 'u1'), 'bob (Requester)');
 });
 
 test('getRequestTargetLabel returns empty string for null user', () => {
