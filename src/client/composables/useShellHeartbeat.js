@@ -18,21 +18,13 @@
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { fetchSystemOverview } from '../lib/system-api.js';
+import {
+  buildShellHeartbeatDetail,
+  buildShellHeartbeatStatusLabel,
+  selectWorstDependencyStatus,
+} from '../lib/heartbeat-presentation.js';
 
 const HEALTH_REFRESH_MS = 30_000;
-
-function selectWorstStatus(statuses) {
-  if (statuses.includes('unavailable') || statuses.includes('error')) {
-    return 'unavailable';
-  }
-  if (statuses.includes('degraded') || statuses.includes('rate_limited') || statuses.includes('misconfigured')) {
-    return 'degraded';
-  }
-  if (statuses.includes('healthy')) {
-    return 'healthy';
-  }
-  return 'unknown';
-}
 
 export function useShellHeartbeat() {
   const status = ref('unknown');
@@ -51,15 +43,9 @@ export function useShellHeartbeat() {
         ...heartbeats.map((h) => String(h?.status ?? '').toLowerCase()),
       ].filter(Boolean);
 
-      const worst = selectWorstStatus(allStatuses);
+      const worst = selectWorstDependencyStatus(allStatuses);
       status.value = worst === 'unknown' ? 'healthy' : worst;
-      detail.value = worst === 'healthy'
-        ? 'All dependencies healthy'
-        : worst === 'degraded'
-          ? 'Some dependencies degraded'
-          : worst === 'unavailable'
-            ? 'Dependencies unavailable'
-            : 'Health unknown';
+      detail.value = buildShellHeartbeatDetail(worst === 'unknown' ? 'healthy' : worst);
 
       const jobs = payload?.activeJobCount;
       if (typeof jobs === 'number') {
@@ -90,14 +76,7 @@ export function useShellHeartbeat() {
     }
   });
 
-  const label = computed(() => {
-    switch (status.value) {
-      case 'healthy': return 'Healthy';
-      case 'degraded': return 'Degraded';
-      case 'unavailable': return 'Unavailable';
-      default: return 'Health';
-    }
-  });
+  const label = computed(() => buildShellHeartbeatStatusLabel(status.value));
 
   return { status, detail, activeJobs, label, refresh: fetchOnce };
 }

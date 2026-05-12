@@ -110,3 +110,30 @@ export function getArtworkCleanupDetailTitle(run) {
 
   return 'Selected cleanup run';
 }
+
+/**
+ * Return true when the given cleanup run status means polling for updates
+ * should continue.
+ *
+ * @param {string|null|undefined} status
+ * @returns {boolean}
+ */
+export function isArtworkCleanupPollingStatus(status) {
+  return status === 'pending' || status === 'running';
+}
+
+/**
+ * Resolve which run ID should be shown in the detail panel.
+ * Preference order: explicit preferred → latest from summary → first of
+ * recent history → null.
+ *
+ * @param {{ latestRunId: string|null, preferredRunId: string|null, recentRuns: Array<{id: string}> }} options
+ * @returns {string|null}
+ */
+export function resolveArtworkSelectedRunId({ latestRunId, preferredRunId, recentRuns }) {
+  if (preferredRunId) {
+    return preferredRunId;
+  }
+
+  return latestRunId ?? recentRuns[0]?.id ?? null;
+}

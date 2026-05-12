@@ -27,6 +27,8 @@ import {
   getArtworkCleanupRunStatusLabel,
   getArtworkMaintenanceStatusClass,
   getArtworkMaintenanceStatusLabel,
+  isArtworkCleanupPollingStatus,
+  resolveArtworkSelectedRunId,
 } from '../../src/client/lib/artwork-maintenance-status.js';
 
 describe('getArtworkMaintenanceStatusLabel', () => {
@@ -198,5 +200,62 @@ describe('getArtworkCleanupDetailTitle', () => {
   });
   it('returns generic title for missing status', () => {
     assert.equal(getArtworkCleanupDetailTitle({}), 'Selected cleanup run');
+  });
+});
+
+describe('isArtworkCleanupPollingStatus', () => {
+  it('returns true for pending', () => {
+    assert.equal(isArtworkCleanupPollingStatus('pending'), true);
+  });
+  it('returns true for running', () => {
+    assert.equal(isArtworkCleanupPollingStatus('running'), true);
+  });
+  it('returns false for completed', () => {
+    assert.equal(isArtworkCleanupPollingStatus('completed'), false);
+  });
+  it('returns false for failed', () => {
+    assert.equal(isArtworkCleanupPollingStatus('failed'), false);
+  });
+  it('returns false for null', () => {
+    assert.equal(isArtworkCleanupPollingStatus(null), false);
+  });
+  it('returns false for undefined', () => {
+    assert.equal(isArtworkCleanupPollingStatus(undefined), false);
+  });
+  it('returns false for empty string', () => {
+    assert.equal(isArtworkCleanupPollingStatus(''), false);
+  });
+});
+
+describe('resolveArtworkSelectedRunId', () => {
+  it('returns preferredRunId when set', () => {
+    assert.equal(
+      resolveArtworkSelectedRunId({ latestRunId: 'run-1', preferredRunId: 'run-pref', recentRuns: [] }),
+      'run-pref',
+    );
+  });
+  it('returns latestRunId when preferredRunId is absent', () => {
+    assert.equal(
+      resolveArtworkSelectedRunId({ latestRunId: 'run-latest', preferredRunId: null, recentRuns: [] }),
+      'run-latest',
+    );
+  });
+  it('returns first recentRun id when latestRunId and preferredRunId are absent', () => {
+    assert.equal(
+      resolveArtworkSelectedRunId({ latestRunId: null, preferredRunId: null, recentRuns: [{ id: 'run-hist' }] }),
+      'run-hist',
+    );
+  });
+  it('returns null when all sources are absent', () => {
+    assert.equal(
+      resolveArtworkSelectedRunId({ latestRunId: null, preferredRunId: null, recentRuns: [] }),
+      null,
+    );
+  });
+  it('returns null for empty recentRuns and no latestRunId', () => {
+    assert.equal(
+      resolveArtworkSelectedRunId({ latestRunId: undefined, preferredRunId: undefined, recentRuns: [] }),
+      null,
+    );
   });
 });

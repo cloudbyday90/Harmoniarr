@@ -1195,3 +1195,42 @@ The Operations Activity tab was rendering completely blank. Root cause: template
 - `src/client/views/OperationsView.vue` — fix `formatTimestampShort` → `formatOperationTimestampShort`
 
 Test suite: **2272 tests, 0 failures** (up from 2214).
+
+### 2026-05-12 - Composable-level Pure Function Extraction
+
+**Composables refactored:**
+- `src/client/composables/useArtworkSummary.js`
+- `src/client/composables/useShellHeartbeat.js`
+
+**Libs extended:**
+- `src/client/lib/artwork-maintenance-status.js` (+2 exports)
+- `src/client/lib/heartbeat-presentation.js` (+3 exports)
+
+**Issues identified and resolved:**
+
+**useArtworkSummary — two module-level helpers with no tests:**
+
+1. `isPollingStatus(status)` — private module-level predicate deciding whether an artwork cleanup run status should be polled for updates (`'pending'` or `'running'`). If a new polling status is ever added or a status is renamed, this function would silently stop polling without any test catching it. Extracted as `isArtworkCleanupPollingStatus(status)` to `artwork-maintenance-status.js`.
+
+2. `resolveSelectedRunId({ latestRunId, preferredRunId, recentRuns })` — preference-ordered run ID selection logic: explicit preferred → latest from summary → first of recent history → null. The fallback chain is non-trivial; if `recentRuns` shape changes or the preference model changes, the detail panel would silently show the wrong run. Extracted as `resolveArtworkSelectedRunId({ ... })` to `artwork-maintenance-status.js`.
+
+**useShellHeartbeat — one module-level function and two inline ternary blocks with no tests:**
+
+3. `selectWorstStatus(statuses)` — priority-ordered reduction of all dependency and heartbeat status strings to a single worst-case status. Prioritisation order: `unavailable/error` → `degraded/rate_limited/misconfigured` → `healthy` → `unknown`. This is the most important health-aggregation logic in the entire shell — if a new status class is added (e.g. `suspended`) or a priority changes, the topbar badge would silently misrepresent the system health with no test catching it. Extracted as `selectWorstDependencyStatus(statuses)` to `heartbeat-presentation.js`.
+
+4. **Inline detail text in `fetchOnce`** — A 4-branch nested ternary set `detail.value` based on `worst`. No tests. Extracted as `buildShellHeartbeatDetail(worstStatus)` to `heartbeat-presentation.js`. The composable now calls `buildShellHeartbeatDetail(worst === 'unknown' ? 'healthy' : worst)`.
+
+5. **Inline `label` computed** — A 4-branch `switch` statement mapped health statuses to display labels (`Healthy`, `Degraded`, `Unavailable`, `Health`). No tests. Extracted as `buildShellHeartbeatStatusLabel(status)` to `heartbeat-presentation.js`. The `label` computed is now a single delegating expression.
+
+**New exports in `artwork-maintenance-status.js`:**
+
+- `isArtworkCleanupPollingStatus(status)` — 7 tests (pending→true, running→true, completed/failed/null/undefined/empty→false)
+- `resolveArtworkSelectedRunId({ latestRunId, preferredRunId, recentRuns })` — 5 tests (preferred wins, latestRunId fallback, recentRuns[0] fallback, all-null→null, empty recentRuns→null)
+
+**New exports in `heartbeat-presentation.js`:**
+
+- `selectWorstDependencyStatus(statuses)` — 10 tests (empty→unknown, healthy-only→healthy, unavailable wins, error wins, degraded wins, rate_limited wins, misconfigured wins, unavailable beats degraded, no-known-status→unknown, multiple-degraded-with-healthy)
+- `buildShellHeartbeatDetail(worstStatus)` — 5 tests (healthy, degraded, unavailable, unknown→health-unknown, null→health-unknown)
+- `buildShellHeartbeatStatusLabel(status)` — 5 tests (healthy→Healthy, degraded→Degraded, unavailable→Unavailable, unknown→Health, null→Health)
+
+Test suite: **2304 tests, 0 failures** (up from 2272).

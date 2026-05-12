@@ -24,20 +24,12 @@ import {
   fetchArtworkSummary as defaultFetchArtworkSummary,
   startArtworkCleanupRun as defaultStartArtworkCleanupRun,
 } from '../lib/artwork-api.js';
+import {
+  isArtworkCleanupPollingStatus,
+  resolveArtworkSelectedRunId,
+} from '../lib/artwork-maintenance-status.js';
 
 const artworkRunPollIntervalMs = 5000;
-
-function isPollingStatus(status) {
-  return status === 'pending' || status === 'running';
-}
-
-function resolveSelectedRunId({ latestRunId, preferredRunId, recentRuns }) {
-  if (preferredRunId) {
-    return preferredRunId;
-  }
-
-  return latestRunId ?? recentRuns[0]?.id ?? null;
-}
 
 export function useArtworkSummary({
   fetchArtworkCleanupHistory = defaultFetchArtworkCleanupHistory,
@@ -75,11 +67,11 @@ export function useArtworkSummary({
   function schedulePolling() {
     clearPollTimeout();
 
-    const runToPoll = isPollingStatus(latestRun.value?.status)
+    const runToPoll = isArtworkCleanupPollingStatus(latestRun.value?.status)
       ? latestRun.value
       : selectedRun.value;
 
-    if (!isPollingStatus(runToPoll?.status)) {
+    if (!isArtworkCleanupPollingStatus(runToPoll?.status)) {
       return;
     }
 
@@ -129,7 +121,7 @@ export function useArtworkSummary({
       artworkSummary.value = nextSummary;
       artworkCleanupHistory.value = nextHistory;
       await loadSelectedRunDetail({
-        runId: resolveSelectedRunId({
+        runId: resolveArtworkSelectedRunId({
           latestRunId: nextSummary.latestRun?.id ?? null,
           preferredRunId,
           recentRuns: nextHistory.runs ?? [],

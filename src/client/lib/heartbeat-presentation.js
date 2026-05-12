@@ -56,3 +56,63 @@ export function getHeartbeatStatusClass(status) {
       return 'review-status-held';
   }
 }
+
+/**
+ * Reduce a list of dependency/heartbeat status strings to the single worst
+ * overall health status.  Priority: unavailable/error > degraded/rate_limited/
+ * misconfigured > healthy > unknown (empty or unrecognised input).
+ *
+ * @param {string[]} statuses
+ * @returns {'unavailable'|'degraded'|'healthy'|'unknown'}
+ */
+export function selectWorstDependencyStatus(statuses) {
+  if (statuses.includes('unavailable') || statuses.includes('error')) {
+    return 'unavailable';
+  }
+  if (statuses.includes('degraded') || statuses.includes('rate_limited') || statuses.includes('misconfigured')) {
+    return 'degraded';
+  }
+  if (statuses.includes('healthy')) {
+    return 'healthy';
+  }
+  return 'unknown';
+}
+
+/**
+ * Return a human-readable detail string for the shell health badge based on
+ * the worst-status value returned by `selectWorstDependencyStatus`.
+ *
+ * @param {string|null|undefined} worstStatus
+ * @returns {string}
+ */
+export function buildShellHeartbeatDetail(worstStatus) {
+  switch (worstStatus) {
+    case 'healthy':
+      return 'All dependencies healthy';
+    case 'degraded':
+      return 'Some dependencies degraded';
+    case 'unavailable':
+      return 'Dependencies unavailable';
+    default:
+      return 'Health unknown';
+  }
+}
+
+/**
+ * Return a short display label for the shell health badge status.
+ *
+ * @param {string|null|undefined} status
+ * @returns {string}
+ */
+export function buildShellHeartbeatStatusLabel(status) {
+  switch (status) {
+    case 'healthy':
+      return 'Healthy';
+    case 'degraded':
+      return 'Degraded';
+    case 'unavailable':
+      return 'Unavailable';
+    default:
+      return 'Health';
+  }
+}
