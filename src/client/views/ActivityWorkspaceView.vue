@@ -24,15 +24,15 @@ const tabs = [
   { name: 'activity-operations', label: 'Operations', implemented: true },
   { name: 'activity-candidates', label: 'Candidates', implemented: true },
   { name: 'activity-requests', label: 'Requests', implemented: true },
-  { name: 'activity-queue', label: 'Queue', implemented: false },
-  { name: 'activity-wanted', label: 'Wanted', implemented: false },
-  { name: 'activity-downloads', label: 'Downloads', implemented: false },
-  { name: 'activity-imports', label: 'Imports', implemented: false },
-  { name: 'activity-releases', label: 'Releases', implemented: false },
-  { name: 'activity-users', label: 'Users', implemented: false },
-  { name: 'activity-history', label: 'History', implemented: false },
+  { name: 'activity-queue', label: 'Queue', implemented: true },
+  { name: 'activity-wanted', label: 'Wanted', implemented: true },
+  { name: 'activity-downloads', label: 'Downloads', implemented: true },
+  { name: 'activity-imports', label: 'Imports', implemented: true },
+  { name: 'activity-releases', label: 'Releases', implemented: true },
+  { name: 'activity-users', label: 'Users', implemented: true },
+  { name: 'activity-history', label: 'History', implemented: true },
   { name: 'activity-blocklist', label: 'Blocklist', implemented: false },
-  { name: 'activity-failed', label: 'Failed', implemented: false },
+  { name: 'activity-failed', label: 'Failed', implemented: true },
 ];
 
 const tabbarRef = ref(null);

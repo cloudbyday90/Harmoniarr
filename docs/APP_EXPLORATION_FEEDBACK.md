@@ -1347,3 +1347,30 @@ The composable imports and locally aliases both (`STORAGE_KEY = THEME_STORAGE_KE
 - `test/client/push-encoding.test.js` — new test file, 10 tests
 
 Test suite: **2374 tests, 0 failures** (up from 2346).
+
+---
+
+### 2026-05-12 - Activity Workspace Tab Bar — "soon" Badge Staleness
+
+**Screen:** `ActivityWorkspaceView.vue` — the Activity workspace shell that wraps all Activity sub-tabs.
+**File changed:** `src/client/views/ActivityWorkspaceView.vue`
+
+**What was found:**
+
+The `tabs` array that drives the Activity tabbar had `implemented: false` for 8 of 9 tabs that were in fact fully implemented and routed to real views. The `hx-tab-count` badge reading "soon" (with `title="Coming soon"`) was therefore visible on Queue, Wanted, Downloads, Imports, Releases, Users, History, and Failed — despite all eight rendering real operational data on click. Only Blocklist, which correctly routes to the `ActivityComingSoonView` placeholder, warranted the badge.
+
+**Issues for operators:**
+
+1. **False signal of incompleteness.** An operator who clicks "Queue soon" immediately sees a working table of operation history. The badge directly contradicts the page content. Any UI element that contradicts itself on interaction undermines operator trust in the whole UI.
+
+2. **Discoverability penalty.** A careful, unfamiliar operator may treat the "soon" badge as a dead-end warning and avoid the tab entirely, losing access to live operational data: the job queue, in-progress downloads, import candidates, source-user trust state, audit history, and failed items. All of that information exists and is queryable — operators just won't find it.
+
+3. **Cognitive model damage.** Operators build a mental map of "what is implemented." When the UI says 8 tabs are not ready and they turn out to be functional, the operator can't trust that map. The cost is repeated re-exploration rather than confident navigation.
+
+4. **Wasted badge real estate.** The "soon" count badge style is the only mechanism for distinguishing implemented from placeholder tabs. With 8 of 9 badges misapplied, the pattern signals nothing reliable. A badge that's wrong 89% of the time is worse than no badge — it creates noise without signal.
+
+**Root cause:** The `tabs` array `implemented` flags were set to `false` during initial scaffolding and were never updated as each view was built and wired into the router.
+
+**Fix:** Updated `implemented: true` for the 8 implemented tabs (Queue, Wanted, Downloads, Imports, Releases, Users, History, Failed). Blocklist remains `implemented: false` (correctly routes to `ActivityComingSoonView`).
+
+No new tests added — the `implemented` flag is a static data constant in a Vue SFC, not a testable pure function. Visual validation confirmed badges removed in the rebuilt container.
