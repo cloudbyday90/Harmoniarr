@@ -541,6 +541,7 @@ body,
   margin: 0 auto;
   padding: var(--hx-space-6) var(--hx-space-6) var(--hx-space-8);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--hx-space-5);
 }
 
@@ -606,7 +607,7 @@ body,
   color: var(--hx-text-strong);
 }
 
-.hx-tab.router-link-active,
+.hx-tab.router-link-exact-active,
 .hx-tab.is-active {
   color: var(--hx-text-strong);
   border-bottom-color: var(--hx-accent);
@@ -1131,11 +1132,6 @@ body,
     grid-template-columns: repeat(2, 1fr);
     gap: var(--hx-space-3);
   }
-
-  /* ── Settings 2-col ─────────────────────────────────────────────────── */
-
-  /* Collapse side-by-side setting sections into a single column */
-  .cfg-2col { grid-template-columns: 1fr; }
 
   /* ── Tables ──────────────────────────────────────────────────────────── */
 
@@ -2093,12 +2089,22 @@ body {
 .cfg-page {
   display: grid;
   gap: var(--hx-space-4);
+  min-width: 0;
 }
 .cfg-2col {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: var(--hx-space-4);
   align-items: start;
+  width: 100%;
+}
+@media (max-width: 960px) {
+  /* Collapse settings two-column layout on smaller screens */
+  .cfg-2col { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  /* Collapse side-by-side setting sections into a single column */
+  .cfg-2col { grid-template-columns: 1fr; }
 }
 .cfg-save-bar {
   position: sticky;

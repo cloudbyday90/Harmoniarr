@@ -27,6 +27,7 @@ import { fetchSystemOperatorNotifications } from '../lib/system-api.js';
 import { fetchMyRequestSummary } from '../lib/media-request-api.js';
 import { useTheme } from '../composables/useTheme.js';
 import { buildVisibleNav, notificationTone } from '../lib/app-shell-presentation.js';
+import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
 import ToastStack from './ToastStack.vue';
 import PwaUpdateBanner from './PwaUpdateBanner.vue';
 
@@ -263,7 +264,7 @@ const visibleNav = computed(() => buildVisibleNav(isRequester.value, requesterNo
                 >
                   <span class="hx-pill" :data-tone="notificationTone(notification.category)">{{ notification.category }}</span>
                   <span class="hx-topbar-notifications-item-title">{{ notification.title ?? notification.message ?? '\u2014' }}</span>
-                  <span v-if="notification.occurredAt" class="hx-topbar-notifications-item-time">{{ notification.occurredAt }}</span>
+                  <span v-if="notification.occurredAt" class="hx-topbar-notifications-item-time">{{ formatOperationTimestampShort(notification.occurredAt) }}</span>
                 </button>
               </li>
             </ul>

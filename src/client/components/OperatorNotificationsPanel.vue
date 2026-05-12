@@ -24,6 +24,7 @@ import {
   getNotificationSeverityClass,
   getNotificationSeverityLabel,
 } from '../lib/operator-notifications-presentation.js';
+import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
 
 defineProps({
   checkedAt: {
@@ -58,7 +59,7 @@ const emit = defineEmits(['refresh']);
       <div>
         <h3 class="hx-card-title">Notifications</h3>
         <p class="hx-card-subtitle">
-          {{ checkedAt ? `Evaluated ${checkedAt}.` : 'No notification snapshot is available yet.' }}
+          {{ checkedAt ? `Evaluated ${formatOperationTimestampShort(checkedAt)}.` : 'No notification snapshot is available yet.' }}
         </p>
       </div>
       <button type="button" @click="emit('refresh')">Refresh</button>
@@ -98,7 +99,7 @@ const emit = defineEmits(['refresh']);
         </div>
         <p class="activity-feed-message">{{ notification.message }}</p>
         <div class="activity-feed-entry-footer">
-          <p class="hx-text-muted">{{ notification.occurredAt ?? 'Timestamp unavailable' }}</p>
+          <p class="hx-text-muted">{{ formatOperationTimestampShort(notification.occurredAt) ?? 'Timestamp unavailable' }}</p>
           <RouterLink
             v-if="buildNotificationLink(notification)"
             class="secondary-button"
