@@ -83,3 +83,29 @@ export function getRadarWindowLabel(kind, days) {
   if (days <= 30) return 'New this month';
   return `New in the last ${days} days`;
 }
+
+/**
+ * Returns the card subtitle for the recent-releases section.
+ *
+ * @param {number} count
+ * @returns {string}
+ */
+export function buildRecentReleasesCardSubtitle(count) {
+  if (!count) return 'No new releases detected';
+  return count === 1
+    ? '1 release from monitored artists'
+    : `${count} releases from monitored artists`;
+}
+
+/**
+ * Returns the card subtitle for the upcoming-releases section.
+ *
+ * @param {number} count
+ * @returns {string}
+ */
+export function buildUpcomingReleasesCardSubtitle(count) {
+  if (!count) return 'No upcoming releases detected';
+  return count === 1
+    ? '1 upcoming release from monitored artists'
+    : `${count} upcoming releases from monitored artists`;
+}

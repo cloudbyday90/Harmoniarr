@@ -19,6 +19,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildRecentReleasesCardSubtitle,
+  buildUpcomingReleasesCardSubtitle,
   getRadarWindowLabel,
   normalizeRadarReleaseForCard,
 } from '../../src/client/lib/release-radar-normalization.js';
@@ -143,4 +145,48 @@ test('getRadarWindowLabel returns "Coming soon" for upcoming 90 days', () => {
 
 test('getRadarWindowLabel returns generic label for upcoming window over 90 days', () => {
   assert.equal(getRadarWindowLabel('upcoming', 180), 'Coming in the next 180 days');
+});
+
+// ── buildRecentReleasesCardSubtitle ───────────────────────────────────────────
+
+test('buildRecentReleasesCardSubtitle: zero returns no-releases message', () => {
+  assert.equal(buildRecentReleasesCardSubtitle(0), 'No new releases detected');
+});
+
+test('buildRecentReleasesCardSubtitle: null returns no-releases message', () => {
+  assert.equal(buildRecentReleasesCardSubtitle(null), 'No new releases detected');
+});
+
+test('buildRecentReleasesCardSubtitle: 1 returns singular', () => {
+  assert.equal(buildRecentReleasesCardSubtitle(1), '1 release from monitored artists');
+});
+
+test('buildRecentReleasesCardSubtitle: 2 returns plural', () => {
+  assert.equal(buildRecentReleasesCardSubtitle(2), '2 releases from monitored artists');
+});
+
+test('buildRecentReleasesCardSubtitle: large count returns plural', () => {
+  assert.equal(buildRecentReleasesCardSubtitle(12), '12 releases from monitored artists');
+});
+
+// ── buildUpcomingReleasesCardSubtitle ─────────────────────────────────────────
+
+test('buildUpcomingReleasesCardSubtitle: zero returns no-releases message', () => {
+  assert.equal(buildUpcomingReleasesCardSubtitle(0), 'No upcoming releases detected');
+});
+
+test('buildUpcomingReleasesCardSubtitle: null returns no-releases message', () => {
+  assert.equal(buildUpcomingReleasesCardSubtitle(null), 'No upcoming releases detected');
+});
+
+test('buildUpcomingReleasesCardSubtitle: 1 returns singular', () => {
+  assert.equal(buildUpcomingReleasesCardSubtitle(1), '1 upcoming release from monitored artists');
+});
+
+test('buildUpcomingReleasesCardSubtitle: 2 returns plural', () => {
+  assert.equal(buildUpcomingReleasesCardSubtitle(2), '2 upcoming releases from monitored artists');
+});
+
+test('buildUpcomingReleasesCardSubtitle: large count returns plural', () => {
+  assert.equal(buildUpcomingReleasesCardSubtitle(8), '8 upcoming releases from monitored artists');
 });

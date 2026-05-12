@@ -26,7 +26,11 @@ import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useReleaseRadar } from '../composables/useReleaseRadar.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { getErrorMessage } from '../lib/error-utils.js';
-import { getRadarWindowLabel } from '../lib/release-radar-normalization.js';
+import {
+  buildRecentReleasesCardSubtitle,
+  buildUpcomingReleasesCardSubtitle,
+  getRadarWindowLabel,
+} from '../lib/release-radar-normalization.js';
 import { sessionStore } from '../state/session.js';
 
 const radar = useReleaseRadar();
@@ -116,7 +120,7 @@ onMounted(() => radar.load());
         <div>
           <h2 class="hx-card-title">{{ recentLabel }}</h2>
           <p class="hx-card-subtitle">
-            {{ radar.recent.value.length === 0 ? 'No new releases detected' : `${radar.recent.value.length} release${radar.recent.value.length === 1 ? '' : 's'} from monitored artists` }}
+            {{ buildRecentReleasesCardSubtitle(radar.recent.value.length) }}
           </p>
         </div>
       </header>
@@ -166,7 +170,7 @@ onMounted(() => radar.load());
         <div>
           <h2 class="hx-card-title">{{ upcomingLabel }}</h2>
           <p class="hx-card-subtitle">
-            {{ radar.upcoming.value.length === 0 ? 'No upcoming releases detected' : `${radar.upcoming.value.length} upcoming release${radar.upcoming.value.length === 1 ? '' : 's'} from monitored artists` }}
+            {{ buildUpcomingReleasesCardSubtitle(radar.upcoming.value.length) }}
           </p>
         </div>
       </header>

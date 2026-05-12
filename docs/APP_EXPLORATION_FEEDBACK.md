@@ -946,3 +946,24 @@ Test suite: **1959 tests, 0 failures** (5 new tests added for `formatActivityEve
 **Test coverage for `formatActivityEventTime`:** null returns `''`, undefined returns `''`, empty string returns `''`, non-date string returns `''`, valid ISO timestamp returns non-empty locale string.
 
 Test suite: **1959 tests, 0 failures** (up from 1954).
+
+### 2026-05-12 - Activity Releases Screen
+
+**Screen:** `ActivityReleasesView.vue` (197 lines before changes)
+
+**Issues identified and resolved:**
+
+1. **Two inline pluralisation ternaries in card subtitles** — Both the Recent and Upcoming sections embedded identical `length === 0 ? 'No X detected' : \`${length} release${length === 1 ? '' : 's'}...\`` patterns directly in the template. Extracted to two pure functions in `src/client/lib/release-radar-normalization.js`:
+   - `buildRecentReleasesCardSubtitle(count)` → `'No new releases detected'` | `'1 release from monitored artists'` | `'N releases from monitored artists'`
+   - `buildUpcomingReleasesCardSubtitle(count)` → `'No upcoming releases detected'` | `'1 upcoming release from monitored artists'` | `'N upcoming releases from monitored artists'`
+
+Both subtitles now read as single clean `{{ helper(count) }}` expressions. The empty-state text and `<EmptyState>` component bodies are separate concerns and were not changed.
+
+**Files changed:**
+- `src/client/lib/release-radar-normalization.js` — add `buildRecentReleasesCardSubtitle` and `buildUpcomingReleasesCardSubtitle`
+- `test/client/release-radar-normalization.test.js` — append 10 tests (zero/null/singular/plural/large-count for each function)
+- `src/client/views/ActivityReleasesView.vue` — import both helpers; replace two inline ternaries
+
+**Test coverage:** zero returns no-releases message, null returns no-releases message, 1 returns singular, 2 returns plural, large count returns plural — for each of the two helpers.
+
+Test suite: **1969 tests, 0 failures** (up from 1959).
