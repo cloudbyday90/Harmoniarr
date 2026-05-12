@@ -20,6 +20,12 @@
 import { onMounted } from 'vue';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
+import {
+  buildWantedReleasesCardSubtitle,
+  formatLastReconciledAt,
+  getWantedStatusLabel,
+  getWantedStatusTone,
+} from '../lib/wanted-release-normalization.js';
 
 const wanted = useLibraryWantedSummary();
 const releases = useLibraryWantedReleases();
@@ -75,8 +81,8 @@ onMounted(() => refresh());
     <article class="hx-card" v-if="wanted.summary.value">
       <header class="hx-card-header">
         <div>
-          <h3 class="hx-card-title">Reconciliation</h3>
-          <p class="hx-card-subtitle">Last reconciled {{ wanted.libraryWantedSummary.value?.lastReconciledAt ?? 'never' }}</p>
+          <h3 class="hx-card-title">Acquisition status</h3>
+          <p class="hx-card-subtitle">Last updated {{ formatLastReconciledAt(wanted.libraryWantedSummary.value?.lastReconciledAt) }}</p>
         </div>
       </header>
       <div class="hx-card-body">
@@ -88,7 +94,7 @@ onMounted(() => refresh());
       <header class="hx-card-header">
         <div>
           <h3 class="hx-card-title">Wanted releases</h3>
-          <p class="hx-card-subtitle">{{ releases.totalCount.value }} release{{ releases.totalCount.value === 1 ? '' : 's' }} pending acquisition</p>
+          <p class="hx-card-subtitle">{{ buildWantedReleasesCardSubtitle(releases.totalCount.value) }}</p>
         </div>
       </header>
       <div class="hx-card-body hx-card-body--flush">
@@ -116,8 +122,8 @@ onMounted(() => refresh());
               </td>
               <td>{{ release.releaseGroupType ?? '—' }}</td>
               <td>
-                <span class="hx-pill" :data-tone="release.wantedStatus === 'missing' ? 'danger' : 'warning'">
-                  {{ release.wantedStatus }}
+                <span class="hx-pill" :data-tone="getWantedStatusTone(release.wantedStatus)">
+                  {{ getWantedStatusLabel(release.wantedStatus) }}
                 </span>
               </td>
               <td class="hx-table-num">{{ release.expectedTrackCount }}</td>

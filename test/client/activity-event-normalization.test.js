@@ -19,6 +19,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  formatActivityEventTime,
   getActivityEventIcon,
   getActivityEventLabel,
   normalizeActivityEvent,
@@ -219,4 +220,27 @@ test('getActivityEventIcon: unknown type returns activity', () => {
 
 test('getActivityEventIcon: null returns activity', () => {
   assert.equal(getActivityEventIcon(null), 'activity');
+});
+
+// ── formatActivityEventTime ───────────────────────────────────────────────────
+
+test('formatActivityEventTime: null returns empty string', () => {
+  assert.equal(formatActivityEventTime(null), '');
+});
+
+test('formatActivityEventTime: undefined returns empty string', () => {
+  assert.equal(formatActivityEventTime(undefined), '');
+});
+
+test('formatActivityEventTime: empty string returns empty string', () => {
+  assert.equal(formatActivityEventTime(''), '');
+});
+
+test('formatActivityEventTime: non-date string returns empty string', () => {
+  assert.equal(formatActivityEventTime('not-a-date'), '');
+});
+
+test('formatActivityEventTime: valid ISO timestamp returns non-empty locale string', () => {
+  const result = formatActivityEventTime('2025-05-12T14:34:00.000Z');
+  assert.ok(typeof result === 'string' && result.length > 0);
 });

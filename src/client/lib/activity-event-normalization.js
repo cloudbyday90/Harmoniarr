@@ -121,3 +121,27 @@ export function getActivityEventIcon(eventType) {
       return 'activity';
   }
 }
+
+/**
+ * Formats an `occurredAt` (or similar) ISO timestamp for compact activity-feed
+ * display, e.g. "May 12, 02:34 PM". Returns an empty string for absent or
+ * unparseable values.
+ *
+ * @param {string|null|undefined} value
+ * @returns {string}
+ */
+export function formatActivityEventTime(value) {
+  if (!value) return '';
+  try {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}

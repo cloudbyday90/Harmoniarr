@@ -20,27 +20,12 @@
 import { onMounted } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useActivityFeed } from '../composables/useActivityFeed.js';
-import { getActivityEventLabel, getActivityEventIcon } from '../lib/activity-event-normalization.js';
+import { getActivityEventLabel, getActivityEventIcon, formatActivityEventTime } from '../lib/activity-event-normalization.js';
 import { sessionStore } from '../state/session.js';
 
 const { events, isLoading, errorMessage, checkedAt, hasEvents, isEmpty, load } = useActivityFeed({ limit: 100 });
 
 const currentUserId = sessionStore.state.user?.id ?? null;
-
-function formatOccurredAt(value) {
-  if (!value) return '';
-  try {
-    const d = new Date(value);
-    return d.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return value;
-  }
-}
 
 onMounted(() => {
   void load();
@@ -107,7 +92,7 @@ onMounted(() => {
           :datetime="event.occurredAt"
           class="activity-feed-time"
         >
-          {{ formatOccurredAt(event.occurredAt) }}
+          {{ formatActivityEventTime(event.occurredAt) }}
         </time>
       </li>
     </ul>
@@ -117,7 +102,7 @@ onMounted(() => {
       class="activity-feed-checked-at"
       aria-live="polite"
     >
-      Last checked: {{ formatOccurredAt(checkedAt) }}
+      Last checked: {{ formatActivityEventTime(checkedAt) }}
     </p>
 
   </section>

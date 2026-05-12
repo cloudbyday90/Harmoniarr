@@ -906,3 +906,43 @@ No raw enum display issues were found — the sort/filter option labels (`'Date 
 **Test coverage for `sortMyRequests`:** empty input, no-mutation, `requested_at` desc (default), `requested_at` asc, `createdAt` fallback, `title` asc (releaseGroupTitle), `title` asc (title fallback), `title` desc, `artist` asc (artistSortName), `artist` asc (artistName fallback), `artist` desc, case-insensitive title sort, case-insensitive artist sort, equal-value order preservation.
 
 Test suite: **1954 tests, 0 failures** (up from 1940).
+
+### 2026-05-12 - Activity Wanted Screen
+
+**Screen:** `ActivityWantedView.vue` (129 lines before changes)
+
+**Issues identified and resolved:**
+
+1. **Raw `wantedStatus` enum in status pill** — The pill rendered `missing` / `partial` with an ad-hoc inline ternary for tone. Replaced with `getWantedStatusLabel(release.wantedStatus)` and `getWantedStatusTone(release.wantedStatus)` from `src/client/lib/wanted-release-normalization.js`. Now renders `Missing` / `Partial` with `danger` / `warning` tones through the shared normalizer.
+
+2. **Raw ISO timestamp for last-reconciled date** — `lastReconciledAt` was rendered with a bare `?? 'never'` fallback, exposing the raw ISO 8601 string to users. Replaced with `formatLastReconciledAt(wanted.libraryWantedSummary.value?.lastReconciledAt)` from the same lib. Now renders `never` for null and a locale-formatted string for valid dates.
+
+3. **Inline pluralisation ternary for release count** — `{{ releases.totalCount.value }} release{{ releases.totalCount.value === 1 ? '' : 's' }} pending acquisition` replaced with `{{ buildWantedReleasesCardSubtitle(releases.totalCount.value) }}`. Also returns `null` for zero/null counts (no subtitle rendered), `'1 release pending acquisition'`, or `'N releases pending acquisition'`.
+
+4. **Jargon card title "Reconciliation"** → changed to `"Acquisition status"`.
+
+5. **Jargon card subtitle "Last reconciled"** → changed to `"Last updated"`.
+
+No new lib exports or tests were needed — all four functions already existed and were already covered by `test/client/wanted-release-normalization.test.js`.
+
+**Files changed:**
+- `src/client/views/ActivityWantedView.vue` — add imports for 4 lib functions; fix raw values in template
+
+Test suite: **1959 tests, 0 failures** (5 new tests added for `formatActivityEventTime` in same commit — see ActivityFeedView entry below).
+
+### 2026-05-12 - Activity Feed Screen
+
+**Screen:** `ActivityFeedView.vue` (156 lines before changes)
+
+**Issues identified and resolved:**
+
+1. **Inline `formatOccurredAt` function in `<script setup>`** — The view defined its own date-formatter using `toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })`. Extracted to `formatActivityEventTime(value)` in `src/client/lib/activity-event-normalization.js`. The view now imports and calls the shared function. Both template call sites (`event.occurredAt` in the `<time>` element and `checkedAt` in the "Last checked" paragraph) updated to `formatActivityEventTime(...)`.
+
+**Files changed:**
+- `src/client/lib/activity-event-normalization.js` — add `formatActivityEventTime` export
+- `test/client/activity-event-normalization.test.js` — append 5 tests for `formatActivityEventTime`
+- `src/client/views/ActivityFeedView.vue` — remove inline function; import and use `formatActivityEventTime`
+
+**Test coverage for `formatActivityEventTime`:** null returns `''`, undefined returns `''`, empty string returns `''`, non-date string returns `''`, valid ISO timestamp returns non-empty locale string.
+
+Test suite: **1959 tests, 0 failures** (up from 1954).
