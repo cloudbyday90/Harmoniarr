@@ -207,7 +207,7 @@ watch(
         <span v-if="lastRefreshedAt" class="ops-refresh-indicator">
           <span v-if="isPollingActive" class="ops-refresh-dot" aria-label="Live auto-refresh active"></span>
           <span class="ops-refresh-label">
-            {{ isPollingActive ? 'Live' : `Refreshed ${formatTimestampShort(lastRefreshedAt)}` }}
+            {{ isPollingActive ? 'Live' : `Refreshed ${formatOperationTimestampShort(lastRefreshedAt)}` }}
           </span>
         </span>
         <button

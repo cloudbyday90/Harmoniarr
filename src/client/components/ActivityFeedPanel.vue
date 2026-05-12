@@ -19,6 +19,10 @@
 <script setup>
 import { RouterLink } from 'vue-router';
 import { buildActivityFeedEntryLinkTarget } from '../lib/activity-feed-link-targets.js';
+import {
+  getActivityFeedStatusClass,
+  getActivityFeedStatusLabel,
+} from '../lib/activity-feed-presentation.js';
 
 defineProps({
   checkedAt: {
@@ -44,36 +48,6 @@ defineProps({
 });
 
 const emit = defineEmits(['load-more', 'refresh']);
-
-function statusClass(status) {
-  switch (status) {
-    case 'success':
-      return 'review-status-selected';
-    case 'error':
-      return 'review-status-failed';
-    case 'active':
-      return 'review-status-held';
-    default:
-      return '';
-  }
-}
-
-function statusLabel(status) {
-  switch (status) {
-    case 'success':
-      return 'Completed';
-    case 'error':
-      return 'Attention';
-    case 'active':
-      return 'Active';
-    default:
-      return 'Recorded';
-  }
-}
-
-function linkTarget(entry) {
-  return buildActivityFeedEntryLinkTarget(entry);
-}
 </script>
 
 <template>
@@ -98,15 +72,15 @@ function linkTarget(entry) {
             <p class="eyebrow">{{ entry.entryType.replace('_', ' ') }}</p>
             <strong>{{ entry.title }}</strong>
           </div>
-          <span class="review-status-pill" :class="statusClass(entry.status)">
-            {{ statusLabel(entry.status) }}
+          <span class="review-status-pill" :class="getActivityFeedStatusClass(entry.status)">
+            {{ getActivityFeedStatusLabel(entry.status) }}
           </span>
         </div>
         <p class="activity-feed-message">{{ entry.message }}</p>
         <div class="activity-feed-entry-footer">
           <p class="metadata-card-copy">{{ entry.occurredAt ?? 'Timestamp unavailable' }}</p>
-          <RouterLink v-if="linkTarget(entry)" class="secondary-button" :to="linkTarget(entry).to">
-            {{ linkTarget(entry).label }}
+          <RouterLink v-if="buildActivityFeedEntryLinkTarget(entry)" class="secondary-button" :to="buildActivityFeedEntryLinkTarget(entry).to">
+            {{ buildActivityFeedEntryLinkTarget(entry).label }}
           </RouterLink>
         </div>
       </li>

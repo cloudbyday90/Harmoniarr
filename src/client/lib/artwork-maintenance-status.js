@@ -62,3 +62,51 @@ export function getArtworkCleanupRunStatusLabel(status) {
 export function getArtworkCleanupRunStatusClass(status) {
   return getOperationRunStatusClass(status);
 }
+
+export function canStartArtworkCleanup(summaryPayload) {
+  if (!summaryPayload) {
+    return false;
+  }
+
+  if ((summaryPayload.inventory?.eligibleAssetCount ?? 0) < 1) {
+    return false;
+  }
+
+  return !['pending', 'running'].includes(summaryPayload.latestRun?.status);
+}
+
+export function getArtworkCleanupHistorySummary(run) {
+  if (run.status === 'failed') {
+    return run.errorMessage || `${run.failedAssetCount ?? 0} artwork asset cleanup failure${run.failedAssetCount === 1 ? '' : 's'} need review.`;
+  }
+
+  if (run.status === 'completed') {
+    return `Deleted ${run.deletedAssetCount ?? 0} asset${run.deletedAssetCount === 1 ? '' : 's'} and skipped ${run.missingFileCount ?? 0} missing file${run.missingFileCount === 1 ? '' : 's'}.`;
+  }
+
+  if (run.status === 'running' || run.status === 'pending') {
+    return `Requested ${run.requestedAssetCount ?? 0} retention-eligible asset${run.requestedAssetCount === 1 ? '' : 's'} for cleanup.`;
+  }
+
+  return 'No details were recorded for this cleanup run.';
+}
+
+export function getArtworkCleanupDetailTitle(run) {
+  if (run.status === 'failed') {
+    return 'Selected cleanup run failed';
+  }
+
+  if (run.status === 'completed') {
+    return 'Selected cleanup run completed';
+  }
+
+  if (run.status === 'running') {
+    return 'Selected cleanup run is active';
+  }
+
+  if (run.status === 'pending') {
+    return 'Selected cleanup run is queued';
+  }
+
+  return 'Selected cleanup run';
+}

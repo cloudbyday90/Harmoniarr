@@ -18,6 +18,9 @@
 
 <script setup>
 import {
+  canStartArtworkCleanup,
+  getArtworkCleanupDetailTitle,
+  getArtworkCleanupHistorySummary,
   getArtworkCleanupRunStatusClass,
   getArtworkCleanupRunStatusLabel,
   getArtworkMaintenanceStatusClass,
@@ -68,54 +71,6 @@ defineProps({
 });
 
 const emit = defineEmits(['refresh', 'select-run', 'start']);
-
-function canStartCleanup(summaryPayload) {
-  if (!summaryPayload) {
-    return false;
-  }
-
-  if ((summaryPayload.inventory?.eligibleAssetCount ?? 0) < 1) {
-    return false;
-  }
-
-  return !['pending', 'running'].includes(summaryPayload.latestRun?.status);
-}
-
-function historySummary(run) {
-  if (run.status === 'failed') {
-    return run.errorMessage || `${run.failedAssetCount ?? 0} artwork asset cleanup failure${run.failedAssetCount === 1 ? '' : 's'} need review.`;
-  }
-
-  if (run.status === 'completed') {
-    return `Deleted ${run.deletedAssetCount ?? 0} asset${run.deletedAssetCount === 1 ? '' : 's'} and skipped ${run.missingFileCount ?? 0} missing file${run.missingFileCount === 1 ? '' : 's'}.`;
-  }
-
-  if (run.status === 'running' || run.status === 'pending') {
-    return `Requested ${run.requestedAssetCount ?? 0} retention-eligible asset${run.requestedAssetCount === 1 ? '' : 's'} for cleanup.`;
-  }
-
-  return 'No details were recorded for this cleanup run.';
-}
-
-function detailTitle(run) {
-  if (run.status === 'failed') {
-    return 'Selected cleanup run failed';
-  }
-
-  if (run.status === 'completed') {
-    return 'Selected cleanup run completed';
-  }
-
-  if (run.status === 'running') {
-    return 'Selected cleanup run is active';
-  }
-
-  if (run.status === 'pending') {
-    return 'Selected cleanup run is queued';
-  }
-
-  return 'Selected cleanup run';
-}
 </script>
 
 <template>
@@ -128,7 +83,7 @@ function detailTitle(run) {
       </div>
       <div class="library-scan-actions">
         <button
-          v-if="canStartCleanup(summaryPayload)"
+          v-if="canStartArtworkCleanup(summaryPayload)"
           type="button"
           class="library-scan-start-button"
           :disabled="isStarting"
@@ -266,7 +221,7 @@ function detailTitle(run) {
               <div class="review-detail-header">
                 <div>
                   <p>{{ run.startedAt ?? 'Unknown start' }}</p>
-                  <strong>{{ historySummary(run) }}</strong>
+                  <strong>{{ getArtworkCleanupHistorySummary(run) }}</strong>
                 </div>
                 <span class="review-status-pill" :class="getArtworkCleanupRunStatusClass(run.status)">
                   {{ getArtworkCleanupRunStatusLabel(run.status) }}
@@ -298,7 +253,7 @@ function detailTitle(run) {
           <div class="review-detail-header">
             <div>
               <p>Run details</p>
-              <strong v-if="selectedRunDetailPayload?.run">{{ detailTitle(selectedRunDetailPayload.run) }}</strong>
+              <strong v-if="selectedRunDetailPayload?.run">{{ getArtworkCleanupDetailTitle(selectedRunDetailPayload.run) }}</strong>
               <strong v-else-if="runDetailErrorMessage">Run details unavailable</strong>
               <strong v-else>Loading selected cleanup run details.</strong>
             </div>
@@ -315,7 +270,7 @@ function detailTitle(run) {
           <p class="error-copy" v-else-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
 
           <template v-else-if="selectedRunDetailPayload?.run">
-            <p class="metadata-card-copy">{{ historySummary(selectedRunDetailPayload.run) }}</p>
+            <p class="metadata-card-copy">{{ getArtworkCleanupHistorySummary(selectedRunDetailPayload.run) }}</p>
             <dl class="review-meta-grid onboarding-meta-grid">
               <div>
                 <dt>Run id</dt>

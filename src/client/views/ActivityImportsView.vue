@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { formatBytes } from '../lib/search-presentation.js';
 import { fetchImportCandidates } from '../lib/import-candidate-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
@@ -28,18 +29,6 @@ const props = defineProps({
   emptyTitle: { type: String, default: 'No import-pending candidates' },
   emptyCopy: { type: String, default: 'Imports awaiting ingestion will appear here once downloads complete.' },
 });
-
-function formatBytes(bytes) {
-  if (typeof bytes !== 'number' || bytes <= 0) return '\u2014';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let i = 0;
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024;
-    i += 1;
-  }
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`;
-}
 
 const {
   data: candidates,

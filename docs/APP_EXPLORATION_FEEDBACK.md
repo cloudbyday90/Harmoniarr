@@ -1154,3 +1154,44 @@ Test suite: **2108 tests, 0 failures** (up from 2067).
 - `src/client/components/ImportCandidateExecutionPanel.vue` — extend import; remove 11 inline functions; update all call sites
 
 Test suite: **2214 tests, 0 failures** (up from 2108).
+
+### 2026-05-12 - ArtworkSummaryPanel, ActivityFeedPanel, ActivityImportsView Components + OperationsView Bug Fix
+
+**Components/views affected:**
+- `src/client/components/ArtworkSummaryPanel.vue` (artwork retention cleanup panel)
+- `src/client/components/ActivityFeedPanel.vue` (background service activity feed)
+- `src/client/views/ActivityImportsView.vue` (import candidates table view)
+- `src/client/views/OperationsView.vue` (background jobs operations tab — bug fix)
+
+**Bug fix: OperationsView blank tab**
+The Operations Activity tab was rendering completely blank. Root cause: template referenced `formatTimestampShort(lastRefreshedAt)` (line 210) but the import used the correctly namespaced `formatOperationTimestampShort`. Vue silently swallowed the undefined reference error and rendered nothing for the entire view. Fixed by correcting the call site to `formatOperationTimestampShort(lastRefreshedAt)`.
+
+**Extended lib:** `src/client/lib/artwork-maintenance-status.js` (+3 exports)
+**New lib:** `src/client/lib/activity-feed-presentation.js` (2 exports)
+
+**Issues identified and resolved:**
+
+**ArtworkSummaryPanel:**
+1. `canStartCleanup(summaryPayload)` — multi-condition eligibility guard (null check, inventory count, run status exclusion). Extracted as `canStartArtworkCleanup(summaryPayload)` in `artwork-maintenance-status.js`. The blocking conditions (no eligible assets, pending/running run) were untested; a field rename would silently break the start button.
+2. `historySummary(run)` — pluralization across `failedAssetCount`, `deletedAssetCount`/`missingFileCount`, `requestedAssetCount` across four run states. Extracted as `getArtworkCleanupHistorySummary(run)`. High regression risk due to the pluralization branches and null-coalescing of multiple fields.
+3. `detailTitle(run)` — run status → panel heading. Extracted as `getArtworkCleanupDetailTitle(run)`. Four status branches + default.
+
+**ActivityFeedPanel:**
+4. `statusClass(status)` → `getActivityFeedStatusClass(status)` — 3-branch CSS class selector (success/error/active/default empty string).
+5. `statusLabel(status)` → `getActivityFeedStatusLabel(status)` — 4-branch label (Completed/Attention/Active/Recorded).
+6. `linkTarget(entry)` — zero-logic wrapper around `buildActivityFeedEntryLinkTarget`. **Deleted entirely**. Template now calls `buildActivityFeedEntryLinkTarget(entry)` directly at three call sites. The wrapper added indirection with no value.
+
+**ActivityImportsView:**
+7. `formatBytes(bytes)` — sixth copy of this function in the codebase. Identical implementation and `'—'` sentinel to `search-presentation.js::formatBytes` (already used by `ActivityDownloadsView`, `SearchView`, `RecoveryWorkspaceView`). Removed inline copy; now imports from `search-presentation.js`.
+
+**Files changed:**
+- `src/client/lib/artwork-maintenance-status.js` — 3 new exports: `canStartArtworkCleanup`, `getArtworkCleanupHistorySummary`, `getArtworkCleanupDetailTitle`
+- `src/client/lib/activity-feed-presentation.js` — new file, 2 exports: `getActivityFeedStatusClass`, `getActivityFeedStatusLabel`
+- `test/client/artwork-maintenance-status.test.js` — new file, 46 tests across 7 describe blocks
+- `test/client/activity-feed-presentation.test.js` — new file, 12 tests across 2 describe blocks
+- `src/client/components/ArtworkSummaryPanel.vue` — import 3 new lib functions; remove 3 inline functions; update 4 call sites
+- `src/client/components/ActivityFeedPanel.vue` — import 2 new lib functions; remove 3 inline functions; update 5 call sites
+- `src/client/views/ActivityImportsView.vue` — replace inline `formatBytes` with `search-presentation.js` import
+- `src/client/views/OperationsView.vue` — fix `formatTimestampShort` → `formatOperationTimestampShort`
+
+Test suite: **2272 tests, 0 failures** (up from 2214).
