@@ -175,7 +175,7 @@ export function createLibraryDiscoveryRequestService({
             library_wanted_releases.metadata_artist_id,
             library_wanted_releases.metadata_release_group_id,
             library_wanted_releases.metadata_release_id,
-            library_wanted_releases.release_date,
+            library_wanted_releases.release_date::text,
             library_wanted_releases.wanted_status,
             library_wanted_releases.evidence->>'strategy' AS wanted_strategy,
             NULL::uuid AS source_media_request_id,

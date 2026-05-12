@@ -1518,3 +1518,91 @@ When `selectedRun.summary` had any keys, both the formatted "Recorded outcome" b
 - `src/client/components/ArtworkSummaryPanel.vue` — template CSS class migration
 
 Test suite: **2506 tests, 0 failures** (121 new tests added).
+
+---
+
+### 2026-05-12 — Critical Screen-by-Screen Review (Third Pass)
+
+**Scope:** Comprehensive walkthrough of all primary routes against the live walkthrough container after commit `a8ee9e9`. Routes reviewed: Home/Dashboard, Activity/Operations, Activity/Candidates, Activity/History, Settings/General, Settings/Connections, Settings/Metadata Browser, Library, Missing, Discover.
+
+---
+
+#### Bug Fixed: SQL UNION Type Mismatch in Library Discovery
+
+**Status: Resolved in this session.**
+
+Every Library discovery background job was failing with the SQL error "UNION types text and date cannot be matched". This was visible on the Activity/Operations job queue (all rows showing "Failed"), the job detail panel (ERROR DETAIL card), and the Activity/History table (25 identical failure entries filling the entire page).
+
+**Root cause:** `loadDiscoveryRequests()` in `library-discovery-request-service.js` joins two CTEs with `UNION ALL`:
+- `monitored_sources` selected `library_wanted_releases.release_date` — PostgreSQL type `DATE` (from migration `20260430_000008_library_wanted_release_baseline.sql`).
+- `request_sources` selected `metadata_releases.release_date` — PostgreSQL type `TEXT` (from migration `20260428_000002_canonical_metadata_foundation.sql`).
+
+PostgreSQL cannot unify `DATE` and `TEXT` in a UNION without an explicit cast.
+
+**Fix:** Added `::text` cast in `monitored_sources`:
+```sql
+library_wanted_releases.release_date::text,
+```
+This is consistent with downstream usage: `buildReleaseDateInstant(value)` uses the value in a template literal and `getReleaseYear(releaseDate)` has an explicit `typeof releaseDate !== 'string'` guard. PostgreSQL's `DATE::text` output is `YYYY-MM-DD` — the string format both functions expect. Docker rebuilt and redeployed; the next discovery run showed "Succeeded" in the History table.
+
+Test suite after fix: **3683 tests, 0 failures** (2506 client + 1177 server).
+
+---
+
+#### Remaining UX Issues Observed
+
+These issues were identified during the walkthrough. None were fixed in this session — all tracked for the next implementation slice.
+
+**Home page — "slskd" exposed throughout the setup checklist**
+
+The setup checklist at `/app` contains multiple operator-facing references to the internal service name:
+- Item title: "Connect to slskd" → should be "Connect to Soulseek" or "Connect to download service"
+- Item title: "Verify slskd authentication" → should be "Verify download service credentials"
+- Action button: "Configure slskd" → should be "Configure connection"
+- Action button: "Review slskd credentials" → should be "Review credentials"
+- Body message: "No explicit slskd download mappings are configured yet; preview resolution still falls back to the downloads root assumption." — contains "slskd", "preview resolution", and "downloads root assumption" (all internal terms). This is the same message that was addressed in `formatPathValidationNote` for the Settings/Media & Storage screen; the onboarding checklist has not been updated to use the formatted version.
+
+**Home page — developer-facing key-value labels in setup item cards**
+
+The "Connect to slskd" checklist item displays three uppercase metadata rows: "IS CONNECTED", "IS LOGGED IN", "IS TRANSITIONING" — each with a "Yes"/"No" value. These read as internal state machine debug output rather than user-facing status context. A single-line status summary or a visual indicator would be more appropriate.
+
+**Candidates page — entire panel cluster still using old eyebrow/section-header pattern**
+
+`/app/activity/candidates` has not been through the design system migration. All eight panels on the page still use uppercase eyebrow labels: "IMPORT CANDIDATES", "FILTER CANDIDATES", "CANDIDATES", "MATCH DETAIL", "CANDIDATES SELECTED FOR DOWNLOAD", "DOWNLOAD RUN", "LIBRARY IMPORT", "READY TO IMPORT". These are structural eyebrows (not just copy issues) — the components themselves need `hx-card`/`hx-card-header` replacements. This is a direct parallel to the Candidates page identified in prior passes but not yet actioned.
+
+**Candidates page — "SOURCE SEARCH ID" filter field label**
+
+The filter form exposes an internal ID concept as a user-facing field label. The field correlates candidates with the Soulseek search run that produced them. A label like "From search" or "Search run" with a tooltip or `hx-field-hint` would convey the intent without requiring the operator to know what a "source search ID" is.
+
+**Settings / Metadata Browser — eyebrow labels still present**
+
+`/app/settings/library-browser` (the MetadataArtistSearchPanel / MetadataLocalSearchPanel cluster) still renders:
+- `<p class="eyebrow">MUSICBRAINZ</p>` above the Find an Artist search form — exposes the service name
+- `<p class="eyebrow">LOCAL CATALOG</p>` above the Open Local Artist form
+- `<p class="eyebrow">ARTIST METADATA</p>` on the introductory card
+
+This is the Metadata Component Cluster identified as the next implementation slice after the Dashboard Panel Cluster work. It includes `MetadataArtistSearchPanel.vue`, `MetadataLocalSearchPanel.vue`, and the downstream result components.
+
+**Settings / General and Settings / Connections — two-column layout clips right column**
+
+Both settings views render a two-column CSS grid that pairs cards side by side (e.g. "Security" + "System" on General; "Soulseek connection" + "How playlist requests work" on Connections). The right column is cut off on the visible viewport because the layout does not account for the sidebar width. The right column contents are unreachable without horizontal scroll. A `max-width` constraint on the grid or a breakpoint-driven single-column fallback would fix this.
+
+**Settings / Connections — "SLSKD ADDRESS" form field label**
+
+The API endpoint field for the Soulseek integration still shows "SLSKD ADDRESS" as its label. The parent card heading was already changed to "Soulseek connection" in the prior session (`buildSlskdConnectionSubtitle()`), but the individual field label was not updated. Should read "Service address" or "Download service URL".
+
+**Library and Missing pages — stat grid cards not using design system**
+
+Both the Library and Missing pages render four stat cards using standalone raw CSS card patterns (`TOTAL RELEASES`, `IN LIBRARY`, `PARTIAL`, `DUPLICATE` on Library; `MONITORED ARTISTS`, `WANTED RELEASES`, `MISSING`, `PARTIAL` on Missing). These were addressed at the data/presentation layer in a prior session (`buildLibraryStatCards`, `buildMissingStatCards`) but the underlying HTML/CSS still uses the old card markup rather than `hx-stat-grid` or `hx-card`.
+
+**Missing page — "BUCKET" column header in Reconciliation table**
+
+The reconciliation data table on `/app/missing` has a "BUCKET" column. This is an internal data model term for the seven reconciliation state categories. An operator reading this table has no reference for what a "bucket" means. Should be "Category".
+
+**Missing page — "Last updated never" awkward phrasing**
+
+Both the "Acquisition status" card and the "Reconciliation" card show "Last updated never" when no timestamp is present. While grammatically valid, the phrase reads awkwardly. "Never updated" flows more naturally, or the em dash `—` with no label would be cleaner in a data table context. The `formatLastReconciledAt` function returns the string `'never'` which is then prefixed by the label in the template — fixing this is a one-line template change.
+
+**Discover — "START WITH AN ARTIST YOU LOVE" uppercase label**
+
+The text above the artist search input renders in uppercase. This is a `<label>` element (not an eyebrow `<p>`), so it's driven by CSS `text-transform: uppercase`. The Discover page was redesigned in a prior session and this label likely survived. Unlike the eyebrow pattern, this is a legitimate field label — but sentence-case ("Start with an artist you love") would be more consistent with the design system's approach to field labels.
