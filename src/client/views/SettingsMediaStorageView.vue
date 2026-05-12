@@ -26,6 +26,18 @@ import {
   normalizeDownloadMappings,
   normalizeUserMusicRoots,
 } from '../lib/settings-form.js';
+import {
+  buildDownloadMappingSourceLabel,
+  buildDownloadsPathHint,
+  buildPathTranslationsDescription,
+  buildPathTranslationsEmptyState,
+  formatCommaSeparatedList,
+  formatMappingLabel,
+  formatPathStatusLabel,
+  formatPathStatusTone,
+  formatPathValidationNote,
+  formatUserRootLabel,
+} from '../lib/settings-media-storage-presentation.js';
 import FolderBrowserModal from '../components/FolderBrowserModal.vue';
 
 const isLoading = ref(true);
@@ -126,10 +138,6 @@ const form = reactive({
   },
 });
 
-function formatCommaSeparatedList(value) {
-  return Array.isArray(value) ? value.join(', ') : '';
-}
-
 function applySettings(payload) {
   Object.assign(form.artwork, {
     ...payload.settings.artwork,
@@ -172,22 +180,6 @@ function applySettings(payload) {
     form.paths.userMusicRoots.length,
     ...normalizeUserMusicRoots(payload.settings.paths?.userMusicRoots),
   );
-}
-
-function statusTone(status) {
-  switch (status) {
-    case 'healthy': return 'success';
-    case 'unavailable': return 'danger';
-    default: return 'warning';
-  }
-}
-
-function statusLabel(status) {
-  switch (status) {
-    case 'healthy': return 'Healthy';
-    case 'unavailable': return 'Unavailable';
-    default: return 'Needs attention';
-  }
 }
 
 function addDownloadMapping() { form.paths.downloadMappings.push(createEmptyDownloadMapping()); }
@@ -265,7 +257,7 @@ onMounted(() => { void loadSettings(); });
               <div class="hx-field" v-if="form.artwork.fetchEnabled">
                 <label class="hx-field-label">Sources to try</label>
                 <input class="hx-input" v-model="form.artwork.providerOrderText" placeholder="coverArtArchive" />
-                <p class="cfg-field-hint">Try these sources in order, separated by commas. <code>coverArtArchive</code> is the main free source.</p>
+                <p class="cfg-field-hint">Try sources in order, separated by commas. <code>coverArtArchive</code> is the default and the main free option (Cover Art Archive).</p>
               </div>
               <label class="cfg-check">
                 <input type="checkbox" v-model="form.artwork.captureEmbedded" />
@@ -375,7 +367,7 @@ onMounted(() => { void loadSettings(); });
                   <input class="hx-input" v-model="form.paths.downloads" />
                   <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Downloads folder', form.paths.downloads, v => form.paths.downloads = v)">Browse…</button>
                 </div>
-                <p class="cfg-field-hint">Where slskd puts completed downloads. Harmoniarr reads from here.</p>
+                <p class="cfg-field-hint">{{ buildDownloadsPathHint() }}</p>
               </div>
               <div class="hx-field">
                 <label class="hx-field-label">Music library</label>
@@ -408,18 +400,18 @@ onMounted(() => { void loadSettings(); });
               <div class="cfg-subsection-header">
                 <div>
                   <p class="cfg-group-title">Path translations</p>
-                  <p class="hx-text-muted">slskd and Harmoniarr may run in separate containers with different folder names pointing to the same place on disk. Add a translation for each mismatch.</p>
+                  <p class="hx-text-muted">{{ buildPathTranslationsDescription() }}</p>
                 </div>
                 <button type="button" class="hx-btn" @click="addDownloadMapping">Add</button>
               </div>
               <div class="hx-empty" v-if="!form.paths.downloadMappings.length">
-                <p class="hx-empty-copy">Not needed if slskd and Harmoniarr share the same folder paths.</p>
+                <p class="hx-empty-copy">{{ buildPathTranslationsEmptyState() }}</p>
               </div>
               <div class="cfg-mapping-list" v-else>
                 <div class="cfg-mapping-card" v-for="(mapping, index) in form.paths.downloadMappings" :key="index">
                   <div class="hx-form-row">
                     <div class="hx-field">
-                      <label class="hx-field-label">slskd sees this path</label>
+                      <label class="hx-field-label">{{ buildDownloadMappingSourceLabel() }}</label>
                       <input class="hx-input" v-model="mapping.slskdPrefix" placeholder="/downloads/complete" />
                     </div>
                     <div class="hx-field">
@@ -472,8 +464,8 @@ onMounted(() => { void loadSettings(); });
             <h3 class="hx-card-title">Path validation</h3>
             <p class="hx-card-subtitle">{{ pathValidation.summary.message }}</p>
           </div>
-          <span class="hx-pill" :data-tone="statusTone(pathValidation.summary.status)">
-            {{ statusLabel(pathValidation.summary.status) }}
+          <span class="hx-pill" :data-tone="formatPathStatusTone(pathValidation.summary.status)">
+            {{ formatPathStatusLabel(pathValidation.summary.status) }}
           </span>
         </header>
         <div class="hx-card-body" v-if="pathValidation.roots?.length">
@@ -496,10 +488,10 @@ onMounted(() => { void loadSettings(); });
             <div class="cfg-mapping-card" v-for="mapping in pathValidation.downloadMappings" :key="mapping.index">
               <div class="cfg-provider-header">
                 <span>
-                  <strong>Mapping {{ mapping.index + 1 }}</strong>
+                  <strong>{{ formatMappingLabel(mapping.index) }}</strong>
                   <span class="hx-text-muted"> — {{ mapping.slskdPrefix }} → {{ mapping.harmoniarrPrefix }}</span>
                 </span>
-                <span class="hx-pill" :data-tone="statusTone(mapping.status)">{{ statusLabel(mapping.status) }}</span>
+                <span class="hx-pill" :data-tone="formatPathStatusTone(mapping.status)">{{ formatPathStatusLabel(mapping.status) }}</span>
               </div>
               <p class="hx-text-muted">{{ mapping.message }}</p>
               <dl class="review-meta-grid review-meta-grid-wide">
@@ -514,17 +506,17 @@ onMounted(() => { void loadSettings(); });
             <div class="cfg-mapping-card" v-for="userMusicRoot in pathValidation.userMusicRoots" :key="`validated-user-root-${userMusicRoot.index}`">
               <div class="cfg-provider-header">
                 <span>
-                  <strong>Per-user root {{ userMusicRoot.index + 1 }}</strong>
+                  <strong>{{ formatUserRootLabel(userMusicRoot.index) }}</strong>
                   <span class="hx-text-muted"> — {{ userMusicRoot.userId }} → {{ userMusicRoot.relativeRoot }}</span>
                 </span>
-                <span class="hx-pill" :data-tone="statusTone(userMusicRoot.status)">{{ statusLabel(userMusicRoot.status) }}</span>
+                <span class="hx-pill" :data-tone="formatPathStatusTone(userMusicRoot.status)">{{ formatPathStatusLabel(userMusicRoot.status) }}</span>
               </div>
               <p class="hx-text-muted">{{ userMusicRoot.message }}</p>
             </div>
           </div>
         </div>
-        <div class="hx-card-body" v-if="!pathValidation.downloadMappings?.length && !pathValidation.userMusicRoots?.length">
-          <p class="hx-text-muted">{{ pathValidation.notes?.remoteSlskdValidation }}</p>
+        <div class="hx-card-body" v-if="!pathValidation.downloadMappings?.length && !pathValidation.userMusicRoots?.length && formatPathValidationNote(pathValidation.notes?.remoteSlskdValidation)">
+          <p class="hx-text-muted">{{ formatPathValidationNote(pathValidation.notes?.remoteSlskdValidation) }}</p>
         </div>
       </article>
 

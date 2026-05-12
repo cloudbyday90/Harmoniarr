@@ -578,3 +578,44 @@ Test suite after this session: **1457 tests, 0 failures** (up from 1377).
 - `formatPlexConflictReason(reason)` — 7 tests (null/undefined/known codes/underscore replacement, no-raw-enum guard)
 
 Test suite after this session: **1572 tests, 0 failures** (up from 1490).
+
+---
+
+### 2026-05-12 - Settings — Media & Storage Screen
+
+**Screen:** `SettingsMediaStorageView.vue`
+**Lib:** `src/client/lib/settings-media-storage-presentation.js` (new file)
+**Tests:** `test/client/settings-media-storage-presentation.test.js` (new file)
+
+**Issues identified and resolved:**
+
+1. **`coverArtArchive` raw internal provider ID in hint text** — The hint beneath "Sources to try" read *"Try these sources in order, separated by commas. `coverArtArchive` is the main free source."* The identifier `coverArtArchive` is the internal provider registry key, not a recognisable product name. Updated to: *"Try sources in order, separated by commas. `coverArtArchive` is the default and the main free option (Cover Art Archive)."* — the registry key is retained as a typed value reference but now named in plain language.
+
+2. **"slskd" exposed in the Downloads folder hint** — *"Where slskd puts completed downloads. Harmoniarr reads from here."* used the internal service name. Replaced with `buildDownloadsPathHint()` → *"Where your download client puts completed downloads. Harmoniarr reads from here."*
+
+3. **"slskd" exposed in Path translations section** — The description read *"slskd and Harmoniarr may run in separate containers with different folder names pointing to the same place on disk."* This is both container-centric (wrong framing for bare-metal or single-container installs) and exposes the internal service name. Replaced with `buildPathTranslationsDescription()` → *"If your download client and Harmoniarr use different paths for the same folder, add a translation here."*
+
+4. **"slskd" exposed in Path translations empty state** — *"Not needed if slskd and Harmoniarr share the same folder paths."* Replaced with `buildPathTranslationsEmptyState()` → *"Not needed if your download client and Harmoniarr share the same folder paths."*
+
+5. **"slskd sees this path" field label exposed internal service name** — The field label inside each mapping card read *"slskd sees this path"*. Replaced with `buildDownloadMappingSourceLabel()` → *"Download client path"*.
+
+6. **`pathValidation.notes?.remoteSlskdValidation` rendered raw backend message** — The path validation card displayed the raw note *"No explicit slskd download mappings are configured yet; preview resolution still falls back to the downloads root assumption."* containing `slskd`, `preview resolution`, and `downloads root assumption` — all internal terminology. Routed through `formatPathValidationNote(note)` which normalises the known pattern to: *"No path translations are configured. Harmoniarr will use the downloads folder path directly."* Also returns `null` for empty/null inputs; the card body is now conditionally rendered with a `v-if` guard so it is hidden when there is no meaningful note to show.
+
+7. **Three pure functions inline in `<script setup>` with no tests** — `statusTone(status)`, `statusLabel(status)`, and `formatCommaSeparatedList(value)` were all defined locally in the component with no tests. All three moved to `settings-media-storage-presentation.js` as `formatPathStatusTone`, `formatPathStatusLabel`, and `formatCommaSeparatedList`.
+
+8. **Template index arithmetic `mapping.index + 1` / `userMusicRoot.index + 1`** — 0-based index arithmetic was performed inline in the template for path validation cards. Moved to `formatMappingLabel(index)` and `formatUserRootLabel(index)`. The user root label also changed from "root" to "folder" (`Per-user root 1` → `Per-user folder 1`) to use vocabulary that matches admin expectations.
+
+**Extractions and tests added to `settings-media-storage-presentation.js`:**
+
+- `formatPathStatusTone(status)` — 6 tests (healthy/unavailable/unknown/null/undefined, non-danger guard)
+- `formatPathStatusLabel(status)` — 6 tests (healthy/unavailable/unknown/null/undefined, no-raw-enum guard)
+- `formatCommaSeparatedList(value)` — 7 tests (join, single, empty, null, undefined, non-array, numeric)
+- `formatMappingLabel(index)` — 5 tests (1-based, prefix, regression guard for 0-based)
+- `formatUserRootLabel(index)` — 5 tests (1-based, uses "folder" not "root", regression guard)
+- `formatPathValidationNote(note)` — 8 tests (null/undefined/empty, known pattern normalisation, slskd replacement, pass-through, case-insensitive)
+- `buildDownloadsPathHint()` — 4 tests (non-empty, no-slskd guard, download client, mentions Harmoniarr)
+- `buildPathTranslationsDescription()` — 4 tests (non-empty, no-slskd guard, no-container guard, download client)
+- `buildPathTranslationsEmptyState()` — 3 tests (non-empty, no-slskd guard, download client)
+- `buildDownloadMappingSourceLabel()` — 3 tests (non-empty, no-slskd guard, plain language)
+
+Test suite after this session: **1623 tests, 0 failures** (up from 1572).
