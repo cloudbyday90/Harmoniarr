@@ -102,6 +102,12 @@
   --hx-sidebar-width: 220px;
   --hx-sidebar-width-collapsed: 64px;
   --hx-bottom-nav-height: 60px;
+
+  /* Scrollbar — light theme */
+  --hx-scrollbar-w: 8px;
+  --hx-scrollbar-thumb: rgba(15, 28, 36, 0.20);
+  --hx-scrollbar-thumb-hover: rgba(15, 28, 36, 0.36);
+  --hx-scrollbar-track: rgba(15, 28, 36, 0.04);
 }
 
 /* ---------- Dark theme tokens ----------
@@ -137,6 +143,11 @@
     --hx-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.30);
     --hx-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.40);
     --hx-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+
+    /* Scrollbar — dark theme */
+    --hx-scrollbar-thumb: rgba(232, 238, 243, 0.22);
+    --hx-scrollbar-thumb-hover: rgba(232, 238, 243, 0.38);
+    --hx-scrollbar-track: rgba(232, 238, 243, 0.04);
   }
 }
 
@@ -165,6 +176,11 @@
   --hx-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.30);
   --hx-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.40);
   --hx-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+
+  /* Scrollbar — dark theme */
+  --hx-scrollbar-thumb: rgba(232, 238, 243, 0.22);
+  --hx-scrollbar-thumb-hover: rgba(232, 238, 243, 0.38);
+  --hx-scrollbar-track: rgba(232, 238, 243, 0.04);
 }
 
 /* Explicit light override — set when user selects "Light" in appearance
@@ -185,6 +201,62 @@
   --hx-shadow-sm: 0 1px 2px rgba(15, 28, 36, 0.06);
   --hx-shadow-md: 0 4px 14px rgba(15, 28, 36, 0.08);
   --hx-shadow-lg: 0 16px 36px rgba(15, 28, 36, 0.14);
+}
+
+/* ---------- Scrollbar ---------- */
+
+/*
+ * 8px track with a floating pill thumb (2px inset via border+background-clip).
+ * Theme-aware via CSS custom properties; sidebar always uses white-alpha
+ * regardless of light/dark theme because the sidebar chrome is always dark.
+ *
+ * Firefox: scrollbar-width / scrollbar-color (standard properties)
+ * Chromium/Safari: ::-webkit-scrollbar pseudo-elements (legacy, widely supported)
+ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hx-scrollbar-thumb) var(--hx-scrollbar-track);
+}
+
+::-webkit-scrollbar {
+  width: var(--hx-scrollbar-w);
+  height: var(--hx-scrollbar-w);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--hx-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--hx-scrollbar-thumb);
+  border-radius: var(--hx-radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hx-scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Sidebar chrome is always dark — use white-alpha regardless of page theme */
+.hx-sidebar {
+  scrollbar-color: rgba(232, 238, 243, 0.22) transparent;
+}
+
+.hx-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(232, 238, 243, 0.22);
+  background-clip: content-box;
+}
+
+.hx-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(232, 238, 243, 0.38);
+  background-clip: content-box;
 }
 
 /* ---------- App canvas overrides ---------- */
@@ -418,8 +490,6 @@ body,
   flex-direction: column;
   height: 100%;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
   z-index: 20;
 }
 
@@ -583,7 +653,11 @@ body,
   padding: 0;
   margin: 0;
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+.hx-tabbar::-webkit-scrollbar {
+  display: none;
 }
 
 .hx-tab {
