@@ -1046,3 +1046,27 @@ Test suite: **1995 tests, 0 failures** (up from 1979).
 - `src/client/components/ImportCandidateApplyPanel.vue` — update import; remove all inline function and constant definitions; update all template call sites to use lib names
 
 Test suite: **2046 tests, 0 failures** (up from 1995).
+
+### 2026-05-12 - RequestCard Component
+
+**Component:** `src/client/components/media/RequestCard.vue` (artwork-first request tracking card shown in My Requests and the Requester dashboard)
+
+**Issues identified and resolved:**
+
+1. **Inline `formatDate` with no tests** — The component defined a private function to format ISO date strings into locale short dates (`year: 'numeric', month: 'short', day: 'numeric'`). The same pattern was already partially established for event timestamps; this one produces a date-only display (no time). Extracted as `formatRequestDate(isoString)` in `my-requests-presentation.js`. Returns `null` for missing or unparseable input (consistent with how the component used it — `null` suppresses rendering in the template).
+
+2. **Inline `kindLabel` computed with no tests** — Three-branch `requestKind` enum mapping (`external_url`, `track`, `release`) was embedded directly. Extracted as `getRequestKindLabel(requestKind)` — returns `null` for absent or unknown values, which suppresses the kind pill in the template.
+
+3. **Inline `attributionLine` computed with no tests** — Multi-case delegation attribution logic (viewer = beneficiary / viewer = submitter / operator view / no-delegation guard). This is the most semantically rich logic in the component and was entirely untested. Extracted as `getRequestAttributionLine(request, viewerUserId)`, preserving all four cases:
+   - `null` when `viewerUserId` absent (backward-compatible suppression)
+   - `null` when by/for are missing or identical (not a delegation)
+   - `"Requested by <submitter>"` when viewer is the beneficiary
+   - `"For <beneficiary>"` when viewer is the submitter
+   - `"By <submitter> · For <beneficiary>"` for operator/third-party view
+
+**Files changed:**
+- `src/client/lib/my-requests-presentation.js` — append `formatRequestDate`, `getRequestKindLabel`, `getRequestAttributionLine`
+- `test/client/my-requests-presentation.test.js` — update import list; append 21 tests covering all three new functions (null/undefined/invalid inputs, all enum values, all attribution branches, fallback username)
+- `src/client/components/media/RequestCard.vue` — import three new lib functions; remove `formatDate` inline function definition; replace `kindLabel`, `requestedDate`/`updatedDate`, and `attributionLine` computed bodies with lib calls
+
+Test suite: **2067 tests, 0 failures** (up from 2046).

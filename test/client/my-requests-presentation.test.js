@@ -18,7 +18,12 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { sortMyRequests } from '../../src/client/lib/my-requests-presentation.js';
+import {
+  formatRequestDate,
+  getRequestAttributionLine,
+  getRequestKindLabel,
+  sortMyRequests,
+} from '../../src/client/lib/my-requests-presentation.js';
 
 // ---------------------------------------------------------------------------
 // sortMyRequests
@@ -146,5 +151,126 @@ describe('sortMyRequests', () => {
     ];
     const result = sortMyRequests(requests, { field: 'requested_at', order: 'desc' });
     assert.equal(result.length, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatRequestDate
+// ---------------------------------------------------------------------------
+
+describe('formatRequestDate', () => {
+  it('returns null for null', () => {
+    assert.equal(formatRequestDate(null), null);
+  });
+
+  it('returns null for undefined', () => {
+    assert.equal(formatRequestDate(undefined), null);
+  });
+
+  it('returns null for empty string', () => {
+    assert.equal(formatRequestDate(''), null);
+  });
+
+  it('returns null for an unparseable string', () => {
+    assert.equal(formatRequestDate('not-a-date'), null);
+  });
+
+  it('returns a non-empty string for a valid ISO date', () => {
+    const result = formatRequestDate('2026-05-12T10:00:00.000Z');
+    assert.ok(typeof result === 'string' && result.length > 0);
+  });
+
+  it('result for a valid date includes the year', () => {
+    const result = formatRequestDate('2026-05-12T10:00:00.000Z');
+    assert.ok(result.includes('2026'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getRequestKindLabel
+// ---------------------------------------------------------------------------
+
+describe('getRequestKindLabel', () => {
+  it('returns External URL for external_url', () => {
+    assert.equal(getRequestKindLabel('external_url'), 'External URL');
+  });
+
+  it('returns Track for track', () => {
+    assert.equal(getRequestKindLabel('track'), 'Track');
+  });
+
+  it('returns Release for release', () => {
+    assert.equal(getRequestKindLabel('release'), 'Release');
+  });
+
+  it('returns null for unknown kind', () => {
+    assert.equal(getRequestKindLabel('album'), null);
+  });
+
+  it('returns null for null', () => {
+    assert.equal(getRequestKindLabel(null), null);
+  });
+
+  it('returns null for undefined', () => {
+    assert.equal(getRequestKindLabel(undefined), null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getRequestAttributionLine
+// ---------------------------------------------------------------------------
+
+describe('getRequestAttributionLine', () => {
+  const byUser = { id: 'admin-1', username: 'alice' };
+  const forUser = { id: 'user-1', username: 'bob' };
+
+  it('returns null when viewerUserId is absent', () => {
+    const req = { requestedByUser: byUser, requestedForUser: forUser };
+    assert.equal(getRequestAttributionLine(req, null), null);
+  });
+
+  it('returns null when submitter equals beneficiary (not a delegation)', () => {
+    const req = { requestedByUser: byUser, requestedForUser: byUser };
+    assert.equal(getRequestAttributionLine(req, byUser.id), null);
+  });
+
+  it('returns null when requestedByUser is missing', () => {
+    const req = { requestedForUser: forUser };
+    assert.equal(getRequestAttributionLine(req, forUser.id), null);
+  });
+
+  it('returns null when requestedForUser is missing', () => {
+    const req = { requestedByUser: byUser };
+    assert.equal(getRequestAttributionLine(req, byUser.id), null);
+  });
+
+  it('returns Requested by <submitter> when viewer is the beneficiary', () => {
+    const req = { requestedByUser: byUser, requestedForUser: forUser };
+    assert.equal(getRequestAttributionLine(req, forUser.id), 'Requested by alice');
+  });
+
+  it('returns For <beneficiary> when viewer is the submitter', () => {
+    const req = { requestedByUser: byUser, requestedForUser: forUser };
+    assert.equal(getRequestAttributionLine(req, byUser.id), 'For bob');
+  });
+
+  it('returns By <submitter> · For <beneficiary> when viewer is neither', () => {
+    const req = { requestedByUser: byUser, requestedForUser: forUser };
+    assert.equal(
+      getRequestAttributionLine(req, 'operator-99'),
+      'By alice · For bob',
+    );
+  });
+
+  it('uses Unknown as fallback when username is missing', () => {
+    const req = {
+      requestedByUser: { id: 'admin-1' },
+      requestedForUser: { id: 'user-1' },
+    };
+    assert.equal(getRequestAttributionLine(req, 'operator-99'), 'By Unknown · For Unknown');
+  });
+
+  it('returns null for a null request', () => {
+    assert.equal(getRequestAttributionLine(null, 'user-1'), null);
   });
 });

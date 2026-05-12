@@ -52,3 +52,80 @@ export function sortMyRequests(requests, { field = 'requested_at', order = 'desc
     return 0;
   });
 }
+
+/**
+ * Format an ISO date string into a locale-appropriate short date (year, month,
+ * day). Returns `null` for missing or unparseable values.
+ *
+ * @param {string|null|undefined} isoString
+ * @returns {string|null}
+ */
+export function formatRequestDate(isoString) {
+  if (!isoString) return null;
+  try {
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return null;
+    return new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }).format(date);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return a display label for a request kind token, or `null` when the kind
+ * is absent or not worth surfacing.
+ *
+ * @param {string|null|undefined} requestKind
+ * @returns {string|null}
+ */
+export function getRequestKindLabel(requestKind) {
+  if (requestKind === 'external_url') return 'External URL';
+  if (requestKind === 'track') return 'Track';
+  if (requestKind === 'release') return 'Release';
+  return null;
+}
+
+/**
+ * Build an attribution line that identifies the submitter and/or beneficiary
+ * of a delegated request, relative to the current viewer.
+ *
+ * Returns `null` when:
+ * - `viewerUserId` is absent (attribution suppressed)
+ * - `requestedByUser` or `requestedForUser` is missing
+ * - The submitter and beneficiary are the same person (not a delegation)
+ *
+ * Cases:
+ * - Viewer is the beneficiary → `"Requested by <submitter>"`
+ * - Viewer is the submitter   → `"For <beneficiary>"`
+ * - Neither                   → `"By <submitter> · For <beneficiary>"`
+ *
+ * @param {object} request  — API request object
+ * @param {string|null} viewerUserId
+ * @returns {string|null}
+ */
+export function getRequestAttributionLine(request, viewerUserId) {
+  if (!viewerUserId) return null;
+
+  const by = request?.requestedByUser;
+  const forUser = request?.requestedForUser;
+
+  if (!by?.id || !forUser?.id) return null;
+  if (by.id === forUser.id) return null;
+
+  const byName = by.username ?? 'Unknown';
+  const forName = forUser.username ?? 'Unknown';
+
+  if (viewerUserId === forUser.id) {
+    return `Requested by ${byName}`;
+  }
+
+  if (viewerUserId === by.id) {
+    return `For ${forName}`;
+  }
+
+  return `By ${byName} · For ${forName}`;
+}

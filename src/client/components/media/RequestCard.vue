@@ -22,6 +22,11 @@ import ArtworkImage from '../ArtworkImage.vue';
 import RequestStatusPill from './RequestStatusPill.vue';
 import { useArtworkColor } from '../../composables/useArtworkColor.js';
 import { getComingSoonLabel, isComingSoon } from '../../lib/request-status.js';
+import {
+  formatRequestDate,
+  getRequestAttributionLine,
+  getRequestKindLabel,
+} from '../../lib/my-requests-presentation.js';
 
 /**
  * RequestCard — presentational artwork-first request tracking card.
@@ -113,78 +118,23 @@ const artworkMbid = computed(() => releaseMbid.value || releaseGroupMbid.value |
 /** Entity type for ArtworkImage. */
 const artworkMbidType = computed(() => (releaseMbid.value ? 'release' : 'release-group'));
 
-/**
- * Format an ISO date string into a locale-appropriate short date.
- * Returns null for missing or unparseable values.
- */
-function formatDate(isoString) {
-  if (!isoString) return null;
-  try {
-    const date = new Date(isoString);
-    if (Number.isNaN(date.getTime())) return null;
-    return new Intl.DateTimeFormat(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    }).format(date);
-  } catch {
-    return null;
-  }
-}
-
 /** Human-readable requested date. */
-const requestedDate = computed(() => formatDate(props.request.createdAt));
+const requestedDate = computed(() => formatRequestDate(props.request.createdAt));
 
 /** Human-readable last updated date, shown only if meaningfully different. */
 const updatedDate = computed(() => {
-  const updated = formatDate(props.request.updatedAt);
-  const requested = formatDate(props.request.createdAt);
-  // Only show if updated differs from created — avoids redundant information.
+  const updated = formatRequestDate(props.request.updatedAt);
+  const requested = formatRequestDate(props.request.createdAt);
   return updated && updated !== requested ? updated : null;
 });
 
 /** Optional request kind label (release / track / external URL). */
-const kindLabel = computed(() => {
-  const k = props.request.requestKind;
-  if (k === 'external_url') return 'External URL';
-  if (k === 'track') return 'Track';
-  if (k === 'release') return 'Release';
-  return null;
-});
+const kindLabel = computed(() => getRequestKindLabel(props.request.requestKind));
 
-/**
- * Attribution line for delegated requests — shown when the submitter and the
- * beneficiary differ and `viewerUserId` is provided.
- *
- * Returns null when no attribution should be displayed.
- *
- * Cases:
- * - Viewer is the beneficiary: "Requested by [submitter]" (admin requested for me)
- * - Viewer is the submitter:   "For [beneficiary]" (I requested on behalf of someone)
- * - Neither (operator view):   "By [submitter] · For [beneficiary]"
- */
-const attributionLine = computed(() => {
-  if (!props.viewerUserId) return null;
-
-  const by = props.request.requestedByUser;
-  const forUser = props.request.requestedForUser;
-
-  if (!by?.id || !forUser?.id) return null;
-  if (by.id === forUser.id) return null;
-
-  const byName = by.username ?? 'Unknown';
-  const forName = forUser.username ?? 'Unknown';
-
-  if (props.viewerUserId === forUser.id) {
-    return `Requested by ${byName}`;
-  }
-
-  if (props.viewerUserId === by.id) {
-    return `For ${forName}`;
-  }
-
-  return `By ${byName} · For ${forName}`;
-});
+/** Attribution line for delegated requests. */
+const attributionLine = computed(() =>
+  getRequestAttributionLine(props.request, props.viewerUserId),
+);
 
 const artworkImageComp = useTemplateRef('artworkImageComp');
 const imgElRef = computed(() => artworkImageComp.value?.imgRef ?? null);
