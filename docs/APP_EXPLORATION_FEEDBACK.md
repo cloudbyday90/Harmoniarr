@@ -819,3 +819,32 @@ Test suite: **1865 tests, 0 failures** (up from 1852).
 - `formatCandidateCountLabel(count)` — 6 tests (singular at 1, plural at 0/2/100, count in label, no singular for 0)
 
 Test suite: **1889 tests, 0 failures** (up from 1865).
+
+---
+
+### 2026-05-12 - Settings — Connections Screen
+
+**Screen:** `SettingsConnectionsView.vue` (476 lines before changes)
+**Lib:** `src/client/lib/settings-connections-presentation.js` (new file)
+**Tests:** `test/client/settings-connections-presentation.test.js` (new file)
+
+**Issues identified and resolved:**
+
+1. **`slskdApiKeyStatusLabel()` — inline closure with no tests** — The function read directly from the `secretStatus` ref to produce `'No API key configured'` / `'Stored in Harmoniarr'` / `'Environment-provided key'`. Extracted to `formatSlskdApiKeyStatusLabel(slskdStatus)` in the new lib, accepting the `secretStatus?.slskd` object. Template call site updated to pass the status slice directly.
+
+2. **`providerSecretStatusLabel(provider, secretKey, sourceKey)` — inline closure with no tests** — Used at three call sites (Spotify client secret, YouTube API key, Apple Music private key) to return the same 3-value label. Extracted to `formatProviderSecretStatusLabel(providerStatus, secretKey, sourceKey)`, accepting the provider status object instead of the provider name string so the function has no dependency on `secretStatus`. All three template call sites updated.
+
+3. **`spotifyOAuthStatusLabel()` / `youtubeOAuthStatusLabel()` — duplicate inline closures with no tests** — Both functions had identical logic: `'Not linked'` / `'Linked until <date>'` / `'Linked'`. Merged into a single `formatOAuthStatusLabel(oauthStatus)` export. Both template call sites updated.
+
+4. **`formatCommaSeparatedList` duplicated inline** — The function was already extracted to `settings-media-storage-presentation.js` during the SettingsMediaStorageView session. The identical copy in this view was removed and replaced with an import from the existing lib.
+
+5. **Internal jargon in Soulseek connection card subtitle** — `"How Harmoniarr talks to slskd, the Soulseek search daemon. You configured this during setup."` exposed both `slskd` (internal service name) and `"daemon"` (infrastructure vocabulary). Replaced via `buildSlskdConnectionSubtitle()` → `'Configure the address and API key for the Soulseek download service.'`
+
+**New lib: `src/client/lib/settings-connections-presentation.js`** (4 exports, 28 tests):
+
+- `buildSlskdConnectionSubtitle()` — 4 tests (no-slskd, no-daemon, non-empty, stable)
+- `formatSlskdApiKeyStatusLabel(slskdStatus)` — 8 tests (null/undefined, not-configured, stored, environment, non-stored-source, no-slskd-in-output)
+- `formatProviderSecretStatusLabel(providerStatus, secretKey, sourceKey)` — 8 tests (null/undefined, not-configured, stored, environment, all three key-name patterns, absent secretKey)
+- `formatOAuthStatusLabel(oauthStatus)` — 8 tests (null/undefined, not-linked, no-expiry, expiry-present, bare-ISO-not-returned, year-present-in-output)
+
+Test suite: **1935 tests, 0 failures** (up from 1907).

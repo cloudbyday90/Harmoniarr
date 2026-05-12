@@ -31,6 +31,13 @@ import {
   normalizeDownloadMappings,
   normalizeUserMusicRoots,
 } from '../lib/settings-form.js';
+import {
+  buildSlskdConnectionSubtitle,
+  formatOAuthStatusLabel,
+  formatProviderSecretStatusLabel,
+  formatSlskdApiKeyStatusLabel,
+} from '../lib/settings-connections-presentation.js';
+import { formatCommaSeparatedList } from '../lib/settings-media-storage-presentation.js';
 
 const isLoading = ref(true);
 const isSaving = ref(false);
@@ -106,10 +113,6 @@ const form = reactive({
   },
 });
 
-function formatCommaSeparatedList(value) {
-  return Array.isArray(value) ? value.join(', ') : '';
-}
-
 function applySettings(payload) {
   Object.assign(form.artwork, {
     ...payload.settings.artwork,
@@ -152,30 +155,6 @@ function applySettings(payload) {
     form.paths.userMusicRoots.length,
     ...normalizeUserMusicRoots(payload.settings.paths?.userMusicRoots),
   );
-}
-
-function slskdApiKeyStatusLabel() {
-  const status = secretStatus.value?.slskd;
-  if (!status?.apiKeyConfigured) return 'No API key configured';
-  return status.apiKeySource === 'stored' ? 'Stored in Harmoniarr' : 'Environment-provided key';
-}
-
-function providerSecretStatusLabel(provider, secretKey, sourceKey) {
-  const status = secretStatus.value?.providers?.[provider];
-  if (!status?.[secretKey]) return 'No secret configured';
-  return status[sourceKey] === 'stored' ? 'Stored in Harmoniarr' : 'Environment-provided secret';
-}
-
-function spotifyOAuthStatusLabel() {
-  const status = secretStatus.value?.providers?.spotifyOAuth;
-  if (!status?.linked) return 'Not linked';
-  return status.tokenExpiresAt ? `Linked until ${new Date(status.tokenExpiresAt).toLocaleString()}` : 'Linked';
-}
-
-function youtubeOAuthStatusLabel() {
-  const status = secretStatus.value?.providers?.youtubeOAuth;
-  if (!status?.linked) return 'Not linked';
-  return status.tokenExpiresAt ? `Linked until ${new Date(status.tokenExpiresAt).toLocaleString()}` : 'Linked';
 }
 
 async function loadSettings() {
@@ -285,10 +264,10 @@ onMounted(() => { void loadSettings(); });
           <header class="hx-card-header">
             <div>
               <h3 class="hx-card-title">Soulseek connection</h3>
-              <p class="hx-card-subtitle">How Harmoniarr talks to slskd, the Soulseek search daemon. You configured this during setup.</p>
+              <p class="hx-card-subtitle">{{ buildSlskdConnectionSubtitle() }}</p>
             </div>
             <span class="review-status-pill" :class="secretStatus?.slskd?.apiKeyConfigured ? 'review-status-selected' : 'review-status-held'">
-              {{ slskdApiKeyStatusLabel() }}
+              {{ formatSlskdApiKeyStatusLabel(secretStatus?.slskd) }}
             </span>
           </header>
           <div class="hx-card-body">
@@ -365,7 +344,7 @@ onMounted(() => { void loadSettings(); });
               <div class="cfg-provider-header">
                 <h4 class="cfg-provider-name">Spotify</h4>
                 <span class="review-status-pill" :class="secretStatus?.providers?.spotify?.clientSecretConfigured ? 'review-status-selected' : 'review-status-held'">
-                  {{ providerSecretStatusLabel('spotify', 'clientSecretConfigured', 'clientSecretSource') }}
+                  {{ formatProviderSecretStatusLabel(secretStatus?.providers?.spotify, 'clientSecretConfigured', 'clientSecretSource') }}
                 </span>
               </div>
               <label class="cfg-check">
@@ -387,7 +366,7 @@ onMounted(() => { void loadSettings(); });
                 <span>Remove the stored Spotify client secret on save</span>
               </label>
               <div class="cfg-provider-header" style="margin-top: var(--hx-space-2)">
-                <span class="hx-text-muted">User authorization — {{ spotifyOAuthStatusLabel() }}</span>
+                <span class="hx-text-muted">User authorization — {{ formatOAuthStatusLabel(secretStatus?.providers?.spotifyOAuth) }}</span>
                 <span class="review-status-pill" :class="secretStatus?.providers?.spotifyOAuth?.linked ? 'review-status-selected' : 'review-status-held'">
                   {{ secretStatus?.providers?.spotifyOAuth?.linked ? 'Linked' : 'Not linked' }}
                 </span>
@@ -407,7 +386,7 @@ onMounted(() => { void loadSettings(); });
               <div class="cfg-provider-header">
                 <h4 class="cfg-provider-name">YouTube</h4>
                 <span class="review-status-pill" :class="secretStatus?.providers?.youtube?.apiKeyConfigured ? 'review-status-selected' : 'review-status-held'">
-                  {{ providerSecretStatusLabel('youtube', 'apiKeyConfigured', 'apiKeySource') }}
+                  {{ formatProviderSecretStatusLabel(secretStatus?.providers?.youtube, 'apiKeyConfigured', 'apiKeySource') }}
                 </span>
               </div>
               <label class="cfg-check">
@@ -439,7 +418,7 @@ onMounted(() => { void loadSettings(); });
                 </label>
               </div>
               <div class="cfg-provider-header" style="margin-top: var(--hx-space-2)">
-                <span class="hx-text-muted">User authorization — {{ youtubeOAuthStatusLabel() }}</span>
+                <span class="hx-text-muted">User authorization — {{ formatOAuthStatusLabel(secretStatus?.providers?.youtubeOAuth) }}</span>
                 <span class="review-status-pill" :class="secretStatus?.providers?.youtubeOAuth?.linked ? 'review-status-selected' : 'review-status-held'">
                   {{ secretStatus?.providers?.youtubeOAuth?.linked ? 'Linked' : 'Not linked' }}
                 </span>
@@ -459,7 +438,7 @@ onMounted(() => { void loadSettings(); });
               <div class="cfg-provider-header">
                 <h4 class="cfg-provider-name">Apple Music</h4>
                 <span class="review-status-pill" :class="secretStatus?.providers?.appleMusic?.privateKeyConfigured ? 'review-status-selected' : 'review-status-held'">
-                  {{ providerSecretStatusLabel('appleMusic', 'privateKeyConfigured', 'privateKeySource') }}
+                  {{ formatProviderSecretStatusLabel(secretStatus?.providers?.appleMusic, 'privateKeyConfigured', 'privateKeySource') }}
                 </span>
               </div>
               <label class="cfg-check">

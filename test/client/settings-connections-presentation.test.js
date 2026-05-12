@@ -1,0 +1,225 @@
+/*
+  Harmoniarr - Soulseek-native music library management
+  Copyright (C) 2026 Harmoniarr Contributors
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+*/
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import {
+  buildSlskdConnectionSubtitle,
+  formatOAuthStatusLabel,
+  formatProviderSecretStatusLabel,
+  formatSlskdApiKeyStatusLabel,
+} from '../../src/client/lib/settings-connections-presentation.js';
+
+// ── buildSlskdConnectionSubtitle ──────────────────────────────────────────────
+
+describe('buildSlskdConnectionSubtitle', () => {
+  it('returns a non-empty string', () => {
+    assert.ok(buildSlskdConnectionSubtitle().length > 0);
+  });
+
+  it('does not mention slskd', () => {
+    assert.ok(!buildSlskdConnectionSubtitle().toLowerCase().includes('slskd'));
+  });
+
+  it('does not mention daemon', () => {
+    assert.ok(!buildSlskdConnectionSubtitle().toLowerCase().includes('daemon'));
+  });
+
+  it('is stable across calls', () => {
+    assert.equal(buildSlskdConnectionSubtitle(), buildSlskdConnectionSubtitle());
+  });
+});
+
+// ── formatSlskdApiKeyStatusLabel ──────────────────────────────────────────────
+
+describe('formatSlskdApiKeyStatusLabel', () => {
+  it('returns "No API key configured" for null', () => {
+    assert.equal(formatSlskdApiKeyStatusLabel(null), 'No API key configured');
+  });
+
+  it('returns "No API key configured" for undefined', () => {
+    assert.equal(formatSlskdApiKeyStatusLabel(undefined), 'No API key configured');
+  });
+
+  it('returns "No API key configured" when apiKeyConfigured is false', () => {
+    assert.equal(formatSlskdApiKeyStatusLabel({ apiKeyConfigured: false }), 'No API key configured');
+  });
+
+  it('returns "No API key configured" when apiKeyConfigured is absent', () => {
+    assert.equal(formatSlskdApiKeyStatusLabel({}), 'No API key configured');
+  });
+
+  it('returns "Stored in Harmoniarr" when stored', () => {
+    assert.equal(
+      formatSlskdApiKeyStatusLabel({ apiKeyConfigured: true, apiKeySource: 'stored' }),
+      'Stored in Harmoniarr',
+    );
+  });
+
+  it('returns "Environment-provided key" when source is environment', () => {
+    assert.equal(
+      formatSlskdApiKeyStatusLabel({ apiKeyConfigured: true, apiKeySource: 'environment' }),
+      'Environment-provided key',
+    );
+  });
+
+  it('returns "Environment-provided key" for any non-stored source', () => {
+    assert.equal(
+      formatSlskdApiKeyStatusLabel({ apiKeyConfigured: true, apiKeySource: 'vault' }),
+      'Environment-provided key',
+    );
+  });
+
+  it('does not expose "slskd" in any output', () => {
+    const labels = [
+      formatSlskdApiKeyStatusLabel(null),
+      formatSlskdApiKeyStatusLabel({ apiKeyConfigured: true, apiKeySource: 'stored' }),
+      formatSlskdApiKeyStatusLabel({ apiKeyConfigured: true, apiKeySource: 'environment' }),
+    ];
+    for (const label of labels) {
+      assert.ok(!label.toLowerCase().includes('slskd'), `slskd exposed in: ${label}`);
+    }
+  });
+});
+
+// ── formatProviderSecretStatusLabel ──────────────────────────────────────────
+
+describe('formatProviderSecretStatusLabel', () => {
+  it('returns "No secret configured" for null provider status', () => {
+    assert.equal(
+      formatProviderSecretStatusLabel(null, 'clientSecretConfigured', 'clientSecretSource'),
+      'No secret configured',
+    );
+  });
+
+  it('returns "No secret configured" for undefined provider status', () => {
+    assert.equal(
+      formatProviderSecretStatusLabel(undefined, 'clientSecretConfigured', 'clientSecretSource'),
+      'No secret configured',
+    );
+  });
+
+  it('returns "No secret configured" when secretKey is falsy', () => {
+    assert.equal(
+      formatProviderSecretStatusLabel(
+        { clientSecretConfigured: false },
+        'clientSecretConfigured',
+        'clientSecretSource',
+      ),
+      'No secret configured',
+    );
+  });
+
+  it('returns "Stored in Harmoniarr" when stored via clientSecretSource', () => {
+    assert.equal(
+      formatProviderSecretStatusLabel(
+        { clientSecretConfigured: true, clientSecretSource: 'stored' },
+        'clientSecretConfigured',
+        'clientSecretSource',
+      ),
+      'Stored in Harmoniarr',
+    );
+  });
+
+  it('returns "Environment-provided secret" when source is environment', () => {
+    assert.equal(
+      formatProviderSecretStatusLabel(
+        { clientSecretConfigured: true, clientSecretSource: 'environment' },
+        'clientSecretConfigured',
+        'clientSecretSource',
+      ),
+      'Environment-provided secret',
+    );
+  });
+
+  it('works with apiKey secretKey/sourceKey names (YouTube pattern)', () => {
+    assert.equal(
+      formatProviderSecretStatusLabel(
+        { apiKeyConfigured: true, apiKeySource: 'stored' },
+        'apiKeyConfigured',
+        'apiKeySource',
+      ),
+      'Stored in Harmoniarr',
+    );
+  });
+
+  it('works with privateKey secretKey/sourceKey names (Apple Music pattern)', () => {
+    assert.equal(
+      formatProviderSecretStatusLabel(
+        { privateKeyConfigured: true, privateKeySource: 'environment' },
+        'privateKeyConfigured',
+        'privateKeySource',
+      ),
+      'Environment-provided secret',
+    );
+  });
+
+  it('returns "No secret configured" when secretKey property is absent', () => {
+    assert.equal(
+      formatProviderSecretStatusLabel(
+        { clientSecretSource: 'stored' },
+        'clientSecretConfigured',
+        'clientSecretSource',
+      ),
+      'No secret configured',
+    );
+  });
+});
+
+// ── formatOAuthStatusLabel ────────────────────────────────────────────────────
+
+describe('formatOAuthStatusLabel', () => {
+  it('returns "Not linked" for null', () => {
+    assert.equal(formatOAuthStatusLabel(null), 'Not linked');
+  });
+
+  it('returns "Not linked" for undefined', () => {
+    assert.equal(formatOAuthStatusLabel(undefined), 'Not linked');
+  });
+
+  it('returns "Not linked" when linked is false', () => {
+    assert.equal(formatOAuthStatusLabel({ linked: false }), 'Not linked');
+  });
+
+  it('returns "Not linked" when linked is absent', () => {
+    assert.equal(formatOAuthStatusLabel({}), 'Not linked');
+  });
+
+  it('returns "Linked" when linked with no expiry', () => {
+    assert.equal(formatOAuthStatusLabel({ linked: true }), 'Linked');
+  });
+
+  it('returns "Linked" when linked with null tokenExpiresAt', () => {
+    assert.equal(formatOAuthStatusLabel({ linked: true, tokenExpiresAt: null }), 'Linked');
+  });
+
+  it('starts with "Linked until" when tokenExpiresAt is present', () => {
+    const result = formatOAuthStatusLabel({
+      linked: true,
+      tokenExpiresAt: '2026-06-01T12:00:00Z',
+    });
+    assert.ok(result.startsWith('Linked until '), `expected "Linked until ..." but got: ${result}`);
+  });
+
+  it('does not return bare token date string — formats it for display', () => {
+    const iso = '2026-06-01T12:00:00Z';
+    const result = formatOAuthStatusLabel({ linked: true, tokenExpiresAt: iso });
+    assert.notEqual(result, iso);
+    assert.ok(result.includes('2026'), `expected year 2026 in: ${result}`);
+  });
+});
