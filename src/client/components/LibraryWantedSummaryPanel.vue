@@ -17,6 +17,11 @@
 -->
 
 <script setup>
+import {
+  getWantedReconciliationStatusClass,
+  getWantedReconciliationStatusLabel,
+} from '../lib/library-status-presentation.js';
+
 defineProps({
   errorMessage: {
     type: String,
@@ -33,61 +38,35 @@ defineProps({
 });
 
 const emit = defineEmits(['refresh']);
-
-function summaryClass(status) {
-  switch (status) {
-    case 'complete':
-      return 'review-status-selected';
-    case 'partial':
-      return 'review-status-pending';
-    case 'wanted':
-      return 'review-status-failed';
-    default:
-      return 'review-status-held';
-  }
-}
-
-function summaryLabel(status) {
-  switch (status) {
-    case 'complete':
-      return 'Satisfied';
-    case 'partial':
-      return 'Partially missing';
-    case 'wanted':
-      return 'Wanted';
-    default:
-      return 'Empty';
-  }
-}
 </script>
 
 <template>
-  <article class="panel-light library-scan-panel">
-    <div class="section-header">
+  <article class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">Wanted reconciliation</p>
-        <h3>Monitored release gaps</h3>
-        <p class="metadata-card-copy" v-if="summaryPayload">{{ summaryPayload.summary.message }}</p>
+        <h3 class="hx-card-title">Monitored release gaps</h3>
+        <p class="hx-card-subtitle" v-if="summaryPayload">{{ summaryPayload.summary.message }}</p>
       </div>
-      <button type="button" class="review-reset-button" @click="emit('refresh')">Refresh</button>
+      <button type="button" @click="emit('refresh')">Refresh</button>
+    </header>
+
+    <div class="hx-card-body" v-if="errorMessage">
+      <p class="error-copy">{{ errorMessage }}</p>
     </div>
 
-    <article class="error-panel panel-light" v-if="errorMessage">
-      <h3>Wanted summary unavailable</h3>
-      <p>{{ errorMessage }}</p>
-    </article>
+    <div class="hx-card-body" v-else-if="isLoading">
+      <p class="hx-text-muted">Loading monitored release gaps from canonical monitoring and library coverage.</p>
+    </div>
 
-    <p v-else-if="isLoading">Loading monitored release gaps from canonical monitoring and library coverage.</p>
-
-    <template v-else-if="summaryPayload">
+    <div class="hx-card-body" v-else-if="summaryPayload">
       <article class="onboarding-step-card">
         <div class="review-detail-header">
           <div>
             <p>Current wanted state</p>
             <strong>{{ summaryPayload.summary.message }}</strong>
           </div>
-          <span class="review-status-pill" :class="summaryClass(summaryPayload.summary.status)">
-            {{ summaryLabel(summaryPayload.summary.status) }}
+          <span class="review-status-pill" :class="getWantedReconciliationStatusClass(summaryPayload.summary.status)">
+            {{ getWantedReconciliationStatusLabel(summaryPayload.summary.status) }}
           </span>
         </div>
         <dl class="review-meta-grid onboarding-meta-grid">
@@ -113,6 +92,6 @@ function summaryLabel(status) {
           </div>
         </dl>
       </article>
-    </template>
+    </div>
   </article>
 </template>

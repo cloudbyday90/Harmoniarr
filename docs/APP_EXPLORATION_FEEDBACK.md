@@ -1474,3 +1474,47 @@ When `selectedRun.summary` had any keys, both the formatted "Recorded outcome" b
 **Fix:** Changed the "Raw JSON" guard from `Object.keys(selectedRun.summary ?? {}).length` to `Object.keys(selectedRun.summary ?? {}).length && !buildOperationSummaryEntries(selectedRun.summary).length`. "Raw JSON" now serves purely as a fallback when the formatter produces no entries — e.g., if a future summary shape cannot be processed by `buildOperationSummaryEntries`. When the formatted view is present, the raw JSON is suppressed.
 
 **Visual verification:** Failed Library discovery run with `errorMessage` now shows two-card layout "ERROR DETAIL / WHAT TO DO NEXT". Timeline shows one entry per event. Technical detail "Operation type" shows "Library discovery". "Recorded outcome" appears without a redundant Raw JSON block below it.
+
+### 2026-05-12 - Dashboard Panel Cluster — Design System Migration and Function Extraction
+
+**Scope:** Seven forward-looking panel components built for a planned Library Status dashboard page (`LibraryDiscoverySummaryPanel.vue`, `LibraryScanSummaryPanel.vue`, `LibraryReconciliationSummaryPanel.vue`, `LibraryWantedSummaryPanel.vue`, `OperatorNotificationsPanel.vue`, `ActivityFeedPanel.vue`, `ArtworkSummaryPanel.vue`). These components exist in `src/client/components/` but are not yet mounted in any route.
+
+**Issues identified and resolved:**
+
+1. **Legacy CSS classes in all 7 panels** — All panels still used `panel-light`, `section-header`, `eyebrow`, `metadata-card-copy`. Replaced throughout with the design system: `hx-card`, `hx-card-header`, `hx-card-title`, `hx-card-subtitle`, `hx-card-body`, `hx-card-actions`, `hx-text-muted`.
+
+2. **`eyebrow` category labels exposed internal system names** — `<p class="eyebrow">Discovery intent</p>`, `<p class="eyebrow">Operator notifications</p>`, `<p class="eyebrow">Background services</p>`, `<p class="eyebrow">Artwork maintenance</p>`, `<p class="eyebrow">Wanted reconciliation</p>`, `<p class="eyebrow">Library reconciliation</p>` all dropped. Panel titles updated to be directly user-facing without eyebrow scaffolding.
+
+3. **Inline presentation functions in all panels** — All panels had 2–6 inline functions for status class computation, label formatting, and action-eligibility logic. Extracted to pure shared lib modules:
+   - New `src/client/lib/library-status-presentation.js` (14 functions covering discovery queue, library scan readiness, reconciliation status, and wanted status).
+   - New `src/client/lib/operator-notifications-presentation.js` (4 functions: severity class/label, notification link target, category label).
+   - Extended `src/client/lib/activity-feed-presentation.js` with `formatActivityFeedEntryTypeLabel`.
+
+4. **Single-replace bug in `OperatorNotificationsPanel` and `ActivityFeedPanel`** — Both used `.replace('_', ' ')` (replaces only the first underscore) for category/entry-type label formatting. Fixed: `formatNotificationCategoryLabel` and `formatActivityFeedEntryTypeLabel` use `replaceAll(/[_-]+/g, ' ')`.
+
+5. **Missing `const emit` binding in `LibraryReconciliationSummaryPanel`** — `defineEmits(['refresh'])` was called without capturing the return value, so `emit('refresh')` in template would fail at runtime. Fixed in rewrite.
+
+6. **Missing `id="library-discovery-panel"` anchor** — `OperatorNotificationsPanel.buildNotificationLink` generates `{ hash: '#library-discovery-panel' }` for heartbeat notifications. The target panel had no matching `id` attribute. Added `id="library-discovery-panel"` to the `<article>` root of `LibraryDiscoverySummaryPanel`.
+
+7. **Nested error-card pattern** — `LibraryDiscoverySummaryPanel` and `LibraryWantedSummaryPanel` used `<article class="error-panel panel-light">` as a nested card inside the outer `panel-light`. Replaced with `<div class="hx-card-body"><p class="error-copy">…</p></div>`.
+
+**New lib files:**
+- `src/client/lib/library-status-presentation.js` — 14 pure functions
+- `src/client/lib/operator-notifications-presentation.js` — 4 pure functions
+- `src/client/lib/activity-feed-presentation.js` — added `formatActivityFeedEntryTypeLabel`
+
+**New test files:**
+- `test/client/library-status-presentation.test.js` — ~80 tests
+- `test/client/operator-notifications-presentation.test.js` — ~30 tests
+- `test/client/activity-feed-presentation.test.js` — extended with 7 new tests
+
+**Files changed:**
+- `src/client/components/LibraryDiscoverySummaryPanel.vue` — full rewrite
+- `src/client/components/LibraryScanSummaryPanel.vue` — full rewrite
+- `src/client/components/LibraryReconciliationSummaryPanel.vue` — full rewrite
+- `src/client/components/LibraryWantedSummaryPanel.vue` — full rewrite
+- `src/client/components/OperatorNotificationsPanel.vue` — full rewrite
+- `src/client/components/ActivityFeedPanel.vue` — full rewrite
+- `src/client/components/ArtworkSummaryPanel.vue` — template CSS class migration
+
+Test suite: **2506 tests, 0 failures** (121 new tests added).

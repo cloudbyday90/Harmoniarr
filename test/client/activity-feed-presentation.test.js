@@ -20,6 +20,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  formatActivityFeedEntryTypeLabel,
   getActivityFeedStatusClass,
   getActivityFeedStatusLabel,
 } from '../../src/client/lib/activity-feed-presentation.js';
@@ -63,5 +64,31 @@ describe('getActivityFeedStatusLabel', () => {
   });
   it('returns Recorded for undefined', () => {
     assert.equal(getActivityFeedStatusLabel(undefined), 'Recorded');
+  });
+});
+
+// ── formatActivityFeedEntryTypeLabel ─────────────────────────────────────────
+
+describe('formatActivityFeedEntryTypeLabel', () => {
+  it('replaces all underscores with spaces in multi-segment type', () => {
+    assert.equal(formatActivityFeedEntryTypeLabel('library_scan_completed'), 'library scan completed');
+  });
+  it('replaces single underscore with space', () => {
+    assert.equal(formatActivityFeedEntryTypeLabel('operation'), 'operation');
+  });
+  it('replaces hyphens with spaces', () => {
+    assert.equal(formatActivityFeedEntryTypeLabel('audit-event'), 'audit event');
+  });
+  it('returns unknown for null', () => {
+    assert.equal(formatActivityFeedEntryTypeLabel(null), 'unknown');
+  });
+  it('returns unknown for undefined', () => {
+    assert.equal(formatActivityFeedEntryTypeLabel(undefined), 'unknown');
+  });
+  it('returns unknown for empty string', () => {
+    assert.equal(formatActivityFeedEntryTypeLabel(''), 'unknown');
+  });
+  it('passes through a plain word unchanged', () => {
+    assert.equal(formatActivityFeedEntryTypeLabel('audit'), 'audit');
   });
 });

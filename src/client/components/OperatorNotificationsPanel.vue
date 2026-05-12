@@ -18,6 +18,12 @@
 
 <script setup>
 import { RouterLink } from 'vue-router';
+import {
+  buildNotificationLink,
+  formatNotificationCategoryLabel,
+  getNotificationSeverityClass,
+  getNotificationSeverityLabel,
+} from '../lib/operator-notifications-presentation.js';
 
 defineProps({
   checkedAt: {
@@ -43,119 +49,69 @@ defineProps({
   },
 });
 
-defineEmits(['refresh']);
-
-function severityClass(severity) {
-  switch (severity) {
-    case 'error':
-      return 'review-status-failed';
-    case 'success':
-      return 'review-status-selected';
-    case 'warning':
-      return 'review-status-held';
-    default:
-      return 'review-status-pending';
-  }
-}
-
-function severityLabel(severity) {
-  switch (severity) {
-    case 'error':
-      return 'Failure';
-    case 'success':
-      return 'Recovered';
-    case 'warning':
-      return 'Needs review';
-    default:
-      return 'Queued';
-  }
-}
-
-function notificationLink(notification) {
-  if (notification?.reference?.type === 'operation_run' && notification.reference.runId) {
-    return {
-      label: 'Open run detail',
-      to: {
-        hash: '#operation-run-detail-panel',
-        name: 'activity-operations',
-        query: {
-          runId: notification.reference.runId,
-        },
-      },
-    };
-  }
-
-  if (notification?.reference?.type === 'heartbeat') {
-    return {
-      label: 'Open dashboard',
-      to: {
-        hash: '#library-discovery-panel',
-        name: 'dashboard',
-      },
-    };
-  }
-
-  return null;
-}
+const emit = defineEmits(['refresh']);
 </script>
 
 <template>
-  <article class="panel-light">
-    <div class="section-header">
+  <article class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">Operator notifications</p>
-        <h3>Actionable runtime signals</h3>
-        <p class="metadata-card-copy">
+        <h3 class="hx-card-title">Notifications</h3>
+        <p class="hx-card-subtitle">
           {{ checkedAt ? `Evaluated ${checkedAt}.` : 'No notification snapshot is available yet.' }}
         </p>
       </div>
-      <button type="button" @click="$emit('refresh')">Refresh</button>
+      <button type="button" @click="emit('refresh')">Refresh</button>
+    </header>
+
+    <div class="hx-card-body" v-if="counts.total > 0">
+      <div class="pill-row">
+        <div class="pill">
+          <span>Total</span>
+          <strong>{{ counts.total }}</strong>
+        </div>
+        <div class="pill">
+          <span>Actionable</span>
+          <strong>{{ counts.actionable }}</strong>
+        </div>
+        <div class="pill">
+          <span>Failures</span>
+          <strong>{{ counts.byCategory?.failure ?? 0 }}</strong>
+        </div>
+        <div class="pill">
+          <span>Manual intervention</span>
+          <strong>{{ counts.byCategory?.manual_intervention ?? 0 }}</strong>
+        </div>
+      </div>
     </div>
 
-    <div class="pill-row" v-if="counts.total > 0">
-      <div class="pill">
-        <span>Total</span>
-        <strong>{{ counts.total }}</strong>
-      </div>
-      <div class="pill">
-        <span>Actionable</span>
-        <strong>{{ counts.actionable }}</strong>
-      </div>
-      <div class="pill">
-        <span>Failures</span>
-        <strong>{{ counts.byCategory?.failure ?? 0 }}</strong>
-      </div>
-      <div class="pill">
-        <span>Manual intervention</span>
-        <strong>{{ counts.byCategory?.manual_intervention ?? 0 }}</strong>
-      </div>
-    </div>
-
-    <div class="activity-feed-list" v-if="notifications.length">
+    <div class="hx-card-body" v-if="notifications.length">
       <article class="activity-feed-entry" v-for="notification in notifications" :key="notification.id">
         <div class="activity-feed-entry-header">
           <div>
-            <p class="eyebrow">{{ notification.category.replace('_', ' ') }}</p>
+            <p class="hx-text-muted">{{ formatNotificationCategoryLabel(notification.category) }}</p>
             <strong>{{ notification.title }}</strong>
           </div>
-          <span class="review-status-pill" :class="severityClass(notification.severity)">
-            {{ severityLabel(notification.severity) }}
+          <span class="review-status-pill" :class="getNotificationSeverityClass(notification.severity)">
+            {{ getNotificationSeverityLabel(notification.severity) }}
           </span>
         </div>
         <p class="activity-feed-message">{{ notification.message }}</p>
         <div class="activity-feed-entry-footer">
-          <p class="metadata-card-copy">{{ notification.occurredAt ?? 'Timestamp unavailable' }}</p>
+          <p class="hx-text-muted">{{ notification.occurredAt ?? 'Timestamp unavailable' }}</p>
           <RouterLink
-            v-if="notificationLink(notification)"
+            v-if="buildNotificationLink(notification)"
             class="secondary-button"
-            :to="notificationLink(notification).to"
+            :to="buildNotificationLink(notification).to"
           >
-            {{ notificationLink(notification).label }}
+            {{ buildNotificationLink(notification).label }}
           </RouterLink>
         </div>
       </article>
     </div>
 
-    <p v-else class="metadata-card-copy">No actionable operator notifications are currently active.</p>
+    <div class="hx-card-body" v-else>
+      <p class="hx-text-muted">No actionable operator notifications are currently active.</p>
+    </div>
   </article>
 </template>

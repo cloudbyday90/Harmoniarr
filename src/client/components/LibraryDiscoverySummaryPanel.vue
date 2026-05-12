@@ -21,6 +21,14 @@ import {
   getOperationRunStatusClass,
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
+import {
+  canStartDiscoveryDispatch,
+  getDiscoveryHeartbeatOutcomeLabel,
+  getDiscoveryHeartbeatSkipReasonLabel,
+  getDiscoveryQueueStatusClass,
+  getDiscoveryQueueStatusLabel,
+  getTriggerSourceLabel,
+} from '../lib/library-status-presentation.js';
 
 defineProps({
   actionErrorMessage: {
@@ -53,97 +61,19 @@ defineProps({
   },
 });
 
-defineEmits(['refresh', 'start']);
-
-function summaryClass(status) {
-  switch (status) {
-    case 'ready':
-      return 'review-status-selected';
-    case 'cooldown':
-      return 'review-status-pending';
-    case 'blocked':
-      return 'review-status-held';
-    default:
-      return 'review-status-held';
-  }
-}
-
-function summaryLabel(status) {
-  switch (status) {
-    case 'ready':
-      return 'Ready';
-    case 'cooldown':
-      return 'Cooling down';
-    case 'blocked':
-      return 'Blocked';
-    default:
-      return 'Empty';
-  }
-}
-
-function triggerSourceLabel(value) {
-  switch (value) {
-    case 'heartbeat':
-      return 'Heartbeat';
-    case 'manual':
-      return 'Manual';
-    default:
-      return 'Unavailable';
-  }
-}
-
-function heartbeatOutcomeLabel(state) {
-  switch (state?.lastOutcome) {
-    case 'started':
-      return 'Started automatic run';
-    case 'error':
-      return 'Automatic run errored';
-    case 'skipped':
-      return 'Skipped automatic run';
-    default:
-      return 'Not yet recorded';
-  }
-}
-
-function heartbeatSkipReasonLabel(reason) {
-  switch (reason) {
-    case 'not_due':
-      return 'Not due';
-    case 'run_in_progress':
-      return 'Run in progress';
-    case 'tick_in_progress':
-      return 'Tick already running';
-    case 'error':
-      return 'Error';
-    default:
-      return 'None';
-  }
-}
-
-function canStartDispatch(summaryPayload) {
-  if (!summaryPayload) {
-    return false;
-  }
-
-  if ((summaryPayload.requestCounts?.totalRequests ?? 0) === 0) {
-    return false;
-  }
-
-  return !['pending', 'running'].includes(summaryPayload.latestRun?.status);
-}
+const emit = defineEmits(['refresh', 'start']);
 </script>
 
 <template>
-  <article class="panel-light library-scan-panel">
-    <div class="section-header">
+  <article id="library-discovery-panel" class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">Discovery intent</p>
-        <h3>Search eligibility queue</h3>
-        <p class="metadata-card-copy" v-if="summaryPayload">{{ summaryPayload.summary.message }}</p>
+        <h3 class="hx-card-title">Discovery queue</h3>
+        <p class="hx-card-subtitle" v-if="summaryPayload">{{ summaryPayload.summary.message }}</p>
       </div>
-      <div class="library-scan-actions">
+      <div class="hx-card-actions">
         <button
-          v-if="canStartDispatch(summaryPayload)"
+          v-if="canStartDiscoveryDispatch(summaryPayload)"
           type="button"
           class="library-scan-start-button"
           :disabled="isStarting"
@@ -151,25 +81,28 @@ function canStartDispatch(summaryPayload) {
         >
           {{ isStarting ? 'Dispatching…' : 'Dispatch now' }}
         </button>
-        <button type="button" class="review-reset-button" @click="emit('refresh')">Refresh</button>
+        <button type="button" @click="emit('refresh')">Refresh</button>
       </div>
+    </header>
+
+    <div class="hx-card-body" v-if="actionErrorMessage || runDetailErrorMessage">
+      <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
+      <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
     </div>
 
-    <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
-    <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
+    <div class="hx-card-body" v-if="errorMessage">
+      <p class="error-copy">{{ errorMessage }}</p>
+    </div>
 
-    <article class="error-panel panel-light" v-if="errorMessage">
-      <h3>Discovery summary unavailable</h3>
-      <p>{{ errorMessage }}</p>
-    </article>
+    <div class="hx-card-body" v-else-if="isLoading">
+      <p class="hx-text-muted">Loading discovery queue state and cooldown eligibility.</p>
+    </div>
 
-    <p v-else-if="isLoading">Loading release-date and cooldown eligibility for discovery requests.</p>
-
-    <template v-else-if="summaryPayload">
+    <div class="hx-card-body" v-else-if="summaryPayload">
       <div class="pill-row onboarding-pill-row">
         <div class="pill">
           <span>Queue state</span>
-          <strong>{{ summaryLabel(summaryPayload.summary.status) }}</strong>
+          <strong>{{ getDiscoveryQueueStatusLabel(summaryPayload.summary.status) }}</strong>
         </div>
         <div class="pill">
           <span>Displayed run</span>
@@ -183,8 +116,8 @@ function canStartDispatch(summaryPayload) {
             <p>Current discovery state</p>
             <strong>{{ summaryPayload.summary.message }}</strong>
           </div>
-          <span class="review-status-pill" :class="summaryClass(summaryPayload.summary.status)">
-            {{ summaryLabel(summaryPayload.summary.status) }}
+          <span class="review-status-pill" :class="getDiscoveryQueueStatusClass(summaryPayload.summary.status)">
+            {{ getDiscoveryQueueStatusLabel(summaryPayload.summary.status) }}
           </span>
         </div>
         <dl class="review-meta-grid onboarding-meta-grid">
@@ -222,7 +155,7 @@ function canStartDispatch(summaryPayload) {
           </div>
           <div>
             <dt>Last automatic outcome</dt>
-            <dd>{{ heartbeatOutcomeLabel(summaryPayload.heartbeat?.state) }}</dd>
+            <dd>{{ getDiscoveryHeartbeatOutcomeLabel(summaryPayload.heartbeat?.state) }}</dd>
           </div>
           <div>
             <dt>Last automatic check</dt>
@@ -230,7 +163,7 @@ function canStartDispatch(summaryPayload) {
           </div>
           <div>
             <dt>Last skip reason</dt>
-            <dd>{{ heartbeatSkipReasonLabel(summaryPayload.heartbeat?.state?.lastSkipReason) }}</dd>
+            <dd>{{ getDiscoveryHeartbeatSkipReasonLabel(summaryPayload.heartbeat?.state?.lastSkipReason) }}</dd>
           </div>
         </dl>
       </article>
@@ -245,8 +178,8 @@ function canStartDispatch(summaryPayload) {
                 : 'No discovery dispatch has been recorded yet.' }}
             </strong>
           </div>
-            <span class="review-status-pill" :class="getOperationRunStatusClass(currentRun?.status)">
-              {{ getOperationRunStatusLabel(currentRun?.status) }}
+          <span class="review-status-pill" :class="getOperationRunStatusClass(currentRun?.status)">
+            {{ getOperationRunStatusLabel(currentRun?.status) }}
           </span>
         </div>
         <dl class="review-meta-grid onboarding-meta-grid">
@@ -268,10 +201,10 @@ function canStartDispatch(summaryPayload) {
           </div>
           <div>
             <dt>Triggered by</dt>
-            <dd>{{ triggerSourceLabel(currentRun?.triggerSource) }}</dd>
+            <dd>{{ getTriggerSourceLabel(currentRun?.triggerSource) }}</dd>
           </div>
         </dl>
       </article>
-    </template>
+    </div>
   </article>
 </template>

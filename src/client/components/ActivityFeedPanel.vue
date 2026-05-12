@@ -20,6 +20,7 @@
 import { RouterLink } from 'vue-router';
 import { buildActivityFeedEntryLinkTarget } from '../lib/activity-feed-link-targets.js';
 import {
+  formatActivityFeedEntryTypeLabel,
   getActivityFeedStatusClass,
   getActivityFeedStatusLabel,
 } from '../lib/activity-feed-presentation.js';
@@ -51,42 +52,51 @@ const emit = defineEmits(['load-more', 'refresh']);
 </script>
 
 <template>
-  <article class="panel-light">
-    <div class="section-header">
+  <article class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">Background services</p>
-        <h3>Recent activity</h3>
-        <p class="metadata-card-copy">
+        <h3 class="hx-card-title">Recent activity</h3>
+        <p class="hx-card-subtitle">
           {{ checkedAt ? `Feed generated ${checkedAt}.` : 'Feed timing is unavailable.' }}
         </p>
       </div>
       <button type="button" @click="emit('refresh')">Refresh</button>
+    </header>
+
+    <div class="hx-card-body" v-if="errorMessage">
+      <p class="error-copy activity-feed-error">{{ errorMessage }}</p>
     </div>
 
-    <p v-if="errorMessage" class="error-copy activity-feed-error">{{ errorMessage }}</p>
-
-    <ul v-if="entries.length" class="activity-feed-list">
-      <li v-for="entry in entries" :key="entry.id" class="activity-feed-entry">
-        <div class="activity-feed-entry-header">
-          <div>
-            <p class="eyebrow">{{ entry.entryType.replace('_', ' ') }}</p>
-            <strong>{{ entry.title }}</strong>
+    <div class="hx-card-body" v-if="entries.length">
+      <ul class="activity-feed-list">
+        <li v-for="entry in entries" :key="entry.id" class="activity-feed-entry">
+          <div class="activity-feed-entry-header">
+            <div>
+              <p class="hx-text-muted">{{ formatActivityFeedEntryTypeLabel(entry.entryType) }}</p>
+              <strong>{{ entry.title }}</strong>
+            </div>
+            <span class="review-status-pill" :class="getActivityFeedStatusClass(entry.status)">
+              {{ getActivityFeedStatusLabel(entry.status) }}
+            </span>
           </div>
-          <span class="review-status-pill" :class="getActivityFeedStatusClass(entry.status)">
-            {{ getActivityFeedStatusLabel(entry.status) }}
-          </span>
-        </div>
-        <p class="activity-feed-message">{{ entry.message }}</p>
-        <div class="activity-feed-entry-footer">
-          <p class="metadata-card-copy">{{ entry.occurredAt ?? 'Timestamp unavailable' }}</p>
-          <RouterLink v-if="buildActivityFeedEntryLinkTarget(entry)" class="secondary-button" :to="buildActivityFeedEntryLinkTarget(entry).to">
-            {{ buildActivityFeedEntryLinkTarget(entry).label }}
-          </RouterLink>
-        </div>
-      </li>
-    </ul>
+          <p class="activity-feed-message">{{ entry.message }}</p>
+          <div class="activity-feed-entry-footer">
+            <p class="hx-text-muted">{{ entry.occurredAt ?? 'Timestamp unavailable' }}</p>
+            <RouterLink
+              v-if="buildActivityFeedEntryLinkTarget(entry)"
+              class="secondary-button"
+              :to="buildActivityFeedEntryLinkTarget(entry).to"
+            >
+              {{ buildActivityFeedEntryLinkTarget(entry).label }}
+            </RouterLink>
+          </div>
+        </li>
+      </ul>
+    </div>
 
-    <p v-else class="metadata-card-copy">No recent background activity has been recorded yet.</p>
+    <div class="hx-card-body" v-else>
+      <p class="hx-text-muted">No recent background activity has been recorded yet.</p>
+    </div>
 
     <div v-if="hasMore" class="activity-feed-actions">
       <button type="button" class="secondary-button" :disabled="isLoadingMore" @click="emit('load-more')">

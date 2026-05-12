@@ -17,6 +17,11 @@
 -->
 
 <script setup>
+import {
+  getLibraryReconciliationStatusClass,
+  getLibraryReconciliationStatusLabel,
+} from '../lib/library-status-presentation.js';
+
 defineProps({
   errorMessage: {
     type: String,
@@ -32,65 +37,36 @@ defineProps({
   },
 });
 
-defineEmits(['refresh']);
-
-function summaryClass(status) {
-  switch (status) {
-    case 'complete':
-      return 'review-status-selected';
-    case 'partial':
-    case 'incomplete':
-      return 'review-status-pending';
-    case 'review_required':
-      return 'review-status-failed';
-    default:
-      return 'review-status-held';
-  }
-}
-
-function summaryLabel(status) {
-  switch (status) {
-    case 'complete':
-      return 'Complete';
-    case 'partial':
-      return 'Partial';
-    case 'review_required':
-      return 'Review required';
-    case 'incomplete':
-      return 'Incomplete';
-    default:
-      return 'Empty';
-  }
-}
+const emit = defineEmits(['refresh']);
 </script>
 
 <template>
-  <article class="panel-light library-scan-panel">
-    <div class="section-header">
+  <article class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">Library reconciliation</p>
-        <h3>Current library coverage</h3>
-        <p class="metadata-card-copy" v-if="summaryPayload">{{ summaryPayload.summary.message }}</p>
+        <h3 class="hx-card-title">Library coverage</h3>
+        <p class="hx-card-subtitle" v-if="summaryPayload">{{ summaryPayload.summary.message }}</p>
       </div>
-      <button type="button" class="review-reset-button" @click="emit('refresh')">Refresh</button>
+      <button type="button" @click="emit('refresh')">Refresh</button>
+    </header>
+
+    <div class="hx-card-body" v-if="errorMessage">
+      <p class="error-copy">{{ errorMessage }}</p>
     </div>
 
-    <article class="error-panel panel-light" v-if="errorMessage">
-      <h3>Library reconciliation summary unavailable</h3>
-      <p>{{ errorMessage }}</p>
-    </article>
+    <div class="hx-card-body" v-else-if="isLoading">
+      <p class="hx-text-muted">Loading current file and release reconciliation counts.</p>
+    </div>
 
-    <p v-else-if="isLoading">Loading current file and release reconciliation counts.</p>
-
-    <template v-else-if="summaryPayload">
+    <div class="hx-card-body" v-else-if="summaryPayload">
       <article class="onboarding-step-card">
         <div class="review-detail-header">
           <div>
             <p>Current reconciliation state</p>
             <strong>{{ summaryPayload.summary.message }}</strong>
           </div>
-          <span class="review-status-pill" :class="summaryClass(summaryPayload.summary.status)">
-            {{ summaryLabel(summaryPayload.summary.status) }}
+          <span class="review-status-pill" :class="getLibraryReconciliationStatusClass(summaryPayload.summary.status)">
+            {{ getLibraryReconciliationStatusLabel(summaryPayload.summary.status) }}
           </span>
         </div>
         <dl class="review-meta-grid onboarding-meta-grid">
@@ -128,6 +104,6 @@ function summaryLabel(status) {
           </div>
         </dl>
       </article>
-    </template>
+    </div>
   </article>
 </template>

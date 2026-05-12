@@ -41,3 +41,17 @@ export function getActivityFeedStatusLabel(status) {
       return 'Recorded';
   }
 }
+
+/**
+ * Format an activity feed entry type token for display.
+ *
+ * Converts all underscore- or hyphen-separated parts to spaces so that raw
+ * API values like 'library_scan_completed' become 'library scan completed'.
+ * Returns 'unknown' for absent values.
+ *
+ * @param {string|null|undefined} entryType
+ * @returns {string}
+ */
+export function formatActivityFeedEntryTypeLabel(entryType) {
+  return String(entryType || 'unknown').replaceAll(/[_-]+/g, ' ');
+}

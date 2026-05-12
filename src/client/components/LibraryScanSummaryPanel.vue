@@ -22,6 +22,12 @@ import {
   getOperationRunStatusClass,
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
+import {
+  canStartLibraryScan,
+  getLibraryScanReadinessClass,
+  getLibraryScanReadinessLabel,
+  getLibraryScanStartLabel,
+} from '../lib/library-status-presentation.js';
 
 defineProps({
   actionErrorMessage: {
@@ -59,67 +65,47 @@ defineProps({
 });
 
 const emit = defineEmits(['refresh', 'start']);
-
-function readinessLabel(status) {
-  return status === 'ready' ? 'Ready' : 'Blocked';
-}
-
-function readinessClass(status) {
-  return status === 'ready'
-    ? 'review-status-selected'
-    : 'review-status-held';
-}
-
-function canStartScan(scanSummary) {
-  if (!scanSummary || scanSummary.readiness?.status !== 'ready') {
-    return false;
-  }
-
-  return !['pending', 'running'].includes(scanSummary.latestRun?.status);
-}
-
-function startLabel(scanSummary) {
-  return scanSummary?.latestRun ? 'Run again' : 'Start scan';
-}
 </script>
 
 <template>
-  <article class="panel-light library-scan-panel">
-    <div class="section-header">
+  <article class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">{{ isSetupMode ? 'First library scan' : 'Library scan status' }}</p>
-        <h3>Existing library readiness</h3>
-        <p class="metadata-card-copy" v-if="scanSummary">{{ scanSummary.summary.message }}</p>
+        <h3 class="hx-card-title">{{ isSetupMode ? 'Initial library scan' : 'Library scan' }}</h3>
+        <p class="hx-card-subtitle" v-if="scanSummary">{{ scanSummary.summary.message }}</p>
       </div>
-      <div class="library-scan-actions">
+      <div class="hx-card-actions">
         <button
-          v-if="canStartScan(scanSummary)"
+          v-if="canStartLibraryScan(scanSummary)"
           type="button"
           class="library-scan-start-button"
           :disabled="isStarting"
           @click="emit('start')"
         >
-          {{ isStarting ? 'Starting…' : startLabel(scanSummary) }}
+          {{ isStarting ? 'Starting…' : getLibraryScanStartLabel(scanSummary) }}
         </button>
-        <button type="button" class="review-reset-button" @click="emit('refresh')">Refresh</button>
+        <button type="button" @click="emit('refresh')">Refresh</button>
       </div>
+    </header>
+
+    <div class="hx-card-body" v-if="actionErrorMessage || runDetailErrorMessage">
+      <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
+      <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
     </div>
 
-    <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
-    <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
+    <div class="hx-card-body" v-if="errorMessage">
+      <p class="error-copy">{{ errorMessage }}</p>
+    </div>
 
-    <article class="error-panel panel-light" v-if="errorMessage">
-      <h3>Library scan summary unavailable</h3>
-      <p>{{ errorMessage }}</p>
-    </article>
+    <div class="hx-card-body" v-else-if="isLoading">
+      <p class="hx-text-muted">Checking whether the configured library root is ready and whether any prior scan has been recorded.</p>
+    </div>
 
-    <p v-else-if="isLoading">Checking whether the configured library root is ready and whether any prior scan has been recorded.</p>
-
-    <template v-else-if="scanSummary">
+    <div class="hx-card-body" v-else-if="scanSummary">
       <div class="pill-row onboarding-pill-row">
         <div class="pill">
           <span>Readiness</span>
-          <strong>{{ readinessLabel(scanSummary.readiness.status) }}</strong>
+          <strong>{{ getLibraryScanReadinessLabel(scanSummary.readiness.status) }}</strong>
         </div>
         <div class="pill">
           <span>Displayed run</span>
@@ -134,8 +120,8 @@ function startLabel(scanSummary) {
               <p>Path readiness</p>
               <strong>{{ scanSummary.readiness.message }}</strong>
             </div>
-            <span class="review-status-pill" :class="readinessClass(scanSummary.readiness.status)">
-              {{ readinessLabel(scanSummary.readiness.status) }}
+            <span class="review-status-pill" :class="getLibraryScanReadinessClass(scanSummary.readiness.status)">
+              {{ getLibraryScanReadinessLabel(scanSummary.readiness.status) }}
             </span>
           </div>
           <dl class="review-meta-grid onboarding-meta-grid">
@@ -187,6 +173,6 @@ function startLabel(scanSummary) {
           </dl>
         </article>
       </div>
-    </template>
+    </div>
   </article>
 </template>

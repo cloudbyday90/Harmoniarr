@@ -74,14 +74,13 @@ const emit = defineEmits(['refresh', 'select-run', 'start']);
 </script>
 
 <template>
-  <article class="panel-light library-scan-panel">
-    <div class="section-header">
+  <article class="hx-card">
+    <header class="hx-card-header">
       <div>
-        <p class="eyebrow">Artwork maintenance</p>
-        <h3>Retention cleanup</h3>
-        <p class="metadata-card-copy" v-if="summaryPayload">{{ summaryPayload.summary.message }}</p>
+        <h3 class="hx-card-title">Artwork cleanup</h3>
+        <p class="hx-card-subtitle" v-if="summaryPayload">{{ summaryPayload.summary.message }}</p>
       </div>
-      <div class="library-scan-actions">
+      <div class="hx-card-actions">
         <button
           v-if="canStartArtworkCleanup(summaryPayload)"
           type="button"
@@ -91,20 +90,23 @@ const emit = defineEmits(['refresh', 'select-run', 'start']);
         >
           {{ isStarting ? 'Starting…' : 'Run cleanup' }}
         </button>
-        <button type="button" class="review-reset-button" @click="emit('refresh')">Refresh</button>
+        <button type="button" @click="emit('refresh')">Refresh</button>
       </div>
+    </header>
+
+    <div class="hx-card-body" v-if="actionErrorMessage">
+      <p class="error-copy">{{ actionErrorMessage }}</p>
     </div>
 
-    <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
+    <div class="hx-card-body" v-if="errorMessage">
+      <p class="error-copy">{{ errorMessage }}</p>
+    </div>
 
-    <article class="error-panel panel-light" v-if="errorMessage">
-      <h3>Artwork summary unavailable</h3>
-      <p>{{ errorMessage }}</p>
-    </article>
+    <div class="hx-card-body" v-else-if="isLoading">
+      <p class="hx-text-muted">Loading artwork retention state and latest cleanup run.</p>
+    </div>
 
-    <p v-else-if="isLoading">Loading artwork retention state and latest cleanup run.</p>
-
-    <template v-else-if="summaryPayload">
+    <div class="hx-card-body" v-else-if="summaryPayload">
       <div class="pill-row onboarding-pill-row">
         <div class="pill">
           <span>Cleanup state</span>
@@ -270,7 +272,7 @@ const emit = defineEmits(['refresh', 'select-run', 'start']);
           <p class="error-copy" v-else-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
 
           <template v-else-if="selectedRunDetailPayload?.run">
-            <p class="metadata-card-copy">{{ getArtworkCleanupHistorySummary(selectedRunDetailPayload.run) }}</p>
+            <p class="hx-text-muted">{{ getArtworkCleanupHistorySummary(selectedRunDetailPayload.run) }}</p>
             <dl class="review-meta-grid onboarding-meta-grid">
               <div>
                 <dt>Run id</dt>
@@ -327,7 +329,7 @@ const emit = defineEmits(['refresh', 'select-run', 'start']);
                   </div>
                   <span class="review-status-pill review-status-failed">{{ failure.code ?? 'artwork_cleanup_failed' }}</span>
                 </div>
-                <p class="metadata-card-copy">{{ failure.message ?? 'Artwork cleanup failed.' }}</p>
+                <p class="hx-text-muted">{{ failure.message ?? 'Artwork cleanup failed.' }}</p>
                 <dl class="review-meta-grid onboarding-meta-grid">
                   <div>
                     <dt>Artwork asset</dt>
@@ -343,6 +345,6 @@ const emit = defineEmits(['refresh', 'select-run', 'start']);
           </template>
         </article>
       </div>
-    </template>
+    </div>
   </article>
 </template>
