@@ -179,6 +179,27 @@ export function getOperationRunDuration(run, { nowFn = () => Date.now() } = {}) 
 }
 
 /**
+ * Returns a display-ready duration label for a finished or active run.
+ *
+ * Identical to getOperationRunDuration except for one case: a `failed` run
+ * whose computed duration rounds down to `0s` (i.e. the run exited before
+ * completing a full second of work) is shown as `'< 1s'` instead of `'0s'`.
+ * This distinguishes an immediate startup crash — service unavailable, bad
+ * config, connectivity failure — from a run that genuinely spent time making
+ * progress before failing.
+ *
+ * @param {object|null} run
+ * @param {{ nowFn?: () => number }} [options]
+ * @returns {string|null}
+ */
+export function getOperationRunDurationLabel(run, { nowFn = () => Date.now() } = {}) {
+  const duration = getOperationRunDuration(run, { nowFn });
+  if (duration === null) return null;
+  if (duration === '0s' && run?.status === 'failed') return '< 1s';
+  return duration;
+}
+
+/**
  * Formats a timestamp as a full locale datetime string for technical details.
  * Returns 'Not yet recorded' for falsy or unparseable values.
  *

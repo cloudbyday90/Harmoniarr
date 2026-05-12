@@ -45,7 +45,7 @@ import {
   formatOperationSummaryValue,
   formatOperationTimestamp,
   formatOperationTimestampShort,
-  getOperationRunDuration,
+  getOperationRunDurationLabel,
   getOperationRunNextStep,
   getOperationRunOperatorSummary,
   groupOperationRunsForDisplay,
@@ -153,7 +153,7 @@ function runLinkTarget(run) {
 }
 
 function runDuration(run) {
-  return getOperationRunDuration(run);
+  return getOperationRunDurationLabel(run);
 }
 
 async function handleSelectRun(runId) {

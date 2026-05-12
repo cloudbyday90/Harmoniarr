@@ -16,6 +16,7 @@ import {
   formatQueueRunStatusTone,
   getOperationRunAttentionLabel,
   getOperationRunDuration,
+  getOperationRunDurationLabel,
   getOperationRunNextStep,
   getOperationRunOperatorSummary,
   groupOperationRunsForDisplay,
@@ -624,4 +625,70 @@ test('formatElapsedDuration returns 1m 0s for exactly 60s elapsed', () => {
     formatElapsedDuration('2026-05-12T10:00:00.000Z', '2026-05-12T10:01:00.000Z'),
     '1m 0s',
   );
+});
+
+// ---------------------------------------------------------------------------
+// getOperationRunDurationLabel
+// ---------------------------------------------------------------------------
+
+test('getOperationRunDurationLabel returns null when getOperationRunDuration would return null', () => {
+  assert.equal(getOperationRunDurationLabel({ status: 'failed' }), null);
+});
+
+test('getOperationRunDurationLabel returns < 1s for failed run with sub-second elapsed time', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:00:00.500Z',
+    status: 'failed',
+  };
+  assert.equal(getOperationRunDurationLabel(run), '< 1s');
+});
+
+test('getOperationRunDurationLabel returns < 1s for failed run where start equals finishedAt', () => {
+  const ts = '2026-05-04T12:00:00.000Z';
+  const run = { startedAt: ts, finishedAt: ts, status: 'failed' };
+  assert.equal(getOperationRunDurationLabel(run), '< 1s');
+});
+
+test('getOperationRunDurationLabel returns 0s for completed run with sub-second elapsed time', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:00:00.500Z',
+    status: 'completed',
+  };
+  assert.equal(getOperationRunDurationLabel(run), '0s');
+});
+
+test('getOperationRunDurationLabel returns 0s for cancelled run with sub-second elapsed time', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:00:00.900Z',
+    status: 'cancelled',
+  };
+  assert.equal(getOperationRunDurationLabel(run), '0s');
+});
+
+test('getOperationRunDurationLabel returns formatted duration for failed run with meaningful elapsed time', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:00:45.000Z',
+    status: 'failed',
+  };
+  assert.equal(getOperationRunDurationLabel(run), '45s');
+});
+
+test('getOperationRunDurationLabel returns 0s for running run with sub-second elapsed (not instant-crash)', () => {
+  const startedAt = '2026-05-04T12:00:00.000Z';
+  const nowMs = new Date('2026-05-04T12:00:00.200Z').getTime();
+  const run = { startedAt, status: 'running' };
+  assert.equal(getOperationRunDurationLabel(run, { nowFn: () => nowMs }), '0s');
+});
+
+test('getOperationRunDurationLabel delegates to getOperationRunDuration for all non-0s values', () => {
+  const run = {
+    startedAt: '2026-05-04T12:00:00.000Z',
+    finishedAt: '2026-05-04T12:03:25.000Z',
+    status: 'failed',
+  };
+  assert.equal(getOperationRunDurationLabel(run), getOperationRunDuration(run));
 });

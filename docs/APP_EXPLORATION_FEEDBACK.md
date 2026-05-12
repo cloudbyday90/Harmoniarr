@@ -1259,3 +1259,32 @@ Test suite: **2304 tests, 0 failures** (up from 2272).
 - `test/client/audit-activity-links.test.js` — update 6 label assertions
 
 Test suite: **2304 tests, 0 failures** (unchanged — no new tests added, 12 label assertions updated).
+
+### 2026-05-12 - Background Jobs Screen — Instant Failure Duration Classification
+
+**Screen:** `OperationsView.vue` (Background Jobs)
+**Lib changed:** `src/client/lib/operation-run-presentation.js`
+**Tests added:** `test/client/operation-run-presentation.test.js`
+
+**Issue identified and resolved:**
+
+**`0s` duration was undiagnosed for instant startup failures.** All Library Discovery failed runs showed `0s` elapsed in the table. On first read, `0s` looks like missing data — it is ambiguous between:
+- A run that had no time to do any work (immediate startup crash: service unavailable, connectivity failure, bad config)
+- A run that genuinely ran for zero measured seconds (clock skew, sub-millisecond completion)
+
+These are different failure modes requiring different operator responses. A run that lasted 45 seconds before failing ran for a while and encountered an error mid-processing — the operator should look at what it processed. A run that lasted `< 1s` and failed never started real work — the operator should look at connectivity or service availability.
+
+Added `getOperationRunDurationLabel(run, options)` to `operation-run-presentation.js`. Identical to the existing `getOperationRunDuration` in all cases except one: when the run's `status` is `'failed'` AND the computed duration rounds to `'0s'` (i.e. less than one full second elapsed), the label returns `'< 1s'` instead of `'0s'`. This is specific to `failed` runs because:
+- A `running` or `pending` run at `0s` is just starting — `0s` is correct
+- A `completed` run at `0s` is unusual but not diagnostically meaningful without status context
+- A `cancelled` run at `0s` was stopped before starting — `0s` is descriptive, not alarming
+- A `failed` run at `0s` is a crash before work began — the annotation changes the diagnostic
+
+Updated `OperationsView.vue` to import and use `getOperationRunDurationLabel` in the `runDuration()` helper. Both the table row duration chip and the detail panel header duration now show `'< 1s'` for instant failures.
+
+**Files changed:**
+- `src/client/lib/operation-run-presentation.js` — add `getOperationRunDurationLabel` export (8 lines)
+- `src/client/views/OperationsView.vue` — import `getOperationRunDurationLabel`; use in `runDuration()`
+- `test/client/operation-run-presentation.test.js` — add `getOperationRunDurationLabel` import; 8 new tests
+
+Test suite: **2312 tests, 0 failures** (up from 2304).
