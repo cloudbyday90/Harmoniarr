@@ -105,9 +105,9 @@
 
   /* Scrollbar — light theme */
   --hx-scrollbar-w: 8px;
-  --hx-scrollbar-thumb: rgba(15, 28, 36, 0.20);
-  --hx-scrollbar-thumb-hover: rgba(15, 28, 36, 0.36);
-  --hx-scrollbar-track: rgba(15, 28, 36, 0.04);
+  --hx-scrollbar-thumb: rgba(15, 28, 36, 0.32);
+  --hx-scrollbar-thumb-hover: rgba(15, 28, 36, 0.52);
+  --hx-scrollbar-track: transparent;
 }
 
 /* ---------- Dark theme tokens ----------
@@ -145,9 +145,9 @@
     --hx-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
 
     /* Scrollbar — dark theme */
-    --hx-scrollbar-thumb: rgba(232, 238, 243, 0.22);
-    --hx-scrollbar-thumb-hover: rgba(232, 238, 243, 0.38);
-    --hx-scrollbar-track: rgba(232, 238, 243, 0.04);
+    --hx-scrollbar-thumb: rgba(232, 238, 243, 0.36);
+    --hx-scrollbar-thumb-hover: rgba(232, 238, 243, 0.58);
+    --hx-scrollbar-track: transparent;
   }
 }
 
@@ -178,9 +178,9 @@
   --hx-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
 
   /* Scrollbar — dark theme */
-  --hx-scrollbar-thumb: rgba(232, 238, 243, 0.22);
-  --hx-scrollbar-thumb-hover: rgba(232, 238, 243, 0.38);
-  --hx-scrollbar-track: rgba(232, 238, 243, 0.04);
+  --hx-scrollbar-thumb: rgba(232, 238, 243, 0.36);
+  --hx-scrollbar-thumb-hover: rgba(232, 238, 243, 0.58);
+  --hx-scrollbar-track: transparent;
 }
 
 /* Explicit light override — set when user selects "Light" in appearance
@@ -231,13 +231,10 @@
 ::-webkit-scrollbar-thumb {
   background: var(--hx-scrollbar-thumb);
   border-radius: var(--hx-radius-pill);
-  border: 2px solid transparent;
-  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--hx-scrollbar-thumb-hover);
-  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-corner {
@@ -250,13 +247,11 @@
 }
 
 .hx-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(232, 238, 243, 0.22);
-  background-clip: content-box;
+  background: rgba(232, 238, 243, 0.36);
 }
 
 .hx-sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(232, 238, 243, 0.38);
-  background-clip: content-box;
+  background: rgba(232, 238, 243, 0.58);
 }
 
 /* ---------- App canvas overrides ---------- */
@@ -653,11 +648,17 @@ body,
   padding: 0;
   margin: 0;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hx-scrollbar-thumb) transparent;
 }
 
 .hx-tabbar::-webkit-scrollbar {
-  display: none;
+  height: 4px;
+}
+
+.hx-tabbar::-webkit-scrollbar-thumb {
+  background: var(--hx-scrollbar-thumb);
+  border-radius: var(--hx-radius-pill);
 }
 
 .hx-tab {
