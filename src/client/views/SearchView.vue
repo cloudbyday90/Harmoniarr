@@ -39,9 +39,12 @@ import {
   buildNetworkStatusTone,
   buildSearchPreSearchBody,
   formatBytes,
+  formatFileCountLabel,
   formatMusicSearchError,
   formatNetworkSearchError,
+  formatPeerCountLabel,
   formatSpeed,
+  sortNetworkResponses,
   totalSizeForResponse,
 } from '../lib/search-presentation.js';
 import {
@@ -202,21 +205,9 @@ const totalFiles = computed(() => {
   return total;
 });
 
-const sortedResponses = computed(() => {
-  const minFiles = Number(minimumFileCount.value) || 1;
-  return [...responses.value]
-    .filter((r) => {
-      const count = typeof r.fileCount === 'number'
-        ? r.fileCount
-        : (Array.isArray(r.files) ? r.files.length : 0);
-      return count >= minFiles;
-    })
-    .sort((a, b) => {
-      const speedDelta = (b.uploadSpeed ?? 0) - (a.uploadSpeed ?? 0);
-      if (speedDelta !== 0) return speedDelta;
-      return (a.queueLength ?? 0) - (b.queueLength ?? 0);
-  });
-});
+const sortedResponses = computed(() =>
+  sortNetworkResponses(responses.value, { minimumFileCount: minimumFileCount.value }),
+);
 
 function clearPollTimer() {
   if (pollTimer) {
@@ -487,8 +478,8 @@ onBeforeUnmount(() => clearPollTimer());
           <div>
             <h2 class="hx-card-title">Results</h2>
             <p class="hx-card-subtitle">
-              {{ sortedResponses.length }} peer{{ sortedResponses.length === 1 ? '' : 's' }}
-              · {{ totalFiles }} file{{ totalFiles === 1 ? '' : 's' }}
+              {{ formatPeerCountLabel(sortedResponses.length) }}
+              · {{ formatFileCountLabel(totalFiles) }}
               <span v-if="searchMeta?.state"> · {{ buildNetworkSearchStateLabel(searchMeta.state) }}</span>
             </p>
           </div>

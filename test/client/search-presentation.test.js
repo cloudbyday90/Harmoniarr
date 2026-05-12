@@ -25,9 +25,12 @@ import {
   buildNetworkStatusTone,
   buildSearchPreSearchBody,
   formatBytes,
+  formatFileCountLabel,
   formatMusicSearchError,
   formatNetworkSearchError,
+  formatPeerCountLabel,
   formatSpeed,
+  sortNetworkResponses,
   totalSizeForResponse,
 } from '../../src/client/lib/search-presentation.js';
 
@@ -409,4 +412,130 @@ test('totalSizeForResponse returns 0 for empty files array', () => {
 test('totalSizeForResponse returns 0 when totalSize is non-numeric', () => {
   // falls back to files sum when totalSize is absent/non-number
   assert.equal(totalSizeForResponse({ files: [{ size: 50 }] }), 50);
+});
+
+// ── sortNetworkResponses ──────────────────────────────────────────────────────
+
+test('sortNetworkResponses returns empty array for empty input', () => {
+  assert.deepEqual(sortNetworkResponses([]), []);
+});
+
+test('sortNetworkResponses does not mutate the original array', () => {
+  const original = [
+    { username: 'a', fileCount: 2, uploadSpeed: 100, queueLength: 0 },
+    { username: 'b', fileCount: 3, uploadSpeed: 200, queueLength: 0 },
+  ];
+  const snapshot = [...original];
+  sortNetworkResponses(original);
+  assert.deepEqual(original, snapshot);
+});
+
+test('sortNetworkResponses filters out responses below minimumFileCount using fileCount', () => {
+  const responses = [
+    { username: 'a', fileCount: 1, uploadSpeed: 100 },
+    { username: 'b', fileCount: 3, uploadSpeed: 50 },
+  ];
+  const result = sortNetworkResponses(responses, { minimumFileCount: 2 });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].username, 'b');
+});
+
+test('sortNetworkResponses filters using files array length when fileCount is absent', () => {
+  const responses = [
+    { username: 'a', files: [{}], uploadSpeed: 100 },
+    { username: 'b', files: [{}, {}, {}], uploadSpeed: 50 },
+  ];
+  const result = sortNetworkResponses(responses, { minimumFileCount: 2 });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].username, 'b');
+});
+
+test('sortNetworkResponses keeps responses at exactly minimumFileCount', () => {
+  const responses = [{ username: 'a', fileCount: 2, uploadSpeed: 100 }];
+  const result = sortNetworkResponses(responses, { minimumFileCount: 2 });
+  assert.equal(result.length, 1);
+});
+
+test('sortNetworkResponses defaults minimumFileCount to 1 when 0 is provided', () => {
+  const responses = [{ username: 'a', fileCount: 1, uploadSpeed: 100 }];
+  const result = sortNetworkResponses(responses, { minimumFileCount: 0 });
+  assert.equal(result.length, 1);
+});
+
+test('sortNetworkResponses sorts by upload speed descending', () => {
+  const responses = [
+    { username: 'slow', fileCount: 2, uploadSpeed: 100, queueLength: 0 },
+    { username: 'fast', fileCount: 2, uploadSpeed: 500, queueLength: 0 },
+    { username: 'mid', fileCount: 2, uploadSpeed: 300, queueLength: 0 },
+  ];
+  const result = sortNetworkResponses(responses);
+  assert.equal(result[0].username, 'fast');
+  assert.equal(result[1].username, 'mid');
+  assert.equal(result[2].username, 'slow');
+});
+
+test('sortNetworkResponses uses queue length ascending as tiebreaker for equal speeds', () => {
+  const responses = [
+    { username: 'long-queue', fileCount: 2, uploadSpeed: 200, queueLength: 10 },
+    { username: 'short-queue', fileCount: 2, uploadSpeed: 200, queueLength: 1 },
+    { username: 'no-queue', fileCount: 2, uploadSpeed: 200, queueLength: 0 },
+  ];
+  const result = sortNetworkResponses(responses);
+  assert.equal(result[0].username, 'no-queue');
+  assert.equal(result[1].username, 'short-queue');
+  assert.equal(result[2].username, 'long-queue');
+});
+
+test('sortNetworkResponses treats missing uploadSpeed as 0', () => {
+  const responses = [
+    { username: 'no-speed', fileCount: 2 },
+    { username: 'has-speed', fileCount: 2, uploadSpeed: 100 },
+  ];
+  const result = sortNetworkResponses(responses);
+  assert.equal(result[0].username, 'has-speed');
+});
+
+test('sortNetworkResponses treats missing queueLength as 0', () => {
+  const responses = [
+    { username: 'no-queue', fileCount: 2, uploadSpeed: 100 },
+    { username: 'has-queue', fileCount: 2, uploadSpeed: 100, queueLength: 5 },
+  ];
+  const result = sortNetworkResponses(responses);
+  assert.equal(result[0].username, 'no-queue');
+});
+
+// ── formatPeerCountLabel ──────────────────────────────────────────────────────
+
+test('formatPeerCountLabel returns "0 peers" for 0', () => {
+  assert.equal(formatPeerCountLabel(0), '0 peers');
+});
+
+test('formatPeerCountLabel returns "1 peer" for 1', () => {
+  assert.equal(formatPeerCountLabel(1), '1 peer');
+});
+
+test('formatPeerCountLabel returns "2 peers" for 2', () => {
+  assert.equal(formatPeerCountLabel(2), '2 peers');
+});
+
+test('formatPeerCountLabel returns "100 peers" for 100', () => {
+  assert.equal(formatPeerCountLabel(100), '100 peers');
+});
+
+// ── formatFileCountLabel ──────────────────────────────────────────────────────
+
+test('formatFileCountLabel returns "0 files" for 0', () => {
+  assert.equal(formatFileCountLabel(0), '0 files');
+});
+
+test('formatFileCountLabel returns "1 file" for 1', () => {
+  assert.equal(formatFileCountLabel(1), '1 file');
+});
+
+test('formatFileCountLabel returns "5 files" for 5', () => {
+  assert.equal(formatFileCountLabel(5), '5 files');
+});
+
+test('formatFileCountLabel returns "50 files" for 50', () => {
+  assert.equal(formatFileCountLabel(50), '50 files');
 });

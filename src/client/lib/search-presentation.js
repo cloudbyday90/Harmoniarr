@@ -205,3 +205,66 @@ export function totalSizeForResponse(response) {
   }
   return 0;
 }
+
+// ── Response sorting / filtering ──────────────────────────────────────────────
+
+/**
+ * Return the file count for a slskd search response object.
+ * Prefers the top-level `fileCount` field; falls back to the length of
+ * the `files` array; returns 0 when neither is available.
+ *
+ * @param {object} response
+ * @returns {number}
+ */
+function responseFileCount(response) {
+  if (typeof response?.fileCount === 'number') return response.fileCount;
+  if (Array.isArray(response?.files)) return response.files.length;
+  return 0;
+}
+
+/**
+ * Filter and sort an array of slskd search response objects for display.
+ *
+ * Filtering:
+ *   - Responses with fewer files than `minimumFileCount` are excluded.
+ *
+ * Sorting (descending priority):
+ *   1. Upload speed descending (faster peers first).
+ *   2. Queue length ascending (shorter queues first) as tiebreaker.
+ *
+ * @param {object[]} responses
+ * @param {{ minimumFileCount?: number }} [options]
+ * @returns {object[]}
+ */
+export function sortNetworkResponses(responses, { minimumFileCount = 1 } = {}) {
+  const minFiles = Number(minimumFileCount) || 1;
+  return [...responses]
+    .filter((r) => responseFileCount(r) >= minFiles)
+    .sort((a, b) => {
+      const speedDelta = (b.uploadSpeed ?? 0) - (a.uploadSpeed ?? 0);
+      if (speedDelta !== 0) return speedDelta;
+      return (a.queueLength ?? 0) - (b.queueLength ?? 0);
+    });
+}
+
+// ── Count labels ──────────────────────────────────────────────────────────────
+
+/**
+ * Format a peer count as a display label ("1 peer" / "N peers").
+ *
+ * @param {number} count
+ * @returns {string}
+ */
+export function formatPeerCountLabel(count) {
+  return count === 1 ? '1 peer' : `${count} peers`;
+}
+
+/**
+ * Format a file count as a display label ("1 file" / "N files").
+ *
+ * @param {number} count
+ * @returns {string}
+ */
+export function formatFileCountLabel(count) {
+  return count === 1 ? '1 file' : `${count} files`;
+}

@@ -501,7 +501,7 @@ Test suite after this session: **1377 tests, 0 failures** (up from 1303).
 
 ### 2026-05-11 - Search Screen
 
-Status: **Resolved** (2026-05-11 — copy corrections, error normalisation, lib extraction).
+Status: **Resolved** (2026-05-11 — copy corrections, error normalisation, lib extraction; 2026-05-12 — sort/filter extraction, count-label extraction).
 
 Critical analysis performed against `SearchView.vue` (685 lines). No `search-presentation.js` lib existed. Five pure utility functions were inline in `<script setup>` with no tests; all string literals were embedded in the template.
 
@@ -534,7 +534,19 @@ Critical analysis performed against `SearchView.vue` (685 lines). No `search-pre
 - `formatSpeed(bytesPerSec)` — 6 tests (null/zero/negative, /s suffix, KB/s and MB/s)
 - `totalSizeForResponse(response)` — 7 tests (null, totalSize preference, files fallback, missing size)
 
-Test suite after this session: **1457 tests, 0 failures** (up from 1377).
+**Additional exports added 2026-05-12** (3 new exports, 18 new tests):
+
+8. **Inline sort/filter comparator extracted** — The `sortedResponses` computed contained a 14-line inline filter+sort that extracted file count from two different response shapes, sorted by upload speed descending with queue-length tiebreaker. Logic was untested and coupled to the component. Extracted to `sortNetworkResponses(responses, { minimumFileCount })` in `search-presentation.js`. The computed is now a single delegating line.
+
+9. **Inline pluralisation ternaries replaced** — Two subtitle ternaries (`peer/peers`, `file/files`) were inline in the template. Replaced with `formatPeerCountLabel(count)` → `"1 peer"` / `"N peers"` and `formatFileCountLabel(count)` → `"1 file"` / `"N files"`.
+
+**Updated lib: `src/client/lib/search-presentation.js`** (13 exports total):
+
+- `sortNetworkResponses(responses, { minimumFileCount })` — 9 tests (empty, no-mutation, fileCount filter, files-array filter, speed sort, queue tiebreaker, missing-field defaults, exact-boundary)
+- `formatPeerCountLabel(count)` — 4 tests (0, 1, 2, 100)
+- `formatFileCountLabel(count)` — 4 tests (0, 1, 5, 50)
+
+Test suite after 2026-05-12 session: **1907 tests, 0 failures** (up from 1889).
 
 ---
 
