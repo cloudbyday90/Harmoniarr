@@ -24,6 +24,7 @@ import {
   normalizeDownloadMappings,
   normalizeUserMusicRoots,
 } from '../lib/settings-form.js';
+import { formatCommaSeparatedList } from '../lib/settings-media-storage-presentation.js';
 
 const isLoading = ref(true);
 const isSaving = ref(false);
@@ -95,10 +96,6 @@ const form = reactive({
     youtubeEnabled: false,
   },
 });
-
-function formatCommaSeparatedList(value) {
-  return Array.isArray(value) ? value.join(', ') : '';
-}
 
 function applySettings(payload) {
   Object.assign(form.artwork, {

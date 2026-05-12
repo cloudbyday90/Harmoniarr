@@ -848,3 +848,17 @@ Test suite: **1889 tests, 0 failures** (up from 1865).
 - `formatOAuthStatusLabel(oauthStatus)` — 8 tests (null/undefined, not-linked, no-expiry, expiry-present, bare-ISO-not-returned, year-present-in-output)
 
 Test suite: **1935 tests, 0 failures** (up from 1907).
+
+---
+
+### 2026-05-12 - Settings — General Screen
+
+**Screen:** `SettingsGeneralView.vue` (262 lines before changes)
+
+**Issues identified and resolved:**
+
+1. **`formatCommaSeparatedList` — third inline duplicate removed** — The function was defined inline for the third time (identical body to the copies in `SettingsConnectionsView.vue` and `SettingsGeneralView.vue`). The canonical version was already extracted to `settings-media-storage-presentation.js` during the SettingsMediaStorageView session (7 existing tests). The inline definition (3 lines) was deleted and an import added. The two `applySettings` call sites at `derivativeSizesText` and `providerOrderText` are unchanged.
+
+No new lib exports or tests were added — `formatCommaSeparatedList` is already fully tested in `test/client/settings-media-storage-presentation.test.js`. The template renders only security checkboxes and system log-level/base-URL fields; all option labels (`Disabled`, `Required`, `debug`, `info`, `warn`, `error`) are appropriate for an admin audience and required no changes.
+
+Test suite: **1935 tests, 0 failures** (unchanged — no new exports).
