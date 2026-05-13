@@ -24,7 +24,6 @@ const tabs = [
   { name: 'activity-operations', label: 'Operations', implemented: true },
   { name: 'activity-candidates', label: 'Candidates', implemented: true },
   { name: 'activity-requests', label: 'Requests', implemented: true },
-  { name: 'activity-queue', label: 'Queue', implemented: true },
   { name: 'activity-wanted', label: 'Wanted', implemented: true },
   { name: 'activity-downloads', label: 'Downloads', implemented: true },
   { name: 'activity-imports', label: 'Imports', implemented: true },

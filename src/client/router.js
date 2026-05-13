@@ -24,7 +24,6 @@ import ActivityDownloadsView from './views/ActivityDownloadsView.vue';
 import ActivityFeedView from './views/ActivityFeedView.vue';
 import ActivityHistoryView from './views/ActivityHistoryView.vue';
 import ActivityImportsView from './views/ActivityImportsView.vue';
-import ActivityQueueView from './views/ActivityQueueView.vue';
 import ActivityReleasesView from './views/ActivityReleasesView.vue';
 import ActivityUsersView from './views/ActivityUsersView.vue';
 import ActivityWantedView from './views/ActivityWantedView.vue';
@@ -63,7 +62,6 @@ const requesterRestrictedRouteNames = new Set([
   'activity-feed',
   'activity-operations',
   'activity-candidates',
-  'activity-queue',
   'activity-wanted',
   'activity-downloads',
   'activity-imports',
@@ -118,7 +116,7 @@ const router = createRouter({
             { path: 'operations', name: 'activity-operations', component: OperationsView },
             { path: 'candidates', name: 'activity-candidates', component: ImportReviewView },
             { path: 'requests', name: 'activity-requests', component: RequestMusicView },
-            { path: 'queue', name: 'activity-queue', component: ActivityQueueView },
+            { path: 'queue', name: 'activity-queue', redirect: { name: 'activity-operations' } },
             { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
             { path: 'downloads', name: 'activity-downloads', component: ActivityDownloadsView },
             { path: 'imports', name: 'activity-imports', component: ActivityImportsView },

@@ -119,7 +119,7 @@ async function openNotificationTarget(notification) {
   notificationsOpen.value = false;
   const runId = notification?.run?.id ?? notification?.runId ?? null;
   if (runId) {
-    await router.push({ name: 'activity-queue', query: { run: runId } });
+    await router.push({ name: 'activity-operations', query: { runId } });
     return;
   }
   await router.push({ name: 'activity-history' });
@@ -211,7 +211,7 @@ const visibleNav = computed(() => buildVisibleNav(isRequester.value, requesterNo
 
         <RouterLink
           v-if="activeJobs !== null"
-          :to="{ name: 'activity-queue' }"
+          :to="{ name: 'activity-operations' }"
           class="hx-topbar-pill"
           :data-status="activeJobs > 0 ? 'busy' : 'idle'"
           :title="`${activeJobs} active job${activeJobs === 1 ? '' : 's'} — open queue`"

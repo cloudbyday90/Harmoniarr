@@ -36,6 +36,7 @@ import {
 } from '../lib/operation-run-status.js';
 import {
   buildOperationSummaryEntries,
+  formatElapsedDuration,
   formatLeaseStateLabel,
   formatLeaseStateTone,
   formatOperationRunStatusTone,
@@ -43,6 +44,8 @@ import {
   formatOperationSummaryValue,
   formatOperationTimestamp,
   formatOperationTimestampShort,
+  formatQueueRunStatusLabel,
+  formatQueueRunStatusTone,
   getOperationRunDurationLabel,
   getOperationRunNextStep,
   getOperationRunOperatorSummary,
@@ -108,6 +111,7 @@ const JOB_CATALOG_DEFS = [
 
 const triggeringJobs = reactive({});
 const triggerErrors = reactive({});
+const expandedJobType = ref(null);
 
 const jobCatalog = computed(() =>
   JOB_CATALOG_DEFS.map((def) => {
@@ -120,12 +124,17 @@ const jobCatalog = computed(() =>
       title: def.title,
       triggerFn: def.triggerFn,
       latestRun,
+      recentRuns: jobRuns,
       isActive: latestRun?.status === 'pending' || latestRun?.status === 'running',
       isTriggering: !!triggeringJobs[def.operationType],
       triggerError: triggerErrors[def.operationType] ?? null,
     };
   }),
 );
+
+function handleToggleJob(operationType) {
+  expandedJobType.value = expandedJobType.value === operationType ? null : operationType;
+}
 
 function buildMergedOperationsRouteQuery(nextState) {
   const query = { ...route.query };
@@ -287,36 +296,71 @@ watch(
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="job in jobCatalog"
-                :key="job.operationType"
-                class="ops-run-row"
-                :class="{ 'ops-run-row--selected': job.latestRun?.id === selectedRunId, 'ops-run-row--no-run': !job.latestRun }"
-                @click="job.latestRun ? handleSelectRun(job.latestRun.id) : undefined"
-              >
-                <td class="ops-run-name">{{ job.title }}</td>
-                <td>
-                  <span v-if="job.latestRun" class="hx-pill" :data-tone="formatOperationRunStatusTone(job.latestRun.status)">
-                    {{ getOperationRunStatusLabel(job.latestRun.status, { defaultLabel: 'Unknown' }) }}
-                  </span>
-                  <span v-else class="hx-pill">Never run</span>
-                </td>
-                <td class="ops-time-cell">
-                  <span v-if="job.latestRun" class="hx-text-muted">{{ formatOperationTimestampShort(job.latestRun.startedAt) }}</span>
-                  <span v-else class="hx-text-muted" style="font-style: italic;">—</span>
-                </td>
-                <td class="ops-run-actions">
-                  <span v-if="job.triggerError" class="hx-pill" data-tone="danger">{{ job.triggerError }}</span>
-                  <button
-                    type="button"
-                    class="hx-btn"
-                    :disabled="job.isActive || job.isTriggering"
-                    @click.stop="handleTriggerJob(job.operationType, job.triggerFn)"
-                  >
-                    {{ job.isTriggering ? 'Starting…' : job.isActive ? 'Running…' : 'Run' }}
-                  </button>
-                </td>
-              </tr>
+              <template v-for="job in jobCatalog" :key="job.operationType">
+                <tr
+                  class="ops-run-row"
+                  :class="{ 'ops-run-row--no-run': !job.latestRun, 'ops-run-row--expanded': expandedJobType === job.operationType }"
+                  @click="job.latestRun ? handleToggleJob(job.operationType) : undefined"
+                >
+                  <td class="ops-run-name">
+                    <span v-if="job.latestRun" class="ops-expand-chevron" :class="{ 'is-open': expandedJobType === job.operationType }" aria-hidden="true"></span>
+                    {{ job.title }}
+                  </td>
+                  <td>
+                    <span v-if="job.latestRun" class="hx-pill" :data-tone="formatOperationRunStatusTone(job.latestRun.status)">
+                      {{ getOperationRunStatusLabel(job.latestRun.status, { defaultLabel: 'Unknown' }) }}
+                    </span>
+                    <span v-else class="hx-pill">Never run</span>
+                  </td>
+                  <td class="ops-time-cell">
+                    <span v-if="job.latestRun" class="hx-text-muted">{{ formatOperationTimestampShort(job.latestRun.startedAt) }}</span>
+                    <span v-else class="hx-text-muted" style="font-style: italic;">—</span>
+                  </td>
+                  <td class="ops-run-actions">
+                    <span v-if="job.triggerError" class="hx-pill" data-tone="danger">{{ job.triggerError }}</span>
+                    <button
+                      type="button"
+                      class="hx-btn"
+                      :disabled="job.isActive || job.isTriggering"
+                      @click.stop="handleTriggerJob(job.operationType, job.triggerFn)"
+                    >
+                      {{ job.isTriggering ? 'Starting…' : job.isActive ? 'Running…' : 'Run' }}
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="expandedJobType === job.operationType && job.recentRuns.length" class="ops-runs-expanded-row">
+                  <td colspan="4" class="ops-runs-expanded-cell">
+                    <table class="hx-table ops-runs-subtable">
+                      <thead>
+                        <tr>
+                          <th>Status</th>
+                          <th>Started</th>
+                          <th>Duration</th>
+                          <th>Attempts</th>
+                          <th>Error</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="run in job.recentRuns"
+                          :key="run.id"
+                          class="ops-run-row"
+                          :class="{ 'ops-run-row--selected': run.id === selectedRunId }"
+                          @click.stop="handleSelectRun(run.id)"
+                        >
+                          <td>
+                            <span class="hx-pill" :data-tone="formatQueueRunStatusTone(run.status)">{{ formatQueueRunStatusLabel(run.status) }}</span>
+                          </td>
+                          <td class="ops-time-cell"><span class="hx-text-muted">{{ formatOperationTimestampShort(run.startedAt) }}</span></td>
+                          <td class="ops-time-cell"><span class="hx-text-muted">{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</span></td>
+                          <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.attemptCount ?? 0 }}<span v-if="run.maxAttempts">/{{ run.maxAttempts }}</span></td>
+                          <td style="font-size: var(--hx-text-xs); color: var(--hx-text-danger, #c0392b);">{{ run.errorMessage ?? '' }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -497,5 +541,49 @@ watch(
 <style scoped>
 .ops-run-row--no-run {
   cursor: default;
+}
+
+.ops-runs-expanded-row > td {
+  padding: 0;
+  border-bottom: 2px solid var(--hx-border-subtle);
+}
+
+.ops-runs-expanded-cell {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.ops-runs-subtable {
+  margin: 0;
+}
+
+.ops-runs-subtable thead th {
+  background: var(--hx-bg-surface-sunken);
+  font-size: var(--hx-text-xs);
+  padding-left: 24px;
+}
+
+.ops-runs-subtable tbody td {
+  padding-left: 24px;
+  border-bottom-color: var(--hx-border-subtle);
+}
+
+.ops-runs-subtable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ops-expand-chevron {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid var(--hx-text-muted);
+  margin-right: 6px;
+  vertical-align: middle;
+  transition: transform 150ms ease;
+}
+
+.ops-expand-chevron.is-open {
+  transform: rotate(90deg);
 }
 </style>
