@@ -206,6 +206,7 @@ export function createOperationRunStore({
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary))],
     );
+    await pruneOldRuns();
   }
 
   async function markRunFailed({ runId, summary = {}, errorMessage }) {
@@ -257,6 +258,7 @@ export function createOperationRunStore({
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary)), errorMessage],
     );
+    await pruneOldRuns();
   }
 
   async function pruneOldRuns({ retainCount = 20 } = {}) {
@@ -313,6 +315,7 @@ export function createOperationRunStore({
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary))],
     );
+    await pruneOldRuns();
   }
 
   async function markRunPaused({ nextAttemptAt = null, runId, summary = {} }) {

@@ -351,8 +351,8 @@ watch(
                           <td>
                             <span class="hx-pill" :data-tone="formatQueueRunStatusTone(run.status)">{{ formatQueueRunStatusLabel(run.status) }}</span>
                           </td>
-                          <td class="ops-time-cell"><span class="hx-text-muted">{{ formatOperationTimestampShort(run.startedAt) }}</span></td>
-                          <td class="ops-time-cell"><span class="hx-text-muted">{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</span></td>
+                          <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatOperationTimestampShort(run.startedAt) }}</span></td>
+                          <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</span></td>
                           <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.attemptCount ?? 0 }}<span v-if="run.maxAttempts">/{{ run.maxAttempts }}</span></td>
                           <td style="font-size: var(--hx-text-xs); color: var(--hx-text-danger, #c0392b);">{{ run.errorMessage ?? '' }}</td>
                         </tr>
@@ -569,8 +569,7 @@ watch(
 .ops-runs-subtable tbody td {
   padding-left: 24px;
   border-bottom-color: var(--hx-border-subtle);
-  display: table-cell;
-  flex-direction: unset;
+  background: var(--hx-bg-surface-sunken);
 }
 
 .ops-runs-subtable tbody tr:last-child td {
