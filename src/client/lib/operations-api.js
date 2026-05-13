@@ -53,3 +53,39 @@ export function requestOperationRunRetry(runId) {
     method: 'POST',
   });
 }
+
+export function triggerArtworkCleanup() {
+  return apiRequest('/api/v1/artwork/cleanup-runs', { includeCsrf: true, method: 'POST' });
+}
+
+export function triggerImportApply() {
+  return apiRequest('/api/v1/import-candidates/apply-runs', { includeCsrf: true, method: 'POST' });
+}
+
+export function triggerImportExecution() {
+  return apiRequest('/api/v1/import-candidates/execution-runs', { includeCsrf: true, method: 'POST' });
+}
+
+export function triggerImportMediaInspection() {
+  return apiRequest('/api/v1/import-candidates/media-inspection-runs', { includeCsrf: true, method: 'POST' });
+}
+
+export function triggerImportTranscode() {
+  return apiRequest('/api/v1/import-candidates/transcode-runs', { includeCsrf: true, method: 'POST' });
+}
+
+export function triggerLibraryDiscovery() {
+  return apiRequest('/api/v1/library/discovery-runs', { includeCsrf: true, method: 'POST' });
+}
+
+export function triggerLibraryOrganize() {
+  return apiRequest('/api/v1/library/organize-runs', { includeCsrf: true, method: 'POST' });
+}
+
+export function triggerLibraryScan() {
+  return apiRequest('/api/v1/library/scan-runs', { includeCsrf: true, method: 'POST' });
+}
+
+export function triggerNotificationFanout() {
+  return apiRequest('/api/v1/system/operator-notification-fanout-runs', { includeCsrf: true, method: 'POST' });
+}

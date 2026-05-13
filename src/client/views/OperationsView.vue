@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
 import {
@@ -35,11 +35,9 @@ import {
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
 import {
-  buildOperationFilterOptions,
   buildOperationSummaryEntries,
   formatLeaseStateLabel,
   formatLeaseStateTone,
-  formatOperationGroupTone,
   formatOperationRunStatusTone,
   formatOperationSummaryLabel,
   formatOperationSummaryValue,
@@ -48,14 +46,22 @@ import {
   getOperationRunDurationLabel,
   getOperationRunNextStep,
   getOperationRunOperatorSummary,
-  groupOperationRunsForDisplay,
 } from '../lib/operation-run-presentation.js';
+import {
+  triggerArtworkCleanup,
+  triggerImportApply,
+  triggerImportExecution,
+  triggerImportMediaInspection,
+  triggerImportTranscode,
+  triggerLibraryDiscovery,
+  triggerLibraryOrganize,
+  triggerLibraryScan,
+  triggerNotificationFanout,
+} from '../lib/operations-api.js';
 
 const route = useRoute();
 const router = useRouter();
 const operationDetailHash = '#operation-run-detail-panel';
-
-const activeFilter = ref(null);
 
 const {
   cancellationErrorMessage,
@@ -83,18 +89,43 @@ const selectedRun = computed(() => selectedRunDetail.value?.run ?? null);
 const selectedRunLease = computed(() => selectedRun.value?.lease ?? null);
 const canRequestCancellation = computed(() => canRequestOperationRunCancellation(selectedRun.value));
 const canRequestRetry = computed(() => canRequestOperationRunRetry(selectedRun.value));
-const groupedRuns = computed(() => groupOperationRunsForDisplay(runs.value));
 const selectedRunWorkflowTarget = computed(() => buildOperationRunLinkTarget({
   operationType: selectedRun.value?.operationType,
   runId: selectedRun.value?.id,
 }));
 
-const filterOptions = computed(() => buildOperationFilterOptions(runs.value));
+const JOB_CATALOG_DEFS = [
+  { operationType: 'artwork_cleanup',                          title: 'Artwork cleanup',          triggerFn: triggerArtworkCleanup },
+  { operationType: 'import_candidate_apply',                   title: 'Import apply',             triggerFn: triggerImportApply },
+  { operationType: 'import_candidate_execution_planning',      title: 'Import execution',         triggerFn: triggerImportExecution },
+  { operationType: 'import_candidate_media_inspection',        title: 'Import media inspection',  triggerFn: triggerImportMediaInspection },
+  { operationType: 'import_candidate_transcode_orchestration', title: 'Import transcode',         triggerFn: triggerImportTranscode },
+  { operationType: 'library_discovery_dispatch',               title: 'Library discovery',        triggerFn: triggerLibraryDiscovery },
+  { operationType: 'library_organize_apply',                   title: 'Library organize apply',   triggerFn: triggerLibraryOrganize },
+  { operationType: 'library_scan',                             title: 'Library scan',             triggerFn: triggerLibraryScan },
+  { operationType: 'operator_notification_fanout',             title: 'Notification fan-out',     triggerFn: triggerNotificationFanout },
+];
 
-const displayGroups = computed(() => {
-  if (!activeFilter.value) return groupedRuns.value;
-  return groupedRuns.value.filter((g) => g.id === activeFilter.value);
-});
+const triggeringJobs = reactive({});
+const triggerErrors = reactive({});
+
+const jobCatalog = computed(() =>
+  JOB_CATALOG_DEFS.map((def) => {
+    const jobRuns = runs.value
+      .filter((r) => r.operationType === def.operationType)
+      .sort((a, b) => new Date(b.startedAt ?? b.createdAt ?? 0) - new Date(a.startedAt ?? a.createdAt ?? 0));
+    const latestRun = jobRuns[0] ?? null;
+    return {
+      operationType: def.operationType,
+      title: def.title,
+      triggerFn: def.triggerFn,
+      latestRun,
+      isActive: latestRun?.status === 'pending' || latestRun?.status === 'running',
+      isTriggering: !!triggeringJobs[def.operationType],
+      triggerError: triggerErrors[def.operationType] ?? null,
+    };
+  }),
+);
 
 function buildMergedOperationsRouteQuery(nextState) {
   const query = { ...route.query };
@@ -167,6 +198,20 @@ async function handleRequestRetry() {
   await requestRetry({ runId: selectedRun.value.id });
 }
 
+async function handleTriggerJob(operationType, triggerFn) {
+  if (triggeringJobs[operationType]) return;
+  triggeringJobs[operationType] = true;
+  delete triggerErrors[operationType];
+  try {
+    await triggerFn();
+    await loadOperationHistory({ preferredRunId: selectedRunId.value || null });
+  } catch (error) {
+    triggerErrors[operationType] = error?.message ?? 'Failed to start job';
+  } finally {
+    delete triggeringJobs[operationType];
+  }
+}
+
 onMounted(() => {
   void loadOperationHistory({ preferredRunId: operationsRouteState.value.runId || null });
 });
@@ -217,23 +262,10 @@ watch(
 
     <div class="operations-grid">
 
-      <!-- Job queue -->
+      <!-- Job catalog -->
       <article class="hx-card">
         <header class="hx-card-header ops-monitor-header">
-          <h3 class="hx-card-title">Job queue</h3>
-          <div class="ops-filter-bar" v-if="filterOptions.length > 2">
-            <button
-              v-for="option in filterOptions"
-              :key="String(option.id)"
-              type="button"
-              class="ops-filter-tab"
-              :data-active="activeFilter === option.id || undefined"
-              @click="activeFilter = option.id"
-            >
-              {{ option.label }}
-              <span class="ops-filter-count">{{ option.count }}</span>
-            </button>
-          </div>
+          <h3 class="hx-card-title">Jobs</h3>
         </header>
 
         <div v-if="errorMessage" class="hx-card-body">
@@ -244,63 +276,47 @@ watch(
           <p class="hx-text-muted">Loading background jobs…</p>
         </div>
 
-        <div v-else-if="!runs.length" class="hx-card-body">
-          <div class="hx-empty">
-            <p class="hx-empty-title">No jobs recorded yet</p>
-            <p class="hx-empty-copy">Background jobs appear here when triggered — library scans, discovery, imports, metadata refreshes, and more.</p>
-          </div>
-        </div>
-
         <div v-else class="hx-card-body is-flush">
           <table class="hx-table">
             <thead>
               <tr>
                 <th>Job</th>
                 <th>Status</th>
-                <th>Started</th>
+                <th>Last run</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              <template v-for="group in displayGroups" :key="group.id">
-                <tr v-if="displayGroups.length > 1" class="ops-group-row">
-                  <td colspan="4">
-                    <span v-if="formatOperationGroupTone(group.id)" class="hx-pill" :data-tone="formatOperationGroupTone(group.id)">{{ group.title }}</span>
-                    <span v-else class="ops-group-label">{{ group.title }}</span>
-                  </td>
-                </tr>
-                <tr
-                  v-for="run in group.runs"
-                  :key="run.id"
-                  class="ops-run-row"
-                  :class="{ 'ops-run-row--selected': run.id === selectedRunId }"
-                  @click="handleSelectRun(run.id)"
-                >
-                  <td class="ops-run-name">
-                    {{ operationTitle(run.operationType) }}
-                    <span v-if="run.attemptCount > 1" class="hx-text-muted"> · attempt {{ run.attemptCount }}</span>
-                  </td>
-                  <td>
-                    <span class="hx-pill" :data-tone="formatOperationRunStatusTone(run.status)">
-                      {{ getOperationRunStatusLabel(run.status, { defaultLabel: 'Unknown' }) }}
-                    </span>
-                  </td>
-                  <td class="ops-time-cell">
-                    <span>{{ formatOperationTimestampShort(run.startedAt) }}</span>
-                    <span v-if="runDuration(run)" class="ops-duration">{{ runDuration(run) }}</span>
-                  </td>
-                  <td class="ops-run-actions">
-                    <RouterLink
-                      v-if="runLinkTarget(run) && run.id !== selectedRunId"
-                      class="hx-btn"
-                      :to="runLinkTarget(run).to"
-                      @click.stop
-                    >
-                      {{ runLinkTarget(run).label }}
-                    </RouterLink>
-                  </td>
-                </tr>
-              </template>
+              <tr
+                v-for="job in jobCatalog"
+                :key="job.operationType"
+                class="ops-run-row"
+                :class="{ 'ops-run-row--selected': job.latestRun?.id === selectedRunId, 'ops-run-row--no-run': !job.latestRun }"
+                @click="job.latestRun ? handleSelectRun(job.latestRun.id) : undefined"
+              >
+                <td class="ops-run-name">{{ job.title }}</td>
+                <td>
+                  <span v-if="job.latestRun" class="hx-pill" :data-tone="formatOperationRunStatusTone(job.latestRun.status)">
+                    {{ getOperationRunStatusLabel(job.latestRun.status, { defaultLabel: 'Unknown' }) }}
+                  </span>
+                  <span v-else class="hx-text-muted">Never run</span>
+                </td>
+                <td class="ops-time-cell">
+                  <span v-if="job.latestRun">{{ formatOperationTimestampShort(job.latestRun.startedAt) }}</span>
+                  <span v-else class="hx-text-muted">Never</span>
+                </td>
+                <td class="ops-run-actions">
+                  <span v-if="job.triggerError" class="hx-pill" data-tone="danger">{{ job.triggerError }}</span>
+                  <button
+                    type="button"
+                    class="hx-btn"
+                    :disabled="job.isActive || job.isTriggering"
+                    @click.stop="handleTriggerJob(job.operationType, job.triggerFn)"
+                  >
+                    {{ job.isTriggering ? 'Starting…' : job.isActive ? 'Running…' : 'Run' }}
+                  </button>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -477,3 +493,9 @@ watch(
     </div>
   </section>
 </template>
+
+<style scoped>
+.ops-run-row--no-run {
+  cursor: default;
+}
+</style>
