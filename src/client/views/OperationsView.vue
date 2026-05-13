@@ -302,7 +302,7 @@ watch(
                   <span v-else class="hx-pill">Never run</span>
                 </td>
                 <td class="ops-time-cell">
-                  <span v-if="job.latestRun">{{ formatOperationTimestampShort(job.latestRun.startedAt) }}</span>
+                  <span v-if="job.latestRun" class="hx-text-muted">{{ formatOperationTimestampShort(job.latestRun.startedAt) }}</span>
                   <span v-else class="hx-text-muted" style="font-style: italic;">—</span>
                 </td>
                 <td class="ops-run-actions">
