@@ -1749,6 +1749,11 @@ body {
   background: var(--hx-bg-surface-muted);
 }
 
+/* Suppress hover on outer catalog rows only (not nested sub-table rows) */
+.ops-catalog-table > tbody > tr:hover > td {
+  background: none;
+}
+
 .hx-table tbody tr:last-child td {
   border-bottom: 0;
 }

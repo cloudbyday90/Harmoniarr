@@ -98,15 +98,24 @@ const selectedRunWorkflowTarget = computed(() => buildOperationRunLinkTarget({
 }));
 
 const JOB_CATALOG_DEFS = [
-  { operationType: 'artwork_cleanup',                          title: 'Artwork cleanup',          triggerFn: triggerArtworkCleanup },
-  { operationType: 'import_candidate_apply',                   title: 'Import apply',             triggerFn: triggerImportApply },
-  { operationType: 'import_candidate_execution_planning',      title: 'Import execution',         triggerFn: triggerImportExecution },
-  { operationType: 'import_candidate_media_inspection',        title: 'Import media inspection',  triggerFn: triggerImportMediaInspection },
-  { operationType: 'import_candidate_transcode_orchestration', title: 'Import transcode',         triggerFn: triggerImportTranscode },
-  { operationType: 'library_discovery_dispatch',               title: 'Library discovery',        triggerFn: triggerLibraryDiscovery },
-  { operationType: 'library_organize_apply',                   title: 'Library organize apply',   triggerFn: triggerLibraryOrganize },
-  { operationType: 'library_scan',                             title: 'Library scan',             triggerFn: triggerLibraryScan },
-  { operationType: 'operator_notification_fanout',             title: 'Notification fan-out',     triggerFn: triggerNotificationFanout },
+  {
+    operationType: 'artwork_cleanup',
+    title: 'Artwork cleanup',
+    triggerFn: triggerArtworkCleanup,
+    formatRunResult: (run) => {
+      const { scannedAssetCount, deletedAssetCount } = run.summary ?? {};
+      if (scannedAssetCount == null) return null;
+      return `${scannedAssetCount} scanned / ${deletedAssetCount ?? 0} deleted`;
+    },
+  },
+  { operationType: 'import_candidate_apply',                   title: 'Import apply',             triggerFn: triggerImportApply,            formatRunResult: null },
+  { operationType: 'import_candidate_execution_planning',      title: 'Import execution',         triggerFn: triggerImportExecution,        formatRunResult: null },
+  { operationType: 'import_candidate_media_inspection',        title: 'Import media inspection',  triggerFn: triggerImportMediaInspection,  formatRunResult: null },
+  { operationType: 'import_candidate_transcode_orchestration', title: 'Import transcode',         triggerFn: triggerImportTranscode,        formatRunResult: null },
+  { operationType: 'library_discovery_dispatch',               title: 'Library discovery',        triggerFn: triggerLibraryDiscovery,       formatRunResult: null },
+  { operationType: 'library_organize_apply',                   title: 'Library organize apply',   triggerFn: triggerLibraryOrganize,        formatRunResult: null },
+  { operationType: 'library_scan',                             title: 'Library scan',             triggerFn: triggerLibraryScan,            formatRunResult: null },
+  { operationType: 'operator_notification_fanout',             title: 'Notification fan-out',     triggerFn: triggerNotificationFanout,     formatRunResult: null },
 ];
 
 const triggeringJobs = reactive({});
@@ -123,6 +132,7 @@ const jobCatalog = computed(() =>
       operationType: def.operationType,
       title: def.title,
       triggerFn: def.triggerFn,
+      formatRunResult: def.formatRunResult ?? null,
       latestRun,
       recentRuns: jobRuns.slice(0, 5),
       isActive: latestRun?.status === 'pending' || latestRun?.status === 'running',
@@ -336,6 +346,7 @@ watch(
                           <th>Status</th>
                           <th>Started</th>
                           <th>Duration</th>
+                          <th v-if="job.formatRunResult">Result</th>
                           <th>Attempts</th>
                           <th>Error</th>
                         </tr>
@@ -353,6 +364,7 @@ watch(
                           </td>
                           <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatOperationTimestampShort(run.startedAt) }}</span></td>
                           <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</span></td>
+                          <td v-if="job.formatRunResult" style="font-size: var(--hx-text-xs);"><span class="hx-text-muted">{{ job.formatRunResult(run) ?? '' }}</span></td>
                           <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.attemptCount ?? 0 }}<span v-if="run.maxAttempts">/{{ run.maxAttempts }}</span></td>
                           <td style="font-size: var(--hx-text-xs); color: var(--hx-text-danger, #c0392b);">{{ run.errorMessage ?? '' }}</td>
                         </tr>
@@ -541,10 +553,6 @@ watch(
 <style scoped>
 .ops-run-row--no-run {
   cursor: default;
-}
-
-.ops-catalog-table :deep(tbody tr:hover td) {
-  background: none;
 }
 
 .ops-runs-expanded-row > td {
