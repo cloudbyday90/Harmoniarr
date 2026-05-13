@@ -30,6 +30,25 @@ function parseIsoDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function mostRecentIsoDate(a, b) {
+  const dateA = parseIsoDate(a);
+  const dateB = parseIsoDate(b);
+
+  if (!dateA && !dateB) {
+    return null;
+  }
+
+  if (!dateA) {
+    return b;
+  }
+
+  if (!dateB) {
+    return a;
+  }
+
+  return dateA.getTime() >= dateB.getTime() ? a : b;
+}
+
 function isStale({ intervalMs, lastEvaluatedAt, now }) {
   const lastEvaluatedDate = parseIsoDate(lastEvaluatedAt);
   if (!lastEvaluatedDate) {
@@ -42,6 +61,7 @@ function isStale({ intervalMs, lastEvaluatedAt, now }) {
 export function shouldStartLibraryDiscoveryHeartbeatRun({
   activeRun,
   intervalMs = defaultHeartbeatIntervalMs,
+  lastHeartbeatEvaluatedAt = null,
   now,
   snapshot,
 }) {
@@ -63,7 +83,11 @@ export function shouldStartLibraryDiscoveryHeartbeatRun({
     return true;
   }
 
-  return isStale({ intervalMs, lastEvaluatedAt: snapshot?.lastEvaluatedAt, now });
+  const effectiveLastEvaluatedAt = mostRecentIsoDate(
+    snapshot?.lastEvaluatedAt,
+    lastHeartbeatEvaluatedAt,
+  );
+  return isStale({ intervalMs, lastEvaluatedAt: effectiveLastEvaluatedAt, now });
 }
 
 export function createLibraryDiscoveryHeartbeat({
@@ -122,6 +146,7 @@ export function createLibraryDiscoveryHeartbeat({
       if (!shouldStartLibraryDiscoveryHeartbeatRun({
         activeRun,
         intervalMs,
+        lastHeartbeatEvaluatedAt: libraryDiscoveryHeartbeatState.getHeartbeatState().lastTickAt,
         now,
         snapshot,
       })) {

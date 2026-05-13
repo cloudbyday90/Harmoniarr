@@ -90,6 +90,7 @@ export function createLibraryDiscoveryRunStore({
     markRunCompleted: operationRunStore.markRunCompleted,
     markRunFailed: operationRunStore.markRunFailed,
     markRunStarted: operationRunStore.markRunStarted,
+    pruneOldRuns: operationRunStore.pruneOldRuns,
     releaseLease: operationRunStore.releaseLease,
     renewLease: operationRunStore.renewLease,
   };

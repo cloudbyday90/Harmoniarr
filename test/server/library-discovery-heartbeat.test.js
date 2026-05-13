@@ -37,6 +37,94 @@ test('shouldStartLibraryDiscoveryHeartbeatRun skips when requests are not due an
   }), false);
 });
 
+test('shouldStartLibraryDiscoveryHeartbeatRun fires when table is empty but lastHeartbeatEvaluatedAt is also absent', () => {
+  // Empty table: snapshot.lastEvaluatedAt is null, no in-memory evaluation yet → should start
+  assert.equal(shouldStartLibraryDiscoveryHeartbeatRun({
+    activeRun: null,
+    intervalMs: 15 * 60 * 1000,
+    lastHeartbeatEvaluatedAt: null,
+    now: new Date('2026-04-30T14:00:00.000Z'),
+    snapshot: {
+      lastEvaluatedAt: null,
+      nextEligibleAt: null,
+      requestCounts: {
+        ready: 0,
+        totalRequests: 0,
+      },
+    },
+  }), true);
+});
+
+test('shouldStartLibraryDiscoveryHeartbeatRun skips when table is empty but lastHeartbeatEvaluatedAt is recent', () => {
+  // After the first run fired and completed, lastHeartbeatEvaluatedAt is set in-memory.
+  // Even though the table is still empty (no discovery rows), the heartbeat should not fire again until the interval elapses.
+  assert.equal(shouldStartLibraryDiscoveryHeartbeatRun({
+    activeRun: null,
+    intervalMs: 15 * 60 * 1000,
+    lastHeartbeatEvaluatedAt: '2026-04-30T13:58:00.000Z',
+    now: new Date('2026-04-30T14:00:00.000Z'),
+    snapshot: {
+      lastEvaluatedAt: null,
+      nextEligibleAt: null,
+      requestCounts: {
+        ready: 0,
+        totalRequests: 0,
+      },
+    },
+  }), false);
+});
+
+test('shouldStartLibraryDiscoveryHeartbeatRun fires again once the interval elapses after an empty-table tick', () => {
+  assert.equal(shouldStartLibraryDiscoveryHeartbeatRun({
+    activeRun: null,
+    intervalMs: 15 * 60 * 1000,
+    lastHeartbeatEvaluatedAt: '2026-04-30T13:44:00.000Z',
+    now: new Date('2026-04-30T14:00:00.000Z'),
+    snapshot: {
+      lastEvaluatedAt: null,
+      nextEligibleAt: null,
+      requestCounts: {
+        ready: 0,
+        totalRequests: 0,
+      },
+    },
+  }), true);
+});
+
+test('shouldStartLibraryDiscoveryHeartbeatRun uses the most recent of snapshot and heartbeat evaluation times', () => {
+  // snapshot has an older lastEvaluatedAt but heartbeat has a more recent one — should skip
+  assert.equal(shouldStartLibraryDiscoveryHeartbeatRun({
+    activeRun: null,
+    intervalMs: 15 * 60 * 1000,
+    lastHeartbeatEvaluatedAt: '2026-04-30T13:58:00.000Z',
+    now: new Date('2026-04-30T14:00:00.000Z'),
+    snapshot: {
+      lastEvaluatedAt: '2026-04-30T12:00:00.000Z',
+      nextEligibleAt: null,
+      requestCounts: {
+        ready: 0,
+        totalRequests: 4,
+      },
+    },
+  }), false);
+
+  // snapshot has a more recent lastEvaluatedAt than heartbeat — should also skip
+  assert.equal(shouldStartLibraryDiscoveryHeartbeatRun({
+    activeRun: null,
+    intervalMs: 15 * 60 * 1000,
+    lastHeartbeatEvaluatedAt: '2026-04-30T12:00:00.000Z',
+    now: new Date('2026-04-30T14:00:00.000Z'),
+    snapshot: {
+      lastEvaluatedAt: '2026-04-30T13:58:00.000Z',
+      nextEligibleAt: null,
+      requestCounts: {
+        ready: 0,
+        totalRequests: 4,
+      },
+    },
+  }), false);
+});
+
 test('createLibraryDiscoveryHeartbeat starts a due discovery run and configures an unref interval', async () => {
   let recordedDelay = null;
   let intervalHandler = null;

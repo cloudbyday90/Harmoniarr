@@ -200,3 +200,56 @@ test('operation run store requeues a paused run without consuming retry budget',
   assert.match(query.mock.calls[0].arguments[0], /attempt_count = GREATEST\(attempt_count - 1, 0\)/);
   assert.match(query.mock.calls[0].arguments[0], /status IN \('pending', 'running'\)/);
 });
+
+test('operation run store pruneOldRuns deletes finished runs beyond the retain count', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const operationRunStore = createOperationRunStore({
+    getPoolFn: () => ({ query }),
+    operationType: 'library_scan',
+  });
+
+  await operationRunStore.pruneOldRuns({ retainCount: 10 });
+
+  assert.equal(query.mock.callCount(), 1);
+  const [sql, params] = query.mock.calls[0].arguments;
+  assert.match(sql, /DELETE FROM operation_runs/);
+  assert.match(sql, /status IN \('completed', 'failed', 'cancelled'\)/);
+  assert.match(sql, /LIMIT \$2/);
+  assert.deepEqual(params, ['library_scan', 10]);
+});
+
+test('operation run store pruneOldRuns uses default retain count of 20 when none supplied', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const operationRunStore = createOperationRunStore({
+    getPoolFn: () => ({ query }),
+    operationType: 'library_scan',
+  });
+
+  await operationRunStore.pruneOldRuns();
+
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['library_scan', 20]);
+});
+
+test('operation run store pruneOldRuns clamps retainCount to at least 1', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const operationRunStore = createOperationRunStore({
+    getPoolFn: () => ({ query }),
+    operationType: 'library_scan',
+  });
+
+  await operationRunStore.pruneOldRuns({ retainCount: 0 });
+
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['library_scan', 1]);
+});
+
+test('operation run store pruneOldRuns clamps retainCount to at most 1000', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const operationRunStore = createOperationRunStore({
+    getPoolFn: () => ({ query }),
+    operationType: 'library_scan',
+  });
+
+  await operationRunStore.pruneOldRuns({ retainCount: 9999 });
+
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['library_scan', 1000]);
+});

@@ -217,3 +217,74 @@ test('createLibraryDiscoveryWorker requeues the run when a maintenance pause is 
     status: 'paused',
   });
 });
+
+test('createLibraryDiscoveryWorker calls pruneOldRuns after a completed run', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const dispatchDiscoveryRequests = t.mock.fn(async () => ({
+    attemptedCount: 0,
+    candidateCount: 0,
+    dispatchedCount: 0,
+    failedCount: 0,
+    fileCount: 0,
+  }));
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const pruneOldRuns = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const worker = createLibraryDiscoveryWorker({
+    acquireLease,
+    dispatchDiscoveryRequests,
+    markRunCompleted,
+    markRunFailed,
+    markRunStarted,
+    pruneOldRuns,
+    releaseLease,
+  });
+
+  const pruned = new Promise((resolve) => {
+    pruneOldRuns.mock.mockImplementation(async () => {
+      resolve();
+    });
+  });
+
+  await worker.startWorkerRun({ runId: 'run-prune-1' });
+  await pruned;
+
+  assert.equal(pruneOldRuns.mock.callCount(), 1);
+  assert.equal(markRunCompleted.mock.callCount(), 1);
+});
+
+test('createLibraryDiscoveryWorker calls pruneOldRuns even when a run fails', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const dispatchDiscoveryRequests = t.mock.fn(async () => {
+    throw new Error('dispatch blew up');
+  });
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const pruneOldRuns = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const worker = createLibraryDiscoveryWorker({
+    acquireLease,
+    dispatchDiscoveryRequests,
+    markRunCompleted,
+    markRunFailed,
+    markRunStarted,
+    pruneOldRuns,
+    releaseLease,
+  });
+
+  const pruned = new Promise((resolve) => {
+    pruneOldRuns.mock.mockImplementation(async () => {
+      resolve();
+    });
+  });
+
+  await worker.startWorkerRun({ runId: 'run-prune-fail-1' });
+  await pruned;
+
+  assert.equal(pruneOldRuns.mock.callCount(), 1);
+  assert.equal(markRunFailed.mock.callCount(), 1);
+  assert.equal(markRunCompleted.mock.callCount(), 0);
+});

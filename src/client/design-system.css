@@ -104,7 +104,7 @@
   --hx-bottom-nav-height: 60px;
 
   /* Scrollbar — light theme */
-  --hx-scrollbar-w: 12px;
+  --hx-scrollbar-w: 8px;
   --hx-scrollbar-thumb: rgba(15, 28, 36, 0.32);
   --hx-scrollbar-thumb-hover: rgba(15, 28, 36, 0.52);
   --hx-scrollbar-track: transparent;
@@ -649,17 +649,17 @@ body,
   display: flex;
   gap: 2px;
   border-bottom: 1px solid var(--hx-border);
-  padding: 0;
+  padding: 0 0 8px 0;
   margin: 0;
   overflow-x: auto;
 }
 
 .hx-tabbar::-webkit-scrollbar {
-  height: 6px;
+  height: 8px;
 }
 
 .hx-tabbar::-webkit-scrollbar-track {
-  margin-inline: 8px;
+  margin-inline: 32px;
 }
 
 .hx-tabbar::-webkit-scrollbar-thumb {

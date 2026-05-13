@@ -39,6 +39,7 @@ export function createLibraryDiscoveryWorker({
   markRunPaused,
   markRunStarted,
   isCancellationRequested,
+  pruneOldRuns = async () => {},
   reconcileDiscoveryRequests = null,
   reconcileWantedReleases = null,
   releaseLease,
@@ -132,6 +133,7 @@ export function createLibraryDiscoveryWorker({
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
       await releaseLease({ runId, status: finalLeaseStatus });
+      await pruneOldRuns();
     }
   }
 

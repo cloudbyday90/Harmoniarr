@@ -248,6 +248,7 @@ export function createLibraryModule({
     markRunFailed: libraryDiscoveryRunStore.markRunFailed,
     markRunPaused: libraryDiscoveryRunStore.markRunPaused,
     markRunStarted: libraryDiscoveryRunStore.markRunStarted,
+    pruneOldRuns: libraryDiscoveryRunStore.pruneOldRuns,
     reconcileDiscoveryRequests: libraryDiscoveryRequestService.reconcileDiscoveryRequests,
     reconcileWantedReleases: libraryWantedReleaseService.reconcileWantedReleases,
     releaseLease: libraryDiscoveryRunStore.releaseLease,

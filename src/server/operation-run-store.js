@@ -259,6 +259,27 @@ export function createOperationRunStore({
     );
   }
 
+  async function pruneOldRuns({ retainCount = 20 } = {}) {
+    const clampedRetainCount = Math.max(1, Math.min(Number.isInteger(retainCount) ? retainCount : 20, 1000));
+    const pool = getPoolFn();
+    await pool.query(
+      `
+        DELETE FROM operation_runs
+        WHERE operation_type = $1
+          AND status IN ('completed', 'failed', 'cancelled')
+          AND id NOT IN (
+            SELECT id
+            FROM operation_runs
+            WHERE operation_type = $1
+              AND status IN ('completed', 'failed', 'cancelled')
+            ORDER BY COALESCE(started_at, created_at) DESC
+            LIMIT $2
+          )
+      `,
+      [operationType, clampedRetainCount],
+    );
+  }
+
   async function isCancellationRequested({ runId }) {
     const pool = getPoolFn();
     const result = await pool.query(
@@ -355,6 +376,7 @@ export function createOperationRunStore({
     markRunCompleted,
     markRunFailed,
     markRunStarted,
+    pruneOldRuns,
     releaseLease,
     renewLease,
   };
