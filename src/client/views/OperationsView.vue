@@ -299,11 +299,11 @@ watch(
                   <span v-if="job.latestRun" class="hx-pill" :data-tone="formatOperationRunStatusTone(job.latestRun.status)">
                     {{ getOperationRunStatusLabel(job.latestRun.status, { defaultLabel: 'Unknown' }) }}
                   </span>
-                  <span v-else class="hx-text-muted">Never run</span>
+                  <span v-else class="hx-pill">Never run</span>
                 </td>
                 <td class="ops-time-cell">
                   <span v-if="job.latestRun">{{ formatOperationTimestampShort(job.latestRun.startedAt) }}</span>
-                  <span v-else class="hx-text-muted">Never</span>
+                  <span v-else class="hx-text-muted" style="font-style: italic;">—</span>
                 </td>
                 <td class="ops-run-actions">
                   <span v-if="job.triggerError" class="hx-pill" data-tone="danger">{{ job.triggerError }}</span>
