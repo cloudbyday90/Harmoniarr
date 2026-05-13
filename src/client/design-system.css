@@ -1754,9 +1754,9 @@ body {
   background: none;
 }
 
-/* Sub-table rows sit on a sunken surface; hover darker, not lighter */
-.ops-runs-subtable > tbody > tr:hover > td {
-  background: color-mix(in srgb, var(--hx-bg-surface-sunken) 88%, currentColor 12%);
+/* Sub-table rows: both classes on the element give higher specificity (0,3,3) vs global (0,2,3) */
+.hx-table.ops-runs-subtable tbody tr:hover td {
+  background: var(--hx-bg-surface-sunken);
 }
 
 .hx-table tbody tr:last-child td {
