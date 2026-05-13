@@ -164,6 +164,6 @@ test('createOnboardingSummaryService keeps the checklist available when provider
   assert.equal(summary.summary.status, 'attention');
   assert.equal(summary.summary.issueCount, 4);
   assert.equal(summary.steps.find((step) => step.id === 'metadata-provider').message, 'MusicBrainz is throttling requests');
-  assert.equal(summary.steps.find((step) => step.id === 'slskd-authentication').message, 'slskd must connect before authentication can be verified.');
+  assert.equal(summary.steps.find((step) => step.id === 'slskd-authentication').message, 'Connect to Soulseek before verifying credentials.');
   assert.equal(summary.steps.find((step) => step.id === 'library-scan').status, 'attention');
 });
