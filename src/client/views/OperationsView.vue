@@ -124,7 +124,7 @@ const jobCatalog = computed(() =>
       title: def.title,
       triggerFn: def.triggerFn,
       latestRun,
-      recentRuns: jobRuns,
+      recentRuns: jobRuns.slice(0, 5),
       isActive: latestRun?.status === 'pending' || latestRun?.status === 'running',
       isTriggering: !!triggeringJobs[def.operationType],
       triggerError: triggerErrors[def.operationType] ?? null,
@@ -286,7 +286,7 @@ watch(
         </div>
 
         <div v-else class="hx-card-body is-flush">
-          <table class="hx-table">
+          <table class="hx-table ops-catalog-table">
             <thead>
               <tr>
                 <th>Job</th>
@@ -543,6 +543,10 @@ watch(
   cursor: default;
 }
 
+.ops-catalog-table :deep(tbody tr:hover td) {
+  background: none;
+}
+
 .ops-runs-expanded-row > td {
   padding: 0;
   border-bottom: 2px solid var(--hx-border-subtle);
@@ -565,6 +569,8 @@ watch(
 .ops-runs-subtable tbody td {
   padding-left: 24px;
   border-bottom-color: var(--hx-border-subtle);
+  display: table-cell;
+  flex-direction: unset;
 }
 
 .ops-runs-subtable tbody tr:last-child td {
