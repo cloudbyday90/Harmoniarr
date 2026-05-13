@@ -132,7 +132,7 @@ export function useOperationHistory({
     try {
       historyPayload.value = await fetchOperationHistory();
       lastRefreshedAt.value = new Date().toISOString();
-      const nextRunId = preferredRunId || historyPayload.value?.runs?.[0]?.id || null;
+      const nextRunId = preferredRunId || null;
       await selectOperationRun({ runId: nextRunId });
       syncPolling();
     } catch (error) {
