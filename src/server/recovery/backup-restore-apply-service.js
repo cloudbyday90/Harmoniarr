@@ -63,6 +63,7 @@ export function createBackupRestoreApplyService({
   markRunCompleted = null,
   markRunFailed = null,
   markRunStarted = null,
+  onReleaseMaintenanceLockError = async () => {},
   readBackupPayloadFn = (storagePath) => readFile(storagePath, 'utf8'),
   replaceOverridesSnapshot = async () => {},
   replaceLibraryWantedReleases = async () => {},
@@ -136,6 +137,9 @@ export function createBackupRestoreApplyService({
     });
 
     let lock = null;
+    let responseBody = null;
+    let thrownError = null;
+    let restoreCompleted = false;
 
     try {
       await markStarted({
@@ -225,13 +229,15 @@ export function createBackupRestoreApplyService({
         userAgent: requestMetadata?.userAgent ?? null,
       });
 
-      return {
+      responseBody = {
         accepted: true,
         backupArtifact: toSafeBackupArtifact(artifact),
         restoreResult,
         run: await getRunById(run.id),
       };
+      restoreCompleted = true;
     } catch (error) {
+      thrownError = error;
       await markFailed({
         runId: run.id,
         errorMessage: error instanceof Error ? error.message : 'Backup restore apply failed',
@@ -259,16 +265,32 @@ export function createBackupRestoreApplyService({
         summary: 'Backup restore apply failed',
         userAgent: requestMetadata?.userAgent ?? null,
       });
-
-      throw error;
     } finally {
       if (lock?.id) {
-        await releaseMaintenanceLock({
-          lockId: lock.id,
-          status: 'released',
-        });
+        try {
+          await releaseMaintenanceLock({
+            lockId: lock.id,
+            status: 'released',
+          });
+        } catch (releaseError) {
+          await onReleaseMaintenanceLockError(releaseError, {
+            backupArtifactId,
+            lockId: lock.id,
+            restoreCompleted,
+            runId: run.id,
+          });
+          if (!thrownError && !restoreCompleted) {
+            thrownError = releaseError;
+          }
+        }
       }
     }
+
+    if (thrownError) {
+      throw thrownError;
+    }
+
+    return responseBody;
   }
 
   return {

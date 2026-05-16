@@ -178,6 +178,72 @@ test('startBackupRestoreApply acquires and releases restore lock, persists run s
   });
 });
 
+test('startBackupRestoreApply preserves a completed restore result when lock release cleanup fails', async (t) => {
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const onReleaseMaintenanceLockError = t.mock.fn(async () => {});
+  const releaseMaintenanceLock = t.mock.fn(async () => {
+    throw new Error('lock release unavailable');
+  });
+
+  const service = createBackupRestoreApplyService({
+    acquireMaintenanceLock: async () => ({ id: 'lock-cleanup-1', lockType: 'restore', status: 'active' }),
+    createOperationRun: async () => ({ id: 'run-restore-cleanup-1' }),
+    getBackupArtifactById: async () => ({
+      id: 'backup-cleanup-1',
+      payloadSha256: 'sha-cleanup-1',
+      storagePath: '/backups/backup-cleanup-1.json',
+      scope: ['settings'],
+    }),
+    getBackupRestorePreview: async () => ({
+      canApplyRestore: true,
+      restoreReadiness: {
+        blockedByLock: false,
+      },
+    }),
+    getOperationRunById: async () => ({
+      id: 'run-restore-cleanup-1',
+      status: 'completed',
+      summary: {
+        currentStep: 'Restore apply completed',
+      },
+    }),
+    markRunCompleted,
+    markRunFailed,
+    markRunStarted: async () => {},
+    onReleaseMaintenanceLockError,
+    readBackupPayloadFn: async () => JSON.stringify({
+      data: {
+        settings: {
+          system: {
+            logLevel: 'debug',
+          },
+        },
+      },
+    }),
+    recordAuditEventFn: async () => {},
+    releaseMaintenanceLock,
+    updateSettingsFn: async () => ({}),
+  });
+
+  const result = await service.startBackupRestoreApply({
+    backupArtifactId: 'backup-cleanup-1',
+    triggeredByUserId: 'user-cleanup-1',
+  });
+
+  assert.equal(result.accepted, true);
+  assert.equal(markRunCompleted.mock.callCount(), 1);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.equal(releaseMaintenanceLock.mock.callCount(), 1);
+  assert.equal(onReleaseMaintenanceLockError.mock.callCount(), 1);
+  assert.deepEqual(onReleaseMaintenanceLockError.mock.calls[0].arguments[1], {
+    backupArtifactId: 'backup-cleanup-1',
+    lockId: 'lock-cleanup-1',
+    restoreCompleted: true,
+    runId: 'run-restore-cleanup-1',
+  });
+});
+
 test('startBackupRestoreApply rejects stale checksum expectations before run creation', async () => {
   const service = createBackupRestoreApplyService({
     acquireMaintenanceLock: async () => ({ id: 'lock-1' }),
