@@ -79,6 +79,11 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  /** Local artwork URL from server-side resolve (preferred over CAA direct). */
+  localSrc: {
+    type: String,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['request', 'detail']);
@@ -160,6 +165,7 @@ const accentStyle = computed(() => {
         :mbid="releaseMbid || releaseGroupMbid || undefined"
         :mbid-type="releaseMbid ? 'release' : 'release-group'"
         :alt="releaseTitle || 'Release artwork'"
+        :local-src="localSrc"
       />
     </div>
     <div class="hx-media-card__body">

@@ -24,9 +24,14 @@ import { createArtworkCleanupRunService } from './artwork-cleanup-run-service.js
 import { createArtworkCleanupRunStore } from './artwork-cleanup-run-store.js';
 import { createArtworkCleanupWorker } from './artwork-cleanup-worker.js';
 import { createArtworkDominantColorService } from './artwork-dominant-color-service.js';
+import { createArtworkFetchService } from './artwork-fetch-service.js';
 import { createArtworkIngestionService } from './artwork-ingestion-service.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
+import { createArtworkQuotaService } from './artwork-quota-service.js';
+import { createArtworkServeService } from './artwork-serve-service.js';
 import { createArtworkSummaryService } from './artwork-summary-service.js';
+import { createCoverArtArchiveClient } from '../integrations/cover-art-archive/cover-art-archive-client.js';
+import { createFanartTvClient } from '../integrations/fanart-tv/fanart-client.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
@@ -47,8 +52,13 @@ export function createArtworkModule({
   artworkCleanupWorker,
   artworkPolicyService = createArtworkPolicyService({ settingsService }),
   artworkIngestionService = createArtworkIngestionService({ artworkPolicyService }),
+  artworkServeService = createArtworkServeService({ artworkPolicyService }),
   artworkAssignmentService = createArtworkAssignmentService(),
   artworkDominantColorService = createArtworkDominantColorService(),
+  artworkQuotaService,
+  coverArtArchiveClient,
+  fanartTvClient,
+  artworkFetchService,
   artworkSummaryService,
 } = {}) {
   const resolvedArtworkCleanupService = artworkCleanupService
@@ -95,6 +105,26 @@ export function createArtworkModule({
       artworkCleanupRunStore,
       artworkPolicyService,
     });
+  const resolvedCoverArtArchiveClient = coverArtArchiveClient
+    ?? (() => { try { return createCoverArtArchiveClient(); } catch { return null; } })();
+  const resolvedFanartTvClient = fanartTvClient
+    ?? (() => { try { return createFanartTvClient(); } catch { return null; } })();
+  const resolvedArtworkQuotaService = artworkQuotaService
+    ?? createArtworkQuotaService({
+      getDailyLimit: async () => {
+        const policy = await artworkPolicyService.getArtworkRuntimePolicy();
+        return policy.fetch.dailyQuotaLimit ?? 1000;
+      },
+    });
+  const resolvedArtworkFetchService = artworkFetchService
+    ?? createArtworkFetchService({
+      artworkAssignmentService,
+      artworkIngestionService,
+      artworkPolicyService,
+      artworkQuotaService: resolvedArtworkQuotaService,
+      coverArtArchiveClient: resolvedCoverArtArchiveClient,
+      fanartTvClient: resolvedFanartTvClient,
+    });
 
   return {
     artworkAssignmentService,
@@ -104,14 +134,21 @@ export function createArtworkModule({
     artworkCleanupRunService: resolvedArtworkCleanupRunService,
     artworkCleanupRunStore,
     artworkCleanupWorker: resolvedArtworkCleanupWorker,
+    artworkFetchService: resolvedArtworkFetchService,
     artworkIngestionService,
     artworkPolicyService,
+    artworkQuotaService: resolvedArtworkQuotaService,
     artworkRepository,
+    artworkServeService,
     artworkSummaryService: resolvedArtworkSummaryService,
     routeDependencies: {
       buildArtworkCleanupRunDetail: resolvedArtworkCleanupDetailService.buildArtworkCleanupRunDetail,
       buildArtworkCleanupHistory: resolvedArtworkCleanupHistoryService.buildArtworkCleanupHistory,
       buildArtworkSummary: resolvedArtworkSummaryService.buildArtworkSummary,
+      getQuotaStatus: resolvedArtworkQuotaService.getQuotaStatus,
+      resolveArtwork: resolvedArtworkFetchService.resolveArtwork,
+      resolveArtworkBatch: resolvedArtworkFetchService.resolveArtworkBatch,
+      serveArtworkFile: artworkServeService.serveArtworkFile,
       startArtworkCleanupRun: resolvedArtworkCleanupRunService.startArtworkCleanupRun,
       writeDominantColor: artworkDominantColorService.writeDominantColor,
     },

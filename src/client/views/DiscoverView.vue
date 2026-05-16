@@ -17,9 +17,11 @@
 -->
 
 <script setup>
+import { watch } from 'vue';
 import ArtistCard from '../components/media/ArtistCard.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
+import { useArtworkBatchResolve } from '../composables/useArtworkBatchResolve.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
 import { useDiscoverGraph } from '../composables/useDiscoverGraph.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
@@ -63,6 +65,38 @@ const {
   addSeed,
   removeSeed,
 } = useDiscoverGraph();
+
+const { getResolved: getArtwork, resolve: resolveArtwork } = useArtworkBatchResolve();
+
+watch(seeds, (current) => {
+  const requests = [];
+  for (const s of current) {
+    if (s.id && !getArtwork('musicbrainz_artist', s.id, 'artist_thumbnail')) {
+      requests.push({ ownerType: 'musicbrainz_artist', ownerId: s.id, artworkRole: 'artist_thumbnail' });
+    }
+  }
+  if (requests.length > 0) void resolveArtwork(requests);
+}, { immediate: true });
+
+watch(suggestions, (current) => {
+  const requests = [];
+  for (const s of current) {
+    if (s.id && !getArtwork('musicbrainz_artist', s.id, 'artist_thumbnail')) {
+      requests.push({ ownerType: 'musicbrainz_artist', ownerId: s.id, artworkRole: 'artist_thumbnail' });
+    }
+  }
+  if (requests.length > 0) void resolveArtwork(requests);
+}, { immediate: true });
+
+watch(results, (current) => {
+  const requests = [];
+  for (const a of current) {
+    if (a.id && !getArtwork('musicbrainz_artist', a.id, 'artist_thumbnail')) {
+      requests.push({ ownerType: 'musicbrainz_artist', ownerId: a.id, artworkRole: 'artist_thumbnail' });
+    }
+  }
+  if (requests.length > 0) void resolveArtwork(requests);
+}, { immediate: true });
 
 /**
  * Monitor an artist and, on success, add them as a taste-graph seed so that
@@ -140,6 +174,19 @@ async function handleMonitor(artist) {
           class="discover-seed-chip"
           role="listitem"
         >
+          <img
+            v-if="getArtwork('musicbrainz_artist', seed.id, 'artist_thumbnail')"
+            :src="getArtwork('musicbrainz_artist', seed.id, 'artist_thumbnail')"
+            :alt="seed.name"
+            class="discover-seed-chip-avatar"
+            loading="lazy"
+          />
+          <span
+            v-else
+            class="discover-seed-chip-initial"
+            :style="buildDiscoverAvatarStyle(seed.id, seed.name)"
+            aria-hidden="true"
+          >{{ buildDiscoverArtistInitial(seed.id, seed.name) }}</span>
           <span class="discover-seed-chip-name">{{ seed.name }}</span>
           <span
             v-if="isSeedLoading(seed.id)"
@@ -187,7 +234,15 @@ async function handleMonitor(artist) {
           @monitor="handleMonitor"
         >
           <template #artwork>
+            <img
+              v-if="getArtwork('musicbrainz_artist', suggestion.id, 'artist_thumbnail')"
+              :src="getArtwork('musicbrainz_artist', suggestion.id, 'artist_thumbnail')"
+              :alt="suggestion.name"
+              class="discover-suggestion-avatar-img"
+              loading="lazy"
+            />
             <div
+              v-else
               class="hx-artwork discover-suggestion-avatar"
               :style="buildDiscoverAvatarStyle(suggestion.id, suggestion.name)"
               aria-hidden="true"
@@ -276,7 +331,15 @@ async function handleMonitor(artist) {
           @monitor="handleMonitor"
         >
           <template #artwork>
+            <img
+              v-if="getArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')"
+              :src="getArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')"
+              :alt="artist.name"
+              class="discover-suggestion-avatar-img"
+              loading="lazy"
+            />
             <div
+              v-else
               class="hx-artwork discover-suggestion-avatar"
               :style="buildDiscoverAvatarStyle(artist.id, artist.name)"
               aria-hidden="true"
@@ -394,13 +457,34 @@ async function handleMonitor(artist) {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.375rem;
   border-radius: 9999px;
   background: var(--hx-bg-surface-raised);
   border: 1px solid var(--hx-border);
   font-size: var(--hx-text-sm);
   color: var(--hx-text-strong);
   line-height: 1.25;
+}
+
+.discover-seed-chip-avatar {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.discover-seed-chip-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .discover-seed-chip-name {
@@ -462,6 +546,13 @@ async function handleMonitor(artist) {
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--hx-radius, 4px);
+}
+
+.discover-suggestion-avatar-img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
   border-radius: var(--hx-radius, 4px);
 }
 

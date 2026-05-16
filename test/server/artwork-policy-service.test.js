@@ -65,6 +65,7 @@ test('buildArtworkRuntimePolicy converts settings into shared worker-facing poli
       ],
     },
     fetch: {
+      dailyQuotaLimit: 1000,
       enabled: true,
       providerOrder: ['coverArtArchive', 'discogs'],
       refetchMissingAutomatically: true,
@@ -139,6 +140,7 @@ test('createArtworkPolicyService reuses the shared settings payload for overview
       ],
     },
     fetch: {
+      dailyQuotaLimit: 1000,
       enabled: true,
       providerOrder: ['coverArtArchive'],
       refetchMissingAutomatically: false,

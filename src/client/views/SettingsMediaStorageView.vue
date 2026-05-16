@@ -20,6 +20,13 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { fetchSettings, updateSettings } from '../lib/settings-api.js';
 import {
+  formatProviderLabel,
+  formatQuotaPercentage,
+  formatQuotaRemaining,
+  formatQuotaUsage,
+  resolveQuotaTone,
+} from '../lib/artwork-quota-presentation.js';
+import {
   buildSettingsUpdatePayload,
   createEmptyDownloadMapping,
   createEmptyUserMusicRoot,
@@ -39,6 +46,7 @@ import {
   formatUserRootLabel,
 } from '../lib/settings-media-storage-presentation.js';
 import FolderBrowserModal from '../components/FolderBrowserModal.vue';
+import { useArtworkQuota } from '../composables/useArtworkQuota.js';
 
 const isLoading = ref(true);
 const isSaving = ref(false);
@@ -78,6 +86,7 @@ const form = reactive({
   artwork: {
     captureEmbedded: true,
     captureFolderArtwork: true,
+    dailyQuotaLimit: 1000,
     derivativeCacheSizeMb: 1024,
     derivativeFormat: 'webp',
     derivativeRetentionDays: 30,
@@ -215,6 +224,10 @@ async function saveSettings() {
 }
 
 onMounted(() => { void loadSettings(); });
+
+const artworkQuota = useArtworkQuota();
+
+onMounted(() => { void artworkQuota.loadQuota(); });
 </script>
 
 <template>
@@ -258,6 +271,11 @@ onMounted(() => { void loadSettings(); });
                 <label class="hx-field-label">Sources to try</label>
                 <input class="hx-input" v-model="form.artwork.providerOrderText" placeholder="coverArtArchive" />
                 <p class="cfg-field-hint">Try sources in order, separated by commas. <code>coverArtArchive</code> is the default and the main free option (Cover Art Archive).</p>
+              </div>
+              <div class="hx-field" v-if="form.artwork.fetchEnabled">
+                <label class="hx-field-label">Daily request limit</label>
+                <input class="hx-input" v-model.number="form.artwork.dailyQuotaLimit" type="number" min="1" max="100000" step="1" />
+                <p class="cfg-field-hint">Maximum external API calls per day across all providers. Prevents excessive usage. Resets at midnight UTC.</p>
               </div>
               <label class="cfg-check">
                 <input type="checkbox" v-model="form.artwork.captureEmbedded" />
@@ -457,6 +475,39 @@ onMounted(() => { void loadSettings(); });
         </article>
       </div>
 
+      <!-- Artwork provider quota -->
+      <article class="hx-card" style="margin-top: var(--hx-space-4)" v-if="artworkQuota.quota.value">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Artwork provider quota</h3>
+            <p class="hx-card-subtitle">Daily request usage for external artwork providers. Resets at midnight UTC.</p>
+          </div>
+          <span class="hx-pill" :data-tone="artworkQuota.anyExceeded.value ? 'danger' : 'success'">
+            {{ artworkQuota.anyExceeded.value ? 'Limit reached' : 'Within limits' }}
+          </span>
+        </header>
+        <div class="hx-card-body">
+          <div class="cfg-quota-grid">
+            <div class="cfg-quota-card" v-for="provider in artworkQuota.providers.value" :key="provider.provider">
+              <div class="cfg-quota-header">
+                <strong>{{ formatProviderLabel(provider.provider) }}</strong>
+                <span class="hx-pill" :data-tone="resolveQuotaTone(provider.exceeded, provider.used, provider.limit)">
+                  {{ formatQuotaUsage(provider.used, provider.limit) }}
+                </span>
+              </div>
+              <div class="cfg-quota-bar-track">
+                <div
+                  class="cfg-quota-bar-fill"
+                  :style="{ '--quota-fill': formatQuotaPercentage(provider.used, provider.limit) + '%' }"
+                  :data-tone="resolveQuotaTone(provider.exceeded, provider.used, provider.limit)"
+                />
+              </div>
+              <p class="cfg-quota-meta">{{ formatQuotaRemaining(provider.remaining) }}</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
       <!-- Path validation (read-only, shown post-save) -->
       <article class="hx-card" style="margin-top: var(--hx-space-4)" v-if="pathValidation">
         <header class="hx-card-header">
@@ -538,3 +589,46 @@ onMounted(() => { void loadSettings(); });
     />
   </div>
 </template>
+
+<style scoped>
+.cfg-quota-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--hx-space-4);
+}
+
+.cfg-quota-card {
+  display: grid;
+  gap: var(--hx-space-2);
+}
+
+.cfg-quota-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+
+.cfg-quota-bar-track {
+  height: 6px;
+  background: var(--hx-bg-surface-sunken);
+  border-radius: var(--hx-radius-full);
+  overflow: hidden;
+}
+
+.cfg-quota-bar-fill {
+  height: 100%;
+  width: var(--quota-fill, 0%);
+  border-radius: var(--hx-radius-full);
+  transition: width 0.3s ease;
+}
+
+.cfg-quota-bar-fill[data-tone="success"] { background: oklch(0.65 0.15 150); }
+.cfg-quota-bar-fill[data-tone="warning"] { background: oklch(0.75 0.15 80); }
+.cfg-quota-bar-fill[data-tone="danger"]  { background: oklch(0.6 0.18 25); }
+
+.cfg-quota-meta {
+  font-size: var(--hx-font-size-sm);
+  color: var(--hx-text-secondary);
+}
+</style>

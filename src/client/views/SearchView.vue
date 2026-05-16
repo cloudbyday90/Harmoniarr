@@ -24,6 +24,7 @@ import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
+import { useArtworkBatchResolve } from '../composables/useArtworkBatchResolve.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
@@ -83,6 +84,8 @@ const {
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
+
+const { getResolved: getResolvedArtwork, resolve: resolveArtworkBatch } = useArtworkBatchResolve();
 
 // ── Release detail modal ─────────────────────────────────────────────────────
 
@@ -159,6 +162,20 @@ async function runMusicSearch() {
     ]);
     musicArtistResults.value = artistPayload.search?.results ?? [];
     musicReleaseResults.value = releasePayload.search?.results ?? [];
+
+    const artworkRequests = [];
+    for (const artist of musicArtistResults.value) {
+      if (artist.id) {
+        artworkRequests.push({ ownerType: 'musicbrainz_artist', ownerId: artist.id, artworkRole: 'artist_thumbnail' });
+      }
+    }
+    for (const release of musicReleaseResults.value) {
+      const mbid = release.id ?? release.musicbrainzReleaseId;
+      if (mbid) {
+        artworkRequests.push({ ownerType: 'musicbrainz_release', ownerId: mbid, artworkRole: 'cover_front' });
+      }
+    }
+    void resolveArtworkBatch(artworkRequests);
   } catch (error) {
     musicSearchError.value = getErrorMessage(error, 'Search failed. Please try again.');
   } finally {
@@ -387,6 +404,9 @@ onBeforeUnmount(() => clearPollTimer());
               :monitored="isMonitored(artist.id)"
               :monitoring="isMonitoring(artist.id)"
               :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
+              :local-src="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.url ?? null : null"
+              :dominant-color="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.dominantColor ?? null : null"
+              :artwork-asset-id="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.assetId ?? null : null"
               @monitor="monitorArtist"
             />
           </div>
@@ -402,6 +422,9 @@ onBeforeUnmount(() => clearPollTimer());
               :release="release"
               :requested="isRequested(release)"
               :requesting="isRequesting(release)"
+              :local-src="(release.id ?? release.musicbrainzReleaseId) ? getResolvedArtwork('musicbrainz_release', release.id ?? release.musicbrainzReleaseId, 'cover_front')?.url ?? null : null"
+              :dominant-color="(release.id ?? release.musicbrainzReleaseId) ? getResolvedArtwork('musicbrainz_release', release.id ?? release.musicbrainzReleaseId, 'cover_front')?.dominantColor ?? null : null"
+              :artwork-asset-id="(release.id ?? release.musicbrainzReleaseId) ? getResolvedArtwork('musicbrainz_release', release.id ?? release.musicbrainzReleaseId, 'cover_front')?.assetId ?? null : null"
               @request="openConfirmModal"
               @detail="openDetailModal"
             />

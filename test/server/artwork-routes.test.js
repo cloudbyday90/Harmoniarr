@@ -48,11 +48,24 @@ function createArtworkRouteTestApp(overrides = {}) {
         ipAddress: request.headers['x-forwarded-for'] ?? '127.0.0.1',
         userAgent: request.headers['user-agent'] ?? null,
       }),
+      getQuotaStatus: async () => ({
+        date: '2026-06-15',
+        limit: 1000,
+        providers: [
+          { exceeded: false, limit: 1000, provider: 'coverArtArchive', remaining: 950, used: 50 },
+          { exceeded: false, limit: 1000, provider: 'fanartTv', remaining: 1000, used: 0 },
+        ],
+        totalUsed: 50,
+      }),
       limitArtworkCleanupRun: (_request, _response, next) => next(),
+      limitArtworkResolveBatch: (_request, _response, next) => next(),
       requireAdminSession: async () => ({ appUserId: 'user-1', user: { role: 'admin' } }),
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
       requireSession: async () => ({ appUserId: 'user-1', user: { role: 'user' } }),
+      resolveArtwork: async () => ({ url: null, assetId: null, cached: false, sourceProvider: null }),
+      resolveArtworkBatch: async () => ({}),
+      serveArtworkFile: async () => { throw new Error('serveArtworkFile not mocked'); },
       startArtworkCleanupRun: async () => ({
         accepted: true,
         run: {
@@ -332,5 +345,214 @@ test('dominant color patch route propagates 422 from the write service for out-o
     assert.equal(response.status, 422);
     assert.equal(payload.ok, false);
     assert.equal(payload.error.code, 'dominant_color_invalid');
+  });
+});
+
+test('artwork resolve route requires authenticated session', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-5', user: { role: 'user' } }));
+  const resolveArtwork = t.mock.fn(async () => ({
+    url: '/api/v1/artwork/assets/asset-1/file',
+    assetId: 'asset-1',
+    cached: true,
+    sourceProvider: 'coverArtArchive',
+  }));
+
+  const app = createArtworkRouteTestApp({ requireSession, resolveArtwork });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/resolve?owner_type=musicbrainz_release_group&owner_id=mbid-1`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(resolveArtwork.mock.callCount(), 1);
+    assert.equal(payload.url, '/api/v1/artwork/assets/asset-1/file');
+    assert.equal(payload.cached, true);
+  });
+});
+
+test('artwork resolve route returns 400 when owner_type is missing', async () => {
+  const app = createArtworkRouteTestApp({
+    resolveArtwork: async () => ({ url: null, assetId: null, cached: false }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/resolve?owner_id=mbid-1`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(payload.error.code, 'validation_error');
+  });
+});
+
+test('artwork resolve batch route returns 400 for empty requests array', async () => {
+  const app = createArtworkRouteTestApp({
+    resolveArtworkBatch: async () => ({}),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/resolve-batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ requests: [] }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(payload.error.code, 'validation_error');
+  });
+});
+
+test('artwork resolve batch route returns 400 when batch exceeds 50 items', async () => {
+  const app = createArtworkRouteTestApp({
+    resolveArtworkBatch: async () => ({}),
+  });
+
+  const bigBatch = Array.from({ length: 51 }, (_, i) => ({
+    ownerType: 'musicbrainz_release_group',
+    ownerId: `mbid-${i}`,
+  }));
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/resolve-batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ requests: bigBatch }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(payload.error.code, 'validation_error');
+    assert.ok(payload.error.message.includes('50'));
+  });
+});
+
+test('artwork resolve batch route returns resolved map', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-5', user: { role: 'user' } }));
+  const resolveArtworkBatch = t.mock.fn(async (requests) => {
+    const results = {};
+    for (const r of requests) {
+      results[`${r.ownerType}:${r.ownerId}:cover_front`] = {
+        url: `/api/v1/artwork/assets/${r.ownerId}/file`,
+        assetId: r.ownerId,
+        cached: true,
+      };
+    }
+    return results;
+  });
+
+  const app = createArtworkRouteTestApp({ requireSession, resolveArtworkBatch });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/resolve-batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requests: [
+          { owner_type: 'musicbrainz_release_group', owner_id: 'mbid-1' },
+          { ownerType: 'musicbrainz_release_group', ownerId: 'mbid-2' },
+        ],
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireSession.mock.callCount(), 1);
+    assert.ok(payload.resolved);
+    assert.ok(payload.resolved['musicbrainz_release_group:mbid-1:cover_front']);
+    assert.ok(payload.resolved['musicbrainz_release_group:mbid-2:cover_front']);
+  });
+});
+
+test('artwork resolve batch route forwards refresh parameter', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-5', user: { role: 'user' } }));
+  const resolveArtworkBatch = t.mock.fn(async (requests) => {
+    const results = {};
+    for (const r of requests) {
+      results[`${r.ownerType}:${r.ownerId}:${r.artworkRole}`] = {
+        url: r.refresh ? `/api/v1/artwork/assets/${r.ownerId}-new/file` : `/api/v1/artwork/assets/${r.ownerId}/file`,
+        assetId: r.refresh ? `${r.ownerId}-new` : r.ownerId,
+        cached: !r.refresh,
+      };
+    }
+    return results;
+  });
+
+  const app = createArtworkRouteTestApp({ requireSession, resolveArtworkBatch });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/resolve-batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requests: [
+          { owner_type: 'musicbrainz_release_group', owner_id: 'mbid-1', refresh: true },
+          { ownerType: 'musicbrainz_release_group', ownerId: 'mbid-2', refresh: 'false' },
+          { ownerType: 'musicbrainz_release_group', ownerId: 'mbid-3' },
+        ],
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(resolveArtworkBatch.mock.callCount(), 1);
+    const batchRequests = resolveArtworkBatch.mock.calls[0].arguments[0];
+    assert.equal(batchRequests[0].refresh, true);
+    assert.equal(batchRequests[1].refresh, false);
+    assert.equal(batchRequests[2].refresh, false);
+    assert.equal(payload.resolved['musicbrainz_release_group:mbid-1:cover_front'].cached, false);
+    assert.equal(payload.resolved['musicbrainz_release_group:mbid-2:cover_front'].cached, true);
+  });
+});
+
+test('artwork quota route requires admin session and returns quota status', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', user: { role: 'admin' } }));
+  const getQuotaStatus = t.mock.fn(async () => ({
+    date: '2026-06-15',
+    limit: 500,
+    providers: [
+      { exceeded: false, limit: 500, provider: 'coverArtArchive', remaining: 480, used: 20 },
+      { exceeded: true, limit: 500, provider: 'fanartTv', remaining: 0, used: 500 },
+    ],
+    totalUsed: 520,
+  }));
+
+  const app = createArtworkRouteTestApp({ getQuotaStatus, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/quota`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(getQuotaStatus.mock.callCount(), 1);
+    assert.equal(payload.limit, 500);
+    assert.equal(payload.totalUsed, 520);
+    assert.equal(payload.providers.length, 2);
+    assert.equal(payload.providers[0].provider, 'coverArtArchive');
+    assert.equal(payload.providers[0].used, 20);
+    assert.equal(payload.providers[1].provider, 'fanartTv');
+    assert.equal(payload.providers[1].exceeded, true);
+  });
+});
+
+test('artwork resolve route passes refresh parameter', async (t) => {
+  const resolveArtwork = t.mock.fn(async ({ refresh }) => ({
+    cached: !refresh,
+    url: refresh ? '/api/v1/artwork/assets/new/file' : '/api/v1/artwork/assets/cached/file',
+    assetId: refresh ? 'new' : 'cached',
+    sourceProvider: 'coverArtArchive',
+  }));
+
+  const app = createArtworkRouteTestApp({ resolveArtwork });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/resolve?owner_type=musicbrainz_release&owner_id=mbid-1&refresh=true`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(resolveArtwork.mock.calls[0].arguments[0].refresh, true);
+    assert.equal(payload.cached, false);
+    assert.equal(payload.url, '/api/v1/artwork/assets/new/file');
   });
 });

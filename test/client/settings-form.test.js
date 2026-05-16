@@ -10,6 +10,7 @@ function createArtworkForm() {
   return {
     captureEmbedded: true,
     captureFolderArtwork: true,
+    dailyQuotaLimit: 1000,
     derivativeCacheSizeMb: 1024,
     derivativeFormat: 'webp',
     derivativeRetentionDays: 30,
@@ -56,6 +57,7 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
     artwork: {
       captureEmbedded: true,
       captureFolderArtwork: true,
+      dailyQuotaLimit: 1000,
       derivativeCacheSizeMb: 1024,
       derivativeFormat: 'webp',
       derivativeRetentionDays: 30,
@@ -190,6 +192,7 @@ test('buildSettingsUpdatePayload includes provider intake settings and secret mu
       clearSpotifyClientSecret: false,
       clearYoutubeApiKey: true,
       clearYoutubeClientSecret: false,
+      fanartTvEnabled: false,
       playlistExpansionPolicy: 'artist_discovery',
       requestTimeoutMs: 12000,
       spotifyClientId: 'spotify-client',
@@ -215,6 +218,7 @@ test('buildSettingsUpdatePayload includes provider intake settings and secret mu
     appleMusicStorefront: 'us',
     appleMusicTeamId: 'apple-team',
     clearYoutubeApiKey: true,
+    fanartTvEnabled: false,
     playlistExpansionPolicy: 'artist_discovery',
     requestTimeoutMs: 12000,
     spotifyClientId: 'spotify-client',

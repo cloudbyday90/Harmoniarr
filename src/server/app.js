@@ -375,6 +375,11 @@ export function createApp({
       limit: 10,
       windowMs: 60 * 1000,
     }),
+    limitArtworkResolveBatch: requestRateLimiterService.createMiddleware({
+      bucketName: 'artwork-resolve-batch',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
   });
   mountMetadataRoutes(app, {
     ...metadataModule.routeDependencies,

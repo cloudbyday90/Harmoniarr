@@ -66,9 +66,10 @@ test('operation run store can check and finalize shared cancellation state', asy
   });
 
   assert.equal(isCancellationRequested, true);
-  assert.equal(query.mock.callCount(), 2);
+  assert.equal(query.mock.callCount(), 3);
   assert.deepEqual(query.mock.calls[0].arguments[1], ['run-19', 'library_scan']);
   assert.deepEqual(query.mock.calls[1].arguments[1], ['run-19', JSON.stringify({ currentStep: 'Cancelled by operator' })]);
+  assert.match(query.mock.calls[2].arguments[0], /DELETE FROM operation_runs/);
 });
 
 test('operation run store persists queue retry metadata when creating a run', async (t) => {

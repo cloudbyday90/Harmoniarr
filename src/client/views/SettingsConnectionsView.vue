@@ -98,9 +98,14 @@ const form = reactive({
     appleMusicStorefront: 'us',
     appleMusicTeamId: '',
     clearAppleMusicPrivateKey: false,
+    clearFanartTvApiKey: false,
+    clearFanartTvClientKey: false,
     clearSpotifyClientSecret: false,
     clearYoutubeApiKey: false,
     clearYoutubeClientSecret: false,
+    fanartTvApiKey: '',
+    fanartTvClientKey: '',
+    fanartTvEnabled: false,
     playlistExpansionPolicy: 'bounded',
     requestTimeoutMs: 15000,
     spotifyClientId: '',
@@ -137,9 +142,13 @@ function applySettings(payload) {
     ...payload.settings.providers,
     appleMusicPrivateKey: '',
     clearAppleMusicPrivateKey: false,
+    clearFanartTvApiKey: false,
+    clearFanartTvClientKey: false,
     clearSpotifyClientSecret: false,
     clearYoutubeApiKey: false,
     clearYoutubeClientSecret: false,
+    fanartTvApiKey: '',
+    fanartTvClientKey: '',
     spotifyClientSecret: '',
     youtubeApiKey: '',
     youtubeClientSecret: '',
@@ -467,6 +476,41 @@ onMounted(() => { void loadSettings(); });
                 <input type="checkbox" v-model="form.providers.clearAppleMusicPrivateKey" />
                 <span>Remove the stored Apple Music private key on save</span>
               </label>
+            </div>
+
+            <!-- Fanart.tv -->
+            <div class="cfg-provider-card">
+              <div class="cfg-provider-header">
+                <h4 class="cfg-provider-name">Fanart.tv</h4>
+                <span class="review-status-pill" :class="(secretStatus?.providers?.fanartTv?.apiKeyConfigured || secretStatus?.providers?.fanartTv?.clientKeyConfigured) ? 'review-status-selected' : 'review-status-held'">
+                  {{ (secretStatus?.providers?.fanartTv?.apiKeyConfigured || secretStatus?.providers?.fanartTv?.clientKeyConfigured) ? 'Configured' : 'Not configured' }}
+                </span>
+              </div>
+              <label class="cfg-check">
+                <input type="checkbox" v-model="form.providers.fanartTvEnabled" />
+                <span>Enable artist artwork from Fanart.tv</span>
+              </label>
+              <div class="hx-form-row">
+                <div class="hx-field">
+                  <label class="hx-field-label">Project API key</label>
+                  <input class="hx-input" v-model="form.providers.fanartTvApiKey" type="password" autocomplete="new-password" :disabled="form.providers.clearFanartTvApiKey" placeholder="Leave blank to keep" />
+                </div>
+                <div class="hx-field">
+                  <label class="hx-field-label">Personal API key</label>
+                  <input class="hx-input" v-model="form.providers.fanartTvClientKey" type="password" autocomplete="new-password" :disabled="form.providers.clearFanartTvClientKey" placeholder="Leave blank to keep" />
+                </div>
+              </div>
+              <p class="cfg-field-hint">Project key provides application-level access (7-day delay). Personal key takes priority (2-day delay). At least one key is required. Get keys at <a href="https://fanart.tv/get-an-api-key/" target="_blank" rel="noopener">fanart.tv</a>.</p>
+              <div class="hx-card-actions">
+                <label class="cfg-check">
+                  <input type="checkbox" v-model="form.providers.clearFanartTvApiKey" />
+                  <span>Remove project key</span>
+                </label>
+                <label class="cfg-check">
+                  <input type="checkbox" v-model="form.providers.clearFanartTvClientKey" />
+                  <span>Remove personal key</span>
+                </label>
+              </div>
             </div>
 
           </div>

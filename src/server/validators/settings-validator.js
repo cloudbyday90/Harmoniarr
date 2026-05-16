@@ -41,6 +41,7 @@ const supportedArtworkProviders = new Set([
   'coverArtArchive',
   'deezer',
   'discogs',
+  'fanartTv',
   'spotify',
   'theAudioDb',
   'tidal',
@@ -133,9 +134,23 @@ const settingDefinitions = {
     },
   },
   artwork: {
+    dailyQuotaLimit: {
+      defaultValue: 1000,
+      normalize(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 1) {
+          throw createSettingsValidationError('artwork.dailyQuotaLimit must be a positive number');
+        }
+        return Math.floor(n);
+      },
+    },
     fetchEnabled: {
       defaultValue: true,
       normalize: normalizeBooleanSetting('artwork.fetchEnabled'),
+    },
+    fanartTvEnabled: {
+      defaultValue: false,
+      normalize: normalizeBooleanSetting('artwork.fanartTvEnabled'),
     },
     providerOrder: {
       defaultValue: ['coverArtArchive'],
@@ -306,6 +321,10 @@ const settingDefinitions = {
     appleMusicEnabled: {
       defaultValue: Boolean(process.env.APPLE_MUSIC_TEAM_ID && process.env.APPLE_MUSIC_KEY_ID),
       normalize: normalizeBooleanSetting('providers.appleMusicEnabled'),
+    },
+    fanartTvEnabled: {
+      defaultValue: false,
+      normalize: normalizeBooleanSetting('providers.fanartTvEnabled'),
     },
     playlistExpansionPolicy: {
       defaultValue: 'bounded',

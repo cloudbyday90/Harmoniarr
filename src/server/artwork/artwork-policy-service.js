@@ -86,6 +86,7 @@ export function buildArtworkRuntimePolicy({
       profiles: buildArtworkDerivativeProfiles(artworkSettings),
     },
     fetch: {
+      dailyQuotaLimit: artworkSettings.dailyQuotaLimit ?? 1000,
       enabled: artworkSettings.fetchEnabled ?? true,
       providerOrder: artworkSettings.providerOrder ?? ['coverArtArchive'],
       refetchMissingAutomatically: artworkSettings.refetchMissingAutomatically ?? false,

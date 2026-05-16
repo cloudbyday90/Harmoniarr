@@ -17,10 +17,11 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
+import { useArtworkBatchResolve } from '../composables/useArtworkBatchResolve.js';
 import { useGridState } from '../composables/useGridState.js';
 import { useLibraryFilterOptions } from '../composables/useLibraryFilterOptions.js';
 import { useLibraryReleases } from '../composables/useLibraryReleases.js';
@@ -100,6 +101,24 @@ const displayReleases = computed(() =>
     ? library.staleData.value
     : library.data.value
   ).map(normalizeLibraryReleaseForCard),
+);
+
+const { getResolved: getResolvedArtwork, resolve: resolveArtworkBatch } = useArtworkBatchResolve();
+
+watch(
+  displayReleases,
+  (releases) => {
+    const requests = [];
+    for (const release of releases) {
+      const mbid = release.musicbrainzReleaseId ?? release.releaseGroupId;
+      if (mbid) {
+        const ownerType = release.musicbrainzReleaseId ? 'musicbrainz_release' : 'musicbrainz_release_group';
+        requests.push({ ownerType, ownerId: mbid, artworkRole: 'cover_front' });
+      }
+    }
+    void resolveArtworkBatch(requests);
+  },
+  { immediate: true },
 );
 
 // ── Stats (computed from current data) ────────────────────────────────────────
@@ -247,6 +266,9 @@ function refreshAll() {
             :key="library.data.value[index]?.id ?? library.staleData.value[index]?.id ?? index"
             :release="release"
             :requestable="false"
+            :local-src="getResolvedArtwork('musicbrainz_release', release.musicbrainzReleaseId, 'cover_front')?.url ?? getResolvedArtwork('musicbrainz_release_group', release.releaseGroupId, 'cover_front')?.url ?? null"
+            :dominant-color="getResolvedArtwork('musicbrainz_release', release.musicbrainzReleaseId, 'cover_front')?.dominantColor ?? getResolvedArtwork('musicbrainz_release_group', release.releaseGroupId, 'cover_front')?.dominantColor ?? null"
+            :artwork-asset-id="getResolvedArtwork('musicbrainz_release', release.musicbrainzReleaseId, 'cover_front')?.assetId ?? getResolvedArtwork('musicbrainz_release_group', release.releaseGroupId, 'cover_front')?.assetId ?? null"
           >
             <template #actions>
               <div class="hx-library-card-actions">

@@ -28,6 +28,7 @@ import { useArtistDetail } from '../composables/useArtistDetail.js';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
+import { resolveArtwork, batchResolveArtwork } from '../lib/artwork-api.js';
 import { buildArtistDetailLocation, groupReleaseGroupsByType, normalizeReleaseGroupForCard } from '../lib/artist-detail-route.js';
 import {
   buildArtistDetailErrorBody,
@@ -164,6 +165,96 @@ const hasDiscography = computed(() => releaseGroups.value.length > 0);
 /** Whether this artist is monitored (tracked in useArtistMonitoring or from local data). */
 const isArtistMonitored = computed(() => isMonitored.value);
 
+const heroBackgroundUrl = ref(null);
+const heroThumbnailUrl = ref(null);
+const isRefreshingArtwork = ref(false);
+
+async function loadArtistArtwork(artistMbid, refresh = false) {
+  if (!artistMbid) return;
+  if (!refresh) {
+    heroBackgroundUrl.value = null;
+    heroThumbnailUrl.value = null;
+  }
+  isRefreshingArtwork.value = true;
+  try {
+    const [bgResult, thumbResult] = await Promise.all([
+      resolveArtwork({ ownerType: 'musicbrainz_artist', ownerId: artistMbid, artworkRole: 'artist_background', refresh }),
+      resolveArtwork({ ownerType: 'musicbrainz_artist', ownerId: artistMbid, artworkRole: 'artist_thumbnail', refresh }),
+    ]);
+    heroBackgroundUrl.value = bgResult?.url ?? null;
+    heroThumbnailUrl.value = thumbResult?.url ?? null;
+  } catch {
+    // Hero artwork is decorative — silently degrade
+  } finally {
+    isRefreshingArtwork.value = false;
+  }
+}
+
+const heroStyle = computed(() => {
+  if (!heroBackgroundUrl.value) return {};
+  return {
+    'background-image': `linear-gradient(to bottom, color-mix(in oklch, var(--hx-bg-base) 40%, transparent), var(--hx-bg-base)), url(${heroBackgroundUrl.value})`,
+  };
+});
+
+const discographyArtwork = ref({});
+
+async function loadDiscographyArtwork(sections) {
+  const requests = [];
+  for (const section of sections) {
+    for (const release of section.releases) {
+      const rgMbid = release.musicbrainzReleaseGroupId;
+      if (rgMbid && !discographyArtwork.value[`musicbrainz_release_group:${rgMbid}:cover_front`]) {
+        requests.push({ ownerType: 'musicbrainz_release_group', ownerId: rgMbid, artworkRole: 'cover_front' });
+      }
+    }
+  }
+  if (requests.length === 0) return;
+  try {
+    const { resolved } = await batchResolveArtwork(requests);
+    discographyArtwork.value = { ...discographyArtwork.value, ...resolved };
+  } catch {
+    // silently degrade
+  }
+}
+
+function getReleaseArtwork(rgMbid) {
+  const key = `musicbrainz_release_group:${rgMbid}:cover_front`;
+  return discographyArtwork.value[key] ?? null;
+}
+
+watch(discographySections, (sections) => {
+  if (sections.length > 0) void loadDiscographyArtwork(sections);
+}, { immediate: true });
+
+const relatedArtwork = ref({});
+
+async function loadRelatedArtwork(artists) {
+  const requests = [];
+  for (const related of artists) {
+    const relatedMbid = related.id;
+    if (relatedMbid && !relatedArtwork.value[`musicbrainz_artist:${relatedMbid}:artist_thumbnail`]) {
+      requests.push({ ownerType: 'musicbrainz_artist', ownerId: relatedMbid, artworkRole: 'artist_thumbnail' });
+    }
+  }
+  if (requests.length === 0) return;
+  try {
+    const { resolved } = await batchResolveArtwork(requests);
+    relatedArtwork.value = { ...relatedArtwork.value, ...resolved };
+  } catch {
+    // silently degrade
+  }
+}
+
+function getRelatedArtwork(artistMbid) {
+  const key = `musicbrainz_artist:${artistMbid}:artist_thumbnail`;
+  return relatedArtwork.value[key]?.url ?? null;
+}
+
+watch(relatedArtists, (artists) => {
+  if (artists.length > 0) void loadRelatedArtwork(artists);
+}, { immediate: true });
+
 async function handleMonitor() {
   const result = await monitorArtist({ id: mbid.value, name: artistName.value });
   if (result?.success) {
@@ -173,12 +264,16 @@ async function handleMonitor() {
 
 // Load on mount and whenever the MBID changes (e.g. navigating between artists).
 onMounted(() => {
-  if (mbid.value) loadArtistDetail(mbid.value);
+  if (mbid.value) {
+    loadArtistDetail(mbid.value);
+    void loadArtistArtwork(mbid.value);
+  }
 });
 
 watch(mbid, (newMbid, oldMbid) => {
   if (newMbid && newMbid !== oldMbid) {
     loadArtistDetail(newMbid);
+    void loadArtistArtwork(newMbid);
   }
 });
 </script>
@@ -207,7 +302,21 @@ watch(mbid, (newMbid, oldMbid) => {
     <!-- Artist page content -->
     <template v-else>
       <!-- ── Artist header ──────────────────────────────────────────────── -->
-      <header class="hx-page-header artist-detail-header">
+      <header class="hx-page-header artist-detail-header" :style="heroStyle">
+        <img
+          v-if="heroThumbnailUrl"
+          :src="heroThumbnailUrl"
+          :alt="`${artistName} artwork`"
+          class="artist-detail-hero-thumb"
+          loading="lazy"
+        />
+        <div class="artist-detail-hero-thumb artist-detail-hero-thumb-placeholder" v-else aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 18V5l12-2v13"/>
+            <circle cx="6" cy="18" r="3"/>
+            <circle cx="18" cy="16" r="3"/>
+          </svg>
+        </div>
         <div class="artist-detail-header-body">
           <h1 class="hx-page-title artist-detail-name">{{ artistName }}</h1>
           <p v-if="artistMeta" class="artist-detail-artist-meta">{{ artistMeta }}</p>
@@ -227,6 +336,20 @@ watch(mbid, (newMbid, oldMbid) => {
             >
               {{ buildArtistMusicBrainzLabel() }}
             </a>
+            <button
+              type="button"
+              class="hx-btn hx-btn-icon"
+              data-variant="ghost"
+              :disabled="isRefreshingArtwork"
+              aria-label="Refresh artwork"
+              title="Refresh artwork"
+              @click="loadArtistArtwork(mbid, true)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" :class="{ 'is-spinning': isRefreshingArtwork }" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-3.2-6.8"/>
+                <polyline points="21 3 21 9 15 9"/>
+              </svg>
+            </button>
           </div>
         </div>
       </header>
@@ -264,6 +387,9 @@ watch(mbid, (newMbid, oldMbid) => {
                 :release="release"
                 :requested="isRequested(release)"
                 :requesting="isRequesting(release)"
+                :local-src="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.url ?? null"
+                :dominant-color="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.dominantColor ?? null"
+                :artwork-asset-id="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.assetId ?? null"
                 @request="openConfirmModal"
                 @detail="openDetailModal"
               />
@@ -288,7 +414,15 @@ watch(mbid, (newMbid, oldMbid) => {
             class="artist-detail-related-card"
             role="listitem"
           >
+            <img
+              v-if="getRelatedArtwork(related.id)"
+              :src="getRelatedArtwork(related.id)"
+              :alt="related.name"
+              class="artist-detail-related-avatar-img"
+              loading="lazy"
+            />
             <div
+              v-else
               class="artist-detail-related-avatar"
               :style="buildRelatedArtistAvatarStyle(related.id, related.name)"
               aria-hidden="true"
@@ -354,6 +488,36 @@ watch(mbid, (newMbid, oldMbid) => {
   display: flex;
   align-items: flex-start;
   gap: var(--hx-space-6);
+  background-size: cover;
+  background-position: center 30%;
+  background-repeat: no-repeat;
+  border-radius: var(--hx-radius-lg);
+  padding: var(--hx-space-8) var(--hx-space-6);
+  min-height: 4rem;
+}
+
+.artist-detail-hero-thumb {
+  width: 5rem;
+  height: 5rem;
+  border-radius: var(--hx-radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.artist-detail-hero-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--hx-bg-surface-sunken);
+  box-shadow: none;
+}
+
+.artist-detail-hero-thumb-placeholder svg {
+  width: 50%;
+  height: 50%;
+  opacity: 0.4;
+  color: var(--hx-text-faint);
 }
 
 .artist-detail-header-body {
@@ -379,6 +543,15 @@ watch(mbid, (newMbid, oldMbid) => {
   gap: var(--hx-space-2);
   align-items: center;
   flex-wrap: wrap;
+}
+
+.is-spinning {
+  animation: artist-detail-spin 0.8s linear infinite;
+}
+
+@keyframes artist-detail-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .artist-detail-soft-error {
@@ -456,6 +629,14 @@ watch(mbid, (newMbid, oldMbid) => {
   flex-shrink: 0;
 }
 
+.artist-detail-related-avatar-img {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 .artist-detail-related-initial {
   line-height: 1;
   user-select: none;
@@ -475,13 +656,17 @@ watch(mbid, (newMbid, oldMbid) => {
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
-  /* Stack artwork above the text + actions so neither element is squished */
   .artist-detail-header {
     flex-direction: column;
     gap: var(--hx-space-4);
+    padding: var(--hx-space-6) var(--hx-space-4);
   }
 
-  /* Let the actions row fill the full width so buttons wrap naturally */
+  .artist-detail-hero-thumb {
+    width: 4rem;
+    height: 4rem;
+  }
+
   .artist-detail-header-actions {
     width: 100%;
   }

@@ -1745,7 +1745,7 @@ body {
   vertical-align: middle;
 }
 
-.hx-table tbody tr:hover td {
+.hx-table tbody tr:hover > td {
   background: var(--hx-bg-surface-muted);
 }
 
@@ -1754,8 +1754,13 @@ body {
   background: none;
 }
 
-/* Sub-table rows: both classes on the element give higher specificity (0,3,3) vs global (0,2,3) */
-.hx-table.ops-runs-subtable tbody tr:hover td {
+/* Keep the expanded nested-table container stable while hovered. */
+.ops-catalog-table > tbody > tr.ops-runs-expanded-row:hover > td {
+  background: var(--hx-bg-surface-sunken);
+}
+
+/* Sub-table rows: keep direct-cell hover styling local to the nested table. */
+.hx-table.ops-runs-subtable tbody tr:hover > td {
   background: var(--hx-bg-surface-sunken);
 }
 
@@ -1961,6 +1966,24 @@ body {
   font-weight: 500;
 }
 
+.ops-catalog-table .ops-status-col,
+.ops-catalog-table .ops-last-run-col,
+.ops-catalog-table .ops-action-col {
+  width: 1%;
+}
+
+.ops-catalog-table .ops-status-col {
+  min-width: 110px;
+}
+
+.ops-catalog-table .ops-last-run-col {
+  min-width: 100px;
+}
+
+.ops-catalog-table .ops-action-col {
+  min-width: 78px;
+}
+
 .ops-run-actions {
   text-align: right;
   white-space: nowrap;
@@ -2159,9 +2182,6 @@ body {
 .ops-time-cell {
   font-size: var(--hx-text-xs);
   white-space: nowrap;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .ops-duration {

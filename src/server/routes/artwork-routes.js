@@ -19,6 +19,7 @@
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
+import { createReadStream } from 'node:fs';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -27,11 +28,16 @@ export function registerArtworkRoutes(app, {
   buildArtworkCleanupRunDetail,
   buildArtworkSummary,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
+  getQuotaStatus,
   limitArtworkCleanupRun = skipRateLimitMiddleware,
+  limitArtworkResolveBatch = skipRateLimitMiddleware,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  resolveArtwork,
+  resolveArtworkBatch,
+  serveArtworkFile,
   startArtworkCleanupRun,
   writeDominantColor,
 }) {
@@ -81,5 +87,76 @@ export function registerArtworkRoutes(app, {
     });
 
     response.json({ ok: result.ok, updated: result.updated });
+  }));
+
+  app.get('/api/v1/artwork/assets/:assetId/file', asyncRoute(async (request, response) => {
+    await requireSession(request);
+
+    const { absolutePath, mimeType, fileSize } = await serveArtworkFile({
+      assetId: request.params.assetId,
+    });
+
+    response.setHeader('Content-Type', mimeType);
+    response.setHeader('Content-Length', fileSize);
+    response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+
+    createReadStream(absolutePath).pipe(response);
+  }));
+
+  app.get('/api/v1/artwork/resolve', asyncRoute(async (request, response) => {
+    await requireSession(request);
+
+    const { owner_type, owner_id, artwork_role, refresh } = request.query;
+    if (!owner_type || !owner_id) {
+      response.status(400).json({
+        ok: false,
+        error: { code: 'validation_error', message: 'owner_type and owner_id are required' },
+      });
+      return;
+    }
+
+    const result = await resolveArtwork({
+      artworkRole: artwork_role ?? 'cover_front',
+      ownerId: owner_id,
+      ownerType: owner_type,
+      refresh: refresh === 'true' || refresh === '1',
+    });
+
+    response.json(result);
+  }));
+
+  app.post('/api/v1/artwork/resolve-batch', limitArtworkResolveBatch, asyncRoute(async (request, response) => {
+    await requireSession(request);
+
+    const { requests: batchRequests } = request.body ?? {};
+    if (!Array.isArray(batchRequests) || batchRequests.length === 0) {
+      response.status(400).json({
+        ok: false,
+        error: { code: 'validation_error', message: 'requests must be a non-empty array' },
+      });
+      return;
+    }
+
+    if (batchRequests.length > 50) {
+      response.status(400).json({
+        ok: false,
+        error: { code: 'validation_error', message: 'Batch size must not exceed 50 items' },
+      });
+      return;
+    }
+
+    const results = await resolveArtworkBatch(batchRequests.map((r) => ({
+      artworkRole: r.artworkRole ?? r.artwork_role ?? 'cover_front',
+      ownerId: r.ownerId ?? r.owner_id,
+      ownerType: r.ownerType ?? r.owner_type,
+      refresh: r.refresh === true || r.refresh === 'true' || r.refresh === 1 || r.refresh === '1',
+    })));
+
+    response.json({ resolved: results });
+  }));
+
+  app.get('/api/v1/artwork/quota', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+    response.json(await getQuotaStatus());
   }));
 }

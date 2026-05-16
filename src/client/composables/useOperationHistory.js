@@ -74,7 +74,7 @@ export function useOperationHistory({
         isPollingActive.value = true;
         pollingTimerId = setIntervalFn(() => {
           if (!isLoadingHistory.value) {
-            void loadOperationHistory({ preferredRunId: selectedRunId.value }); // eslint-disable-line no-use-before-define
+            void loadOperationHistory({ preferredRunId: selectedRunId.value });
           }
         }, POLL_INTERVAL_MS);
       }
@@ -132,7 +132,7 @@ export function useOperationHistory({
     try {
       historyPayload.value = await fetchOperationHistory();
       lastRefreshedAt.value = new Date().toISOString();
-      const nextRunId = preferredRunId || null;
+      const nextRunId = preferredRunId || runs.value[0]?.id || null;
       await selectOperationRun({ runId: nextRunId });
       syncPolling();
     } catch (error) {

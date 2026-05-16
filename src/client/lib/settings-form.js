@@ -81,6 +81,7 @@ export function buildSettingsUpdatePayload(form) {
     artwork: {
       captureEmbedded: form.artwork.captureEmbedded,
       captureFolderArtwork: form.artwork.captureFolderArtwork,
+      dailyQuotaLimit: form.artwork.dailyQuotaLimit,
       derivativeCacheSizeMb: form.artwork.derivativeCacheSizeMb,
       derivativeFormat: form.artwork.derivativeFormat,
       derivativeRetentionDays: form.artwork.derivativeRetentionDays,
@@ -114,6 +115,7 @@ export function buildSettingsUpdatePayload(form) {
       appleMusicKeyId: form.providers.appleMusicKeyId,
       appleMusicStorefront: form.providers.appleMusicStorefront,
       appleMusicTeamId: form.providers.appleMusicTeamId,
+      fanartTvEnabled: form.providers.fanartTvEnabled,
       playlistExpansionPolicy: form.providers.playlistExpansionPolicy,
       requestTimeoutMs: form.providers.requestTimeoutMs,
       spotifyClientId: form.providers.spotifyClientId,
@@ -157,6 +159,25 @@ export function buildSettingsUpdatePayload(form) {
       payload.providers.clearAppleMusicPrivateKey = true;
     } else if (appleMusicPrivateKey) {
       payload.providers.appleMusicPrivateKey = appleMusicPrivateKey;
+    }
+
+    const fanartTvApiKey = typeof form.providers.fanartTvApiKey === 'string'
+      ? form.providers.fanartTvApiKey.trim()
+      : '';
+    const fanartTvClientKey = typeof form.providers.fanartTvClientKey === 'string'
+      ? form.providers.fanartTvClientKey.trim()
+      : '';
+
+    if (form.providers.clearFanartTvApiKey) {
+      payload.providers.clearFanartTvApiKey = true;
+    } else if (fanartTvApiKey) {
+      payload.providers.fanartTvApiKey = fanartTvApiKey;
+    }
+
+    if (form.providers.clearFanartTvClientKey) {
+      payload.providers.clearFanartTvClientKey = true;
+    } else if (fanartTvClientKey) {
+      payload.providers.fanartTvClientKey = fanartTvClientKey;
     }
   }
 

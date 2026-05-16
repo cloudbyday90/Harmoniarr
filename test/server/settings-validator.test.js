@@ -70,7 +70,7 @@ test('normalizeSettingsPatch rejects unknown artwork providers', () => {
     }),
     (error) => error?.status === 400
       && error?.code === 'validation_error'
-      && error?.message === 'artwork.providerOrder entries must be one of appleMusic, coverArtArchive, deezer, discogs, spotify, theAudioDb, tidal',
+      && error?.message === 'artwork.providerOrder entries must be one of appleMusic, coverArtArchive, deezer, discogs, fanartTv, spotify, theAudioDb, tidal',
   );
 });
 

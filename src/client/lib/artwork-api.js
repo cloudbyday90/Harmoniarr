@@ -44,3 +44,18 @@ export function patchArtworkDominantColor(assetId, { hue, chroma, lightness }) {
     method: 'PATCH',
   });
 }
+
+export function resolveArtwork({ ownerType, ownerId, artworkRole, refresh = false }) {
+  return apiRequest(`/api/v1/artwork/resolve${buildQueryString({ owner_type: ownerType, owner_id: ownerId, artwork_role: artworkRole, refresh: refresh || undefined })}`);
+}
+
+export function batchResolveArtwork(requests) {
+  return apiRequest('/api/v1/artwork/resolve-batch', {
+    body: { requests },
+    method: 'POST',
+  });
+}
+
+export function fetchArtworkQuota() {
+  return apiRequest('/api/v1/artwork/quota');
+}

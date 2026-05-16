@@ -25,6 +25,8 @@ const spotifyClientSecretName = 'providers.spotify.clientSecret';
 const youtubeApiKeySecretName = 'providers.youtube.apiKey';
 const youtubeClientSecretName = 'providers.youtube.clientSecret';
 const appleMusicPrivateKeySecretName = 'providers.appleMusic.privateKey';
+const fanartTvApiKeySecretName = 'providers.fanartTv.apiKey';
+const fanartTvClientKeySecretName = 'providers.fanartTv.clientKey';
 
 function createNoopSecretMutation(patch) {
   return {
@@ -96,19 +98,36 @@ export function createProviderCredentialsService({
   encryptedSecretService = createEncryptedSecretService({ env }),
 } = {}) {
   async function buildSecretStatus(queryable) {
-    const [spotifyMeta, youtubeMeta, youtubeClientSecretMeta, appleMusicMeta] = await Promise.all([
+    const [spotifyMeta, youtubeMeta, youtubeClientSecretMeta, appleMusicMeta, fanartTvApiKeyMeta, fanartTvClientKeyMeta] = await Promise.all([
       encryptedSecretService.getSecretMetadata({ name: spotifyClientSecretName, queryable, secretType }),
       encryptedSecretService.getSecretMetadata({ name: youtubeApiKeySecretName, queryable, secretType }),
       encryptedSecretService.getSecretMetadata({ name: youtubeClientSecretName, queryable, secretType }),
       encryptedSecretService.getSecretMetadata({ name: appleMusicPrivateKeySecretName, queryable, secretType }),
+      encryptedSecretService.getSecretMetadata({ name: fanartTvApiKeySecretName, queryable, secretType }),
+      encryptedSecretService.getSecretMetadata({ name: fanartTvClientKeySecretName, queryable, secretType }),
     ]);
 
     const hasSpotifyEnvSecret = Boolean(env.SPOTIFY_CLIENT_SECRET?.trim());
     const hasYoutubeEnvSecret = Boolean(env.YOUTUBE_API_KEY?.trim());
     const hasYoutubeClientSecretEnvSecret = Boolean(env.YOUTUBE_CLIENT_SECRET?.trim());
     const hasAppleMusicEnvSecret = Boolean(env.APPLE_MUSIC_PRIVATE_KEY?.trim());
+    const hasFanartTvApiKeyEnvSecret = Boolean(env.FANARTTV_API_KEY?.trim());
+    const hasFanartTvClientKeyEnvSecret = Boolean(env.FANARTTV_CLIENT_KEY?.trim());
 
     return {
+      appleMusic: {
+        privateKeyConfigured: appleMusicMeta.configured || hasAppleMusicEnvSecret,
+        privateKeySource: appleMusicMeta.configured ? 'stored' : hasAppleMusicEnvSecret ? 'environment' : 'unset',
+        privateKeyUpdatedAt: appleMusicMeta.updatedAt ?? null,
+      },
+      fanartTv: {
+        apiKeyConfigured: fanartTvApiKeyMeta.configured || hasFanartTvApiKeyEnvSecret,
+        apiKeySource: fanartTvApiKeyMeta.configured ? 'stored' : hasFanartTvApiKeyEnvSecret ? 'environment' : 'unset',
+        apiKeyUpdatedAt: fanartTvApiKeyMeta.updatedAt ?? null,
+        clientKeyConfigured: fanartTvClientKeyMeta.configured || hasFanartTvClientKeyEnvSecret,
+        clientKeySource: fanartTvClientKeyMeta.configured ? 'stored' : hasFanartTvClientKeyEnvSecret ? 'environment' : 'unset',
+        clientKeyUpdatedAt: fanartTvClientKeyMeta.updatedAt ?? null,
+      },
       spotify: {
         clientSecretConfigured: spotifyMeta.configured || hasSpotifyEnvSecret,
         clientSecretSource: spotifyMeta.configured ? 'stored' : hasSpotifyEnvSecret ? 'environment' : 'unset',
@@ -121,11 +140,6 @@ export function createProviderCredentialsService({
         clientSecretConfigured: youtubeClientSecretMeta.configured || hasYoutubeClientSecretEnvSecret,
         clientSecretSource: youtubeClientSecretMeta.configured ? 'stored' : hasYoutubeClientSecretEnvSecret ? 'environment' : 'unset',
         clientSecretUpdatedAt: youtubeClientSecretMeta.updatedAt ?? null,
-      },
-      appleMusic: {
-        privateKeyConfigured: appleMusicMeta.configured || hasAppleMusicEnvSecret,
-        privateKeySource: appleMusicMeta.configured ? 'stored' : hasAppleMusicEnvSecret ? 'environment' : 'unset',
-        privateKeyUpdatedAt: appleMusicMeta.updatedAt ?? null,
       },
     };
   }
@@ -216,6 +230,44 @@ export function createProviderCredentialsService({
       delete sanitizedPatch.providers.appleMusicPrivateKey;
       delete sanitizedPatch.providers.clearAppleMusicPrivateKey;
 
+      // Fanart.tv project API key
+      const fanartTvApiKeyExtract = buildSingleSecretMutation({
+        clearPatchKey: 'clearFanartTvApiKey',
+        encryptedSecretService,
+        envFallback: env.FANARTTV_API_KEY,
+        fieldPath: 'providers.fanartTvApiKey',
+        patchKey: 'fanartTvApiKey',
+        patchNamespace: 'providers',
+        secretName: fanartTvApiKeySecretName,
+      })(patch);
+
+      if (fanartTvApiKeyExtract.updatedKeys?.length > 0) {
+        allUpdatedKeys.push(...fanartTvApiKeyExtract.updatedKeys);
+        applyFunctions.push(fanartTvApiKeyExtract.apply);
+      }
+
+      delete sanitizedPatch.providers.fanartTvApiKey;
+      delete sanitizedPatch.providers.clearFanartTvApiKey;
+
+      // Fanart.tv personal API key
+      const fanartTvClientKeyExtract = buildSingleSecretMutation({
+        clearPatchKey: 'clearFanartTvClientKey',
+        encryptedSecretService,
+        envFallback: env.FANARTTV_CLIENT_KEY,
+        fieldPath: 'providers.fanartTvClientKey',
+        patchKey: 'fanartTvClientKey',
+        patchNamespace: 'providers',
+        secretName: fanartTvClientKeySecretName,
+      })(patch);
+
+      if (fanartTvClientKeyExtract.updatedKeys?.length > 0) {
+        allUpdatedKeys.push(...fanartTvClientKeyExtract.updatedKeys);
+        applyFunctions.push(fanartTvClientKeyExtract.apply);
+      }
+
+      delete sanitizedPatch.providers.fanartTvClientKey;
+      delete sanitizedPatch.providers.clearFanartTvClientKey;
+
       if (Object.keys(sanitizedPatch.providers).length === 0) {
         delete sanitizedPatch.providers;
       }
@@ -252,10 +304,22 @@ export function createProviderCredentialsService({
     return stored ?? env.APPLE_MUSIC_PRIVATE_KEY?.trim() ?? null;
   }
 
+  async function resolveFanartTvApiKey(queryable) {
+    const stored = await encryptedSecretService.getSecretValue({ name: fanartTvApiKeySecretName, queryable, secretType });
+    return stored ?? env.FANARTTV_API_KEY?.trim() ?? null;
+  }
+
+  async function resolveFanartTvClientKey(queryable) {
+    const stored = await encryptedSecretService.getSecretValue({ name: fanartTvClientKeySecretName, queryable, secretType });
+    return stored ?? env.FANARTTV_CLIENT_KEY?.trim() ?? null;
+  }
+
   return {
     buildSecretMutation,
     buildSecretStatus,
     resolveAppleMusicPrivateKey,
+    resolveFanartTvApiKey,
+    resolveFanartTvClientKey,
     resolveSpotifyClientSecret,
     resolveYoutubeApiKey,
     resolveYoutubeClientSecret,

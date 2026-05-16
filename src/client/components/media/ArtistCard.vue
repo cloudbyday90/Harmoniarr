@@ -84,6 +84,11 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  /** Local artwork URL from server-side resolve (preferred over CAA direct). */
+  localSrc: {
+    type: String,
+    default: null,
+  },
 });
 
 const emit = defineEmits(['monitor']);
@@ -131,7 +136,7 @@ const accentStyle = computed(() => {
     <RouterLink v-if="to" :to="to" class="hx-media-card__link-area">
       <div class="hx-media-card__artwork">
         <slot name="artwork">
-          <ArtworkImage ref="artworkImageComp" :alt="artist.name" />
+          <ArtworkImage ref="artworkImageComp" :alt="artist.name" :local-src="localSrc" />
         </slot>
       </div>
       <div class="hx-media-card__body">
@@ -142,7 +147,7 @@ const accentStyle = computed(() => {
     <template v-else>
       <div class="hx-media-card__artwork">
         <slot name="artwork">
-          <ArtworkImage ref="artworkImageComp" :alt="artist.name" />
+          <ArtworkImage ref="artworkImageComp" :alt="artist.name" :local-src="localSrc" />
         </slot>
       </div>
       <div class="hx-media-card__body">

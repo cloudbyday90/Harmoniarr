@@ -1,0 +1,64 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { resolveArtwork, batchResolveArtwork } from '../../src/client/lib/artwork-api.js';
+
+function createJsonResponse(payload = {}) {
+  return {
+    headers: new Headers({ 'content-type': 'application/json' }),
+    ok: true,
+    status: 200,
+    async json() {
+      return payload;
+    },
+  };
+}
+
+test('resolveArtwork builds URL without refresh when refresh is omitted', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({ url: null }));
+
+  await resolveArtwork({ ownerType: 'musicbrainz_artist', ownerId: 'mbid-1', artworkRole: 'artist_thumbnail' });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.ok(!url.includes('refresh'), `URL should not contain refresh: ${url}`);
+});
+
+test('resolveArtwork builds URL with refresh=true when refresh is true', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({ url: null }));
+
+  await resolveArtwork({ ownerType: 'musicbrainz_artist', ownerId: 'mbid-1', artworkRole: 'artist_thumbnail', refresh: true });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.ok(url.includes('refresh=true'), `URL should contain refresh=true: ${url}`);
+});
+
+test('resolveArtwork omits refresh from URL when refresh is false', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({ url: null }));
+
+  await resolveArtwork({ ownerType: 'musicbrainz_artist', ownerId: 'mbid-1', artworkRole: 'artist_thumbnail', refresh: false });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.ok(!url.includes('refresh'), `URL should not contain refresh: ${url}`);
+});
+
+test('batchResolveArtwork sends requests with refresh in body', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({ resolved: {} }));
+
+  await batchResolveArtwork([
+    { ownerType: 'musicbrainz_release', ownerId: 'mbid-1', refresh: true },
+    { ownerType: 'musicbrainz_release', ownerId: 'mbid-2' },
+  ]);
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  const [, opts] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(opts.method, 'POST');
+  const body = typeof opts.body === 'string' ? JSON.parse(opts.body) : opts.body;
+  assert.equal(body.requests[0].refresh, true);
+  assert.equal(body.requests[1].refresh, undefined);
+});
