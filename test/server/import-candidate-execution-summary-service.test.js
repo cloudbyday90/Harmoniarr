@@ -36,6 +36,20 @@ test('buildImportCandidateExecutionSummary returns the current run with persiste
         status: 'completed',
         totalSelected: 1,
       }),
+      listRecentRuns: async () => [{
+        blockedCount: 1,
+        currentStep: 'Planning snapshot complete',
+        executionMode: 'planning_only',
+        finishedAt: '2026-04-30T20:00:00.000Z',
+        id: 'run-1',
+        processedCandidateCount: 1,
+        readyCount: 0,
+        readyWithWarningsCount: 0,
+        requestedCandidateCount: 1,
+        startedAt: '2026-04-30T19:59:00.000Z',
+        status: 'completed',
+        totalSelected: 1,
+      }],
     },
     listImportExecutionRunItemsFn: async () => [{
       id: 'item-1',
@@ -53,6 +67,8 @@ test('buildImportCandidateExecutionSummary returns the current run with persiste
   assert.equal(summary.heartbeat.state.lastOutcome, 'started');
   assert.equal(summary.currentRun.id, 'run-1');
   assert.equal(summary.currentRun.items.length, 1);
+  assert.equal(summary.recentRuns.length, 1);
+  assert.equal(summary.recentRuns[0].id, 'run-1');
   assert.equal(summary.summary.status, 'blocked');
 });
 
@@ -64,6 +80,7 @@ test('buildImportCandidateExecutionSummary reports no run when none exist', asyn
     importCandidateExecutionRunStore: {
       getActiveRun: async () => null,
       getLatestRun: async () => null,
+      listRecentRuns: async () => [],
     },
     listImportExecutionRunItemsFn: async () => [],
   });
@@ -71,6 +88,7 @@ test('buildImportCandidateExecutionSummary reports no run when none exist', asyn
   const summary = await service.buildImportCandidateExecutionSummary();
 
   assert.equal(summary.currentRun, null);
+  assert.deepEqual(summary.recentRuns, []);
   assert.equal(summary.summary.status, 'not_started');
 });
 

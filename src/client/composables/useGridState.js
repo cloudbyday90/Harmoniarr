@@ -207,9 +207,9 @@ export function useGridState(
 
   function _hasFilterParams() {
     return (
-      Object.prototype.hasOwnProperty.call(route.query, 'sort') ||
-      Object.prototype.hasOwnProperty.call(route.query, 'order') ||
-      filterGroupKeys.some((k) => Object.prototype.hasOwnProperty.call(route.query, k))
+      Object.hasOwn(route.query, 'sort') ||
+      Object.hasOwn(route.query, 'order') ||
+      filterGroupKeys.some((k) => Object.hasOwn(route.query, k))
     );
   }
 

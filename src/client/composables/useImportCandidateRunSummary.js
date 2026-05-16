@@ -42,6 +42,7 @@ export function useImportCandidateRunSummary({
   const activeRun = computed(() => runSummary.value?.activeRun ?? null);
   const currentRun = computed(() => selectedRunDetail.value?.run ?? runSummary.value?.currentRun ?? null);
   const latestRun = computed(() => runSummary.value?.latestRun ?? null);
+  const recentRuns = computed(() => runSummary.value?.recentRuns ?? []);
   const summary = computed(() => runSummary.value?.summary ?? null);
 
   async function loadSelectedRunDetail({ runId }) {
@@ -130,6 +131,7 @@ export function useImportCandidateRunSummary({
     isSecondaryActionPending,
     isStarting,
     latestRun,
+    recentRuns,
     loadSelectedRunDetail,
     loadRunSummary,
     runDetailErrorMessage,

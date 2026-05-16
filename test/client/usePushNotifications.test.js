@@ -325,7 +325,6 @@ describe('usePushNotifications: unsubscribe', () => {
   it('sets errorMessage on failure', async () => {
     _resetPushNotificationsState();
     globalThis.PushManager = class {};
-    const existingSub = makePushSubscription();
     const { checkSubscriptionStatus, unsubscribe, errorMessage } = usePushNotifications({
       notificationApi: makeNotificationApi(),
       navigatorApi: {

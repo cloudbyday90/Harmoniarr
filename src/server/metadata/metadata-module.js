@@ -35,7 +35,7 @@ import { createMusicBrainzImportService } from './musicbrainz-import-service.js'
 import { createMusicBrainzSearchService } from './musicbrainz-search-service.js';
 import { createSimilarArtistsService } from './similar-artists-service.js';
 import { createReleaseGroupTracklistService } from './release-group-tracklist-service.js';
-import { markCanonicalRelease, forceCanonicalRelease } from './canonical-release-service.js';
+import { forceCanonicalRelease } from './canonical-release-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 
 export function createMetadataModule({

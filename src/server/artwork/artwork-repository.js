@@ -73,6 +73,24 @@ function mapArtworkAssignmentRow(row) {
   };
 }
 
+function mapArtworkFetchFailureRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    artworkRole: row.artwork_role,
+    createdAt: row.created_at,
+    failureCount: Number(row.failure_count ?? 0),
+    lastFailureCode: row.last_failure_code ?? null,
+    lastFailedAt: row.last_failed_at ?? null,
+    nextRetryAt: row.next_retry_at ?? null,
+    ownerId: row.owner_id,
+    ownerType: row.owner_type,
+    updatedAt: row.updated_at,
+  };
+}
+
 export async function upsertArtworkAsset(asset, queryable) {
   const db = resolveQueryable(queryable);
   const result = await db.query(
@@ -363,4 +381,82 @@ export async function deleteStaleArtworkAssignments({ artworkRole, exceptArtwork
   );
 
   return result.rows.map((row) => row.artwork_asset_id);
+}
+
+export async function getArtworkFetchFailure({ artworkRole, ownerId, ownerType }, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      SELECT *
+      FROM artwork_fetch_failures
+      WHERE owner_type = $1
+        AND owner_id = $2
+        AND artwork_role = $3
+      LIMIT 1
+    `,
+    [ownerType, ownerId, artworkRole],
+  );
+
+  return mapArtworkFetchFailureRow(result.rows[0]);
+}
+
+export async function upsertArtworkFetchFailure({
+  artworkRole,
+  failureCount,
+  lastFailureCode = null,
+  lastFailedAt,
+  nextRetryAt,
+  ownerId,
+  ownerType,
+}, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      INSERT INTO artwork_fetch_failures (
+        owner_type,
+        owner_id,
+        artwork_role,
+        failure_count,
+        last_failed_at,
+        next_retry_at,
+        last_failure_code,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (owner_type, owner_id, artwork_role) DO UPDATE
+      SET failure_count = EXCLUDED.failure_count,
+          last_failed_at = EXCLUDED.last_failed_at,
+          next_retry_at = EXCLUDED.next_retry_at,
+          last_failure_code = EXCLUDED.last_failure_code,
+          updated_at = NOW()
+      RETURNING *
+    `,
+    [
+      ownerType,
+      ownerId,
+      artworkRole,
+      failureCount,
+      lastFailedAt,
+      nextRetryAt,
+      lastFailureCode,
+    ],
+  );
+
+  return mapArtworkFetchFailureRow(result.rows[0]);
+}
+
+export async function deleteArtworkFetchFailure({ artworkRole, ownerId, ownerType }, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      DELETE FROM artwork_fetch_failures
+      WHERE owner_type = $1
+        AND owner_id = $2
+        AND artwork_role = $3
+      RETURNING *
+    `,
+    [ownerType, ownerId, artworkRole],
+  );
+
+  return mapArtworkFetchFailureRow(result.rows[0]);
 }

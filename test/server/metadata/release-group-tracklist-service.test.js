@@ -267,7 +267,9 @@ test('getReleaseGroupTracklist fires background import when on MB fallback path'
   await service.getReleaseGroupTracklist({ releaseGroupMbid: 'mb-rg-1', sessionUserId: null });
 
   // Allow the fire-and-forget to settle
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
   assert.equal(importMusicBrainzReleaseGroup.mock.callCount(), 1);
   assert.equal(importMusicBrainzReleaseGroup.mock.calls[0].arguments[0].releaseGroupId, 'mb-rg-1');
 });

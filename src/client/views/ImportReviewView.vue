@@ -21,6 +21,7 @@ import { computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ImportCandidateApplyPanel from '../components/ImportCandidateApplyPanel.vue';
 import ImportCandidateExecutionPanel from '../components/ImportCandidateExecutionPanel.vue';
+import ImportCandidateMediaInspectionPanel from '../components/ImportCandidateMediaInspectionPanel.vue';
 import ImportCandidateDetailPanel from '../components/ImportCandidateDetailPanel.vue';
 import ImportCandidateFilters from '../components/ImportCandidateFilters.vue';
 import ImportCandidateQueueList from '../components/ImportCandidateQueueList.vue';
@@ -31,6 +32,7 @@ import {
   normalizeImportReviewRouteState,
 } from '../lib/import-review-route-state.js';
 import { useImportCandidateApplySummary } from '../composables/useImportCandidateApplySummary.js';
+import { useImportCandidateMediaInspectionSummary } from '../composables/useImportCandidateMediaInspectionSummary.js';
 import SelectedImportCandidateStatusPanel from '../components/SelectedImportCandidateStatusPanel.vue';
 import { useImportCandidateExecutionSummary } from '../composables/useImportCandidateExecutionSummary.js';
 import { useImportReviewWorkspace } from '../composables/useImportReviewWorkspace.js';
@@ -97,6 +99,7 @@ const {
   isLoading: isLoadingApplySummary,
   isStarting: isStartingApplyRun,
   loadImportCandidateApplySummary,
+  recentRuns: recentApplyRuns,
   runDetailErrorMessage: applyRunDetailErrorMessage,
   selectedRunId: selectedApplyRunId,
   startApplyRun,
@@ -111,12 +114,27 @@ const {
   isReconciling: isReconcilingExecutionState,
   isStarting: isStartingExecutionRun,
   loadImportCandidateExecutionSummary,
+  recentRuns: recentExecutionRuns,
   reconcileExecutionState,
   runDetailErrorMessage: executionRunDetailErrorMessage,
   selectedRunId: selectedExecutionRunId,
   startExecutionRun,
   summary: executionSummary,
 } = useImportCandidateExecutionSummary();
+
+const {
+  actionErrorMessage: mediaInspectionActionErrorMessage,
+  currentRun: currentMediaInspectionRun,
+  errorMessage: mediaInspectionErrorMessage,
+  isLoading: isLoadingMediaInspectionSummary,
+  isStarting: isStartingMediaInspectionRun,
+  loadImportCandidateMediaInspectionSummary,
+  recentRuns: recentMediaInspectionRuns,
+  runDetailErrorMessage: mediaInspectionRunDetailErrorMessage,
+  selectedRunId: selectedMediaInspectionRunId,
+  startMediaInspectionRun,
+  summary: mediaInspectionSummary,
+} = useImportCandidateMediaInspectionSummary();
 
 function importReviewRouteState() {
   return normalizeImportReviewRouteState(route.query);
@@ -127,6 +145,7 @@ function buildMergedImportReviewRouteQuery(nextState) {
   delete query.applyRunId;
   delete query.candidate;
   delete query.executionRunId;
+  delete query.mediaInspectionRunId;
   delete query.folderPath;
   delete query.sourceSearchId;
   delete query.status;
@@ -184,10 +203,28 @@ async function handleReconcileExecutionState() {
   await refreshQueue({ preserveSelection: true });
 }
 
+async function handleSelectExecutionRun(runId) {
+  await replaceImportReviewRouteState({ executionRunId: runId }, { hash: '#import-execution-run-panel' });
+}
+
 async function handleStartApplyRun() {
   await replaceImportReviewRouteState({ applyRunId: '' }, { hash: '#import-apply-run-panel' });
   await startApplyRun();
   await refreshQueue({ preserveSelection: true });
+}
+
+async function handleStartMediaInspectionRun() {
+  await replaceImportReviewRouteState({ mediaInspectionRunId: '' }, { hash: '#import-media-inspection-run-panel' });
+  await startMediaInspectionRun();
+  await refreshQueue({ preserveSelection: true });
+}
+
+async function handleSelectApplyRun(runId) {
+  await replaceImportReviewRouteState({ applyRunId: runId }, { hash: '#import-apply-run-panel' });
+}
+
+async function handleSelectMediaInspectionRun(runId) {
+  await replaceImportReviewRouteState({ mediaInspectionRunId: runId }, { hash: '#import-media-inspection-run-panel' });
 }
 
 watch(
@@ -198,6 +235,7 @@ watch(
     }
 
     void loadImportCandidateExecutionSummary();
+    void loadImportCandidateMediaInspectionSummary();
   },
   { immediate: true },
 );
@@ -240,6 +278,29 @@ watch(
 
     void loadImportCandidateExecutionSummary({ preferredRunId: nextRunId });
     void nextTick().then(() => scrollPanelIntoView('import-execution-run-panel'));
+  },
+);
+
+watch(
+  () => importReviewRouteState().mediaInspectionRunId,
+  (nextRunId, previousRunId) => {
+    if (!isAdmin.value) {
+      return;
+    }
+
+    if (nextRunId === previousRunId) {
+      return;
+    }
+
+    if (!nextRunId) {
+      if (selectedMediaInspectionRunId.value !== null) {
+        void loadImportCandidateMediaInspectionSummary({ preferredRunId: null });
+      }
+      return;
+    }
+
+    void loadImportCandidateMediaInspectionSummary({ preferredRunId: nextRunId });
+    void nextTick().then(() => scrollPanelIntoView('import-media-inspection-run-panel'));
   },
 );
 
@@ -358,12 +419,33 @@ watch(
       :is-loading="isLoadingExecutionSummary"
       :is-reconciling="isReconcilingExecutionState"
       :is-starting="isStartingExecutionRun"
+      :recent-runs="recentExecutionRuns"
       :run-detail-error-message="executionRunDetailErrorMessage"
       :selected-candidate-count="selectedSummaryCounts.totalSelected"
+      :selected-run-id="selectedExecutionRunId"
       :summary="executionSummary"
       @reconcile="handleReconcileExecutionState"
       @refresh="loadImportCandidateExecutionSummary"
+      @select-run="handleSelectExecutionRun"
       @start="handleStartExecutionRun"
+    />
+
+    <ImportCandidateMediaInspectionPanel
+      v-if="isAdmin"
+      id="import-media-inspection-run-panel"
+      :action-error-message="mediaInspectionActionErrorMessage"
+      :current-run="currentMediaInspectionRun"
+      :error-message="mediaInspectionErrorMessage"
+      :is-loading="isLoadingMediaInspectionSummary"
+      :is-starting="isStartingMediaInspectionRun"
+      :recent-runs="recentMediaInspectionRuns"
+      :run-detail-error-message="mediaInspectionRunDetailErrorMessage"
+      :selected-candidate-count="selectedSummaryCounts.totalSelected"
+      :selected-run-id="selectedMediaInspectionRunId"
+      :summary="mediaInspectionSummary"
+      @refresh="loadImportCandidateMediaInspectionSummary"
+      @select-run="handleSelectMediaInspectionRun"
+      @start="handleStartMediaInspectionRun"
     />
 
     <ImportCandidateApplyPanel
@@ -375,9 +457,12 @@ watch(
       :import-pending-candidate-count="importPendingSummaryCounts.totalImportPending"
       :is-loading="isLoadingApplySummary"
       :is-starting="isStartingApplyRun"
+      :recent-runs="recentApplyRuns"
       :run-detail-error-message="applyRunDetailErrorMessage"
+      :selected-run-id="selectedApplyRunId"
       :summary="applyRunSummary"
       @refresh="loadImportCandidateApplySummary"
+      @select-run="handleSelectApplyRun"
       @start="handleStartApplyRun"
     />
 

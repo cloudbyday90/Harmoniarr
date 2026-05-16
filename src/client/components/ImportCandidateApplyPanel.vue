@@ -31,6 +31,10 @@ import {
   getApplyOperationStepLabel,
   getRunStatusClass,
 } from '../lib/import-candidate-presentation.js';
+import {
+  formatElapsedDuration,
+  formatOperationTimestampShort,
+} from '../lib/operation-run-presentation.js';
 
 defineProps({
   actionErrorMessage: {
@@ -57,9 +61,17 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  recentRuns: {
+    type: Array,
+    default: () => [],
+  },
   runDetailErrorMessage: {
     type: String,
     default: '',
+  },
+  selectedRunId: {
+    type: String,
+    default: null,
   },
   summary: {
     type: Object,
@@ -67,7 +79,7 @@ defineProps({
   },
 });
 
-defineEmits(['refresh', 'start']);
+defineEmits(['refresh', 'select-run', 'start']);
 </script>
 
 <template>
@@ -118,10 +130,64 @@ defineEmits(['refresh', 'start']);
     </article>
 
     <template v-else>
+      <article class="onboarding-step-card" v-if="recentRuns.length">
+        <div class="review-detail-header">
+          <div>
+            <p>Recent apply history</p>
+            <strong>The last {{ recentRuns.length }} import apply run{{ recentRuns.length === 1 ? '' : 's' }}.</strong>
+          </div>
+        </div>
+        <table class="hx-table apply-runs-subtable">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Duration</th>
+              <th>Requested</th>
+              <th>Applied</th>
+              <th>Warnings</th>
+              <th>Failed</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="run in recentRuns"
+              :key="run.id"
+              class="apply-runs-subtable-row"
+              :aria-selected="run.id === (selectedRunId || currentRun?.id) ? 'true' : 'false'"
+              :class="{ 'is-selected': run.id === (selectedRunId || currentRun?.id) }"
+            >
+              <td>
+                <span class="review-status-pill" :class="getRunStatusClass(run.status)">
+                  {{ formatRunStatus(run.status) }}
+                </span>
+              </td>
+              <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatOperationTimestampShort(run.startedAt) }}</span></td>
+              <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</span></td>
+              <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.requestedCandidateCount ?? 0 }}</td>
+              <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.appliedCount ?? 0 }}</td>
+              <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.appliedWithWarningsCount ?? 0 }}</td>
+              <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.applyFailedCount ?? 0 }}</td>
+              <td class="apply-run-detail-cell">
+                <button
+                  type="button"
+                  class="hx-btn apply-run-detail-btn"
+                  :aria-pressed="run.id === (selectedRunId || currentRun?.id) ? 'true' : 'false'"
+                  @click="$emit('select-run', run.id)"
+                >
+                  {{ run.id === (selectedRunId || currentRun?.id) ? 'Selected' : 'View' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+
       <div class="review-detail-header">
         <div>
-          <p class="eyebrow">Move</p>
-          <h3>Run {{ currentRun.id }}</h3>
+          <p>Selected run</p>
+          <strong>Run {{ currentRun.id }}</strong>
           <p class="metadata-card-copy">{{ currentRun.currentStep || 'No current step reported' }}</p>
         </div>
         <span class="review-status-pill" :class="getRunStatusClass(currentRun.status)">
@@ -268,3 +334,59 @@ defineEmits(['refresh', 'start']);
     </template>
   </article>
 </template>
+
+<style scoped>
+.apply-runs-subtable {
+  margin: 0;
+  background: var(--hx-bg-surface-sunken);
+}
+
+.apply-runs-subtable thead,
+.apply-runs-subtable tbody,
+.apply-runs-subtable thead tr,
+.apply-runs-subtable tbody tr {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.apply-runs-subtable thead th,
+.apply-runs-subtable tbody td {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.apply-runs-subtable thead tr:hover > th,
+.apply-runs-subtable tbody tr:hover > td {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.apply-runs-subtable-row {
+  cursor: default;
+}
+
+.apply-runs-subtable tbody tr.is-selected > td {
+  background: var(--hx-bg-surface) !important;
+  border-top-color: rgba(94, 173, 255, 0.22);
+  border-bottom-color: rgba(94, 173, 255, 0.22);
+}
+
+.apply-runs-subtable tbody tr.is-selected > td:first-child {
+  border-left: 3px solid var(--hx-accent);
+  padding-left: 9px;
+}
+
+.apply-run-detail-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.apply-run-detail-btn {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: var(--hx-text-xs);
+}
+
+.apply-run-detail-btn[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  border-color: rgba(94, 173, 255, 0.32);
+  color: var(--hx-accent-strong);
+}
+</style>

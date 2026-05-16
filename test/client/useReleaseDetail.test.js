@@ -140,7 +140,9 @@ test('useReleaseDetail load aborts in-flight request when called again', async (
   const fetchTracklist = t.mock.fn(async (_mbid, options) => {
     capturedSignal = options?.signal;
     // Simulate a slow request that resolves after the abort check
-    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => {
+      setImmediate(resolve);
+    });
     if (capturedSignal?.aborted) {
       const err = new Error('AbortError');
       err.name = 'AbortError';

@@ -451,8 +451,8 @@ test('toggleSortOrder from default asc (no order param) flips to desc', () => {
 // ── sessionStorage restore ────────────────────────────────────────────────────
 
 test('sessionStorage: restores saved state when URL has no params and restoreKey set', async () => {
-  const route = makeRoute({});
-  const router = makeRouter();
+  const _route = makeRoute({});
+  const _router = makeRouter();
   const saved = JSON.stringify({ sort: 'title', order: 'desc' });
   const storage = makeStorage({ 'hx_grid_myview': saved });
 

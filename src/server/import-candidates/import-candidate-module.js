@@ -25,6 +25,7 @@ import { createImportCandidateApplySummaryService } from './import-candidate-app
 import { createImportCandidateApplyWorker } from './import-candidate-apply-worker.js';
 import { createImportCandidateMediaInspectionRunStore } from './import-candidate-media-inspection-run-store.js';
 import { createImportCandidateMediaInspectionService } from './import-candidate-media-inspection-service.js';
+import { createImportCandidateMediaInspectionSummaryService } from './import-candidate-media-inspection-summary-service.js';
 import { createImportCandidateMediaInspectionWorker } from './import-candidate-media-inspection-worker.js';
 import { createImportCandidateTranscodeRunStore } from './import-candidate-transcode-run-store.js';
 import { createImportCandidateTranscodeService } from './import-candidate-transcode-service.js';
@@ -237,6 +238,9 @@ export function createImportCandidateModule({
     importCandidateExecutionHeartbeatState,
     importCandidateExecutionRunStore,
   }),
+  importCandidateMediaInspectionSummaryService = createImportCandidateMediaInspectionSummaryService({
+    importCandidateMediaInspectionRunStore,
+  }),
   importCandidateApplySummaryService = createImportCandidateApplySummaryService({
     importCandidateApplyRunStore,
   }),
@@ -253,6 +257,7 @@ export function createImportCandidateModule({
     importCandidateApplyOperationService,
     importCandidateMediaInspectionRunStore,
     importCandidateMediaInspectionService,
+    importCandidateMediaInspectionSummaryService,
     importCandidateMediaInspectionWorker,
     importCandidateTranscodeRunStore,
     importCandidateTranscodeService,
@@ -279,6 +284,8 @@ export function createImportCandidateModule({
       buildImportCandidateApplySummary: importCandidateApplySummaryService.buildImportCandidateApplySummary,
       buildImportCandidateExecutionRunDetail: importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail,
       buildImportCandidateExecutionSummary: importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
+      buildImportCandidateMediaInspectionRunDetail: importCandidateMediaInspectionSummaryService.buildImportCandidateMediaInspectionRunDetail,
+      buildImportCandidateMediaInspectionSummary: importCandidateMediaInspectionSummaryService.buildImportCandidateMediaInspectionSummary,
       buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
       buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
       getImportCandidate: importCandidateService.getImportCandidate,

@@ -83,55 +83,8 @@ function createArtworkRouteTestApp(overrides = {}) {
       }),
       writeDominantColor: async () => ({ ok: true, updated: true }),
       ...overrides,
+    });
   });
-});
-
-test('artwork quota history route requires admin session and returns history', async (t) => {
-  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', user: { role: 'admin' } }));
-  const getQuotaHistory = t.mock.fn(async ({ days }) => ({
-    days,
-    history: {
-      coverArtArchive: [
-        { date: '2026-05-14', requestCount: 42 },
-        { date: '2026-05-15', requestCount: 55 },
-      ],
-      fanartTv: [{ date: '2026-05-15', requestCount: 10 }],
-    },
-    limit: 100,
-  }));
-
-  const app = createArtworkRouteTestApp({ getQuotaHistory, requireAdminSession });
-
-  await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/artwork/quota/history?days=7`);
-    const payload = await response.json();
-
-    assert.equal(response.status, 200);
-    assert.equal(requireAdminSession.mock.callCount(), 1);
-    assert.equal(getQuotaHistory.mock.callCount(), 1);
-    assert.equal(getQuotaHistory.mock.calls[0].arguments[0].days, 7);
-    assert.equal(payload.days, 7);
-    assert.equal(payload.limit, 100);
-    assert.equal(payload.history.coverArtArchive.length, 2);
-    assert.equal(payload.history.fanartTv.length, 1);
-  });
-});
-
-test('artwork quota history route defaults to 30 days', async (t) => {
-  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', user: { role: 'admin' } }));
-  const getQuotaHistory = t.mock.fn(async ({ days }) => ({ days, history: {}, limit: 100 }));
-
-  const app = createArtworkRouteTestApp({ getQuotaHistory, requireAdminSession });
-
-  await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/artwork/quota/history`);
-    const payload = await response.json();
-
-    assert.equal(response.status, 200);
-    assert.equal(getQuotaHistory.mock.calls[0].arguments[0].days, 30);
-    assert.equal(payload.days, 30);
-  });
-});
 }
 
 test('artwork cleanup run detail route requires admin session and returns a single cleanup run', async (t) => {

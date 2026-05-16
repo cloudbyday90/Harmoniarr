@@ -21,9 +21,15 @@ test('resolveArtwork returns null when fetch is disabled', async () => {
 });
 
 test('resolveArtwork returns cached assignment when one exists', async () => {
+  let clearedFailure = false;
   const fetchService = createArtworkFetchService({
     artworkPolicyService: {
       getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }),
+    },
+    artworkFetchBackoffService: {
+      clearFailure: async () => { clearedFailure = true; },
+      recordFailure: async () => { throw new Error('should not record failure for cached artwork'); },
+      shouldBackoff: async () => ({ active: false, retryAfterAt: null }),
     },
     listArtworkAssignmentsFn: async () => [
       {
@@ -45,6 +51,7 @@ test('resolveArtwork returns cached assignment when one exists', async () => {
   assert.equal(result.assetId, 'asset-1');
   assert.equal(result.cached, true);
   assert.equal(result.sourceProvider, 'coverArtArchive');
+  assert.equal(clearedFailure, true);
 });
 
 test('resolveArtwork returns null when no CAA client is configured', async () => {
@@ -111,9 +118,21 @@ test('resolveArtwork fetches from CAA and creates assignment', async () => {
 });
 
 test('resolveArtwork returns null when CAA has no artwork', async () => {
+  let recordedFailure = null;
   const fetchService = createArtworkFetchService({
     artworkPolicyService: {
       getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }),
+    },
+    artworkFetchBackoffService: {
+      clearFailure: async () => {},
+      recordFailure: async (failure) => {
+        recordedFailure = {
+          ...failure,
+          nextRetryAt: '2026-05-15T13:00:00.000Z',
+        };
+        return recordedFailure;
+      },
+      shouldBackoff: async () => ({ active: false, retryAfterAt: null }),
     },
     coverArtArchiveClient: {
       fetchFrontImage: async () => null,
@@ -128,6 +147,14 @@ test('resolveArtwork returns null when CAA has no artwork', async () => {
 
   assert.equal(result.url, null);
   assert.equal(result.assetId, null);
+  assert.equal(result.retryAfterAt, '2026-05-15T13:00:00.000Z');
+  assert.deepEqual(recordedFailure, {
+    artworkRole: 'cover_front',
+    failureCode: 'artwork_unavailable',
+    nextRetryAt: '2026-05-15T13:00:00.000Z',
+    ownerId: 'mbid-1',
+    ownerType: 'musicbrainz_release_group',
+  });
 });
 
 test('resolveArtwork returns null for unsupported owner types', async () => {
@@ -239,10 +266,16 @@ test('resolveArtwork fetches artist thumbnail from Fanart.tv', async () => {
 test('resolveArtwork falls through to Fanart.tv for release groups when CAA returns nothing', async () => {
   const fakeAsset = { id: 'fanart-album-1', dominantChroma: null, dominantHue: null, dominantLightness: null };
   const fakeImageBuffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
+  let clearedFailure = false;
 
   const fetchService = createArtworkFetchService({
     artworkPolicyService: {
       getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }),
+    },
+    artworkFetchBackoffService: {
+      clearFailure: async () => { clearedFailure = true; },
+      recordFailure: async () => { throw new Error('should not record a failure when Fanart.tv succeeds'); },
+      shouldBackoff: async () => ({ active: false, retryAfterAt: null }),
     },
     listArtworkAssignmentsFn: async () => [],
     coverArtArchiveClient: {
@@ -270,6 +303,7 @@ test('resolveArtwork falls through to Fanart.tv for release groups when CAA retu
 
   assert.equal(result.sourceProvider, 'fanartTv');
   assert.equal(result.url, '/api/v1/artwork/assets/fanart-album-1/file');
+  assert.equal(clearedFailure, true);
 });
 
 test('resolveArtwork skips CAA when quota is exceeded', async () => {
@@ -453,6 +487,73 @@ test('resolveArtwork with refresh=false returns cached assignment', async () => 
 
   assert.equal(result.cached, true);
   assert.equal(result.url, '/api/v1/artwork/assets/cached-asset/file');
+});
+
+test('resolveArtwork respects tracked retry backoff for non-refresh fetches', async () => {
+  let coverArtCalled = false;
+  const fetchService = createArtworkFetchService({
+    artworkPolicyService: {
+      getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }),
+    },
+    artworkFetchBackoffService: {
+      clearFailure: async () => {},
+      recordFailure: async () => { throw new Error('should not record during an active backoff window'); },
+      shouldBackoff: async () => ({
+        active: true,
+        retryAfterAt: '2026-05-15T16:00:00.000Z',
+      }),
+    },
+    coverArtArchiveClient: {
+      fetchFrontImage: async () => {
+        coverArtCalled = true;
+        return null;
+      },
+    },
+    listArtworkAssignmentsFn: async () => [],
+  });
+
+  const result = await fetchService.resolveArtwork({
+    ownerId: 'artist-1',
+    ownerType: 'musicbrainz_release_group',
+    artworkRole: 'cover_front',
+  });
+
+  assert.equal(coverArtCalled, false);
+  assert.equal(result.retryBackoffActive, true);
+  assert.equal(result.retryAfterAt, '2026-05-15T16:00:00.000Z');
+});
+
+test('resolveArtwork refresh=true bypasses tracked retry backoff', async () => {
+  let coverArtCalled = false;
+  const fetchService = createArtworkFetchService({
+    artworkPolicyService: {
+      getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }),
+    },
+    artworkFetchBackoffService: {
+      clearFailure: async () => {},
+      recordFailure: async () => ({ nextRetryAt: '2026-05-15T18:00:00.000Z' }),
+      shouldBackoff: async () => ({
+        active: true,
+        retryAfterAt: '2026-05-15T16:00:00.000Z',
+      }),
+    },
+    coverArtArchiveClient: {
+      fetchFrontImage: async () => {
+        coverArtCalled = true;
+        return null;
+      },
+    },
+    listArtworkAssignmentsFn: async () => [],
+  });
+
+  await fetchService.resolveArtwork({
+    ownerId: 'artist-1',
+    ownerType: 'musicbrainz_release_group',
+    artworkRole: 'cover_front',
+    refresh: true,
+  });
+
+  assert.equal(coverArtCalled, true);
 });
 
 test('resolveArtworkBatch forwards refresh=true to resolveArtwork', async () => {

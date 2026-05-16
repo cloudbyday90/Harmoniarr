@@ -20,8 +20,6 @@ import { getPool } from '../database.js';
 import {
   getMetadataReleaseGroupByMusicBrainzReleaseGroupId,
   listReleasesWithCanonicalByReleaseGroupId,
-  getMetadataReleaseById,
-  getMetadataReleaseByMusicBrainzReleaseId,
   listMetadataMediaByReleaseId,
   listMetadataTracksByReleaseId,
 } from './metadata-repository.js';

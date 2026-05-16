@@ -16,12 +16,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createApiError } from '../auth.js';
 import { listImportExecutionRunItems } from './import-candidate-execution-repository.js';
 import { resolveImportCandidateExecutionHeartbeatConfig } from './import-candidate-execution-heartbeat-config.js';
 import { resolveImportCandidateExecutionMissingTransferConfig } from './import-candidate-execution-missing-transfer-config.js';
 import { createImportCandidateExecutionHeartbeatState } from './import-candidate-execution-heartbeat-state.js';
 import { createImportCandidateExecutionRunStore } from './import-candidate-execution-run-store.js';
+import { createImportCandidateRunSummaryService } from './import-candidate-run-summary-service.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
 
 function parseIsoDate(value) {
@@ -298,44 +298,23 @@ export function createImportCandidateExecutionSummaryService({
     };
   }
 
-  async function buildImportCandidateExecutionSummary() {
-    const checkedAt = new Date().toISOString();
-    const [activeRun, latestRun] = await Promise.all([
-      importCandidateExecutionRunStore.getActiveRun(),
-      importCandidateExecutionRunStore.getLatestRun(),
-    ]);
-
-    const currentRun = await buildRunWithItems(activeRun ?? latestRun);
-
-    return {
-      activeRun,
-      checkedAt,
-      currentRun,
+  const runSummaryService = createImportCandidateRunSummaryService({
+    buildDisplayRunSummary,
+    buildRunWithItems,
+    extendSummary: async () => ({
       heartbeat: {
         ...importCandidateExecutionHeartbeatConfig,
         state: importCandidateExecutionHeartbeatState.getHeartbeatState(),
       },
       missingTransferPolicy: importCandidateExecutionMissingTransferConfig,
-      latestRun,
-      summary: buildDisplayRunSummary(currentRun),
-    };
-  }
-
-  async function buildImportCandidateExecutionRunDetail({ runId }) {
-    const run = await importCandidateExecutionRunStore.getRunById(runId);
-
-    if (!run) {
-      throw createApiError(404, 'import_candidate_execution_run_not_found', 'Import execution run not found');
-    }
-
-    return {
-      checkedAt: new Date().toISOString(),
-      run: await buildRunWithItems(run),
-    };
-  }
+    }),
+    runNotFoundCode: 'import_candidate_execution_run_not_found',
+    runNotFoundMessage: 'Import execution run not found',
+    runStore: importCandidateExecutionRunStore,
+  });
 
   return {
-    buildImportCandidateExecutionRunDetail,
-    buildImportCandidateExecutionSummary,
+    buildImportCandidateExecutionRunDetail: runSummaryService.buildRunDetail,
+    buildImportCandidateExecutionSummary: runSummaryService.buildRunSummary,
   };
 }

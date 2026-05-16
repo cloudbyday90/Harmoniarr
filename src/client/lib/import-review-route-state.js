@@ -50,6 +50,7 @@ export function normalizeImportReviewRouteState(query = {}) {
     applyRunId: normalizeRunId(query.applyRunId),
     candidateId: normalizeRouteValue(query.candidate),
     executionRunId: normalizeRunId(query.executionRunId),
+    mediaInspectionRunId: normalizeRunId(query.mediaInspectionRunId),
     folderPath: normalizeRouteValue(query.folderPath),
     sourceSearchId: normalizeRouteValue(query.sourceSearchId),
     status: normalizeStatusToken(query.status),
@@ -61,6 +62,7 @@ export function buildImportReviewRouteQuery(state = {}) {
   const applyRunId = normalizeRunId(state.applyRunId);
   const candidateId = normalizeRouteValue(state.candidateId);
   const executionRunId = normalizeRunId(state.executionRunId);
+  const mediaInspectionRunId = normalizeRunId(state.mediaInspectionRunId);
   const folderPath = normalizeRouteValue(state.folderPath);
   const sourceSearchId = normalizeRouteValue(state.sourceSearchId);
   const status = typeof state.status === 'string'
@@ -79,6 +81,10 @@ export function buildImportReviewRouteQuery(state = {}) {
 
   if (executionRunId) {
     query.executionRunId = executionRunId;
+  }
+
+  if (mediaInspectionRunId) {
+    query.mediaInspectionRunId = mediaInspectionRunId;
   }
 
   if (folderPath) {
@@ -107,6 +113,7 @@ export function getImportReviewRouteStateKey(state) {
     applyRunId: state?.applyRunId,
     candidate: state?.candidateId,
     executionRunId: state?.executionRunId,
+    mediaInspectionRunId: state?.mediaInspectionRunId,
     folderPath: state?.folderPath,
     sourceSearchId: state?.sourceSearchId,
     status: state?.status === '' ? 'all' : state?.status,
@@ -117,6 +124,7 @@ export function getImportReviewRouteStateKey(state) {
     normalized.applyRunId,
     normalized.candidateId,
     normalized.executionRunId,
+    normalized.mediaInspectionRunId,
     normalized.folderPath,
     normalized.sourceSearchId,
     normalized.status,
@@ -140,6 +148,16 @@ export function buildImportReviewApplyRunLocation(runId) {
     name: 'review-queue',
     query: buildImportReviewRouteQuery({
       applyRunId: runId,
+    }),
+  };
+}
+
+export function buildImportReviewMediaInspectionRunLocation(runId) {
+  return {
+    hash: '#import-media-inspection-run-panel',
+    name: 'review-queue',
+    query: buildImportReviewRouteQuery({
+      mediaInspectionRunId: runId,
     }),
   };
 }

@@ -53,6 +53,7 @@ export function useImportCandidateExecutionSummary({
     latestRun: workflow.latestRun,
     loadImportCandidateExecutionSummary: workflow.loadRunSummary,
     loadSelectedImportCandidateExecutionRun: workflow.loadSelectedRunDetail,
+    recentRuns: workflow.recentRuns,
     reconcileExecutionState: workflow.runSecondaryAction,
     runDetailErrorMessage: workflow.runDetailErrorMessage,
     selectedRunId: workflow.selectedRunId,

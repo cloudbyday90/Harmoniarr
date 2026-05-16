@@ -26,6 +26,10 @@ import {
   getArtworkMaintenanceStatusClass,
   getArtworkMaintenanceStatusLabel,
 } from '../lib/artwork-maintenance-status.js';
+import {
+  formatElapsedDuration,
+  formatOperationTimestampShort,
+} from '../lib/operation-run-presentation.js';
 
 defineProps({
   actionErrorMessage: {
@@ -211,44 +215,49 @@ const emit = defineEmits(['refresh', 'select-run', 'start']);
             </div>
             <span class="review-status-pill review-status-held">Checked {{ runHistoryPayload.checkedAt ?? 'Unavailable' }}</span>
           </div>
-          <div class="review-file-list">
-            <button
-              v-for="run in runHistoryPayload.runs"
-              :key="run.id"
-              type="button"
-              class="review-list-item"
-              :class="{ 'is-selected': run.id === selectedRunId }"
-              @click="emit('select-run', run.id)"
-            >
-              <div class="review-detail-header">
-                <div>
-                  <p>{{ run.startedAt ?? 'Unknown start' }}</p>
-                  <strong>{{ getArtworkCleanupHistorySummary(run) }}</strong>
-                </div>
-                <span class="review-status-pill" :class="getArtworkCleanupRunStatusClass(run.status)">
-                  {{ getArtworkCleanupRunStatusLabel(run.status) }}
-                </span>
-              </div>
-              <dl class="review-meta-grid onboarding-meta-grid">
-                <div>
-                  <dt>Requested</dt>
-                  <dd>{{ run.requestedAssetCount ?? 'Unavailable' }}</dd>
-                </div>
-                <div>
-                  <dt>Deleted</dt>
-                  <dd>{{ run.deletedAssetCount ?? 'Unavailable' }}</dd>
-                </div>
-                <div>
-                  <dt>Failed</dt>
-                  <dd>{{ run.failedAssetCount ?? 'Unavailable' }}</dd>
-                </div>
-                <div>
-                  <dt>Finished</dt>
-                  <dd>{{ run.finishedAt ?? 'Not yet recorded' }}</dd>
-                </div>
-              </dl>
-            </button>
-          </div>
+          <table class="hx-table artwork-runs-subtable">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Requested</th>
+                <th>Deleted</th>
+                <th>Failed</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="run in runHistoryPayload.runs"
+                :key="run.id"
+                class="artwork-runs-subtable-row"
+                :aria-selected="run.id === selectedRunId ? 'true' : 'false'"
+                :class="{ 'is-selected': run.id === selectedRunId }"
+              >
+                <td>
+                  <span class="review-status-pill" :class="getArtworkCleanupRunStatusClass(run.status)">
+                    {{ getArtworkCleanupRunStatusLabel(run.status) }}
+                  </span>
+                </td>
+                <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatOperationTimestampShort(run.startedAt) }}</span></td>
+                <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</span></td>
+                <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.requestedAssetCount ?? 0 }}</td>
+                <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.deletedAssetCount ?? 0 }}</td>
+                <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.failedAssetCount ?? 0 }}</td>
+                <td class="artwork-run-detail-cell">
+                  <button
+                    type="button"
+                    class="hx-btn artwork-run-detail-btn"
+                    :aria-pressed="run.id === selectedRunId ? 'true' : 'false'"
+                    @click="emit('select-run', run.id)"
+                  >
+                    {{ run.id === selectedRunId ? 'Selected' : 'View' }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </article>
 
         <article class="onboarding-step-card" v-if="selectedRunDetailPayload || runDetailErrorMessage || isLoadingRunDetail">
@@ -348,3 +357,59 @@ const emit = defineEmits(['refresh', 'select-run', 'start']);
     </div>
   </article>
 </template>
+
+<style scoped>
+.artwork-runs-subtable {
+  margin: 0;
+  background: var(--hx-bg-surface-sunken);
+}
+
+.artwork-runs-subtable thead,
+.artwork-runs-subtable tbody,
+.artwork-runs-subtable thead tr,
+.artwork-runs-subtable tbody tr {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.artwork-runs-subtable thead th,
+.artwork-runs-subtable tbody td {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.artwork-runs-subtable thead tr:hover > th,
+.artwork-runs-subtable tbody tr:hover > td {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.artwork-runs-subtable-row {
+  cursor: default;
+}
+
+.artwork-runs-subtable tbody tr.is-selected > td {
+  background: var(--hx-bg-surface) !important;
+  border-top-color: rgba(94, 173, 255, 0.22);
+  border-bottom-color: rgba(94, 173, 255, 0.22);
+}
+
+.artwork-runs-subtable tbody tr.is-selected > td:first-child {
+  border-left: 3px solid var(--hx-accent);
+  padding-left: 9px;
+}
+
+.artwork-run-detail-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.artwork-run-detail-btn {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: var(--hx-text-xs);
+}
+
+.artwork-run-detail-btn[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  border-color: rgba(94, 173, 255, 0.32);
+  color: var(--hx-accent-strong);
+}
+</style>

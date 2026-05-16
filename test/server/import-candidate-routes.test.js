@@ -27,6 +27,34 @@ function createImportCandidateRouteTestApp(overrides = {}) {
           message: 'No import execution planning run has been recorded yet.',
         },
       }),
+      buildImportCandidateMediaInspectionRunDetail: async ({ runId }) => ({
+        checkedAt: '2026-04-30T20:40:00.000Z',
+        run: {
+          blockedCandidateCount: 0,
+          currentStep: 'Inspection complete',
+          errorMessage: null,
+          finishedAt: '2026-04-30T20:39:00.000Z',
+          id: runId,
+          inspectedCandidateCount: 1,
+          inspectedFileCount: 3,
+          inspectionUnavailableCount: 0,
+          requestedCandidateCount: 1,
+          startedAt: '2026-04-30T20:38:00.000Z',
+          status: 'completed',
+          warningCount: 0,
+        },
+      }),
+      buildImportCandidateMediaInspectionSummary: async () => ({
+        activeRun: null,
+        checkedAt: '2026-04-30T20:40:00.000Z',
+        currentRun: null,
+        latestRun: null,
+        recentRuns: [],
+        summary: {
+          status: 'not_started',
+          message: 'No import media inspection run has been recorded yet.',
+        },
+      }),
       buildImportPendingCandidateSummary: async () => ({
         checkedAt: '2026-04-30T20:45:00.000Z',
         counts: {
@@ -775,6 +803,73 @@ test('import candidate apply summary route returns latest durable apply state', 
     assert.equal(buildImportCandidateApplySummary.mock.callCount(), 1);
     assert.equal(payload.importCandidateApply.currentRun.id, 'apply-run-1');
     assert.equal(payload.importCandidateApply.summary.status, 'ready');
+  });
+});
+
+test('import candidate media inspection summary route returns latest durable inspection state', async (t) => {
+  const buildImportCandidateMediaInspectionSummary = t.mock.fn(async () => ({
+    activeRun: null,
+    checkedAt: '2026-04-30T20:40:00.000Z',
+    currentRun: {
+      id: 'inspection-run-1',
+      status: 'completed',
+      warningCount: 1,
+    },
+    latestRun: {
+      id: 'inspection-run-1',
+      status: 'completed',
+    },
+    recentRuns: [{
+      id: 'inspection-run-1',
+      status: 'completed',
+    }],
+    summary: {
+      message: '1 media inspection warning was recorded.',
+      status: 'attention',
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildImportCandidateMediaInspectionSummary });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/media-inspection-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(buildImportCandidateMediaInspectionSummary.mock.callCount(), 1);
+    assert.equal(payload.importCandidateMediaInspection.currentRun.id, 'inspection-run-1');
+    assert.equal(payload.importCandidateMediaInspection.summary.status, 'attention');
+  });
+});
+
+test('import candidate media inspection run detail route returns a historical run', async (t) => {
+  const buildImportCandidateMediaInspectionRunDetail = t.mock.fn(async ({ runId }) => ({
+    checkedAt: '2026-04-30T20:40:00.000Z',
+    run: {
+      blockedCandidateCount: 1,
+      currentStep: 'Inspection complete',
+      errorMessage: null,
+      finishedAt: '2026-04-30T20:39:00.000Z',
+      id: runId,
+      inspectedCandidateCount: 1,
+      inspectedFileCount: 3,
+      inspectionUnavailableCount: 0,
+      requestedCandidateCount: 2,
+      startedAt: '2026-04-30T20:38:00.000Z',
+      status: 'completed',
+      warningCount: 0,
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildImportCandidateMediaInspectionRunDetail });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/media-inspection-runs/inspection-run-4`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(buildImportCandidateMediaInspectionRunDetail.mock.calls[0].arguments, [{
+      runId: 'inspection-run-4',
+    }]);
+    assert.equal(payload.importCandidateMediaInspectionRun.run.id, 'inspection-run-4');
   });
 });
 

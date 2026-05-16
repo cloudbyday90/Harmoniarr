@@ -24,8 +24,16 @@ test('createArtworkModule exposes the shared artwork policy service', () => {
   const artworkCleanupWorker = {
     startWorkerRun: () => {},
   };
+  const artworkFetchBackoffService = {
+    clearFailure: () => {},
+    recordFailure: () => {},
+    shouldBackoff: () => {},
+  };
   const artworkIngestionService = {
     ingestArtworkBuffer: () => {},
+  };
+  const artworkMonitoredArtistPrefetchService = {
+    prefetchMonitoredArtistArtwork: () => {},
   };
   const artworkPolicyService = {
     buildArtworkOverview: () => {},
@@ -43,7 +51,9 @@ test('createArtworkModule exposes the shared artwork policy service', () => {
     artworkCleanupRunService,
     artworkCleanupRunStore,
     artworkCleanupWorker,
+    artworkFetchBackoffService,
     artworkIngestionService,
+    artworkMonitoredArtistPrefetchService,
     artworkPolicyService,
     artworkSummaryService,
     settingsService: { buildSettingsPayload: () => ({}) },
@@ -56,7 +66,9 @@ test('createArtworkModule exposes the shared artwork policy service', () => {
   assert.equal(artworkModule.artworkCleanupRunService, artworkCleanupRunService);
   assert.equal(artworkModule.artworkCleanupRunStore, artworkCleanupRunStore);
   assert.equal(artworkModule.artworkCleanupWorker, artworkCleanupWorker);
+  assert.equal(artworkModule.artworkFetchBackoffService, artworkFetchBackoffService);
   assert.equal(artworkModule.artworkIngestionService, artworkIngestionService);
+  assert.equal(artworkModule.artworkMonitoredArtistPrefetchService, artworkMonitoredArtistPrefetchService);
   assert.equal(artworkModule.artworkPolicyService, artworkPolicyService);
   assert.equal(artworkModule.artworkSummaryService, artworkSummaryService);
   assert.equal(typeof artworkModule.artworkRepository.upsertArtworkAsset, 'function');

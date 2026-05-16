@@ -589,3 +589,22 @@ export function canStartExecutionRun(currentRun, selectedCandidateCount) {
     selectedCandidateCount > 0
   );
 }
+
+/**
+ * Return whether a new media inspection run can be started.
+ *
+ * A run can be started when there is no current run, or the current run has
+ * finished (i.e. is neither pending nor running) and there are selected
+ * candidates waiting.
+ *
+ * @param {object|null|undefined} currentRun
+ * @param {number} selectedCandidateCount
+ * @returns {boolean}
+ */
+export function canStartMediaInspectionRun(currentRun, selectedCandidateCount) {
+  return !currentRun || (
+    currentRun.status !== 'pending' &&
+    currentRun.status !== 'running' &&
+    selectedCandidateCount > 0
+  );
+}

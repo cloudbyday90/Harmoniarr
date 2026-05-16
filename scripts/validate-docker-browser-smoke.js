@@ -11,7 +11,7 @@ import {
   renderDockerBrowserSmokeSuccessMessage,
   runDockerOperatorBrowserSmoke,
 } from './docker-browser-smoke-validation.js';
-import { dockerSmokeEvidencePathEnvVar, getOptionalDockerSmokeEvidencePath } from './docker-smoke-evidence.js';
+import { getOptionalDockerSmokeEvidencePath } from './docker-smoke-evidence.js';
 import { getBooleanInput, getOptionalStringInput, getRequiredStringInput, parseStrictScriptOptions } from './script-input-resolution.js';
 import { runDirectScriptTask } from './script-runtime.js';
 

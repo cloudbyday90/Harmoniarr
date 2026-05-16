@@ -23,6 +23,10 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   const importCandidateMediaInspectionService = {
     startImportCandidateMediaInspectionRun: () => {},
   };
+  const importCandidateMediaInspectionSummaryService = {
+    buildImportCandidateMediaInspectionRunDetail: () => {},
+    buildImportCandidateMediaInspectionSummary: () => {},
+  };
   const importCandidateMediaInspectionWorker = {};
   const importCandidateTranscodeRunStore = {};
   const importCandidateTranscodeService = {
@@ -86,6 +90,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     importCandidateApplyWorker,
     importCandidateMediaInspectionRunStore,
     importCandidateMediaInspectionService,
+    importCandidateMediaInspectionSummaryService,
     importCandidateMediaInspectionWorker,
     importCandidateTranscodeRunStore,
     importCandidateTranscodeService,
@@ -113,6 +118,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   assert.equal(importCandidateModule.importCandidateApplyWorker, importCandidateApplyWorker);
   assert.equal(importCandidateModule.importCandidateMediaInspectionRunStore, importCandidateMediaInspectionRunStore);
   assert.equal(importCandidateModule.importCandidateMediaInspectionService, importCandidateMediaInspectionService);
+  assert.equal(importCandidateModule.importCandidateMediaInspectionSummaryService, importCandidateMediaInspectionSummaryService);
   assert.equal(importCandidateModule.importCandidateMediaInspectionWorker, importCandidateMediaInspectionWorker);
   assert.equal(importCandidateModule.importCandidateTranscodeRunStore, importCandidateTranscodeRunStore);
   assert.equal(importCandidateModule.importCandidateTranscodeService, importCandidateTranscodeService);
@@ -136,6 +142,8 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     buildImportCandidateApplySummary: importCandidateApplySummaryService.buildImportCandidateApplySummary,
     buildImportCandidateExecutionRunDetail: importCandidateExecutionSummaryService.buildImportCandidateExecutionRunDetail,
     buildImportCandidateExecutionSummary: importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
+    buildImportCandidateMediaInspectionRunDetail: importCandidateMediaInspectionSummaryService.buildImportCandidateMediaInspectionRunDetail,
+    buildImportCandidateMediaInspectionSummary: importCandidateMediaInspectionSummaryService.buildImportCandidateMediaInspectionSummary,
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     getImportCandidate: importCandidateService.getImportCandidate,

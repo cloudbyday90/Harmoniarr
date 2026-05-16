@@ -34,6 +34,10 @@ import {
   searchMusicBrainzReleases,
 } from '../lib/metadata-api.js';
 import {
+  buildReleaseArtworkRequests,
+  getPreferredReleaseArtwork,
+} from '../lib/release-artwork-resolve.js';
+import {
   buildNetworkNoResultsBody,
   buildNetworkSearchStateLabel,
   buildNetworkStatusLabel,
@@ -86,6 +90,10 @@ const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
 
 const { getResolved: getResolvedArtwork, resolve: resolveArtworkBatch } = useArtworkBatchResolve();
+
+function getReleaseArtwork(release) {
+  return getPreferredReleaseArtwork(getResolvedArtwork, release);
+}
 
 // ── Release detail modal ─────────────────────────────────────────────────────
 
@@ -169,12 +177,7 @@ async function runMusicSearch() {
         artworkRequests.push({ ownerType: 'musicbrainz_artist', ownerId: artist.id, artworkRole: 'artist_thumbnail' });
       }
     }
-    for (const release of musicReleaseResults.value) {
-      const mbid = release.id ?? release.musicbrainzReleaseId;
-      if (mbid) {
-        artworkRequests.push({ ownerType: 'musicbrainz_release', ownerId: mbid, artworkRole: 'cover_front' });
-      }
-    }
+    artworkRequests.push(...buildReleaseArtworkRequests(musicReleaseResults.value));
     void resolveArtworkBatch(artworkRequests);
   } catch (error) {
     musicSearchError.value = getErrorMessage(error, 'Search failed. Please try again.');
@@ -422,9 +425,9 @@ onBeforeUnmount(() => clearPollTimer());
               :release="release"
               :requested="isRequested(release)"
               :requesting="isRequesting(release)"
-              :local-src="(release.id ?? release.musicbrainzReleaseId) ? getResolvedArtwork('musicbrainz_release', release.id ?? release.musicbrainzReleaseId, 'cover_front')?.url ?? null : null"
-              :dominant-color="(release.id ?? release.musicbrainzReleaseId) ? getResolvedArtwork('musicbrainz_release', release.id ?? release.musicbrainzReleaseId, 'cover_front')?.dominantColor ?? null : null"
-              :artwork-asset-id="(release.id ?? release.musicbrainzReleaseId) ? getResolvedArtwork('musicbrainz_release', release.id ?? release.musicbrainzReleaseId, 'cover_front')?.assetId ?? null : null"
+              :local-src="getReleaseArtwork(release)?.url ?? null"
+              :dominant-color="getReleaseArtwork(release)?.dominantColor ?? null"
+              :artwork-asset-id="getReleaseArtwork(release)?.assetId ?? null"
               @request="openConfirmModal"
               @detail="openDetailModal"
             />

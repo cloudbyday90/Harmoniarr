@@ -17,8 +17,9 @@
 -->
 
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { useToast } from '../composables/useToast.js';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
 import {
   buildOperationsRouteQuery,
@@ -64,7 +65,7 @@ import {
 
 const route = useRoute();
 const router = useRouter();
-const operationDetailHash = '#operation-run-detail-panel';
+const toast = useToast();
 
 const {
   cancellationErrorMessage,
@@ -142,8 +143,22 @@ const jobCatalog = computed(() =>
   }),
 );
 
+const triggerErrorEntries = computed(() =>
+  JOB_CATALOG_DEFS
+    .filter((def) => typeof triggerErrors[def.operationType] === 'string' && triggerErrors[def.operationType].trim())
+    .map((def) => ({
+      operationType: def.operationType,
+      title: def.title,
+      message: triggerErrors[def.operationType],
+    })),
+);
+
 function handleToggleJob(operationType) {
   expandedJobType.value = expandedJobType.value === operationType ? null : operationType;
+}
+
+function clearTriggerError(operationType) {
+  delete triggerErrors[operationType];
 }
 
 function buildMergedOperationsRouteQuery(nextState) {
@@ -177,23 +192,8 @@ async function replaceOperationsRouteState(nextState, { hash = route.hash } = {}
   });
 }
 
-function scrollDetailIntoView() {
-  if (typeof document === 'undefined') return;
-  document.getElementById('operation-run-detail-panel')?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-  });
-}
-
 function operationTitle(operationType) {
   return getOperationRunDescriptor(operationType).title;
-}
-
-function runLinkTarget(run) {
-  return buildOperationRunLinkTarget({
-    operationType: run?.operationType,
-    runId: run?.id,
-  });
 }
 
 function runDuration(run) {
@@ -202,9 +202,7 @@ function runDuration(run) {
 
 async function handleSelectRun(runId) {
   await selectOperationRun({ runId });
-  await replaceOperationsRouteState({ runId }, { hash: operationDetailHash });
-  await nextTick();
-  scrollDetailIntoView();
+  await replaceOperationsRouteState({ runId });
 }
 
 async function handleRequestCancellation() {
@@ -225,7 +223,9 @@ async function handleTriggerJob(operationType, triggerFn) {
     await triggerFn();
     await loadOperationHistory({ preferredRunId: selectedRunId.value || null });
   } catch (error) {
-    triggerErrors[operationType] = error?.message ?? 'Failed to start job';
+    const message = error?.message ?? 'Failed to start job';
+    triggerErrors[operationType] = message;
+    toast.error(`${operationTitle(operationType)}: ${message}`);
   } finally {
     delete triggeringJobs[operationType];
   }
@@ -248,8 +248,6 @@ watch(
     if (nextRunId !== selectedRunId.value) {
       void selectOperationRun({ runId: nextRunId });
     }
-
-    void nextTick().then(scrollDetailIntoView);
   },
 );
 </script>
@@ -262,6 +260,9 @@ watch(
         <p class="hx-page-subtitle">Automated tasks — scans, discovery, imports, and metadata refreshes.</p>
       </div>
       <div class="hx-page-actions ops-header-actions">
+        <span v-if="!isLoadingHistory" class="hx-pill" :data-tone="hasActiveRuns ? 'info' : null">
+          {{ hasActiveRuns ? 'Active jobs' : 'Idle' }}
+        </span>
         <span v-if="lastRefreshedAt" class="ops-refresh-indicator">
           <span v-if="isPollingActive" class="ops-refresh-dot" aria-label="Live auto-refresh active"></span>
           <span class="ops-refresh-label">
@@ -295,14 +296,36 @@ watch(
           <p class="hx-text-muted">Loading background jobs…</p>
         </div>
 
-        <div v-else class="hx-card-body is-flush">
-          <table class="hx-table ops-catalog-table">
+        <template v-else>
+          <div v-if="triggerErrorEntries.length" class="hx-card-body ops-trigger-errors">
+            <div
+              v-for="entry in triggerErrorEntries"
+              :key="entry.operationType"
+              class="ops-trigger-error"
+              role="alert"
+            >
+              <div class="ops-trigger-error-copy">
+                <strong>{{ entry.title }}</strong>
+                <p>{{ entry.message }}</p>
+              </div>
+              <button
+                type="button"
+                class="secondary-button ops-trigger-error-dismiss"
+                @click="clearTriggerError(entry.operationType)"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+
+          <div class="hx-card-body is-flush">
+            <table class="hx-table ops-catalog-table">
             <thead>
               <tr>
-                <th>Job</th>
-                <th>Status</th>
-                <th>Last run</th>
-                <th></th>
+                <th class="ops-job-col">Job</th>
+                <th class="ops-status-col">Status</th>
+                <th class="ops-last-run-col">Last run</th>
+                <th class="ops-action-col"></th>
               </tr>
             </thead>
             <tbody>
@@ -327,7 +350,6 @@ watch(
                     <span v-else class="hx-text-muted" style="font-style: italic;">—</span>
                   </td>
                   <td class="ops-run-actions">
-                    <span v-if="job.triggerError" class="hx-pill" data-tone="danger">{{ job.triggerError }}</span>
                     <button
                       type="button"
                       class="hx-btn"
@@ -349,15 +371,16 @@ watch(
                           <th v-if="job.formatRunResult">Result</th>
                           <th>Attempts</th>
                           <th>Error</th>
+                          <th>Detail</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr
                           v-for="run in job.recentRuns"
                           :key="run.id"
-                          class="ops-run-row"
+                          class="ops-runs-subtable-row"
+                          :aria-selected="run.id === selectedRunId ? 'true' : 'false'"
                           :class="{ 'ops-run-row--selected': run.id === selectedRunId }"
-                          @click.stop="handleSelectRun(run.id)"
                         >
                           <td>
                             <span class="hx-pill" :data-tone="formatQueueRunStatusTone(run.status)">{{ formatQueueRunStatusLabel(run.status) }}</span>
@@ -367,6 +390,16 @@ watch(
                           <td v-if="job.formatRunResult" style="font-size: var(--hx-text-xs);"><span class="hx-text-muted">{{ job.formatRunResult(run) ?? '' }}</span></td>
                           <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.attemptCount ?? 0 }}<span v-if="run.maxAttempts">/{{ run.maxAttempts }}</span></td>
                           <td style="font-size: var(--hx-text-xs); color: var(--hx-text-danger, #c0392b);">{{ run.errorMessage ?? '' }}</td>
+                          <td class="ops-run-detail-cell">
+                            <button
+                              type="button"
+                              class="hx-btn ops-run-detail-btn"
+                              :aria-pressed="run.id === selectedRunId ? 'true' : 'false'"
+                              @click.stop="handleSelectRun(run.id)"
+                            >
+                              {{ run.id === selectedRunId ? 'Selected' : 'View' }}
+                            </button>
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -375,7 +408,8 @@ watch(
               </template>
             </tbody>
           </table>
-        </div>
+          </div>
+        </template>
       </article>
 
       <!-- Job detail -->
@@ -555,6 +589,45 @@ watch(
   cursor: default;
 }
 
+.ops-trigger-errors {
+  display: grid;
+  gap: var(--hx-space-3);
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+
+.ops-trigger-error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3);
+  border: 1px solid rgba(197, 69, 69, 0.24);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-danger-soft);
+}
+
+.ops-trigger-error-copy {
+  min-width: 0;
+}
+
+.ops-trigger-error-copy strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+}
+
+.ops-trigger-error-copy p {
+  margin: 0;
+  color: var(--hx-text);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.ops-trigger-error-dismiss {
+  flex-shrink: 0;
+}
+
 .ops-runs-expanded-row > td {
   padding: 0;
   border-bottom: 2px solid var(--hx-border-subtle);
@@ -566,6 +639,18 @@ watch(
 
 .ops-runs-subtable {
   margin: 0;
+  background: var(--hx-bg-surface-sunken);
+}
+
+.ops-runs-subtable thead,
+.ops-runs-subtable tbody,
+.ops-runs-subtable thead tr,
+.ops-runs-subtable tbody tr {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.ops-runs-subtable thead tr:hover > th {
+  background: var(--hx-bg-surface-sunken);
 }
 
 .ops-runs-subtable thead th {
@@ -578,10 +663,43 @@ watch(
   padding-left: 24px;
   border-bottom-color: var(--hx-border-subtle);
   background: var(--hx-bg-surface-sunken);
+  transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
 .ops-runs-subtable tbody tr:last-child td {
   border-bottom: none;
+}
+
+.ops-runs-subtable-row {
+  cursor: default;
+}
+
+.ops-runs-subtable tbody tr.ops-run-row--selected > td {
+  background: var(--hx-bg-surface) !important;
+  border-top-color: rgba(94, 173, 255, 0.22);
+  border-bottom-color: rgba(94, 173, 255, 0.22);
+}
+
+.ops-runs-subtable tbody tr.ops-run-row--selected > td:first-child {
+  border-left: 3px solid var(--hx-accent);
+  padding-left: 21px;
+}
+
+.ops-run-detail-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ops-run-detail-btn {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: var(--hx-text-xs);
+}
+
+.ops-run-detail-btn[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  border-color: rgba(94, 173, 255, 0.32);
+  color: var(--hx-accent-strong);
 }
 
 .ops-expand-chevron {
@@ -598,5 +716,16 @@ watch(
 
 .ops-expand-chevron.is-open {
   transform: rotate(90deg);
+}
+
+@media (max-width: 720px) {
+  .ops-trigger-error {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ops-trigger-error-dismiss {
+    align-self: flex-start;
+  }
 }
 </style>

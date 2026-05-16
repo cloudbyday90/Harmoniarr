@@ -61,10 +61,8 @@ const LIBRARY_DEFAULTS = {
 
 const {
   clearAll,
-  clearFilter,
   filterState,
   isDefault,
-  toggleSortOrder,
   updateState,
 } = useGridState(LIBRARY_DEFAULTS, {
   filterGroupKeys: FILTER_GROUP_KEYS,

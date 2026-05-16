@@ -122,7 +122,6 @@ const ARTIST_DEFAULTS = {
 const {
   filterState,
   isDefault,
-  toggleSortOrder,
   updateState,
 } = useGridState(ARTIST_DEFAULTS, {
   filterGroupKeys: [],

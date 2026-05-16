@@ -39,6 +39,7 @@ export function createLibraryDiscoveryWorker({
   markRunPaused,
   markRunStarted,
   isCancellationRequested,
+  prefetchMonitoredArtistArtwork = null,
   pruneOldRuns = async () => {},
   reconcileDiscoveryRequests = null,
   reconcileWantedReleases = null,
@@ -80,6 +81,20 @@ export function createLibraryDiscoveryWorker({
 
       await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
 
+      let monitoredArtistArtwork = null;
+      if (prefetchMonitoredArtistArtwork) {
+        try {
+          monitoredArtistArtwork = await prefetchMonitoredArtistArtwork();
+        } catch (error) {
+          monitoredArtistArtwork = {
+            errorMessage: error.message,
+            status: 'failed',
+          };
+        }
+      }
+
+      await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
+
       const summary = await dispatchDiscoveryRequests({
         actorUserId: triggeredByUserId,
         requestMetadata,
@@ -88,6 +103,7 @@ export function createLibraryDiscoveryWorker({
       await markRunCompleted({
         runId,
         summary: {
+          ...(monitoredArtistArtwork ? { monitoredArtistArtwork } : {}),
           ...summary,
           triggerSource,
         },

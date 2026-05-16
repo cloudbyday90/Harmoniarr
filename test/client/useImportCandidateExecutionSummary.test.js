@@ -21,6 +21,10 @@ test('useImportCandidateExecutionSummary loads the shared execution summary payl
           id: 'run-1',
           status: 'completed',
         },
+        recentRuns: [{
+          id: 'run-1',
+          status: 'completed',
+        }],
         summary: {
           status: 'ready',
           message: '1 candidate was enqueued for download.',
@@ -32,6 +36,7 @@ test('useImportCandidateExecutionSummary loads the shared execution summary payl
   await workflow.loadImportCandidateExecutionSummary();
 
   assert.equal(workflow.currentRun.value.id, 'run-1');
+  assert.equal(workflow.recentRuns.value.length, 1);
   assert.equal(workflow.summary.value.status, 'ready');
   assert.equal(workflow.errorMessage.value, '');
   assert.equal(workflow.isLoading.value, false);
@@ -48,6 +53,10 @@ test('useImportCandidateExecutionSummary starts a planning run and reloads summa
         id: 'run-2',
         status: 'pending',
       },
+      recentRuns: [{
+        id: 'run-2',
+        status: 'pending',
+      }],
       summary: {
         status: 'running',
         message: 'Download enqueue is in progress.',
@@ -81,6 +90,10 @@ test('useImportCandidateExecutionSummary reconciles transfer state and reloads s
         id: 'run-3',
         status: 'completed',
       },
+      recentRuns: [{
+        id: 'run-3',
+        status: 'completed',
+      }],
       summary: {
         status: 'ready',
         message: 'Transfer state persisted.',
@@ -123,6 +136,10 @@ test('useImportCandidateExecutionSummary can load an exact historical run detail
           id: 'run-latest',
           status: 'completed',
         },
+        recentRuns: [{
+          id: 'run-latest',
+          status: 'completed',
+        }],
         summary: {
           status: 'ready',
           message: 'Latest execution run completed.',

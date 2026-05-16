@@ -101,6 +101,14 @@ export function fetchImportCandidateApplyRunDetail(runId) {
   return apiRequest(`/api/v1/import-candidates/apply-runs/${encodeURIComponent(runId)}`);
 }
 
+export function fetchImportCandidateMediaInspectionSummary() {
+  return apiRequest('/api/v1/import-candidates/media-inspection-summary');
+}
+
+export function fetchImportCandidateMediaInspectionRunDetail(runId) {
+  return apiRequest(`/api/v1/import-candidates/media-inspection-runs/${encodeURIComponent(runId)}`);
+}
+
 export function startImportCandidateExecutionRun() {
   return apiRequest('/api/v1/import-candidates/execution-runs', {
     method: 'POST',
@@ -111,6 +119,14 @@ export function startImportCandidateExecutionRun() {
 
 export function startImportCandidateApplyRun() {
   return apiRequest('/api/v1/import-candidates/apply-runs', {
+    method: 'POST',
+    includeCsrf: true,
+    body: {},
+  });
+}
+
+export function startImportCandidateMediaInspectionRun() {
+  return apiRequest('/api/v1/import-candidates/media-inspection-runs', {
     method: 'POST',
     includeCsrf: true,
     body: {},

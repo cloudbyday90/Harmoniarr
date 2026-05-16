@@ -19,7 +19,6 @@
 <script setup>
 import {
   canStartExecutionRun,
-  formatExecutionMode,
   formatLiveTransferStatus,
   formatPath,
   formatPercent,
@@ -35,6 +34,10 @@ import {
   getPersistedTransferObservation,
   getRunStatusClass,
 } from '../lib/import-candidate-presentation.js';
+import {
+  formatElapsedDuration,
+  formatOperationTimestampShort,
+} from '../lib/operation-run-presentation.js';
 
 defineProps({
   actionErrorMessage: {
@@ -61,6 +64,10 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  recentRuns: {
+    type: Array,
+    default: () => [],
+  },
   runDetailErrorMessage: {
     type: String,
     default: '',
@@ -69,13 +76,17 @@ defineProps({
     type: Number,
     default: 0,
   },
+  selectedRunId: {
+    type: String,
+    default: null,
+  },
   summary: {
     type: Object,
     default: null,
   },
 });
 
-defineEmits(['reconcile', 'refresh', 'start']);
+defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
 </script>
 
 <template>
@@ -165,10 +176,64 @@ defineEmits(['reconcile', 'refresh', 'start']);
     </article>
 
     <template v-else>
+      <article class="onboarding-step-card" v-if="recentRuns.length">
+        <div class="review-detail-header">
+          <div>
+            <p>Recent download history</p>
+            <strong>The last {{ recentRuns.length }} import execution run{{ recentRuns.length === 1 ? '' : 's' }}.</strong>
+          </div>
+        </div>
+        <table class="hx-table execution-runs-subtable">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Duration</th>
+              <th>Requested</th>
+              <th>Queued</th>
+              <th>Warnings</th>
+              <th>Failed</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="run in recentRuns"
+              :key="run.id"
+              class="execution-runs-subtable-row"
+              :aria-selected="run.id === (selectedRunId || currentRun?.id) ? 'true' : 'false'"
+              :class="{ 'is-selected': run.id === (selectedRunId || currentRun?.id) }"
+            >
+              <td>
+                <span class="review-status-pill" :class="getRunStatusClass(run.status)">
+                  {{ formatRunStatus(run.status) }}
+                </span>
+              </td>
+              <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatOperationTimestampShort(run.startedAt) }}</span></td>
+              <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</span></td>
+              <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.requestedCandidateCount ?? 0 }}</td>
+              <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.queuedCount ?? run.readyCount ?? 0 }}</td>
+              <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.queuedWithWarningsCount ?? run.readyWithWarningsCount ?? 0 }}</td>
+              <td class="hx-table-num hx-text-muted" style="font-size: var(--hx-text-xs);">{{ run.queueFailedCount ?? 0 }}</td>
+              <td class="execution-run-detail-cell">
+                <button
+                  type="button"
+                  class="hx-btn execution-run-detail-btn"
+                  :aria-pressed="run.id === (selectedRunId || currentRun?.id) ? 'true' : 'false'"
+                  @click="$emit('select-run', run.id)"
+                >
+                  {{ run.id === (selectedRunId || currentRun?.id) ? 'Selected' : 'View' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+
       <div class="review-detail-header">
         <div>
-          <p class="eyebrow">{{ formatExecutionMode(currentRun.executionMode) }}</p>
-          <h3>Run {{ currentRun.id }}</h3>
+          <p>Selected run</p>
+          <strong>Run {{ currentRun.id }}</strong>
           <p class="metadata-card-copy">{{ currentRun.currentStep || 'No current step reported' }}</p>
         </div>
         <span class="review-status-pill" :class="getRunStatusClass(currentRun.status)">
@@ -348,3 +413,59 @@ defineEmits(['reconcile', 'refresh', 'start']);
     </template>
   </article>
 </template>
+
+<style scoped>
+.execution-runs-subtable {
+  margin: 0;
+  background: var(--hx-bg-surface-sunken);
+}
+
+.execution-runs-subtable thead,
+.execution-runs-subtable tbody,
+.execution-runs-subtable thead tr,
+.execution-runs-subtable tbody tr {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.execution-runs-subtable thead th,
+.execution-runs-subtable tbody td {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.execution-runs-subtable thead tr:hover > th,
+.execution-runs-subtable tbody tr:hover > td {
+  background: var(--hx-bg-surface-sunken);
+}
+
+.execution-runs-subtable-row {
+  cursor: default;
+}
+
+.execution-runs-subtable tbody tr.is-selected > td {
+  background: var(--hx-bg-surface) !important;
+  border-top-color: rgba(94, 173, 255, 0.22);
+  border-bottom-color: rgba(94, 173, 255, 0.22);
+}
+
+.execution-runs-subtable tbody tr.is-selected > td:first-child {
+  border-left: 3px solid var(--hx-accent);
+  padding-left: 9px;
+}
+
+.execution-run-detail-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.execution-run-detail-btn {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: var(--hx-text-xs);
+}
+
+.execution-run-detail-btn[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  border-color: rgba(94, 173, 255, 0.32);
+  color: var(--hx-accent-strong);
+}
+</style>

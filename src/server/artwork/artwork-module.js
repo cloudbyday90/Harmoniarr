@@ -24,8 +24,10 @@ import { createArtworkCleanupRunService } from './artwork-cleanup-run-service.js
 import { createArtworkCleanupRunStore } from './artwork-cleanup-run-store.js';
 import { createArtworkCleanupWorker } from './artwork-cleanup-worker.js';
 import { createArtworkDominantColorService } from './artwork-dominant-color-service.js';
+import { createArtworkFetchBackoffService } from './artwork-fetch-backoff-service.js';
 import { createArtworkFetchService } from './artwork-fetch-service.js';
 import { createArtworkIngestionService } from './artwork-ingestion-service.js';
+import { createArtworkMonitoredArtistPrefetchService } from './artwork-monitored-artist-prefetch-service.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
 import { createArtworkQuotaService } from './artwork-quota-service.js';
 import { createArtworkServeService } from './artwork-serve-service.js';
@@ -55,10 +57,12 @@ export function createArtworkModule({
   artworkServeService = createArtworkServeService({ artworkPolicyService }),
   artworkAssignmentService = createArtworkAssignmentService(),
   artworkDominantColorService = createArtworkDominantColorService(),
+  artworkFetchBackoffService,
   artworkQuotaService,
   coverArtArchiveClient,
   fanartTvClient,
   artworkFetchService,
+  artworkMonitoredArtistPrefetchService,
   artworkSummaryService,
 } = {}) {
   const resolvedArtworkCleanupService = artworkCleanupService
@@ -116,14 +120,21 @@ export function createArtworkModule({
         return policy.fetch.dailyQuotaLimit ?? 1000;
       },
     });
+  const resolvedArtworkFetchBackoffService = artworkFetchBackoffService
+    ?? createArtworkFetchBackoffService();
   const resolvedArtworkFetchService = artworkFetchService
     ?? createArtworkFetchService({
       artworkAssignmentService,
+      artworkFetchBackoffService: resolvedArtworkFetchBackoffService,
       artworkIngestionService,
       artworkPolicyService,
       artworkQuotaService: resolvedArtworkQuotaService,
       coverArtArchiveClient: resolvedCoverArtArchiveClient,
       fanartTvClient: resolvedFanartTvClient,
+    });
+  const resolvedArtworkMonitoredArtistPrefetchService = artworkMonitoredArtistPrefetchService
+    ?? createArtworkMonitoredArtistPrefetchService({
+      artworkFetchService: resolvedArtworkFetchService,
     });
 
   return {
@@ -134,8 +145,10 @@ export function createArtworkModule({
     artworkCleanupRunService: resolvedArtworkCleanupRunService,
     artworkCleanupRunStore,
     artworkCleanupWorker: resolvedArtworkCleanupWorker,
+    artworkFetchBackoffService: resolvedArtworkFetchBackoffService,
     artworkFetchService: resolvedArtworkFetchService,
     artworkIngestionService,
+    artworkMonitoredArtistPrefetchService: resolvedArtworkMonitoredArtistPrefetchService,
     artworkPolicyService,
     artworkQuotaService: resolvedArtworkQuotaService,
     artworkRepository,

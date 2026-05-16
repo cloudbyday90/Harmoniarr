@@ -16,10 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createApiError } from '../auth.js';
 import { listImportApplyRunItems } from './import-candidate-apply-repository.js';
 import { listImportOperations } from './import-candidate-operation-repository.js';
 import { createImportCandidateApplyRunStore } from './import-candidate-apply-run-store.js';
+import { createImportCandidateRunSummaryService } from './import-candidate-run-summary-service.js';
 
 function groupImportOperationsByCandidateId(importOperations) {
   return importOperations.reduce((grouped, operation) => {
@@ -111,38 +111,16 @@ export function createImportCandidateApplySummaryService({
     };
   }
 
-  async function buildImportCandidateApplySummary() {
-    const checkedAt = new Date().toISOString();
-    const [activeRun, latestRun] = await Promise.all([
-      importCandidateApplyRunStore.getActiveRun(),
-      importCandidateApplyRunStore.getLatestRun(),
-    ]);
-    const currentRun = await buildRunWithItems(activeRun ?? latestRun);
-
-    return {
-      activeRun,
-      checkedAt,
-      currentRun,
-      latestRun,
-      summary: buildDisplayRunSummary(currentRun),
-    };
-  }
-
-  async function buildImportCandidateApplyRunDetail({ runId }) {
-    const run = await importCandidateApplyRunStore.getRunById(runId);
-
-    if (!run) {
-      throw createApiError(404, 'import_candidate_apply_run_not_found', 'Import apply run not found');
-    }
-
-    return {
-      checkedAt: new Date().toISOString(),
-      run: await buildRunWithItems(run),
-    };
-  }
+  const runSummaryService = createImportCandidateRunSummaryService({
+    buildDisplayRunSummary,
+    buildRunWithItems,
+    runNotFoundCode: 'import_candidate_apply_run_not_found',
+    runNotFoundMessage: 'Import apply run not found',
+    runStore: importCandidateApplyRunStore,
+  });
 
   return {
-    buildImportCandidateApplyRunDetail,
-    buildImportCandidateApplySummary,
+    buildImportCandidateApplyRunDetail: runSummaryService.buildRunDetail,
+    buildImportCandidateApplySummary: runSummaryService.buildRunSummary,
   };
 }

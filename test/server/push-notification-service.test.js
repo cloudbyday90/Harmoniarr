@@ -207,7 +207,9 @@ test('sendNotificationToUser: auto-removes subscription on 410 response', async 
 
   assert.deepEqual(result, { sent: 0, failed: 0, removed: 1 });
   // Deletion is fire-and-forget — give it a tick to complete
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
   assert.equal(deleteSubscriptionByEndpoint.mock.callCount(), 1);
   assert.equal(deleteSubscriptionByEndpoint.mock.calls[0].arguments[0], 'https://ep-expired');
 });
@@ -230,7 +232,9 @@ test('sendNotificationToUser: auto-removes subscription on 404 response', async 
   const result = await service.sendNotificationToUser({ userId: 'user-1', payload: { type: 'test' } });
 
   assert.deepEqual(result, { sent: 0, failed: 0, removed: 1 });
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
   assert.equal(deleteSubscriptionByEndpoint.mock.callCount(), 1);
 });
 

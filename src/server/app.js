@@ -243,6 +243,7 @@ export function createApp({
     importCandidateService: importCandidateModule.importCandidateService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,
+    prefetchMonitoredArtistArtwork: artworkModule.artworkMonitoredArtistPrefetchService?.prefetchMonitoredArtistArtwork,
     providerClientResolverService: createProviderClientResolverService({
       spotifyOAuthService: providerModule.spotifyOAuthService,
       youtubeOAuthService: providerModule.youtubeOAuthService,

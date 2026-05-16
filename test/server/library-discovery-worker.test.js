@@ -14,6 +14,11 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
   const markRunCompleted = t.mock.fn(async () => {});
   const markRunFailed = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
+  const prefetchMonitoredArtistArtwork = t.mock.fn(async () => ({
+    cachedCount: 2,
+    eligibleArtistCount: 2,
+    fetchedCount: 1,
+  }));
   const reconcileDiscoveryRequests = t.mock.fn(async () => {});
   const reconcileWantedReleases = t.mock.fn(async () => {});
   const releaseLease = t.mock.fn(async () => {});
@@ -23,6 +28,7 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
     markRunCompleted,
     markRunFailed,
     markRunStarted,
+    prefetchMonitoredArtistArtwork,
     reconcileDiscoveryRequests,
     reconcileWantedReleases,
     releaseLease,
@@ -61,6 +67,7 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
   });
   assert.equal(reconcileWantedReleases.mock.callCount(), 1);
   assert.equal(reconcileDiscoveryRequests.mock.callCount(), 1);
+  assert.equal(prefetchMonitoredArtistArtwork.mock.callCount(), 1);
   assert.equal(dispatchDiscoveryRequests.mock.callCount(), 1);
   assert.deepEqual(dispatchDiscoveryRequests.mock.calls[0].arguments[0], {
     actorUserId: 'user-2',
@@ -78,6 +85,11 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
       dispatchedCount: 2,
       failedCount: 1,
       fileCount: 14,
+      monitoredArtistArtwork: {
+        cachedCount: 2,
+        eligibleArtistCount: 2,
+        fetchedCount: 1,
+      },
       triggerSource: 'manual',
     },
   });
@@ -287,4 +299,59 @@ test('createLibraryDiscoveryWorker calls pruneOldRuns even when a run fails', as
   assert.equal(pruneOldRuns.mock.callCount(), 1);
   assert.equal(markRunFailed.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 0);
+});
+
+test('createLibraryDiscoveryWorker records monitored artist artwork prefetch failures without failing discovery dispatch', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const dispatchDiscoveryRequests = t.mock.fn(async () => ({
+    attemptedCount: 1,
+    candidateCount: 1,
+    dispatchedCount: 1,
+    failedCount: 0,
+    fileCount: 2,
+  }));
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const prefetchMonitoredArtistArtwork = t.mock.fn(async () => {
+    throw new Error('prefetch failed');
+  });
+  const releaseLease = t.mock.fn(async () => {});
+  const worker = createLibraryDiscoveryWorker({
+    acquireLease,
+    dispatchDiscoveryRequests,
+    markRunCompleted,
+    markRunFailed,
+    markRunStarted,
+    prefetchMonitoredArtistArtwork,
+    releaseLease,
+  });
+
+  const completion = new Promise((resolve) => {
+    markRunCompleted.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({ runId: 'run-prefetch-warning' });
+  const completionArgs = await completion;
+
+  assert.equal(prefetchMonitoredArtistArtwork.mock.callCount(), 1);
+  assert.equal(dispatchDiscoveryRequests.mock.callCount(), 1);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.deepEqual(completionArgs, {
+    runId: 'run-prefetch-warning',
+    summary: {
+      attemptedCount: 1,
+      candidateCount: 1,
+      dispatchedCount: 1,
+      failedCount: 0,
+      fileCount: 2,
+      monitoredArtistArtwork: {
+        errorMessage: 'prefetch failed',
+        status: 'failed',
+      },
+      triggerSource: 'manual',
+    },
+  });
 });

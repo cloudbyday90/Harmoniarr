@@ -12,6 +12,7 @@ suite('createApp', () => {
   const startedAt = new Date('2026-04-28T12:00:00.000Z');
   const artworkModule = {
     artworkAssignmentService: { assignPreferredArtwork: () => ({}) },
+    artworkMonitoredArtistPrefetchService: { prefetchMonitoredArtistArtwork: () => ({}) },
     routeDependencies: { artwork: 'deps' },
     artworkIngestionService: { ingestArtworkBuffer: () => ({}) },
     artworkPolicyService: { buildArtworkOverviewFromSettingsPayload: () => ({}) },
@@ -213,6 +214,7 @@ suite('createApp', () => {
   assert.equal(libraryModuleArgs.artworkAssignmentService, artworkModule.artworkAssignmentService);
   assert.equal(libraryModuleArgs.artworkIngestionService, artworkModule.artworkIngestionService);
   assert.equal(libraryModuleArgs.importCandidateService, importCandidateModule.importCandidateService);
+  assert.equal(libraryModuleArgs.prefetchMonitoredArtistArtwork, artworkModule.artworkMonitoredArtistPrefetchService.prefetchMonitoredArtistArtwork);
   assert.equal(typeof libraryModuleArgs.providerClientResolverService.resolveProviderClients, 'function');
   assert.equal(libraryModuleArgs.settingsService, settingsService);
   assert.equal(libraryModuleArgs.slskdService, slskdModule.slskdService);

@@ -1,3 +1,21 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { createArtworkIngestionService } from './artwork-ingestion-service.js';
 import { createArtworkAssignmentService } from './artwork-assignment-service.js';
 import { createArtworkPolicyService } from './artwork-policy-service.js';
@@ -25,12 +43,22 @@ function buildResult(asset, sourceProvider) {
 }
 
 const emptyResult = { url: null, assetId: null, cached: false, sourceProvider: null, quotaExceeded: false };
+const backoffResult = {
+  url: null,
+  assetId: null,
+  cached: false,
+  sourceProvider: null,
+  quotaExceeded: false,
+  retryBackoffActive: true,
+  retryAfterAt: null,
+};
 const quotaExceededResult = { url: null, assetId: null, cached: false, sourceProvider: null, quotaExceeded: true };
 
 export function createArtworkFetchService({
   artworkPolicyService = createArtworkPolicyService(),
   artworkIngestionService = createArtworkIngestionService({ artworkPolicyService }),
   artworkAssignmentService = createArtworkAssignmentService(),
+  artworkFetchBackoffService = null,
   artworkQuotaService = null,
   coverArtArchiveClient = null,
   fanartTvClient = null,
@@ -41,6 +69,12 @@ export function createArtworkFetchService({
     return Buffer.from(await response.arrayBuffer());
   },
 } = {}) {
+  const resolvedArtworkFetchBackoffService = artworkFetchBackoffService ?? {
+    clearFailure: async () => {},
+    recordFailure: async () => null,
+    shouldBackoff: async () => ({ active: false, retryAfterAt: null }),
+  };
+
   async function resolveFromCaa({ mbid, mbidType, ownerId, ownerType, artworkRole, refresh = false }) {
     if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('coverArtArchive')) {
       return null;
@@ -162,12 +196,21 @@ export function createArtworkFetchService({
       const preferred = assignments.find((a) => a.isPreferred && a.artworkRole === artworkRole);
 
       if (preferred) {
+        await resolvedArtworkFetchBackoffService.clearFailure({ artworkRole, ownerId, ownerType });
         return {
           assetId: preferred.artworkAssetId,
           cached: true,
           dominantColor: null,
           sourceProvider: preferred.sourceProvider,
           url: `/api/v1/artwork/assets/${preferred.artworkAssetId}/file`,
+        };
+      }
+
+      const retryState = await resolvedArtworkFetchBackoffService.shouldBackoff({ artworkRole, ownerId, ownerType });
+      if (retryState.active) {
+        return {
+          ...backoffResult,
+          retryAfterAt: retryState.retryAfterAt,
         };
       }
     }
@@ -177,12 +220,14 @@ export function createArtworkFetchService({
     const isArtist = ownerType === 'musicbrainz_artist';
 
     let anyQuotaExceeded = false;
+    let attemptedFetch = false;
 
     if (isRelease || isReleaseGroup) {
       if (coverArtArchiveClient) {
         if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('coverArtArchive')) {
           anyQuotaExceeded = true;
         } else {
+          attemptedFetch = true;
           const caaResult = await resolveFromCaa({
             artworkRole,
             mbid: ownerId,
@@ -191,7 +236,10 @@ export function createArtworkFetchService({
             ownerType,
             refresh,
           });
-          if (caaResult) return caaResult;
+          if (caaResult) {
+            await resolvedArtworkFetchBackoffService.clearFailure({ artworkRole, ownerId, ownerType });
+            return caaResult;
+          }
         }
       }
 
@@ -199,8 +247,12 @@ export function createArtworkFetchService({
         if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('fanartTv')) {
           anyQuotaExceeded = true;
         } else {
+          attemptedFetch = true;
           const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType, refresh });
-          if (fanarResult) return fanarResult;
+          if (fanarResult) {
+            await resolvedArtworkFetchBackoffService.clearFailure({ artworkRole, ownerId, ownerType });
+            return fanarResult;
+          }
         }
       }
     }
@@ -209,9 +261,27 @@ export function createArtworkFetchService({
       if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('fanartTv')) {
         anyQuotaExceeded = true;
       } else {
+        attemptedFetch = true;
         const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType, refresh });
-        if (fanarResult) return fanarResult;
+        if (fanarResult) {
+          await resolvedArtworkFetchBackoffService.clearFailure({ artworkRole, ownerId, ownerType });
+          return fanarResult;
+        }
       }
+    }
+
+    if (!refresh && attemptedFetch && !anyQuotaExceeded) {
+      const failureState = await resolvedArtworkFetchBackoffService.recordFailure({
+        artworkRole,
+        failureCode: 'artwork_unavailable',
+        ownerId,
+        ownerType,
+      });
+      return {
+        ...emptyResult,
+        retryAfterAt: failureState?.nextRetryAt ?? null,
+        retryBackoffActive: false,
+      };
     }
 
     return anyQuotaExceeded ? { ...quotaExceededResult } : { ...emptyResult };

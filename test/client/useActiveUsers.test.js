@@ -21,7 +21,9 @@ import test from 'node:test';
 import { useActiveUsers, clearActiveUsersCache } from '../../src/client/composables/useActiveUsers.js';
 
 function settle() {
-  return new Promise((resolve) => setImmediate(resolve));
+  return new Promise((resolve) => {
+    setImmediate(resolve);
+  });
 }
 
 test('useActiveUsers resolves to active users from fetchUsersFn', async () => {

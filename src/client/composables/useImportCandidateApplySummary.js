@@ -48,6 +48,7 @@ export function useImportCandidateApplySummary({
     latestRun: workflow.latestRun,
     loadImportCandidateApplySummary: workflow.loadRunSummary,
     loadSelectedImportCandidateApplyRun: workflow.loadSelectedRunDetail,
+    recentRuns: workflow.recentRuns,
     runDetailErrorMessage: workflow.runDetailErrorMessage,
     selectedRunId: workflow.selectedRunId,
     startApplyRun: workflow.startRunAction,

@@ -3344,7 +3344,23 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260509_133313_create_push_notification_tables.sql
--- Checksum: 904a47f8c4a9aa3bd7b64ed4abf621d0ba50e905399e51e866913de445cda168
+-- Checksum: 023c94c49f9d74a05557b2e404af0892a79f8d54a4643a68effaf912c0aa6b3a
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 -- Push subscription registry — one row per browser/device registration.
 -- Soft-deleted on 410/412 (invalidated_at set, never hard-deleted immediately).
 -- Pruned after 30 days via a background maintenance task.
@@ -3404,7 +3420,7 @@ VALUES (
   '20260509_133313',
   '20260509_133313_create_push_notification_tables.sql',
   'create_push_notification_tables',
-  '904a47f8c4a9aa3bd7b64ed4abf621d0ba50e905399e51e866913de445cda168',
+  '023c94c49f9d74a05557b2e404af0892a79f8d54a4643a68effaf912c0aa6b3a',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -3638,7 +3654,23 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260603_010000_add_user_preferences.sql
--- Checksum: 94709b598bc58d15c7c59348eed557b67455ee95d30b326327d96bfa54ff6a30
+-- Checksum: a294222a4313f908a02096b0ecef78f460f32298a596f89748b0fa137b36ab9d
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 -- Add user_preferences JSONB column to app_users.
 -- Stores per-user format and quality preferences used during import candidate
 -- evaluation and download result scoring.
@@ -3659,7 +3691,7 @@ VALUES (
   '20260603_010000',
   '20260603_010000_add_user_preferences.sql',
   'add_user_preferences',
-  '94709b598bc58d15c7c59348eed557b67455ee95d30b326327d96bfa54ff6a30',
+  'a294222a4313f908a02096b0ecef78f460f32298a596f89748b0fa137b36ab9d',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -3675,7 +3707,23 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260604_010000_media_request_cross_user_dedup.sql
--- Checksum: bc197f709834354122b1adc3df5420136b9dce93e0c783dd50323687347f8629
+-- Checksum: f757afdcda6ea82eb1604adc3efc1d15a7af759bbf3cd9dc9d78412bf81ab411
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 -- Cross-user deduplication: link duplicate requests for the same release to a
 -- single download job. musicbrainz_release_id enables exact MBID-based matching
 -- without JOINing to metadata_releases. linked_request_id points to the primary
@@ -3707,7 +3755,7 @@ VALUES (
   '20260604_010000',
   '20260604_010000_media_request_cross_user_dedup.sql',
   'media_request_cross_user_dedup',
-  'bc197f709834354122b1adc3df5420136b9dce93e0c783dd50323687347f8629',
+  'f757afdcda6ea82eb1604adc3efc1d15a7af759bbf3cd9dc9d78412bf81ab411',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -3723,7 +3771,23 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260604_020000_media_request_expected_release_date.sql
--- Checksum: 43ba38ffceac56300b4c7369ccf69f458e9497dde5ae39106b26dd22225919b0
+-- Checksum: 4a999b141e3a57728492689376c9fd5e5a8a706e0176b9e9f0778e9e1d68e6d7
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 -- Add expected_release_date to media_requests to support pre-requests for
 -- upcoming albums. Stores the anticipated release date so the fulfillment
 -- UI can surface a "Coming Soon" indicator without polling discovery state.
@@ -3740,7 +3804,125 @@ VALUES (
   '20260604_020000',
   '20260604_020000_media_request_expected_release_date.sql',
   'media_request_expected_release_date',
-  '43ba38ffceac56300b4c7369ccf69f458e9497dde5ae39106b26dd22225919b0',
+  '4a999b141e3a57728492689376c9fd5e5a8a706e0176b9e9f0778e9e1d68e6d7',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260615_010000_artwork_provider_quota.sql
+-- Checksum: 7617dc4ba3d97626c9313b3b78a2d06f74211c94b9fa93c4c761955f096d24fc
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-- Artwork provider quota tracking
+CREATE TABLE IF NOT EXISTS artwork_provider_quota (
+  id            UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  provider      TEXT NOT NULL,
+  window_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+  request_count INTEGER NOT NULL DEFAULT 0 CHECK (request_count >= 0),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (provider, window_date)
+);
+
+CREATE INDEX IF NOT EXISTS artwork_provider_quota_recent_idx
+  ON artwork_provider_quota (provider, window_date DESC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260615_010000',
+  '20260615_010000_artwork_provider_quota.sql',
+  'artwork_provider_quota',
+  '7617dc4ba3d97626c9313b3b78a2d06f74211c94b9fa93c4c761955f096d24fc',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260615_020000_artwork_fetch_backoff.sql
+-- Checksum: 21aeac8f4b550279ac51c205dc17db86dec1a7f93cb5aad97fef2e7dbd389d09
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE TABLE IF NOT EXISTS artwork_fetch_failures (
+  owner_type TEXT NOT NULL,
+  owner_id UUID NOT NULL,
+  artwork_role TEXT NOT NULL,
+  failure_count INTEGER NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
+  last_failed_at TIMESTAMPTZ NOT NULL,
+  next_retry_at TIMESTAMPTZ NOT NULL,
+  last_failure_code TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (owner_type, owner_id, artwork_role)
+);
+
+CREATE INDEX IF NOT EXISTS artwork_fetch_failures_next_retry_idx
+  ON artwork_fetch_failures (next_retry_at ASC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260615_020000',
+  '20260615_020000_artwork_fetch_backoff.sql',
+  'artwork_fetch_backoff',
+  '21aeac8f4b550279ac51c205dc17db86dec1a7f93cb5aad97fef2e7dbd389d09',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE

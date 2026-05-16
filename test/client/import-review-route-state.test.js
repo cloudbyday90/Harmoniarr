@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildImportReviewApplyRunLocation,
   buildImportReviewExecutionRunLocation,
+  buildImportReviewMediaInspectionRunLocation,
   buildImportReviewRouteQuery,
   getImportReviewRouteStateKey,
   normalizeImportReviewRouteState,
@@ -19,6 +20,7 @@ test('normalizeImportReviewRouteState trims route query values and defaults inva
     applyRunId: '',
     candidateId: 'candidate-1',
     executionRunId: '',
+    mediaInspectionRunId: '',
     folderPath: 'Amber',
     sourceSearchId: 'search-1',
     status: 'pending',
@@ -31,6 +33,7 @@ test('normalizeImportReviewRouteState maps all-status route tokens to an empty s
     applyRunId: '',
     candidateId: '',
     executionRunId: '',
+    mediaInspectionRunId: '',
     folderPath: '',
     sourceSearchId: '',
     status: '',
@@ -43,6 +46,7 @@ test('buildImportReviewRouteQuery omits default pending status and preserves exp
     applyRunId: 'apply-run-2',
     candidateId: 'candidate-1',
     executionRunId: 'execution-run-1',
+    mediaInspectionRunId: 'inspection-run-1',
     folderPath: 'Amber',
     sourceSearchId: 'search-1',
     status: 'pending',
@@ -51,6 +55,7 @@ test('buildImportReviewRouteQuery omits default pending status and preserves exp
     applyRunId: 'apply-run-2',
     candidate: 'candidate-1',
     executionRunId: 'execution-run-1',
+    mediaInspectionRunId: 'inspection-run-1',
     folderPath: 'Amber',
     sourceSearchId: 'search-1',
     username: 'source-user',
@@ -101,6 +106,14 @@ test('import review route helpers build execution and apply run drill-down locat
     name: 'review-queue',
     query: {
       applyRunId: 'apply-run-9',
+    },
+  });
+
+  assert.deepEqual(buildImportReviewMediaInspectionRunLocation('inspection-run-4'), {
+    hash: '#import-media-inspection-run-panel',
+    name: 'review-queue',
+    query: {
+      mediaInspectionRunId: 'inspection-run-4',
     },
   });
 });

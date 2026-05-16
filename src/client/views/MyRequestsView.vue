@@ -69,7 +69,6 @@ const {
   clearAll,
   filterState,
   isDefault,
-  toggleSortOrder,
   updateState,
 } = useGridState(REQUESTS_DEFAULTS, {
   filterGroupKeys: ['status'],

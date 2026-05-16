@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  deleteArtworkFetchFailure,
   deleteArtworkAssetById,
+  getArtworkFetchFailure,
   getArtworkCleanupSnapshot,
   getArtworkAssetBySha256,
+  upsertArtworkFetchFailure,
   listArtworkCleanupCandidates,
   listArtworkAssignments,
   refreshArtworkAssetAssignmentState,
@@ -348,4 +351,128 @@ test('deleteArtworkAssetById removes an artwork asset row and returns the delete
   assert.deepEqual(values, ['asset-1']);
   assert.equal(deletedAsset.id, 'asset-1');
   assert.equal(deletedAsset.storageClass, 'extracted_embedded');
+});
+
+test('getArtworkFetchFailure returns a mapped retry-backoff row or null', async (t) => {
+  const queryable = {
+    query: t.mock.fn(async (_sql, values) => ({
+      rows: values[1] === 'artist-1'
+        ? [{
+            owner_type: values[0],
+            owner_id: values[1],
+            artwork_role: values[2],
+            failure_count: '2',
+            last_failed_at: '2026-05-15T10:00:00.000Z',
+            next_retry_at: '2026-05-15T14:00:00.000Z',
+            last_failure_code: 'artwork_unavailable',
+            created_at: '2026-05-15T10:00:00.000Z',
+            updated_at: '2026-05-15T10:00:00.000Z',
+          }]
+        : [],
+    })),
+  };
+
+  const failure = await getArtworkFetchFailure({
+    artworkRole: 'artist_thumbnail',
+    ownerId: 'artist-1',
+    ownerType: 'musicbrainz_artist',
+  }, queryable);
+
+  assert.match(queryable.query.mock.calls[0].arguments[0], /FROM artwork_fetch_failures/);
+  assert.deepEqual(queryable.query.mock.calls[0].arguments[1], [
+    'musicbrainz_artist',
+    'artist-1',
+    'artist_thumbnail',
+  ]);
+  assert.deepEqual(failure, {
+    artworkRole: 'artist_thumbnail',
+    createdAt: '2026-05-15T10:00:00.000Z',
+    failureCount: 2,
+    lastFailureCode: 'artwork_unavailable',
+    lastFailedAt: '2026-05-15T10:00:00.000Z',
+    nextRetryAt: '2026-05-15T14:00:00.000Z',
+    ownerId: 'artist-1',
+    ownerType: 'musicbrainz_artist',
+    updatedAt: '2026-05-15T10:00:00.000Z',
+  });
+  assert.equal(await getArtworkFetchFailure({
+    artworkRole: 'artist_thumbnail',
+    ownerId: 'artist-2',
+    ownerType: 'musicbrainz_artist',
+  }, queryable), null);
+});
+
+test('upsertArtworkFetchFailure stores exponential-backoff state', async (t) => {
+  const queryable = {
+    query: t.mock.fn(async (_sql, values) => ({
+      rows: [{
+        owner_type: values[0],
+        owner_id: values[1],
+        artwork_role: values[2],
+        failure_count: String(values[3]),
+        last_failed_at: values[4],
+        next_retry_at: values[5],
+        last_failure_code: values[6],
+        created_at: '2026-05-15T10:00:00.000Z',
+        updated_at: '2026-05-15T10:00:00.000Z',
+      }],
+    })),
+  };
+
+  const failure = await upsertArtworkFetchFailure({
+    artworkRole: 'cover_front',
+    failureCount: 3,
+    lastFailureCode: 'artwork_unavailable',
+    lastFailedAt: '2026-05-15T10:00:00.000Z',
+    nextRetryAt: '2026-05-16T10:00:00.000Z',
+    ownerId: 'release-1',
+    ownerType: 'musicbrainz_release_group',
+  }, queryable);
+
+  const [sql, values] = queryable.query.mock.calls[0].arguments;
+  assert.match(sql, /INSERT INTO artwork_fetch_failures/);
+  assert.match(sql, /ON CONFLICT \(owner_type, owner_id, artwork_role\) DO UPDATE/);
+  assert.deepEqual(values, [
+    'musicbrainz_release_group',
+    'release-1',
+    'cover_front',
+    3,
+    '2026-05-15T10:00:00.000Z',
+    '2026-05-16T10:00:00.000Z',
+    'artwork_unavailable',
+  ]);
+  assert.equal(failure.failureCount, 3);
+  assert.equal(failure.nextRetryAt, '2026-05-16T10:00:00.000Z');
+});
+
+test('deleteArtworkFetchFailure removes tracked retry state', async (t) => {
+  const queryable = {
+    query: t.mock.fn(async (_sql, values) => ({
+      rows: [{
+        owner_type: values[0],
+        owner_id: values[1],
+        artwork_role: values[2],
+        failure_count: '1',
+        last_failed_at: '2026-05-15T10:00:00.000Z',
+        next_retry_at: '2026-05-15T11:00:00.000Z',
+        last_failure_code: 'artwork_unavailable',
+        created_at: '2026-05-15T10:00:00.000Z',
+        updated_at: '2026-05-15T10:00:00.000Z',
+      }],
+    })),
+  };
+
+  const deleted = await deleteArtworkFetchFailure({
+    artworkRole: 'artist_background',
+    ownerId: 'artist-1',
+    ownerType: 'musicbrainz_artist',
+  }, queryable);
+
+  assert.match(queryable.query.mock.calls[0].arguments[0], /DELETE FROM artwork_fetch_failures/);
+  assert.deepEqual(queryable.query.mock.calls[0].arguments[1], [
+    'musicbrainz_artist',
+    'artist-1',
+    'artist_background',
+  ]);
+  assert.equal(deleted.lastFailureCode, 'artwork_unavailable');
 });

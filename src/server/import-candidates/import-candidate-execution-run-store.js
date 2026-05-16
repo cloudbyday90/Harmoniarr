@@ -85,12 +85,17 @@ export function createImportCandidateExecutionRunStore({
     return normalizeRun(await operationRunStore.getRunById(runId));
   }
 
+  async function listRecentRuns({ limit } = {}) {
+    return (await operationRunStore.listRecentRuns({ limit })).map(normalizeRun);
+  }
+
   return {
     acquireLease: operationRunStore.acquireLease,
     createOperationRun,
     getActiveRun,
     getRunById,
     getLatestRun,
+    listRecentRuns,
     isCancellationRequested: operationRunStore.isCancellationRequested,
     markRunCancelled: operationRunStore.markRunCancelled,
     markRunPaused: operationRunStore.markRunPaused,

@@ -130,7 +130,9 @@ export function createLibraryDiscoveryDispatchService({
       if (getUserPreferencesFn && ownership?.sourceRequestedForUserId) {
         try {
           userPreferences = await getUserPreferencesFn({ userId: ownership.sourceRequestedForUserId });
-        } catch {}
+        } catch {
+          userPreferences = null;
+        }
       }
 
       const searchQuery = buildDiscoverySearchQuery({

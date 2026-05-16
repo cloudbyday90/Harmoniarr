@@ -61,6 +61,8 @@ export function registerImportCandidateRoutes(app, {
   buildImportCandidateApplySummary,
   buildImportCandidateExecutionRunDetail,
   buildImportCandidateExecutionSummary,
+  buildImportCandidateMediaInspectionRunDetail,
+  buildImportCandidateMediaInspectionSummary,
   buildImportPendingCandidateSummary,
   buildSelectedImportCandidateSummary,
   clearImportCandidateFileDecision,
@@ -152,6 +154,26 @@ export function registerImportCandidateRoutes(app, {
     response.json({
       ok: true,
       importCandidateApplyRun: await buildImportCandidateApplyRunDetail({
+        runId: request.params.runId,
+      }),
+    });
+  }));
+
+  app.get('/api/v1/import-candidates/media-inspection-summary', importCandidateRoute(async (request, response) => {
+    await requireAdminSessionFn(request);
+
+    response.json({
+      ok: true,
+      importCandidateMediaInspection: await buildImportCandidateMediaInspectionSummary(),
+    });
+  }));
+
+  app.get('/api/v1/import-candidates/media-inspection-runs/:runId', importCandidateRoute(async (request, response) => {
+    await requireAdminSessionFn(request);
+
+    response.json({
+      ok: true,
+      importCandidateMediaInspectionRun: await buildImportCandidateMediaInspectionRunDetail({
         runId: request.params.runId,
       }),
     });

@@ -74,6 +74,7 @@ export function createImportCandidateMediaInspectionRunStore({
     getActiveRun: async () => normalizeRun(await operationRunStore.getActiveRun()),
     getRunById: async (runId) => normalizeRun(await operationRunStore.getRunById(runId)),
     getLatestRun: async () => normalizeRun(await operationRunStore.getLatestRun()),
+    listRecentRuns: async ({ limit } = {}) => (await operationRunStore.listRecentRuns({ limit })).map(normalizeRun),
     isCancellationRequested: operationRunStore.isCancellationRequested,
     markRunCancelled: operationRunStore.markRunCancelled,
     markRunPaused: operationRunStore.markRunPaused,

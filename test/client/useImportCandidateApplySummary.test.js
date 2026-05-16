@@ -18,6 +18,10 @@ test('useImportCandidateApplySummary loads the shared apply summary payload', as
           id: 'apply-run-1',
           status: 'completed',
         },
+        recentRuns: [{
+          id: 'apply-run-1',
+          status: 'completed',
+        }],
         summary: {
           status: 'ready',
           message: '1 candidate was applied into the library.',
@@ -29,6 +33,7 @@ test('useImportCandidateApplySummary loads the shared apply summary payload', as
   await workflow.loadImportCandidateApplySummary();
 
   assert.equal(workflow.currentRun.value.id, 'apply-run-1');
+  assert.equal(workflow.recentRuns.value.length, 1);
   assert.equal(workflow.summary.value.status, 'ready');
   assert.equal(workflow.errorMessage.value, '');
   assert.equal(workflow.isLoading.value, false);
@@ -45,6 +50,10 @@ test('useImportCandidateApplySummary starts an apply run and reloads summary', a
         id: 'apply-run-2',
         status: 'pending',
       },
+      recentRuns: [{
+        id: 'apply-run-2',
+        status: 'pending',
+      }],
       summary: {
         status: 'running',
         message: 'Import apply is in progress.',
@@ -93,6 +102,10 @@ test('useImportCandidateApplySummary can load an exact historical apply run deta
           id: 'apply-run-latest',
           status: 'completed',
         },
+        recentRuns: [{
+          id: 'apply-run-latest',
+          status: 'completed',
+        }],
         summary: {
           status: 'ready',
           message: 'Latest apply run completed.',

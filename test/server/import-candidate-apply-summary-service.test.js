@@ -23,6 +23,23 @@ test('buildImportCandidateApplySummary returns the current run with persisted it
         status: 'completed',
         totalImportPending: 1,
       }),
+      listRecentRuns: async () => [{
+        appliedCount: 1,
+        appliedWithWarningsCount: 0,
+        applyFailedCount: 0,
+        blockedCount: 0,
+        currentStep: 'Import apply complete',
+        executionMode: 'move',
+        finishedAt: '2026-04-30T20:00:00.000Z',
+        id: 'run-1',
+        processedCandidateCount: 1,
+        readyCount: 1,
+        readyWithWarningsCount: 0,
+        requestedCandidateCount: 1,
+        startedAt: '2026-04-30T19:59:00.000Z',
+        status: 'completed',
+        totalImportPending: 1,
+      }],
     },
     listImportOperationsFn: async () => [{
       destinationPath: '/data/music/Autechre/Amber/01 Foil.flac',
@@ -57,6 +74,8 @@ test('buildImportCandidateApplySummary returns the current run with persisted it
   assert.equal(summary.currentRun.items.length, 1);
   assert.equal(summary.currentRun.items[0].importOperations.length, 1);
   assert.equal(summary.currentRun.items[0].importOperations[0].id, 'operation-1');
+  assert.equal(summary.recentRuns.length, 1);
+  assert.equal(summary.recentRuns[0].id, 'run-1');
   assert.equal(summary.summary.status, 'ready');
 });
 
@@ -65,6 +84,7 @@ test('buildImportCandidateApplySummary reports no run when none exist', async ()
     importCandidateApplyRunStore: {
       getActiveRun: async () => null,
       getLatestRun: async () => null,
+      listRecentRuns: async () => [],
     },
     listImportApplyRunItemsFn: async () => [],
   });
@@ -72,5 +92,6 @@ test('buildImportCandidateApplySummary reports no run when none exist', async ()
   const summary = await service.buildImportCandidateApplySummary();
 
   assert.equal(summary.currentRun, null);
+  assert.deepEqual(summary.recentRuns, []);
   assert.equal(summary.summary.status, 'not_started');
 });

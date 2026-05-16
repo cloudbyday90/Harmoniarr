@@ -33,7 +33,9 @@ function makeWorker(initialState = 'installing') {
     get state() { return state; },
     setState(s) {
       state = s;
-      listeners['statechange']?.forEach((fn) => fn());
+      listeners['statechange']?.forEach((fn) => {
+        fn();
+      });
     },
     addEventListener(type, fn) {
       listeners[type] ??= [];
@@ -59,7 +61,9 @@ function makeRegistration({ installing = null, waiting = null, active = null } =
     },
     _fireUpdateFound(worker) {
       reg.installing = worker;
-      listeners['updatefound']?.forEach((fn) => fn());
+      listeners['updatefound']?.forEach((fn) => {
+        fn();
+      });
     },
   };
   return reg;
@@ -76,7 +80,9 @@ function makeServiceWorkerContainer({ registration, controller = {} }) {
       listeners[type].push(fn);
     },
     _fireControllerChange() {
-      listeners['controllerchange']?.forEach((fn) => fn());
+      listeners['controllerchange']?.forEach((fn) => {
+        fn();
+      });
     },
   };
 }

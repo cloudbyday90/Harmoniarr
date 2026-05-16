@@ -25,6 +25,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const extractLibraryFileTags = () => {};
   const listMediaRequests = () => {};
   const matchLibraryFiles = () => {};
+  const prefetchMonitoredArtistArtwork = () => {};
   const reconcileDiscoveryRequests = () => {};
   const reconcileLibraryReleases = () => {};
   const reconcileWantedReleases = () => {};
@@ -122,6 +123,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryWantedSummaryService,
     libraryWantedSummaryStore,
     libraryScanWorker,
+    prefetchMonitoredArtistArtwork,
     settingsService: {},
   });
 
@@ -291,6 +293,10 @@ test('createLibraryModule initializes the default discovery worker after pause s
     maintenanceLockService: {
       listActiveMaintenanceLocks: async () => [],
     },
+    prefetchMonitoredArtistArtwork: async () => ({
+      cachedCount: 0,
+      fetchedCount: 0,
+    }),
     providerClientResolverService: {},
     settingsService: {},
     slskdService: {},
