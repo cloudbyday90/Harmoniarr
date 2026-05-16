@@ -478,3 +478,108 @@ test('resolveArtworkBatch forwards refresh=true to resolveArtwork', async () => 
   assert.equal(results['musicbrainz_release:mbid-norefresh:cover_front'].cached, true);
   assert.equal(results['musicbrainz_release:mbid-norefresh:cover_front'].url, '/api/v1/artwork/assets/cached-1/file');
 });
+
+test('resolveArtwork with refresh=true removes stale assignments after successful CAA fetch', async (t) => {
+  const fakeAsset = { id: 'new-asset', dominantChroma: null, dominantHue: null, dominantLightness: null };
+  const removeStaleFn = t.mock.fn(async () => ({ removedCount: 1 }));
+  const assignFn = t.mock.fn(async () => ({}));
+
+  const fetchService = createArtworkFetchService({
+    artworkPolicyService: {
+      getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }),
+    },
+    coverArtArchiveClient: {
+      fetchFrontImage: async () => ({ buffer: Buffer.from([0xFF]), sourceUrl: 'https://example.com/img.jpg' }),
+    },
+    artworkIngestionService: {
+      ingestArtworkBuffer: async () => ({ asset: fakeAsset }),
+    },
+    artworkAssignmentService: {
+      assignPreferredArtwork: assignFn,
+      removeStaleAssignments: removeStaleFn,
+    },
+    listArtworkAssignmentsFn: async () => [],
+  });
+
+  await fetchService.resolveArtwork({
+    ownerId: 'mbid-1',
+    ownerType: 'musicbrainz_release',
+    artworkRole: 'cover_front',
+    refresh: true,
+  });
+
+  assert.equal(removeStaleFn.mock.callCount(), 1);
+  assert.equal(removeStaleFn.mock.calls[0].arguments[0].artworkAssetId, 'new-asset');
+  assert.equal(removeStaleFn.mock.calls[0].arguments[0].artworkRole, 'cover_front');
+  assert.equal(removeStaleFn.mock.calls[0].arguments[0].ownerId, 'mbid-1');
+  assert.equal(removeStaleFn.mock.calls[0].arguments[0].ownerType, 'musicbrainz_release');
+});
+
+test('resolveArtwork without refresh does not remove stale assignments', async (t) => {
+  const fakeAsset = { id: 'new-asset', dominantChroma: null, dominantHue: null, dominantLightness: null };
+  const removeStaleFn = t.mock.fn(async () => ({ removedCount: 0 }));
+  const assignFn = t.mock.fn(async () => ({}));
+
+  const fetchService = createArtworkFetchService({
+    artworkPolicyService: {
+      getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }),
+    },
+    coverArtArchiveClient: {
+      fetchFrontImage: async () => ({ buffer: Buffer.from([0xFF]), sourceUrl: 'https://example.com/img.jpg' }),
+    },
+    artworkIngestionService: {
+      ingestArtworkBuffer: async () => ({ asset: fakeAsset }),
+    },
+    artworkAssignmentService: {
+      assignPreferredArtwork: assignFn,
+      removeStaleAssignments: removeStaleFn,
+    },
+    listArtworkAssignmentsFn: async () => [],
+  });
+
+  await fetchService.resolveArtwork({
+    ownerId: 'mbid-1',
+    ownerType: 'musicbrainz_release',
+    artworkRole: 'cover_front',
+    refresh: false,
+  });
+
+  assert.equal(removeStaleFn.mock.callCount(), 0);
+});
+
+test('resolveArtwork with refresh=true removes stale assignments after successful Fanart.tv fetch', async (t) => {
+  const fakeAsset = { id: 'fanart-new', dominantChroma: null, dominantHue: null, dominantLightness: null };
+  const removeStaleFn = t.mock.fn(async () => ({ removedCount: 2 }));
+  const assignFn = t.mock.fn(async () => ({}));
+
+  const fetchService = createArtworkFetchService({
+    artworkPolicyService: {
+      getArtworkRuntimePolicy: async () => ({ fetch: { enabled: true } }),
+    },
+    listArtworkAssignmentsFn: async () => [],
+    fanartTvClient: {
+      fetchArtistImages: async () => [
+        { imageType: 'artistthumb', url: 'https://fanart.tv/thumb.jpg', id: '10', likes: 5 },
+      ],
+    },
+    artworkIngestionService: {
+      ingestArtworkBuffer: async () => ({ asset: fakeAsset }),
+    },
+    artworkAssignmentService: {
+      assignPreferredArtwork: assignFn,
+      removeStaleAssignments: removeStaleFn,
+    },
+    downloadImageFn: async () => Buffer.from([0xFF]),
+  });
+
+  await fetchService.resolveArtwork({
+    ownerId: 'artist-1',
+    ownerType: 'musicbrainz_artist',
+    artworkRole: 'artist_thumbnail',
+    refresh: true,
+  });
+
+  assert.equal(removeStaleFn.mock.callCount(), 1);
+  assert.equal(removeStaleFn.mock.calls[0].arguments[0].artworkAssetId, 'fanart-new');
+  assert.equal(removeStaleFn.mock.calls[0].arguments[0].artworkRole, 'artist_thumbnail');
+});

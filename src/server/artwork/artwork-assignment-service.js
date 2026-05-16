@@ -22,6 +22,7 @@ import {
   listArtworkAssignments,
   refreshArtworkAssetAssignmentState,
   upsertArtworkAssignment,
+  deleteStaleArtworkAssignments,
 } from './artwork-repository.js';
 
 function normalizeRequiredString(value, fieldName) {
@@ -139,6 +140,7 @@ export function createArtworkAssignmentService({
   listArtworkAssignmentsFn = listArtworkAssignments,
   refreshArtworkAssetAssignmentStateFn = refreshArtworkAssetAssignmentState,
   upsertArtworkAssignmentFn = upsertArtworkAssignment,
+  deleteStaleArtworkAssignmentsFn = deleteStaleArtworkAssignments,
 } = {}) {
   async function assignPreferredArtwork({
     artworkAssetId,
@@ -363,9 +365,48 @@ export function createArtworkAssignmentService({
     }
   }
 
+  async function removeStaleAssignments({
+    artworkAssetId,
+    artworkRole,
+    ownerId,
+    ownerType,
+  }) {
+    const normalizedArtworkAssetId = normalizeRequiredString(artworkAssetId, 'artworkAssetId');
+    const normalizedArtworkRole = normalizeRequiredString(artworkRole, 'artworkRole');
+    const normalizedOwnerId = normalizeRequiredString(ownerId, 'ownerId');
+    const normalizedOwnerType = normalizeRequiredString(ownerType, 'ownerType');
+    const pool = getPoolFn();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const removedAssetIds = await deleteStaleArtworkAssignmentsFn({
+        artworkRole: normalizedArtworkRole,
+        exceptArtworkAssetId: normalizedArtworkAssetId,
+        ownerId: normalizedOwnerId,
+        ownerType: normalizedOwnerType,
+      }, client);
+
+      const affectedAssetIds = collectArtworkAssetIds(removedAssetIds, normalizedArtworkAssetId);
+      if (affectedAssetIds.length > 0) {
+        await refreshArtworkAssetAssignmentStateFn(affectedAssetIds, client);
+      }
+
+      await client.query('COMMIT');
+      return { removedCount: removedAssetIds.length };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   return {
     assignPreferredArtwork,
     clearArtworkSource,
     reconcilePreferredArtwork,
+    removeStaleAssignments,
   };
 }

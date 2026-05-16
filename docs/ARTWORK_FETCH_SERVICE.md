@@ -597,6 +597,12 @@ The artist detail hero includes a ghost icon button (refresh icon) that:
 
 This allows operators to force artwork re-fetch for specific items without clearing the entire cache.
 
+### Stale Assignment Cleanup on Refresh
+
+When `refresh=true` succeeds in fetching new artwork, the fetch service calls `removeStaleAssignments` on the assignment service. This deletes all previous assignments for the same `(ownerType, ownerId, artworkRole)` except the newly created one. This prevents orphaned assets from accumulating over repeated refresh cycles.
+
+The cleanup runs inside a transaction: stale assignments are deleted, then `refreshArtworkAssetAssignmentState` updates the `has_preferred_assignment` flag on all affected assets (both the newly promoted one and the removed ones). Removed assets with no remaining assignments become eligible for the next cleanup worker run.
+
 ## Fetch Strategies
 
 ### Provider Priority
@@ -740,6 +746,13 @@ For 1,000 artists + 3,000 releases:
 4. `buildSparklineData` presentation helper — maps history entries to `{ date, height, requestCount, tone }` with height relative to limit/max.
 5. Pure CSS sparkline in `SettingsMediaStorageView.vue` — flexbox bar chart with 2px gap, 2rem height, tone-based bar colors matching quota bar styling.
 6. Tests: 4 service tests, 2 route tests, 2 client API tests, 7 presentation tests.
+
+### Phase 4n: Stale Assignment Cleanup on Refresh (Complete)
+
+1. `deleteStaleArtworkAssignments` in `artwork-repository.js` — deletes all assignments for `(ownerType, ownerId, artworkRole)` except the given asset ID, returns removed asset IDs.
+2. `removeStaleAssignments` in `artwork-assignment-service.js` — transactional wrapper that calls the repository function and refreshes assignment state for all affected assets.
+3. Fetch service passes `refresh` flag to `resolveFromCaa` and `resolveFromFanartTv`. When `refresh=true` and a new asset is ingested, calls `removeStaleAssignments` to clean up old assignments for that owner+role.
+4. Tests: 3 fetch service tests verifying stale cleanup is called on refresh (CAA path + Fanart.tv path) and not called on normal fetch.
 
 ## Security Considerations
 

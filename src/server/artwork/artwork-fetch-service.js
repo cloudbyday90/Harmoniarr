@@ -41,7 +41,7 @@ export function createArtworkFetchService({
     return Buffer.from(await response.arrayBuffer());
   },
 } = {}) {
-  async function resolveFromCaa({ mbid, mbidType, ownerId, ownerType, artworkRole }) {
+  async function resolveFromCaa({ mbid, mbidType, ownerId, ownerType, artworkRole, refresh = false }) {
     if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('coverArtArchive')) {
       return null;
     }
@@ -70,10 +70,19 @@ export function createArtworkFetchService({
       sourceReference: mbid,
     });
 
+    if (refresh) {
+      await artworkAssignmentService.removeStaleAssignments({
+        artworkAssetId: asset.id,
+        artworkRole,
+        ownerId,
+        ownerType,
+      });
+    }
+
     return buildResult(asset, 'coverArtArchive');
   }
 
-  async function resolveFromFanartTv({ ownerId, ownerType, artworkRole }) {
+  async function resolveFromFanartTv({ ownerId, ownerType, artworkRole, refresh = false }) {
     if (!fanartTvClient) return null;
 
     if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('fanartTv')) {
@@ -128,6 +137,15 @@ export function createArtworkFetchService({
       sourceReference: ownerId,
     });
 
+    if (refresh) {
+      await artworkAssignmentService.removeStaleAssignments({
+        artworkAssetId: asset.id,
+        artworkRole: resolvedRole,
+        ownerId,
+        ownerType,
+      });
+    }
+
     if (artworkQuotaService) {
       await artworkQuotaService.incrementQuota('fanartTv');
     }
@@ -171,6 +189,7 @@ export function createArtworkFetchService({
             mbidType: isReleaseGroup ? 'release-group' : 'release',
             ownerId,
             ownerType,
+            refresh,
           });
           if (caaResult) return caaResult;
         }
@@ -180,7 +199,7 @@ export function createArtworkFetchService({
         if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('fanartTv')) {
           anyQuotaExceeded = true;
         } else {
-          const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType });
+          const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType, refresh });
           if (fanarResult) return fanarResult;
         }
       }
@@ -190,7 +209,7 @@ export function createArtworkFetchService({
       if (artworkQuotaService && await artworkQuotaService.isQuotaExceeded('fanartTv')) {
         anyQuotaExceeded = true;
       } else {
-        const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType });
+        const fanarResult = await resolveFromFanartTv({ artworkRole, ownerId, ownerType, refresh });
         if (fanarResult) return fanarResult;
       }
     }

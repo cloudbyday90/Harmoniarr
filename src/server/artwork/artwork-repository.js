@@ -347,3 +347,20 @@ export async function upsertArtworkAssignment(assignment, queryable) {
 
   return mapArtworkAssignmentRow(result.rows[0]);
 }
+
+export async function deleteStaleArtworkAssignments({ artworkRole, exceptArtworkAssetId, ownerId, ownerType }, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      DELETE FROM artwork_assignments
+      WHERE owner_type = $1
+        AND owner_id = $2
+        AND artwork_role = $3
+        AND artwork_asset_id <> $4
+      RETURNING artwork_asset_id
+    `,
+    [ownerType, ownerId, artworkRole, exceptArtworkAssetId],
+  );
+
+  return result.rows.map((row) => row.artwork_asset_id);
+}
