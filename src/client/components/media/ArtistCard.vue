@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, toRef, useTemplateRef } from 'vue';
+import { computed, toRef, useSlots, useTemplateRef } from 'vue';
 import { RouterLink } from 'vue-router';
 import ArtworkImage from '../ArtworkImage.vue';
 import MonitorButton from './MonitorButton.vue';
@@ -92,6 +92,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['monitor']);
+const slots = useSlots();
 
 /** Readable metadata line built from available artist fields. Computed once per render. */
 const meta = computed(() => {
@@ -140,8 +141,14 @@ const accentStyle = computed(() => {
         </slot>
       </div>
       <div class="hx-media-card__body">
-        <p class="hx-media-card__title">{{ artist.name }}</p>
-        <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
+        <slot name="eyebrow" />
+        <p class="hx-media-card__title">
+          <slot name="title">{{ artist.name }}</slot>
+        </p>
+        <p v-if="slots.meta || meta" class="hx-media-card__meta">
+          <slot name="meta">{{ meta }}</slot>
+        </p>
+        <slot name="body-footer" />
       </div>
     </RouterLink>
     <template v-else>
@@ -151,8 +158,14 @@ const accentStyle = computed(() => {
         </slot>
       </div>
       <div class="hx-media-card__body">
-        <p class="hx-media-card__title">{{ artist.name }}</p>
-        <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
+        <slot name="eyebrow" />
+        <p class="hx-media-card__title">
+          <slot name="title">{{ artist.name }}</slot>
+        </p>
+        <p v-if="slots.meta || meta" class="hx-media-card__meta">
+          <slot name="meta">{{ meta }}</slot>
+        </p>
+        <slot name="body-footer" />
       </div>
     </template>
     <div class="hx-media-card__actions">
@@ -202,5 +215,15 @@ const accentStyle = computed(() => {
 
 .hx-media-card:hover {
   border-color: oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0) / 0.85);
+}
+
+.hx-media-card[data-variant='discover'] {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--hx-accent-soft) 18%, transparent) 0%, transparent 44%),
+    var(--hx-bg-surface);
+}
+
+.hx-media-card[data-variant='discover'] .hx-media-card__body {
+  gap: 6px;
 }
 </style>
