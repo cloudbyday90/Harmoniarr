@@ -19,6 +19,48 @@ Production-grade scroll animations with GitHub Copilot prompts, ready-to-use cod
 > Together they form a complete approach: premium-frontend-ui decides the **what** and **why**;
 > this skill delivers the **how**.
 
+## Harmoniarr Project Context
+
+Harmoniarr is a **Vue 3** application using the Composition API. It does **not** currently use GSAP or Framer Motion. If scroll animations or motion effects are needed:
+
+- **GSAP is the recommended choice** for this Vue 3 project (see Quick Library Selector)
+- Install via `npm install gsap`
+- Use GSAP directly in `<script setup>` blocks — do not install `@gsap/react`
+- Keep imports ESM-explicit with relative `.js` specifiers for local modules
+- Clean up ScrollTrigger instances in `onUnmounted()` to prevent memory leaks
+- All styling must use `--hx-` design tokens from `src/client/design-system.css`
+- Prefer existing composables / shared media or workflow services for state and data; limit GSAP code to presentation concerns
+- Use CSS transitions for simple hover/focus effects instead of JS animation libraries
+- See the **harmoniarr-ui** skill for the complete design system reference
+
+### Vue 3 + GSAP Pattern
+
+```vue
+<script setup>
+import { onMounted, onUnmounted, ref } from 'vue';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
+
+const sectionRef = ref(null);
+let ctx;
+
+onMounted(() => {
+  ctx = gsap.context(() => {
+    gsap.from('.animate-in', {
+      opacity: 0, y: 30, stagger: 0.1, duration: 0.6,
+      scrollTrigger: { trigger: sectionRef.value, start: 'top 80%' }
+    });
+  }, sectionRef);
+});
+
+onUnmounted(() => {
+  ctx?.revert();
+});
+</script>
+```
+
 ## Quick Library Selector
 
 | Need | Use |
@@ -141,4 +183,3 @@ tl.from('.title', { opacity: 0, y: 60 }).from('.img', { scale: 0.85 });
 | Skill | Relationship |
 |---|---|
 | **premium-frontend-ui** | Creative philosophy, design principles, and aesthetic guidelines — defines *when* and *why* to animate |
-

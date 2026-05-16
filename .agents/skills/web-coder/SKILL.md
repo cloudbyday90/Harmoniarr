@@ -13,6 +13,54 @@ Transform into an expert 10x web development engineer with deep knowledge of web
 
 Like a seasoned web architect who speaks fluently across all layers of the web stack—from HTML semantics to TCP handshakes—you can translate requirements into standards-compliant, performant, and accessible web solutions.
 
+## Harmoniarr Project Context
+
+This project is a **Soulseek-native music library manager** with the following stack:
+
+| Layer | Technology | Version |
+|---|---|---|
+| Frontend framework | Vue 3 (Composition API, `<script setup>`) | 3.5.x |
+| Router | Vue Router | 5.0.x |
+| Backend framework | Express | 5.2.x |
+| Database | PostgreSQL (via `pg`) | 8.20.x |
+| Build tool | Vite | 8.0.x |
+| Image processing | Sharp | 0.34.x |
+| Push notifications | web-push | 3.6.x |
+| Audio metadata | music-metadata | 11.12.x |
+| Testing | Node.js built-in `node:test` + Playwright | 25.4.x / 1.59.x |
+| Linting | ESLint 10 + eslint-plugin-vue | 10.3.x |
+| CSS | Plain CSS with `--hx-` custom property design system | — |
+
+### Key Directories
+
+```
+src/client/    Vue 3 SPA (components, views, composables, state)
+src/server/    Express 5 API (routes, middleware, database)
+src/shared/    Code shared between client and server
+test/          Test files (server, client, integration, browser, scripts)
+scripts/       Build and utility scripts
+```
+
+### Conventions
+
+- **No Tailwind, no CSS-in-JS** — plain CSS with design tokens
+- **No Vuex/Pinia** — composables + plain JS modules for state
+- **Node.js test runner** (`node:test`) — not Jest or Vitest
+- **ESM only** (`"type": "module"` in package.json)
+- **Relative ESM imports must include `.js`** in JS modules
+- **CSS custom properties** prefixed with `--hx-` for the design system
+- **Component classes** prefixed with `.hx-` for design system primitives
+- See the **harmoniarr-ui** skill for full design system and component patterns
+
+### Reuse Before Rebuild
+
+- Prefer shared client composables and API helpers over view-local fetch logic
+- Prefer shared server services in `src/server/media/` and `src/server/*/` over route-local workflow code
+- For import-candidate run workflows, reuse `src/client/composables/useImportCandidateRunSummary.js`
+- For shared UI state, prefer existing composables such as `src/client/composables/useToast.js` and `src/client/composables/useOperationHistory.js`
+- For media-request reads, prefer existing helpers in `src/client/lib/media-request-api.js`
+- For media inspection behavior, prefer `src/server/media/media-inspection-service.js` instead of duplicating ffprobe/process logic
+
 ## When to Use This Skill
 
 - Working with HTML, CSS, JavaScript, or any web markup/styling/scripting

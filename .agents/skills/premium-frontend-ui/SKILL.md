@@ -15,6 +15,21 @@ As an AI engineering assistant, your role when building premium frontend experie
 
 When a user requests a high-end landing page, an interactive portfolio, or a specialized component that requires top-tier visual polish, apply the following rigorous standards to every line of code you generate.
 
+## Harmoniarr Project Context
+
+Harmoniarr uses a **dense ops-console aesthetic** — not a marketing/landing-page style. When applying premium UI principles to this project:
+
+- **Adapt the philosophy, not the surface aesthetic.** The principles of intentional design, consistent spacing, and typography hierarchy apply, but the visual output should be compact and information-dense, not cinematic.
+- **No external animation libraries.** The project does not use GSAP, Framer Motion, or Lenis. Use CSS transitions and animations only.
+- **No framework animation packages.** This is Vue 3, not React/Next.js.
+- **ESM discipline is mandatory.** Use explicit relative `.js` imports in JS modules and `<script setup>` blocks.
+- **Design tokens are mandatory.** All styling must use `--hx-` prefixed CSS custom properties from `src/client/design-system.css`. Never introduce hardcoded colors, spacing, or typography values.
+- **Dark chrome, theme-aware content.** Sidebar/topbar are always dark. Main content area supports light and dark themes via `data-theme` on `<html>`.
+- **Responsive breakpoints:** >960px (full), 641-960px (collapsed sidebar), <=640px (mobile with bottom nav).
+- **Touch targets:** Minimum 44x44px on mobile.
+- **Reuse shared state and media primitives.** Extend existing composables / API helpers before creating view-local workflow state or media fetch layers.
+- See the **harmoniarr-ui** skill for the complete design system reference.
+
 ---
 
 ## 1. Establishing the Creative Foundation

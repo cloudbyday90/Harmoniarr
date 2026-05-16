@@ -11,6 +11,70 @@ name: web-design-reviewer
 
 This skill enables visual inspection and validation of website design quality, identifying and fixing issues at the source code level.
 
+## Harmoniarr Project Context
+
+### Framework and Styling
+
+| Item | Value |
+|---|---|
+| Framework | Vue 3 (Composition API, `<script setup>`) |
+| Router | Vue Router 5 |
+| Styling | Plain CSS — no Tailwind, no CSS-in-JS, no preprocessors |
+| Design system | `--hx-` prefixed CSS custom properties |
+| Theme | Light/dark via `data-theme` attribute on `<html>` |
+| Main stylesheets | `src/client/styles.css` (legacy) → `src/client/design-system.css` (active) |
+
+### Design Token Reference
+
+All tokens use the `--hx-` prefix and are defined in `src/client/design-system.css`:
+
+- **Colors:** `--hx-bg-*` (surfaces), `--hx-text-*` (text), `--hx-accent*` (blue), `--hx-success/warning/danger/info`
+- **Spacing:** `--hx-space-1` (4px) through `--hx-space-8` (40px)
+- **Typography:** `--hx-text-xs` through `--hx-text-2xl`, `--hx-font-sans`, `--hx-font-mono`
+- **Radii:** `--hx-radius-xs` (4px) through `--hx-radius-pill` (999px)
+- **Shadows:** `--hx-shadow-sm/md/lg`
+- **Layout:** `--hx-topbar-height` (56px), `--hx-sidebar-width` (220px)
+
+### CSS Class Naming
+
+- Design system primitives: `.hx-` prefix (e.g., `.hx-card`, `.hx-btn`, `.hx-pill`)
+- Legacy classes: `.panel-dark`, `.panel-light`, `.pill`, `.pill-row` (overridden by design system)
+- New code should use `.hx-` classes exclusively
+
+### Responsive Breakpoints
+
+| Name | Width | Layout |
+|---|---|---|
+| Desktop | > 960px | Full sidebar (220px) + main |
+| Tablet | 641–960px | Collapsed sidebar (64px, icons only) |
+| Mobile | <= 640px | No sidebar, bottom nav, hamburger drawer |
+
+### Key Files for Design Review
+
+```
+src/client/design-system.css    Active design system (2629 lines)
+src/client/styles.css           Legacy stylesheet (1282 lines, overridden)
+src/client/components/AppShell.vue   App shell layout
+src/client/views/                Page-level components
+src/client/composables/useTheme.js   Theme switching
+src/client/composables/useBreakpoint.js  Responsive detection
+```
+
+### When Fixing Issues
+
+1. Always use `--hx-` design tokens — never hardcode colors, spacing, or font sizes
+2. Test both light and dark themes
+3. Check all three responsive breakpoints
+4. Prefer `.hx-` primitive classes over custom CSS
+5. The sidebar and topbar are always dark — use `--hx-text-on-dark*` tokens for text in those areas
+6. See the **harmoniarr-ui** skill for the complete design system reference
+
+### Harmoniarr Reuse Rules
+
+- Keep Vue SFC imports ESM-explicit: use relative imports with `.js` in `<script setup>`
+- When fixing workflow panels, prefer shared composables such as `useOperationHistory`, `useToast`, and `useImportCandidateRunSummary`
+- Do not re-implement media workflow fetches inside a component when a shared `src/client/lib/*-api.js` helper already exists
+
 ## Scope of Application
 
 - Static sites (HTML/CSS/JS)

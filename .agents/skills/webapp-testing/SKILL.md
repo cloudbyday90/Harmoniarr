@@ -13,6 +13,58 @@ This skill enables comprehensive testing and debugging of local web applications
 
 You should use the Playwright MCP Server to undertake the work if possible. If the MCP Server is unavailable, you can run the code in a local Node.js environment with Playwright installed.
 
+## Harmoniarr Project Context
+
+### Test Framework
+
+Harmoniarr uses the **Node.js built-in test runner** (`node:test`), not Jest or Vitest. Tests use `describe()`, `it()`, and `assert` from `node:test` / `node:assert`.
+
+### Test Commands
+
+```bash
+npm test                    # Lint + test hygiene + all node tests
+npm run test:server         # Server unit tests (test/server/)
+npm run test:client         # Client unit tests (test/client/)
+npm run test:integration    # Integration tests (test/integration/)
+npm run test:scripts        # Script tests (test/scripts/)
+npm run test:browser        # Browser/Playwright tests (test/browser/)
+npm run test:node           # server + client + scripts + integration
+npm run lint                # Lint all (server, client, shared, test, scripts)
+npm run validate            # Full validation (copyright + migrations + lint + build)
+```
+
+### Test File Locations
+
+```
+test/
+  server/       Server unit tests
+  client/       Client unit tests
+  integration/  Integration tests (DB, API)
+  browser/      Playwright browser tests
+  scripts/      Script/utility tests
+```
+
+### Running the App Locally
+
+The app runs in Docker. For local development testing:
+
+```bash
+npm run build          # Build client + server
+npm run start          # Start production server on port 3000
+```
+
+For Docker-based testing, use `compose.yaml` or `compose.walkthrough.yaml`.
+
+### Key Testing Notes
+
+- Browser tests require `npx playwright install chromium` before first run
+- Browser tests run with `--test-concurrency=1` (sequential)
+- The app uses Express 5, Vue 3, and PostgreSQL
+- Auth is cookie-based with CSRF protection (configurable via `HARMONIARR_CSRF_PROTECTION`)
+- Playwright is a devDependency (version 1.59.x)
+- Client and server code are ESM-first; keep explicit `.js` import specifiers in test fixtures and support code
+- When testing media-request or import-review flows, prefer existing shared helpers such as `src/client/lib/media-request-api.js`, `src/client/composables/useImportCandidateRunSummary.js`, and `src/client/composables/useOperationHistory.js`
+
 ## When to Use This Skill
 
 Use this skill when you need to:
@@ -93,19 +145,20 @@ await page.screenshot({ path: "debug.png", fullPage: true });
 5. **Handle timeouts gracefully** - Set reasonable timeouts for slow operations
 6. **Test incrementally** - Start with simple interactions before complex flows
 7. **Use selectors wisely** - Prefer data-testid or role-based selectors over CSS classes
+8. **Prefer web-first Playwright APIs** - Use locators and retrying assertions instead of manual polling or brittle timeout chains
 
 ## Common Patterns
 
 ### Pattern: Wait for Element
 
 ```javascript
-await page.waitForSelector("#element-id", { state: "visible" });
+await expect(page.getByRole('button', { name: 'Submit' })).toBeVisible();
 ```
 
 ### Pattern: Check if Element Exists
 
 ```javascript
-const exists = (await page.locator("#element-id").count()) > 0;
+const exists = await page.getByRole('button', { name: 'Submit' }).isVisible();
 ```
 
 ### Pattern: Get Console Logs
@@ -118,7 +171,7 @@ page.on("console", (msg) => console.log("Browser log:", msg.text()));
 
 ```javascript
 try {
-  await page.click("#button");
+  await page.getByRole('button', { name: 'Submit' }).click();
 } catch (error) {
   await page.screenshot({ path: "error.png" });
   throw error;
