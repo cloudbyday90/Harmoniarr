@@ -71,7 +71,9 @@ export async function createBrowserSmokeRuntime({
         const browser = await chromium.launch({
           headless: true,
         });
-        const browserContext = await browser.newContext();
+        const browserContext = await browser.newContext({
+          serviceWorkers: 'block',
+        });
         const page = await browserContext.newPage();
         page.setDefaultTimeout(context.config?.httpRequestTimeoutMs ?? 10000);
 
