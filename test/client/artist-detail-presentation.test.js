@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildArtistDetailErrorBody,
+  buildArtistHeroBackgroundStyle,
   buildArtistMetaLine,
   buildArtistMusicBrainzLabel,
   buildArtistMusicBrainzUrl,
@@ -28,6 +29,7 @@ import {
   buildRelatedArtistInitial,
   formatArtistDetailError,
   formatDiscographyError,
+  formatRelatedArtistScore,
   pluralizeReleaseType,
 } from '../../src/client/lib/artist-detail-presentation.js';
 import { buildAvatarInitial, buildAvatarStyle } from '../../src/client/lib/artist-avatar.js';
@@ -120,6 +122,18 @@ test('buildArtistMusicBrainzLabel does not say "MusicBrainz"', () => {
 
 test('buildArtistMusicBrainzLabel is stable across calls', () => {
   assert.equal(buildArtistMusicBrainzLabel(), buildArtistMusicBrainzLabel());
+});
+
+// ── buildArtistHeroBackgroundStyle ───────────────────────────────────────────
+
+test('buildArtistHeroBackgroundStyle returns empty object for null artwork', () => {
+  assert.deepEqual(buildArtistHeroBackgroundStyle(null), {});
+});
+
+test('buildArtistHeroBackgroundStyle returns backgroundImage when artwork exists', () => {
+  const style = buildArtistHeroBackgroundStyle('/art/hero.webp');
+  assert.equal(typeof style.backgroundImage, 'string');
+  assert.ok(style.backgroundImage.includes('/art/hero.webp'));
 });
 
 // ── buildArtistDetailErrorBody ────────────────────────────────────────────────
@@ -343,4 +357,14 @@ test('buildRelatedArtistInitial matches shared buildAvatarInitial output', () =>
     buildRelatedArtistInitial(mbid, 'Radiohead'),
     buildAvatarInitial(mbid, 'Radiohead'),
   );
+});
+
+// ── formatRelatedArtistScore ─────────────────────────────────────────────────
+
+test('formatRelatedArtistScore falls back when score is absent', () => {
+  assert.equal(formatRelatedArtistScore(null), 'Related artist');
+});
+
+test('formatRelatedArtistScore formats positive scores to two decimals', () => {
+  assert.equal(formatRelatedArtistScore(0.913), 'Similarity 0.91');
 });

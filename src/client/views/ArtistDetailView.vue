@@ -17,29 +17,34 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
+import ArtistDetailRelatedArtistCard from '../components/media/ArtistDetailRelatedArtistCard.vue';
 import EmptyState from '../components/EmptyState.vue';
 import MonitorButton from '../components/media/MonitorButton.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistDetail } from '../composables/useArtistDetail.js';
+import { useArtistDetailArtwork } from '../composables/useArtistDetailArtwork.js';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
-import { resolveArtwork, batchResolveArtwork } from '../lib/artwork-api.js';
-import { buildArtistDetailLocation, groupReleaseGroupsByType, normalizeReleaseGroupForCard } from '../lib/artist-detail-route.js';
+import {
+  buildArtistDetailLocation,
+  groupReleaseGroupsByType,
+  normalizeReleaseGroupForCard,
+} from '../lib/artist-detail-route.js';
 import {
   buildArtistDetailErrorBody,
+  buildArtistHeroBackgroundStyle,
   buildArtistMetaLine,
   buildArtistMusicBrainzLabel,
   buildArtistMusicBrainzUrl,
   buildNoDiscographyBody,
-  buildRelatedArtistAvatarStyle,
-  buildRelatedArtistInitial,
   formatArtistDetailError,
   formatDiscographyError,
+  formatRelatedArtistScore,
   pluralizeReleaseType,
 } from '../lib/artist-detail-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
@@ -47,14 +52,7 @@ import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 
-/** MBID from route params. */
 const mbid = computed(() => String(route.params.mbid ?? ''));
-
-/**
- * Artist name hint from query string — used as a display placeholder while the
- * API response is in flight. Populated when navigating from ArtistCard via
- * buildArtistDetailLocation(mbid, nameHint).
- */
 const nameHint = computed(() => String(route.query.name ?? ''));
 
 const {
@@ -81,20 +79,20 @@ const {
   requestRelease,
 } = useReleaseRequest();
 
-// ── Confirm request modal state ──────────────────────────────────────────────
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
 
 const confirmModalOpen = ref(false);
 const confirmRelease = ref(null);
 const confirmError = ref(null);
 
-const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
-const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
-
 function openConfirmModal(release) {
   confirmRelease.value = release;
   confirmError.value = null;
   confirmModalOpen.value = true;
-  if (isAdmin.value) void loadRequestForUsers();
+  if (isAdmin.value) {
+    void loadRequestForUsers();
+  }
 }
 
 function closeConfirmModal() {
@@ -106,15 +104,18 @@ function closeConfirmModal() {
 }
 
 const confirmIsRequesting = computed(() =>
-  confirmRelease.value ? isRequesting(confirmRelease.value) : false,
+  (confirmRelease.value ? isRequesting(confirmRelease.value) : false),
 );
 
 const confirmIsRequested = computed(() =>
-  confirmRelease.value ? isRequested(confirmRelease.value) : false,
+  (confirmRelease.value ? isRequested(confirmRelease.value) : false),
 );
 
 async function handleConfirmRequest({ requestedForUserId = null } = {}) {
-  if (!confirmRelease.value) return;
+  if (!confirmRelease.value) {
+    return;
+  }
+
   confirmError.value = null;
   const result = await requestRelease(confirmRelease.value, { requestedForUserId });
   if (result.ok) {
@@ -124,8 +125,6 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
     confirmError.value = getErrorMessage(result.error, 'Request failed. Please try again.');
   }
 }
-
-// ── Release detail modal ─────────────────────────────────────────────────────
 
 const detailModalOpen = ref(false);
 const detailRelease = ref(null);
@@ -140,120 +139,74 @@ function closeDetailModal() {
   detailRelease.value = null;
 }
 
-/** Displayed artist name — local metadata preferred, query hint as fallback. */
-const artistName = computed(() => {
-  return (artist.value?.name ?? nameHint.value) || 'Artist';
-});
-
-/** Short metadata line under the artist name. */
+const artistName = computed(() => (artist.value?.name ?? nameHint.value) || 'Artist');
 const artistMeta = computed(() => buildArtistMetaLine(artist.value));
-
-/** Whether the artist has a known MusicBrainz page. */
 const musicBrainzUrl = computed(() => buildArtistMusicBrainzUrl(mbid.value));
 
-/** Discography grouped into sections by primary type, newest first within each. */
-const discographySections = computed(() => {
-  return groupReleaseGroupsByType(releaseGroups.value).map((section) => ({
+const discographySections = computed(() =>
+  groupReleaseGroupsByType(releaseGroups.value).map((section) => ({
+    releaseCount: section.items.length,
     type: section.type,
     releases: section.items.map(normalizeReleaseGroupForCard),
-  }));
-});
+  })),
+);
 
-/** Whether there is at least one release group to show. */
 const hasDiscography = computed(() => releaseGroups.value.length > 0);
-
-/** Whether this artist is monitored (tracked in useArtistMonitoring or from local data). */
 const isArtistMonitored = computed(() => isMonitored.value);
+const discographyReleaseCount = computed(() => releaseGroups.value.length);
+const discographySectionCount = computed(() => discographySections.value.length);
+const relatedArtistCount = computed(() => relatedArtists.value.length);
 
-const heroBackgroundUrl = ref(null);
-const heroThumbnailUrl = ref(null);
-const isRefreshingArtwork = ref(false);
-
-async function loadArtistArtwork(artistMbid, refresh = false) {
-  if (!artistMbid) return;
-  if (!refresh) {
-    heroBackgroundUrl.value = null;
-    heroThumbnailUrl.value = null;
-  }
-  isRefreshingArtwork.value = true;
-  try {
-    const [bgResult, thumbResult] = await Promise.all([
-      resolveArtwork({ ownerType: 'musicbrainz_artist', ownerId: artistMbid, artworkRole: 'artist_background', refresh }),
-      resolveArtwork({ ownerType: 'musicbrainz_artist', ownerId: artistMbid, artworkRole: 'artist_thumbnail', refresh }),
-    ]);
-    heroBackgroundUrl.value = bgResult?.url ?? null;
-    heroThumbnailUrl.value = thumbResult?.url ?? null;
-  } catch {
-    // Hero artwork is decorative — silently degrade
-  } finally {
-    isRefreshingArtwork.value = false;
-  }
-}
-
-const heroStyle = computed(() => {
-  if (!heroBackgroundUrl.value) return {};
-  return {
-    'background-image': `linear-gradient(to bottom, color-mix(in oklch, var(--hx-bg-base) 40%, transparent), var(--hx-bg-base)), url(${heroBackgroundUrl.value})`,
-  };
+const {
+  getRelatedArtwork,
+  getReleaseArtwork,
+  heroBackgroundUrl,
+  heroThumbnailUrl,
+  isRefreshingArtwork,
+  loadArtistArtwork,
+} = useArtistDetailArtwork({
+  artistMbid: mbid,
+  discographySections,
+  relatedArtists,
 });
 
-const discographyArtwork = ref({});
+const heroStyle = computed(() => buildArtistHeroBackgroundStyle(heroBackgroundUrl.value));
 
-async function loadDiscographyArtwork(sections) {
-  const requests = [];
-  for (const section of sections) {
-    for (const release of section.releases) {
-      const rgMbid = release.musicbrainzReleaseGroupId;
-      if (rgMbid && !discographyArtwork.value[`musicbrainz_release_group:${rgMbid}:cover_front`]) {
-        requests.push({ ownerType: 'musicbrainz_release_group', ownerId: rgMbid, artworkRole: 'cover_front' });
-      }
-    }
-  }
-  if (requests.length === 0) return;
-  try {
-    const { resolved } = await batchResolveArtwork(requests);
-    discographyArtwork.value = { ...discographyArtwork.value, ...resolved };
-  } catch {
-    // silently degrade
-  }
+const overviewCards = computed(() => ([
+  {
+    body: isArtistMonitored.value
+      ? 'This artist is already feeding your release discovery and request workflow.'
+      : 'Follow this artist to route future releases into the broader metadata workflow.',
+    label: 'Status',
+    value: isArtistMonitored.value ? 'Monitored' : 'Available',
+  },
+  {
+    body: hasDiscography.value
+      ? 'Grouped by release type so albums, EPs, and singles stay easy to scan.'
+      : 'The discography panel will populate here once release groups are available.',
+    label: 'Discography',
+    value: String(discographyReleaseCount.value),
+  },
+  {
+    body: relatedArtistCount.value > 0
+      ? 'Related artists are resolved alongside the main profile to preserve context.'
+      : 'Related artists appear when MusicBrainz similarity data is available.',
+    label: 'Related',
+    value: String(relatedArtistCount.value),
+  },
+]));
+
+function buildRelatedArtistLocation(relatedArtist) {
+  return buildArtistDetailLocation(relatedArtist.id, relatedArtist.name);
 }
 
-function getReleaseArtwork(rgMbid) {
-  const key = `musicbrainz_release_group:${rgMbid}:cover_front`;
-  return discographyArtwork.value[key] ?? null;
-}
-
-watch(discographySections, (sections) => {
-  if (sections.length > 0) void loadDiscographyArtwork(sections);
-}, { immediate: true });
-
-const relatedArtwork = ref({});
-
-async function loadRelatedArtwork(artists) {
-  const requests = [];
-  for (const related of artists) {
-    const relatedMbid = related.id;
-    if (relatedMbid && !relatedArtwork.value[`musicbrainz_artist:${relatedMbid}:artist_thumbnail`]) {
-      requests.push({ ownerType: 'musicbrainz_artist', ownerId: relatedMbid, artworkRole: 'artist_thumbnail' });
-    }
+function buildRelatedSupportingText(relatedArtist) {
+  if (typeof relatedArtist?.score === 'number' && relatedArtist.score >= 0.9) {
+    return 'Strong similarity signal from MusicBrainz recommendations.';
   }
-  if (requests.length === 0) return;
-  try {
-    const { resolved } = await batchResolveArtwork(requests);
-    relatedArtwork.value = { ...relatedArtwork.value, ...resolved };
-  } catch {
-    // silently degrade
-  }
-}
 
-function getRelatedArtwork(artistMbid) {
-  const key = `musicbrainz_artist:${artistMbid}:artist_thumbnail`;
-  return relatedArtwork.value[key]?.url ?? null;
+  return 'Open this artist to compare discography and recommendation context.';
 }
-
-watch(relatedArtists, (artists) => {
-  if (artists.length > 0) void loadRelatedArtwork(artists);
-}, { immediate: true });
 
 async function handleMonitor() {
   const result = await monitorArtist({ id: mbid.value, name: artistName.value });
@@ -262,30 +215,22 @@ async function handleMonitor() {
   }
 }
 
-// Load on mount and whenever the MBID changes (e.g. navigating between artists).
-onMounted(() => {
-  if (mbid.value) {
-    loadArtistDetail(mbid.value);
-    void loadArtistArtwork(mbid.value);
+watch(mbid, (nextMbid) => {
+  if (nextMbid) {
+    void loadArtistDetail(nextMbid);
   }
-});
-
-watch(mbid, (newMbid, oldMbid) => {
-  if (newMbid && newMbid !== oldMbid) {
-    loadArtistDetail(newMbid);
-    void loadArtistArtwork(newMbid);
-  }
-});
+}, { immediate: true });
 </script>
 
 <template>
-  <div class="hx-page artist-detail-page">
-    <!-- Loading indicator -->
-    <div v-if="isLoading" class="artist-detail-loading" aria-live="polite" aria-busy="true">
-      <p class="artist-detail-loading-text">Loading…</p>
-    </div>
+  <section class="hx-page artist-detail-page">
+    <article v-if="isLoading" class="hx-card artist-detail-loading" aria-live="polite" aria-busy="true">
+      <div class="hx-card-body">
+        <p class="artist-detail-loading__title">Loading artist detail...</p>
+        <p class="artist-detail-loading__body">Discography, artwork, and related artists are being prepared.</p>
+      </div>
+    </article>
 
-    <!-- Hard error (discography failed AND no artist name fallback) -->
     <EmptyState
       v-else-if="discographyError && !artist && !nameHint"
       :title="formatDiscographyError(discographyError)"
@@ -293,153 +238,184 @@ watch(mbid, (newMbid, oldMbid) => {
     >
       <template #icon>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 8v4M12 16h.01"/>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 8v4M12 16h.01" />
         </svg>
       </template>
     </EmptyState>
 
-    <!-- Artist page content -->
     <template v-else>
-      <!-- ── Artist header ──────────────────────────────────────────────── -->
-      <header class="hx-page-header artist-detail-header" :style="heroStyle">
-        <img
-          v-if="heroThumbnailUrl"
-          :src="heroThumbnailUrl"
-          :alt="`${artistName} artwork`"
-          class="artist-detail-hero-thumb"
-          loading="lazy"
-        />
-        <div class="artist-detail-hero-thumb artist-detail-hero-thumb-placeholder" v-else aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 18V5l12-2v13"/>
-            <circle cx="6" cy="18" r="3"/>
-            <circle cx="18" cy="16" r="3"/>
-          </svg>
-        </div>
-        <div class="artist-detail-header-body">
-          <h1 class="hx-page-title artist-detail-name">{{ artistName }}</h1>
-          <p v-if="artistMeta" class="artist-detail-artist-meta">{{ artistMeta }}</p>
-          <div class="artist-detail-header-actions">
-            <MonitorButton
-              :monitored="isArtistMonitored"
-              :loading="isMonitoring(mbid)"
-              @monitor="handleMonitor"
+      <article class="hx-card artist-stage" :style="heroStyle">
+        <div class="hx-card-body artist-stage__body">
+          <div class="artist-stage__media">
+            <img
+              v-if="heroThumbnailUrl"
+              :src="heroThumbnailUrl"
+              :alt="`${artistName} artwork`"
+              class="artist-stage__thumb"
+              loading="lazy"
             />
-            <a
-              v-if="musicBrainzUrl"
-              :href="musicBrainzUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hx-btn"
-              data-variant="ghost"
-            >
-              {{ buildArtistMusicBrainzLabel() }}
-            </a>
-            <button
-              type="button"
-              class="hx-btn hx-btn-icon"
-              data-variant="ghost"
-              :disabled="isRefreshingArtwork"
-              aria-label="Refresh artwork"
-              title="Refresh artwork"
-              @click="loadArtistArtwork(mbid, true)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" :class="{ 'is-spinning': isRefreshingArtwork }" aria-hidden="true">
-                <path d="M21 12a9 9 0 1 1-3.2-6.8"/>
-                <polyline points="21 3 21 9 15 9"/>
+            <div v-else class="artist-stage__thumb artist-stage__thumb--placeholder" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
               </svg>
-            </button>
+            </div>
           </div>
-        </div>
-      </header>
 
-      <!-- Artist error (non-fatal — discography may still be present) -->
+          <div class="artist-stage__content">
+            <span class="artist-stage__eyebrow">Artist Profile</span>
+            <h1 class="hx-page-title artist-stage__title">{{ artistName }}</h1>
+            <p v-if="artistMeta" class="artist-stage__meta">{{ artistMeta }}</p>
+            <p class="artist-stage__copy">
+              Review the artist’s current release map, decide what to request, and keep nearby recommendations close
+              without leaving the metadata workflow.
+            </p>
+            <div class="artist-stage__signals">
+              <span class="hx-pill" :data-tone="isArtistMonitored ? 'success' : 'info'">
+                {{ isArtistMonitored ? 'Monitored artist' : 'Not monitored yet' }}
+              </span>
+              <span class="hx-pill" data-tone="info">
+                {{ discographySectionCount }} section{{ discographySectionCount === 1 ? '' : 's' }}
+              </span>
+              <span v-if="isRefreshingArtwork" class="hx-pill" data-tone="warning">Refreshing artwork</span>
+            </div>
+            <div class="artist-stage__actions">
+              <MonitorButton
+                :monitored="isArtistMonitored"
+                :loading="isMonitoring(mbid)"
+                @monitor="handleMonitor"
+              />
+              <a
+                v-if="musicBrainzUrl"
+                :href="musicBrainzUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hx-btn"
+                data-variant="ghost"
+              >
+                {{ buildArtistMusicBrainzLabel() }}
+              </a>
+              <button
+                type="button"
+                class="hx-btn hx-btn-icon"
+                data-variant="ghost"
+                :disabled="isRefreshingArtwork"
+                aria-label="Refresh artwork"
+                title="Refresh artwork"
+                @click="loadArtistArtwork(true)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" :class="{ 'is-spinning': isRefreshingArtwork }" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-3.2-6.8" />
+                  <polyline points="21 3 21 9 15 9" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <section class="artist-stage__summary" aria-label="Artist overview">
+            <article v-for="card in overviewCards" :key="card.label" class="artist-stage__summary-card">
+              <span class="artist-stage__summary-label">{{ card.label }}</span>
+              <strong class="artist-stage__summary-value">{{ card.value }}</strong>
+              <p class="artist-stage__summary-body">{{ card.body }}</p>
+            </article>
+          </section>
+        </div>
+      </article>
+
       <p v-if="artistError" class="artist-detail-soft-error" role="alert">
         {{ formatArtistDetailError(artistError) }}
       </p>
 
-      <!-- ── Discography ────────────────────────────────────────────────── -->
-      <section class="artist-detail-section" aria-label="Discography">
-        <h2 class="artist-detail-section-heading">Discography</h2>
-
-        <p v-if="discographyError" class="artist-detail-soft-error" role="alert">
-          {{ formatDiscographyError(discographyError) }}
-        </p>
-
-        <EmptyState
-          v-else-if="!hasDiscography"
-          title="No releases found"
-          :body="buildNoDiscographyBody()"
-        />
-
-        <template v-else>
-          <div
-            v-for="section in discographySections"
-            :key="section.type"
-            class="artist-detail-type-section"
-          >
-            <h3 class="artist-detail-type-heading">{{ pluralizeReleaseType(section.type) }}</h3>
-            <div class="hx-artwork-grid artist-detail-grid" :aria-label="`${section.type}s`">
-              <ReleaseCard
-                v-for="release in section.releases"
-                :key="release.musicbrainzReleaseGroupId"
-                :release="release"
-                :requested="isRequested(release)"
-                :requesting="isRequesting(release)"
-                :local-src="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.url ?? null"
-                :dominant-color="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.dominantColor ?? null"
-                :artwork-asset-id="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.assetId ?? null"
-                @request="openConfirmModal"
-                @detail="openDetailModal"
-              />
-            </div>
+      <article class="hx-card artist-detail-section-card" aria-label="Discography">
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">Discography</h2>
+            <p class="hx-card-subtitle">
+              {{ hasDiscography ? `${discographyReleaseCount} release groups across ${discographySectionCount} sections.` : 'Release groups appear here when they are available.' }}
+            </p>
           </div>
-        </template>
-      </section>
+        </header>
 
-      <!-- ── Related artists ───────────────────────────────────────────── -->
-      <section
+        <div class="hx-card-body artist-detail-section-card__body">
+          <p v-if="discographyError" class="artist-detail-soft-error" role="alert">
+            {{ formatDiscographyError(discographyError) }}
+          </p>
+
+          <EmptyState
+            v-else-if="!hasDiscography"
+            title="No releases found"
+            :body="buildNoDiscographyBody()"
+          />
+
+          <div v-else class="artist-detail-discography">
+            <section
+              v-for="section in discographySections"
+              :key="section.type"
+              class="artist-detail-discography__section"
+            >
+              <div class="artist-detail-discography__header">
+                <div>
+                  <h3 class="artist-detail-discography__title">{{ pluralizeReleaseType(section.type) }}</h3>
+                  <p class="artist-detail-discography__meta">{{ section.releaseCount }} release{{ section.releaseCount === 1 ? '' : 's' }}</p>
+                </div>
+              </div>
+
+              <div class="hx-artwork-grid artist-detail-grid" :aria-label="`${section.type}s`">
+                <ReleaseCard
+                  v-for="release in section.releases"
+                  :key="release.musicbrainzReleaseGroupId"
+                  :release="release"
+                  :requested="isRequested(release)"
+                  :requesting="isRequesting(release)"
+                  :local-src="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.url ?? null"
+                  :dominant-color="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.dominantColor ?? null"
+                  :artwork-asset-id="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.assetId ?? null"
+                  @request="openConfirmModal"
+                  @detail="openDetailModal"
+                />
+              </div>
+            </section>
+          </div>
+        </div>
+      </article>
+
+      <article
         v-if="relatedArtists.length > 0"
-        class="artist-detail-section"
+        class="hx-card artist-detail-section-card"
         aria-label="Related artists"
       >
-        <h2 class="artist-detail-section-heading">Related artists</h2>
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">Related artists</h2>
+            <p class="hx-card-subtitle">
+              Similar artists are surfaced alongside this profile so you can move through metadata context quickly.
+            </p>
+          </div>
+        </header>
 
-        <div class="artist-detail-related-strip" role="list">
-          <RouterLink
-            v-for="related in relatedArtists"
-            :key="related.id"
-            :to="buildArtistDetailLocation(related.id, related.name)"
-            class="artist-detail-related-card"
-            role="listitem"
-          >
-            <img
-              v-if="getRelatedArtwork(related.id)"
-              :src="getRelatedArtwork(related.id)"
-              :alt="related.name"
-              class="artist-detail-related-avatar-img"
-              loading="lazy"
+        <div class="hx-card-body artist-detail-section-card__body">
+          <div class="artist-detail-related-strip" role="list">
+            <ArtistDetailRelatedArtistCard
+              v-for="related in relatedArtists"
+              :key="related.id"
+              :artist="related"
+              :artwork-url="getRelatedArtwork(related.id)?.url ?? null"
+              :meta-text="formatRelatedArtistScore(related.score)"
+              :supporting-text="buildRelatedSupportingText(related)"
+              :to="buildRelatedArtistLocation(related)"
+              role="listitem"
             />
-            <div
-              v-else
-              class="artist-detail-related-avatar"
-              :style="buildRelatedArtistAvatarStyle(related.id, related.name)"
-              aria-hidden="true"
-            >
-              <span class="artist-detail-related-initial">{{ buildRelatedArtistInitial(related.id, related.name) }}</span>
-            </div>
-            <span class="artist-detail-related-name">{{ related.name }}</span>
-          </RouterLink>
-        </div>
+          </div>
 
-        <p v-if="relatedError" class="artist-detail-soft-error" role="alert">
-          {{ relatedError }}
-        </p>
-      </section>
+          <p v-if="relatedError" class="artist-detail-soft-error" role="alert">
+            {{ relatedError }}
+          </p>
+        </div>
+      </article>
     </template>
 
-    <!-- ── Confirm request modal ─────────────────────────────────────── -->
     <ConfirmRequestModal
       :open="confirmModalOpen"
       :release="confirmRelease"
@@ -451,7 +427,6 @@ watch(mbid, (newMbid, oldMbid) => {
       @close="closeConfirmModal"
     />
 
-    <!-- Release detail modal -->
     <ReleaseDetailModal
       v-if="detailRelease"
       :open="detailModalOpen"
@@ -462,87 +437,194 @@ watch(mbid, (newMbid, oldMbid) => {
       @close="closeDetailModal"
       @requested="closeDetailModal"
     />
-  </div>
+  </section>
 </template>
 
 <style scoped>
 .artist-detail-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--hx-space-8);
+  display: grid;
+  gap: var(--hx-space-5);
+  align-content: start;
 }
 
-.artist-detail-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 20rem;
+.artist-detail-loading__title {
+  margin: 0;
+  font-size: var(--hx-text-base);
+  font-weight: 700;
+  color: var(--hx-text-strong);
 }
 
-.artist-detail-loading-text {
+.artist-detail-loading__body {
+  margin: var(--hx-space-2) 0 0;
   color: var(--hx-text-muted);
-  font-size: var(--hx-text-sm);
 }
 
-.artist-detail-header {
+.artist-stage {
+  overflow: hidden;
+  background-position: center 24%;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.artist-stage__body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.4fr) minmax(240px, 0.95fr);
+  gap: var(--hx-space-5);
+  align-items: start;
+}
+
+.artist-stage__media {
   display: flex;
   align-items: flex-start;
-  gap: var(--hx-space-6);
-  background-size: cover;
-  background-position: center 30%;
-  background-repeat: no-repeat;
+  justify-content: center;
+}
+
+.artist-stage__thumb {
+  width: clamp(88px, 12vw, 112px);
+  height: clamp(88px, 12vw, 112px);
   border-radius: var(--hx-radius-lg);
-  padding: var(--hx-space-8) var(--hx-space-6);
-  min-height: 4rem;
-}
-
-.artist-detail-hero-thumb {
-  width: 5rem;
-  height: 5rem;
-  border-radius: var(--hx-radius-md);
   object-fit: cover;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--hx-shadow-md);
 }
 
-.artist-detail-hero-thumb-placeholder {
+.artist-stage__thumb--placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--hx-bg-surface-sunken);
-  box-shadow: none;
-}
-
-.artist-detail-hero-thumb-placeholder svg {
-  width: 50%;
-  height: 50%;
-  opacity: 0.4;
+  background: color-mix(in srgb, var(--hx-bg-surface-muted) 76%, transparent);
   color: var(--hx-text-faint);
 }
 
-.artist-detail-header-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--hx-space-3);
-  flex: 1;
+.artist-stage__thumb--placeholder svg {
+  width: 46%;
+  height: 46%;
+}
+
+.artist-stage__content {
+  display: grid;
+  gap: var(--hx-space-2);
   min-width: 0;
 }
 
-.artist-detail-name {
+.artist-stage__eyebrow {
+  font-size: var(--hx-text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--hx-accent-strong);
+}
+
+.artist-stage__title {
   margin: 0;
 }
 
-.artist-detail-artist-meta {
+.artist-stage__meta {
   margin: 0;
+  color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
+}
+
+.artist-stage__copy {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--hx-text-muted);
+  line-height: 1.6;
+}
+
+.artist-stage__signals,
+.artist-stage__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+
+.artist-stage__actions {
+  margin-top: var(--hx-space-1);
+}
+
+.artist-stage__summary {
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.artist-stage__summary-card {
+  display: grid;
+  gap: var(--hx-space-1);
+  padding: var(--hx-space-3);
+  border-radius: var(--hx-radius-lg);
+  background: color-mix(in srgb, var(--hx-bg-surface) 84%, transparent);
+  border: 1px solid var(--hx-border-subtle);
+}
+
+.artist-stage__summary-label {
+  font-size: var(--hx-text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--hx-text-muted);
 }
 
-.artist-detail-header-actions {
+.artist-stage__summary-value {
+  font-size: var(--hx-text-lg);
+  line-height: 1.05;
+  color: var(--hx-text-strong);
+}
+
+.artist-stage__summary-body {
+  margin: 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  line-height: 1.5;
+}
+
+.artist-detail-soft-error {
+  margin: 0;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+}
+
+.artist-detail-section-card__body {
+  display: grid;
+  gap: var(--hx-space-4);
+}
+
+.artist-detail-discography {
+  display: grid;
+  gap: var(--hx-space-5);
+}
+
+.artist-detail-discography__section {
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.artist-detail-discography__header {
   display: flex;
-  gap: var(--hx-space-2);
-  align-items: center;
-  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+}
+
+.artist-detail-discography__title {
+  margin: 0;
+  font-size: var(--hx-text-base);
+  font-weight: 700;
+  color: var(--hx-text-strong);
+}
+
+.artist-detail-discography__meta {
+  margin: 4px 0 0;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+}
+
+.artist-detail-grid {
+  --hx-artwork-grid-min: 168px;
+}
+
+.artist-detail-related-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--hx-space-3);
 }
 
 .is-spinning {
@@ -554,121 +636,30 @@ watch(mbid, (newMbid, oldMbid) => {
   to { transform: rotate(360deg); }
 }
 
-.artist-detail-soft-error {
-  font-size: var(--hx-text-sm);
-  color: var(--hx-text-danger, var(--hx-text-muted));
-  margin: 0;
+@media (max-width: 960px) {
+  .artist-stage__body {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .artist-stage__summary {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
-
-.artist-detail-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--hx-space-4);
-}
-
-.artist-detail-section-heading {
-  margin: 0;
-  font-size: var(--hx-text-strong);
-  font-weight: 700;
-  color: var(--hx-text-strong);
-}
-
-.artist-detail-type-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--hx-space-3);
-}
-
-.artist-detail-type-heading {
-  margin: 0;
-  font-size: var(--hx-text-base);
-  font-weight: 600;
-  color: var(--hx-text-strong);
-}
-
-.artist-detail-grid {
-  /* Inherits hx-artwork-grid layout. */
-}
-
-/* ── Related artists strip ─────────────────────────────────────────────── */
-
-.artist-detail-related-strip {
-  display: flex;
-  gap: var(--hx-space-3);
-  overflow-x: auto;
-  padding-bottom: var(--hx-space-2);
-  scrollbar-width: thin;
-}
-
-.artist-detail-related-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--hx-space-2);
-  text-decoration: none;
-  color: inherit;
-  flex-shrink: 0;
-  width: 6rem;
-  cursor: pointer;
-}
-
-.artist-detail-related-card:hover .artist-detail-related-name,
-.artist-detail-related-card:focus-visible .artist-detail-related-name {
-  text-decoration: underline;
-}
-
-.artist-detail-related-avatar {
-  width: 4rem;
-  height: 4rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.artist-detail-related-avatar-img {
-  width: 4rem;
-  height: 4rem;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.artist-detail-related-initial {
-  line-height: 1;
-  user-select: none;
-}
-
-.artist-detail-related-name {
-  font-size: var(--hx-text-xs);
-  font-weight: 500;
-  color: var(--hx-text-strong);
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-}
-
-/* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
-  .artist-detail-header {
-    flex-direction: column;
-    gap: var(--hx-space-4);
-    padding: var(--hx-space-6) var(--hx-space-4);
+  .artist-stage__body,
+  .artist-stage__summary,
+  .artist-detail-related-strip {
+    grid-template-columns: 1fr;
   }
 
-  .artist-detail-hero-thumb {
-    width: 4rem;
-    height: 4rem;
+  .artist-stage__media {
+    justify-content: flex-start;
   }
 
-  .artist-detail-header-actions {
-    width: 100%;
+  .artist-detail-grid {
+    --hx-artwork-grid-min: 140px;
   }
 }
 </style>

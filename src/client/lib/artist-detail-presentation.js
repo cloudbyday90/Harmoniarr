@@ -70,6 +70,22 @@ export function buildArtistMusicBrainzLabel() {
   return 'More info ↗';
 }
 
+/**
+ * Background-image style object for the artist hero stage.
+ *
+ * @param {string|null|undefined} artworkUrl
+ * @returns {{ backgroundImage?: string }}
+ */
+export function buildArtistHeroBackgroundStyle(artworkUrl) {
+  if (!artworkUrl) {
+    return {};
+  }
+
+  return {
+    backgroundImage: `linear-gradient(180deg, color-mix(in srgb, var(--hx-bg-canvas) 20%, transparent) 0%, color-mix(in srgb, var(--hx-bg-canvas) 82%, transparent) 62%, var(--hx-bg-canvas) 100%), url(${artworkUrl})`,
+  };
+}
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 
 /**
@@ -182,4 +198,18 @@ export function buildRelatedArtistAvatarStyle(id, name) {
  */
 export function buildRelatedArtistInitial(id, name) {
   return buildAvatarInitial(id, name);
+}
+
+/**
+ * Small label for related-artist similarity strength.
+ *
+ * @param {number|null|undefined} score
+ * @returns {string}
+ */
+export function formatRelatedArtistScore(score) {
+  if (typeof score !== 'number' || Number.isNaN(score) || score <= 0) {
+    return 'Related artist';
+  }
+
+  return `Similarity ${score.toFixed(2)}`;
 }
