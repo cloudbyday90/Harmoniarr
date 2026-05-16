@@ -71,7 +71,7 @@ export const releaseImageEvidenceVerificationStep = Object.freeze({
 });
 
 export const releaseImageEvidenceDownloadStep = Object.freeze({
-  action: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0',
+  action: 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
   artifactName: 'harmoniarr-docker-smoke-released-image.json',
   name: 'Download published-image smoke evidence artifact',
   path: 'supply-chain',
@@ -84,7 +84,7 @@ export const releaseImageEvidenceReleaseContractVerificationStep = Object.freeze
 });
 
 export const releaseImageBrowserSmokeEvidenceDownloadStep = Object.freeze({
-  action: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0',
+  action: 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
   artifactName: 'harmoniarr-docker-smoke-browser-operator.json',
   name: 'Download published-image browser smoke evidence artifact',
   path: 'supply-chain',
@@ -121,7 +121,7 @@ export const releaseImageUpgradeEvidenceVerificationStep = Object.freeze({
 });
 
 export const releaseImageUpgradeEvidenceDownloadStep = Object.freeze({
-  action: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0',
+  action: 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
   artifactName: 'harmoniarr-docker-smoke-upgrade-path.json',
   name: 'Download upgrade-path smoke evidence artifact',
   path: 'supply-chain',

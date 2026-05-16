@@ -80,18 +80,18 @@
     "@testcontainers/postgresql": "^11.14.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "eslint": "^10.3.0",
-    "eslint-plugin-vue": "^10.9.0",
+    "eslint-plugin-vue": "^10.9.1",
     "glob": "^13.0.6",
     "globals": "^17.6.0",
     "playwright": "^1.59.1",
-    "vite": "^8.0.10"
+    "vite": "^8.0.13"
   },
   "dependencies": {
     "express": "^5.2.1",
     "music-metadata": "^11.12.3",
     "pg": "^8.20.0",
     "sharp": "^0.34.5",
-    "vue": "^3.5.33",
+    "vue": "^3.5.34",
     "vue-router": "^5.0.6",
     "web-push": "^3.6.7"
   }
