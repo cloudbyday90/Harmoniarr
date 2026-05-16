@@ -112,5 +112,43 @@ export function createArtworkQuotaService({
     };
   }
 
-  return { getQuotaStatus, incrementQuota, isQuotaExceeded };
+  async function getQuotaHistory({ days = 30 } = {}) {
+    invalidateStaleCache();
+
+    const limit = await getDailyLimit();
+    const db = getPoolFn();
+
+    const result = await db.query(
+      `SELECT provider, window_date, request_count
+       FROM artwork_provider_quota
+       WHERE window_date >= CURRENT_DATE - ($1::integer || ' days')::interval
+       ORDER BY provider, window_date`,
+      [days],
+    );
+
+    const history = {};
+    for (const row of result.rows) {
+      if (!history[row.provider]) {
+        history[row.provider] = [];
+      }
+      history[row.provider].push({
+        date: row.window_date.toISOString().slice(0, 10),
+        requestCount: Number(row.request_count),
+      });
+    }
+
+    for (const provider of Object.keys(history)) {
+      history[provider].sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    for (const provider of SUPPORTED_PROVIDERS) {
+      if (!history[provider]) {
+        history[provider] = [];
+      }
+    }
+
+    return { days, history, limit };
+  }
+
+  return { getQuotaHistory, getQuotaStatus, incrementQuota, isQuotaExceeded };
 }

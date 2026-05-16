@@ -59,3 +59,7 @@ export function batchResolveArtwork(requests) {
 export function fetchArtworkQuota() {
   return apiRequest('/api/v1/artwork/quota');
 }
+
+export function fetchArtworkQuotaHistory({ days = 30 } = {}) {
+  return apiRequest(`/api/v1/artwork/quota/history${buildQueryString({ days })}`);
+}

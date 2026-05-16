@@ -28,6 +28,7 @@ export function registerArtworkRoutes(app, {
   buildArtworkCleanupRunDetail,
   buildArtworkSummary,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
+  getQuotaHistory,
   getQuotaStatus,
   limitArtworkCleanupRun = skipRateLimitMiddleware,
   limitArtworkResolveBatch = skipRateLimitMiddleware,
@@ -158,5 +159,11 @@ export function registerArtworkRoutes(app, {
   app.get('/api/v1/artwork/quota', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
     response.json(await getQuotaStatus());
+  }));
+
+  app.get('/api/v1/artwork/quota/history', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+    const days = Math.min(Math.max(Number(request.query.days) || 30, 1), 90);
+    response.json(await getQuotaHistory({ days }));
   }));
 }

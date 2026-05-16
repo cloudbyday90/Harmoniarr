@@ -25,7 +25,9 @@ import {
   formatQuotaRemaining,
   formatQuotaUsage,
   resolveQuotaTone,
+  buildSparklineData,
 } from '../lib/artwork-quota-presentation.js';
+import { fetchArtworkQuotaHistory } from '../lib/artwork-api.js';
 import {
   buildSettingsUpdatePayload,
   createEmptyDownloadMapping,
@@ -227,7 +229,30 @@ onMounted(() => { void loadSettings(); });
 
 const artworkQuota = useArtworkQuota();
 
+const quotaHistory = ref(null);
+
+const providerSparklines = computed(() => {
+  if (!quotaHistory.value) return {};
+  const result = {};
+  for (const provider of Object.keys(quotaHistory.value.history)) {
+    result[provider] = buildSparklineData(
+      quotaHistory.value.history[provider],
+      quotaHistory.value.limit,
+    );
+  }
+  return result;
+});
+
+async function loadQuotaHistory() {
+  try {
+    quotaHistory.value = await fetchArtworkQuotaHistory({ days: 30 });
+  } catch {
+    quotaHistory.value = null;
+  }
+}
+
 onMounted(() => { void artworkQuota.loadQuota(); });
+onMounted(() => { void loadQuotaHistory(); });
 </script>
 
 <template>
@@ -503,6 +528,21 @@ onMounted(() => { void artworkQuota.loadQuota(); });
                 />
               </div>
               <p class="cfg-quota-meta">{{ formatQuotaRemaining(provider.remaining) }}</p>
+              <div
+                v-if="providerSparklines[provider.provider]?.length"
+                class="cfg-sparkline"
+                :aria-label="`${formatProviderLabel(provider.provider)} usage over 30 days`"
+                role="img"
+              >
+                <span
+                  v-for="bar in providerSparklines[provider.provider]"
+                  :key="bar.date"
+                  class="cfg-sparkline-bar"
+                  :data-tone="bar.tone"
+                  :style="{ '--bar-height': bar.height + '%' }"
+                  :title="`${bar.date}: ${bar.requestCount}`"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -631,4 +671,24 @@ onMounted(() => { void artworkQuota.loadQuota(); });
   font-size: var(--hx-font-size-sm);
   color: var(--hx-text-secondary);
 }
+
+.cfg-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 2rem;
+  padding-top: var(--hx-space-1);
+}
+
+.cfg-sparkline-bar {
+  flex: 1;
+  min-width: 2px;
+  height: var(--bar-height, 1%);
+  border-radius: 1px 1px 0 0;
+  transition: height 0.3s ease;
+}
+
+.cfg-sparkline-bar[data-tone="success"] { background: oklch(0.65 0.15 150 / 0.6); }
+.cfg-sparkline-bar[data-tone="warning"] { background: oklch(0.75 0.15 80 / 0.7); }
+.cfg-sparkline-bar[data-tone="danger"]  { background: oklch(0.6 0.18 25 / 0.7); }
 </style>

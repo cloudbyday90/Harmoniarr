@@ -177,6 +177,8 @@ function collectRegisteredRoutes() {
   registerImportCandidateRoutes(app, {
     buildImportCandidateApplySummary: asyncNoopResult({}),
     buildImportCandidateExecutionSummary: asyncNoopResult({}),
+    buildImportCandidateMediaInspectionRunDetail: asyncNoopResult({}),
+    buildImportCandidateMediaInspectionSummary: asyncNoopResult({}),
     buildImportPendingCandidateSummary: asyncNoopResult({}),
     buildSelectedImportCandidateSummary: asyncNoopResult({}),
     clearImportCandidateFileDecision: asyncNoopResult({}),

@@ -36,7 +36,8 @@ It covers:
 | Batch artwork resolution | Working — `POST /api/v1/artwork/resolve-batch` (50-item limit) |
 | Quota tracking | Working — `artwork_provider_quota` table with daily tracking |
 | Quota enforcement | Working — `dailyQuotaLimit` setting (default 1000), checked before each external call |
-| Quota dashboard UI | Working — per-provider progress bars in Settings > Media & Storage |
+| Quota dashboard UI | Working — per-provider progress bars + 30-day sparkline in Settings > Media & Storage |
+| Quota history | Working — `GET /api/v1/artwork/quota/history` returns daily usage per provider for up to 90 days |
 | Refresh support | Working — `?refresh=true` on single + batch resolve endpoints, client-side refresh button on artist detail hero |
 | Artist detail hero | Working — background + thumbnail from Fanart.tv, ghost refresh button with spinner |
 | Related artists artwork | Working — batch resolves `artist_thumbnail` for related artists, `<img>` with lazy loading, avatar fallback |
@@ -438,6 +439,34 @@ GET /api/v1/artwork/quota
 }
 ```
 
+### Artwork Quota History
+
+```
+GET /api/v1/artwork/quota/history?days=30
+```
+
+**Auth:** Admin only. `days` parameter: 1–90, defaults to 30.
+
+**Response:**
+
+```json
+{
+  "days": 30,
+  "limit": 1000,
+  "history": {
+    "coverArtArchive": [
+      { "date": "2026-04-16", "requestCount": 42 },
+      { "date": "2026-04-17", "requestCount": 55 }
+    ],
+    "fanartTv": [
+      { "date": "2026-04-17", "requestCount": 10 }
+    ]
+  }
+}
+```
+
+Each provider's array is sorted by date ascending. Providers with no data in the window return an empty array.
+
 ## Client-Side Wiring
 
 ### ArtworkImage Component (3-Tier Fallback)
@@ -537,9 +566,12 @@ The quota service maintains an in-memory cache:
 
 Located in Settings > Media & Storage. Shows:
 
-- Per-provider progress bar (usage / limit) with tone-based coloring (sun for normal, moon for approaching limit, eclipse for exceeded).
+- Per-provider progress bar (usage / limit) with tone-based coloring (success for normal, warning for approaching limit, danger for exceeded).
 - Per-provider usage count and remaining count.
+- Per-provider 30-day usage sparkline — pure CSS bar chart showing daily request counts. Bar heights are relative to the daily limit (or max count, whichever is larger). Color matches the tone (success/warning/danger) based on that day's usage.
 - "Daily request limit" input field in the cover art section (applies globally).
+
+The sparkline data is fetched via `GET /api/v1/artwork/quota/history?days=30` and transformed client-side by `buildSparklineData` into `{ date, height, requestCount, tone }` objects.
 
 ## Refresh Support
 
@@ -699,6 +731,15 @@ For 1,000 artists + 3,000 releases:
 
 1. Design doc final update — reflects batch refresh, related artists artwork, refresh button, per-item batch refresh normalization.
 2. Discover view artwork — `useArtworkBatchResolve` integrated into `DiscoverView.vue`. Three watchers on `seeds`, `suggestions`, `results` batch-resolve `artist_thumbnail`. Seed chips: circular 1.5rem avatar with colored-initial fallback. Suggestions + search results: full card artwork with `<img>` / avatar fallback.
+
+### Phase 4m: Quota History Sparkline (Complete)
+
+1. `getQuotaHistory` in `artwork-quota-service.js` — queries `artwork_provider_quota` for the last N days (default 30, max 90), returns per-provider arrays sorted by date ascending.
+2. `GET /api/v1/artwork/quota/history` admin route with `days` query parameter (clamped 1–90).
+3. `fetchArtworkQuotaHistory` client API function.
+4. `buildSparklineData` presentation helper — maps history entries to `{ date, height, requestCount, tone }` with height relative to limit/max.
+5. Pure CSS sparkline in `SettingsMediaStorageView.vue` — flexbox bar chart with 2px gap, 2rem height, tone-based bar colors matching quota bar styling.
+6. Tests: 4 service tests, 2 route tests, 2 client API tests, 7 presentation tests.
 
 ## Security Considerations
 

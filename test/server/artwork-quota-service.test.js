@@ -141,3 +141,66 @@ test('getQuotaStatus marks provider as exceeded when at limit', async () => {
   assert.equal(status.providers[1].exceeded, true);
   assert.equal(status.providers[1].remaining, 0);
 });
+
+test('getQuotaHistory returns history for all supported providers', async () => {
+  const { pool } = createMockPool([
+    [
+      { provider: 'coverArtArchive', window_date: new Date('2026-05-14'), request_count: 42 },
+      { provider: 'coverArtArchive', window_date: new Date('2026-05-15'), request_count: 55 },
+      { provider: 'fanartTv', window_date: new Date('2026-05-15'), request_count: 10 },
+    ],
+  ]);
+  const { getQuotaHistory } = createArtworkQuotaService({
+    getPoolFn: () => pool,
+    getDailyLimit: async () => 100,
+  });
+
+  const result = await getQuotaHistory({ days: 30 });
+  assert.equal(result.days, 30);
+  assert.equal(result.limit, 100);
+  assert.equal(result.history.coverArtArchive.length, 2);
+  assert.equal(result.history.fanartTv.length, 1);
+  assert.equal(result.history.coverArtArchive[0].date, '2026-05-14');
+  assert.equal(result.history.coverArtArchive[0].requestCount, 42);
+});
+
+test('getQuotaHistory returns empty arrays for providers with no data', async () => {
+  const { pool } = createMockPool([[]]);
+  const { getQuotaHistory } = createArtworkQuotaService({
+    getPoolFn: () => pool,
+    getDailyLimit: async () => 100,
+  });
+
+  const result = await getQuotaHistory({ days: 30 });
+  assert.equal(result.history.coverArtArchive.length, 0);
+  assert.equal(result.history.fanartTv.length, 0);
+});
+
+test('getQuotaHistory sorts entries by date ascending', async () => {
+  const { pool } = createMockPool([
+    [
+      { provider: 'fanartTv', window_date: new Date('2026-05-15'), request_count: 10 },
+      { provider: 'fanartTv', window_date: new Date('2026-05-13'), request_count: 5 },
+      { provider: 'fanartTv', window_date: new Date('2026-05-14'), request_count: 8 },
+    ],
+  ]);
+  const { getQuotaHistory } = createArtworkQuotaService({
+    getPoolFn: () => pool,
+    getDailyLimit: async () => 100,
+  });
+
+  const result = await getQuotaHistory({ days: 30 });
+  const dates = result.history.fanartTv.map((d) => d.date);
+  assert.deepEqual(dates, ['2026-05-13', '2026-05-14', '2026-05-15']);
+});
+
+test('getQuotaHistory uses default 30 days when no options', async () => {
+  const { calls, pool } = createMockPool([[]]);
+  const { getQuotaHistory } = createArtworkQuotaService({
+    getPoolFn: () => pool,
+    getDailyLimit: async () => 100,
+  });
+
+  await getQuotaHistory();
+  assert.equal(calls[0].params[0], 30);
+});

@@ -145,6 +145,7 @@ export function createArtworkModule({
       buildArtworkCleanupRunDetail: resolvedArtworkCleanupDetailService.buildArtworkCleanupRunDetail,
       buildArtworkCleanupHistory: resolvedArtworkCleanupHistoryService.buildArtworkCleanupHistory,
       buildArtworkSummary: resolvedArtworkSummaryService.buildArtworkSummary,
+      getQuotaHistory: resolvedArtworkQuotaService.getQuotaHistory,
       getQuotaStatus: resolvedArtworkQuotaService.getQuotaStatus,
       resolveArtwork: resolvedArtworkFetchService.resolveArtwork,
       resolveArtworkBatch: resolvedArtworkFetchService.resolveArtworkBatch,

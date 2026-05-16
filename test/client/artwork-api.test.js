@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveArtwork, batchResolveArtwork } from '../../src/client/lib/artwork-api.js';
+import { resolveArtwork, batchResolveArtwork, fetchArtworkQuotaHistory } from '../../src/client/lib/artwork-api.js';
 
 function createJsonResponse(payload = {}) {
   return {
@@ -61,4 +61,26 @@ test('batchResolveArtwork sends requests with refresh in body', async (t) => {
   const body = typeof opts.body === 'string' ? JSON.parse(opts.body) : opts.body;
   assert.equal(body.requests[0].refresh, true);
   assert.equal(body.requests[1].refresh, undefined);
+});
+
+test('fetchArtworkQuotaHistory builds URL with days parameter', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({ days: 7, history: {}, limit: 100 }));
+
+  await fetchArtworkQuotaHistory({ days: 7 });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.ok(url.includes('days=7'), `URL should contain days=7: ${url}`);
+});
+
+test('fetchArtworkQuotaHistory defaults to 30 days', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({ days: 30, history: {}, limit: 100 }));
+
+  await fetchArtworkQuotaHistory();
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.ok(url.includes('days=30'), `URL should contain days=30: ${url}`);
 });

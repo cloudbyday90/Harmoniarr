@@ -55,6 +55,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/artwork/resolve', access: 'authenticated', area: 'artwork', kind: 'read' },
   { method: 'POST', path: '/api/v1/artwork/resolve-batch', access: 'authenticated', area: 'artwork', kind: 'read' },
   { method: 'GET', path: '/api/v1/artwork/quota', access: 'admin', area: 'artwork', kind: 'read' },
+  { method: 'GET', path: '/api/v1/artwork/quota/history', access: 'admin', area: 'artwork', kind: 'read' },
   { method: 'GET', path: '/api/v1/settings', access: 'admin', area: 'system', kind: 'read' },
   { method: 'PUT', path: '/api/v1/settings', access: 'admin', area: 'system', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/system/overview', access: 'admin', area: 'system', kind: 'diagnostic' },
