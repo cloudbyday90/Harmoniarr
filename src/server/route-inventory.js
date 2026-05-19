@@ -163,6 +163,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/import-candidates/slskd/searches/:searchId', access: 'admin', area: 'import-candidates', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/recovery/bootstrap-admin/status', access: 'public', area: 'recovery', kind: 'read' },
   { method: 'POST', path: '/api/v1/recovery/bootstrap-admin/complete', access: 'public', area: 'recovery', kind: 'mutation' },
+  { method: 'GET', path: '/api/v1/search', access: 'authenticated', area: 'search', kind: 'read' },
 ]);
 
 export function toRouteSignature({ method, path }) {

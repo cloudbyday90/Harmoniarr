@@ -30,6 +30,7 @@ import { buildVisibleNav, notificationTone } from '../lib/app-shell-presentation
 import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
 import ToastStack from './ToastStack.vue';
 import PwaUpdateBanner from './PwaUpdateBanner.vue';
+import GlobalSearchPalette from './GlobalSearchPalette.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -163,6 +164,35 @@ async function openAccount() {
 }
 
 const visibleNav = computed(() => buildVisibleNav(isRequester.value, requesterNotificationCount.value));
+
+const searchOpen = ref(false);
+
+function openSearch() {
+  searchOpen.value = true;
+}
+
+function closeSearch() {
+  searchOpen.value = false;
+}
+
+function handleGlobalKeydown(event) {
+  if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+    event.preventDefault();
+    searchOpen.value = !searchOpen.value;
+  }
+  if (event.key === 'Escape' && searchOpen.value) {
+    event.preventDefault();
+    searchOpen.value = false;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleGlobalKeydown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleGlobalKeydown);
+});
 </script>
 
 <template>
@@ -177,10 +207,13 @@ const visibleNav = computed(() => buildVisibleNav(isRequester.value, requesterNo
         <input
           class="hx-topbar-search-input"
           type="search"
-          placeholder="Search artists, albums, songs, users…"
+          placeholder="Search artists, albums, songs…"
           aria-label="Global search"
-          disabled
+          @focus="openSearch"
+          @click="openSearch"
+          readonly
         />
+        <kbd class="hx-topbar-search-shortcut" aria-hidden="true">Ctrl+K</kbd>
       </div>
 
       <div class="hx-topbar-actions">
@@ -381,6 +414,7 @@ const visibleNav = computed(() => buildVisibleNav(isRequester.value, requesterNo
 
     <ToastStack />
     <PwaUpdateBanner />
+    <GlobalSearchPalette :open="searchOpen" @close="closeSearch" />
   </div>
 </template>
 

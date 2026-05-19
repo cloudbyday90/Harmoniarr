@@ -159,6 +159,7 @@ export function createMetadataModule({
       importMusicBrainzArtist: resolvedMusicBrainzImportService.importArtistById,
       importMusicBrainzReleaseGroup: resolvedMusicBrainzImportService.importReleaseGroupById,
       importMusicBrainzRelease: resolvedMusicBrainzImportService.importReleaseById,
+      searchAllLocalMetadata: resolvedMetadataSearchService.searchAll,
       searchLocalMetadataArtists: resolvedMetadataSearchService.searchArtists,
       searchLocalMetadataReleaseGroups: resolvedMetadataSearchService.searchReleaseGroups,
       searchLocalMetadataReleases: resolvedMetadataSearchService.searchReleases,

@@ -154,8 +154,26 @@ export function createMetadataSearchService({
     };
   }
 
+  async function searchAll({ query, artistLimit = 5, releaseGroupLimit = 5, releaseLimit = 5 } = {}) {
+    const normalizedQuery = normalizeSearchText(query, 'query');
+
+    const [artists, releaseGroups, releases] = await Promise.all([
+      searchArtists({ query: normalizedQuery, limit: artistLimit }),
+      searchReleaseGroups({ query: normalizedQuery, limit: releaseGroupLimit }),
+      searchReleases({ query: normalizedQuery, limit: releaseLimit }),
+    ]);
+
+    return {
+      query: normalizedQuery,
+      artists: artists.results,
+      releaseGroups: releaseGroups.results,
+      releases: releases.results,
+    };
+  }
+
   return {
     listMonitoredArtists,
+    searchAll,
     searchArtists,
     searchReleaseGroups,
     searchReleases,
