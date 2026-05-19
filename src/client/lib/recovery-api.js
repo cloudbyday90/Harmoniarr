@@ -81,4 +81,25 @@ export function fetchRecoveryDiagnostics({ auditLimit, runLimit, signal } = {}) 
   return apiRequest(`/api/v1/system/diagnostics/recovery-state${buildQueryString({ auditLimit, runLimit })}`, { signal });
 }
 
+export function fetchMaintenanceLocks({ lockTypes, signal } = {}) {
+  return apiRequest(`/api/v1/recovery/maintenance-locks${buildQueryString({ lockTypes })}`, { signal });
+}
+
+export function enterMaintenanceLock({ lockType, expiresAt, reason } = {}) {
+  return apiRequest('/api/v1/recovery/maintenance-locks', {
+    body: { lockType, expiresAt, reason },
+    headers: createControlPlaneIdempotencyHeaders('recovery.maintenanceLocks.enter'),
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function releaseMaintenanceLock(lockId) {
+  return apiRequest(`/api/v1/recovery/maintenance-locks/${encodeURIComponent(lockId)}/release`, {
+    headers: createControlPlaneIdempotencyHeaders('recovery.maintenanceLocks.release'),
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
 

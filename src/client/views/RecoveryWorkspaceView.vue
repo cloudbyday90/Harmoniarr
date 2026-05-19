@@ -34,7 +34,17 @@ import {
   formatScope,
   formatTimestamp,
 } from '../lib/backup-restore-presentation.js';
+import {
+  describeLockImpact,
+  formatDiagnosticTimestamp,
+  formatLockExpiresAt,
+  formatLockStatus,
+  formatLockType,
+  getLockStatusTone,
+} from '../lib/maintenance-lock-presentation.js';
 import { useRecoveryBackups } from '../composables/useRecoveryBackups.js';
+import { useRecoveryDiagnostics } from '../composables/useRecoveryDiagnostics.js';
+import { useMaintenanceLocks } from '../composables/useMaintenanceLocks.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -62,6 +72,29 @@ const {
   selectedBackupPreview,
   applyRestore,
 } = useRecoveryBackups();
+
+const {
+  actionError: lockActionError,
+  activeLocks,
+  errorMessage: lockErrorMessage,
+  hasActiveLocks,
+  isLoading: isLoadingLocks,
+  isReleasing,
+  loadLocks,
+  locks: allLocks,
+  releaseLock,
+} = useMaintenanceLocks();
+
+const {
+  errorMessage: diagnosticsErrorMessage,
+  isLoading: isLoadingDiagnostics,
+  loadDiagnostics,
+  recentFailedRuns,
+  recentPrivilegedActions,
+  recentQueueRuns,
+  queueDiagnostics,
+  recoveryDiagnostics,
+} = useRecoveryDiagnostics();
 
 const recoveryRouteState = computed(() => normalizeRecoveryRouteState(route.query));
 const backupStatusPill = computed(() => {
@@ -136,6 +169,8 @@ async function handleApplyRestore() {
 
 onMounted(async () => {
   await loadBackups({ preferredBackupArtifactId: recoveryRouteState.value.backupArtifactId || null });
+  await loadLocks();
+  await loadDiagnostics();
 
   if (selectedBackupId.value !== recoveryRouteState.value.backupArtifactId) {
     await replaceRecoveryRouteState({ backupArtifactId: selectedBackupId.value ?? '' });
@@ -329,6 +364,165 @@ watch(
           </template>
         </div>
       </article>
+    </div>
+
+    <div class="cfg-2col" style="margin-top: var(--hx-space-4)">
+
+      <!-- Maintenance Locks -->
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Maintenance locks</h3>
+            <p class="hx-card-subtitle">Active locks pause background operations and filesystem mutations.</p>
+          </div>
+          <span v-if="hasActiveLocks" class="hx-pill" data-tone="warning">
+            {{ activeLocks.length }} active
+          </span>
+          <span v-else class="hx-pill">Idle</span>
+        </header>
+        <div class="hx-card-body">
+          <div class="hx-card-actions">
+            <button type="button" class="hx-btn" @click="loadLocks" :disabled="isLoadingLocks">
+              {{ isLoadingLocks ? 'Refreshing…' : 'Refresh' }}
+            </button>
+          </div>
+
+          <p v-if="lockActionError" style="font-size: var(--hx-text-sm); color: var(--hx-danger); margin-top: var(--hx-space-2)">{{ lockActionError }}</p>
+          <p v-else-if="lockErrorMessage" style="font-size: var(--hx-text-sm); color: var(--hx-danger); margin-top: var(--hx-space-2)">{{ lockErrorMessage }}</p>
+          <p class="hx-text-muted" style="margin-top: var(--hx-space-2)" v-else-if="isLoadingLocks">Loading maintenance locks…</p>
+
+          <div class="hx-empty" v-else-if="!allLocks.length">
+            <p class="hx-empty-copy">No maintenance locks have been recorded yet. Locks are created automatically during backup restores or manually by operators.</p>
+          </div>
+
+          <div class="cfg-mapping-list" v-else style="margin-top: var(--hx-space-3)">
+            <div class="cfg-mapping-card" v-for="lock in allLocks" :key="lock.id">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--hx-space-3)">
+                <div>
+                  <div style="display: flex; align-items: center; gap: var(--hx-space-2); margin-bottom: var(--hx-space-1)">
+                    <span class="hx-pill" :data-tone="getLockStatusTone(lock)">{{ formatLockStatus(lock) }}</span>
+                    <span class="hx-pill">{{ formatLockType(lock.lockType) }}</span>
+                  </div>
+                  <p class="hx-text-muted">{{ describeLockImpact(lock.lockType) }}</p>
+                  <p class="hx-text-muted" style="margin-top: var(--hx-space-1)">
+                    <span v-if="lock.reason">Reason: {{ lock.reason }} · </span>
+                    Acquired {{ formatDiagnosticTimestamp(lock.acquiredAt ?? lock.createdAt) }}
+                    · Expires {{ formatLockExpiresAt(lock) }}
+                  </p>
+                </div>
+                <button
+                  v-if="formatLockStatus(lock) === 'Active'"
+                  type="button"
+                  class="hx-btn"
+                  data-variant="danger"
+                  :disabled="isReleasing"
+                  @click="releaseLock(lock.id)"
+                  style="flex-shrink: 0"
+                >
+                  {{ isReleasing ? 'Releasing…' : 'Release' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Recovery Diagnostics -->
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Recovery diagnostics</h3>
+            <p class="hx-card-subtitle">Queue state, failed runs, and recent privileged audit actions.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <div class="hx-card-actions">
+            <button type="button" class="hx-btn" @click="loadDiagnostics" :disabled="isLoadingDiagnostics">
+              {{ isLoadingDiagnostics ? 'Refreshing…' : 'Refresh' }}
+            </button>
+          </div>
+
+          <p v-if="diagnosticsErrorMessage" style="font-size: var(--hx-text-sm); color: var(--hx-danger); margin-top: var(--hx-space-2)">{{ diagnosticsErrorMessage }}</p>
+
+          <div v-if="isLoadingDiagnostics" class="hx-empty">
+            <p class="hx-empty-copy">Loading diagnostics…</p>
+          </div>
+
+          <template v-else-if="queueDiagnostics || recoveryDiagnostics">
+
+            <div class="cfg-group" v-if="queueDiagnostics" style="padding-top: var(--hx-space-3)">
+              <p class="cfg-group-title">Queue overview</p>
+              <dl class="review-meta-grid" style="margin-top: var(--hx-space-2)">
+                <div>
+                  <dt>Pending</dt>
+                  <dd>{{ queueDiagnostics.pendingCount ?? 0 }}</dd>
+                </div>
+                <div>
+                  <dt>Running</dt>
+                  <dd>{{ queueDiagnostics.runningCount ?? 0 }}</dd>
+                </div>
+                <div>
+                  <dt>Failed</dt>
+                  <dd>{{ queueDiagnostics.failedCount ?? 0 }}</dd>
+                </div>
+                <div>
+                  <dt>Completed</dt>
+                  <dd>{{ queueDiagnostics.completedCount ?? 0 }}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="cfg-group" v-if="recentQueueRuns.length" style="padding-top: var(--hx-space-3)">
+              <p class="cfg-group-title">Recent queue runs</p>
+              <div class="cfg-mapping-list" style="margin-top: var(--hx-space-2)">
+                <div class="cfg-mapping-card" v-for="run in recentQueueRuns.slice(0, 5)" :key="run.operationType + (run.startedAt ?? run.createdAt)">
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: var(--hx-space-3)">
+                    <div>
+                      <strong>{{ run.operationType }}</strong>
+                      <p class="hx-text-muted">{{ formatDiagnosticTimestamp(run.startedAt) }}</p>
+                    </div>
+                    <span class="hx-pill" :data-tone="run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : null">
+                      {{ run.status }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="cfg-group" v-if="recentFailedRuns.length" style="padding-top: var(--hx-space-3)">
+              <p class="cfg-group-title">Recent failures</p>
+              <div class="cfg-mapping-list" style="margin-top: var(--hx-space-2)">
+                <div class="cfg-mapping-card" v-for="failed in recentFailedRuns.slice(0, 5)" :key="failed.operationType + (failed.recentFailureAt ?? '')">
+                  <strong>{{ failed.operationType }}</strong>
+                  <p class="hx-text-muted">Last failure {{ formatDiagnosticTimestamp(failed.recentFailureAt) }}</p>
+                  <p class="hx-text-muted" v-if="failed.recentFailureMessage">{{ failed.recentFailureMessage }}</p>
+                  <p class="hx-text-muted">{{ failed.recentFailureCount ?? 0 }} failure{{ failed.recentFailureCount === 1 ? '' : 's' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="cfg-group" v-if="recentPrivilegedActions.length" style="padding-top: var(--hx-space-3)">
+              <p class="cfg-group-title">Recent privileged actions</p>
+              <div class="cfg-mapping-list" style="margin-top: var(--hx-space-2)">
+                <div class="cfg-mapping-card" v-for="action in recentPrivilegedActions.slice(0, 5)" :key="action.eventName + (action.occurredAt ?? '')">
+                  <strong>{{ action.eventName }}</strong>
+                  <p class="hx-text-muted">{{ formatDiagnosticTimestamp(action.occurredAt) }}<span v-if="action.actorUserId"> · by {{ action.actorUserId }}</span></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="hx-empty" v-if="!recentQueueRuns.length && !recentFailedRuns.length && !recentPrivilegedActions.length">
+              <p class="hx-empty-copy">No recent activity to display.</p>
+            </div>
+
+          </template>
+
+          <div class="hx-empty" v-else>
+            <p class="hx-empty-copy">No diagnostics data available. Refresh to load current state.</p>
+          </div>
+        </div>
+      </article>
+
     </div>
 
   </div>

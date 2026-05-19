@@ -3,11 +3,14 @@ import { suite, test } from 'node:test';
 import {
   buildBackupExportDownloadUrl,
   deleteBackupExport,
+  enterMaintenanceLock,
   fetchBackupExportById,
   fetchBackupExports,
   fetchBackupRestorePreview,
+  fetchMaintenanceLocks,
   fetchQueueDiagnostics,
   fetchRecoveryDiagnostics,
+  releaseMaintenanceLock,
   startBackupExport,
   startBackupRestoreApply,
 } from '../../src/client/lib/recovery-api.js';
@@ -71,5 +74,28 @@ suite('recovery-api', () => {
       buildBackupExportDownloadUrl('backup 1'),
       '/api/v1/recovery/backups/backup%201/download',
     );
+  });
+
+  test('maintenance lock routes hit the correct endpoints', async (t) => {
+    globalThis.document = { cookie: 'harmoniarr_csrf=csrf-recovery' };
+    globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+    await fetchMaintenanceLocks({ lockTypes: 'maintenance' });
+    await enterMaintenanceLock({ lockType: 'maintenance', expiresAt: '2027-01-01T00:00:00Z', reason: 'Testing' });
+    await releaseMaintenanceLock('lock-1');
+
+    assert.equal(globalThis.fetch.mock.callCount(), 3);
+
+    const [fetchCall, enterCall, releaseCall] = globalThis.fetch.mock.calls;
+
+    assert.equal(fetchCall.arguments[0], '/api/v1/recovery/maintenance-locks?lockTypes=maintenance');
+
+    assert.equal(enterCall.arguments[0], '/api/v1/recovery/maintenance-locks');
+    assert.equal(enterCall.arguments[1].method, 'POST');
+    assert.match(enterCall.arguments[1].headers.get('Idempotency-Key'), /^recovery-maintenancelocks-enter-/);
+
+    assert.equal(releaseCall.arguments[0], '/api/v1/recovery/maintenance-locks/lock-1/release');
+    assert.equal(releaseCall.arguments[1].method, 'POST');
+    assert.match(releaseCall.arguments[1].headers.get('Idempotency-Key'), /^recovery-maintenancelocks-release-/);
   });
 });
