@@ -17,6 +17,7 @@
 -->
 
 <script setup>
+import { ref } from 'vue';
 import {
   candidateStatusLabel,
   formatBytes,
@@ -25,6 +26,7 @@ import {
   formatTokenLabel,
 } from '../lib/import-candidate-presentation.js';
 import { formatFileDuration } from '../lib/track-duration.js';
+import ConfirmDialog from './ConfirmDialog.vue';
 
 const props = defineProps({
   actionError: {
@@ -105,6 +107,19 @@ const emit = defineEmits([
 
 function updateActionReason(event) {
   emit('update:action-reason', event.target.value);
+}
+
+const rejectConfirmOpen = ref(false);
+const rejectAcknowledged = ref(false);
+
+function openRejectConfirm() {
+  rejectAcknowledged.value = false;
+  rejectConfirmOpen.value = true;
+}
+
+function onRejectConfirm() {
+  rejectConfirmOpen.value = false;
+  emit('reject');
 }
 
 function canHold(candidate) {
@@ -262,7 +277,7 @@ function fileDecisionButtonLabel(filePreview) {
             type="button"
             class="danger-button"
             :disabled="isTransitionPending"
-            @click="$emit('reject')"
+            @click="openRejectConfirm"
           >
             {{ isTransitionPending ? 'Saving...' : 'Reject' }}
           </button>
@@ -518,4 +533,25 @@ function fileDecisionButtonLabel(filePreview) {
       </article>
     </template>
   </article>
+
+  <ConfirmDialog
+    :is-open="rejectConfirmOpen"
+    :is-confirming="true"
+    :is-executing="false"
+    :is-done="false"
+    :title="'Reject candidate?'"
+    :confirm-level="'checkbox'"
+    :confirm-text="''"
+    :gate-label="'I understand rejecting this candidate will remove it from the review queue and it will need to be re-discovered to re-enter the workflow.'"
+    :typed="''"
+    :acknowledged="rejectAcknowledged"
+    :matches="true"
+    :can-confirm="rejectAcknowledged"
+    :button-enabled="rejectAcknowledged"
+    :error="''"
+    @close="rejectConfirmOpen = false"
+    @execute="onRejectConfirm"
+    @update:typed="() => {}"
+    @update:acknowledged="rejectAcknowledged = $event"
+  />
 </template>

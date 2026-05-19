@@ -17,6 +17,7 @@
 -->
 
 <script setup>
+import { ref } from 'vue';
 import {
   canStartApplyRun,
   describeApplyOperation,
@@ -35,6 +36,7 @@ import {
   formatElapsedDuration,
   formatOperationTimestampShort,
 } from '../lib/operation-run-presentation.js';
+import ConfirmDialog from './ConfirmDialog.vue';
 
 defineProps({
   actionErrorMessage: {
@@ -79,7 +81,22 @@ defineProps({
   },
 });
 
-defineEmits(['refresh', 'select-run', 'start']);
+const emit = defineEmits(['refresh', 'select-run', 'start']);
+
+const confirmOpen = ref(false);
+const applyTyped = ref('');
+const applyAcknowledged = ref(false);
+
+function openConfirm() {
+  applyTyped.value = '';
+  applyAcknowledged.value = false;
+  confirmOpen.value = true;
+}
+
+function onApplyConfirm() {
+  confirmOpen.value = false;
+  emit('start');
+}
 </script>
 
 <template>
@@ -101,7 +118,7 @@ defineEmits(['refresh', 'select-run', 'start']);
         <button
           type="button"
           :disabled="!canStartApplyRun(currentRun, importPendingCandidateCount) || isStarting"
-          @click="$emit('start')"
+          @click="openConfirm"
         >
           {{ isStarting ? 'Starting...' : 'Start import apply' }}
         </button>
@@ -333,6 +350,27 @@ defineEmits(['refresh', 'select-run', 'start']);
       </article>
     </template>
   </article>
+
+  <ConfirmDialog
+    :is-open="confirmOpen"
+    :is-confirming="true"
+    :is-executing="false"
+    :is-done="false"
+    :title="'Start import apply?'"
+    :confirm-level="'type_to_confirm'"
+    :confirm-text="'start import apply'"
+    :gate-label="'I understand this will move files from staging into the music library. This cannot be undone.'"
+    :typed="applyTyped"
+    :acknowledged="applyAcknowledged"
+    :matches="applyTyped === 'start import apply'"
+    :can-confirm="applyAcknowledged && applyTyped === 'start import apply'"
+    :button-enabled="applyAcknowledged && applyTyped === 'start import apply'"
+    :error="''"
+    @close="confirmOpen = false"
+    @execute="onApplyConfirm"
+    @update:typed="applyTyped = $event"
+    @update:acknowledged="applyAcknowledged = $event"
+  />
 </template>
 
 <style scoped>

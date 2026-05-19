@@ -21,6 +21,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useToast } from '../composables/useToast.js';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import {
   buildOperationsRouteQuery,
   getOperationsRouteStateKey,
@@ -119,9 +120,42 @@ const JOB_CATALOG_DEFS = [
   { operationType: 'operator_notification_fanout',             title: 'Notification fan-out',     triggerFn: triggerNotificationFanout,     formatRunResult: null },
 ];
 
+const DESTRUCTIVE_OPERATIONS = Object.freeze({
+  import_candidate_apply: {
+    confirmLevel: 'type_to_confirm',
+    confirmText: 'start import apply',
+    gateLabel: 'I understand this will move files from staging into the music library. This cannot be undone.',
+  },
+  library_organize_apply: {
+    confirmLevel: 'type_to_confirm',
+    confirmText: 'start library organize',
+    gateLabel: 'I understand this will rename and move library files to canonical paths. This cannot be undone.',
+  },
+  import_candidate_transcode_orchestration: {
+    confirmLevel: 'checkbox',
+    confirmText: '',
+    gateLabel: 'I understand this will run ffmpeg preflight validation on selected candidates.',
+  },
+});
+
 const triggeringJobs = reactive({});
 const triggerErrors = reactive({});
 const expandedJobType = ref(null);
+
+const confirmDialogOpen = ref(false);
+const confirmOperationType = ref(null);
+const confirmTyped = ref('');
+const confirmAcknowledged = ref(false);
+
+const pendingConfirmJob = computed(() => {
+  if (!confirmOperationType.value) return null;
+  return jobCatalog.value.find((j) => j.operationType === confirmOperationType.value) ?? null;
+});
+
+const destructiveConfig = computed(() => {
+  if (!confirmOperationType.value) return null;
+  return DESTRUCTIVE_OPERATIONS[confirmOperationType.value] ?? null;
+});
 
 const jobCatalog = computed(() =>
   JOB_CATALOG_DEFS.map((def) => {
@@ -217,6 +251,21 @@ async function handleRequestRetry() {
 
 async function handleTriggerJob(operationType, triggerFn) {
   if (triggeringJobs[operationType]) return;
+
+  const destructive = DESTRUCTIVE_OPERATIONS[operationType];
+  if (destructive) {
+    confirmOperationType.value = operationType;
+    confirmTyped.value = '';
+    confirmAcknowledged.value = false;
+    confirmDialogOpen.value = true;
+    return;
+  }
+
+  await executeJobTrigger(operationType, triggerFn);
+}
+
+async function executeJobTrigger(operationType, triggerFn) {
+  if (triggeringJobs[operationType]) return;
   triggeringJobs[operationType] = true;
   delete triggerErrors[operationType];
   try {
@@ -229,6 +278,21 @@ async function handleTriggerJob(operationType, triggerFn) {
   } finally {
     delete triggeringJobs[operationType];
   }
+}
+
+async function onConfirmJobExecute() {
+  if (!confirmOperationType.value) return;
+  const job = pendingConfirmJob.value;
+  const config = destructiveConfig.value;
+  if (!job || !config) return;
+
+  confirmDialogOpen.value = false;
+  await executeJobTrigger(confirmOperationType.value, job.triggerFn);
+}
+
+function closeConfirmDialog() {
+  confirmDialogOpen.value = false;
+  confirmOperationType.value = null;
 }
 
 onMounted(() => {
@@ -582,6 +646,27 @@ watch(
 
     </div>
   </section>
+
+  <ConfirmDialog
+    :is-open="confirmDialogOpen"
+    :is-confirming="true"
+    :is-executing="false"
+    :is-done="false"
+    :title="pendingConfirmJob ? `Start ${pendingConfirmJob.title}?` : 'Confirm'"
+    :confirm-level="destructiveConfig?.confirmLevel ?? 'checkbox'"
+    :confirm-text="destructiveConfig?.confirmText ?? ''"
+    :gate-label="destructiveConfig?.gateLabel ?? ''"
+    :typed="confirmTyped"
+    :acknowledged="confirmAcknowledged"
+    :matches="destructiveConfig?.confirmText ? confirmTyped === destructiveConfig.confirmText : true"
+    :can-confirm="destructiveConfig?.confirmLevel === 'type_to_confirm' ? confirmAcknowledged && confirmTyped === (destructiveConfig?.confirmText ?? '') : confirmAcknowledged"
+    :button-enabled="destructiveConfig?.confirmLevel === 'type_to_confirm' ? confirmAcknowledged && confirmTyped === (destructiveConfig?.confirmText ?? '') : confirmAcknowledged"
+    :error="''"
+    @close="closeConfirmDialog"
+    @execute="onConfirmJobExecute"
+    @update:typed="confirmTyped = $event"
+    @update:acknowledged="confirmAcknowledged = $event"
+  />
 </template>
 
 <style scoped>
