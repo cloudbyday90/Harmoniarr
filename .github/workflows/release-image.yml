@@ -463,7 +463,7 @@ jobs:
 
       - name: Set up ORAS
         if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' }}
-        uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1
+        uses: oras-project/setup-oras@38de303aac69abb66f3e6255b7198bff35f323e3 # v2.0.0
 
       - name: Probe Docker Hub trusted mirror capabilities
         if: ${{ needs.publish-image.outputs.dockerhub_enabled == 'true' && needs.publish-image.outputs.trusted_dockerhub_mirror_enabled == 'true' }}
