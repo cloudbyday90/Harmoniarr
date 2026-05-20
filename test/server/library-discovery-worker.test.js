@@ -90,6 +90,7 @@ test('createLibraryDiscoveryWorker reconciles and dispatches a protected discove
         eligibleArtistCount: 2,
         fetchedCount: 1,
       },
+      outcome: 'partial',
       triggerSource: 'manual',
     },
   });
@@ -351,6 +352,7 @@ test('createLibraryDiscoveryWorker records monitored artist artwork prefetch fai
         errorMessage: 'prefetch failed',
         status: 'failed',
       },
+      outcome: 'completed',
       triggerSource: 'manual',
     },
   });

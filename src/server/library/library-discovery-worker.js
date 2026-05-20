@@ -23,6 +23,28 @@ import {
   throwIfOperationRunCancellationRequested,
 } from '../operation-run-cancellation.js';
 
+function buildDispatchBreakdown(summary) {
+  if (!summary) {
+    return { outcome: 'empty' };
+  }
+
+  const { attemptedCount = 0, dispatchedCount = 0, failedCount = 0 } = summary;
+
+  if (attemptedCount === 0) {
+    return { outcome: 'empty' };
+  }
+
+  if (failedCount === 0) {
+    return { outcome: 'completed' };
+  }
+
+  if (dispatchedCount === 0) {
+    return { outcome: 'failed' };
+  }
+
+  return { outcome: 'partial' };
+}
+
 export function createLibraryDiscoveryWorker({
   acquireLease,
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
@@ -100,11 +122,14 @@ export function createLibraryDiscoveryWorker({
         requestMetadata,
       });
 
+      const dispatchBreakdown = buildDispatchBreakdown(summary);
+
       await markRunCompleted({
         runId,
         summary: {
           ...(monitoredArtistArtwork ? { monitoredArtistArtwork } : {}),
           ...summary,
+          ...dispatchBreakdown,
           triggerSource,
         },
       });

@@ -23,6 +23,7 @@ import {
   isOperationRunPauseError,
   throwIfOperationRunCancellationRequested,
 } from '../operation-run-cancellation.js';
+import { buildOperationResultBreakdown } from '../operation-result-detail-service.js';
 
 function buildMovePlan({ createExclusiveFileMutationPlan, file }) {
   return createExclusiveFileMutationPlan({
@@ -32,6 +33,18 @@ function buildMovePlan({ createExclusiveFileMutationPlan, file }) {
     sourcePath: file.currentPath,
     sourceRoot: file.libraryRootPath,
   });
+}
+
+function buildNotAttemptedFileResult(file) {
+  return {
+    destinationPath: file.proposedPath ?? null,
+    errorMessage: 'A previous file failure stopped processing of remaining files.',
+    fileId: file.fileId ?? null,
+    filename: basename(file.currentPath ?? file.proposedPath ?? ''),
+    sourcePath: file.currentPath ?? null,
+    status: 'not_attempted',
+    transport: null,
+  };
 }
 
 export function createLibraryOrganizeApplyWorker({
@@ -73,40 +86,89 @@ export function createLibraryOrganizeApplyWorker({
 
       const organizePreview = await buildLibraryOrganizePreview();
       const filesToMove = (organizePreview.files ?? []).filter((file) => file.status?.code === 'rename_required');
+      const fileResults = [];
       let movedCount = 0;
 
-      for (const file of filesToMove) {
+      for (let index = 0; index < filesToMove.length; index += 1) {
+        const file = filesToMove[index];
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
 
-        const movePlan = buildMovePlan({
-          createExclusiveFileMutationPlan,
-          file,
-        });
-        const result = await applyExclusiveFileMutationPlan(movePlan);
+        const startedAt = new Date().toISOString();
 
-        await updateLibraryFileCanonicalPath({
-          canonicalPath: file.proposedPath,
-          fileId: file.fileId,
-          filename: basename(file.proposedPath),
-          relativePath: file.proposedRelativePath,
-        });
+        try {
+          const movePlan = buildMovePlan({ createExclusiveFileMutationPlan, file });
+          const result = await applyExclusiveFileMutationPlan(movePlan);
 
-        movedCount += 1;
+          await updateLibraryFileCanonicalPath({
+            canonicalPath: file.proposedPath,
+            fileId: file.fileId,
+            filename: basename(file.proposedPath),
+            relativePath: file.proposedRelativePath,
+          });
 
-        await markRunStarted({
-          runId,
-          summary: {
-            currentStep: `Applied ${movedCount} of ${filesToMove.length} organize changes`,
-            latestTransport: result.transport,
-            movedCount,
-            plannedRenameCount: filesToMove.length,
-          },
-        });
+          movedCount += 1;
+
+          fileResults.push({
+            destinationPath: file.proposedPath,
+            errorMessage: null,
+            fileId: file.fileId ?? null,
+            filename: basename(file.proposedPath),
+            sourcePath: file.currentPath,
+            startedAt,
+            status: 'moved',
+            transport: result.transport,
+            verification: result.verification ?? null,
+          });
+
+          await markRunStarted({
+            runId,
+            summary: {
+              currentStep: `Applied ${movedCount} of ${filesToMove.length} organize changes`,
+              fileResults,
+              latestTransport: result.transport,
+              movedCount,
+              plannedRenameCount: filesToMove.length,
+            },
+          });
+        } catch (fileError) {
+          fileResults.push({
+            destinationPath: file.proposedPath ?? null,
+            errorMessage: fileError instanceof Error ? fileError.message : String(fileError),
+            fileId: file.fileId ?? null,
+            filename: basename(file.currentPath ?? file.proposedPath ?? ''),
+            sourcePath: file.currentPath ?? null,
+            startedAt,
+            status: 'failed',
+            transport: null,
+          });
+
+          for (let remainingIndex = index + 1; remainingIndex < filesToMove.length; remainingIndex += 1) {
+            fileResults.push(buildNotAttemptedFileResult(filesToMove[remainingIndex]));
+          }
+
+          const breakdown = buildOperationResultBreakdown(fileResults);
+
+          await markRunCompleted({
+            runId,
+            summary: {
+              ...breakdown,
+              fileResults,
+              movedCount,
+              plannedRenameCount: filesToMove.length,
+              skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
+            },
+          });
+          return;
+        }
       }
+
+      const breakdown = buildOperationResultBreakdown(fileResults);
 
       await markRunCompleted({
         runId,
         summary: {
+          ...breakdown,
+          fileResults,
           movedCount,
           plannedRenameCount: filesToMove.length,
           skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),

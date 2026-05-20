@@ -24,6 +24,28 @@ import {
   throwIfOperationRunCancellationRequested,
 } from '../operation-run-cancellation.js';
 
+function buildPhaseTiming() {
+  const phases = [];
+
+  return {
+    finishPhase(name) {
+      phases.push({
+        finishedAt: new Date().toISOString(),
+        name,
+      });
+    },
+    startPhase(name) {
+      phases.push({
+        name,
+        startedAt: new Date().toISOString(),
+      });
+    },
+    toJson() {
+      return phases.map((phase) => ({ ...phase }));
+    },
+  };
+}
+
 export function createLibraryScanWorker({
   acquireLease,
   captureLibrarySidecarArtwork = null,
@@ -64,7 +86,10 @@ export function createLibraryScanWorker({
         },
       });
 
+      const phaseTiming = buildPhaseTiming();
       const observedFiles = [];
+
+      phaseTiming.startPhase('filesystem_walk');
       const summary = await executeScan({
         isCancellationRequested,
         libraryRoot,
@@ -73,22 +98,28 @@ export function createLibraryScanWorker({
         },
         runId,
       });
+      phaseTiming.finishPhase('filesystem_walk');
 
       let catalogResult = null;
       if (recordLibraryFiles) {
+        phaseTiming.startPhase('catalog');
         catalogResult = await recordLibraryFiles({
           files: observedFiles,
           libraryRootPath: summary.libraryRoot,
         });
+        phaseTiming.finishPhase('catalog');
       }
 
       if (extractLibraryFileTags && catalogResult?.files?.length) {
+        phaseTiming.startPhase('tag_extraction');
         await extractLibraryFileTags({
           files: catalogResult.files.filter((file) => file.fileState === 'observed'),
         });
+        phaseTiming.finishPhase('tag_extraction');
       }
 
       if (captureLibrarySidecarArtwork && catalogResult?.files?.length) {
+        phaseTiming.startPhase('sidecar_artwork');
         try {
           await captureLibrarySidecarArtwork({
             files: catalogResult.files,
@@ -96,27 +127,43 @@ export function createLibraryScanWorker({
         } catch {
           // Sidecar artwork capture is best-effort and must not fail the scan.
         }
+        phaseTiming.finishPhase('sidecar_artwork');
       }
 
       if (matchLibraryFiles && catalogResult?.files?.length) {
+        phaseTiming.startPhase('file_matching');
         await matchLibraryFiles({
           files: catalogResult.files.filter((file) => file.fileState === 'observed'),
         });
+        phaseTiming.finishPhase('file_matching');
       }
 
       if (reconcileLibraryReleases) {
+        phaseTiming.startPhase('release_reconciliation');
         await reconcileLibraryReleases();
+        phaseTiming.finishPhase('release_reconciliation');
       }
 
       if (reconcileWantedReleases) {
+        phaseTiming.startPhase('wanted_reconciliation');
         await reconcileWantedReleases();
+        phaseTiming.finishPhase('wanted_reconciliation');
       }
 
       if (reconcileDiscoveryRequests) {
+        phaseTiming.startPhase('discovery_reconciliation');
         await reconcileDiscoveryRequests();
+        phaseTiming.finishPhase('discovery_reconciliation');
       }
 
-      await markRunCompleted({ runId, summary });
+      await markRunCompleted({
+        runId,
+        summary: {
+          ...summary,
+          observedFileCount: observedFiles.length,
+          phases: phaseTiming.toJson(),
+        },
+      });
     } catch (error) {
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
