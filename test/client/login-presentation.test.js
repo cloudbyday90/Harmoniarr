@@ -64,6 +64,27 @@ test('buildLoginInfoMessage returns reauth message for reauth-required reason', 
   );
 });
 
+test('buildLoginInfoMessage returns Plex not-linked guidance when direct sign-in account is missing', () => {
+  assert.equal(
+    buildLoginInfoMessage('plex-sign-in-not-linked'),
+    'This Plex account is not linked to a direct-sign-in-capable Harmoniarr user. Use local login or claim your account.',
+  );
+});
+
+test('buildLoginInfoMessage returns restricted Plex guidance for managed accounts', () => {
+  assert.equal(
+    buildLoginInfoMessage('plex-sign-in-restricted'),
+    'Managed or restricted Plex accounts cannot sign in directly. Use the local account linked by your administrator.',
+  );
+});
+
+test('buildLoginInfoMessage returns generic Plex failure guidance', () => {
+  assert.equal(
+    buildLoginInfoMessage('plex-sign-in-failed'),
+    'Plex sign-in did not complete. Try again or continue with local login.',
+  );
+});
+
 test('buildLoginInfoMessage returns empty string for unknown reason', () => {
   assert.equal(buildLoginInfoMessage('unknown-reason'), '');
 });
@@ -81,7 +102,14 @@ test('buildLoginInfoMessage returns empty string for empty string reason', () =>
 });
 
 test('buildLoginInfoMessage all known reasons return non-empty strings', () => {
-  const knownReasons = ['claim-complete', 'session-expired', 'reauth-required'];
+  const knownReasons = [
+    'claim-complete',
+    'session-expired',
+    'reauth-required',
+    'plex-sign-in-not-linked',
+    'plex-sign-in-restricted',
+    'plex-sign-in-failed',
+  ];
   for (const reason of knownReasons) {
     const msg = buildLoginInfoMessage(reason);
     assert.ok(msg.length > 0, `expected non-empty message for reason: ${reason}`);

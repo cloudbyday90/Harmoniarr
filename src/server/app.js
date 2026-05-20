@@ -41,6 +41,7 @@ import { createMediaToolingStatusService } from './media/media-tooling-status-se
 import { createMediaTranscodeExecutionService } from './media/media-transcode-execution-service.js';
 import { createOperationsModule } from './operations-module.js';
 import { createProviderModule } from './provider-module.js';
+import { createPlexDirectSignInService } from './integrations/plex/plex-direct-sign-in-service.js';
 import { createPlexDirectoryImportService } from './integrations/plex/plex-directory-import-service.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
@@ -212,6 +213,7 @@ export function createApp({
     listTrustSnapshot: restoreScopeRuntimeSnapshotStore.listTrustSnapshot,
     replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
   });
+  const plexDirectSignInService = createPlexDirectSignInService();
   const pushModule = buildPushModule();
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
@@ -329,6 +331,7 @@ export function createApp({
 
   mountAuthRoutes(app, {
     ...authModule.routeDependencies,
+    completePlexSignIn: plexDirectSignInService.completeSignIn,
     limitBootstrapAdmin: requestRateLimiterService.createMiddleware({
       bucketName: 'bootstrap-admin',
       limit: 5,
@@ -346,11 +349,22 @@ export function createApp({
       limit: 10,
       windowMs: 10 * 60 * 1000,
     }),
+    limitPlexSignInCallback: requestRateLimiterService.createMiddleware({
+      bucketName: 'auth-plex-callback',
+      limit: 30,
+      windowMs: 5 * 60 * 1000,
+    }),
+    limitPlexSignInStart: requestRateLimiterService.createMiddleware({
+      bucketName: 'auth-plex-start',
+      limit: 15,
+      windowMs: 10 * 60 * 1000,
+    }),
     limitRefresh: requestRateLimiterService.createMiddleware({
       bucketName: 'auth-refresh',
       limit: 30,
       windowMs: 5 * 60 * 1000,
     }),
+    startPlexSignIn: plexDirectSignInService.startSignIn,
   });
   mountAdminRecoveryRoutes(app, {
     getBootstrapAdminRecoveryStatus: systemModule.adminRecoveryService.getBootstrapAdminRecoveryStatus,

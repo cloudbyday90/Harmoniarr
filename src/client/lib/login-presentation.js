@@ -70,5 +70,17 @@ export function buildLoginInfoMessage(reason) {
     return 'A privileged action requires you to confirm your password again before continuing.';
   }
 
+  if (reason === 'plex-sign-in-not-linked') {
+    return 'This Plex account is not linked to a direct-sign-in-capable Harmoniarr user. Use local login or claim your account.';
+  }
+
+  if (reason === 'plex-sign-in-restricted') {
+    return 'Managed or restricted Plex accounts cannot sign in directly. Use the local account linked by your administrator.';
+  }
+
+  if (reason === 'plex-sign-in-failed') {
+    return 'Plex sign-in did not complete. Try again or continue with local login.';
+  }
+
   return '';
 }

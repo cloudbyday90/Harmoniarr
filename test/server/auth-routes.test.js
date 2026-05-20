@@ -14,6 +14,11 @@ function createAuthRouteTestApp(overrides = {}) {
         issuedSession: { refreshToken: 'refresh-password', csrfToken: 'csrf-password' },
       }),
       clearAuthCookies: () => {},
+      completePlexSignIn: async () => ({
+        user: { id: 'user-plex', username: 'plex-user' },
+        issuedSession: { refreshToken: 'plex-refresh', csrfToken: 'plex-csrf' },
+        redirectTo: '/app',
+      }),
       completeAppUserClaim: async ({ username }) => ({ requiresLogin: true, username }),
       createActiveSessionsResponse: (payload) => ({ ok: true, ...payload }),
       createAuthenticatedResponse: (user, issuedSession) => ({
@@ -60,6 +65,8 @@ function createAuthRouteTestApp(overrides = {}) {
       limitBootstrapAdmin: (_request, _response, next) => next(),
       limitClaimComplete: (_request, _response, next) => next(),
       limitLogin: (_request, _response, next) => next(),
+      limitPlexSignInCallback: (_request, _response, next) => next(),
+      limitPlexSignInStart: (_request, _response, next) => next(),
       limitRefresh: (_request, _response, next) => next(),
       requireCsrf: () => {},
       requireFreshSession: async () => ({ appUserId: 'user-1', user: { id: 'user-1', username: 'admin' } }),
@@ -67,6 +74,11 @@ function createAuthRouteTestApp(overrides = {}) {
       revokeSession: async ({ refreshTokenId }) => ({ revokedSessionId: refreshTokenId }),
       rotateSession: async () => ({ refreshToken: 'refresh-2', csrfToken: 'csrf-2' }),
       setAuthCookies: () => {},
+      startPlexSignIn: async ({ redirectTo, requestMetadata }) => ({
+        authorizationUrl: `https://app.plex.tv/auth#?redirect=${encodeURIComponent(redirectTo ?? '')}&origin=${encodeURIComponent(requestMetadata.origin ?? '')}`,
+        expiresAt: '2026-06-02T12:10:00.000Z',
+        provider: 'plex',
+      }),
       ...overrides,
     });
   });
@@ -179,6 +191,77 @@ test('auth login route passes request metadata to the injected shared login serv
         userAgent: 'HarmoniarrAuthTest/1.0',
       },
     });
+  });
+});
+
+test('auth Plex start route passes redirect and reconstructed origin to the injected service', async (t) => {
+  const startPlexSignIn = t.mock.fn(async ({ redirectTo, requestMetadata }) => ({
+    authorizationUrl: `https://app.plex.tv/auth#?redirect=${encodeURIComponent(redirectTo)}&origin=${encodeURIComponent(requestMetadata.origin)}`,
+    expiresAt: '2026-06-02T12:10:00.000Z',
+    provider: 'plex',
+  }));
+  const app = createAuthRouteTestApp({ startPlexSignIn });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/plex/start`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-host': 'music.example.test',
+        'x-forwarded-proto': 'https',
+      },
+      body: JSON.stringify({ redirect: '/app/activity/blocklist' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(startPlexSignIn.mock.callCount(), 1);
+    const [args] = startPlexSignIn.mock.calls[0].arguments;
+    assert.equal(args.redirectTo, '/app/activity/blocklist');
+    assert.equal(args.requestMetadata.ipAddress, '127.0.0.1');
+    assert.equal(args.requestMetadata.origin, 'https://music.example.test');
+    assert.equal(typeof args.requestMetadata.userAgent, 'string');
+    assert.equal(payload.provider, 'plex');
+  });
+});
+
+test('auth Plex callback sets auth cookies and redirects to the resolved app route', async (t) => {
+  const completePlexSignIn = t.mock.fn(async () => ({
+    user: { id: 'user-plex', username: 'plex-user' },
+    issuedSession: { refreshToken: 'plex-refresh', csrfToken: 'plex-csrf' },
+    redirectTo: '/app/activity/blocklist',
+  }));
+  const setAuthCookies = t.mock.fn();
+  const app = createAuthRouteTestApp({ completePlexSignIn, setAuthCookies });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/plex/callback?state=state-1`, {
+      redirect: 'manual',
+    });
+
+    assert.equal(response.status, 303);
+    assert.equal(completePlexSignIn.mock.callCount(), 1);
+    assert.equal(setAuthCookies.mock.callCount(), 1);
+    assert.equal(setAuthCookies.mock.calls[0].arguments[1], 'plex-refresh');
+    assert.equal(setAuthCookies.mock.calls[0].arguments[2], 'plex-csrf');
+    assert.equal(response.headers.get('location'), '/app/activity/blocklist');
+  });
+});
+
+test('auth Plex callback redirects to login with failure reason when completion fails', async () => {
+  const app = createAuthRouteTestApp({
+    completePlexSignIn: async () => {
+      throw createApiError(403, 'plex_sign_in_not_linked', 'No linked user');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/plex/callback?state=state-1`, {
+      redirect: 'manual',
+    });
+
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.get('location'), '/login?reason=plex-sign-in-not-linked&code=plex_sign_in_not_linked');
   });
 });
 

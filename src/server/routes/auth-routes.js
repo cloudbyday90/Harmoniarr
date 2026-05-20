@@ -47,11 +47,25 @@ const defaultAccountSecurityService = createAccountSecurityService();
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 const defaultBootstrapStatusService = createBootstrapStatusService();
 
+function requestOrigin(request) {
+  const forwardedProto = request.headers['x-forwarded-proto'];
+  const forwardedHost = request.headers['x-forwarded-host'];
+  const proto = typeof forwardedProto === 'string'
+    ? forwardedProto.split(',')[0].trim()
+    : request.protocol;
+  const host = typeof forwardedHost === 'string'
+    ? forwardedHost.split(',')[0].trim()
+    : request.headers.host;
+
+  return host ? `${proto}://${host}` : null;
+}
+
 export function registerAuthRoutes(app, {
   buildSessionPayload = defaultBuildSessionPayload,
   buildBootstrapStatusPayload = defaultBootstrapStatusService.buildBootstrapStatusPayload,
   changePassword = defaultAccountSecurityService.changePassword,
   clearAuthCookies = defaultClearAuthCookies,
+  completePlexSignIn = null,
   completeAppUserClaim = null,
   createActiveSessionsResponse = defaultCreateActiveSessionsResponse,
   createAuthenticatedResponse = defaultCreateAuthenticatedResponse,
@@ -73,6 +87,8 @@ export function registerAuthRoutes(app, {
   limitBootstrapAdmin = skipRateLimitMiddleware,
   limitClaimComplete = skipRateLimitMiddleware,
   limitLogin = skipRateLimitMiddleware,
+  limitPlexSignInCallback = skipRateLimitMiddleware,
+  limitPlexSignInStart = skipRateLimitMiddleware,
   limitRefresh = skipRateLimitMiddleware,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
@@ -80,7 +96,23 @@ export function registerAuthRoutes(app, {
   revokeSession = defaultAccountSecurityService.revokeSession,
   rotateSession = defaultRotateSession,
   setAuthCookies = defaultSetAuthCookies,
+  startPlexSignIn = null,
 } = {}) {
+  function loginRedirectUrl({ code = null, reason = null, redirect = null } = {}) {
+    const url = new URL('/login', 'http://harmoniarr.local');
+    if (reason) {
+      url.searchParams.set('reason', reason);
+    }
+    if (code) {
+      url.searchParams.set('code', code);
+    }
+    if (redirect) {
+      url.searchParams.set('redirect', redirect);
+    }
+
+    return `${url.pathname}${url.search}`;
+  }
+
   app.get('/api/v1/bootstrap/status', asyncRoute(async (_request, response) => {
     response.json(createBootstrapStatusResponse(await buildBootstrapStatusPayload()));
   }));
@@ -110,6 +142,44 @@ export function registerAuthRoutes(app, {
 
     response.json(createAuthenticatedResponse(user, issuedSession));
   }));
+
+  if (typeof startPlexSignIn === 'function') {
+    app.post('/api/v1/auth/plex/start', limitPlexSignInStart, asyncRoute(async (request, response) => {
+      const requestMetadata = getRequestMetadata(request);
+      response.status(202).json({
+        ok: true,
+        ...(await startPlexSignIn({
+          redirectTo: request.body?.redirect,
+          requestMetadata: {
+            ...requestMetadata,
+            origin: requestOrigin(request),
+          },
+        })),
+      });
+    }));
+  }
+
+  if (typeof completePlexSignIn === 'function') {
+    app.get('/api/v1/auth/plex/callback', limitPlexSignInCallback, asyncRoute(async (request, response) => {
+      try {
+        const { issuedSession, redirectTo } = await completePlexSignIn({
+          requestMetadata: getRequestMetadata(request),
+          state: request.query.state,
+        });
+        setAuthCookies(response, issuedSession.refreshToken, issuedSession.csrfToken);
+        response.redirect(303, redirectTo);
+      } catch (error) {
+        response.redirect(303, loginRedirectUrl({
+          code: error?.code ?? 'plex_sign_in_failed',
+          reason: error?.code === 'plex_sign_in_restricted_account'
+            ? 'plex-sign-in-restricted'
+            : error?.code === 'plex_sign_in_not_linked'
+              ? 'plex-sign-in-not-linked'
+              : 'plex-sign-in-failed',
+        }));
+      }
+    }));
+  }
 
   app.post('/api/v1/auth/refresh', limitRefresh, asyncRoute(async (request, response) => {
     const session = await requireFreshSession(request);

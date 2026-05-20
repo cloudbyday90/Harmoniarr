@@ -40,6 +40,13 @@ export function login(form) {
   });
 }
 
+export function startPlexSignIn({ redirect } = {}) {
+  return apiRequest('/api/v1/auth/plex/start', {
+    method: 'POST',
+    body: { redirect },
+  });
+}
+
 export function claimAccount(form) {
   return apiRequest('/api/v1/auth/claim', {
     method: 'POST',

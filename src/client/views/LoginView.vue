@@ -20,6 +20,7 @@
 import { computed, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
+import { startPlexSignIn } from '../lib/auth-api.js';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
 import { buildClaimAccountRoute, buildLoginDescription, buildLoginInfoMessage } from '../lib/login-presentation.js';
 import { useAutoFocus } from '../composables/useAutoFocus.js';
@@ -33,6 +34,7 @@ const form = reactive({
   password: '',
 });
 const errorMessage = ref('');
+const isStartingPlex = ref(false);
 const isSubmitting = ref(false);
 const infoMessage = computed(() => buildLoginInfoMessage(
   typeof route.query.reason === 'string' ? route.query.reason : undefined,
@@ -50,6 +52,30 @@ async function submit() {
     errorMessage.value = error instanceof Error ? error.message : 'Login failed';
   } finally {
     isSubmitting.value = false;
+  }
+}
+
+async function startPlex() {
+  errorMessage.value = '';
+  isStartingPlex.value = true;
+
+  try {
+    const payload = await startPlexSignIn({
+      redirect: typeof route.query.redirect === 'string' ? route.query.redirect : '/app',
+    });
+    const authorizationUrl = typeof payload?.authorizationUrl === 'string'
+      ? payload.authorizationUrl
+      : '';
+
+    if (!authorizationUrl) {
+      throw new Error('Plex sign-in URL was not returned');
+    }
+
+    globalThis.location.assign(authorizationUrl);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Plex sign-in failed';
+  } finally {
+    isStartingPlex.value = false;
   }
 }
 </script>
@@ -84,6 +110,11 @@ async function submit() {
           {{ isSubmitting ? 'Logging in...' : 'Log in' }}
         </button>
       </form>
+      <div class="auth-entry-divider" aria-hidden="true">or</div>
+      <button type="button" class="hx-btn" @click="startPlex" :disabled="isStartingPlex || isSubmitting">
+        {{ isStartingPlex ? 'Redirecting to Plex…' : 'Continue with Plex' }}
+      </button>
+      <p class="auth-entry-inline-note">Use your Plex account when it is already linked to a direct-sign-in-capable Harmoniarr user.</p>
       <p class="auth-entry-inline-note">First time here? <RouterLink :to="buildClaimAccountRoute(form.username)">Claim your account</RouterLink> with the code from your administrator.</p>
     </article>
   </AuthEntryShell>

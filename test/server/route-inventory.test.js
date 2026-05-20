@@ -58,6 +58,7 @@ function collectRegisteredRoutes() {
   });
 
   registerAuthRoutes(app, {
+    completePlexSignIn: asyncNoopResult({ issuedSession: {}, redirectTo: '/app', user: {} }),
     completeAppUserClaim: asyncNoopResult({ requiresLogin: true }),
     createAuthenticatedResponse: () => ({}),
     createBootstrapAdmin: asyncNoopResult({ user: {}, issuedSession: {} }),
@@ -73,6 +74,7 @@ function collectRegisteredRoutes() {
     requireFreshSession: asyncNoopResult({ appUserId: 'user-1' }),
     requireSession: asyncNoopResult({ appUserId: 'user-1' }),
     rotateSession: asyncNoopResult({}),
+    startPlexSignIn: asyncNoopResult({ authorizationUrl: 'https://app.plex.tv/auth#?', expiresAt: '2026-06-01T12:00:00.000Z', provider: 'plex' }),
   });
 
   registerAdminRecoveryRoutes(app, {

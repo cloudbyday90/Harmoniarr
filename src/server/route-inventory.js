@@ -28,6 +28,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/bootstrap/status', access: 'public', area: 'auth', kind: 'diagnostic' },
   { method: 'POST', path: '/api/v1/bootstrap/admin', access: 'public', area: 'auth', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/auth/login', access: 'public', area: 'auth', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/auth/plex/start', access: 'public', area: 'auth', kind: 'mutation' },
+  { method: 'GET', path: '/api/v1/auth/plex/callback', access: 'public', area: 'auth', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/auth/claim', access: 'public', area: 'auth', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/auth/refresh', access: 'authenticated', area: 'auth', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/auth/change-password', access: 'authenticated', area: 'auth', kind: 'mutation' },
