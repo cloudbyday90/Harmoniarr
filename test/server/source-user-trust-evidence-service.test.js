@@ -1,0 +1,93 @@
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createSourceUserTrustEvidenceService } from '../../src/server/activity/source-user-trust-evidence-service.js';
+
+test('listSourceUserReputationIndex returns case-insensitive reputation rows', async () => {
+  const service = createSourceUserTrustEvidenceService({
+    listTrustSnapshot: async () => ([
+      { failureCount: 2, successCount: 5, trustState: 'trusted', username: 'Trusted-Peer' },
+      { failureCount: 4, isBlocked: true, successCount: 0, username: 'blocked-peer' },
+    ]),
+  });
+
+  const reputationIndex = await service.listSourceUserReputationIndex({ usernames: ['trusted-peer', 'missing-peer'] });
+
+  assert.equal(reputationIndex.size, 1);
+  assert.deepEqual(reputationIndex.get('trusted-peer'), {
+    failureCount: 2,
+    successCount: 5,
+    trustState: 'trusted',
+    username: 'Trusted-Peer',
+  });
+});
+
+test('recordSourceUserOutcomeEvidence appends a neutral row for new successful evidence', async (t) => {
+  const replaceTrustSnapshot = t.mock.fn(async () => {});
+  const service = createSourceUserTrustEvidenceService({
+    listTrustSnapshot: async () => ([]),
+    replaceTrustSnapshot,
+  });
+
+  const row = await service.recordSourceUserOutcomeEvidence({
+    eventType: 'import_candidate_applied',
+    outcome: 'success',
+    reason: 'Imported cleanly',
+    username: 'new-peer',
+  });
+
+  assert.equal(row.username, 'new-peer');
+  assert.equal(row.trustState, 'neutral');
+  assert.equal(row.successCount, 1);
+  assert.equal(row.failureCount, 0);
+  assert.equal(row.lastEvidenceOutcome, 'success');
+  assert.equal(row.lastSuccessfulEventType, 'import_candidate_applied');
+  assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
+});
+
+test('recordSourceUserOutcomeEvidence preserves blocked rows while incrementing failure evidence', async (t) => {
+  const replaceTrustSnapshot = t.mock.fn(async () => {});
+  const service = createSourceUserTrustEvidenceService({
+    listTrustSnapshot: async () => ([{
+      blockReason: 'Fake FLAC labels',
+      failureCount: 1,
+      isBlocked: true,
+      successCount: 3,
+      trustState: 'blocked',
+      username: 'bad-peer',
+    }]),
+    replaceTrustSnapshot,
+  });
+
+  const row = await service.recordSourceUserOutcomeEvidence({
+    eventType: 'import_candidate_download_failed',
+    outcome: 'failure',
+    reason: 'Remote transfer failed',
+    username: 'BAD-PEER',
+  });
+
+  assert.equal(row.username, 'bad-peer');
+  assert.equal(row.trustState, 'blocked');
+  assert.equal(row.successCount, 3);
+  assert.equal(row.failureCount, 2);
+  assert.equal(row.lastFailureEventType, 'import_candidate_download_failed');
+  assert.equal(row.blockReason, 'Fake FLAC labels');
+  assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
+});

@@ -164,6 +164,13 @@ function buildSourceResponseKey({ folderPath, username }) {
     .digest('hex');
 }
 
+function buildUsernameKey(username) {
+  return normalizeOptionalString(username, {
+    fieldName: 'username',
+    maxLength: 100,
+  })?.toLowerCase() ?? '';
+}
+
 function normalizeResponseFile(file, {
   fallbackIndex,
   isLocked,
@@ -310,9 +317,11 @@ export function createImportCandidateService({
   listImportCandidateFilesFn = listImportCandidateFiles,
   listImportCandidatesFn = listImportCandidatesFromRepository,
   listImportCandidatesBySourceMediaRequestIdsFn = listImportCandidatesBySourceMediaRequestIdsFromRepository,
+  listSourceUserReputationIndexFn = async () => new Map(),
   normalizeSlskdResponsesFn = normalizeSlskdResponsesToImportCandidates,
   pool = getPool(),
   recordAuditEventFn = recordAuditEvent,
+  recordSourceUserOutcomeEvidenceFn = async () => null,
   replaceImportCandidateFilesFn = replaceImportCandidateFiles,
   scoreDownloadResultFn = scoreDownloadResult,
   slskdService,
@@ -596,6 +605,19 @@ export function createImportCandidateService({
       requestMetadata,
       summary: 'Import candidate applied into the library',
       toStatus: 'applied',
+    }).then(async (transitionResult) => {
+      try {
+        await recordSourceUserOutcomeEvidenceFn({
+          eventType: 'import_candidate_applied',
+          occurredAt: transitionResult?.candidate?.updatedAt ?? null,
+          outcome: 'success',
+          reason,
+          username: transitionResult?.candidate?.username,
+        });
+      } catch {
+        // Trust evidence must not block the core status transition.
+      }
+      return transitionResult;
     });
   }
 
@@ -614,6 +636,19 @@ export function createImportCandidateService({
       requestMetadata,
       summary: 'Import candidate download failed',
       toStatus: 'failed',
+    }).then(async (transitionResult) => {
+      try {
+        await recordSourceUserOutcomeEvidenceFn({
+          eventType: 'import_candidate_download_failed',
+          occurredAt: transitionResult?.candidate?.updatedAt ?? null,
+          outcome: 'failure',
+          reason,
+          username: transitionResult?.candidate?.username,
+        });
+      } catch {
+        // Trust evidence must not block the core status transition.
+      }
+      return transitionResult;
     });
   }
 
@@ -669,6 +704,14 @@ export function createImportCandidateService({
       responses: searchResponses.responses,
       searchId: searchResponses.searchId,
     });
+    let reputationIndex;
+    try {
+      reputationIndex = await listSourceUserReputationIndexFn({
+        usernames: candidates.map((candidate) => candidate.username),
+      });
+    } catch {
+      reputationIndex = new Map();
+    }
 
     for (const candidate of candidates) {
       const scoring = scoreDownloadResultFn({
@@ -676,6 +719,7 @@ export function createImportCandidateService({
         formatPreferences,
         expectedTrackCount,
         expectedDurationSeconds,
+        uploaderReputation: reputationIndex.get(buildUsernameKey(candidate.username)) ?? null,
       });
 
       if (scoring.compositeScore !== null) {

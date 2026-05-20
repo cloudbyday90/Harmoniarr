@@ -19,6 +19,7 @@
 import { createActivityEventService } from './activity-event-service.js';
 import { createActivityEventStore } from './activity-event-store.js';
 import { createSourceUserBlocklistService } from './source-user-blocklist-service.js';
+import { createSourceUserTrustEvidenceService } from './source-user-trust-evidence-service.js';
 import { createSourceUserTrustService } from './source-user-trust-service.js';
 
 /**
@@ -41,11 +42,16 @@ export function createActivityModule({
   sourceUserTrustService = createSourceUserTrustService({
     listTrustSnapshot,
   }),
+  sourceUserTrustEvidenceService = createSourceUserTrustEvidenceService({
+    listTrustSnapshot,
+    replaceTrustSnapshot,
+  }),
 } = {}) {
   return {
     activityEventService,
     activityEventStore,
     sourceUserBlocklistService,
+    sourceUserTrustEvidenceService,
     sourceUserTrustService,
     routeDependencies: {
       buildActivityFeed: activityEventService.buildActivityFeed,

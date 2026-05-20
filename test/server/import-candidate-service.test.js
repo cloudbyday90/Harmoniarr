@@ -279,6 +279,45 @@ test('createImportCandidateService ingests slskd responses in one transaction an
   assert.equal(result.candidates[0].files[0].filename, '01 Wildlife Analysis.flac');
 });
 
+test('createImportCandidateService includes stored uploader reputation in candidate scoring', async (t) => {
+  const { pool } = createPool(t);
+  const scoreDownloadResultFn = t.mock.fn(() => ({ breakdown: [], compositeScore: 88 }));
+  const service = createImportCandidateService({
+    listSourceUserReputationIndexFn: t.mock.fn(async () => new Map([[
+      'source-user',
+      { failureCount: 1, successCount: 9, trustState: 'trusted', username: 'source-user' },
+    ]])),
+    pool,
+    recordAuditEventFn: t.mock.fn(),
+    replaceImportCandidateFilesFn: t.mock.fn(async (importCandidateId, files) => files.map((file) => ({
+      id: `file-${file.sourceFileIndex}`,
+      importCandidateId,
+      ...file,
+    }))),
+    scoreDownloadResultFn,
+    slskdService: {
+      getSearchResponses: async () => ({
+        searchId: 'search-1',
+        responses: [{
+          username: 'source-user',
+          files: [{ filename: 'Autechre\\Amber\\01 Foil.flac', size: 123 }],
+        }],
+      }),
+    },
+    upsertImportCandidateFn: t.mock.fn(async (candidate) => ({ id: 'candidate-1', ...candidate })),
+  });
+
+  await service.ingestSlskdSearchResponses({ searchId: 'search-1' });
+
+  assert.equal(scoreDownloadResultFn.mock.callCount(), 1);
+  assert.deepEqual(scoreDownloadResultFn.mock.calls[0].arguments[0].uploaderReputation, {
+    failureCount: 1,
+    successCount: 9,
+    trustState: 'trusted',
+    username: 'source-user',
+  });
+});
+
 test('createImportCandidateService lists candidates with normalized filters and pagination', async (t) => {
   const listImportCandidatesFn = t.mock.fn(async (filters) => ({
     items: [{
@@ -605,11 +644,13 @@ test('createImportCandidateService marks download workflow transitions with shar
     newStatus,
     reason,
   }));
+  const recordSourceUserOutcomeEvidenceFn = t.mock.fn(async () => null);
   const service = createImportCandidateService({
     getImportCandidateByIdFn,
     insertImportCandidateEventFn,
     pool,
     recordAuditEventFn: t.mock.fn(),
+    recordSourceUserOutcomeEvidenceFn,
     slskdService: {
       getSearchResponses: async () => ({ searchId: 'unused', responses: [] }),
     },
@@ -618,6 +659,7 @@ test('createImportCandidateService marks download workflow transitions with shar
 
   await service.markImportCandidateDownloading({ importCandidateId: 'candidate-1', reason: 'Queued remotely' });
   await service.markImportCandidateImportPending({ importCandidateId: 'candidate-1', reason: 'Completed' });
+  await service.markImportCandidateApplied({ importCandidateId: 'candidate-1', reason: 'Imported cleanly' });
   await service.markImportCandidateDownloadFailed({ importCandidateId: 'candidate-1', reason: 'Remote transfer failed' });
 
   assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[0].arguments, [{
@@ -631,13 +673,64 @@ test('createImportCandidateService marks download workflow transitions with shar
     toStatus: 'import_pending',
   }, client]);
   assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[2].arguments, [{
+    fromStatuses: ['import_pending'],
+    importCandidateId: 'candidate-1',
+    toStatus: 'applied',
+  }, client]);
+  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[3].arguments, [{
     fromStatuses: ['selected', 'downloading'],
     importCandidateId: 'candidate-1',
     toStatus: 'failed',
   }, client]);
   assert.equal(insertImportCandidateEventFn.mock.calls[0].arguments[0].eventType, 'import_candidate_downloading');
   assert.equal(insertImportCandidateEventFn.mock.calls[1].arguments[0].eventType, 'import_candidate_import_pending');
-  assert.equal(insertImportCandidateEventFn.mock.calls[2].arguments[0].eventType, 'import_candidate_download_failed');
+  assert.equal(insertImportCandidateEventFn.mock.calls[2].arguments[0].eventType, 'import_candidate_applied');
+  assert.equal(insertImportCandidateEventFn.mock.calls[3].arguments[0].eventType, 'import_candidate_download_failed');
+  assert.deepEqual(recordSourceUserOutcomeEvidenceFn.mock.calls.map((call) => call.arguments[0]), [
+    {
+      eventType: 'import_candidate_applied',
+      occurredAt: '2026-04-30T14:00:00.000Z',
+      outcome: 'success',
+      reason: 'Imported cleanly',
+      username: 'source-user',
+    },
+    {
+      eventType: 'import_candidate_download_failed',
+      occurredAt: '2026-04-30T14:00:00.000Z',
+      outcome: 'failure',
+      reason: 'Remote transfer failed',
+      username: 'source-user',
+    },
+  ]);
+});
+
+test('createImportCandidateService preserves status transitions when trust evidence recording fails', async (t) => {
+  const { pool } = createPool(t);
+  const service = createImportCandidateService({
+    getImportCandidateByIdFn: t.mock.fn(async () => createStoredCandidate({ status: 'selected' })),
+    insertImportCandidateEventFn: t.mock.fn(async ({ eventType, previousStatus, newStatus, reason }) => ({
+      eventType,
+      previousStatus,
+      newStatus,
+      reason,
+    })),
+    pool,
+    recordAuditEventFn: t.mock.fn(),
+    recordSourceUserOutcomeEvidenceFn: t.mock.fn(async () => {
+      throw new Error('trust snapshot unavailable');
+    }),
+    slskdService: {
+      getSearchResponses: async () => ({ searchId: 'unused', responses: [] }),
+    },
+    transitionImportCandidateStatusFn: t.mock.fn(async ({ toStatus }) => createStoredCandidate({ status: toStatus })),
+  });
+
+  const result = await service.markImportCandidateDownloadFailed({
+    importCandidateId: 'candidate-1',
+    reason: 'Remote transfer failed',
+  });
+
+  assert.equal(result.candidate.status, 'failed');
 });
 
 test('createImportCandidateService rejects stale review transitions with a conflict', async (t) => {

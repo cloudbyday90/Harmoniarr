@@ -62,6 +62,8 @@ export function createImportCandidateModule({
     status: 'healthy',
   }),
   getAppUserById = null,
+  listSourceUserReputationIndexFn = async () => new Map(),
+  recordSourceUserOutcomeEvidenceFn = async () => null,
   sendFulfillmentNotificationFn = null,
   slskdService,
   mediaInspectionService = createMediaInspectionService({
@@ -72,7 +74,11 @@ export function createImportCandidateModule({
   }),
   mediaLosslessRetentionPolicyService = createMediaLosslessRetentionPolicyService(),
   mediaTranscodePlanningService = createMediaTranscodePlanningService(),
-  importCandidateService = createImportCandidateService({ slskdService }),
+  importCandidateService = createImportCandidateService({
+    listSourceUserReputationIndexFn,
+    recordSourceUserOutcomeEvidenceFn,
+    slskdService,
+  }),
   importCandidatePreviewService = createImportCandidatePreviewService({
     getImportCandidate: importCandidateService.getImportCandidate,
     getAppUserById,

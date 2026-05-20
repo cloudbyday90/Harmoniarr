@@ -218,6 +218,7 @@ export function createApp({
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
+    listSourceUserReputationIndexFn: activityModule.sourceUserTrustEvidenceService.listSourceUserReputationIndex,
     sendFulfillmentNotificationFn: ({ userId }) => pushModule.pushNotificationService.sendNotificationToUser({
       payload: {
         body: 'Your requested music has been added to your library.',
@@ -239,6 +240,7 @@ export function createApp({
     }),
     maintenanceLockService,
     maintenanceLockOperationPauseService,
+    recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
     slskdTransferSnapshotService: slskdModule.slskdTransferSnapshotService,
     slskdService: slskdModule.slskdService,
   });
