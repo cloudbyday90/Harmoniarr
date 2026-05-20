@@ -92,6 +92,7 @@ function collectRegisteredRoutes() {
     getUserPreferences: asyncNoopResult({ preferredFormat: 'any', minimumQuality: 'any' }),
     issueAppUserClaimCode: asyncNoopResult({}),
     listAppUsers: asyncNoopResult([]),
+    buildPlexLinkedAccountOverview: asyncNoopResult({}),
     relinkPlexDirectoryConflict: asyncNoopResult({}),
     resetAppUserPassword: asyncNoopResult({}),
     unlinkPlexAppUser: asyncNoopResult({}),

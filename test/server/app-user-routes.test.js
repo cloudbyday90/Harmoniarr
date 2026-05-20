@@ -47,6 +47,26 @@ function createAppUserRouteTestApp(overrides = {}) {
           total: 2,
         },
       }),
+      buildPlexLinkedAccountOverview: async () => ({
+        checkedAt: '2026-05-03T11:56:00.000Z',
+        conflictProfiles: [],
+        importableProfiles: [],
+        linkedUsers: [{ id: 'user-plex-1', repairState: 'healthy', unlinkReady: true, username: 'plex-friend' }],
+        ownerLink: { linked: true, linkedUserTitle: 'Owner Account' },
+        previewLinkedProfiles: [],
+        previewStatus: { code: null, message: 'Plex linked-account preview is current.', state: 'ready' },
+        summary: {
+          conflictProfiles: 0,
+          importableProfiles: 0,
+          linkedUsers: 1,
+          ownerLinked: true,
+          previewLinkedProfiles: 0,
+          repairRequiredUsers: 0,
+          staleUsers: 0,
+          unlinkBlockedUsers: 0,
+          unlinkReadyUsers: 1,
+        },
+      }),
       claimManagedLibraryRoot: async ({ actorUserId }) => ({
         provisioning: {
           authProvider: 'local',
@@ -514,6 +534,44 @@ test('app user Plex preview route returns the classified directory preview for a
     assert.equal(payload.ok, true);
     assert.equal(payload.summary.importable, 1);
     assert.equal(payload.profiles[0].suggestedUsername, 'plex-friend');
+  });
+});
+
+test('app user Plex linked accounts overview route returns the aggregated management payload for admins', async (t) => {
+  const buildPlexLinkedAccountOverview = t.mock.fn(async () => ({
+    checkedAt: '2026-05-03T11:56:00.000Z',
+    conflictProfiles: [],
+    importableProfiles: [],
+    linkedUsers: [{ id: 'user-plex-1', repairState: 'healthy', unlinkReady: true, username: 'plex-friend' }],
+    ownerLink: { linked: true, linkedUserTitle: 'Owner Account' },
+    previewLinkedProfiles: [],
+    previewStatus: { code: null, message: 'Plex linked-account preview is current.', state: 'ready' },
+    summary: {
+      conflictProfiles: 0,
+      importableProfiles: 0,
+      linkedUsers: 1,
+      ownerLinked: true,
+      previewLinkedProfiles: 0,
+      repairRequiredUsers: 0,
+      staleUsers: 0,
+      unlinkBlockedUsers: 0,
+      unlinkReadyUsers: 1,
+    },
+  }));
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', user: { role: 'admin' } }));
+  const app = createAppUserRouteTestApp({ buildPlexLinkedAccountOverview, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/linked-accounts/plex`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(buildPlexLinkedAccountOverview.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.summary.linkedUsers, 1);
+    assert.equal(payload.ownerLink.linked, true);
+    assert.equal(payload.linkedUsers[0].username, 'plex-friend');
   });
 });
 

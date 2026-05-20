@@ -28,6 +28,7 @@ export function createAppUserModule({
   appUserService,
   permissionService,
   plexDirectoryImportService = null,
+  plexLinkedAccountManagementService = null,
   ...overrides
 } = {}) {
   const resolvedPermissionService = permissionService ?? createAppUserPermissionService();
@@ -61,6 +62,11 @@ export function createAppUserModule({
           buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
           relinkPlexDirectoryConflict: plexDirectoryImportService.relinkConflict,
           unlinkPlexAppUser: plexDirectoryImportService.unlinkUser,
+        }
+        : {}),
+      ...(plexLinkedAccountManagementService
+        ? {
+          buildPlexLinkedAccountOverview: plexLinkedAccountManagementService.buildOverview,
         }
         : {}),
       provisionManagedLibraryRoot: resolvedAppUserProvisioningService.provisionManagedLibraryRoot,

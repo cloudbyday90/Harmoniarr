@@ -43,6 +43,7 @@ import { createOperationsModule } from './operations-module.js';
 import { createProviderModule } from './provider-module.js';
 import { createPlexDirectSignInService } from './integrations/plex/plex-direct-sign-in-service.js';
 import { createPlexDirectoryImportService } from './integrations/plex/plex-directory-import-service.js';
+import { createPlexLinkedAccountManagementService } from './integrations/plex/plex-linked-account-management-service.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
 import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
@@ -190,12 +191,18 @@ export function createApp({
     listAppUsers: baseAppUserModule.appUserService.listAppUsers,
     plexOwnerLinkService: providerModule.plexOwnerLinkService,
   });
+  const plexLinkedAccountManagementService = createPlexLinkedAccountManagementService({
+    buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
+    buildPlexLinkStatus: providerModule.plexOwnerLinkService.buildStatus,
+    listAppUsers: baseAppUserModule.appUserService.listAppUsers,
+  });
   const appUserModule = buildAppUserModule({
     accountClaimService: baseAppUserModule.accountClaimService,
     appUserProvisioningService: baseAppUserModule.appUserProvisioningService,
     appUserService: baseAppUserModule.appUserService,
     permissionService: baseAppUserModule.permissionService,
     plexDirectoryImportService,
+    plexLinkedAccountManagementService,
   });
   const artworkModule = buildArtworkModule({
     maintenanceLockOperationPauseService,

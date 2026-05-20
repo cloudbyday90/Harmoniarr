@@ -22,6 +22,10 @@ export function fetchUsers() {
   return apiRequest('/api/v1/users');
 }
 
+export function fetchPlexLinkedAccountsOverview() {
+  return apiRequest('/api/v1/users/linked-accounts/plex');
+}
+
 export function createUser(user) {
   return apiRequest('/api/v1/users', {
     method: 'POST',

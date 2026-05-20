@@ -29,6 +29,7 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
 export function registerAppUserRoutes(app, {
   applyPlexDirectoryImport = null,
+  buildPlexLinkedAccountOverview = null,
   buildPlexDirectoryImportPreview = null,
   claimManagedLibraryRoot = defaultAppUserProvisioningService.claimManagedLibraryRoot,
   createAppUser = defaultAppUserService.createAppUser,
@@ -199,6 +200,17 @@ export function registerAppUserRoutes(app, {
       response.json({
         ok: true,
         ...(await buildPlexDirectoryImportPreview()),
+      });
+    }));
+  }
+
+  if (typeof buildPlexLinkedAccountOverview === 'function') {
+    app.get('/api/v1/users/linked-accounts/plex', asyncRoute(async (request, response) => {
+      await requireAdminSession(request);
+
+      response.json({
+        ok: true,
+        ...(await buildPlexLinkedAccountOverview()),
       });
     }));
   }

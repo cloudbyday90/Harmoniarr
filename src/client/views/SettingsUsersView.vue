@@ -17,8 +17,9 @@
 -->
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
-import { clearPlexLink, fetchSettings, startPlexLink } from '../lib/settings-api.js';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { clearPlexLink, startPlexLink } from '../lib/settings-api.js';
+import { usePlexLinkedAccounts } from '../composables/usePlexLinkedAccounts.js';
 import {
   buildUsersEmptyStateBody,
   describePlexLibraryAccessPolicy,
@@ -36,11 +37,21 @@ import {
   plexLibraryAccessPolicyTone,
 } from '../lib/settings-users-presentation.js';
 import {
+  formatPlexLinkedAccountsCountLabel,
+  formatPlexOwnerLinkLabel,
+  formatPlexOwnerLinkTone,
+  formatPlexPreviewStateLabel,
+  formatPlexRepairStateLabel,
+  formatPlexRepairStateTone,
+  hasPlexRepairQueue,
+} from '../lib/plex-linked-accounts-presentation.js';
+import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
+import {
   applyPlexUserImport,
   createUser,
+  fetchPlexLinkedAccountsOverview,
   fetchUsers,
   issueUserClaimCode,
-  previewPlexUserImport,
   provisionUserManagedLibraryRoot,
   relinkPlexUserConflict,
   resetUserPassword,
@@ -50,17 +61,25 @@ import {
 
 const isUsersLoading = ref(true);
 const isCreatingUser = ref(false);
-const isPreviewingPlexUsers = ref(false);
 const isImportingPlexUsers = ref(false);
 const isStartingPlexLink = ref(false);
 const isClearingPlexLink = ref(false);
 const activePlexRelinkProfileId = ref('');
 const errorMessage = ref('');
 const successMessage = ref('');
-const secretStatus = ref(null);
 const roleOptions = ref(['admin', 'operator', 'requester']);
 const users = ref([]);
-const plexUserImportPreview = ref(null);
+
+const {
+  errorMessage: plexLinkedAccountsErrorMessage,
+  isLoading: isLoadingPlexLinkedAccounts,
+  load: loadPlexLinkedAccountsOverview,
+  overview: plexLinkedAccountsOverview,
+} = usePlexLinkedAccounts({ fetchPlexLinkedAccountsOverview });
+
+const linkedUsersById = computed(() => new Map(users.value.map((user) => [user.id, user])));
+const plexOwnerLinked = computed(() => plexLinkedAccountsOverview.value.ownerLink?.linked === true);
+const plexRepairQueueActive = computed(() => hasPlexRepairQueue(plexLinkedAccountsOverview.value));
 
 const newUserForm = reactive({
   managedLibraryRelativeRoot: '',
@@ -86,10 +105,6 @@ function toEditableUser(user, overrides = {}) {
   };
 }
 
-
-
-
-
 function resetNewUserForm() {
   newUserForm.managedLibraryRelativeRoot = '';
   newUserForm.password = '';
@@ -106,15 +121,6 @@ function applyUsers(payload) {
     : [];
   if (!roleOptions.value.includes(newUserForm.role)) {
     newUserForm.role = roleOptions.value.at(-1) ?? 'requester';
-  }
-}
-
-async function loadSettings() {
-  try {
-    const payload = await fetchSettings();
-    secretStatus.value = payload.secretStatus ?? null;
-  } catch {
-    // secretStatus remains null — Plex link status unavailable
   }
 }
 
@@ -148,9 +154,8 @@ async function disconnectPlexLink() {
   errorMessage.value = '';
   successMessage.value = '';
   try {
-    const payload = await clearPlexLink();
-    if (secretStatus.value?.providers) secretStatus.value.providers.plex = payload.status;
-    plexUserImportPreview.value = null;
+    await clearPlexLink();
+    await loadPlexLinkedAccountsOverview();
     successMessage.value = 'Plex owner link cleared.';
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Plex link clear failed';
@@ -160,15 +165,8 @@ async function disconnectPlexLink() {
 }
 
 async function loadPlexUserImportPreview() {
-  isPreviewingPlexUsers.value = true;
   errorMessage.value = '';
-  try {
-    plexUserImportPreview.value = await previewPlexUserImport();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Plex user preview failed';
-  } finally {
-    isPreviewingPlexUsers.value = false;
-  }
+  await loadPlexLinkedAccountsOverview();
 }
 
 async function importPlexUsersNow() {
@@ -177,8 +175,7 @@ async function importPlexUsersNow() {
   successMessage.value = '';
   try {
     const payload = await applyPlexUserImport();
-    plexUserImportPreview.value = payload;
-    await loadUsers();
+    await Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]);
     const created = payload.summary?.created ?? 0;
     const updated = payload.summary?.updated ?? 0;
     successMessage.value = `Plex user import applied. Created ${created}, refreshed ${updated}.`;
@@ -196,20 +193,7 @@ async function relinkPlexConflict(profile) {
   successMessage.value = '';
   try {
     const payload = await relinkPlexUserConflict({ plexUserId: profile.id, userId: profile.existingUser.id });
-    if (plexUserImportPreview.value?.profiles) {
-      plexUserImportPreview.value = {
-        ...plexUserImportPreview.value,
-        profiles: plexUserImportPreview.value.profiles.map((candidate) => (
-          candidate.id === payload.profile.id ? payload.profile : candidate
-        )),
-        summary: {
-          ...plexUserImportPreview.value.summary,
-          conflicts: Math.max(0, (plexUserImportPreview.value.summary?.conflicts ?? 0) - 1),
-          linked: (plexUserImportPreview.value.summary?.linked ?? 0) + 1,
-        },
-      };
-    }
-    await loadUsers();
+    await Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]);
     successMessage.value = `Linked Plex profile ${payload.profile.title} to ${payload.user.username}.`;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Plex conflict relink failed';
@@ -329,7 +313,7 @@ async function unlinkManagedPlexUser(user) {
       claimCode: user.claimCode,
       claimCodeExpiresAt: user.claimCodeExpiresAt,
     }));
-    if (plexUserImportPreview.value) await loadPlexUserImportPreview();
+    await loadPlexLinkedAccountsOverview();
     successMessage.value = `Plex link removed for ${payload.user.username}. Local sign-in remains available.`;
   } catch (error) {
     user.unlinkingPlex = false;
@@ -337,54 +321,153 @@ async function unlinkManagedPlexUser(user) {
   }
 }
 
-onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
+function findEditableUser(userId) {
+  return linkedUsersById.value.get(userId) ?? null;
+}
+
+async function unlinkLinkedPlexAccount(userId) {
+  const user = findEditableUser(userId);
+  if (!user) {
+    return;
+  }
+
+  await unlinkManagedPlexUser(user);
+}
+
+onMounted(() => { void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]); });
 </script>
 
 <template>
   <div class="cfg-page">
 
-    <!-- Plex directory import -->
+    <!-- Plex linked accounts -->
     <article class="hx-card">
       <header class="hx-card-header">
         <div>
-          <h3 class="hx-card-title">Plex import</h3>
-          <p class="hx-card-subtitle">Link your Plex account to preview your Plex home users, then import them as Harmoniarr accounts.</p>
+          <h3 class="hx-card-title">Plex connected accounts</h3>
+          <p class="hx-card-subtitle">Manage the Plex owner connection, linked Harmoniarr users, and relink conflicts from one repair-oriented workspace.</p>
         </div>
-        <span class="review-status-pill" :class="secretStatus?.providers?.plex?.linked ? 'review-status-selected' : 'review-status-held'">
-          {{ secretStatus?.providers?.plex?.linked ? 'Linked' : 'Not linked' }}
+        <span class="hx-pill" :data-tone="formatPlexOwnerLinkTone(plexLinkedAccountsOverview.ownerLink)">
+          {{ formatPlexOwnerLinkLabel(plexLinkedAccountsOverview.ownerLink) }}
         </span>
       </header>
       <div class="hx-card-body">
-        <p class="hx-text-muted" v-if="formatPlexLinkStatusDetail(secretStatus?.providers?.plex)">{{ formatPlexLinkStatusDetail(secretStatus?.providers?.plex) }}</p>
-        <div class="hx-card-actions">
+        <div class="hx-card-actions" style="margin-bottom: var(--hx-space-3)">
           <button type="button" class="hx-btn" @click="connectPlexLink" :disabled="isStartingPlexLink">
             {{ isStartingPlexLink ? 'Starting…' : 'Connect Plex owner account' }}
           </button>
-          <button type="button" class="hx-btn" @click="disconnectPlexLink" :disabled="isClearingPlexLink || !secretStatus?.providers?.plex?.linked">
-            {{ isClearingPlexLink ? 'Clearing…' : 'Clear Plex link' }}
+          <button type="button" class="hx-btn" @click="disconnectPlexLink" :disabled="isClearingPlexLink || !plexOwnerLinked">
+            {{ isClearingPlexLink ? 'Clearing…' : 'Clear Plex owner link' }}
           </button>
-          <button type="button" class="hx-btn" @click="loadPlexUserImportPreview" :disabled="isPreviewingPlexUsers || !secretStatus?.providers?.plex?.linked">
-            {{ isPreviewingPlexUsers ? 'Refreshing…' : 'Preview Plex users' }}
+          <button type="button" class="hx-btn" @click="loadPlexUserImportPreview" :disabled="isLoadingPlexLinkedAccounts">
+            {{ isLoadingPlexLinkedAccounts ? 'Refreshing…' : 'Refresh linked-account preview' }}
           </button>
-          <button type="button" class="hx-btn" data-variant="primary" @click="importPlexUsersNow" :disabled="isImportingPlexUsers || !secretStatus?.providers?.plex?.linked">
-              {{ isImportingPlexUsers ? 'Importing…' : 'Import ready Plex users' }}
+          <button type="button" class="hx-btn" data-variant="primary" @click="importPlexUsersNow" :disabled="isImportingPlexUsers || !plexOwnerLinked">
+            {{ isImportingPlexUsers ? 'Importing…' : 'Import ready Plex users' }}
           </button>
         </div>
 
-        <div class="hx-empty" v-if="!plexUserImportPreview">
-          <p class="hx-empty-copy">Click Preview to see which Plex home users can be imported, which already exist, and which need attention before importing.</p>
+        <p class="hx-text-muted" v-if="formatPlexLinkStatusDetail(plexLinkedAccountsOverview.ownerLink)">{{ formatPlexLinkStatusDetail(plexLinkedAccountsOverview.ownerLink) }}</p>
+        <p class="hx-text-muted" v-if="plexLinkedAccountsOverview.ownerLink?.linkedAt">Owner linked {{ formatOperationTimestampShort(plexLinkedAccountsOverview.ownerLink.linkedAt) }}</p>
+        <p class="hx-text-muted" v-if="plexRepairQueueActive">Repair queue active: review link blockers, stale profiles, and import conflicts before treating Plex sign-in as stable.</p>
+
+        <div class="hx-stat-grid" style="margin-top: var(--hx-space-4); margin-bottom: var(--hx-space-4)">
+          <div class="hx-stat">
+            <span class="hx-stat-label">LINKED USERS</span>
+            <span class="hx-stat-value">{{ plexLinkedAccountsOverview.summary.linkedUsers }}</span>
+            <span class="hx-stat-meta">{{ formatPlexLinkedAccountsCountLabel(plexLinkedAccountsOverview.summary.unlinkReadyUsers, 'unlink-ready') }}</span>
+          </div>
+          <div class="hx-stat">
+            <span class="hx-stat-label">REPAIR REQUIRED</span>
+            <span class="hx-stat-value">{{ plexLinkedAccountsOverview.summary.repairRequiredUsers }}</span>
+            <span class="hx-stat-meta">{{ formatPlexLinkedAccountsCountLabel(plexLinkedAccountsOverview.summary.staleUsers, 'stale') }}</span>
+          </div>
+          <div class="hx-stat">
+            <span class="hx-stat-label">IMPORT READY</span>
+            <span class="hx-stat-value">{{ plexLinkedAccountsOverview.summary.importableProfiles }}</span>
+            <span class="hx-stat-meta">Profiles that can become app users now</span>
+          </div>
+          <div class="hx-stat">
+            <span class="hx-stat-label">CONFLICTS</span>
+            <span class="hx-stat-value">{{ plexLinkedAccountsOverview.summary.conflictProfiles }}</span>
+            <span class="hx-stat-meta">Profiles that need explicit relink decisions</span>
+          </div>
+          <div class="hx-stat">
+            <span class="hx-stat-label">PREVIEW</span>
+            <span class="hx-stat-value" style="font-size: var(--hx-text-sm)">{{ formatPlexPreviewStateLabel(plexLinkedAccountsOverview.previewStatus) }}</span>
+            <span class="hx-stat-meta">{{ plexLinkedAccountsOverview.previewStatus.message }}</span>
+          </div>
+        </div>
+
+        <div v-if="plexLinkedAccountsErrorMessage" class="hx-card-body" style="padding-inline: 0">
+          <span class="hx-pill" data-tone="danger">{{ plexLinkedAccountsErrorMessage }}</span>
+        </div>
+
+        <div v-else-if="!plexOwnerLinked && !isLoadingPlexLinkedAccounts" class="hx-empty">
+          <p class="hx-empty-title">No Plex owner account connected</p>
+          <p class="hx-empty-copy">Connect the Plex owner account first. Once linked, this workspace will show linked Harmoniarr users, importable home members, and repair blockers.</p>
         </div>
 
         <template v-else>
-          <dl class="review-meta-grid review-meta-grid-wide">
-            <div><dt>Ready to import</dt><dd>{{ plexUserImportPreview.summary?.importable ?? 0 }}</dd></div>
-            <div><dt>Already linked</dt><dd>{{ plexUserImportPreview.summary?.linked ?? 0 }}</dd></div>
-            <div><dt>Conflicts</dt><dd>{{ plexUserImportPreview.summary?.conflicts ?? 0 }}</dd></div>
-            <div><dt>Owner (skipped)</dt><dd>{{ plexUserImportPreview.summary?.ownerAccounts ?? 0 }}</dd></div>
-          </dl>
+          <div class="hx-table-scroll" v-if="plexLinkedAccountsOverview.linkedUsers.length">
+            <table class="hx-table" aria-label="Plex linked users">
+              <thead>
+                <tr>
+                  <th>App user</th>
+                  <th>Plex identity</th>
+                  <th>Health</th>
+                  <th>Local auth</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="linkedUser in plexLinkedAccountsOverview.linkedUsers" :key="linkedUser.id">
+                  <td>
+                    <strong>{{ linkedUser.username }}</strong>
+                    <div class="hx-text-muted" style="margin-top: var(--hx-space-1)">{{ linkedUser.plexProfile?.plexTitle ?? linkedUser.previewProfile?.title ?? 'Plex user' }}</div>
+                  </td>
+                  <td>
+                    {{ linkedUser.plexProfile?.plexEmail ?? linkedUser.previewProfile?.email ?? linkedUser.plexProfile?.plexUsername ?? linkedUser.previewProfile?.username ?? linkedUser.authSubject ?? '—' }}
+                    <div class="hx-text-muted" style="margin-top: var(--hx-space-1)">Synced {{ linkedUser.plexProfile?.syncedAt ? formatOperationTimestampShort(linkedUser.plexProfile.syncedAt) : '—' }}</div>
+                  </td>
+                  <td>
+                    <span class="hx-pill" :data-tone="formatPlexRepairStateTone(linkedUser.repairState)">{{ formatPlexRepairStateLabel(linkedUser.repairState) }}</span>
+                    <div class="hx-text-muted" style="margin-top: var(--hx-space-1)">{{ linkedUser.repairMessage }}</div>
+                  </td>
+                  <td>
+                    <span class="hx-pill" :data-tone="linkedUser.unlinkReady ? 'success' : 'warning'">
+                      {{ linkedUser.unlinkReady ? 'Ready' : 'Needs password' }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="hx-card-actions">
+                      <a :href="`#user-card-${linkedUser.id}`" class="hx-btn" data-variant="ghost">Review user</a>
+                      <button
+                        type="button"
+                        class="hx-btn"
+                        :disabled="!linkedUser.unlinkReady || findEditableUser(linkedUser.id)?.unlinkingPlex"
+                        @click="unlinkLinkedPlexAccount(linkedUser.id)"
+                      >
+                        {{ findEditableUser(linkedUser.id)?.unlinkingPlex ? 'Removing…' : 'Unlink Plex' }}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-          <div class="cfg-mapping-list" v-if="plexUserImportPreview.profiles?.length">
-            <div class="cfg-mapping-card" v-for="profile in plexUserImportPreview.profiles" :key="`plex-preview-${profile.uuid ?? profile.id}`">
+          <div class="hx-empty" v-else>
+            <p class="hx-empty-title">No linked Plex app users</p>
+            <p class="hx-empty-copy">Use the import queue below to create or relink Harmoniarr users from the connected Plex home.</p>
+          </div>
+
+          <div class="cfg-mapping-list" v-if="plexLinkedAccountsOverview.importableProfiles.length || plexLinkedAccountsOverview.conflictProfiles.length" style="margin-top: var(--hx-space-4)">
+            <div
+              class="cfg-mapping-card"
+              v-for="profile in [...plexLinkedAccountsOverview.conflictProfiles, ...plexLinkedAccountsOverview.importableProfiles]"
+              :key="`plex-linked-overview-${profile.uuid ?? profile.id}`"
+            >
               <div class="cfg-provider-header">
                 <div>
                   <p class="hx-text-muted" style="margin-bottom: var(--hx-space-1)">{{ formatPlexHomeRole(profile.homeRole) }}</p>
@@ -502,7 +585,7 @@ onMounted(() => { void Promise.all([loadSettings(), loadUsers()]); });
     </article>
 
     <div class="cfg-mapping-list" v-else>
-      <article class="hx-card" v-for="user in users" :key="user.id">
+      <article class="hx-card" v-for="user in users" :id="`user-card-${user.id}`" :key="user.id">
         <header class="hx-card-header">
           <div>
             <p class="hx-text-muted" style="font-size: var(--hx-text-xs); letter-spacing: 0.08em; margin-bottom: var(--hx-space-1)">{{ formatUserRole(user.role) }}</p>
