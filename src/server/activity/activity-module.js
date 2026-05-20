@@ -19,6 +19,7 @@
 import { createActivityEventService } from './activity-event-service.js';
 import { createActivityEventStore } from './activity-event-store.js';
 import { createSourceUserBlocklistService } from './source-user-blocklist-service.js';
+import { createSourceUserTrustService } from './source-user-trust-service.js';
 
 /**
  * Activity module factory. Wires together the activity event store and service.
@@ -37,15 +38,20 @@ export function createActivityModule({
     listTrustSnapshot,
     replaceTrustSnapshot,
   }),
+  sourceUserTrustService = createSourceUserTrustService({
+    listTrustSnapshot,
+  }),
 } = {}) {
   return {
     activityEventService,
     activityEventStore,
     sourceUserBlocklistService,
+    sourceUserTrustService,
     routeDependencies: {
       buildActivityFeed: activityEventService.buildActivityFeed,
       blockSourceUser: sourceUserBlocklistService.blockSourceUser,
       listBlockedSourceUsers: sourceUserBlocklistService.listBlockedSourceUsers,
+      listSourceUsers: sourceUserTrustService.listSourceUsers,
       unblockSourceUser: sourceUserBlocklistService.unblockSourceUser,
     },
   };

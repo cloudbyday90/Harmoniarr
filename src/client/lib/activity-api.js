@@ -41,6 +41,13 @@ export function fetchActivityBlocklist({ query, signal } = {}) {
   );
 }
 
+export function fetchActivitySourceUsers({ query, signal, trustState } = {}) {
+  return apiRequest(
+    `/api/v1/activity/source-users${buildQueryString({ q: query, trustState })}`,
+    { signal },
+  );
+}
+
 export function blockActivitySourceUser({ username, reason, operatorNotes } = {}) {
   return apiRequest('/api/v1/activity/blocklist', {
     body: { operatorNotes, reason, username },

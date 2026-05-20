@@ -43,6 +43,7 @@ function collectRegisteredRoutes() {
     blockSourceUser: asyncNoopResult({ sourceUser: { username: 'peer-1' } }),
     buildActivityFeed: asyncNoopResult({}),
     listBlockedSourceUsers: asyncNoopResult({ blockedSourceUsers: [], checkedAt: null, query: null, total: 0 }),
+    listSourceUsers: asyncNoopResult({ checkedAt: null, counts: {}, query: null, sourceUsers: [], total: 0, trustState: null }),
     requireAdminSession: asyncNoopResult({ appUserId: 'admin-1' }),
     requireCsrf: () => {},
     requireFreshAdminSession: asyncNoopResult({ appUserId: 'admin-1', csrfToken: 'csrf-token' }),

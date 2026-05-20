@@ -37,6 +37,14 @@ function createActivityRouteTestApp(overrides = {}) {
         query: null,
         total: 0,
       }),
+      listSourceUsers: async () => ({
+        checkedAt: '2026-06-01T12:00:00.000Z',
+        counts: { blocked: 0, needsReview: 0, neutral: 0, preferred: 0, total: 0, trusted: 0, unknown: 0, withEvidence: 0 },
+        query: null,
+        sourceUsers: [],
+        total: 0,
+        trustState: null,
+      }),
       requireAdminSession: async () => ({ appUserId: 'admin-1' }),
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }),
@@ -174,6 +182,39 @@ test('activity blocklist route requires an admin session and returns list payloa
     assert.equal(payload.total, 1);
     assert.equal(payload.blockedSourceUsers[0].username, 'peer-1');
     assert.equal(listBlockedSourceUsers.mock.calls[0].arguments[0].query, 'peer');
+  });
+});
+
+test('activity source users route requires an admin session and returns trust payload', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
+  const listSourceUsers = t.mock.fn(async () => ({
+    checkedAt: '2026-06-01T12:10:00.000Z',
+    counts: { blocked: 1, needsReview: 1, neutral: 1, preferred: 0, total: 2, trusted: 0, unknown: 0, withEvidence: 1 },
+    query: 'peer',
+    sourceUsers: [
+      {
+        review: { reason: '3 failures across 4 recorded attempts.', state: 'watch' },
+        trustState: 'neutral',
+        username: 'peer-1',
+      },
+    ],
+    total: 1,
+    trustState: 'neutral',
+  }));
+  const app = createActivityRouteTestApp({ listSourceUsers, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/source-users?q=peer&trustState=neutral`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(listSourceUsers.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.total, 1);
+    assert.equal(payload.sourceUsers[0].username, 'peer-1');
+    assert.equal(listSourceUsers.mock.calls[0].arguments[0].query, 'peer');
+    assert.equal(listSourceUsers.mock.calls[0].arguments[0].trustState, 'neutral');
   });
 });
 

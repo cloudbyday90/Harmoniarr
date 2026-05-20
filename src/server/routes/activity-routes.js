@@ -33,6 +33,7 @@ export function registerActivityRoutes(app, {
   buildActivityFeed,
   blockSourceUser,
   listBlockedSourceUsers,
+  listSourceUsers,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
@@ -81,6 +82,24 @@ export function registerActivityRoutes(app, {
     response.json({
       ok: true,
       ...blocklist,
+    });
+  }));
+
+  app.get('/api/v1/activity/source-users', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const query = typeof request.query.q === 'string'
+      ? request.query.q
+      : null;
+    const trustState = typeof request.query.trustState === 'string'
+      ? request.query.trustState
+      : null;
+
+    const sourceUsers = await listSourceUsers({ query, trustState });
+
+    response.json({
+      ok: true,
+      ...sourceUsers,
     });
   }));
 

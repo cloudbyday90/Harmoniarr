@@ -17,58 +17,149 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
-import { fetchUsers } from '../lib/users-api.js';
-import { useAsyncResource } from '../composables/useAsyncResource.js';
+import { computed, onMounted, ref } from 'vue';
+import { useSourceUserTrust } from '../composables/useSourceUserTrust.js';
 import {
-  formatAuthProvider,
-  formatUserCountLabel,
-  formatUserRole,
-  formatUserRoleTone,
-} from '../lib/settings-users-presentation.js';
-import { formatOperationTimestamp } from '../lib/operation-run-presentation.js';
+  filterSourceUsers,
+  formatSourceUserConfidence,
+  formatSourceUserCountLabel,
+  formatSourceUserEvidence,
+  formatSourceUserNotes,
+  formatSourceUserReliabilityLabel,
+  formatSourceUserReliabilityTone,
+  formatSourceUserReviewLabel,
+  formatSourceUserReviewTone,
+  formatSourceUsername,
+  formatSourceUserTrustLabel,
+  formatSourceUserTrustTone,
+  formatSourceUserUpdatedAt,
+  sourceUserTrustFilters,
+} from '../lib/source-user-trust-presentation.js';
+import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
+
+const activeFilter = ref('all');
+const query = ref('');
 
 const {
-  data: users,
+  checkedAt,
+  counts,
   errorMessage,
   isLoading,
   load,
-} = useAsyncResource({
-  fetcher: () => fetchUsers(),
-  project: (payload) => (Array.isArray(payload?.users) ? payload.users : []),
-  initialData: [],
-  fallbackErrorMessage: 'Failed to load users',
-});
+  sourceUsers,
+  total,
+} = useSourceUserTrust();
 
-const userCount = computed(() => users.value?.length ?? 0);
+const visibleSourceUsers = computed(() => filterSourceUsers(sourceUsers.value, {
+  filter: activeFilter.value,
+  query: query.value,
+}));
+
+function setFilter(value) {
+  activeFilter.value = value;
+}
+
+onMounted(() => {
+  void load();
+});
 </script>
 
 <template>
   <section>
     <header class="hx-page-header">
       <div>
-        <h2 class="hx-page-title">Users</h2>
+        <h2 class="hx-page-title">Source Users</h2>
         <p class="hx-page-subtitle">
-          {{ formatUserCountLabel(userCount) }}.
-          Source-side Soulseek peers will land in a future release.
+          {{ formatSourceUserCountLabel(total) }}.
+          Explainable peer trust built from operator overrides and recorded delivery evidence.
         </p>
       </div>
       <div class="hx-page-actions">
+        <RouterLink :to="{ name: 'activity-blocklist' }" class="hx-btn" data-variant="ghost">
+          Manage blocklist
+        </RouterLink>
         <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
-          {{ isLoading ? 'Loading…' : 'Refresh' }}
+          {{ isLoading ? 'Refreshing…' : 'Refresh' }}
         </button>
       </div>
     </header>
 
-    <article v-if="errorMessage" class="hx-card">
-      <div class="hx-card-body">
-        <span class="hx-pill" data-tone="danger">{{ errorMessage }}</span>
+    <div class="hx-stat-grid" style="margin-bottom: var(--hx-space-4)">
+      <div class="hx-stat">
+        <span class="hx-stat-label">SOURCE USERS</span>
+        <span class="hx-stat-value">{{ counts.total }}</span>
+        <span class="hx-stat-meta">Rows in the trust snapshot</span>
       </div>
-    </article>
+      <div class="hx-stat">
+        <span class="hx-stat-label">NEEDS REVIEW</span>
+        <span class="hx-stat-value">{{ counts.needsReview }}</span>
+        <span class="hx-stat-meta">Peers with weak delivery evidence</span>
+      </div>
+      <div class="hx-stat">
+        <span class="hx-stat-label">BLOCKED</span>
+        <span class="hx-stat-value">{{ counts.blocked }}</span>
+        <span class="hx-stat-meta">Excluded from future trust decisions</span>
+      </div>
+      <div class="hx-stat">
+        <span class="hx-stat-label">WITH EVIDENCE</span>
+        <span class="hx-stat-value">{{ counts.withEvidence }}</span>
+        <span class="hx-stat-meta">Rows with recorded success or failure counts</span>
+      </div>
+      <div class="hx-stat">
+        <span class="hx-stat-label">LAST CHECKED</span>
+        <span class="hx-stat-value" style="font-size: var(--hx-text-sm)">{{ checkedAt ? formatOperationTimestampShort(checkedAt) : '—' }}</span>
+        <span class="hx-stat-meta">Server read timestamp</span>
+      </div>
+    </div>
 
     <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Peer trust ledger</h3>
+          <p class="hx-card-subtitle">Use raw delivery evidence, explicit operator notes, and clear review states instead of a black-box score.</p>
+        </div>
+      </header>
       <div class="hx-card-body is-flush">
-        <div v-if="isLoading && !userCount" class="hx-card-body">
+        <div class="hx-card-body">
+          <div class="hx-table-toolbar">
+            <span class="hx-table-toolbar-meta">{{ visibleSourceUsers.length }} visible of {{ total }}</span>
+          </div>
+
+          <div class="hx-form-row" role="search">
+            <div class="hx-field">
+              <label class="hx-field-label" for="source-user-filter">Filter source users</label>
+              <input
+                id="source-user-filter"
+                v-model="query"
+                class="hx-input"
+                type="search"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+          </div>
+
+          <div class="hx-tabbar-wrap">
+            <nav class="hx-tabbar" aria-label="Source user trust filters">
+              <button
+                v-for="filterOption in sourceUserTrustFilters"
+                :key="filterOption.value"
+                type="button"
+                class="hx-tab"
+                :class="{ 'router-link-exact-active': activeFilter === filterOption.value }"
+                @click="setFilter(filterOption.value)"
+              >
+                {{ filterOption.label }}
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        <div v-if="errorMessage" class="hx-card-body">
+          <span class="hx-pill" data-tone="danger">{{ errorMessage }}</span>
+        </div>
+
+        <div v-else-if="isLoading && !total" class="hx-card-body">
           <div class="hx-skeleton-stack">
             <span class="hx-skeleton" data-size="lg"></span>
             <span class="hx-skeleton"></span>
@@ -76,35 +167,52 @@ const userCount = computed(() => users.value?.length ?? 0);
             <span class="hx-skeleton"></span>
           </div>
         </div>
-        <div v-else-if="!userCount" class="hx-empty">
-          <p class="hx-empty-title">No application users</p>
-          <p class="hx-empty-copy">Add users from the Settings workspace.</p>
+        <div v-else-if="!total" class="hx-empty">
+          <p class="hx-empty-title">No source-user trust records</p>
+          <p class="hx-empty-copy">Peers appear here once the trust snapshot contains operator decisions or delivery evidence.</p>
+        </div>
+        <div v-else-if="!visibleSourceUsers.length" class="hx-empty">
+          <p class="hx-empty-title">No matches for this filter</p>
+          <p class="hx-empty-copy">Clear the local filter to see the full trust ledger.</p>
         </div>
         <div v-else class="hx-table-scroll">
-          <table class="hx-table">
+          <table class="hx-table" aria-label="Source user trust ledger">
             <thead>
               <tr>
                 <th>Username</th>
-                <th>Role</th>
-                <th>Auth provider</th>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Last login</th>
-                <th>Created</th>
+                <th>Trust</th>
+                <th>Review</th>
+                <th>Reliability</th>
+                <th>Evidence</th>
+                <th>Notes</th>
+                <th>Updated</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="user in users" :key="user.id">
-                <td>{{ user.username }}</td>
-                <td><span class="hx-pill" :data-tone="formatUserRoleTone(user.role)">{{ formatUserRole(user.role) }}</span></td>
-                <td>{{ formatAuthProvider(user.authProvider) }}</td>
-                <td>{{ user.email ?? '—' }}</td>
+              <tr v-for="entry in visibleSourceUsers" :key="entry.username">
                 <td>
-                  <span v-if="user.isDisabled" class="hx-pill" data-tone="danger">Disabled</span>
-                  <span v-else class="hx-pill" data-tone="success">Active</span>
+                  <strong>{{ formatSourceUsername(entry.username) }}</strong>
+                  <div class="hx-text-muted" style="margin-top: var(--hx-space-1)">{{ entry.review.reason }}</div>
                 </td>
-                <td>{{ user.lastLoginAt ? formatOperationTimestamp(user.lastLoginAt) : '—' }}</td>
-                <td>{{ user.createdAt ? formatOperationTimestamp(user.createdAt) : '—' }}</td>
+                <td>
+                  <span class="hx-pill" :data-tone="formatSourceUserTrustTone(entry.trustState)">
+                    {{ formatSourceUserTrustLabel(entry.trustState) }}
+                  </span>
+                </td>
+                <td>
+                  <span class="hx-pill" :data-tone="formatSourceUserReviewTone(entry.review.state)">
+                    {{ formatSourceUserReviewLabel(entry.review.state) }}
+                  </span>
+                </td>
+                <td>
+                  <span class="hx-pill" :data-tone="formatSourceUserReliabilityTone(entry.reputation.reliability)">
+                    {{ formatSourceUserReliabilityLabel(entry.reputation.reliability) }}
+                  </span>
+                  <div class="hx-text-muted" style="margin-top: var(--hx-space-1)">{{ formatSourceUserConfidence(entry.reputation) }}</div>
+                </td>
+                <td>{{ formatSourceUserEvidence(entry.reputation) }}</td>
+                <td>{{ formatSourceUserNotes(entry) }}</td>
+                <td>{{ formatSourceUserUpdatedAt(entry.updatedAt) }}</td>
               </tr>
             </tbody>
           </table>
