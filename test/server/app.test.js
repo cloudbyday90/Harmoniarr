@@ -303,6 +303,7 @@ suite('createApp', () => {
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: 'C:/virtual/package.json',
     plexOwnerLinkService: providerModule.plexOwnerLinkService,
+    restoreScopeRuntimeSnapshotStore: systemModuleArgs.restoreScopeRuntimeSnapshotStore,
     runtimeResourceService,
     settingsService,
     slskdService: slskdModule.slskdService,

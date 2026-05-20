@@ -25,12 +25,23 @@ import { createJsonTestApp, withServer } from '../../testing/server/http-test-he
 function createActivityRouteTestApp(overrides = {}) {
   return createJsonTestApp((app) => {
     registerActivityRoutes(app, {
+      blockSourceUser: async () => ({ sourceUser: { username: 'peer-1' } }),
       buildActivityFeed: async () => ({
         checkedAt: '2026-06-01T12:00:00.000Z',
         events: [],
         total: 0,
       }),
+      listBlockedSourceUsers: async () => ({
+        blockedSourceUsers: [],
+        checkedAt: '2026-06-01T12:00:00.000Z',
+        query: null,
+        total: 0,
+      }),
+      requireAdminSession: async () => ({ appUserId: 'admin-1' }),
+      requireCsrf: () => {},
+      requireFreshAdminSession: async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }),
       requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
+      unblockSourceUser: async () => ({ sourceUser: { username: 'peer-1' } }),
       ...overrides,
     });
   });
@@ -132,6 +143,79 @@ test('activity feed route passes undefined limit when query param is absent', as
     const [args] = buildActivityFeed.mock.calls[0].arguments;
     assert.equal(args.limit, undefined);
     assert.equal(args.eventType, null);
+  });
+});
+
+test('activity blocklist route requires an admin session and returns list payload', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
+  const listBlockedSourceUsers = t.mock.fn(async () => ({
+    blockedSourceUsers: [
+      {
+        blockedAt: '2026-06-01T12:00:00.000Z',
+        blockReason: 'Bad files',
+        isBlocked: true,
+        username: 'peer-1',
+      },
+    ],
+    checkedAt: '2026-06-01T12:10:00.000Z',
+    query: 'peer',
+    total: 1,
+  }));
+  const app = createActivityRouteTestApp({ listBlockedSourceUsers, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/blocklist?q=peer`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(listBlockedSourceUsers.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.total, 1);
+    assert.equal(payload.blockedSourceUsers[0].username, 'peer-1');
+    assert.equal(listBlockedSourceUsers.mock.calls[0].arguments[0].query, 'peer');
+  });
+});
+
+test('activity blocklist create route requires fresh admin csrf and returns created payload', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const blockSourceUser = t.mock.fn(async () => ({ sourceUser: { username: 'peer-1' } }));
+  const app = createActivityRouteTestApp({ blockSourceUser, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/blocklist`, {
+      body: JSON.stringify({ operatorNotes: 'note', reason: 'Bad files', username: 'peer-1' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(blockSourceUser.mock.callCount(), 1);
+    assert.equal(payload.sourceUser.username, 'peer-1');
+  });
+});
+
+test('activity blocklist delete route requires fresh admin csrf and returns cleared payload', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const unblockSourceUser = t.mock.fn(async () => ({ sourceUser: { username: 'peer-1' } }));
+  const app = createActivityRouteTestApp({ requireCsrf, requireFreshAdminSession, unblockSourceUser });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/blocklist/peer-1`, {
+      method: 'DELETE',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(unblockSourceUser.mock.callCount(), 1);
+    assert.equal(payload.sourceUser.username, 'peer-1');
   });
 });
 

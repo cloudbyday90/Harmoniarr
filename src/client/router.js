@@ -18,8 +18,8 @@
 
 import { createRouter, createWebHistory } from 'vue-router';
 import AppShell from './components/AppShell.vue';
+import ActivityBlocklistView from './views/ActivityBlocklistView.vue';
 import AccountSecurityView from './views/AccountSecurityView.vue';
-import ActivityComingSoonView from './views/ActivityComingSoonView.vue';
 import ActivityDownloadsView from './views/ActivityDownloadsView.vue';
 import ActivityFeedView from './views/ActivityFeedView.vue';
 import ActivityHistoryView from './views/ActivityHistoryView.vue';
@@ -124,7 +124,7 @@ const router = createRouter({
             { path: 'feed', name: 'activity-feed', component: ActivityFeedView },
             { path: 'users', name: 'activity-users', component: ActivityUsersView },
             { path: 'history', name: 'activity-history', component: ActivityHistoryView },
-            { path: 'blocklist', name: 'activity-blocklist', component: ActivityComingSoonView, props: { section: 'blocklist' } },
+            { path: 'blocklist', name: 'activity-blocklist', component: ActivityBlocklistView },
             { path: 'failed', name: 'activity-failed', component: ActivityImportsView, props: { status: 'failed', title: 'Failed', subtitle: 'Failed import candidates.', emptyTitle: 'No failed import candidates', emptyCopy: 'Imports that fail will surface here once the apply worker reports them.' } },
           ],
         },

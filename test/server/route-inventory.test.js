@@ -40,8 +40,14 @@ function collectRegisteredRoutes() {
   const { app, routes } = createRecordingApp();
 
   registerActivityRoutes(app, {
+    blockSourceUser: asyncNoopResult({ sourceUser: { username: 'peer-1' } }),
     buildActivityFeed: asyncNoopResult({}),
+    listBlockedSourceUsers: asyncNoopResult({ blockedSourceUsers: [], checkedAt: null, query: null, total: 0 }),
+    requireAdminSession: asyncNoopResult({ appUserId: 'admin-1' }),
+    requireCsrf: () => {},
+    requireFreshAdminSession: asyncNoopResult({ appUserId: 'admin-1', csrfToken: 'csrf-token' }),
     requireSession: asyncNoopResult({ appUserId: 'user-1' }),
+    unblockSourceUser: asyncNoopResult({ sourceUser: { username: 'peer-1' } }),
   });
 
   registerPushRoutes(app, {

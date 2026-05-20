@@ -45,6 +45,7 @@ import { createPlexDirectoryImportService } from './integrations/plex/plex-direc
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
 import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
+import { createRestoreScopeRuntimeSnapshotStore } from './recovery/restore-scope-runtime-snapshot-store.js';
 import { createMaintenanceLockOperationPauseService } from './recovery/maintenance-lock-operation-pause-service.js';
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { registerArtworkRoutes } from './routes/artwork-routes.js';
@@ -206,7 +207,11 @@ export function createApp({
   });
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
-  const activityModule = buildActivityModule();
+  const restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore();
+  const activityModule = buildActivityModule({
+    listTrustSnapshot: restoreScopeRuntimeSnapshotStore.listTrustSnapshot,
+    replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
+  });
   const pushModule = buildPushModule();
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
@@ -292,6 +297,7 @@ export function createApp({
     operationHistoryService: operationsModule.operationHistoryService,
     packageJsonPath: resolvedPackageJsonPath,
     plexOwnerLinkService: providerModule.plexOwnerLinkService,
+    restoreScopeRuntimeSnapshotStore,
     runtimeResourceService,
     settingsService,
     slskdService: slskdModule.slskdService,

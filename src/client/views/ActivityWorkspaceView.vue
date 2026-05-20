@@ -30,7 +30,7 @@ const tabs = [
   { name: 'activity-releases', label: 'Releases', implemented: true },
   { name: 'activity-users', label: 'Users', implemented: true },
   { name: 'activity-history', label: 'History', implemented: true },
-  { name: 'activity-blocklist', label: 'Blocklist', implemented: false },
+  { name: 'activity-blocklist', label: 'Blocklist', implemented: true },
   { name: 'activity-failed', label: 'Failed', implemented: true },
 ];
 

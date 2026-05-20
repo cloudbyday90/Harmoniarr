@@ -33,3 +33,25 @@ export function fetchActivityFeed({ limit, eventType, signal } = {}) {
     { signal },
   );
 }
+
+export function fetchActivityBlocklist({ query, signal } = {}) {
+  return apiRequest(
+    `/api/v1/activity/blocklist${buildQueryString({ q: query })}`,
+    { signal },
+  );
+}
+
+export function blockActivitySourceUser({ username, reason, operatorNotes } = {}) {
+  return apiRequest('/api/v1/activity/blocklist', {
+    body: { operatorNotes, reason, username },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function unblockActivitySourceUser(username) {
+  return apiRequest(`/api/v1/activity/blocklist/${encodeURIComponent(username)}`, {
+    includeCsrf: true,
+    method: 'DELETE',
+  });
+}

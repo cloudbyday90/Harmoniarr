@@ -31,7 +31,13 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
  */
 export function registerActivityRoutes(app, {
   buildActivityFeed,
+  blockSourceUser,
+  listBlockedSourceUsers,
+  requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
+  requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  unblockSourceUser,
 }) {
   /**
    * GET /api/v1/activity/feed
@@ -60,6 +66,53 @@ export function registerActivityRoutes(app, {
     response.json({
       ok: true,
       ...feed,
+    });
+  }));
+
+  app.get('/api/v1/activity/blocklist', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const query = typeof request.query.q === 'string'
+      ? request.query.q
+      : null;
+
+    const blocklist = await listBlockedSourceUsers({ query });
+
+    response.json({
+      ok: true,
+      ...blocklist,
+    });
+  }));
+
+  app.post('/api/v1/activity/blocklist', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await blockSourceUser({
+      actorUserId: session.appUserId,
+      operatorNotes: request.body?.operatorNotes,
+      reason: request.body?.reason,
+      username: request.body?.username,
+    });
+
+    response.status(201).json({
+      ok: true,
+      ...result,
+    });
+  }));
+
+  app.delete('/api/v1/activity/blocklist/:username', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await unblockSourceUser({
+      actorUserId: session.appUserId,
+      username: request.params.username,
+    });
+
+    response.json({
+      ok: true,
+      ...result,
     });
   }));
 }
