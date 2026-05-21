@@ -535,6 +535,7 @@ test('import candidate list route returns filtered review queue results', async 
           offset: '5',
           total: 1,
         },
+        reputationSummary: {},
       },
     });
   });

@@ -21,6 +21,8 @@ import {
   candidateStatusLabel,
   formatBytes,
   formatTimestamp,
+  formatUploaderReviewState,
+  formatUploaderReviewTone,
 } from '../lib/import-candidate-presentation.js';
 
 defineProps({
@@ -92,7 +94,14 @@ defineEmits(['refresh', 'select-candidate']);
       >
         <div class="review-list-header">
           <div>
-            <p class="eyebrow">{{ candidate.username }}</p>
+            <div class="eyebrow-row">
+              <p class="eyebrow">{{ candidate.username }}</p>
+              <span
+                v-if="candidate.uploaderReputation"
+                class="review-status-pill"
+                :class="`review-reputation-${formatUploaderReviewTone(candidate.uploaderReputation.reviewState)}`"
+              >{{ formatUploaderReviewState(candidate.uploaderReputation.reviewState) }}</span>
+            </div>
             <h3>{{ candidate.folderPath || 'Root-level files' }}</h3>
           </div>
           <span class="review-status-pill" :class="`review-status-${candidate.status}`">

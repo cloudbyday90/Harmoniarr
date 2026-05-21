@@ -953,6 +953,38 @@ dd {
   background: rgba(17, 37, 36, 0.08);
 }
 
+.eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-reputation-success {
+  background: rgba(45, 122, 88, 0.14);
+  color: #246647;
+}
+
+.review-reputation-warning {
+  background: rgba(183, 122, 45, 0.14);
+  color: #8d5a14;
+}
+
+.review-reputation-danger {
+  background: rgba(161, 61, 54, 0.14);
+  color: #8d302d;
+}
+
+.review-reputation-info {
+  background: rgba(36, 54, 50, 0.12);
+  color: #243632;
+}
+
+.review-reputation-muted {
+  background: rgba(24, 57, 54, 0.06);
+  color: #5e7572;
+}
+
 .review-meta-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

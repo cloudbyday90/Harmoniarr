@@ -57,6 +57,7 @@ export function buildStageCandidateBase(candidate, preview) {
     sourceProvider: candidate.sourceProvider,
     sourceSearchId: candidate.sourceSearchId,
     totalSizeBytes: candidate.totalSizeBytes,
+    uploaderReputation: candidate.uploaderReputation ?? null,
     username: candidate.username,
   };
 }

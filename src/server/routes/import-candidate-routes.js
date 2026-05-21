@@ -63,9 +63,11 @@ export function registerImportCandidateRoutes(app, {
   buildImportCandidateExecutionSummary,
   buildImportCandidateMediaInspectionRunDetail,
   buildImportCandidateMediaInspectionSummary,
+  buildCandidateReputationSummary = () => ({}),
   buildImportPendingCandidateSummary,
   buildSelectedImportCandidateSummary,
   clearImportCandidateFileDecision,
+  enrichCandidatesWithUploaderReputation = async (candidates) => candidates,
   requireAdminSession: requireAdminSessionFn = defaultRequestAuthDependencies.requireAdminSession,
   getRequestMetadata: getRequestMetadataFn = defaultRequestAuthDependencies.getRequestMetadata,
   getImportCandidate,
@@ -105,17 +107,26 @@ export function registerImportCandidateRoutes(app, {
     const session = await requireSessionFn(request);
     const visibility = buildReadVisibility(session);
 
+    const result = await listImportCandidates({
+      folderPath: request.query.folderPath,
+      limit: request.query.limit,
+      offset: request.query.offset,
+      requestedForUserId: visibility.requestedForUserId,
+      sourceSearchId: request.query.sourceSearchId,
+      status: request.query.status,
+      username: request.query.username,
+    });
+
+    const enrichedCandidates = await enrichCandidatesWithUploaderReputation(result.candidates);
+    const reputationSummary = buildCandidateReputationSummary(enrichedCandidates);
+
     response.json({
       ok: true,
-      importCandidates: await listImportCandidates({
-        folderPath: request.query.folderPath,
-        limit: request.query.limit,
-        offset: request.query.offset,
-        requestedForUserId: visibility.requestedForUserId,
-        sourceSearchId: request.query.sourceSearchId,
-        status: request.query.status,
-        username: request.query.username,
-      }),
+      importCandidates: {
+        ...result,
+        candidates: enrichedCandidates,
+        reputationSummary,
+      },
     });
   }));
 
@@ -283,9 +294,11 @@ export function registerImportCandidateRoutes(app, {
       candidate: importCandidate,
     });
 
+    const [enrichedCandidate] = await enrichCandidatesWithUploaderReputation([importCandidate]);
+
     response.json({
       ok: true,
-      importCandidate,
+      importCandidate: enrichedCandidate,
     });
   }));
 

@@ -24,6 +24,9 @@ import {
   formatPath,
   formatTimestamp,
   formatTokenLabel,
+  formatUploaderReviewState,
+  formatUploaderReviewTone,
+  formatUploaderReputationEvidence,
 } from '../lib/import-candidate-presentation.js';
 import { formatFileDuration } from '../lib/track-duration.js';
 import ConfirmDialog from './ConfirmDialog.vue';
@@ -219,7 +222,14 @@ function fileDecisionButtonLabel(filePreview) {
     <template v-else>
       <div class="review-detail-header">
         <div>
-          <p class="eyebrow">{{ candidate.username }}</p>
+          <div class="eyebrow-row">
+            <p class="eyebrow">{{ candidate.username }}</p>
+            <span
+              v-if="candidate.uploaderReputation"
+              class="review-status-pill"
+              :class="`review-reputation-${formatUploaderReviewTone(candidate.uploaderReputation.reviewState)}`"
+            >{{ formatUploaderReviewState(candidate.uploaderReputation.reviewState) }}</span>
+          </div>
           <h3>{{ candidate.folderPath || 'Root-level files' }}</h3>
         </div>
       </div>
@@ -240,6 +250,10 @@ function fileDecisionButtonLabel(filePreview) {
         <div>
           <dt>Discovered</dt>
           <dd>{{ formatTimestamp(candidate.discoveredAt) }}</dd>
+        </div>
+        <div v-if="candidate.uploaderReputation">
+          <dt>Uploader</dt>
+          <dd>{{ formatUploaderReputationEvidence(candidate.uploaderReputation) }}</dd>
         </div>
       </dl>
 

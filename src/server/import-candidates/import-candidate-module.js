@@ -41,6 +41,7 @@ import { createImportCandidateExecutionWorker } from './import-candidate-executi
 import { createImportCandidateImportPendingSummaryService } from './import-candidate-import-pending-summary-service.js';
 import { listImportCandidateFileDecisions } from './import-candidate-file-decision-repository.js';
 import { replaceImportExecutionRunItems, updateImportExecutionRunItem } from './import-candidate-execution-repository.js';
+import { createImportCandidateReputationEnrichmentService } from './import-candidate-reputation-enrichment-service.js';
 import { createImportCandidateService } from './import-candidate-service.js';
 import { createImportCandidatePreviewService } from './import-candidate-preview-service.js';
 import { createImportCandidateSelectionSummaryService } from './import-candidate-selection-summary-service.js';
@@ -74,6 +75,9 @@ export function createImportCandidateModule({
   }),
   mediaLosslessRetentionPolicyService = createMediaLosslessRetentionPolicyService(),
   mediaTranscodePlanningService = createMediaTranscodePlanningService(),
+  importCandidateReputationEnrichmentService = createImportCandidateReputationEnrichmentService({
+    listSourceUserReputationIndexFn,
+  }),
   importCandidateService = createImportCandidateService({
     listSourceUserReputationIndexFn,
     recordSourceUserOutcomeEvidenceFn,
@@ -283,6 +287,7 @@ export function createImportCandidateModule({
     importCandidateImportPendingSummaryService,
     importCandidateApplyPreviewService,
     importCandidatePreviewService,
+    importCandidateReputationEnrichmentService,
     importCandidateSelectionSummaryService,
     importCandidateService,
     routeDependencies: {
@@ -292,8 +297,10 @@ export function createImportCandidateModule({
       buildImportCandidateExecutionSummary: importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
       buildImportCandidateMediaInspectionRunDetail: importCandidateMediaInspectionSummaryService.buildImportCandidateMediaInspectionRunDetail,
       buildImportCandidateMediaInspectionSummary: importCandidateMediaInspectionSummaryService.buildImportCandidateMediaInspectionSummary,
+      buildCandidateReputationSummary: importCandidateReputationEnrichmentService.buildCandidateReputationSummary,
       buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
       buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
+      enrichCandidatesWithUploaderReputation: importCandidateReputationEnrichmentService.enrichCandidatesWithUploaderReputation,
       getImportCandidate: importCandidateService.getImportCandidate,
       holdImportCandidate: importCandidateService.holdImportCandidate,
       ingestSlskdSearchResponses: importCandidateService.ingestSlskdSearchResponses,

@@ -608,3 +608,49 @@ export function canStartMediaInspectionRun(currentRun, selectedCandidateCount) {
     selectedCandidateCount > 0
   );
 }
+
+export function formatUploaderReviewState(reviewState) {
+  switch (reviewState) {
+    case 'excluded':
+      return 'Blocked';
+    case 'healthy':
+      return 'Healthy';
+    case 'normal':
+      return 'Normal';
+    case 'preferred':
+      return 'Trusted';
+    case 'unknown':
+      return 'New';
+    case 'watch':
+      return 'Watch';
+    default:
+      return 'Unknown';
+  }
+}
+
+export function formatUploaderReviewTone(reviewState) {
+  switch (reviewState) {
+    case 'excluded':
+      return 'danger';
+    case 'healthy':
+    case 'preferred':
+      return 'success';
+    case 'watch':
+      return 'warning';
+    case 'normal':
+      return 'info';
+    default:
+      return 'muted';
+  }
+}
+
+export function formatUploaderReputationEvidence(reputation) {
+  if (!reputation || reputation.evidenceCount < 1) {
+    return 'No history';
+  }
+
+  const rate = reputation.successRate !== null
+    ? `${Math.round(reputation.successRate * 100)}%`
+    : 'N/A';
+  return `${reputation.successCount}/${reputation.evidenceCount} (${rate})`;
+}
