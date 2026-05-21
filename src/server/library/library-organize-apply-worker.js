@@ -47,6 +47,33 @@ function buildNotAttemptedFileResult(file) {
   };
 }
 
+function buildReleaseSummary(files) {
+  const seen = new Set();
+  const releases = [];
+
+  for (const file of files) {
+    if (file?.status !== 'moved') {
+      continue;
+    }
+
+    const artistName = typeof file.artistName === 'string' ? file.artistName : null;
+    const releaseTitle = typeof file.releaseTitle === 'string' ? file.releaseTitle : null;
+    const dedupeKey = `${artistName ?? ''}::${releaseTitle ?? ''}`;
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    releases.push({ artistName, releaseTitle });
+  }
+
+  return {
+    count: releases.length,
+    primaryArtistName: releases[0]?.artistName ?? null,
+    primaryReleaseTitle: releases[0]?.releaseTitle ?? null,
+  };
+}
+
 export function createLibraryOrganizeApplyWorker({
   acquireLease,
   applyExclusiveFileMutationPlan,
@@ -59,11 +86,47 @@ export function createLibraryOrganizeApplyWorker({
   markRunCompleted,
   markRunFailed,
   markRunStarted,
+  onReleaseAddedFn = null,
+  recordActivityEventFn = null,
   releaseLease,
   renewLease,
   updateLibraryFileCanonicalPath,
 } = {}) {
   const activeRunIds = new Set();
+
+  async function notifyOrganizedReleases({ fileResults, movedCount }) {
+    if (movedCount < 1) {
+      return;
+    }
+
+    const releaseSummary = buildReleaseSummary(fileResults);
+
+    if (typeof onReleaseAddedFn === 'function') {
+      void onReleaseAddedFn({
+        movedCount,
+        releaseCount: releaseSummary.count,
+        releaseTitle: releaseSummary.primaryReleaseTitle,
+        artistName: releaseSummary.primaryArtistName,
+      }).catch(() => {});
+    }
+
+    if (typeof recordActivityEventFn === 'function') {
+      void recordActivityEventFn({
+        actorUserId: null,
+        entityArtist: releaseSummary.primaryArtistName,
+        entityId: null,
+        entityTitle: releaseSummary.count > 1
+          ? `${releaseSummary.count} releases`
+          : releaseSummary.primaryReleaseTitle,
+        entityType: 'library_release',
+        eventType: 'release_added',
+        extraPayload: {
+          movedCount,
+          releaseCount: releaseSummary.count,
+        },
+      }).catch(() => {});
+    }
+  }
 
   async function runOrganizeApply({ plannedRenameCount = null, runId }) {
     let finalLeaseStatus = 'completed';
@@ -109,10 +172,12 @@ export function createLibraryOrganizeApplyWorker({
           movedCount += 1;
 
           fileResults.push({
+            artistName: file.match?.artistName ?? null,
             destinationPath: file.proposedPath,
             errorMessage: null,
             fileId: file.fileId ?? null,
             filename: basename(file.proposedPath),
+            releaseTitle: file.match?.releaseTitle ?? null,
             sourcePath: file.currentPath,
             startedAt,
             status: 'moved',
@@ -132,10 +197,12 @@ export function createLibraryOrganizeApplyWorker({
           });
         } catch (fileError) {
           fileResults.push({
+            artistName: file.match?.artistName ?? null,
             destinationPath: file.proposedPath ?? null,
             errorMessage: fileError instanceof Error ? fileError.message : String(fileError),
             fileId: file.fileId ?? null,
             filename: basename(file.currentPath ?? file.proposedPath ?? ''),
+            releaseTitle: file.match?.releaseTitle ?? null,
             sourcePath: file.currentPath ?? null,
             startedAt,
             status: 'failed',
@@ -158,6 +225,7 @@ export function createLibraryOrganizeApplyWorker({
               skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
             },
           });
+          await notifyOrganizedReleases({ fileResults, movedCount });
           return;
         }
       }
@@ -174,6 +242,7 @@ export function createLibraryOrganizeApplyWorker({
           skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
         },
       });
+      await notifyOrganizedReleases({ fileResults, movedCount });
     } catch (error) {
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';

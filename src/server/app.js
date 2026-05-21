@@ -341,6 +341,23 @@ export function createApp({
     importCandidateService: importCandidateModule.importCandidateService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,
+    onOrganizeReleaseAddedFn: ({ artistName, movedCount, releaseCount, releaseTitle }) => broadcastHouseholdNotification({
+      category: 'releaseAdded',
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: releaseCount > 1
+          ? `${releaseCount} releases were organized into the library (${movedCount} files moved)`
+          : releaseTitle
+            ? artistName
+              ? `${releaseTitle} by ${artistName} was organized into the library`
+              : `${releaseTitle} was organized into the library`
+            : `${movedCount} library files were organized into the canonical layout`,
+        title: 'Release added',
+        url: '/app/library',
+      },
+    }),
     onRequestCreatedFn: ({ _actorUserId, artistName, releaseTitle }) => broadcastHouseholdNotification({
       category: 'requestCreated',
       listAppUsers: notificationDispatchDeps.listAppUsers,
