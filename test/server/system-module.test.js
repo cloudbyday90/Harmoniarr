@@ -52,8 +52,10 @@ test('createSystemModule exposes shared route dependencies from injected service
   };
   const operatorNotificationFanoutRunStore = {};
   const operatorNotificationFanoutService = {
+    startOperatorNotificationFanoutRunIfNeeded: () => {},
     startOperatorNotificationFanoutRun,
   };
+  const operatorNotificationFanoutHeartbeat = {};
   const operatorNotificationFanoutWorker = {};
   const backupArtifactRepository = {};
   const backupExportService = {
@@ -101,6 +103,7 @@ test('createSystemModule exposes shared route dependencies from injected service
     onboardingSummaryService,
     operatorNotificationFanoutRunStore,
     operatorNotificationFanoutService,
+    operatorNotificationFanoutHeartbeat,
     operatorNotificationFanoutWorker,
     packageJsonPath: 'ignored-for-test',
     startedAt: new Date('2026-04-28T00:00:00.000Z'),
@@ -115,6 +118,7 @@ test('createSystemModule exposes shared route dependencies from injected service
   assert.equal(systemModule.backupExportService, backupExportService);
   assert.equal(systemModule.operatorNotificationFanoutRunStore, operatorNotificationFanoutRunStore);
   assert.equal(systemModule.operatorNotificationFanoutService, operatorNotificationFanoutService);
+  assert.equal(systemModule.operatorNotificationFanoutHeartbeat, operatorNotificationFanoutHeartbeat);
   assert.equal(systemModule.operatorNotificationFanoutWorker, operatorNotificationFanoutWorker);
   assert.equal(systemModule.libraryScanSummaryService, libraryScanSummaryService);
   assert.equal(systemModule.onboardingSummaryService, onboardingSummaryService);
@@ -214,8 +218,10 @@ test('createSystemModule builds recovery diagnostics after pause service initial
     },
     operatorNotificationFanoutRunStore: {},
     operatorNotificationFanoutService: {
+      startOperatorNotificationFanoutRunIfNeeded: () => {},
       startOperatorNotificationFanoutRun: () => {},
     },
+    operatorNotificationFanoutHeartbeat: {},
     operatorNotificationFanoutWorker: {},
     packageJsonPath: 'ignored-for-test',
     settingsService: {

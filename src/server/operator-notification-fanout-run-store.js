@@ -45,10 +45,10 @@ export function createOperatorNotificationFanoutRunStore({
     operationType: operationDescriptor.operationType,
   });
 
-  async function createOperationRun({ status = 'pending', triggeredByUserId = null } = {}) {
+  async function createOperationRun({ status = 'pending', summary = {}, triggeredByUserId = null } = {}) {
     const run = await operationRunStore.createOperationRun({
       status,
-      summary: {},
+      summary,
       triggeredByUserId,
     });
 

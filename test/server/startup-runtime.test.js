@@ -54,6 +54,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       callOrder.push('stop:idempotency-cleanup');
     },
   };
+  const operatorNotificationFanoutHeartbeat = {
+    start() {
+      callOrder.push('start:operator-fanout');
+    },
+    async stop() {
+      callOrder.push('stop:operator-fanout');
+    },
+  };
   const operationStrandedRunRecoveryService = {
     recoverStrandedRuns: async () => ({
       activeLeaseCount: 0,
@@ -190,6 +198,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
           getDependencyHealth: async () => [],
         },
         idempotencyRecordCleanupHeartbeat,
+        operatorNotificationFanoutHeartbeat,
         runtimeResourceMonitor,
         runtimeResourceService,
       },
@@ -301,6 +310,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     metadataRefreshHeartbeat,
     libraryDiscoveryHeartbeat,
     importExecutionHeartbeat,
+    operatorNotificationFanoutHeartbeat,
     idempotencyRecordCleanupHeartbeat,
     runtimeResourceMonitor,
   ]);
@@ -316,6 +326,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:metadata',
     'start:library',
     'start:import',
+    'start:operator-fanout',
     'start:idempotency-cleanup',
     'start:runtime-monitor',
   ]);
@@ -339,11 +350,13 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:metadata',
     'start:library',
     'start:import',
+    'start:operator-fanout',
     'start:idempotency-cleanup',
     'start:runtime-monitor',
     'shutdown',
     'stop:runtime-monitor',
     'stop:idempotency-cleanup',
+    'stop:operator-fanout',
     'stop:import',
     'stop:library',
     'stop:metadata',
@@ -451,6 +464,10 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
           getDependencyHealth: async () => [],
         },
         idempotencyRecordCleanupHeartbeat: {
+          start() {},
+          async stop() {},
+        },
+        operatorNotificationFanoutHeartbeat: {
           start() {},
           async stop() {},
         },

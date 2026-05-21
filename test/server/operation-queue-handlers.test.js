@@ -228,6 +228,7 @@ test('operation queue handlers register shared operation types and map run summa
     triggerSource: 'heartbeat',
   });
   assert.deepEqual(operatorNotificationFanoutStartWorkerRun.mock.calls[0].arguments[0], {
+    notificationDedupeKeys: null,
     runId: 'run-9',
   });
 });

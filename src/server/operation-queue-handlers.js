@@ -144,6 +144,9 @@ export function createOperationQueueHandlers({
 
   if (systemModule?.operatorNotificationFanoutWorker?.startWorkerRun) {
     handlers[operationRunRegistry.operatorNotificationFanout.operationType] = async ({ run }) => systemModule.operatorNotificationFanoutWorker.startWorkerRun({
+      notificationDedupeKeys: Array.isArray(run.summary?.notificationDedupeKeys)
+        ? run.summary.notificationDedupeKeys
+        : null,
       runId: run.id,
     });
   }

@@ -33,8 +33,21 @@ export function createOperatorNotificationFanoutService({
   recordAuditEventFn = recordAuditEvent,
 } = {}) {
   const operationDescriptor = operationRunRegistry.operatorNotificationFanout;
+  let previousActionableKeys = new Set();
 
-  async function startOperatorNotificationFanoutRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+  function normalizeActionableNotifications(payload) {
+    return (payload.notifications ?? []).filter((notification) => notification.requiresAction);
+  }
+
+  function buildActionableKeySet(notifications) {
+    return new Set(notifications.map((notification) => notification.dedupeKey).filter(Boolean));
+  }
+
+  function diffNewActionableKeys(currentKeys) {
+    return [...currentKeys].filter((key) => !previousActionableKeys.has(key));
+  }
+
+  async function startOperatorNotificationFanoutRun({ requestMetadata = null, summary = {}, triggeredByUserId = null } = {}) {
     const activeRun = await getActiveRun();
     if (activeRun) {
       throw createApiError(409, 'operator_notification_fanout_in_progress', 'An operator notification fan-out run is already running or queued');
@@ -42,6 +55,7 @@ export function createOperatorNotificationFanoutService({
 
     const run = await createOperationRun({
       status: 'pending',
+      summary,
       triggeredByUserId,
     });
 
@@ -65,9 +79,45 @@ export function createOperatorNotificationFanoutService({
     };
   }
 
-  async function fanOutOperatorNotifications({ limit = 50 } = {}) {
+  async function startOperatorNotificationFanoutRunIfNeeded({ limit = 50 } = {}) {
+    const activeRun = await getActiveRun();
+    if (activeRun) {
+      return {
+        accepted: false,
+        reason: 'fanout_in_progress',
+      };
+    }
+
     const payload = await getOperatorNotifications({ limit });
-    const actionableNotifications = (payload.notifications ?? []).filter((notification) => notification.requiresAction);
+    const actionableNotifications = normalizeActionableNotifications(payload);
+    const currentActionableKeys = buildActionableKeySet(actionableNotifications);
+    const newActionableKeys = diffNewActionableKeys(currentActionableKeys);
+    previousActionableKeys = currentActionableKeys;
+
+    if (newActionableKeys.length === 0) {
+      return {
+        accepted: false,
+        reason: actionableNotifications.length > 0 ? 'no_new_actionable_notifications' : 'no_actionable_notifications',
+      };
+    }
+
+    return startOperatorNotificationFanoutRun({
+      summary: {
+        actionableNotificationCount: newActionableKeys.length,
+        notificationDedupeKeys: newActionableKeys,
+        triggerSource: 'automatic',
+      },
+      triggeredByUserId: null,
+    });
+  }
+
+  async function fanOutOperatorNotifications({ limit = 50, notificationDedupeKeys = null } = {}) {
+    const payload = await getOperatorNotifications({ limit });
+    const allowedKeys = Array.isArray(notificationDedupeKeys) && notificationDedupeKeys.length > 0
+      ? new Set(notificationDedupeKeys)
+      : null;
+    const actionableNotifications = normalizeActionableNotifications(payload)
+      .filter((notification) => !allowedKeys || allowedKeys.has(notification.dedupeKey));
     const dispatchResult = await dispatchNotificationBatch({
       notifications: actionableNotifications,
     });
@@ -83,5 +133,6 @@ export function createOperatorNotificationFanoutService({
   return {
     fanOutOperatorNotifications,
     startOperatorNotificationFanoutRun,
+    startOperatorNotificationFanoutRunIfNeeded,
   };
 }

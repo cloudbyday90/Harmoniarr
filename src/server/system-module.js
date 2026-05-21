@@ -27,6 +27,7 @@ import { createOperationRunInterruptionGate } from './operation-run-cancellation
 import { createOperatorNotificationService } from './operator-notification-service.js';
 import { createOperatorNotificationFanoutRunStore } from './operator-notification-fanout-run-store.js';
 import { createOperatorNotificationFanoutService } from './operator-notification-fanout-service.js';
+import { createOperatorNotificationFanoutHeartbeat } from './operator-notification-fanout-heartbeat.js';
 import { createOperatorNotificationFanoutWorker } from './operator-notification-fanout-worker.js';
 import { createBackupArtifactRepository } from './recovery/backup-artifact-repository.js';
 import { createBackupExportService } from './recovery/backup-export-service.js';
@@ -81,6 +82,7 @@ export function createSystemModule({
   operatorNotificationService = null,
   operatorNotificationFanoutRunStore = createOperatorNotificationFanoutRunStore(),
   operatorNotificationFanoutService = null,
+  operatorNotificationFanoutHeartbeat = null,
   operatorNotificationFanoutWorker = null,
   operationHistoryService = null,
   packageJsonPath,
@@ -234,6 +236,10 @@ export function createSystemModule({
       releaseLease: operatorNotificationFanoutRunStore.releaseLease,
       renewLease: operatorNotificationFanoutRunStore.renewLease,
     });
+  const resolvedOperatorNotificationFanoutHeartbeat = operatorNotificationFanoutHeartbeat
+    ?? createOperatorNotificationFanoutHeartbeat({
+      startOperatorNotificationFanoutRunIfNeeded: resolvedOperatorNotificationFanoutService.startOperatorNotificationFanoutRunIfNeeded,
+    });
 
   const resolvedIdempotencyRecordCleanupHeartbeat = idempotencyRecordCleanupHeartbeat
     ?? createIdempotencyRecordCleanupHeartbeat({
@@ -252,6 +258,7 @@ export function createSystemModule({
     dependencyHealthService,
     diagnosticsExportService: resolvedSystemDiagnosticsExportService,
     idempotencyRecordCleanupHeartbeat: resolvedIdempotencyRecordCleanupHeartbeat,
+    operatorNotificationFanoutHeartbeat: resolvedOperatorNotificationFanoutHeartbeat,
     operatorNotificationFanoutRunStore,
     operatorNotificationFanoutService: resolvedOperatorNotificationFanoutService,
     operatorNotificationFanoutWorker: resolvedOperatorNotificationFanoutWorker,

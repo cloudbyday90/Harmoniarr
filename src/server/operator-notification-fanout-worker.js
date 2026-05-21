@@ -38,7 +38,7 @@ export function createOperatorNotificationFanoutWorker({
 } = {}) {
   const activeRunIds = new Set();
 
-  async function runFanout({ runId }) {
+  async function runFanout({ notificationDedupeKeys = null, runId }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
 
@@ -56,7 +56,10 @@ export function createOperatorNotificationFanoutWorker({
         },
       });
 
-      const fanoutSummary = await fanOutOperatorNotifications({ limit: 50 });
+      const fanoutSummary = await fanOutOperatorNotifications({
+        limit: 50,
+        notificationDedupeKeys,
+      });
 
       await markRunCompleted({
         runId,
@@ -101,14 +104,14 @@ export function createOperatorNotificationFanoutWorker({
     }
   }
 
-  async function startWorkerRun({ runId }) {
+  async function startWorkerRun({ notificationDedupeKeys = null, runId }) {
     if (activeRunIds.has(runId)) {
       return;
     }
 
     activeRunIds.add(runId);
     queueMicrotask(() => {
-      void runFanout({ runId });
+      void runFanout({ notificationDedupeKeys, runId });
     });
   }
 
