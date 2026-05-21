@@ -61,8 +61,10 @@ test('buildDefaultNotificationPreferences returns a boolean for every category',
 test('includes trust and blocklist categories for admin users', () => {
   assert.ok('trustOverride' in NOTIFICATION_CATEGORIES);
   assert.ok('blocklistEvent' in NOTIFICATION_CATEGORIES);
+  assert.ok('trustThresholdCrossed' in NOTIFICATION_CATEGORIES);
   assert.equal(NOTIFICATION_CATEGORIES.trustOverride.adminOnly, true);
   assert.equal(NOTIFICATION_CATEGORIES.blocklistEvent.adminOnly, true);
+  assert.equal(NOTIFICATION_CATEGORIES.trustThresholdCrossed.adminOnly, true);
 });
 
 test('includes standard activity categories for all users', () => {

@@ -141,3 +141,76 @@ test('recordSourceUserOutcomeEvidence compacts expired delivery_evidence entries
   assert.ok(ids.includes('old-manual'), 'manual_override entries should be preserved regardless of age');
   assert.ok(ids.includes('old-blocklist'), 'blocklist_event entries should be preserved regardless of age');
 });
+
+test('recordSourceUserOutcomeEvidence calls onTrustThresholdCrossedFn when evidence degrades into watch', async (t) => {
+  const onTrustThresholdCrossedFn = t.mock.fn(async () => {});
+  const service = createSourceUserTrustEvidenceService({
+    listTrustSnapshot: async () => ([{
+      failureCount: 1,
+      successCount: 1,
+      trustState: 'neutral',
+      username: 'borderline-peer',
+    }]),
+    onTrustThresholdCrossedFn,
+    replaceTrustSnapshot: async () => {},
+  });
+
+  const row = await service.recordSourceUserOutcomeEvidence({
+    eventType: 'import_candidate_download_failed',
+    outcome: 'failure',
+    reason: 'Transfer timed out',
+    username: 'borderline-peer',
+  });
+
+  assert.equal(row.failureCount, 2);
+  assert.equal(onTrustThresholdCrossedFn.mock.callCount(), 1);
+  const callArgs = onTrustThresholdCrossedFn.mock.calls[0].arguments[0];
+  assert.equal(callArgs.previousReviewState, 'normal');
+  assert.equal(callArgs.reviewState, 'watch');
+  assert.equal(callArgs.username, 'borderline-peer');
+  assert.equal(callArgs.reason, 'Failures currently outweigh successes (2/3).');
+});
+
+test('recordSourceUserOutcomeEvidence does not call onTrustThresholdCrossedFn when already in watch', async (t) => {
+  const onTrustThresholdCrossedFn = t.mock.fn(async () => {});
+  const service = createSourceUserTrustEvidenceService({
+    listTrustSnapshot: async () => ([{
+      failureCount: 2,
+      successCount: 1,
+      trustState: 'neutral',
+      username: 'watch-peer',
+    }]),
+    onTrustThresholdCrossedFn,
+    replaceTrustSnapshot: async () => {},
+  });
+
+  await service.recordSourceUserOutcomeEvidence({
+    eventType: 'import_candidate_download_failed',
+    outcome: 'failure',
+    reason: 'Transfer timed out',
+    username: 'watch-peer',
+  });
+
+  assert.equal(onTrustThresholdCrossedFn.mock.callCount(), 0);
+});
+
+test('recordSourceUserOutcomeEvidence swallows onTrustThresholdCrossedFn errors', async () => {
+  const service = createSourceUserTrustEvidenceService({
+    listTrustSnapshot: async () => ([{
+      failureCount: 1,
+      successCount: 1,
+      trustState: 'neutral',
+      username: 'borderline-peer',
+    }]),
+    onTrustThresholdCrossedFn: async () => { throw new Error('dispatch failed'); },
+    replaceTrustSnapshot: async () => {},
+  });
+
+  const row = await service.recordSourceUserOutcomeEvidence({
+    eventType: 'import_candidate_download_failed',
+    outcome: 'failure',
+    username: 'borderline-peer',
+  });
+
+  assert.equal(row.username, 'borderline-peer');
+});

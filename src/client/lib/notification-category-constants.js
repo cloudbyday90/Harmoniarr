@@ -24,4 +24,5 @@ export const NOTIFICATION_CATEGORIES = [
   { key: 'requestCreated', label: 'Request created', description: 'When a new music request is submitted', adminOnly: false },
   { key: 'trustOverride', label: 'Trust override', description: 'When a source user trust level is changed', adminOnly: true },
   { key: 'blocklistEvent', label: 'Blocklist change', description: 'When a source user is blocked or unblocked', adminOnly: true },
+  { key: 'trustThresholdCrossed', label: 'Trust threshold crossed', description: 'When source user delivery evidence drops into a review state', adminOnly: true },
 ];

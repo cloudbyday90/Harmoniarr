@@ -258,6 +258,17 @@ export function createApp({
         url: '/app/activity/source-users',
       },
     }),
+    onTrustThresholdCrossedFn: ({ failureCount, reason, reviewState, successCount, successRatePercent, username }) => broadcastAdminNotification({
+      category: 'trustThresholdCrossed',
+      listAppUsers: adminDispatchDeps.listAppUsers,
+      getUserPreferences: adminDispatchDeps.getUserPreferences,
+      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: `Source user "${username}" moved to ${reviewState} (${successCount} success, ${failureCount} failure, ${successRatePercent ?? 0}% success). ${reason}`,
+        title: 'Trust threshold crossed',
+        url: '/app/activity/source-users',
+      },
+    }),
   });
   const plexDirectSignInService = createPlexDirectSignInService();
   const importCandidateModule = buildImportCandidateModule({

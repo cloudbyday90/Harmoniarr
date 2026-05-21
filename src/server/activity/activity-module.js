@@ -41,6 +41,7 @@ export function createActivityModule({
   replaceTrustSnapshot = async () => {},
   onTrustOverrideFn = async () => {},
   onBlockEventFn = async () => {},
+  onTrustThresholdCrossedFn = async () => {},
   sourceUserBlocklistService = createSourceUserBlocklistService({
     listTrustSnapshot,
     replaceTrustSnapshot,
@@ -57,6 +58,7 @@ export function createActivityModule({
   }),
   sourceUserTrustEvidenceService = createSourceUserTrustEvidenceService({
     listTrustSnapshot,
+    onTrustThresholdCrossedFn,
     replaceTrustSnapshot,
   }),
   sourceUserTrustOverrideService = createSourceUserTrustOverrideService({

@@ -31,6 +31,7 @@ export const NOTIFICATION_CATEGORIES = /** @type {const} */ ({
   requestCreated: { label: 'Request created', adminOnly: false, defaultEnabled: true },
   trustOverride: { label: 'Trust override', adminOnly: true, defaultEnabled: true },
   blocklistEvent: { label: 'Blocklist change', adminOnly: true, defaultEnabled: true },
+  trustThresholdCrossed: { label: 'Trust threshold crossed', adminOnly: true, defaultEnabled: true },
 });
 
 /** Ordered list of category keys for stable iteration. */

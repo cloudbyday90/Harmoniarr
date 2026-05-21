@@ -27,10 +27,13 @@ function normalizeOptionalString(value) {
 
 import {
   buildSourceUserUsernameKey,
+  mapSourceUserTrustRow,
   normalizeSourceUserTrustSnapshotRows,
   resolveSourceUserTrustState,
 } from './source-user-trust-service.js';
 import { HISTORY_RETENTION_MS, MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
+
+const ALERTABLE_REVIEW_STATES = new Set(['watch', 'excluded']);
 
 function toNonNegativeInteger(value) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -80,8 +83,18 @@ function appendTrustHistory(row, entry) {
   return normalizeTrustHistory([entry, ...(Array.isArray(row?.trustHistory) ? row.trustHistory : [])]);
 }
 
+function resolveReviewState(row) {
+  return mapSourceUserTrustRow(row).review?.state ?? null;
+}
+
+function shouldAlertOnReviewTransition(previousState, nextState) {
+  return ALERTABLE_REVIEW_STATES.has(nextState)
+    && previousState !== nextState;
+}
+
 export function createSourceUserTrustEvidenceService({
   listTrustSnapshot = async () => [],
+  onTrustThresholdCrossedFn = null,
   replaceTrustSnapshot = async () => {},
 } = {}) {
   async function listSourceUserReputationIndex({ usernames } = {}) {
@@ -125,6 +138,7 @@ export function createSourceUserTrustEvidenceService({
     const rows = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot());
     const existingIndex = rows.findIndex((row) => buildSourceUserUsernameKey(row?.username) === usernameKey);
     const existing = existingIndex >= 0 ? rows[existingIndex] : null;
+    const previousReviewState = existing ? resolveReviewState(existing) : null;
     const updatedAt = typeof occurredAt === 'string' && occurredAt.trim() ? occurredAt : new Date().toISOString();
     const normalizedReason = normalizeOptionalString(reason);
     const normalizedEventType = normalizeOptionalString(eventType);
@@ -170,6 +184,21 @@ export function createSourceUserTrustEvidenceService({
     }
 
     await replaceTrustSnapshot({ sourceUsers: rows });
+
+    const nextView = mapSourceUserTrustRow(nextRow);
+    if (typeof onTrustThresholdCrossedFn === 'function' && shouldAlertOnReviewTransition(previousReviewState, nextView.review?.state)) {
+      void onTrustThresholdCrossedFn({
+        failureCount: nextView.reputation.failureCount,
+        previousReviewState,
+        reason: nextView.review?.reason ?? null,
+        reviewState: nextView.review?.state ?? null,
+        successCount: nextView.reputation.successCount,
+        successRatePercent: nextView.reputation.successRatePercent,
+        trustState: nextView.trustState,
+        username: nextView.username,
+      }).catch(() => {});
+    }
+
     return nextRow;
   }
 
