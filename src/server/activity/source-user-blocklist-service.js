@@ -167,6 +167,7 @@ function sortBlockedSourceUsers(a, b) {
 export function createSourceUserBlocklistService({
   listTrustSnapshot = async () => [],
   replaceTrustSnapshot = async () => {},
+  onBlockEventFn = async () => {},
 } = {}) {
   async function listBlockedSourceUsers({ query } = {}) {
     const normalizedQuery = normalizeQuery(query);
@@ -226,6 +227,15 @@ export function createSourceUserBlocklistService({
 
     await replaceTrustSnapshot({ sourceUsers: rows });
 
+    if (!wasBlocked) {
+      void onBlockEventFn({
+        actorUserId,
+        eventType: 'blocked',
+        reason: normalizedReason,
+        username: nextRow.username,
+      }).catch(() => {});
+    }
+
     return {
       sourceUser: mapBlockedSourceUser(nextRow),
     };
@@ -266,6 +276,12 @@ export function createSourceUserBlocklistService({
 
     rows.splice(existingIndex, 1, nextRow);
     await replaceTrustSnapshot({ sourceUsers: rows });
+
+    void onBlockEventFn({
+      actorUserId,
+      eventType: 'unblocked',
+      username: nextRow.username,
+    }).catch(() => {});
 
     return {
       sourceUser: {

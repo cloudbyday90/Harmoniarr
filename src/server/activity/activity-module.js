@@ -39,9 +39,12 @@ export function createActivityModule({
   activityEventService = createActivityEventService({ activityEventStore }),
   listTrustSnapshot = async () => [],
   replaceTrustSnapshot = async () => {},
+  onTrustOverrideFn = async () => {},
+  onBlockEventFn = async () => {},
   sourceUserBlocklistService = createSourceUserBlocklistService({
     listTrustSnapshot,
     replaceTrustSnapshot,
+    onBlockEventFn,
   }),
   sourceUserTrustService = createSourceUserTrustService({
     listTrustSnapshot,
@@ -59,6 +62,7 @@ export function createActivityModule({
   sourceUserTrustOverrideService = createSourceUserTrustOverrideService({
     listTrustSnapshot,
     replaceTrustSnapshot,
+    onTrustOverrideFn,
   }),
   sourceUserBulkOperationService = createSourceUserBulkOperationService({
     blockSourceUser: sourceUserBlocklistService.blockSourceUser,

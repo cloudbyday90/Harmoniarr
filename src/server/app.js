@@ -68,6 +68,7 @@ import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { loadSettings } from './settings.js';
 import { createSettingsService } from './settings-service.js';
 import { shouldSendNotification } from './notification/notification-preference-service.js';
+import { broadcastAdminNotification } from './notification/notification-admin-dispatch-service.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
 import { createSlskdModule } from './slskd/slskd-module.js';
 import { createSystemModule } from './system-module.js';
@@ -224,12 +225,41 @@ export function createApp({
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore();
+  const pushModule = buildPushModule();
+  const adminDispatchDeps = {
+    getUserPreferences: appUserModule.appUserService.getUserPreferences,
+    listAppUsers: appUserModule.appUserService.listAppUsers,
+    sendNotificationToUser: pushModule.pushNotificationService.sendNotificationToUser,
+  };
   const activityModule = buildActivityModule({
     listTrustSnapshot: restoreScopeRuntimeSnapshotStore.listTrustSnapshot,
     replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
+    onTrustOverrideFn: ({ _actorUserId, _reason, trustState, username }) => broadcastAdminNotification({
+      category: 'trustOverride',
+      listAppUsers: adminDispatchDeps.listAppUsers,
+      getUserPreferences: adminDispatchDeps.getUserPreferences,
+      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: `Source user "${username}" trust level changed to ${trustState}`,
+        title: 'Trust override',
+        url: '/app/activity/source-users',
+      },
+    }),
+    onBlockEventFn: ({ eventType, _reason, username }) => broadcastAdminNotification({
+      category: 'blocklistEvent',
+      listAppUsers: adminDispatchDeps.listAppUsers,
+      getUserPreferences: adminDispatchDeps.getUserPreferences,
+      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: eventType === 'blocked'
+          ? `Source user "${username}" has been blocked`
+          : `Source user "${username}" has been unblocked`,
+        title: eventType === 'blocked' ? 'Source user blocked' : 'Source user unblocked',
+        url: '/app/activity/source-users',
+      },
+    }),
   });
   const plexDirectSignInService = createPlexDirectSignInService();
-  const pushModule = buildPushModule();
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,

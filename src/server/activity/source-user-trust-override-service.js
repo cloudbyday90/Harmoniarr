@@ -99,6 +99,7 @@ function normalizeTrustHistory(entries) {
 export function createSourceUserTrustOverrideService({
   listTrustSnapshot = async () => [],
   replaceTrustSnapshot = async () => {},
+  onTrustOverrideFn = async () => {},
 } = {}) {
   async function updateSourceUserTrust({ actorUserId = null, operatorNotes = null, reason, trustState, username } = {}) {
     const normalizedUsername = normalizeRequiredText(username, 'username', 128);
@@ -145,6 +146,13 @@ export function createSourceUserTrustOverrideService({
     }
 
     await replaceTrustSnapshot({ sourceUsers: rows });
+
+    void onTrustOverrideFn({
+      actorUserId,
+      reason: normalizedReason,
+      trustState: normalizedTrustState,
+      username: nextRow.username,
+    }).catch(() => {});
 
     return {
       sourceUser: mapSourceUserTrustRow(nextRow),
