@@ -35,11 +35,15 @@ import { shouldSendNotification } from './notification-preference-service.js';
  */
 export async function broadcastNotification({
   category,
+  cooldownKey = null,
+  cooldownMs = 0,
+  dispatchCooldownService = null,
   payload,
   listAppUsers,
   getUserPreferences,
   sendNotificationToUser,
   recipientFilter = () => true,
+  suppressUserIds = [],
 }) {
   let users;
   try {
@@ -52,8 +56,18 @@ export async function broadcastNotification({
     ? users.filter((user) => user && recipientFilter(user))
     : [];
 
+  const suppressedUserIdSet = new Set(
+    Array.isArray(suppressUserIds)
+      ? suppressUserIds.filter((userId) => typeof userId === 'string' && userId.length > 0)
+      : [],
+  );
+
   await Promise.allSettled(
     recipients.map(async (recipient) => {
+      if (suppressedUserIdSet.has(recipient.id)) {
+        return;
+      }
+
       const allowed = await shouldSendNotification({
         category,
         getUserPreferences,
@@ -61,7 +75,21 @@ export async function broadcastNotification({
       });
       if (!allowed) return;
 
-      return sendNotificationToUser({ userId: recipient.id, payload });
+      if (dispatchCooldownService?.shouldDispatch && !dispatchCooldownService.shouldDispatch({
+        cooldownKey,
+        cooldownMs,
+        userId: recipient.id,
+      })) {
+        return;
+      }
+
+      const result = await sendNotificationToUser({ userId: recipient.id, payload });
+      dispatchCooldownService?.markDispatched?.({
+        cooldownKey,
+        cooldownMs,
+        userId: recipient.id,
+      });
+      return result;
     }),
   );
 }

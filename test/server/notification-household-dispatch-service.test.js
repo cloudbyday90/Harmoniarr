@@ -18,6 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createNotificationDispatchCooldownService } from '../../src/server/notification/notification-dispatch-cooldown-service.js';
 import { broadcastHouseholdNotification } from '../../src/server/notification/notification-household-dispatch-service.js';
 import { buildDefaultNotificationPreferences } from '../../src/server/notification/notification-preference-constants.js';
 
@@ -109,4 +110,55 @@ test('broadcastHouseholdNotification handles empty user lists', async () => {
   });
 
   assert.equal(sent.length, 0);
+});
+
+test('broadcastHouseholdNotification suppresses explicitly excluded user ids', async () => {
+  const sent = [];
+
+  await broadcastHouseholdNotification({
+    category: 'artistMonitored',
+    getUserPreferences: async () => ({ notificationPreferences: ALL_ENABLED }),
+    listAppUsers: async () => [
+      { id: 'user-1', role: 'requester' },
+      { id: 'user-2', role: 'requester' },
+    ],
+    payload: { body: 'Artist monitored', title: 'Artist monitored', url: '/app/activity/releases' },
+    sendNotificationToUser: async ({ userId }) => {
+      sent.push(userId);
+      return { failed: 0, removed: 0, sent: 1 };
+    },
+    suppressUserIds: ['user-1'],
+  });
+
+  assert.deepEqual(sent, ['user-2']);
+});
+
+test('broadcastHouseholdNotification respects per-user cooldowns', async () => {
+  let now = new Date('2026-05-21T12:00:00.000Z');
+  const sent = [];
+  const dispatchCooldownService = createNotificationDispatchCooldownService({
+    nowFn: () => now,
+  });
+
+  const baseOptions = {
+    category: 'releaseAdded',
+    cooldownKey: 'releaseAdded:Radiohead:OK Computer',
+    cooldownMs: 60000,
+    dispatchCooldownService,
+    getUserPreferences: async () => ({ notificationPreferences: ALL_ENABLED }),
+    listAppUsers: async () => [{ id: 'user-1', role: 'requester' }],
+    payload: { body: 'Added', title: 'Release added', url: '/app/library' },
+    sendNotificationToUser: async ({ userId }) => {
+      sent.push(userId);
+      return { failed: 0, removed: 0, sent: 1 };
+    },
+  };
+
+  await broadcastHouseholdNotification(baseOptions);
+  await broadcastHouseholdNotification(baseOptions);
+
+  now = new Date('2026-05-21T12:01:01.000Z');
+  await broadcastHouseholdNotification(baseOptions);
+
+  assert.deepEqual(sent, ['user-1', 'user-1']);
 });

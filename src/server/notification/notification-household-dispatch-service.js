@@ -28,19 +28,31 @@ import { broadcastNotification } from './notification-broadcast-service.js';
  * @param {function} options.listAppUsers
  * @param {function} options.getUserPreferences
  * @param {function} options.sendNotificationToUser
+ * @param {string|null} [options.cooldownKey]
+ * @param {number} [options.cooldownMs]
+ * @param {object|null} [options.dispatchCooldownService]
+ * @param {string[]} [options.suppressUserIds]
  */
 export async function broadcastHouseholdNotification({
   category,
+  cooldownKey = null,
+  cooldownMs = 0,
+  dispatchCooldownService = null,
   payload,
   listAppUsers,
   getUserPreferences,
   sendNotificationToUser,
+  suppressUserIds = [],
 }) {
   return broadcastNotification({
     category,
+    cooldownKey,
+    cooldownMs,
+    dispatchCooldownService,
     getUserPreferences,
     listAppUsers,
     payload,
+    suppressUserIds,
     sendNotificationToUser,
   });
 }

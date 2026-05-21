@@ -69,6 +69,7 @@ import { loadSettings } from './settings.js';
 import { createSettingsService } from './settings-service.js';
 import { shouldSendNotification } from './notification/notification-preference-service.js';
 import { broadcastAdminNotification } from './notification/notification-admin-dispatch-service.js';
+import { createNotificationDispatchCooldownService } from './notification/notification-dispatch-cooldown-service.js';
 import { broadcastHouseholdNotification } from './notification/notification-household-dispatch-service.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
 import { createSlskdModule } from './slskd/slskd-module.js';
@@ -227,11 +228,19 @@ export function createApp({
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore();
   const pushModule = buildPushModule();
+  const householdNotificationCooldownService = createNotificationDispatchCooldownService();
   const notificationDispatchDeps = {
+    dispatchCooldownService: householdNotificationCooldownService,
     getUserPreferences: appUserModule.appUserService.getUserPreferences,
     listAppUsers: appUserModule.appUserService.listAppUsers,
     sendNotificationToUser: pushModule.pushNotificationService.sendNotificationToUser,
   };
+  const householdNotificationCooldowns = Object.freeze({
+    artistMonitoredMs: 30 * 60 * 1000,
+    downloadCompletedMs: 10 * 60 * 1000,
+    releaseAddedMs: 10 * 60 * 1000,
+    requestCreatedMs: 5 * 60 * 1000,
+  });
   const activityModule = buildActivityModule({
     listTrustSnapshot: restoreScopeRuntimeSnapshotStore.listTrustSnapshot,
     replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
@@ -278,6 +287,9 @@ export function createApp({
     listSourceUserReputationIndexFn: activityModule.sourceUserTrustEvidenceService.listSourceUserReputationIndex,
     onDownloadCompletedFn: ({ folderPath, username }) => broadcastHouseholdNotification({
       category: 'downloadCompleted',
+      cooldownKey: `downloadCompleted:${username ?? ''}:${folderPath ?? ''}`,
+      cooldownMs: householdNotificationCooldowns.downloadCompletedMs,
+      dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
       listAppUsers: notificationDispatchDeps.listAppUsers,
       getUserPreferences: notificationDispatchDeps.getUserPreferences,
       sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
@@ -289,6 +301,9 @@ export function createApp({
     }),
     onReleaseAddedFn: ({ folderPath, username }) => broadcastHouseholdNotification({
       category: 'releaseAdded',
+      cooldownKey: `releaseAdded:import:${username ?? ''}:${folderPath ?? ''}`,
+      cooldownMs: householdNotificationCooldowns.releaseAddedMs,
+      dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
       listAppUsers: notificationDispatchDeps.listAppUsers,
       getUserPreferences: notificationDispatchDeps.getUserPreferences,
       sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
@@ -343,6 +358,9 @@ export function createApp({
     maintenanceLockService,
     onOrganizeReleaseAddedFn: ({ artistName, movedCount, releaseCount, releaseTitle }) => broadcastHouseholdNotification({
       category: 'releaseAdded',
+      cooldownKey: `releaseAdded:organize:${artistName ?? ''}:${releaseTitle ?? ''}:${releaseCount ?? 0}:${movedCount ?? 0}`,
+      cooldownMs: householdNotificationCooldowns.releaseAddedMs,
+      dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
       listAppUsers: notificationDispatchDeps.listAppUsers,
       getUserPreferences: notificationDispatchDeps.getUserPreferences,
       sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
@@ -360,6 +378,9 @@ export function createApp({
     }),
     onRequestCreatedFn: ({ _actorUserId, artistName, releaseTitle }) => broadcastHouseholdNotification({
       category: 'requestCreated',
+      cooldownKey: `requestCreated:${artistName ?? ''}:${releaseTitle ?? ''}`,
+      cooldownMs: householdNotificationCooldowns.requestCreatedMs,
+      dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
       listAppUsers: notificationDispatchDeps.listAppUsers,
       getUserPreferences: notificationDispatchDeps.getUserPreferences,
       sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
@@ -372,6 +393,7 @@ export function createApp({
         title: 'Music request created',
         url: '/app/activity/wanted',
       },
+      suppressUserIds: typeof _actorUserId === 'string' && _actorUserId.length > 0 ? [_actorUserId] : [],
     }),
     prefetchMonitoredArtistArtwork: artworkModule.artworkMonitoredArtistPrefetchService?.prefetchMonitoredArtistArtwork,
     providerClientResolverService: createProviderClientResolverService({
@@ -384,8 +406,11 @@ export function createApp({
   });
   const metadataModule = buildMetadataModule({
     maintenanceLockOperationPauseService,
-    onArtistMonitoredFn: ({ artistName }) => broadcastHouseholdNotification({
+    onArtistMonitoredFn: ({ actorUserId, artistName }) => broadcastHouseholdNotification({
       category: 'artistMonitored',
+      cooldownKey: `artistMonitored:${artistName ?? ''}`,
+      cooldownMs: householdNotificationCooldowns.artistMonitoredMs,
+      dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
       listAppUsers: notificationDispatchDeps.listAppUsers,
       getUserPreferences: notificationDispatchDeps.getUserPreferences,
       sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
@@ -394,6 +419,7 @@ export function createApp({
         title: 'Artist monitored',
         url: '/app/activity/releases',
       },
+      suppressUserIds: typeof actorUserId === 'string' && actorUserId.length > 0 ? [actorUserId] : [],
     }),
     providerHealthRecorder,
     reconcileWantedReleases: libraryModule.libraryWantedReleaseService.reconcileWantedReleases,
