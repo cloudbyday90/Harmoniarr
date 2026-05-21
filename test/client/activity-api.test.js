@@ -22,6 +22,9 @@ import {
   blockActivitySourceUser,
   fetchActivityBlocklist,
   fetchActivityFeed,
+  fetchActivitySourceUserDetail,
+  fetchActivitySourceUsers,
+  updateActivitySourceUserTrust,
   unblockActivitySourceUser,
 } from '../../src/client/lib/activity-api.js';
 
@@ -42,10 +45,14 @@ suite('activity-api', () => {
 
     await fetchActivityFeed({ eventType: 'request_created', limit: 10 });
     await fetchActivityBlocklist({ query: 'peer' });
+    await fetchActivitySourceUsers({ query: 'peer', trustState: 'trusted' });
+    await fetchActivitySourceUserDetail('peer 1');
 
-    assert.equal(globalThis.fetch.mock.callCount(), 2);
+    assert.equal(globalThis.fetch.mock.callCount(), 4);
     assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/activity/feed?limit=10&eventType=request_created');
     assert.equal(globalThis.fetch.mock.calls[1].arguments[0], '/api/v1/activity/blocklist?q=peer');
+    assert.equal(globalThis.fetch.mock.calls[2].arguments[0], '/api/v1/activity/source-users?q=peer&trustState=trusted');
+    assert.equal(globalThis.fetch.mock.calls[3].arguments[0], '/api/v1/activity/source-users/peer%201');
   });
 
   test('mutation routes include CSRF headers', async (t) => {
@@ -53,15 +60,20 @@ suite('activity-api', () => {
     globalThis.fetch = t.mock.fn(async () => createJsonResponse());
 
     await blockActivitySourceUser({ operatorNotes: 'Note', reason: 'Bad files', username: 'peer 1' });
+    await updateActivitySourceUserTrust('peer 1', { operatorNotes: 'Known good', reason: 'Verified releases', trustState: 'trusted' });
     await unblockActivitySourceUser('peer 1');
 
-    assert.equal(globalThis.fetch.mock.callCount(), 2);
+    assert.equal(globalThis.fetch.mock.callCount(), 3);
 
-    const [blockCall, unblockCall] = globalThis.fetch.mock.calls;
+    const [blockCall, updateCall, unblockCall] = globalThis.fetch.mock.calls;
 
     assert.equal(blockCall.arguments[0], '/api/v1/activity/blocklist');
     assert.equal(blockCall.arguments[1].method, 'POST');
     assert.equal(blockCall.arguments[1].headers.get('X-CSRF-Token'), 'csrf-activity');
+
+    assert.equal(updateCall.arguments[0], '/api/v1/activity/source-users/peer%201');
+    assert.equal(updateCall.arguments[1].method, 'PATCH');
+    assert.equal(updateCall.arguments[1].headers.get('X-CSRF-Token'), 'csrf-activity');
 
     assert.equal(unblockCall.arguments[0], '/api/v1/activity/blocklist/peer%201');
     assert.equal(unblockCall.arguments[1].method, 'DELETE');

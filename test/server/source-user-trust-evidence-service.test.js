@@ -59,6 +59,8 @@ test('recordSourceUserOutcomeEvidence appends a neutral row for new successful e
   assert.equal(row.failureCount, 0);
   assert.equal(row.lastEvidenceOutcome, 'success');
   assert.equal(row.lastSuccessfulEventType, 'import_candidate_applied');
+  assert.equal(Array.isArray(row.trustHistory), true);
+  assert.equal(row.trustHistory[0].kind, 'delivery_evidence');
   assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
 });
 
@@ -90,4 +92,22 @@ test('recordSourceUserOutcomeEvidence preserves blocked rows while incrementing 
   assert.equal(row.lastFailureEventType, 'import_candidate_download_failed');
   assert.equal(row.blockReason, 'Fake FLAC labels');
   assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
+});
+
+test('recordSourceUserOutcomeEvidence records actor provenance in trust history', async () => {
+  const service = createSourceUserTrustEvidenceService({
+    listTrustSnapshot: async () => ([]),
+    replaceTrustSnapshot: async () => {},
+  });
+
+  const row = await service.recordSourceUserOutcomeEvidence({
+    actorUserId: 'admin-1',
+    eventType: 'import_candidate_applied',
+    outcome: 'success',
+    reason: 'Imported cleanly',
+    username: 'new-peer',
+  });
+
+  assert.equal(row.trustHistory[0].actorUserId, 'admin-1');
+  assert.equal(row.trustHistory[0].reason, 'Imported cleanly');
 });

@@ -16,16 +16,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-function normalizeSnapshotRows(rows) {
-  if (!Array.isArray(rows)) {
-    return [];
-  }
-
-  return rows
-    .filter((row) => row && typeof row === 'object')
-    .map((row) => ({ ...row }));
-}
-
 function normalizeOptionalString(value) {
   if (typeof value !== 'string') {
     return null;
@@ -35,34 +25,46 @@ function normalizeOptionalString(value) {
   return normalized || null;
 }
 
-function buildUsernameKey(username) {
-  return normalizeOptionalString(username)?.toLowerCase() ?? '';
-}
+import {
+  buildSourceUserUsernameKey,
+  normalizeSourceUserTrustSnapshotRows,
+  resolveSourceUserTrustState,
+} from './source-user-trust-service.js';
+
+const MAX_TRUST_HISTORY_ENTRIES = 25;
 
 function toNonNegativeInteger(value) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
 
-function resolveTrustState(row) {
-  if (row?.isBlocked === true || row?.trustState === 'blocked') {
-    return 'blocked';
-  }
-
-  if (row?.trustState === 'trusted') {
-    return 'trusted';
-  }
-
-  return 'neutral';
-}
-
 function mapReputationRow(row) {
   return {
     failureCount: toNonNegativeInteger(row?.failureCount),
     successCount: toNonNegativeInteger(row?.successCount),
-    trustState: resolveTrustState(row),
+    trustState: resolveSourceUserTrustState(row),
     username: normalizeOptionalString(row?.username),
   };
+}
+
+function normalizeTrustHistory(rows) {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({ ...row }))
+    .sort((a, b) => {
+      const timeA = typeof a.occurredAt === 'string' ? Date.parse(a.occurredAt) : 0;
+      const timeB = typeof b.occurredAt === 'string' ? Date.parse(b.occurredAt) : 0;
+      return timeB - timeA;
+    })
+    .slice(0, MAX_TRUST_HISTORY_ENTRIES);
+}
+
+function appendTrustHistory(row, entry) {
+  return normalizeTrustHistory([entry, ...(Array.isArray(row?.trustHistory) ? row.trustHistory : [])]);
 }
 
 export function createSourceUserTrustEvidenceService({
@@ -70,15 +72,15 @@ export function createSourceUserTrustEvidenceService({
   replaceTrustSnapshot = async () => {},
 } = {}) {
   async function listSourceUserReputationIndex({ usernames } = {}) {
-    const rows = normalizeSnapshotRows(await listTrustSnapshot());
+    const rows = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot());
     const usernameFilter = Array.isArray(usernames)
-      ? new Set(usernames.map((value) => buildUsernameKey(value)).filter(Boolean))
+      ? new Set(usernames.map((value) => buildSourceUserUsernameKey(value)).filter(Boolean))
       : null;
     const reputationIndex = new Map();
 
     for (const row of rows) {
       const reputation = mapReputationRow(row);
-      const usernameKey = buildUsernameKey(reputation.username);
+      const usernameKey = buildSourceUserUsernameKey(reputation.username);
       if (!usernameKey) {
         continue;
       }
@@ -94,6 +96,7 @@ export function createSourceUserTrustEvidenceService({
   }
 
   async function recordSourceUserOutcomeEvidence({
+    actorUserId = null,
     eventType = null,
     occurredAt = new Date().toISOString(),
     outcome,
@@ -105,13 +108,22 @@ export function createSourceUserTrustEvidenceService({
       return null;
     }
 
-    const usernameKey = buildUsernameKey(normalizedUsername);
-    const rows = normalizeSnapshotRows(await listTrustSnapshot());
-    const existingIndex = rows.findIndex((row) => buildUsernameKey(row?.username) === usernameKey);
+    const usernameKey = buildSourceUserUsernameKey(normalizedUsername);
+    const rows = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot());
+    const existingIndex = rows.findIndex((row) => buildSourceUserUsernameKey(row?.username) === usernameKey);
     const existing = existingIndex >= 0 ? rows[existingIndex] : null;
     const updatedAt = typeof occurredAt === 'string' && occurredAt.trim() ? occurredAt : new Date().toISOString();
     const normalizedReason = normalizeOptionalString(reason);
     const normalizedEventType = normalizeOptionalString(eventType);
+    const historyEntry = {
+      actorUserId,
+      eventType: normalizedEventType,
+      id: `${updatedAt}:${normalizedEventType ?? outcome}:${outcome}:${toNonNegativeInteger(existing?.successCount) + toNonNegativeInteger(existing?.failureCount) + 1}`,
+      kind: 'delivery_evidence',
+      occurredAt: updatedAt,
+      outcome,
+      reason: normalizedReason,
+    };
     const nextRow = {
       ...(existing ?? {}),
       failureCount: toNonNegativeInteger(existing?.failureCount) + (outcome === 'failure' ? 1 : 0),
@@ -121,7 +133,8 @@ export function createSourceUserTrustEvidenceService({
       lastEvidenceOutcome: outcome,
       lastEvidenceReason: normalizedReason,
       successCount: toNonNegativeInteger(existing?.successCount) + (outcome === 'success' ? 1 : 0),
-      trustState: resolveTrustState(existing),
+      trustHistory: appendTrustHistory(existing, historyEntry),
+      trustState: resolveSourceUserTrustState(existing),
       updatedAt,
       username: existing?.username ?? normalizedUsername,
       ...(outcome === 'success'

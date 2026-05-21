@@ -32,12 +32,14 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
 export function registerActivityRoutes(app, {
   buildActivityFeed,
   blockSourceUser,
+  getSourceUserDetail,
   listBlockedSourceUsers,
   listSourceUsers,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  updateSourceUserTrust,
   unblockSourceUser,
 }) {
   /**
@@ -100,6 +102,31 @@ export function registerActivityRoutes(app, {
     response.json({
       ok: true,
       ...sourceUsers,
+    });
+  }));
+
+  app.get('/api/v1/activity/source-users/:username', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    response.json({
+      ok: true,
+      ...(await getSourceUserDetail({ username: request.params.username })),
+    });
+  }));
+
+  app.patch('/api/v1/activity/source-users/:username', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    response.json({
+      ok: true,
+      ...(await updateSourceUserTrust({
+        actorUserId: session.appUserId,
+        operatorNotes: request.body?.operatorNotes,
+        reason: request.body?.reason,
+        trustState: request.body?.trustState,
+        username: request.params.username,
+      })),
     });
   }));
 

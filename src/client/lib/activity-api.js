@@ -48,6 +48,18 @@ export function fetchActivitySourceUsers({ query, signal, trustState } = {}) {
   );
 }
 
+export function fetchActivitySourceUserDetail(username, { signal } = {}) {
+  return apiRequest(`/api/v1/activity/source-users/${encodeURIComponent(username)}`, { signal });
+}
+
+export function updateActivitySourceUserTrust(username, { operatorNotes, reason, trustState } = {}) {
+  return apiRequest(`/api/v1/activity/source-users/${encodeURIComponent(username)}`, {
+    body: { operatorNotes, reason, trustState },
+    includeCsrf: true,
+    method: 'PATCH',
+  });
+}
+
 export function blockActivitySourceUser({ username, reason, operatorNotes } = {}) {
   return apiRequest('/api/v1/activity/blocklist', {
     body: { operatorNotes, reason, username },

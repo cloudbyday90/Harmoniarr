@@ -26,6 +26,11 @@ export const sourceUserTrustFilters = Object.freeze([
   Object.freeze({ value: 'unknown', label: 'Unknown' }),
 ]);
 
+export const sourceUserTrustStateOptions = Object.freeze([
+  Object.freeze({ value: 'trusted', label: 'Mark trusted' }),
+  Object.freeze({ value: 'neutral', label: 'Set neutral' }),
+]);
+
 export function formatSourceUserCountLabel(count) {
   if (!Number.isFinite(count) || count < 1) {
     return 'No source users';
@@ -167,6 +172,67 @@ export function formatSourceUserNotes(entry) {
 
 export function formatSourceUserUpdatedAt(timestamp) {
   return timestamp ? formatOperationTimestamp(timestamp) : '—';
+}
+
+export function formatSourceUserHistoryKind(kind) {
+  switch (kind) {
+    case 'delivery_evidence':
+      return 'Delivery evidence';
+    case 'manual_override':
+      return 'Manual override';
+    default:
+      return 'Recorded event';
+  }
+}
+
+export function formatSourceUserHistoryTone(entry) {
+  if (entry?.kind === 'manual_override') {
+    return entry?.trustState === 'trusted' ? 'success' : 'info';
+  }
+
+  if (entry?.outcome === 'failure') {
+    return 'danger';
+  }
+
+  if (entry?.outcome === 'success') {
+    return 'success';
+  }
+
+  return 'muted';
+}
+
+export function formatSourceUserHistorySummary(entry) {
+  if (entry?.kind === 'manual_override') {
+    if (entry?.trustState === 'trusted') {
+      return entry?.reason ?? 'Operator marked this peer as trusted.';
+    }
+
+    return entry?.reason ?? 'Operator reset this peer to neutral.';
+  }
+
+  if (entry?.outcome === 'failure') {
+    return entry?.reason ?? 'A delivery failure was recorded.';
+  }
+
+  if (entry?.outcome === 'success') {
+    return entry?.reason ?? 'A successful delivery was recorded.';
+  }
+
+  return entry?.reason ?? 'No additional detail recorded.';
+}
+
+export function formatSourceUserHistoryActor(entry) {
+  return typeof entry?.actorUserId === 'string' && entry.actorUserId.trim()
+    ? entry.actorUserId
+    : 'System';
+}
+
+export function canPromoteSourceUserTrust(entry) {
+  return entry?.trustState !== 'blocked' && entry?.trustState !== 'trusted';
+}
+
+export function canResetSourceUserTrust(entry) {
+  return entry?.trustState !== 'blocked' && entry?.trustState !== 'neutral';
 }
 
 export function filterSourceUsers(entries, { filter = 'all', query = '' } = {}) {

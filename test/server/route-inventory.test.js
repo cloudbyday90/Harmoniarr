@@ -42,12 +42,14 @@ function collectRegisteredRoutes() {
   registerActivityRoutes(app, {
     blockSourceUser: asyncNoopResult({ sourceUser: { username: 'peer-1' } }),
     buildActivityFeed: asyncNoopResult({}),
+    getSourceUserDetail: asyncNoopResult({ checkedAt: null, sourceUser: null }),
     listBlockedSourceUsers: asyncNoopResult({ blockedSourceUsers: [], checkedAt: null, query: null, total: 0 }),
     listSourceUsers: asyncNoopResult({ checkedAt: null, counts: {}, query: null, sourceUsers: [], total: 0, trustState: null }),
     requireAdminSession: asyncNoopResult({ appUserId: 'admin-1' }),
     requireCsrf: () => {},
     requireFreshAdminSession: asyncNoopResult({ appUserId: 'admin-1', csrfToken: 'csrf-token' }),
     requireSession: asyncNoopResult({ appUserId: 'user-1' }),
+    updateSourceUserTrust: asyncNoopResult({ sourceUser: {} }),
     unblockSourceUser: asyncNoopResult({ sourceUser: { username: 'peer-1' } }),
   });
 

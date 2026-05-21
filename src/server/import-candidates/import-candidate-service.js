@@ -608,6 +608,7 @@ export function createImportCandidateService({
     }).then(async (transitionResult) => {
       try {
         await recordSourceUserOutcomeEvidenceFn({
+          actorUserId,
           eventType: 'import_candidate_applied',
           occurredAt: transitionResult?.candidate?.updatedAt ?? null,
           outcome: 'success',
@@ -639,6 +640,7 @@ export function createImportCandidateService({
     }).then(async (transitionResult) => {
       try {
         await recordSourceUserOutcomeEvidenceFn({
+          actorUserId,
           eventType: 'import_candidate_download_failed',
           occurredAt: transitionResult?.candidate?.updatedAt ?? null,
           outcome: 'failure',

@@ -19,7 +19,9 @@
 import { createActivityEventService } from './activity-event-service.js';
 import { createActivityEventStore } from './activity-event-store.js';
 import { createSourceUserBlocklistService } from './source-user-blocklist-service.js';
+import { createSourceUserTrustDetailService } from './source-user-trust-detail-service.js';
 import { createSourceUserTrustEvidenceService } from './source-user-trust-evidence-service.js';
+import { createSourceUserTrustOverrideService } from './source-user-trust-override-service.js';
 import { createSourceUserTrustService } from './source-user-trust-service.js';
 
 /**
@@ -42,7 +44,14 @@ export function createActivityModule({
   sourceUserTrustService = createSourceUserTrustService({
     listTrustSnapshot,
   }),
+  sourceUserTrustDetailService = createSourceUserTrustDetailService({
+    listTrustSnapshot,
+  }),
   sourceUserTrustEvidenceService = createSourceUserTrustEvidenceService({
+    listTrustSnapshot,
+    replaceTrustSnapshot,
+  }),
+  sourceUserTrustOverrideService = createSourceUserTrustOverrideService({
     listTrustSnapshot,
     replaceTrustSnapshot,
   }),
@@ -51,13 +60,17 @@ export function createActivityModule({
     activityEventService,
     activityEventStore,
     sourceUserBlocklistService,
+    sourceUserTrustDetailService,
     sourceUserTrustEvidenceService,
+    sourceUserTrustOverrideService,
     sourceUserTrustService,
     routeDependencies: {
       buildActivityFeed: activityEventService.buildActivityFeed,
       blockSourceUser: sourceUserBlocklistService.blockSourceUser,
       listBlockedSourceUsers: sourceUserBlocklistService.listBlockedSourceUsers,
+      getSourceUserDetail: sourceUserTrustDetailService.getSourceUserDetail,
       listSourceUsers: sourceUserTrustService.listSourceUsers,
+      updateSourceUserTrust: sourceUserTrustOverrideService.updateSourceUserTrust,
       unblockSourceUser: sourceUserBlocklistService.unblockSourceUser,
     },
   };

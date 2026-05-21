@@ -62,7 +62,7 @@ function normalizeTrustStateFilter(value) {
   return normalized;
 }
 
-function normalizeSnapshotRows(rows) {
+export function normalizeSourceUserTrustSnapshotRows(rows) {
   if (!Array.isArray(rows)) {
     return [];
   }
@@ -81,7 +81,7 @@ function toNonNegativeInteger(value) {
   return Math.trunc(number);
 }
 
-function resolveTrustState(row) {
+export function resolveSourceUserTrustState(row) {
   if (row?.isBlocked === true || row?.trustState === 'blocked') {
     return 'blocked';
   }
@@ -91,6 +91,10 @@ function resolveTrustState(row) {
   }
 
   return 'neutral';
+}
+
+export function buildSourceUserUsernameKey(username) {
+  return normalizeWhitespace(String(username ?? '')).toLowerCase();
 }
 
 function buildReputation({ failureCount, successCount }) {
@@ -140,8 +144,17 @@ function buildReview({ blockReason, reputation, trustState }) {
 
   if (trustState === 'trusted') {
     return {
-      reason: 'Operator marked this peer as trusted.',
+      reason: typeof blockReason === 'string' && blockReason.trim()
+        ? blockReason
+        : 'Operator marked this peer as trusted.',
       state: 'preferred',
+    };
+  }
+
+  if (reputation.evidenceCount === 0 && typeof blockReason === 'string' && blockReason.trim()) {
+    return {
+      reason: blockReason,
+      state: 'unknown',
     };
   }
 
@@ -179,14 +192,34 @@ function buildReview({ blockReason, reputation, trustState }) {
   };
 }
 
-function mapSourceUser(row) {
-  const trustState = resolveTrustState(row);
+function resolveLatestManualReason(row) {
+  if (typeof row?.lastManualDecisionReason === 'string' && row.lastManualDecisionReason.trim()) {
+    return row.lastManualDecisionReason;
+  }
+
+  if (!Array.isArray(row?.trustHistory)) {
+    return '';
+  }
+
+  const manualOverride = row.trustHistory
+    .filter((entry) => entry && typeof entry === 'object' && entry.kind === 'manual_override')
+    .sort((a, b) => {
+      const timeA = typeof a.occurredAt === 'string' ? Date.parse(a.occurredAt) : 0;
+      const timeB = typeof b.occurredAt === 'string' ? Date.parse(b.occurredAt) : 0;
+      return timeB - timeA;
+    })[0];
+
+  return typeof manualOverride?.reason === 'string' ? manualOverride.reason : '';
+}
+
+export function mapSourceUserTrustRow(row) {
+  const trustState = resolveSourceUserTrustState(row);
   const reputation = buildReputation({
     failureCount: toNonNegativeInteger(row?.failureCount),
     successCount: toNonNegativeInteger(row?.successCount),
   });
   const review = buildReview({
-    blockReason: row?.blockReason ?? row?.reason ?? '',
+    blockReason: row?.blockReason ?? resolveLatestManualReason(row) ?? row?.reason ?? '',
     reputation,
     trustState,
   });
@@ -199,6 +232,7 @@ function mapSourceUser(row) {
     operatorNotes: row?.operatorNotes ?? row?.notes ?? null,
     reputation,
     review,
+    trustHistoryCount: Array.isArray(row?.trustHistory) ? row.trustHistory.length : 0,
     trustState,
     unblockedAt: row?.unblockedAt ?? null,
     unblockedByUserId: row?.unblockedByUserId ?? null,
@@ -273,8 +307,8 @@ export function createSourceUserTrustService({
   async function listSourceUsers({ query, trustState } = {}) {
     const normalizedQuery = normalizeQuery(query);
     const normalizedTrustState = normalizeTrustStateFilter(trustState);
-    const sourceUsers = normalizeSnapshotRows(await listTrustSnapshot())
-      .map(mapSourceUser)
+    const sourceUsers = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot())
+      .map(mapSourceUserTrustRow)
       .filter((row) => (normalizedTrustState ? row.trustState === normalizedTrustState : true))
       .filter((row) => (normalizedQuery ? buildSearchText(row).includes(normalizedQuery) : true))
       .sort(sortSourceUsers);

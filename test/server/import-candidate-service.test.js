@@ -688,6 +688,7 @@ test('createImportCandidateService marks download workflow transitions with shar
   assert.equal(insertImportCandidateEventFn.mock.calls[3].arguments[0].eventType, 'import_candidate_download_failed');
   assert.deepEqual(recordSourceUserOutcomeEvidenceFn.mock.calls.map((call) => call.arguments[0]), [
     {
+      actorUserId: null,
       eventType: 'import_candidate_applied',
       occurredAt: '2026-04-30T14:00:00.000Z',
       outcome: 'success',
@@ -695,6 +696,7 @@ test('createImportCandidateService marks download workflow transitions with shar
       username: 'source-user',
     },
     {
+      actorUserId: null,
       eventType: 'import_candidate_download_failed',
       occurredAt: '2026-04-30T14:00:00.000Z',
       outcome: 'failure',

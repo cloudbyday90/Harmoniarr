@@ -19,7 +19,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  canPromoteSourceUserTrust,
+  canResetSourceUserTrust,
   filterSourceUsers,
+  formatSourceUserHistoryActor,
+  formatSourceUserHistoryKind,
+  formatSourceUserHistorySummary,
+  formatSourceUserHistoryTone,
   formatSourceUserConfidence,
   formatSourceUserCountLabel,
   formatSourceUserEvidence,
@@ -27,6 +33,7 @@ import {
   formatSourceUserReliabilityTone,
   formatSourceUserReviewLabel,
   formatSourceUserReviewTone,
+  sourceUserTrustStateOptions,
   formatSourceUserTrustLabel,
   formatSourceUserTrustTone,
 } from '../../src/client/lib/source-user-trust-presentation.js';
@@ -83,4 +90,27 @@ test('filterSourceUsers filters by state and search text', () => {
   assert.equal(filterSourceUsers(entries, { filter: 'blocked' }).length, 1);
   assert.equal(filterSourceUsers(entries, { query: 'verification' }).length, 1);
   assert.equal(filterSourceUsers(entries, { query: 'fake' }).length, 1);
+});
+
+test('source user trust state options remain explicit and ordered', () => {
+  assert.deepEqual(sourceUserTrustStateOptions.map((option) => option.value), ['trusted', 'neutral']);
+});
+
+test('history helpers format provenance entries for manual overrides and evidence', () => {
+  assert.equal(formatSourceUserHistoryKind('manual_override'), 'Manual override');
+  assert.equal(formatSourceUserHistoryTone({ kind: 'manual_override', trustState: 'trusted' }), 'success');
+  assert.equal(formatSourceUserHistorySummary({ kind: 'manual_override', trustState: 'trusted', reason: 'Verified complete releases' }), 'Verified complete releases');
+  assert.equal(formatSourceUserHistoryTone({ kind: 'delivery_evidence', outcome: 'failure' }), 'danger');
+  assert.equal(formatSourceUserHistorySummary({ kind: 'delivery_evidence', outcome: 'failure', reason: 'Import candidate download failed' }), 'Import candidate download failed');
+  assert.equal(formatSourceUserHistoryActor({ actorUserId: 'admin-1' }), 'admin-1');
+  assert.equal(formatSourceUserHistoryActor({ actorUserId: null }), 'System');
+});
+
+test('trust action guards only allow non-blocked peers to be adjusted inline', () => {
+  assert.equal(canPromoteSourceUserTrust({ trustState: 'neutral' }), true);
+  assert.equal(canPromoteSourceUserTrust({ trustState: 'trusted' }), false);
+  assert.equal(canPromoteSourceUserTrust({ trustState: 'blocked' }), false);
+  assert.equal(canResetSourceUserTrust({ trustState: 'trusted' }), true);
+  assert.equal(canResetSourceUserTrust({ trustState: 'neutral' }), false);
+  assert.equal(canResetSourceUserTrust({ trustState: 'blocked' }), false);
 });

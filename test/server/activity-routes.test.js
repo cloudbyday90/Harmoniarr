@@ -45,10 +45,15 @@ function createActivityRouteTestApp(overrides = {}) {
         total: 0,
         trustState: null,
       }),
+      getSourceUserDetail: async ({ username }) => ({
+        checkedAt: '2026-06-01T12:00:00.000Z',
+        sourceUser: { trustHistory: [], trustState: 'neutral', username },
+      }),
       requireAdminSession: async () => ({ appUserId: 'admin-1' }),
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }),
       requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token' }),
+      updateSourceUserTrust: async ({ username }) => ({ sourceUser: { trustState: 'trusted', username } }),
       unblockSourceUser: async () => ({ sourceUser: { username: 'peer-1' } }),
       ...overrides,
     });
@@ -215,6 +220,60 @@ test('activity source users route requires an admin session and returns trust pa
     assert.equal(payload.sourceUsers[0].username, 'peer-1');
     assert.equal(listSourceUsers.mock.calls[0].arguments[0].query, 'peer');
     assert.equal(listSourceUsers.mock.calls[0].arguments[0].trustState, 'neutral');
+  });
+});
+
+test('activity source user detail route requires an admin session and returns trust history payload', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
+  const getSourceUserDetail = t.mock.fn(async ({ username }) => ({
+    checkedAt: '2026-06-01T12:15:00.000Z',
+    sourceUser: {
+      trustHistory: [{ id: 'evt-1', kind: 'delivery_evidence', outcome: 'failure', occurredAt: '2026-06-01T12:00:00.000Z' }],
+      trustState: 'neutral',
+      username,
+    },
+  }));
+  const app = createActivityRouteTestApp({ getSourceUserDetail, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/source-users/peer-1`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(getSourceUserDetail.mock.callCount(), 1);
+    assert.equal(payload.sourceUser.username, 'peer-1');
+    assert.equal(payload.sourceUser.trustHistory.length, 1);
+  });
+});
+
+test('activity source user trust patch route requires fresh admin csrf and returns updated payload', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const updateSourceUserTrust = t.mock.fn(async ({ actorUserId, operatorNotes, reason, trustState, username }) => ({
+    sourceUser: { actorUserId, operatorNotes, trustState, username },
+  }));
+  const app = createActivityRouteTestApp({ requireCsrf, requireFreshAdminSession, updateSourceUserTrust });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/source-users/peer-1`, {
+      body: JSON.stringify({ operatorNotes: 'Known good uploader', reason: 'Verified complete releases', trustState: 'trusted' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(updateSourceUserTrust.mock.calls[0].arguments[0], {
+      actorUserId: 'admin-1',
+      operatorNotes: 'Known good uploader',
+      reason: 'Verified complete releases',
+      trustState: 'trusted',
+      username: 'peer-1',
+    });
+    assert.equal(payload.sourceUser.trustState, 'trusted');
   });
 });
 
