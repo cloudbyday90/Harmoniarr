@@ -282,6 +282,7 @@ test('apply worker calls onReleaseAddedFn and recordActivityEventFn after succes
         importStatus: { code: 'ready', message: 'ready' },
         fileCount: 5,
         folderPath: '/music/album',
+        releaseIdentity: { artistName: 'Radiohead', releaseTitle: 'OK Computer' },
         username: 'uploader1',
         importPendingAt: new Date().toISOString(),
         planning: {},
@@ -315,12 +316,16 @@ test('apply worker calls onReleaseAddedFn and recordActivityEventFn after succes
   await new Promise((resolve) => { setTimeout(resolve, 100); });
 
   assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].artistName, 'Radiohead');
   assert.equal(notifications[0].importCandidateId, 'ic-1');
+  assert.equal(notifications[0].releaseTitle, 'OK Computer');
   assert.equal(notifications[0].username, 'uploader1');
 
   const releaseAddedEvents = activityEvents.filter((e) => e.eventType === 'release_added');
   const fulfilledEvents = activityEvents.filter((e) => e.eventType === 'request_fulfilled');
   assert.equal(releaseAddedEvents.length, 1);
+  assert.equal(releaseAddedEvents[0].entityArtist, 'Radiohead');
+  assert.equal(releaseAddedEvents[0].entityTitle, 'OK Computer');
   assert.equal(fulfilledEvents.length, 1);
   assert.equal(fulfilledEvents[0].extraPayload.requestedForUserId, 'user-1');
 });

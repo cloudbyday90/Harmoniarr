@@ -209,9 +209,11 @@ export function createImportCandidateCanonicalNamingService({
     }
 
     return {
+      artistName: artist.name,
       canApply: true,
       fileNamesById,
       relativeFolderPath: path.join(...folderSegments),
+      releaseTitle: releaseGroup.title ?? release.title,
       strategy: 'canonical_release_default_template',
       warnings: [],
     };

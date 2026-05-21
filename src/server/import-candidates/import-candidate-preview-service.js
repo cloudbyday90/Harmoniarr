@@ -229,6 +229,12 @@ export function createImportCandidatePreviewService({
         userRootPath: libraryPlacement.userRootPath,
       },
       naming: {
+        releaseIdentity: canonicalNamingPlan?.canApply
+          ? {
+            artistName: canonicalNamingPlan.artistName ?? null,
+            releaseTitle: canonicalNamingPlan.releaseTitle ?? null,
+          }
+          : null,
         strategy: canonicalNamingPlan?.canApply ? canonicalNamingPlan.strategy : 'mirror_candidate_path',
         filePreviews,
       },

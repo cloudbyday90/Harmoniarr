@@ -71,6 +71,7 @@ import { shouldSendNotification } from './notification/notification-preference-s
 import { broadcastAdminNotification } from './notification/notification-admin-dispatch-service.js';
 import { createNotificationDispatchCooldownService } from './notification/notification-dispatch-cooldown-service.js';
 import { createNotificationDispatchHistoryService } from './notification/notification-dispatch-history-service.js';
+import { buildReleaseAddedCooldownKey } from './notification/release-added-identity.js';
 import { broadcastHouseholdNotification } from './notification/notification-household-dispatch-service.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
 import { createSlskdModule } from './slskd/slskd-module.js';
@@ -305,16 +306,24 @@ export function createApp({
         url: '/app/activity/imports',
       },
     }),
-    onReleaseAddedFn: ({ folderPath, username }) => broadcastHouseholdNotification({
+    onReleaseAddedFn: ({ artistName, folderPath, releaseTitle, username }) => broadcastHouseholdNotification({
       category: 'releaseAdded',
-      cooldownKey: `releaseAdded:import:${username ?? ''}:${folderPath ?? ''}`,
+      cooldownKey: buildReleaseAddedCooldownKey({
+        artistName,
+        fallbackKey: `${username ?? ''}:${folderPath ?? ''}`,
+        releaseTitle,
+      }),
       cooldownMs: householdNotificationCooldowns.releaseAddedMs,
       dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
       listAppUsers: notificationDispatchDeps.listAppUsers,
       getUserPreferences: notificationDispatchDeps.getUserPreferences,
       sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
       payload: {
-        body: `Release from "${username}" added to library: ${folderPath}`,
+        body: releaseTitle
+          ? artistName
+            ? `${releaseTitle} by ${artistName} was added to the library`
+            : `${releaseTitle} was added to the library`
+          : `Release from "${username}" added to library: ${folderPath}`,
         title: 'Release added',
         url: '/app/activity/imports',
       },
@@ -364,7 +373,11 @@ export function createApp({
     maintenanceLockService,
     onOrganizeReleaseAddedFn: ({ artistName, movedCount, releaseCount, releaseTitle }) => broadcastHouseholdNotification({
       category: 'releaseAdded',
-      cooldownKey: `releaseAdded:organize:${artistName ?? ''}:${releaseTitle ?? ''}:${releaseCount ?? 0}:${movedCount ?? 0}`,
+      cooldownKey: buildReleaseAddedCooldownKey({
+        artistName,
+        fallbackKey: `${releaseCount ?? 0}:${movedCount ?? 0}`,
+        releaseTitle,
+      }),
       cooldownMs: householdNotificationCooldowns.releaseAddedMs,
       dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
       listAppUsers: notificationDispatchDeps.listAppUsers,

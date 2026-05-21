@@ -256,8 +256,10 @@ export function createImportCandidateApplyWorker({
 
             if (typeof onReleaseAddedFn === 'function') {
               void onReleaseAddedFn({
+                artistName: summaryCandidate.releaseIdentity?.artistName ?? null,
                 folderPath: summaryCandidate.folderPath ?? null,
                 importCandidateId: summaryCandidate.id,
+                releaseTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? null,
                 username: summaryCandidate.username ?? null,
               }).catch(() => {});
             }
@@ -265,8 +267,9 @@ export function createImportCandidateApplyWorker({
             if (typeof recordActivityEventFn === 'function') {
               void recordActivityEventFn({
                 actorUserId: null,
+                entityArtist: summaryCandidate.releaseIdentity?.artistName ?? null,
                 entityId: summaryCandidate.id,
-                entityTitle: summaryCandidate.folderPath ?? null,
+                entityTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? summaryCandidate.folderPath ?? null,
                 entityType: 'import_candidate',
                 eventType: 'release_added',
               }).catch(() => {});
@@ -275,8 +278,9 @@ export function createImportCandidateApplyWorker({
             if (notifyUserId && typeof recordActivityEventFn === 'function') {
               void recordActivityEventFn({
                 actorUserId: null,
+                entityArtist: summaryCandidate.releaseIdentity?.artistName ?? null,
                 entityId: summaryCandidate.id,
-                entityTitle: summaryCandidate.folderPath ?? null,
+                entityTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? summaryCandidate.folderPath ?? null,
                 entityType: 'import_candidate',
                 eventType: 'request_fulfilled',
                 extraPayload: { requestedForUserId: notifyUserId },
