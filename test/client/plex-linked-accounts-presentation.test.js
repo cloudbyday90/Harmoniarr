@@ -19,6 +19,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  formatPlexLinkedAccountActionLabel,
   formatPlexLinkedAccountsCountLabel,
   formatPlexOwnerLinkLabel,
   formatPlexOwnerLinkTone,
@@ -42,10 +43,13 @@ test('plex-linked-accounts presentation formats repair states', () => {
   assert.equal(formatPlexRepairStateTone('healthy'), 'success');
   assert.equal(formatPlexRepairStateLabel('remote_profile_missing'), 'Remote profile missing');
   assert.equal(formatPlexRepairStateTone('remote_profile_missing'), 'danger');
+  assert.equal(formatPlexRepairStateLabel('stale_acknowledged'), 'Stale acknowledged');
+  assert.equal(formatPlexRepairStateTone('stale_acknowledged'), 'info');
 });
 
 test('plex-linked-accounts presentation exposes repair queue state', () => {
   assert.equal(formatPlexLinkedAccountsCountLabel(3, 'unlink-ready'), '3 unlink-ready');
+  assert.equal(formatPlexLinkedAccountActionLabel('safe_relink'), 'Safe relink');
   assert.equal(hasPlexRepairQueue({ summary: { conflictProfiles: 0, repairRequiredUsers: 0 } }), false);
   assert.equal(hasPlexRepairQueue({ summary: { conflictProfiles: 1, repairRequiredUsers: 0 } }), true);
   assert.equal(hasPlexRepairQueue({ summary: { conflictProfiles: 0, repairRequiredUsers: 2 } }), true);

@@ -95,6 +95,7 @@ function collectRegisteredRoutes() {
     issueAppUserClaimCode: asyncNoopResult({}),
     listAppUsers: asyncNoopResult([]),
     buildPlexLinkedAccountOverview: asyncNoopResult({}),
+    reconcilePlexLinkedAccount: asyncNoopResult({}),
     relinkPlexDirectoryConflict: asyncNoopResult({}),
     resetAppUserPassword: asyncNoopResult({}),
     unlinkPlexAppUser: asyncNoopResult({}),

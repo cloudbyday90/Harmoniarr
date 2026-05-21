@@ -37,6 +37,7 @@ import {
   plexLibraryAccessPolicyTone,
 } from '../lib/settings-users-presentation.js';
 import {
+  formatPlexLinkedAccountActionLabel,
   formatPlexLinkedAccountsCountLabel,
   formatPlexOwnerLinkLabel,
   formatPlexOwnerLinkTone,
@@ -52,6 +53,7 @@ import {
   fetchPlexLinkedAccountsOverview,
   fetchUsers,
   issueUserClaimCode,
+  reconcilePlexLinkedAccount,
   provisionUserManagedLibraryRoot,
   relinkPlexUserConflict,
   resetUserPassword,
@@ -65,6 +67,7 @@ const isImportingPlexUsers = ref(false);
 const isStartingPlexLink = ref(false);
 const isClearingPlexLink = ref(false);
 const activePlexRelinkProfileId = ref('');
+const activePlexLinkedAccountActionKey = ref('');
 const errorMessage = ref('');
 const successMessage = ref('');
 const roleOptions = ref(['admin', 'operator', 'requester']);
@@ -199,6 +202,45 @@ async function relinkPlexConflict(profile) {
     errorMessage.value = error instanceof Error ? error.message : 'Plex conflict relink failed';
   } finally {
     activePlexRelinkProfileId.value = '';
+  }
+}
+
+function buildPlexLinkedAccountActionKey(userId, action) {
+  return `${userId}:${action}`;
+}
+
+function isPlexLinkedAccountActionPending(userId, action) {
+  return activePlexLinkedAccountActionKey.value === buildPlexLinkedAccountActionKey(userId, action);
+}
+
+async function runPlexLinkedAccountAction(linkedUser, action) {
+  if (!linkedUser?.id) {
+    return;
+  }
+
+  activePlexLinkedAccountActionKey.value = buildPlexLinkedAccountActionKey(linkedUser.id, action);
+  errorMessage.value = '';
+  successMessage.value = '';
+
+  try {
+    const payload = await reconcilePlexLinkedAccount(linkedUser.id, action);
+    await Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]);
+
+    switch (action) {
+      case 'mark_stale':
+        successMessage.value = `Marked ${linkedUser.username} as a reviewed stale Plex link.`;
+        break;
+      case 'safe_relink':
+        successMessage.value = `Relinked ${payload.user.username} back to Plex sign-in using the latest preview.`;
+        break;
+      default:
+        successMessage.value = `Refreshed the Plex profile snapshot for ${payload.user.username}.`;
+        break;
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Plex linked-account reconciliation failed';
+  } finally {
+    activePlexLinkedAccountActionKey.value = '';
   }
 }
 
@@ -370,6 +412,7 @@ onMounted(() => { void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview(
         <p class="hx-text-muted" v-if="formatPlexLinkStatusDetail(plexLinkedAccountsOverview.ownerLink)">{{ formatPlexLinkStatusDetail(plexLinkedAccountsOverview.ownerLink) }}</p>
         <p class="hx-text-muted" v-if="plexLinkedAccountsOverview.ownerLink?.linkedAt">Owner linked {{ formatOperationTimestampShort(plexLinkedAccountsOverview.ownerLink.linkedAt) }}</p>
         <p class="hx-text-muted" v-if="plexRepairQueueActive">Repair queue active: review link blockers, stale profiles, and import conflicts before treating Plex sign-in as stable.</p>
+        <p class="hx-text-muted" v-if="plexLinkedAccountsOverview.summary.acknowledgedStaleUsers > 0">{{ formatPlexLinkedAccountsCountLabel(plexLinkedAccountsOverview.summary.acknowledgedStaleUsers, 'stale acknowledged') }} after the latest preview.</p>
 
         <div class="hx-stat-grid" style="margin-top: var(--hx-space-4); margin-bottom: var(--hx-space-4)">
           <div class="hx-stat">
@@ -433,6 +476,7 @@ onMounted(() => { void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview(
                   <td>
                     <span class="hx-pill" :data-tone="formatPlexRepairStateTone(linkedUser.repairState)">{{ formatPlexRepairStateLabel(linkedUser.repairState) }}</span>
                     <div class="hx-text-muted" style="margin-top: var(--hx-space-1)">{{ linkedUser.repairMessage }}</div>
+                    <div class="hx-text-muted" style="margin-top: var(--hx-space-1)" v-if="linkedUser.staleAcknowledgement?.occurredAt">Acknowledged {{ formatOperationTimestampShort(linkedUser.staleAcknowledgement.occurredAt) }}</div>
                   </td>
                   <td>
                     <span class="hx-pill" :data-tone="linkedUser.unlinkReady ? 'success' : 'warning'">
@@ -442,6 +486,17 @@ onMounted(() => { void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview(
                   <td>
                     <div class="hx-card-actions">
                       <a :href="`#user-card-${linkedUser.id}`" class="hx-btn" data-variant="ghost">Review user</a>
+                      <button
+                        v-for="action in linkedUser.availableActions ?? []"
+                        :key="`${linkedUser.id}-${action}`"
+                        type="button"
+                        class="hx-btn"
+                        :data-variant="action === 'safe_relink' ? 'primary' : null"
+                        :disabled="isPlexLinkedAccountActionPending(linkedUser.id, action)"
+                        @click="runPlexLinkedAccountAction(linkedUser, action)"
+                      >
+                        {{ isPlexLinkedAccountActionPending(linkedUser.id, action) ? 'Working…' : formatPlexLinkedAccountActionLabel(action) }}
+                      </button>
                       <button
                         type="button"
                         class="hx-btn"

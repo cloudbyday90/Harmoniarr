@@ -30,6 +30,7 @@ function emptyOverview() {
     previewLinkedProfiles: [],
     previewStatus: { code: 'plex_link_required', message: 'Connect a Plex owner account before previewing or repairing linked accounts.', state: 'owner_link_required' },
     summary: {
+      acknowledgedStaleUsers: 0,
       conflictProfiles: 0,
       importableProfiles: 0,
       linkedUsers: 0,

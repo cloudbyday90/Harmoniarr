@@ -100,6 +100,16 @@ function createAppUserRouteTestApp(overrides = {}) {
         },
       }),
       listAppUsers: async () => [{ id: 'user-1', username: 'admin', role: 'admin', authProvider: 'local', managedLibraryRelativeRoot: 'staff/admin', permissions: ['admin.system'] }],
+      reconcilePlexLinkedAccount: async ({ action, userId }) => ({
+        action,
+        reconciledAt: '2026-05-04T10:15:00.000Z',
+        user: {
+          id: userId,
+          username: 'listener',
+          role: 'requester',
+          authProvider: action === 'safe_relink' ? 'plex' : 'local',
+        },
+      }),
       resetAppUserPassword: async ({ userId }) => ({
         revokedSessionCount: 0,
         user: {
@@ -670,6 +680,51 @@ test('app user Plex relink route resolves a conflict through the shared service'
     assert.equal(payload.ok, true);
     assert.equal(payload.user.authProvider, 'plex');
     assert.equal(payload.profile.classification, 'linked');
+  });
+});
+
+test('app user Plex reconciliation route runs an explicit linked-account repair action', async (t) => {
+  const reconcilePlexLinkedAccount = t.mock.fn(async ({ action, actorUserId, requestMetadata, userId }) => ({
+    action,
+    reconciledAt: '2026-05-04T10:15:00.000Z',
+    user: {
+      authProvider: action === 'safe_relink' ? 'plex' : 'local',
+      id: userId,
+      username: 'listener',
+    },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-users', user: { role: 'admin' } }));
+  const app = createAppUserRouteTestApp({ reconcilePlexLinkedAccount, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/user-plex-1/plex-reconciliation`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-users',
+        'x-forwarded-for': '198.51.100.22',
+        'user-agent': 'HarmoniarrUsersTest/1.0',
+      },
+      body: JSON.stringify({ action: 'safe_relink' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(reconcilePlexLinkedAccount.mock.calls[0].arguments, [{
+      action: 'safe_relink',
+      actorUserId: 'admin-1',
+      requestMetadata: {
+        ipAddress: '198.51.100.22',
+        userAgent: 'HarmoniarrUsersTest/1.0',
+      },
+      userId: 'user-plex-1',
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.action, 'safe_relink');
+    assert.equal(payload.user.authProvider, 'plex');
   });
 });
 

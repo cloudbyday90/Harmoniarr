@@ -87,6 +87,14 @@ export function relinkPlexUserConflict({ plexUserId, userId }) {
   });
 }
 
+export function reconcilePlexLinkedAccount(userId, action) {
+  return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/plex-reconciliation`, {
+    method: 'POST',
+    includeCsrf: true,
+    body: { action },
+  });
+}
+
 export function unlinkPlexUser(userId) {
   return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/unlink-plex`, {
     method: 'POST',

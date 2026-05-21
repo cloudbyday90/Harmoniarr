@@ -58,6 +58,8 @@ export function formatPlexRepairStateLabel(repairState) {
       return 'Provider mismatch';
     case 'remote_profile_missing':
       return 'Remote profile missing';
+    case 'stale_acknowledged':
+      return 'Stale acknowledged';
     case 'preview_unavailable':
       return 'Preview unavailable';
     default:
@@ -69,6 +71,8 @@ export function formatPlexRepairStateTone(repairState) {
   switch (repairState) {
     case 'healthy':
       return 'success';
+    case 'stale_acknowledged':
+      return 'info';
     case 'preview_unavailable':
       return 'warning';
     case 'local_auth_required':
@@ -87,6 +91,19 @@ export function formatPlexLinkedAccountsCountLabel(count, noun) {
   }
 
   return `${count} ${noun}`;
+}
+
+export function formatPlexLinkedAccountActionLabel(action) {
+  switch (action) {
+    case 'mark_stale':
+      return 'Mark stale';
+    case 'refresh_profile':
+      return 'Refresh profile';
+    case 'safe_relink':
+      return 'Safe relink';
+    default:
+      return 'Review';
+  }
 }
 
 export function hasPlexRepairQueue(overview) {

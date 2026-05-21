@@ -65,7 +65,9 @@ test('buildOverview aggregates owner status, linked users, and repair states', a
   const healthyUser = overview.linkedUsers.find((entry) => entry.username === 'listener-1');
   const staleUser = overview.linkedUsers.find((entry) => entry.username === 'listener-2');
   assert.equal(healthyUser?.repairState, 'healthy');
+  assert.deepEqual(healthyUser?.availableActions, []);
   assert.equal(staleUser?.repairState, 'remote_profile_missing');
+  assert.deepEqual(staleUser?.availableActions, ['mark_stale']);
 });
 
 test('buildOverview reports owner-link-required state when no Plex owner is linked', async () => {
@@ -108,4 +110,34 @@ test('buildOverview preserves linked users when preview loading fails', async ()
   assert.equal(overview.previewStatus.state, 'error');
   assert.equal(overview.linkedUsers.length, 1);
   assert.equal(overview.linkedUsers[0].repairState, 'preview_unavailable');
+});
+
+test('buildOverview applies stale acknowledgements only to the current preview snapshot', async () => {
+  const service = createPlexLinkedAccountManagementService({
+    buildPlexDirectoryImportPreview: async () => ({
+      fetchedAt: '2026-06-01T12:00:00.000Z',
+      profiles: [],
+      summary: { conflicts: 0, importable: 0, linked: 0, ownerAccounts: 1, skipped: 0, total: 1 },
+    }),
+    buildPlexLinkStatus: async () => ({ linked: true }),
+    listAppUsers: async () => ([{
+      authProvider: 'plex',
+      authSubject: 'plex-uuid-1',
+      id: 'user-1',
+      localAuth: { unlinkPlexReady: true },
+      plexProfile: { plexTitle: 'Linked User', plexUserId: 'plex-1', plexUuid: 'plex-uuid-1' },
+      username: 'listener-1',
+    }]),
+    listLatestStaleAcknowledgements: async () => new Map([['user-1', {
+      actorUserId: 'admin-1',
+      occurredAt: '2026-06-01T12:05:00.000Z',
+    }]]),
+  });
+
+  const overview = await service.buildOverview();
+
+  assert.equal(overview.linkedUsers[0].repairState, 'stale_acknowledged');
+  assert.equal(overview.summary.acknowledgedStaleUsers, 1);
+  assert.equal(overview.summary.repairRequiredUsers, 0);
+  assert.deepEqual(overview.linkedUsers[0].availableActions, []);
 });

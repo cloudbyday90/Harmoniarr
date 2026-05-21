@@ -44,6 +44,7 @@ import { createProviderModule } from './provider-module.js';
 import { createPlexDirectSignInService } from './integrations/plex/plex-direct-sign-in-service.js';
 import { createPlexDirectoryImportService } from './integrations/plex/plex-directory-import-service.js';
 import { createPlexLinkedAccountManagementService } from './integrations/plex/plex-linked-account-management-service.js';
+import { createPlexLinkedAccountReconciliationService } from './integrations/plex/plex-linked-account-reconciliation-service.js';
 import { createProviderClientResolverService } from './integrations/providers/provider-client-resolver-service.js';
 import { createRequestRateLimiterService } from './request-rate-limiter.js';
 import { createControlPlaneRedactionService } from './control-plane-redaction-service.js';
@@ -191,9 +192,14 @@ export function createApp({
     listAppUsers: baseAppUserModule.appUserService.listAppUsers,
     plexOwnerLinkService: providerModule.plexOwnerLinkService,
   });
+  const plexLinkedAccountReconciliationService = createPlexLinkedAccountReconciliationService({
+    buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
+    getAppUserById: baseAppUserModule.appUserService.getAppUserById,
+  });
   const plexLinkedAccountManagementService = createPlexLinkedAccountManagementService({
     buildPlexDirectoryImportPreview: plexDirectoryImportService.buildPreview,
     buildPlexLinkStatus: providerModule.plexOwnerLinkService.buildStatus,
+    listLatestStaleAcknowledgements: plexLinkedAccountReconciliationService.listLatestStaleAcknowledgements,
     listAppUsers: baseAppUserModule.appUserService.listAppUsers,
   });
   const appUserModule = buildAppUserModule({
@@ -203,6 +209,7 @@ export function createApp({
     permissionService: baseAppUserModule.permissionService,
     plexDirectoryImportService,
     plexLinkedAccountManagementService,
+    plexLinkedAccountReconciliationService,
   });
   const artworkModule = buildArtworkModule({
     maintenanceLockOperationPauseService,

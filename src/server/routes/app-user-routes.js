@@ -37,6 +37,7 @@ export function registerAppUserRoutes(app, {
   getUserPreferences = defaultAppUserService.getUserPreferences,
   issueAppUserClaimCode = null,
   listAppUsers = defaultAppUserService.listAppUsers,
+  reconcilePlexLinkedAccount = null,
   relinkPlexDirectoryConflict = null,
   resetAppUserPassword = defaultAppUserService.resetAppUserPassword,
   provisionManagedLibraryRoot = defaultAppUserProvisioningService.provisionManagedLibraryRoot,
@@ -242,6 +243,23 @@ export function registerAppUserRoutes(app, {
           plexUserId: request.body?.plexUserId,
           requestMetadata: getRequestMetadata(request),
           userId: request.body?.userId,
+        })),
+      });
+    }));
+  }
+
+  if (typeof reconcilePlexLinkedAccount === 'function') {
+    app.post('/api/v1/users/:userId/plex-reconciliation', asyncRoute(async (request, response) => {
+      const session = await requireFreshAdminSession(request);
+      requireCsrf(request, session);
+
+      response.status(201).json({
+        ok: true,
+        ...(await reconcilePlexLinkedAccount({
+          action: request.body?.action,
+          actorUserId: session.appUserId,
+          requestMetadata: getRequestMetadata(request),
+          userId: request.params.userId,
         })),
       });
     }));
