@@ -59,11 +59,21 @@ export function createOperatorNotificationFanoutRunStore({
     return normalizeRun(await operationRunStore.getActiveRun());
   }
 
+  async function getLatestRun() {
+    return normalizeRun(await operationRunStore.getLatestRun());
+  }
+
+  async function listRecentRuns({ limit } = {}) {
+    return (await operationRunStore.listRecentRuns({ limit })).map(normalizeRun);
+  }
+
   return {
     acquireLease: operationRunStore.acquireLease,
     createOperationRun,
     getActiveRun,
+    getLatestRun,
     isCancellationRequested: operationRunStore.isCancellationRequested,
+    listRecentRuns,
     markRunCancelled: operationRunStore.markRunCancelled,
     markRunPaused: operationRunStore.markRunPaused,
     markRunCompleted: operationRunStore.markRunCompleted,

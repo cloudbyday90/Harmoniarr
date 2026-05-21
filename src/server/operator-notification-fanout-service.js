@@ -29,11 +29,13 @@ export function createOperatorNotificationFanoutService({
     deliveredCount: notifications.length,
   }),
   getActiveRun = async () => null,
+  listRecentRuns = async () => [],
   getOperatorNotifications = async () => ({ notifications: [] }),
   recordAuditEventFn = recordAuditEvent,
 } = {}) {
   const operationDescriptor = operationRunRegistry.operatorNotificationFanout;
   let previousActionableKeys = new Set();
+  let previousActionableKeysLoaded = false;
 
   function normalizeActionableNotifications(payload) {
     return (payload.notifications ?? []).filter((notification) => notification.requiresAction);
@@ -45,6 +47,23 @@ export function createOperatorNotificationFanoutService({
 
   function diffNewActionableKeys(currentKeys) {
     return [...currentKeys].filter((key) => !previousActionableKeys.has(key));
+  }
+
+  async function ensurePreviousActionableKeysLoaded() {
+    if (previousActionableKeysLoaded) {
+      return;
+    }
+
+    const recentRuns = await listRecentRuns({ limit: 10 });
+    const persistedRun = recentRuns.find((run) => (
+      run?.summary?.triggerSource === 'automatic'
+      && Array.isArray(run.summary.notificationDedupeKeys)
+    ));
+
+    previousActionableKeys = persistedRun
+      ? new Set(persistedRun.summary.notificationDedupeKeys.filter(Boolean))
+      : new Set();
+    previousActionableKeysLoaded = true;
   }
 
   async function startOperatorNotificationFanoutRun({ requestMetadata = null, summary = {}, triggeredByUserId = null } = {}) {
@@ -80,6 +99,8 @@ export function createOperatorNotificationFanoutService({
   }
 
   async function startOperatorNotificationFanoutRunIfNeeded({ limit = 50 } = {}) {
+    await ensurePreviousActionableKeysLoaded();
+
     const activeRun = await getActiveRun();
     if (activeRun) {
       return {

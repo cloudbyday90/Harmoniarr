@@ -108,6 +108,61 @@ test('startOperatorNotificationFanoutRunIfNeeded skips when a fanout run is alre
   assert.equal(result.reason, 'fanout_in_progress');
 });
 
+test('startOperatorNotificationFanoutRunIfNeeded restores persisted automatic dedupe keys across restart', async () => {
+  const createOperationRun = async ({ status, summary }) => ({ id: 'run-new', status, summary });
+  const service = createOperatorNotificationFanoutService({
+    createOperationRun,
+    getActiveRun: async () => null,
+    getOperatorNotifications: async () => ({
+      notifications: [{ dedupeKey: 'run:1:failure', requiresAction: true }],
+    }),
+    listRecentRuns: async () => ([{
+      id: 'run-old',
+      summary: {
+        notificationDedupeKeys: ['run:1:failure'],
+        triggerSource: 'automatic',
+      },
+    }]),
+    recordAuditEventFn: async () => {},
+  });
+
+  const result = await service.startOperatorNotificationFanoutRunIfNeeded();
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.reason, 'no_new_actionable_notifications');
+});
+
+test('startOperatorNotificationFanoutRunIfNeeded restores the latest persisted automatic dedupe keys even after a newer manual run', async () => {
+  const service = createOperatorNotificationFanoutService({
+    createOperationRun: async ({ status, summary }) => ({ id: 'run-new', status, summary }),
+    getActiveRun: async () => null,
+    getOperatorNotifications: async () => ({
+      notifications: [{ dedupeKey: 'heartbeat:libraryDiscovery:paused', requiresAction: true }],
+    }),
+    listRecentRuns: async () => ([
+      {
+        id: 'run-manual',
+        summary: {
+          triggerSource: 'manual',
+        },
+      },
+      {
+        id: 'run-auto',
+        summary: {
+          notificationDedupeKeys: ['heartbeat:libraryDiscovery:paused'],
+          triggerSource: 'automatic',
+        },
+      },
+    ]),
+    recordAuditEventFn: async () => {},
+  });
+
+  const result = await service.startOperatorNotificationFanoutRunIfNeeded();
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.reason, 'no_new_actionable_notifications');
+});
+
 test('fanOutOperatorNotifications filters actionable notifications by dedupe keys when provided', async () => {
   const dispatchedBatches = [];
   const service = createOperatorNotificationFanoutService({

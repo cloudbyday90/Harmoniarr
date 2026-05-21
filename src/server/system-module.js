@@ -215,6 +215,7 @@ export function createSystemModule({
       createOperationRun: operatorNotificationFanoutRunStore.createOperationRun,
       getActiveRun: operatorNotificationFanoutRunStore.getActiveRun,
       getOperatorNotifications: systemService.getOperatorNotifications,
+      listRecentRuns: operatorNotificationFanoutRunStore.listRecentRuns,
     });
   const operatorNotificationFanoutInterruptionGate = resolvedMaintenanceLockOperationPauseService
     ? createOperationRunInterruptionGate({
