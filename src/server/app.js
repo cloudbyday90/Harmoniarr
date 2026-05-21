@@ -70,6 +70,7 @@ import { createSettingsService } from './settings-service.js';
 import { shouldSendNotification } from './notification/notification-preference-service.js';
 import { broadcastAdminNotification } from './notification/notification-admin-dispatch-service.js';
 import { createNotificationDispatchCooldownService } from './notification/notification-dispatch-cooldown-service.js';
+import { createNotificationDispatchHistoryService } from './notification/notification-dispatch-history-service.js';
 import { broadcastHouseholdNotification } from './notification/notification-household-dispatch-service.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
 import { createSlskdModule } from './slskd/slskd-module.js';
@@ -228,7 +229,12 @@ export function createApp({
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore();
   const pushModule = buildPushModule();
-  const householdNotificationCooldownService = createNotificationDispatchCooldownService();
+  const householdNotificationDispatchHistoryService = createNotificationDispatchHistoryService({
+    pushNotificationQueueStore: pushModule.pushNotificationQueueStore,
+  });
+  const householdNotificationCooldownService = createNotificationDispatchCooldownService({
+    dispatchHistoryService: householdNotificationDispatchHistoryService,
+  });
   const notificationDispatchDeps = {
     dispatchCooldownService: householdNotificationCooldownService,
     getUserPreferences: appUserModule.appUserService.getUserPreferences,

@@ -17,6 +17,7 @@
  */
 
 import { createPushNotificationService } from './push-notification-service.js';
+import { createPushNotificationQueueStore } from './push-notification-queue-store.js';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
 
 /**
@@ -29,10 +30,12 @@ import { createPushSubscriptionStore } from './push-subscription-store.js';
  * @returns {{ pushSubscriptionStore, pushNotificationService, routeDependencies }}
  */
 export function createPushModule({
+  pushNotificationQueueStore = createPushNotificationQueueStore(),
   pushSubscriptionStore = createPushSubscriptionStore(),
   pushNotificationService = createPushNotificationService({ pushSubscriptionStore }),
 } = {}) {
   return {
+    pushNotificationQueueStore,
     pushSubscriptionStore,
     pushNotificationService,
     routeDependencies: {

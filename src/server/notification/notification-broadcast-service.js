@@ -75,7 +75,8 @@ export async function broadcastNotification({
       });
       if (!allowed) return;
 
-      if (dispatchCooldownService?.shouldDispatch && !dispatchCooldownService.shouldDispatch({
+      if (dispatchCooldownService?.shouldDispatch && !await dispatchCooldownService.shouldDispatch({
+        category,
         cooldownKey,
         cooldownMs,
         userId: recipient.id,
@@ -84,9 +85,11 @@ export async function broadcastNotification({
       }
 
       const result = await sendNotificationToUser({ userId: recipient.id, payload });
-      dispatchCooldownService?.markDispatched?.({
+      await dispatchCooldownService?.markDispatched?.({
+        category,
         cooldownKey,
         cooldownMs,
+        payload,
         userId: recipient.id,
       });
       return result;

@@ -68,10 +68,58 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
     await pool.query(query, params);
   }
 
+  async function getLatestSentNotificationAt({ userId, eventType, coalesceKey = null, since = null }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT COALESCE(sent_at, created_at) AS dispatched_at
+        FROM notification_queue
+        WHERE user_id = $1
+          AND event_type = $2
+          AND (
+            ($3::text IS NULL AND coalesce_key IS NULL)
+            OR coalesce_key = $3::text
+          )
+          AND status = 'sent'
+          AND ($4::timestamptz IS NULL OR COALESCE(sent_at, created_at) >= $4::timestamptz)
+        ORDER BY COALESCE(sent_at, created_at) DESC
+        LIMIT 1
+      `,
+      [userId, eventType, coalesceKey, since],
+    );
+
+    return result.rows[0]?.dispatched_at?.toISOString?.() ?? result.rows[0]?.dispatched_at ?? null;
+  }
+
+  async function recordSentNotification({ userId, subscriptionId = null, eventType, coalesceKey = null, payload = {}, ttlSeconds }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        INSERT INTO notification_queue (
+          user_id,
+          subscription_id,
+          event_type,
+          coalesce_key,
+          payload,
+          ttl_seconds,
+          status,
+          sent_at
+        )
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'sent', NOW())
+        RETURNING *
+      `,
+      [userId, subscriptionId, eventType, coalesceKey, JSON.stringify(payload), ttlSeconds],
+    );
+
+    return result.rows[0];
+  }
+
   return {
     enqueueNotification,
+    getLatestSentNotificationAt,
     claimPendingNotifications,
     markNotificationSent,
     markNotificationFailed,
+    recordSentNotification,
   };
 }

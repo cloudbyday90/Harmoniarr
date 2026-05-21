@@ -25,16 +25,22 @@ function normalizeNow(nowFn) {
   return Number(value) || Date.now();
 }
 
+function normalizeTimestamp(value) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function buildEntryKey({ cooldownKey, userId }) {
   return `${userId}:${cooldownKey}`;
 }
 
 export function createNotificationDispatchCooldownService({
+  dispatchHistoryService = null,
   nowFn = () => new Date(),
 } = {}) {
   const cooldownEntries = new Map();
 
-  function shouldDispatch({ cooldownKey = null, cooldownMs = 0, userId }) {
+  async function shouldDispatch({ category = null, cooldownKey = null, cooldownMs = 0, userId }) {
     if (!cooldownKey || !userId || !Number.isFinite(cooldownMs) || cooldownMs < 1) {
       return true;
     }
@@ -45,13 +51,24 @@ export function createNotificationDispatchCooldownService({
 
     if (expiresAt <= now) {
       cooldownEntries.delete(entryKey);
+      const since = new Date(now - cooldownMs).toISOString();
+      const latestDispatchAt = dispatchHistoryService?.getLatestDispatchAt
+        ? await dispatchHistoryService.getLatestDispatchAt({ category, cooldownKey, since, userId })
+        : null;
+      const persistedDispatchedAt = normalizeTimestamp(latestDispatchAt);
+
+      if (persistedDispatchedAt > 0 && persistedDispatchedAt + cooldownMs > now) {
+        cooldownEntries.set(entryKey, persistedDispatchedAt + cooldownMs);
+        return false;
+      }
+
       return true;
     }
 
     return false;
   }
 
-  function markDispatched({ cooldownKey = null, cooldownMs = 0, userId }) {
+  async function markDispatched({ category = null, cooldownKey = null, cooldownMs = 0, payload = {}, userId }) {
     if (!cooldownKey || !userId || !Number.isFinite(cooldownMs) || cooldownMs < 1) {
       return;
     }
@@ -60,6 +77,16 @@ export function createNotificationDispatchCooldownService({
       buildEntryKey({ cooldownKey, userId }),
       normalizeNow(nowFn) + cooldownMs,
     );
+
+    if (dispatchHistoryService?.recordDispatch) {
+      await dispatchHistoryService.recordDispatch({
+        category,
+        cooldownKey,
+        cooldownMs,
+        payload,
+        userId,
+      });
+    }
   }
 
   return {
