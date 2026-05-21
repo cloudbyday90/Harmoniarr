@@ -59,8 +59,10 @@ const {
   detail,
   errorMessage: detailErrorMessage,
   isLoading: isLoadingDetail,
+  isLoadingMoreHistory,
   isSaving: isSavingDetail,
   load: loadDetail,
+  loadMoreHistory,
   saveTrustState,
 } = useSourceUserTrustDetail();
 
@@ -285,7 +287,9 @@ onMounted(() => {
         :detail="detail"
         :error-message="detailErrorMessage"
         :is-loading="isLoadingDetail"
+        :is-loading-more-history="isLoadingMoreHistory"
         :is-saving="isSavingDetail"
+        @load-more-history="loadMoreHistory"
         @save-trust="handleSaveTrust"
       />
     </div>

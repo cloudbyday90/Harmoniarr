@@ -23,11 +23,11 @@ import {
   normalizeSourceUserTrustSnapshotRows,
   resolveSourceUserTrustState,
 } from './source-user-trust-service.js';
+import { MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
 
 const ALLOWED_TRUST_STATES = new Set(['neutral', 'trusted']);
 const MAX_REASON_LENGTH = 400;
 const MAX_NOTES_LENGTH = 1000;
-const MAX_HISTORY_ENTRIES = 25;
 
 function normalizeRequiredText(value, fieldName, maxLength) {
   if (typeof value !== 'string') {
@@ -93,7 +93,7 @@ function normalizeTrustHistory(entries) {
       const timeB = typeof b.occurredAt === 'string' ? Date.parse(b.occurredAt) : 0;
       return timeB - timeA;
     })
-    .slice(0, MAX_HISTORY_ENTRIES);
+    .slice(0, MAX_TRUST_HISTORY_ENTRIES);
 }
 
 export function createSourceUserTrustOverrideService({

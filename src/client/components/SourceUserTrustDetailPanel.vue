@@ -44,10 +44,11 @@ const props = defineProps({
   detail: { type: Object, default: null },
   errorMessage: { type: String, default: '' },
   isLoading: { type: Boolean, default: false },
+  isLoadingMoreHistory: { type: Boolean, default: false },
   isSaving: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['save-trust']);
+const emit = defineEmits(['load-more-history', 'save-trust']);
 
 const overrideForm = reactive({
   operatorNotes: '',
@@ -58,6 +59,14 @@ const overrideForm = reactive({
 const canPromote = computed(() => canPromoteSourceUserTrust(props.detail));
 const canReset = computed(() => canResetSourceUserTrust(props.detail));
 const hasHistory = computed(() => Array.isArray(props.detail?.trustHistory) && props.detail.trustHistory.length > 0);
+const canLoadMoreHistory = computed(() => {
+  const pagination = props.detail?.trustHistoryPagination;
+  if (!pagination) {
+    return false;
+  }
+
+  return props.detail.trustHistory.length < pagination.total;
+});
 
 watch(
   () => props.detail,
@@ -132,7 +141,7 @@ function submitOverride() {
           </div>
           <div class="hx-stat">
             <span class="hx-stat-label">HISTORY</span>
-            <span class="hx-stat-value source-user-detail-stat-value">{{ detail.trustHistoryCount ?? 0 }}</span>
+            <span class="hx-stat-value source-user-detail-stat-value">{{ detail.trustHistoryPagination?.total ?? detail.trustHistoryCount ?? 0 }}</span>
             <span class="hx-stat-meta">{{ checkedAt ? `Read ${formatOperationTimestampShort(checkedAt)}` : 'Server detail snapshot' }}</span>
           </div>
         </div>
@@ -205,7 +214,7 @@ function submitOverride() {
         </form>
 
         <div class="source-user-history" v-if="hasHistory">
-          <p class="ops-section-label">Trust history</p>
+          <p class="ops-section-label">Trust history <span v-if="detail.trustHistoryPagination" class="hx-text-muted">({{ detail.trustHistory.length }} of {{ detail.trustHistoryPagination.total }})</span></p>
           <div class="hx-table-scroll">
             <table class="hx-table" aria-label="Source user trust history">
               <thead>
@@ -227,6 +236,11 @@ function submitOverride() {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div v-if="canLoadMoreHistory" class="source-user-history-actions">
+            <button class="hx-btn" :disabled="isLoadingMoreHistory" @click="emit('load-more-history')">
+              {{ isLoadingMoreHistory ? 'Loading…' : 'Load more history' }}
+            </button>
           </div>
         </div>
       </template>
@@ -296,6 +310,11 @@ function submitOverride() {
 .source-user-history {
   display: grid;
   gap: var(--hx-space-2);
+}
+
+.source-user-history-actions {
+  display: flex;
+  justify-content: center;
 }
 
 @media (max-width: 720px) {

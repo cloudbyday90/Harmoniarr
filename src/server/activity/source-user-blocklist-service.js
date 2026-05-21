@@ -17,10 +17,27 @@
  */
 
 import { createApiError } from '../auth.js';
+import { MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
 
 const MAX_USERNAME_LENGTH = 128;
 const MAX_REASON_LENGTH = 400;
 const MAX_NOTES_LENGTH = 1000;
+
+function normalizeTrustHistory(rows) {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({ ...row }))
+    .sort((a, b) => {
+      const timeA = typeof a.occurredAt === 'string' ? Date.parse(a.occurredAt) : 0;
+      const timeB = typeof b.occurredAt === 'string' ? Date.parse(b.occurredAt) : 0;
+      return timeB - timeA;
+    })
+    .slice(0, MAX_TRUST_HISTORY_ENTRIES);
+}
 
 function normalizeWhitespace(value) {
   return value.replace(/\s+/g, ' ').trim();
@@ -178,6 +195,14 @@ export function createSourceUserBlocklistService({
     const existing = existingIndex >= 0 ? rows[existingIndex] : null;
     const wasBlocked = isBlockedSourceUser(existing);
     const nowIso = new Date().toISOString();
+    const blockHistoryEntry = wasBlocked ? null : {
+      actorUserId,
+      eventType: 'source_user_blocked',
+      id: `${nowIso}:blocklist_event:blocked:${rows.length + 1}`,
+      kind: 'blocklist_event',
+      occurredAt: nowIso,
+      reason: normalizedReason,
+    };
     const nextRow = {
       ...(existing ?? {}),
       blockedAt: wasBlocked ? (existing.blockedAt ?? nowIso) : nowIso,
@@ -185,6 +210,9 @@ export function createSourceUserBlocklistService({
       blockReason: normalizedReason,
       isBlocked: true,
       operatorNotes: normalizedNotes,
+      trustHistory: blockHistoryEntry
+        ? normalizeTrustHistory([blockHistoryEntry, ...(Array.isArray(existing?.trustHistory) ? existing.trustHistory : [])])
+        : (existing?.trustHistory ?? []),
       trustState: 'blocked',
       updatedAt: nowIso,
       username: normalizedUsername,
@@ -214,16 +242,25 @@ export function createSourceUserBlocklistService({
     }
 
     const existing = rows[existingIndex];
+    const nowIso = new Date().toISOString();
+    const unblockHistoryEntry = {
+      actorUserId,
+      eventType: 'source_user_unblocked',
+      id: `${nowIso}:blocklist_event:unblocked:${rows.length + 1}`,
+      kind: 'blocklist_event',
+      occurredAt: nowIso,
+    };
     const nextRow = {
       ...existing,
       blockedAt: null,
       blockedByUserId: null,
       blockReason: null,
       isBlocked: false,
+      trustHistory: normalizeTrustHistory([unblockHistoryEntry, ...(Array.isArray(existing.trustHistory) ? existing.trustHistory : [])]),
       trustState: existing.trustState === 'blocked' ? 'neutral' : existing.trustState,
-      unblockedAt: new Date().toISOString(),
+      unblockedAt: nowIso,
       unblockedByUserId: actorUserId ?? null,
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso,
       username: existing.username ?? normalizedUsername,
     };
 

@@ -111,3 +111,33 @@ test('recordSourceUserOutcomeEvidence records actor provenance in trust history'
   assert.equal(row.trustHistory[0].actorUserId, 'admin-1');
   assert.equal(row.trustHistory[0].reason, 'Imported cleanly');
 });
+
+test('recordSourceUserOutcomeEvidence compacts expired delivery_evidence entries', async (t) => {
+  const replaceTrustSnapshot = t.mock.fn(async () => {});
+  const oldDate = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString();
+  const service = createSourceUserTrustEvidenceService({
+    listTrustSnapshot: async () => ([{
+      failureCount: 1,
+      successCount: 1,
+      trustHistory: [
+        { id: 'old-evidence', kind: 'delivery_evidence', occurredAt: oldDate, outcome: 'success' },
+        { id: 'old-manual', kind: 'manual_override', occurredAt: oldDate, trustState: 'trusted' },
+        { id: 'old-blocklist', kind: 'blocklist_event', occurredAt: oldDate, eventType: 'source_user_blocked' },
+      ],
+      trustState: 'neutral',
+      username: 'aged-peer',
+    }]),
+    replaceTrustSnapshot,
+  });
+
+  const row = await service.recordSourceUserOutcomeEvidence({
+    eventType: 'import_candidate_applied',
+    outcome: 'success',
+    username: 'aged-peer',
+  });
+
+  const ids = row.trustHistory.map((e) => e.id);
+  assert.ok(!ids.includes('old-evidence'), 'expired delivery_evidence should be compacted');
+  assert.ok(ids.includes('old-manual'), 'manual_override entries should be preserved regardless of age');
+  assert.ok(ids.includes('old-blocklist'), 'blocklist_event entries should be preserved regardless of age');
+});

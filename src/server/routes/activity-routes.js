@@ -110,7 +110,11 @@ export function registerActivityRoutes(app, {
 
     response.json({
       ok: true,
-      ...(await getSourceUserDetail({ username: request.params.username })),
+      ...(await getSourceUserDetail({
+        username: request.params.username,
+        historyLimit: request.query.historyLimit,
+        historyOffset: request.query.historyOffset,
+      })),
     });
   }));
 

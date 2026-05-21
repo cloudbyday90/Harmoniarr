@@ -22,6 +22,7 @@ import {
   mapSourceUserTrustRow,
   normalizeSourceUserTrustSnapshotRows,
 } from './source-user-trust-service.js';
+import { DEFAULT_HISTORY_PAGE_SIZE, MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
 
 function normalizeUsername(value) {
   if (typeof value !== 'string') {
@@ -34,6 +35,32 @@ function normalizeUsername(value) {
   }
 
   return normalized;
+}
+
+function normalizeHistoryLimit(value) {
+  if (value == null || value === '') {
+    return DEFAULT_HISTORY_PAGE_SIZE;
+  }
+
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_TRUST_HISTORY_ENTRIES) {
+    throw createApiError(400, 'validation_error', `historyLimit must be an integer between 1 and ${MAX_TRUST_HISTORY_ENTRIES}`);
+  }
+
+  return parsed;
+}
+
+function normalizeHistoryOffset(value) {
+  if (value == null || value === '') {
+    return 0;
+  }
+
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > MAX_TRUST_HISTORY_ENTRIES) {
+    throw createApiError(400, 'validation_error', `historyOffset must be a non-negative integer up to ${MAX_TRUST_HISTORY_ENTRIES}`);
+  }
+
+  return parsed;
 }
 
 function normalizeTrustHistory(entries) {
@@ -64,8 +91,10 @@ function normalizeTrustHistory(entries) {
 export function createSourceUserTrustDetailService({
   listTrustSnapshot = async () => [],
 } = {}) {
-  async function getSourceUserDetail({ username } = {}) {
+  async function getSourceUserDetail({ username, historyLimit, historyOffset } = {}) {
     const normalizedUsername = normalizeUsername(username);
+    const limit = normalizeHistoryLimit(historyLimit);
+    const offset = normalizeHistoryOffset(historyOffset);
     const usernameKey = buildSourceUserUsernameKey(normalizedUsername);
     const rows = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot());
     const row = rows.find((entry) => buildSourceUserUsernameKey(entry?.username) === usernameKey);
@@ -74,11 +103,20 @@ export function createSourceUserTrustDetailService({
       throw createApiError(404, 'source_user_not_found', 'Source user was not found');
     }
 
+    const fullHistory = normalizeTrustHistory(row.trustHistory);
+    const totalCount = fullHistory.length;
+    const pagedHistory = fullHistory.slice(offset, offset + limit);
+
     return {
       checkedAt: new Date().toISOString(),
       sourceUser: {
         ...mapSourceUserTrustRow(row),
-        trustHistory: normalizeTrustHistory(row.trustHistory),
+        trustHistory: pagedHistory,
+        trustHistoryPagination: {
+          limit,
+          offset,
+          total: totalCount,
+        },
       },
     };
   }

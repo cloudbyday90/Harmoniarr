@@ -176,6 +176,8 @@ export function formatSourceUserUpdatedAt(timestamp) {
 
 export function formatSourceUserHistoryKind(kind) {
   switch (kind) {
+    case 'blocklist_event':
+      return 'Blocklist';
     case 'delivery_evidence':
       return 'Delivery evidence';
     case 'manual_override':
@@ -186,6 +188,10 @@ export function formatSourceUserHistoryKind(kind) {
 }
 
 export function formatSourceUserHistoryTone(entry) {
+  if (entry?.kind === 'blocklist_event') {
+    return entry?.eventType === 'source_user_blocked' ? 'danger' : 'success';
+  }
+
   if (entry?.kind === 'manual_override') {
     return entry?.trustState === 'trusted' ? 'success' : 'info';
   }
@@ -202,6 +208,14 @@ export function formatSourceUserHistoryTone(entry) {
 }
 
 export function formatSourceUserHistorySummary(entry) {
+  if (entry?.kind === 'blocklist_event') {
+    if (entry?.eventType === 'source_user_unblocked') {
+      return entry?.reason ?? 'Peer was unblocked.';
+    }
+
+    return entry?.reason ?? 'Peer was blocked.';
+  }
+
   if (entry?.kind === 'manual_override') {
     if (entry?.trustState === 'trusted') {
       return entry?.reason ?? 'Operator marked this peer as trusted.';

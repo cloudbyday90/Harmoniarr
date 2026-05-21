@@ -48,8 +48,11 @@ export function fetchActivitySourceUsers({ query, signal, trustState } = {}) {
   );
 }
 
-export function fetchActivitySourceUserDetail(username, { signal } = {}) {
-  return apiRequest(`/api/v1/activity/source-users/${encodeURIComponent(username)}`, { signal });
+export function fetchActivitySourceUserDetail(username, { historyLimit, historyOffset, signal } = {}) {
+  return apiRequest(
+    `/api/v1/activity/source-users/${encodeURIComponent(username)}${buildQueryString({ historyLimit, historyOffset })}`,
+    { signal },
+  );
 }
 
 export function updateActivitySourceUserTrust(username, { operatorNotes, reason, trustState } = {}) {

@@ -30,8 +30,7 @@ import {
   normalizeSourceUserTrustSnapshotRows,
   resolveSourceUserTrustState,
 } from './source-user-trust-service.js';
-
-const MAX_TRUST_HISTORY_ENTRIES = 25;
+import { HISTORY_RETENTION_MS, MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
 
 function toNonNegativeInteger(value) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -47,14 +46,28 @@ function mapReputationRow(row) {
   };
 }
 
+function compactExpiredEntries(rows) {
+  const cutoff = Date.now() - HISTORY_RETENTION_MS;
+  return rows.filter((row) => {
+    if (row.kind === 'manual_override' || row.kind === 'blocklist_event') {
+      return true;
+    }
+
+    const timestamp = typeof row.occurredAt === 'string' ? Date.parse(row.occurredAt) : 0;
+    return timestamp >= cutoff;
+  });
+}
+
 function normalizeTrustHistory(rows) {
   if (!Array.isArray(rows)) {
     return [];
   }
 
-  return rows
-    .filter((row) => row && typeof row === 'object')
-    .map((row) => ({ ...row }))
+  return compactExpiredEntries(
+    rows
+      .filter((row) => row && typeof row === 'object')
+      .map((row) => ({ ...row })),
+  )
     .sort((a, b) => {
       const timeA = typeof a.occurredAt === 'string' ? Date.parse(a.occurredAt) : 0;
       const timeB = typeof b.occurredAt === 'string' ? Date.parse(b.occurredAt) : 0;

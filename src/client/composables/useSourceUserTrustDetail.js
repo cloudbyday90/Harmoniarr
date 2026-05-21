@@ -32,6 +32,7 @@ export function useSourceUserTrustDetail({
   const detail = ref(null);
   const errorMessage = ref('');
   const isLoading = ref(false);
+  const isLoadingMoreHistory = ref(false);
   const isSaving = ref(false);
   const selectedUsername = ref('');
 
@@ -58,6 +59,38 @@ export function useSourceUserTrustDetail({
       errorMessage.value = getErrorMessage(error, 'Failed to load source user detail');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  async function loadMoreHistory() {
+    if (!detail.value?.trustHistoryPagination) {
+      return;
+    }
+
+    const { offset, total } = detail.value.trustHistoryPagination;
+    if (offset + (detail.value.trustHistory?.length ?? 0) >= total) {
+      return;
+    }
+
+    isLoadingMoreHistory.value = true;
+
+    try {
+      const nextOffset = offset + (detail.value.trustHistory?.length ?? 0);
+      const payload = await fetchActivitySourceUserDetail(selectedUsername.value, {
+        historyOffset: nextOffset,
+      });
+      const nextHistory = payload?.sourceUser?.trustHistory ?? [];
+      const nextPagination = payload?.sourceUser?.trustHistoryPagination ?? detail.value.trustHistoryPagination;
+
+      detail.value = {
+        ...detail.value,
+        trustHistory: [...(detail.value.trustHistory ?? []), ...nextHistory],
+        trustHistoryPagination: nextPagination,
+      };
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, 'Failed to load more history');
+    } finally {
+      isLoadingMoreHistory.value = false;
     }
   }
 
@@ -92,8 +125,10 @@ export function useSourceUserTrustDetail({
     detail,
     errorMessage,
     isLoading,
+    isLoadingMoreHistory,
     isSaving,
     load,
+    loadMoreHistory,
     saveTrustState,
     selectedUsername,
   };

@@ -106,6 +106,7 @@ test('unblockSourceUser clears block state and preserves the row', async (t) => 
         blockReason: 'Malware spam',
         failureCount: 4,
         isBlocked: true,
+        trustHistory: [{ id: 'existing', kind: 'blocklist_event', eventType: 'source_user_blocked' }],
         trustState: 'blocked',
         username: 'bad-peer',
       },
@@ -121,6 +122,7 @@ test('unblockSourceUser clears block state and preserves the row', async (t) => 
   assert.equal(nextSnapshot.sourceUsers[0].trustState, 'neutral');
   assert.equal(nextSnapshot.sourceUsers[0].failureCount, 4);
   assert.equal(nextSnapshot.sourceUsers[0].blockReason, null);
+  assert.equal(nextSnapshot.sourceUsers[0].trustHistory.length, 2);
 });
 
 test('unblockSourceUser throws when the username is not currently blocked', async () => {
@@ -132,6 +134,71 @@ test('unblockSourceUser throws when the username is not currently blocked', asyn
     () => service.unblockSourceUser({ username: 'bad-peer' }),
     (error) => error?.status === 404 && error?.code === 'source_user_block_not_found',
   );
+});
+
+test('blockSourceUser appends a blocklist_event to trust history', async (t) => {
+  const replaceTrustSnapshot = t.mock.fn(async () => {});
+  const service = createSourceUserBlocklistService({
+    listTrustSnapshot: async () => ([]),
+    replaceTrustSnapshot,
+  });
+
+  await service.blockSourceUser({
+    actorUserId: 'admin-1',
+    reason: 'Fake files',
+    username: 'bad-peer',
+  });
+
+  const [nextSnapshot] = replaceTrustSnapshot.mock.calls[0].arguments;
+  const history = nextSnapshot.sourceUsers[0].trustHistory;
+
+  assert.equal(history.length, 1);
+  assert.equal(history[0].kind, 'blocklist_event');
+  assert.equal(history[0].eventType, 'source_user_blocked');
+  assert.equal(history[0].reason, 'Fake files');
+  assert.equal(history[0].actorUserId, 'admin-1');
+});
+
+test('blockSourceUser does not duplicate history when re-blocking', async (t) => {
+  const replaceTrustSnapshot = t.mock.fn(async () => {});
+  const service = createSourceUserBlocklistService({
+    listTrustSnapshot: async () => ([{
+      isBlocked: true,
+      trustHistory: [{ id: 'existing', kind: 'blocklist_event', eventType: 'source_user_blocked' }],
+      trustState: 'blocked',
+      username: 'bad-peer',
+    }]),
+    replaceTrustSnapshot,
+  });
+
+  await service.blockSourceUser({ reason: 'Updated', username: 'bad-peer' });
+
+  const [nextSnapshot] = replaceTrustSnapshot.mock.calls[0].arguments;
+  assert.equal(nextSnapshot.sourceUsers[0].trustHistory.length, 1);
+});
+
+test('unblockSourceUser appends a blocklist_event to trust history', async (t) => {
+  const replaceTrustSnapshot = t.mock.fn(async () => {});
+  const service = createSourceUserBlocklistService({
+    listTrustSnapshot: async () => ([{
+      isBlocked: true,
+      trustHistory: [{ id: 'existing', kind: 'blocklist_event', eventType: 'source_user_blocked' }],
+      trustState: 'blocked',
+      username: 'bad-peer',
+    }]),
+    replaceTrustSnapshot,
+  });
+
+  await service.unblockSourceUser({ actorUserId: 'admin-2', username: 'bad-peer' });
+
+  const [nextSnapshot] = replaceTrustSnapshot.mock.calls[0].arguments;
+  const history = nextSnapshot.sourceUsers[0].trustHistory;
+
+  assert.equal(history.length, 2);
+  assert.equal(history[0].kind, 'blocklist_event');
+  assert.equal(history[0].eventType, 'source_user_unblocked');
+  assert.equal(history[0].actorUserId, 'admin-2');
+  assert.equal(history[1].eventType, 'source_user_blocked');
 });
 
 test('blockSourceUser validates required fields', async () => {
