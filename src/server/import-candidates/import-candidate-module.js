@@ -64,6 +64,9 @@ export function createImportCandidateModule({
   }),
   getAppUserById = null,
   listSourceUserReputationIndexFn = async () => new Map(),
+  onDownloadCompletedFn = null,
+  onReleaseAddedFn = null,
+  recordActivityEventFn = null,
   recordSourceUserOutcomeEvidenceFn = async () => null,
   sendFulfillmentNotificationFn = null,
   slskdService,
@@ -168,6 +171,8 @@ export function createImportCandidateModule({
     renewLease: importCandidateApplyRunStore.renewLease,
     replaceImportApplyRunItems,
     sendFulfillmentNotificationFn,
+    onReleaseAddedFn,
+    recordActivityEventFn,
     updateImportApplyRunItem,
   }),
   importCandidateMediaInspectionWorker = createImportCandidateMediaInspectionWorker({
@@ -260,6 +265,8 @@ export function createImportCandidateModule({
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
     markImportCandidateDownloading: importCandidateService.markImportCandidateDownloading,
     markImportCandidateImportPending: importCandidateService.markImportCandidateImportPending,
+    onDownloadCompletedFn,
+    recordActivityEventFn,
     updateImportExecutionRunItem,
   }),
 } = {}) {

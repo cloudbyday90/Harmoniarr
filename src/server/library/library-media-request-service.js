@@ -260,6 +260,7 @@ export function createLibraryMediaRequestService({
   releaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),
   recordActivityEventFn = null,
   recordAuditEventFn = recordAuditEvent,
+  onRequestCreatedFn = null,
 } = {}) {
   async function resolveRequestedForUserId({ actorUserId, actorUserRole, requestedForUserId }) {
     const normalizedRequestedForUserId = normalizeOptionalUserId(requestedForUserId, 'requestedForUserId');
@@ -421,6 +422,15 @@ export function createLibraryMediaRequestService({
         entityTitle: draft.releaseTitle ?? draft.artistName ?? null,
         entityType: 'media_request',
         eventType: 'request_created',
+      }).catch(() => {});
+    }
+
+    if (typeof onRequestCreatedFn === 'function') {
+      void onRequestCreatedFn({
+        actorUserId,
+        artistName: draft.artistName ?? null,
+        requestKind: draft.requestKind,
+        releaseTitle: draft.releaseTitle ?? null,
       }).catch(() => {});
     }
 

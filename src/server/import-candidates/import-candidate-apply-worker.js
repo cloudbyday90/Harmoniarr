@@ -132,6 +132,8 @@ export function createImportCandidateApplyWorker({
   renewLease,
   replaceImportApplyRunItems = async () => [],
   sendFulfillmentNotificationFn = null,
+  onReleaseAddedFn = null,
+  recordActivityEventFn = null,
   updateImportApplyRunItem = async () => null,
 } = {}) {
   const activeRunIds = new Set();
@@ -250,6 +252,35 @@ export function createImportCandidateApplyWorker({
               ?? null;
             if (notifyUserId && typeof sendFulfillmentNotificationFn === 'function') {
               void sendFulfillmentNotificationFn({ userId: notifyUserId }).catch(() => {});
+            }
+
+            if (typeof onReleaseAddedFn === 'function') {
+              void onReleaseAddedFn({
+                folderPath: summaryCandidate.folderPath ?? null,
+                importCandidateId: summaryCandidate.id,
+                username: summaryCandidate.username ?? null,
+              }).catch(() => {});
+            }
+
+            if (typeof recordActivityEventFn === 'function') {
+              void recordActivityEventFn({
+                actorUserId: null,
+                entityId: summaryCandidate.id,
+                entityTitle: summaryCandidate.folderPath ?? null,
+                entityType: 'import_candidate',
+                eventType: 'release_added',
+              }).catch(() => {});
+            }
+
+            if (notifyUserId && typeof recordActivityEventFn === 'function') {
+              void recordActivityEventFn({
+                actorUserId: null,
+                entityId: summaryCandidate.id,
+                entityTitle: summaryCandidate.folderPath ?? null,
+                entityType: 'import_candidate',
+                eventType: 'request_fulfilled',
+                extraPayload: { requestedForUserId: notifyUserId },
+              }).catch(() => {});
             }
           }
         } catch (error) {

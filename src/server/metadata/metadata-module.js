@@ -40,6 +40,7 @@ import { createOperationRunInterruptionGate } from '../operation-run-cancellatio
 
 export function createMetadataModule({
   maintenanceLockOperationPauseService = null,
+  onArtistMonitoredFn = null,
   reconcileWantedReleases = null,
   metadataArtistRefreshRunStore = null,
   metadataArtistRefreshService = null,
@@ -79,6 +80,7 @@ export function createMetadataModule({
     metadataMonitoringStore: resolvedMetadataMonitoringStore,
     metadataRefreshSchedulerService: resolvedMetadataRefreshSchedulerService,
     recordActivityEventFn,
+    onArtistMonitoredFn,
   });
   const resolvedMetadataRefreshService = metadataRefreshService ?? createMetadataRefreshService({
     getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,

@@ -70,6 +70,7 @@ export function createMetadataMonitoringService({
   metadataMonitoringStore = createMetadataMonitoringStore(),
   metadataRefreshSchedulerService = createMetadataRefreshSchedulerService({ metadataMonitoringStore }),
   recordActivityEventFn = null,
+  onArtistMonitoredFn = null,
 } = {}) {
   async function ensureArtistExists(metadataArtistId) {
     const pool = getPoolFn();
@@ -112,6 +113,14 @@ export function createMetadataMonitoringService({
         entityTitle: artist.name ?? null,
         entityType: 'artist',
         eventType: 'artist_monitored',
+      }).catch(() => {});
+    }
+
+    if (normalizedPatch.isMonitored && typeof onArtistMonitoredFn === 'function') {
+      void onArtistMonitoredFn({
+        actorUserId,
+        artistName: artist.name ?? null,
+        metadataArtistId,
       }).catch(() => {});
     }
 

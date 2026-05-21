@@ -100,6 +100,8 @@ export function createImportCandidateExecutionReconciliationService({
   markImportCandidateDownloadFailed = async () => null,
   markImportCandidateDownloading = async () => null,
   markImportCandidateImportPending = async () => null,
+  onDownloadCompletedFn = null,
+  recordActivityEventFn = null,
   updateImportExecutionRunItem = async () => null,
 } = {}) {
   async function reconcileImportCandidateExecutionSummary({
@@ -154,6 +156,24 @@ export function createImportCandidateExecutionReconciliationService({
           reason,
           requestMetadata,
         });
+
+        if (typeof onDownloadCompletedFn === 'function' && result?.candidate) {
+          void onDownloadCompletedFn({
+            importCandidateId,
+            username: result.candidate.username ?? null,
+            folderPath: result.candidate.folderPath ?? null,
+          }).catch(() => {});
+        }
+
+        if (typeof recordActivityEventFn === 'function' && result?.candidate) {
+          void recordActivityEventFn({
+            actorUserId: null,
+            entityId: importCandidateId,
+            entityTitle: result.candidate.folderPath ?? null,
+            entityType: 'import_candidate',
+            eventType: 'download_completed',
+          }).catch(() => {});
+        }
       } else if (targetStatus === 'failed') {
         result = await markImportCandidateDownloadFailed({
           actorUserId,

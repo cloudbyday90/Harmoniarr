@@ -264,6 +264,28 @@ export function createApp({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
     listSourceUserReputationIndexFn: activityModule.sourceUserTrustEvidenceService.listSourceUserReputationIndex,
+    onDownloadCompletedFn: ({ folderPath, username }) => broadcastAdminNotification({
+      category: 'downloadCompleted',
+      listAppUsers: adminDispatchDeps.listAppUsers,
+      getUserPreferences: adminDispatchDeps.getUserPreferences,
+      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: `Download from "${username}" completed: ${folderPath}`,
+        title: 'Download completed',
+        url: '/app/activity/imports',
+      },
+    }),
+    onReleaseAddedFn: ({ folderPath, username }) => broadcastAdminNotification({
+      category: 'releaseAdded',
+      listAppUsers: adminDispatchDeps.listAppUsers,
+      getUserPreferences: adminDispatchDeps.getUserPreferences,
+      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: `Release from "${username}" added to library: ${folderPath}`,
+        title: 'Release added',
+        url: '/app/activity/imports',
+      },
+    }),
     sendFulfillmentNotificationFn: async ({ userId }) => {
       const allowed = await shouldSendNotification({
         category: 'requestFulfilled',
@@ -294,6 +316,7 @@ export function createApp({
     }),
     maintenanceLockService,
     maintenanceLockOperationPauseService,
+    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
     slskdTransferSnapshotService: slskdModule.slskdTransferSnapshotService,
     slskdService: slskdModule.slskdService,
@@ -306,6 +329,21 @@ export function createApp({
     importCandidateService: importCandidateModule.importCandidateService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,
+    onRequestCreatedFn: ({ _actorUserId, artistName, releaseTitle }) => broadcastAdminNotification({
+      category: 'requestCreated',
+      listAppUsers: adminDispatchDeps.listAppUsers,
+      getUserPreferences: adminDispatchDeps.getUserPreferences,
+      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: releaseTitle
+          ? `New request: ${artistName} - ${releaseTitle}`
+          : artistName
+            ? `New request: ${artistName}`
+            : 'New music request submitted',
+        title: 'Music request created',
+        url: '/app/activity/wanted',
+      },
+    }),
     prefetchMonitoredArtistArtwork: artworkModule.artworkMonitoredArtistPrefetchService?.prefetchMonitoredArtistArtwork,
     providerClientResolverService: createProviderClientResolverService({
       spotifyOAuthService: providerModule.spotifyOAuthService,
@@ -317,6 +355,17 @@ export function createApp({
   });
   const metadataModule = buildMetadataModule({
     maintenanceLockOperationPauseService,
+    onArtistMonitoredFn: ({ artistName }) => broadcastAdminNotification({
+      category: 'artistMonitored',
+      listAppUsers: adminDispatchDeps.listAppUsers,
+      getUserPreferences: adminDispatchDeps.getUserPreferences,
+      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: `"${artistName}" is now being monitored for new releases`,
+        title: 'Artist monitored',
+        url: '/app/activity/releases',
+      },
+    }),
     providerHealthRecorder,
     reconcileWantedReleases: libraryModule.libraryWantedReleaseService.reconcileWantedReleases,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
