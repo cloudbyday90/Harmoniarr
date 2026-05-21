@@ -19,20 +19,17 @@
 import { broadcastNotification } from './notification-broadcast-service.js';
 
 /**
- * Broadcast a push notification to every admin user who has the given
- * notification category enabled in their preferences.
- *
- * Fire-and-forget — errors are swallowed so notification failures never
- * block the originating domain operation.
+ * Broadcast a push notification to every app user who has the given category
+ * enabled in their preferences.
  *
  * @param {object} options
- * @param {string} options.category - A key from NOTIFICATION_CATEGORIES.
+ * @param {string} options.category
  * @param {{ title: string, body: string, url: string }} options.payload
- * @param {function} options.listAppUsers - Returns all app users.
- * @param {function} options.getUserPreferences - Reads a user's preferences.
- * @param {function} options.sendNotificationToUser - Sends push to one user.
+ * @param {function} options.listAppUsers
+ * @param {function} options.getUserPreferences
+ * @param {function} options.sendNotificationToUser
  */
-export async function broadcastAdminNotification({
+export async function broadcastHouseholdNotification({
   category,
   payload,
   listAppUsers,
@@ -44,7 +41,6 @@ export async function broadcastAdminNotification({
     getUserPreferences,
     listAppUsers,
     payload,
-    recipientFilter: (user) => user.role === 'admin',
     sendNotificationToUser,
   });
 }

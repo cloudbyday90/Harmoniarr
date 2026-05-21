@@ -69,6 +69,7 @@ import { loadSettings } from './settings.js';
 import { createSettingsService } from './settings-service.js';
 import { shouldSendNotification } from './notification/notification-preference-service.js';
 import { broadcastAdminNotification } from './notification/notification-admin-dispatch-service.js';
+import { broadcastHouseholdNotification } from './notification/notification-household-dispatch-service.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
 import { createSlskdModule } from './slskd/slskd-module.js';
 import { createSystemModule } from './system-module.js';
@@ -226,7 +227,7 @@ export function createApp({
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore();
   const pushModule = buildPushModule();
-  const adminDispatchDeps = {
+  const notificationDispatchDeps = {
     getUserPreferences: appUserModule.appUserService.getUserPreferences,
     listAppUsers: appUserModule.appUserService.listAppUsers,
     sendNotificationToUser: pushModule.pushNotificationService.sendNotificationToUser,
@@ -236,9 +237,9 @@ export function createApp({
     replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
     onTrustOverrideFn: ({ _actorUserId, _reason, trustState, username }) => broadcastAdminNotification({
       category: 'trustOverride',
-      listAppUsers: adminDispatchDeps.listAppUsers,
-      getUserPreferences: adminDispatchDeps.getUserPreferences,
-      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
       payload: {
         body: `Source user "${username}" trust level changed to ${trustState}`,
         title: 'Trust override',
@@ -247,9 +248,9 @@ export function createApp({
     }),
     onBlockEventFn: ({ eventType, _reason, username }) => broadcastAdminNotification({
       category: 'blocklistEvent',
-      listAppUsers: adminDispatchDeps.listAppUsers,
-      getUserPreferences: adminDispatchDeps.getUserPreferences,
-      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
       payload: {
         body: eventType === 'blocked'
           ? `Source user "${username}" has been blocked`
@@ -260,9 +261,9 @@ export function createApp({
     }),
     onTrustThresholdCrossedFn: ({ failureCount, reason, reviewState, successCount, successRatePercent, username }) => broadcastAdminNotification({
       category: 'trustThresholdCrossed',
-      listAppUsers: adminDispatchDeps.listAppUsers,
-      getUserPreferences: adminDispatchDeps.getUserPreferences,
-      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
       payload: {
         body: `Source user "${username}" moved to ${reviewState} (${successCount} success, ${failureCount} failure, ${successRatePercent ?? 0}% success). ${reason}`,
         title: 'Trust threshold crossed',
@@ -275,22 +276,22 @@ export function createApp({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
     listSourceUserReputationIndexFn: activityModule.sourceUserTrustEvidenceService.listSourceUserReputationIndex,
-    onDownloadCompletedFn: ({ folderPath, username }) => broadcastAdminNotification({
+    onDownloadCompletedFn: ({ folderPath, username }) => broadcastHouseholdNotification({
       category: 'downloadCompleted',
-      listAppUsers: adminDispatchDeps.listAppUsers,
-      getUserPreferences: adminDispatchDeps.getUserPreferences,
-      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
       payload: {
         body: `Download from "${username}" completed: ${folderPath}`,
         title: 'Download completed',
         url: '/app/activity/imports',
       },
     }),
-    onReleaseAddedFn: ({ folderPath, username }) => broadcastAdminNotification({
+    onReleaseAddedFn: ({ folderPath, username }) => broadcastHouseholdNotification({
       category: 'releaseAdded',
-      listAppUsers: adminDispatchDeps.listAppUsers,
-      getUserPreferences: adminDispatchDeps.getUserPreferences,
-      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
       payload: {
         body: `Release from "${username}" added to library: ${folderPath}`,
         title: 'Release added',
@@ -340,11 +341,11 @@ export function createApp({
     importCandidateService: importCandidateModule.importCandidateService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,
-    onRequestCreatedFn: ({ _actorUserId, artistName, releaseTitle }) => broadcastAdminNotification({
+    onRequestCreatedFn: ({ _actorUserId, artistName, releaseTitle }) => broadcastHouseholdNotification({
       category: 'requestCreated',
-      listAppUsers: adminDispatchDeps.listAppUsers,
-      getUserPreferences: adminDispatchDeps.getUserPreferences,
-      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
       payload: {
         body: releaseTitle
           ? `New request: ${artistName} - ${releaseTitle}`
@@ -366,11 +367,11 @@ export function createApp({
   });
   const metadataModule = buildMetadataModule({
     maintenanceLockOperationPauseService,
-    onArtistMonitoredFn: ({ artistName }) => broadcastAdminNotification({
+    onArtistMonitoredFn: ({ artistName }) => broadcastHouseholdNotification({
       category: 'artistMonitored',
-      listAppUsers: adminDispatchDeps.listAppUsers,
-      getUserPreferences: adminDispatchDeps.getUserPreferences,
-      sendNotificationToUser: adminDispatchDeps.sendNotificationToUser,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
       payload: {
         body: `"${artistName}" is now being monitored for new releases`,
         title: 'Artist monitored',
