@@ -22,11 +22,15 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useToast } from '../composables/useToast.js';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import OperationRunDrilldownPanel from '../components/OperationRunDrilldownPanel.vue';
 import {
   buildOperationsRouteQuery,
   getOperationsRouteStateKey,
   normalizeOperationsRouteState,
 } from '../lib/operations-route-state.js';
+import {
+  getOperationRunDrilldownSummaryKeys,
+} from '../lib/operation-run-drilldown-presentation.js';
 import {
   buildOperationRunLinkTarget,
   canRequestOperationRunCancellation,
@@ -92,6 +96,11 @@ const {
 const operationsRouteState = computed(() => normalizeOperationsRouteState(route.query));
 const selectedRun = computed(() => selectedRunDetail.value?.run ?? null);
 const selectedRunLease = computed(() => selectedRun.value?.lease ?? null);
+const selectedRunSummaryEntries = computed(() => {
+  const hiddenKeys = new Set(getOperationRunDrilldownSummaryKeys(selectedRun.value));
+  return buildOperationSummaryEntries(selectedRun.value?.summary)
+    .filter((entry) => !hiddenKeys.has(entry.key));
+});
 const canRequestCancellation = computed(() => canRequestOperationRunCancellation(selectedRun.value));
 const canRequestRetry = computed(() => canRequestOperationRunRetry(selectedRun.value));
 const selectedRunWorkflowTarget = computed(() => buildOperationRunLinkTarget({
@@ -558,6 +567,8 @@ watch(
               </div>
             </div>
 
+            <OperationRunDrilldownPanel :run="selectedRun" />
+
             <details class="ops-technical-details">
               <summary>Technical detail</summary>
               <dl class="ops-meta-dl">
@@ -623,17 +634,17 @@ watch(
                 </div>
               </dl>
 
-              <div v-if="buildOperationSummaryEntries(selectedRun.summary).length" class="ops-sub-section">
+              <div v-if="selectedRunSummaryEntries.length" class="ops-sub-section">
                 <p class="ops-section-label">Recorded outcome</p>
                 <dl class="ops-meta-dl">
-                  <div v-for="entry in buildOperationSummaryEntries(selectedRun.summary)" :key="entry.key">
+                  <div v-for="entry in selectedRunSummaryEntries" :key="entry.key">
                     <dt>{{ formatOperationSummaryLabel(entry.key) }}</dt>
                     <dd>{{ formatOperationSummaryValue(entry.value) }}</dd>
                   </div>
                 </dl>
               </div>
 
-              <div v-if="Object.keys(selectedRun.summary ?? {}).length && !buildOperationSummaryEntries(selectedRun.summary).length" class="ops-sub-section">
+              <div v-if="Object.keys(selectedRun.summary ?? {}).length && !selectedRunSummaryEntries.length && !getOperationRunDrilldownSummaryKeys(selectedRun).length" class="ops-sub-section">
                 <p class="ops-section-label">Raw JSON</p>
                 <pre class="ops-pre">{{ JSON.stringify(selectedRun.summary, null, 2) }}</pre>
               </div>
