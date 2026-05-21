@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createApiError } from '../../src/server/auth.js';
 import { normalizeUserPreferences, VALID_PREFERRED_FORMATS, VALID_MINIMUM_QUALITIES } from '../../src/server/app-user-service.js';
+import { NOTIFICATION_CATEGORY_KEYS, buildDefaultNotificationPreferences } from '../../src/server/notification/notification-preference-constants.js';
 import { registerAppUserRoutes } from '../../src/server/routes/app-user-routes.js';
 import { createJsonTestApp, withServer } from '../../testing/server/http-test-helpers.js';
 
@@ -27,7 +28,7 @@ import { createJsonTestApp, withServer } from '../../testing/server/http-test-he
 
 const TEST_SESSION = { appUserId: 'user-pref-1', csrfToken: 'csrf-pref' };
 
-const DEFAULT_PREFERENCES = { preferredFormat: 'any', minimumQuality: 'any' };
+const DEFAULT_PREFERENCES = { preferredFormat: 'any', minimumQuality: 'any', notificationPreferences: buildDefaultNotificationPreferences() };
 
 function createPreferencesRouteTestApp(overrides = {}) {
   return createJsonTestApp((app) => {
@@ -48,6 +49,7 @@ function createPreferencesRouteTestApp(overrides = {}) {
       updateUserPreferences: async ({ preferences }) => ({
         preferredFormat: preferences?.preferredFormat ?? 'any',
         minimumQuality: preferences?.minimumQuality ?? 'any',
+        notificationPreferences: preferences?.notificationPreferences ?? buildDefaultNotificationPreferences(),
       }),
       ...overrides,
     });
@@ -57,11 +59,17 @@ function createPreferencesRouteTestApp(overrides = {}) {
 // ── normalizeUserPreferences ──────────────────────────────────────────────────
 
 test('normalizeUserPreferences: returns all-any defaults for empty object', () => {
-  assert.deepEqual(normalizeUserPreferences({}), { preferredFormat: 'any', minimumQuality: 'any' });
+  const result = normalizeUserPreferences({});
+  assert.equal(result.preferredFormat, 'any');
+  assert.equal(result.minimumQuality, 'any');
+  assert.deepEqual(result.notificationPreferences, buildDefaultNotificationPreferences());
 });
 
 test('normalizeUserPreferences: returns all-any defaults for null', () => {
-  assert.deepEqual(normalizeUserPreferences(null), { preferredFormat: 'any', minimumQuality: 'any' });
+  const result = normalizeUserPreferences(null);
+  assert.equal(result.preferredFormat, 'any');
+  assert.equal(result.minimumQuality, 'any');
+  assert.deepEqual(result.notificationPreferences, buildDefaultNotificationPreferences());
 });
 
 test('normalizeUserPreferences: preserves valid preferredFormat values', () => {
@@ -88,13 +96,42 @@ test('normalizeUserPreferences: falls back to any for unknown minimumQuality', (
 
 test('normalizeUserPreferences: ignores unrecognised extra keys', () => {
   const result = normalizeUserPreferences({ preferredFormat: 'flac', theme: 'dark', extra: 'value' });
-  assert.deepEqual(result, { preferredFormat: 'flac', minimumQuality: 'any' });
+  assert.equal(result.preferredFormat, 'flac');
+  assert.equal(result.minimumQuality, 'any');
+});
+
+test('normalizeUserPreferences: preserves valid notificationPreferences', () => {
+  const prefs = { ...buildDefaultNotificationPreferences(), requestFulfilled: false };
+  const result = normalizeUserPreferences({ notificationPreferences: prefs });
+  assert.equal(result.notificationPreferences.requestFulfilled, false);
+  assert.equal(result.notificationPreferences.downloadCompleted, true);
+});
+
+test('normalizeUserPreferences: fills defaults for missing notification category keys', () => {
+  const result = normalizeUserPreferences({ notificationPreferences: { requestFulfilled: false } });
+  assert.equal(result.notificationPreferences.requestFulfilled, false);
+  for (const key of NOTIFICATION_CATEGORY_KEYS) {
+    if (key !== 'requestFulfilled') {
+      assert.equal(result.notificationPreferences[key], true, `${key} should default to true`);
+    }
+  }
+});
+
+test('normalizeUserPreferences: ignores non-boolean notification values', () => {
+  const result = normalizeUserPreferences({ notificationPreferences: { requestFulfilled: 'yes' } });
+  assert.equal(result.notificationPreferences.requestFulfilled, true);
+});
+
+test('normalizeUserPreferences: ignores non-object notificationPreferences', () => {
+  const result = normalizeUserPreferences({ notificationPreferences: 'all' });
+  assert.deepEqual(result.notificationPreferences, buildDefaultNotificationPreferences());
 });
 
 // ── GET /api/v1/users/me/preferences ─────────────────────────────────────────
 
 test('GET /users/me/preferences: returns preferences for the authenticated user', async (t) => {
-  const getUserPreferences = t.mock.fn(async () => ({ preferredFormat: 'flac', minimumQuality: 'lossless' }));
+  const fullPrefs = { preferredFormat: 'flac', minimumQuality: 'lossless', notificationPreferences: buildDefaultNotificationPreferences() };
+  const getUserPreferences = t.mock.fn(async () => fullPrefs);
   const app = createPreferencesRouteTestApp({ getUserPreferences });
 
   await withServer(app, async (baseUrl) => {
@@ -103,7 +140,9 @@ test('GET /users/me/preferences: returns preferences for the authenticated user'
 
     assert.equal(response.status, 200);
     assert.equal(payload.ok, true);
-    assert.deepEqual(payload.preferences, { preferredFormat: 'flac', minimumQuality: 'lossless' });
+    assert.equal(payload.preferences.preferredFormat, 'flac');
+    assert.equal(payload.preferences.minimumQuality, 'lossless');
+    assert.deepEqual(payload.preferences.notificationPreferences, buildDefaultNotificationPreferences());
   });
 });
 
@@ -135,7 +174,8 @@ test('GET /users/me/preferences: preserves auth failures from the injected fresh
 // ── PATCH /api/v1/users/me/preferences ───────────────────────────────────────
 
 test('PATCH /users/me/preferences: returns updated preferences on valid input', async (t) => {
-  const updateUserPreferences = t.mock.fn(async () => ({ preferredFormat: 'mp3_320', minimumQuality: 'high' }));
+  const updatedPrefs = { preferredFormat: 'mp3_320', minimumQuality: 'high', notificationPreferences: buildDefaultNotificationPreferences() };
+  const updateUserPreferences = t.mock.fn(async () => updatedPrefs);
   const app = createPreferencesRouteTestApp({ updateUserPreferences });
 
   await withServer(app, async (baseUrl) => {
@@ -148,7 +188,8 @@ test('PATCH /users/me/preferences: returns updated preferences on valid input', 
 
     assert.equal(response.status, 200);
     assert.equal(payload.ok, true);
-    assert.deepEqual(payload.preferences, { preferredFormat: 'mp3_320', minimumQuality: 'high' });
+    assert.equal(payload.preferences.preferredFormat, 'mp3_320');
+    assert.equal(payload.preferences.minimumQuality, 'high');
   });
 });
 
@@ -237,5 +278,85 @@ test('PATCH /users/me/preferences: preserves auth failures from the injected fre
 
     assert.equal(response.status, 401);
     assert.equal(payload.error?.code, 'auth_required');
+  });
+});
+
+// ── PATCH /api/v1/users/me/preferences with notificationPreferences ──────────
+
+test('PATCH /users/me/preferences: accepts notificationPreferences with valid booleans', async (t) => {
+  const notifPrefs = { ...buildDefaultNotificationPreferences(), requestFulfilled: false };
+  const updatedPrefs = { preferredFormat: 'any', minimumQuality: 'any', notificationPreferences: notifPrefs };
+  const updateUserPreferences = t.mock.fn(async () => updatedPrefs);
+  const app = createPreferencesRouteTestApp({ updateUserPreferences });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/me/preferences`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notificationPreferences: { requestFulfilled: false } }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.preferences.notificationPreferences.requestFulfilled, false);
+  });
+});
+
+test('PATCH /users/me/preferences: rejects non-object notificationPreferences', async (t) => {
+  const updateUserPreferences = async () => {
+    throw createApiError(400, 'validation_error', 'notificationPreferences must be an object');
+  };
+  const app = createPreferencesRouteTestApp({ updateUserPreferences });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/me/preferences`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notificationPreferences: 'all' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(payload.error?.code, 'validation_error');
+  });
+});
+
+test('PATCH /users/me/preferences: rejects unknown notification category keys', async (t) => {
+  const updateUserPreferences = async () => {
+    throw createApiError(400, 'validation_error', 'Unknown notification categories: fakeCategory');
+  };
+  const app = createPreferencesRouteTestApp({ updateUserPreferences });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/me/preferences`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notificationPreferences: { fakeCategory: true } }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(payload.error?.code, 'validation_error');
+    assert.ok(payload.error?.message?.includes('Unknown notification'));
+  });
+});
+
+test('PATCH /users/me/preferences: rejects non-boolean notification category value', async (t) => {
+  const updateUserPreferences = async () => {
+    throw createApiError(400, 'validation_error', 'notificationPreferences.requestFulfilled must be a boolean');
+  };
+  const app = createPreferencesRouteTestApp({ updateUserPreferences });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users/me/preferences`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notificationPreferences: { requestFulfilled: 'yes' } }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(payload.error?.code, 'validation_error');
   });
 });

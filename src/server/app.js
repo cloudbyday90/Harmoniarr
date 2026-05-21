@@ -67,6 +67,7 @@ import { registerSystemRoutes } from './routes/system-routes.js';
 import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { loadSettings } from './settings.js';
 import { createSettingsService } from './settings-service.js';
+import { shouldSendNotification } from './notification/notification-preference-service.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
 import { createSlskdModule } from './slskd/slskd-module.js';
 import { createSystemModule } from './system-module.js';
@@ -233,14 +234,23 @@ export function createApp({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
     listSourceUserReputationIndexFn: activityModule.sourceUserTrustEvidenceService.listSourceUserReputationIndex,
-    sendFulfillmentNotificationFn: ({ userId }) => pushModule.pushNotificationService.sendNotificationToUser({
-      payload: {
-        body: 'Your requested music has been added to your library.',
-        title: 'Music request ready',
-        url: '/app/my-requests',
-      },
-      userId,
-    }),
+    sendFulfillmentNotificationFn: async ({ userId }) => {
+      const allowed = await shouldSendNotification({
+        category: 'requestFulfilled',
+        getUserPreferences: appUserModule.appUserService.getUserPreferences,
+        userId,
+      });
+      if (!allowed) return { sent: 0, failed: 0, removed: 0 };
+
+      return pushModule.pushNotificationService.sendNotificationToUser({
+        payload: {
+          body: 'Your requested music has been added to your library.',
+          title: 'Music request ready',
+          url: '/app/my-requests',
+        },
+        userId,
+      });
+    },
     mediaInspectionService: createMediaInspectionService({
       ffprobeBin: ffprobeBinary,
       getMediaToolingStatus: mediaToolingStatusService.getStatus,

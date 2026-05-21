@@ -30,20 +30,22 @@ export function fetchMyPreferences({ signal } = {}) {
 }
 
 /**
- * Update the authenticated user's format/quality preferences.
+ * Update the authenticated user's format/quality and/or notification preferences.
  *
  * Accepts a partial patch — only specified keys are updated on the server.
  *
  * @param {object} patch
  * @param {string} [patch.preferredFormat]
  * @param {string} [patch.minimumQuality]
+ * @param {Record<string, boolean>} [patch.notificationPreferences]
  * @param {AbortSignal} [patch.signal]
- * @returns {Promise<{ ok: boolean, preferences: { preferredFormat: string, minimumQuality: string } }>}
+ * @returns {Promise<{ ok: boolean, preferences: object }>}
  */
-export function updateMyPreferences({ preferredFormat, minimumQuality, signal } = {}) {
+export function updateMyPreferences({ preferredFormat, minimumQuality, notificationPreferences, signal } = {}) {
   const body = {};
   if (preferredFormat !== undefined) body.preferredFormat = preferredFormat;
   if (minimumQuality !== undefined) body.minimumQuality = minimumQuality;
+  if (notificationPreferences !== undefined) body.notificationPreferences = notificationPreferences;
 
   return apiRequest('/api/v1/users/me/preferences', {
     body,

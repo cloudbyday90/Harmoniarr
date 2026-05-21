@@ -16,22 +16,67 @@
   along with this program. If not, see <https://www.gnu.org/licenses/>.
 -->
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onMounted, reactive } from 'vue';
 import { usePushNotifications } from '../composables/usePushNotifications.js';
+import { useAccountPreferences } from '../composables/useAccountPreferences.js';
+import { NOTIFICATION_CATEGORIES } from '../lib/notification-category-constants.js';
+import { sessionStore } from '../state/session.js';
+
+const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 
 const {
   isSupported,
   permissionState,
   isSubscribed,
-  isLoading,
-  errorMessage,
+  isLoading: isPushLoading,
+  errorMessage: pushError,
   subscribe,
   unsubscribe,
   checkSubscriptionStatus,
 } = usePushNotifications();
 
+const {
+  preferences,
+  isLoading: isPrefsLoading,
+  errorMessage: prefsError,
+  loadPreferences,
+  savePreferences,
+} = useAccountPreferences();
+
+const notifPrefs = computed(() => preferences.value?.notificationPreferences ?? {});
+const visibleCategories = computed(() => NOTIFICATION_CATEGORIES.filter((c) => !c.adminOnly || isAdmin.value));
+
+const pendingToggles = reactive({});
+
+function isPending(key) {
+  return key in pendingToggles;
+}
+
+function getEffectiveValue(key) {
+  if (key in pendingToggles) return pendingToggles[key];
+  return notifPrefs.value[key] !== false;
+}
+
+async function toggleCategory(key) {
+  const current = getEffectiveValue(key);
+  pendingToggles[key] = !current;
+
+  try {
+    await savePreferences({
+      notificationPreferences: {
+        ...notifPrefs.value,
+        ...pendingToggles,
+      },
+    });
+    delete pendingToggles[key];
+  } catch {
+    delete pendingToggles[key];
+  }
+}
+
 onMounted(() => {
   checkSubscriptionStatus();
+  loadPreferences();
 });
 </script>
 
@@ -52,8 +97,8 @@ onMounted(() => {
         </div>
 
         <template v-else>
-          <div v-if="errorMessage" class="hx-callout hx-callout-error" style="margin-bottom: var(--hx-space-3)">
-            {{ errorMessage }}
+          <div v-if="pushError" class="hx-callout hx-callout-error" style="margin-bottom: var(--hx-space-3)">
+            {{ pushError }}
           </div>
 
           <div class="cfg-group" style="padding-top: 0; border-top: none">
@@ -66,10 +111,10 @@ onMounted(() => {
               <button
                 type="button"
                 class="hx-btn"
-                :disabled="isLoading"
+                :disabled="isPushLoading"
                 @click="unsubscribe"
               >
-                {{ isLoading ? 'Unsubscribing…' : 'Unsubscribe' }}
+                {{ isPushLoading ? 'Unsubscribing…' : 'Unsubscribe' }}
               </button>
             </div>
 
@@ -79,10 +124,10 @@ onMounted(() => {
                 type="button"
                 class="hx-btn"
                 data-variant="primary"
-                :disabled="isLoading"
+                :disabled="isPushLoading"
                 @click="subscribe"
               >
-                {{ isLoading ? 'Subscribing…' : 'Enable notifications' }}
+                {{ isPushLoading ? 'Subscribing…' : 'Enable notifications' }}
               </button>
             </div>
           </div>
@@ -90,5 +135,61 @@ onMounted(() => {
 
       </div>
     </article>
+
+    <article class="hx-card" style="margin-top: var(--hx-space-4)">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Notification categories</h3>
+          <p class="hx-card-subtitle">Choose which events trigger push notifications.</p>
+        </div>
+      </header>
+      <div class="hx-card-body">
+        <div v-if="prefsError" class="hx-callout hx-callout-error" style="margin-bottom: var(--hx-space-3)">
+          {{ prefsError }}
+        </div>
+
+        <div class="sn-categories">
+          <label
+            v-for="category in visibleCategories"
+            :key="category.key"
+            class="cfg-check sn-category"
+          >
+            <input
+              type="checkbox"
+              :checked="getEffectiveValue(category.key)"
+              :disabled="isPending(category.key) || isPrefsLoading"
+              @change="toggleCategory(category.key)"
+            />
+            <span>
+              <span class="sn-category-label">{{ category.label }}</span>
+              <span class="sn-category-desc">{{ category.description }}</span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </article>
   </div>
 </template>
+
+<style scoped>
+.sn-categories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+}
+
+.sn-category span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+}
+
+.sn-category-label {
+  font-weight: 500;
+}
+
+.sn-category-desc {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+}
+</style>

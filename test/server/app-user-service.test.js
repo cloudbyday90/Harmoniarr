@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAppUserService } from '../../src/server/app-user-service.js';
+import { buildDefaultNotificationPreferences } from '../../src/server/notification/notification-preference-constants.js';
+
+const DEFAULT_NOTIF_PREFS = buildDefaultNotificationPreferences();
 
 test('createAppUserService lists users with resolved permission sets', async (t) => {
   const getPoolFn = t.mock.fn(() => ({
@@ -51,7 +54,7 @@ test('createAppUserService lists users with resolved permission sets', async (t)
     plexProfile: null,
     role: 'requester',
     updatedAt: '2026-05-02T15:00:00.000Z',
-    userPreferences: { preferredFormat: 'any', minimumQuality: 'any' },
+    userPreferences: { preferredFormat: 'any', minimumQuality: 'any', notificationPreferences: DEFAULT_NOTIF_PREFS },
     username: 'listener',
   }]);
 });
@@ -134,7 +137,7 @@ test('createAppUserService creates a user with the requested role and audit evid
     plexProfile: null,
     role: 'operator',
     updatedAt: '2026-05-02T15:05:00.000Z',
-    userPreferences: { preferredFormat: 'any', minimumQuality: 'any' },
+    userPreferences: { preferredFormat: 'any', minimumQuality: 'any', notificationPreferences: DEFAULT_NOTIF_PREFS },
     username: 'curator',
   });
   assert.equal(recordAuditEventFn.mock.callCount(), 1);

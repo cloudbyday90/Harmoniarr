@@ -26,6 +26,10 @@ import { buildPlexLibraryAccessPolicy } from './plex-library-access-policy.js';
 import { normalizeOptionalManagedLibraryRelativeRoot } from './paths/user-music-root-service.js';
 import { hashPassword } from './security.js';
 import { normalizeUsername, validatePassword } from './validators/auth-validator.js';
+import {
+  NOTIFICATION_CATEGORY_KEYS,
+  buildDefaultNotificationPreferences,
+} from './notification/notification-preference-constants.js';
 
 /** Allowed values for the per-user preferred audio format preference. */
 export const VALID_PREFERRED_FORMATS = /** @type {const} */ (['any', 'flac', 'mp3_320', 'mp3_v0']);
@@ -51,14 +55,29 @@ function normalizeUserId(value) {
 export function normalizeUserPreferences(raw) {
   const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
 
+  const notifRaw = obj.notificationPreferences;
+  const notifDefaults = buildDefaultNotificationPreferences();
+  const notificationPreferences = notifRaw && typeof notifRaw === 'object' && !Array.isArray(notifRaw)
+    ? normalizeNotificationPreferences(notifRaw, notifDefaults)
+    : notifDefaults;
+
   return {
-    preferredFormat: VALID_PREFERRED_FORMATS.includes(obj.preferredFormat)
-      ? obj.preferredFormat
-      : 'any',
     minimumQuality: VALID_MINIMUM_QUALITIES.includes(obj.minimumQuality)
       ? obj.minimumQuality
       : 'any',
+    notificationPreferences,
+    preferredFormat: VALID_PREFERRED_FORMATS.includes(obj.preferredFormat)
+      ? obj.preferredFormat
+      : 'any',
   };
+}
+
+function normalizeNotificationPreferences(raw, defaults) {
+  const result = {};
+  for (const key of NOTIFICATION_CATEGORY_KEYS) {
+    result[key] = typeof raw[key] === 'boolean' ? raw[key] : defaults[key];
+  }
+  return result;
 }
 
 /**
@@ -98,7 +117,45 @@ function validatePreferencesPatch(patch) {
     cleaned.minimumQuality = patch.minimumQuality;
   }
 
+  if ('notificationPreferences' in patch) {
+    cleaned.notificationPreferences = validateNotificationPreferencesPatch(patch.notificationPreferences);
+  }
+
   return cleaned;
+}
+
+function validateNotificationPreferencesPatch(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw createApiError(400, 'validation_error', 'notificationPreferences must be an object');
+  }
+
+  const defaults = buildDefaultNotificationPreferences();
+  const result = {};
+  const unknownKeys = Object.keys(raw).filter((k) => !NOTIFICATION_CATEGORY_KEYS.includes(k));
+  if (unknownKeys.length > 0) {
+    throw createApiError(
+      400,
+      'validation_error',
+      `Unknown notification categories: ${unknownKeys.join(', ')}`,
+    );
+  }
+
+  for (const key of NOTIFICATION_CATEGORY_KEYS) {
+    if (key in raw) {
+      if (typeof raw[key] !== 'boolean') {
+        throw createApiError(
+          400,
+          'validation_error',
+          `notificationPreferences.${key} must be a boolean`,
+        );
+      }
+      result[key] = raw[key];
+    } else {
+      result[key] = defaults[key];
+    }
+  }
+
+  return result;
 }
 
 function mapAppUserRow(row, permissionService) {
