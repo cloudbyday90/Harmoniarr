@@ -41,6 +41,8 @@ function collectRegisteredRoutes() {
 
   registerActivityRoutes(app, {
     blockSourceUser: asyncNoopResult({ sourceUser: { username: 'peer-1' } }),
+    bulkBlockSourceUsers: asyncNoopResult({ failed: 0, results: [], succeeded: 0, total: 0 }),
+    bulkUpdateSourceUserTrust: asyncNoopResult({ failed: 0, results: [], succeeded: 0, total: 0 }),
     buildActivityFeed: asyncNoopResult({}),
     getSourceUserDetail: asyncNoopResult({ checkedAt: null, sourceUser: null }),
     listBlockedSourceUsers: asyncNoopResult({ blockedSourceUsers: [], checkedAt: null, query: null, total: 0 }),

@@ -71,6 +71,22 @@ export function blockActivitySourceUser({ username, reason, operatorNotes } = {}
   });
 }
 
+export function bulkBlockActivitySourceUsers({ usernames, reason, operatorNotes } = {}) {
+  return apiRequest('/api/v1/activity/blocklist/bulk', {
+    body: { operatorNotes, reason, usernames },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function bulkUpdateActivitySourceUserTrust({ usernames, reason, operatorNotes, trustState } = {}) {
+  return apiRequest('/api/v1/activity/source-users/bulk-trust', {
+    body: { operatorNotes, reason, trustState, usernames },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
 export function unblockActivitySourceUser(username) {
   return apiRequest(`/api/v1/activity/blocklist/${encodeURIComponent(username)}`, {
     includeCsrf: true,

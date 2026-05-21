@@ -17,8 +17,9 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import SourceUserTrustDetailPanel from '../components/SourceUserTrustDetailPanel.vue';
+import { useSourceUserBulkOperation } from '../composables/useSourceUserBulkOperation.js';
 import { useSourceUserTrust } from '../composables/useSourceUserTrust.js';
 import { useSourceUserTrustDetail } from '../composables/useSourceUserTrustDetail.js';
 import {
@@ -42,6 +43,9 @@ import { formatOperationTimestampShort } from '../lib/operation-run-presentation
 const activeFilter = ref('all');
 const query = ref('');
 const selectedUsername = ref('');
+const selectedBulkUsernames = reactive(new Set());
+const bulkAction = ref('');
+const bulkReason = ref('');
 
 const {
   checkedAt,
@@ -66,10 +70,89 @@ const {
   saveTrustState,
 } = useSourceUserTrustDetail();
 
+const {
+  errorMessage: bulkErrorMessage,
+  executeBulkBlock,
+  executeBulkTrust,
+  isExecuting: isExecutingBulk,
+  lastResult: bulkLastResult,
+  reset: resetBulk,
+} = useSourceUserBulkOperation();
+
 const visibleSourceUsers = computed(() => filterSourceUsers(sourceUsers.value, {
   filter: activeFilter.value,
   query: query.value,
 }));
+
+const hasBulkSelection = computed(() => selectedBulkUsernames.size > 0);
+const bulkSelectionCount = computed(() => selectedBulkUsernames.size);
+const bulkActionLabel = computed(() => {
+  switch (bulkAction.value) {
+    case 'trusted':
+      return 'Mark trusted';
+    case 'neutral':
+      return 'Set neutral';
+    case 'block':
+      return 'Block';
+    default:
+      return 'Apply';
+  }
+});
+
+function toggleBulkSelection(username) {
+  if (selectedBulkUsernames.has(username)) {
+    selectedBulkUsernames.delete(username);
+  } else {
+    selectedBulkUsernames.add(username);
+  }
+}
+
+function toggleAllVisible() {
+  const visibleUsernames = visibleSourceUsers.value.map((e) => e.username);
+  const allSelected = visibleUsernames.every((u) => selectedBulkUsernames.has(u));
+
+  if (allSelected) {
+    for (const u of visibleUsernames) {
+      selectedBulkUsernames.delete(u);
+    }
+  } else {
+    for (const u of visibleUsernames) {
+      selectedBulkUsernames.add(u);
+    }
+  }
+}
+
+function clearBulkSelection() {
+  selectedBulkUsernames.clear();
+  bulkAction.value = '';
+  bulkReason.value = '';
+  resetBulk();
+}
+
+async function executeBulkAction() {
+  const usernames = Array.from(selectedBulkUsernames);
+  if (usernames.length === 0 || !bulkAction.value || !bulkReason.value.trim()) {
+    return;
+  }
+
+  let result;
+  if (bulkAction.value === 'block') {
+    result = await executeBulkBlock({ reason: bulkReason.value, usernames });
+  } else {
+    result = await executeBulkTrust({ reason: bulkReason.value, trustState: bulkAction.value, usernames });
+  }
+
+  if (result) {
+    await load();
+    if (selectedUsername.value) {
+      await loadDetail(selectedUsername.value);
+    }
+
+    if (result.failed === 0) {
+      clearBulkSelection();
+    }
+  }
+}
 
 function setFilter(value) {
   activeFilter.value = value;
@@ -230,22 +313,66 @@ onMounted(() => {
             <p class="hx-empty-title">No matches for this filter</p>
             <p class="hx-empty-copy">Clear the local filter to see the full trust ledger.</p>
           </div>
-          <div v-else class="hx-table-scroll">
-            <table class="hx-table" aria-label="Source user trust ledger">
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Trust</th>
-                  <th>Review</th>
-                  <th>Reliability</th>
-                  <th>Evidence</th>
-                  <th>Notes</th>
-                  <th>Updated</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="entry in visibleSourceUsers" :key="entry.username" :class="{ 'source-user-row-selected': selectedUsername === entry.username }">
+          <div v-else>
+            <div v-if="hasBulkSelection" class="source-user-bulk-bar">
+              <span class="source-user-bulk-meta">{{ bulkSelectionCount }} selected</span>
+              <div class="source-user-bulk-fields">
+                <select v-model="bulkAction" class="hx-select source-user-bulk-select" aria-label="Bulk action">
+                  <option value="">Choose action…</option>
+                  <option value="trusted">Mark trusted</option>
+                  <option value="neutral">Set neutral</option>
+                  <option value="block">Block</option>
+                </select>
+                <input
+                  v-model="bulkReason"
+                  class="hx-input source-user-bulk-reason"
+                  type="text"
+                  placeholder="Reason for bulk action"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="source-user-bulk-actions">
+                <button
+                  type="button"
+                  class="hx-btn"
+                  data-variant="primary"
+                  :disabled="isExecutingBulk || !bulkAction || !bulkReason.trim()"
+                  @click="executeBulkAction"
+                >
+                  {{ isExecutingBulk ? 'Applying…' : bulkActionLabel }}
+                </button>
+                <button type="button" class="hx-btn" data-variant="ghost" @click="clearBulkSelection" :disabled="isExecutingBulk">
+                  Clear
+                </button>
+              </div>
+              <p v-if="bulkErrorMessage" class="source-user-bulk-error">{{ bulkErrorMessage }}</p>
+              <p v-if="bulkLastResult && bulkLastResult.failed > 0" class="source-user-bulk-error">
+                {{ bulkLastResult.failed }} of {{ bulkLastResult.total }} failed.
+              </p>
+            </div>
+            <div class="hx-table-scroll">
+              <table class="hx-table" aria-label="Source user trust ledger">
+                <thead>
+                  <tr>
+                    <th class="source-user-row-check">
+                      <input type="checkbox" :checked="visibleSourceUsers.length > 0 && visibleSourceUsers.every((e) => selectedBulkUsernames.has(e.username))" @change="toggleAllVisible" aria-label="Select all visible" />
+                    </th>
+                    <th>Username</th>
+                    <th>Trust</th>
+                    <th>Review</th>
+                    <th>Reliability</th>
+                    <th>Evidence</th>
+                    <th>Notes</th>
+                    <th>Updated</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="entry in visibleSourceUsers" :key="entry.username" :class="{ 'source-user-row-selected': selectedUsername === entry.username, 'source-user-row-bulk': selectedBulkUsernames.has(entry.username) }">
+                    <td class="source-user-row-check">
+                      <input type="checkbox" :checked="selectedBulkUsernames.has(entry.username)" @change="toggleBulkSelection(entry.username)" :aria-label="`Select ${entry.username}`" />
+                    </td>
                   <td>
                     <strong>{{ formatSourceUsername(entry.username) }}</strong>
                     <div class="hx-text-muted" style="margin-top: var(--hx-space-1)">{{ entry.review.reason }}</div>
@@ -311,9 +438,63 @@ onMounted(() => {
   border-left: 3px solid var(--hx-accent);
 }
 
+.source-user-row-bulk > td {
+  background: var(--hx-warning-soft, rgba(192, 138, 22, 0.1));
+}
+
 .source-user-row-action {
   text-align: right;
   white-space: nowrap;
+}
+
+.source-user-row-check {
+  width: 40px;
+  text-align: center;
+}
+
+.source-user-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  background: var(--hx-bg-surface-muted);
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+
+.source-user-bulk-meta {
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  color: var(--hx-text-strong);
+}
+
+.source-user-bulk-fields {
+  display: flex;
+  gap: var(--hx-space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.source-user-bulk-select {
+  width: 160px;
+  flex-shrink: 0;
+}
+
+.source-user-bulk-reason {
+  flex: 1;
+  min-width: 180px;
+}
+
+.source-user-bulk-actions {
+  display: flex;
+  gap: var(--hx-space-2);
+}
+
+.source-user-bulk-error {
+  width: 100%;
+  margin: 0;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
 }
 
 @media (max-width: 1040px) {

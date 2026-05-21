@@ -30,8 +30,10 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
  * @param {function} [deps.requireSession]
  */
 export function registerActivityRoutes(app, {
-  buildActivityFeed,
   blockSourceUser,
+  bulkBlockSourceUsers,
+  bulkUpdateSourceUserTrust,
+  buildActivityFeed,
   getSourceUserDetail,
   listBlockedSourceUsers,
   listSourceUsers,
@@ -134,6 +136,22 @@ export function registerActivityRoutes(app, {
     });
   }));
 
+  app.post('/api/v1/activity/source-users/bulk-trust', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    response.json({
+      ok: true,
+      ...(await bulkUpdateSourceUserTrust({
+        actorUserId: session.appUserId,
+        operatorNotes: request.body?.operatorNotes,
+        reason: request.body?.reason,
+        trustState: request.body?.trustState,
+        usernames: request.body?.usernames,
+      })),
+    });
+  }));
+
   app.post('/api/v1/activity/blocklist', asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
@@ -148,6 +166,21 @@ export function registerActivityRoutes(app, {
     response.status(201).json({
       ok: true,
       ...result,
+    });
+  }));
+
+  app.post('/api/v1/activity/blocklist/bulk', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    response.json({
+      ok: true,
+      ...(await bulkBlockSourceUsers({
+        actorUserId: session.appUserId,
+        operatorNotes: request.body?.operatorNotes,
+        reason: request.body?.reason,
+        usernames: request.body?.usernames,
+      })),
     });
   }));
 

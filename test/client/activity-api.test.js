@@ -20,6 +20,8 @@ import assert from 'node:assert/strict';
 import { suite, test } from 'node:test';
 import {
   blockActivitySourceUser,
+  bulkBlockActivitySourceUsers,
+  bulkUpdateActivitySourceUserTrust,
   fetchActivityBlocklist,
   fetchActivityFeed,
   fetchActivitySourceUserDetail,
@@ -78,5 +80,25 @@ suite('activity-api', () => {
     assert.equal(unblockCall.arguments[0], '/api/v1/activity/blocklist/peer%201');
     assert.equal(unblockCall.arguments[1].method, 'DELETE');
     assert.equal(unblockCall.arguments[1].headers.get('X-CSRF-Token'), 'csrf-activity');
+  });
+
+  test('bulk mutation routes include CSRF headers', async (t) => {
+    globalThis.document = { cookie: 'harmoniarr_csrf=csrf-bulk' };
+    globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+    await bulkUpdateActivitySourceUserTrust({ reason: 'Batch trust', trustState: 'trusted', usernames: ['peer-1', 'peer-2'] });
+    await bulkBlockActivitySourceUsers({ reason: 'Spam', usernames: ['spammer-1'] });
+
+    assert.equal(globalThis.fetch.mock.callCount(), 2);
+
+    const [bulkTrustCall, bulkBlockCall] = globalThis.fetch.mock.calls;
+
+    assert.equal(bulkTrustCall.arguments[0], '/api/v1/activity/source-users/bulk-trust');
+    assert.equal(bulkTrustCall.arguments[1].method, 'POST');
+    assert.equal(bulkTrustCall.arguments[1].headers.get('X-CSRF-Token'), 'csrf-bulk');
+
+    assert.equal(bulkBlockCall.arguments[0], '/api/v1/activity/blocklist/bulk');
+    assert.equal(bulkBlockCall.arguments[1].method, 'POST');
+    assert.equal(bulkBlockCall.arguments[1].headers.get('X-CSRF-Token'), 'csrf-bulk');
   });
 });

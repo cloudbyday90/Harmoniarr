@@ -26,6 +26,8 @@ function createActivityRouteTestApp(overrides = {}) {
   return createJsonTestApp((app) => {
     registerActivityRoutes(app, {
       blockSourceUser: async () => ({ sourceUser: { username: 'peer-1' } }),
+      bulkBlockSourceUsers: async () => ({ failed: 0, results: [], succeeded: 0, total: 0 }),
+      bulkUpdateSourceUserTrust: async () => ({ failed: 0, results: [], succeeded: 0, total: 0 }),
       buildActivityFeed: async () => ({
         checkedAt: '2026-06-01T12:00:00.000Z',
         events: [],
@@ -336,5 +338,62 @@ test('activity feed route returns empty events list', async () => {
     assert.equal(payload.ok, true);
     assert.deepEqual(payload.events, []);
     assert.equal(payload.total, 0);
+  });
+});
+
+test('activity bulk trust route requires fresh admin csrf and returns batch results', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const bulkUpdateSourceUserTrust = t.mock.fn(async ({ actorUserId, reason, trustState, usernames }) => ({
+    failed: 0,
+    results: usernames.map((username) => ({ ok: true, username })),
+    succeeded: usernames.length,
+    total: usernames.length,
+  }));
+  const app = createActivityRouteTestApp({ bulkUpdateSourceUserTrust, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/source-users/bulk-trust`, {
+      body: JSON.stringify({ reason: 'Batch trust', trustState: 'trusted', usernames: ['peer-1', 'peer-2'] }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(bulkUpdateSourceUserTrust.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.total, 2);
+    assert.equal(payload.succeeded, 2);
+  });
+});
+
+test('activity bulk block route requires fresh admin csrf and returns batch results', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const bulkBlockSourceUsers = t.mock.fn(async ({ reason, usernames }) => ({
+    failed: 0,
+    results: usernames.map((username) => ({ ok: true, username })),
+    succeeded: usernames.length,
+    total: usernames.length,
+  }));
+  const app = createActivityRouteTestApp({ bulkBlockSourceUsers, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/blocklist/bulk`, {
+      body: JSON.stringify({ reason: 'Spam ring', usernames: ['spammer-1'] }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(bulkBlockSourceUsers.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.total, 1);
   });
 });

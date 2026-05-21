@@ -19,6 +19,7 @@
 import { createActivityEventService } from './activity-event-service.js';
 import { createActivityEventStore } from './activity-event-store.js';
 import { createSourceUserBlocklistService } from './source-user-blocklist-service.js';
+import { createSourceUserBulkOperationService } from './source-user-bulk-operation-service.js';
 import { createSourceUserTrustDetailService } from './source-user-trust-detail-service.js';
 import { createSourceUserTrustEvidenceService } from './source-user-trust-evidence-service.js';
 import { createSourceUserTrustOverrideService } from './source-user-trust-override-service.js';
@@ -55,20 +56,27 @@ export function createActivityModule({
     listTrustSnapshot,
     replaceTrustSnapshot,
   }),
+  sourceUserBulkOperationService = createSourceUserBulkOperationService({
+    blockSourceUser: sourceUserBlocklistService.blockSourceUser,
+    updateSourceUserTrust: sourceUserTrustOverrideService.updateSourceUserTrust,
+  }),
 } = {}) {
   return {
     activityEventService,
     activityEventStore,
     sourceUserBlocklistService,
+    sourceUserBulkOperationService,
     sourceUserTrustDetailService,
     sourceUserTrustEvidenceService,
     sourceUserTrustOverrideService,
     sourceUserTrustService,
     routeDependencies: {
-      buildActivityFeed: activityEventService.buildActivityFeed,
       blockSourceUser: sourceUserBlocklistService.blockSourceUser,
-      listBlockedSourceUsers: sourceUserBlocklistService.listBlockedSourceUsers,
+      bulkBlockSourceUsers: sourceUserBulkOperationService.bulkBlockSourceUsers,
+      bulkUpdateSourceUserTrust: sourceUserBulkOperationService.bulkUpdateSourceUserTrust,
+      buildActivityFeed: activityEventService.buildActivityFeed,
       getSourceUserDetail: sourceUserTrustDetailService.getSourceUserDetail,
+      listBlockedSourceUsers: sourceUserBlocklistService.listBlockedSourceUsers,
       listSourceUsers: sourceUserTrustService.listSourceUsers,
       updateSourceUserTrust: sourceUserTrustOverrideService.updateSourceUserTrust,
       unblockSourceUser: sourceUserBlocklistService.unblockSourceUser,
