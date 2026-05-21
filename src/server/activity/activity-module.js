@@ -22,6 +22,7 @@ import { createSourceUserBlocklistService } from './source-user-blocklist-servic
 import { createSourceUserBulkOperationService } from './source-user-bulk-operation-service.js';
 import { createSourceUserTrustDetailService } from './source-user-trust-detail-service.js';
 import { createSourceUserTrustEvidenceService } from './source-user-trust-evidence-service.js';
+import { createSourceUserTrustExportService } from './source-user-trust-export-service.js';
 import { createSourceUserTrustOverrideService } from './source-user-trust-override-service.js';
 import { createSourceUserTrustService } from './source-user-trust-service.js';
 
@@ -48,6 +49,9 @@ export function createActivityModule({
   sourceUserTrustDetailService = createSourceUserTrustDetailService({
     listTrustSnapshot,
   }),
+  sourceUserTrustExportService = createSourceUserTrustExportService({
+    listTrustSnapshot,
+  }),
   sourceUserTrustEvidenceService = createSourceUserTrustEvidenceService({
     listTrustSnapshot,
     replaceTrustSnapshot,
@@ -67,6 +71,7 @@ export function createActivityModule({
     sourceUserBlocklistService,
     sourceUserBulkOperationService,
     sourceUserTrustDetailService,
+    sourceUserTrustExportService,
     sourceUserTrustEvidenceService,
     sourceUserTrustOverrideService,
     sourceUserTrustService,
@@ -75,6 +80,7 @@ export function createActivityModule({
       bulkBlockSourceUsers: sourceUserBulkOperationService.bulkBlockSourceUsers,
       bulkUpdateSourceUserTrust: sourceUserBulkOperationService.bulkUpdateSourceUserTrust,
       buildActivityFeed: activityEventService.buildActivityFeed,
+      exportSourceUserTrustHistory: sourceUserTrustExportService.exportSourceUserTrustHistory,
       getSourceUserDetail: sourceUserTrustDetailService.getSourceUserDetail,
       listBlockedSourceUsers: sourceUserBlocklistService.listBlockedSourceUsers,
       listSourceUsers: sourceUserTrustService.listSourceUsers,

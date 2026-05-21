@@ -48,7 +48,7 @@ const props = defineProps({
   isSaving: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['load-more-history', 'save-trust']);
+const emit = defineEmits(['export-history', 'load-more-history', 'save-trust']);
 
 const overrideForm = reactive({
   operatorNotes: '',
@@ -214,7 +214,11 @@ function submitOverride() {
         </form>
 
         <div class="source-user-history" v-if="hasHistory">
-          <p class="ops-section-label">Trust history <span v-if="detail.trustHistoryPagination" class="hx-text-muted">({{ detail.trustHistory.length }} of {{ detail.trustHistoryPagination.total }})</span></p>
+          <div class="source-user-history-header">
+            <p class="ops-section-label">Trust history <span v-if="detail.trustHistoryPagination" class="hx-text-muted">({{ detail.trustHistory.length }} of {{ detail.trustHistoryPagination.total }})</span></p>
+            <button class="hx-btn" data-variant="ghost" @click="emit('export-history', 'csv')" title="Export as CSV">CSV</button>
+            <button class="hx-btn" data-variant="ghost" @click="emit('export-history', 'json')" title="Export as JSON">JSON</button>
+          </div>
           <div class="hx-table-scroll">
             <table class="hx-table" aria-label="Source user trust history">
               <thead>
@@ -310,6 +314,16 @@ function submitOverride() {
 .source-user-history {
   display: grid;
   gap: var(--hx-space-2);
+}
+
+.source-user-history-header {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+
+.source-user-history-header .ops-section-label {
+  flex: 1;
 }
 
 .source-user-history-actions {

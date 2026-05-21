@@ -34,6 +34,7 @@ export function registerActivityRoutes(app, {
   bulkBlockSourceUsers,
   bulkUpdateSourceUserTrust,
   buildActivityFeed,
+  exportSourceUserTrustHistory,
   getSourceUserDetail,
   listBlockedSourceUsers,
   listSourceUsers,
@@ -118,6 +119,28 @@ export function registerActivityRoutes(app, {
         historyOffset: request.query.historyOffset,
       })),
     });
+  }));
+
+  app.get('/api/v1/activity/source-users/:username/export', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const result = await exportSourceUserTrustHistory({
+      accept: request.headers.accept,
+      format: request.query.format,
+      username: request.params.username,
+    });
+
+    if (result.mediaType === 'text/csv') {
+      response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      response.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      response.send(result.payload);
+    } else {
+      response.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      response.json({
+        ok: true,
+        ...result.payload,
+      });
+    }
   }));
 
   app.patch('/api/v1/activity/source-users/:username', asyncRoute(async (request, response) => {

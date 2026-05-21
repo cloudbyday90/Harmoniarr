@@ -180,6 +180,21 @@ async function handleSaveTrust(payload) {
   await loadDetail(updatedDetail.username);
 }
 
+async function handleExportHistory(format) {
+  if (!selectedUsername.value) {
+    return;
+  }
+
+  const username = selectedUsername.value;
+  const url = `/api/v1/activity/source-users/${encodeURIComponent(username)}/export?format=${format}`;
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `trust-history-${username.replace(/[^a-zA-Z0-9_-]/g, '_')}.${format}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 watch(
   visibleSourceUsers,
   (entries) => {
@@ -416,6 +431,7 @@ onMounted(() => {
         :is-loading="isLoadingDetail"
         :is-loading-more-history="isLoadingMoreHistory"
         :is-saving="isSavingDetail"
+        @export-history="handleExportHistory"
         @load-more-history="loadMoreHistory"
         @save-trust="handleSaveTrust"
       />

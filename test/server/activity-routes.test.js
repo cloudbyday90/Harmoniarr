@@ -33,6 +33,7 @@ function createActivityRouteTestApp(overrides = {}) {
         events: [],
         total: 0,
       }),
+      exportSourceUserTrustHistory: async () => ({ filename: 'test.csv', mediaType: 'text/csv', payload: 'occurredAt,kind', totalEntries: 0, username: 'test' }),
       listBlockedSourceUsers: async () => ({
         blockedSourceUsers: [],
         checkedAt: '2026-06-01T12:00:00.000Z',
@@ -395,5 +396,51 @@ test('activity bulk block route requires fresh admin csrf and returns batch resu
     assert.equal(bulkBlockSourceUsers.mock.callCount(), 1);
     assert.equal(payload.ok, true);
     assert.equal(payload.total, 1);
+  });
+});
+
+test('activity source user export route returns CSV with correct headers', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
+  const exportSourceUserTrustHistory = t.mock.fn(async () => ({
+    filename: 'trust-history-peer-1.csv',
+    mediaType: 'text/csv',
+    payload: 'occurredAt,kind\r\n2026-06-01T10:00:00.000Z,delivery_evidence',
+    totalEntries: 1,
+    username: 'peer-1',
+  }));
+  const app = createActivityRouteTestApp({ exportSourceUserTrustHistory, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/source-users/peer-1/export?format=csv`);
+    const body = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'text/csv; charset=utf-8');
+    assert.equal(response.headers.get('content-disposition'), 'attachment; filename="trust-history-peer-1.csv"');
+    assert.ok(body.includes('occurredAt,kind'));
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(exportSourceUserTrustHistory.mock.callCount(), 1);
+  });
+});
+
+test('activity source user export route returns JSON with correct headers', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
+  const exportSourceUserTrustHistory = t.mock.fn(async () => ({
+    filename: 'trust-history-peer-1.json',
+    mediaType: 'application/json',
+    payload: { totalEntries: 0, trustHistory: [], username: 'peer-1' },
+    totalEntries: 0,
+    username: 'peer-1',
+  }));
+  const app = createActivityRouteTestApp({ exportSourceUserTrustHistory, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/source-users/peer-1/export?format=json`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-disposition'), 'attachment; filename="trust-history-peer-1.json"');
+    assert.equal(payload.ok, true);
+    assert.equal(payload.totalEntries, 0);
   });
 });

@@ -44,6 +44,7 @@ function collectRegisteredRoutes() {
     bulkBlockSourceUsers: asyncNoopResult({ failed: 0, results: [], succeeded: 0, total: 0 }),
     bulkUpdateSourceUserTrust: asyncNoopResult({ failed: 0, results: [], succeeded: 0, total: 0 }),
     buildActivityFeed: asyncNoopResult({}),
+    exportSourceUserTrustHistory: asyncNoopResult({ filename: 'trust-history-test.csv', mediaType: 'text/csv', payload: '', totalEntries: 0, username: 'test' }),
     getSourceUserDetail: asyncNoopResult({ checkedAt: null, sourceUser: null }),
     listBlockedSourceUsers: asyncNoopResult({ blockedSourceUsers: [], checkedAt: null, query: null, total: 0 }),
     listSourceUsers: asyncNoopResult({ checkedAt: null, counts: {}, query: null, sourceUsers: [], total: 0, trustState: null }),

@@ -55,6 +55,13 @@ export function fetchActivitySourceUserDetail(username, { historyLimit, historyO
   );
 }
 
+export function exportSourceUserTrustHistory(username, { format = 'json', signal } = {}) {
+  return apiRequest(
+    `/api/v1/activity/source-users/${encodeURIComponent(username)}/export${buildQueryString({ format })}`,
+    { signal },
+  );
+}
+
 export function updateActivitySourceUserTrust(username, { operatorNotes, reason, trustState } = {}) {
   return apiRequest(`/api/v1/activity/source-users/${encodeURIComponent(username)}`, {
     body: { operatorNotes, reason, trustState },

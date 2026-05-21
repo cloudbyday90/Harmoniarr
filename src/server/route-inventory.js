@@ -20,6 +20,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/activity/feed', access: 'authenticated', area: 'activity', kind: 'read' },
   { method: 'GET', path: '/api/v1/activity/source-users', access: 'admin', area: 'activity', kind: 'read' },
   { method: 'GET', path: '/api/v1/activity/source-users/:username', access: 'admin', area: 'activity', kind: 'read' },
+  { method: 'GET', path: '/api/v1/activity/source-users/:username/export', access: 'admin', area: 'activity', kind: 'read' },
   { method: 'PATCH', path: '/api/v1/activity/source-users/:username', access: 'admin', area: 'activity', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/activity/source-users/bulk-trust', access: 'admin', area: 'activity', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/activity/blocklist', access: 'admin', area: 'activity', kind: 'read' },
