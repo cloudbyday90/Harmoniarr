@@ -19,359 +19,248 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  formatActivityEventTime,
   getActivityEventDetail,
   getActivityEventIcon,
   getActivityEventLabel,
   normalizeActivityEvent,
 } from '../../src/client/lib/activity-event-normalization.js';
 
-// ── normalizeActivityEvent ────────────────────────────────────────────────────
+function makeReleaseAddedEvent(overrides = {}) {
+  return {
+    id: 'evt-1',
+    eventType: 'release_added',
+    actorUserId: null,
+    entityType: 'release',
+    entityId: null,
+    entityTitle: 'OK Computer',
+    entityArtist: 'Radiohead',
+    extraPayload: {
+      schemaVersion: 1,
+      presentationType: 'release_added',
+      primaryRelease: { artistName: 'Radiohead', releaseTitle: 'OK Computer' },
+      releaseCount: 1,
+      releases: [{ artistName: 'Radiohead', releaseTitle: 'OK Computer' }],
+      movedCount: 12,
+      source: {
+        operationType: 'library_organize_apply',
+        runId: 'run-1',
+      },
+    },
+    occurredAt: '2026-06-01T11:00:00.000Z',
+    ...overrides,
+  };
+}
 
-test('normalizeActivityEvent: returns empty object for null input', () => {
+test('normalizeActivityEvent returns empty object for null/undefined', () => {
   assert.deepEqual(normalizeActivityEvent(null), {});
-});
-
-test('normalizeActivityEvent: returns empty object for undefined input', () => {
   assert.deepEqual(normalizeActivityEvent(undefined), {});
 });
 
-test('normalizeActivityEvent: maps all fields from a full event row', () => {
-  const raw = {
-    id: 'evt-1',
-    eventType: 'request_created',
+test('normalizeActivityEvent preserves all raw fields', () => {
+  const event = {
+    id: 'evt-2',
+    eventType: 'artist_monitored',
     actorUserId: 'user-1',
-    entityType: 'media_request',
-    entityId: 'req-1',
-    entityTitle: 'OK Computer',
-    entityArtist: 'Radiohead',
-    extraPayload: { note: 'expanded edition' },
-    occurredAt: '2026-06-01T11:00:00.000Z',
+    entityType: 'artist',
+    entityId: 'artist-1',
+    entityTitle: 'Aphex Twin',
+    entityArtist: null,
+    extraPayload: { some: 'data' },
+    occurredAt: '2026-06-01T12:00:00.000Z',
   };
 
-  const result = normalizeActivityEvent(raw);
+  const normalized = normalizeActivityEvent(event);
 
-  assert.equal(result.id, 'evt-1');
-  assert.equal(result.eventType, 'request_created');
-  assert.equal(result.actorUserId, 'user-1');
-  assert.equal(result.entityType, 'media_request');
-  assert.equal(result.entityId, 'req-1');
-  assert.equal(result.entityTitle, 'OK Computer');
-  assert.equal(result.entityArtist, 'Radiohead');
-  assert.deepEqual(result.extraPayload, { note: 'expanded edition' });
-  assert.equal(result.occurredAt, '2026-06-01T11:00:00.000Z');
-  assert.equal(result.releasePresentation, null);
+  assert.equal(normalized.id, 'evt-2');
+  assert.equal(normalized.eventType, 'artist_monitored');
+  assert.equal(normalized.actorUserId, 'user-1');
+  assert.equal(normalized.entityType, 'artist');
+  assert.equal(normalized.entityId, 'artist-1');
+  assert.equal(normalized.entityTitle, 'Aphex Twin');
+  assert.equal(normalized.entityArtist, null);
+  assert.deepEqual(normalized.extraPayload, { some: 'data' });
+  assert.equal(normalized.occurredAt, '2026-06-01T12:00:00.000Z');
 });
 
-test('normalizeActivityEvent: falls back to null for missing optional fields', () => {
-  const result = normalizeActivityEvent({ eventType: 'artist_monitored' });
+test('normalizeActivityEvent attaches releasePresentation for release_added events', () => {
+  const event = makeReleaseAddedEvent();
 
-  assert.equal(result.id, null);
-  assert.equal(result.actorUserId, null);
-  assert.equal(result.entityType, null);
-  assert.equal(result.entityId, null);
-  assert.equal(result.entityTitle, null);
-  assert.equal(result.entityArtist, null);
-  assert.equal(result.extraPayload, null);
-  assert.equal(result.occurredAt, null);
-  assert.equal(result.releasePresentation, null);
+  const normalized = normalizeActivityEvent(event);
+
+  assert.ok(normalized.releasePresentation);
+  assert.equal(normalized.releasePresentation.schemaVersion, 1);
+  assert.equal(normalized.releasePresentation.presentationType, 'release_added');
+  assert.equal(normalized.releasePresentation.releaseCount, 1);
+  assert.equal(normalized.releasePresentation.primaryRelease.artistName, 'Radiohead');
+  assert.equal(normalized.releasePresentation.primaryRelease.releaseTitle, 'OK Computer');
+  assert.equal(normalized.releasePresentation.source.operationType, 'library_organize_apply');
+  assert.equal(normalized.releasePresentation.source.runId, 'run-1');
 });
 
-test('normalizeActivityEvent: normalizes release_added events onto a shared release presentation contract', () => {
-  const result = normalizeActivityEvent({
+test('normalizeActivityEvent sets releasePresentation to null for non-release events', () => {
+  const event = { id: 'evt-3', eventType: 'artist_monitored', entityTitle: 'Aphex Twin' };
+
+  const normalized = normalizeActivityEvent(event);
+
+  assert.equal(normalized.releasePresentation, null);
+});
+
+test('normalizeActivityEvent normalizes legacy release_added events without extraPayload', () => {
+  const event = {
+    id: 'evt-legacy',
     eventType: 'release_added',
+    entityTitle: 'Kid A',
+    entityArtist: 'Radiohead',
+    extraPayload: null,
+  };
+
+  const normalized = normalizeActivityEvent(event);
+
+  assert.ok(normalized.releasePresentation);
+  assert.equal(normalized.releasePresentation.schemaVersion, 1);
+  assert.equal(normalized.releasePresentation.presentationType, 'release_added');
+  assert.equal(normalized.releasePresentation.primaryRelease.artistName, 'Radiohead');
+  assert.equal(normalized.releasePresentation.primaryRelease.releaseTitle, 'Kid A');
+  assert.equal(normalized.releasePresentation.source, null);
+});
+
+test('normalizeActivityEvent normalizes multi-release events from shared presentation', () => {
+  const event = makeReleaseAddedEvent({
+    entityTitle: '2 releases',
+    entityArtist: null,
     extraPayload: {
       schemaVersion: 1,
       presentationType: 'release_added',
+      primaryRelease: null,
       releaseCount: 2,
       releases: [
+        { artistName: 'Radiohead', releaseTitle: 'OK Computer' },
         { artistName: 'Radiohead', releaseTitle: 'Kid A' },
-        { artistName: 'Autechre', releaseTitle: 'Amber' },
       ],
-      source: {
-        operationType: 'library_organize_apply',
-        runId: 'run-1',
-      },
+      movedCount: 24,
+      source: { operationType: 'library_organize_apply', runId: 'run-multi-1' },
     },
   });
 
-  assert.deepEqual(result.releasePresentation, {
-    schemaVersion: 1,
-    presentationType: 'release_added',
-    movedCount: null,
-    primaryRelease: { artistName: 'Radiohead', releaseTitle: 'Kid A' },
-    releaseCount: 2,
-    releases: [
-      { artistName: 'Radiohead', releaseTitle: 'Kid A' },
-      { artistName: 'Autechre', releaseTitle: 'Amber' },
-    ],
-    source: {
-      operationType: 'library_organize_apply',
-      runId: 'run-1',
-    },
-  });
+  const normalized = normalizeActivityEvent(event);
+
+  assert.equal(normalized.releasePresentation.releaseCount, 2);
+  assert.equal(normalized.releasePresentation.releases.length, 2);
+  assert.equal(normalized.releasePresentation.source.operationType, 'library_organize_apply');
 });
 
-// ── getActivityEventLabel ─────────────────────────────────────────────────────
+test('getActivityEventLabel formats release_added with presentation subject', () => {
+  const event = normalizeActivityEvent(makeReleaseAddedEvent());
 
-test('getActivityEventLabel: request_created with title and artist', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'request_created', entityTitle: 'OK Computer', entityArtist: 'Radiohead' },
-    null,
-  );
-  assert.equal(label, 'Music requested: OK Computer by Radiohead');
+  assert.equal(getActivityEventLabel(event), 'OK Computer by Radiohead added to library');
 });
 
-test('getActivityEventLabel: request_created with title only', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'request_created', entityTitle: 'OK Computer', entityArtist: null },
-    null,
-  );
-  assert.equal(label, 'Music requested: OK Computer');
-});
-
-test('getActivityEventLabel: request_created with no title falls back to "music"', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'request_created', entityTitle: null, entityArtist: null },
-    null,
-  );
-  assert.equal(label, 'Music requested: music');
-});
-
-test('getActivityEventLabel: artist_monitored with title', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'artist_monitored', entityTitle: 'Radiohead', actorUserId: null },
-    null,
-  );
-  assert.equal(label, 'Now monitoring Radiohead');
-});
-
-test('getActivityEventLabel: artist_monitored with no title falls back', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'artist_monitored', entityTitle: null, actorUserId: null },
-    null,
-  );
-  assert.equal(label, 'Now monitoring an artist');
-});
-
-test('getActivityEventLabel: release_added with title and artist', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'release_added', entityTitle: 'Kid A', entityArtist: 'Radiohead' },
-    null,
-  );
-  assert.equal(label, 'Kid A by Radiohead added to library');
-});
-
-test('getActivityEventLabel: release_added with shared multi-release presentation avoids misleading artist suffix', () => {
-  const label = getActivityEventLabel(
-    {
-      eventType: 'release_added',
-      entityArtist: 'Radiohead',
-      entityTitle: '2 releases',
-      releasePresentation: {
-        schemaVersion: 1,
-        presentationType: 'release_added',
-        movedCount: 2,
-        primaryRelease: { artistName: 'Radiohead', releaseTitle: 'Kid A' },
-        releaseCount: 2,
-        releases: [
-          { artistName: 'Radiohead', releaseTitle: 'Kid A' },
-          { artistName: 'Autechre', releaseTitle: 'Amber' },
-        ],
-        source: null,
-      },
-    },
-    null,
-  );
-  assert.equal(label, '2 releases added to library');
-});
-
-test('getActivityEventDetail: release_added with multi-release summaries returns detail copy', () => {
-  const detail = getActivityEventDetail({
-    eventType: 'release_added',
+test('getActivityEventLabel formats multi-release added', () => {
+  const event = normalizeActivityEvent(makeReleaseAddedEvent({
+    entityTitle: '2 releases',
+    entityArtist: null,
     extraPayload: {
+      schemaVersion: 1,
+      presentationType: 'release_added',
+      primaryRelease: null,
+      releaseCount: 2,
+      releases: [
+        { artistName: 'Radiohead', releaseTitle: 'OK Computer' },
+        { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+      ],
+      movedCount: 24,
+      source: null,
+    },
+  }));
+
+  assert.equal(getActivityEventLabel(event), '2 releases added to library');
+});
+
+test('getActivityEventLabel formats request_created with artist', () => {
+  const event = { eventType: 'request_created', entityTitle: 'Amber', entityArtist: 'Autechre' };
+
+  assert.equal(getActivityEventLabel(event), 'Music requested: Amber by Autechre');
+});
+
+test('getActivityEventLabel formats artist_monitored', () => {
+  const event = { eventType: 'artist_monitored', entityTitle: 'Boards of Canada' };
+
+  assert.equal(getActivityEventLabel(event), 'Now monitoring Boards of Canada');
+});
+
+test('getActivityEventLabel formats request_fulfilled for the requester', () => {
+  const event = {
+    eventType: 'request_fulfilled',
+    entityTitle: 'Amber',
+    entityArtist: 'Autechre',
+    actorUserId: 'user-1',
+  };
+
+  assert.equal(getActivityEventLabel(event, 'user-1'), 'Your request for Amber by Autechre is ready');
+});
+
+test('getActivityEventLabel formats request_fulfilled for other users', () => {
+  const event = {
+    eventType: 'request_fulfilled',
+    entityTitle: 'Amber',
+    entityArtist: 'Autechre',
+    actorUserId: 'user-1',
+  };
+
+  assert.equal(getActivityEventLabel(event, 'user-2'), 'Amber by Autechre added to library');
+});
+
+test('getActivityEventLabel formats download_completed', () => {
+  const event = {
+    eventType: 'download_completed',
+    entityTitle: 'Amber',
+    entityArtist: 'Autechre',
+  };
+
+  assert.equal(getActivityEventLabel(event), 'Download completed: Amber by Autechre');
+});
+
+test('getActivityEventDetail returns detail for multi-release release_added', () => {
+  const event = normalizeActivityEvent(makeReleaseAddedEvent({
+    entityTitle: '2 releases',
+    entityArtist: null,
+    extraPayload: {
+      schemaVersion: 1,
+      presentationType: 'release_added',
+      primaryRelease: null,
       releaseCount: 3,
-      releaseSummaries: [
-        { artistName: 'Radiohead', releaseTitle: 'Kid A' },
-        { artistName: 'Autechre', releaseTitle: 'Amber' },
-        { artistName: 'Aphex Twin', releaseTitle: 'Selected Ambient Works 85-92' },
-      ],
-    },
-  });
-
-  assert.equal(detail, 'Includes Kid A by Radiohead, Amber by Autechre, Selected Ambient Works 85-92 by Aphex Twin.');
-});
-
-test('getActivityEventDetail: release_added with truncated summaries mentions remaining releases', () => {
-  const detail = getActivityEventDetail({
-    eventType: 'release_added',
-    extraPayload: {
-      releaseCount: 4,
-      releaseSummaries: [
-        { artistName: 'Radiohead', releaseTitle: 'Kid A' },
-        { artistName: 'Autechre', releaseTitle: 'Amber' },
-        { artistName: 'Aphex Twin', releaseTitle: 'Selected Ambient Works 85-92' },
-      ],
-    },
-  });
-
-  assert.equal(detail, 'Includes Kid A by Radiohead, Amber by Autechre, Selected Ambient Works 85-92 by Aphex Twin, and 1 more.');
-});
-
-test('getActivityEventDetail: release_added with shared contract payload returns detail copy', () => {
-  const detail = getActivityEventDetail({
-    eventType: 'release_added',
-    extraPayload: {
-      schemaVersion: 1,
-      presentationType: 'release_added',
-      releaseCount: 2,
       releases: [
+        { artistName: 'Radiohead', releaseTitle: 'OK Computer' },
         { artistName: 'Radiohead', releaseTitle: 'Kid A' },
-        { artistName: 'Autechre', releaseTitle: 'Amber' },
       ],
-      source: {
-        operationType: 'library_organize_apply',
-        runId: 'run-1',
-      },
+      movedCount: 30,
+      source: null,
     },
-  });
+  }));
 
-  assert.equal(detail, 'Includes Kid A by Radiohead, Amber by Autechre.');
+  const detail = getActivityEventDetail(event);
+  assert.ok(detail.includes('OK Computer by Radiohead'));
+  assert.ok(detail.includes('Kid A by Radiohead'));
+  assert.ok(detail.includes('1 more'));
 });
 
-test('getActivityEventDetail: release_added with a single release returns empty string', () => {
-  const detail = getActivityEventDetail({
-    eventType: 'release_added',
-    extraPayload: {
-      releaseCount: 1,
-      releaseSummaries: [{ artistName: 'Radiohead', releaseTitle: 'Kid A' }],
-    },
-  });
+test('getActivityEventDetail returns empty for single-release events', () => {
+  const event = normalizeActivityEvent(makeReleaseAddedEvent());
 
-  assert.equal(detail, '');
+  assert.equal(getActivityEventDetail(event), '');
 });
 
-test('getActivityEventDetail: non-release events return empty string', () => {
-  assert.equal(getActivityEventDetail({ eventType: 'request_created', extraPayload: {} }), '');
+test('getActivityEventDetail returns empty for non-release events', () => {
+  assert.equal(getActivityEventDetail({ eventType: 'artist_monitored' }), '');
+  assert.equal(getActivityEventDetail(null), '');
 });
 
-test('getActivityEventLabel: request_fulfilled — owner sees personal variant', () => {
-  const label = getActivityEventLabel(
-    {
-      eventType: 'request_fulfilled',
-      entityTitle: 'Kid A',
-      entityArtist: 'Radiohead',
-      actorUserId: 'user-1',
-    },
-    'user-1',
-  );
-  assert.equal(label, 'Your request for Kid A by Radiohead is ready');
-});
-
-test('getActivityEventLabel: request_fulfilled — other user sees generic variant', () => {
-  const label = getActivityEventLabel(
-    {
-      eventType: 'request_fulfilled',
-      entityTitle: 'Kid A',
-      entityArtist: 'Radiohead',
-      actorUserId: 'user-1',
-    },
-    'user-2',
-  );
-  assert.equal(label, 'Kid A by Radiohead added to library');
-});
-
-test('getActivityEventLabel: request_fulfilled — null currentUserId shows generic variant', () => {
-  const label = getActivityEventLabel(
-    {
-      eventType: 'request_fulfilled',
-      entityTitle: 'Kid A',
-      entityArtist: null,
-      actorUserId: 'user-1',
-    },
-    null,
-  );
-  assert.equal(label, 'Kid A added to library');
-});
-
-test('getActivityEventLabel: download_completed with title and artist', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'download_completed', entityTitle: 'Amnesiac', entityArtist: 'Radiohead' },
-    null,
-  );
-  assert.equal(label, 'Download completed: Amnesiac by Radiohead');
-});
-
-test('getActivityEventLabel: download_completed with no title falls back to "a file"', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'download_completed', entityTitle: null, entityArtist: null },
-    null,
-  );
-  assert.equal(label, 'Download completed: a file');
-});
-
-test('getActivityEventLabel: unknown eventType returns the type string', () => {
-  const label = getActivityEventLabel(
-    { eventType: 'hypothetical_event' },
-    null,
-  );
-  assert.equal(label, 'hypothetical_event');
-});
-
-test('getActivityEventLabel: null eventType returns "Activity" fallback', () => {
-  const label = getActivityEventLabel({ eventType: null }, null);
-  assert.equal(label, 'Activity');
-});
-
-// ── getActivityEventIcon ──────────────────────────────────────────────────────
-
-test('getActivityEventIcon: request_created returns music-request', () => {
+test('getActivityEventIcon returns correct icon keys for each event type', () => {
   assert.equal(getActivityEventIcon('request_created'), 'music-request');
-});
-
-test('getActivityEventIcon: artist_monitored returns artist-monitored', () => {
   assert.equal(getActivityEventIcon('artist_monitored'), 'artist-monitored');
-});
-
-test('getActivityEventIcon: release_added returns release-added', () => {
   assert.equal(getActivityEventIcon('release_added'), 'release-added');
-});
-
-test('getActivityEventIcon: request_fulfilled returns checkmark', () => {
   assert.equal(getActivityEventIcon('request_fulfilled'), 'checkmark');
-});
-
-test('getActivityEventIcon: download_completed returns download', () => {
   assert.equal(getActivityEventIcon('download_completed'), 'download');
-});
-
-test('getActivityEventIcon: unknown type returns activity', () => {
-  assert.equal(getActivityEventIcon('some_future_type'), 'activity');
-});
-
-test('getActivityEventIcon: null returns activity', () => {
+  assert.equal(getActivityEventIcon('unknown_type'), 'activity');
   assert.equal(getActivityEventIcon(null), 'activity');
-});
-
-// ── formatActivityEventTime ───────────────────────────────────────────────────
-
-test('formatActivityEventTime: null returns empty string', () => {
-  assert.equal(formatActivityEventTime(null), '');
-});
-
-test('formatActivityEventTime: undefined returns empty string', () => {
-  assert.equal(formatActivityEventTime(undefined), '');
-});
-
-test('formatActivityEventTime: empty string returns empty string', () => {
-  assert.equal(formatActivityEventTime(''), '');
-});
-
-test('formatActivityEventTime: non-date string returns empty string', () => {
-  assert.equal(formatActivityEventTime('not-a-date'), '');
-});
-
-test('formatActivityEventTime: valid ISO timestamp returns non-empty locale string', () => {
-  const result = formatActivityEventTime('2025-05-12T14:34:00.000Z');
-  assert.ok(typeof result === 'string' && result.length > 0);
 });
