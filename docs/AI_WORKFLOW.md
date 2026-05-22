@@ -50,6 +50,25 @@ Examples:
 - `.eslintcache`
 - transient local prompt experiments that are not meant to be shared
 
+## Editor LSP Configuration
+
+The repo includes `jsconfig.json` at the root for Vue/Volar + TypeScript language server support. This enables go-to-definition, autocomplete, and symbol search across the Vue client (`src/client/`).
+
+### Vue LSP hybrid mode
+
+opencode's built-in Vue LSP uses hybrid mode: Volar handles template/CSS, and the TypeScript language server handles `<script>` blocks. The project already has `typescript` as a dependency, so both should auto-start.
+
+If Vue diagnostics don't appear in your editor, configure `vue_ls` with initialization options pointing to the TypeScript plugin. The `opencode.json` at the repo root includes this configuration. For other editors (Neovim, Helix, Zed), follow the Volar v3+ setup pattern: install both `typescript-language-server` and `@vue/language-server`, then pass the `@vue/typescript-plugin` location in `init_options.plugins`.
+
+### Postgres LSP
+
+The repo includes a `.gitignore`d `postgres-language-server.jsonc` config template. To use the Postgres Language Server for schema-aware SQL completions and migration linting:
+
+1. Install the Postgres LSP (`npm install -D @postgres-language-server/cli` or via editor extension).
+2. Copy or create `postgres-language-server.jsonc` in the repo root (run `postgres-language-server init`).
+3. Update the `db` section with your local PostgreSQL connection details.
+4. The LSP will provide completions against the live schema and lint migration files in `src/server/migrations/`.
+
 ## When To Update This Area
 
 Update `.agents/` when:
