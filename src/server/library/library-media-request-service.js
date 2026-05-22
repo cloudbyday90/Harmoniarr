@@ -688,9 +688,111 @@ export function createLibraryMediaRequestService({
     };
   }
 
+  async function reassignMediaRequest({
+    actorUserId,
+    actorUserRole = null,
+    mediaRequestId,
+    newRequestedForUserId,
+    reason,
+    requestMetadata = null,
+  }) {
+    if (actorUserRole !== 'admin') {
+      throw createApiError(403, 'forbidden', 'Only administrators can reassign media requests');
+    }
+
+    const normalizedReason = normalizeOptionalText(reason, 'reason', { maxLength: 500 });
+    const normalizedNewUserId = normalizeRequiredText(newRequestedForUserId, 'newRequestedForUserId');
+
+    const existingRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
+    if (!existingRequest) {
+      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
+    }
+
+    const currentForUserId = existingRequest.requestedForUser?.id;
+    if (currentForUserId === normalizedNewUserId) {
+      throw createApiError(409, 'reassignment_noop', 'The media request is already assigned to the specified user');
+    }
+
+    if (typeof getAppUserById !== 'function') {
+      throw new Error('Media request reassignment requires getAppUserById');
+    }
+
+    const targetUser = await getAppUserById({ userId: normalizedNewUserId });
+    if (!targetUser) {
+      throw createApiError(404, 'app_user_not_found', 'The target user could not be found');
+    }
+
+    const targetEligibility = buildMediaRequestTargetEligibility(targetUser);
+    if (!targetEligibility.eligible) {
+      throw createApiError(409, 'media_request_target_ineligible', 'The target user is not currently eligible for media requests');
+    }
+
+    const updated = await mediaRequestStore.updateRequestedForUserId({
+      mediaRequestId,
+      newRequestedForUserId: normalizedNewUserId,
+    });
+
+    if (!updated) {
+      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be updated');
+    }
+
+    await mediaRequestStore.insertMediaRequestEvent({
+      actorUserId,
+      details: {
+        artistName: existingRequest.artistName,
+        releaseTitle: existingRequest.releaseTitle,
+        requestKind: existingRequest.requestKind,
+        requestState: existingRequest.requestState,
+      },
+      eventType: 'reassigned',
+      mediaRequestId,
+      newRequestedForUserId: normalizedNewUserId,
+      previousRequestedForUserId: currentForUserId,
+      reason: normalizedReason,
+    });
+
+    const reassignedRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
+
+    await recordAuditEventFn({
+      actorType: 'app_user',
+      actorUserId,
+      details: {
+        newRequestedForUserId: normalizedNewUserId,
+        previousRequestedForUserId: currentForUserId,
+        reason: normalizedReason,
+        requestId: mediaRequestId,
+      },
+      entityId: mediaRequestId,
+      entityType: 'media_request',
+      eventType: 'media_request_reassigned',
+      ipAddress: requestMetadata?.ipAddress ?? null,
+      summary: `Reassigned media request from user ${currentForUserId} to user ${normalizedNewUserId}${normalizedReason ? `: ${normalizedReason}` : ''}`,
+      userAgent: requestMetadata?.userAgent ?? null,
+    });
+
+    if (typeof recordActivityEventFn === 'function') {
+      void recordActivityEventFn({
+        actorUserId,
+        entityArtist: existingRequest.artistName ?? null,
+        entityId: mediaRequestId,
+        entityTitle: existingRequest.releaseTitle ?? existingRequest.artistName ?? null,
+        entityType: 'media_request',
+        eventType: 'request_reassigned',
+      }).catch(() => {});
+    }
+
+    return reassignedRequest;
+  }
+
+  async function getMediaRequestReassignmentHistory({ mediaRequestId, limit = 50 } = {}) {
+    return mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit });
+  }
+
   return {
     buildMediaRequestSummary,
     createMediaRequest,
+    getMediaRequestReassignmentHistory,
     listMediaRequests,
+    reassignMediaRequest,
   };
 }

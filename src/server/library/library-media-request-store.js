@@ -439,14 +439,106 @@ export function createLibraryMediaRequestStore({
     );
   }
 
+  async function updateRequestedForUserId({ mediaRequestId, newRequestedForUserId }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        UPDATE media_requests
+        SET requested_for_user_id = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING requested_for_user_id
+      `,
+      [mediaRequestId, newRequestedForUserId],
+    );
+
+    return result.rows.length > 0;
+  }
+
+  async function insertMediaRequestEvent({
+    mediaRequestId,
+    eventType,
+    previousRequestedForUserId = null,
+    newRequestedForUserId = null,
+    reason = null,
+    actorUserId = null,
+    details = null,
+  }) {
+    const pool = getPoolFn();
+    await pool.query(
+      `
+        INSERT INTO media_request_events (
+          media_request_id,
+          event_type,
+          previous_requested_for_user_id,
+          new_requested_for_user_id,
+          reason,
+          actor_user_id,
+          details,
+          occurred_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())
+      `,
+      [
+        mediaRequestId,
+        eventType,
+        previousRequestedForUserId,
+        newRequestedForUserId,
+        reason,
+        actorUserId,
+        details ? JSON.stringify(details) : null,
+      ],
+    );
+  }
+
+  async function listMediaRequestEvents({ mediaRequestId, limit = 50 } = {}) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT
+          media_request_events.id,
+          media_request_events.event_type,
+          media_request_events.previous_requested_for_user_id,
+          media_request_events.new_requested_for_user_id,
+          media_request_events.reason,
+          media_request_events.actor_user_id,
+          media_request_events.details,
+          media_request_events.occurred_at,
+          actor_users.username AS actor_username
+        FROM media_request_events
+        LEFT JOIN app_users AS actor_users
+          ON actor_users.id = media_request_events.actor_user_id
+        WHERE media_request_events.media_request_id = $1
+        ORDER BY media_request_events.occurred_at DESC
+        LIMIT $2
+      `,
+      [mediaRequestId, limit],
+    );
+
+    return result.rows.map((row) => ({
+      actorUserId: row.actor_user_id ?? null,
+      actorUsername: row.actor_username ?? null,
+      details: row.details ?? null,
+      eventType: row.event_type,
+      id: row.id,
+      newRequestedForUserId: row.new_requested_for_user_id ?? null,
+      occurredAt: row.occurred_at,
+      previousRequestedForUserId: row.previous_requested_for_user_id ?? null,
+      reason: row.reason ?? null,
+    }));
+  }
+
   return {
     createFanOutChildRequests,
     createMediaRequest,
     findActiveDuplicateRequest,
     getMediaRequestById,
     getMediaRequestCounts,
+    insertMediaRequestEvent,
+    listMediaRequestEvents,
     listMediaRequests,
     mergeMediaRequestEvidence,
     updateFanOutChildCount,
+    updateRequestedForUserId,
   };
 }

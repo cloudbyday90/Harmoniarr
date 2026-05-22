@@ -3581,6 +3581,74 @@ SET migration_key = EXCLUDED.migration_key,
     application_version = NULL,
     updated_at = NOW();
 
+-- Migration: 20260522_030000_media_request_events.sql
+-- Checksum: babc0f3ec045c9278725a279f255d318712692d9735b9a2a409562811631ca79
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+-- Append-only domain events for media request lifecycle tracking.
+-- Follows the import_candidate_events pattern for consistency.
+CREATE TABLE IF NOT EXISTS media_request_events (
+  id UUID PRIMARY KEY DEFAULT harmoniarr_generate_uuid(),
+  media_request_id UUID NOT NULL REFERENCES media_requests(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  previous_requested_for_user_id UUID NULL REFERENCES app_users(id) ON DELETE SET NULL,
+  new_requested_for_user_id UUID NULL REFERENCES app_users(id) ON DELETE SET NULL,
+  reason TEXT NULL,
+  actor_user_id UUID NULL REFERENCES app_users(id) ON DELETE SET NULL,
+  details JSONB NULL,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_media_request_events_request_id
+  ON media_request_events (media_request_id, occurred_at DESC);
+
+CREATE INDEX idx_media_request_events_event_type
+  ON media_request_events (event_type)
+  WHERE event_type = 'reassigned';
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260522_030000',
+  '20260522_030000_media_request_events.sql',
+  'media_request_events',
+  'babc0f3ec045c9278725a279f255d318712692d9735b9a2a409562811631ca79',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
 -- Migration: 20260601_070000_add_canonical_to_metadata_releases.sql
 -- Checksum: 3cdb7a9ff0a5d86e1a08cb42158aee161e5419fa264057a6e41b9cdf39e47f35
 -- Harmoniarr - Soulseek-native music library management

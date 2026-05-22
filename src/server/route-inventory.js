@@ -145,6 +145,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/library/releases', access: 'authenticated', area: 'library', kind: 'read' },
   { method: 'GET', path: '/api/v1/library/wanted-releases', access: 'authenticated', area: 'library', kind: 'read' },
   { method: 'POST', path: '/api/v1/library/media-requests', access: 'authenticated', area: 'requests', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/reassign', access: 'admin', area: 'requests', kind: 'mutation' },
+  { method: 'GET', path: '/api/v1/library/media-requests/:mediaRequestId/reassignment-history', access: 'admin', area: 'requests', kind: 'read' },
   { method: 'POST', path: '/api/v1/library/discovery-runs', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/library/organize-runs', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/library/scan-runs/:runId', access: 'authenticated', area: 'library', kind: 'read' },

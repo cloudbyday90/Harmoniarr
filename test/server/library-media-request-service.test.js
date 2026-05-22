@@ -1144,3 +1144,222 @@ test('createLibraryMediaRequestService rejects malformed expectedReleaseDate', a
     (error) => error?.code === 'validation_error',
   );
 });
+
+test('reassignMediaRequest rejects non-admin callers', async () => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.reassignMediaRequest({
+      actorUserId: 'user-1',
+      actorUserRole: 'requester',
+      mediaRequestId: 'request-1',
+      newRequestedForUserId: 'user-2',
+    }),
+    (error) => error?.status === 403 && error?.code === 'forbidden',
+  );
+});
+
+test('reassignMediaRequest rejects unknown media request ids', async (t) => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      getMediaRequestById: t.mock.fn(async () => null),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.reassignMediaRequest({
+      actorUserId: 'admin-1',
+      actorUserRole: 'admin',
+      mediaRequestId: 'nonexistent-request',
+      newRequestedForUserId: 'user-2',
+    }),
+    (error) => error?.status === 404 && error?.code === 'media_request_not_found',
+  );
+});
+
+test('reassignMediaRequest rejects reassignment to the same user', async (t) => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      getMediaRequestById: t.mock.fn(async () => ({
+        id: 'request-1',
+        requestedForUser: { id: 'user-2', role: 'requester', username: 'same-user' },
+      })),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.reassignMediaRequest({
+      actorUserId: 'admin-1',
+      actorUserRole: 'admin',
+      mediaRequestId: 'request-1',
+      newRequestedForUserId: 'user-2',
+    }),
+    (error) => error?.status === 409 && error?.code === 'reassignment_noop',
+  );
+});
+
+test('reassignMediaRequest rejects ineligible target users', async (t) => {
+  const service = createLibraryMediaRequestService({
+    getAppUserById: t.mock.fn(async () => ({
+      id: 'user-ineligible',
+      isDisabled: true,
+      role: 'requester',
+      username: 'disabled-user',
+    })),
+    mediaRequestStore: {
+      getMediaRequestById: t.mock.fn(async () => ({
+        id: 'request-1',
+        requestedForUser: { id: 'user-old', role: 'requester', username: 'old-user' },
+      })),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.reassignMediaRequest({
+      actorUserId: 'admin-1',
+      actorUserRole: 'admin',
+      mediaRequestId: 'request-1',
+      newRequestedForUserId: 'user-ineligible',
+    }),
+    (error) => error?.status === 409 && error?.code === 'media_request_target_ineligible',
+  );
+});
+
+test('reassignMediaRequest updates ownership and records both domain event and audit event', async (t) => {
+  const updateRequestedForUserId = t.mock.fn(async () => true);
+  const insertMediaRequestEvent = t.mock.fn(async () => {});
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const recordActivityEventFn = t.mock.fn(async () => {});
+
+  const service = createLibraryMediaRequestService({
+    getAppUserById: t.mock.fn(async () => ({
+      id: 'user-new',
+      username: 'new-target',
+      disabled: false,
+      role: 'requester',
+    })),
+    mediaRequestStore: {
+      getMediaRequestById: t.mock.fn(async () => ({
+        artistName: 'Aphex Twin',
+        id: 'request-1',
+        releaseTitle: 'Selected Ambient Works 85-92',
+        requestKind: 'release',
+        requestedForUser: { id: 'user-old', role: 'requester', username: 'old-target' },
+        requestState: 'needs_fetch',
+      })),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      insertMediaRequestEvent,
+      listMediaRequests: async () => [],
+      updateRequestedForUserId,
+    },
+    recordActivityEventFn,
+    recordAuditEventFn,
+  });
+
+  const _result = await service.reassignMediaRequest({
+    actorUserId: 'admin-1',
+    actorUserRole: 'admin',
+    mediaRequestId: 'request-1',
+    newRequestedForUserId: 'user-new',
+    reason: 'User account transfer',
+    requestMetadata: { ipAddress: '10.0.0.1', userAgent: 'TestAgent/1.0' },
+  });
+
+  assert.equal(updateRequestedForUserId.mock.callCount(), 1);
+  assert.deepEqual(updateRequestedForUserId.mock.calls[0].arguments[0], {
+    mediaRequestId: 'request-1',
+    newRequestedForUserId: 'user-new',
+  });
+
+  assert.equal(insertMediaRequestEvent.mock.callCount(), 1);
+  const eventArgs = insertMediaRequestEvent.mock.calls[0].arguments[0];
+  assert.equal(eventArgs.mediaRequestId, 'request-1');
+  assert.equal(eventArgs.eventType, 'reassigned');
+  assert.equal(eventArgs.previousRequestedForUserId, 'user-old');
+  assert.equal(eventArgs.newRequestedForUserId, 'user-new');
+  assert.equal(eventArgs.reason, 'User account transfer');
+  assert.equal(eventArgs.actorUserId, 'admin-1');
+
+  assert.equal(recordAuditEventFn.mock.callCount(), 1);
+  const auditArgs = recordAuditEventFn.mock.calls[0].arguments[0];
+  assert.equal(auditArgs.eventType, 'media_request_reassigned');
+  assert.equal(auditArgs.entityId, 'request-1');
+  assert.equal(auditArgs.ipAddress, '10.0.0.1');
+
+  assert.equal(recordActivityEventFn.mock.callCount(), 1);
+  assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].eventType, 'request_reassigned');
+});
+
+test('reassignMediaRequest works without a reason', async (t) => {
+  const updateRequestedForUserId = t.mock.fn(async () => true);
+  const insertMediaRequestEvent = t.mock.fn(async () => {});
+
+  const service = createLibraryMediaRequestService({
+    getAppUserById: t.mock.fn(async () => ({
+      id: 'user-new',
+      username: 'new-target',
+      disabled: false,
+      role: 'requester',
+    })),
+    mediaRequestStore: {
+      getMediaRequestById: t.mock.fn(async () => ({
+        artistName: 'Massive Attack',
+        id: 'request-2',
+        releaseTitle: 'Mezzanine',
+        requestKind: 'release',
+        requestedForUser: { id: 'user-old', role: 'requester', username: 'old-target' },
+        requestState: 'needs_fetch',
+      })),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      insertMediaRequestEvent,
+      listMediaRequests: async () => [],
+      updateRequestedForUserId,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await service.reassignMediaRequest({
+    actorUserId: 'admin-1',
+    actorUserRole: 'admin',
+    mediaRequestId: 'request-2',
+    newRequestedForUserId: 'user-new',
+  });
+
+  assert.equal(insertMediaRequestEvent.mock.callCount(), 1);
+  assert.equal(insertMediaRequestEvent.mock.calls[0].arguments[0].reason, null);
+});
+
+test('reassignMediaRequest rejects missing newRequestedForUserId', async () => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    () => service.reassignMediaRequest({
+      actorUserId: 'admin-1',
+      actorUserRole: 'admin',
+      mediaRequestId: 'request-1',
+      newRequestedForUserId: '',
+    }),
+    (error) => error?.code === 'validation_error',
+  );
+});

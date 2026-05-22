@@ -943,3 +943,91 @@ test('release radar route forwards recentDays, upcomingDays, and limit query par
     assert.equal(callArgs.arguments[0].limit, 20);
   });
 });
+
+test('media request reassign route requires fresh admin session and csrf', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({
+    appUserId: 'admin-1',
+    csrfToken: 'csrf-admin',
+    user: { role: 'admin' },
+  }));
+  const requireCsrf = t.mock.fn();
+  const reassignMediaRequest = t.mock.fn(async () => ({
+    id: 'request-1',
+    requestedForUser: { id: 'user-2', role: 'requester', username: 'new-target' },
+  }));
+  const app = createLibraryRouteTestApp({ requireCsrf, requireFreshAdminSession, reassignMediaRequest });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/request-1/reassign`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-admin',
+        'x-forwarded-for': '10.0.0.5',
+        'user-agent': 'ReassignRouteTest/1.0',
+      },
+      body: JSON.stringify({
+        newRequestedForUserId: 'user-2',
+        reason: 'Account consolidation',
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(reassignMediaRequest.mock.callCount(), 1);
+    assert.deepEqual(reassignMediaRequest.mock.calls[0].arguments[0], {
+      actorUserId: 'admin-1',
+      actorUserRole: 'admin',
+      mediaRequestId: 'request-1',
+      newRequestedForUserId: 'user-2',
+      reason: 'Account consolidation',
+      requestMetadata: {
+        ipAddress: '10.0.0.5',
+        userAgent: 'ReassignRouteTest/1.0',
+      },
+    });
+    assert.equal(payload.ok, true);
+    assert.equal(payload.mediaRequest.requestedForUser.id, 'user-2');
+  });
+});
+
+test('media request reassignment history route requires admin session', async (t) => {
+  const requireSession = t.mock.fn(async () => ({
+    appUserId: 'admin-1',
+    csrfToken: 'csrf-admin',
+    user: { role: 'admin' },
+  }));
+  const getMediaRequestReassignmentHistory = t.mock.fn(async () => [
+    { eventType: 'reassigned', previousRequestedForUserId: 'user-a', newRequestedForUserId: 'user-b', reason: 'transfer', occurredAt: '2026-05-22T12:00:00Z' },
+  ]);
+  const app = createLibraryRouteTestApp({ getMediaRequestReassignmentHistory, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/request-1/reassignment-history`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.events.length, 1);
+    assert.equal(payload.events[0].eventType, 'reassigned');
+    assert.equal(getMediaRequestReassignmentHistory.mock.callCount(), 1);
+    assert.deepEqual(getMediaRequestReassignmentHistory.mock.calls[0].arguments[0], { mediaRequestId: 'request-1' });
+  });
+});
+
+test('media request reassignment history route rejects non-admin sessions', async (t) => {
+  const requireSession = t.mock.fn(async () => ({
+    appUserId: 'user-1',
+    csrfToken: 'csrf-1',
+    user: { role: 'requester' },
+  }));
+  const app = createLibraryRouteTestApp({ requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/request-1/reassignment-history`);
+
+    assert.equal(response.status, 403);
+  });
+});

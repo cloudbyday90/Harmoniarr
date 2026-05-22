@@ -38,10 +38,12 @@ export function registerLibraryRoutes(app, {
   buildReleaseRadar,
   createMediaRequest,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
+  getMediaRequestReassignmentHistory,
   limitLibraryDiscoveryRun = skipRateLimitMiddleware,
   limitLibraryOrganizeApplyRun = skipRateLimitMiddleware,
   limitLibraryScanRun = skipRateLimitMiddleware,
   listMediaRequests,
+  reassignMediaRequest,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
@@ -246,6 +248,42 @@ export function registerLibraryRoutes(app, {
     response.status(202).json({
       ok: true,
       ...result,
+    });
+  }));
+
+  app.post('/api/v1/library/media-requests/:mediaRequestId/reassign', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const reassignedRequest = await reassignMediaRequest({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
+      mediaRequestId: request.params.mediaRequestId,
+      newRequestedForUserId: request.body?.newRequestedForUserId,
+      reason: request.body?.reason,
+      requestMetadata: getRequestMetadata(request),
+    });
+
+    response.json({
+      mediaRequest: reassignedRequest,
+      ok: true,
+    });
+  }));
+
+  app.get('/api/v1/library/media-requests/:mediaRequestId/reassignment-history', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+
+    if (session?.user?.role !== 'admin') {
+      throw createApiError(403, 'forbidden', 'Only administrators can view reassignment history');
+    }
+
+    const events = await getMediaRequestReassignmentHistory({
+      mediaRequestId: request.params.mediaRequestId,
+    });
+
+    response.json({
+      events,
+      ok: true,
     });
   }));
 }
