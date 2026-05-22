@@ -60,6 +60,7 @@ test('normalizeActivityEvent: maps all fields from a full event row', () => {
   assert.equal(result.entityArtist, 'Radiohead');
   assert.deepEqual(result.extraPayload, { note: 'expanded edition' });
   assert.equal(result.occurredAt, '2026-06-01T11:00:00.000Z');
+  assert.equal(result.releasePresentation, null);
 });
 
 test('normalizeActivityEvent: falls back to null for missing optional fields', () => {
@@ -73,6 +74,42 @@ test('normalizeActivityEvent: falls back to null for missing optional fields', (
   assert.equal(result.entityArtist, null);
   assert.equal(result.extraPayload, null);
   assert.equal(result.occurredAt, null);
+  assert.equal(result.releasePresentation, null);
+});
+
+test('normalizeActivityEvent: normalizes release_added events onto a shared release presentation contract', () => {
+  const result = normalizeActivityEvent({
+    eventType: 'release_added',
+    extraPayload: {
+      schemaVersion: 1,
+      presentationType: 'release_added',
+      releaseCount: 2,
+      releases: [
+        { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+        { artistName: 'Autechre', releaseTitle: 'Amber' },
+      ],
+      source: {
+        operationType: 'library_organize_apply',
+        runId: 'run-1',
+      },
+    },
+  });
+
+  assert.deepEqual(result.releasePresentation, {
+    schemaVersion: 1,
+    presentationType: 'release_added',
+    movedCount: null,
+    primaryRelease: { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+    releaseCount: 2,
+    releases: [
+      { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+      { artistName: 'Autechre', releaseTitle: 'Amber' },
+    ],
+    source: {
+      operationType: 'library_organize_apply',
+      runId: 'run-1',
+    },
+  });
 });
 
 // ── getActivityEventLabel ─────────────────────────────────────────────────────
@@ -125,6 +162,30 @@ test('getActivityEventLabel: release_added with title and artist', () => {
   assert.equal(label, 'Kid A by Radiohead added to library');
 });
 
+test('getActivityEventLabel: release_added with shared multi-release presentation avoids misleading artist suffix', () => {
+  const label = getActivityEventLabel(
+    {
+      eventType: 'release_added',
+      entityArtist: 'Radiohead',
+      entityTitle: '2 releases',
+      releasePresentation: {
+        schemaVersion: 1,
+        presentationType: 'release_added',
+        movedCount: 2,
+        primaryRelease: { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+        releaseCount: 2,
+        releases: [
+          { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+          { artistName: 'Autechre', releaseTitle: 'Amber' },
+        ],
+        source: null,
+      },
+    },
+    null,
+  );
+  assert.equal(label, '2 releases added to library');
+});
+
 test('getActivityEventDetail: release_added with multi-release summaries returns detail copy', () => {
   const detail = getActivityEventDetail({
     eventType: 'release_added',
@@ -155,6 +216,27 @@ test('getActivityEventDetail: release_added with truncated summaries mentions re
   });
 
   assert.equal(detail, 'Includes Kid A by Radiohead, Amber by Autechre, Selected Ambient Works 85-92 by Aphex Twin, and 1 more.');
+});
+
+test('getActivityEventDetail: release_added with shared contract payload returns detail copy', () => {
+  const detail = getActivityEventDetail({
+    eventType: 'release_added',
+    extraPayload: {
+      schemaVersion: 1,
+      presentationType: 'release_added',
+      releaseCount: 2,
+      releases: [
+        { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+        { artistName: 'Autechre', releaseTitle: 'Amber' },
+      ],
+      source: {
+        operationType: 'library_organize_apply',
+        runId: 'run-1',
+      },
+    },
+  });
+
+  assert.equal(detail, 'Includes Kid A by Radiohead, Amber by Autechre.');
 });
 
 test('getActivityEventDetail: release_added with a single release returns empty string', () => {

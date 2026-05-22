@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -265,14 +266,15 @@ export function createImportCandidateApplyWorker({
             }
 
             if (typeof recordActivityEventFn === 'function') {
-              void recordActivityEventFn({
-                actorUserId: null,
-                entityArtist: summaryCandidate.releaseIdentity?.artistName ?? null,
+              void recordActivityEventFn(buildReleaseAddedActivityEvent({
+                artistName: summaryCandidate.releaseIdentity?.artistName ?? null,
                 entityId: summaryCandidate.id,
-                entityTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? summaryCandidate.folderPath ?? null,
                 entityType: 'import_candidate',
-                eventType: 'release_added',
-              }).catch(() => {});
+                fallbackEntityTitle: summaryCandidate.folderPath ?? null,
+                operationType: 'import_candidate_apply',
+                releaseTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? null,
+                runId,
+              })).catch(() => {});
             }
 
             if (notifyUserId && typeof recordActivityEventFn === 'function') {

@@ -17,6 +17,7 @@
  */
 
 import { basename } from 'node:path';
+import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -95,7 +96,7 @@ export function createLibraryOrganizeApplyWorker({
 } = {}) {
   const activeRunIds = new Set();
 
-  async function notifyOrganizedReleases({ fileResults, movedCount }) {
+  async function notifyOrganizedReleases({ fileResults, movedCount, runId }) {
     if (movedCount < 1) {
       return;
     }
@@ -112,21 +113,16 @@ export function createLibraryOrganizeApplyWorker({
     }
 
     if (typeof recordActivityEventFn === 'function') {
-      void recordActivityEventFn({
-        actorUserId: null,
-        entityArtist: releaseSummary.primaryArtistName,
-        entityId: null,
-        entityTitle: releaseSummary.count > 1
-          ? `${releaseSummary.count} releases`
-          : releaseSummary.primaryReleaseTitle,
+      void recordActivityEventFn(buildReleaseAddedActivityEvent({
+        artistName: releaseSummary.primaryArtistName,
         entityType: 'library_release',
-        eventType: 'release_added',
-        extraPayload: {
-          movedCount,
-          releaseCount: releaseSummary.count,
-          releaseSummaries: releaseSummary.releases,
-        },
-      }).catch(() => {});
+        movedCount,
+        operationType: 'library_organize_apply',
+        releaseCount: releaseSummary.count,
+        releases: releaseSummary.releases,
+        releaseTitle: releaseSummary.primaryReleaseTitle,
+        runId,
+      })).catch(() => {});
     }
   }
 
@@ -227,7 +223,7 @@ export function createLibraryOrganizeApplyWorker({
               skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
             },
           });
-          await notifyOrganizedReleases({ fileResults, movedCount });
+          await notifyOrganizedReleases({ fileResults, movedCount, runId });
           return;
         }
       }
@@ -244,7 +240,7 @@ export function createLibraryOrganizeApplyWorker({
           skippedCount: Math.max((organizePreview.counts?.totalFiles ?? filesToMove.length) - filesToMove.length, 0),
         },
       });
-      await notifyOrganizedReleases({ fileResults, movedCount });
+        await notifyOrganizedReleases({ fileResults, movedCount, runId });
     } catch (error) {
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';

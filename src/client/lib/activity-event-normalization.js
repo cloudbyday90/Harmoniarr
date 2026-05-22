@@ -16,6 +16,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  formatReleaseActivityDetail,
+  formatReleaseActivitySubject,
+  normalizeReleaseActivityPresentation,
+} from '../../shared/release-activity-presentation.js';
+
 /**
  * Activity event normalization helpers.
  *
@@ -31,6 +37,14 @@
  */
 export function normalizeActivityEvent(event) {
   if (!event) return {};
+  const releasePresentation = event.eventType === 'release_added'
+    ? normalizeReleaseActivityPresentation({
+      entityArtist: event.entityArtist ?? null,
+      entityTitle: event.entityTitle ?? null,
+      extraPayload: event.extraPayload ?? null,
+    })
+    : null;
+
   return {
     id: event.id ?? null,
     eventType: event.eventType ?? null,
@@ -41,7 +55,19 @@ export function normalizeActivityEvent(event) {
     entityArtist: event.entityArtist ?? null,
     extraPayload: event.extraPayload ?? null,
     occurredAt: event.occurredAt ?? null,
+    releasePresentation,
   };
+}
+
+function formatFallbackReleaseSubject(event) {
+  const title = event?.entityTitle ?? null;
+  const artist = event?.entityArtist ?? null;
+
+  if (title && artist) {
+    return `${title} by ${artist}`;
+  }
+
+  return title || artist || 'a release';
 }
 
 /**
@@ -73,9 +99,10 @@ export function getActivityEventLabel(event, currentUserId = null) {
       return `Now monitoring ${artistName}`;
     }
     case 'release_added': {
-      const releaseDesc = title
-        ? (artist ? `${title} by ${artist}` : title)
-        : 'a release';
+      const releaseDesc = formatReleaseActivitySubject(
+        event.releasePresentation,
+        formatFallbackReleaseSubject(event),
+      );
       return `${releaseDesc} added to library`;
     }
     case 'request_fulfilled': {
@@ -98,21 +125,6 @@ export function getActivityEventLabel(event, currentUserId = null) {
   }
 }
 
-function formatReleaseSummary(summary) {
-  if (!summary || typeof summary !== 'object') {
-    return null;
-  }
-
-  const artistName = typeof summary.artistName === 'string' ? summary.artistName : null;
-  const releaseTitle = typeof summary.releaseTitle === 'string' ? summary.releaseTitle : null;
-
-  if (releaseTitle && artistName) {
-    return `${releaseTitle} by ${artistName}`;
-  }
-
-  return releaseTitle || artistName || null;
-}
-
 export function getActivityEventDetail(event) {
   if (!event || typeof event !== 'object') {
     return '';
@@ -122,19 +134,14 @@ export function getActivityEventDetail(event) {
     return '';
   }
 
-  const releaseCount = Number(event.extraPayload?.releaseCount ?? 0);
-  const releaseSummaries = Array.isArray(event.extraPayload?.releaseSummaries)
-    ? event.extraPayload.releaseSummaries.map(formatReleaseSummary).filter(Boolean)
-    : [];
-
-  if (releaseCount <= 1 || releaseSummaries.length === 0) {
-    return '';
-  }
-
-  const remainingCount = Math.max(releaseCount - releaseSummaries.length, 0);
-  return remainingCount > 0
-    ? `Includes ${releaseSummaries.join(', ')}, and ${remainingCount} more.`
-    : `Includes ${releaseSummaries.join(', ')}.`;
+  return formatReleaseActivityDetail(
+    event.releasePresentation
+    ?? normalizeReleaseActivityPresentation({
+      entityArtist: event.entityArtist ?? null,
+      entityTitle: event.entityTitle ?? null,
+      extraPayload: event.extraPayload ?? null,
+    }),
+  );
 }
 
 /**

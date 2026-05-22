@@ -87,9 +87,16 @@ test('library organize apply worker records release activity and notifications a
   assert.equal(activityEvents[0].entityArtist, 'Radiohead');
   assert.equal(activityEvents[0].entityTitle, 'OK Computer');
   assert.deepEqual(activityEvents[0].extraPayload, {
+    schemaVersion: 1,
+    presentationType: 'release_added',
     movedCount: 2,
+    primaryRelease: { artistName: 'Radiohead', releaseTitle: 'OK Computer' },
     releaseCount: 1,
-    releaseSummaries: [{ artistName: 'Radiohead', releaseTitle: 'OK Computer' }],
+    releases: [{ artistName: 'Radiohead', releaseTitle: 'OK Computer' }],
+    source: {
+      operationType: 'library_organize_apply',
+      runId: 'run-1',
+    },
   });
 });
 
@@ -153,9 +160,16 @@ test('library organize apply worker still records release activity when some fil
   assert.equal(activityEvents.length, 1);
   assert.equal(activityEvents[0].eventType, 'release_added');
   assert.deepEqual(activityEvents[0].extraPayload, {
+    schemaVersion: 1,
+    presentationType: 'release_added',
     movedCount: 1,
+    primaryRelease: { artistName: 'Autechre', releaseTitle: 'Amber' },
     releaseCount: 1,
-    releaseSummaries: [{ artistName: 'Autechre', releaseTitle: 'Amber' }],
+    releases: [{ artistName: 'Autechre', releaseTitle: 'Amber' }],
+    source: {
+      operationType: 'library_organize_apply',
+      runId: 'run-2',
+    },
   });
 });
 
@@ -206,13 +220,21 @@ test('library organize apply worker records multi-release summaries in activity 
   await waitForWorkerTick();
 
   assert.equal(activityEvents.length, 1);
+  assert.equal(activityEvents[0].entityArtist, null);
   assert.deepEqual(activityEvents[0].extraPayload, {
+    schemaVersion: 1,
+    presentationType: 'release_added',
     movedCount: 2,
+    primaryRelease: { artistName: 'Radiohead', releaseTitle: 'Kid A' },
     releaseCount: 2,
-    releaseSummaries: [
+    releases: [
       { artistName: 'Radiohead', releaseTitle: 'Kid A' },
       { artistName: 'Autechre', releaseTitle: 'Amber' },
     ],
+    source: {
+      operationType: 'library_organize_apply',
+      runId: 'run-4',
+    },
   });
   assert.equal(activityEvents[0].entityTitle, '2 releases');
 });
