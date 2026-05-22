@@ -250,6 +250,31 @@ function findExistingRelease(results, { artistName, releaseTitle }) {
   }) ?? null;
 }
 
+function normalizeOptionalUserIdList(value, fieldName) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const normalized = value
+    .map((item) => {
+      if (typeof item !== 'string') return null;
+      const trimmed = item.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    })
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  const unique = [...new Set(normalized)];
+  if (unique.length > 50) {
+    throw createApiError(400, 'validation_error', `${fieldName} must contain 50 user IDs or fewer`);
+  }
+
+  return unique;
+}
+
 export function createLibraryMediaRequestService({
   externalIntakeService = null,
   getAppUserById = null,
@@ -290,17 +315,94 @@ export function createLibraryMediaRequestService({
     return targetUser.id;
   }
 
+  async function resolveRequestedForUserIds({ actorUserRole, requestedForUserIds }) {
+    if (!Array.isArray(requestedForUserIds) || requestedForUserIds.length === 0) {
+      return null;
+    }
+
+    if (actorUserRole !== 'admin') {
+      throw createApiError(403, 'forbidden', 'Only administrators can submit music requests for other users');
+    }
+
+    if (typeof getAppUserById !== 'function') {
+      throw new Error('Multi-target media request requires getAppUserById');
+    }
+
+    const resolved = [];
+    const ineligible = [];
+
+    for (const rawId of requestedForUserIds) {
+      const normalizedId = normalizeOptionalUserId(rawId, 'requestedForUserIds');
+      if (!normalizedId) continue;
+
+      const targetUser = await getAppUserById({ userId: normalizedId });
+      if (!targetUser) {
+        throw createApiError(404, 'app_user_not_found', `Request-target user ${normalizedId} could not be found`);
+      }
+
+      const eligibility = buildMediaRequestTargetEligibility(targetUser);
+      if (!eligibility.eligible) {
+        ineligible.push({ id: targetUser.id, username: targetUser.username, reasonCode: eligibility.reasonCode });
+        continue;
+      }
+
+      resolved.push(targetUser);
+    }
+
+    return { ineligible, resolved };
+  }
+
   async function createMediaRequest({ actorUserId, actorUserRole = null, payload, requestMetadata }) {
     const draft = validateDraft(payload ?? {});
     const normalizedQuery = buildNormalizedQuery(draft);
+    const expectedReleaseDate = normalizeOptionalDate(payload?.expectedReleaseDate, 'expectedReleaseDate');
+    const requestedForUserIds = normalizeOptionalUserIdList(payload?.requestedForUserIds, 'requestedForUserIds');
+
+    if (requestedForUserIds && requestedForUserIds.length > 1) {
+      return createFanOutMediaRequest({
+        actorUserId,
+        actorUserRole,
+        draft,
+        expectedReleaseDate,
+        normalizedQuery,
+        payload,
+        requestedForUserIds,
+        requestMetadata,
+      });
+    }
+
+    const singleTargetOverride = requestedForUserIds?.length === 1
+      ? requestedForUserIds[0]
+      : payload?.requestedForUserId;
+
     const requestedForUserId = await resolveRequestedForUserId({
       actorUserId,
       actorUserRole,
-      requestedForUserId: payload?.requestedForUserId,
+      requestedForUserId: singleTargetOverride,
     });
 
-    const expectedReleaseDate = normalizeOptionalDate(payload?.expectedReleaseDate, 'expectedReleaseDate');
+    return createSingleMediaRequest({
+      actorUserId,
+      draft,
+      expectedReleaseDate,
+      normalizedQuery,
+      payload,
+      requestedForUserId,
+      requestMetadata,
+    });
+  }
 
+  async function createSingleMediaRequest({
+    actorUserId,
+    draft,
+    expectedReleaseDate,
+    normalizedQuery,
+    payload,
+    requestedForUserId,
+    requestMetadata,
+    fanOutParentId = null,
+    fanOutChildCount = 0,
+  }) {
     let matchedMetadataReleaseGroupId = null;
     let matchedMetadataReleaseId = null;
     let musicbrainzReleaseId = normalizeOptionalMbReleaseId(payload?.musicbrainzReleaseId);
@@ -378,6 +480,8 @@ export function createLibraryMediaRequestService({
       artistName: draft.artistName,
       evidence,
       expectedReleaseDate,
+      fanOutChildCount,
+      fanOutParentId,
       linkedRequestId,
       matchedMetadataReleaseGroupId,
       matchedMetadataReleaseId,
@@ -399,6 +503,8 @@ export function createLibraryMediaRequestService({
       actorUserId,
       details: {
         delegated: requestedForUserId !== actorUserId,
+        fanOutChildCount,
+        fanOutParentId,
         linked,
         linkedToRequestId: linkedRequestId,
         requestId: mediaRequest.id,
@@ -410,7 +516,7 @@ export function createLibraryMediaRequestService({
       entityType: 'media_request',
       eventType: 'media_request_created',
       ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: `Created ${mediaRequest.requestKind} music request as ${mediaRequest.requestState}${linked ? ' (linked to existing request)' : ''}`,
+      summary: `Created ${mediaRequest.requestKind} music request as ${mediaRequest.requestState}${linked ? ' (linked to existing request)' : ''}${fanOutParentId ? ' (fan-out child)' : ''}`,
       userAgent: requestMetadata?.userAgent ?? null,
     });
 
@@ -453,6 +559,109 @@ export function createLibraryMediaRequestService({
     }
 
     return { ...mediaRequest, linked };
+  }
+
+  async function createFanOutMediaRequest({
+    actorUserId,
+    actorUserRole,
+    draft,
+    expectedReleaseDate,
+    normalizedQuery,
+    payload,
+    requestedForUserIds,
+    requestMetadata,
+  }) {
+    const { ineligible, resolved } = await resolveRequestedForUserIds({
+      actorUserId,
+      actorUserRole,
+      requestedForUserIds,
+    });
+
+    if (resolved.length === 0) {
+      throw createApiError(409, 'media_request_no_eligible_targets', 'No eligible target users were found for the multi-target request');
+    }
+
+    const firstTargetUserId = resolved[0].id;
+
+    const parentRequest = await createSingleMediaRequest({
+      actorUserId,
+      draft,
+      expectedReleaseDate,
+      normalizedQuery,
+      payload,
+      requestedForUserId: firstTargetUserId,
+      requestMetadata,
+    });
+
+    if (resolved.length <= 1) {
+      return {
+        ...parentRequest,
+        fanOut: { childCount: 0, ineligible, totalTargets: resolved.length },
+      };
+    }
+
+    const additionalTargetIds = resolved.slice(1).map((user) => user.id);
+    const fanOutChildren = await mediaRequestStore.createFanOutChildRequests({
+      parentRequest,
+      targetUserIds: additionalTargetIds,
+      linkedRequestId: parentRequest.linkedRequestId,
+    });
+
+    const childCount = fanOutChildren.length;
+    await mediaRequestStore.updateFanOutChildCount({
+      mediaRequestId: parentRequest.id,
+      childCount,
+    });
+
+    for (const child of fanOutChildren) {
+      if (typeof recordActivityEventFn === 'function') {
+        void recordActivityEventFn({
+          actorUserId,
+          entityArtist: draft.artistName ?? null,
+          entityId: child.id,
+          entityTitle: draft.releaseTitle ?? draft.artistName ?? null,
+          entityType: 'media_request',
+          eventType: 'request_created',
+        }).catch(() => {});
+      }
+    }
+
+    await recordAuditEventFn({
+      actorType: 'app_user',
+      actorUserId,
+      details: {
+        fanOutChildCount: childCount,
+        ineligibleCount: ineligible.length,
+        parentRequestId: parentRequest.id,
+        targetUserCount: resolved.length,
+      },
+      entityId: parentRequest.id,
+      entityType: 'media_request',
+      eventType: 'media_request_fan_out_created',
+      ipAddress: requestMetadata?.ipAddress ?? null,
+      summary: `Created fan-out media request for ${resolved.length} users (${childCount} children)`,
+      userAgent: requestMetadata?.userAgent ?? null,
+    });
+
+    if (typeof onRequestCreatedFn === 'function') {
+      void onRequestCreatedFn({
+        actorUserId,
+        artistName: draft.artistName ?? null,
+        requestKind: draft.requestKind,
+        releaseTitle: draft.releaseTitle ?? null,
+      }).catch(() => {});
+    }
+
+    return {
+      ...parentRequest,
+      fanOutChildCount: childCount,
+      fanOut: {
+        childCount,
+        children: fanOutChildren.map((child) => child.id),
+        ineligible,
+        totalTargets: resolved.length,
+      },
+    };
   }
 
   async function listMediaRequests({ requestedForUserId = null } = {}) {

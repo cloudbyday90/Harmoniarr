@@ -43,6 +43,8 @@ function mapMediaRequestRow(row) {
     musicbrainzReleaseId: row.musicbrainz_release_id ?? null,
     linkedRequestId: row.linked_request_id ?? null,
     expectedReleaseDate: row.expected_release_date ?? null,
+    fanOutParentId: row.fan_out_parent_id ?? null,
+    fanOutChildCount: Number.parseInt(String(row.fan_out_child_count ?? 0), 10) || 0,
     requestedByUser: {
       id: row.requested_by_user_id,
       role: row.requested_by_role ?? null,
@@ -111,6 +113,8 @@ const baseSelect = `
     media_requests.musicbrainz_release_id,
     media_requests.linked_request_id,
     media_requests.expected_release_date,
+    media_requests.fan_out_parent_id,
+    media_requests.fan_out_child_count,
     request_users.username AS requested_by_username,
     request_users.role AS requested_by_role,
     target_users.username AS requested_for_username,
@@ -157,6 +161,8 @@ export function createLibraryMediaRequestStore({
     sourceProvider,
     sourceUrl,
     trackTitle,
+    fanOutParentId = null,
+    fanOutChildCount = 0,
   }) {
     const pool = getPoolFn();
     const result = await pool.query(
@@ -179,6 +185,8 @@ export function createLibraryMediaRequestStore({
           musicbrainz_release_id,
           linked_request_id,
           expected_release_date,
+          fan_out_parent_id,
+          fan_out_child_count,
           updated_at
         )
         VALUES (
@@ -199,6 +207,8 @@ export function createLibraryMediaRequestStore({
           $15,
           $16,
           $17,
+          $18,
+          $19,
           NOW()
         )
         RETURNING id
@@ -221,6 +231,8 @@ export function createLibraryMediaRequestStore({
         musicbrainzReleaseId,
         linkedRequestId,
         expectedReleaseDate ?? null,
+        fanOutParentId,
+        fanOutChildCount,
       ],
     );
 
@@ -333,12 +345,108 @@ export function createLibraryMediaRequestStore({
     return null;
   }
 
+  async function createFanOutChildRequests({ parentRequest, targetUserIds, linkedRequestId = null }) {
+    if (!Array.isArray(targetUserIds) || targetUserIds.length === 0) {
+      return [];
+    }
+
+    const pool = getPoolFn();
+    const values = [];
+    const params = [];
+    let paramIdx = 1;
+
+    for (const targetUserId of targetUserIds) {
+      const offset = (paramIdx - 1) * 19;
+      values.push(
+        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}::jsonb, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19})`,
+      );
+      params.push(
+        parentRequest.requestedByUser.id,
+        targetUserId,
+        parentRequest.requestKind,
+        parentRequest.requestState,
+        parentRequest.artistName,
+        parentRequest.releaseTitle,
+        parentRequest.trackTitle,
+        parentRequest.sourceUrl,
+        parentRequest.sourceProvider,
+        parentRequest.normalizedQuery,
+        parentRequest.existingMatch?.releaseGroupId ?? null,
+        parentRequest.existingMatch?.releaseId ?? null,
+        parentRequest.notes,
+        JSON.stringify(parentRequest.evidence ?? {}),
+        parentRequest.musicbrainzReleaseId,
+        linkedRequestId ?? parentRequest.linkedRequestId,
+        parentRequest.expectedReleaseDate,
+        parentRequest.id,
+        0,
+      );
+      paramIdx += 1;
+    }
+
+    const result = await pool.query(
+      `
+        INSERT INTO media_requests (
+          requested_by_user_id,
+          requested_for_user_id,
+          request_kind,
+          request_state,
+          artist_name,
+          release_title,
+          track_title,
+          source_url,
+          source_provider,
+          normalized_query,
+          matched_metadata_release_group_id,
+          matched_metadata_release_id,
+          notes,
+          evidence,
+          musicbrainz_release_id,
+          linked_request_id,
+          expected_release_date,
+          fan_out_parent_id,
+          fan_out_child_count,
+          updated_at
+        )
+        VALUES ${values.join(', ')}
+        RETURNING id
+      `,
+      params,
+    );
+
+    const childIds = result.rows.map((row) => row.id);
+    const children = [];
+    for (const childId of childIds) {
+      const child = await getMediaRequestById({ mediaRequestId: childId });
+      if (child) {
+        children.push(child);
+      }
+    }
+
+    return children;
+  }
+
+  async function updateFanOutChildCount({ mediaRequestId, childCount }) {
+    const pool = getPoolFn();
+    await pool.query(
+      `
+        UPDATE media_requests
+        SET fan_out_child_count = $2,
+            updated_at = NOW()
+        WHERE id = $1
+      `,
+      [mediaRequestId, childCount],
+    );
+  }
+
   return {
+    createFanOutChildRequests,
     createMediaRequest,
     findActiveDuplicateRequest,
     getMediaRequestById,
     getMediaRequestCounts,
     listMediaRequests,
     mergeMediaRequestEvidence,
+    updateFanOutChildCount,
   };
 }

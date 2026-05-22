@@ -171,9 +171,21 @@ export function registerLibraryRoutes(app, {
     });
 
     const linked = mediaRequest.linked ?? false;
-    const responseBody = { ...mediaRequest, linked };
+    const fanOut = mediaRequest.fanOut ?? null;
+    const responseBody = { ...mediaRequest };
+    delete responseBody.fanOut;
+
     if (linked) {
       responseBody.linkedMessage = 'Someone has already requested this — you\'ve been added to the queue.';
+    }
+
+    if (fanOut && fanOut.childCount > 0) {
+      responseBody.fanOutMessage = `Request created for ${fanOut.totalTargets} user${fanOut.totalTargets === 1 ? '' : 's'} (${fanOut.childCount} additional target${fanOut.childCount === 1 ? '' : 's'}).`;
+      responseBody.fanOutChildIds = fanOut.children;
+      responseBody.fanOutChildCount = fanOut.childCount;
+      if (fanOut.ineligible.length > 0) {
+        responseBody.fanOutIneligibleTargets = fanOut.ineligible;
+      }
     }
 
     response.status(201).json({

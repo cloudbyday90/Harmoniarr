@@ -126,7 +126,7 @@ export function getRequestTargetLabel(user, currentUserId) {
  * Builds the API submission payload from form state.
  *
  * @param {object} options
- * @param {{ artistName: string, notes: string, releaseTitle: string, requestKind: string, requestedForUserId: string, sourceUrl: string, trackTitle: string }} options.form
+ * @param {{ artistName: string, notes: string, releaseTitle: string, requestKind: string, requestedForUserId: string, requestedForUserIds: string[], sourceUrl: string, trackTitle: string }} options.form
  * @param {boolean} options.isAdmin
  * @returns {object}
  */
@@ -136,7 +136,9 @@ export function buildMediaRequestPayload({ form, isAdmin }) {
     requestKind: form.requestKind,
   };
 
-  if (isAdmin && form.requestedForUserId) {
+  if (isAdmin && form.requestedForUserIds && form.requestedForUserIds.length > 0) {
+    payload.requestedForUserIds = form.requestedForUserIds;
+  } else if (isAdmin && form.requestedForUserId) {
     payload.requestedForUserId = form.requestedForUserId;
   }
 
@@ -160,11 +162,15 @@ export function buildMediaRequestPayload({ form, isAdmin }) {
 /**
  * Derives the success message shown after a media request is submitted.
  *
- * @param {{ requestState: string, requestedForUser: { id: string, username: string } }} mediaRequest
+ * @param {{ requestState: string, requestedForUser: { id: string, username: string }, fanOutMessage?: string }} mediaRequest
  * @param {string} currentUserId - The ID of the user currently logged in.
  * @returns {string}
  */
 export function buildMediaRequestSuccessMessage(mediaRequest, currentUserId) {
+  if (mediaRequest.fanOutMessage) {
+    return mediaRequest.fanOutMessage;
+  }
+
   const targetUser = mediaRequest.requestedForUser;
   const delegated = Boolean(targetUser && targetUser.id !== currentUserId);
 

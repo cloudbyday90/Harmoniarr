@@ -314,3 +314,67 @@ test('buildMediaRequestSuccessMessage returns already_exists delegated message w
   const result = buildMediaRequestSuccessMessage(mediaRequest, 'u1');
   assert.equal(result, 'This request already maps to imported media and has been added for bob.');
 });
+
+test('buildMediaRequestPayload includes requestedForUserIds when admin provides multi-target selection', () => {
+  const result = buildMediaRequestPayload({
+    form: {
+      artistName: 'Daft Punk',
+      notes: '',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+      requestedForUserId: '',
+      requestedForUserIds: ['user-1', 'user-2', 'user-3'],
+      sourceUrl: '',
+      trackTitle: '',
+    },
+    isAdmin: true,
+  });
+  assert.deepEqual(result.requestedForUserIds, ['user-1', 'user-2', 'user-3']);
+  assert.equal(result.requestedForUserId, undefined);
+});
+
+test('buildMediaRequestPayload prefers requestedForUserIds over requestedForUserId when both present', () => {
+  const result = buildMediaRequestPayload({
+    form: {
+      artistName: 'Daft Punk',
+      notes: '',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+      requestedForUserId: 'user-1',
+      requestedForUserIds: ['user-1', 'user-2'],
+      sourceUrl: '',
+      trackTitle: '',
+    },
+    isAdmin: true,
+  });
+  assert.deepEqual(result.requestedForUserIds, ['user-1', 'user-2']);
+  assert.equal(result.requestedForUserId, undefined);
+});
+
+test('buildMediaRequestPayload uses requestedForUserId when no multi-target', () => {
+  const result = buildMediaRequestPayload({
+    form: {
+      artistName: 'Daft Punk',
+      notes: '',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+      requestedForUserId: 'user-1',
+      requestedForUserIds: [],
+      sourceUrl: '',
+      trackTitle: '',
+    },
+    isAdmin: true,
+  });
+  assert.equal(result.requestedForUserId, 'user-1');
+  assert.equal(result.requestedForUserIds, undefined);
+});
+
+test('buildMediaRequestSuccessMessage returns fanOutMessage when present', () => {
+  const mediaRequest = {
+    requestState: 'needs_fetch',
+    requestedForUser: { id: 'u1', username: 'alice' },
+    fanOutMessage: 'Request created for 3 users (2 additional targets).',
+  };
+  const result = buildMediaRequestSuccessMessage(mediaRequest, 'admin-1');
+  assert.equal(result, 'Request created for 3 users (2 additional targets).');
+});

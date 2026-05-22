@@ -189,6 +189,325 @@ test('createLibraryMediaRequestService rejects invalid request payloads before p
   );
 });
 
+test('createLibraryMediaRequestService creates fan-out child requests when requestedForUserIds has multiple targets', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: `request-${createMediaRequest.mock.callCount() + 1}`,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'admin', role: 'admin' },
+    requestedForUser: { id: payload.requestedForUserId, username: `user-${payload.requestedForUserId}`, role: 'requester' },
+    existingMatch: null,
+    artistName: payload.artistName,
+    releaseTitle: payload.releaseTitle,
+    linkedRequestId: null,
+    fanOutParentId: payload.fanOutParentId ?? null,
+    fanOutChildCount: payload.fanOutChildCount ?? 0,
+  }));
+
+  const createFanOutChildRequests = t.mock.fn(async ({ parentRequest, targetUserIds }) => {
+    return targetUserIds.map((targetUserId, idx) => ({
+      id: `child-${idx + 1}`,
+      requestKind: parentRequest.requestKind,
+      requestState: parentRequest.requestState,
+      requestedByUser: parentRequest.requestedByUser,
+      requestedForUser: { id: targetUserId, username: `user-${targetUserId}`, role: 'requester' },
+      existingMatch: null,
+      fanOutParentId: parentRequest.id,
+      fanOutChildCount: 0,
+    }));
+  });
+
+  const updateFanOutChildCount = t.mock.fn(async () => {});
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const recordActivityEventFn = t.mock.fn(async () => {});
+
+  const getAppUserById = t.mock.fn(async ({ userId }) => {
+    const users = {
+      'admin-1': { id: 'admin-1', username: 'admin', role: 'admin', isDisabled: false, plexProfile: null },
+      'user-1': { id: 'user-1', username: 'listener1', role: 'requester', isDisabled: false, plexProfile: null },
+      'user-2': { id: 'user-2', username: 'listener2', role: 'requester', isDisabled: false, plexProfile: null },
+      'user-3': { id: 'user-3', username: 'listener3', role: 'requester', isDisabled: false, plexProfile: null },
+    };
+    return users[userId] ?? null;
+  });
+
+  const service = createLibraryMediaRequestService({
+    getAppUserById,
+    mediaRequestStore: {
+      createMediaRequest,
+      createFanOutChildRequests,
+      updateFanOutChildCount,
+      findActiveDuplicateRequest: async () => null,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: t.mock.fn(async () => ({ results: [] })),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordActivityEventFn,
+    recordAuditEventFn,
+  });
+
+  const result = await service.createMediaRequest({
+    actorUserId: 'admin-1',
+    actorUserRole: 'admin',
+    payload: {
+      artistName: 'Daft Punk',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+      requestedForUserIds: ['user-1', 'user-2', 'user-3'],
+    },
+    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'Test/1.0' },
+  });
+
+  assert.equal(createMediaRequest.mock.callCount(), 1);
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].requestedForUserId, 'user-1');
+  assert.equal(createFanOutChildRequests.mock.callCount(), 1);
+  assert.deepEqual(
+    createFanOutChildRequests.mock.calls[0].arguments[0].targetUserIds,
+    ['user-2', 'user-3'],
+  );
+  assert.equal(updateFanOutChildCount.mock.callCount(), 1);
+  assert.equal(result.fanOut.childCount, 2);
+  assert.equal(result.fanOut.totalTargets, 3);
+  assert.equal(result.fanOut.ineligible.length, 0);
+  assert.ok(recordAuditEventFn.mock.callCount() >= 2);
+});
+
+test('createLibraryMediaRequestService fan-out skips ineligible targets', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'parent-1',
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'admin', role: 'admin' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'eligible', role: 'requester' },
+    existingMatch: null,
+    artistName: payload.artistName,
+    releaseTitle: payload.releaseTitle,
+    linkedRequestId: null,
+    fanOutParentId: null,
+    fanOutChildCount: 0,
+  }));
+
+  const createFanOutChildRequests = t.mock.fn(async () => [
+    { id: 'child-1', fanOutParentId: 'parent-1', fanOutChildCount: 0 },
+  ]);
+  const updateFanOutChildCount = t.mock.fn(async () => {});
+  const recordAuditEventFn = t.mock.fn(async () => {});
+
+  const getAppUserById = t.mock.fn(async ({ userId }) => {
+    if (userId === 'admin-1') return { id: 'admin-1', username: 'admin', role: 'admin', isDisabled: false, plexProfile: null };
+    if (userId === 'eligible-1') return { id: 'eligible-1', username: 'eligible', role: 'requester', isDisabled: false, plexProfile: null };
+    if (userId === 'disabled-1') return { id: 'disabled-1', username: 'disabled', role: 'requester', isDisabled: true, plexProfile: null };
+    return null;
+  });
+
+  const service = createLibraryMediaRequestService({
+    getAppUserById,
+    mediaRequestStore: {
+      createMediaRequest,
+      createFanOutChildRequests,
+      updateFanOutChildCount,
+      findActiveDuplicateRequest: async () => null,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: t.mock.fn(async () => ({ results: [] })),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn,
+  });
+
+  const result = await service.createMediaRequest({
+    actorUserId: 'admin-1',
+    actorUserRole: 'admin',
+    payload: {
+      artistName: 'Daft Punk',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+      requestedForUserIds: ['eligible-1', 'disabled-1'],
+    },
+    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'Test/1.0' },
+  });
+
+  assert.equal(result.fanOut.ineligible.length, 1);
+  assert.equal(result.fanOut.ineligible[0].reasonCode, 'media_request_target_disabled');
+  assert.equal(result.fanOut.totalTargets, 1);
+});
+
+test('createLibraryMediaRequestService fan-out with single target falls through to single-request path', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-1',
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'admin', role: 'admin' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'target', role: 'requester' },
+    existingMatch: null,
+    artistName: payload.artistName,
+    releaseTitle: payload.releaseTitle,
+    linkedRequestId: null,
+  }));
+
+  const createFanOutChildRequests = t.mock.fn(async () => []);
+  const recordAuditEventFn = t.mock.fn(async () => {});
+
+  const getAppUserById = t.mock.fn(async ({ userId }) => {
+    if (userId === 'admin-1') return { id: 'admin-1', username: 'admin', role: 'admin', isDisabled: false, plexProfile: null };
+    if (userId === 'user-1') return { id: 'user-1', username: 'target', role: 'requester', isDisabled: false, plexProfile: null };
+    return null;
+  });
+
+  const service = createLibraryMediaRequestService({
+    getAppUserById,
+    mediaRequestStore: {
+      createMediaRequest,
+      createFanOutChildRequests,
+      findActiveDuplicateRequest: async () => null,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: t.mock.fn(async () => ({ results: [] })),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn,
+  });
+
+  const result = await service.createMediaRequest({
+    actorUserId: 'admin-1',
+    actorUserRole: 'admin',
+    payload: {
+      artistName: 'Daft Punk',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+      requestedForUserIds: ['user-1'],
+    },
+    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'Test/1.0' },
+  });
+
+  assert.equal(createMediaRequest.mock.callCount(), 1);
+  assert.equal(createFanOutChildRequests.mock.callCount(), 0);
+  assert.equal(result.linked, false);
+});
+
+test('createLibraryMediaRequestService fan-out rejects non-admin multi-target requests', async () => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest: async () => { throw new Error('should not be called'); },
+      findActiveDuplicateRequest: async () => null,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    service.createMediaRequest({
+      actorUserId: 'user-1',
+      actorUserRole: 'requester',
+      payload: {
+        artistName: 'Daft Punk',
+        releaseTitle: 'Discovery',
+        requestKind: 'release',
+        requestedForUserIds: ['user-1', 'user-2'],
+      },
+      requestMetadata: {},
+    }),
+    (error) => error?.status === 403 && error?.code === 'forbidden',
+  );
+});
+
+test('createLibraryMediaRequestService fan-out rejects when all targets are ineligible', async (t) => {
+  const createMediaRequest = t.mock.fn(async () => { throw new Error('should not be called'); });
+  const getAppUserById = t.mock.fn(async ({ userId }) => ({
+    id: userId,
+    username: `disabled-${userId}`,
+    role: 'requester',
+    isDisabled: true,
+    plexProfile: null,
+  }));
+
+  const service = createLibraryMediaRequestService({
+    getAppUserById,
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: async () => null,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: t.mock.fn(async () => ({ results: [] })),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await assert.rejects(
+    service.createMediaRequest({
+      actorUserId: 'admin-1',
+      actorUserRole: 'admin',
+      payload: {
+        artistName: 'Daft Punk',
+        releaseTitle: 'Discovery',
+        requestKind: 'release',
+        requestedForUserIds: ['disabled-1', 'disabled-2'],
+      },
+      requestMetadata: {},
+    }),
+    (error) => error?.status === 409 && error?.code === 'media_request_no_eligible_targets',
+  );
+});
+
+test('createLibraryMediaRequestService fan-out validates requestedForUserIds array length', async () => {
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest: async () => { throw new Error('should not be called'); },
+      findActiveDuplicateRequest: async () => null,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      listMediaRequests: async () => [],
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  const ids = Array.from({ length: 51 }, (_, i) => `user-${i + 1}`);
+  await assert.rejects(
+    service.createMediaRequest({
+      actorUserId: 'admin-1',
+      actorUserRole: 'admin',
+      payload: {
+        artistName: 'Daft Punk',
+        releaseTitle: 'Discovery',
+        requestKind: 'release',
+        requestedForUserIds: ids,
+      },
+      requestMetadata: {},
+    }),
+    (error) => error?.status === 400 && error?.code === 'validation_error',
+  );
+});
+
 test('createLibraryMediaRequestService preserves lock conflicts from external intake planning', async () => {
   const service = createLibraryMediaRequestService({
     externalIntakeService: {

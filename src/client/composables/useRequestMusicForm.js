@@ -77,6 +77,7 @@ export function useRequestMusicForm({
     releaseTitle: '',
     requestKind: 'release',
     requestedForUserId: '',
+    requestedForUserIds: [],
     sourceUrl: '',
     trackTitle: '',
   });
@@ -119,6 +120,7 @@ export function useRequestMusicForm({
     form.notes = '';
     form.releaseTitle = '';
     form.requestKind = 'release';
+    form.requestedForUserIds = [];
     form.sourceUrl = '';
     form.trackTitle = '';
     applyDefaultRequestTarget();

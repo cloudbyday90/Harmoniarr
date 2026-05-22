@@ -3523,6 +3523,64 @@ SET migration_key = EXCLUDED.migration_key,
     application_version = NULL,
     updated_at = NOW();
 
+-- Migration: 20260522_020000_media_request_fan_out.sql
+-- Checksum: 946c95ebe7c0e5929e1718f2c48a9e09cac8e87728624cce8bdb8184c9eeef5f
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+-- Add fan-out columns so a single admin request can materialise
+-- durable target-owned request rows for multiple users.
+ALTER TABLE media_requests
+  ADD COLUMN fan_out_parent_id UUID NULL
+    REFERENCES media_requests(id) ON DELETE CASCADE,
+  ADD COLUMN fan_out_child_count INTEGER NOT NULL DEFAULT 0;
+
+-- Index for looking up children of a parent request.
+CREATE INDEX idx_media_requests_fan_out_parent_id
+  ON media_requests (fan_out_parent_id)
+  WHERE fan_out_parent_id IS NOT NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260522_020000',
+  '20260522_020000_media_request_fan_out.sql',
+  'media_request_fan_out',
+  '946c95ebe7c0e5929e1718f2c48a9e09cac8e87728624cce8bdb8184c9eeef5f',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
 -- Migration: 20260601_070000_add_canonical_to_metadata_releases.sql
 -- Checksum: 3cdb7a9ff0a5d86e1a08cb42158aee161e5419fa264057a6e41b9cdf39e47f35
 -- Harmoniarr - Soulseek-native music library management

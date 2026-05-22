@@ -380,7 +380,16 @@ Status note:
   - Progress: media requests now persist both acting and target users, the shared request service validates delegated targets against a server-owned eligibility contract, and Request Music intake plus history now surface delegated "requested by" versus target-owned "requested for" behavior without introducing a second request model.
   - Decision: initial implementation should land the single-target ownership split first, then extend into multi-user fan-out through explicit per-target child requests or equivalent durable target-owned records rather than one ambiguous request shared across many users.
   - Decision: target users should receive explicit inbox and notification visibility for admin-on-behalf request creation, review, queueing, fulfillment, and failure states.
-- [ ] Extend admin-targeted Request Music into explicit per-target fan-out records so a single admin action can materialize durable target-owned requests for multiple users without collapsing ownership or audit history.
+- [x] Extend admin-targeted Request Music into explicit per-target fan-out records so a single admin action can materialize durable target-owned requests for multiple users without collapsing ownership or audit history.
+  - Added `fan_out_parent_id` and `fan_out_child_count` columns to `media_requests` via migration `20260522_020000_media_request_fan_out.sql`.
+  - The admin multi-target path is activated by sending `requestedForUserIds` (array) instead of a single `requestedForUserId` in the request payload.
+  - The first eligible target becomes the parent request (full classification, dedup, and audit). Remaining eligible targets become fan-out child rows that inherit all classification metadata from the parent.
+  - Ineligible targets are reported back in the response (`fanOutIneligibleTargets`) but do not block creation for eligible ones.
+  - Child rows carry `fan_out_parent_id` referencing the parent, enabling future aggregate queries and lifecycle management.
+  - Fan-out creation records a dedicated `media_request_fan_out_created` audit event with parent/child counts, plus individual activity events for each child request.
+  - The client form helper (`buildMediaRequestPayload`) prefers `requestedForUserIds` over `requestedForUserId` when multi-target selection is active, and the success message builder surfaces `fanOutMessage` when present.
+  - Fan-out is admin-only and validated to a maximum of 50 target user IDs. A single-element array falls through to the existing single-target path for backward compatibility.
+  - Test suites: 6 new server tests covering multi-target creation, ineligible-target skipping, single-target passthrough, non-admin rejection, all-ineligible rejection, and array-length validation; 4 new client tests covering payload builder multi-target selection, preference order, single-target fallback, and fan-out success message rendering.
 - [ ] Add explicit audited request reassignment flows so admins can change the target user only through a visible state transition that preserves prior ownership history.
 - [ ] Add target-user request notifications and inbox visibility so users can see when media was requested, reviewed, queued, fulfilled, or failed on their behalf.
   - Progress: import-candidate read access now follows delegated target ownership through a shared server visibility policy, so non-admin users only see import queue, selected, import-pending, preview, and apply-preview state for candidates whose `sourceRequestedForUserId` matches their app user.
