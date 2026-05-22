@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   formatActivityEventTime,
+  getActivityEventDetail,
   getActivityEventIcon,
   getActivityEventLabel,
   normalizeActivityEvent,
@@ -122,6 +123,54 @@ test('getActivityEventLabel: release_added with title and artist', () => {
     null,
   );
   assert.equal(label, 'Kid A by Radiohead added to library');
+});
+
+test('getActivityEventDetail: release_added with multi-release summaries returns detail copy', () => {
+  const detail = getActivityEventDetail({
+    eventType: 'release_added',
+    extraPayload: {
+      releaseCount: 3,
+      releaseSummaries: [
+        { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+        { artistName: 'Autechre', releaseTitle: 'Amber' },
+        { artistName: 'Aphex Twin', releaseTitle: 'Selected Ambient Works 85-92' },
+      ],
+    },
+  });
+
+  assert.equal(detail, 'Includes Kid A by Radiohead, Amber by Autechre, Selected Ambient Works 85-92 by Aphex Twin.');
+});
+
+test('getActivityEventDetail: release_added with truncated summaries mentions remaining releases', () => {
+  const detail = getActivityEventDetail({
+    eventType: 'release_added',
+    extraPayload: {
+      releaseCount: 4,
+      releaseSummaries: [
+        { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+        { artistName: 'Autechre', releaseTitle: 'Amber' },
+        { artistName: 'Aphex Twin', releaseTitle: 'Selected Ambient Works 85-92' },
+      ],
+    },
+  });
+
+  assert.equal(detail, 'Includes Kid A by Radiohead, Amber by Autechre, Selected Ambient Works 85-92 by Aphex Twin, and 1 more.');
+});
+
+test('getActivityEventDetail: release_added with a single release returns empty string', () => {
+  const detail = getActivityEventDetail({
+    eventType: 'release_added',
+    extraPayload: {
+      releaseCount: 1,
+      releaseSummaries: [{ artistName: 'Radiohead', releaseTitle: 'Kid A' }],
+    },
+  });
+
+  assert.equal(detail, '');
+});
+
+test('getActivityEventDetail: non-release events return empty string', () => {
+  assert.equal(getActivityEventDetail({ eventType: 'request_created', extraPayload: {} }), '');
 });
 
 test('getActivityEventLabel: request_fulfilled — owner sees personal variant', () => {

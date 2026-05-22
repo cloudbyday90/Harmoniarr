@@ -89,6 +89,7 @@ test('library organize apply worker records release activity and notifications a
   assert.deepEqual(activityEvents[0].extraPayload, {
     movedCount: 2,
     releaseCount: 1,
+    releaseSummaries: [{ artistName: 'Radiohead', releaseTitle: 'OK Computer' }],
   });
 });
 
@@ -154,7 +155,66 @@ test('library organize apply worker still records release activity when some fil
   assert.deepEqual(activityEvents[0].extraPayload, {
     movedCount: 1,
     releaseCount: 1,
+    releaseSummaries: [{ artistName: 'Autechre', releaseTitle: 'Amber' }],
   });
+});
+
+test('library organize apply worker records multi-release summaries in activity payloads', async () => {
+  const activityEvents = [];
+
+  const worker = createLibraryOrganizeApplyWorker({
+    acquireLease: async () => {},
+    applyExclusiveFileMutationPlan: async () => ({ transport: 'rename' }),
+    buildLibraryOrganizePreview: async () => ({
+      counts: { totalFiles: 2 },
+      files: [
+        {
+          currentPath: 'D:/music/tmp/01.mp3',
+          fileId: 'file-1',
+          libraryRootPath: 'D:/music',
+          match: { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+          proposedPath: 'D:/music/Radiohead/Kid A/01 Everything In Its Right Place.mp3',
+          proposedRelativePath: 'Radiohead/Kid A/01 Everything In Its Right Place.mp3',
+          status: { code: 'rename_required' },
+        },
+        {
+          currentPath: 'D:/music/tmp/02.mp3',
+          fileId: 'file-2',
+          libraryRootPath: 'D:/music',
+          match: { artistName: 'Autechre', releaseTitle: 'Amber' },
+          proposedPath: 'D:/music/Autechre/Amber/01 Foil.mp3',
+          proposedRelativePath: 'Autechre/Amber/01 Foil.mp3',
+          status: { code: 'rename_required' },
+        },
+      ],
+    }),
+    createExclusiveFileMutationPlan: async (plan) => plan,
+    isCancellationRequested: async () => false,
+    markRunCancelled: async () => {},
+    markRunCompleted: async () => {},
+    markRunFailed: async () => {},
+    markRunPaused: async () => {},
+    markRunStarted: async () => {},
+    onReleaseAddedFn: async () => {},
+    recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
+    releaseLease: async () => {},
+    renewLease: async () => {},
+    updateLibraryFileCanonicalPath: async () => {},
+  });
+
+  await worker.startWorkerRun({ plannedRenameCount: 2, runId: 'run-4' });
+  await waitForWorkerTick();
+
+  assert.equal(activityEvents.length, 1);
+  assert.deepEqual(activityEvents[0].extraPayload, {
+    movedCount: 2,
+    releaseCount: 2,
+    releaseSummaries: [
+      { artistName: 'Radiohead', releaseTitle: 'Kid A' },
+      { artistName: 'Autechre', releaseTitle: 'Amber' },
+    ],
+  });
+  assert.equal(activityEvents[0].entityTitle, '2 releases');
 });
 
 test('library organize apply worker does not emit release activity when no files were moved', async () => {

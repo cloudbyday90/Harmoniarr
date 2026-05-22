@@ -33,7 +33,7 @@ import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../../composables/useRequestUsers.js';
 import { buildArtistDetailLocation } from '../../lib/artist-detail-route.js';
 import { getErrorMessage } from '../../lib/error-utils.js';
-import { formatActivityEventTime, getActivityEventLabel } from '../../lib/activity-event-normalization.js';
+import { formatActivityEventTime, getActivityEventDetail, getActivityEventLabel } from '../../lib/activity-event-normalization.js';
 import { getRadarWindowLabel } from '../../lib/release-radar-normalization.js';
 import { sessionStore } from '../../state/session.js';
 
@@ -300,8 +300,13 @@ onMounted(() => {
             class="requester-home-activity-item"
           >
             <span class="requester-home-activity-dot" aria-hidden="true" />
-            <span class="requester-home-activity-label">
-              {{ getActivityEventLabel(event, currentUserId) }}
+            <span class="requester-home-activity-label-wrap">
+              <span class="requester-home-activity-label">
+                {{ getActivityEventLabel(event, currentUserId) }}
+              </span>
+              <span v-if="getActivityEventDetail(event)" class="requester-home-activity-detail">
+                {{ getActivityEventDetail(event) }}
+              </span>
             </span>
             <time
               v-if="event.occurredAt"
@@ -450,7 +455,7 @@ onMounted(() => {
 
 .requester-home-activity-item {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 0.625rem;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
@@ -466,9 +471,20 @@ onMounted(() => {
   align-self: center;
 }
 
-.requester-home-activity-label {
+.requester-home-activity-label-wrap {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+}
+
+.requester-home-activity-label {
   font-size: var(--hx-text-sm);
+}
+
+.requester-home-activity-detail {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
 }
 
 .requester-home-activity-time {

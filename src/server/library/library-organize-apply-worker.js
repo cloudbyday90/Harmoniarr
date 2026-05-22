@@ -71,6 +71,7 @@ function buildReleaseSummary(files) {
     count: releases.length,
     primaryArtistName: releases[0]?.artistName ?? null,
     primaryReleaseTitle: releases[0]?.releaseTitle ?? null,
+    releases: releases.slice(0, 5),
   };
 }
 
@@ -123,6 +124,7 @@ export function createLibraryOrganizeApplyWorker({
         extraPayload: {
           movedCount,
           releaseCount: releaseSummary.count,
+          releaseSummaries: releaseSummary.releases,
         },
       }).catch(() => {});
     }

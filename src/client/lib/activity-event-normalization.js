@@ -98,6 +98,45 @@ export function getActivityEventLabel(event, currentUserId = null) {
   }
 }
 
+function formatReleaseSummary(summary) {
+  if (!summary || typeof summary !== 'object') {
+    return null;
+  }
+
+  const artistName = typeof summary.artistName === 'string' ? summary.artistName : null;
+  const releaseTitle = typeof summary.releaseTitle === 'string' ? summary.releaseTitle : null;
+
+  if (releaseTitle && artistName) {
+    return `${releaseTitle} by ${artistName}`;
+  }
+
+  return releaseTitle || artistName || null;
+}
+
+export function getActivityEventDetail(event) {
+  if (!event || typeof event !== 'object') {
+    return '';
+  }
+
+  if (event.eventType !== 'release_added') {
+    return '';
+  }
+
+  const releaseCount = Number(event.extraPayload?.releaseCount ?? 0);
+  const releaseSummaries = Array.isArray(event.extraPayload?.releaseSummaries)
+    ? event.extraPayload.releaseSummaries.map(formatReleaseSummary).filter(Boolean)
+    : [];
+
+  if (releaseCount <= 1 || releaseSummaries.length === 0) {
+    return '';
+  }
+
+  const remainingCount = Math.max(releaseCount - releaseSummaries.length, 0);
+  return remainingCount > 0
+    ? `Includes ${releaseSummaries.join(', ')}, and ${remainingCount} more.`
+    : `Includes ${releaseSummaries.join(', ')}.`;
+}
+
 /**
  * Returns a short icon key for a given event type, suitable for mapping to
  * an icon component or CSS class.

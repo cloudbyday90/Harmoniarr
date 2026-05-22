@@ -20,7 +20,12 @@
 import { onMounted } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useActivityFeed } from '../composables/useActivityFeed.js';
-import { getActivityEventLabel, getActivityEventIcon, formatActivityEventTime } from '../lib/activity-event-normalization.js';
+import {
+  formatActivityEventTime,
+  getActivityEventDetail,
+  getActivityEventIcon,
+  getActivityEventLabel,
+} from '../lib/activity-event-normalization.js';
 import { sessionStore } from '../state/session.js';
 
 const { events, isLoading, errorMessage, checkedAt, hasEvents, isEmpty, load } = useActivityFeed({ limit: 100 });
@@ -84,8 +89,13 @@ onMounted(() => {
           class="activity-feed-icon"
           :aria-label="getActivityEventIcon(event.eventType)"
         />
-        <span class="activity-feed-label">
-          {{ getActivityEventLabel(event, currentUserId) }}
+        <span class="activity-feed-label-wrap">
+          <span class="activity-feed-label">
+            {{ getActivityEventLabel(event, currentUserId) }}
+          </span>
+          <span v-if="getActivityEventDetail(event)" class="activity-feed-detail">
+            {{ getActivityEventDetail(event) }}
+          </span>
         </span>
         <time
           v-if="event.occurredAt"
@@ -129,7 +139,7 @@ onMounted(() => {
 
 .activity-feed-item {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 6px;
@@ -145,9 +155,20 @@ onMounted(() => {
   align-self: center;
 }
 
-.activity-feed-label {
+.activity-feed-label-wrap {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+}
+
+.activity-feed-label {
   font-size: 0.9rem;
+}
+
+.activity-feed-detail {
+  color: var(--hx-text-muted, #888);
+  font-size: 0.8rem;
 }
 
 .activity-feed-time {
