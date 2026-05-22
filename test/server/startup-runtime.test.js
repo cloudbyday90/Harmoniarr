@@ -78,6 +78,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       callOrder.push('stop:push-delivery');
     },
   };
+  const fulfillmentCorrelationHeartbeat = {
+    start() {
+      callOrder.push('start:fulfillment-correlation');
+    },
+    async stop() {
+      callOrder.push('stop:fulfillment-correlation');
+    },
+  };
   const operationStrandedRunRecoveryService = {
     recoverStrandedRuns: async () => ({
       activeLeaseCount: 0,
@@ -165,6 +173,12 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
         importCandidateExecutionWorker: {
           startWorkerRun: async () => {},
+        },
+      },
+      fulfillmentModule: {
+        fulfillmentEvidenceService: {
+          correlateUnmatchedEvidence: async () => ({ matched: 0, total: 0, unmatched: 0 }),
+          deleteExpiredEvidence: async () => 0,
         },
       },
       maintenanceLockService: {
@@ -275,6 +289,12 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       assert.equal(typeof operationQueueStore.claimNextRunnableRun, 'function');
       return operationStrandedRunRecoveryService;
     },
+    createFulfillmentCorrelationHeartbeat: (options) => {
+      assert.equal(typeof options.correlateUnmatchedEvidence, 'function');
+      assert.equal(typeof options.deleteExpiredEvidence, 'function');
+      assert.equal(typeof options.onError, 'function');
+      return fulfillmentCorrelationHeartbeat;
+    },
     createStartupServiceSupervisor: ({ processEmitter: injectedProcessEmitter }) => {
       assert.equal(injectedProcessEmitter, processEmitter);
 
@@ -330,6 +350,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     metadataRefreshHeartbeat,
     libraryDiscoveryHeartbeat,
     importExecutionHeartbeat,
+    fulfillmentCorrelationHeartbeat,
     operatorNotificationFanoutHeartbeat,
     pushNotificationDeliveryHeartbeat,
     pushNotificationHistoryCleanupHeartbeat,
@@ -348,6 +369,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:metadata',
     'start:library',
     'start:import',
+    'start:fulfillment-correlation',
     'start:operator-fanout',
     'start:push-delivery',
     'start:push-history-cleanup',
@@ -374,6 +396,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:metadata',
     'start:library',
     'start:import',
+    'start:fulfillment-correlation',
     'start:operator-fanout',
     'start:push-delivery',
     'start:push-history-cleanup',
@@ -385,6 +408,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:push-history-cleanup',
     'stop:push-delivery',
     'stop:operator-fanout',
+    'stop:fulfillment-correlation',
     'stop:import',
     'stop:library',
     'stop:metadata',
@@ -446,6 +470,12 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         },
         importCandidateExecutionWorker: {
           startWorkerRun: async () => {},
+        },
+      },
+      fulfillmentModule: {
+        fulfillmentEvidenceService: {
+          correlateUnmatchedEvidence: async () => ({ matched: 0, total: 0, unmatched: 0 }),
+          deleteExpiredEvidence: async () => 0,
         },
       },
       maintenanceLockService: {

@@ -34,6 +34,8 @@ import {
 import { createImportCandidateModule } from './import-candidates/import-candidate-module.js';
 import { createLibraryModule } from './library/library-module.js';
 import { createPushModule } from './push/push-module.js';
+import { createFulfillmentModule } from './fulfillment/fulfillment-module.js';
+import { createPlexWebhookIngestionService } from './integrations/plex/plex-webhook-ingestion-service.js';
 import { createMediaCommandService } from './media/media-command-service.js';
 import { createMediaInspectionService } from './media/media-inspection-service.js';
 import { createMetadataModule } from './metadata/metadata-module.js';
@@ -62,6 +64,7 @@ import { registerMetadataRoutes } from './routes/metadata-routes.js';
 import { registerOperationsRoutes } from './routes/operations-routes.js';
 import { registerProviderRoutes } from './routes/provider-routes.js';
 import { registerPushRoutes } from './routes/push-routes.js';
+import { registerPlexWebhookRoutes } from './routes/plex-webhook-routes.js';
 import { registerSlskdRoutes } from './routes/slskd-routes.js';
 import { registerSystemRoutes } from './routes/system-routes.js';
 import { createRuntimeResourceService } from './runtime-resource-service.js';
@@ -137,6 +140,7 @@ export function createApp({
   createImportCandidateModule: buildImportCandidateModule = createImportCandidateModule,
   createLibraryModule: buildLibraryModule = createLibraryModule,
   createPushModule: buildPushModule = createPushModule,
+  createFulfillmentModule: buildFulfillmentModule = createFulfillmentModule,
   createMediaToolingStatusService: buildMediaToolingStatusService = createMediaToolingStatusService,
   createMetadataModule: buildMetadataModule = createMetadataModule,
   createOperationsModule: buildOperationsModule = createOperationsModule,
@@ -156,6 +160,7 @@ export function createApp({
   registerOperationsRoutes: mountOperationsRoutes = registerOperationsRoutes,
   registerProviderRoutes: mountProviderRoutes = registerProviderRoutes,
   registerPushRoutes: mountPushRoutes = registerPushRoutes,
+  registerPlexWebhookRoutes: mountPlexWebhookRoutes = registerPlexWebhookRoutes,
   registerSlskdRoutes: mountSlskdRoutes = registerSlskdRoutes,
   registerSystemRoutes: mountSystemRoutes = registerSystemRoutes,
 } = {}) {
@@ -230,6 +235,11 @@ export function createApp({
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore();
   const pushModule = buildPushModule();
+  const fulfillmentModule = buildFulfillmentModule();
+  const plexWebhookIngestionService = createPlexWebhookIngestionService({
+    fulfillmentEvidenceService: fulfillmentModule.fulfillmentEvidenceService,
+    plexOwnerLinkService: providerModule.plexOwnerLinkService,
+  });
   const householdNotificationDispatchHistoryService = createNotificationDispatchHistoryService({
     pushNotificationQueueStore: pushModule.pushNotificationQueueStore,
   });
@@ -592,6 +602,15 @@ export function createApp({
   });
   mountOperationsRoutes(app, operationsModule.routeDependencies);
   mountProviderRoutes(app, providerModule.routeDependencies);
+  mountPlexWebhookRoutes(app, {
+    getWebhookStatus: plexWebhookIngestionService.getWebhookStatus,
+    ingestWebhook: plexWebhookIngestionService.ingestWebhook,
+    limitWebhook: requestRateLimiterService.createMiddleware({
+      bucketName: 'plex-webhook',
+      limit: 60,
+      windowMs: 60 * 1000,
+    }),
+  });
   mountSlskdRoutes(app, slskdModule.routeDependencies);
   mountImportCandidateRoutes(app, {
     ...importCandidateModule.routeDependencies,
@@ -688,6 +707,7 @@ export function createApp({
     app,
     appPort,
     artworkModule,
+    fulfillmentModule,
     importCandidateModule,
     libraryModule,
     maintenanceLockOperationPauseService,

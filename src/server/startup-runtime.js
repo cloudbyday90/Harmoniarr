@@ -19,6 +19,7 @@
 import { closePool, getPool } from './database.js';
 import { createApp } from './app.js';
 import { createImportCandidateExecutionHeartbeat } from './import-candidates/import-candidate-execution-heartbeat.js';
+import { createFulfillmentCorrelationHeartbeat } from './fulfillment/fulfillment-correlation-heartbeat.js';
 import { createLibraryDiscoveryHeartbeat } from './library/library-discovery-heartbeat.js';
 import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discovery-heartbeat-config.js';
 import { createMetadataRefreshHeartbeat } from './metadata/metadata-refresh-heartbeat.js';
@@ -51,6 +52,7 @@ export async function startServerRuntime({
   closePool: closeDatabasePool = closePool,
   createApp: buildApp = createApp,
   createImportCandidateExecutionHeartbeat: buildImportCandidateExecutionHeartbeat = createImportCandidateExecutionHeartbeat,
+  createFulfillmentCorrelationHeartbeat: buildFulfillmentCorrelationHeartbeat = createFulfillmentCorrelationHeartbeat,
   createLibraryDiscoveryHeartbeat: buildLibraryDiscoveryHeartbeat = createLibraryDiscoveryHeartbeat,
   createMetadataRefreshHeartbeat: buildMetadataRefreshHeartbeat = createMetadataRefreshHeartbeat,
   createOperationQueueDispatcher: buildOperationQueueDispatcher = createOperationQueueDispatcher,
@@ -89,6 +91,7 @@ export async function startServerRuntime({
     app,
     appPort,
     artworkModule,
+    fulfillmentModule,
     importCandidateModule,
     libraryModule,
     maintenanceLockOperationPauseService,
@@ -147,6 +150,13 @@ export async function startServerRuntime({
     startMetadataArtistRefresh: metadataModule.metadataArtistRefreshService.startMetadataArtistRefresh,
   });
   const operationQueueStore = buildOperationQueueStore();
+  const fulfillmentCorrelationHeartbeat = buildFulfillmentCorrelationHeartbeat({
+    correlateUnmatchedEvidence: fulfillmentModule.fulfillmentEvidenceService.correlateUnmatchedEvidence,
+    deleteExpiredEvidence: fulfillmentModule.fulfillmentEvidenceService.deleteExpiredEvidence,
+    onError: (error) => {
+      runtimeReporter.writeError(error, { label: 'fulfillment correlation heartbeat failed' });
+    },
+  });
   const operationStrandedRunRecoveryService = buildOperationStrandedRunRecoveryService({
     operationQueueStore,
   });
@@ -177,6 +187,7 @@ export async function startServerRuntime({
   startupServiceSupervisor.registerService(metadataRefreshHeartbeat);
   startupServiceSupervisor.registerService(libraryDiscoveryHeartbeat);
   startupServiceSupervisor.registerService(importExecutionHeartbeat);
+  startupServiceSupervisor.registerService(fulfillmentCorrelationHeartbeat);
   startupServiceSupervisor.registerService(systemModule.operatorNotificationFanoutHeartbeat);
   if (pushModule?.pushNotificationDeliveryHeartbeat) {
     startupServiceSupervisor.registerService(pushModule.pushNotificationDeliveryHeartbeat);
