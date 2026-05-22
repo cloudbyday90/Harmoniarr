@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildOperationRunLinkTarget,
   buildOperationRunLinkTargetFromEvent,
+  buildOperationRunLinkTargetFromReleasePresentation,
   canRequestOperationRunCancellation,
   canRequestOperationRunRetry,
   getOperationRunDescriptor,
@@ -30,6 +31,15 @@ test('operation run link targets resolve shared descriptors by operation type', 
       name: 'jobs',
       query: {
         runId: 'restore-run-1',
+      },
+    },
+  });
+  assert.deepEqual(buildOperationRunLinkTarget({ operationType: 'library_organize_apply', runId: 'organize-run-1' }), {
+    label: 'View organize apply',
+    to: {
+      name: 'jobs',
+      query: {
+        runId: 'organize-run-1',
       },
     },
   });
@@ -70,6 +80,25 @@ test('operation run descriptors preserve fallback behavior for unknown operation
     title: 'Metadata Refresh',
   });
   assert.equal(buildOperationRunLinkTarget({ operationType: 'metadata_refresh', runId: 'run-99' }), null);
+});
+
+test('operation run link targets resolve release presentation source metadata', () => {
+  assert.deepEqual(buildOperationRunLinkTargetFromReleasePresentation({
+    source: {
+      operationType: 'import_candidate_apply',
+      runId: 'apply-run-1',
+    },
+  }), {
+    label: 'View library import',
+    to: {
+      hash: '#import-apply-run-panel',
+      name: 'review-queue',
+      query: {
+        applyRunId: 'apply-run-1',
+      },
+    },
+  });
+  assert.equal(buildOperationRunLinkTargetFromReleasePresentation({ source: null }), null);
 });
 
 test('operation run descriptor helpers centralize cancel and retry capability checks', () => {

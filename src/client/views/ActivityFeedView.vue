@@ -18,6 +18,7 @@
 
 <script setup>
 import { onMounted } from 'vue';
+import { RouterLink } from 'vue-router';
 import EmptyState from '../components/EmptyState.vue';
 import { useActivityFeed } from '../composables/useActivityFeed.js';
 import {
@@ -26,6 +27,7 @@ import {
   getActivityEventIcon,
   getActivityEventLabel,
 } from '../lib/activity-event-normalization.js';
+import { buildActivityEventLinkTarget } from '../lib/activity-event-link-targets.js';
 import { sessionStore } from '../state/session.js';
 
 const { events, isLoading, errorMessage, checkedAt, hasEvents, isEmpty, load } = useActivityFeed({ limit: 100 });
@@ -96,6 +98,13 @@ onMounted(() => {
           <span v-if="getActivityEventDetail(event)" class="activity-feed-detail">
             {{ getActivityEventDetail(event) }}
           </span>
+          <RouterLink
+            v-if="buildActivityEventLinkTarget(event)"
+            class="activity-feed-link"
+            :to="buildActivityEventLinkTarget(event).to"
+          >
+            {{ buildActivityEventLinkTarget(event).label }}
+          </RouterLink>
         </span>
         <time
           v-if="event.occurredAt"
@@ -169,6 +178,19 @@ onMounted(() => {
 .activity-feed-detail {
   color: var(--hx-text-muted, #888);
   font-size: 0.8rem;
+}
+
+.activity-feed-link {
+  align-self: flex-start;
+  color: var(--hx-accent-strong, var(--hx-accent, #6ea8fe));
+  font-size: var(--hx-text-sm, 0.82rem);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.activity-feed-link:hover,
+.activity-feed-link:focus-visible {
+  text-decoration: underline;
 }
 
 .activity-feed-time {

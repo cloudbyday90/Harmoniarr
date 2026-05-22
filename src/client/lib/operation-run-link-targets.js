@@ -47,6 +47,10 @@ const operationRunLinkDefinitionsByType = new Map([
     buildLocation: buildImportReviewApplyRunLocation,
     openLabel: 'View library import',
   }],
+  [operationRunRegistry.libraryOrganizeApply.operationType, {
+    buildLocation: buildOperationRunDetailLocation,
+    openLabel: 'View organize apply',
+  }],
   [operationRunRegistry.libraryScan.operationType, {
     buildLocation: buildLibraryScanRunDashboardLocation,
     openLabel: 'View library scan',
@@ -107,6 +111,17 @@ export function buildOperationRunLinkTarget({ operationType, runId }) {
 
 export function buildOperationRunLinkTargetFromEvent({ entityId, eventType }) {
   return buildDefinitionLinkTarget(getOperationRunDescriptorDefinitionForAnyEventType(eventType), entityId);
+}
+
+export function buildOperationRunLinkTargetFromReleasePresentation(presentation) {
+  const operationType = presentation?.source?.operationType ?? null;
+  const runId = presentation?.source?.runId ?? null;
+
+  if (!operationType || !runId) {
+    return null;
+  }
+
+  return buildOperationRunLinkTarget({ operationType, runId });
 }
 
 export function getOperationRunDescriptor(operationType) {
