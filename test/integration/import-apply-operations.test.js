@@ -128,7 +128,8 @@ suite('integration import apply and media inspection operations', () => {
       assert.equal(runDetailResponse.payload.operationRun.run.status, 'running');
       assert.equal(runDetailResponse.payload.operationRun.run.operationType, operationRunRegistry.importCandidateApply.operationType);
 
-      const runLease = await applyRunStore.getLease({ runId: createdRun.id });
+      const leaseCheck = await getPoolFn().query('SELECT lease_key FROM job_leases WHERE lease_key = $1', [`import_candidate_apply:${createdRun.id}`]);
+      const runLease = leaseCheck.rows[0];
       assert.ok(runLease, 'running apply run should have an active lease');
 
       await applyRunStore.markRunCompleted({
@@ -167,8 +168,9 @@ suite('integration import apply and media inspection operations', () => {
       );
 
       assert.equal(applyRunDetailResponse.response.status, 200);
-      assert.equal(applyRunDetailResponse.payload.summary.appliedCount, 1);
-      assert.equal(applyRunDetailResponse.payload.summary.requestedCandidateCount, 2);
+      assert.ok(applyRunDetailResponse.payload.importCandidateApplyRun);
+      assert.equal(applyRunDetailResponse.payload.importCandidateApplyRun.run.appliedCount, 1);
+      assert.equal(applyRunDetailResponse.payload.importCandidateApplyRun.run.requestedCandidateCount, 2);
     }, {
       scenarioName: 'import_apply_run_lifecycle',
     });
@@ -200,10 +202,10 @@ suite('integration import apply and media inspection operations', () => {
 
       assert.equal(startResponse.response.status, 202);
       assert.equal(startResponse.payload.ok, true);
-      assert.ok(startResponse.payload.operationRun?.id);
-      assert.equal(startResponse.payload.operationRun.status, 'pending');
+      assert.ok(startResponse.payload.run?.id);
+      assert.equal(startResponse.payload.run.status, 'pending');
 
-      const createdRunId = startResponse.payload.operationRun.id;
+      const createdRunId = startResponse.payload.run.id;
 
       const inspectionRunStore = createImportCandidateMediaInspectionRunStore({ getPoolFn });
 
@@ -242,9 +244,13 @@ suite('integration import apply and media inspection operations', () => {
         'audit trail should include media inspection started event',
       );
 
-      const runLease = await inspectionRunStore.getLease({ runId: createdRunId });
+      const leaseRow = await getPoolFn().query(
+        'SELECT owner_instance_id FROM job_leases WHERE lease_key = $1',
+        [`import_candidate_media_inspection:${createdRunId}`],
+      );
+      const runLease = leaseRow.rows[0];
       assert.ok(runLease, 'running media inspection run should have an active lease');
-      assert.equal(runLease.ownerInstanceId, process.env.HARMONIARR_INSTANCE_ID ?? `pid:${process.pid}`);
+      assert.equal(runLease.owner_instance_id, process.env.HARMONIARR_INSTANCE_ID ?? `pid:${process.pid}`);
 
       const inspectionSummaryResponse = await client.requestJson(
         '/api/v1/import-candidates/media-inspection-summary',

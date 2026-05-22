@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS fulfillment_evidence (
   metadata_album             TEXT         NULL,
   metadata_type              TEXT         NULL,
   raw_payload                JSONB        NULL,
-  matched_activity_event_id  UUID         NULL REFERENCES activity_events(id) ON DELETE SET NULL,
+  matched_activity_event_id  UUID         NULL,
   matched_at                 TIMESTAMPTZ  NULL,
   received_at                TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   expires_at                 TIMESTAMPTZ  NOT NULL

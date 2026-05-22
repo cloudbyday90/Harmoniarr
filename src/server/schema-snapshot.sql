@@ -3436,7 +3436,7 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260522_010000_create_fulfillment_evidence.sql
--- Checksum: 7617dba701ce4a61db360e2ce74a6a33c504030d12b0cf95a1905222964fc882
+-- Checksum: 6cf47cd87c217b7205cd349af9cded1cd86d2f7c6b74e8ba7a900d69823b4852
 -- Harmoniarr - Soulseek-native music library management
 -- Copyright (C) 2026 Harmoniarr Contributors
 --
@@ -3472,7 +3472,7 @@ CREATE TABLE IF NOT EXISTS fulfillment_evidence (
   metadata_album             TEXT         NULL,
   metadata_type              TEXT         NULL,
   raw_payload                JSONB        NULL,
-  matched_activity_event_id  UUID         NULL REFERENCES activity_events(id) ON DELETE SET NULL,
+  matched_activity_event_id  UUID         NULL,
   matched_at                 TIMESTAMPTZ  NULL,
   received_at                TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   expires_at                 TIMESTAMPTZ  NOT NULL
@@ -3508,7 +3508,7 @@ VALUES (
   '20260522_010000',
   '20260522_010000_create_fulfillment_evidence.sql',
   'create_fulfillment_evidence',
-  '7617dba701ce4a61db360e2ce74a6a33c504030d12b0cf95a1905222964fc882',
+  '6cf47cd87c217b7205cd349af9cded1cd86d2f7c6b74e8ba7a900d69823b4852',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -4137,6 +4137,68 @@ VALUES (
   '20260615_020000_artwork_fetch_backoff.sql',
   'artwork_fetch_backoff',
   '21aeac8f4b550279ac51c205dc17db86dec1a7f93cb5aad97fef2e7dbd389d09',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260615_030000_fulfillment_evidence_activity_event_fk.sql
+-- Checksum: f936ee4413d4823920ecfed6e077105f12e79bba8ebaa9647fc855b063dfe699
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-- Add deferred FK from fulfillment_evidence to activity_events.
+-- The original migration (20260522) creates the column without the FK constraint
+-- because activity_events does not exist until 20260601. The snapshot generator
+-- concatenates migrations in timestamp order, so inline FK references to tables
+-- created by later migrations cause the snapshot to fail on empty databases.
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'fulfillment_evidence_matched_activity_event_id_fkey'
+  ) THEN
+    ALTER TABLE fulfillment_evidence
+      ADD CONSTRAINT fulfillment_evidence_matched_activity_event_id_fkey
+      FOREIGN KEY (matched_activity_event_id) REFERENCES activity_events(id) ON DELETE SET NULL;
+  END IF;
+END$$;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260615_030000',
+  '20260615_030000_fulfillment_evidence_activity_event_fk.sql',
+  'fulfillment_evidence_activity_event_fk',
+  'f936ee4413d4823920ecfed6e077105f12e79bba8ebaa9647fc855b063dfe699',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE

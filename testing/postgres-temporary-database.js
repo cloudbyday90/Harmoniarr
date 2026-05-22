@@ -11,6 +11,9 @@ import { buildConnectionConfig } from '../src/server/database.js';
 
 const { Client, Pool } = pg;
 
+const DRAIN_POLL_INTERVAL_MS = 50;
+const DRAIN_TIMEOUT_MS = 5_000;
+
 export function buildPostgresAdminConnectionConfig(env = process.env) {
   return {
     ...buildConnectionConfig(env),
@@ -25,6 +28,45 @@ export function createTemporaryDatabaseName(prefix = 'harmoniarr_schema_snapshot
 
 function quoteIdentifier(identifier) {
   return `"${String(identifier).replaceAll('"', '""')}"`;
+}
+
+async function countActiveBackends(client, databaseName) {
+  const result = await client.query(
+    `
+      SELECT COUNT(*)::integer AS active_count
+      FROM pg_stat_activity
+      WHERE datname = $1
+        AND pid <> pg_backend_pid()
+    `,
+    [databaseName],
+  );
+  return result.rows[0]?.active_count ?? 0;
+}
+
+async function drainDatabaseBackends(client, databaseName) {
+  const deadline = Date.now() + DRAIN_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    const activeCount = await countActiveBackends(client, databaseName).catch(() => 0);
+    if (activeCount === 0) {
+      return;
+    }
+
+    await client.query(
+      `
+        SELECT pg_terminate_backend(pid)
+        FROM pg_stat_activity
+        WHERE datname = $1
+          AND pid <> pg_backend_pid()
+      `,
+      [databaseName],
+    ).catch(() => {});
+
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, DRAIN_POLL_INTERVAL_MS);
+      timer.unref?.();
+    });
+  }
 }
 
 export async function withTemporaryPostgresDatabase({
@@ -69,6 +111,9 @@ export async function withTemporaryPostgresDatabase({
         `,
         [databaseName],
       ).catch(() => {});
+
+      await drainDatabaseBackends(adminClient, databaseName);
+
       await adminClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(databaseName)}`).catch(() => {});
     }
 

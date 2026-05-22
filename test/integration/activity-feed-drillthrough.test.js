@@ -324,8 +324,8 @@ suite('activity feed drillthrough integration', () => {
       );
 
       assert.ok(runDetail);
-      assert.equal(runDetail.operationType, 'library_organize_apply');
-      assert.equal(runDetail.status, 'completed');
+      assert.equal(runDetail.operationRun.run.operationType, 'library_organize_apply');
+      assert.equal(runDetail.operationRun.run.status, 'completed');
     }, { scenarioName: 'activity_feed_drillthrough_run_fetch' });
   });
 }, { timeout: integrationRuntimeConfig.suiteSetupTimeoutMs });
