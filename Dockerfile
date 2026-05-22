@@ -3,6 +3,8 @@
 ARG NODE_IMAGE=node:25.4.0-alpine
 ARG RUNTIME_IMAGE=alpine:3.23
 
+FROM ${NODE_IMAGE} AS node-base
+
 FROM ${NODE_IMAGE} AS client-builder
 WORKDIR /build
 
@@ -47,12 +49,14 @@ RUN apk add --no-cache \
       ca-certificates \
       coreutils \
       ffmpeg \
-      nodejs \
-      npm \
       postgresql18 \
       postgresql18-client \
     postgresql18-contrib \
       tzdata
+
+COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 RUN addgroup -g 1000 -S harmoniarr \
     && adduser -u 1000 -S -D -h /app -G harmoniarr harmoniarr \
