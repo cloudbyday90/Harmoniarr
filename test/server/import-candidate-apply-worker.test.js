@@ -291,6 +291,76 @@ test('import apply worker fires sendFulfillmentNotificationFn fire-and-forget wh
   assert.equal(notifiedUserId, 'user-for-uuid', 'should notify sourceRequestedForUserId');
 });
 
+test('import apply worker requeues the run when a maintenance pause is requested', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunCancelled = t.mock.fn(async () => {});
+  const markRunPaused = t.mock.fn(async () => {});
+
+  const worker = createImportCandidateApplyWorker({
+    acquireLease,
+    isCancellationRequested: async () => ({
+      kind: 'paused',
+      nextRetryAt: '2026-05-04T12:30:00.000Z',
+      pauseCode: 'recovery_lock_conflict',
+      pauseMessage: 'Import apply is paused while the restore maintenance lock is active.',
+      pauseProvider: 'restore',
+    }),
+    markRunCancelled,
+    markRunCompleted,
+    markRunFailed,
+    markRunPaused,
+    markRunStarted,
+    releaseLease,
+    replaceImportApplyRunItems: t.mock.fn(async () => []),
+  });
+
+  const paused = new Promise((resolve) => {
+    markRunPaused.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+  const leaseReleased = new Promise((resolve) => {
+    releaseLease.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 3,
+    requestedCandidateCount: 4,
+    runId: 'run-paused',
+  });
+
+  const pausedArgs = await paused;
+  const releasedLeaseArgs = await leaseReleased;
+
+  assert.equal(markRunStarted.mock.callCount(), 0);
+  assert.equal(markRunCompleted.mock.callCount(), 0);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.equal(markRunCancelled.mock.callCount(), 0);
+  assert.deepEqual(pausedArgs, {
+    nextAttemptAt: '2026-05-04T12:30:00.000Z',
+    runId: 'run-paused',
+    summary: {
+      currentStep: 'Import apply paused by maintenance lock',
+      executionMode: 'move',
+      executableCandidateCount: 3,
+      pauseCode: 'recovery_lock_conflict',
+      pauseMessage: 'Import apply is paused while the restore maintenance lock is active.',
+      pauseProvider: 'restore',
+      requestedCandidateCount: 4,
+    },
+  });
+  assert.deepEqual(releasedLeaseArgs, {
+    runId: 'run-paused',
+    status: 'paused',
+  });
+});
+
 test('import apply worker does not call sendFulfillmentNotificationFn when candidate has no requestOwnership', async (t) => {
   let notifyCallCount = 0;
   let resolveCompleted;

@@ -2,6 +2,73 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createImportCandidateTranscodeWorker } from '../../src/server/import-candidates/import-candidate-transcode-worker.js';
 
+test('createImportCandidateTranscodeWorker requeues the run when a maintenance pause is requested', async (t) => {
+  const acquireLease = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunCancelled = t.mock.fn(async () => {});
+  const markRunPaused = t.mock.fn(async () => {});
+
+  const worker = createImportCandidateTranscodeWorker({
+    acquireLease,
+    isCancellationRequested: async () => ({
+      kind: 'paused',
+      nextRetryAt: '2026-05-04T12:30:00.000Z',
+      pauseCode: 'recovery_lock_conflict',
+      pauseMessage: 'Transcode orchestration is paused while the restore maintenance lock is active.',
+      pauseProvider: 'restore',
+    }),
+    markRunCancelled,
+    markRunCompleted,
+    markRunFailed,
+    markRunPaused,
+    markRunStarted,
+    releaseLease,
+  });
+
+  const paused = new Promise((resolve) => {
+    markRunPaused.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+  const leaseReleased = new Promise((resolve) => {
+    releaseLease.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({
+    requestedCandidateCount: 3,
+    runId: 'run-paused',
+    transcodeCandidateFileCount: 2,
+  });
+
+  const pausedArgs = await paused;
+  const releasedLeaseArgs = await leaseReleased;
+
+  assert.equal(markRunStarted.mock.callCount(), 0);
+  assert.equal(markRunCompleted.mock.callCount(), 0);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.equal(markRunCancelled.mock.callCount(), 0);
+  assert.deepEqual(pausedArgs, {
+    nextAttemptAt: '2026-05-04T12:30:00.000Z',
+    runId: 'run-paused',
+    summary: {
+      currentStep: 'Transcode orchestration paused by maintenance lock',
+      pauseCode: 'recovery_lock_conflict',
+      pauseMessage: 'Transcode orchestration is paused while the restore maintenance lock is active.',
+      pauseProvider: 'restore',
+      requestedCandidateCount: 3,
+    },
+  });
+  assert.deepEqual(releasedLeaseArgs, {
+    runId: 'run-paused',
+    status: 'paused',
+  });
+});
+
 test('createImportCandidateTranscodeWorker executes transcode preflight for transcode candidates', async (t) => {
   const acquireLease = t.mock.fn(async () => {});
   const markRunStarted = t.mock.fn(async () => {});
