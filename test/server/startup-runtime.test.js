@@ -70,6 +70,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       callOrder.push('stop:push-history-cleanup');
     },
   };
+  const pushNotificationDeliveryHeartbeat = {
+    start() {
+      callOrder.push('start:push-delivery');
+    },
+    async stop() {
+      callOrder.push('stop:push-delivery');
+    },
+  };
   const operationStrandedRunRecoveryService = {
     recoverStrandedRuns: async () => ({
       activeLeaseCount: 0,
@@ -202,6 +210,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
       },
       pushModule: {
+        pushNotificationDeliveryHeartbeat,
         pushNotificationHistoryCleanupHeartbeat,
       },
       systemModule: {
@@ -322,6 +331,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     libraryDiscoveryHeartbeat,
     importExecutionHeartbeat,
     operatorNotificationFanoutHeartbeat,
+    pushNotificationDeliveryHeartbeat,
     pushNotificationHistoryCleanupHeartbeat,
     idempotencyRecordCleanupHeartbeat,
     runtimeResourceMonitor,
@@ -339,6 +349,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:library',
     'start:import',
     'start:operator-fanout',
+    'start:push-delivery',
     'start:push-history-cleanup',
     'start:idempotency-cleanup',
     'start:runtime-monitor',
@@ -364,6 +375,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:library',
     'start:import',
     'start:operator-fanout',
+    'start:push-delivery',
     'start:push-history-cleanup',
     'start:idempotency-cleanup',
     'start:runtime-monitor',
@@ -371,6 +383,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:runtime-monitor',
     'stop:idempotency-cleanup',
     'stop:push-history-cleanup',
+    'stop:push-delivery',
     'stop:operator-fanout',
     'stop:import',
     'stop:library',
@@ -475,6 +488,10 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         },
       },
       pushModule: {
+        pushNotificationDeliveryHeartbeat: {
+          start() {},
+          async stop() {},
+        },
         pushNotificationHistoryCleanupHeartbeat: {
           start() {},
           async stop() {},

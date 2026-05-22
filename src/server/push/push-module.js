@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createPushNotificationDeliveryHeartbeat } from './push-notification-delivery-heartbeat.js';
+import { createPushNotificationDispatchService } from './push-notification-dispatch-service.js';
 import { createPushNotificationService } from './push-notification-service.js';
 import { createPushNotificationHistoryCleanupHeartbeat } from './push-notification-history-cleanup-heartbeat.js';
 import { createPushNotificationQueueStore } from './push-notification-queue-store.js';
@@ -31,17 +33,31 @@ import { createPushSubscriptionStore } from './push-subscription-store.js';
  * @returns {{ pushSubscriptionStore, pushNotificationService, routeDependencies }}
  */
 export function createPushModule({
+  pushNotificationDeliveryHeartbeat = null,
+  pushNotificationDispatchService = null,
   pushNotificationHistoryCleanupHeartbeat = null,
   pushNotificationQueueStore = createPushNotificationQueueStore(),
   pushSubscriptionStore = createPushSubscriptionStore(),
   pushNotificationService = createPushNotificationService({ pushSubscriptionStore }),
 } = {}) {
+  const resolvedPushNotificationDispatchService = pushNotificationDispatchService
+    ?? createPushNotificationDispatchService({
+      pushNotificationQueueStore,
+      pushNotificationService,
+      pushSubscriptionStore,
+    });
+  const resolvedPushNotificationDeliveryHeartbeat = pushNotificationDeliveryHeartbeat
+    ?? createPushNotificationDeliveryHeartbeat({
+      deliverPendingNotifications: resolvedPushNotificationDispatchService.deliverPendingNotifications,
+    });
   const resolvedPushNotificationHistoryCleanupHeartbeat = pushNotificationHistoryCleanupHeartbeat
     ?? createPushNotificationHistoryCleanupHeartbeat({
       deleteSentNotificationHistory: pushNotificationQueueStore.deleteSentNotificationHistory,
     });
 
   return {
+    pushNotificationDeliveryHeartbeat: resolvedPushNotificationDeliveryHeartbeat,
+    pushNotificationDispatchService: resolvedPushNotificationDispatchService,
     pushNotificationHistoryCleanupHeartbeat: resolvedPushNotificationHistoryCleanupHeartbeat,
     pushNotificationQueueStore,
     pushSubscriptionStore,

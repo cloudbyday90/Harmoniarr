@@ -240,7 +240,7 @@ export function createApp({
     dispatchCooldownService: householdNotificationCooldownService,
     getUserPreferences: appUserModule.appUserService.getUserPreferences,
     listAppUsers: appUserModule.appUserService.listAppUsers,
-    sendNotificationToUser: pushModule.pushNotificationService.sendNotificationToUser,
+    sendNotificationToUser: pushModule.pushNotificationDispatchService.sendNotificationToUser,
   };
   const householdNotificationCooldowns = Object.freeze({
     artistMonitoredMs: 30 * 60 * 1000,
@@ -336,7 +336,8 @@ export function createApp({
       });
       if (!allowed) return { sent: 0, failed: 0, removed: 0 };
 
-      return pushModule.pushNotificationService.sendNotificationToUser({
+      return pushModule.pushNotificationDispatchService.sendNotificationToUser({
+        eventType: 'requestFulfilled',
         payload: {
           body: 'Your requested music has been added to your library.',
           title: 'Music request ready',

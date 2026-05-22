@@ -178,6 +178,9 @@ export async function startServerRuntime({
   startupServiceSupervisor.registerService(libraryDiscoveryHeartbeat);
   startupServiceSupervisor.registerService(importExecutionHeartbeat);
   startupServiceSupervisor.registerService(systemModule.operatorNotificationFanoutHeartbeat);
+  if (pushModule?.pushNotificationDeliveryHeartbeat) {
+    startupServiceSupervisor.registerService(pushModule.pushNotificationDeliveryHeartbeat);
+  }
   if (pushModule?.pushNotificationHistoryCleanupHeartbeat) {
     startupServiceSupervisor.registerService(pushModule.pushNotificationHistoryCleanupHeartbeat);
   }

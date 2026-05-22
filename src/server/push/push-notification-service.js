@@ -31,6 +31,33 @@ const DEFAULT_TTL_SECONDS = 86400;
  * invalid subscription. On receiving these the subscription should be removed.
  */
 const EXPIRED_SUBSCRIPTION_STATUSES = new Set([404, 410]);
+const INVALID_SUBSCRIPTION_STATUSES = new Set([404, 410, 412]);
+const RETRYABLE_DELIVERY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+function normalizeHeaders(headers) {
+  if (!headers || typeof headers !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [String(key).toLowerCase(), value]),
+  );
+}
+
+function parseRetryAfterHeader(value, now = new Date()) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  const seconds = Number.parseInt(trimmed, 10);
+  if (Number.isInteger(seconds) && seconds >= 0) {
+    return new Date(now.getTime() + (seconds * 1000)).toISOString();
+  }
+
+  const retryAt = new Date(trimmed);
+  return Number.isNaN(retryAt.getTime()) ? null : retryAt.toISOString();
+}
 
 /**
  * Builds the `PushSubscription`-shaped object that `web-push.sendNotification`
@@ -72,7 +99,7 @@ function serialisePayload(payload) {
  * @param {string} [options.vapidContact]
  * @param {object} [options.webPushLib] - Injectable for testing (defaults to the `web-push` module).
  * @param {object} [options.stderr]
- * @returns {{ getVapidPublicKey, subscribe, unsubscribe, sendNotificationToUser }}
+ * @returns {{ getVapidPublicKey, subscribe, unsubscribe, sendNotificationToSubscription, sendNotificationToUser }}
  */
 export function createPushNotificationService({
   pushSubscriptionStore = createPushSubscriptionStore(),
@@ -92,6 +119,56 @@ export function createPushNotificationService({
    */
   function getVapidPublicKey() {
     return vapidKeys.publicKey;
+  }
+
+  /**
+   * Sends a push notification to one active subscription.
+   *
+   * @param {object} params
+   * @param {object} params.subscription
+   * @param {object} params.payload
+   * @param {number} [params.ttl]
+   * @param {string|null} [params.userId]
+   * @returns {Promise<object>}
+   */
+  async function sendNotificationToSubscription({ subscription, payload, ttl = DEFAULT_TTL_SECONDS, userId = null }) {
+    try {
+      await webPushLib.sendNotification(
+        buildWebPushSubscription(subscription),
+        serialisePayload(payload),
+        { TTL: ttl },
+      );
+      return {
+        status: 'sent',
+      };
+    } catch (error) {
+      const statusCode = error?.statusCode ?? error?.status ?? null;
+
+      if (INVALID_SUBSCRIPTION_STATUSES.has(statusCode)) {
+        pushSubscriptionStore.deleteSubscriptionByEndpoint(subscription.endpoint).catch((deleteError) => {
+          stderr.write(
+            `[harmoniarr-push] Failed to remove expired subscription endpoint=${subscription.endpoint}: ${deleteError?.message}\n`,
+          );
+        });
+        return {
+          retryAt: null,
+          retryable: false,
+          status: 'expired',
+          statusCode,
+        };
+      }
+
+      const headers = normalizeHeaders(error?.headers);
+      stderr.write(
+        `[harmoniarr-push] Push delivery failed for userId=${userId ?? subscription.userId ?? 'unknown'} endpoint=${subscription.endpoint} status=${statusCode ?? 'unknown'}: ${error?.message}\n`,
+      );
+      return {
+        retryAt: parseRetryAfterHeader(headers['retry-after']),
+        retryable: statusCode == null || RETRYABLE_DELIVERY_STATUSES.has(statusCode),
+        status: 'failed',
+        statusCode,
+      };
+    }
   }
 
   /**
@@ -140,31 +217,24 @@ export function createPushNotificationService({
     let removed = 0;
 
     for (const subscription of subscriptions) {
-      try {
-        await webPushLib.sendNotification(
-          buildWebPushSubscription(subscription),
-          serialisePayload(payload),
-          { TTL: ttl },
-        );
-        sent++;
-      } catch (error) {
-        const statusCode = error?.statusCode ?? error?.status;
+      const result = await sendNotificationToSubscription({
+        payload,
+        subscription,
+        ttl,
+        userId,
+      });
 
-        if (EXPIRED_SUBSCRIPTION_STATUSES.has(statusCode)) {
-          // Subscription has expired — remove it so we don't retry next time.
-          removed++;
-          pushSubscriptionStore.deleteSubscriptionByEndpoint(subscription.endpoint).catch((deleteError) => {
-            stderr.write(
-              `[harmoniarr-push] Failed to remove expired subscription endpoint=${subscription.endpoint}: ${deleteError?.message}\n`,
-            );
-          });
-        } else {
-          failed++;
-          stderr.write(
-            `[harmoniarr-push] Push delivery failed for userId=${userId} endpoint=${subscription.endpoint} status=${statusCode ?? 'unknown'}: ${error?.message}\n`,
-          );
-        }
+      if (result.status === 'sent') {
+        sent++;
+        continue;
       }
+
+      if (result.status === 'expired') {
+        removed++;
+        continue;
+      }
+
+      failed++;
     }
 
     return { sent, failed, removed };
@@ -174,6 +244,12 @@ export function createPushNotificationService({
     getVapidPublicKey,
     subscribe,
     unsubscribe,
+    sendNotificationToSubscription,
     sendNotificationToUser,
   };
 }
+
+export {
+  DEFAULT_TTL_SECONDS,
+  EXPIRED_SUBSCRIPTION_STATUSES,
+};

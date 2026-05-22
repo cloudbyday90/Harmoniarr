@@ -84,7 +84,12 @@ export async function broadcastNotification({
         return;
       }
 
-      const result = await sendNotificationToUser({ userId: recipient.id, payload });
+      const result = await sendNotificationToUser({
+        coalesceKey: cooldownKey,
+        eventType: category,
+        payload,
+        userId: recipient.id,
+      });
       await dispatchCooldownService?.markDispatched?.({
         category,
         cooldownKey,

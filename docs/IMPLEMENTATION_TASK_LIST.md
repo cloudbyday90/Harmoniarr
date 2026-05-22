@@ -468,9 +468,9 @@ Status note:
   - The server now emits that contract through a dedicated `release-added-activity-presentation-service.js` boundary reused by both organize-apply and import-apply workers, while the client consumes the same shared normalization helpers with legacy fallback for already-persisted rows.
 - [x] Add per-run release drilldown from activity entries so multi-release activity events link directly into existing operations/import detail patterns for full drilldown instead of remaining inline-only.
   - Household activity feed entries now derive drillthrough targets from the shared release presentation source metadata, so import-apply releases reopen the existing import-review apply panel and organize-apply releases reopen the matching Jobs run detail without a new read model or duplicate route surface.
-- [ ] Implement the actual async push delivery worker around `notification_queue` so queued notifications flow through a full decoupled worker-based delivery path instead of remaining in the durable-history-only posture.
-  - `push-notification-queue-store.js`, `notification-dispatch-cooldown-service.js`, `notification-dispatch-history-service.js`, and `push-notification-history-cleanup-heartbeat.js` already own the queue table, cooldown, history, and cleanup seams.
-  - A startup-owned delivery worker would claim pending queue rows, respect per-household and per-user cooldowns, delegate to the push module for actual web-push dispatch, and record delivery outcomes without blocking the notification emission path.
+- [x] Implement the actual async push delivery worker around `notification_queue` so queued notifications flow through a full decoupled worker-based delivery path instead of remaining in the durable-history-only posture.
+  - Notifications now enqueue through a shared `push-notification-dispatch-service.js` boundary that writes one durable queue row per active subscription, supports 2-minute coalescing updates for matching pending work, and preserves the existing app-facing `sendNotificationToUser` seam for higher-level broadcast services.
+  - A startup-owned `push-notification-delivery-heartbeat.js` worker now claims pending rows with a bounded claim window, delegates actual delivery through the existing web-push service, respects invalid or missing subscriptions, retries transient failures with exponential backoff plus `Retry-After` support, and marks terminal rows `failed` or `expired` without blocking the event emitter path.
 
 ## Phase 5 - Recovery, Restore, And Diagnostics
 

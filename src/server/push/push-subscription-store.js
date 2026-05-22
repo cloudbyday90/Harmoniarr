@@ -45,7 +45,7 @@ function mapSubscriptionRow(row) {
  *
  * @param {object} [options]
  * @param {function} [options.getPoolFn]
- * @returns {{ upsertSubscription, deleteSubscription, deleteSubscriptionByEndpoint, listSubscriptionsForUser, listAllSubscriptions }}
+ * @returns {{ upsertSubscription, deleteSubscription, deleteSubscriptionByEndpoint, getSubscriptionById, listSubscriptionsForUser, listAllSubscriptions }}
  */
 export function createPushSubscriptionStore({ getPoolFn = getPool } = {}) {
   /**
@@ -110,6 +110,21 @@ export function createPushSubscriptionStore({ getPoolFn = getPool } = {}) {
   }
 
   /**
+   * Returns a single active subscription by id.
+   *
+   * @param {string} subscriptionId
+   * @returns {Promise<object|null>}
+   */
+  async function getSubscriptionById(subscriptionId) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      'SELECT * FROM user_push_subscriptions WHERE id = $1 AND invalidated_at IS NULL LIMIT 1',
+      [subscriptionId],
+    );
+    return result.rows[0] ? mapSubscriptionRow(result.rows[0]) : null;
+  }
+
+  /**
    * Returns all active subscriptions for a given user.
    *
    * @param {string} userId
@@ -141,6 +156,7 @@ export function createPushSubscriptionStore({ getPoolFn = getPool } = {}) {
     upsertSubscription,
     deleteSubscription,
     deleteSubscriptionByEndpoint,
+    getSubscriptionById,
     listSubscriptionsForUser,
     listAllSubscriptions,
   };
