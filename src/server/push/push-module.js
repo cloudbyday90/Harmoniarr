@@ -17,6 +17,7 @@
  */
 
 import { createPushNotificationService } from './push-notification-service.js';
+import { createPushNotificationHistoryCleanupHeartbeat } from './push-notification-history-cleanup-heartbeat.js';
 import { createPushNotificationQueueStore } from './push-notification-queue-store.js';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
 
@@ -30,11 +31,18 @@ import { createPushSubscriptionStore } from './push-subscription-store.js';
  * @returns {{ pushSubscriptionStore, pushNotificationService, routeDependencies }}
  */
 export function createPushModule({
+  pushNotificationHistoryCleanupHeartbeat = null,
   pushNotificationQueueStore = createPushNotificationQueueStore(),
   pushSubscriptionStore = createPushSubscriptionStore(),
   pushNotificationService = createPushNotificationService({ pushSubscriptionStore }),
 } = {}) {
+  const resolvedPushNotificationHistoryCleanupHeartbeat = pushNotificationHistoryCleanupHeartbeat
+    ?? createPushNotificationHistoryCleanupHeartbeat({
+      deleteSentNotificationHistory: pushNotificationQueueStore.deleteSentNotificationHistory,
+    });
+
   return {
+    pushNotificationHistoryCleanupHeartbeat: resolvedPushNotificationHistoryCleanupHeartbeat,
     pushNotificationQueueStore,
     pushSubscriptionStore,
     pushNotificationService,

@@ -62,6 +62,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       callOrder.push('stop:operator-fanout');
     },
   };
+  const pushNotificationHistoryCleanupHeartbeat = {
+    start() {
+      callOrder.push('start:push-history-cleanup');
+    },
+    async stop() {
+      callOrder.push('stop:push-history-cleanup');
+    },
+  };
   const operationStrandedRunRecoveryService = {
     recoverStrandedRuns: async () => ({
       activeLeaseCount: 0,
@@ -193,6 +201,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
           startWorkerRun: async () => {},
         },
       },
+      pushModule: {
+        pushNotificationHistoryCleanupHeartbeat,
+      },
       systemModule: {
         dependencyHealthService: {
           getDependencyHealth: async () => [],
@@ -311,6 +322,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     libraryDiscoveryHeartbeat,
     importExecutionHeartbeat,
     operatorNotificationFanoutHeartbeat,
+    pushNotificationHistoryCleanupHeartbeat,
     idempotencyRecordCleanupHeartbeat,
     runtimeResourceMonitor,
   ]);
@@ -327,6 +339,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:library',
     'start:import',
     'start:operator-fanout',
+    'start:push-history-cleanup',
     'start:idempotency-cleanup',
     'start:runtime-monitor',
   ]);
@@ -351,11 +364,13 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:library',
     'start:import',
     'start:operator-fanout',
+    'start:push-history-cleanup',
     'start:idempotency-cleanup',
     'start:runtime-monitor',
     'shutdown',
     'stop:runtime-monitor',
     'stop:idempotency-cleanup',
+    'stop:push-history-cleanup',
     'stop:operator-fanout',
     'stop:import',
     'stop:library',
@@ -457,6 +472,12 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         },
         metadataArtistRefreshWorker: {
           startWorkerRun: async () => {},
+        },
+      },
+      pushModule: {
+        pushNotificationHistoryCleanupHeartbeat: {
+          start() {},
+          async stop() {},
         },
       },
       systemModule: {

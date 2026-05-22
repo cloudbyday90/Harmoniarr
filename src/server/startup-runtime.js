@@ -94,6 +94,7 @@ export async function startServerRuntime({
     maintenanceLockOperationPauseService,
     maintenanceLockService,
     metadataModule,
+    pushModule,
     systemModule,
   } = buildApp();
   const maintenanceLockHeartbeatPauseService = createMaintenanceLockHeartbeatPauseService({
@@ -177,6 +178,9 @@ export async function startServerRuntime({
   startupServiceSupervisor.registerService(libraryDiscoveryHeartbeat);
   startupServiceSupervisor.registerService(importExecutionHeartbeat);
   startupServiceSupervisor.registerService(systemModule.operatorNotificationFanoutHeartbeat);
+  if (pushModule?.pushNotificationHistoryCleanupHeartbeat) {
+    startupServiceSupervisor.registerService(pushModule.pushNotificationHistoryCleanupHeartbeat);
+  }
   startupServiceSupervisor.registerService(systemModule.idempotencyRecordCleanupHeartbeat);
   if (systemModule?.runtimeResourceMonitor) {
     startupServiceSupervisor.registerService(systemModule.runtimeResourceMonitor);
@@ -202,6 +206,7 @@ export async function startServerRuntime({
     libraryDiscoveryHeartbeat,
     metadataRefreshHeartbeat,
     operationQueueDispatcher,
+    pushModule: pushModule ?? null,
     runtimeResourceMonitor: systemModule?.runtimeResourceMonitor ?? null,
     server,
     startupServiceSupervisor,

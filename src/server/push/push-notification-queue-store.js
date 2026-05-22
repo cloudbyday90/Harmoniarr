@@ -114,7 +114,25 @@ export function createPushNotificationQueueStore({ getPoolFn = getPool } = {}) {
     return result.rows[0];
   }
 
+  async function deleteSentNotificationHistory({ olderThan } = {}) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        DELETE FROM notification_queue
+        WHERE subscription_id IS NULL
+          AND status = 'sent'
+          AND ($1::timestamptz IS NULL OR COALESCE(sent_at, created_at) < $1::timestamptz)
+      `,
+      [olderThan ?? null],
+    );
+
+    return {
+      deletedCount: result.rowCount ?? 0,
+    };
+  }
+
   return {
+    deleteSentNotificationHistory,
     enqueueNotification,
     getLatestSentNotificationAt,
     claimPendingNotifications,

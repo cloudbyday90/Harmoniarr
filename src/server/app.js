@@ -694,6 +694,7 @@ export function createApp({
     metadataModule,
     operationsModule,
     providerModule,
+    pushModule,
     runtimeResourceService,
     systemModule,
   };
