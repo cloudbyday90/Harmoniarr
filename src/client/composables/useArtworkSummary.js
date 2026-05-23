@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, getCurrentScope, onScopeDispose, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
   fetchArtworkCleanupHistory as defaultFetchArtworkCleanupHistory,
@@ -29,13 +29,15 @@ import {
   resolveArtworkSelectedRunId,
 } from '../lib/artwork-maintenance-status.js';
 
-const artworkRunPollIntervalMs = 5000;
+const DEFAULT_POLL_INTERVAL_MS = 5000;
 
 export function useArtworkSummary({
   fetchArtworkCleanupHistory = defaultFetchArtworkCleanupHistory,
   fetchArtworkCleanupRunDetail = defaultFetchArtworkCleanupRunDetail,
   fetchArtworkSummary = defaultFetchArtworkSummary,
   startArtworkCleanupRun = defaultStartArtworkCleanupRun,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  revalidateOnFocus = false,
 } = {}) {
   const actionErrorMessage = ref('');
   const artworkCleanupHistory = ref(null);
@@ -43,12 +45,15 @@ export function useArtworkSummary({
   const errorMessage = ref('');
   const isLoading = ref(true);
   const isLoadingRunDetail = ref(false);
+  const isRevalidating = ref(false);
   const isStarting = ref(false);
   const runDetailErrorMessage = ref('');
   const selectedRunDetail = ref(null);
   const selectedRunId = ref(null);
 
   let pollTimeout = null;
+  let destroyed = false;
+  let hasLoaded = false;
 
   const cleanup = computed(() => artworkSummary.value?.cleanup ?? null);
   const inventory = computed(() => artworkSummary.value?.inventory ?? null);
@@ -66,6 +71,9 @@ export function useArtworkSummary({
 
   function schedulePolling() {
     clearPollTimeout();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!hasLoaded) return;
 
     const runToPoll = isArtworkCleanupPollingStatus(latestRun.value?.status)
       ? latestRun.value
@@ -76,11 +84,37 @@ export function useArtworkSummary({
     }
 
     pollTimeout = setTimeout(() => {
+      if (destroyed) return;
       void loadArtworkSummary({ preferredRunId: selectedRunId.value });
-    }, artworkRunPollIntervalMs);
+    }, pollIntervalMs);
 
     if (typeof pollTimeout?.unref === 'function') {
       pollTimeout.unref();
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    const runToPoll = isArtworkCleanupPollingStatus(latestRun.value?.status)
+      ? latestRun.value
+      : selectedRun.value;
+    if (!isArtworkCleanupPollingStatus(runToPoll?.status)) return;
+    void revalidate().then(() => {
+      if (!destroyed) schedulePolling();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimeout();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     }
   }
 
@@ -100,16 +134,24 @@ export function useArtworkSummary({
     try {
       selectedRunDetail.value = await fetchArtworkCleanupRunDetail(runId);
     } catch (error) {
+      if (destroyed) return;
       selectedRunDetail.value = null;
       runDetailErrorMessage.value = getErrorMessage(error, 'Artwork cleanup run detail failed');
     } finally {
       isLoadingRunDetail.value = false;
-      schedulePolling();
+      if (!destroyed) schedulePolling();
     }
   }
 
   async function loadArtworkSummary({ preferredRunId = selectedRunId.value } = {}) {
-    isLoading.value = true;
+    if (destroyed) return;
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
     errorMessage.value = '';
 
     try {
@@ -118,8 +160,12 @@ export function useArtworkSummary({
         fetchArtworkCleanupHistory({ limit: 5 }),
       ]);
 
+      if (destroyed) return;
+
       artworkSummary.value = nextSummary;
       artworkCleanupHistory.value = nextHistory;
+      hasLoaded = true;
+
       await loadSelectedRunDetail({
         runId: resolveArtworkSelectedRunId({
           latestRunId: nextSummary.latestRun?.id ?? null,
@@ -128,6 +174,7 @@ export function useArtworkSummary({
         }),
       });
     } catch (error) {
+      if (destroyed) return;
       artworkCleanupHistory.value = null;
       artworkSummary.value = null;
       runDetailErrorMessage.value = '';
@@ -136,7 +183,32 @@ export function useArtworkSummary({
       errorMessage.value = getErrorMessage(error, 'Artwork summary failed');
       clearPollTimeout();
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+      }
+    }
+  }
+
+  async function revalidate() {
+    if (destroyed) return;
+    isRevalidating.value = true;
+
+    try {
+      const [nextSummary, nextHistory] = await Promise.all([
+        fetchArtworkSummary(),
+        fetchArtworkCleanupHistory({ limit: 5 }),
+      ]);
+      if (destroyed) return;
+      artworkSummary.value = nextSummary;
+      artworkCleanupHistory.value = nextHistory;
+    } catch {
+      // Preserve stale data on revalidation error.
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+        schedulePolling();
+      }
     }
   }
 
@@ -158,25 +230,23 @@ export function useArtworkSummary({
     await loadSelectedRunDetail({ runId });
   }
 
-  if (getCurrentScope()) {
-    onScopeDispose(() => {
-      clearPollTimeout();
-    });
-  }
-
   return {
     actionErrorMessage,
     artworkCleanupHistory,
     artworkSummary,
+    attachVisibilityListener,
     cleanup,
+    destroy,
     errorMessage,
     inventory,
     isLoading,
     isLoadingRunDetail,
+    isRevalidating: readonly(isRevalidating),
     isStarting,
     latestRun,
     loadArtworkSummary,
     recentRuns,
+    revalidate,
     runDetailErrorMessage,
     selectArtworkCleanupRun,
     selectedRun,
