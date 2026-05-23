@@ -121,9 +121,9 @@
 
     // SQL Language Server
     "sql": {
-      "command": ["npx", "-y", "sql-language-server@1.5.0", "up", "--method", "stdio"],
+      "command": ["pwsh", "-NoLogo", "-NoProfile", "-File", ".opencode/scripts/start-postgres-language-server.ps1"],
       "extensions": [".sql"],
-      "description": "SQL language support with dialect detection",
+      "description": "PostgreSQL-focused language support via Postgres Language Server",
       "initialization_options": {
         "diagnostics": {
           "enable": true
