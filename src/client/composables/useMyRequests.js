@@ -44,6 +44,7 @@ export function useMyRequests({
   limit = 50,
   fetchRequests = defaultFetchMyMediaRequests,
   pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   const requests = ref([]);
   const isLoading = ref(true);
@@ -106,9 +107,46 @@ export function useMyRequests({
   function destroy() {
     destroyed = true;
     clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed) return;
+    if (!hasActiveFulfillment(requests.value)) return;
+    void loadRequests().then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  async function revalidate() {
+    if (destroyed) return;
+    isRevalidating.value = true;
+    errorMessage.value = '';
+
+    try {
+      const payload = await fetchRequests({ limit });
+      if (destroyed) return;
+      requests.value = Array.isArray(payload?.mediaRequests) ? payload.mediaRequests : [];
+    } catch {
+      // Preserve stale data on revalidation error.
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+        schedulePoll();
+      }
+    }
   }
 
   return {
+    attachVisibilityListener,
     destroy,
     errorMessage,
     hasRequests,
@@ -116,5 +154,6 @@ export function useMyRequests({
     isRevalidating,
     loadRequests,
     requests,
+    revalidate,
   };
 }

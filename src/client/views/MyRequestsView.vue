@@ -30,7 +30,7 @@ import { sessionStore } from '../state/session.js';
 
 const viewerUserId = computed(() => sessionStore.state.user?.id ?? null);
 
-const { destroy: destroyRequests, errorMessage, hasRequests, isLoading, loadRequests, requests } = useMyRequests({ limit: 50, pollIntervalMs: 15000 });
+const { attachVisibilityListener: attachRequestsVisibility, destroy: destroyRequests, errorMessage, hasRequests, isLoading, loadRequests, requests } = useMyRequests({ limit: 50, pollIntervalMs: 15000, revalidateOnFocus: true });
 
 // ── Notification feed (delegated requests + fulfillment updates) ─────────────
 
@@ -90,6 +90,7 @@ const displayRequests = computed(() => {
 });
 
 onMounted(() => {
+  attachRequestsVisibility();
   void loadRequests();
   void loadNotifications();
 });

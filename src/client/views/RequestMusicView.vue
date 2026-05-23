@@ -52,6 +52,7 @@ const rm = useRequestMusicForm({
   isAdmin: isAdmin.value,
   currentUserId: currentUserId.value,
   pollIntervalMs: 15000,
+  revalidateOnFocus: true,
 });
 
 const toast = useToast();
@@ -127,6 +128,7 @@ const hasNotifications = computed(
 const sortedRequests = computed(() => filters.sortRequests(rm.mediaRequests.value));
 
 onMounted(() => {
+  rm.attachVisibilityListener();
   void rm.loadRequestDashboard(filters.toApiParams());
   void rm.loadRequestTargets();
 });

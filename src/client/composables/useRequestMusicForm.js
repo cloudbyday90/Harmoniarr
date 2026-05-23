@@ -60,6 +60,7 @@ export function useRequestMusicForm({
   fetchMediaRequestSummaryFn = defaultFetchMediaRequestSummary,
   fetchUsersFn = defaultFetchUsers,
   pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   // ── Summary & history ────────────────────────────────────────────────────
   const summary = ref(null);
@@ -204,6 +205,47 @@ export function useRequestMusicForm({
   function destroy() {
     destroyed = true;
     clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed) return;
+    if (!hasActiveFulfillment.value) return;
+    void loadRequestDashboard(lastFilterParams).then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  async function revalidate() {
+    if (destroyed) return;
+    isRevalidating.value = true;
+    loadError.value = '';
+
+    try {
+      const [summaryPayload, requestsPayload] = await Promise.all([
+        fetchMediaRequestSummaryFn({ scope: selectedScope.value }),
+        fetchMediaRequestsFn({ ...lastFilterParams, offset: 0 }),
+      ]);
+      if (destroyed) return;
+      summary.value = summaryPayload;
+      mediaRequests.value = requestsPayload.mediaRequests ?? [];
+      totalCount.value = requestsPayload.totalCount ?? mediaRequests.value.length;
+    } catch {
+      // Preserve stale data on revalidation error.
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+        schedulePoll();
+      }
+    }
   }
 
   async function loadMoreRequests({ requestState, requestKind, search } = {}) {
@@ -276,6 +318,7 @@ export function useRequestMusicForm({
   }
 
   return {
+    attachVisibilityListener,
     canSubmit,
     destroy,
     errorMessage,
@@ -294,6 +337,7 @@ export function useRequestMusicForm({
     mediaRequests,
     requestTargets,
     resetForm,
+    revalidate,
     selectedScope,
     selectedTargetUser,
     submitRequest,

@@ -132,4 +132,120 @@ describe('useMyRequests SWR polling', () => {
       destroy();
     }
   });
+
+  test('revalidate fetches data without setting isLoading', async () => {
+    const { useMyRequests } = await import('../../src/client/composables/useMyRequests.js');
+
+    const fetchRequests = async () => ({
+      mediaRequests: [makeRequest('downloading')],
+      totalCount: 1,
+    });
+
+    const { requests, isLoading, isRevalidating, loadRequests, revalidate, destroy } = useMyRequests({
+      fetchRequests,
+      pollIntervalMs: 0,
+    });
+
+    try {
+      await loadRequests();
+      assert.equal(requests.value.length, 1);
+
+      await revalidate();
+      assert.equal(isLoading.value, false);
+      assert.equal(isRevalidating.value, false);
+      assert.equal(requests.value.length, 1);
+    } finally {
+      destroy();
+    }
+  });
+
+  test('revalidate preserves stale data on error', async () => {
+    const { useMyRequests } = await import('../../src/client/composables/useMyRequests.js');
+
+    let callCount = 0;
+    const fetchRequests = async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return { mediaRequests: [makeRequest('downloading')], totalCount: 1 };
+      }
+      throw new Error('refresh failed');
+    };
+
+    const { requests, loadRequests, revalidate, destroy } = useMyRequests({
+      fetchRequests,
+      pollIntervalMs: 0,
+    });
+
+    try {
+      await loadRequests();
+      assert.equal(requests.value.length, 1);
+
+      await revalidate();
+      assert.equal(requests.value.length, 1, 'stale data preserved on revalidate error');
+    } finally {
+      destroy();
+    }
+  });
+
+  test('destroy removes visibility listener when revalidateOnFocus is true', async () => {
+    const listeners = [];
+    const origAdd = globalThis.document?.addEventListener;
+    const _origRemove = globalThis.document?.removeEventListener;
+
+    globalThis.document = globalThis.document ?? {};
+    const origDocAdd = globalThis.document.addEventListener;
+    const origDocRemove = globalThis.document.removeEventListener;
+
+    globalThis.document.addEventListener = (event, fn) => {
+      if (event === 'visibilitychange') listeners.push(fn);
+    };
+    globalThis.document.removeEventListener = (event, fn) => {
+      if (event === 'visibilitychange') {
+        const idx = listeners.indexOf(fn);
+        if (idx >= 0) listeners.splice(idx, 1);
+      }
+    };
+
+    const { useMyRequests } = await import('../../src/client/composables/useMyRequests.js');
+
+    const { attachVisibilityListener, destroy } = useMyRequests({
+      fetchRequests: async () => ({ mediaRequests: [], totalCount: 0 }),
+      pollIntervalMs: 0,
+      revalidateOnFocus: true,
+    });
+
+    try {
+      attachVisibilityListener();
+      assert.equal(listeners.length, 1);
+
+      destroy();
+      assert.equal(listeners.length, 0, 'listener removed after destroy');
+    } finally {
+      globalThis.document.addEventListener = origDocAdd;
+      globalThis.document.removeEventListener = origDocRemove;
+      if (origAdd === undefined) delete globalThis.document;
+    }
+  });
+
+  test('revalidate is no-op after destroy', async () => {
+    const { useMyRequests } = await import('../../src/client/composables/useMyRequests.js');
+
+    let callCount = 0;
+    const fetchRequests = async () => {
+      callCount += 1;
+      return { mediaRequests: [], totalCount: 0 };
+    };
+
+    const { loadRequests, revalidate, destroy } = useMyRequests({
+      fetchRequests,
+      pollIntervalMs: 0,
+    });
+
+    await loadRequests();
+    assert.equal(callCount, 1);
+    destroy();
+
+    await revalidate();
+    assert.equal(callCount, 1, 'no fetch after destroy');
+  });
 });

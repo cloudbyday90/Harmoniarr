@@ -565,3 +565,114 @@ test('useRequestMusicForm resetForm clears all form fields', () => {
   assert.equal(form.notes, '');
   assert.equal(form.requestKind, 'release');
 });
+
+// ---------------------------------------------------------------------------
+// revalidate
+// ---------------------------------------------------------------------------
+
+test('useRequestMusicForm revalidate refreshes summary and requests', async (t) => {
+  const summaryPayload = makeSummaryPayload({ total: 3 });
+  const fetchMediaRequestSummaryFn = t.mock.fn(async () => summaryPayload);
+  const fetchMediaRequestsFn = t.mock.fn(async () => makeRequestsPayload([makeRequest()]));
+
+  const { summary, mediaRequests, loadRequestDashboard, revalidate, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn,
+    fetchMediaRequestsFn,
+    pollIntervalMs: 0,
+  });
+
+  try {
+    await loadRequestDashboard();
+    assert.equal(summary.value.counts.totalRequests, 3);
+    assert.equal(mediaRequests.value.length, 1);
+
+    await revalidate();
+    assert.equal(fetchMediaRequestSummaryFn.mock.callCount(), 2);
+    assert.equal(fetchMediaRequestsFn.mock.callCount(), 2);
+  } finally {
+    destroy();
+  }
+});
+
+test('useRequestMusicForm revalidate preserves stale data on error', async (t) => {
+  let callCount = 0;
+  const fetchMediaRequestSummaryFn = async () => {
+    callCount += 1;
+    if (callCount === 1) return makeSummaryPayload({ total: 1 });
+    throw new Error('refresh failed');
+  };
+  const fetchMediaRequestsFn = async () => makeRequestsPayload();
+
+  const { summary, loadRequestDashboard, revalidate, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn,
+    fetchMediaRequestsFn,
+    pollIntervalMs: 0,
+  });
+
+  try {
+    await loadRequestDashboard();
+    assert.equal(summary.value.counts.totalRequests, 1);
+
+    await revalidate();
+    assert.equal(summary.value.counts.totalRequests, 1, 'stale summary preserved');
+  } finally {
+    destroy();
+  }
+});
+
+test('useRequestMusicForm revalidate is no-op after destroy', async (t) => {
+  const fetchMediaRequestSummaryFn = t.mock.fn(async () => makeSummaryPayload());
+  const fetchMediaRequestsFn = t.mock.fn(async () => makeRequestsPayload());
+
+  const { loadRequestDashboard, revalidate, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn,
+    fetchMediaRequestsFn,
+    pollIntervalMs: 0,
+  });
+
+  await loadRequestDashboard();
+  assert.equal(fetchMediaRequestSummaryFn.mock.callCount(), 1);
+  destroy();
+
+  await revalidate();
+  assert.equal(fetchMediaRequestSummaryFn.mock.callCount(), 1, 'no fetch after destroy');
+});
+
+test('useRequestMusicForm destroy removes visibility listener', async () => {
+  const listeners = [];
+  const origDocAdd = globalThis.document?.addEventListener;
+  const origDocRemove = globalThis.document?.removeEventListener;
+
+  globalThis.document = globalThis.document ?? {};
+  globalThis.document.addEventListener = (event, fn) => {
+    if (event === 'visibilitychange') listeners.push(fn);
+  };
+  globalThis.document.removeEventListener = (event, fn) => {
+    if (event === 'visibilitychange') {
+      const idx = listeners.indexOf(fn);
+      if (idx >= 0) listeners.splice(idx, 1);
+    }
+  };
+
+  const fetchMediaRequestSummaryFn = async () => makeSummaryPayload();
+  const fetchMediaRequestsFn = async () => makeRequestsPayload();
+
+  const { attachVisibilityListener, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn,
+    fetchMediaRequestsFn,
+    pollIntervalMs: 0,
+    revalidateOnFocus: true,
+  });
+
+  try {
+    attachVisibilityListener();
+    assert.equal(listeners.length, 1);
+
+    destroy();
+    assert.equal(listeners.length, 0, 'listener removed after destroy');
+  } finally {
+    globalThis.document.addEventListener = origDocAdd;
+    globalThis.document.removeEventListener = origDocRemove;
+    if (origDocAdd === undefined) delete globalThis.document;
+  }
+});
