@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import RequestCard from '../components/media/RequestCard.vue';
@@ -30,7 +30,7 @@ import { sessionStore } from '../state/session.js';
 
 const viewerUserId = computed(() => sessionStore.state.user?.id ?? null);
 
-const { errorMessage, hasRequests, isLoading, loadRequests, requests } = useMyRequests({ limit: 50 });
+const { destroy: destroyRequests, errorMessage, hasRequests, isLoading, loadRequests, requests } = useMyRequests({ limit: 50, pollIntervalMs: 15000 });
 
 // ── Notification feed (delegated requests + fulfillment updates) ─────────────
 
@@ -92,6 +92,10 @@ const displayRequests = computed(() => {
 onMounted(() => {
   void loadRequests();
   void loadNotifications();
+});
+
+onBeforeUnmount(() => {
+  destroyRequests();
 });
 </script>
 

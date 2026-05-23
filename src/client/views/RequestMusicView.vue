@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestListFilters from '../components/RequestListFilters.vue';
@@ -51,6 +51,7 @@ const rm = useRequestMusicForm({
   initialScope: isAdmin.value ? 'all' : 'mine',
   isAdmin: isAdmin.value,
   currentUserId: currentUserId.value,
+  pollIntervalMs: 15000,
 });
 
 const toast = useToast();
@@ -128,6 +129,10 @@ const sortedRequests = computed(() => filters.sortRequests(rm.mediaRequests.valu
 onMounted(() => {
   void rm.loadRequestDashboard(filters.toApiParams());
   void rm.loadRequestTargets();
+});
+
+onBeforeUnmount(() => {
+  rm.destroy();
 });
 
 watch(

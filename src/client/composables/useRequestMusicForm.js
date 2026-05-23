@@ -48,6 +48,8 @@ import {
  * @param {function} [options.fetchMediaRequestsFn] - Override for testing.
  * @param {function} [options.fetchMediaRequestSummaryFn] - Override for testing.
  * @param {function} [options.fetchUsersFn] - Override for testing.
+ * @param {number} [options.pollIntervalMs] - SWR polling interval in ms. Polls
+ *   only while visible requests have active fulfillment. Default 0 (disabled).
  */
 export function useRequestMusicForm({
   initialScope = 'mine',
@@ -57,16 +59,27 @@ export function useRequestMusicForm({
   fetchMediaRequestsFn = defaultFetchMediaRequests,
   fetchMediaRequestSummaryFn = defaultFetchMediaRequestSummary,
   fetchUsersFn = defaultFetchUsers,
+  pollIntervalMs = 0,
 } = {}) {
   // ── Summary & history ────────────────────────────────────────────────────
   const summary = ref(null);
   const mediaRequests = ref([]);
   const isLoading = ref(false);
+  const isRevalidating = ref(false);
   const loadError = ref('');
   const selectedScope = ref(initialScope);
   const totalCount = ref(0);
   const currentOffset = ref(0);
   const pageSize = 50;
+  let pollTimer = null;
+  let destroyed = false;
+  let lastFilterParams = {};
+
+  const hasActiveFulfillment = computed(() => {
+    const counts = summary.value?.fulfillmentCounts;
+    if (!counts) return false;
+    return (counts.active ?? 0) > 0 || (counts.downloading ?? 0) > 0 || (counts.importPending ?? 0) > 0;
+  });
 
   const hasMore = computed(() => mediaRequests.value.length < totalCount.value);
   const isLoadingMore = ref(false);
@@ -133,11 +146,19 @@ export function useRequestMusicForm({
   }
 
   async function loadRequestDashboard({ requestState, requestKind, search } = {}) {
-    isLoading.value = true;
+    if (destroyed) return;
+
+    const isRevalidation = summary.value !== null;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
     loadError.value = '';
     currentOffset.value = 0;
 
     const requestParams = { scope: selectedScope.value, requestState, requestKind, search, limit: pageSize, offset: 0 };
+    lastFilterParams = requestParams;
 
     try {
       const [summaryPayload, requestsPayload] = await Promise.all([
@@ -145,14 +166,44 @@ export function useRequestMusicForm({
         fetchMediaRequestsFn(requestParams),
       ]);
 
+      if (destroyed) return;
       summary.value = summaryPayload;
       mediaRequests.value = requestsPayload.mediaRequests ?? [];
       totalCount.value = requestsPayload.totalCount ?? mediaRequests.value.length;
     } catch (error) {
+      if (destroyed) return;
       loadError.value = getErrorMessage(error, 'Music request dashboard could not be loaded');
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
+  }
+
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (!hasActiveFulfillment.value) return;
+    if (destroyed) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await loadRequestDashboard(lastFilterParams);
+    }, pollIntervalMs);
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
   }
 
   async function loadMoreRequests({ requestState, requestKind, search } = {}) {
@@ -226,12 +277,15 @@ export function useRequestMusicForm({
 
   return {
     canSubmit,
+    destroy,
     errorMessage,
     form,
+    hasActiveFulfillment,
     hasMore,
     isLoading,
     isLoadingMore,
     isLoadingTargets,
+    isRevalidating,
     isSubmitting,
     loadError,
     loadMoreRequests,

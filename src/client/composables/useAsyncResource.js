@@ -19,11 +19,23 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 /**
- * Shared async-resource composable used by Activity list views and other
- * read-only panels.
+ * Shared async-resource composable implementing stale-while-revalidate
+ * semantics for read-only panels and list views.
  *
- * Owns the repeated `{ isLoading, errorMessage, data, load() }` pattern so
- * individual views describe only how to fetch and how to project the response.
+ * Owns the repeated `{ isLoading, isRevalidating, errorMessage, data, load() }`
+ * pattern so individual views describe only how to fetch and how to project
+ * the response.
+ *
+ * SWR behaviour:
+ * - First load shows `isLoading = true` (no stale data).
+ * - Subsequent revalidations (poll, focus) set `isRevalidating = true`
+ *   while keeping stale `data` visible — the UI can show a subtle indicator
+ *   without a loading skeleton.
+ * - `pollWhile(data) => boolean` allows conditional polling: the timer
+ *   continues only while the guard returns true. When it returns false,
+ *   polling pauses until the next `load()` call makes it true again.
+ * - `revalidateOnFocus` triggers a background revalidation when the
+ *   browser tab regains visibility.
  *
  * @param {object} options
  * @param {() => Promise<unknown>} options.fetcher Resolves the raw API payload.
@@ -33,7 +45,11 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
  *   first successful fetch (default `null`).
  * @param {boolean} [options.immediate] Load on mount (default `true`).
  * @param {number} [options.pollIntervalMs] When set, schedules a recurring
- *   `load()` while the component is mounted.
+ *   `load()` while the component is mounted and `pollWhile` returns true.
+ * @param {(data: unknown) => boolean} [options.pollWhile] Guard checked after
+ *   each load. When it returns false, polling pauses until re-enabled.
+ * @param {boolean} [options.revalidateOnFocus] Revalidate when the browser
+ *   tab becomes visible again (default `false`).
  * @param {string} [options.fallbackErrorMessage]
  */
 export function useAsyncResource({
@@ -42,6 +58,8 @@ export function useAsyncResource({
   initialData = null,
   immediate = true,
   pollIntervalMs = null,
+  pollWhile = null,
+  revalidateOnFocus = false,
   fallbackErrorMessage = 'Request failed',
 } = {}) {
   if (typeof fetcher !== 'function') {
@@ -49,28 +67,41 @@ export function useAsyncResource({
   }
 
   const isLoading = ref(immediate);
+  const isRevalidating = ref(false);
   const errorMessage = ref('');
   const data = ref(initialData);
   const lastRefreshedAt = ref(null);
   let pollTimer = null;
   let unmounted = false;
+  let hasLoaded = false;
 
   async function load() {
     if (unmounted) return;
-    isLoading.value = true;
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
     errorMessage.value = '';
+
     try {
       const payload = await fetcher();
       if (unmounted) return;
       data.value = project(payload);
       lastRefreshedAt.value = new Date().toISOString();
+      hasLoaded = true;
     } catch (error) {
       if (unmounted) return;
       errorMessage.value = error?.message ?? fallbackErrorMessage;
-      data.value = initialData;
+      if (!isRevalidation) {
+        data.value = initialData;
+      }
     } finally {
       if (!unmounted) {
         isLoading.value = false;
+        isRevalidating.value = false;
       }
     }
   }
@@ -82,13 +113,26 @@ export function useAsyncResource({
     }
   }
 
+  function shouldPoll() {
+    if (!pollIntervalMs || pollIntervalMs <= 0) return false;
+    if (typeof pollWhile === 'function') return pollWhile(data.value);
+    return true;
+  }
+
   function schedulePoll() {
-    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (!shouldPoll()) return;
     clearPollTimer();
     pollTimer = setTimeout(async () => {
       await load();
       if (!unmounted) schedulePoll();
     }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (document.hidden || unmounted || !hasLoaded) return;
+    void load().then(() => {
+      if (!unmounted) schedulePoll();
+    });
   }
 
   onMounted(async () => {
@@ -98,17 +142,25 @@ export function useAsyncResource({
       isLoading.value = false;
     }
     schedulePoll();
+
+    if (revalidateOnFocus) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
   });
 
   onBeforeUnmount(() => {
     unmounted = true;
     clearPollTimer();
+    if (revalidateOnFocus) {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
   });
 
   return {
     data,
     errorMessage,
     isLoading,
+    isRevalidating,
     lastRefreshedAt,
     load,
   };

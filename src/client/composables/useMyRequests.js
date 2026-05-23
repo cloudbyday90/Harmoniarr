@@ -20,53 +20,100 @@ import { computed, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchMyMediaRequests as defaultFetchMyMediaRequests } from '../lib/media-request-api.js';
 
+const activeFulfillmentCodes = new Set(['downloading', 'import_pending', 'queued']);
+
+function hasActiveFulfillment(requests) {
+  return Array.isArray(requests) && requests.some((r) => activeFulfillmentCodes.has(r?.fulfillmentStatus?.code));
+}
+
 /**
- * Composable that loads the current user's submitted media requests.
+ * Composable that loads the current user's submitted media requests with
+ * optional SWR (stale-while-revalidate) polling.
  *
  * The caller is responsible for triggering `loadRequests()` — typically from
- * the view's own `onMounted` hook — so this composable remains testable under
- * Node without a component instance.
+ * the view's own `onMounted` hook — and for calling `destroy()` in
+ * `onBeforeUnmount`.
  *
  * @param {object} [options]
  * @param {number} [options.limit=50] - Maximum number of requests to load.
  * @param {function} [options.fetchRequests] - Override for testing.
+ * @param {number} [options.pollIntervalMs=0] - SWR poll interval. Polls only
+ *   while visible requests have active fulfillment. Default 0 (disabled).
  */
 export function useMyRequests({
   limit = 50,
   fetchRequests = defaultFetchMyMediaRequests,
+  pollIntervalMs = 0,
 } = {}) {
   const requests = ref([]);
   const isLoading = ref(true);
+  const isRevalidating = ref(false);
   const errorMessage = ref('');
+  let pollTimer = null;
+  let destroyed = false;
 
   const hasRequests = computed(() => requests.value.length > 0);
 
-  /**
-   * Load the current user's requests. Clears any previous error before
-   * fetching. On failure, stale requests are cleared so the view can show the
-   * error state clearly.
-   *
-   * @param {object} [options]
-   * @param {AbortSignal} [options.signal] - Optional abort signal.
-   */
-  async function loadRequests({ signal } = {}) {
-    isLoading.value = true;
-    errorMessage.value = '';
-    try {
-      const payload = await fetchRequests({ limit, signal });
-      requests.value = Array.isArray(payload?.mediaRequests) ? payload.mediaRequests : [];
-    } catch (error) {
-      requests.value = [];
-      errorMessage.value = getErrorMessage(error, 'Could not load your requests.');
-    } finally {
-      isLoading.value = false;
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
     }
   }
 
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (!hasActiveFulfillment(requests.value)) return;
+    if (destroyed) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await loadRequests();
+    }, pollIntervalMs);
+  }
+
+  async function loadRequests({ signal } = {}) {
+    if (destroyed) return;
+
+    const isRevalidation = requests.value.length > 0;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
+    errorMessage.value = '';
+
+    try {
+      const payload = await fetchRequests({ limit, signal });
+      if (destroyed) return;
+      requests.value = Array.isArray(payload?.mediaRequests) ? payload.mediaRequests : [];
+    } catch (error) {
+      if (destroyed) return;
+      if (!isRevalidation) {
+        requests.value = [];
+      }
+      errorMessage.value = getErrorMessage(error, 'Could not load your requests.');
+    } finally {
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
+    }
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+  }
+
   return {
+    destroy,
     errorMessage,
     hasRequests,
     isLoading,
+    isRevalidating,
     loadRequests,
     requests,
   };
