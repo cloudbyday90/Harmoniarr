@@ -64,6 +64,12 @@ export function useRequestMusicForm({
   const isLoading = ref(false);
   const loadError = ref('');
   const selectedScope = ref(initialScope);
+  const totalCount = ref(0);
+  const currentOffset = ref(0);
+  const pageSize = 50;
+
+  const hasMore = computed(() => mediaRequests.value.length < totalCount.value);
+  const isLoadingMore = ref(false);
 
   // ── Request targets (admin only) ─────────────────────────────────────────
   const requestTargets = ref([]);
@@ -129,8 +135,9 @@ export function useRequestMusicForm({
   async function loadRequestDashboard({ requestState, requestKind, search } = {}) {
     isLoading.value = true;
     loadError.value = '';
+    currentOffset.value = 0;
 
-    const requestParams = { scope: selectedScope.value, requestState, requestKind, search };
+    const requestParams = { scope: selectedScope.value, requestState, requestKind, search, limit: pageSize, offset: 0 };
 
     try {
       const [summaryPayload, requestsPayload] = await Promise.all([
@@ -140,10 +147,31 @@ export function useRequestMusicForm({
 
       summary.value = summaryPayload;
       mediaRequests.value = requestsPayload.mediaRequests ?? [];
+      totalCount.value = requestsPayload.totalCount ?? mediaRequests.value.length;
     } catch (error) {
       loadError.value = getErrorMessage(error, 'Music request dashboard could not be loaded');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  async function loadMoreRequests({ requestState, requestKind, search } = {}) {
+    if (isLoadingMore.value || !hasMore.value) return;
+    isLoadingMore.value = true;
+
+    const nextOffset = currentOffset.value + pageSize;
+    const requestParams = { scope: selectedScope.value, requestState, requestKind, search, limit: pageSize, offset: nextOffset };
+
+    try {
+      const requestsPayload = await fetchMediaRequestsFn(requestParams);
+      const newRequests = requestsPayload.mediaRequests ?? [];
+      mediaRequests.value = [...mediaRequests.value, ...newRequests];
+      totalCount.value = requestsPayload.totalCount ?? totalCount.value;
+      currentOffset.value = nextOffset;
+    } catch {
+      // silent — user can retry
+    } finally {
+      isLoadingMore.value = false;
     }
   }
 
@@ -200,10 +228,13 @@ export function useRequestMusicForm({
     canSubmit,
     errorMessage,
     form,
+    hasMore,
     isLoading,
+    isLoadingMore,
     isLoadingTargets,
     isSubmitting,
     loadError,
+    loadMoreRequests,
     loadRequestDashboard,
     loadRequestTargets,
     mediaRequests,

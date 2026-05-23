@@ -297,6 +297,26 @@ export function createLibraryMediaRequestStore({
     return result.rows.map(mapMediaRequestRow);
   }
 
+  async function countMediaRequests({
+    requestedForUserId = null,
+    requestState = null,
+    requestKind = null,
+    search = null,
+  } = {}) {
+    const pool = getPoolFn();
+    const filter = buildListFilter({ requestedForUserId, requestState, requestKind, search });
+    const result = await pool.query(
+      `
+        SELECT COUNT(*)::integer AS total
+        FROM media_requests
+        ${filter.sql}
+      `,
+      filter.params,
+    );
+
+    return result.rows[0]?.total ?? 0;
+  }
+
   async function getMediaRequestCounts({ requestedForUserId = null } = {}) {
     const pool = getPoolFn();
     const filter = buildListFilter({ requestedForUserId });
@@ -588,6 +608,7 @@ export function createLibraryMediaRequestStore({
 
   return {
     createFanOutChildRequests,
+    countMediaRequests,
     createMediaRequest,
     findActiveDuplicateRequest,
     getMediaRequestById,

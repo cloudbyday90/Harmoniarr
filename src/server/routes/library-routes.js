@@ -89,17 +89,19 @@ export function registerLibraryRoutes(app, {
     const scope = resolveMediaRequestScope(session, request.query.scope);
     const requestedForUserId = scope === 'mine' ? session.appUserId : null;
     const { requestState, requestKind, search, limit, offset } = request.query;
+    const listResult = await listMediaRequests({
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined,
+      requestKind: typeof requestKind === 'string' && requestKind.length > 0 ? requestKind : null,
+      requestedForUserId,
+      requestState: typeof requestState === 'string' && requestState.length > 0 ? requestState : null,
+      search: typeof search === 'string' && search.trim().length > 0 ? search.trim() : null,
+    });
     response.json({
-      mediaRequests: await listMediaRequests({
-        limit: limit ? Number(limit) : undefined,
-        offset: offset ? Number(offset) : undefined,
-        requestKind: typeof requestKind === 'string' && requestKind.length > 0 ? requestKind : null,
-        requestedForUserId,
-        requestState: typeof requestState === 'string' && requestState.length > 0 ? requestState : null,
-        search: typeof search === 'string' && search.trim().length > 0 ? search.trim() : null,
-      }),
+      mediaRequests: listResult.mediaRequests,
       ok: true,
       scope,
+      totalCount: listResult.totalCount,
     });
   }));
 

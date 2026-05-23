@@ -672,22 +672,24 @@ export function createLibraryMediaRequestService({
     limit = null,
     offset = null,
   } = {}) {
-    const mediaRequests = await mediaRequestStore.listMediaRequests({
-      requestedForUserId,
-      requestState,
-      requestKind,
-      search,
-      limit,
-      offset,
-    });
-    return mediaRequestFulfillmentService.enrichMediaRequests(mediaRequests);
+    const filterParams = { requestedForUserId, requestState, requestKind, search };
+    const [mediaRequests, totalCount] = await Promise.all([
+      mediaRequestStore.listMediaRequests({ ...filterParams, limit, offset }),
+      mediaRequestStore.countMediaRequests(filterParams),
+    ]);
+    const enrichedRequests = await mediaRequestFulfillmentService.enrichMediaRequests(mediaRequests);
+    return {
+      mediaRequests: enrichedRequests,
+      totalCount,
+    };
   }
 
   async function buildMediaRequestSummary({ requestedForUserId = null } = {}) {
-    const [counts, mediaRequests] = await Promise.all([
+    const [counts, listResult] = await Promise.all([
       mediaRequestStore.getMediaRequestCounts({ requestedForUserId }),
       listMediaRequests({ requestedForUserId }),
     ]);
+    const { mediaRequests } = listResult;
     const fulfillmentCounts = mediaRequestFulfillmentService.buildMediaRequestFulfillmentCounts(mediaRequests);
     const notificationFeed = mediaRequestNotificationService.buildNotifications({
       mediaRequests,

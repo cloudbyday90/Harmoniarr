@@ -147,13 +147,16 @@ function createLibraryRouteTestApp(overrides = {}) {
       }),
       limitLibraryDiscoveryRun: (_request, _response, next) => next(),
       limitLibraryScanRun: (_request, _response, next) => next(),
-      listMediaRequests: async () => [{
-        id: 'request-1',
-        requestKind: 'release',
-        requestState: 'needs_fetch',
-        requestedByUser: { id: 'user-1', role: 'requester', username: 'listener' },
-        requestedForUser: { id: 'user-1', role: 'requester', username: 'listener' },
-      }],
+      listMediaRequests: async () => ({
+        mediaRequests: [{
+          id: 'request-1',
+          requestKind: 'release',
+          requestState: 'needs_fetch',
+          requestedByUser: { id: 'user-1', role: 'requester', username: 'listener' },
+          requestedForUser: { id: 'user-1', role: 'requester', username: 'listener' },
+        }],
+        totalCount: 1,
+      }),
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
       requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'requester' } }),
@@ -327,7 +330,7 @@ test('library organize apply route requires admin csrf and starts queued organiz
 
 test('media request list route allows admins to read all requests', async (t) => {
   const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-admin', user: { role: 'admin' } }));
-  const listMediaRequests = t.mock.fn(async () => [{ id: 'request-2' }]);
+  const listMediaRequests = t.mock.fn(async () => ({ mediaRequests: [{ id: 'request-2' }], totalCount: 1 }));
   const app = createLibraryRouteTestApp({ listMediaRequests, requireSession });
 
   await withServer(app, async (baseUrl) => {
@@ -351,7 +354,7 @@ test('media request list route allows admins to read all requests', async (t) =>
 
 test('media request list route passes filter params to service', async (t) => {
   const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-admin', user: { role: 'admin' } }));
-  const listMediaRequests = t.mock.fn(async () => []);
+  const listMediaRequests = t.mock.fn(async () => ({ mediaRequests: [], totalCount: 0 }));
   const app = createLibraryRouteTestApp({ listMediaRequests, requireSession });
 
   await withServer(app, async (baseUrl) => {
@@ -371,7 +374,7 @@ test('media request list route passes filter params to service', async (t) => {
 
 test('media request list route ignores empty filter params', async (t) => {
   const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-admin', user: { role: 'admin' } }));
-  const listMediaRequests = t.mock.fn(async () => []);
+  const listMediaRequests = t.mock.fn(async () => ({ mediaRequests: [], totalCount: 0 }));
   const app = createLibraryRouteTestApp({ listMediaRequests, requireSession });
 
   await withServer(app, async (baseUrl) => {

@@ -369,7 +369,20 @@ onMounted(() => {
           </article>
         </div>
 
-        <div class="hx-empty" v-else>
+        <template v-if="!rm.isLoading.value && rm.mediaRequests.value.length">
+          <div v-if="rm.hasMore.value" class="rm-load-more">
+            <button
+              type="button"
+              class="hx-btn"
+              data-variant="ghost"
+              :disabled="rm.isLoadingMore.value"
+              @click="rm.loadMoreRequests(filters.toApiParams())"
+            >{{ rm.isLoadingMore.value ? 'Loading\u2026' : 'Load more' }}</button>
+            <p class="hx-text-muted">{{ rm.mediaRequests.value.length }} of {{ rm.totalCount?.value ?? rm.mediaRequests.value.length }}</p>
+          </div>
+        </template>
+
+        <div class="hx-empty" v-if="!rm.isLoading.value && !rm.mediaRequests.value.length">
           <p class="hx-empty-title">No requests yet</p>
           <p class="hx-empty-copy">No requests have been submitted in this scope yet.</p>
         </div>
@@ -471,5 +484,13 @@ onMounted(() => {
   display: flex;
   gap: var(--hx-space-2);
   padding-top: var(--hx-space-1);
+}
+
+.rm-load-more {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding-top: var(--hx-space-4);
+  justify-content: center;
 }
 </style>

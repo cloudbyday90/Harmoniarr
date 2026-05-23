@@ -567,6 +567,7 @@ test('buildMediaRequestSummary exposes fulfillment counts and recent request sta
         throw new Error('Should not be called');
       },
       getMediaRequestCounts: async () => ({ alreadyExists: 1, needsFetch: 1, needsReview: 1, totalRequests: 3 }),
+      countMediaRequests: async () => 3,
       listMediaRequests: async () => ([
         {
           id: 'request-1',
