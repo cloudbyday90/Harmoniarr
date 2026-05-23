@@ -5,6 +5,7 @@ import {
   fetchLibraryDiscoverySummary,
   fetchLibraryOrganizePreview,
   fetchMediaRequestDetail,
+  fetchMediaRequestEvents,
   fetchMediaRequests,
   fetchMediaRequestReassignmentHistory,
   fetchMediaRequestSummary,
@@ -102,6 +103,37 @@ test('library-api fetchMediaRequestDetail encodes special characters', async (t)
   globalThis.fetch = t.mock.fn(async () => createJsonResponse());
 
   await fetchMediaRequestDetail({ mediaRequestId: 'req/slash' });
+
+  assert.ok(globalThis.fetch.mock.calls[0].arguments[0].includes('req%2Fslash'));
+});
+
+test('library-api fetchMediaRequestEvents sends GET without params', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchMediaRequestEvents({ mediaRequestId: 'req-1' });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/library/media-requests/req-1/events');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'GET');
+});
+
+test('library-api fetchMediaRequestEvents sends cursor and limit as query params', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchMediaRequestEvents({ mediaRequestId: 'req-1', cursor: 'abc123', limit: 25 });
+
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.ok(url.includes('cursor=abc123'));
+  assert.ok(url.includes('limit=25'));
+});
+
+test('library-api fetchMediaRequestEvents encodes mediaRequestId', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchMediaRequestEvents({ mediaRequestId: 'req/slash' });
 
   assert.ok(globalThis.fetch.mock.calls[0].arguments[0].includes('req%2Fslash'));
 });

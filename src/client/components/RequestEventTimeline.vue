@@ -27,7 +27,11 @@ import {
 const props = defineProps({
   events: { type: Array, default: () => [] },
   eligibleUsers: { type: Array, default: () => [] },
+  hasMore: { type: Boolean, default: false },
+  isLoadingMore: { type: Boolean, default: false },
 });
+
+const emit = defineEmits(['load-more']);
 
 const usersById = computed(() => {
   const map = {};
@@ -64,6 +68,14 @@ function formatTimestamp(isoString) {
         </div>
       </li>
     </ol>
+    <button
+      v-if="hasMore"
+      type="button"
+      class="hx-btn hx-btn--sm ret-load-more"
+      data-variant="ghost"
+      :disabled="isLoadingMore"
+      @click="emit('load-more')"
+    >{{ isLoadingMore ? 'Loading\u2026' : 'Load more events' }}</button>
   </div>
 </template>
 
@@ -139,5 +151,10 @@ function formatTimestamp(isoString) {
   font-size: var(--hx-text-sm);
   color: var(--hx-text-muted);
   line-height: 1.5;
+}
+
+.ret-load-more {
+  margin-top: var(--hx-space-3);
+  width: 100%;
 }
 </style>

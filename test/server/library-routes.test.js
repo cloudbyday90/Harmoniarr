@@ -75,6 +75,7 @@ function createLibraryRouteTestApp(overrides = {}) {
         }
         return {
           events: [{ id: 'evt-1', eventType: 'reassigned', occurredAt: '2026-05-22T12:00:00Z' }],
+          hasMoreEvents: false,
           mediaRequest: {
             id: mediaRequestId,
             requestKind: 'release',
@@ -85,6 +86,7 @@ function createLibraryRouteTestApp(overrides = {}) {
             requestedForUser: { id: 'user-1', role: 'requester', username: 'listener' },
             fulfillmentStatus: { code: 'queued', label: 'Queued', tone: 'info' },
           },
+          nextCursor: null,
         };
       },
       buildLibraryReconciliationSummary: async () => ({
@@ -191,6 +193,14 @@ function createLibraryRouteTestApp(overrides = {}) {
         windows: { recentDays: 30, upcomingDays: 90 },
       }),
       limitLibraryOrganizeApplyRun: (_request, _response, next) => next(),
+      getMediaRequestReassignmentHistory: async () => [
+        { id: 'evt-1', eventType: 'reassigned', occurredAt: '2026-05-22T12:00:00Z' },
+      ],
+      listMediaRequestEventsPage: async () => ({
+        events: [{ id: 'evt-2', eventType: 'created', occurredAt: '2026-05-22T11:00:00Z' }],
+        hasMore: false,
+        nextCursor: null,
+      }),
       ...overrides,
     });
   });
@@ -394,6 +404,7 @@ test('media request list route ignores empty filter params', async (t) => {
 test('media request detail route returns enriched request with events', async (t) => {
   const buildMediaRequestDetail = t.mock.fn(async ({ mediaRequestId }) => ({
     events: [{ id: 'evt-1', eventType: 'reassigned' }],
+    hasMoreEvents: false,
     mediaRequest: {
       id: mediaRequestId,
       requestKind: 'release',
@@ -404,6 +415,7 @@ test('media request detail route returns enriched request with events', async (t
       requestedForUser: { id: 'u-1', role: 'requester', username: 'listener' },
       fulfillmentStatus: { code: 'queued', label: 'Queued', tone: 'info' },
     },
+    nextCursor: null,
   }));
   const app = createLibraryRouteTestApp({ buildMediaRequestDetail });
 
@@ -417,6 +429,8 @@ test('media request detail route returns enriched request with events', async (t
     assert.equal(payload.mediaRequest.artistName, 'Daft Punk');
     assert.equal(payload.mediaRequest.fulfillmentStatus.label, 'Queued');
     assert.equal(payload.events.length, 1);
+    assert.equal(payload.hasMoreEvents, false);
+    assert.equal(payload.nextCursor, null);
     assert.equal(buildMediaRequestDetail.mock.calls[0].arguments[0].mediaRequestId, 'req-42');
   });
 });
@@ -433,6 +447,69 @@ test('media request detail route returns 404 for unknown request', async (t) => 
 
     assert.equal(response.status, 404);
     assert.equal(payload.error.code, 'media_request_not_found');
+  });
+});
+
+test('media request events route returns paginated events with cursor', async (t) => {
+  const listMediaRequestEventsPage = t.mock.fn(async ({ mediaRequestId, cursor, limit }) => ({
+    events: [{ id: 'evt-10', eventType: 'created', occurredAt: '2026-05-22T10:00:00Z' }],
+    hasMore: true,
+    nextCursor: 'next-page-cursor',
+  }));
+  const app = createLibraryRouteTestApp({ listMediaRequestEventsPage });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-1/events?cursor=abc&limit=25`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.events.length, 1);
+    assert.equal(payload.events[0].id, 'evt-10');
+    assert.equal(payload.hasMore, true);
+    assert.equal(payload.nextCursor, 'next-page-cursor');
+
+    const callArgs = listMediaRequestEventsPage.mock.calls[0].arguments[0];
+    assert.equal(callArgs.mediaRequestId, 'req-1');
+    assert.equal(callArgs.cursor, 'abc');
+    assert.equal(callArgs.limit, 25);
+  });
+});
+
+test('media request events route defaults limit to 50 when not provided', async (t) => {
+  const listMediaRequestEventsPage = t.mock.fn(async () => ({
+    events: [],
+    hasMore: false,
+    nextCursor: null,
+  }));
+  const app = createLibraryRouteTestApp({ listMediaRequestEventsPage });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-1/events`);
+    await response.json();
+
+    assert.equal(response.status, 200);
+    const callArgs = listMediaRequestEventsPage.mock.calls[0].arguments[0];
+    assert.equal(callArgs.limit, 50);
+    assert.equal(callArgs.cursor, null);
+  });
+});
+
+test('media request events route caps limit at 100', async (t) => {
+  const listMediaRequestEventsPage = t.mock.fn(async () => ({
+    events: [],
+    hasMore: false,
+    nextCursor: null,
+  }));
+  const app = createLibraryRouteTestApp({ listMediaRequestEventsPage });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-1/events?limit=500`);
+    await response.json();
+
+    assert.equal(response.status, 200);
+    const callArgs = listMediaRequestEventsPage.mock.calls[0].arguments[0];
+    assert.equal(callArgs.limit, 100);
   });
 });
 

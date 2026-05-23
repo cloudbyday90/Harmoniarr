@@ -154,3 +154,15 @@ export function reassignMediaRequest({ mediaRequestId, newRequestedForUserId, re
 export function fetchMediaRequestReassignmentHistory({ mediaRequestId }) {
   return apiRequest(`/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}/reassignment-history`);
 }
+
+export function fetchMediaRequestEvents({ mediaRequestId, cursor, limit } = {}) {
+  const params = new URLSearchParams();
+  if (cursor) params.set('cursor', cursor);
+  if (limit != null) params.set('limit', String(limit));
+  const query = params.toString();
+  return apiRequest(
+    query
+      ? `/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}/events?${query}`
+      : `/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}/events`,
+  );
+}

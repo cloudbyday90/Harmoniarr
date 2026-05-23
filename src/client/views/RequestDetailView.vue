@@ -52,7 +52,10 @@ const {
   events,
   isLoading,
   errorMessage,
+  hasMoreEvents,
+  isLoadingMoreEvents,
   load,
+  loadMoreEvents,
 } = useMediaRequestDetail();
 
 const {
@@ -263,6 +266,9 @@ function formatTimestamp(ts) {
       <RequestEventTimeline
         :events="events"
         :eligible-users="eligibleUsers.value"
+        :has-more="hasMoreEvents"
+        :is-loading-more="isLoadingMoreEvents"
+        @load-more="loadMoreEvents({ mediaRequestId: route.params.id })"
       />
 
       <ReassignRequestModal

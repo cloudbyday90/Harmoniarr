@@ -44,6 +44,7 @@ export function registerLibraryRoutes(app, {
   limitLibraryDiscoveryRun = skipRateLimitMiddleware,
   limitLibraryOrganizeApplyRun = skipRateLimitMiddleware,
   limitLibraryScanRun = skipRateLimitMiddleware,
+  listMediaRequestEventsPage,
   listMediaRequests,
   reassignMediaRequest,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
@@ -108,11 +109,32 @@ export function registerLibraryRoutes(app, {
   app.get('/api/v1/library/media-requests/:mediaRequestId', asyncRoute(async (request, response) => {
     await requireSession(request);
 
+    const detail = await buildMediaRequestDetail({
+      mediaRequestId: request.params.mediaRequestId,
+    });
+
     response.json({
+      events: detail.events,
+      hasMoreEvents: detail.hasMoreEvents,
+      mediaRequest: detail.mediaRequest,
+      nextCursor: detail.nextCursor,
       ok: true,
-      ...(await buildMediaRequestDetail({
-        mediaRequestId: request.params.mediaRequestId,
-      })),
+    });
+  }));
+
+  app.get('/api/v1/library/media-requests/:mediaRequestId/events', asyncRoute(async (request, response) => {
+    await requireSession(request);
+    const { cursor, limit } = request.query;
+    const result = await listMediaRequestEventsPage({
+      mediaRequestId: request.params.mediaRequestId,
+      cursor: typeof cursor === 'string' && cursor.length > 0 ? cursor : null,
+      limit: limit ? Math.min(Number(limit), 100) : 50,
+    });
+    response.json({
+      events: result.events,
+      hasMore: result.hasMore,
+      nextCursor: result.nextCursor,
+      ok: true,
     });
   }));
 

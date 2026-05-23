@@ -586,41 +586,83 @@ export function createLibraryMediaRequestStore({
     );
   }
 
-  async function listMediaRequestEvents({ mediaRequestId, limit = 50 } = {}) {
+  function encodeEventCursor({ occurredAt, id }) {
+    return Buffer.from(JSON.stringify({ o: occurredAt, i: id })).toString('base64url');
+  }
+
+  function decodeEventCursor(cursor) {
+    try {
+      const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+      if (!parsed.o || !parsed.i) return null;
+      return { occurredAt: parsed.o, id: parsed.i };
+    } catch {
+      return null;
+    }
+  }
+
+  async function listMediaRequestEvents({ mediaRequestId, limit = 50, cursor = null } = {}) {
     const pool = getPoolFn();
+    const fetchLimit = limit + 1;
+    const decoded = cursor ? decodeEventCursor(cursor) : null;
+
+    const columns = `
+      media_request_events.id,
+      media_request_events.event_type,
+      media_request_events.previous_requested_for_user_id,
+      media_request_events.new_requested_for_user_id,
+      media_request_events.reason,
+      media_request_events.actor_user_id,
+      media_request_events.details,
+      media_request_events.occurred_at,
+      actor_users.username AS actor_username
+    `;
+
+    const params = [mediaRequestId];
+    let cursorFilter = '';
+
+    if (decoded) {
+      cursorFilter = 'AND (media_request_events.occurred_at, media_request_events.id) < ($2, $3)';
+      params.push(decoded.occurredAt, decoded.id);
+    }
+
+    const limitParamIdx = params.length + 1;
+    params.push(fetchLimit);
+
     const result = await pool.query(
       `
-        SELECT
-          media_request_events.id,
-          media_request_events.event_type,
-          media_request_events.previous_requested_for_user_id,
-          media_request_events.new_requested_for_user_id,
-          media_request_events.reason,
-          media_request_events.actor_user_id,
-          media_request_events.details,
-          media_request_events.occurred_at,
-          actor_users.username AS actor_username
+        SELECT ${columns}
         FROM media_request_events
         LEFT JOIN app_users AS actor_users
           ON actor_users.id = media_request_events.actor_user_id
         WHERE media_request_events.media_request_id = $1
-        ORDER BY media_request_events.occurred_at DESC
-        LIMIT $2
+        ${cursorFilter}
+        ORDER BY media_request_events.occurred_at DESC, media_request_events.id DESC
+        LIMIT $${limitParamIdx}
       `,
-      [mediaRequestId, limit],
+      params,
     );
 
-    return result.rows.map((row) => ({
-      actorUserId: row.actor_user_id ?? null,
-      actorUsername: row.actor_username ?? null,
-      details: row.details ?? null,
-      eventType: row.event_type,
-      id: row.id,
-      newRequestedForUserId: row.new_requested_for_user_id ?? null,
-      occurredAt: row.occurred_at,
-      previousRequestedForUserId: row.previous_requested_for_user_id ?? null,
-      reason: row.reason ?? null,
-    }));
+    const hasMore = result.rows.length > limit;
+    const rows = hasMore ? result.rows.slice(0, limit) : result.rows;
+    const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
+
+    return {
+      events: rows.map((row) => ({
+        actorUserId: row.actor_user_id ?? null,
+        actorUsername: row.actor_username ?? null,
+        details: row.details ?? null,
+        eventType: row.event_type,
+        id: row.id,
+        newRequestedForUserId: row.new_requested_for_user_id ?? null,
+        occurredAt: row.occurred_at,
+        previousRequestedForUserId: row.previous_requested_for_user_id ?? null,
+        reason: row.reason ?? null,
+      })),
+      hasMore,
+      nextCursor: hasMore && lastRow
+        ? encodeEventCursor({ occurredAt: lastRow.occurred_at, id: lastRow.id })
+        : null,
+    };
   }
 
   return {

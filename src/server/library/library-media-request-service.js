@@ -801,7 +801,12 @@ export function createLibraryMediaRequestService({
   }
 
   async function getMediaRequestReassignmentHistory({ mediaRequestId, limit = 50 } = {}) {
-    return mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit });
+    const result = await mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit });
+    return result.events;
+  }
+
+  async function listMediaRequestEventsPage({ mediaRequestId, cursor, limit = 50 }) {
+    return mediaRequestStore.listMediaRequestEvents({ mediaRequestId, cursor, limit });
   }
 
   async function buildMediaRequestDetail({ mediaRequestId }) {
@@ -812,11 +817,13 @@ export function createLibraryMediaRequestService({
     }
 
     const [enriched] = await mediaRequestFulfillmentService.enrichMediaRequests([mediaRequest]);
-    const events = await mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit: 50 });
+    const eventResult = await mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit: 50 });
 
     return {
-      events,
+      events: eventResult.events,
+      hasMoreEvents: eventResult.hasMore,
       mediaRequest: enriched,
+      nextCursor: eventResult.nextCursor,
     };
   }
 
@@ -955,6 +962,7 @@ export function createLibraryMediaRequestService({
     cancelMediaRequest,
     createMediaRequest,
     getMediaRequestReassignmentHistory,
+    listMediaRequestEventsPage,
     listMediaRequests,
     reassignMediaRequest,
   };

@@ -29,6 +29,8 @@ test('useMediaRequestDetail load populates mediaRequest and events', async () =>
     ok: true,
     mediaRequest: { id: 'req-1', requestKind: 'release', artistName: 'Daft Punk' },
     events: [{ id: 'evt-1', eventType: 'reassigned' }],
+    hasMoreEvents: false,
+    nextCursor: null,
   };
   const { mediaRequest, events, load } = useMediaRequestDetail({
     fetchDetailFn: makeFetchDetailFn(mockResult),
@@ -84,21 +86,25 @@ test('useMediaRequestDetail isLoading is false initially', () => {
 });
 
 test('useMediaRequestDetail reset clears all state', async () => {
-  const { mediaRequest, events, errorMessage, load, reset } = useMediaRequestDetail({
+  const { mediaRequest, events, errorMessage, hasMoreEvents, load, reset } = useMediaRequestDetail({
     fetchDetailFn: async () => ({
       ok: true,
       mediaRequest: { id: 'r1' },
       events: [{ id: 'e1' }],
+      hasMoreEvents: true,
+      nextCursor: 'cursor-1',
     }),
   });
 
   await load({ mediaRequestId: 'r1' });
   assert.equal(mediaRequest.value.id, 'r1');
+  assert.equal(hasMoreEvents.value, true);
 
   reset();
   assert.equal(mediaRequest.value, null);
   assert.equal(events.value.length, 0);
   assert.equal(errorMessage.value, '');
+  assert.equal(hasMoreEvents.value, false);
 });
 
 test('useMediaRequestDetail handles missing events in response', async () => {
@@ -109,4 +115,138 @@ test('useMediaRequestDetail handles missing events in response', async () => {
   await load({ mediaRequestId: 'r1' });
 
   assert.equal(events.value.length, 0);
+});
+
+test('useMediaRequestDetail load sets hasMoreEvents and nextCursor from detail', async () => {
+  const { hasMoreEvents, load } = useMediaRequestDetail({
+    fetchDetailFn: async () => ({
+      ok: true,
+      mediaRequest: { id: 'r1' },
+      events: [{ id: 'e1' }, { id: 'e2' }],
+      hasMoreEvents: true,
+      nextCursor: 'cursor-abc',
+    }),
+  });
+
+  await load({ mediaRequestId: 'r1' });
+
+  assert.equal(hasMoreEvents.value, true);
+});
+
+test('useMediaRequestDetail loadMoreEvents appends events and updates cursor', async () => {
+  let fetchEventsCallCount = 0;
+  const { events, hasMoreEvents, load, loadMoreEvents } = useMediaRequestDetail({
+    fetchDetailFn: async () => ({
+      ok: true,
+      mediaRequest: { id: 'r1' },
+      events: [{ id: 'e1' }],
+      hasMoreEvents: true,
+      nextCursor: 'cursor-1',
+    }),
+    fetchEventsFn: async () => {
+      fetchEventsCallCount += 1;
+      return {
+        events: [{ id: 'e2' }, { id: 'e3' }],
+        hasMore: false,
+        nextCursor: null,
+      };
+    },
+  });
+
+  await load({ mediaRequestId: 'r1' });
+  assert.equal(events.value.length, 1);
+
+  await loadMoreEvents({ mediaRequestId: 'r1' });
+  assert.equal(events.value.length, 3);
+  assert.equal(events.value[0].id, 'e1');
+  assert.equal(events.value[1].id, 'e2');
+  assert.equal(events.value[2].id, 'e3');
+  assert.equal(hasMoreEvents.value, false);
+  assert.equal(fetchEventsCallCount, 1);
+});
+
+test('useMediaRequestDetail loadMoreEvents is no-op when no cursor', async () => {
+  let fetchEventsCallCount = 0;
+  const { events, load, loadMoreEvents } = useMediaRequestDetail({
+    fetchDetailFn: async () => ({
+      ok: true,
+      mediaRequest: { id: 'r1' },
+      events: [{ id: 'e1' }],
+      hasMoreEvents: false,
+      nextCursor: null,
+    }),
+    fetchEventsFn: async () => {
+      fetchEventsCallCount += 1;
+      return { events: [], hasMore: false, nextCursor: null };
+    },
+  });
+
+  await load({ mediaRequestId: 'r1' });
+  await loadMoreEvents({ mediaRequestId: 'r1' });
+
+  assert.equal(events.value.length, 1);
+  assert.equal(fetchEventsCallCount, 0);
+});
+
+test('useMediaRequestDetail loadMoreEvents is no-op when already loading', async () => {
+  let resolveEvents;
+  const fetchEventsFn = async () => new Promise((resolve) => { resolveEvents = resolve; });
+  const { events, load, loadMoreEvents } = useMediaRequestDetail({
+    fetchDetailFn: async () => ({
+      ok: true,
+      mediaRequest: { id: 'r1' },
+      events: [{ id: 'e1' }],
+      hasMoreEvents: true,
+      nextCursor: 'cursor-1',
+    }),
+    fetchEventsFn,
+  });
+
+  await load({ mediaRequestId: 'r1' });
+
+  const p1 = loadMoreEvents({ mediaRequestId: 'r1' });
+  loadMoreEvents({ mediaRequestId: 'r1' });
+
+  resolveEvents({ events: [{ id: 'e2' }], hasMore: false, nextCursor: null });
+  await p1;
+
+  assert.equal(events.value.length, 2);
+});
+
+test('useMediaRequestDetail loadMoreEvents silently ignores fetch errors', async () => {
+  const { events, hasMoreEvents, load, loadMoreEvents } = useMediaRequestDetail({
+    fetchDetailFn: async () => ({
+      ok: true,
+      mediaRequest: { id: 'r1' },
+      events: [{ id: 'e1' }],
+      hasMoreEvents: true,
+      nextCursor: 'cursor-1',
+    }),
+    fetchEventsFn: async () => { throw new Error('network error'); },
+  });
+
+  await load({ mediaRequestId: 'r1' });
+  await loadMoreEvents({ mediaRequestId: 'r1' });
+
+  assert.equal(events.value.length, 1);
+  assert.equal(hasMoreEvents.value, true);
+});
+
+test('useMediaRequestDetail reset clears pagination state', async () => {
+  const { hasMoreEvents, isLoadingMoreEvents, load, reset } = useMediaRequestDetail({
+    fetchDetailFn: async () => ({
+      ok: true,
+      mediaRequest: { id: 'r1' },
+      events: [{ id: 'e1' }],
+      hasMoreEvents: true,
+      nextCursor: 'cursor-1',
+    }),
+  });
+
+  await load({ mediaRequestId: 'r1' });
+  assert.equal(hasMoreEvents.value, true);
+
+  reset();
+  assert.equal(hasMoreEvents.value, false);
+  assert.equal(isLoadingMoreEvents.value, false);
 });
