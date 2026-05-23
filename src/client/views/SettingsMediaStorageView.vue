@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import {
   formatProviderLabel,
   formatQuotaPercentage,
@@ -63,7 +63,7 @@ const {
 } = useSettingsForm({
   extraApply: (payload) => { pathValidation.value = payload.pathValidation ?? null; },
   onSaveSuccess: () => {
-    void artworkQuota.loadQuota();
+    void artworkQuota.revalidate();
     void loadQuotaHistory();
   },
 });
@@ -125,6 +125,8 @@ async function loadQuotaHistory() {
 
 onMounted(() => { void artworkQuota.loadQuota(); });
 onMounted(() => { void loadQuotaHistory(); });
+onMounted(() => { artworkQuota.attachVisibilityListener(); });
+onBeforeUnmount(() => { artworkQuota.destroy(); });
 </script>
 
 <template>
