@@ -30,6 +30,10 @@ export function fetchMediaRequests({ scope } = {}) {
   return apiRequest(`/api/v1/library/media-requests${buildQueryString({ scope })}`);
 }
 
+export function fetchMediaRequestDetail({ mediaRequestId }) {
+  return apiRequest(`/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}`);
+}
+
 export function createMediaRequest(payload) {
   return apiRequest('/api/v1/library/media-requests', {
     body: payload,

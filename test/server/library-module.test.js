@@ -12,6 +12,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const buildLibraryDiscoverySummary = () => {};
   const startLibraryOrganizeApplyRun = () => {};
   const buildLibraryOrganizePreview = () => {};
+  const buildMediaRequestDetail = () => {};
   const buildMediaRequestSummary = () => {};
   const buildLibraryReconciliationSummary = () => {};
   const buildLibraryWantedSummary = () => {};
@@ -44,7 +45,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryFileMatchStore = {};
   const getMediaRequestReassignmentHistory = () => {};
   const reassignMediaRequest = () => {};
-  const libraryMediaRequestService = { buildMediaRequestSummary, createMediaRequest, getMediaRequestReassignmentHistory, listMediaRequests, reassignMediaRequest };
+  const libraryMediaRequestService = { buildMediaRequestDetail, buildMediaRequestSummary, createMediaRequest, getMediaRequestReassignmentHistory, listMediaRequests, reassignMediaRequest };
   const libraryMediaRequestStore = {};
   const libraryOrganizeApplyRunStore = {};
   const libraryOrganizeApplyService = { startLibraryOrganizeApplyRun };
@@ -178,6 +179,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     buildLibraryOrganizePreview,
     buildLibraryReleases,
     buildLibraryWantedReleases,
+    buildMediaRequestDetail,
     buildMediaRequestSummary,
     buildLibraryReconciliationSummary,
     buildLibraryScanRunDetail,
@@ -244,6 +246,7 @@ test('createLibraryModule initializes the default discovery worker after pause s
     },
     libraryFileMatchStore: {},
     libraryMediaRequestService: {
+      buildMediaRequestDetail: () => {},
       buildMediaRequestSummary: () => {},
       createMediaRequest: () => {},
       getMediaRequestReassignmentHistory: () => {},

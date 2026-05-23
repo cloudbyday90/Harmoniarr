@@ -69,6 +69,24 @@ function createLibraryRouteTestApp(overrides = {}) {
           status: 'active',
         },
       }),
+      buildMediaRequestDetail: async ({ mediaRequestId }) => {
+        if (mediaRequestId === 'not-found') {
+          throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
+        }
+        return {
+          events: [{ id: 'evt-1', eventType: 'reassigned', occurredAt: '2026-05-22T12:00:00Z' }],
+          mediaRequest: {
+            id: mediaRequestId,
+            requestKind: 'release',
+            requestState: 'needs_fetch',
+            artistName: 'Daft Punk',
+            releaseTitle: 'Discovery',
+            requestedByUser: { id: 'user-1', role: 'requester', username: 'listener' },
+            requestedForUser: { id: 'user-1', role: 'requester', username: 'listener' },
+            fulfillmentStatus: { code: 'queued', label: 'Queued', tone: 'info' },
+          },
+        };
+      },
       buildLibraryReconciliationSummary: async () => ({
         fileCounts: {
           ambiguous: 1,
@@ -320,6 +338,51 @@ test('media request list route allows admins to read all requests', async (t) =>
     assert.deepEqual(listMediaRequests.mock.calls[0].arguments, [{ requestedForUserId: null }]);
     assert.equal(payload.scope, 'all');
     assert.deepEqual(payload.mediaRequests, [{ id: 'request-2' }]);
+  });
+});
+
+test('media request detail route returns enriched request with events', async (t) => {
+  const buildMediaRequestDetail = t.mock.fn(async ({ mediaRequestId }) => ({
+    events: [{ id: 'evt-1', eventType: 'reassigned' }],
+    mediaRequest: {
+      id: mediaRequestId,
+      requestKind: 'release',
+      requestState: 'needs_fetch',
+      artistName: 'Daft Punk',
+      releaseTitle: 'Discovery',
+      requestedByUser: { id: 'u-1', role: 'requester', username: 'listener' },
+      requestedForUser: { id: 'u-1', role: 'requester', username: 'listener' },
+      fulfillmentStatus: { code: 'queued', label: 'Queued', tone: 'info' },
+    },
+  }));
+  const app = createLibraryRouteTestApp({ buildMediaRequestDetail });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-42`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.mediaRequest.id, 'req-42');
+    assert.equal(payload.mediaRequest.artistName, 'Daft Punk');
+    assert.equal(payload.mediaRequest.fulfillmentStatus.label, 'Queued');
+    assert.equal(payload.events.length, 1);
+    assert.equal(buildMediaRequestDetail.mock.calls[0].arguments[0].mediaRequestId, 'req-42');
+  });
+});
+
+test('media request detail route returns 404 for unknown request', async (t) => {
+  const buildMediaRequestDetail = t.mock.fn(async () => {
+    throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
+  });
+  const app = createLibraryRouteTestApp({ buildMediaRequestDetail });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/not-found`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.equal(payload.error.code, 'media_request_not_found');
   });
 });
 

@@ -43,6 +43,7 @@ import RecoveryWorkspaceView from './views/RecoveryWorkspaceView.vue';
 import DiscoverView from './views/DiscoverView.vue';
 import LibraryView from './views/LibraryView.vue';
 import MyRequestsView from './views/MyRequestsView.vue';
+import RequestDetailView from './views/RequestDetailView.vue';
 import RequestMusicView from './views/RequestMusicView.vue';
 import SearchView from './views/SearchView.vue';
 import SettingsConnectionsView from './views/SettingsConnectionsView.vue';
@@ -105,6 +106,7 @@ const router = createRouter({
         { path: 'missing', name: 'missing', component: MissingView },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
+        { path: 'requests/:id', name: 'request-detail', component: RequestDetailView },
         { path: 'my-requests', name: 'my-requests', component: MyRequestsView },
         { path: 'artists/:mbid', name: 'artist-detail', component: ArtistDetailView },
 

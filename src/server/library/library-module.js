@@ -385,6 +385,7 @@ export function createLibraryModule({
       buildLibraryReleases: libraryReleasesService.buildLibraryReleases,
       buildLibraryWantedReleases: libraryWantedSummaryService.buildLibraryWantedReleases,
       buildReleaseRadar: libraryReleaseRadarService.buildReleaseRadar,
+      buildMediaRequestDetail: libraryMediaRequestService.buildMediaRequestDetail,
       buildMediaRequestSummary: libraryMediaRequestService.buildMediaRequestSummary,
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,
       buildLibraryScanRunDetail: libraryScanSummaryService.buildLibraryScanRunDetail,

@@ -788,7 +788,24 @@ export function createLibraryMediaRequestService({
     return mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit });
   }
 
+  async function buildMediaRequestDetail({ mediaRequestId }) {
+    const mediaRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
+
+    if (!mediaRequest) {
+      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
+    }
+
+    const [enriched] = await mediaRequestFulfillmentService.enrichMediaRequests([mediaRequest]);
+    const events = await mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit: 50 });
+
+    return {
+      events,
+      mediaRequest: enriched,
+    };
+  }
+
   return {
+    buildMediaRequestDetail,
     buildMediaRequestSummary,
     createMediaRequest,
     getMediaRequestReassignmentHistory,

@@ -31,10 +31,11 @@ export function registerLibraryRoutes(app, {
   buildLibraryOrganizePreview,
   buildLibraryReleases,
   buildLibraryWantedReleases,
-  buildMediaRequestSummary,
   buildLibraryReconciliationSummary,
   buildLibraryScanRunDetail,
   buildLibraryWantedSummary,
+  buildMediaRequestDetail,
+  buildMediaRequestSummary,
   buildReleaseRadar,
   createMediaRequest,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
@@ -91,6 +92,17 @@ export function registerLibraryRoutes(app, {
       }),
       ok: true,
       scope,
+    });
+  }));
+
+  app.get('/api/v1/library/media-requests/:mediaRequestId', asyncRoute(async (request, response) => {
+    await requireSession(request);
+
+    response.json({
+      ok: true,
+      ...(await buildMediaRequestDetail({
+        mediaRequestId: request.params.mediaRequestId,
+      })),
     });
   }));
 

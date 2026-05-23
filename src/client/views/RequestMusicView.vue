@@ -267,7 +267,7 @@ onMounted(() => {
             <div class="rm-request-header">
               <div>
                 <p class="rm-request-kind">{{ getRequestKindLabel(request.requestKind) }}</p>
-                <h3 class="rm-request-headline">{{ getRequestHeadline(request) }}</h3>
+                <router-link :to="{ name: 'request-detail', params: { id: request.id } }" class="rm-request-headline">{{ getRequestHeadline(request) }}</router-link>
                 <p class="hx-text-muted" v-if="rm.selectedScope.value === 'all' && request.requestedByUser.id !== request.requestedForUser.id">
                   Requested by {{ request.requestedByUser.username }} ({{ formatUserRole(request.requestedByUser.role) }}) for {{ request.requestedForUser.username }} ({{ formatUserRole(request.requestedForUser.role) }})
                 </p>
@@ -389,9 +389,16 @@ onMounted(() => {
 }
 
 .rm-request-headline {
+  display: block;
   font-size: var(--hx-text-base);
   font-weight: 600;
   margin: 0 0 var(--hx-space-1);
+  color: var(--hx-accent-strong);
+  text-decoration: none;
+}
+
+.rm-request-headline:hover {
+  text-decoration: underline;
 }
 
 .rm-request-actions {

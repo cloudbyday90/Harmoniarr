@@ -4,6 +4,7 @@ import {
   createMediaRequest,
   fetchLibraryDiscoverySummary,
   fetchLibraryOrganizePreview,
+  fetchMediaRequestDetail,
   fetchMediaRequests,
   fetchMediaRequestReassignmentHistory,
   fetchMediaRequestSummary,
@@ -81,6 +82,26 @@ test('library-api reassignMediaRequest encodes mediaRequestId in URL', async (t)
   globalThis.fetch = t.mock.fn(async () => createJsonResponse());
 
   await reassignMediaRequest({ mediaRequestId: 'req/slash', newRequestedForUserId: 'u-1', reason: null });
+
+  assert.ok(globalThis.fetch.mock.calls[0].arguments[0].includes('req%2Fslash'));
+});
+
+test('library-api fetchMediaRequestDetail sends GET with encoded id', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchMediaRequestDetail({ mediaRequestId: 'req-1' });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/library/media-requests/req-1');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'GET');
+});
+
+test('library-api fetchMediaRequestDetail encodes special characters', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchMediaRequestDetail({ mediaRequestId: 'req/slash' });
 
   assert.ok(globalThis.fetch.mock.calls[0].arguments[0].includes('req%2Fslash'));
 });
