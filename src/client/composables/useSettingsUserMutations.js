@@ -35,6 +35,7 @@ export function useSettingsUserMutations({
   users,
   loadUsers,
   loadPlexLinkedAccountsOverview,
+  revalidateUsers,
   startPlexLinkFn = defaultStartPlexLink,
   clearPlexLinkFn = defaultClearPlexLink,
   createUserFn = defaultCreateUser,
@@ -240,6 +241,7 @@ export function useSettingsUserMutations({
         claimCodeExpiresAt: user.claimCodeExpiresAt,
       });
       successMessage.value = `User ${payload.user.username} updated.`;
+      if (revalidateUsers) void revalidateUsers();
     } catch (error) {
       user.saving = false;
       errorMessage.value = getErrorMessage(error, 'User update failed');
@@ -259,6 +261,7 @@ export function useSettingsUserMutations({
       successMessage.value = payload.provisioning?.created
         ? `Managed library folder provisioned for ${payload.user.username}.`
         : `Managed library folder already existed for ${payload.user.username}.`;
+      if (revalidateUsers) void revalidateUsers();
     } catch (error) {
       user.provisioning = false;
       errorMessage.value = getErrorMessage(error, 'Managed library folder provisioning failed');
@@ -293,6 +296,7 @@ export function useSettingsUserMutations({
         claimCodeExpiresAt: user.claimCodeExpiresAt,
       }));
       successMessage.value = `Temporary password set for ${payload.user.username}. The user must change it on next login.`;
+      if (revalidateUsers) void revalidateUsers();
     } catch (error) {
       user.resettingPassword = false;
       errorMessage.value = getErrorMessage(error, 'User password reset failed');
@@ -310,6 +314,7 @@ export function useSettingsUserMutations({
         claimCodeExpiresAt: user.claimCodeExpiresAt,
       }));
       await loadPlexLinkedAccountsOverview();
+      if (revalidateUsers) await revalidateUsers();
       successMessage.value = `Plex link removed for ${payload.user.username}. Local sign-in remains available.`;
     } catch (error) {
       user.unlinkingPlex = false;

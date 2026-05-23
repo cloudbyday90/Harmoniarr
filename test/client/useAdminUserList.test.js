@@ -167,3 +167,40 @@ test('useAdminUserList load skips empty filter values', async () => {
   assert.equal(capturedParams.role, undefined);
   assert.equal(capturedParams.isDisabled, undefined);
 });
+
+test('useAdminUserList revalidate fetches without setting isLoading', async () => {
+  let callCount = 0;
+  const { users, isLoading, load, revalidate } = useAdminUserList({
+    fetchUsersFn: async () => {
+      callCount += 1;
+      return { users: [{ id: `u-${callCount}` }], totalCount: callCount };
+    },
+  });
+
+  await load();
+  assert.equal(callCount, 1);
+  assert.equal(isLoading.value, false);
+
+  await revalidate();
+  assert.equal(callCount, 2);
+  assert.equal(isLoading.value, false);
+  assert.equal(users.value[0].id, 'u-2');
+});
+
+test('useAdminUserList revalidate preserves existing data on error', async () => {
+  let callCount = 0;
+  const { users, errorMessage, load, revalidate } = useAdminUserList({
+    fetchUsersFn: async () => {
+      callCount += 1;
+      if (callCount === 1) return { users: [{ id: 'u-1' }], totalCount: 1 };
+      throw new Error('refresh failed');
+    },
+  });
+
+  await load();
+  assert.equal(users.value.length, 1);
+
+  await revalidate();
+  assert.equal(users.value.length, 1, 'users preserved on revalidation error');
+  assert.equal(errorMessage.value, 'refresh failed');
+});

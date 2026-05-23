@@ -61,6 +61,18 @@ export function useAdminUserList({
     }
   }
 
+  async function revalidate() {
+    errorMessage.value = '';
+
+    try {
+      const payload = await fetchUsersFn(buildParams());
+      users.value = payload.users ?? [];
+      totalCount.value = payload.totalCount ?? 0;
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : 'Failed to refresh users';
+    }
+  }
+
   async function loadMore() {
     if (isLoadingMore.value || users.value.length >= totalCount.value) return;
     isLoadingMore.value = true;
@@ -116,6 +128,7 @@ export function useAdminUserList({
     loadMore,
     reset,
     resetFilters,
+    revalidate,
     roleFilter: readonly(roleFilter),
     search: readonly(search),
     setRoleFilter,

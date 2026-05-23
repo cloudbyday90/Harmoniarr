@@ -166,6 +166,26 @@ export function useUserDetail({
     hasLoaded = false;
   }
 
+  async function revalidate() {
+    if (!currentUserId || destroyed) return;
+    errorMessage.value = '';
+    isRevalidating.value = true;
+
+    try {
+      const payload = await fetchUserDetailFn(currentUserId);
+      user.value = payload.user ?? null;
+      requestSummary.value = payload.requestSummary ?? null;
+      sessions.value = payload.sessions ?? [];
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, 'Failed to refresh user detail');
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+        schedulePoll();
+      }
+    }
+  }
+
   async function revokeUserSession(refreshTokenId) {
     if (!user.value) return;
     isRevokingSession.value = true;
@@ -178,6 +198,7 @@ export function useUserDetail({
         s.id === refreshTokenId ? { ...s, isRevoked: true } : s,
       );
       revokeSuccessMessage.value = 'Session revoked.';
+      void revalidate();
     } catch (error) {
       revokeErrorMessage.value = error instanceof Error ? error.message : 'Failed to revoke session';
       throw error;
@@ -196,6 +217,7 @@ export function useUserDetail({
       const result = await adminRevokeAllUserSessionsFn(user.value.id);
       sessions.value = sessions.value.map((s) => ({ ...s, isRevoked: true }));
       revokeSuccessMessage.value = `Revoked ${result.revokedSessionCount} session${result.revokedSessionCount === 1 ? '' : 's'}.`;
+      void revalidate();
     } catch (error) {
       revokeErrorMessage.value = error instanceof Error ? error.message : 'Failed to revoke sessions';
       throw error;
@@ -220,6 +242,7 @@ export function useUserDetail({
     requestSummary: readonly(requestSummary),
     reset,
     revokeAllUserSessions,
+    revalidate,
     revokeErrorMessage: readonly(revokeErrorMessage),
     revokeUserSession,
     revokeSuccessMessage: readonly(revokeSuccessMessage),

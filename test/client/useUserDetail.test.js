@@ -115,17 +115,22 @@ test('useUserDetail does not load while already loading', async () => {
 });
 
 test('useUserDetail revokeUserSession marks the session as revoked', async () => {
+  let callCount = 0;
   const revokeFn = async () => ({ ok: true, revokedSessionId: 'rt-1' });
   const { sessions, revokeUserSession, revokeSuccessMessage, load } = useUserDetail({
     adminRevokeUserSessionFn: revokeFn,
-    fetchUserDetailFn: async () => ({
-      user: { id: 'u-1', username: 'bob' },
-      requestSummary: null,
-      sessions: [
-        { id: 'rt-1', isRevoked: false },
-        { id: 'rt-2', isRevoked: false },
-      ],
-    }),
+    fetchUserDetailFn: async () => {
+      callCount += 1;
+      const revoked = callCount > 1;
+      return {
+        user: { id: 'u-1', username: 'bob' },
+        requestSummary: null,
+        sessions: [
+          { id: 'rt-1', isRevoked: revoked },
+          { id: 'rt-2', isRevoked: false },
+        ],
+      };
+    },
   });
 
   await load({ userId: 'u-1' });
@@ -155,16 +160,21 @@ test('useUserDetail revokeUserSession sets error on failure', async () => {
 });
 
 test('useUserDetail revokeAllUserSessions marks all sessions as revoked', async () => {
+  let callCount = 0;
   const { sessions, revokeAllUserSessions, revokeSuccessMessage, load } = useUserDetail({
     adminRevokeAllUserSessionsFn: async () => ({ ok: true, revokedSessionCount: 2 }),
-    fetchUserDetailFn: async () => ({
-      user: { id: 'u-1', username: 'bob' },
-      requestSummary: null,
-      sessions: [
-        { id: 'rt-1', isRevoked: false },
-        { id: 'rt-2', isRevoked: false },
-      ],
-    }),
+    fetchUserDetailFn: async () => {
+      callCount += 1;
+      const revoked = callCount > 1;
+      return {
+        user: { id: 'u-1', username: 'bob' },
+        requestSummary: null,
+        sessions: [
+          { id: 'rt-1', isRevoked: revoked },
+          { id: 'rt-2', isRevoked: revoked },
+        ],
+      };
+    },
   });
 
   await load({ userId: 'u-1' });

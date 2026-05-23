@@ -102,6 +102,7 @@ const {
   users,
   loadUsers,
   loadPlexLinkedAccountsOverview,
+  revalidateUsers: () => userList.revalidate(),
 });
 
 watch(() => userList.users.value, (rawUsers) => {
