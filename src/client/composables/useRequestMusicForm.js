@@ -126,14 +126,16 @@ export function useRequestMusicForm({
     applyDefaultRequestTarget();
   }
 
-  async function loadRequestDashboard() {
+  async function loadRequestDashboard({ requestState, requestKind, search } = {}) {
     isLoading.value = true;
     loadError.value = '';
+
+    const requestParams = { scope: selectedScope.value, requestState, requestKind, search };
 
     try {
       const [summaryPayload, requestsPayload] = await Promise.all([
         fetchMediaRequestSummaryFn({ scope: selectedScope.value }),
-        fetchMediaRequestsFn({ scope: selectedScope.value }),
+        fetchMediaRequestsFn(requestParams),
       ]);
 
       summary.value = summaryPayload;

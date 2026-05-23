@@ -86,9 +86,16 @@ export function registerLibraryRoutes(app, {
   app.get('/api/v1/library/media-requests', asyncRoute(async (request, response) => {
     const session = await requireSession(request);
     const scope = resolveMediaRequestScope(session, request.query.scope);
+    const requestedForUserId = scope === 'mine' ? session.appUserId : null;
+    const { requestState, requestKind, search, limit, offset } = request.query;
     response.json({
       mediaRequests: await listMediaRequests({
-        requestedForUserId: scope === 'mine' ? session.appUserId : null,
+        limit: limit ? Number(limit) : undefined,
+        offset: offset ? Number(offset) : undefined,
+        requestKind: typeof requestKind === 'string' && requestKind.length > 0 ? requestKind : null,
+        requestedForUserId,
+        requestState: typeof requestState === 'string' && requestState.length > 0 ? requestState : null,
+        search: typeof search === 'string' && search.trim().length > 0 ? search.trim() : null,
       }),
       ok: true,
       scope,

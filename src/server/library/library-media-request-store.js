@@ -77,17 +77,48 @@ function mapSummaryCounts(row) {
   };
 }
 
-function buildVisibilityFilter({ requestedForUserId }) {
-  if (!requestedForUserId) {
-    return {
-      params: [],
-      sql: '',
-    };
+const ALLOWED_REQUEST_STATES = new Set(['already_exists', 'needs_fetch', 'needs_review']);
+const ALLOWED_REQUEST_KINDS = new Set(['release', 'track', 'external_url']);
+const DEFAULT_PAGE_LIMIT = 100;
+const MAX_PAGE_LIMIT = 500;
+
+function buildListFilter({
+  requestedForUserId = null,
+  requestState = null,
+  requestKind = null,
+  search = null,
+} = {}) {
+  const clauses = [];
+  const params = [];
+  let idx = 1;
+
+  if (requestedForUserId) {
+    clauses.push(`media_requests.requested_for_user_id = $${idx++}`);
+    params.push(requestedForUserId);
+  }
+
+  if (ALLOWED_REQUEST_STATES.has(requestState)) {
+    clauses.push(`media_requests.request_state = $${idx++}`);
+    params.push(requestState);
+  }
+
+  if (ALLOWED_REQUEST_KINDS.has(requestKind)) {
+    clauses.push(`media_requests.request_kind = $${idx++}`);
+    params.push(requestKind);
+  }
+
+  if (search && search.trim().length > 0) {
+    clauses.push(`(
+      media_requests.artist_name ILIKE $${idx}
+      OR media_requests.release_title ILIKE $${idx}
+      OR media_requests.track_title ILIKE $${idx}
+    )`);
+    params.push(`%${search.trim()}%`);
   }
 
   return {
-    params: [requestedForUserId],
-    sql: 'WHERE media_requests.requested_for_user_id = $1',
+    params,
+    sql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '',
   };
 }
 
@@ -240,16 +271,27 @@ export function createLibraryMediaRequestStore({
     return getMediaRequestById({ mediaRequestId });
   }
 
-  async function listMediaRequests({ requestedForUserId = null } = {}) {
+  async function listMediaRequests({
+    requestedForUserId = null,
+    requestState = null,
+    requestKind = null,
+    search = null,
+    limit = DEFAULT_PAGE_LIMIT,
+    offset = 0,
+  } = {}) {
     const pool = getPoolFn();
-    const filter = buildVisibilityFilter({ requestedForUserId });
+    const filter = buildListFilter({ requestedForUserId, requestState, requestKind, search });
+    const safeLimit = Math.max(1, Math.min(Number(limit) || DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT));
+    const safeOffset = Math.max(0, Number(offset) || 0);
     const result = await pool.query(
       `
         ${baseSelect}
         ${filter.sql}
         ORDER BY media_requests.created_at DESC, media_requests.id DESC
+        LIMIT $${filter.params.length + 1}
+        OFFSET $${filter.params.length + 2}
       `,
-      filter.params,
+      [...filter.params, safeLimit, safeOffset],
     );
 
     return result.rows.map(mapMediaRequestRow);
@@ -257,7 +299,7 @@ export function createLibraryMediaRequestStore({
 
   async function getMediaRequestCounts({ requestedForUserId = null } = {}) {
     const pool = getPoolFn();
-    const filter = buildVisibilityFilter({ requestedForUserId });
+    const filter = buildListFilter({ requestedForUserId });
     const result = await pool.query(
       `
         SELECT

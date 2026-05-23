@@ -664,8 +664,22 @@ export function createLibraryMediaRequestService({
     };
   }
 
-  async function listMediaRequests({ requestedForUserId = null } = {}) {
-    const mediaRequests = await mediaRequestStore.listMediaRequests({ requestedForUserId });
+  async function listMediaRequests({
+    requestedForUserId = null,
+    requestState = null,
+    requestKind = null,
+    search = null,
+    limit = null,
+    offset = null,
+  } = {}) {
+    const mediaRequests = await mediaRequestStore.listMediaRequests({
+      requestedForUserId,
+      requestState,
+      requestKind,
+      search,
+      limit,
+      offset,
+    });
     return mediaRequestFulfillmentService.enrichMediaRequests(mediaRequests);
   }
 

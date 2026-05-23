@@ -335,9 +335,56 @@ test('media request list route allows admins to read all requests', async (t) =>
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(listMediaRequests.mock.calls[0].arguments, [{ requestedForUserId: null }]);
+    assert.deepEqual(Object.keys(listMediaRequests.mock.calls[0].arguments[0]).sort(), [
+      'limit',
+      'offset',
+      'requestKind',
+      'requestedForUserId',
+      'requestState',
+      'search',
+    ].sort());
+    assert.equal(listMediaRequests.mock.calls[0].arguments[0].requestedForUserId, null);
     assert.equal(payload.scope, 'all');
     assert.deepEqual(payload.mediaRequests, [{ id: 'request-2' }]);
+  });
+});
+
+test('media request list route passes filter params to service', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-admin', user: { role: 'admin' } }));
+  const listMediaRequests = t.mock.fn(async () => []);
+  const app = createLibraryRouteTestApp({ listMediaRequests, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests?scope=all&requestState=needs_fetch&requestKind=track&search=daft`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+
+    const args = listMediaRequests.mock.calls[0].arguments[0];
+    assert.equal(args.requestState, 'needs_fetch');
+    assert.equal(args.requestKind, 'track');
+    assert.equal(args.search, 'daft');
+    assert.equal(args.requestedForUserId, null);
+  });
+});
+
+test('media request list route ignores empty filter params', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-admin', user: { role: 'admin' } }));
+  const listMediaRequests = t.mock.fn(async () => []);
+  const app = createLibraryRouteTestApp({ listMediaRequests, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests?scope=all&requestState=&requestKind=&search=`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+
+    const args = listMediaRequests.mock.calls[0].arguments[0];
+    assert.equal(args.requestState, null);
+    assert.equal(args.requestKind, null);
+    assert.equal(args.search, null);
   });
 });
 

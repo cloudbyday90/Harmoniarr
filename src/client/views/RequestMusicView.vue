@@ -19,8 +19,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
+import RequestListFilters from '../components/RequestListFilters.vue';
 import RequestNotificationsPanel from '../components/RequestNotificationsPanel.vue';
 import { useMediaRequestReassignment } from '../composables/useMediaRequestReassignment.js';
+import { useRequestListFilters } from '../composables/useRequestListFilters.js';
 import { useRequestMusicForm } from '../composables/useRequestMusicForm.js';
 import { formatSourceProvider } from '../lib/import-candidate-presentation.js';
 import {
@@ -46,6 +48,19 @@ const rm = useRequestMusicForm({
 
 const toast = useToast();
 
+const filters = useRequestListFilters({
+  applyFiltersFn: () => applyFilters(),
+});
+
+function applyFilters() {
+  void rm.loadRequestDashboard(filters.toApiParams());
+}
+
+function handleResetFilters() {
+  filters.resetFilters();
+  void rm.loadRequestDashboard();
+}
+
 const reassignment = useMediaRequestReassignment();
 
 const reassignModalOpen = ref(false);
@@ -67,7 +82,7 @@ async function handleReassign({ mediaRequestId, newRequestedForUserId, reason })
   if (result) {
     closeReassignModal();
     toast.success('Request reassigned successfully.');
-    void rm.loadRequestDashboard();
+    void rm.loadRequestDashboard(filters.toApiParams());
   }
 }
 
@@ -250,6 +265,30 @@ onMounted(() => {
       :counts="rm.summary.value.notificationFeed.counts"
       :notifications="rm.summary.value.notificationFeed.notifications"
     />
+
+    <!-- ── Filters ─────────────────────────────────────────────────────── -->
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h2 class="hx-card-title">Filter requests</h2>
+          <p class="hx-card-subtitle">{{ filters.activeFilterCount.value }} active {{ filters.activeFilterCount.value === 1 ? 'filter' : 'filters' }}</p>
+        </div>
+      </header>
+      <div class="hx-card-body">
+        <RequestListFilters
+          :active-filter-count="filters.activeFilterCount.value"
+          :is-loading="rm.isLoading.value"
+          :request-kind="filters.filters.requestKind"
+          :request-state="filters.filters.requestState"
+          :search="filters.filters.search"
+          @apply="applyFilters"
+          @reset="handleResetFilters"
+          @update:request-kind="filters.updateFilter('requestKind', $event)"
+          @update:request-state="filters.updateFilter('requestState', $event)"
+          @update:search="filters.updateFilter('search', $event)"
+        />
+      </div>
+    </article>
 
     <!-- ── Request history ────────────────────────────────────────────── -->
     <article class="hx-card">

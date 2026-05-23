@@ -26,8 +26,16 @@ export function fetchMediaRequestSummary({ scope } = {}) {
   return apiRequest(`/api/v1/library/media-request-summary${buildQueryString({ scope })}`);
 }
 
-export function fetchMediaRequests({ scope } = {}) {
-  return apiRequest(`/api/v1/library/media-requests${buildQueryString({ scope })}`);
+export function fetchMediaRequests({ scope, requestState, requestKind, search, limit, offset } = {}) {
+  const params = new URLSearchParams();
+  if (scope) params.set('scope', scope);
+  if (requestState) params.set('requestState', requestState);
+  if (requestKind) params.set('requestKind', requestKind);
+  if (search) params.set('search', search);
+  if (limit != null) params.set('limit', String(limit));
+  if (offset != null) params.set('offset', String(offset));
+  const query = params.toString();
+  return apiRequest(query ? `/api/v1/library/media-requests?${query}` : '/api/v1/library/media-requests');
 }
 
 export function fetchMediaRequestDetail({ mediaRequestId }) {
