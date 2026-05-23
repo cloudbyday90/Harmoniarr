@@ -22,10 +22,18 @@ import { getErrorMessage } from '../lib/error-utils.js';
 
 export function useBootstrapStatus({
   fetchBootstrapStatus = defaultFetchBootstrapStatus,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   const bootstrapStatus = ref(null);
   const errorMessage = ref('');
   const isLoading = ref(true);
+  const isRevalidating = ref(false);
+
+  let destroyed = false;
+  let hasLoaded = false;
+  let pollTimer = null;
+  let visibilityHandler = null;
 
   const pathValidationSummary = computed(() => {
     if (!bootstrapStatus.value?.pathValidation) {
@@ -55,25 +63,102 @@ export function useBootstrapStatus({
     };
   });
 
+  function clearPollTimer() {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (pollIntervalMs <= 0 || destroyed) {
+      return;
+    }
+    pollTimer = setTimeout(() => {
+      if (!destroyed) {
+        void revalidate();
+      }
+    }, pollIntervalMs);
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (visibilityHandler) {
+      document.removeEventListener('visibilitychange', visibilityHandler);
+      visibilityHandler = null;
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (visibilityHandler) {
+      return;
+    }
+    visibilityHandler = () => {
+      if (document.visibilityState === 'visible' && !destroyed) {
+        void revalidate();
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
+  }
+
   async function loadStatus() {
+    if (destroyed) return;
     isLoading.value = true;
     errorMessage.value = '';
     try {
       bootstrapStatus.value = await fetchBootstrapStatus();
+      if (destroyed) return;
+      hasLoaded = true;
     } catch (error) {
+      if (destroyed) return;
       bootstrapStatus.value = null;
       errorMessage.value = getErrorMessage(error, 'Bootstrap status failed');
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        schedulePoll();
+      }
+    }
+  }
+
+  async function revalidate() {
+    if (destroyed) return;
+    const isFirst = !hasLoaded;
+    if (isFirst) {
+      isLoading.value = true;
+    } else {
+      isRevalidating.value = true;
+    }
+    try {
+      const result = await fetchBootstrapStatus();
+      if (destroyed) return;
+      bootstrapStatus.value = result;
+      hasLoaded = true;
+    } catch {
+      if (destroyed) return;
+    } finally {
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
   return {
+    attachVisibilityListener,
     bootstrapStatus,
+    destroy,
     errorMessage,
     isLoading,
+    isRevalidating,
     loadStatus,
     ownerClaimSummary,
     pathValidationSummary,
+    pollIntervalMs,
+    revalidate,
+    revalidateOnFocus,
   };
 }

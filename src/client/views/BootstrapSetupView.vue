@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
 import {
@@ -35,7 +35,7 @@ const firstInput = ref(null);
 const form = reactive({ claimCode: '', email: '', password: '', confirmPassword: '', username: '' });
 const errorMessage = ref('');
 const isSubmitting = ref(false);
-const { loadStatus, ownerClaimSummary } = useBootstrapStatus();
+const { loadStatus, ownerClaimSummary, destroy: destroyBootstrapStatus } = useBootstrapStatus({ revalidateOnFocus: true });
 const supportItems = computed(() => buildAuthEntrySupportItems('bootstrap'));
 useAutoFocus(firstInput);
 const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch } = usePasswordMatch(
@@ -45,6 +45,10 @@ const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMisma
 
 onMounted(() => {
   void loadStatus();
+});
+
+onBeforeUnmount(() => {
+  destroyBootstrapStatus();
 });
 
 async function submit() {
