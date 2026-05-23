@@ -72,8 +72,13 @@ const {
 const {
   candidates: pipelineCandidates,
   isLoading: isLoadingPipeline,
+  isRevalidating: isRevalidatingPipeline,
   load: loadPipeline,
-} = useMediaRequestPipeline();
+  destroy: destroyPipeline,
+} = useMediaRequestPipeline({
+  pollIntervalMs: 15000,
+  revalidateOnFocus: true,
+});
 
 const {
   eligibleUsers,
@@ -169,6 +174,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   destroy();
+  destroyPipeline();
 });
 
 function goBack() {
@@ -275,7 +281,7 @@ function formatTimestamp(ts) {
       <article v-if="hasPipeline" class="hx-card">
         <header class="hx-card-header">
           <div>
-            <h2 class="hx-card-title">Fulfillment pipeline</h2>
+            <h2 class="hx-card-title">Fulfillment pipeline <span v-if="isRevalidatingPipeline" class="rdl-revalidating" aria-label="Refreshing">↻</span></h2>
             <p class="hx-card-subtitle">{{ candidateCount }} import candidate{{ candidateCount === 1 ? '' : 's' }} linked to this request.</p>
           </div>
         </header>
