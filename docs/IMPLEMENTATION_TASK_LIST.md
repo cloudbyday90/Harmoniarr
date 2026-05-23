@@ -6,6 +6,14 @@ Backup and restore source: `docs/BACKUP_RESTORE_DESIGN.md`
 Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 Database model source: `docs/DATABASE_MODEL.md`
 
+## Current Status (2026-05-23)
+
+- Admin user detail view implemented (`1093faa`): `GET /api/v1/users/:userId/detail` returns user profile, media request summary (by requester/target role), and active sessions; `GET /api/v1/users/:userId/activity` returns cursor-paginated audit trail. Client includes `useUserDetail` composable, `UserDetailView.vue` with stat cards, Plex profile, session table, and timeline. 11 new tests (5 server, 6 client). 1547 server / 2793 client tests pass.
+- Settings composable extraction (`1687008`): `useSettingsForm` shared by General/MediaStorage/Connections views; `useSettingsUserMutations` extracted from Users view. General 275→138 lines, MediaStorage 694→562, Connections 529→386, Users 751→476. 31 new tests. 2787 client tests pass.
+- Event timeline cursor-based pagination (`4642b46`): keyset pagination via composite `(occurred_at, id)` cursor with opaque base64url-encoded JSON.
+- Admin user list with server-side search, filter, pagination (`8d03dd5`): backward-compatible `GET /api/v1/users`.
+- Prior items: URL-backed filter/sort state, request list sort, cascade-aware cancel toast, fan-out child cancellation, request list pagination, import candidate fulfillment, admin reassign, request list filtering, cancellation with event trail, request detail view, RequestCard navigation, admin reassignment UI, shared release-event contract, per-run drilldown, async push worker, fulfillment signals, E2E UI, multi-target fan-out, audited reassignment, maintenance locks, integration tests, 57P01 FK fix.
+
 ## Current Status (2026-05-04)
 
 - Initial implementation planning exists in `docs/harmoniarr.md`.
