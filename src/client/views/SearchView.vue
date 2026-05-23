@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import ArtistCard from '../components/media/ArtistCard.vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -89,7 +89,6 @@ const {
 } = musicWorkflow;
 
 const {
-  clearPollTimer,
   hasNetworkSearched,
   isNetworkSearching,
   isProbingStatus,
@@ -104,6 +103,8 @@ const {
   sortedResponses,
   totalFiles,
   totalResultBytes,
+  destroy: destroyNetworkWorkflow,
+  attachVisibilityListener: attachNetworkVisibility,
 } = networkWorkflow;
 
 function getReleaseArtwork(release) {
@@ -254,7 +255,8 @@ const networkSummaryCards = computed(() => ([
   },
 ]));
 
-onBeforeUnmount(() => clearPollTimer());
+onMounted(() => attachNetworkVisibility());
+onBeforeUnmount(() => destroyNetworkWorkflow());
 </script>
 
 <template>

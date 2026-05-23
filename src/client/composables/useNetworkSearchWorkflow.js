@@ -28,11 +28,18 @@ import {
   startSlskdSearch as defaultStartSearch,
 } from '../lib/slskd-search-api.js';
 
+function isSearchComplete(state) {
+  return state?.isComplete
+    || state?.state === 'completed'
+    || state?.state === 'cancelled';
+}
+
 export function useNetworkSearchWorkflow({
   fetchResponses = defaultFetchResponses,
   fetchSearchState = defaultFetchSearchState,
   fetchStatus = defaultFetchStatus,
-  schedulePoll = setTimeout,
+  pollIntervalMs = 2000,
+  revalidateOnFocus = false,
   startSearch = defaultStartSearch,
 } = {}) {
   const networkQuery = ref('');
@@ -44,10 +51,14 @@ export function useNetworkSearchWorkflow({
   const searchMeta = ref(null);
   const slskdStatus = ref(null);
   const isProbingStatus = ref(false);
+  const isRevalidating = ref(false);
   const hasNetworkSearched = ref(false);
 
   let pollTimer = null;
   let activePollToken = 0;
+  let destroyed = false;
+  let currentSearchId = null;
+  let visibilityHandler = null;
 
   const sortedResponses = computed(() =>
     sortNetworkResponses(responses.value, {
@@ -82,6 +93,27 @@ export function useNetworkSearchWorkflow({
     }
   }
 
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (visibilityHandler) {
+      document.removeEventListener('visibilitychange', visibilityHandler);
+      visibilityHandler = null;
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (visibilityHandler) {
+      return;
+    }
+    visibilityHandler = () => {
+      if (document.visibilityState === 'visible' && !destroyed) {
+        void revalidate();
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
+  }
+
   async function refreshStatus() {
     isProbingStatus.value = true;
     try {
@@ -96,34 +128,62 @@ export function useNetworkSearchWorkflow({
     }
   }
 
+  async function revalidate() {
+    if (destroyed || !currentSearchId) {
+      return;
+    }
+    isRevalidating.value = true;
+    try {
+      const [nextResponses, nextState] = await Promise.all([
+        fetchResponses({ searchId: currentSearchId }),
+        fetchSearchState({ searchId: currentSearchId }),
+      ]);
+      if (destroyed) {
+        return;
+      }
+      responses.value = nextResponses;
+      searchMeta.value = nextState;
+      if (isSearchComplete(nextState)) {
+        isNetworkSearching.value = false;
+      }
+    } catch {
+      if (destroyed) {
+        return;
+      }
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+      }
+    }
+  }
+
   async function pollResponses(searchId, pollToken) {
+    if (destroyed) {
+      return;
+    }
     try {
       const [nextResponses, nextState] = await Promise.all([
         fetchResponses({ searchId }),
         fetchSearchState({ searchId }),
       ]);
 
-      if (pollToken !== activePollToken) {
+      if (pollToken !== activePollToken || destroyed) {
         return;
       }
 
       responses.value = nextResponses;
       searchMeta.value = nextState;
 
-      const isComplete = nextState?.isComplete
-        || nextState?.state === 'completed'
-        || nextState?.state === 'cancelled';
-
-      if (isComplete) {
+      if (isSearchComplete(nextState)) {
         isNetworkSearching.value = false;
         return;
       }
 
-      pollTimer = schedulePoll(() => {
+      pollTimer = setTimeout(() => {
         void pollResponses(searchId, pollToken);
-      }, 2000);
+      }, pollIntervalMs);
     } catch (error) {
-      if (pollToken !== activePollToken) {
+      if (pollToken !== activePollToken || destroyed) {
         return;
       }
 
@@ -133,6 +193,9 @@ export function useNetworkSearchWorkflow({
   }
 
   async function runNetworkSearch() {
+    if (destroyed) {
+      return;
+    }
     const trimmed = networkQuery.value.trim();
     if (!trimmed || isNetworkSearching.value) {
       return;
@@ -145,6 +208,7 @@ export function useNetworkSearchWorkflow({
     searchMeta.value = null;
     isNetworkSearching.value = true;
     hasNetworkSearched.value = true;
+    currentSearchId = null;
 
     try {
       const search = await startSearch({
@@ -152,28 +216,40 @@ export function useNetworkSearchWorkflow({
         query: trimmed,
         responseLimit: Number(responseLimit.value) || 50,
       });
+      if (destroyed) {
+        return;
+      }
       const searchId = search?.searchId ?? search?.id;
       if (!searchId) {
         throw new Error('slskd did not return a search identifier');
       }
 
       searchMeta.value = search;
+      currentSearchId = searchId;
       await pollResponses(searchId, activePollToken);
     } catch (error) {
+      if (destroyed) {
+        return;
+      }
       networkErrorMessage.value = error?.message ?? 'Failed to start search';
       isNetworkSearching.value = false;
     }
   }
 
   return {
-    clearPollTimer,
+    attachVisibilityListener,
+    destroy,
     hasNetworkSearched,
     isNetworkSearching,
     isProbingStatus,
+    isRevalidating,
     minimumFileCount,
     networkErrorMessage,
     networkQuery,
+    pollIntervalMs,
     refreshStatus,
+    revalidate,
+    revalidateOnFocus,
     responseLimit,
     responses,
     runNetworkSearch,
