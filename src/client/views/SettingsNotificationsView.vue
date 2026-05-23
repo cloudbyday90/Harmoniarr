@@ -16,13 +16,9 @@
   along with this program. If not, see <https://www.gnu.org/licenses/>.
 -->
 <script setup>
-import { computed, onMounted, reactive } from 'vue';
+import { onMounted } from 'vue';
 import { usePushNotifications } from '../composables/usePushNotifications.js';
-import { useAccountPreferences } from '../composables/useAccountPreferences.js';
-import { NOTIFICATION_CATEGORIES } from '../lib/notification-category-constants.js';
-import { sessionStore } from '../state/session.js';
-
-const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+import { useNotificationCategories } from '../composables/useNotificationCategories.js';
 
 const {
   isSupported,
@@ -36,43 +32,14 @@ const {
 } = usePushNotifications();
 
 const {
-  preferences,
-  isLoading: isPrefsLoading,
   errorMessage: prefsError,
+  getEffectiveValue,
+  isPending,
+  isLoading: isPrefsLoading,
   loadPreferences,
-  savePreferences,
-} = useAccountPreferences();
-
-const notifPrefs = computed(() => preferences.value?.notificationPreferences ?? {});
-const visibleCategories = computed(() => NOTIFICATION_CATEGORIES.filter((c) => !c.adminOnly || isAdmin.value));
-
-const pendingToggles = reactive({});
-
-function isPending(key) {
-  return key in pendingToggles;
-}
-
-function getEffectiveValue(key) {
-  if (key in pendingToggles) return pendingToggles[key];
-  return notifPrefs.value[key] !== false;
-}
-
-async function toggleCategory(key) {
-  const current = getEffectiveValue(key);
-  pendingToggles[key] = !current;
-
-  try {
-    await savePreferences({
-      notificationPreferences: {
-        ...notifPrefs.value,
-        ...pendingToggles,
-      },
-    });
-    delete pendingToggles[key];
-  } catch {
-    delete pendingToggles[key];
-  }
-}
+  toggleCategory,
+  visibleCategories,
+} = useNotificationCategories();
 
 onMounted(() => {
   checkSubscriptionStatus();
