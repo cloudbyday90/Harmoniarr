@@ -166,50 +166,73 @@ const comingSoonLabel = computed(() => getComingSoonLabel(props.request));
 </script>
 
 <template>
-  <article class="hx-media-card request-card" :data-variant="variant || undefined" :style="accentStyle">
-    <div class="hx-media-card__artwork">
-      <ArtworkImage
-        ref="artworkImageComp"
-        :mbid="artworkMbid"
-        :mbid-type="artworkMbidType"
-        :alt="releaseTitle"
-      />
-    </div>
+  <router-link
+    :to="{ name: 'request-detail', params: { id: request.id } }"
+    custom
+    v-slot="{ navigate, href }"
+  >
+    <article
+      class="hx-media-card request-card"
+      :data-variant="variant || undefined"
+      :style="accentStyle"
+      role="link"
+      tabindex="0"
+      :aria-label="`${releaseTitle} by ${artistName}`"
+      @click="navigate"
+      @keydown.enter="navigate"
+      @keydown.space.prevent="navigate"
+    >
+      <a :href="href" class="request-card__sr-link" tabindex="-1" aria-hidden="true"></a>
+      <div class="hx-media-card__artwork">
+        <ArtworkImage
+          ref="artworkImageComp"
+          :mbid="artworkMbid"
+          :mbid-type="artworkMbidType"
+          :alt="releaseTitle"
+        />
+      </div>
 
-    <div class="hx-media-card__body">
-      <p class="hx-media-card__title">{{ releaseTitle }}</p>
-      <p class="hx-media-card__meta">{{ artistName }}</p>
-      <p v-if="kindLabel" class="hx-media-card__meta request-card__kind">{{ kindLabel }}</p>
-      <p v-if="attributionLine" class="hx-media-card__meta request-card__attribution">{{ attributionLine }}</p>
-    </div>
+      <div class="hx-media-card__body">
+        <p class="hx-media-card__title">{{ releaseTitle }}</p>
+        <p class="hx-media-card__meta">{{ artistName }}</p>
+        <p v-if="kindLabel" class="hx-media-card__meta request-card__kind">{{ kindLabel }}</p>
+        <p v-if="attributionLine" class="hx-media-card__meta request-card__attribution">{{ attributionLine }}</p>
+      </div>
 
-    <div class="hx-media-card__actions request-card__status-row">
-      <span v-if="comingSoon" class="hx-pill request-card__coming-soon-pill" data-tone="upcoming" :title="request.expectedReleaseDate">{{ comingSoonLabel }}</span>
-      <RequestStatusPill :status="request.requestState" />
+      <div class="hx-media-card__actions request-card__status-row">
+        <span v-if="comingSoon" class="hx-pill request-card__coming-soon-pill" data-tone="upcoming" :title="request.expectedReleaseDate">{{ comingSoonLabel }}</span>
+        <RequestStatusPill :status="request.requestState" />
 
-      <dl class="request-card__dates" aria-label="Request dates">
-        <template v-if="requestedDate">
-          <dt class="sr-only">Requested</dt>
-          <dd class="request-card__date">Requested {{ requestedDate }}</dd>
-        </template>
-        <template v-if="updatedDate">
-          <dt class="sr-only">Updated</dt>
-          <dd class="request-card__date request-card__date--updated">Updated {{ updatedDate }}</dd>
-        </template>
-      </dl>
-    </div>
-  </article>
+        <dl class="request-card__dates" aria-label="Request dates">
+          <template v-if="requestedDate">
+            <dt class="sr-only">Requested</dt>
+            <dd class="request-card__date">Requested {{ requestedDate }}</dd>
+          </template>
+          <template v-if="updatedDate">
+            <dt class="sr-only">Updated</dt>
+            <dd class="request-card__date request-card__date--updated">Updated {{ updatedDate }}</dd>
+          </template>
+        </dl>
+      </div>
+    </article>
+  </router-link>
 </template>
 
 <style scoped>
 .request-card {
   display: grid;
+  cursor: pointer;
   border: 1px solid color-mix(
     in oklch,
     oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0)) 40%,
     transparent
   );
   transition: border-color 0.2s ease;
+}
+
+.request-card:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
 }
 
 :global([data-theme="light"]) .request-card {
@@ -259,6 +282,14 @@ const comingSoonLabel = computed(() => getComingSoonLabel(props.request));
   font-size: var(--hx-text-xs, 0.75rem);
   color: var(--hx-text-muted, #888);
   font-style: italic;
+}
+
+.request-card__sr-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 
 /* Screen-reader-only utility (matches Tailwind's sr-only if present). */
