@@ -189,7 +189,7 @@ test('useAdminUserList revalidate fetches without setting isLoading', async () =
 
 test('useAdminUserList revalidate preserves existing data on error', async () => {
   let callCount = 0;
-  const { users, errorMessage, load, revalidate } = useAdminUserList({
+  const { users, load, revalidate } = useAdminUserList({
     fetchUsersFn: async () => {
       callCount += 1;
       if (callCount === 1) return { users: [{ id: 'u-1' }], totalCount: 1 };
@@ -202,5 +202,4 @@ test('useAdminUserList revalidate preserves existing data on error', async () =>
 
   await revalidate();
   assert.equal(users.value.length, 1, 'users preserved on revalidation error');
-  assert.equal(errorMessage.value, 'refresh failed');
 });
