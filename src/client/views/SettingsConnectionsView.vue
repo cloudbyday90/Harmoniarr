@@ -17,90 +17,33 @@
 -->
 
 <script setup>
-import { onMounted, ref } from 'vue';
-import {
-  clearSpotifyOAuth,
-  clearYouTubeOAuth,
-  startSpotifyOAuth,
-  startYouTubeOAuth,
-} from '../lib/settings-api.js';
+import { onMounted } from 'vue';
 import {
   buildSlskdConnectionSubtitle,
   formatOAuthStatusLabel,
   formatProviderSecretStatusLabel,
   formatSlskdApiKeyStatusLabel,
 } from '../lib/settings-connections-presentation.js';
-import { useSettingsForm } from '../composables/useSettingsForm.js';
-
-const isStartingSpotifyOAuth = ref(false);
-const isClearingSpotifyOAuth = ref(false);
-const isStartingYouTubeOAuth = ref(false);
-const isClearingYouTubeOAuth = ref(false);
-const secretStatus = ref(null);
+import { useConnections } from '../composables/useConnections.js';
 
 const {
+  connectSpotifyOAuth,
+  connectYouTubeOAuth,
+  disconnectSpotifyOAuth,
+  disconnectYouTubeOAuth,
   errorMessage,
   form,
+  isClearingSpotifyOAuth,
+  isClearingYouTubeOAuth,
   isLoading,
   isSaving,
+  isStartingSpotifyOAuth,
+  isStartingYouTubeOAuth,
   loadSettings,
   saveSettings,
+  secretStatus,
   successMessage,
-} = useSettingsForm({
-  extraApply: (payload) => { secretStatus.value = payload.secretStatus ?? null; },
-});
-
-async function connectSpotifyOAuth() {
-  isStartingSpotifyOAuth.value = true;
-  errorMessage.value = '';
-  try {
-    const payload = await startSpotifyOAuth();
-    window.location.href = payload.authorizationUrl;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Spotify authorization start failed';
-    isStartingSpotifyOAuth.value = false;
-  }
-}
-
-async function disconnectSpotifyOAuth() {
-  isClearingSpotifyOAuth.value = true;
-  errorMessage.value = '';
-  try {
-    const payload = await clearSpotifyOAuth();
-    if (secretStatus.value?.providers) secretStatus.value.providers.spotifyOAuth = payload.status;
-    successMessage.value = 'Spotify authorization cleared.';
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Spotify authorization clear failed';
-  } finally {
-    isClearingSpotifyOAuth.value = false;
-  }
-}
-
-async function connectYouTubeOAuth() {
-  isStartingYouTubeOAuth.value = true;
-  errorMessage.value = '';
-  try {
-    const payload = await startYouTubeOAuth();
-    window.location.href = payload.authorizationUrl;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'YouTube authorization start failed';
-    isStartingYouTubeOAuth.value = false;
-  }
-}
-
-async function disconnectYouTubeOAuth() {
-  isClearingYouTubeOAuth.value = true;
-  errorMessage.value = '';
-  try {
-    const payload = await clearYouTubeOAuth();
-    if (secretStatus.value?.providers) secretStatus.value.providers.youtubeOAuth = payload.status;
-    successMessage.value = 'YouTube authorization cleared.';
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'YouTube authorization clear failed';
-  } finally {
-    isClearingYouTubeOAuth.value = false;
-  }
-}
+} = useConnections();
 
 onMounted(() => { void loadSettings(); });
 </script>
