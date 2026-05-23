@@ -42,6 +42,7 @@ export function useConnections({
   startSpotifyOAuthFn = startSpotifyOAuth,
   startYouTubeOAuthFn = startYouTubeOAuth,
   useSettingsFormFn = useSettingsForm,
+  onSaveSuccess,
 } = {}) {
   const isStartingSpotifyOAuth = ref(false);
   const isClearingSpotifyOAuth = ref(false);
@@ -53,6 +54,7 @@ export function useConnections({
     extraApply: (payload) => {
       secretStatus.value = payload.secretStatus ?? null;
     },
+    onSaveSuccess,
   });
 
   const {

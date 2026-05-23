@@ -26,6 +26,7 @@ export function useSettingsForm({
   fetchSettingsFn = defaultFetchSettings,
   updateSettingsFn = defaultUpdateSettings,
   extraApply,
+  onSaveSuccess,
 } = {}) {
   const isLoading = ref(true);
   const isSaving = ref(false);
@@ -170,6 +171,7 @@ export function useSettingsForm({
       const payload = await updateSettingsFn(buildSettingsUpdatePayload(form));
       applySettings(payload);
       successMessage.value = 'Settings saved.';
+      if (onSaveSuccess) onSaveSuccess(payload);
     } catch (error) {
       errorMessage.value = getErrorMessage(error, 'Settings save failed');
     } finally {

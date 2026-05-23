@@ -210,3 +210,39 @@ test('useSettingsForm initial state has correct defaults', () => {
   assert.equal(form.artwork.derivativeFormat, 'webp');
   assert.equal(form.providers.playlistExpansionPolicy, 'bounded');
 });
+
+test('useSettingsForm onSaveSuccess is called after successful save', async () => {
+  const payload = createSettingsPayload();
+  let savedPayload = null;
+  let callCount = 0;
+
+  const { loadSettings, saveSettings } = useSettingsForm({
+    fetchSettingsFn: async () => createSettingsPayload(),
+    updateSettingsFn: async () => payload,
+    onSaveSuccess: (p) => {
+      callCount += 1;
+      savedPayload = p;
+    },
+  });
+
+  await loadSettings();
+  await saveSettings();
+
+  assert.equal(callCount, 1);
+  assert.equal(savedPayload, payload);
+});
+
+test('useSettingsForm onSaveSuccess is not called on save failure', async () => {
+  let callCount = 0;
+
+  const { loadSettings, saveSettings } = useSettingsForm({
+    fetchSettingsFn: async () => createSettingsPayload(),
+    updateSettingsFn: async () => { throw new Error('fail'); },
+    onSaveSuccess: () => { callCount += 1; },
+  });
+
+  await loadSettings();
+  await saveSettings();
+
+  assert.equal(callCount, 0);
+});

@@ -48,6 +48,10 @@ import { useSettingsForm } from '../composables/useSettingsForm.js';
 
 const pathValidation = ref(null);
 
+const artworkQuota = useArtworkQuota();
+
+const quotaHistory = ref(null);
+
 const {
   errorMessage,
   form,
@@ -58,6 +62,10 @@ const {
   successMessage,
 } = useSettingsForm({
   extraApply: (payload) => { pathValidation.value = payload.pathValidation ?? null; },
+  onSaveSuccess: () => {
+    void artworkQuota.loadQuota();
+    void loadQuotaHistory();
+  },
 });
 
 const browseTarget = ref(null);
@@ -94,10 +102,6 @@ function addUserMusicRoot() { form.paths.userMusicRoots.push(createEmptyUserMusi
 function removeUserMusicRoot(index) { form.paths.userMusicRoots.splice(index, 1); }
 
 onMounted(() => { void loadSettings(); });
-
-const artworkQuota = useArtworkQuota();
-
-const quotaHistory = ref(null);
 
 const providerSparklines = computed(() => {
   if (!quotaHistory.value) return {};
