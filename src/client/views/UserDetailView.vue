@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserDetail } from '../composables/useUserDetail.js';
 import {
@@ -43,12 +43,15 @@ const {
   hasMoreActivity,
   isRevokingSession,
   isRevokingAllSessions,
+  isRevalidating,
   revokeErrorMessage,
   revokeSuccessMessage,
   load,
   loadActivity,
   revokeUserSession,
   revokeAllUserSessions,
+  attachVisibilityListener,
+  destroy,
 } = useUserDetail();
 
 const requestStats = computed(() => summarizeRequestCounts(requestSummary.value));
@@ -61,6 +64,11 @@ onMounted(() => {
     void load({ userId });
     void loadActivity({ userId });
   }
+  attachVisibilityListener();
+});
+
+onBeforeUnmount(() => {
+  destroy();
 });
 
 function goBack() {
@@ -103,7 +111,7 @@ function formatTimestamp(isoString) {
     </header>
 
     <p v-if="isLoading" class="hx-text-muted" aria-live="polite" aria-busy="true">Loading user detail.</p>
-    <p v-else-if="errorMessage" class="hx-text-muted" style="color: var(--hx-danger)">{{ errorMessage }}</p>
+    <p v-else-if="errorMessage && !user" class="hx-text-muted" style="color: var(--hx-danger)">{{ errorMessage }}</p>
 
     <template v-else-if="user">
       <div class="hx-stat-grid">
@@ -166,7 +174,7 @@ function formatTimestamp(isoString) {
       <div v-if="sessions.length > 0" class="hx-card udl-section">
         <header class="hx-card-header">
           <div>
-            <h2 class="hx-card-title">Sessions</h2>
+            <h2 class="hx-card-title">Sessions <span v-if="isRevalidating" class="hx-text-muted" aria-hidden="true">&#8635;</span></h2>
             <p class="hx-card-subtitle">{{ sessions.length }} session{{ sessions.length === 1 ? '' : 's' }}</p>
           </div>
           <div class="hx-card-actions" v-if="hasActiveSessions">

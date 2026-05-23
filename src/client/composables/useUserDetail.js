@@ -17,6 +17,7 @@
  */
 
 import { readonly, ref, shallowRef } from 'vue';
+import { getErrorMessage } from '../lib/error-utils.js';
 import {
   adminRevokeAllUserSessions as defaultAdminRevokeAllUserSessions,
   adminRevokeUserSession as defaultAdminRevokeUserSession,
@@ -32,6 +33,8 @@ export function useUserDetail({
   fetchUserDetailFn = defaultFetchUserDetail,
   fetchUserActivityFn = defaultFetchUserActivity,
   pageSize = ACTIVITY_PAGE_SIZE,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   const user = shallowRef(null);
   const requestSummary = shallowRef(null);
@@ -46,21 +49,84 @@ export function useUserDetail({
   const isRevokingAllSessions = ref(false);
   const revokeErrorMessage = ref('');
   const revokeSuccessMessage = ref('');
+  const isRevalidating = ref(false);
+
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
+  let currentUserId = null;
+
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!currentUserId) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await load({ userId: currentUserId });
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded || !currentUserId) return;
+    void load({ userId: currentUserId }).then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
 
   async function load({ userId }) {
     if (isLoading.value) return;
-    isLoading.value = true;
+    currentUserId = userId;
     errorMessage.value = '';
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
 
     try {
       const payload = await fetchUserDetailFn(userId);
       user.value = payload.user ?? null;
       requestSummary.value = payload.requestSummary ?? null;
       sessions.value = payload.sessions ?? [];
+      hasLoaded = true;
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'Failed to load user detail';
+      if (!isRevalidation) {
+        user.value = null;
+        requestSummary.value = null;
+        sessions.value = [];
+      }
+      errorMessage.value = getErrorMessage(error, 'Failed to load user detail');
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
@@ -86,6 +152,7 @@ export function useUserDetail({
   }
 
   function reset() {
+    clearPollTimer();
     user.value = null;
     requestSummary.value = null;
     sessions.value = [];
@@ -95,6 +162,8 @@ export function useUserDetail({
     nextCursor.value = null;
     revokeErrorMessage.value = '';
     revokeSuccessMessage.value = '';
+    currentUserId = null;
+    hasLoaded = false;
   }
 
   async function revokeUserSession(refreshTokenId) {
@@ -137,10 +206,13 @@ export function useUserDetail({
 
   return {
     activityEvents: readonly(activityEvents),
+    attachVisibilityListener,
+    destroy,
     errorMessage: readonly(errorMessage),
     hasMoreActivity: readonly(hasMoreActivity),
     isLoading: readonly(isLoading),
     isLoadingActivity: readonly(isLoadingActivity),
+    isRevalidating: readonly(isRevalidating),
     isRevokingAllSessions: readonly(isRevokingAllSessions),
     isRevokingSession: readonly(isRevokingSession),
     load,
