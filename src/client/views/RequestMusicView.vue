@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestListFilters from '../components/RequestListFilters.vue';
 import RequestNotificationsPanel from '../components/RequestNotificationsPanel.vue';
@@ -43,6 +44,9 @@ import { sessionStore } from '../state/session.js';
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const currentUserId = computed(() => sessionStore.state.user?.id ?? '');
 
+const route = useRoute();
+const router = useRouter();
+
 const rm = useRequestMusicForm({
   initialScope: isAdmin.value ? 'all' : 'mine',
   isAdmin: isAdmin.value,
@@ -53,6 +57,8 @@ const toast = useToast();
 
 const filters = useRequestListFilters({
   applyFiltersFn: () => applyFilters(),
+  route,
+  router,
 });
 
 function applyFilters() {
@@ -120,9 +126,17 @@ const hasNotifications = computed(
 const sortedRequests = computed(() => filters.sortRequests(rm.mediaRequests.value));
 
 onMounted(() => {
-  void rm.loadRequestDashboard();
+  void rm.loadRequestDashboard(filters.toApiParams());
   void rm.loadRequestTargets();
 });
+
+watch(
+  () => [route.query.requestState, route.query.requestKind, route.query.search, route.query.sortBy],
+  () => {
+    filters.hydrateFromRoute();
+    void rm.loadRequestDashboard(filters.toApiParams());
+  },
+);
 </script>
 
 <template>

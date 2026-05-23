@@ -18,6 +18,12 @@
 
 import { computed, reactive } from 'vue';
 
+import {
+  buildRequestListRouteQuery,
+  getRequestListRouteStateKey,
+  normalizeRequestListRouteState,
+} from '../lib/request-list-route-state.js';
+
 const EMPTY_FILTER_STATE = {
   requestKind: '',
   requestState: '',
@@ -29,8 +35,19 @@ const ALLOWED_SORT_KEYS = new Set(['newest', 'oldest', 'state', 'kind']);
 
 export function useRequestListFilters({
   applyFiltersFn = null,
+  route = null,
+  router = null,
 } = {}) {
-  const filters = reactive({ ...EMPTY_FILTER_STATE });
+  const initialState = route
+    ? normalizeRequestListRouteState(route.query)
+    : EMPTY_FILTER_STATE;
+
+  const filters = reactive({
+    requestKind: initialState.requestKind,
+    requestState: initialState.requestState,
+    search: initialState.search,
+    sortBy: initialState.sortBy,
+  });
 
   const activeFilterCount = computed(() => {
     let count = 0;
@@ -50,12 +67,41 @@ export function useRequestListFilters({
 
   function resetFilters() {
     Object.assign(filters, EMPTY_FILTER_STATE);
+    syncRoute();
   }
 
   function applyFilters() {
+    syncRoute();
     if (typeof applyFiltersFn === 'function') {
       applyFiltersFn();
     }
+  }
+
+  function syncRoute() {
+    if (!route || !router) return;
+
+    const nextQuery = buildRequestListRouteQuery(filters);
+    const currentKey = getRequestListRouteStateKey(route.query);
+    const nextKey = getRequestListRouteStateKey(nextQuery);
+
+    if (currentKey === nextKey) return;
+
+    const merged = { ...route.query };
+    delete merged.requestKind;
+    delete merged.requestState;
+    delete merged.search;
+    delete merged.sortBy;
+
+    router.replace({ query: { ...merged, ...nextQuery } });
+  }
+
+  function hydrateFromRoute() {
+    if (!route) return;
+    const state = normalizeRequestListRouteState(route.query);
+    filters.requestKind = state.requestKind;
+    filters.requestState = state.requestState;
+    filters.search = state.search;
+    filters.sortBy = state.sortBy;
   }
 
   function toApiParams() {
@@ -92,6 +138,7 @@ export function useRequestListFilters({
     applyFilters,
     filters,
     hasActiveFilters,
+    hydrateFromRoute,
     resetFilters,
     sortRequests,
     toApiParams,

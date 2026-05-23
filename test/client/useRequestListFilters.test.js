@@ -219,3 +219,101 @@ test('sortRequests does not mutate the original array', () => {
   assert.equal(result[0].id, '2');
   assert.equal(requests[0].id, '1');
 });
+
+test('hydrates filter state from route query params', () => {
+  const route = { query: { requestState: 'needs_fetch', sortBy: 'oldest' } };
+  const { filters } = useRequestListFilters({ route });
+  assert.equal(filters.requestState, 'needs_fetch');
+  assert.equal(filters.sortBy, 'oldest');
+  assert.equal(filters.requestKind, '');
+  assert.equal(filters.search, '');
+});
+
+test('ignores unknown route query values', () => {
+  const route = { query: { requestState: 'bogus', sortBy: 'reverse' } };
+  const { filters } = useRequestListFilters({ route });
+  assert.equal(filters.requestState, '');
+  assert.equal(filters.sortBy, '');
+});
+
+test('applyFilters calls router.replace with query params', () => {
+  const route = { query: {} };
+  const replaceCalls = [];
+  const router = { replace: (loc) => { replaceCalls.push(loc); } };
+  let applied = false;
+  const { filters, applyFilters, updateFilter } = useRequestListFilters({
+    applyFiltersFn: () => { applied = true; },
+    route,
+    router,
+  });
+
+  updateFilter('requestState', 'needs_fetch');
+  updateFilter('sortBy', 'state');
+  applyFilters();
+
+  assert.equal(applied, true);
+  assert.equal(replaceCalls.length, 1);
+  assert.equal(replaceCalls[0].query.requestState, 'needs_fetch');
+  assert.equal(replaceCalls[0].query.sortBy, 'state');
+});
+
+test('applyFilters deduplicates identical route state', () => {
+  const route = { query: { requestState: 'needs_fetch' } };
+  const replaceCalls = [];
+  const router = { replace: (loc) => { replaceCalls.push(loc); } };
+  const { filters, applyFilters, updateFilter } = useRequestListFilters({ route, router });
+
+  updateFilter('requestState', 'needs_fetch');
+  applyFilters();
+
+  assert.equal(replaceCalls.length, 0);
+});
+
+test('resetFilters calls router.replace with empty query', () => {
+  const route = { query: { requestState: 'needs_fetch' } };
+  const replaceCalls = [];
+  const router = { replace: (loc) => { replaceCalls.push(loc); } };
+  const { updateFilter, resetFilters } = useRequestListFilters({ route, router });
+
+  updateFilter('requestState', 'needs_fetch');
+  resetFilters();
+
+  assert.equal(replaceCalls.length, 1);
+  assert.equal(Object.keys(replaceCalls[0].query).length, 0);
+});
+
+test('resetFilters preserves unrelated query params', () => {
+  const route = { query: { requestState: 'needs_fetch', tab: 'history' } };
+  const replaceCalls = [];
+  const router = { replace: (loc) => { replaceCalls.push(loc); } };
+  const { resetFilters } = useRequestListFilters({ route, router });
+
+  resetFilters();
+
+  assert.equal(replaceCalls.length, 1);
+  assert.equal(replaceCalls[0].query.tab, 'history');
+  assert.equal(Object.prototype.hasOwnProperty.call(replaceCalls[0].query, 'requestState'), false);
+});
+
+test('hydrateFromRoute updates local state from current route.query', () => {
+  const route = { query: { requestState: 'cancelled', search: 'boards' } };
+  const { filters, hydrateFromRoute } = useRequestListFilters({ route });
+
+  assert.equal(filters.requestState, 'cancelled');
+  assert.equal(filters.search, 'boards');
+
+  route.query.requestState = 'needs_review';
+  hydrateFromRoute();
+
+  assert.equal(filters.requestState, 'needs_review');
+});
+
+test('works without route or router (no URL sync)', () => {
+  const { filters, updateFilter, applyFilters, resetFilters } = useRequestListFilters();
+  updateFilter('requestState', 'needs_fetch');
+  applyFilters();
+  assert.equal(filters.requestState, 'needs_fetch');
+
+  resetFilters();
+  assert.equal(filters.requestState, '');
+});
