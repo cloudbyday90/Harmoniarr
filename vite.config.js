@@ -11,5 +11,17 @@ export default defineConfig({
   build: {
     outDir: resolve(rootDir, 'dist/client'),
     emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-vue',
+              test: /node_modules\/vue\/|node_modules\/@vue\/|node_modules\/vue-router\/|node_modules\/@vue\/router\//,
+            },
+          ],
+        },
+      },
+    },
   },
 });
