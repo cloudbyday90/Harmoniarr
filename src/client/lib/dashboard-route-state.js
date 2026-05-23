@@ -88,7 +88,7 @@ export function buildArtworkCleanupRunDashboardLocation(runId) {
 
   return {
     hash: artworkMaintenancePanelHash,
-    name: 'dashboard',
+    name: 'dashboard-panel',
     query: buildDashboardRouteQuery({ artworkRunId: normalizedRunId }),
   };
 }
@@ -102,7 +102,7 @@ export function buildLibraryScanRunDashboardLocation(runId) {
 
   return {
     hash: libraryScanPanelHash,
-    name: 'dashboard',
+    name: 'dashboard-panel',
     query: buildDashboardRouteQuery({ libraryScanRunId: normalizedRunId }),
   };
 }
@@ -116,7 +116,7 @@ export function buildLibraryDiscoveryRunDashboardLocation(runId) {
 
   return {
     hash: libraryDiscoveryPanelHash,
-    name: 'dashboard',
+    name: 'dashboard-panel',
     query: buildDashboardRouteQuery({ libraryDiscoveryRunId: normalizedRunId }),
   };
 }

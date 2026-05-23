@@ -101,10 +101,11 @@ const router = createRouter({
       component: AppShell,
       meta: { requiresAuth: true },
       children: [
-        { path: '', name: 'dashboard', component: DashboardView },
+        { path: '', name: 'dashboard', component: LibraryView },
+        { path: 'dashboard', name: 'dashboard-panel', component: DashboardView },
         { path: 'onboarding', name: 'onboarding', component: OnboardingView },
         { path: 'discover', name: 'discover', component: DiscoverView },
-        { path: 'library', name: 'library', component: LibraryView },
+        { path: 'library', name: 'library', redirect: { name: 'dashboard' } },
         { path: 'missing', name: 'missing', component: MissingView },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },

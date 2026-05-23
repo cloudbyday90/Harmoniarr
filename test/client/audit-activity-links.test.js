@@ -11,7 +11,7 @@ test('buildAuditActivityLinkTarget links artwork cleanup audit events into the d
     label: 'View artwork cleanup',
     to: {
       hash: '#artwork-maintenance-panel',
-      name: 'dashboard',
+      name: 'dashboard-panel',
       query: {
         artworkRunId: 'run-22',
       },
@@ -60,7 +60,7 @@ test('buildAuditActivityLinkTarget links library scan and discovery audit events
     label: 'View library scan',
     to: {
       hash: '#library-scan-panel',
-      name: 'dashboard',
+      name: 'dashboard-panel',
       query: {
         libraryScanRunId: 'scan-run-8',
       },
@@ -75,7 +75,7 @@ test('buildAuditActivityLinkTarget links library scan and discovery audit events
     label: 'View library discovery',
     to: {
       hash: '#library-discovery-panel',
-      name: 'dashboard',
+      name: 'dashboard-panel',
       query: {
         libraryDiscoveryRunId: 'discovery-run-5',
       },

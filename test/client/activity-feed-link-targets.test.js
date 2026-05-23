@@ -11,7 +11,7 @@ test('activity feed link targets map operation entries onto existing run drill-t
     label: 'View library scan',
     to: {
       hash: '#library-scan-panel',
-      name: 'dashboard',
+      name: 'dashboard-panel',
       query: {
         libraryScanRunId: 'run-11',
       },

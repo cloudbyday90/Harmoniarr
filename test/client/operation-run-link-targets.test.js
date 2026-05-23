@@ -19,7 +19,7 @@ test('operation run link targets resolve shared descriptors by operation type', 
     label: 'View library scan',
     to: {
       hash: '#library-scan-panel',
-      name: 'dashboard',
+      name: 'dashboard-panel',
       query: {
         libraryScanRunId: 'run-11',
       },

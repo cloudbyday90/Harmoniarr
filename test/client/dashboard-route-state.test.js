@@ -63,7 +63,7 @@ test('getDashboardRouteStateKey matches equivalent dashboard route states after 
 test('dashboard route helpers build library scan and discovery run drill-down locations', () => {
   assert.deepEqual(buildLibraryScanRunDashboardLocation('scan-run-8'), {
     hash: '#library-scan-panel',
-    name: 'dashboard',
+    name: 'dashboard-panel',
     query: {
       libraryScanRunId: 'scan-run-8',
     },
@@ -71,7 +71,7 @@ test('dashboard route helpers build library scan and discovery run drill-down lo
 
   assert.deepEqual(buildLibraryDiscoveryRunDashboardLocation('discovery-run-5'), {
     hash: '#library-discovery-panel',
-    name: 'dashboard',
+    name: 'dashboard-panel',
     query: {
       libraryDiscoveryRunId: 'discovery-run-5',
     },

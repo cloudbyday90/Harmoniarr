@@ -234,7 +234,7 @@ test('buildActivityEventLinkTarget handles library_scan drillthrough', () => {
     label: 'View library scan',
     to: {
       hash: '#library-scan-panel',
-      name: 'dashboard',
+      name: 'dashboard-panel',
       query: { libraryScanRunId: 'run-scan-1' },
     },
   });
@@ -262,7 +262,7 @@ test('buildActivityEventLinkTarget handles artwork_cleanup drillthrough', () => 
     label: 'View artwork cleanup',
     to: {
       hash: '#artwork-maintenance-panel',
-      name: 'dashboard',
+      name: 'dashboard-panel',
       query: { artworkRunId: 'run-art-1' },
     },
   });

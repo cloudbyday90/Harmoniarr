@@ -104,7 +104,7 @@ describe('buildNotificationLink', () => {
       label: 'Open dashboard',
       to: {
         hash: '#library-discovery-panel',
-        name: 'dashboard',
+        name: 'dashboard-panel',
       },
     });
   });

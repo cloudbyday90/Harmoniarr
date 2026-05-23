@@ -15,7 +15,7 @@ test('buildOperatorNav returns 6 items in expected order', () => {
   const nav = buildOperatorNav();
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'discover', 'library', 'missing', 'activity', 'settings'],
+    ['dashboard', 'dashboard-panel', 'discover', 'missing', 'activity', 'settings'],
   );
 });
 
@@ -59,11 +59,11 @@ test('buildOperatorNav returns a stable reference across multiple calls', () => 
 // buildRequesterNav
 // ---------------------------------------------------------------------------
 
-test('buildRequesterNav returns 5 items in expected order', () => {
+test('buildRequesterNav returns 4 items in expected order', () => {
   const nav = buildRequesterNav();
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'discover', 'library', 'search', 'my-requests'],
+    ['dashboard', 'discover', 'search', 'my-requests'],
   );
 });
 
@@ -92,7 +92,7 @@ test('buildVisibleNav for operator returns operator nav regardless of count', ()
   const nav = buildVisibleNav(false, 0);
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'discover', 'library', 'missing', 'activity', 'settings'],
+    ['dashboard', 'dashboard-panel', 'discover', 'missing', 'activity', 'settings'],
   );
 });
 
@@ -105,7 +105,7 @@ test('buildVisibleNav for requester with count 0 returns base array without badg
   const nav = buildVisibleNav(true, 0);
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'discover', 'library', 'search', 'my-requests'],
+    ['dashboard', 'discover', 'search', 'my-requests'],
   );
   assert.ok(!nav.some((item) => item.badge), 'no badge when count is 0');
 });
