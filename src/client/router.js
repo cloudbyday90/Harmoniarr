@@ -53,6 +53,7 @@ import SettingsMediaStorageView from './views/SettingsMediaStorageView.vue';
 import SettingsNotificationsView from './views/SettingsNotificationsView.vue';
 import SettingsUsersView from './views/SettingsUsersView.vue';
 import SettingsWorkspaceView from './views/SettingsWorkspaceView.vue';
+import UserDetailView from './views/UserDetailView.vue';
 import { resolveRouterScroll } from './lib/router-scroll.js';
 import { sessionStore } from './state/session.js';
 
@@ -75,6 +76,7 @@ const requesterRestrictedRouteNames = new Set([
   'settings-connections',
   'settings-media-storage',
   'settings-users',
+  'settings-user-detail',
   'settings-library',
   'settings-notifications',
   'settings-recovery',
@@ -140,6 +142,7 @@ const router = createRouter({
             { path: 'library', name: 'settings-library', component: SettingsLibraryView },
             { path: 'media-storage', name: 'settings-media-storage', component: SettingsMediaStorageView },
             { path: 'users', name: 'settings-users', component: SettingsUsersView },
+            { path: 'users/:userId', name: 'settings-user-detail', component: UserDetailView },
             { path: 'notifications', name: 'settings-notifications', component: SettingsNotificationsView },
             { path: 'account', name: 'settings-account', component: AccountSecurityView },
             { path: 'recovery', name: 'settings-recovery', component: RecoveryWorkspaceView },

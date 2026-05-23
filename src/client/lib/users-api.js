@@ -102,6 +102,18 @@ export function reconcilePlexLinkedAccount(userId, action) {
   });
 }
 
+export function fetchUserDetail(userId) {
+  return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/detail`);
+}
+
+export function fetchUserActivity(userId, { cursor, limit } = {}) {
+  const params = new URLSearchParams();
+  if (cursor) params.set('cursor', cursor);
+  if (limit != null) params.set('limit', String(limit));
+  const query = params.toString();
+  return apiRequest(query ? `/api/v1/users/${encodeURIComponent(userId)}/activity?${query}` : `/api/v1/users/${encodeURIComponent(userId)}/activity`);
+}
+
 export function unlinkPlexUser(userId) {
   return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/unlink-plex`, {
     method: 'POST',

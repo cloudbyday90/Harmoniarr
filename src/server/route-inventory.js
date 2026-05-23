@@ -45,6 +45,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/auth/activity', access: 'authenticated', area: 'auth', kind: 'read' },
   { method: 'POST', path: '/api/v1/auth/sessions/:refreshTokenId/revoke', access: 'authenticated', area: 'auth', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/users', access: 'admin', area: 'users', kind: 'read' },
+  { method: 'GET', path: '/api/v1/users/:userId/detail', access: 'admin', area: 'users', kind: 'read' },
+  { method: 'GET', path: '/api/v1/users/:userId/activity', access: 'admin', area: 'users', kind: 'read' },
   { method: 'POST', path: '/api/v1/users', access: 'admin', area: 'users', kind: 'mutation' },
   { method: 'PATCH', path: '/api/v1/users/:userId', access: 'admin', area: 'users', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/users/:userId/claim-code', access: 'admin', area: 'users', kind: 'mutation' },

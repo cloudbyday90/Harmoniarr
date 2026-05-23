@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createAppUserDetailService } from '../app-user-detail-service.js';
 import { createAppUserProvisioningService } from '../app-user-provisioning-service.js';
 import { createAppUserService } from '../app-user-service.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
@@ -25,6 +26,7 @@ const defaultAppUserService = createAppUserService();
 const defaultAppUserProvisioningService = createAppUserProvisioningService({
   getAppUserById: defaultAppUserService.getAppUserById,
 });
+const defaultAppUserDetailService = createAppUserDetailService();
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
 export function registerAppUserRoutes(app, {
@@ -34,11 +36,15 @@ export function registerAppUserRoutes(app, {
   claimManagedLibraryRoot = defaultAppUserProvisioningService.claimManagedLibraryRoot,
   countAppUsers = defaultAppUserService.countAppUsers,
   createAppUser = defaultAppUserService.createAppUser,
+  getAppUserById = defaultAppUserService.getAppUserById,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getUserPreferences = defaultAppUserService.getUserPreferences,
+  getUserRequestSummary = defaultAppUserDetailService.getUserRequestSummary,
+  getUserSessions = defaultAppUserDetailService.getUserSessions,
   issueAppUserClaimCode = null,
   listAppUsers = defaultAppUserService.listAppUsers,
   listAppUsersPage = defaultAppUserService.listAppUsersPage,
+  listUserAuditEvents = defaultAppUserDetailService.listUserAuditEvents,
   reconcilePlexLinkedAccount = null,
   relinkPlexDirectoryConflict = null,
   resetAppUserPassword = defaultAppUserService.resetAppUserPassword,
@@ -70,6 +76,56 @@ export function registerAppUserRoutes(app, {
     } else {
       response.json({ ok: true, roleOptions, users: await listAppUsers() });
     }
+  }));
+
+  app.get('/api/v1/users/:userId/detail', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const userId = request.params.userId;
+    const [user, requestSummary, sessions] = await Promise.all([
+      getAppUserById({ userId }),
+      getUserRequestSummary({ userId }),
+      getUserSessions({ userId }),
+    ]);
+
+    if (!user) {
+      response.status(404).json({ ok: false, error: 'User not found' });
+      return;
+    }
+
+    response.json({
+      ok: true,
+      requestSummary,
+      sessions,
+      user,
+    });
+  }));
+
+  app.get('/api/v1/users/:userId/activity', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const userId = request.params.userId;
+    const user = await getAppUserById({ userId });
+    if (!user) {
+      response.status(404).json({ ok: false, error: 'User not found' });
+      return;
+    }
+
+    const limit = request.query.limit ? Number(request.query.limit) : 25;
+    const cursor = request.query.cursor || null;
+
+    const result = await listUserAuditEvents({
+      userId,
+      cursor,
+      limit,
+    });
+
+    response.json({
+      events: result.events,
+      hasMore: result.hasMore,
+      nextCursor: result.nextCursor,
+      ok: true,
+    });
   }));
 
   app.post('/api/v1/users', asyncRoute(async (request, response) => {
