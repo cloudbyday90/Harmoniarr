@@ -56,6 +56,8 @@ export function createAppUserModule({
       getUserPreferences: resolvedAppUserService.getUserPreferences,
       issueAppUserClaimCode: resolvedAccountClaimService.issueClaimCode,
       listAppUsers: resolvedAppUserService.listAppUsers,
+      countAppUsers: resolvedAppUserService.countAppUsers,
+      listAppUsersPage: resolvedAppUserService.listAppUsersPage,
       resetAppUserPassword: resolvedAppUserService.resetAppUserPassword,
       ...(plexDirectoryImportService
         ? {

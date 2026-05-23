@@ -32,11 +32,13 @@ export function registerAppUserRoutes(app, {
   buildPlexLinkedAccountOverview = null,
   buildPlexDirectoryImportPreview = null,
   claimManagedLibraryRoot = defaultAppUserProvisioningService.claimManagedLibraryRoot,
+  countAppUsers = defaultAppUserService.countAppUsers,
   createAppUser = defaultAppUserService.createAppUser,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getUserPreferences = defaultAppUserService.getUserPreferences,
   issueAppUserClaimCode = null,
   listAppUsers = defaultAppUserService.listAppUsers,
+  listAppUsersPage = defaultAppUserService.listAppUsersPage,
   reconcilePlexLinkedAccount = null,
   relinkPlexDirectoryConflict = null,
   resetAppUserPassword = defaultAppUserService.resetAppUserPassword,
@@ -52,11 +54,22 @@ export function registerAppUserRoutes(app, {
 } = {}) {
   app.get('/api/v1/users', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
-    response.json({
-      ok: true,
-      roleOptions,
-      users: await listAppUsers(),
-    });
+    const { search, role, isDisabled, limit, offset } = request.query;
+
+    if (limit != null) {
+      const filterParams = {
+        isDisabled: typeof isDisabled === 'string' && isDisabled.length > 0 ? isDisabled : null,
+        role: typeof role === 'string' && role.length > 0 ? role : null,
+        search: typeof search === 'string' && search.trim().length > 0 ? search.trim() : null,
+      };
+      const [users, totalCount] = await Promise.all([
+        listAppUsersPage({ ...filterParams, limit: Number(limit), offset: Number(offset || 0) }),
+        countAppUsers(filterParams),
+      ]);
+      response.json({ ok: true, roleOptions, totalCount, users });
+    } else {
+      response.json({ ok: true, roleOptions, users: await listAppUsers() });
+    }
   }));
 
   app.post('/api/v1/users', asyncRoute(async (request, response) => {

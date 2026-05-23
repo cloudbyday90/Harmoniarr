@@ -18,8 +18,15 @@
 
 import { apiRequest } from './api.js';
 
-export function fetchUsers() {
-  return apiRequest('/api/v1/users');
+export function fetchUsers({ search, role, isDisabled, limit, offset } = {}) {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (role) params.set('role', role);
+  if (isDisabled) params.set('isDisabled', isDisabled);
+  if (limit != null) params.set('limit', String(limit));
+  if (offset != null) params.set('offset', String(offset));
+  const query = params.toString();
+  return apiRequest(query ? `/api/v1/users?${query}` : '/api/v1/users');
 }
 
 export function fetchPlexLinkedAccountsOverview() {

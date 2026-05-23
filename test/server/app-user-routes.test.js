@@ -777,3 +777,51 @@ test('app user Plex unlink route passes actor and request metadata to the shared
     assert.equal(payload.user.localAuth.unlinkPlexReady, true);
   });
 });
+
+test('app user list route with limit uses paginated endpoint', async (t) => {
+  const listAppUsersPage = t.mock.fn(async ({ search, role, isDisabled, limit, offset }) => ({
+    id: 'user-1',
+    username: 'admin',
+    role: 'admin',
+    authProvider: 'local',
+    managedLibraryRelativeRoot: 'staff/admin',
+    permissions: ['admin.system'],
+  }));
+  const countAppUsers = t.mock.fn(async () => 42);
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', user: { role: 'admin' } }));
+  const app = createAppUserRouteTestApp({ countAppUsers, listAppUsersPage, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users?limit=25&offset=0&search=admin&role=admin&isDisabled=false`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.totalCount, 42);
+    assert.equal(listAppUsersPage.mock.callCount(), 1);
+    assert.equal(countAppUsers.mock.callCount(), 1);
+
+    const pageArgs = listAppUsersPage.mock.calls[0].arguments[0];
+    assert.equal(pageArgs.limit, 25);
+    assert.equal(pageArgs.offset, 0);
+    assert.equal(pageArgs.search, 'admin');
+    assert.equal(pageArgs.role, 'admin');
+    assert.equal(pageArgs.isDisabled, 'false');
+  });
+});
+
+test('app user list route without limit uses unpaginated listAppUsers', async (t) => {
+  const listAppUsers = t.mock.fn(async () => [{ id: 'user-1', username: 'admin', role: 'admin' }]);
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', user: { role: 'admin' } }));
+  const app = createAppUserRouteTestApp({ listAppUsers, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/users`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.users.length, 1);
+    assert.equal(listAppUsers.mock.callCount(), 1);
+  });
+});

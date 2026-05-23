@@ -316,3 +316,76 @@ test('createAppUserService resets a user password, requires password change, and
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].eventType, 'app_user_password_reset');
 });
+
+test('listAppUsersPage applies search filter with LIKE clause', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      auth_provider: 'local',
+      auth_subject: null,
+      created_at: '2026-05-02T15:00:00.000Z',
+      id: 'user-1',
+      is_disabled: false,
+      last_login_at: null,
+      managed_library_relative_root: null,
+      must_change_password: false,
+      password_changed_at: null,
+      role: 'requester',
+      updated_at: '2026-05-02T15:00:00.000Z',
+      username: 'listener',
+    }],
+  }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  const users = await service.listAppUsersPage({ search: 'list', limit: 50, offset: 0 });
+
+  assert.equal(users.length, 1);
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /LOWER\(app_users\.username\) LIKE/);
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[0], '%list%');
+});
+
+test('listAppUsersPage applies role filter', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  await service.listAppUsersPage({ role: 'admin', limit: 50, offset: 0 });
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /app_users\.role =/);
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[0], 'admin');
+});
+
+test('listAppUsersPage applies isDisabled filter', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  await service.listAppUsersPage({ isDisabled: 'true', limit: 50, offset: 0 });
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /app_users\.is_disabled = TRUE/);
+});
+
+test('countAppUsers returns total matching filter', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [{ total: 42 }] }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  const total = await service.countAppUsers({ search: 'admin' });
+
+  assert.equal(total, 42);
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /COUNT/);
+  assert.match(sql, /LOWER\(app_users\.username\) LIKE/);
+});
+
+test('countAppUsers with no filter counts all users', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [{ total: 10 }] }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  const total = await service.countAppUsers();
+
+  assert.equal(total, 10);
+  const sql = query.mock.calls[0].arguments[0];
+  assert.doesNotMatch(sql, /WHERE/);
+});

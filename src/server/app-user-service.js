@@ -261,6 +261,63 @@ export function createAppUserService({
     return result.rows.map((row) => mapAppUserRow(row, permissionService));
   }
 
+  function buildUserListFilter({ search, role, isDisabled } = {}) {
+    const conditions = [];
+    const params = [];
+
+    if (typeof search === 'string' && search.trim().length > 0) {
+      params.push(`%${search.trim().toLowerCase()}%`);
+      conditions.push(`LOWER(app_users.username) LIKE $${params.length}`);
+    }
+
+    if (typeof role === 'string' && role.length > 0) {
+      params.push(role);
+      conditions.push(`app_users.role = $${params.length}`);
+    }
+
+    if (isDisabled === 'true' || isDisabled === true) {
+      conditions.push('app_users.is_disabled = TRUE');
+    } else if (isDisabled === 'false' || isDisabled === false) {
+      conditions.push('app_users.is_disabled = FALSE');
+    }
+
+    return { conditions, params };
+  }
+
+  async function countAppUsers({ search, role, isDisabled } = {}) {
+    const { conditions, params } = buildUserListFilter({ search, role, isDisabled });
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const result = await getPoolFn().query(
+      `SELECT COUNT(*)::int AS total FROM app_users ${where}`,
+      params,
+    );
+
+    return result.rows[0].total;
+  }
+
+  async function listAppUsersPage({ search = null, role = null, isDisabled = null, limit = 50, offset = 0 } = {}) {
+    const { conditions, params } = buildUserListFilter({ search, role, isDisabled });
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const limitParamIdx = params.length + 1;
+    const offsetParamIdx = params.length + 2;
+    params.push(limit, offset);
+
+    const result = await getPoolFn().query(
+      `
+        ${appUserSelectSql}
+        ${where}
+        ORDER BY app_users.username ASC
+        LIMIT $${limitParamIdx}
+        OFFSET $${offsetParamIdx}
+      `,
+      params,
+    );
+
+    return result.rows.map((row) => mapAppUserRow(row, permissionService));
+  }
+
   async function createAppUser({ actorUserId, managedLibraryRelativeRoot, password, requestMetadata, role = 'requester', username }) {
     const normalizedActorUserId = normalizeUserId(actorUserId);
     const normalizedManagedLibraryRelativeRoot = normalizeOptionalManagedLibraryRelativeRoot(managedLibraryRelativeRoot, {
@@ -514,10 +571,12 @@ export function createAppUserService({
   }
 
   return {
+    countAppUsers,
     createAppUser,
     getAppUserById,
     getUserPreferences,
     listAppUsers,
+    listAppUsersPage,
     resetAppUserPassword,
     roleOptions: [...permissionService.roleOptions],
     updateAppUser,

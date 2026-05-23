@@ -17,9 +17,10 @@
 -->
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { clearPlexLink, startPlexLink } from '../lib/settings-api.js';
 import { usePlexLinkedAccounts } from '../composables/usePlexLinkedAccounts.js';
+import { useAdminUserList } from '../composables/useAdminUserList.js';
 import {
   buildUsersEmptyStateBody,
   describePlexLibraryAccessPolicy,
@@ -51,7 +52,6 @@ import {
   applyPlexUserImport,
   createUser,
   fetchPlexLinkedAccountsOverview,
-  fetchUsers,
   issueUserClaimCode,
   reconcilePlexLinkedAccount,
   provisionUserManagedLibraryRoot,
@@ -61,7 +61,6 @@ import {
   updateUser,
 } from '../lib/users-api.js';
 
-const isUsersLoading = ref(true);
 const isCreatingUser = ref(false);
 const isImportingPlexUsers = ref(false);
 const isStartingPlexLink = ref(false);
@@ -71,7 +70,18 @@ const activePlexLinkedAccountActionKey = ref('');
 const errorMessage = ref('');
 const successMessage = ref('');
 const roleOptions = ref(['admin', 'operator', 'requester']);
+
+const userList = useAdminUserList();
 const users = ref([]);
+
+const isUsersLoading = computed(() => userList.isLoading.value);
+const searchQuery = ref('');
+const userRoleFilter = ref('');
+const userStatusFilter = ref('');
+
+watch(() => userList.users.value, (rawUsers) => {
+  users.value = rawUsers.map((user) => toEditableUser(user));
+}, { immediate: true });
 
 const {
   errorMessage: plexLinkedAccountsErrorMessage,
@@ -115,28 +125,18 @@ function resetNewUserForm() {
   newUserForm.username = '';
 }
 
-function applyUsers(payload) {
-  roleOptions.value = Array.isArray(payload.roleOptions) && payload.roleOptions.length > 0
-    ? payload.roleOptions
-    : ['admin', 'operator', 'requester'];
-  users.value = Array.isArray(payload.users)
-    ? payload.users.map((user) => toEditableUser(user))
-    : [];
-  if (!roleOptions.value.includes(newUserForm.role)) {
-    newUserForm.role = roleOptions.value.at(-1) ?? 'requester';
-  }
+async function loadUsers() {
+  userList.setSearch(searchQuery.value);
+  userList.setRoleFilter(userRoleFilter.value);
+  userList.setStatusFilter(userStatusFilter.value);
+  await userList.load();
+  const rawUsers = userList.users.value;
+  roleOptions.value = ['admin', 'operator', 'requester'];
+  users.value = rawUsers.map((user) => toEditableUser(user));
 }
 
-async function loadUsers() {
-  isUsersLoading.value = true;
-  errorMessage.value = '';
-  try {
-    applyUsers(await fetchUsers());
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'User load failed';
-  } finally {
-    isUsersLoading.value = false;
-  }
+async function loadMoreUsers() {
+  await userList.loadMore();
 }
 
 async function connectPlexLink() {
@@ -623,6 +623,22 @@ onMounted(() => { void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview(
       <span style="font-size: var(--hx-text-sm); color: var(--hx-success)" v-else-if="successMessage">{{ successMessage }}</span>
     </div>
 
+    <!-- User list filters -->
+    <div class="hx-card">
+      <div class="hx-card-body suf-bar">
+        <input class="hx-input suf-search" v-model="searchQuery" type="search" placeholder="Search users…" @input="void loadUsers()" />
+        <select class="hx-select" v-model="userRoleFilter" @change="void loadUsers()">
+          <option value="">All roles</option>
+          <option v-for="opt in roleOptions" :key="opt" :value="opt">{{ formatUserRole(opt) }}</option>
+        </select>
+        <select class="hx-select" v-model="userStatusFilter" @change="void loadUsers()">
+          <option value="">All statuses</option>
+          <option value="false">Enabled</option>
+          <option value="true">Disabled</option>
+        </select>
+      </div>
+    </div>
+
     <!-- User list -->
     <article class="hx-card" v-if="isUsersLoading">
       <div class="hx-card-body">
@@ -709,5 +725,27 @@ onMounted(() => { void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview(
       </article>
     </div>
 
+    <div v-if="userList.hasMore()" class="hx-card">
+      <div class="hx-card-body" style="text-align: center">
+        <button type="button" class="hx-btn" data-variant="ghost" :disabled="userList.isLoadingMore.value" @click="loadMoreUsers">
+          {{ userList.isLoadingMore.value ? 'Loading\u2026' : 'Load more users' }}
+        </button>
+      </div>
+    </div>
+
   </div>
 </template>
+
+<style scoped>
+.suf-bar {
+  display: flex;
+  gap: var(--hx-space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.suf-search {
+  flex: 1;
+  min-width: 180px;
+}
+</style>

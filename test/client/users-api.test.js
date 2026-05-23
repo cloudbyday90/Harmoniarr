@@ -51,3 +51,17 @@ test('users-api routes list, create, and update requests through the shared api 
   assert.equal(globalThis.fetch.mock.calls[4].arguments[1].method, 'POST');
   assert.equal(globalThis.fetch.mock.calls[4].arguments[1].headers.get('X-CSRF-Token'), 'csrf-users');
 });
+
+test('users-api fetchUsers sends filter and pagination query params', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchUsers({ search: 'admin', role: 'admin', isDisabled: 'false', limit: 25, offset: 50 });
+
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.ok(url.includes('search=admin'));
+  assert.ok(url.includes('role=admin'));
+  assert.ok(url.includes('isDisabled=false'));
+  assert.ok(url.includes('limit=25'));
+  assert.ok(url.includes('offset=50'));
+});
