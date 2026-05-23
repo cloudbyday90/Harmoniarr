@@ -17,11 +17,18 @@
  */
 
 import { readonly, ref, shallowRef } from 'vue';
-import { fetchUserDetail as defaultFetchUserDetail, fetchUserActivity as defaultFetchUserActivity } from '../lib/users-api.js';
+import {
+  adminRevokeAllUserSessions as defaultAdminRevokeAllUserSessions,
+  adminRevokeUserSession as defaultAdminRevokeUserSession,
+  fetchUserDetail as defaultFetchUserDetail,
+  fetchUserActivity as defaultFetchUserActivity,
+} from '../lib/users-api.js';
 
 const ACTIVITY_PAGE_SIZE = 25;
 
 export function useUserDetail({
+  adminRevokeAllUserSessionsFn = defaultAdminRevokeAllUserSessions,
+  adminRevokeUserSessionFn = defaultAdminRevokeUserSession,
   fetchUserDetailFn = defaultFetchUserDetail,
   fetchUserActivityFn = defaultFetchUserActivity,
   pageSize = ACTIVITY_PAGE_SIZE,
@@ -35,6 +42,10 @@ export function useUserDetail({
   const errorMessage = ref('');
   const hasMoreActivity = ref(false);
   const nextCursor = ref(null);
+  const isRevokingSession = ref(false);
+  const isRevokingAllSessions = ref(false);
+  const revokeErrorMessage = ref('');
+  const revokeSuccessMessage = ref('');
 
   async function load({ userId }) {
     if (isLoading.value) return;
@@ -82,6 +93,46 @@ export function useUserDetail({
     errorMessage.value = '';
     hasMoreActivity.value = false;
     nextCursor.value = null;
+    revokeErrorMessage.value = '';
+    revokeSuccessMessage.value = '';
+  }
+
+  async function revokeUserSession(refreshTokenId) {
+    if (!user.value) return;
+    isRevokingSession.value = true;
+    revokeErrorMessage.value = '';
+    revokeSuccessMessage.value = '';
+
+    try {
+      await adminRevokeUserSessionFn(user.value.id, refreshTokenId);
+      sessions.value = sessions.value.map((s) =>
+        s.id === refreshTokenId ? { ...s, isRevoked: true } : s,
+      );
+      revokeSuccessMessage.value = 'Session revoked.';
+    } catch (error) {
+      revokeErrorMessage.value = error instanceof Error ? error.message : 'Failed to revoke session';
+      throw error;
+    } finally {
+      isRevokingSession.value = false;
+    }
+  }
+
+  async function revokeAllUserSessions() {
+    if (!user.value) return;
+    isRevokingAllSessions.value = true;
+    revokeErrorMessage.value = '';
+    revokeSuccessMessage.value = '';
+
+    try {
+      const result = await adminRevokeAllUserSessionsFn(user.value.id);
+      sessions.value = sessions.value.map((s) => ({ ...s, isRevoked: true }));
+      revokeSuccessMessage.value = `Revoked ${result.revokedSessionCount} session${result.revokedSessionCount === 1 ? '' : 's'}.`;
+    } catch (error) {
+      revokeErrorMessage.value = error instanceof Error ? error.message : 'Failed to revoke sessions';
+      throw error;
+    } finally {
+      isRevokingAllSessions.value = false;
+    }
   }
 
   return {
@@ -90,10 +141,16 @@ export function useUserDetail({
     hasMoreActivity: readonly(hasMoreActivity),
     isLoading: readonly(isLoading),
     isLoadingActivity: readonly(isLoadingActivity),
+    isRevokingAllSessions: readonly(isRevokingAllSessions),
+    isRevokingSession: readonly(isRevokingSession),
     load,
     loadActivity,
     requestSummary: readonly(requestSummary),
     reset,
+    revokeAllUserSessions,
+    revokeErrorMessage: readonly(revokeErrorMessage),
+    revokeUserSession,
+    revokeSuccessMessage: readonly(revokeSuccessMessage),
     sessions: readonly(sessions),
     user: readonly(user),
   };

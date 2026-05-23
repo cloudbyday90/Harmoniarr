@@ -120,3 +120,17 @@ export function unlinkPlexUser(userId) {
     includeCsrf: true,
   });
 }
+
+export function adminRevokeUserSession(userId, refreshTokenId) {
+  return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(refreshTokenId)}/revoke`, {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}
+
+export function adminRevokeAllUserSessions(userId) {
+  return apiRequest(`/api/v1/users/${encodeURIComponent(userId)}/sessions/revoke-all`, {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}

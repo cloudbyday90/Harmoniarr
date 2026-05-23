@@ -19,6 +19,7 @@
 import { createAppUserDetailService } from '../app-user-detail-service.js';
 import { createAppUserProvisioningService } from '../app-user-provisioning-service.js';
 import { createAppUserService } from '../app-user-service.js';
+import { createAccountSecurityService } from '../account-security-service.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
 
@@ -27,9 +28,12 @@ const defaultAppUserProvisioningService = createAppUserProvisioningService({
   getAppUserById: defaultAppUserService.getAppUserById,
 });
 const defaultAppUserDetailService = createAppUserDetailService();
+const defaultAccountSecurityService = createAccountSecurityService();
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
 export function registerAppUserRoutes(app, {
+  adminRevokeAllUserSessions = defaultAccountSecurityService.adminRevokeAllUserSessions,
+  adminRevokeUserSession = defaultAccountSecurityService.adminRevokeUserSession,
   applyPlexDirectoryImport = null,
   buildPlexLinkedAccountOverview = null,
   buildPlexDirectoryImportPreview = null,
@@ -204,6 +208,38 @@ export function registerAppUserRoutes(app, {
       ok: true,
       revokedSessionCount: result.revokedSessionCount,
       user: result.user,
+    });
+  }));
+
+  app.post('/api/v1/users/:userId/sessions/:refreshTokenId/revoke', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await adminRevokeUserSession({
+      adminUserId: session.appUserId,
+      refreshTokenId: request.params.refreshTokenId,
+      requestMetadata: getRequestMetadata(request),
+    });
+
+    response.json({
+      ok: true,
+      ...result,
+    });
+  }));
+
+  app.post('/api/v1/users/:userId/sessions/revoke-all', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await adminRevokeAllUserSessions({
+      adminUserId: session.appUserId,
+      requestMetadata: getRequestMetadata(request),
+      targetUserId: request.params.userId,
+    });
+
+    response.json({
+      ok: true,
+      ...result,
     });
   }));
 

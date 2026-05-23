@@ -201,7 +201,90 @@ export function createAccountSecurityService({
     };
   }
 
+  async function adminRevokeUserSession({ adminUserId, refreshTokenId, requestMetadata }) {
+    const tokenResult = await getPoolFn().query(
+      `
+        SELECT rt.id, rt.app_user_id, u.username
+        FROM refresh_tokens rt
+        JOIN app_users u ON u.id = rt.app_user_id
+        WHERE rt.id = $1
+          AND rt.is_revoked = FALSE
+          AND rt.expires_at > NOW()
+        LIMIT 1
+      `,
+      [refreshTokenId],
+    );
+
+    if (!tokenResult.rows[0]) {
+      throw createApiError(404, 'session_not_found', 'The requested session was not found');
+    }
+
+    const targetUserId = tokenResult.rows[0].app_user_id;
+    const targetUsername = tokenResult.rows[0].username;
+
+    await revokeRefreshTokenFn(refreshTokenId, 'admin_revoked');
+    await recordAuditEventFn({
+      actorUserId: adminUserId,
+      actorType: 'admin',
+      details: {
+        targetSessionId: refreshTokenId,
+        targetUserId,
+        targetUsername,
+      },
+      entityId: refreshTokenId,
+      entityType: 'refresh_token',
+      eventType: 'admin_session_revoked',
+      ipAddress: requestMetadata?.ipAddress ?? null,
+      summary: `Admin revoked a session for user "${targetUsername}"`,
+      userAgent: requestMetadata?.userAgent ?? null,
+    });
+
+    return {
+      revokedSessionId: refreshTokenId,
+      targetUserId,
+      targetUsername,
+    };
+  }
+
+  async function adminRevokeAllUserSessions({ adminUserId, requestMetadata, targetUserId }) {
+    const userResult = await getPoolFn().query(
+      'SELECT username FROM app_users WHERE id = $1 LIMIT 1',
+      [targetUserId],
+    );
+
+    if (!userResult.rows[0]) {
+      throw createApiError(404, 'user_not_found', 'Target user not found');
+    }
+
+    const targetUsername = userResult.rows[0].username;
+
+    const revokedSessionCount = await revokeAllUserSessions(targetUserId, 'admin_revoked');
+    await recordAuditEventFn({
+      actorUserId: adminUserId,
+      actorType: 'admin',
+      details: {
+        revokedSessionCount,
+        targetUserId,
+        targetUsername,
+      },
+      entityId: targetUserId,
+      entityType: 'app_user',
+      eventType: 'admin_sessions_revoked',
+      ipAddress: requestMetadata?.ipAddress ?? null,
+      summary: `Admin revoked all sessions for user "${targetUsername}" (${revokedSessionCount} session${revokedSessionCount === 1 ? '' : 's'})`,
+      userAgent: requestMetadata?.userAgent ?? null,
+    });
+
+    return {
+      revokedSessionCount,
+      targetUserId,
+      targetUsername,
+    };
+  }
+
   return {
+    adminRevokeAllUserSessions,
+    adminRevokeUserSession,
     changePassword,
     listActiveSessions,
     listRecentActivity,

@@ -61,6 +61,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/users/imports/plex/relink', access: 'admin', area: 'users', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/users/:userId/plex-reconciliation', access: 'admin', area: 'users', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/users/:userId/unlink-plex', access: 'admin', area: 'users', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/users/:userId/sessions/:refreshTokenId/revoke', access: 'admin', area: 'users', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/users/:userId/sessions/revoke-all', access: 'admin', area: 'users', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/artwork/summary', access: 'admin', area: 'artwork', kind: 'diagnostic' },
   { method: 'GET', path: '/api/v1/artwork/cleanup-runs', access: 'admin', area: 'artwork', kind: 'read' },
   { method: 'GET', path: '/api/v1/artwork/cleanup-runs/:runId', access: 'admin', area: 'artwork', kind: 'read' },

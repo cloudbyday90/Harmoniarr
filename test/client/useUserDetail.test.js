@@ -113,3 +113,80 @@ test('useUserDetail does not load while already loading', async () => {
 
   assert.equal(callCount, 1);
 });
+
+test('useUserDetail revokeUserSession marks the session as revoked', async () => {
+  const revokeFn = async () => ({ ok: true, revokedSessionId: 'rt-1' });
+  const { sessions, revokeUserSession, revokeSuccessMessage, load } = useUserDetail({
+    adminRevokeUserSessionFn: revokeFn,
+    fetchUserDetailFn: async () => ({
+      user: { id: 'u-1', username: 'bob' },
+      requestSummary: null,
+      sessions: [
+        { id: 'rt-1', isRevoked: false },
+        { id: 'rt-2', isRevoked: false },
+      ],
+    }),
+  });
+
+  await load({ userId: 'u-1' });
+  assert.equal(sessions.value.length, 2);
+
+  await revokeUserSession('rt-1');
+
+  assert.equal(sessions.value[0].isRevoked, true);
+  assert.equal(sessions.value[1].isRevoked, false);
+  assert.equal(revokeSuccessMessage.value, 'Session revoked.');
+});
+
+test('useUserDetail revokeUserSession sets error on failure', async () => {
+  const { revokeUserSession, revokeErrorMessage, load } = useUserDetail({
+    adminRevokeUserSessionFn: async () => { throw new Error('Revoke failed'); },
+    fetchUserDetailFn: async () => ({
+      user: { id: 'u-1', username: 'bob' },
+      requestSummary: null,
+      sessions: [{ id: 'rt-1', isRevoked: false }],
+    }),
+  });
+
+  await load({ userId: 'u-1' });
+
+  await assert.rejects(() => revokeUserSession('rt-1'));
+  assert.equal(revokeErrorMessage.value, 'Revoke failed');
+});
+
+test('useUserDetail revokeAllUserSessions marks all sessions as revoked', async () => {
+  const { sessions, revokeAllUserSessions, revokeSuccessMessage, load } = useUserDetail({
+    adminRevokeAllUserSessionsFn: async () => ({ ok: true, revokedSessionCount: 2 }),
+    fetchUserDetailFn: async () => ({
+      user: { id: 'u-1', username: 'bob' },
+      requestSummary: null,
+      sessions: [
+        { id: 'rt-1', isRevoked: false },
+        { id: 'rt-2', isRevoked: false },
+      ],
+    }),
+  });
+
+  await load({ userId: 'u-1' });
+  await revokeAllUserSessions();
+
+  assert.equal(sessions.value[0].isRevoked, true);
+  assert.equal(sessions.value[1].isRevoked, true);
+  assert.equal(revokeSuccessMessage.value, 'Revoked 2 sessions.');
+});
+
+test('useUserDetail revokeAllUserSessions sets error on failure', async () => {
+  const { revokeAllUserSessions, revokeErrorMessage, load } = useUserDetail({
+    adminRevokeAllUserSessionsFn: async () => { throw new Error('Bulk revoke failed'); },
+    fetchUserDetailFn: async () => ({
+      user: { id: 'u-1', username: 'bob' },
+      requestSummary: null,
+      sessions: [{ id: 'rt-1', isRevoked: false }],
+    }),
+  });
+
+  await load({ userId: 'u-1' });
+
+  await assert.rejects(() => revokeAllUserSessions());
+  assert.equal(revokeErrorMessage.value, 'Bulk revoke failed');
+});

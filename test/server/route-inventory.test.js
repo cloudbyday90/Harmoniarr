@@ -89,6 +89,8 @@ function collectRegisteredRoutes() {
   });
 
   registerAppUserRoutes(app, {
+    adminRevokeAllUserSessions: asyncNoopResult({}),
+    adminRevokeUserSession: asyncNoopResult({}),
     applyPlexDirectoryImport: asyncNoopResult({}),
     buildPlexDirectoryImportPreview: asyncNoopResult({}),
     claimManagedLibraryRoot: asyncNoopResult({}),

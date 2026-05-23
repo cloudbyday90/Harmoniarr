@@ -41,11 +41,19 @@ const {
   isLoadingActivity,
   errorMessage,
   hasMoreActivity,
+  isRevokingSession,
+  isRevokingAllSessions,
+  revokeErrorMessage,
+  revokeSuccessMessage,
   load,
   loadActivity,
+  revokeUserSession,
+  revokeAllUserSessions,
 } = useUserDetail();
 
 const requestStats = computed(() => summarizeRequestCounts(requestSummary.value));
+const activeSessions = computed(() => sessions.value.filter((s) => !s.isRevoked));
+const hasActiveSessions = computed(() => activeSessions.value.length > 0);
 
 onMounted(() => {
   const userId = route.params.userId;
@@ -61,6 +69,14 @@ function goBack() {
 
 function handleLoadMoreActivity() {
   void loadActivity({ userId: route.params.userId });
+}
+
+function handleRevokeSession(refreshTokenId) {
+  void revokeUserSession(refreshTokenId);
+}
+
+function handleRevokeAllSessions() {
+  void revokeAllUserSessions();
 }
 
 function formatTimestamp(isoString) {
@@ -153,7 +169,18 @@ function formatTimestamp(isoString) {
             <h2 class="hx-card-title">Sessions</h2>
             <p class="hx-card-subtitle">{{ sessions.length }} session{{ sessions.length === 1 ? '' : 's' }}</p>
           </div>
+          <div class="hx-card-actions" v-if="hasActiveSessions">
+            <button
+              type="button"
+              class="hx-btn hx-btn--sm"
+              data-variant="danger-outline"
+              :disabled="isRevokingAllSessions"
+              @click="handleRevokeAllSessions"
+            >{{ isRevokingAllSessions ? 'Revoking\u2026' : 'Revoke all' }}</button>
+          </div>
         </header>
+        <div v-if="revokeErrorMessage" class="udl-revoke-msg" style="color: var(--hx-danger)">{{ revokeErrorMessage }}</div>
+        <div v-if="revokeSuccessMessage" class="udl-revoke-msg" style="color: var(--hx-success)">{{ revokeSuccessMessage }}</div>
         <div class="hx-card-body is-flush">
           <div class="hx-table-scroll">
             <table class="hx-table">
@@ -164,6 +191,7 @@ function formatTimestamp(isoString) {
                   <th>IP</th>
                   <th>Last used</th>
                   <th>Expires</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -173,6 +201,16 @@ function formatTimestamp(isoString) {
                   <td>{{ session.issuedIp ?? 'Unknown' }}</td>
                   <td>{{ session.lastUsedAt ? formatRelativeTime(session.lastUsedAt) : 'Never' }}</td>
                   <td>{{ formatTimestamp(session.expiresAt) }}</td>
+                  <td>
+                    <button
+                      v-if="!session.isRevoked"
+                      type="button"
+                      class="hx-btn hx-btn--sm"
+                      data-variant="danger-outline"
+                      :disabled="isRevokingSession"
+                      @click="handleRevokeSession(session.id)"
+                    >{{ isRevokingSession ? 'Revoking\u2026' : 'Revoke' }}</button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -225,6 +263,11 @@ function formatTimestamp(isoString) {
 
 .udl-section {
   margin-top: var(--hx-space-4);
+}
+
+.udl-revoke-msg {
+  font-size: var(--hx-text-sm);
+  padding: var(--hx-space-2) var(--hx-space-4);
 }
 
 .udl-deflist {
