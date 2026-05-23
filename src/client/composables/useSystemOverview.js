@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
   fetchSystemOperatorNotifications,
@@ -24,27 +24,35 @@ import {
 } from '../lib/system-api.js';
 import { useActivityFeedPagination } from './useActivityFeedPagination.js';
 
+const emptyOperatorNotificationCounts = Object.freeze({
+  actionable: 0,
+  byCategory: {
+    failure: 0,
+    manual_intervention: 0,
+    queued_work: 0,
+    recovery: 0,
+  },
+  total: 0,
+});
+
 export function useSystemOverview({
   fetchActivityFeed,
   fetchOperatorNotifications = fetchSystemOperatorNotifications,
   fetchOverview = fetchSystemOverview,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   const overview = ref(null);
   const operatorNotificationCheckedAt = ref(null);
-  const operatorNotificationCounts = ref({
-    actionable: 0,
-    byCategory: {
-      failure: 0,
-      manual_intervention: 0,
-      queued_work: 0,
-      recovery: 0,
-    },
-    total: 0,
-  });
+  const operatorNotificationCounts = ref({ ...emptyOperatorNotificationCounts });
   const operatorNotifications = ref([]);
   const errorMessage = ref('');
   const hasActionableOperatorNotifications = computed(() => operatorNotificationCounts.value.actionable > 0);
   const isLoading = ref(true);
+  const isRevalidating = ref(false);
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
 
   const feed = useActivityFeedPagination({
     fetchActivityFeed,
@@ -153,9 +161,57 @@ export function useSystemOverview({
   });
   const dependencyStatuses = computed(() => overview.value?.dependencies ?? []);
 
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!overview.value) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await loadOverview();
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    void loadOverview().then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
   async function loadOverview() {
-    isLoading.value = true;
+    if (destroyed) return;
     errorMessage.value = '';
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
+
     try {
       const [nextOverview, nextOperatorNotifications] = await Promise.all([
         fetchOverview(),
@@ -171,22 +227,21 @@ export function useSystemOverview({
         nextOverview?.activityFeed?.checkedAt ?? null,
         nextOverview?.activityFeed?.pageInfo ?? undefined,
       );
+      hasLoaded = true;
     } catch (error) {
+      if (!isRevalidation) {
+        overview.value = null;
+        operatorNotificationCheckedAt.value = null;
+        operatorNotificationCounts.value = { ...emptyOperatorNotificationCounts };
+        operatorNotifications.value = [];
+      }
       errorMessage.value = getErrorMessage(error, 'Overview failed');
-      operatorNotificationCheckedAt.value = null;
-      operatorNotificationCounts.value = {
-        actionable: 0,
-        byCategory: {
-          failure: 0,
-          manual_intervention: 0,
-          queued_work: 0,
-          recovery: 0,
-        },
-        total: 0,
-      };
-      operatorNotifications.value = [];
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
@@ -196,13 +251,16 @@ export function useSystemOverview({
     activityFeedEntries: feed.entries,
     activityFeedErrorMessage: feed.errorMessage,
     activityFeedPageInfo: feed.pageInfo,
+    attachVisibilityListener,
     dependencyStatuses,
+    destroy,
     errorMessage,
     hasMoreActivityFeedEntries: feed.hasMore,
     hasActionableOperatorNotifications,
     heartbeatSummaries,
     isLoading,
     isLoadingMoreActivityFeed: feed.isLoadingMore,
+    isRevalidating: readonly(isRevalidating),
     loadMoreActivityFeed: feed.loadMore,
     loadOverview,
     metadataRefreshSummary,
