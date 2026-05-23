@@ -17,11 +17,13 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestEventTimeline from '../components/RequestEventTimeline.vue';
 import { useMediaRequestDetail } from '../composables/useMediaRequestDetail.js';
 import { useMediaRequestReassignment } from '../composables/useMediaRequestReassignment.js';
+import { useToast } from '../composables/useToast.js';
 import {
   candidateStatusLabel,
   candidateStatusTone,
@@ -52,7 +54,50 @@ const {
 
 const {
   eligibleUsers,
+  isLoadingUsers,
+  events: reassignEvents,
+  isLoadingHistory,
+  isReassigning,
+  reassignError,
+  historyError,
+  loadEligibleUsers,
+  loadHistory,
+  reassign,
+  reset,
 } = useMediaRequestReassignment();
+
+const toast = useToast();
+
+const reassignModalOpen = ref(false);
+const reassignTarget = ref(null);
+
+function openReassignModal() {
+  reassignTarget.value = mediaRequest.value;
+  reset();
+  reassignModalOpen.value = true;
+}
+
+function closeReassignModal() {
+  reassignModalOpen.value = false;
+  reassignTarget.value = null;
+}
+
+async function handleReassign({ mediaRequestId, newRequestedForUserId, reason }) {
+  const result = await reassign({ mediaRequestId, newRequestedForUserId, reason });
+  if (result) {
+    closeReassignModal();
+    toast.success('Request reassigned successfully.');
+    void load({ mediaRequestId: route.params.id });
+  }
+}
+
+function handleLoadHistory({ mediaRequestId }) {
+  void loadHistory({ mediaRequestId });
+}
+
+function handleLoadUsers() {
+  void loadEligibleUsers();
+}
 
 const requestKindLabel = computed(() => getRequestKindLabel(mediaRequest.value?.requestKind));
 const headline = computed(() => getRequestHeadline(mediaRequest.value ?? {}));
@@ -72,9 +117,7 @@ const importReviewLink = computed(() => {
 onMounted(() => {
   const id = route.params.id;
   if (id) void load({ mediaRequestId: id });
-  if (isAdmin.value) {
-    void useMediaRequestReassignment().loadEligibleUsers();
-  }
+  if (isAdmin.value) void loadEligibleUsers();
 });
 
 function goBack() {
@@ -97,6 +140,7 @@ function formatTimestamp(ts) {
       </div>
       <div class="hx-page-actions">
         <span v-if="mediaRequest?.fulfillmentStatus" class="hx-pill" :data-tone="fulfillmentTone">{{ fulfillmentLabel }}</span>
+        <button v-if="isAdmin && mediaRequest" type="button" class="hx-btn" data-variant="ghost" @click="openReassignModal">Reassign</button>
       </div>
     </header>
 
@@ -198,6 +242,23 @@ function formatTimestamp(ts) {
       <RequestEventTimeline
         :events="events"
         :eligible-users="eligibleUsers.value"
+      />
+
+      <ReassignRequestModal
+        v-if="reassignTarget"
+        :open="reassignModalOpen"
+        :request="reassignTarget"
+        :eligible-users="eligibleUsers.value"
+        :is-loading-users="isLoadingUsers.value"
+        :events="reassignEvents.value"
+        :is-loading-history="isLoadingHistory.value"
+        :is-reassigning="isReassigning.value"
+        :reassign-error="reassignError.value"
+        :history-error="historyError.value"
+        @reassign="handleReassign"
+        @close="closeReassignModal"
+        @load-history="handleLoadHistory"
+        @load-users="handleLoadUsers"
       />
     </template>
   </section>
