@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useGlobalSearch } from '../composables/useGlobalSearch.js';
 
 const props = defineProps({
@@ -45,18 +45,68 @@ const {
   totalResultCount,
 } = useGlobalSearch();
 
+const panelRef = ref(null);
 const inputRef = ref(null);
 const listRef = ref(null);
+
+let previouslyFocusedElement = null;
 
 watch(query, (value) => {
   scheduleSearch(value);
 });
 
+function setInert(value) {
+  const app = document.getElementById('app');
+  if (!app) return;
+  if (value) {
+    app.setAttribute('inert', '');
+  } else {
+    app.removeAttribute('inert');
+  }
+}
+
 function close() {
+  setInert(false);
   emit('close');
+  if (previouslyFocusedElement && typeof previouslyFocusedElement.focus === 'function') {
+    previouslyFocusedElement.focus();
+    previouslyFocusedElement = null;
+  }
+}
+
+function getFocusableElements() {
+  if (!panelRef.value) return [];
+  return [...panelRef.value.querySelectorAll(
+    'input, button, [href], [tabindex]:not([tabindex="-1"])',
+  )].filter((el) => !el.hasAttribute('disabled') && !el.hasAttribute('inert'));
+}
+
+function trapFocus(event) {
+  const focusable = getFocusableElements();
+  if (focusable.length === 0) return;
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  if (event.shiftKey) {
+    if (document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    }
+  } else {
+    if (document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 }
 
 function onPanelKeydown(event) {
+  if (event.key === 'Tab') {
+    trapFocus(event);
+    return;
+  }
+
   if (event.key === 'Escape') {
     event.preventDefault();
     close();
@@ -76,27 +126,46 @@ function onResultClick(entry) {
   navigateToResult(entry, { close });
 }
 
-function onFocusOut(event) {
-  requestAnimationFrame(() => {
-    const panel = event.currentTarget;
-    if (panel && !panel.contains(document.activeElement)) {
-      close();
-    }
-  });
-}
-
 watch(() => props.open, async (isOpen) => {
   if (isOpen) {
+    previouslyFocusedElement = document.activeElement;
     resetQuery();
+    setInert(true);
     await nextTick();
     inputRef.value?.focus();
+  } else {
+    setInert(false);
   }
 });
 
 onMounted(() => {
   if (props.open) {
+    previouslyFocusedElement = document.activeElement;
+    setInert(true);
     nextTick(() => inputRef.value?.focus());
   }
+});
+
+onBeforeUnmount(() => {
+  setInert(false);
+});
+
+watch(activeIndex, () => {
+  nextTick(() => {
+    const entry = activeEntry.value;
+    if (!entry) return;
+    const id = resultItemId(entry.type, entry.item);
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  });
+});
+
+const activeDescendantId = computed(() => {
+  const entry = activeEntry.value;
+  if (!entry) return undefined;
+  return resultItemId(entry.type, entry.item);
 });
 
 const activeEntry = computed(() => {
@@ -126,12 +195,12 @@ const shortcutKey = isMac ? 'Cmd+K' : 'Ctrl+K';
   <Teleport to="body">
     <div v-if="open" class="hx-search-overlay" @click.self="close">
       <div
+        ref="panelRef"
         class="hx-search-panel"
         role="dialog"
         aria-modal="true"
         aria-label="Global search"
         @keydown="onPanelKeydown"
-        @focusout="onFocusOut"
       >
         <div class="hx-search-header">
           <svg class="hx-search-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
@@ -146,7 +215,7 @@ const shortcutKey = isMac ? 'Cmd+K' : 'Ctrl+K';
             role="combobox"
             aria-expanded="true"
             aria-controls="search-results-list"
-            aria-activedescendant=""
+            :aria-activedescendant="activeDescendantId"
             aria-autocomplete="list"
             aria-label="Search artists, releases, and more"
             placeholder="Search artists, albums, releases..."
