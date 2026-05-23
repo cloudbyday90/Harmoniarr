@@ -26,6 +26,7 @@ import { useRequestListFilters } from '../composables/useRequestListFilters.js';
 import { useRequestMusicForm } from '../composables/useRequestMusicForm.js';
 import { formatSourceProvider } from '../lib/import-candidate-presentation.js';
 import {
+  getCancelToastMessage,
   getFulfillmentStatusLabel,
   getFulfillmentStatusTone,
   getRequestHeadline,
@@ -102,8 +103,8 @@ async function handleCancelRequest(request) {
   if (cancellingId.value) return;
   cancellingId.value = request.id;
   try {
-    await cancelMediaRequest({ mediaRequestId: request.id });
-    toast.success('Request cancelled.');
+    const result = await cancelMediaRequest({ mediaRequestId: request.id });
+    toast.success(getCancelToastMessage(result?.mediaRequest?.cancelledChildCount));
     void rm.loadRequestDashboard(filters.toApiParams());
   } catch (error) {
     toast.error(error instanceof Error ? error.message : 'Failed to cancel request.');

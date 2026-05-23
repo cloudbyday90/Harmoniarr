@@ -22,6 +22,7 @@ import {
   buildMediaRequestPayload,
   buildMediaRequestSuccessMessage,
   formatReassignmentEventDescription,
+  getCancelToastMessage,
   getFulfillmentStatusLabel,
   getFulfillmentStatusTone,
   getReassignmentEventLabel,
@@ -443,4 +444,28 @@ test('formatReassignmentEventDescription handles missing usersById entries', () 
   assert.ok(result.includes('Unknown admin'));
   assert.ok(result.includes('u-1'));
   assert.ok(result.includes('u-2'));
+});
+
+// ---------------------------------------------------------------------------
+// getCancelToastMessage
+// ---------------------------------------------------------------------------
+
+test('getCancelToastMessage returns default message when no children cancelled', () => {
+  assert.equal(getCancelToastMessage(0), 'Request cancelled.');
+});
+
+test('getCancelToastMessage returns default message for null', () => {
+  assert.equal(getCancelToastMessage(null), 'Request cancelled.');
+});
+
+test('getCancelToastMessage returns default message for undefined', () => {
+  assert.equal(getCancelToastMessage(undefined), 'Request cancelled.');
+});
+
+test('getCancelToastMessage returns singular child message for 1', () => {
+  assert.equal(getCancelToastMessage(1), 'Request cancelled. 1 child request also cancelled.');
+});
+
+test('getCancelToastMessage returns plural child message for 3', () => {
+  assert.equal(getCancelToastMessage(3), 'Request cancelled. 3 child requests also cancelled.');
 });

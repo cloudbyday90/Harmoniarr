@@ -103,6 +103,13 @@ export function isRequestCancellable(request) {
   return request.requestState === 'needs_fetch' || request.requestState === 'needs_review';
 }
 
+export function getCancelToastMessage(cancelledChildCount) {
+  if (!cancelledChildCount || cancelledChildCount <= 0) {
+    return 'Request cancelled.';
+  }
+  return `Request cancelled. ${cancelledChildCount} child request${cancelledChildCount === 1 ? '' : 's'} also cancelled.`;
+}
+
 /**
  * Maps a fulfillmentStatus object to an hx-pill tone for visual status display.
  *

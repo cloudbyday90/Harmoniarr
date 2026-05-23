@@ -30,6 +30,7 @@ import {
   formatSourceProvider,
 } from '../lib/import-candidate-presentation.js';
 import {
+  getCancelToastMessage,
   getFulfillmentStatusLabel,
   getFulfillmentStatusTone,
   getRequestHeadline,
@@ -108,8 +109,8 @@ async function handleCancel() {
   if (!mediaRequest.value || isCancelling.value) return;
   isCancelling.value = true;
   try {
-    await cancelMediaRequest({ mediaRequestId: mediaRequest.value.id });
-    toast.success('Request cancelled.');
+    const result = await cancelMediaRequest({ mediaRequestId: mediaRequest.value.id });
+    toast.success(getCancelToastMessage(result?.mediaRequest?.cancelledChildCount));
     void load({ mediaRequestId: route.params.id });
   } catch (error) {
     toast.error(error instanceof Error ? error.message : 'Failed to cancel request.');
