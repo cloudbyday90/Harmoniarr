@@ -136,3 +136,86 @@ test('updateFilter ignores unknown fields', () => {
   updateFilter('unknownField', 'value');
   assert.equal(Object.prototype.hasOwnProperty.call(filters, 'unknownField'), false);
 });
+
+test('sortBy is included in empty filter state', () => {
+  const { filters } = useRequestListFilters();
+  assert.equal(filters.sortBy, '');
+});
+
+test('sortBy is not counted in activeFilterCount', () => {
+  const { activeFilterCount, updateFilter } = useRequestListFilters();
+  updateFilter('sortBy', 'oldest');
+  assert.equal(activeFilterCount.value, 0);
+});
+
+test('resetFilters clears sortBy', () => {
+  const { filters, updateFilter, resetFilters } = useRequestListFilters();
+  updateFilter('sortBy', 'state');
+  resetFilters();
+  assert.equal(filters.sortBy, '');
+});
+
+test('sortRequests returns same order when sortBy is empty (newest default)', () => {
+  const { sortRequests } = useRequestListFilters();
+  const requests = [
+    { id: '1', createdAt: '2026-01-01' },
+    { id: '2', createdAt: '2026-06-01' },
+  ];
+  const result = sortRequests(requests);
+  assert.equal(result[0].id, '1');
+  assert.equal(result[1].id, '2');
+});
+
+test('sortRequests sorts by oldest first', () => {
+  const { sortRequests, updateFilter } = useRequestListFilters();
+  updateFilter('sortBy', 'oldest');
+  const requests = [
+    { id: '1', createdAt: '2026-06-01' },
+    { id: '2', createdAt: '2026-01-01' },
+    { id: '3', createdAt: '2026-03-01' },
+  ];
+  const result = sortRequests(requests);
+  assert.equal(result[0].id, '2');
+  assert.equal(result[1].id, '3');
+  assert.equal(result[2].id, '1');
+});
+
+test('sortRequests sorts by state', () => {
+  const { sortRequests, updateFilter } = useRequestListFilters();
+  updateFilter('sortBy', 'state');
+  const requests = [
+    { id: '1', requestState: 'needs_fetch' },
+    { id: '2', requestState: 'already_exists' },
+    { id: '3', requestState: 'needs_review' },
+  ];
+  const result = sortRequests(requests);
+  assert.equal(result[0].id, '2');
+  assert.equal(result[1].id, '1');
+  assert.equal(result[2].id, '3');
+});
+
+test('sortRequests sorts by kind', () => {
+  const { sortRequests, updateFilter } = useRequestListFilters();
+  updateFilter('sortBy', 'kind');
+  const requests = [
+    { id: '1', requestKind: 'release' },
+    { id: '2', requestKind: 'track' },
+    { id: '3', requestKind: 'external_url' },
+  ];
+  const result = sortRequests(requests);
+  assert.equal(result[0].id, '3');
+  assert.equal(result[1].id, '1');
+  assert.equal(result[2].id, '2');
+});
+
+test('sortRequests does not mutate the original array', () => {
+  const { sortRequests, updateFilter } = useRequestListFilters();
+  updateFilter('sortBy', 'oldest');
+  const requests = [
+    { id: '1', createdAt: '2026-06-01' },
+    { id: '2', createdAt: '2026-01-01' },
+  ];
+  const result = sortRequests(requests);
+  assert.equal(result[0].id, '2');
+  assert.equal(requests[0].id, '1');
+});

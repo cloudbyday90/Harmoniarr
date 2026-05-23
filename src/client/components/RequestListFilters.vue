@@ -38,6 +38,10 @@ defineProps({
     type: String,
     default: '',
   },
+  sortBy: {
+    type: String,
+    default: '',
+  },
 });
 
 defineEmits([
@@ -46,6 +50,7 @@ defineEmits([
   'update:requestKind',
   'update:requestState',
   'update:search',
+  'update:sortBy',
 ]);
 </script>
 
@@ -87,6 +92,20 @@ defineEmits([
         <option value="release">Release</option>
         <option value="track">Track</option>
         <option value="external_url">Playlist / URL</option>
+      </select>
+    </label>
+
+    <label class="rlf-field">
+      <span class="rlf-label">Sort</span>
+      <select
+        :value="sortBy"
+        class="rlf-select"
+        @change="$emit('update:sortBy', $event.target.value)"
+      >
+        <option value="">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="state">By status</option>
+        <option value="kind">By type</option>
       </select>
     </label>
 

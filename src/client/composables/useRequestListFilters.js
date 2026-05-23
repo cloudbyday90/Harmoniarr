@@ -22,7 +22,10 @@ const EMPTY_FILTER_STATE = {
   requestKind: '',
   requestState: '',
   search: '',
+  sortBy: '',
 };
+
+const ALLOWED_SORT_KEYS = new Set(['newest', 'oldest', 'state', 'kind']);
 
 export function useRequestListFilters({
   applyFiltersFn = null,
@@ -63,12 +66,34 @@ export function useRequestListFilters({
     return params;
   }
 
+  function getSortComparator() {
+    switch (filters.sortBy) {
+      case 'oldest':
+        return (a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '');
+      case 'state':
+        return (a, b) => (a.requestState ?? '').localeCompare(b.requestState ?? '');
+      case 'kind':
+        return (a, b) => (a.requestKind ?? '').localeCompare(b.requestKind ?? '');
+      case 'newest':
+      default:
+        return (a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '');
+    }
+  }
+
+  function sortRequests(requests) {
+    if (!ALLOWED_SORT_KEYS.has(filters.sortBy) || filters.sortBy === 'newest') {
+      return requests;
+    }
+    return [...requests].sort(getSortComparator());
+  }
+
   return {
     activeFilterCount,
     applyFilters,
     filters,
     hasActiveFilters,
     resetFilters,
+    sortRequests,
     toApiParams,
     updateFilter,
   };

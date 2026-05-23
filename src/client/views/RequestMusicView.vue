@@ -117,6 +117,8 @@ const hasNotifications = computed(
   () => (rm.summary.value?.notificationFeed?.counts?.total ?? 0) > 0,
 );
 
+const sortedRequests = computed(() => filters.sortRequests(rm.mediaRequests.value));
+
 onMounted(() => {
   void rm.loadRequestDashboard();
   void rm.loadRequestTargets();
@@ -300,11 +302,13 @@ onMounted(() => {
           :request-kind="filters.filters.requestKind"
           :request-state="filters.filters.requestState"
           :search="filters.filters.search"
+          :sort-by="filters.filters.sortBy"
           @apply="applyFilters"
           @reset="handleResetFilters"
           @update:request-kind="filters.updateFilter('requestKind', $event)"
           @update:request-state="filters.updateFilter('requestState', $event)"
           @update:search="filters.updateFilter('search', $event)"
+          @update:sort-by="filters.updateFilter('sortBy', $event)"
         />
       </div>
     </article>
@@ -321,7 +325,7 @@ onMounted(() => {
         <p v-if="rm.isLoading.value" class="hx-text-muted">Loading request history.</p>
 
         <div class="rm-request-list" v-else-if="rm.mediaRequests.value.length">
-          <article class="rm-request-item" v-for="request in rm.mediaRequests.value" :key="request.id">
+          <article class="rm-request-item" v-for="request in sortedRequests" :key="request.id">
             <div class="rm-request-header">
               <div>
                 <p class="rm-request-kind">{{ getRequestKindLabel(request.requestKind) }}</p>
