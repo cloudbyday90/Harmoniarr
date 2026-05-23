@@ -17,7 +17,6 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
 import {
   formatActivityEntryCountLabel,
   formatActivityEntryStatusLabel,
@@ -25,22 +24,15 @@ import {
   formatActivityEntryTypeLabel,
 } from '../lib/activity-history-presentation.js';
 import { formatOperationTimestamp } from '../lib/operation-run-presentation.js';
-import { fetchSystemActivityFeed } from '../lib/system-api.js';
-import { useAsyncResource } from '../composables/useAsyncResource.js';
+import { useActivityHistory } from '../composables/useActivityHistory.js';
 
 const {
-  data: entries,
+  entries,
+  entryCount,
   errorMessage,
   isLoading,
   load,
-} = useAsyncResource({
-  fetcher: () => fetchSystemActivityFeed({ limit: 100 }),
-  project: (payload) => (Array.isArray(payload?.entries) ? payload.entries : []),
-  initialData: [],
-  fallbackErrorMessage: 'Failed to load activity feed',
-});
-
-const entryCount = computed(() => entries.value?.length ?? 0);
+} = useActivityHistory({ limit: 100 });
 </script>
 
 <template>

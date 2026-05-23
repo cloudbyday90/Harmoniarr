@@ -21,26 +21,6 @@ import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchActivityFeed as defaultFetchActivityFeed } from '../lib/activity-api.js';
 import { normalizeActivityEvent } from '../lib/activity-event-normalization.js';
 
-/**
- * Composable that loads the household activity feed.
- *
- * Not lifecycle-bound — the caller triggers `load()`, typically in `onMounted`
- * or on a polling interval. Returns normalized events ready for rendering.
- *
- * @param {object} [options]
- * @param {function} [options.fetchFeedFn] - Override for testing.
- * @param {number} [options.limit] - Max events to request (default 50).
- * @returns {{
- *   checkedAt: import('vue').Ref<string|null>,
- *   errorMessage: import('vue').Ref<string>,
- *   events: import('vue').Ref<object[]>,
- *   hasEvents: import('vue').ComputedRef<boolean>,
- *   isEmpty: import('vue').ComputedRef<boolean>,
- *   isLoading: import('vue').Ref<boolean>,
- *   load: function,
- *   total: import('vue').Ref<number>,
- * }}
- */
 export function useActivityFeed({
   fetchFeedFn = defaultFetchActivityFeed,
   limit = 50,
@@ -54,14 +34,6 @@ export function useActivityFeed({
   const hasEvents = computed(() => events.value.length > 0);
   const isEmpty = computed(() => !isLoading.value && !hasEvents.value && !errorMessage.value);
 
-  /**
-   * Loads the activity feed from the API. Normalizes each event for display.
-   * Clears any previous error before fetching.
-   *
-   * @param {object} [options]
-   * @param {AbortSignal} [options.signal]
-   * @param {string|null} [options.eventType] - Optional event-type filter.
-   */
   async function load({ signal, eventType = null } = {}) {
     isLoading.value = true;
     errorMessage.value = '';

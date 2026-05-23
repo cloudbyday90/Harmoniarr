@@ -19,26 +19,17 @@
 import { computed, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
-  fetchSystemActivityFeed,
   fetchSystemOperatorNotifications,
   fetchSystemOverview,
 } from '../lib/system-api.js';
-
-const emptyPageInfo = {
-  hasMore: false,
-  nextCursor: null,
-};
+import { useActivityFeedPagination } from './useActivityFeedPagination.js';
 
 export function useSystemOverview({
-  fetchActivityFeed = fetchSystemActivityFeed,
+  fetchActivityFeed,
   fetchOperatorNotifications = fetchSystemOperatorNotifications,
   fetchOverview = fetchSystemOverview,
 } = {}) {
   const overview = ref(null);
-  const activityFeedCheckedAt = ref(null);
-  const activityFeedEntries = ref([]);
-  const activityFeedErrorMessage = ref('');
-  const activityFeedPageInfo = ref(emptyPageInfo);
   const operatorNotificationCheckedAt = ref(null);
   const operatorNotificationCounts = ref({
     actionable: 0,
@@ -52,9 +43,12 @@ export function useSystemOverview({
   });
   const operatorNotifications = ref([]);
   const errorMessage = ref('');
-    const hasActionableOperatorNotifications = computed(() => operatorNotificationCounts.value.actionable > 0);
+  const hasActionableOperatorNotifications = computed(() => operatorNotificationCounts.value.actionable > 0);
   const isLoading = ref(true);
-  const isLoadingMoreActivityFeed = ref(false);
+
+  const feed = useActivityFeedPagination({
+    fetchActivityFeed,
+  });
 
   const statusPills = computed(() => {
     if (!overview.value) {
@@ -72,7 +66,6 @@ export function useSystemOverview({
   });
 
   const heartbeatSummaries = computed(() => overview.value?.heartbeats ?? []);
-  const hasMoreActivityFeedEntries = computed(() => activityFeedPageInfo.value.hasMore === true);
 
   const metadataRefreshSummary = computed(() => {
     const heartbeat = heartbeatSummaries.value.find((entry) => entry.key === 'metadataRefresh');
@@ -173,10 +166,11 @@ export function useSystemOverview({
       operatorNotificationCheckedAt.value = nextOperatorNotifications.checkedAt ?? null;
       operatorNotificationCounts.value = nextOperatorNotifications.counts ?? operatorNotificationCounts.value;
       operatorNotifications.value = nextOperatorNotifications.notifications ?? [];
-      activityFeedCheckedAt.value = overview.value?.activityFeed?.checkedAt ?? null;
-      activityFeedEntries.value = overview.value?.activityFeed?.entries ?? [];
-      activityFeedPageInfo.value = overview.value?.activityFeed?.pageInfo ?? emptyPageInfo;
-      activityFeedErrorMessage.value = '';
+      feed.reset(
+        nextOverview?.activityFeed?.entries ?? [],
+        nextOverview?.activityFeed?.checkedAt ?? null,
+        nextOverview?.activityFeed?.pageInfo ?? undefined,
+      );
     } catch (error) {
       errorMessage.value = getErrorMessage(error, 'Overview failed');
       operatorNotificationCheckedAt.value = null;
@@ -196,46 +190,20 @@ export function useSystemOverview({
     }
   }
 
-  async function loadMoreActivityFeed() {
-    if (!hasMoreActivityFeedEntries.value || isLoadingMoreActivityFeed.value) {
-      return;
-    }
-
-    isLoadingMoreActivityFeed.value = true;
-    activityFeedErrorMessage.value = '';
-
-    try {
-      const result = await fetchActivityFeed({
-        before: activityFeedPageInfo.value.nextCursor,
-      });
-
-      activityFeedCheckedAt.value = result.checkedAt ?? activityFeedCheckedAt.value;
-      activityFeedEntries.value = [
-        ...activityFeedEntries.value,
-        ...(result.entries ?? []),
-      ];
-      activityFeedPageInfo.value = result.pageInfo ?? emptyPageInfo;
-    } catch (error) {
-      activityFeedErrorMessage.value = getErrorMessage(error, 'Loading more activity failed');
-    } finally {
-      isLoadingMoreActivityFeed.value = false;
-    }
-  }
-
   return {
     artworkMaintenanceSummary,
-    activityFeedCheckedAt,
-    activityFeedEntries,
-    activityFeedErrorMessage,
-    activityFeedPageInfo,
+    activityFeedCheckedAt: feed.checkedAt,
+    activityFeedEntries: feed.entries,
+    activityFeedErrorMessage: feed.errorMessage,
+    activityFeedPageInfo: feed.pageInfo,
     dependencyStatuses,
     errorMessage,
-    hasMoreActivityFeedEntries,
+    hasMoreActivityFeedEntries: feed.hasMore,
     hasActionableOperatorNotifications,
     heartbeatSummaries,
     isLoading,
-    isLoadingMoreActivityFeed,
-    loadMoreActivityFeed,
+    isLoadingMoreActivityFeed: feed.isLoadingMore,
+    loadMoreActivityFeed: feed.loadMore,
     loadOverview,
     metadataRefreshSummary,
     operatorNotificationCheckedAt,
