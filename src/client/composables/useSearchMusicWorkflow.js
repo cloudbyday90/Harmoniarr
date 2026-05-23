@@ -24,6 +24,16 @@ import {
 } from '../lib/metadata-api.js';
 import { buildReleaseArtworkRequests } from '../lib/release-artwork-resolve.js';
 
+/**
+ * One-shot MusicBrainz catalog search workflow.
+ *
+ * SWR note: This composable intentionally does NOT include pollIntervalMs,
+ * revalidateOnFocus, destroy(), or attachVisibilityListener(). MusicBrainz
+ * search returns complete results in a single response — there is no
+ * incremental polling (unlike useNetworkSearchWorkflow which polls Soulseek
+ * peers). Adding SWR lifecycle would be over-engineering for a fire-once
+ * mutation pattern.
+ */
 export function useSearchMusicWorkflow({
   resolveArtworkFn = async () => {},
   searchArtists = defaultSearchArtists,
