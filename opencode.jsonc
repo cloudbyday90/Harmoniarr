@@ -1,0 +1,179 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // ============================================================================
+  // Model Context Protocol (MCP) Server Configurations
+  // ============================================================================
+  // MCP servers provide external tool capabilities to the AI assistant.
+  // Each server can be local (runs on your machine) or remote (cloud-hosted).
+  //
+  // Environment Variables Required:
+  // - GITHUB_TOKEN: GitHub personal access token for API access
+  // - SEARXNG_BASE_URL: Local SearXNG instance URL (default: http://localhost:8080)
+  // - KINDLY_BROWSER_EXECUTABLE_PATH: Path to browser executable (optional)
+  // ============================================================================
+  "mcp": {
+    "kindly-web-search": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "--from",
+        "git+https://github.com/Shelpuk-AI-Technology-Consulting/kindly-web-search-mcp-server",
+        "kindly-web-search-mcp-server",
+        "start-mcp-server"
+      ],
+      "enabled": true,
+      "description": "Web search capabilities using SearXNG as the backend",
+      "env": {
+        "SEARXNG_BASE_URL": "${SEARXNG_BASE_URL:http://192.168.50.80:40827}",
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+        "KINDLY_BROWSER_EXECUTABLE_PATH": "${KINDLY_BROWSER_EXECUTABLE_PATH:C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe}"
+      },
+      "timeout": 30000,
+      "retry": {
+        "max_attempts": 3,
+        "backoff_ms": 1000
+      }
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true,
+      "description": "Context7 AI-powered context and analysis services",
+      "timeout": 30000,
+      "retry": {
+        "max_attempts": 3,
+        "backoff_ms": 1000
+      }
+    }
+  },
+
+  // ============================================================================
+  // Language Server Protocol (LSP) Configurations
+  // ============================================================================
+  // LSP servers provide language-specific features like:
+  // - Syntax highlighting and error detection
+  // - Code completion and IntelliSense
+  // - Go-to-definition and references
+  // - Refactoring and code actions
+  //
+  // All LSP servers use npx with -y flag for auto-confirmation and fresh installs.
+  // Consider pinning versions in production for stability.
+  // ============================================================================
+  "lsp": {
+    // TypeScript/JavaScript Language Server
+    "typescript": {
+      "command": ["npx", "-y", "typescript-language-server@4.3.3", "--stdio"],
+      "extensions": [".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs", ".cjs"],
+      "description": "TypeScript and JavaScript language support",
+      "initialization_options": {
+        "preferences": {
+          "includeInlayParameterNameHints": "all",
+          "includeInlayFunctionParameterTypeHints": true,
+          "includeInlayVariableTypeHints": true,
+          "includeInlayPropertyDeclarationTypeHints": true
+        }
+      }
+    },
+
+    // Vue.js Language Server
+    "vue": {
+      "command": ["npx", "-y", "@vue/language-server@2.1.10", "--stdio"],
+      "extensions": [".vue"],
+      "description": "Vue.js Single File Component support"
+    },
+
+    // CSS/SCSS Language Server
+    "css": {
+      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.2", "vscode-css-language-server", "--stdio"],
+      "extensions": [".css", ".scss", ".sass", ".less"],
+      "description": "CSS, SCSS, Sass, and Less language support"
+    },
+
+    // JSON/JSONC Language Server
+    "json": {
+      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.2", "vscode-json-language-server", "--stdio"],
+      "extensions": [".json", ".jsonc"],
+      "description": "JSON and JSON with Comments support",
+      "initialization_options": {
+        "provideFormatter": true,
+        "validate": {
+          "enableCommentSyntax": true
+        }
+      }
+    },
+
+    // ESLint Language Server
+    "eslint": {
+      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.2", "vscode-eslint-language-server", "--stdio"],
+      "extensions": [".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".vue"],
+      "description": "ESLint integration for JavaScript/TypeScript linting",
+      "initialization_options": {
+        "codeActionOnSave": {
+          "enable": true
+        },
+        "format": true,
+        "nodePath": "${NODE_PATH}"
+      }
+    },
+
+    // SQL Language Server
+    "sql": {
+      "command": ["npx", "-y", "sql-language-server@1.5.0", "up", "--method", "stdio"],
+      "extensions": [".sql"],
+      "description": "SQL language support with dialect detection",
+      "initialization_options": {
+        "diagnostics": {
+          "enable": true
+        }
+      }
+    },
+
+    // YAML Language Server
+    "yaml": {
+      "command": ["npx", "-y", "yaml-language-server@1.15.0", "--stdio"],
+      "extensions": [".yml", ".yaml"],
+      "description": "YAML language support with schema validation",
+      "initialization_options": {
+        "validate": true,
+        "completion": true,
+        "hover": true,
+        "format": {
+          "enable": true
+        },
+        "schemas": {
+          "https://json.schemastore.org/docker-compose.json": ["docker-compose*.yml", "docker-compose*.yaml"],
+          "https://json.schemastore.org/github-workflow.json": [".github/workflows/*.yml", ".github/workflows/*.yaml"]
+        }
+      }
+    }
+  },
+
+  // ============================================================================
+  // Experimental Features and Settings
+  // ============================================================================
+  // These configurations are for features under active development.
+  // Use with caution as they may change or be removed without notice.
+  // ============================================================================
+  "experimental": {
+    // MCP operation timeout in milliseconds
+    // Default: 120000 (2 minutes)
+    // Increase for long-running operations, decrease for faster feedback
+    "mcp_timeout": 120000,
+
+    // Enable detailed MCP logging for debugging
+    "mcp_debug_logging": false,
+
+    // Maximum concurrent MCP operations
+    "mcp_max_concurrent": 5,
+
+    // LSP server startup timeout in milliseconds
+    "lsp_startup_timeout": 30000,
+
+    // Enable LSP server health checks
+    "lsp_health_checks": true,
+
+    // Health check interval in milliseconds
+    "health_check_interval": 60000
+  }
+}

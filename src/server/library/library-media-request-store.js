@@ -533,6 +533,23 @@ export function createLibraryMediaRequestStore({
     return result.rows.length > 0;
   }
 
+  async function cancelFanOutChildren({ parentMediaRequestId, cancellableStates }) {
+    const pool = getPoolFn();
+    const stateParams = cancellableStates.map((_, i) => `$${i + 2}`).join(', ');
+    const result = await pool.query(
+      `
+        UPDATE media_requests
+        SET request_state = 'cancelled',
+            updated_at = NOW()
+        WHERE fan_out_parent_id = $1
+          AND request_state IN (${stateParams})
+        RETURNING id
+      `,
+      [parentMediaRequestId, ...cancellableStates],
+    );
+    return result.rows.map((row) => row.id);
+  }
+
   async function insertMediaRequestEvent({
     mediaRequestId,
     eventType,
@@ -607,6 +624,7 @@ export function createLibraryMediaRequestStore({
   }
 
   return {
+    cancelFanOutChildren,
     createFanOutChildRequests,
     countMediaRequests,
     createMediaRequest,

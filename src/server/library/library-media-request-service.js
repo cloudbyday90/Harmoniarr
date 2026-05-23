@@ -843,7 +843,8 @@ export function createLibraryMediaRequestService({
       throw createApiError(403, 'forbidden', 'You can only cancel your own requests');
     }
 
-    const cancellableStates = new Set(['needs_fetch', 'needs_review']);
+    const CANCELLABLE_STATES = ['needs_fetch', 'needs_review'];
+    const cancellableStates = new Set(CANCELLABLE_STATES);
     if (!cancellableStates.has(existingRequest.requestState)) {
       throw createApiError(409, 'request_not_cancellable', `Requests in state "${existingRequest.requestState}" cannot be cancelled`);
     }
@@ -857,6 +858,46 @@ export function createLibraryMediaRequestService({
 
     if (!updated) {
       throw createApiError(404, 'media_request_not_found', 'The specified media request could not be updated');
+    }
+
+    let cancelledChildIds = [];
+
+    if (existingRequest.fanOutChildCount > 0) {
+      cancelledChildIds = await mediaRequestStore.cancelFanOutChildren({
+        parentMediaRequestId: mediaRequestId,
+        cancellableStates: CANCELLABLE_STATES,
+      });
+
+      for (const childId of cancelledChildIds) {
+        await mediaRequestStore.insertMediaRequestEvent({
+          actorUserId,
+          details: {
+            cascadeFromParentId: mediaRequestId,
+            previousState: 'needs_fetch',
+          },
+          eventType: 'cancelled',
+          mediaRequestId: childId,
+          reason: normalizedReason,
+        });
+      }
+
+      if (typeof recordAuditEventFn === 'function' && cancelledChildIds.length > 0) {
+        void recordAuditEventFn({
+          actorType: 'app_user',
+          actorUserId,
+          details: {
+            cancelledChildCount: cancelledChildIds.length,
+            parentRequestId: mediaRequestId,
+            reason: normalizedReason,
+          },
+          entityId: mediaRequestId,
+          entityType: 'media_request',
+          eventType: 'media_request_fan_out_cancelled',
+          ipAddress: requestMetadata?.ipAddress ?? null,
+          summary: `Cascade-cancelled ${cancelledChildIds.length} fan-out child request${cancelledChildIds.length === 1 ? '' : 's'}`,
+          userAgent: requestMetadata?.userAgent ?? null,
+        }).catch(() => {});
+      }
     }
 
     await mediaRequestStore.insertMediaRequestEvent({
@@ -902,7 +943,10 @@ export function createLibraryMediaRequestService({
     }
 
     const cancelledRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
-    return cancelledRequest;
+    return {
+      ...cancelledRequest,
+      cancelledChildCount: cancelledChildIds.length,
+    };
   }
 
   return {

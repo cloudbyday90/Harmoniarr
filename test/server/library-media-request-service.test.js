@@ -1364,3 +1364,98 @@ test('reassignMediaRequest rejects missing newRequestedForUserId', async () => {
     (error) => error?.code === 'validation_error',
   );
 });
+
+test('cancelMediaRequest cascades cancellation to fan-out children', async (t) => {
+  const getMediaRequestById = t.mock.fn(async () => ({
+    artistName: 'Boards of Canada',
+    fanOutChildCount: 2,
+    id: 'parent-1',
+    releaseTitle: 'Music Has the Right to Children',
+    requestKind: 'release',
+    requestState: 'needs_fetch',
+    requestedByUser: { id: 'admin-1', username: 'owner' },
+    requestedForUser: { id: 'user-1', username: 'listener' },
+  }));
+
+  const updateRequestState = t.mock.fn(async () => true);
+  const insertMediaRequestEvent = t.mock.fn(async () => {});
+  const cancelFanOutChildren = t.mock.fn(async () => ['child-1', 'child-2']);
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const recordActivityEventFn = t.mock.fn(async () => {});
+
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      cancelFanOutChildren,
+      getMediaRequestById,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      insertMediaRequestEvent,
+      listMediaRequests: async () => [],
+      updateRequestState,
+    },
+    recordActivityEventFn,
+    recordAuditEventFn,
+  });
+
+  const result = await service.cancelMediaRequest({
+    actorUserId: 'admin-1',
+    actorUserRole: 'admin',
+    mediaRequestId: 'parent-1',
+    reason: 'Duplicate',
+  });
+
+  assert.equal(result.cancelledChildCount, 2);
+  assert.equal(cancelFanOutChildren.mock.callCount(), 1);
+  assert.equal(cancelFanOutChildren.mock.calls[0].arguments[0].parentMediaRequestId, 'parent-1');
+
+  assert.equal(insertMediaRequestEvent.mock.callCount(), 3);
+  assert.equal(insertMediaRequestEvent.mock.calls[0].arguments[0].mediaRequestId, 'child-1');
+  assert.equal(insertMediaRequestEvent.mock.calls[0].arguments[0].eventType, 'cancelled');
+  assert.equal(insertMediaRequestEvent.mock.calls[1].arguments[0].mediaRequestId, 'child-2');
+  assert.equal(insertMediaRequestEvent.mock.calls[2].arguments[0].mediaRequestId, 'parent-1');
+
+  const auditCalls = recordAuditEventFn.mock.calls.map((c) => c.arguments[0].eventType);
+  assert.ok(auditCalls.includes('media_request_cancelled'));
+  assert.ok(auditCalls.includes('media_request_fan_out_cancelled'));
+});
+
+test('cancelMediaRequest skips cascade when request has no fan-out children', async (t) => {
+  const getMediaRequestById = t.mock.fn(async () => ({
+    artistName: 'Aphex Twin',
+    fanOutChildCount: 0,
+    id: 'request-1',
+    releaseTitle: 'Selected Ambient Works 85-92',
+    requestKind: 'release',
+    requestState: 'needs_fetch',
+    requestedByUser: { id: 'user-1', username: 'listener' },
+    requestedForUser: { id: 'user-1', username: 'listener' },
+  }));
+
+  const updateRequestState = t.mock.fn(async () => true);
+  const insertMediaRequestEvent = t.mock.fn(async () => {});
+  const cancelFanOutChildren = t.mock.fn(async () => []);
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const recordActivityEventFn = t.mock.fn(async () => {});
+
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      cancelFanOutChildren,
+      getMediaRequestById,
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
+      insertMediaRequestEvent,
+      listMediaRequests: async () => [],
+      updateRequestState,
+    },
+    recordActivityEventFn,
+    recordAuditEventFn,
+  });
+
+  const result = await service.cancelMediaRequest({
+    actorUserId: 'user-1',
+    mediaRequestId: 'request-1',
+  });
+
+  assert.equal(result.cancelledChildCount, 0);
+  assert.equal(cancelFanOutChildren.mock.callCount(), 0);
+  assert.equal(insertMediaRequestEvent.mock.callCount(), 1);
+  assert.equal(insertMediaRequestEvent.mock.calls[0].arguments[0].mediaRequestId, 'request-1');
+});

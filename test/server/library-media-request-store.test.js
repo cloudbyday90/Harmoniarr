@@ -72,3 +72,45 @@ test('library media request store joins matched artists through release groups',
   assert.equal(mediaRequest.existingMatch.artistName, 'Autechre');
   assert.equal(mediaRequest.existingMatch.releaseId, 'release-1');
 });
+
+test('cancelFanOutChildren updates only cancellable children of a parent request', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /UPDATE media_requests/);
+    assert.match(sql, /fan_out_parent_id = \$1/);
+    assert.match(sql, /request_state = 'cancelled'/);
+    assert.equal(params[0], 'parent-1');
+    assert.deepEqual(params.slice(1), ['needs_fetch', 'needs_review']);
+
+    return {
+      rows: [{ id: 'child-1' }, { id: 'child-2' }],
+    };
+  });
+
+  const store = createLibraryMediaRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const cancelledIds = await store.cancelFanOutChildren({
+    parentMediaRequestId: 'parent-1',
+    cancellableStates: ['needs_fetch', 'needs_review'],
+  });
+
+  assert.deepEqual(cancelledIds, ['child-1', 'child-2']);
+  assert.equal(query.mock.callCount(), 1);
+});
+
+test('cancelFanOutChildren returns empty array when no children match', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+
+  const store = createLibraryMediaRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const cancelledIds = await store.cancelFanOutChildren({
+    parentMediaRequestId: 'parent-1',
+    cancellableStates: ['needs_fetch', 'needs_review'],
+  });
+
+  assert.deepEqual(cancelledIds, []);
+  assert.equal(query.mock.callCount(), 1);
+});
