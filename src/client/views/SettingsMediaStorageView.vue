@@ -26,7 +26,6 @@ import {
   resolveQuotaTone,
   buildSparklineData,
 } from '../lib/artwork-quota-presentation.js';
-import { fetchArtworkQuotaHistory } from '../lib/artwork-api.js';
 import {
   createEmptyDownloadMapping,
   createEmptyUserMusicRoot,
@@ -44,13 +43,14 @@ import {
 } from '../lib/settings-media-storage-presentation.js';
 import FolderBrowserModal from '../components/FolderBrowserModal.vue';
 import { useArtworkQuota } from '../composables/useArtworkQuota.js';
+import { useQuotaHistory } from '../composables/useQuotaHistory.js';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
 
 const pathValidation = ref(null);
 
 const artworkQuota = useArtworkQuota();
 
-const quotaHistory = ref(null);
+const quotaHistory = useQuotaHistory({ days: 30 });
 
 const {
   errorMessage,
@@ -64,7 +64,7 @@ const {
   extraApply: (payload) => { pathValidation.value = payload.pathValidation ?? null; },
   onSaveSuccess: () => {
     void artworkQuota.revalidate();
-    void loadQuotaHistory();
+    void quotaHistory.revalidate();
   },
 });
 
@@ -101,32 +101,25 @@ function removeDownloadMapping(index) { form.paths.downloadMappings.splice(index
 function addUserMusicRoot() { form.paths.userMusicRoots.push(createEmptyUserMusicRoot()); }
 function removeUserMusicRoot(index) { form.paths.userMusicRoots.splice(index, 1); }
 
-onMounted(() => { void loadSettings(); });
-
 const providerSparklines = computed(() => {
-  if (!quotaHistory.value) return {};
+  if (!quotaHistory.history.value) return {};
   const result = {};
-  for (const provider of Object.keys(quotaHistory.value.history)) {
+  for (const provider of Object.keys(quotaHistory.history.value.history)) {
     result[provider] = buildSparklineData(
-      quotaHistory.value.history[provider],
-      quotaHistory.value.limit,
+      quotaHistory.history.value.history[provider],
+      quotaHistory.history.value.limit,
     );
   }
   return result;
 });
 
-async function loadQuotaHistory() {
-  try {
-    quotaHistory.value = await fetchArtworkQuotaHistory({ days: 30 });
-  } catch {
-    quotaHistory.value = null;
-  }
-}
-
+onMounted(() => { void loadSettings(); });
 onMounted(() => { void artworkQuota.loadQuota(); });
-onMounted(() => { void loadQuotaHistory(); });
+onMounted(() => { void quotaHistory.load(); });
 onMounted(() => { artworkQuota.attachVisibilityListener(); });
+onMounted(() => { quotaHistory.attachVisibilityListener(); });
 onBeforeUnmount(() => { artworkQuota.destroy(); });
+onBeforeUnmount(() => { quotaHistory.destroy(); });
 </script>
 
 <template>
