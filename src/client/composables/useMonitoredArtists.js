@@ -16,47 +16,100 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { ref } from 'vue';
+import { readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchMonitoredArtists as defaultFetchMonitoredArtists } from '../lib/metadata-api.js';
 
-/**
- * Composable that loads the current user's monitored artists from the local
- * metadata store.
- *
- * Returns an artwork-ready artist list suitable for rendering with ArtistCard.
- * All artists in the result are already monitored (`monitored: true`).
- *
- * @param {object} [options]
- * @param {number} [options.limit=25] - Maximum number of artists to load.
- * @param {function} [options.fetchArtists] - Override for testing.
- */
 export function useMonitoredArtists({
   limit = 25,
   fetchArtists = defaultFetchMonitoredArtists,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   const artists = ref([]);
   const errorMessage = ref('');
   const isLoading = ref(true);
+  const isRevalidating = ref(false);
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
+
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (artists.value.length === 0) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await loadMonitoredArtists();
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    void loadMonitoredArtists().then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
 
   async function loadMonitoredArtists() {
-    isLoading.value = true;
+    if (destroyed) return;
     errorMessage.value = '';
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
+
     try {
       const payload = await fetchArtists({ limit });
       artists.value = Array.isArray(payload?.results) ? payload.results : [];
+      hasLoaded = true;
     } catch (error) {
-      artists.value = [];
+      if (!isRevalidation) {
+        artists.value = [];
+      }
       errorMessage.value = getErrorMessage(error, 'Could not load your monitored artists.');
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
   return {
     artists,
+    attachVisibilityListener,
+    destroy,
     errorMessage,
     isLoading,
+    isRevalidating: readonly(isRevalidating),
     loadMonitoredArtists,
   };
 }

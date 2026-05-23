@@ -16,46 +16,82 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchReleaseRadar as defaultFetchReleaseRadar } from '../lib/library-api.js';
 import { normalizeRadarReleaseForCard } from '../lib/release-radar-normalization.js';
 
-/**
- * Composable that loads the release radar: new and upcoming releases from
- * monitored artists.
- *
- * Not lifecycle-bound — the caller triggers `load()`, typically in `onMounted`.
- * Returns raw radar items pre-normalized via `normalizeRadarReleaseForCard` so
- * they can be passed directly to `ReleaseCard`.
- *
- * @param {object} [options]
- * @param {function} [options.fetchRadarFn] - Override for testing.
- */
 export function useReleaseRadar({
   fetchRadarFn = defaultFetchReleaseRadar,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   const recent = ref([]);
   const upcoming = ref([]);
   const checkedAt = ref(null);
   const windows = ref({ recentDays: 30, upcomingDays: 90 });
   const isLoading = ref(false);
+  const isRevalidating = ref(false);
   const errorMessage = ref('');
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
 
   const hasRecent = computed(() => recent.value.length > 0);
   const hasUpcoming = computed(() => upcoming.value.length > 0);
   const isEmpty = computed(() => !hasRecent.value && !hasUpcoming.value);
 
-  /**
-   * Loads the release radar from the API. Normalizes each item for use with
-   * `ReleaseCard`. Clears any previous error before fetching.
-   *
-   * @param {object} [options]
-   * @param {AbortSignal} [options.signal] - Optional abort signal.
-   */
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (isEmpty.value) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await load();
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    void load().then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
   async function load({ signal } = {}) {
-    isLoading.value = true;
+    if (destroyed) return;
     errorMessage.value = '';
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
+
     try {
       const payload = await fetchRadarFn({ signal });
       recent.value = Array.isArray(payload?.recent)
@@ -66,23 +102,33 @@ export function useReleaseRadar({
         : [];
       checkedAt.value = payload?.checkedAt ?? null;
       windows.value = payload?.windows ?? { recentDays: 30, upcomingDays: 90 };
+      hasLoaded = true;
     } catch (error) {
-      recent.value = [];
-      upcoming.value = [];
-      checkedAt.value = null;
+      if (!isRevalidation) {
+        recent.value = [];
+        upcoming.value = [];
+        checkedAt.value = null;
+      }
       errorMessage.value = getErrorMessage(error, 'Could not load release radar.');
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
   return {
+    attachVisibilityListener,
     checkedAt,
+    destroy,
     errorMessage,
     hasRecent,
     hasUpcoming,
     isEmpty,
     isLoading,
+    isRevalidating: readonly(isRevalidating),
     load,
     recent,
     upcoming,

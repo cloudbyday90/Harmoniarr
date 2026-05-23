@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import ArtistCard from '../media/ArtistCard.vue';
 import ConfirmRequestModal from '../media/ConfirmRequestModal.vue';
@@ -37,12 +37,12 @@ import { formatActivityEventTime, getActivityEventDetail, getActivityEventLabel 
 import { getRadarWindowLabel } from '../../lib/release-radar-normalization.js';
 import { sessionStore } from '../../state/session.js';
 
-const { artists, errorMessage, isLoading, loadMonitoredArtists } = useMonitoredArtists({ limit: 25 });
+const { artists, errorMessage, isLoading, loadMonitoredArtists, destroy: destroyArtists, attachVisibilityListener: attachArtistsVisibility } = useMonitoredArtists({ limit: 25, pollIntervalMs: 30000, revalidateOnFocus: true });
 
-const activityFeed = useActivityFeed({ limit: 10 });
+const activityFeed = useActivityFeed({ limit: 10, pollIntervalMs: 30000, revalidateOnFocus: true });
 const currentUserId = sessionStore.state.user?.id ?? null;
 
-const radar = useReleaseRadar();
+const radar = useReleaseRadar({ pollIntervalMs: 30000, revalidateOnFocus: true });
 const radarStrip = computed(() => [
   ...radar.recent.value.slice(0, 4),
   ...radar.upcoming.value.slice(0, 4),
@@ -153,6 +153,15 @@ onMounted(() => {
   void loadMonitoredArtists();
   void radar.load();
   void activityFeed.load();
+  attachArtistsVisibility();
+  radar.attachVisibilityListener();
+  activityFeed.attachVisibilityListener();
+});
+
+onBeforeUnmount(() => {
+  destroyArtists();
+  radar.destroy();
+  activityFeed.destroy();
 });
 </script>
 
