@@ -64,7 +64,7 @@ const userInitial = computed(() => {
   return name.slice(0, 1).toUpperCase();
 });
 
-const { status: healthStatus, label: healthLabel, detail: healthDetail, activeJobs } = useShellHeartbeat();
+const { status: healthStatus, label: healthLabel, detail: healthDetail, activeJobs, refresh: heartbeatRefresh, attachVisibilityListener: attachHeartbeatVisibility, destroy: destroyHeartbeat } = useShellHeartbeat({ revalidateOnFocus: true });
 
 const {
   data: notificationsPayload,
@@ -188,10 +188,13 @@ function handleGlobalKeydown(event) {
 
 onMounted(() => {
   document.addEventListener('keydown', handleGlobalKeydown);
+  attachHeartbeatVisibility();
+  void heartbeatRefresh();
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleGlobalKeydown);
+  destroyHeartbeat();
 });
 </script>
 

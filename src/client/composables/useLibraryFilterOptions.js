@@ -16,73 +16,100 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { getCurrentInstance, onMounted, onUnmounted, ref } from 'vue';
+import { readonly, ref } from 'vue';
 import { fetchLibraryFilterOptions as defaultFetchLibraryFilterOptions } from '../lib/library-api.js';
 
-const POLL_INTERVAL_MS = 60_000;
+const DEFAULT_POLL_INTERVAL_MS = 60_000;
 
-/**
- * Composable that fetches the dynamic filter options for the Library view
- * and keeps them fresh via a 60-second background poll.
- *
- * Returns `{ options }` where `options.value` is null until the first response
- * arrives, then takes the shape `{ formats: string[], genres: string[] }`.
- *
- * The background poll is non-blocking and fires no loading state — callers
- * should simply render with null options (no filter panel) until data arrives.
- *
- * Injectable `fetchOptions` and `setIntervalFn`/`clearIntervalFn` are provided
- * for full testability under Node without a component instance.
- *
- * @param {object} [options]
- * @param {function} [options.fetchOptions]       Override for testing
- * @param {function|null} [options.setIntervalFn] Override for testing
- * @param {function|null} [options.clearIntervalFn] Override for testing
- */
 export function useLibraryFilterOptions({
   fetchOptions = defaultFetchLibraryFilterOptions,
-  setIntervalFn = null,
-  clearIntervalFn = null,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  revalidateOnFocus = false,
 } = {}) {
-  const _setInterval =
-    setIntervalFn ?? (typeof globalThis.setInterval !== 'undefined' ? globalThis.setInterval : null);
-  const _clearInterval =
-    clearIntervalFn ??
-    (typeof globalThis.clearInterval !== 'undefined' ? globalThis.clearInterval : null);
-
-  /** @type {import('vue').Ref<{formats: string[], genres: string[]} | null>} */
   const options = ref(null);
+  const isRevalidating = ref(false);
 
-  let intervalHandle = null;
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
 
-  async function _poll() {
-    try {
-      const result = await fetchOptions();
-      options.value = result ?? null;
-    } catch {
-      // Background poll failures are silent — stale options remain visible
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
     }
   }
 
-  if (getCurrentInstance()) {
-    onMounted(async () => {
-      await _poll();
-      if (_setInterval) {
-        intervalHandle = _setInterval(_poll, POLL_INTERVAL_MS);
-      }
-    });
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!hasLoaded) return;
 
-    onUnmounted(() => {
-      if (intervalHandle !== null && _clearInterval) {
-        _clearInterval(intervalHandle);
-        intervalHandle = null;
-      }
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await revalidate();
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    void revalidate().then(() => {
+      if (!destroyed) schedulePoll();
     });
   }
 
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  async function load() {
+    if (destroyed) return;
+    try {
+      const result = await fetchOptions();
+      if (destroyed) return;
+      options.value = result ?? null;
+      hasLoaded = true;
+    } catch {
+      // Silent — callers render with null options.
+    } finally {
+      if (!destroyed) schedulePoll();
+    }
+  }
+
+  async function revalidate() {
+    if (destroyed) return;
+    isRevalidating.value = true;
+    try {
+      const result = await fetchOptions();
+      if (destroyed) return;
+      options.value = result ?? null;
+    } catch {
+      // Preserve stale data on revalidation error.
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+        schedulePoll();
+      }
+    }
+  }
+
   return {
+    attachVisibilityListener,
+    destroy,
+    isRevalidating: readonly(isRevalidating),
+    load,
     options,
-    // Exposed for testing
-    _poll,
+    revalidate,
   };
 }

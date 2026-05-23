@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useToast } from '../composables/useToast.js';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
@@ -73,8 +73,10 @@ const router = useRouter();
 const toast = useToast();
 
 const {
+  attachVisibilityListener,
   cancellationErrorMessage,
   detailErrorMessage,
+  destroy: destroyOperationHistory,
   errorMessage,
   hasActiveRuns,
   isCancellingRun,
@@ -91,7 +93,7 @@ const {
   selectedRunDetail,
   selectedRunId,
   selectOperationRun,
-} = useOperationHistory();
+} = useOperationHistory({ revalidateOnFocus: true });
 
 const operationsRouteState = computed(() => normalizeOperationsRouteState(route.query));
 const selectedRun = computed(() => selectedRunDetail.value?.run ?? null);
@@ -305,7 +307,12 @@ function closeConfirmDialog() {
 }
 
 onMounted(() => {
+  attachVisibilityListener();
   void loadOperationHistory({ preferredRunId: operationsRouteState.value.runId || null });
+});
+
+onBeforeUnmount(() => {
+  destroyOperationHistory();
 });
 
 watch(

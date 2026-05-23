@@ -16,23 +16,29 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, ref, shallowRef } from 'vue';
+import { computed, readonly, ref, shallowRef } from 'vue';
 import { fetchRecoveryStatus as defaultFetchRecoveryStatus, completeRecovery as defaultCompleteRecovery } from '../lib/recovery-api.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 
-const POLL_INTERVAL_MS = 10_000;
+const DEFAULT_POLL_INTERVAL_MS = 10_000;
 
 export function useRecoveryStatus({
   fetchRecoveryStatus = defaultFetchRecoveryStatus,
   completeRecovery = defaultCompleteRecovery,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  revalidateOnFocus = false,
 } = {}) {
   const status = shallowRef(null);
   const errorMessage = ref('');
   const isLoading = ref(true);
+  const isRevalidating = ref(false);
   const isSubmitting = ref(false);
   const completionResult = shallowRef(null);
   const isCompleted = ref(false);
+
   let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
 
   const recoveryAvailable = computed(() => status.value?.recoveryAvailable === true);
   const blockedByLock = computed(() => status.value?.blockedByLock === true);
@@ -50,30 +56,76 @@ export function useRecoveryStatus({
 
   const expired = computed(() => secondsRemaining.value <= 0 && recoveryAvailable.value);
 
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!hasLoaded) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await revalidate();
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    void revalidate().then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
   async function loadStatus() {
+    if (destroyed) return;
     isLoading.value = true;
     errorMessage.value = '';
     try {
       status.value = await fetchRecoveryStatus();
+      hasLoaded = true;
     } catch (error) {
       status.value = null;
       errorMessage.value = getErrorMessage(error, 'Failed to load recovery status');
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        schedulePoll();
+      }
     }
   }
 
-  function startPolling() {
-    stopPolling();
-    pollTimer = setInterval(() => {
-      void loadStatus();
-    }, POLL_INTERVAL_MS);
-  }
-
-  function stopPolling() {
-    if (pollTimer !== null) {
-      clearInterval(pollTimer);
-      pollTimer = null;
+  async function revalidate() {
+    if (destroyed) return;
+    isRevalidating.value = true;
+    try {
+      status.value = await fetchRecoveryStatus();
+    } catch {
+      // Preserve stale data on revalidation error.
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
@@ -84,7 +136,7 @@ export function useRecoveryStatus({
       const result = await completeRecovery(form);
       completionResult.value = result;
       isCompleted.value = true;
-      stopPolling();
+      clearPollTimer();
       return result;
     } catch (error) {
       errorMessage.value = getErrorMessage(error, 'Recovery failed');
@@ -95,21 +147,23 @@ export function useRecoveryStatus({
   }
 
   return {
+    attachVisibilityListener,
     blockedByLock,
     completionResult,
+    destroy,
     errorMessage,
     expired,
     expiresAt,
     isCompleted,
     isLoading,
+    isRevalidating: readonly(isRevalidating),
     isSubmitting,
     loadStatus,
     recoveryAvailable,
     remainingAttempts,
+    revalidate,
     secondsRemaining,
-    startPolling,
     status,
-    stopPolling,
     submitRecovery,
   };
 }

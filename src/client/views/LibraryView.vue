@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
@@ -73,7 +73,7 @@ const {
 
 // ── Dynamic filter options (60s background poll) ──────────────────────────────
 
-const { options: dynamicFilterOptions } = useLibraryFilterOptions();
+const { options: dynamicFilterOptions, load: loadFilterOptions, attachVisibilityListener: attachFilterVisibility, destroy: destroyFilterOptions } = useLibraryFilterOptions({ revalidateOnFocus: true });
 
 // Merge static status filter group with any dynamic format/genre groups from the server
 const filterGroups = computed(() => {
@@ -102,6 +102,15 @@ const displayReleases = computed(() =>
 );
 
 const { getResolved: getResolvedArtwork, resolve: resolveArtworkBatch } = useArtworkBatchResolve();
+
+onMounted(() => {
+  attachFilterVisibility();
+  void loadFilterOptions();
+});
+
+onBeforeUnmount(() => {
+  destroyFilterOptions();
+});
 
 watch(
   displayReleases,

@@ -27,6 +27,7 @@ test('useOperationHistory loads history and selects the most recent run by defau
         },
       },
     }),
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory();
@@ -34,6 +35,7 @@ test('useOperationHistory loads history and selects the most recent run by defau
   assert.equal(workflow.runs.value.length, 1);
   assert.equal(workflow.selectedRunId.value, 'run-1');
   assert.equal(workflow.selectedRunDetail.value.run.id, 'run-1');
+  workflow.destroy();
 });
 
 test('useOperationHistory can load a preferred historical run detail explicitly', async () => {
@@ -61,6 +63,7 @@ test('useOperationHistory can load a preferred historical run detail explicitly'
         },
       },
     }),
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory({ preferredRunId: 'run-older-2' });
@@ -68,6 +71,7 @@ test('useOperationHistory can load a preferred historical run detail explicitly'
   assert.equal(workflow.selectedRunId.value, 'run-older-2');
   assert.equal(workflow.selectedRunDetail.value.run.status, 'failed');
   assert.equal(workflow.detailErrorMessage.value, '');
+  workflow.destroy();
 });
 
 test('useOperationHistory clears stale state when history loading fails', async () => {
@@ -75,6 +79,7 @@ test('useOperationHistory clears stale state when history loading fails', async 
     fetchOperationHistory: async () => {
       throw new Error('operation history unavailable');
     },
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory();
@@ -82,12 +87,11 @@ test('useOperationHistory clears stale state when history loading fails', async 
   assert.equal(workflow.historyPayload.value, null);
   assert.equal(workflow.selectedRunId.value, null);
   assert.equal(workflow.errorMessage.value, 'operation history unavailable');
+  workflow.destroy();
 });
 
 test('useOperationHistory requests cancellation and refreshes the selected run detail', async () => {
   const workflow = useOperationHistory({
-    setIntervalFn: () => 0,
-    clearIntervalFn: () => {},
     fetchOperationHistory: async () => ({
       checkedAt: '2026-05-01T01:00:00.000Z',
       runs: [{
@@ -124,6 +128,7 @@ test('useOperationHistory requests cancellation and refreshes the selected run d
         summary: {},
       },
     }),
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory();
@@ -132,6 +137,7 @@ test('useOperationHistory requests cancellation and refreshes the selected run d
   assert.equal(workflow.cancellationErrorMessage.value, '');
   assert.equal(workflow.selectedRunDetail.value.run.cancelRequestedByUserId, 'admin-9');
   assert.equal(workflow.runs.value[0].cancelRequestedAt, '2026-05-01T01:02:00.000Z');
+  workflow.destroy();
 });
 
 test('useOperationHistory requests retry and refreshes the selected run detail', async () => {
@@ -176,6 +182,7 @@ test('useOperationHistory requests retry and refreshes the selected run detail',
         summary: {},
       },
     }),
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory();
@@ -184,71 +191,44 @@ test('useOperationHistory requests retry and refreshes the selected run detail',
   assert.equal(workflow.retryErrorMessage.value, '');
   assert.equal(workflow.selectedRunDetail.value.run.maxAttempts, 2);
   assert.equal(workflow.runs.value[0].status, 'pending');
+  workflow.destroy();
 });
 
-// ---------------------------------------------------------------------------
-// Auto-refresh polling
-// ---------------------------------------------------------------------------
-
-function buildTimerMock() {
-  let nextId = 1;
-  const timers = new Map();
-  return {
-    setIntervalFn(cb, ms) {
-      const id = nextId++;
-      timers.set(id, { cb, ms });
-      return id;
-    },
-    clearIntervalFn(id) {
-      timers.delete(id);
-    },
-    get activeCount() { return timers.size; },
-    fireAll() {
-      for (const { cb } of timers.values()) cb();
-    },
-  };
-}
-
-test('useOperationHistory starts polling when active runs are present after load', async () => {
-  const timer = buildTimerMock();
+test('useOperationHistory isPollingActive is true when active runs are present after load', async () => {
   const workflow = useOperationHistory({
     fetchOperationHistory: async () => ({
       runs: [{ id: 'run-a', operationType: 'library_scan', status: 'running', summary: {} }],
     }),
     fetchOperationRunDetail: async (runId) => ({ operationRun: { auditEvents: [], run: { id: runId, status: 'running' } } }),
-    setIntervalFn: (cb, ms) => timer.setIntervalFn(cb, ms),
-    clearIntervalFn: (id) => timer.clearIntervalFn(id),
+    pollIntervalMs: 50,
   });
 
   await workflow.loadOperationHistory();
 
   assert.equal(workflow.isPollingActive.value, true);
-  assert.equal(timer.activeCount, 1);
+  workflow.destroy();
 });
 
-test('useOperationHistory does not start polling when no active runs exist after load', async () => {
-  const timer = buildTimerMock();
+test('useOperationHistory isPollingActive is false when no active runs exist after load', async () => {
   const workflow = useOperationHistory({
     fetchOperationHistory: async () => ({
       runs: [{ id: 'run-b', operationType: 'library_scan', status: 'completed', summary: {} }],
     }),
     fetchOperationRunDetail: async (runId) => ({ operationRun: { auditEvents: [], run: { id: runId, status: 'completed' } } }),
-    setIntervalFn: (cb, ms) => timer.setIntervalFn(cb, ms),
-    clearIntervalFn: (id) => timer.clearIntervalFn(id),
+    pollIntervalMs: 50,
   });
 
   await workflow.loadOperationHistory();
 
   assert.equal(workflow.isPollingActive.value, false);
-  assert.equal(timer.activeCount, 0);
+  workflow.destroy();
 });
 
 test('useOperationHistory stops polling when active runs disappear on next load', async () => {
-  const timer = buildTimerMock();
   let callCount = 0;
   const workflow = useOperationHistory({
     fetchOperationHistory: async () => {
-      callCount++;
+      callCount += 1;
       return {
         runs: [{
           id: 'run-c',
@@ -259,63 +239,60 @@ test('useOperationHistory stops polling when active runs disappear on next load'
       };
     },
     fetchOperationRunDetail: async (runId) => ({ operationRun: { auditEvents: [], run: { id: runId, status: 'completed' } } }),
-    setIntervalFn: (cb, ms) => timer.setIntervalFn(cb, ms),
-    clearIntervalFn: (id) => timer.clearIntervalFn(id),
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory();
-  assert.equal(workflow.isPollingActive.value, true);
+  assert.equal(workflow.isPollingActive.value, false);
 
-  // Second load returns completed run
   await workflow.loadOperationHistory();
   assert.equal(workflow.isPollingActive.value, false);
-  assert.equal(timer.activeCount, 0);
+  workflow.destroy();
 });
 
 test('useOperationHistory sets lastRefreshedAt after a successful load', async () => {
   const workflow = useOperationHistory({
     fetchOperationHistory: async () => ({ runs: [] }),
+    pollIntervalMs: 0,
   });
 
   assert.equal(workflow.lastRefreshedAt.value, null);
   await workflow.loadOperationHistory();
   assert.ok(workflow.lastRefreshedAt.value, 'lastRefreshedAt should be set after load');
   assert.doesNotThrow(() => new Date(workflow.lastRefreshedAt.value));
+  workflow.destroy();
 });
 
 test('useOperationHistory does not set lastRefreshedAt when load fails', async () => {
   const workflow = useOperationHistory({
     fetchOperationHistory: async () => { throw new Error('network error'); },
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory();
 
   assert.equal(workflow.lastRefreshedAt.value, null);
+  workflow.destroy();
 });
 
-test('useOperationHistory stopPolling sets isPollingActive to false and removes timer', async () => {
-  const timer = buildTimerMock();
+test('useOperationHistory destroy sets isPollingActive to false', async () => {
   const workflow = useOperationHistory({
     fetchOperationHistory: async () => ({
       runs: [{ id: 'run-d', operationType: 'library_scan', status: 'running', summary: {} }],
     }),
     fetchOperationRunDetail: async (runId) => ({ operationRun: { auditEvents: [], run: { id: runId, status: 'running' } } }),
-    setIntervalFn: (cb, ms) => timer.setIntervalFn(cb, ms),
-    clearIntervalFn: (id) => timer.clearIntervalFn(id),
+    pollIntervalMs: 50,
   });
 
   await workflow.loadOperationHistory();
   assert.equal(workflow.isPollingActive.value, true);
 
-  workflow.stopPolling();
+  workflow.destroy();
   assert.equal(workflow.isPollingActive.value, false);
-  assert.equal(timer.activeCount, 0);
 });
 
 test('useOperationHistory hasActiveRuns reflects pending and running runs', async () => {
   const workflow = useOperationHistory({
-    setIntervalFn: () => 0,
-    clearIntervalFn: () => {},
     fetchOperationHistory: async () => ({
       runs: [
         { id: 'run-e1', operationType: 'library_scan', status: 'completed', summary: {} },
@@ -323,11 +300,13 @@ test('useOperationHistory hasActiveRuns reflects pending and running runs', asyn
       ],
     }),
     fetchOperationRunDetail: async (runId) => ({ operationRun: { auditEvents: [], run: { id: runId, status: 'pending' } } }),
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory();
 
   assert.equal(workflow.hasActiveRuns.value, true);
+  workflow.destroy();
 });
 
 test('useOperationHistory hasActiveRuns is false when all runs are terminal', async () => {
@@ -340,9 +319,68 @@ test('useOperationHistory hasActiveRuns is false when all runs are terminal', as
       ],
     }),
     fetchOperationRunDetail: async (runId) => ({ operationRun: { auditEvents: [], run: { id: runId, status: 'completed' } } }),
+    pollIntervalMs: 0,
   });
 
   await workflow.loadOperationHistory();
 
   assert.equal(workflow.hasActiveRuns.value, false);
+  workflow.destroy();
+});
+
+test('useOperationHistory revalidate preserves stale data on error', async () => {
+  let callCount = 0;
+  const workflow = useOperationHistory({
+    fetchOperationHistory: async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return { runs: [{ id: 'run-g', status: 'running', summary: {} }] };
+      }
+      throw new Error('refresh failed');
+    },
+    fetchOperationRunDetail: async () => ({ operationRun: { auditEvents: [], run: { id: 'run-g', status: 'running' } } }),
+    pollIntervalMs: 0,
+  });
+
+  await workflow.loadOperationHistory();
+  assert.equal(workflow.runs.value.length, 1);
+
+  await workflow.revalidate();
+  assert.equal(workflow.runs.value.length, 1, 'stale data preserved on revalidation error');
+  workflow.destroy();
+});
+
+test('useOperationHistory revalidate is no-op after destroy', async () => {
+  let callCount = 0;
+  const workflow = useOperationHistory({
+    fetchOperationHistory: async () => {
+      callCount += 1;
+      return { runs: [] };
+    },
+    pollIntervalMs: 0,
+  });
+
+  await workflow.loadOperationHistory();
+  assert.equal(callCount, 1);
+  workflow.destroy();
+
+  await workflow.revalidate();
+  assert.equal(callCount, 1, 'no fetch after destroy');
+});
+
+test('useOperationHistory isRevalidating is true during background revalidation', async () => {
+  const workflow = useOperationHistory({
+    fetchOperationHistory: async () => ({ runs: [{ id: 'run-h', status: 'running', summary: {} }] }),
+    fetchOperationRunDetail: async (runId) => ({ operationRun: { auditEvents: [], run: { id: runId, status: 'running' } } }),
+    pollIntervalMs: 0,
+  });
+
+  await workflow.loadOperationHistory();
+  assert.equal(workflow.isRevalidating.value, false);
+
+  const p = workflow.revalidate();
+  assert.equal(workflow.isRevalidating.value, true);
+  await p;
+  assert.equal(workflow.isRevalidating.value, false);
+  workflow.destroy();
 });

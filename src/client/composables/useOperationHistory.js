@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, onUnmounted, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
   fetchOperationHistory as defaultFetchOperationHistory,
@@ -25,16 +25,15 @@ import {
   requestOperationRunRetry as defaultRequestOperationRunRetry,
 } from '../lib/operations-api.js';
 
-/** Interval between background polls when active runs are present. */
-const POLL_INTERVAL_MS = 15_000;
+const DEFAULT_POLL_INTERVAL_MS = 15_000;
 
 export function useOperationHistory({
-  clearIntervalFn = clearInterval,
   fetchOperationHistory = defaultFetchOperationHistory,
   fetchOperationRunDetail = defaultFetchOperationRunDetail,
   requestOperationRunCancellation = defaultRequestOperationRunCancellation,
   requestOperationRunRetry = defaultRequestOperationRunRetry,
-  setIntervalFn = setInterval,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  revalidateOnFocus = false,
 } = {}) {
   const cancellationErrorMessage = ref('');
   const detailErrorMessage = ref('');
@@ -45,45 +44,68 @@ export function useOperationHistory({
   const isLoadingDetail = ref(false);
   const isLoadingHistory = ref(true);
   const isPollingActive = ref(false);
+  const isRevalidating = ref(false);
   const lastRefreshedAt = ref(null);
   const retryErrorMessage = ref('');
   const selectedRunDetail = ref(null);
   const selectedRunId = ref(null);
 
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
+
   const runs = computed(() => historyPayload.value?.runs ?? []);
 
-  /** True when at least one run is pending or running — drives auto-refresh. */
   const hasActiveRuns = computed(() =>
     runs.value.some((r) => r.status === 'pending' || r.status === 'running'),
   );
 
-  let pollingTimerId = null;
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
 
-  function stopPolling() {
-    if (pollingTimerId !== null) {
-      clearIntervalFn(pollingTimerId);
-      pollingTimerId = null;
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!hasLoaded) return;
+    if (!hasActiveRuns.value) {
       isPollingActive.value = false;
+      return;
+    }
+
+    isPollingActive.value = true;
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await loadOperationHistory({ preferredRunId: selectedRunId.value });
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    if (!hasActiveRuns.value) return;
+    void loadOperationHistory({ preferredRunId: selectedRunId.value }).then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    isPollingActive.value = false;
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
   }
 
-  /** Start or stop polling depending on whether active runs exist. */
-  function syncPolling() {
-    if (hasActiveRuns.value) {
-      if (pollingTimerId === null) {
-        isPollingActive.value = true;
-        pollingTimerId = setIntervalFn(() => {
-          if (!isLoadingHistory.value) {
-            void loadOperationHistory({ preferredRunId: selectedRunId.value });
-          }
-        }, POLL_INTERVAL_MS);
-      }
-    } else {
-      stopPolling();
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     }
   }
-
-  onUnmounted(stopPolling);
 
   function mergeRunIntoHistory(run) {
     if (!run || !historyPayload.value?.runs) {
@@ -124,7 +146,14 @@ export function useOperationHistory({
   }
 
   async function loadOperationHistory({ preferredRunId = selectedRunId.value } = {}) {
-    isLoadingHistory.value = true;
+    if (destroyed) return;
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoadingHistory.value = true;
+    }
     cancellationErrorMessage.value = '';
     errorMessage.value = '';
     retryErrorMessage.value = '';
@@ -134,7 +163,8 @@ export function useOperationHistory({
       lastRefreshedAt.value = new Date().toISOString();
       const nextRunId = preferredRunId || runs.value[0]?.id || null;
       await selectOperationRun({ runId: nextRunId });
-      syncPolling();
+      hasLoaded = true;
+      schedulePoll();
     } catch (error) {
       historyPayload.value = null;
       selectedRunDetail.value = null;
@@ -142,7 +172,29 @@ export function useOperationHistory({
       detailErrorMessage.value = '';
       errorMessage.value = getErrorMessage(error, 'Operation history failed');
     } finally {
-      isLoadingHistory.value = false;
+      if (!destroyed) {
+        isLoadingHistory.value = false;
+        isRevalidating.value = false;
+      }
+    }
+  }
+
+  async function revalidate() {
+    if (destroyed) return;
+    isRevalidating.value = true;
+
+    try {
+      const payload = await fetchOperationHistory();
+      if (destroyed) return;
+      historyPayload.value = payload;
+      lastRefreshedAt.value = new Date().toISOString();
+    } catch {
+      // Preserve stale data on revalidation error.
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
@@ -171,6 +223,7 @@ export function useOperationHistory({
         }
 
         await selectOperationRun({ runId: operationRun.id });
+        schedulePoll();
       }
     } catch (error) {
       cancellationErrorMessage.value = getErrorMessage(error, 'Operation cancellation failed');
@@ -204,6 +257,7 @@ export function useOperationHistory({
         }
 
         await selectOperationRun({ runId: operationRun.id });
+        schedulePoll();
       }
     } catch (error) {
       retryErrorMessage.value = getErrorMessage(error, 'Operation retry failed');
@@ -213,7 +267,9 @@ export function useOperationHistory({
   }
 
   return {
+    attachVisibilityListener,
     cancellationErrorMessage,
+    destroy,
     detailErrorMessage,
     errorMessage,
     hasActiveRuns,
@@ -221,17 +277,18 @@ export function useOperationHistory({
     isCancellingRun,
     isLoadingDetail,
     isLoadingHistory,
-    isPollingActive,
+    isPollingActive: readonly(isPollingActive),
+    isRevalidating: readonly(isRevalidating),
     isRetryingRun,
     lastRefreshedAt,
     loadOperationHistory,
     requestCancellation,
     requestRetry,
+    revalidate,
     retryErrorMessage,
     runs,
     selectedRunDetail,
     selectedRunId,
     selectOperationRun,
-    stopPolling,
   };
 }

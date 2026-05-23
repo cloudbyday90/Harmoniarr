@@ -20,113 +20,136 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { useLibraryFilterOptions } from '../../src/client/composables/useLibraryFilterOptions.js';
 
-// ── Initial state ─────────────────────────────────────────────────────────────
-
 test('useLibraryFilterOptions options is null initially', () => {
-  const { options } = useLibraryFilterOptions({
+  const { options, destroy } = useLibraryFilterOptions({
     fetchOptions: async () => ({ formats: [], genres: [] }),
-    setIntervalFn: () => 0,
-    clearIntervalFn: () => {},
+    pollIntervalMs: 0,
   });
 
   assert.equal(options.value, null);
+  destroy();
 });
 
-// ── _poll ─────────────────────────────────────────────────────────────────────
-
-test('useLibraryFilterOptions _poll populates options on success', async () => {
-  const { options, _poll } = useLibraryFilterOptions({
+test('useLibraryFilterOptions load populates options on success', async () => {
+  const { options, load, destroy } = useLibraryFilterOptions({
     fetchOptions: async () => ({ formats: ['FLAC', 'MP3'], genres: ['Rock'] }),
-    setIntervalFn: () => 0,
-    clearIntervalFn: () => {},
+    pollIntervalMs: 0,
   });
 
-  await _poll();
-
+  await load();
   assert.deepEqual(options.value, { formats: ['FLAC', 'MP3'], genres: ['Rock'] });
+  destroy();
 });
 
-test('useLibraryFilterOptions _poll silently suppresses errors', async () => {
-  const { options, _poll } = useLibraryFilterOptions({
+test('useLibraryFilterOptions load silently suppresses errors', async () => {
+  const { options, load, destroy } = useLibraryFilterOptions({
     fetchOptions: async () => { throw new Error('network error'); },
-    setIntervalFn: () => 0,
-    clearIntervalFn: () => {},
+    pollIntervalMs: 0,
   });
 
-  // Should not throw
-  await _poll();
-
+  await load();
   assert.equal(options.value, null);
+  destroy();
 });
 
-test('useLibraryFilterOptions _poll handles null response', async () => {
-  const { options, _poll } = useLibraryFilterOptions({
+test('useLibraryFilterOptions load handles null response', async () => {
+  const { options, load, destroy } = useLibraryFilterOptions({
     fetchOptions: async () => null,
-    setIntervalFn: () => 0,
-    clearIntervalFn: () => {},
+    pollIntervalMs: 0,
   });
 
-  await _poll();
-
+  await load();
   assert.equal(options.value, null);
+  destroy();
 });
 
-test('useLibraryFilterOptions _poll keeps stale data on subsequent error', async () => {
+test('useLibraryFilterOptions revalidate preserves stale data on error', async () => {
   let callCount = 0;
-  const { options, _poll } = useLibraryFilterOptions({
+  const { options, load, revalidate, destroy } = useLibraryFilterOptions({
     fetchOptions: async () => {
-      callCount++;
+      callCount += 1;
       if (callCount === 1) return { formats: ['FLAC'], genres: [] };
       throw new Error('poll failure');
     },
-    setIntervalFn: () => 0,
-    clearIntervalFn: () => {},
+    pollIntervalMs: 0,
   });
 
-  await _poll();
+  await load();
   assert.deepEqual(options.value?.formats, ['FLAC']);
 
-  await _poll();
-  // Stale data preserved on error
-  assert.deepEqual(options.value?.formats, ['FLAC']);
+  await revalidate();
+  assert.deepEqual(options.value?.formats, ['FLAC'], 'stale data preserved on revalidation error');
+  destroy();
 });
 
-// ── setInterval behavior (injectable) ────────────────────────────────────────
-
-test('useLibraryFilterOptions calls setInterval with POLL_INTERVAL_MS (60000)', () => {
-  const intervals = [];
-  const { _poll } = useLibraryFilterOptions({
-    fetchOptions: async () => ({ formats: [], genres: [] }),
-    setIntervalFn: (fn, ms) => {
-      intervals.push({ fn, ms });
-      return 1;
-    },
-    clearIntervalFn: () => {},
-  });
-
-  // setIntervalFn is only called inside onMounted, which requires a component
-  // context. Outside Vue, the lifecycle guard prevents it from running.
-  // We verify the injectable plumbing is wired by confirming no side-effects
-  // from calling _poll directly (no interval registered outside component).
-  assert.equal(intervals.length, 0);
-});
-
-test('useLibraryFilterOptions _poll is callable multiple times', async () => {
+test('useLibraryFilterOptions load is callable multiple times', async () => {
   let callCount = 0;
-  const { options, _poll } = useLibraryFilterOptions({
+  const { options, load, destroy } = useLibraryFilterOptions({
     fetchOptions: async () => {
-      callCount++;
+      callCount += 1;
       return { formats: [`fmt${callCount}`], genres: [] };
     },
-    setIntervalFn: () => 0,
-    clearIntervalFn: () => {},
+    pollIntervalMs: 0,
   });
 
-  await _poll();
+  await load();
   assert.deepEqual(options.value?.formats, ['fmt1']);
 
-  await _poll();
+  await load();
   assert.deepEqual(options.value?.formats, ['fmt2']);
 
   assert.equal(callCount, 2);
+  destroy();
+});
+
+test('useLibraryFilterOptions isRevalidating is true during revalidate', async () => {
+  const { isRevalidating, load, revalidate, destroy } = useLibraryFilterOptions({
+    fetchOptions: async () => ({ formats: [], genres: [] }),
+    pollIntervalMs: 0,
+  });
+
+  await load();
+  assert.equal(isRevalidating.value, false);
+
+  const p = revalidate();
+  assert.equal(isRevalidating.value, true);
+  await p;
+  assert.equal(isRevalidating.value, false);
+  destroy();
+});
+
+test('useLibraryFilterOptions destroy stops polling', async () => {
+  let callCount = 0;
+  const { load, destroy } = useLibraryFilterOptions({
+    fetchOptions: async () => {
+      callCount += 1;
+      return { formats: [], genres: [] };
+    },
+    pollIntervalMs: 50,
+  });
+
+  await load();
+  assert.equal(callCount, 1);
+  destroy();
+
+  await new Promise((resolve) => { setTimeout(resolve, 120); });
+  assert.equal(callCount, 1, 'no additional fetch after destroy');
+});
+
+test('useLibraryFilterOptions revalidate is no-op after destroy', async () => {
+  let callCount = 0;
+  const { load, revalidate, destroy } = useLibraryFilterOptions({
+    fetchOptions: async () => {
+      callCount += 1;
+      return { formats: [], genres: [] };
+    },
+    pollIntervalMs: 0,
+  });
+
+  await load();
+  assert.equal(callCount, 1);
+  destroy();
+
+  await revalidate();
+  assert.equal(callCount, 1, 'no fetch after destroy');
 });

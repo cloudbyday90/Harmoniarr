@@ -31,6 +31,7 @@ const validationError = ref('');
 const {
   blockedByLock,
   completionResult,
+  destroy: destroyRecoveryStatus,
   errorMessage,
   expired,
   isCompleted,
@@ -40,10 +41,8 @@ const {
   recoveryAvailable,
   remainingAttempts,
   secondsRemaining,
-  startPolling,
-  stopPolling,
   submitRecovery,
-} = useRecoveryStatus();
+} = useRecoveryStatus({ revalidateOnFocus: true });
 const supportItems = computed(() => buildAuthEntrySupportItems('recovery', { username: form.username }));
 const { markTouched: markConfirmTouched, showMatch: showPasswordMatch, showMismatch: showPasswordMismatch } = usePasswordMatch(
   () => form.password,
@@ -67,13 +66,10 @@ const formDisabled = computed(() => {
 
 onMounted(async () => {
   await loadStatus();
-  if (recoveryAvailable.value && !isCompleted.value) {
-    startPolling();
-  }
 });
 
 onBeforeUnmount(() => {
-  stopPolling();
+  destroyRecoveryStatus();
 });
 
 function validate() {
