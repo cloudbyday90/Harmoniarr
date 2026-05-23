@@ -20,85 +20,125 @@ import { computed, getCurrentInstance, ref, watch } from 'vue';
 import { isAbortError } from '../lib/abort-error.js';
 import { fetchLibraryReleases as defaultFetchLibraryReleases } from '../lib/library-api.js';
 
-/**
- * Composable that loads library releases with full stale-while-revalidate
- * semantics and AbortController race-condition protection.
- *
- * When `filterState` is provided (a reactive ref or computed ref whose value
- * is a GridFilterState), the composable watches it and re-fetches with a
- * 300ms trailing debounce. Concurrent in-flight requests are aborted via
- * AbortController so only the latest response updates the display.
- *
- * When `filterState` is null, legacy callers can still use `loadReleases()`
- * imperatively as before.
- *
- * @param {object} options
- * @param {import('vue').Ref | null} [options.filterState]   Reactive GridFilterState
- * @param {function} [options.fetchLibraryReleases]          Override for testing
- * @param {function | null} [options.setTimeoutFn]           Override for testing
- * @param {function | null} [options.clearTimeoutFn]         Override for testing
- */
 export function useLibraryReleases({
   filterState = null,
   fetchLibraryReleases = defaultFetchLibraryReleases,
-  setTimeoutFn = null,
-  clearTimeoutFn = null,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
-  const _setTimeout = setTimeoutFn ?? (typeof globalThis.setTimeout !== 'undefined' ? globalThis.setTimeout : null);
-  const _clearTimeout = clearTimeoutFn ?? (typeof globalThis.clearTimeout !== 'undefined' ? globalThis.clearTimeout : null);
-
-  // ── State ──────────────────────────────────────────────────────────────────
-
-  /** Confirmed-good results from the last successful response. */
   const data = ref([]);
-  /** Last successful results — kept non-null after first load for stale display. */
   const staleData = ref([]);
   const isLoading = ref(false);
-  /** True until the first successful response has been received. */
+  const isRevalidating = ref(false);
   const isFirstLoad = ref(true);
   const error = ref(null);
 
   const isEmpty = computed(() => data.value.length === 0);
 
-  // ── Abort / debounce bookkeeping ───────────────────────────────────────────
-
   let currentController = null;
   let debounceTimer = null;
+  let pollTimer = null;
+  let lastParams = {};
+  let destroyed = false;
+  let hasLoaded = false;
+  let visibilityHandler = null;
 
-  // ── Core fetch ─────────────────────────────────────────────────────────────
-
-  /**
-   * Fire a fetch for the given params. Aborts any in-flight request first.
-   * @param {object} params  Query params forwarded to fetchLibraryReleases
-   */
-  async function _fetch(params) {
+  function abortCurrent() {
     if (currentController) {
       currentController.abort();
+      currentController = null;
     }
+  }
+
+  function clearDebounce() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+  }
+
+  function clearPollTimer() {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function destroy() {
+    destroyed = true;
+    abortCurrent();
+    clearDebounce();
+    clearPollTimer();
+    if (visibilityHandler) {
+      document.removeEventListener('visibilitychange', visibilityHandler);
+      visibilityHandler = null;
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (visibilityHandler) {
+      return;
+    }
+    visibilityHandler = () => {
+      if (document.visibilityState === 'visible' && !destroyed) {
+        void revalidate();
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (pollIntervalMs <= 0 || destroyed) {
+      return;
+    }
+    pollTimer = setTimeout(() => {
+      if (!destroyed) {
+        void revalidate();
+      }
+    }, pollIntervalMs);
+  }
+
+  async function _fetch(params) {
+    abortCurrent();
     currentController = new AbortController();
     const signal = currentController.signal;
 
-    isLoading.value = true;
+    const isFirst = !hasLoaded;
+    if (isFirst) {
+      isLoading.value = true;
+    } else {
+      isRevalidating.value = true;
+    }
     error.value = null;
+    lastParams = params;
 
     try {
       const response = await fetchLibraryReleases({ ...params, signal });
+      if (destroyed) return;
+
       const releases = Array.isArray(response?.releases) ? response.releases : [];
       data.value = releases;
       staleData.value = releases;
       isFirstLoad.value = false;
+      hasLoaded = true;
     } catch (err) {
-      if (isAbortError(err)) return; // Intentional cancel — discard silently
+      if (isAbortError(err)) return;
+      if (destroyed) return;
       error.value = err instanceof Error ? err : new Error(String(err));
     } finally {
-      // Only clear loading if this controller wasn't already superseded
-      if (!signal.aborted) {
+      if (!signal.aborted && !destroyed) {
         isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
       }
     }
   }
 
-  // ── filterState watcher (server-side mode) ─────────────────────────────────
+  async function revalidate() {
+    if (destroyed) return;
+    await _fetch({ ...lastParams });
+  }
 
   function _filterStateToParams(state) {
     if (!state) return {};
@@ -114,46 +154,27 @@ export function useLibraryReleases({
     watch(
       filterState,
       (newState) => {
-        if (_clearTimeout && debounceTimer !== null) {
-          _clearTimeout(debounceTimer);
-        }
-        if (_setTimeout) {
-          debounceTimer = _setTimeout(() => {
+        if (destroyed) return;
+        clearDebounce();
+        debounceTimer = setTimeout(() => {
+          if (!destroyed) {
             void _fetch(_filterStateToParams(newState));
-          }, 300);
-        } else {
-          void _fetch(_filterStateToParams(newState));
-        }
+          }
+        }, 300);
       },
       { immediate: true },
     );
   }
 
-  // ── Imperative load (legacy / non-reactive callers) ────────────────────────
-
-  /**
-   * Manually trigger a fetch. Used by LibraryView when not in filter-state mode,
-   * and by all existing callers that relied on the previous API.
-   *
-   * @param {object} [options]
-   * @param {string|null} [options.reconciliationStatus]
-   */
   async function loadReleases({ reconciliationStatus = null } = {}) {
+    if (destroyed) return;
     await _fetch({ reconciliationStatus });
   }
 
-  /**
-   * Re-fire the last query. Exposed for error-state retry buttons.
-   */
   function retry() {
-    if (filterState !== null) {
-      void _fetch(_filterStateToParams(filterState.value));
-    } else {
-      void _fetch({});
-    }
+    if (destroyed) return;
+    void _fetch(filterState !== null ? _filterStateToParams(filterState.value) : {});
   }
-
-  // ── Legacy computed aliases (backwards compat with existing views) ─────────
 
   const releases = data;
   const totalCount = computed(() => data.value.length);
@@ -161,24 +182,24 @@ export function useLibraryReleases({
   const partialReleases = computed(() => data.value.filter((r) => r.reconciliationStatus === 'partial'));
   const duplicateReleases = computed(() => data.value.filter((r) => r.reconciliationStatus === 'duplicate'));
 
-  // Keep errorMessage for backwards compat
   const errorMessage = computed(() => error.value?.message ?? '');
 
-  // isLoading starts false — LibraryView used to check `isLoading.value` as a
-  // proxy for "first load in progress". Set it true immediately so legacy
-  // views see the expected skeleton state on first render.
   isLoading.value = true;
 
   return {
-    // New SWR API
+    attachVisibilityListener,
     data,
+    destroy,
     error,
     isEmpty,
     isFirstLoad,
     isLoading,
+    isRevalidating,
+    pollIntervalMs,
+    revalidate,
+    revalidateOnFocus,
     retry,
     staleData,
-    // Legacy API (backwards compat)
     completeReleases,
     duplicateReleases,
     errorMessage,

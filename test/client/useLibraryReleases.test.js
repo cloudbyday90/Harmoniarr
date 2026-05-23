@@ -17,7 +17,7 @@
  */
 
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { describe, test } from 'node:test';
 import { useLibraryReleases } from '../../src/client/composables/useLibraryReleases.js';
 
 function makeRelease(overrides = {}) {
@@ -47,216 +47,459 @@ function makeRelease(overrides = {}) {
   };
 }
 
-// ── Initial state ─────────────────────────────────────────────────────────────
+let origDocument;
 
-test('useLibraryReleases has correct initial state', () => {
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => ({ total: 0, releases: [] }),
-  });
+function stubDocument() {
+  const listeners = new Map();
+  origDocument = globalThis.document;
 
-  assert.equal(composable.isLoading.value, true);
-  assert.equal(composable.errorMessage.value, '');
-  assert.deepEqual(composable.releases.value, []);
-  assert.equal(composable.totalCount.value, 0);
-  assert.deepEqual(composable.completeReleases.value, []);
-  assert.deepEqual(composable.partialReleases.value, []);
-  assert.deepEqual(composable.duplicateReleases.value, []);
-});
-
-// ── Happy path ────────────────────────────────────────────────────────────────
-
-test('useLibraryReleases loads releases and exposes them', async (t) => {
-  const releases = [
-    makeRelease({ reconciliationStatus: 'complete' }),
-    makeRelease({ id: 'uuid-2', releaseTitle: 'Amnesiac', reconciliationStatus: 'partial', matchedTrackCount: 6 }),
-  ];
-  const fetchLibraryReleases = t.mock.fn(async () => ({ total: 2, releases }));
-
-  const composable = useLibraryReleases({ fetchLibraryReleases });
-  await composable.loadReleases();
-
-  assert.equal(fetchLibraryReleases.mock.callCount(), 1);
-  assert.equal(composable.isLoading.value, false);
-  assert.equal(composable.errorMessage.value, '');
-  assert.equal(composable.totalCount.value, 2);
-  assert.equal(composable.releases.value.length, 2);
-});
-
-test('useLibraryReleases passes reconciliationStatus filter to fetch', async (t) => {
-  const fetchLibraryReleases = t.mock.fn(async () => ({ total: 0, releases: [] }));
-
-  const composable = useLibraryReleases({ fetchLibraryReleases });
-  await composable.loadReleases({ reconciliationStatus: 'complete' });
-
-  const callArgs = fetchLibraryReleases.mock.calls[0].arguments[0];
-  assert.equal(callArgs.reconciliationStatus, 'complete');
-});
-
-test('useLibraryReleases passes partial reconciliationStatus filter', async (t) => {
-  const fetchLibraryReleases = t.mock.fn(async () => ({ total: 0, releases: [] }));
-
-  const composable = useLibraryReleases({ fetchLibraryReleases });
-  await composable.loadReleases({ reconciliationStatus: 'partial' });
-
-  const callArgs = fetchLibraryReleases.mock.calls[0].arguments[0];
-  assert.equal(callArgs.reconciliationStatus, 'partial');
-});
-
-test('useLibraryReleases passes duplicate reconciliationStatus filter', async (t) => {
-  const fetchLibraryReleases = t.mock.fn(async () => ({ total: 0, releases: [] }));
-
-  const composable = useLibraryReleases({ fetchLibraryReleases });
-  await composable.loadReleases({ reconciliationStatus: 'duplicate' });
-
-  const callArgs = fetchLibraryReleases.mock.calls[0].arguments[0];
-  assert.equal(callArgs.reconciliationStatus, 'duplicate');
-});
-
-test('useLibraryReleases passes null reconciliationStatus when omitted', async (t) => {
-  const fetchLibraryReleases = t.mock.fn(async () => ({ total: 0, releases: [] }));
-
-  const composable = useLibraryReleases({ fetchLibraryReleases });
-  await composable.loadReleases();
-
-  const callArgs = fetchLibraryReleases.mock.calls[0].arguments[0];
-  assert.equal(callArgs.reconciliationStatus, null);
-});
-
-// ── Computed derivations ──────────────────────────────────────────────────────
-
-test('useLibraryReleases completeReleases filters to complete status', async () => {
-  const releases = [
-    makeRelease({ id: '1', reconciliationStatus: 'complete' }),
-    makeRelease({ id: '2', reconciliationStatus: 'partial', matchedTrackCount: 4 }),
-    makeRelease({ id: '3', reconciliationStatus: 'complete' }),
-  ];
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => ({ total: 3, releases }),
-  });
-
-  await composable.loadReleases();
-
-  assert.equal(composable.completeReleases.value.length, 2);
-  assert.ok(composable.completeReleases.value.every((r) => r.reconciliationStatus === 'complete'));
-});
-
-test('useLibraryReleases partialReleases filters to partial status', async () => {
-  const releases = [
-    makeRelease({ id: '1', reconciliationStatus: 'complete' }),
-    makeRelease({ id: '2', reconciliationStatus: 'partial', matchedTrackCount: 4 }),
-  ];
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => ({ total: 2, releases }),
-  });
-
-  await composable.loadReleases();
-
-  assert.equal(composable.partialReleases.value.length, 1);
-  assert.equal(composable.partialReleases.value[0].reconciliationStatus, 'partial');
-});
-
-test('useLibraryReleases duplicateReleases filters to duplicate status', async () => {
-  const releases = [
-    makeRelease({ id: '1', reconciliationStatus: 'complete' }),
-    makeRelease({ id: '2', reconciliationStatus: 'duplicate', duplicateTrackCount: 2 }),
-  ];
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => ({ total: 2, releases }),
-  });
-
-  await composable.loadReleases();
-
-  assert.equal(composable.duplicateReleases.value.length, 1);
-  assert.equal(composable.duplicateReleases.value[0].reconciliationStatus, 'duplicate');
-});
-
-test('useLibraryReleases includes musicbrainzReleaseId in returned releases', async () => {
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => ({
-      total: 1,
-      releases: [makeRelease({ musicbrainzReleaseId: 'test-mbid' })],
-    }),
-  });
-
-  await composable.loadReleases();
-
-  assert.equal(composable.releases.value[0].musicbrainzReleaseId, 'test-mbid');
-});
-
-// ── Error handling ────────────────────────────────────────────────────────────
-
-test('useLibraryReleases surfaces fetch errors in errorMessage', async () => {
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => {
-      throw new Error('network error fetching library releases');
+  globalThis.document = {
+    addEventListener(type, fn) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(fn);
     },
-  });
-
-  await composable.loadReleases();
-
-  assert.equal(composable.isLoading.value, false);
-  assert.equal(composable.errorMessage.value, 'network error fetching library releases');
-  assert.deepEqual(composable.releases.value, []);
-  assert.equal(composable.totalCount.value, 0);
-});
-
-test('useLibraryReleases preserves staleData on fetch error (SWR)', async () => {
-  let callCount = 0;
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => {
-      callCount++;
-      if (callCount === 1) return { total: 1, releases: [makeRelease()] };
-      throw new Error('second call failed');
+    removeEventListener(type, fn) {
+      const arr = listeners.get(type);
+      if (arr) {
+        const idx = arr.indexOf(fn);
+        if (idx >= 0) arr.splice(idx, 1);
+      }
     },
+    get visibilityState() {
+      return this._vis ?? 'visible';
+    },
+    _vis: 'visible',
+  };
+
+  return listeners;
+}
+
+function restoreDocument() {
+  globalThis.document = origDocument;
+}
+
+describe('useLibraryReleases', () => {
+  test('has correct initial state', () => {
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => ({ total: 0, releases: [] }),
+    });
+
+    assert.equal(c.isLoading.value, true);
+    assert.equal(c.isRevalidating.value, false);
+    assert.equal(c.errorMessage.value, '');
+    assert.deepEqual(c.releases.value, []);
+    assert.equal(c.totalCount.value, 0);
+    assert.deepEqual(c.completeReleases.value, []);
+    assert.deepEqual(c.partialReleases.value, []);
+    assert.deepEqual(c.duplicateReleases.value, []);
+    c.destroy();
   });
 
-  await composable.loadReleases();
-  assert.equal(composable.releases.value.length, 1);
+  test('loads releases and exposes them', async () => {
+    const releases = [
+      makeRelease({ reconciliationStatus: 'complete' }),
+      makeRelease({ id: 'uuid-2', releaseTitle: 'Amnesiac', reconciliationStatus: 'partial', matchedTrackCount: 6 }),
+    ];
+    let fetchCount = 0;
+    const fetchLibraryReleases = async () => {
+      fetchCount += 1;
+      return { total: 2, releases };
+    };
 
-  await composable.loadReleases();
-  // SWR: staleData preserves last-good result; data/releases also preserves it
-  assert.equal(composable.staleData.value.length, 1, 'staleData should hold last-good data');
-  assert.equal(composable.errorMessage.value, 'second call failed');
-});
+    const c = useLibraryReleases({ fetchLibraryReleases });
+    await c.loadReleases();
 
-test('useLibraryReleases clears error on successful reload', async () => {
-  let callCount = 0;
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => {
-      callCount++;
-      if (callCount === 1) throw new Error('transient error');
+    assert.equal(fetchCount, 1);
+    assert.equal(c.isLoading.value, false);
+    assert.equal(c.isRevalidating.value, false);
+    assert.equal(c.errorMessage.value, '');
+    assert.equal(c.totalCount.value, 2);
+    assert.equal(c.releases.value.length, 2);
+    c.destroy();
+  });
+
+  test('passes reconciliationStatus filter to fetch', async () => {
+    let captured = null;
+    const fetchLibraryReleases = async (params) => {
+      captured = params;
       return { total: 0, releases: [] };
-    },
+    };
+
+    const c = useLibraryReleases({ fetchLibraryReleases });
+    await c.loadReleases({ reconciliationStatus: 'complete' });
+
+    assert.equal(captured.reconciliationStatus, 'complete');
+    c.destroy();
   });
 
-  await composable.loadReleases();
-  assert.equal(composable.errorMessage.value, 'transient error');
+  test('passes partial reconciliationStatus filter', async () => {
+    let captured = null;
+    const fetchLibraryReleases = async (params) => {
+      captured = params;
+      return { total: 0, releases: [] };
+    };
 
-  await composable.loadReleases();
-  assert.equal(composable.errorMessage.value, '');
-});
+    const c = useLibraryReleases({ fetchLibraryReleases });
+    await c.loadReleases({ reconciliationStatus: 'partial' });
 
-// ── Empty response ────────────────────────────────────────────────────────────
-
-test('useLibraryReleases handles empty releases array', async () => {
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => ({ total: 0, releases: [] }),
+    assert.equal(captured.reconciliationStatus, 'partial');
+    c.destroy();
   });
 
-  await composable.loadReleases();
+  test('passes duplicate reconciliationStatus filter', async () => {
+    let captured = null;
+    const fetchLibraryReleases = async (params) => {
+      captured = params;
+      return { total: 0, releases: [] };
+    };
 
-  assert.equal(composable.totalCount.value, 0);
-  assert.deepEqual(composable.releases.value, []);
-  assert.equal(composable.isLoading.value, false);
-  assert.equal(composable.errorMessage.value, '');
-});
+    const c = useLibraryReleases({ fetchLibraryReleases });
+    await c.loadReleases({ reconciliationStatus: 'duplicate' });
 
-test('useLibraryReleases handles missing releases field gracefully', async () => {
-  const composable = useLibraryReleases({
-    fetchLibraryReleases: async () => ({ total: 0 }),
+    assert.equal(captured.reconciliationStatus, 'duplicate');
+    c.destroy();
   });
 
-  await composable.loadReleases();
+  test('passes null reconciliationStatus when omitted', async () => {
+    let captured = null;
+    const fetchLibraryReleases = async (params) => {
+      captured = params;
+      return { total: 0, releases: [] };
+    };
 
-  assert.deepEqual(composable.releases.value, []);
+    const c = useLibraryReleases({ fetchLibraryReleases });
+    await c.loadReleases();
+
+    assert.equal(captured.reconciliationStatus, null);
+    c.destroy();
+  });
+
+  test('completeReleases filters to complete status', async () => {
+    const releases = [
+      makeRelease({ id: '1', reconciliationStatus: 'complete' }),
+      makeRelease({ id: '2', reconciliationStatus: 'partial', matchedTrackCount: 4 }),
+      makeRelease({ id: '3', reconciliationStatus: 'complete' }),
+    ];
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => ({ total: 3, releases }),
+    });
+
+    await c.loadReleases();
+
+    assert.equal(c.completeReleases.value.length, 2);
+    assert.ok(c.completeReleases.value.every((r) => r.reconciliationStatus === 'complete'));
+    c.destroy();
+  });
+
+  test('partialReleases filters to partial status', async () => {
+    const releases = [
+      makeRelease({ id: '1', reconciliationStatus: 'complete' }),
+      makeRelease({ id: '2', reconciliationStatus: 'partial', matchedTrackCount: 4 }),
+    ];
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => ({ total: 2, releases }),
+    });
+
+    await c.loadReleases();
+
+    assert.equal(c.partialReleases.value.length, 1);
+    assert.equal(c.partialReleases.value[0].reconciliationStatus, 'partial');
+    c.destroy();
+  });
+
+  test('duplicateReleases filters to duplicate status', async () => {
+    const releases = [
+      makeRelease({ id: '1', reconciliationStatus: 'complete' }),
+      makeRelease({ id: '2', reconciliationStatus: 'duplicate', duplicateTrackCount: 2 }),
+    ];
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => ({ total: 2, releases }),
+    });
+
+    await c.loadReleases();
+
+    assert.equal(c.duplicateReleases.value.length, 1);
+    assert.equal(c.duplicateReleases.value[0].reconciliationStatus, 'duplicate');
+    c.destroy();
+  });
+
+  test('includes musicbrainzReleaseId in returned releases', async () => {
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => ({
+        total: 1,
+        releases: [makeRelease({ musicbrainzReleaseId: 'test-mbid' })],
+      }),
+    });
+
+    await c.loadReleases();
+
+    assert.equal(c.releases.value[0].musicbrainzReleaseId, 'test-mbid');
+    c.destroy();
+  });
+
+  test('surfaces fetch errors in errorMessage', async () => {
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        throw new Error('network error fetching library releases');
+      },
+    });
+
+    await c.loadReleases();
+
+    assert.equal(c.isLoading.value, false);
+    assert.equal(c.errorMessage.value, 'network error fetching library releases');
+    assert.deepEqual(c.releases.value, []);
+    assert.equal(c.totalCount.value, 0);
+    c.destroy();
+  });
+
+  test('preserves staleData on fetch error (SWR)', async () => {
+    let callCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        callCount += 1;
+        if (callCount === 1) return { total: 1, releases: [makeRelease()] };
+        throw new Error('second call failed');
+      },
+    });
+
+    await c.loadReleases();
+    assert.equal(c.releases.value.length, 1);
+
+    await c.loadReleases();
+    assert.equal(c.staleData.value.length, 1, 'staleData should hold last-good data');
+    assert.equal(c.errorMessage.value, 'second call failed');
+    c.destroy();
+  });
+
+  test('clears error on successful reload', async () => {
+    let callCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        callCount += 1;
+        if (callCount === 1) throw new Error('transient error');
+        return { total: 0, releases: [] };
+      },
+    });
+
+    await c.loadReleases();
+    assert.equal(c.errorMessage.value, 'transient error');
+
+    await c.loadReleases();
+    assert.equal(c.errorMessage.value, '');
+    c.destroy();
+  });
+
+  test('handles empty releases array', async () => {
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => ({ total: 0, releases: [] }),
+    });
+
+    await c.loadReleases();
+
+    assert.equal(c.totalCount.value, 0);
+    assert.deepEqual(c.releases.value, []);
+    assert.equal(c.isLoading.value, false);
+    assert.equal(c.errorMessage.value, '');
+    c.destroy();
+  });
+
+  test('handles missing releases field gracefully', async () => {
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => ({ total: 0 }),
+    });
+
+    await c.loadReleases();
+
+    assert.deepEqual(c.releases.value, []);
+    c.destroy();
+  });
+
+  test('isRevalidating is true during revalidation', async () => {
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => ({ total: 0, releases: [] }),
+    });
+
+    await c.loadReleases();
+    assert.equal(c.isRevalidating.value, false);
+
+    const p = c.revalidate();
+    assert.equal(c.isRevalidating.value, true);
+    await p;
+    assert.equal(c.isRevalidating.value, false);
+    c.destroy();
+  });
+
+  test('revalidate preserves stale data on error', async () => {
+    let callCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        callCount += 1;
+        if (callCount === 1) return { total: 1, releases: [makeRelease()] };
+        throw new Error('refresh failed');
+      },
+    });
+
+    await c.loadReleases();
+    assert.equal(c.releases.value.length, 1);
+
+    await c.revalidate();
+    assert.equal(c.staleData.value.length, 1, 'stale data preserved on revalidation error');
+    assert.equal(c.isRevalidating.value, false);
+    c.destroy();
+  });
+
+  test('revalidate is no-op after destroy', async () => {
+    let fetchCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        fetchCount += 1;
+        return { total: 0, releases: [] };
+      },
+    });
+
+    await c.loadReleases();
+    assert.equal(fetchCount, 1);
+    c.destroy();
+
+    await c.revalidate();
+    assert.equal(fetchCount, 1, 'no fetch after destroy');
+  });
+
+  test('loadReleases is no-op after destroy', async () => {
+    let fetchCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        fetchCount += 1;
+        return { total: 0, releases: [] };
+      },
+    });
+
+    await c.loadReleases();
+    assert.equal(fetchCount, 1);
+    c.destroy();
+
+    await c.loadReleases();
+    assert.equal(fetchCount, 1, 'no fetch after destroy');
+  });
+
+  test('retry is no-op after destroy', async () => {
+    let fetchCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        fetchCount += 1;
+        return { total: 0, releases: [] };
+      },
+    });
+
+    await c.loadReleases();
+    assert.equal(fetchCount, 1);
+    c.destroy();
+
+    c.retry();
+    await new Promise((r) => { setTimeout(r, 50); });
+    assert.equal(fetchCount, 1, 'no fetch after destroy');
+  });
+
+  test('destroy aborts in-flight request', async () => {
+    let aborted = false;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async ({ signal }) => {
+        return new Promise((resolve, reject) => {
+          const onAbort = () => {
+            aborted = true;
+            reject(new DOMException('Aborted', 'AbortError'));
+          };
+          if (signal.aborted) {
+            onAbort();
+            return;
+          }
+          signal.addEventListener('abort', onAbort, { once: true });
+        });
+      },
+    });
+
+    const p = c.loadReleases();
+    c.destroy();
+    await p.catch(() => {});
+    assert.equal(aborted, true, 'in-flight request was aborted');
+  });
+
+  test('destroy stops polling', async () => {
+    let fetchCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        fetchCount += 1;
+        return { total: 0, releases: [] };
+      },
+      pollIntervalMs: 50,
+    });
+
+    await c.loadReleases();
+    assert.equal(fetchCount, 1);
+    c.destroy();
+
+    await new Promise((r) => { setTimeout(r, 120); });
+    assert.equal(fetchCount, 1, 'no additional fetch after destroy');
+  });
+
+  test('pollIntervalMs=0 does not schedule polling', async () => {
+    let fetchCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        fetchCount += 1;
+        return { total: 0, releases: [] };
+      },
+      pollIntervalMs: 0,
+    });
+
+    await c.loadReleases();
+    assert.equal(fetchCount, 1);
+
+    await new Promise((r) => { setTimeout(r, 80); });
+    assert.equal(fetchCount, 1, 'no polling when pollIntervalMs=0');
+    c.destroy();
+  });
+
+  test('attachVisibilityListener triggers revalidate on visibility change', async () => {
+    const listeners = stubDocument();
+    let fetchCount = 0;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async () => {
+        fetchCount += 1;
+        return { total: 0, releases: [] };
+      },
+    });
+
+    await c.loadReleases();
+    const countBefore = fetchCount;
+
+    c.attachVisibilityListener();
+    assert.equal(listeners.get('visibilitychange').length, 1, 'handler registered');
+
+    globalThis.document._vis = 'visible';
+    await listeners.get('visibilitychange')[0]();
+    assert.equal(fetchCount, countBefore + 1, 'revalidate called on visibility change');
+
+    c.destroy();
+    assert.equal(listeners.get('visibilitychange').length, 0, 'listener removed on destroy');
+    restoreDocument();
+  });
+
+  test('revalidate re-fires with last params', async () => {
+    let captured = null;
+    const c = useLibraryReleases({
+      fetchLibraryReleases: async (params) => {
+        captured = params;
+        return { total: 0, releases: [] };
+      },
+    });
+
+    await c.loadReleases({ reconciliationStatus: 'partial' });
+    assert.equal(captured.reconciliationStatus, 'partial');
+
+    await c.revalidate();
+    assert.equal(captured.reconciliationStatus, 'partial', 'revalidate uses last params');
+    c.destroy();
+  });
 });

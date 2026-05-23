@@ -90,7 +90,7 @@ const filterGroups = computed(() => {
 
 // ── Library releases (server-side, SWR) ──────────────────────────────────────
 
-const library = useLibraryReleases({ filterState });
+const library = useLibraryReleases({ filterState, revalidateOnFocus: true });
 
 // ── Normalised releases for ReleaseCard ───────────────────────────────────────
 
@@ -105,10 +105,12 @@ const { getResolved: getResolvedArtwork, resolve: resolveArtworkBatch } = useArt
 
 onMounted(() => {
   attachFilterVisibility();
+  library.attachVisibilityListener();
   void loadFilterOptions();
 });
 
 onBeforeUnmount(() => {
+  library.destroy();
   destroyFilterOptions();
 });
 
