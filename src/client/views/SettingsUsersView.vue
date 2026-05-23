@@ -444,6 +444,7 @@ onMounted(() => { void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview(
           <p class="hx-text-muted" v-if="user.claimCode">Current claim code: {{ user.claimCode }}</p>
           <p class="hx-text-muted" v-if="user.claimCodeExpiresAt">Claim code expires {{ new Date(user.claimCodeExpiresAt).toLocaleString() }}. The user can complete setup at /claim-account using username {{ user.username }}.</p>
           <div class="hx-card-actions" style="margin-top: var(--hx-space-3)">
+            <router-link :to="{ name: 'settings-user-detail', params: { userId: user.id } }" class="hx-btn" data-variant="ghost">View detail</router-link>
             <button type="button" class="hx-btn" data-variant="primary" @click="saveManagedUser(user)" :disabled="user.saving">
               {{ user.saving ? 'Saving…' : 'Save user' }}
             </button>
