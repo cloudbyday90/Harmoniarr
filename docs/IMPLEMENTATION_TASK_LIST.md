@@ -8,7 +8,9 @@ Database model source: `docs/DATABASE_MODEL.md`
 
 ## Current Status (2026-05-23)
 
+- Settings notifications composable extraction (`62c9d1e`): `useNotificationCategories` extracted from `SettingsNotificationsView` — owns pending toggle state, effective value resolution, category visibility (admin-only filtering), and persistence through `useAccountPreferences`. View script reduced from 63 to 14 lines. 8 new tests. 2801 client tests pass.
 - Admin user detail view implemented (`1093faa`): `GET /api/v1/users/:userId/detail` returns user profile, media request summary (by requester/target role), and active sessions; `GET /api/v1/users/:userId/activity` returns cursor-paginated audit trail. Client includes `useUserDetail` composable, `UserDetailView.vue` with stat cards, Plex profile, session table, and timeline. 11 new tests (5 server, 6 client). 1547 server / 2793 client tests pass.
+- User detail navigation wiring (`03cc4ca`): "View detail" ghost link on each user card in `SettingsUsersView` navigates to `settings-user-detail` route.
 - Settings composable extraction (`1687008`): `useSettingsForm` shared by General/MediaStorage/Connections views; `useSettingsUserMutations` extracted from Users view. General 275→138 lines, MediaStorage 694→562, Connections 529→386, Users 751→476. 31 new tests. 2787 client tests pass.
 - Event timeline cursor-based pagination (`4642b46`): keyset pagination via composite `(occurred_at, id)` cursor with opaque base64url-encoded JSON.
 - Admin user list with server-side search, filter, pagination (`8d03dd5`): backward-compatible `GET /api/v1/users`.
