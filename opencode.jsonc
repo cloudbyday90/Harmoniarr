@@ -62,8 +62,9 @@
   // ============================================================================
   "lsp": {
     // TypeScript/JavaScript Language Server
+    // Prefer the workspace-local server so diagnostics match the repo's TS toolchain.
     "typescript": {
-      "command": ["npx", "-y", "typescript-language-server@4.3.3", "--stdio"],
+      "command": ["npx", "typescript-language-server", "--stdio"],
       "extensions": [".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs", ".cjs"],
       "description": "TypeScript and JavaScript language support",
       "initialization_options": {
@@ -77,22 +78,23 @@
     },
 
     // Vue.js Language Server
+    // Prefer the workspace-local server to stay aligned with the installed Vue tooling.
     "vue": {
-      "command": ["npx", "-y", "@vue/language-server@2.1.10", "--stdio"],
+      "command": ["npx", "@vue/language-server", "--stdio"],
       "extensions": [".vue"],
       "description": "Vue.js Single File Component support"
     },
 
     // CSS/SCSS Language Server
     "css": {
-      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.2", "vscode-css-language-server", "--stdio"],
+      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.0", "vscode-css-language-server", "--stdio"],
       "extensions": [".css", ".scss", ".sass", ".less"],
       "description": "CSS, SCSS, Sass, and Less language support"
     },
 
     // JSON/JSONC Language Server
     "json": {
-      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.2", "vscode-json-language-server", "--stdio"],
+      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.0", "vscode-json-language-server", "--stdio"],
       "extensions": [".json", ".jsonc"],
       "description": "JSON and JSON with Comments support",
       "initialization_options": {
@@ -105,7 +107,7 @@
 
     // ESLint Language Server
     "eslint": {
-      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.2", "vscode-eslint-language-server", "--stdio"],
+      "command": ["npx", "-y", "--package", "vscode-langservers-extracted@4.10.0", "vscode-eslint-language-server", "--stdio"],
       "extensions": [".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".vue"],
       "description": "ESLint integration for JavaScript/TypeScript linting",
       "initialization_options": {
@@ -131,7 +133,7 @@
 
     // YAML Language Server
     "yaml": {
-      "command": ["npx", "-y", "yaml-language-server@1.15.0", "--stdio"],
+      "command": ["npx", "-y", "yaml-language-server@1.23.0", "--stdio"],
       "extensions": [".yml", ".yaml"],
       "description": "YAML language support with schema validation",
       "initialization_options": {
