@@ -136,6 +136,7 @@ function collectRegisteredRoutes() {
     requireFreshAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
     requireSession: asyncNoopResult({ appUserId: 'user-1', user: { role: 'requester' } }),
     listMediaRequests: asyncNoopResult([]),
+    cancelMediaRequest: asyncNoopResult({}),
     reassignMediaRequest: asyncNoopResult({}),
     startLibraryOrganizeApplyRun: asyncNoopResult({}),
     startLibraryDiscoveryRun: asyncNoopResult({}),

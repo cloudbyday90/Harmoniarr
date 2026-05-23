@@ -32,7 +32,9 @@ import {
   getRequestKindLabel,
   getRequestStateLabel,
   getRequestTargetLabel,
+  isRequestCancellable,
 } from '../lib/request-music-form.js';
+import { cancelMediaRequest } from '../lib/library-api.js';
 import { formatUserRole } from '../lib/settings-users-presentation.js';
 import { useToast } from '../composables/useToast.js';
 import { sessionStore } from '../state/session.js';
@@ -92,6 +94,22 @@ function handleLoadHistory({ mediaRequestId }) {
 
 function handleLoadUsers() {
   void reassignment.loadEligibleUsers();
+}
+
+const cancellingId = ref(null);
+
+async function handleCancelRequest(request) {
+  if (cancellingId.value) return;
+  cancellingId.value = request.id;
+  try {
+    await cancelMediaRequest({ mediaRequestId: request.id });
+    toast.success('Request cancelled.');
+    void rm.loadRequestDashboard(filters.toApiParams());
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Failed to cancel request.');
+  } finally {
+    cancellingId.value = null;
+  }
 }
 
 const hasNotifications = computed(
@@ -331,8 +349,17 @@ onMounted(() => {
             <p class="hx-text-muted" v-if="request.existingMatch">
               Matched release: {{ request.existingMatch.artistName }} &#x2014; {{ request.existingMatch.releaseTitle || request.existingMatch.releaseGroupTitle }}
             </p>
-            <div v-if="isAdmin && rm.selectedScope.value === 'all'" class="rm-request-actions">
+            <div class="rm-request-actions">
               <button
+                v-if="isRequestCancellable(request)"
+                type="button"
+                class="hx-btn"
+                data-variant="danger"
+                :disabled="cancellingId === request.id"
+                @click="handleCancelRequest(request)"
+              >{{ cancellingId === request.id ? 'Cancelling\u2026' : 'Cancel' }}</button>
+              <button
+                v-if="isAdmin && rm.selectedScope.value === 'all'"
                 type="button"
                 class="hx-btn"
                 data-variant="ghost"

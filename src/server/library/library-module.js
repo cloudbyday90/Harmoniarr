@@ -390,6 +390,7 @@ export function createLibraryModule({
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,
       buildLibraryScanRunDetail: libraryScanSummaryService.buildLibraryScanRunDetail,
       buildLibraryWantedSummary: libraryWantedSummaryService.buildLibraryWantedSummary,
+      cancelMediaRequest: libraryMediaRequestService.cancelMediaRequest,
       createMediaRequest: libraryMediaRequestService.createMediaRequest,
       getMediaRequestReassignmentHistory: libraryMediaRequestService.getMediaRequestReassignmentHistory,
       listMediaRequests: libraryMediaRequestService.listMediaRequests,

@@ -44,8 +44,9 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryFileMatcherService = { matchLibraryFiles };
   const libraryFileMatchStore = {};
   const getMediaRequestReassignmentHistory = () => {};
+  const cancelMediaRequest = () => {};
   const reassignMediaRequest = () => {};
-  const libraryMediaRequestService = { buildMediaRequestDetail, buildMediaRequestSummary, createMediaRequest, getMediaRequestReassignmentHistory, listMediaRequests, reassignMediaRequest };
+  const libraryMediaRequestService = { buildMediaRequestDetail, buildMediaRequestSummary, cancelMediaRequest, createMediaRequest, getMediaRequestReassignmentHistory, listMediaRequests, reassignMediaRequest };
   const libraryMediaRequestStore = {};
   const libraryOrganizeApplyRunStore = {};
   const libraryOrganizeApplyService = { startLibraryOrganizeApplyRun };
@@ -185,6 +186,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     buildLibraryScanRunDetail,
     buildLibraryWantedSummary,
     buildReleaseRadar,
+    cancelMediaRequest,
     createMediaRequest,
     getMediaRequestReassignmentHistory,
     listMediaRequests,

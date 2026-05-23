@@ -135,6 +135,14 @@ export function startLibraryScanRun() {
   });
 }
 
+export function cancelMediaRequest({ mediaRequestId, reason }) {
+  return apiRequest(`/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}/cancel`, {
+    body: { reason },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
 export function reassignMediaRequest({ mediaRequestId, newRequestedForUserId, reason }) {
   return apiRequest(`/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}/reassign`, {
     body: { newRequestedForUserId, reason },

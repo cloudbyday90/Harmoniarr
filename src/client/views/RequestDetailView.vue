@@ -35,7 +35,9 @@ import {
   getRequestHeadline,
   getRequestKindLabel,
   getRequestStateLabel,
+  isRequestCancellable,
 } from '../lib/request-music-form.js';
+import { cancelMediaRequest } from '../lib/library-api.js';
 import { formatUserRole } from '../lib/settings-users-presentation.js';
 import { sessionStore } from '../state/session.js';
 
@@ -99,6 +101,23 @@ function handleLoadUsers() {
   void loadEligibleUsers();
 }
 
+const isCancellable = computed(() => isRequestCancellable(mediaRequest.value));
+const isCancelling = ref(false);
+
+async function handleCancel() {
+  if (!mediaRequest.value || isCancelling.value) return;
+  isCancelling.value = true;
+  try {
+    await cancelMediaRequest({ mediaRequestId: mediaRequest.value.id });
+    toast.success('Request cancelled.');
+    void load({ mediaRequestId: route.params.id });
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Failed to cancel request.');
+  } finally {
+    isCancelling.value = false;
+  }
+}
+
 const requestKindLabel = computed(() => getRequestKindLabel(mediaRequest.value?.requestKind));
 const headline = computed(() => getRequestHeadline(mediaRequest.value ?? {}));
 const fulfillmentLabel = computed(() => getFulfillmentStatusLabel(mediaRequest.value?.fulfillmentStatus));
@@ -140,6 +159,7 @@ function formatTimestamp(ts) {
       </div>
       <div class="hx-page-actions">
         <span v-if="mediaRequest?.fulfillmentStatus" class="hx-pill" :data-tone="fulfillmentTone">{{ fulfillmentLabel }}</span>
+        <button v-if="isCancellable" type="button" class="hx-btn" data-variant="danger" :disabled="isCancelling" @click="handleCancel">{{ isCancelling ? 'Cancelling\u2026' : 'Cancel request' }}</button>
         <button v-if="isAdmin && mediaRequest" type="button" class="hx-btn" data-variant="ghost" @click="openReassignModal">Reassign</button>
       </div>
     </header>

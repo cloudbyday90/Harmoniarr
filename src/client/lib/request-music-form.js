@@ -71,11 +71,36 @@ export function getRequestStateLabel(requestState) {
   switch (requestState) {
     case 'already_exists':
       return 'Already exists';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'failed':
+      return 'Failed';
     case 'needs_review':
       return 'Needs review';
     default:
       return 'Needs fetch';
   }
+}
+
+export function getRequestStateTone(requestState) {
+  switch (requestState) {
+    case 'cancelled':
+      return 'muted';
+    case 'failed':
+      return 'danger';
+    case 'already_exists':
+      return 'success';
+    case 'needs_review':
+      return 'warning';
+    default:
+      return 'info';
+  }
+}
+
+export function isRequestCancellable(request) {
+  if (!request) return false;
+  if (request.requestState === 'cancelled') return false;
+  return request.requestState === 'needs_fetch' || request.requestState === 'needs_review';
 }
 
 /**
@@ -189,6 +214,8 @@ export function getReassignmentEventLabel(eventType) {
   switch (eventType) {
     case 'reassigned':
       return 'Reassigned';
+    case 'cancelled':
+      return 'Cancelled';
     default:
       return eventType;
   }
@@ -198,6 +225,8 @@ export function getReassignmentEventTone(eventType) {
   switch (eventType) {
     case 'reassigned':
       return 'info';
+    case 'cancelled':
+      return 'danger';
     default:
       return 'info';
   }

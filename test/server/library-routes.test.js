@@ -1141,3 +1141,58 @@ test('media request reassignment history route rejects non-admin sessions', asyn
     assert.equal(response.status, 403);
   });
 });
+
+test('media request cancel route allows request owner to cancel', async (t) => {
+  const requireSession = t.mock.fn(async () => ({
+    appUserId: 'user-1',
+    csrfToken: 'csrf-1',
+    user: { role: 'requester' },
+  }));
+  const requireCsrf = t.mock.fn();
+  const cancelMediaRequest = t.mock.fn(async () => ({
+    id: 'request-1',
+    requestState: 'cancelled',
+    requestedByUser: { id: 'user-1', username: 'listener', role: 'requester' },
+    requestedForUser: { id: 'user-1', username: 'listener', role: 'requester' },
+  }));
+  const app = createLibraryRouteTestApp({ cancelMediaRequest, requireCsrf, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/request-1/cancel`, {
+      body: JSON.stringify({ reason: 'No longer needed' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.mediaRequest.requestState, 'cancelled');
+    assert.equal(cancelMediaRequest.mock.callCount(), 1);
+    assert.equal(cancelMediaRequest.mock.calls[0].arguments[0].mediaRequestId, 'request-1');
+    assert.equal(cancelMediaRequest.mock.calls[0].arguments[0].actorUserId, 'user-1');
+    assert.equal(cancelMediaRequest.mock.calls[0].arguments[0].reason, 'No longer needed');
+  });
+});
+
+test('media request cancel route passes actor role through', async (t) => {
+  const requireSession = t.mock.fn(async () => ({
+    appUserId: 'admin-1',
+    csrfToken: 'csrf-admin',
+    user: { role: 'admin' },
+  }));
+  const requireCsrf = t.mock.fn();
+  const cancelMediaRequest = t.mock.fn(async () => ({ id: 'request-1', requestState: 'cancelled' }));
+  const app = createLibraryRouteTestApp({ cancelMediaRequest, requireCsrf, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/request-1/cancel`, {
+      body: JSON.stringify({}),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(cancelMediaRequest.mock.calls[0].arguments[0].actorUserRole, 'admin');
+  });
+});

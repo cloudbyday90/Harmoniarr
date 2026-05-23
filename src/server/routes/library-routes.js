@@ -37,6 +37,7 @@ export function registerLibraryRoutes(app, {
   buildMediaRequestDetail,
   buildMediaRequestSummary,
   buildReleaseRadar,
+  cancelMediaRequest,
   createMediaRequest,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getMediaRequestReassignmentHistory,
@@ -267,6 +268,24 @@ export function registerLibraryRoutes(app, {
     response.status(202).json({
       ok: true,
       ...result,
+    });
+  }));
+
+  app.post('/api/v1/library/media-requests/:mediaRequestId/cancel', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    requireCsrf(request, session);
+
+    const cancelledRequest = await cancelMediaRequest({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
+      mediaRequestId: request.params.mediaRequestId,
+      reason: request.body?.reason,
+      requestMetadata: getRequestMetadata(request),
+    });
+
+    response.json({
+      mediaRequest: cancelledRequest,
+      ok: true,
     });
   }));
 

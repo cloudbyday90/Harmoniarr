@@ -818,9 +818,95 @@ export function createLibraryMediaRequestService({
     };
   }
 
+  async function cancelMediaRequest({
+    actorUserId,
+    actorUserRole = null,
+    mediaRequestId,
+    reason,
+    requestMetadata = null,
+  }) {
+    const existingRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
+    if (!existingRequest) {
+      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
+    }
+
+    if (existingRequest.requestState === 'cancelled') {
+      throw createApiError(409, 'request_already_cancelled', 'This request is already cancelled');
+    }
+
+    const isOwnRequest = existingRequest.requestedForUser?.id === actorUserId
+      || existingRequest.requestedByUser?.id === actorUserId;
+
+    if (actorUserRole !== 'admin' && !isOwnRequest) {
+      throw createApiError(403, 'forbidden', 'You can only cancel your own requests');
+    }
+
+    const cancellableStates = new Set(['needs_fetch', 'needs_review']);
+    if (!cancellableStates.has(existingRequest.requestState)) {
+      throw createApiError(409, 'request_not_cancellable', `Requests in state "${existingRequest.requestState}" cannot be cancelled`);
+    }
+
+    const normalizedReason = reason ? normalizeOptionalText(reason, 'reason', { maxLength: 500 }) : null;
+
+    const updated = await mediaRequestStore.updateRequestState({
+      mediaRequestId,
+      newState: 'cancelled',
+    });
+
+    if (!updated) {
+      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be updated');
+    }
+
+    await mediaRequestStore.insertMediaRequestEvent({
+      actorUserId,
+      details: {
+        artistName: existingRequest.artistName,
+        previousState: existingRequest.requestState,
+        releaseTitle: existingRequest.releaseTitle,
+        requestKind: existingRequest.requestKind,
+      },
+      eventType: 'cancelled',
+      mediaRequestId,
+      reason: normalizedReason,
+    });
+
+    if (typeof recordAuditEventFn === 'function') {
+      void recordAuditEventFn({
+        actorType: 'app_user',
+        actorUserId,
+        details: {
+          previousState: existingRequest.requestState,
+          reason: normalizedReason,
+          requestId: mediaRequestId,
+        },
+        entityId: mediaRequestId,
+        entityType: 'media_request',
+        eventType: 'media_request_cancelled',
+        ipAddress: requestMetadata?.ipAddress ?? null,
+        summary: `Cancelled media request${normalizedReason ? `: ${normalizedReason}` : ''}`,
+        userAgent: requestMetadata?.userAgent ?? null,
+      }).catch(() => {});
+    }
+
+    if (typeof recordActivityEventFn === 'function') {
+      void recordActivityEventFn({
+        actorUserId,
+        entityArtist: existingRequest.artistName ?? null,
+        entityId: mediaRequestId,
+        entityTitle: existingRequest.releaseTitle ?? existingRequest.artistName ?? null,
+        entityType: 'media_request',
+        eventType: 'request_cancelled',
+      }).catch(() => {});
+    }
+
+    const cancelledRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
+    return cancelledRequest;
+  }
+
   return {
     buildMediaRequestDetail,
     buildMediaRequestSummary,
+    cancelMediaRequest,
     createMediaRequest,
     getMediaRequestReassignmentHistory,
     listMediaRequests,

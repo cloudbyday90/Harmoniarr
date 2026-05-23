@@ -77,7 +77,7 @@ function mapSummaryCounts(row) {
   };
 }
 
-const ALLOWED_REQUEST_STATES = new Set(['already_exists', 'needs_fetch', 'needs_review']);
+const ALLOWED_REQUEST_STATES = new Set(['already_exists', 'cancelled', 'failed', 'needs_fetch', 'needs_review']);
 const ALLOWED_REQUEST_KINDS = new Set(['release', 'track', 'external_url']);
 const DEFAULT_PAGE_LIMIT = 100;
 const MAX_PAGE_LIMIT = 500;
@@ -497,6 +497,22 @@ export function createLibraryMediaRequestStore({
     return result.rows.length > 0;
   }
 
+  async function updateRequestState({ mediaRequestId, newState }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        UPDATE media_requests
+        SET request_state = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, request_state
+      `,
+      [mediaRequestId, newState],
+    );
+
+    return result.rows.length > 0;
+  }
+
   async function insertMediaRequestEvent({
     mediaRequestId,
     eventType,
@@ -582,5 +598,6 @@ export function createLibraryMediaRequestStore({
     mergeMediaRequestEvidence,
     updateFanOutChildCount,
     updateRequestedForUserId,
+    updateRequestState,
   };
 }
