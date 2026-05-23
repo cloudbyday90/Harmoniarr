@@ -39,9 +39,12 @@ export function useImportCandidateMediaInspectionSummary({
 
   return {
     actionErrorMessage: workflow.actionErrorMessage,
+    attachVisibilityListener: workflow.attachVisibilityListener,
     currentRun: workflow.currentRun,
+    destroy: workflow.destroy,
     errorMessage: workflow.errorMessage,
     isLoading: workflow.isLoading,
+    isRevalidating: workflow.isRevalidating,
     isStarting: workflow.isStarting,
     loadImportCandidateMediaInspectionSummary: workflow.loadRunSummary,
     recentRuns: workflow.recentRuns,

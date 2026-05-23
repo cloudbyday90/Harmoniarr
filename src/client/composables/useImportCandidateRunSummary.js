@@ -16,13 +16,22 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
+
+const activeRunStatuses = new Set(['pending', 'running']);
+
+function hasActiveRun(runSummaryValue) {
+  const status = runSummaryValue?.activeRun?.status ?? runSummaryValue?.currentRun?.status;
+  return activeRunStatuses.has(status);
+}
 
 export function useImportCandidateRunSummary({
   fetchRunDetail = null,
   fetchSummary = async () => ({}),
   loadErrorMessage,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
   secondaryAction = null,
   secondaryActionErrorMessage = 'Action failed',
   startRun = null,
@@ -32,18 +41,62 @@ export function useImportCandidateRunSummary({
   const actionErrorMessage = ref('');
   const errorMessage = ref('');
   const isLoading = ref(true);
+  const isRevalidating = ref(false);
   const isSecondaryActionPending = ref(false);
   const isStarting = ref(false);
   const runDetailErrorMessage = ref('');
   const runSummary = ref(null);
   const selectedRunDetail = ref(null);
   const selectedRunId = ref(null);
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
 
   const activeRun = computed(() => runSummary.value?.activeRun ?? null);
   const currentRun = computed(() => selectedRunDetail.value?.run ?? runSummary.value?.currentRun ?? null);
   const latestRun = computed(() => runSummary.value?.latestRun ?? null);
   const recentRuns = computed(() => runSummary.value?.recentRuns ?? []);
   const summary = computed(() => runSummary.value?.summary ?? null);
+
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!hasActiveRun(runSummary.value)) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await loadRunSummary();
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    void loadRunSummary().then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
 
   async function loadSelectedRunDetail({ runId }) {
     selectedRunId.value = runId;
@@ -65,24 +118,38 @@ export function useImportCandidateRunSummary({
   }
 
   async function loadRunSummary({ preferredRunId = selectedRunId.value } = {}) {
-    isLoading.value = true;
+    if (destroyed) return;
     errorMessage.value = '';
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
 
     try {
       runSummary.value = (await fetchSummary())?.[summaryKey] ?? null;
+      hasLoaded = true;
       if (preferredRunId && preferredRunId !== runSummary.value?.currentRun?.id) {
         await loadSelectedRunDetail({ runId: preferredRunId });
       } else {
         await loadSelectedRunDetail({ runId: null });
       }
     } catch (error) {
-      runSummary.value = null;
-      selectedRunDetail.value = null;
-      selectedRunId.value = null;
-      runDetailErrorMessage.value = '';
+      if (!isRevalidation) {
+        runSummary.value = null;
+        selectedRunDetail.value = null;
+        selectedRunId.value = null;
+        runDetailErrorMessage.value = '';
+      }
       errorMessage.value = getErrorMessage(error, loadErrorMessage);
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
@@ -125,9 +192,12 @@ export function useImportCandidateRunSummary({
   return {
     actionErrorMessage,
     activeRun,
+    attachVisibilityListener,
     currentRun,
+    destroy,
     errorMessage,
     isLoading,
+    isRevalidating: readonly(isRevalidating),
     isSecondaryActionPending,
     isStarting,
     latestRun,

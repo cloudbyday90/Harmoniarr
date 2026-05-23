@@ -243,6 +243,18 @@ export function useImportReviewAdminWorkflow({
     { immediate: true },
   );
 
+  function destroy() {
+    executionSummaryWorkflow.destroy?.();
+    mediaInspectionSummaryWorkflow.destroy?.();
+    applySummaryWorkflow.destroy?.();
+  }
+
+  function attachVisibilityListener() {
+    executionSummaryWorkflow.attachVisibilityListener?.();
+    mediaInspectionSummaryWorkflow.attachVisibilityListener?.();
+    applySummaryWorkflow.attachVisibilityListener?.();
+  }
+
   return {
     apply: {
       ...applySummaryWorkflow,
@@ -250,6 +262,8 @@ export function useImportReviewAdminWorkflow({
       handleStartRun: handleStartApplyRun,
       panelId: IMPORT_REVIEW_APPLY_PANEL_ID,
     },
+    attachVisibilityListener,
+    destroy,
     execution: {
       ...executionSummaryWorkflow,
       handleReconcile: handleReconcileExecutionState,

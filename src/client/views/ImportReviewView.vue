@@ -28,6 +28,9 @@ import ImportCandidateQueueList from '../components/ImportCandidateQueueList.vue
 import ImportPendingCandidateStatusPanel from '../components/ImportPendingCandidateStatusPanel.vue';
 import SelectedImportCandidateStatusPanel from '../components/SelectedImportCandidateStatusPanel.vue';
 import { useImportReviewWorkspace } from '../composables/useImportReviewWorkspace.js';
+import { useImportCandidateApplySummary } from '../composables/useImportCandidateApplySummary.js';
+import { useImportCandidateExecutionSummary } from '../composables/useImportCandidateExecutionSummary.js';
+import { useImportCandidateMediaInspectionSummary } from '../composables/useImportCandidateMediaInspectionSummary.js';
 import {
   IMPORT_REVIEW_APPLY_PANEL_ID,
   IMPORT_REVIEW_EXECUTION_PANEL_ID,
@@ -107,9 +110,16 @@ function scrollPanelIntoView(panelId) {
   });
 }
 
+const applySummaryWorkflow = useImportCandidateApplySummary({ pollIntervalMs: 15000, revalidateOnFocus: true });
+const executionSummaryWorkflow = useImportCandidateExecutionSummary({ pollIntervalMs: 15000, revalidateOnFocus: true });
+const mediaInspectionSummaryWorkflow = useImportCandidateMediaInspectionSummary({ pollIntervalMs: 15000, revalidateOnFocus: true });
+
 const adminWorkflow = useImportReviewAdminWorkflow({
+  applySummaryWorkflow,
+  executionSummaryWorkflow,
   importPendingCandidateCount: computed(() => importPendingSummaryCounts.value.totalImportPending),
   isAdmin,
+  mediaInspectionSummaryWorkflow,
   onPanelNavigate: async (panelId) => {
     scrollPanelIntoView(panelId);
   },
@@ -125,6 +135,12 @@ const overviewCards = computed(() => buildImportReviewOverviewCards({
   selectedCounts: selectedSummaryCounts.value,
   statusFilter: statusFilter.value,
 }));
+
+const isAnyRunRevalidating = computed(() =>
+  adminWorkflow.apply.isRevalidating?.value
+  || adminWorkflow.execution.isRevalidating?.value
+  || adminWorkflow.mediaInspection.isRevalidating?.value,
+);
 
 const workflowStages = computed(() => buildImportReviewWorkflowStages({
   applyCurrentRun: adminWorkflow.apply.currentRun?.value,
@@ -142,10 +158,12 @@ onMounted(() => {
     void adminWorkflow.replaceImportReviewRouteState({ status: '' });
   }
   attachVisibilityListener();
+  adminWorkflow.attachVisibilityListener();
 });
 
 onBeforeUnmount(() => {
   destroyWorkspace();
+  adminWorkflow.destroy();
 });
 </script>
 
@@ -306,7 +324,7 @@ onBeforeUnmount(() => {
       <div class="import-review-runway__header">
         <div>
           <p class="import-review-workspace-card__eyebrow">Operator runway</p>
-          <h2 class="import-review-workspace-card__title">Advance the workflow in controlled stages</h2>
+          <h2 class="import-review-workspace-card__title">Advance the workflow in controlled stages <span v-if="isAnyRunRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h2>
           <p class="import-review-workspace-card__copy">
             Each run below consumes the state prepared above. Inspection validates files, download execution hands work to slskd, and apply commits safe results into the library.
           </p>
