@@ -94,7 +94,7 @@ test('useUserDetail does not load while already loading', async () => {
   let resolveFirst;
   const firstCall = new Promise((resolve) => { resolveFirst = resolve; });
   let callCount = 0;
-  const { load, user } = useUserDetail({
+  const { load } = useUserDetail({
     fetchUserDetailFn: async () => {
       callCount += 1;
       if (callCount === 1) {

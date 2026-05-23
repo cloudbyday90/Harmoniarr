@@ -62,13 +62,13 @@ test('buildRequestListRouteQuery includes only non-empty fields', () => {
   });
   assert.equal(query.requestState, 'needs_review');
   assert.equal(query.sortBy, 'state');
-  assert.equal(Object.prototype.hasOwnProperty.call(query, 'requestKind'), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(query, 'search'), false);
+  assert.equal(Object.hasOwn(query, 'requestKind'), false);
+  assert.equal(Object.hasOwn(query, 'search'), false);
 });
 
 test('buildRequestListRouteQuery strips unknown values', () => {
   const query = buildRequestListRouteQuery({ requestKind: 'bogus' });
-  assert.equal(Object.prototype.hasOwnProperty.call(query, 'requestKind'), false);
+  assert.equal(Object.hasOwn(query, 'requestKind'), false);
 });
 
 test('getRequestListRouteStateKey returns same key for same state', () => {

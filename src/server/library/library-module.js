@@ -42,6 +42,7 @@ import { createLibraryFileMatcherService } from './library-file-matcher-service.
 import { createLibraryFileMatchStore } from './library-file-match-store.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
 import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
+import { createLibraryMediaRequestPipelineService } from './library-media-request-pipeline-service.js';
 import { createLibraryMediaRequestService } from './library-media-request-service.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
 import { createLibraryOrganizeApplyRunStore } from './library-organize-apply-run-store.js';
@@ -102,6 +103,7 @@ export function createLibraryModule({
     getMediaRequestById: libraryMediaRequestStore.getMediaRequestById,
   }),
   libraryMediaRequestNotificationService = createLibraryMediaRequestNotificationService(),
+  libraryMediaRequestPipelineService = createLibraryMediaRequestPipelineService(),
   providerClientResolverService = createProviderClientResolverService(),
   libraryProviderIngestRequestStore = createLibraryProviderIngestRequestStore(),
   maintenanceLockService = createMaintenanceLockService(),
@@ -386,6 +388,7 @@ export function createLibraryModule({
       buildLibraryWantedReleases: libraryWantedSummaryService.buildLibraryWantedReleases,
       buildReleaseRadar: libraryReleaseRadarService.buildReleaseRadar,
       buildMediaRequestDetail: libraryMediaRequestService.buildMediaRequestDetail,
+      buildMediaRequestPipeline: libraryMediaRequestPipelineService.buildPipeline,
       buildMediaRequestSummary: libraryMediaRequestService.buildMediaRequestSummary,
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,
       buildLibraryScanRunDetail: libraryScanSummaryService.buildLibraryScanRunDetail,

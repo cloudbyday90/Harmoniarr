@@ -35,6 +35,7 @@ export function registerLibraryRoutes(app, {
   buildLibraryScanRunDetail,
   buildLibraryWantedSummary,
   buildMediaRequestDetail,
+  buildMediaRequestPipeline,
   buildMediaRequestSummary,
   buildReleaseRadar,
   cancelMediaRequest,
@@ -118,6 +119,19 @@ export function registerLibraryRoutes(app, {
       hasMoreEvents: detail.hasMoreEvents,
       mediaRequest: detail.mediaRequest,
       nextCursor: detail.nextCursor,
+      ok: true,
+    });
+  }));
+
+  app.get('/api/v1/library/media-requests/:mediaRequestId/pipeline', asyncRoute(async (request, response) => {
+    await requireSession(request);
+
+    const pipeline = await buildMediaRequestPipeline({
+      mediaRequestId: request.params.mediaRequestId,
+    });
+
+    response.json({
+      candidates: pipeline.candidates,
       ok: true,
     });
   }));

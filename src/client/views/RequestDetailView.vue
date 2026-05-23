@@ -22,13 +22,10 @@ import { useRoute, useRouter } from 'vue-router';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestEventTimeline from '../components/RequestEventTimeline.vue';
 import { useMediaRequestDetail } from '../composables/useMediaRequestDetail.js';
+import { useMediaRequestPipeline } from '../composables/useMediaRequestPipeline.js';
 import { useMediaRequestReassignment } from '../composables/useMediaRequestReassignment.js';
 import { useToast } from '../composables/useToast.js';
-import {
-  candidateStatusLabel,
-  candidateStatusTone,
-  formatSourceProvider,
-} from '../lib/import-candidate-presentation.js';
+import { formatSourceProvider } from '../lib/import-candidate-presentation.js';
 import {
   getCancelToastMessage,
   getFulfillmentStatusLabel,
@@ -39,6 +36,14 @@ import {
   isRequestCancellable,
 } from '../lib/request-music-form.js';
 import { cancelMediaRequest } from '../lib/library-api.js';
+import {
+  candidateStatusLabel,
+  candidateStatusTone,
+  formatBytes,
+  runItemStatusLabel,
+  runItemStatusTone,
+  buildPipelineSteps,
+} from '../lib/request-pipeline-presentation.js';
 import { formatUserRole } from '../lib/settings-users-presentation.js';
 import { sessionStore } from '../state/session.js';
 
@@ -57,6 +62,12 @@ const {
   load,
   loadMoreEvents,
 } = useMediaRequestDetail();
+
+const {
+  candidates: pipelineCandidates,
+  isLoading: isLoadingPipeline,
+  load: loadPipeline,
+} = useMediaRequestPipeline();
 
 const {
   eligibleUsers,
@@ -137,9 +148,15 @@ const importReviewLink = computed(() => {
   return { name: 'activity-candidates', query: { candidate: importCandidateId.value } };
 });
 
+const hasPipeline = computed(() => pipelineCandidates.value.length > 0);
+const candidateCount = computed(() => pipelineCandidates.value.length);
+
 onMounted(() => {
   const id = route.params.id;
-  if (id) void load({ mediaRequestId: id });
+  if (id) {
+    void load({ mediaRequestId: id });
+    void loadPipeline({ mediaRequestId: id });
+  }
   if (isAdmin.value) void loadEligibleUsers();
 });
 
@@ -184,6 +201,10 @@ function formatTimestamp(ts) {
         <article class="hx-stat-card" v-if="mediaRequest.fulfillmentStatus?.detail">
           <span class="hx-stat-label">Fulfillment</span>
           <span class="hx-stat-value">{{ mediaRequest.fulfillmentStatus.detail }}</span>
+        </article>
+        <article class="hx-stat-card" v-if="hasPipeline">
+          <span class="hx-stat-label">Candidates</span>
+          <span class="hx-stat-value">{{ candidateCount }}</span>
         </article>
         <article class="hx-stat-card" v-if="mediaRequest.fanOutChildCount">
           <span class="hx-stat-label">Fan-out children</span>
@@ -239,7 +260,60 @@ function formatTimestamp(ts) {
         </div>
       </article>
 
-      <article v-if="hasImportCandidate" class="hx-card">
+      <article v-if="hasPipeline" class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">Fulfillment pipeline</h2>
+            <p class="hx-card-subtitle">{{ candidateCount }} import candidate{{ candidateCount === 1 ? '' : 's' }} linked to this request.</p>
+          </div>
+        </header>
+        <div class="hx-card-body hx-card-body--flush">
+          <p v-if="isLoadingPipeline" class="hx-text-muted rdl-pipeline-loading">Loading pipeline data.</p>
+          <div v-else class="rdl-pipeline-list">
+            <details v-for="candidate in pipelineCandidates" :key="candidate.id" class="rdl-candidate">
+              <summary class="rdl-candidate-summary">
+                <span class="hx-pill" :data-tone="candidateStatusTone(candidate.status)">{{ candidateStatusLabel(candidate.status) }}</span>
+                <span class="rdl-candidate-source">{{ candidate.username ?? 'unknown' }} &mdash; {{ candidate.folderPath?.split(/[/\\]/).pop() ?? 'unknown folder' }}</span>
+                <span class="rdl-candidate-meta">{{ candidate.fileCount ?? 0 }} files{{ candidate.totalSizeBytes ? `, ${formatBytes(candidate.totalSizeBytes)}` : '' }}</span>
+              </summary>
+              <div class="rdl-candidate-body">
+                <div class="rdl-pipeline-steps">
+                  <div v-for="(step, index) in buildPipelineSteps(candidate)" :key="step.key" class="rdl-step" :data-status="step.status">
+                    <div class="rdl-step-dot"></div>
+                    <span v-if="index < buildPipelineSteps(candidate).length - 1" class="rdl-step-line"></span>
+                    <span class="rdl-step-label">{{ step.label }}</span>
+                  </div>
+                </div>
+                <dl class="rdl-fields rdl-candidate-details" v-if="candidate.execution || candidate.apply">
+                  <div class="rdl-field" v-if="candidate.execution">
+                    <dt>Download</dt>
+                    <dd>
+                      <span v-if="runItemStatusLabel(candidate.execution)" class="hx-pill" :data-tone="runItemStatusTone(candidate.execution)">{{ runItemStatusLabel(candidate.execution) }}</span>
+                      <span class="rdl-timestamp" v-if="candidate.execution.startedAt">{{ formatTimestamp(candidate.execution.startedAt) }}</span>
+                      <span class="rdl-errmsg" v-if="candidate.execution.runErrorMessage">{{ candidate.execution.runErrorMessage }}</span>
+                    </dd>
+                  </div>
+                  <div class="rdl-field" v-if="candidate.apply">
+                    <dt>Import</dt>
+                    <dd>
+                      <span v-if="runItemStatusLabel(candidate.apply)" class="hx-pill" :data-tone="runItemStatusTone(candidate.apply)">{{ runItemStatusLabel(candidate.apply) }}</span>
+                      <span class="rdl-timestamp" v-if="candidate.apply.startedAt">{{ formatTimestamp(candidate.apply.startedAt) }}</span>
+                      <span class="rdl-errmsg" v-if="candidate.apply.runErrorMessage">{{ candidate.apply.runErrorMessage }}</span>
+                    </dd>
+                  </div>
+                </dl>
+                <router-link
+                  :to="{ name: 'activity-candidates', query: { candidate: candidate.id } }"
+                  class="hx-btn rdl-candidate-link"
+                  data-variant="ghost"
+                >Open in import review</router-link>
+              </div>
+            </details>
+          </div>
+        </div>
+      </article>
+
+      <article v-else-if="hasImportCandidate" class="hx-card">
         <header class="hx-card-header">
           <div>
             <h2 class="hx-card-title">Import pipeline</h2>
@@ -325,6 +399,10 @@ function formatTimestamp(ts) {
   margin: 0;
   font-size: var(--hx-text-sm);
   color: var(--hx-text);
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
 }
 
 .rdl-url {
@@ -350,9 +428,152 @@ function formatTimestamp(ts) {
   font-size: var(--hx-text-xs);
 }
 
+.rdl-pipeline-loading {
+  padding: var(--hx-space-3) var(--hx-space-4);
+}
+
+.rdl-pipeline-list {
+  display: grid;
+}
+
+.rdl-candidate {
+  border-bottom: 1px solid var(--hx-border);
+}
+
+.rdl-candidate:last-child {
+  border-bottom: none;
+}
+
+.rdl-candidate-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  cursor: pointer;
+  font-size: var(--hx-text-sm);
+  flex-wrap: wrap;
+}
+
+.rdl-candidate-summary:hover {
+  background: var(--hx-surface-hover, rgba(0, 0, 0, 0.02));
+}
+
+.rdl-candidate-source {
+  color: var(--hx-text-primary);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rdl-candidate-meta {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+}
+
+.rdl-candidate-body {
+  padding: 0 var(--hx-space-4) var(--hx-space-4);
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.rdl-candidate-details {
+  padding-top: var(--hx-space-2);
+}
+
+.rdl-candidate-link {
+  justify-self: start;
+}
+
+.rdl-timestamp {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+}
+
+.rdl-errmsg {
+  color: var(--hx-tone-danger, #e53e3e);
+  font-size: var(--hx-text-xs);
+}
+
+.rdl-pipeline-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: var(--hx-space-2) 0;
+}
+
+.rdl-step {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  position: relative;
+}
+
+.rdl-step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--hx-border);
+}
+
+.rdl-step[data-status="completed"] .rdl-step-dot {
+  background: var(--hx-tone-success, #38a169);
+}
+
+.rdl-step[data-status="active"] .rdl-step-dot {
+  background: var(--hx-accent-strong, #3182ce);
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.2);
+}
+
+.rdl-step[data-status="failed"] .rdl-step-dot {
+  background: var(--hx-tone-danger, #e53e3e);
+}
+
+.rdl-step-line {
+  width: 24px;
+  height: 2px;
+  background: var(--hx-border);
+  flex-shrink: 0;
+}
+
+.rdl-step[data-status="completed"] + .rdl-step .rdl-step-line,
+.rdl-step[data-status="completed"] .rdl-step-line {
+  background: var(--hx-tone-success, #38a169);
+}
+
+.rdl-step-label {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+  white-space: nowrap;
+}
+
+.rdl-step[data-status="completed"] .rdl-step-label {
+  color: var(--hx-tone-success, #38a169);
+}
+
+.rdl-step[data-status="active"] .rdl-step-label {
+  color: var(--hx-accent-strong, #3182ce);
+  font-weight: 600;
+}
+
+.rdl-step[data-status="failed"] .rdl-step-label {
+  color: var(--hx-tone-danger, #e53e3e);
+}
+
 @media (max-width: 640px) {
   .rdl-field {
     grid-template-columns: 1fr;
+  }
+
+  .rdl-pipeline-steps {
+    flex-wrap: wrap;
+    gap: var(--hx-space-1);
+  }
+
+  .rdl-step-line {
+    width: 12px;
   }
 }
 </style>

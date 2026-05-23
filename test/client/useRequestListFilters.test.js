@@ -52,7 +52,7 @@ test('updateFilter sets multiple fields independently', () => {
 });
 
 test('activeFilterCount counts non-empty filters', () => {
-  const { filters, activeFilterCount, updateFilter } = useRequestListFilters();
+  const { activeFilterCount, updateFilter } = useRequestListFilters();
 
   updateFilter('requestState', 'needs_fetch');
   assert.equal(activeFilterCount.value, 1);
@@ -110,7 +110,7 @@ test('toApiParams includes only non-empty filters', () => {
   const params = toApiParams();
   assert.equal(params.requestState, 'needs_fetch');
   assert.equal(params.search, 'daft punk');
-  assert.equal(Object.prototype.hasOwnProperty.call(params, 'requestKind'), false);
+  assert.equal(Object.hasOwn(params, 'requestKind'), false);
 });
 
 test('toApiParams trims search', () => {
@@ -134,7 +134,7 @@ test('updateFilter ignores unknown fields', () => {
   const { filters, updateFilter } = useRequestListFilters();
 
   updateFilter('unknownField', 'value');
-  assert.equal(Object.prototype.hasOwnProperty.call(filters, 'unknownField'), false);
+  assert.equal(Object.hasOwn(filters, 'unknownField'), false);
 });
 
 test('sortBy is included in empty filter state', () => {
@@ -241,7 +241,7 @@ test('applyFilters calls router.replace with query params', () => {
   const replaceCalls = [];
   const router = { replace: (loc) => { replaceCalls.push(loc); } };
   let applied = false;
-  const { filters, applyFilters, updateFilter } = useRequestListFilters({
+  const { applyFilters, updateFilter } = useRequestListFilters({
     applyFiltersFn: () => { applied = true; },
     route,
     router,
@@ -261,7 +261,7 @@ test('applyFilters deduplicates identical route state', () => {
   const route = { query: { requestState: 'needs_fetch' } };
   const replaceCalls = [];
   const router = { replace: (loc) => { replaceCalls.push(loc); } };
-  const { filters, applyFilters, updateFilter } = useRequestListFilters({ route, router });
+  const { applyFilters, updateFilter } = useRequestListFilters({ route, router });
 
   updateFilter('requestState', 'needs_fetch');
   applyFilters();
@@ -292,7 +292,7 @@ test('resetFilters preserves unrelated query params', () => {
 
   assert.equal(replaceCalls.length, 1);
   assert.equal(replaceCalls[0].query.tab, 'history');
-  assert.equal(Object.prototype.hasOwnProperty.call(replaceCalls[0].query, 'requestState'), false);
+  assert.equal(Object.hasOwn(replaceCalls[0].query, 'requestState'), false);
 });
 
 test('hydrateFromRoute updates local state from current route.query', () => {

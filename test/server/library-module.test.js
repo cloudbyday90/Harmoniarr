@@ -173,7 +173,10 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.libraryWantedSummaryService, libraryWantedSummaryService);
   assert.equal(libraryModule.libraryWantedSummaryStore, libraryWantedSummaryStore);
   assert.equal(libraryModule.libraryScanWorker, libraryScanWorker);
-  assert.deepEqual(libraryModule.routeDependencies, {
+  assert.equal(typeof libraryModule.routeDependencies.buildMediaRequestPipeline, 'function');
+  assert.deepEqual(Object.fromEntries(
+    Object.entries(libraryModule.routeDependencies).filter(([k]) => k !== 'buildMediaRequestPipeline'),
+  ), {
     buildLibraryDiscoveryRunDetail,
     buildLibraryDiscoverySummary,
     buildLibraryFilterOptions: libraryReleasesService.buildLibraryFilterOptions,

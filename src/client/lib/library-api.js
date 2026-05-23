@@ -42,6 +42,10 @@ export function fetchMediaRequestDetail({ mediaRequestId }) {
   return apiRequest(`/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}`);
 }
 
+export function fetchMediaRequestPipeline({ mediaRequestId }) {
+  return apiRequest(`/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}/pipeline`);
+}
+
 export function createMediaRequest(payload) {
   return apiRequest('/api/v1/library/media-requests', {
     body: payload,
