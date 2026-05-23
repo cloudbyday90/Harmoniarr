@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { ref } from 'vue';
+import { readonly, ref } from 'vue';
 import {
   changePassword as changePasswordRequest,
   fetchActiveSessions,
@@ -25,31 +25,86 @@ import {
 } from '../lib/account-security-api.js';
 import { sessionStore } from '../state/session.js';
 
-export function useAccountSecurity() {
+export function useAccountSecurity({
+  changePasswordFn = changePasswordRequest,
+  fetchActiveSessionsFn = fetchActiveSessions,
+  fetchRecentActivityFn = fetchRecentActivity,
+  revokeSessionFn = revokeSessionRequest,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
+} = {}) {
   const actionErrorMessage = ref('');
   const activityErrorMessage = ref('');
   const isChangingPassword = ref(false);
   const isLoadingActivity = ref(false);
   const isLoadingSessions = ref(false);
+  const isRevalidating = ref(false);
   const recentActivity = ref([]);
   const revokingSessionId = ref('');
   const sessionErrorMessage = ref('');
   const sessions = ref([]);
   const successMessage = ref('');
 
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoadedSessions = false;
+
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await revalidate();
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoadedSessions) return;
+    void revalidate().then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
   async function loadSessions() {
     isLoadingSessions.value = true;
     sessionErrorMessage.value = '';
 
     try {
-      const payload = await fetchActiveSessions();
+      const payload = await fetchActiveSessionsFn();
       sessions.value = payload.sessions ?? [];
+      hasLoadedSessions = true;
       return payload;
     } catch (error) {
       sessionErrorMessage.value = error instanceof Error ? error.message : 'Session list failed to load';
       throw error;
     } finally {
-      isLoadingSessions.value = false;
+      if (!destroyed) {
+        isLoadingSessions.value = false;
+        schedulePoll();
+      }
     }
   }
 
@@ -58,7 +113,7 @@ export function useAccountSecurity() {
     activityErrorMessage.value = '';
 
     try {
-      const payload = await fetchRecentActivity();
+      const payload = await fetchRecentActivityFn();
       recentActivity.value = payload.events ?? [];
       return payload;
     } catch (error) {
@@ -69,13 +124,34 @@ export function useAccountSecurity() {
     }
   }
 
+  async function revalidate() {
+    if (destroyed) return;
+    isRevalidating.value = true;
+
+    try {
+      const [sessionsPayload, activityPayload] = await Promise.all([
+        fetchActiveSessionsFn(),
+        fetchRecentActivityFn(),
+      ]);
+      sessions.value = sessionsPayload.sessions ?? [];
+      recentActivity.value = activityPayload.events ?? [];
+    } catch {
+      // Preserve stale data on revalidation error.
+    } finally {
+      if (!destroyed) {
+        isRevalidating.value = false;
+        schedulePoll();
+      }
+    }
+  }
+
   async function changePassword({ currentPassword, newPassword }) {
     isChangingPassword.value = true;
     actionErrorMessage.value = '';
     successMessage.value = '';
 
     try {
-      const payload = await changePasswordRequest({ currentPassword, newPassword });
+      const payload = await changePasswordFn({ currentPassword, newPassword });
       sessionStore.applySessionPayload(payload);
       successMessage.value = 'Password updated. Other active sessions were revoked.';
       await loadSessions();
@@ -99,14 +175,10 @@ export function useAccountSecurity() {
     successMessage.value = '';
 
     try {
-      await revokeSessionRequest(refreshTokenId);
+      await revokeSessionFn(refreshTokenId);
       sessions.value = sessions.value.filter((session) => session.id !== refreshTokenId);
       successMessage.value = 'Session revoked.';
-      try {
-        await loadRecentActivity();
-      } catch {
-        // Keep the revocation successful even if the activity refresh fails.
-      }
+      void revalidate();
     } catch (error) {
       actionErrorMessage.value = error instanceof Error ? error.message : 'Session revocation failed';
       throw error;
@@ -118,15 +190,19 @@ export function useAccountSecurity() {
   return {
     actionErrorMessage,
     activityErrorMessage,
+    attachVisibilityListener,
     changePassword,
+    destroy,
     isChangingPassword,
     isLoadingActivity,
     isLoadingSessions,
+    isRevalidating: readonly(isRevalidating),
     loadRecentActivity,
     loadSessions,
     recentActivity,
     revokeSession,
     revokingSessionId,
+    revalidate,
     sessionErrorMessage,
     sessions,
     successMessage,

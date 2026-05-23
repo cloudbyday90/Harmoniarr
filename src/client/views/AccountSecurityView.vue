@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, inject, onMounted, reactive } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { buildAuditActivityLinkTarget } from '../lib/audit-activity-links.js';
 import {
@@ -62,6 +62,7 @@ const {
   isChangingPassword,
   isLoadingActivity,
   isLoadingSessions,
+  isRevalidating,
   loadRecentActivity,
   loadSessions,
   recentActivity,
@@ -70,6 +71,8 @@ const {
   sessionErrorMessage,
   sessions,
   successMessage,
+  attachVisibilityListener,
+  destroy,
 } = useAccountSecurity();
 
 const {
@@ -140,6 +143,11 @@ onMounted(() => {
   void loadSessions();
   void loadRecentActivity();
   void loadPreferences().then(syncDraftFromPreferences);
+  attachVisibilityListener();
+});
+
+onBeforeUnmount(() => {
+  destroy();
 });
 </script>
 
@@ -237,7 +245,7 @@ onMounted(() => {
             class="hx-btn"
             data-variant="ghost"
             @click="loadSessions"
-            :disabled="isLoadingSessions"
+            :disabled="isLoadingSessions || isRevalidating"
           >
             {{ isLoadingSessions ? 'Refreshing\u2026' : 'Refresh' }}
           </button>
@@ -314,7 +322,7 @@ onMounted(() => {
             class="hx-btn"
             data-variant="ghost"
             @click="loadRecentActivity"
-            :disabled="isLoadingActivity"
+            :disabled="isLoadingActivity || isRevalidating"
           >
             {{ isLoadingActivity ? 'Refreshing\u2026' : 'Refresh' }}
           </button>
