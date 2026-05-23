@@ -47,4 +47,32 @@ test('useLibraryWantedSummary clears stale state when the summary fetch fails', 
   assert.equal(workflow.summary.value, null);
   assert.equal(workflow.releaseCounts.value, null);
   assert.equal(workflow.monitoredArtistCount.value, 0);
+
+  workflow.destroy();
+});
+
+test('useLibraryWantedSummary preserves stale data on revalidation error', async () => {
+  let callCount = 0;
+  const fetchLibraryWantedSummary = async () => {
+    callCount++;
+    if (callCount === 1) {
+      return {
+        monitoredArtistCount: 3,
+        releaseCounts: { missing: 2, partial: 1, totalWanted: 3 },
+        summary: { status: 'wanted', message: 'Releases need files.' },
+      };
+    }
+    throw new Error('revalidation failed');
+  };
+
+  const workflow = useLibraryWantedSummary({ fetchLibraryWantedSummary });
+
+  await workflow.loadLibraryWantedSummary();
+  assert.equal(workflow.monitoredArtistCount.value, 3);
+
+  await workflow.loadLibraryWantedSummary();
+  assert.equal(workflow.monitoredArtistCount.value, 3, 'stale summary preserved');
+  assert.equal(workflow.errorMessage.value, 'revalidation failed');
+
+  workflow.destroy();
 });

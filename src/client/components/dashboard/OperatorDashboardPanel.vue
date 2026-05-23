@@ -17,17 +17,14 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import OnboardingSummaryPanel from '../OnboardingSummaryPanel.vue';
 import { useAsyncResource } from '../../composables/useAsyncResource.js';
 import { useLibraryWantedReleases } from '../../composables/useLibraryWantedReleases.js';
 import { useLibraryWantedSummary } from '../../composables/useLibraryWantedSummary.js';
 import { useOnboardingSummary } from '../../composables/useOnboardingSummary.js';
-import {
-  fetchMediaRequests,
-  fetchMediaRequestSummary,
-} from '../../lib/library-api.js';
+import { useOperatorRequests } from '../../composables/useOperatorRequests.js';
 import {
   fulfillmentLabel,
   fulfillmentTone,
@@ -52,29 +49,16 @@ const showOnboardingSummary = computed(() => (onboardingSummary.value?.issueCoun
 const showOnboardingPanel = computed(() => showOnboardingSummary.value || isLoadingOnboarding.value);
 
 // ── Requests ─────────────────────────────────────────────────────────────────
-const mediaRequests = ref([]);
-const requestSummary = ref(null);
-const isLoadingRequests = ref(false);
-
-async function loadRequests() {
-  isLoadingRequests.value = true;
-  try {
-    const [summaryPayload, requestsPayload] = await Promise.all([
-      fetchMediaRequestSummary({ scope: 'mine' }),
-      fetchMediaRequests({ scope: 'mine' }),
-    ]);
-    requestSummary.value = summaryPayload;
-    mediaRequests.value = requestsPayload.mediaRequests ?? [];
-  } catch {
-    // silent — stats row simply won't show
-  } finally {
-    isLoadingRequests.value = false;
-  }
-}
+const {
+  isLoading: isLoadingRequests,
+  loadRequests,
+  mediaRequests,
+  requestSummary,
+} = useOperatorRequests({ pollIntervalMs: 15000, revalidateOnFocus: true });
 
 // ── Wanted releases ───────────────────────────────────────────────────────────
-const wantedSummary = useLibraryWantedSummary();
-const wantedReleases = useLibraryWantedReleases();
+const wantedSummary = useLibraryWantedSummary({ pollIntervalMs: 15000, revalidateOnFocus: true });
+const wantedReleases = useLibraryWantedReleases({ pollIntervalMs: 15000, revalidateOnFocus: true });
 
 const displayWanted = computed(() => wantedReleases.wantedReleases.value.slice(0, 8));
 const hasWanted = computed(() => wantedReleases.wantedReleases.value.length > 0);
@@ -114,6 +98,13 @@ onMounted(() => {
   void wantedSummary.loadLibraryWantedSummary();
   void wantedReleases.loadWantedReleases();
   void loadDownloads();
+  wantedSummary.attachVisibilityListener();
+  wantedReleases.attachVisibilityListener();
+});
+
+onBeforeUnmount(() => {
+  wantedSummary.destroy();
+  wantedReleases.destroy();
 });
 </script>
 

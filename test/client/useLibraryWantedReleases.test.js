@@ -196,7 +196,7 @@ test('useLibraryWantedReleases surfaces fetch errors in errorMessage', async () 
   assert.equal(composable.totalCount.value, 0);
 });
 
-test('useLibraryWantedReleases clears previous data on fetch error', async () => {
+test('useLibraryWantedReleases preserves stale data on revalidation error', async () => {
   let callCount = 0;
   const composable = useLibraryWantedReleases({
     fetchLibraryWantedReleases: async () => {
@@ -212,8 +212,10 @@ test('useLibraryWantedReleases clears previous data on fetch error', async () =>
   assert.equal(composable.wantedReleases.value.length, 1);
 
   await composable.loadWantedReleases();
-  assert.deepEqual(composable.wantedReleases.value, []);
+  assert.equal(composable.wantedReleases.value.length, 1, 'stale data preserved on revalidation error');
   assert.equal(composable.errorMessage.value, 'second call failed');
+
+  composable.destroy();
 });
 
 test('useLibraryWantedReleases clears error on successful reload', async () => {

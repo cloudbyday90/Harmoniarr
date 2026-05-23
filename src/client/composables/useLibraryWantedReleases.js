@@ -16,38 +16,104 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchLibraryWantedReleases as defaultFetchLibraryWantedReleases } from '../lib/library-api.js';
 
 export function useLibraryWantedReleases({
   fetchLibraryWantedReleases = defaultFetchLibraryWantedReleases,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   const wantedReleasesResponse = ref(null);
   const errorMessage = ref('');
   const isLoading = ref(true);
+  const isRevalidating = ref(false);
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
+  let lastWantedStatus = null;
 
   const wantedReleases = computed(() => wantedReleasesResponse.value?.wantedReleases ?? []);
   const missingReleases = computed(() => wantedReleases.value.filter((r) => r.wantedStatus === 'missing'));
   const partialReleases = computed(() => wantedReleases.value.filter((r) => r.wantedStatus === 'partial'));
   const totalCount = computed(() => wantedReleasesResponse.value?.total ?? 0);
 
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!wantedReleasesResponse.value) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await loadWantedReleases({ wantedStatus: lastWantedStatus });
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    void loadWantedReleases({ wantedStatus: lastWantedStatus }).then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
   async function loadWantedReleases({ wantedStatus = null } = {}) {
-    isLoading.value = true;
+    if (destroyed) return;
+    lastWantedStatus = wantedStatus;
     errorMessage.value = '';
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoading.value = true;
+    }
+
     try {
       wantedReleasesResponse.value = await fetchLibraryWantedReleases({ wantedStatus });
+      hasLoaded = true;
     } catch (error) {
-      wantedReleasesResponse.value = null;
+      if (!isRevalidation) {
+        wantedReleasesResponse.value = null;
+      }
       errorMessage.value = getErrorMessage(error, 'Wanted releases failed to load');
     } finally {
-      isLoading.value = false;
+      if (!destroyed) {
+        isLoading.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
   return {
+    attachVisibilityListener,
+    destroy,
     errorMessage,
     isLoading,
+    isRevalidating: readonly(isRevalidating),
     loadWantedReleases,
     missingReleases,
     partialReleases,
