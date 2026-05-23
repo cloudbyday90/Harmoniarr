@@ -48,7 +48,7 @@ import { sessionStore } from '../state/session.js';
 
 const wanted = useLibraryWantedSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
 const releases = useLibraryWantedReleases({ pollIntervalMs: 30000, revalidateOnFocus: true });
-const reconciliation = useLibraryReconciliationSummary();
+const reconciliation = useLibraryReconciliationSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
 
 const {
   isRequested,
@@ -153,7 +153,11 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 const isLoading = computed(() => wanted.isLoading.value || releases.isLoading.value || reconciliation.isLoading.value);
-const isRefreshing = computed(() => wanted.isRevalidating.value || releases.isRevalidating.value);
+const isRefreshing = computed(() =>
+  wanted.isRevalidating.value
+  || releases.isRevalidating.value
+  || reconciliation.isRevalidating.value,
+);
 
 const statCards = computed(() =>
   buildMissingStatCards(
@@ -176,11 +180,13 @@ onMounted(() => {
   void reconciliation.loadLibraryReconciliationSummary();
   wanted.attachVisibilityListener();
   releases.attachVisibilityListener();
+  reconciliation.attachVisibilityListener();
 });
 
 onBeforeUnmount(() => {
   wanted.destroy();
   releases.destroy();
+  reconciliation.destroy();
 });
 </script>
 
