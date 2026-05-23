@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
@@ -46,8 +46,8 @@ import {
 } from '../lib/wanted-release-normalization.js';
 import { sessionStore } from '../state/session.js';
 
-const wanted = useLibraryWantedSummary();
-const releases = useLibraryWantedReleases();
+const wanted = useLibraryWantedSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
+const releases = useLibraryWantedReleases({ pollIntervalMs: 30000, revalidateOnFocus: true });
 const reconciliation = useLibraryReconciliationSummary();
 
 const {
@@ -153,6 +153,7 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 const isLoading = computed(() => wanted.isLoading.value || releases.isLoading.value || reconciliation.isLoading.value);
+const isRefreshing = computed(() => wanted.isRevalidating.value || releases.isRevalidating.value);
 
 const statCards = computed(() =>
   buildMissingStatCards(
@@ -170,9 +171,16 @@ function refreshAll() {
 }
 
 onMounted(() => {
-  wanted.loadLibraryWantedSummary();
-  releases.loadWantedReleases();
-  reconciliation.loadLibraryReconciliationSummary();
+  void wanted.loadLibraryWantedSummary();
+  void releases.loadWantedReleases();
+  void reconciliation.loadLibraryReconciliationSummary();
+  wanted.attachVisibilityListener();
+  releases.attachVisibilityListener();
+});
+
+onBeforeUnmount(() => {
+  wanted.destroy();
+  releases.destroy();
 });
 </script>
 
@@ -184,8 +192,8 @@ onMounted(() => {
         <p class="hx-page-subtitle">{{ buildMissingPageSubtitle() }}</p>
       </div>
       <div class="hx-page-actions">
-        <button type="button" class="hx-btn" @click="refreshAll" :disabled="isLoading">
-          {{ isLoading ? 'Refreshing…' : 'Refresh' }}
+        <button type="button" class="hx-btn" @click="refreshAll" :disabled="isLoading || isRefreshing">
+          {{ (isLoading || isRefreshing) ? 'Refreshing…' : 'Refresh' }}
         </button>
       </div>
     </header>

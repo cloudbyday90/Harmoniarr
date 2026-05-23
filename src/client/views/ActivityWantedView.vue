@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import {
@@ -27,15 +27,26 @@ import {
   getWantedStatusTone,
 } from '../lib/wanted-release-normalization.js';
 
-const wanted = useLibraryWantedSummary();
-const releases = useLibraryWantedReleases();
+const wanted = useLibraryWantedSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
+const releases = useLibraryWantedReleases({ pollIntervalMs: 30000, revalidateOnFocus: true });
+
+const isRefreshing = computed(() => wanted.isRevalidating.value || releases.isRevalidating.value);
 
 function refresh() {
   wanted.loadLibraryWantedSummary();
   releases.loadWantedReleases();
 }
 
-onMounted(() => refresh());
+onMounted(() => {
+  refresh();
+  wanted.attachVisibilityListener();
+  releases.attachVisibilityListener();
+});
+
+onBeforeUnmount(() => {
+  wanted.destroy();
+  releases.destroy();
+});
 </script>
 
 <template>
@@ -46,8 +57,8 @@ onMounted(() => refresh());
         <p class="hx-page-subtitle">Monitored releases pending acquisition.</p>
       </div>
       <div class="hx-page-actions">
-        <button type="button" class="hx-btn" @click="refresh" :disabled="wanted.isLoading.value || releases.isLoading.value">
-          {{ (wanted.isLoading.value || releases.isLoading.value) ? 'Loading…' : 'Refresh' }}
+        <button type="button" class="hx-btn" @click="refresh" :disabled="wanted.isLoading.value || releases.isLoading.value || isRefreshing">
+          {{ (wanted.isLoading.value || releases.isLoading.value || isRefreshing) ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
     </header>
