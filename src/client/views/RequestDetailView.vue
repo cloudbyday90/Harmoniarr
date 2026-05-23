@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestEventTimeline from '../components/RequestEventTimeline.vue';
@@ -56,12 +56,18 @@ const {
   mediaRequest,
   events,
   isLoading,
+  isRevalidating,
   errorMessage,
   hasMoreEvents,
   isLoadingMoreEvents,
   load,
   loadMoreEvents,
-} = useMediaRequestDetail();
+  destroy,
+  attachVisibilityListener,
+} = useMediaRequestDetail({
+  pollIntervalMs: 15000,
+  revalidateOnFocus: true,
+});
 
 const {
   candidates: pipelineCandidates,
@@ -154,10 +160,15 @@ const candidateCount = computed(() => pipelineCandidates.value.length);
 onMounted(() => {
   const id = route.params.id;
   if (id) {
+    attachVisibilityListener();
     void load({ mediaRequestId: id });
     void loadPipeline({ mediaRequestId: id });
   }
   if (isAdmin.value) void loadEligibleUsers();
+});
+
+onBeforeUnmount(() => {
+  destroy();
 });
 
 function goBack() {
@@ -180,6 +191,7 @@ function formatTimestamp(ts) {
       </div>
       <div class="hx-page-actions">
         <span v-if="mediaRequest?.fulfillmentStatus" class="hx-pill" :data-tone="fulfillmentTone">{{ fulfillmentLabel }}</span>
+        <span v-if="isRevalidating" class="rdl-revalidating" aria-label="Refreshing">↻</span>
         <button v-if="isCancellable" type="button" class="hx-btn" data-variant="danger" :disabled="isCancelling" @click="handleCancel">{{ isCancelling ? 'Cancelling\u2026' : 'Cancel request' }}</button>
         <button v-if="isAdmin && mediaRequest" type="button" class="hx-btn" data-variant="ghost" @click="openReassignModal">Reassign</button>
       </div>
@@ -374,6 +386,16 @@ function formatTimestamp(ts) {
 
 .rdl-title {
   margin-top: var(--hx-space-2);
+}
+
+.rdl-revalidating {
+  display: inline-block;
+  animation: hx-spin 1s linear infinite;
+  color: var(--hx-text-muted);
+}
+
+@keyframes hx-spin {
+  to { transform: rotate(360deg); }
 }
 
 .rdl-fields {
