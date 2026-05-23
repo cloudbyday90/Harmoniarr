@@ -22,7 +22,11 @@ import { useRoute, useRouter } from 'vue-router';
 import RequestEventTimeline from '../components/RequestEventTimeline.vue';
 import { useMediaRequestDetail } from '../composables/useMediaRequestDetail.js';
 import { useMediaRequestReassignment } from '../composables/useMediaRequestReassignment.js';
-import { formatSourceProvider } from '../lib/import-candidate-presentation.js';
+import {
+  candidateStatusLabel,
+  candidateStatusTone,
+  formatSourceProvider,
+} from '../lib/import-candidate-presentation.js';
 import {
   getFulfillmentStatusLabel,
   getFulfillmentStatusTone,
@@ -55,6 +59,15 @@ const headline = computed(() => getRequestHeadline(mediaRequest.value ?? {}));
 const fulfillmentLabel = computed(() => getFulfillmentStatusLabel(mediaRequest.value?.fulfillmentStatus));
 const fulfillmentTone = computed(() => getFulfillmentStatusTone(mediaRequest.value?.fulfillmentStatus));
 const stateLabel = computed(() => getRequestStateLabel(mediaRequest.value?.requestState));
+const hasImportCandidate = computed(() => Boolean(mediaRequest.value?.fulfillmentStatus?.importCandidateId));
+const importCandidateId = computed(() => mediaRequest.value?.fulfillmentStatus?.importCandidateId ?? null);
+const importCandidateStatus = computed(() => mediaRequest.value?.fulfillmentStatus?.importCandidateStatus ?? null);
+const importStatusLabel = computed(() => candidateStatusLabel(importCandidateStatus.value));
+const importStatusTone = computed(() => candidateStatusTone(importCandidateStatus.value));
+const importReviewLink = computed(() => {
+  if (!importCandidateId.value) return null;
+  return { name: 'activity-candidates', query: { candidate: importCandidateId.value } };
+});
 
 onMounted(() => {
   const id = route.params.id;
@@ -158,6 +171,30 @@ function formatTimestamp(ts) {
         </div>
       </article>
 
+      <article v-if="hasImportCandidate" class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">Import pipeline</h2>
+            <p class="hx-card-subtitle">Linked import candidate status.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <div class="rdl-pipeline">
+            <div class="rdl-pipeline-status">
+              <span class="hx-pill" :data-tone="importStatusTone">{{ importStatusLabel }}</span>
+              <span class="hx-text-muted rdl-pipeline-id">Candidate {{ importCandidateId?.substring(0, 8) }}…</span>
+            </div>
+            <p class="hx-text-muted" v-if="mediaRequest?.fulfillmentStatus?.detail">{{ mediaRequest.fulfillmentStatus.detail }}</p>
+            <router-link
+              v-if="importReviewLink"
+              :to="importReviewLink"
+              class="hx-btn"
+              data-variant="ghost"
+            >Open in import review</router-link>
+          </div>
+        </div>
+      </article>
+
       <RequestEventTimeline
         :events="events"
         :eligible-users="eligibleUsers.value"
@@ -204,6 +241,23 @@ function formatTimestamp(ts) {
 
 .rdl-url {
   word-break: break-all;
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+}
+
+.rdl-pipeline {
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.rdl-pipeline-status {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  flex-wrap: wrap;
+}
+
+.rdl-pipeline-id {
   font-family: var(--hx-font-mono);
   font-size: var(--hx-text-xs);
 }
