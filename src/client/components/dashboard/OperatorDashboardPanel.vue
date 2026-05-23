@@ -40,7 +40,9 @@ const {
   nextAction,
   steps,
   summary: onboardingSummary,
-} = useOnboardingSummary();
+  destroy: destroyOnboarding,
+  attachVisibilityListener: attachOnboardingVisibility,
+} = useOnboardingSummary({ pollIntervalMs: 15000, revalidateOnFocus: true });
 
 // Show the setup panel whenever there are outstanding issues, or while the
 // first load is in flight (shows a skeleton so operators aren't surprised by
@@ -98,11 +100,13 @@ onMounted(() => {
   void wantedSummary.loadLibraryWantedSummary();
   void wantedReleases.loadWantedReleases();
   void loadDownloads();
+  attachOnboardingVisibility();
   wantedSummary.attachVisibilityListener();
   wantedReleases.attachVisibilityListener();
 });
 
 onBeforeUnmount(() => {
+  destroyOnboarding();
   wantedSummary.destroy();
   wantedReleases.destroy();
 });
