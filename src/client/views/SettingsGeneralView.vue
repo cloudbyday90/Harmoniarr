@@ -17,155 +17,18 @@
 -->
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
-import { fetchSettings, updateSettings } from '../lib/settings-api.js';
-import {
-  buildSettingsUpdatePayload,
-  normalizeDownloadMappings,
-  normalizeUserMusicRoots,
-} from '../lib/settings-form.js';
-import { formatCommaSeparatedList } from '../lib/settings-media-storage-presentation.js';
+import { onMounted } from 'vue';
+import { useSettingsForm } from '../composables/useSettingsForm.js';
 
-const isLoading = ref(true);
-const isSaving = ref(false);
-const errorMessage = ref('');
-const successMessage = ref('');
-
-// Full form maintained so buildSettingsUpdatePayload stays safe.
-// Only the security and system sections are rendered here.
-const form = reactive({
-  artwork: {
-    captureEmbedded: true,
-    captureFolderArtwork: true,
-    derivativeCacheSizeMb: 1024,
-    derivativeFormat: 'webp',
-    derivativeRetentionDays: 30,
-    derivativeSizesText: '256, 512',
-    fetchEnabled: true,
-    maxOriginalDimensionPixels: 4000,
-    maxOriginalFileSizeBytes: 20971520,
-    providerOrderText: 'coverArtArchive',
-    refetchMissingAutomatically: false,
-    refreshAfterImport: true,
-    refreshAfterLibraryScan: false,
-    refreshAfterMetadataRefresh: true,
-    unassignedRetentionDays: 90,
-  },
-  security: {
-    csrfProtectionMode: 'disabled',
-    enforceHttps: false,
-    secureCookies: false,
-    strictTransportSecurity: false,
-  },
-  system: {
-    baseUrl: '',
-    logLevel: 'info',
-  },
-  paths: {
-    downloadMappings: [],
-    downloads: '',
-    music: '',
-    staging: '',
-    transcodeTemp: '',
-    userMusicRoots: [],
-  },
-  slskd: {
-    apiKey: '',
-    baseUrl: 'http://slskd:5030',
-    clearApiKey: false,
-    requestTimeoutMs: 10000,
-  },
-  providers: {
-    appleMusicEnabled: false,
-    appleMusicKeyId: '',
-    appleMusicPrivateKey: '',
-    appleMusicStorefront: 'us',
-    appleMusicTeamId: '',
-    clearAppleMusicPrivateKey: false,
-    clearSpotifyClientSecret: false,
-    clearYoutubeApiKey: false,
-    clearYoutubeClientSecret: false,
-    playlistExpansionPolicy: 'bounded',
-    requestTimeoutMs: 15000,
-    spotifyClientId: '',
-    spotifyClientSecret: '',
-    spotifyEnabled: false,
-    youtubeApiKey: '',
-    youtubeClientId: '',
-    youtubeClientSecret: '',
-    youtubeEnabled: false,
-  },
-});
-
-function applySettings(payload) {
-  Object.assign(form.artwork, {
-    ...payload.settings.artwork,
-    derivativeSizesText: formatCommaSeparatedList(payload.settings.artwork?.derivativeSizes),
-    providerOrderText: formatCommaSeparatedList(payload.settings.artwork?.providerOrder),
-  });
-  Object.assign(form.security, payload.settings.security);
-  Object.assign(form.system, payload.settings.system);
-  Object.assign(form.paths, {
-    ...payload.settings.paths,
-    downloadMappings: form.paths.downloadMappings,
-    userMusicRoots: form.paths.userMusicRoots,
-  });
-  Object.assign(form.slskd, {
-    ...form.slskd,
-    ...payload.settings.slskd,
-    apiKey: '',
-    clearApiKey: false,
-  });
-  Object.assign(form.providers, {
-    ...form.providers,
-    ...payload.settings.providers,
-    appleMusicPrivateKey: '',
-    clearAppleMusicPrivateKey: false,
-    clearSpotifyClientSecret: false,
-    clearYoutubeApiKey: false,
-    clearYoutubeClientSecret: false,
-    spotifyClientSecret: '',
-    youtubeApiKey: '',
-    youtubeClientSecret: '',
-  });
-  form.paths.downloadMappings.splice(
-    0,
-    form.paths.downloadMappings.length,
-    ...normalizeDownloadMappings(payload.settings.paths?.downloadMappings),
-  );
-  form.paths.userMusicRoots.splice(
-    0,
-    form.paths.userMusicRoots.length,
-    ...normalizeUserMusicRoots(payload.settings.paths?.userMusicRoots),
-  );
-}
-
-async function loadSettings() {
-  isLoading.value = true;
-  errorMessage.value = '';
-  try {
-    applySettings(await fetchSettings());
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Settings load failed';
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-async function saveSettings() {
-  isSaving.value = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await updateSettings(buildSettingsUpdatePayload(form));
-    applySettings(payload);
-    successMessage.value = 'Settings saved.';
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Settings save failed';
-  } finally {
-    isSaving.value = false;
-  }
-}
+const {
+  errorMessage,
+  form,
+  isLoading,
+  isSaving,
+  loadSettings,
+  saveSettings,
+  successMessage,
+} = useSettingsForm();
 
 onMounted(() => { void loadSettings(); });
 </script>

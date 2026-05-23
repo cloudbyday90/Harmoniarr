@@ -17,10 +17,10 @@
 -->
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { clearPlexLink, startPlexLink } from '../lib/settings-api.js';
+import { computed, onMounted, ref, watch } from 'vue';
 import { usePlexLinkedAccounts } from '../composables/usePlexLinkedAccounts.js';
 import { useAdminUserList } from '../composables/useAdminUserList.js';
+import { useSettingsUserMutations } from '../composables/useSettingsUserMutations.js';
 import {
   buildUsersEmptyStateBody,
   describePlexLibraryAccessPolicy,
@@ -48,28 +48,7 @@ import {
   hasPlexRepairQueue,
 } from '../lib/plex-linked-accounts-presentation.js';
 import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
-import {
-  applyPlexUserImport,
-  createUser,
-  fetchPlexLinkedAccountsOverview,
-  issueUserClaimCode,
-  reconcilePlexLinkedAccount,
-  provisionUserManagedLibraryRoot,
-  relinkPlexUserConflict,
-  resetUserPassword,
-  unlinkPlexUser,
-  updateUser,
-} from '../lib/users-api.js';
-
-const isCreatingUser = ref(false);
-const isImportingPlexUsers = ref(false);
-const isStartingPlexLink = ref(false);
-const isClearingPlexLink = ref(false);
-const activePlexRelinkProfileId = ref('');
-const activePlexLinkedAccountActionKey = ref('');
-const errorMessage = ref('');
-const successMessage = ref('');
-const roleOptions = ref(['admin', 'operator', 'requester']);
+import { fetchPlexLinkedAccountsOverview } from '../lib/users-api.js';
 
 const userList = useAdminUserList();
 const users = ref([]);
@@ -79,10 +58,6 @@ const searchQuery = ref('');
 const userRoleFilter = ref('');
 const userStatusFilter = ref('');
 
-watch(() => userList.users.value, (rawUsers) => {
-  users.value = rawUsers.map((user) => toEditableUser(user));
-}, { immediate: true });
-
 const {
   errorMessage: plexLinkedAccountsErrorMessage,
   isLoading: isLoadingPlexLinkedAccounts,
@@ -90,290 +65,54 @@ const {
   overview: plexLinkedAccountsOverview,
 } = usePlexLinkedAccounts({ fetchPlexLinkedAccountsOverview });
 
-const linkedUsersById = computed(() => new Map(users.value.map((user) => [user.id, user])));
-const plexOwnerLinked = computed(() => plexLinkedAccountsOverview.value.ownerLink?.linked === true);
-const plexRepairQueueActive = computed(() => hasPlexRepairQueue(plexLinkedAccountsOverview.value));
-
-const newUserForm = reactive({
-  managedLibraryRelativeRoot: '',
-  password: '',
-  role: 'requester',
-  username: '',
-});
-
-function toEditableUser(user, overrides = {}) {
-  return {
-    ...user,
-    claimCode: overrides.claimCode ?? null,
-    claimCodeExpiresAt: overrides.claimCodeExpiresAt ?? null,
-    issuingClaimCode: false,
-    pendingIsDisabled: Boolean(user.isDisabled),
-    pendingManagedLibraryRelativeRoot: user.managedLibraryRelativeRoot ?? '',
-    pendingPasswordReset: '',
-    pendingRole: user.role,
-    provisioning: false,
-    resettingPassword: false,
-    saving: false,
-    unlinkingPlex: false,
-  };
-}
-
-function resetNewUserForm() {
-  newUserForm.managedLibraryRelativeRoot = '';
-  newUserForm.password = '';
-  newUserForm.role = roleOptions.value.includes('requester') ? 'requester' : (roleOptions.value[0] ?? 'requester');
-  newUserForm.username = '';
-}
-
 async function loadUsers() {
   userList.setSearch(searchQuery.value);
   userList.setRoleFilter(userRoleFilter.value);
   userList.setStatusFilter(userStatusFilter.value);
   await userList.load();
-  const rawUsers = userList.users.value;
-  roleOptions.value = ['admin', 'operator', 'requester'];
-  users.value = rawUsers.map((user) => toEditableUser(user));
+  users.value = userList.users.value.map((user) => toEditableUser(user));
 }
+
+const {
+  activePlexRelinkProfileId,
+  connectPlexLink,
+  disconnectPlexLink,
+  errorMessage,
+  findEditableUser,
+  importPlexUsersNow,
+  isClearingPlexLink,
+  isCreatingUser,
+  isImportingPlexUsers,
+  isPlexLinkedAccountActionPending,
+  isStartingPlexLink,
+  issueManagedUserClaimCode,
+  newUserForm,
+  provisionManagedUserLibraryRoot,
+  relinkPlexConflict,
+  resetManagedUserPassword,
+  roleOptions,
+  runPlexLinkedAccountAction,
+  saveManagedUser,
+  saveNewUser,
+  successMessage,
+  toEditableUser,
+  unlinkLinkedPlexAccount,
+  unlinkManagedPlexUser,
+} = useSettingsUserMutations({
+  users,
+  loadUsers,
+  loadPlexLinkedAccountsOverview,
+});
+
+watch(() => userList.users.value, (rawUsers) => {
+  users.value = rawUsers.map((user) => toEditableUser(user));
+}, { immediate: true });
+
+const plexOwnerLinked = computed(() => plexLinkedAccountsOverview.value.ownerLink?.linked === true);
+const plexRepairQueueActive = computed(() => hasPlexRepairQueue(plexLinkedAccountsOverview.value));
 
 async function loadMoreUsers() {
   await userList.loadMore();
-}
-
-async function connectPlexLink() {
-  isStartingPlexLink.value = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await startPlexLink();
-    window.location.href = payload.authorizationUrl;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Plex link start failed';
-    isStartingPlexLink.value = false;
-  }
-}
-
-async function disconnectPlexLink() {
-  isClearingPlexLink.value = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    await clearPlexLink();
-    await loadPlexLinkedAccountsOverview();
-    successMessage.value = 'Plex owner link cleared.';
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Plex link clear failed';
-  } finally {
-    isClearingPlexLink.value = false;
-  }
-}
-
-async function loadPlexUserImportPreview() {
-  errorMessage.value = '';
-  await loadPlexLinkedAccountsOverview();
-}
-
-async function importPlexUsersNow() {
-  isImportingPlexUsers.value = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await applyPlexUserImport();
-    await Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]);
-    const created = payload.summary?.created ?? 0;
-    const updated = payload.summary?.updated ?? 0;
-    successMessage.value = `Plex user import applied. Created ${created}, refreshed ${updated}.`;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Plex user import failed';
-  } finally {
-    isImportingPlexUsers.value = false;
-  }
-}
-
-async function relinkPlexConflict(profile) {
-  if (!profile?.existingUser?.id || !profile?.id) return;
-  activePlexRelinkProfileId.value = profile.id;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await relinkPlexUserConflict({ plexUserId: profile.id, userId: profile.existingUser.id });
-    await Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]);
-    successMessage.value = `Linked Plex profile ${payload.profile.title} to ${payload.user.username}.`;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Plex conflict relink failed';
-  } finally {
-    activePlexRelinkProfileId.value = '';
-  }
-}
-
-function buildPlexLinkedAccountActionKey(userId, action) {
-  return `${userId}:${action}`;
-}
-
-function isPlexLinkedAccountActionPending(userId, action) {
-  return activePlexLinkedAccountActionKey.value === buildPlexLinkedAccountActionKey(userId, action);
-}
-
-async function runPlexLinkedAccountAction(linkedUser, action) {
-  if (!linkedUser?.id) {
-    return;
-  }
-
-  activePlexLinkedAccountActionKey.value = buildPlexLinkedAccountActionKey(linkedUser.id, action);
-  errorMessage.value = '';
-  successMessage.value = '';
-
-  try {
-    const payload = await reconcilePlexLinkedAccount(linkedUser.id, action);
-    await Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]);
-
-    switch (action) {
-      case 'mark_stale':
-        successMessage.value = `Marked ${linkedUser.username} as a reviewed stale Plex link.`;
-        break;
-      case 'safe_relink':
-        successMessage.value = `Relinked ${payload.user.username} back to Plex sign-in using the latest preview.`;
-        break;
-      default:
-        successMessage.value = `Refreshed the Plex profile snapshot for ${payload.user.username}.`;
-        break;
-    }
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Plex linked-account reconciliation failed';
-  } finally {
-    activePlexLinkedAccountActionKey.value = '';
-  }
-}
-
-async function saveNewUser() {
-  isCreatingUser.value = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await createUser({
-      managedLibraryRelativeRoot: newUserForm.managedLibraryRelativeRoot,
-      password: newUserForm.password,
-      role: newUserForm.role,
-      username: newUserForm.username,
-    });
-    await loadUsers();
-    resetNewUserForm();
-    successMessage.value = `User ${payload.user.username} created.`;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'User creation failed';
-  } finally {
-    isCreatingUser.value = false;
-  }
-}
-
-async function saveManagedUser(user) {
-  user.saving = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await updateUser(user.id, {
-      isDisabled: user.pendingIsDisabled,
-      managedLibraryRelativeRoot: user.pendingManagedLibraryRelativeRoot,
-      role: user.pendingRole,
-    });
-    const index = users.value.findIndex((entry) => entry.id === user.id);
-    if (index >= 0) {
-      users.value[index] = toEditableUser(payload.user, {
-        claimCode: users.value[index].claimCode,
-        claimCodeExpiresAt: users.value[index].claimCodeExpiresAt,
-      });
-    }
-    successMessage.value = `User ${payload.user.username} updated.`;
-  } catch (error) {
-    user.saving = false;
-    errorMessage.value = error instanceof Error ? error.message : 'User update failed';
-  }
-}
-
-async function provisionManagedUserLibraryRoot(user) {
-  user.provisioning = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await provisionUserManagedLibraryRoot(user.id);
-    const index = users.value.findIndex((entry) => entry.id === user.id);
-    if (index >= 0) {
-      users.value[index] = toEditableUser(payload.user, {
-        claimCode: users.value[index].claimCode,
-        claimCodeExpiresAt: users.value[index].claimCodeExpiresAt,
-      });
-    }
-    successMessage.value = payload.provisioning?.created
-      ? `Managed library folder provisioned for ${payload.user.username}.`
-      : `Managed library folder already existed for ${payload.user.username}.`;
-  } catch (error) {
-    user.provisioning = false;
-    errorMessage.value = error instanceof Error ? error.message : 'Managed library folder provisioning failed';
-  }
-}
-
-async function issueManagedUserClaimCode(user) {
-  user.issuingClaimCode = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await issueUserClaimCode(user.id);
-    Object.assign(user, toEditableUser(payload.user, {
-      claimCode: payload.claimCode,
-      claimCodeExpiresAt: payload.expiresAt,
-    }));
-    successMessage.value = `Claim code issued for ${payload.user.username}. Share it before ${new Date(payload.expiresAt).toLocaleString()}.`;
-  } catch (error) {
-    user.issuingClaimCode = false;
-    errorMessage.value = error instanceof Error ? error.message : 'User claim code issuance failed';
-  }
-}
-
-async function resetManagedUserPassword(user) {
-  user.resettingPassword = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await resetUserPassword(user.id, user.pendingPasswordReset);
-    Object.assign(user, toEditableUser(payload.user, {
-      claimCode: user.claimCode,
-      claimCodeExpiresAt: user.claimCodeExpiresAt,
-    }));
-    successMessage.value = `Temporary password set for ${payload.user.username}. The user must change it on next login.`;
-  } catch (error) {
-    user.resettingPassword = false;
-    errorMessage.value = error instanceof Error ? error.message : 'User password reset failed';
-  }
-}
-
-async function unlinkManagedPlexUser(user) {
-  user.unlinkingPlex = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await unlinkPlexUser(user.id);
-    Object.assign(user, toEditableUser(payload.user, {
-      claimCode: user.claimCode,
-      claimCodeExpiresAt: user.claimCodeExpiresAt,
-    }));
-    await loadPlexLinkedAccountsOverview();
-    successMessage.value = `Plex link removed for ${payload.user.username}. Local sign-in remains available.`;
-  } catch (error) {
-    user.unlinkingPlex = false;
-    errorMessage.value = error instanceof Error ? error.message : 'Plex unlink failed';
-  }
-}
-
-function findEditableUser(userId) {
-  return linkedUsersById.value.get(userId) ?? null;
-}
-
-async function unlinkLinkedPlexAccount(userId) {
-  const user = findEditableUser(userId);
-  if (!user) {
-    return;
-  }
-
-  await unlinkManagedPlexUser(user);
 }
 
 onMounted(() => { void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]); });

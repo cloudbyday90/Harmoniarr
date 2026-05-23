@@ -17,181 +17,38 @@
 -->
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import {
   clearSpotifyOAuth,
   clearYouTubeOAuth,
-  fetchSettings,
   startSpotifyOAuth,
   startYouTubeOAuth,
-  updateSettings,
 } from '../lib/settings-api.js';
-import {
-  buildSettingsUpdatePayload,
-  normalizeDownloadMappings,
-  normalizeUserMusicRoots,
-} from '../lib/settings-form.js';
 import {
   buildSlskdConnectionSubtitle,
   formatOAuthStatusLabel,
   formatProviderSecretStatusLabel,
   formatSlskdApiKeyStatusLabel,
 } from '../lib/settings-connections-presentation.js';
-import { formatCommaSeparatedList } from '../lib/settings-media-storage-presentation.js';
+import { useSettingsForm } from '../composables/useSettingsForm.js';
 
-const isLoading = ref(true);
-const isSaving = ref(false);
 const isStartingSpotifyOAuth = ref(false);
 const isClearingSpotifyOAuth = ref(false);
 const isStartingYouTubeOAuth = ref(false);
 const isClearingYouTubeOAuth = ref(false);
-const errorMessage = ref('');
-const successMessage = ref('');
 const secretStatus = ref(null);
 
-const form = reactive({
-  artwork: {
-    captureEmbedded: true,
-    captureFolderArtwork: true,
-    derivativeCacheSizeMb: 1024,
-    derivativeFormat: 'webp',
-    derivativeRetentionDays: 30,
-    derivativeSizesText: '256, 512',
-    fetchEnabled: true,
-    maxOriginalDimensionPixels: 4000,
-    maxOriginalFileSizeBytes: 20971520,
-    providerOrderText: 'coverArtArchive',
-    refetchMissingAutomatically: false,
-    refreshAfterImport: true,
-    refreshAfterLibraryScan: false,
-    refreshAfterMetadataRefresh: true,
-    unassignedRetentionDays: 90,
-  },
-  security: {
-    csrfProtectionMode: 'disabled',
-    enforceHttps: false,
-    secureCookies: false,
-    strictTransportSecurity: false,
-  },
-  system: {
-    baseUrl: '',
-    logLevel: 'info',
-  },
-  paths: {
-    downloadMappings: [],
-    downloads: '',
-    music: '',
-    staging: '',
-    transcodeTemp: '',
-    userMusicRoots: [],
-  },
-  slskd: {
-    apiKey: '',
-    baseUrl: 'http://slskd:5030',
-    clearApiKey: false,
-    requestTimeoutMs: 10000,
-  },
-  providers: {
-    appleMusicEnabled: false,
-    appleMusicKeyId: '',
-    appleMusicPrivateKey: '',
-    appleMusicStorefront: 'us',
-    appleMusicTeamId: '',
-    clearAppleMusicPrivateKey: false,
-    clearFanartTvApiKey: false,
-    clearFanartTvClientKey: false,
-    clearSpotifyClientSecret: false,
-    clearYoutubeApiKey: false,
-    clearYoutubeClientSecret: false,
-    fanartTvApiKey: '',
-    fanartTvClientKey: '',
-    fanartTvEnabled: false,
-    playlistExpansionPolicy: 'bounded',
-    requestTimeoutMs: 15000,
-    spotifyClientId: '',
-    spotifyClientSecret: '',
-    spotifyEnabled: false,
-    youtubeApiKey: '',
-    youtubeClientId: '',
-    youtubeClientSecret: '',
-    youtubeEnabled: false,
-  },
+const {
+  errorMessage,
+  form,
+  isLoading,
+  isSaving,
+  loadSettings,
+  saveSettings,
+  successMessage,
+} = useSettingsForm({
+  extraApply: (payload) => { secretStatus.value = payload.secretStatus ?? null; },
 });
-
-function applySettings(payload) {
-  Object.assign(form.artwork, {
-    ...payload.settings.artwork,
-    derivativeSizesText: formatCommaSeparatedList(payload.settings.artwork?.derivativeSizes),
-    providerOrderText: formatCommaSeparatedList(payload.settings.artwork?.providerOrder),
-  });
-  Object.assign(form.security, payload.settings.security);
-  Object.assign(form.system, payload.settings.system);
-  Object.assign(form.paths, {
-    ...payload.settings.paths,
-    downloadMappings: form.paths.downloadMappings,
-    userMusicRoots: form.paths.userMusicRoots,
-  });
-  Object.assign(form.slskd, {
-    ...form.slskd,
-    ...payload.settings.slskd,
-    apiKey: '',
-    clearApiKey: false,
-  });
-  Object.assign(form.providers, {
-    ...form.providers,
-    ...payload.settings.providers,
-    appleMusicPrivateKey: '',
-    clearAppleMusicPrivateKey: false,
-    clearFanartTvApiKey: false,
-    clearFanartTvClientKey: false,
-    clearSpotifyClientSecret: false,
-    clearYoutubeApiKey: false,
-    clearYoutubeClientSecret: false,
-    fanartTvApiKey: '',
-    fanartTvClientKey: '',
-    spotifyClientSecret: '',
-    youtubeApiKey: '',
-    youtubeClientSecret: '',
-  });
-  secretStatus.value = payload.secretStatus ?? null;
-  form.paths.downloadMappings.splice(
-    0,
-    form.paths.downloadMappings.length,
-    ...normalizeDownloadMappings(payload.settings.paths?.downloadMappings),
-  );
-  form.paths.userMusicRoots.splice(
-    0,
-    form.paths.userMusicRoots.length,
-    ...normalizeUserMusicRoots(payload.settings.paths?.userMusicRoots),
-  );
-}
-
-async function loadSettings() {
-  isLoading.value = true;
-  errorMessage.value = '';
-  try {
-    applySettings(await fetchSettings());
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Settings load failed';
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-async function saveSettings() {
-  isSaving.value = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const payload = await updateSettings(buildSettingsUpdatePayload(form));
-    applySettings(payload);
-    successMessage.value = 'Settings saved.';
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Settings save failed';
-  } finally {
-    isSaving.value = false;
-  }
-}
 
 async function connectSpotifyOAuth() {
   isStartingSpotifyOAuth.value = true;
