@@ -31,8 +31,13 @@ const {
   entryCount,
   errorMessage,
   isLoading,
+  isRevalidating,
   load,
-} = useActivityHistory({ limit: 100 });
+} = useActivityHistory({
+  limit: 100,
+  pollIntervalMs: 30000,
+  revalidateOnFocus: true,
+});
 </script>
 
 <template>
@@ -40,7 +45,10 @@ const {
     <header class="hx-page-header">
       <div>
         <h2 class="hx-page-title">History</h2>
-        <p class="hx-page-subtitle">Recent system activity ({{ formatActivityEntryCountLabel(entryCount) }}).</p>
+        <p class="hx-page-subtitle">
+          Recent system activity ({{ formatActivityEntryCountLabel(entryCount) }}).
+          <span v-if="isRevalidating" class="history-revalidating" aria-label="Refreshing">↻</span>
+        </p>
       </div>
       <div class="hx-page-actions">
         <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
@@ -99,3 +107,14 @@ const {
     </article>
   </section>
 </template>
+
+<style scoped>
+.history-revalidating {
+  display: inline-block;
+  animation: hx-spin 1s linear infinite;
+}
+
+@keyframes hx-spin {
+  to { transform: rotate(360deg); }
+}
+</style>

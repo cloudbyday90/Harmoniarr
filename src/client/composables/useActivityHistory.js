@@ -23,11 +23,15 @@ import { useAsyncResource } from './useAsyncResource.js';
 export function useActivityHistory({
   fetchSystemActivityFeed = defaultFetchSystemActivityFeed,
   limit = 100,
+  pollIntervalMs = 0,
+  revalidateOnFocus = false,
 } = {}) {
   const {
     data: entries,
     errorMessage,
     isLoading,
+    isRevalidating,
+    lastRefreshedAt,
     load,
   } = useAsyncResource({
     fetcher: () => fetchSystemActivityFeed({ limit }),
@@ -35,6 +39,8 @@ export function useActivityHistory({
     initialData: [],
     immediate: false,
     fallbackErrorMessage: 'Failed to load activity feed',
+    pollIntervalMs,
+    revalidateOnFocus,
   });
 
   const entryCount = computed(() => entries.value?.length ?? 0);
@@ -44,6 +50,8 @@ export function useActivityHistory({
     entryCount,
     errorMessage,
     isLoading,
+    isRevalidating,
+    lastRefreshedAt,
     load,
   };
 }

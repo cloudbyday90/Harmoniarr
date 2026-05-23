@@ -177,8 +177,7 @@ test('useActivityFeed: load sets errorMessage on API error', async () => {
   assert.equal(feed.isLoading.value, false);
 });
 
-test('useActivityFeed: load clears events and total on error', async () => {
-  // Prime with data first
+test('useActivityFeed: load preserves stale events on revalidation error', async () => {
   const event = makeEvent();
   let callCount = 0;
   const fetchFeedFn = async () => {
@@ -188,13 +187,14 @@ test('useActivityFeed: load clears events and total on error', async () => {
   };
   const feed = useActivityFeed({ fetchFeedFn });
 
-  await feed.load(); // success
+  await feed.load();
   assert.equal(feed.events.value.length, 1);
 
-  await feed.load(); // error
-  assert.deepEqual(feed.events.value, []);
-  assert.equal(feed.total.value, 0);
-  assert.equal(feed.checkedAt.value, null);
+  await feed.load();
+  assert.equal(feed.events.value.length, 1, 'stale events preserved on revalidation error');
+  assert.equal(feed.total.value, 1, 'stale total preserved');
+  assert.equal(feed.checkedAt.value, '2026-06-01T12:00:00.000Z', 'stale checkedAt preserved');
+  assert.ok(feed.errorMessage.value.length > 0);
 });
 
 // ── limit option ──────────────────────────────────────────────────────────────

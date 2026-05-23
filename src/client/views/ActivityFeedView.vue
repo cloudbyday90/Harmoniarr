@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { onMounted } from 'vue';
+import { onBeforeUnmount, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import EmptyState from '../components/EmptyState.vue';
 import { useActivityFeed } from '../composables/useActivityFeed.js';
@@ -30,12 +30,32 @@ import {
 import { buildActivityEventLinkTarget } from '../lib/activity-event-link-targets.js';
 import { sessionStore } from '../state/session.js';
 
-const { events, isLoading, errorMessage, checkedAt, hasEvents, isEmpty, load } = useActivityFeed({ limit: 100 });
+const {
+  events,
+  isLoading,
+  isRevalidating,
+  errorMessage,
+  checkedAt,
+  hasEvents,
+  isEmpty,
+  load,
+  destroy,
+  attachVisibilityListener,
+} = useActivityFeed({
+  limit: 100,
+  pollIntervalMs: 30000,
+  revalidateOnFocus: true,
+});
 
 const currentUserId = sessionStore.state.user?.id ?? null;
 
 onMounted(() => {
+  attachVisibilityListener();
   void load();
+});
+
+onBeforeUnmount(() => {
+  destroy();
 });
 </script>
 
@@ -121,6 +141,7 @@ onMounted(() => {
       class="activity-feed-checked-at"
       aria-live="polite"
     >
+      <span v-if="isRevalidating" class="activity-feed-revalidating" aria-label="Refreshing">↻</span>
       Last checked: {{ formatActivityEventTime(checkedAt) }}
     </p>
 
@@ -204,5 +225,14 @@ onMounted(() => {
   margin-top: 1.5rem;
   font-size: 0.75rem;
   color: var(--hx-text-muted, #888);
+}
+
+.activity-feed-revalidating {
+  display: inline-block;
+  animation: hx-spin 1s linear infinite;
+}
+
+@keyframes hx-spin {
+  to { transform: rotate(360deg); }
 }
 </style>
