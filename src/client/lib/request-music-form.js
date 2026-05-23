@@ -184,3 +184,41 @@ export function buildMediaRequestSuccessMessage(mediaRequest, currentUserId) {
     ? `Music request submitted for ${targetUser.username}.`
     : 'Music request submitted and added to your request profile.';
 }
+
+export function getReassignmentEventLabel(eventType) {
+  switch (eventType) {
+    case 'reassigned':
+      return 'Reassigned';
+    default:
+      return eventType;
+  }
+}
+
+export function getReassignmentEventTone(eventType) {
+  switch (eventType) {
+    case 'reassigned':
+      return 'info';
+    default:
+      return 'info';
+  }
+}
+
+export function formatReassignmentEventDescription(event, usersById) {
+  if (!event) return '';
+
+  const actorLabel = event.actorUsername ?? 'Unknown admin';
+  const previousUser = usersById[event.previousRequestedForUserId];
+  const newUser = usersById[event.newRequestedForUserId];
+  const previousLabel = previousUser?.username ?? event.previousRequestedForUserId ?? 'unknown';
+  const newLabel = newUser?.username ?? event.newRequestedForUserId ?? 'unknown';
+
+  const parts = [
+    `${actorLabel} reassigned from ${previousLabel} to ${newLabel}`,
+  ];
+
+  if (event.reason) {
+    parts.push(`Reason: ${event.reason}`);
+  }
+
+  return parts.join('. ');
+}

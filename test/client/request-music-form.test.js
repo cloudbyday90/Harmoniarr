@@ -21,8 +21,11 @@ import test from 'node:test';
 import {
   buildMediaRequestPayload,
   buildMediaRequestSuccessMessage,
+  formatReassignmentEventDescription,
   getFulfillmentStatusLabel,
   getFulfillmentStatusTone,
+  getReassignmentEventLabel,
+  getReassignmentEventTone,
   getRequestHeadline,
   getRequestKindLabel,
   getRequestStateLabel,
@@ -377,4 +380,67 @@ test('buildMediaRequestSuccessMessage returns fanOutMessage when present', () =>
   };
   const result = buildMediaRequestSuccessMessage(mediaRequest, 'admin-1');
   assert.equal(result, 'Request created for 3 users (2 additional targets).');
+});
+
+test('getReassignmentEventLabel returns "Reassigned" for reassigned event type', () => {
+  assert.equal(getReassignmentEventLabel('reassigned'), 'Reassigned');
+});
+
+test('getReassignmentEventLabel returns raw event type for unknown types', () => {
+  assert.equal(getReassignmentEventLabel('something_else'), 'something_else');
+});
+
+test('getReassignmentEventTone returns "info" for reassigned', () => {
+  assert.equal(getReassignmentEventTone('reassigned'), 'info');
+});
+
+test('getReassignmentEventTone returns "info" for unknown types', () => {
+  assert.equal(getReassignmentEventTone('unknown'), 'info');
+});
+
+test('formatReassignmentEventDescription builds correct description', () => {
+  const event = {
+    actorUsername: 'admin',
+    previousRequestedForUserId: 'u-1',
+    newRequestedForUserId: 'u-2',
+    reason: null,
+  };
+  const usersById = {
+    'u-1': { username: 'alice' },
+    'u-2': { username: 'bob' },
+  };
+  const result = formatReassignmentEventDescription(event, usersById);
+  assert.equal(result, 'admin reassigned from alice to bob');
+});
+
+test('formatReassignmentEventDescription includes reason when present', () => {
+  const event = {
+    actorUsername: 'admin',
+    previousRequestedForUserId: 'u-1',
+    newRequestedForUserId: 'u-2',
+    reason: 'User left the team',
+  };
+  const usersById = {
+    'u-1': { username: 'alice' },
+    'u-2': { username: 'bob' },
+  };
+  const result = formatReassignmentEventDescription(event, usersById);
+  assert.ok(result.includes('Reason: User left the team'));
+});
+
+test('formatReassignmentEventDescription handles null event', () => {
+  assert.equal(formatReassignmentEventDescription(null, {}), '');
+});
+
+test('formatReassignmentEventDescription handles missing usersById entries', () => {
+  const event = {
+    actorUsername: null,
+    previousRequestedForUserId: 'u-1',
+    newRequestedForUserId: 'u-2',
+    reason: null,
+  };
+  const result = formatReassignmentEventDescription(event, {});
+  assert.ok(result.includes('Unknown admin'));
+  assert.ok(result.includes('u-1'));
+  assert.ok(result.includes('u-2'));
 });

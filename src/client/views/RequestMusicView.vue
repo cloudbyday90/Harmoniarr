@@ -17,8 +17,10 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestNotificationsPanel from '../components/RequestNotificationsPanel.vue';
+import { useMediaRequestReassignment } from '../composables/useMediaRequestReassignment.js';
 import { useRequestMusicForm } from '../composables/useRequestMusicForm.js';
 import { formatSourceProvider } from '../lib/import-candidate-presentation.js';
 import {
@@ -30,6 +32,7 @@ import {
   getRequestTargetLabel,
 } from '../lib/request-music-form.js';
 import { formatUserRole } from '../lib/settings-users-presentation.js';
+import { useToast } from '../composables/useToast.js';
 import { sessionStore } from '../state/session.js';
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
@@ -40,6 +43,41 @@ const rm = useRequestMusicForm({
   isAdmin: isAdmin.value,
   currentUserId: currentUserId.value,
 });
+
+const toast = useToast();
+
+const reassignment = useMediaRequestReassignment();
+
+const reassignModalOpen = ref(false);
+const reassignTarget = ref(null);
+
+function openReassignModal(request) {
+  reassignTarget.value = request;
+  reassignment.reset();
+  reassignModalOpen.value = true;
+}
+
+function closeReassignModal() {
+  reassignModalOpen.value = false;
+  reassignTarget.value = null;
+}
+
+async function handleReassign({ mediaRequestId, newRequestedForUserId, reason }) {
+  const result = await reassignment.reassign({ mediaRequestId, newRequestedForUserId, reason });
+  if (result) {
+    closeReassignModal();
+    toast.success('Request reassigned successfully.');
+    void rm.loadRequestDashboard();
+  }
+}
+
+function handleLoadHistory({ mediaRequestId }) {
+  void reassignment.loadHistory({ mediaRequestId });
+}
+
+function handleLoadUsers() {
+  void reassignment.loadEligibleUsers();
+}
 
 const hasNotifications = computed(
   () => (rm.summary.value?.notificationFeed?.counts?.total ?? 0) > 0,
@@ -254,6 +292,14 @@ onMounted(() => {
             <p class="hx-text-muted" v-if="request.existingMatch">
               Matched release: {{ request.existingMatch.artistName }} &#x2014; {{ request.existingMatch.releaseTitle || request.existingMatch.releaseGroupTitle }}
             </p>
+            <div v-if="isAdmin && rm.selectedScope.value === 'all'" class="rm-request-actions">
+              <button
+                type="button"
+                class="hx-btn"
+                data-variant="ghost"
+                @click="openReassignModal(request)"
+              >Reassign</button>
+            </div>
           </article>
         </div>
 
@@ -263,6 +309,22 @@ onMounted(() => {
         </div>
       </div>
     </article>
+
+    <ReassignRequestModal
+      :open="reassignModalOpen"
+      :request="reassignTarget"
+      :eligible-users="reassignment.eligibleUsers.value"
+      :is-loading-users="reassignment.isLoadingUsers.value"
+      :events="reassignment.events.value"
+      :is-loading-history="reassignment.isLoadingHistory.value"
+      :is-reassigning="reassignment.isReassigning.value"
+      :reassign-error="reassignment.reassignError.value"
+      :history-error="reassignment.historyError.value"
+      @reassign="handleReassign"
+      @close="closeReassignModal"
+      @load-users="handleLoadUsers"
+      @load-history="handleLoadHistory"
+    />
   </section>
 </template>
 
@@ -330,5 +392,11 @@ onMounted(() => {
   font-size: var(--hx-text-base);
   font-weight: 600;
   margin: 0 0 var(--hx-space-1);
+}
+
+.rm-request-actions {
+  display: flex;
+  gap: var(--hx-space-2);
+  padding-top: var(--hx-space-1);
 }
 </style>

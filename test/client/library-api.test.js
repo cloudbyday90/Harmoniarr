@@ -5,7 +5,9 @@ import {
   fetchLibraryDiscoverySummary,
   fetchLibraryOrganizePreview,
   fetchMediaRequests,
+  fetchMediaRequestReassignmentHistory,
   fetchMediaRequestSummary,
+  reassignMediaRequest,
 } from '../../src/client/lib/library-api.js';
 
 function createJsonResponse({ ok = true, payload = { ok: true }, status = 200 } = {}) {
@@ -41,4 +43,44 @@ test('library-api routes discovery and media request calls through the shared ap
   assert.equal(globalThis.fetch.mock.calls[4].arguments[0], '/api/v1/library/media-requests');
   assert.equal(globalThis.fetch.mock.calls[4].arguments[1].method, 'POST');
   assert.equal(globalThis.fetch.mock.calls[4].arguments[1].headers.get('X-CSRF-Token'), 'csrf-library');
+});
+
+test('library-api reassignMediaRequest sends POST with CSRF', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-reassign' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await reassignMediaRequest({
+    mediaRequestId: 'req-1',
+    newRequestedForUserId: 'u-2',
+    reason: 'User left',
+  });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/library/media-requests/req-1/reassign');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'POST');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].headers.get('X-CSRF-Token'), 'csrf-reassign');
+
+  const body = JSON.parse(globalThis.fetch.mock.calls[0].arguments[1].body);
+  assert.equal(body.newRequestedForUserId, 'u-2');
+  assert.equal(body.reason, 'User left');
+});
+
+test('library-api fetchMediaRequestReassignmentHistory sends GET', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchMediaRequestReassignmentHistory({ mediaRequestId: 'req-1' });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/library/media-requests/req-1/reassignment-history');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'GET');
+});
+
+test('library-api reassignMediaRequest encodes mediaRequestId in URL', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await reassignMediaRequest({ mediaRequestId: 'req/slash', newRequestedForUserId: 'u-1', reason: null });
+
+  assert.ok(globalThis.fetch.mock.calls[0].arguments[0].includes('req%2Fslash'));
 });

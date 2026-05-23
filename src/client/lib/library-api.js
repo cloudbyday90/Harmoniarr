@@ -122,3 +122,15 @@ export function startLibraryScanRun() {
     method: 'POST',
   });
 }
+
+export function reassignMediaRequest({ mediaRequestId, newRequestedForUserId, reason }) {
+  return apiRequest(`/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}/reassign`, {
+    body: { newRequestedForUserId, reason },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function fetchMediaRequestReassignmentHistory({ mediaRequestId }) {
+  return apiRequest(`/api/v1/library/media-requests/${encodeURIComponent(mediaRequestId)}/reassignment-history`);
+}
