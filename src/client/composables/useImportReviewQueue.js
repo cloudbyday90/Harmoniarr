@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, ref } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
   fetchImportCandidate,
@@ -37,13 +37,28 @@ import {
 
 const defaultFilters = defaultImportReviewFilters;
 
+const activeCandidateStatuses = new Set([
+  'pending',
+  'selected',
+  'downloading',
+  'import_pending',
+]);
+
+function hasActiveCandidates(queueValue) {
+  return (queueValue?.candidates ?? []).some(
+    (c) => activeCandidateStatuses.has(c.status),
+  );
+}
+
 export function useImportReviewQueue({
   fetchCandidate = fetchImportCandidate,
   getNow = () => new Date(),
   holdCandidate = holdImportCandidate,
   listCandidates = fetchImportCandidates,
+  pollIntervalMs = 0,
   rejectCandidate = rejectImportCandidate,
   reopenCandidate = reopenImportCandidate,
+  revalidateOnFocus = false,
   selectCandidateForDownload = selectImportCandidate,
 } = {}) {
   const folderPathFilter = ref(defaultFilters.folderPath);
@@ -62,9 +77,13 @@ export function useImportReviewQueue({
   const detailError = ref('');
   const actionError = ref('');
   const isLoadingQueue = ref(false);
+  const isRevalidating = ref(false);
   const isLoadingCandidate = ref(false);
   const isTransitionPending = ref(false);
   const lastLoadedAt = ref(null);
+  let pollTimer = null;
+  let destroyed = false;
+  let hasLoaded = false;
 
   const candidates = computed(() => queue.value.candidates ?? []);
   const pagination = computed(() => queue.value.pagination ?? createEmptyQueue().pagination);
@@ -138,21 +157,75 @@ export function useImportReviewQueue({
     offset.value = defaultFilters.offset;
   }
 
+  function clearPollTimer() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    clearPollTimer();
+    if (!pollIntervalMs || pollIntervalMs <= 0) return;
+    if (destroyed) return;
+    if (!hasActiveCandidates(queue.value)) return;
+
+    pollTimer = setTimeout(async () => {
+      if (destroyed) return;
+      await loadQueue();
+    }, pollIntervalMs);
+  }
+
+  function handleVisibilityChange() {
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
+    void loadQueue().then(() => {
+      if (!destroyed) schedulePoll();
+    });
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function attachVisibilityListener() {
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
   async function loadQueue() {
+    if (destroyed) return queue.value;
     listError.value = '';
-    isLoadingQueue.value = true;
+
+    const isRevalidation = hasLoaded;
+    if (isRevalidation) {
+      isRevalidating.value = true;
+    } else {
+      isLoadingQueue.value = true;
+    }
 
     try {
       queue.value = normalizeQueuePayload(await listCandidates(currentFilters()));
       lastLoadedAt.value = getNow().toISOString();
       syncSelectedCandidateFromQueue();
+      hasLoaded = true;
       return queue.value;
     } catch (error) {
-      queue.value = createEmptyQueue();
+      if (!isRevalidation) {
+        queue.value = createEmptyQueue();
+      }
       listError.value = getErrorMessage(error, 'Import review queue failed to load');
       return queue.value;
     } finally {
-      isLoadingQueue.value = false;
+      if (!destroyed) {
+        isLoadingQueue.value = false;
+        isRevalidating.value = false;
+        schedulePoll();
+      }
     }
   }
 
@@ -255,13 +328,16 @@ export function useImportReviewQueue({
     actionError,
     actionReason,
     activeFilterCount,
+    attachVisibilityListener,
     candidates,
     clearSelection,
+    destroy,
     detailError,
     folderPathFilter,
     holdSelectedCandidate,
     isLoadingCandidate,
     isLoadingQueue,
+    isRevalidating: readonly(isRevalidating),
     isTransitionPending,
     lastLoadedAt,
     limit,

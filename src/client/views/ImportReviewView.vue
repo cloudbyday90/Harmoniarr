@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import ImportCandidateApplyPanel from '../components/ImportCandidateApplyPanel.vue';
 import ImportCandidateExecutionPanel from '../components/ImportCandidateExecutionPanel.vue';
@@ -50,8 +50,10 @@ const {
   applyPreview,
   applyPreviewError,
   applyFilters,
+  attachVisibilityListener,
   candidates,
   decisionError,
+  destroy: destroyWorkspace,
   detailError,
   folderPathFilter,
   importPendingCandidates,
@@ -64,6 +66,7 @@ const {
   isLoadingImportPendingSummary,
   isLoadingPreview,
   isLoadingQueue,
+  isRevalidating,
   isTransitionPending,
   lastLoadedAt,
   listError,
@@ -91,7 +94,7 @@ const {
   summaryPills,
   usernameFilter,
   isLoadingSelectedSummary,
-} = useImportReviewWorkspace();
+} = useImportReviewWorkspace({ pollIntervalMs: 15000, revalidateOnFocus: true });
 
 function scrollPanelIntoView(panelId) {
   if (typeof document === 'undefined') {
@@ -138,6 +141,11 @@ onMounted(() => {
   if (!isAdmin.value && !route.query.status) {
     void adminWorkflow.replaceImportReviewRouteState({ status: '' });
   }
+  attachVisibilityListener();
+});
+
+onBeforeUnmount(() => {
+  destroyWorkspace();
 });
 </script>
 
@@ -149,7 +157,7 @@ onMounted(() => {
         <div class="import-review-stage__intro">
           <div>
             <p class="import-review-stage__eyebrow">Import candidates</p>
-            <h1 class="import-review-stage__title">Download candidates</h1>
+            <h1 class="import-review-stage__title">Download candidates <span v-if="isRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h1>
             <p class="import-review-stage__copy" v-if="isAdmin">
               Review each match, pressure-test the files, queue the download run, and only then apply completed downloads into the library.
             </p>
@@ -425,6 +433,17 @@ onMounted(() => {
   margin: 0;
   font-size: clamp(1.8rem, 2vw + 1rem, 3rem);
   line-height: 1.02;
+}
+
+.import-review-revalidating {
+  display: inline-block;
+  font-size: 0.5em;
+  animation: import-review-spin 1s linear infinite;
+  color: var(--hx-text-on-dark-muted);
+}
+
+@keyframes import-review-spin {
+  to { transform: rotate(360deg); }
 }
 
 .import-review-stage__copy,

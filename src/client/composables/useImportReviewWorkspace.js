@@ -117,13 +117,16 @@ export function useImportReviewWorkspace({
     actionError,
     actionReason,
     activeFilterCount,
+    attachVisibilityListener,
     candidates,
     clearSelection,
+    destroy: destroyQueue,
     detailError,
     folderPathFilter,
     holdSelectedCandidate,
     isLoadingCandidate,
     isLoadingQueue,
+    isRevalidating,
     isTransitionPending,
     lastLoadedAt,
     listError,
@@ -290,6 +293,10 @@ export function useImportReviewWorkspace({
     await runFileDecision(clearFileDecision, importCandidateFileId);
   }
 
+  function destroy() {
+    destroyQueue();
+  }
+
   watch(
     () => [
       resolvedRoute.query.candidate,
@@ -311,8 +318,10 @@ export function useImportReviewWorkspace({
     applyPreview,
     applyPreviewError,
     applyFilters,
+    attachVisibilityListener,
     candidates,
     decisionError,
+    destroy,
     detailError,
     folderPathFilter,
     importPendingCandidates,
@@ -325,6 +334,7 @@ export function useImportReviewWorkspace({
     isLoadingImportPendingSummary,
     isLoadingPreview,
     isLoadingQueue,
+    isRevalidating,
     isTransitionPending,
     lastLoadedAt,
     listError,
