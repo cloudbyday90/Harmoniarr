@@ -16,8 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { readonly, ref, shallowRef } from 'vue';
+import { readonly, ref, shallowRef, watch } from 'vue';
 import { fetchUsers as defaultFetchUsers } from '../lib/users-api.js';
+import { useAsyncResource } from './useAsyncResource.js';
 
 const PAGE_SIZE = 50;
 
@@ -28,19 +29,11 @@ export function useAdminUserList({
   revalidateOnFocus = false,
 } = {}) {
   const users = shallowRef([]);
-  const isLoading = ref(false);
   const isLoadingMore = ref(false);
-  const isRevalidating = ref(false);
-  const errorMessage = ref('');
   const totalCount = ref(0);
-
   const search = ref('');
   const roleFilter = ref('');
   const statusFilter = ref('');
-
-  let pollTimer = null;
-  let destroyed = false;
-  let hasLoaded = false;
 
   function buildParams({ offset = 0 } = {}) {
     return {
@@ -52,83 +45,43 @@ export function useAdminUserList({
     };
   }
 
-  function clearPollTimer() {
-    if (pollTimer !== null) {
-      clearTimeout(pollTimer);
-      pollTimer = null;
-    }
-  }
+  const {
+    data: listPayload,
+    destroy: destroyResource,
+    errorMessage,
+    isLoading,
+    isRevalidating,
+    load: loadResource,
+    reset: resetResource,
+  } = useAsyncResource({
+    fetcher: () => fetchUsersFn(buildParams()),
+    project: (payload) => ({
+      users: payload.users ?? [],
+      totalCount: payload.totalCount ?? 0,
+    }),
+    initialData: { users: [], totalCount: 0 },
+    immediate: false,
+    fallbackErrorMessage: 'Failed to load users',
+    pollIntervalMs,
+    revalidateOnFocus,
+  });
 
-  function schedulePoll() {
-    clearPollTimer();
-    if (!pollIntervalMs || pollIntervalMs <= 0) return;
-    if (destroyed) return;
-    if (!hasLoaded) return;
-
-    pollTimer = setTimeout(async () => {
-      if (destroyed) return;
-      await revalidate();
-    }, pollIntervalMs);
-  }
-
-  function handleVisibilityChange() {
-    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
-    void revalidate().then(() => {
-      if (!destroyed) schedulePoll();
-    });
-  }
-
-  function destroy() {
-    destroyed = true;
-    clearPollTimer();
-    if (revalidateOnFocus && typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
-  }
-
-  function attachVisibilityListener() {
-    if (revalidateOnFocus && typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-  }
+  watch(listPayload, (payload) => {
+    users.value = payload.users;
+    totalCount.value = payload.totalCount;
+  });
 
   async function load() {
     if (isLoading.value) return;
-    isLoading.value = true;
-    errorMessage.value = '';
-
-    try {
-      const payload = await fetchUsersFn(buildParams());
-      users.value = payload.users ?? [];
-      totalCount.value = payload.totalCount ?? 0;
-      hasLoaded = true;
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'Failed to load users';
-    } finally {
-      if (!destroyed) {
-        isLoading.value = false;
-        schedulePoll();
-      }
-    }
+    await loadResource();
+    users.value = listPayload.value.users;
+    totalCount.value = listPayload.value.totalCount;
   }
 
   async function revalidate() {
-    if (destroyed) return;
-    isRevalidating.value = true;
-    errorMessage.value = '';
-
-    try {
-      const payload = await fetchUsersFn(buildParams());
-      users.value = payload.users ?? [];
-      totalCount.value = payload.totalCount ?? 0;
-    } catch {
-      // Preserve stale data on revalidation error.
-    } finally {
-      if (!destroyed) {
-        isRevalidating.value = false;
-        schedulePoll();
-      }
-    }
+    await loadResource();
+    users.value = listPayload.value.users;
+    totalCount.value = listPayload.value.totalCount;
   }
 
   async function loadMore() {
@@ -169,18 +122,19 @@ export function useAdminUserList({
   }
 
   function reset() {
-    clearPollTimer();
+    resetResource();
     users.value = [];
     totalCount.value = 0;
-    errorMessage.value = '';
     search.value = '';
     roleFilter.value = '';
     statusFilter.value = '';
-    hasLoaded = false;
+  }
+
+  function destroy() {
+    destroyResource();
   }
 
   return {
-    attachVisibilityListener,
     destroy,
     errorMessage: readonly(errorMessage),
     hasMore,

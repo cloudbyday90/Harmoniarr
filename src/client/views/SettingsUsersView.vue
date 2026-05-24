@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { usePlexLinkedAccounts } from '../composables/usePlexLinkedAccounts.js';
 import { useAdminUserList } from '../composables/useAdminUserList.js';
 import { useSettingsUserMutations } from '../composables/useSettingsUserMutations.js';
@@ -118,11 +118,6 @@ async function loadMoreUsers() {
 
 onMounted(() => {
   void Promise.all([loadUsers(), loadPlexLinkedAccountsOverview()]);
-  userList.attachVisibilityListener();
-});
-
-onBeforeUnmount(() => {
-  userList.destroy();
 });
 </script>
 
