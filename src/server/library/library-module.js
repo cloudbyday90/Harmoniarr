@@ -43,6 +43,7 @@ import { createLibraryFileMatchStore } from './library-file-match-store.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
 import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
 import { createLibraryMediaRequestPipelineService } from './library-media-request-pipeline-service.js';
+import { createLibraryMediaRequestBulkCancelService } from './library-media-request-bulk-cancel-service.js';
 import { createLibraryMediaRequestService } from './library-media-request-service.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
 import { createLibraryOrganizeApplyRunStore } from './library-organize-apply-run-store.js';
@@ -180,6 +181,9 @@ export function createLibraryModule({
     recordActivityEventFn,
     releaseAvailabilityStore: libraryReleaseAvailabilityStore,
     onRequestCreatedFn,
+  }),
+  libraryMediaRequestBulkCancelService = createLibraryMediaRequestBulkCancelService({
+    cancelMediaRequest: libraryMediaRequestService.cancelMediaRequest,
   }),
   mediaFilesystemService = createMediaFilesystemService(),
   libraryOrganizePreviewStore = createLibraryOrganizePreviewStore(),
@@ -350,6 +354,7 @@ export function createLibraryModule({
     libraryExternalIntakeService,
     libraryExternalIntakeWorker,
     libraryMediaRequestService,
+    libraryMediaRequestBulkCancelService,
     libraryMediaRequestStore,
     libraryOrganizeApplyRunStore,
     libraryOrganizeApplyService,
@@ -390,6 +395,7 @@ export function createLibraryModule({
       buildMediaRequestDetail: libraryMediaRequestService.buildMediaRequestDetail,
       buildMediaRequestPipeline: libraryMediaRequestPipelineService.buildPipeline,
       buildMediaRequestSummary: libraryMediaRequestService.buildMediaRequestSummary,
+      bulkCancelMediaRequests: libraryMediaRequestBulkCancelService.bulkCancelMediaRequests,
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,
       buildLibraryScanRunDetail: libraryScanSummaryService.buildLibraryScanRunDetail,
       buildLibraryWantedSummary: libraryWantedSummaryService.buildLibraryWantedSummary,

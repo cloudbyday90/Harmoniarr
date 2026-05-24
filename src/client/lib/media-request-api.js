@@ -48,3 +48,11 @@ export function fetchMyMediaRequests({ limit = 50, signal } = {}) {
 export function fetchMyRequestSummary({ signal } = {}) {
   return apiRequest('/api/v1/library/media-request-summary?scope=mine', { signal });
 }
+
+export function bulkCancelMediaRequests({ mediaRequestIds, reason } = {}) {
+  return apiRequest('/api/v1/library/media-requests/bulk-cancel', {
+    method: 'POST',
+    includeCsrf: true,
+    body: { mediaRequestIds, reason: reason || undefined },
+  });
+}

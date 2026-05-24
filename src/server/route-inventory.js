@@ -149,6 +149,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/library/releases', access: 'authenticated', area: 'library', kind: 'read' },
   { method: 'GET', path: '/api/v1/library/wanted-releases', access: 'authenticated', area: 'library', kind: 'read' },
   { method: 'POST', path: '/api/v1/library/media-requests', access: 'authenticated', area: 'requests', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/library/media-requests/bulk-cancel', access: 'authenticated', area: 'requests', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/library/media-requests/:mediaRequestId', access: 'authenticated', area: 'requests', kind: 'read' },
   { method: 'GET', path: '/api/v1/library/media-requests/:mediaRequestId/pipeline', access: 'authenticated', area: 'requests', kind: 'read' },
   { method: 'GET', path: '/api/v1/library/media-requests/:mediaRequestId/events', access: 'authenticated', area: 'requests', kind: 'read' },

@@ -38,6 +38,7 @@ export function registerLibraryRoutes(app, {
   buildMediaRequestPipeline,
   buildMediaRequestSummary,
   buildReleaseRadar,
+  bulkCancelMediaRequests,
   cancelMediaRequest,
   createMediaRequest,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
@@ -47,6 +48,7 @@ export function registerLibraryRoutes(app, {
   limitLibraryScanRun = skipRateLimitMiddleware,
   limitMediaRequestMutation = skipRateLimitMiddleware,
   limitMediaRequestAdminMutation = skipRateLimitMiddleware,
+  limitMediaRequestBulkCancel = skipRateLimitMiddleware,
   listMediaRequestEventsPage,
   listMediaRequests,
   reassignMediaRequest,
@@ -252,6 +254,24 @@ export function registerLibraryRoutes(app, {
 
     response.status(201).json({
       mediaRequest: responseBody,
+      ok: true,
+    });
+  }));
+
+  app.post('/api/v1/library/media-requests/bulk-cancel', limitMediaRequestBulkCancel, asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    requireCsrf(request, session);
+
+    const result = await bulkCancelMediaRequests({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
+      mediaRequestIds: request.body?.mediaRequestIds,
+      reason: request.body?.reason,
+      requestMetadata: getRequestMetadata(request),
+    });
+
+    response.json({
+      ...result,
       ok: true,
     });
   }));

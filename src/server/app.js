@@ -754,6 +754,11 @@ export function createApp({
       limit: 30,
       windowMs: 60 * 1000,
     }),
+    limitMediaRequestBulkCancel: requestRateLimiterService.createMiddleware({
+      bucketName: 'media-request-bulk-cancel',
+      limit: 20,
+      windowMs: 60 * 1000,
+    }),
   });
   mountSystemRoutes(app, {
     ...systemModule.routeDependencies,
