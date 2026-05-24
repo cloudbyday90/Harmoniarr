@@ -397,7 +397,49 @@ function createImportCandidateRouteTestApp(overrides = {}) {
           requestMetadata,
         },
       }),
+      buildImportCandidateApplyRunDetail: async ({ runId }) => ({
+        checkedAt: '2026-04-30T21:10:00.000Z',
+        run: {
+          completedFileCount: 1,
+          errorMessage: null,
+          failedFileCount: 0,
+          finishedAt: '2026-04-30T21:09:00.000Z',
+          id: runId,
+          skippedFileCount: 0,
+          startedAt: '2026-04-30T21:08:00.000Z',
+          status: 'completed',
+          totalFileCount: 1,
+        },
+      }),
+      buildImportCandidateExecutionRunDetail: async ({ runId }) => ({
+        checkedAt: '2026-04-30T20:35:00.000Z',
+        run: {
+          errorMessage: null,
+          finishedAt: '2026-04-30T20:34:00.000Z',
+          id: runId,
+          plannedCandidateCount: 1,
+          skippedCandidateCount: 0,
+          startedAt: '2026-04-30T20:33:00.000Z',
+          status: 'completed',
+          transferredCandidateCount: 1,
+        },
+      }),
+      bulkReviewImportCandidates: async ({ action, actorUserId, importCandidateIds, reason, requestMetadata }) => ({
+        results: importCandidateIds.map((id) => ({
+          importCandidateId: id,
+          ok: true,
+          previousStatus: 'pending',
+          newStatus: action === 'select' ? 'selected' : action,
+        })),
+        summary: {
+          action,
+          failed: 0,
+          succeeded: importCandidateIds.length,
+          total: importCandidateIds.length,
+        },
+      }),
       limitImportCandidateApplyRun: (_request, _response, next) => next(),
+      limitImportCandidateDecision: (_request, _response, next) => next(),
       limitImportCandidateMediaInspectionRun: (_request, _response, next) => next(),
       limitImportCandidateTranscodeRun: (_request, _response, next) => next(),
       limitImportCandidateExecutionReconcile: (_request, _response, next) => next(),
@@ -1739,5 +1781,142 @@ test('import candidate slskd ingestion route normalizes provider failures', asyn
         message: 'slskd is temporarily unavailable',
       },
     });
+  });
+});
+
+test('import candidate execution run detail route returns a historical run', async (t) => {
+  const buildImportCandidateExecutionRunDetail = t.mock.fn(async ({ runId }) => ({
+    checkedAt: '2026-04-30T20:35:00.000Z',
+    run: {
+      errorMessage: null,
+      finishedAt: '2026-04-30T20:34:00.000Z',
+      id: runId,
+      plannedCandidateCount: 2,
+      skippedCandidateCount: 0,
+      startedAt: '2026-04-30T20:33:00.000Z',
+      status: 'completed',
+      transferredCandidateCount: 2,
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildImportCandidateExecutionRunDetail });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-runs/run-42`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(buildImportCandidateExecutionRunDetail.mock.calls[0].arguments, [{ runId: 'run-42' }]);
+    assert.deepEqual(payload, {
+      ok: true,
+      importCandidateExecutionRun: {
+        checkedAt: '2026-04-30T20:35:00.000Z',
+        run: {
+          errorMessage: null,
+          finishedAt: '2026-04-30T20:34:00.000Z',
+          id: 'run-42',
+          plannedCandidateCount: 2,
+          skippedCandidateCount: 0,
+          startedAt: '2026-04-30T20:33:00.000Z',
+          status: 'completed',
+          transferredCandidateCount: 2,
+        },
+      },
+    });
+  });
+});
+
+test('import candidate apply run detail route returns a historical run', async (t) => {
+  const buildImportCandidateApplyRunDetail = t.mock.fn(async ({ runId }) => ({
+    checkedAt: '2026-04-30T21:10:00.000Z',
+    run: {
+      completedFileCount: 3,
+      errorMessage: null,
+      failedFileCount: 1,
+      finishedAt: '2026-04-30T21:09:00.000Z',
+      id: runId,
+      skippedFileCount: 0,
+      startedAt: '2026-04-30T21:08:00.000Z',
+      status: 'completed',
+      totalFileCount: 4,
+    },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildImportCandidateApplyRunDetail });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/apply-runs/apply-run-7`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(buildImportCandidateApplyRunDetail.mock.calls[0].arguments, [{ runId: 'apply-run-7' }]);
+    assert.deepEqual(payload, {
+      ok: true,
+      importCandidateApplyRun: {
+        checkedAt: '2026-04-30T21:10:00.000Z',
+        run: {
+          completedFileCount: 3,
+          errorMessage: null,
+          failedFileCount: 1,
+          finishedAt: '2026-04-30T21:09:00.000Z',
+          id: 'apply-run-7',
+          skippedFileCount: 0,
+          startedAt: '2026-04-30T21:08:00.000Z',
+          status: 'completed',
+          totalFileCount: 4,
+        },
+      },
+    });
+  });
+});
+
+test('import candidate bulk review route enforces csrf and returns aggregate results', async (t) => {
+  const bulkReviewImportCandidates = t.mock.fn(async ({ action, actorUserId, importCandidateIds, reason, requestMetadata }) => ({
+    results: [
+      { importCandidateId: 'c-1', ok: true, previousStatus: 'pending', newStatus: 'selected' },
+      { importCandidateId: 'c-2', ok: true, previousStatus: 'pending', newStatus: 'selected' },
+      { importCandidateId: 'c-3', ok: false, error: { code: 'import_candidate_status_conflict', message: 'Candidate c-3 cannot transition from rejected to selected' }, previousStatus: 'rejected' },
+    ],
+    summary: { action, failed: 1, succeeded: 2, total: 3 },
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token', user: { role: 'admin' } }));
+  const app = createImportCandidateRouteTestApp({
+    bulkReviewImportCandidates,
+    requireCsrf,
+    requireFreshAdminSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/bulk-review`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+        'user-agent': 'HarmoniarrBulkReviewTest/1.0',
+      },
+      body: JSON.stringify({
+        action: 'select',
+        importCandidateIds: ['c-1', 'c-2', 'c-3'],
+        reason: 'Batch approve',
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(bulkReviewImportCandidates.mock.calls[0].arguments, [{
+      action: 'select',
+      actorUserId: 'admin-1',
+      importCandidateIds: ['c-1', 'c-2', 'c-3'],
+      reason: 'Batch approve',
+      requestMetadata: {
+        ipAddress: '127.0.0.1',
+        userAgent: 'HarmoniarrBulkReviewTest/1.0',
+      },
+    }]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.summary.succeeded, 2);
+    assert.equal(payload.summary.failed, 1);
+    assert.equal(payload.summary.total, 3);
+    assert.equal(payload.results.length, 3);
   });
 });
