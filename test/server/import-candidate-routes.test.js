@@ -2151,3 +2151,79 @@ test('import candidate slskd ingestion route normalizes request-failed provider 
     });
   });
 });
+
+test('import candidate execution summary route returns 200 with partial data when slskd is unavailable', async () => {
+  const app = createImportCandidateRouteTestApp({
+    buildImportCandidateExecutionSummary: async () => ({
+      activeRun: { id: 'run-1', status: 'running' },
+      checkedAt: '2026-05-15T10:00:00.000Z',
+      currentRun: {
+        id: 'run-1',
+        items: [{
+          id: 'item-1',
+          itemStatus: 'queued',
+          liveTransferSummary: { status: 'not_found', message: 'No live transfers found.' },
+          liveTransfers: [],
+          persistedTransferObservation: {
+            lastReconciledAt: '2026-05-15T09:58:00.000Z',
+            lastSeenAt: '2026-05-15T09:58:00.000Z',
+            summary: { message: 'Active', status: 'active', total: 1 },
+            transfers: [],
+          },
+          statusMessage: 'Enqueued.',
+        }],
+        status: 'running',
+        transferSnapshotUnavailable: true,
+      },
+      latestRun: { id: 'run-1', status: 'running' },
+      recentRuns: [],
+      summary: { message: 'Running', status: 'running' },
+    }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.importCandidateExecution.currentRun.transferSnapshotUnavailable, true);
+    assert.equal(payload.importCandidateExecution.currentRun.items.length, 1);
+  });
+});
+
+test('import candidate execution run detail route returns 200 with partial data when slskd is unavailable', async () => {
+  const app = createImportCandidateRouteTestApp({
+    buildImportCandidateExecutionRunDetail: async () => ({
+      checkedAt: '2026-05-15T10:00:00.000Z',
+      run: {
+        id: 'run-42',
+        items: [{
+          id: 'item-42',
+          itemStatus: 'queued',
+          liveTransferSummary: { status: 'not_found', message: 'No live transfers found.' },
+          liveTransfers: [],
+          persistedTransferObservation: {
+            lastReconciledAt: '2026-05-15T09:55:00.000Z',
+            lastSeenAt: '2026-05-15T09:55:00.000Z',
+            summary: { message: 'Queued', status: 'queued', total: 1 },
+            transfers: [],
+          },
+          statusMessage: 'Enqueued.',
+        }],
+        status: 'running',
+        transferSnapshotUnavailable: true,
+      },
+    }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-runs/run-42`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.importCandidateExecutionRun.run.transferSnapshotUnavailable, true);
+    assert.equal(payload.importCandidateExecutionRun.run.items.length, 1);
+  });
+});

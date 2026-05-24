@@ -24,6 +24,10 @@ import { createImportCandidateExecutionRunStore } from './import-candidate-execu
 import { createImportCandidateRunSummaryService } from './import-candidate-run-summary-service.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
 
+function isSlskdError(error) {
+  return error && typeof error.code === 'string' && error.code.startsWith('slskd_');
+}
+
 function parseIsoDate(value) {
   if (!value) {
     return null;
@@ -284,9 +288,22 @@ export function createImportCandidateExecutionSummaryService({
 
     const now = new Date();
     const items = await listImportExecutionRunItemsFn(run.id);
-    const transferSnapshot = await buildTransferSnapshot({
-      requestedTransfers: listRequestedTransfers(items),
-    });
+
+    let transferSnapshot;
+    let transferSnapshotUnavailable = false;
+
+    try {
+      transferSnapshot = await buildTransferSnapshot({
+        requestedTransfers: listRequestedTransfers(items),
+      });
+    } catch (error) {
+      if (!isSlskdError(error)) {
+        throw error;
+      }
+
+      transferSnapshotUnavailable = true;
+      transferSnapshot = { getTransfer: () => null };
+    }
 
     return {
       ...run,
@@ -295,6 +312,7 @@ export function createImportCandidateExecutionSummaryService({
         now,
         transferSnapshot,
       }))),
+      transferSnapshotUnavailable,
     };
   }
 

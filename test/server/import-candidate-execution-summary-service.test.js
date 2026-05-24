@@ -380,3 +380,204 @@ test('buildImportCandidateExecutionSummary exposes persisted missing-transfer st
   });
   assert.equal(summary.currentRun.items[0].persistedTransferObservation.summary.status, 'queued');
 });
+
+test('buildImportCandidateExecutionSummary returns partial data with transferSnapshotUnavailable when slskd is unavailable', async () => {
+  const slskdError = new Error('slskd download list request failed before receiving a response');
+  slskdError.code = 'slskd_unavailable';
+
+  const service = createImportCandidateExecutionSummaryService({
+    buildTransferSnapshot: async () => { throw slskdError; },
+    importCandidateExecutionRunStore: {
+      getActiveRun: async () => ({
+        blockedCount: 0,
+        currentStep: 'Download enqueue complete',
+        executionMode: 'download_enqueue',
+        finishedAt: null,
+        id: 'run-down',
+        processedCandidateCount: 1,
+        queueFailedCount: 0,
+        queuedCount: 1,
+        queuedWithWarningsCount: 0,
+        readyCount: 1,
+        readyWithWarningsCount: 0,
+        requestedCandidateCount: 1,
+        startedAt: '2026-05-01T00:00:00.000Z',
+        status: 'running',
+        totalSelected: 1,
+      }),
+      getLatestRun: async () => null,
+      listRecentRuns: async () => [],
+    },
+    listImportExecutionRunItemsFn: async () => [{
+      id: 'item-down',
+      itemStatus: 'queued',
+      planningSnapshot: {
+        candidate: { id: 'candidate-down' },
+        execution: {
+          enqueuedTransfers: [{
+            id: 'transfer-down',
+            username: 'source-user',
+          }],
+          latestTransferSnapshot: {
+            lastReconciledAt: '2026-05-01T00:01:00.000Z',
+            lastSeenAt: '2026-05-01T00:01:00.000Z',
+            summary: { message: 'Downloading', status: 'active', total: 1 },
+            transfers: [{ id: 'transfer-down', username: 'source-user' }],
+          },
+        },
+      },
+      statusMessage: '1 file accepted by slskd for download.',
+      updatedAt: '2026-05-01T00:01:00.000Z',
+    }],
+  });
+
+  const summary = await service.buildImportCandidateExecutionSummary();
+
+  assert.equal(summary.currentRun.id, 'run-down');
+  assert.equal(summary.currentRun.transferSnapshotUnavailable, true);
+  assert.equal(summary.currentRun.items.length, 1);
+  assert.equal(summary.currentRun.items[0].id, 'item-down');
+  assert.equal(summary.currentRun.items[0].liveTransfers.length, 0);
+  assert.equal(summary.currentRun.items[0].liveTransferSummary.status, 'not_found');
+  assert.notEqual(summary.currentRun.items[0].persistedTransferObservation, null);
+  assert.equal(summary.currentRun.items[0].persistedTransferObservation.summary.status, 'active');
+  assert.equal(summary.recentRuns.length, 0);
+});
+
+test('buildImportCandidateExecutionSummary returns partial data with transferSnapshotUnavailable when slskd request fails', async () => {
+  const slskdError = new Error('slskd returned 400 for download list');
+  slskdError.code = 'slskd_request_failed';
+
+  const service = createImportCandidateExecutionSummaryService({
+    buildTransferSnapshot: async () => { throw slskdError; },
+    importCandidateExecutionRunStore: {
+      getActiveRun: async () => null,
+      getLatestRun: async () => ({
+        executionMode: 'download_enqueue',
+        id: 'run-reqfail',
+        status: 'completed',
+      }),
+      listRecentRuns: async () => [],
+    },
+    listImportExecutionRunItemsFn: async () => [{
+      id: 'item-reqfail',
+      itemStatus: 'queued',
+      planningSnapshot: {
+        candidate: { id: 'candidate-reqfail' },
+        execution: {
+          enqueuedTransfers: [{ id: 't-1', username: 'user-1' }],
+        },
+      },
+      statusMessage: 'Enqueued.',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    }],
+  });
+
+  const summary = await service.buildImportCandidateExecutionSummary();
+
+  assert.equal(summary.currentRun.transferSnapshotUnavailable, true);
+  assert.equal(summary.currentRun.items[0].liveTransferSummary.status, 'not_found');
+  assert.equal(summary.currentRun.items[0].persistedTransferObservation, null);
+});
+
+test('buildImportCandidateExecutionSummary does not catch non-slskd errors', async () => {
+  const dbError = new Error('connection refused');
+  dbError.code = 'ECONNREFUSED';
+
+  const service = createImportCandidateExecutionSummaryService({
+    buildTransferSnapshot: async () => { throw dbError; },
+    importCandidateExecutionRunStore: {
+      getActiveRun: async () => ({
+        id: 'run-db',
+        status: 'running',
+      }),
+      getLatestRun: async () => null,
+    },
+    listImportExecutionRunItemsFn: async () => [{
+      id: 'item-db',
+      itemStatus: 'queued',
+      planningSnapshot: {
+        candidate: { id: 'candidate-db' },
+        execution: {
+          enqueuedTransfers: [{ id: 't-db', username: 'user-db' }],
+        },
+      },
+      statusMessage: 'Enqueued.',
+    }],
+  });
+
+  await assert.rejects(
+    () => service.buildImportCandidateExecutionSummary(),
+    (error) => error.code === 'ECONNREFUSED',
+  );
+});
+
+test('buildImportCandidateExecutionSummary sets transferSnapshotUnavailable false when slskd is healthy', async () => {
+  const service = createImportCandidateExecutionSummaryService({
+    buildTransferSnapshot: async () => ({
+      getTransfer: () => null,
+    }),
+    importCandidateExecutionRunStore: {
+      getActiveRun: async () => null,
+      getLatestRun: async () => ({
+        blockedCount: 0,
+        id: 'run-ok',
+        readyCount: 1,
+        status: 'completed',
+      }),
+      listRecentRuns: async () => [],
+    },
+    listImportExecutionRunItemsFn: async () => [{
+      id: 'item-ok',
+      itemStatus: 'ready',
+      planningSnapshot: { candidate: { id: 'candidate-ok' } },
+      statusMessage: 'Ready.',
+    }],
+  });
+
+  const summary = await service.buildImportCandidateExecutionSummary();
+
+  assert.equal(summary.currentRun.transferSnapshotUnavailable, false);
+});
+
+test('buildImportCandidateExecutionRunDetail returns partial data with transferSnapshotUnavailable when slskd is down', async () => {
+  const slskdError = new Error('slskd download list request failed');
+  slskdError.code = 'slskd_unavailable';
+
+  const service = createImportCandidateExecutionSummaryService({
+    buildTransferSnapshot: async () => { throw slskdError; },
+    importCandidateExecutionRunStore: {
+      getRunById: async () => ({
+        executionMode: 'download_enqueue',
+        id: 'run-detail-down',
+        status: 'running',
+      }),
+    },
+    listImportExecutionRunItemsFn: async () => [{
+      id: 'item-detail-down',
+      itemStatus: 'queued',
+      planningSnapshot: {
+        candidate: { id: 'candidate-detail-down' },
+        execution: {
+          enqueuedTransfers: [{ id: 't-detail', username: 'user-detail' }],
+          latestTransferSnapshot: {
+            lastReconciledAt: '2026-05-01T00:02:00.000Z',
+            lastSeenAt: '2026-05-01T00:02:00.000Z',
+            summary: { message: 'Queued', status: 'queued', total: 1 },
+            transfers: [{ id: 't-detail', username: 'user-detail' }],
+          },
+        },
+      },
+      statusMessage: 'Enqueued.',
+      updatedAt: '2026-05-01T00:02:00.000Z',
+    }],
+  });
+
+  const detail = await service.buildImportCandidateExecutionRunDetail({ runId: 'run-detail-down' });
+
+  assert.equal(detail.run.id, 'run-detail-down');
+  assert.equal(detail.run.transferSnapshotUnavailable, true);
+  assert.equal(detail.run.items.length, 1);
+  assert.equal(detail.run.items[0].persistedTransferObservation.summary.status, 'queued');
+  assert.equal(detail.run.items[0].liveTransferSummary.status, 'not_found');
+});
