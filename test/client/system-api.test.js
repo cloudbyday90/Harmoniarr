@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  acknowledgeAllOperatorNotifications,
   browseFsDirectory,
   fetchLibraryScanSummary,
   fetchOnboardingSummary,
@@ -90,4 +91,16 @@ test('system-api browseFsDirectory omits params when none provided', async (t) =
   await browseFsDirectory();
 
   assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/system/fs/browse');
+});
+
+test('system-api acknowledgeAllOperatorNotifications sends POST with CSRF', async (t) => {
+  globalThis.document = { cookie: '__Host-csrf=test-csrf-token' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await acknowledgeAllOperatorNotifications();
+
+  const call = globalThis.fetch.mock.calls[0];
+  assert.equal(call.arguments[0], '/api/v1/system/operator-notifications/acknowledge-all');
+  const opts = call.arguments[1];
+  assert.equal(opts.method, 'POST');
 });

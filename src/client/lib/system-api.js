@@ -38,6 +38,13 @@ export function fetchSystemOperatorNotifications({ limit } = {}) {
   return apiRequest(`/api/v1/system/operator-notifications${buildQueryString({ limit })}`);
 }
 
+export function acknowledgeAllOperatorNotifications() {
+  return apiRequest('/api/v1/system/operator-notifications/acknowledge-all', {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}
+
 export function browseFsDirectory({ path } = {}) {
   return apiRequest(`/api/v1/system/fs/browse${buildQueryString({ path })}`);
 }

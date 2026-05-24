@@ -28,6 +28,7 @@ import { createOperatorNotificationService } from './operator-notification-servi
 import { createOperatorNotificationFanoutRunStore } from './operator-notification-fanout-run-store.js';
 import { createOperatorNotificationFanoutService } from './operator-notification-fanout-service.js';
 import { createOperatorNotificationFanoutHeartbeat } from './operator-notification-fanout-heartbeat.js';
+import { createOperatorNotificationAcknowledgementService } from './operator-notification-acknowledgement-service.js';
 import { createOperatorNotificationFanoutWorker } from './operator-notification-fanout-worker.js';
 import { createBackupArtifactRepository } from './recovery/backup-artifact-repository.js';
 import { createBackupExportService } from './recovery/backup-export-service.js';
@@ -80,6 +81,7 @@ export function createSystemModule({
   restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore(),
   libraryWantedReleaseStore = null,
   operatorNotificationService = null,
+  operatorNotificationAcknowledgementService = createOperatorNotificationAcknowledgementService(),
   operatorNotificationFanoutRunStore = createOperatorNotificationFanoutRunStore(),
   operatorNotificationFanoutService = null,
   operatorNotificationFanoutHeartbeat = null,
@@ -173,6 +175,7 @@ export function createSystemModule({
     libraryDiscoveryHeartbeatState,
     metadataRefreshHeartbeatConfig,
     metadataRefreshHeartbeatState,
+    operatorNotificationAcknowledgementService,
     operatorNotificationService: systemOperatorNotificationService,
     operationHistoryService,
     spotifyOAuthService,

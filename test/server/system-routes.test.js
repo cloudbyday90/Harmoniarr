@@ -1622,9 +1622,29 @@ test('system operator notifications route returns the shared actionable-notifica
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(getOperatorNotifications.mock.calls[0].arguments, [{ limit: 12 }]);
+    assert.deepEqual(getOperatorNotifications.mock.calls[0].arguments, [{ limit: 12, userId: 'user-1' }]);
     assert.equal(payload.counts.actionable, 1);
     assert.equal(payload.notifications[0].title, 'Library scan failed');
+  });
+});
+
+test('system operator notifications acknowledge-all route acknowledges and returns count', async (t) => {
+  const acknowledgeAllOperatorNotifications = t.mock.fn(async (userId) => ({
+    acknowledgedAt: '2026-05-24T12:00:00.000Z',
+    acknowledgedCount: 3,
+  }));
+  const app = createSystemRouteTestApp({ acknowledgeAllOperatorNotifications });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/system/operator-notifications/acknowledge-all`, {
+      method: 'POST',
+      headers: { 'cookie': '__Host-csrf=csrf-token', 'x-csrf-token': 'csrf-token' },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.acknowledgedCount, 3);
+    assert.equal(acknowledgeAllOperatorNotifications.mock.calls[0].arguments[0], 'user-1');
   });
 });
 

@@ -40,6 +40,7 @@ export function registerSystemRoutes(app, {
   releaseMaintenanceLockById,
   startBackupRestoreApply,
   getOperatorNotifications,
+  acknowledgeAllOperatorNotifications,
   listBackupExports,
   limitBackupExport = skipRateLimitMiddleware,
   limitDiagnosticsExport = skipRateLimitMiddleware,
@@ -131,10 +132,18 @@ export function registerSystemRoutes(app, {
   }));
 
   app.get('/api/v1/system/operator-notifications', asyncRoute(async (request, response) => {
-    await requireAdminSession(request);
+    const session = await requireAdminSession(request);
     response.json(await getOperatorNotifications({
       limit: sanitizePageLimit(request.query.limit, { default: 20, max: 25 }),
+      userId: session.appUserId,
     }));
+  }));
+
+  app.post('/api/v1/system/operator-notifications/acknowledge-all', asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+    const result = await acknowledgeAllOperatorNotifications(session.appUserId);
+    response.json(result);
   }));
 
   app.get('/api/v1/recovery/maintenance-locks', asyncRoute(async (request, response) => {

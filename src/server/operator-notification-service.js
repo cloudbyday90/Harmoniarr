@@ -118,6 +118,7 @@ export function createOperatorNotificationService({
   nowFn = () => new Date(),
 } = {}) {
   function buildOperatorNotifications({
+    acknowledgedBefore = null,
     heartbeats = [],
     operationRuns = [],
     limit,
@@ -133,10 +134,12 @@ export function createOperatorNotificationService({
       }
 
       dedupe.add(notification.dedupeKey);
+      const occurredAt = run.finishedAt ?? run.cancelledAt ?? run.startedAt ?? null;
       notifications.push({
         ...notification,
         id: notification.dedupeKey,
-        occurredAt: run.finishedAt ?? run.cancelledAt ?? run.startedAt ?? null,
+        isAcknowledged: acknowledgedBefore && occurredAt ? occurredAt <= acknowledgedBefore : false,
+        occurredAt,
       });
     }
 
@@ -147,10 +150,12 @@ export function createOperatorNotificationService({
       }
 
       dedupe.add(notification.dedupeKey);
+      const occurredAt = heartbeat.lastTickAt ?? null;
       notifications.push({
         ...notification,
         id: notification.dedupeKey,
-        occurredAt: heartbeat.lastTickAt ?? null,
+        isAcknowledged: acknowledgedBefore && occurredAt ? occurredAt <= acknowledgedBefore : false,
+        occurredAt,
       });
     }
 
@@ -162,6 +167,9 @@ export function createOperatorNotificationService({
       accumulator.total += 1;
       if (notification.requiresAction) {
         accumulator.actionable += 1;
+      }
+      if (!notification.isAcknowledged) {
+        accumulator.unacknowledged += 1;
       }
 
       accumulator.byCategory[notification.category] = (accumulator.byCategory[notification.category] ?? 0) + 1;
@@ -175,6 +183,7 @@ export function createOperatorNotificationService({
         recovery: 0,
       },
       total: 0,
+      unacknowledged: 0,
     });
 
     return {

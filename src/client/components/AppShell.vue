@@ -23,7 +23,7 @@ import harmoniarrIcon from '../assets/harmoniarr-icon.svg';
 import { sessionStore } from '../state/session.js';
 import { useShellHeartbeat } from '../composables/useShellHeartbeat.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
-import { fetchSystemOperatorNotifications } from '../lib/system-api.js';
+import { fetchSystemOperatorNotifications, acknowledgeAllOperatorNotifications } from '../lib/system-api.js';
 import { fetchMyRequestSummary } from '../lib/media-request-api.js';
 import { useTheme } from '../composables/useTheme.js';
 import { buildVisibleNav, notificationTone } from '../lib/app-shell-presentation.js';
@@ -85,7 +85,21 @@ const {
 
 const actionableCount = computed(() => notificationsPayload.value?.counts?.actionable ?? 0);
 const totalNotificationCount = computed(() => notificationsPayload.value?.counts?.total ?? 0);
+const unacknowledgedCount = computed(() => notificationsPayload.value?.counts?.unacknowledged ?? 0);
 const notifications = computed(() => notificationsPayload.value?.notifications ?? []);
+
+const isAcknowledgingAll = ref(false);
+
+async function handleAcknowledgeAll() {
+  if (isAcknowledgingAll.value) return;
+  isAcknowledgingAll.value = true;
+  try {
+    await acknowledgeAllOperatorNotifications();
+    await refreshNotifications();
+  } finally {
+    isAcknowledgingAll.value = false;
+  }
+}
 
 // ── Requester: notification count for "My Requests" nav badge ────────────────────
 
@@ -309,10 +323,10 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="hx-topbar-iconbtn"
-            :class="{ 'is-alert': actionableCount > 0 }"
+            :class="{ 'is-alert': unacknowledgedCount > 0 }"
             :aria-expanded="notificationsOpen"
             aria-haspopup="menu"
-            :aria-label="`Notifications (${actionableCount} actionable)`"
+            :aria-label="`Notifications (${unacknowledgedCount} unread)`"
             @click.stop="toggleNotifications"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -321,18 +335,26 @@ onBeforeUnmount(() => {
             </svg>
             <span class="hx-topbar-iconbtn-label" aria-hidden="true">Alerts</span>
             <span
-              v-if="actionableCount > 0"
+              v-if="unacknowledgedCount > 0"
               class="hx-topbar-iconbtn-badge"
-              :data-tone="actionableCount > 0 ? 'danger' : 'info'"
-            >{{ actionableCount }}</span>
+              :data-tone="unacknowledgedCount > 0 ? 'danger' : 'info'"
+            >{{ unacknowledgedCount }}</span>
           </button>
 
           <div v-if="notificationsOpen" class="hx-topbar-notifications-panel" role="menu">
             <div class="hx-topbar-notifications-header">
               <strong>Notifications</strong>
-              <span class="hx-pill" :data-tone="actionableCount > 0 ? 'warning' : undefined">
-                {{ actionableCount }} actionable / {{ totalNotificationCount }} total
+              <span class="hx-pill" :data-tone="unacknowledgedCount > 0 ? 'warning' : undefined">
+                {{ unacknowledgedCount }} unread / {{ totalNotificationCount }} total
               </span>
+              <button
+                v-if="unacknowledgedCount > 0"
+                type="button"
+                class="hx-btn hx-btn--sm"
+                data-variant="ghost"
+                :disabled="isAcknowledgingAll"
+                @click="handleAcknowledgeAll"
+              >{{ isAcknowledgingAll ? 'Marking\u2026' : 'Mark all read' }}</button>
             </div>
             <div v-if="notificationsLoading && !notifications.length" class="hx-topbar-notifications-empty">
               Loading\u2026
@@ -345,6 +367,7 @@ onBeforeUnmount(() => {
                 <button
                   type="button"
                   class="hx-topbar-notifications-item"
+                  :class="{ 'is-acknowledged': notification.isAcknowledged }"
                   role="menuitem"
                   @click="openNotificationTarget(notification)"
                 >
@@ -673,6 +696,9 @@ onBeforeUnmount(() => {
   font-size: 11px;
   color: var(--hx-color-muted, rgba(255, 255, 255, 0.45));
   white-space: nowrap;
+}
+.hx-topbar-notifications-item.is-acknowledged {
+  opacity: 0.5;
 }
 .hx-sidebar-link-badge {
   margin-left: auto;

@@ -80,3 +80,64 @@ test('createOperatorNotificationService deduplicates notifications and enforces 
   assert.equal(payload.notifications.length, 1);
   assert.equal(payload.counts.total, 1);
 });
+
+test('buildOperatorNotifications marks notifications as acknowledged when occurredAt <= acknowledgedBefore', () => {
+  const service = createOperatorNotificationService({
+    nowFn: () => new Date('2026-05-02T16:00:00.000Z'),
+  });
+
+  const payload = service.buildOperatorNotifications({
+    acknowledgedBefore: '2026-05-02T15:50:00.000Z',
+    operationRuns: [{
+      id: 'run-old',
+      operationType: 'library_scan',
+      startedAt: '2026-05-02T15:40:00.000Z',
+      status: 'failed',
+    }, {
+      id: 'run-new',
+      operationType: 'metadata_artist_refresh',
+      startedAt: '2026-05-02T15:55:00.000Z',
+      status: 'failed',
+    }],
+  });
+
+  assert.equal(payload.notifications.length, 2);
+  assert.equal(payload.notifications[0].isAcknowledged, false, 'newer notification is unacknowledged');
+  assert.equal(payload.notifications[1].isAcknowledged, true, 'older notification is acknowledged');
+  assert.equal(payload.counts.unacknowledged, 1);
+  assert.equal(payload.counts.total, 2);
+});
+
+test('buildOperatorNotifications sets all notifications unacknowledged when no acknowledgedBefore', () => {
+  const service = createOperatorNotificationService();
+
+  const payload = service.buildOperatorNotifications({
+    operationRuns: [{
+      id: 'run-1',
+      operationType: 'library_scan',
+      startedAt: '2026-05-02T15:40:00.000Z',
+      status: 'failed',
+    }],
+  });
+
+  assert.equal(payload.notifications[0].isAcknowledged, false);
+  assert.equal(payload.counts.unacknowledged, 1);
+});
+
+test('buildOperatorNotifications marks heartbeat notifications as acknowledged', () => {
+  const service = createOperatorNotificationService();
+
+  const payload = service.buildOperatorNotifications({
+    acknowledgedBefore: '2026-05-02T15:55:00.000Z',
+    heartbeats: [{
+      key: 'metadataRefresh',
+      label: 'Metadata refresh',
+      lastTickAt: '2026-05-02T15:50:00.000Z',
+      message: 'Paused',
+      status: 'paused',
+    }],
+  });
+
+  assert.equal(payload.notifications[0].isAcknowledged, true);
+  assert.equal(payload.counts.unacknowledged, 0);
+});

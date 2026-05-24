@@ -90,6 +90,7 @@ export function createSystemService({
   importCandidateExecutionHeartbeatState = null,
   metadataRefreshHeartbeatConfig = null,
   metadataRefreshHeartbeatState = null,
+  operatorNotificationAcknowledgementService = null,
   operatorNotificationService = null,
   operationHistoryService = null,
   spotifyOAuthService = null,
@@ -171,7 +172,7 @@ export function createSystemService({
       };
   }
 
-  async function getOperatorNotifications({ limit = 20 } = {}) {
+  async function getOperatorNotifications({ limit = 20, userId = null } = {}) {
     const heartbeats = buildSystemHeartbeats();
     const operationRuns = operationHistoryService?.listRecentOperationRuns
       ? await operationHistoryService.listRecentOperationRuns({ limit: Number(limit) * 2 })
@@ -189,16 +190,35 @@ export function createSystemService({
             recovery: 0,
           },
           total: 0,
+          unacknowledged: 0,
         },
         notifications: [],
       };
     }
 
+    let acknowledgedBefore = null;
+    if (userId && operatorNotificationAcknowledgementService?.getAcknowledgedAt) {
+      acknowledgedBefore = await operatorNotificationAcknowledgementService.getAcknowledgedAt(userId);
+    }
+
     return operatorNotificationService.buildOperatorNotifications({
+      acknowledgedBefore,
       heartbeats,
       limit,
       operationRuns,
     });
+  }
+
+  async function acknowledgeAllOperatorNotifications(userId) {
+    if (!operatorNotificationAcknowledgementService?.setAcknowledgedAt) {
+      return { acknowledgedAt: new Date().toISOString(), acknowledgedCount: 0 };
+    }
+
+    const acknowledgedAt = await operatorNotificationAcknowledgementService.setAcknowledgedAt(userId);
+    const current = await getOperatorNotifications({ userId });
+    const acknowledgedCount = current.notifications.filter((n) => n.isAcknowledged).length;
+
+    return { acknowledgedAt, acknowledgedCount };
   }
 
   async function getOverview(options = {}) {
@@ -297,6 +317,7 @@ export function createSystemService({
     };
   }
   return {
+    acknowledgeAllOperatorNotifications,
     getActivityFeed,
     getOperatorNotifications,
     getOverview,
