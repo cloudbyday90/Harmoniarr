@@ -1979,6 +1979,150 @@ test('import candidate slskd ingestion route normalizes unauthorized provider fa
   });
 });
 
+test('import candidate execution summary route normalizes slskd unavailable errors from transfer snapshot', async () => {
+  const app = createImportCandidateRouteTestApp({
+    buildImportCandidateExecutionSummary: async () => {
+      const error = new Error('slskd transfer snapshot failed: service unavailable');
+      error.code = 'slskd_unavailable';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_unavailable',
+        message: 'slskd is temporarily unavailable',
+      },
+    });
+  });
+});
+
+test('import candidate execution summary route normalizes slskd misconfigured errors from transfer snapshot', async () => {
+  const app = createImportCandidateRouteTestApp({
+    buildImportCandidateExecutionSummary: async () => {
+      const error = new Error('slskd is not configured: SLSKD_API_KEY is missing');
+      error.code = 'slskd_misconfigured';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_misconfigured',
+        message: 'slskd is not configured: SLSKD_API_KEY is missing',
+      },
+    });
+  });
+});
+
+test('import candidate execution summary route normalizes slskd unauthorized errors from transfer snapshot', async () => {
+  const app = createImportCandidateRouteTestApp({
+    buildImportCandidateExecutionSummary: async () => {
+      const error = new Error('slskd rejected credentials');
+      error.code = 'slskd_unauthorized';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_unauthorized',
+        message: 'slskd authentication failed',
+      },
+    });
+  });
+});
+
+test('import candidate execution summary route normalizes slskd request-failed errors to 502', async () => {
+  const app = createImportCandidateRouteTestApp({
+    buildImportCandidateExecutionSummary: async () => {
+      const error = new Error('slskd returned an invalid response for downloads');
+      error.code = 'slskd_request_failed';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-summary`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 502);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_request_failed',
+        message: 'slskd returned an invalid response for downloads',
+      },
+    });
+  });
+});
+
+test('import candidate execution run detail route normalizes slskd unavailable errors from transfer snapshot', async () => {
+  const app = createImportCandidateRouteTestApp({
+    buildImportCandidateExecutionRunDetail: async () => {
+      const error = new Error('slskd transfer snapshot failed: service unavailable');
+      error.code = 'slskd_unavailable';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-runs/run-99`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_unavailable',
+        message: 'slskd is temporarily unavailable',
+      },
+    });
+  });
+});
+
+test('import candidate execution run detail route normalizes slskd request-failed errors to 502', async () => {
+  const app = createImportCandidateRouteTestApp({
+    buildImportCandidateExecutionRunDetail: async () => {
+      const error = new Error('slskd download request malformed');
+      error.code = 'slskd_request_failed';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/execution-runs/run-99`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 502);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_request_failed',
+        message: 'slskd download request malformed',
+      },
+    });
+  });
+});
+
 test('import candidate slskd ingestion route normalizes request-failed provider errors to 502', async () => {
   const app = createImportCandidateRouteTestApp({
     ingestSlskdSearchResponses: async () => {
