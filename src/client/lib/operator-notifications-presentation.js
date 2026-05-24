@@ -19,7 +19,7 @@
 /**
  * Operator notifications presentation helpers.
  *
- * Pure, framework-free functions for the OperatorNotificationsPanel.
+ * Pure, framework-free functions for operator notification display.
  * Extracted from component inline functions so they can be independently
  * tested and shared without Vue dependencies.
  */
