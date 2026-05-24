@@ -17,13 +17,14 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted } from 'vue';
 import DiscoverArtistCard from '../components/media/DiscoverArtistCard.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useDiscoverArtistArtwork } from '../composables/useDiscoverArtistArtwork.js';
 import { useDiscoverGraph } from '../composables/useDiscoverGraph.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
+import { useMonitoredArtists } from '../composables/useMonitoredArtists.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import {
   buildDiscoverGraphSubtitle,
@@ -44,6 +45,12 @@ const {
   runSearch,
   searchError,
 } = useDiscoverSearch();
+
+const {
+  artists: monitoredArtists,
+  loadMonitoredArtists,
+  destroy: destroyMonitoredArtists,
+} = useMonitoredArtists({ limit: 25 });
 
 const {
   isMonitored,
@@ -76,6 +83,17 @@ async function handleMonitor(artist) {
     await addSeed(artist);
   }
 }
+
+onMounted(async () => {
+  await loadMonitoredArtists();
+  for (const artist of monitoredArtists.value) {
+    await addSeed({ id: artist.id, name: artist.name });
+  }
+});
+
+onBeforeUnmount(() => {
+  destroyMonitoredArtists();
+});
 
 const summaryCards = computed(() => ([
   {
