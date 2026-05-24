@@ -110,7 +110,7 @@ test('getQuotaStatus returns status for all supported providers', async () => {
   const status = await getQuotaStatus();
   assert.equal(status.limit, 100);
   assert.equal(status.totalUsed, 42);
-  assert.equal(status.providers.length, 2);
+  assert.equal(status.providers.length, 3);
 
   const caa = status.providers.find((p) => p.provider === 'coverArtArchive');
   assert.equal(caa.used, 42);
@@ -121,6 +121,11 @@ test('getQuotaStatus returns status for all supported providers', async () => {
   assert.equal(fanart.used, 0);
   assert.equal(fanart.remaining, 100);
   assert.equal(fanart.exceeded, false);
+
+  const theaudiodb = status.providers.find((p) => p.provider === 'theAudioDb');
+  assert.equal(theaudiodb.used, 0);
+  assert.equal(theaudiodb.remaining, 100);
+  assert.equal(theaudiodb.exceeded, false);
 });
 
 test('getQuotaStatus marks provider as exceeded when at limit', async () => {

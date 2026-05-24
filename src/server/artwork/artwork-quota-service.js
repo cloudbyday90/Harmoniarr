@@ -19,7 +19,7 @@
 import { getPool } from '../database.js';
 
 const DEFAULT_DAILY_LIMIT = 1000;
-const SUPPORTED_PROVIDERS = ['coverArtArchive', 'fanartTv'];
+const SUPPORTED_PROVIDERS = ['coverArtArchive', 'fanartTv', 'theAudioDb'];
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);

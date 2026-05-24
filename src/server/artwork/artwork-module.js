@@ -34,6 +34,7 @@ import { createArtworkServeService } from './artwork-serve-service.js';
 import { createArtworkSummaryService } from './artwork-summary-service.js';
 import { createCoverArtArchiveClient } from '../integrations/cover-art-archive/cover-art-archive-client.js';
 import { createFanartTvClient } from '../integrations/fanart-tv/fanart-client.js';
+import { createTheAudioDbClient } from '../integrations/theaudiodb/theaudiodb-client.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
@@ -61,6 +62,7 @@ export function createArtworkModule({
   artworkQuotaService,
   coverArtArchiveClient,
   fanartTvClient,
+  theAudioDbClient,
   artworkFetchService,
   artworkMonitoredArtistPrefetchService,
   artworkSummaryService,
@@ -113,6 +115,8 @@ export function createArtworkModule({
     ?? (() => { try { return createCoverArtArchiveClient(); } catch { return null; } })();
   const resolvedFanartTvClient = fanartTvClient
     ?? (() => { try { return createFanartTvClient(); } catch { return null; } })();
+  const resolvedTheAudioDbClient = theAudioDbClient
+    ?? (() => { try { return createTheAudioDbClient(); } catch { return null; } })();
   const resolvedArtworkQuotaService = artworkQuotaService
     ?? createArtworkQuotaService({
       getDailyLimit: async () => {
@@ -131,6 +135,7 @@ export function createArtworkModule({
       artworkQuotaService: resolvedArtworkQuotaService,
       coverArtArchiveClient: resolvedCoverArtArchiveClient,
       fanartTvClient: resolvedFanartTvClient,
+      theAudioDbClient: resolvedTheAudioDbClient,
     });
   const resolvedArtworkMonitoredArtistPrefetchService = artworkMonitoredArtistPrefetchService
     ?? createArtworkMonitoredArtistPrefetchService({
