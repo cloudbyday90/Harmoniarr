@@ -389,3 +389,43 @@ test('countAppUsers with no filter counts all users', async (t) => {
   const sql = query.mock.calls[0].arguments[0];
   assert.doesNotMatch(sql, /WHERE/);
 });
+
+test('listAppUsersPage clamps NaN limit to default', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  await service.listAppUsersPage({ limit: Number.NaN, offset: 0 });
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[params.length - 2], 50);
+});
+
+test('listAppUsersPage clamps negative limit to 1', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  await service.listAppUsersPage({ limit: -10, offset: 0 });
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[params.length - 2], 1);
+});
+
+test('listAppUsersPage clamps limit exceeding max to 100', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  await service.listAppUsersPage({ limit: 500, offset: 0 });
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[params.length - 2], 100);
+});
+
+test('listAppUsersPage clamps negative offset to 0', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const service = createAppUserService({ getPoolFn: () => ({ query }) });
+
+  await service.listAppUsersPage({ limit: 50, offset: -5 });
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[params.length - 1], 0);
+});

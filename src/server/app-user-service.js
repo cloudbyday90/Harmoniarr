@@ -297,12 +297,14 @@ export function createAppUserService({
   }
 
   async function listAppUsersPage({ search = null, role = null, isDisabled = null, limit = 50, offset = 0 } = {}) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+    const safeOffset = Math.max(0, Number(offset) || 0);
     const { conditions, params } = buildUserListFilter({ search, role, isDisabled });
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const limitParamIdx = params.length + 1;
     const offsetParamIdx = params.length + 2;
-    params.push(limit, offset);
+    params.push(safeLimit, safeOffset);
 
     const result = await getPoolFn().query(
       `

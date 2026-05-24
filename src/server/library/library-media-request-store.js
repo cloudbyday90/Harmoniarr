@@ -81,6 +81,8 @@ const ALLOWED_REQUEST_STATES = new Set(['already_exists', 'cancelled', 'failed',
 const ALLOWED_REQUEST_KINDS = new Set(['release', 'track', 'external_url']);
 const DEFAULT_PAGE_LIMIT = 100;
 const MAX_PAGE_LIMIT = 500;
+const DEFAULT_EVENT_PAGE_LIMIT = 50;
+const MAX_EVENT_PAGE_LIMIT = 100;
 
 function encodeRequestCursor({ createdAt, id }) {
   return Buffer.from(JSON.stringify({ c: createdAt, i: id })).toString('base64url');
@@ -647,9 +649,10 @@ export function createLibraryMediaRequestStore({
     }
   }
 
-  async function listMediaRequestEvents({ mediaRequestId, limit = 50, cursor = null } = {}) {
+  async function listMediaRequestEvents({ mediaRequestId, limit = DEFAULT_EVENT_PAGE_LIMIT, cursor = null } = {}) {
     const pool = getPoolFn();
-    const fetchLimit = limit + 1;
+    const safeLimit = Math.max(1, Math.min(Number(limit) || DEFAULT_EVENT_PAGE_LIMIT, MAX_EVENT_PAGE_LIMIT));
+    const fetchLimit = safeLimit + 1;
     const decoded = cursor ? decodeEventCursor(cursor) : null;
 
     const columns = `
@@ -689,8 +692,8 @@ export function createLibraryMediaRequestStore({
       params,
     );
 
-    const hasMore = result.rows.length > limit;
-    const rows = hasMore ? result.rows.slice(0, limit) : result.rows;
+    const hasMore = result.rows.length > safeLimit;
+    const rows = hasMore ? result.rows.slice(0, safeLimit) : result.rows;
     const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
 
     return {

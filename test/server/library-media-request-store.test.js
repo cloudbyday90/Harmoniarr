@@ -238,6 +238,60 @@ test('listMediaRequestEvents with valid cursor containing non-date value falls b
   assert.doesNotMatch(sql, /< \(\$2, \$3\)/);
 });
 
+test('listMediaRequestEvents clamps NaN limit to default', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+
+  await store.listMediaRequestEvents({ mediaRequestId: 'req-1', limit: Number.NaN });
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[params.length - 1], 51);
+});
+
+test('listMediaRequestEvents clamps negative limit to 1', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+
+  await store.listMediaRequestEvents({ mediaRequestId: 'req-1', limit: -5 });
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[params.length - 1], 2);
+});
+
+test('listMediaRequestEvents clamps limit exceeding max to MAX_EVENT_PAGE_LIMIT', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+
+  await store.listMediaRequestEvents({ mediaRequestId: 'req-1', limit: 999 });
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[params.length - 1], 101);
+});
+
+test('listMediaRequestEvents uses safeLimit for hasMore and row slicing', async (t) => {
+  const rows = Array.from({ length: 4 }, (_, i) => ({
+    id: `evt-${i}`,
+    event_type: 'created',
+    previous_requested_for_user_id: null,
+    new_requested_for_user_id: null,
+    reason: null,
+    actor_user_id: 'u-1',
+    details: null,
+    occurred_at: new Date(Date.now() - i * 60000).toISOString(),
+    actor_username: 'listener',
+  }));
+
+  const query = t.mock.fn(async () => ({ rows }));
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+
+  const result = await store.listMediaRequestEvents({ mediaRequestId: 'req-1', limit: 3 });
+
+  assert.equal(result.events.length, 3);
+  assert.equal(result.hasMore, true);
+  assert.ok(result.nextCursor);
+  assert.equal(query.mock.calls[0].arguments[1][1], 4);
+});
+
 function makeRequestRow(overrides = {}) {
   return {
     id: overrides.id ?? 'req-1',
