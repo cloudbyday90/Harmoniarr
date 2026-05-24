@@ -17,11 +17,12 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestListFilters from '../components/RequestListFilters.vue';
 import RequestNotificationsPanel from '../components/RequestNotificationsPanel.vue';
+import { useMediaRequestBulkCancel } from '../composables/useMediaRequestBulkCancel.js';
 import { useMediaRequestReassignment } from '../composables/useMediaRequestReassignment.js';
 import { useRequestListFilters } from '../composables/useRequestListFilters.js';
 import { useRequestMusicForm } from '../composables/useRequestMusicForm.js';
@@ -106,6 +107,63 @@ function handleLoadUsers() {
 }
 
 const cancellingId = ref(null);
+
+const selectedBulkIds = reactive(new Set());
+const bulkCancelReason = ref('');
+
+const bulkCancel = useMediaRequestBulkCancel();
+
+const cancellableRequests = computed(() => sortedRequests.value.filter(isRequestCancellable));
+const hasBulkSelection = computed(() => selectedBulkIds.size > 0);
+const bulkSelectionCount = computed(() => selectedBulkIds.size);
+const allCancellableSelected = computed(() => cancellableRequests.value.length > 0 && cancellableRequests.value.every((r) => selectedBulkIds.has(r.id)));
+
+function toggleBulkSelection(id) {
+  if (selectedBulkIds.has(id)) {
+    selectedBulkIds.delete(id);
+  } else {
+    selectedBulkIds.add(id);
+  }
+}
+
+function toggleAllCancellable() {
+  if (allCancellableSelected.value) {
+    for (const r of cancellableRequests.value) {
+      selectedBulkIds.delete(r.id);
+    }
+  } else {
+    for (const r of cancellableRequests.value) {
+      selectedBulkIds.add(r.id);
+    }
+  }
+}
+
+function clearBulkSelection() {
+  selectedBulkIds.clear();
+  bulkCancelReason.value = '';
+  bulkCancel.reset();
+}
+
+async function handleBulkCancel() {
+  const ids = Array.from(selectedBulkIds);
+  if (ids.length === 0) return;
+
+  const result = await bulkCancel.execute({
+    mediaRequestIds: ids,
+    reason: bulkCancelReason.value || undefined,
+  });
+
+  if (result) {
+    if (result.failed === 0) {
+      const totalCancelled = result.succeeded;
+      toast.success(totalCancelled === 1 ? 'Request cancelled.' : `${totalCancelled} requests cancelled.`);
+      clearBulkSelection();
+    } else {
+      toast.warning(`${result.succeeded} cancelled, ${result.failed} failed.`);
+    }
+    void rm.loadRequestDashboard(filters.toApiParams());
+  }
+}
 
 async function handleCancelRequest(request) {
   if (cancellingId.value) return;
@@ -345,23 +403,64 @@ watch(
       <div class="hx-card-body">
         <p v-if="rm.isLoading.value" class="hx-text-muted">Loading request history.</p>
 
-        <div class="rm-request-list" v-else-if="rm.mediaRequests.value.length">
-          <article class="rm-request-item" v-for="request in sortedRequests" :key="request.id">
-            <div class="rm-request-header">
-              <div>
-                <p class="rm-request-kind">{{ getRequestKindLabel(request.requestKind) }}</p>
-                <router-link :to="{ name: 'request-detail', params: { id: request.id } }" class="rm-request-headline">{{ getRequestHeadline(request) }}</router-link>
-                <p class="hx-text-muted" v-if="rm.selectedScope.value === 'all' && request.requestedByUser.id !== request.requestedForUser.id">
-                  Requested by {{ request.requestedByUser.username }} ({{ formatUserRole(request.requestedByUser.role) }}) for {{ request.requestedForUser.username }} ({{ formatUserRole(request.requestedForUser.role) }})
-                </p>
-                <p class="hx-text-muted" v-else-if="rm.selectedScope.value === 'all'">
-                  Requested by {{ request.requestedByUser.username }} ({{ formatUserRole(request.requestedByUser.role) }})
-                </p>
-                <p class="hx-text-muted" v-else-if="request.requestedByUser.id !== request.requestedForUser.id">
-                  Requested on your behalf by {{ request.requestedByUser.username }}.
-                </p>
-                <p class="hx-text-muted" v-else>Created {{ request.createdAt ?? 'recently' }}</p>
-              </div>
+        <div v-else-if="rm.mediaRequests.value.length">
+          <div v-if="hasBulkSelection" class="rm-bulk-bar">
+            <span class="rm-bulk-meta">{{ bulkSelectionCount }} selected</span>
+            <div class="rm-bulk-fields">
+              <input
+                v-model="bulkCancelReason"
+                class="hx-input rm-bulk-reason"
+                type="text"
+                placeholder="Reason for cancellation (optional)"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <div class="rm-bulk-actions">
+              <button
+                type="button"
+                class="hx-btn"
+                data-variant="danger"
+                :disabled="bulkCancel.isExecuting.value"
+                @click="handleBulkCancel"
+              >{{ bulkCancel.isExecuting.value ? 'Cancelling\u2026' : 'Cancel selected' }}</button>
+              <button type="button" class="hx-btn" data-variant="ghost" @click="clearBulkSelection" :disabled="bulkCancel.isExecuting.value">
+                Clear
+              </button>
+            </div>
+            <p v-if="bulkCancel.errorMessage.value" class="rm-bulk-error">{{ bulkCancel.errorMessage.value }}</p>
+            <p v-if="bulkCancel.lastResult.value && bulkCancel.lastResult.value.failed > 0" class="rm-bulk-error">
+              {{ bulkCancel.lastResult.value.failed }} of {{ bulkCancel.lastResult.value.total }} failed.
+            </p>
+          </div>
+          <div class="rm-request-list">
+            <div class="rm-request-list-header" v-if="cancellableRequests.length > 0">
+              <label class="rm-request-check">
+                <input type="checkbox" :checked="allCancellableSelected" @change="toggleAllCancellable" aria-label="Select all cancellable requests" />
+              </label>
+              <span class="rm-request-list-header-label">Select cancellable</span>
+            </div>
+            <article class="rm-request-item" v-for="request in sortedRequests" :key="request.id" :class="{ 'rm-request-item-bulk': selectedBulkIds.has(request.id) }">
+              <div class="rm-request-header">
+                <div class="rm-request-header-left">
+                  <label v-if="isRequestCancellable(request)" class="rm-request-check">
+                    <input type="checkbox" :checked="selectedBulkIds.has(request.id)" @change="toggleBulkSelection(request.id)" :aria-label="`Select ${getRequestHeadline(request)}`" />
+                  </label>
+                  <div>
+                    <p class="rm-request-kind">{{ getRequestKindLabel(request.requestKind) }}</p>
+                    <router-link :to="{ name: 'request-detail', params: { id: request.id } }" class="rm-request-headline">{{ getRequestHeadline(request) }}</router-link>
+                    <p class="hx-text-muted" v-if="rm.selectedScope.value === 'all' && request.requestedByUser.id !== request.requestedForUser.id">
+                      Requested by {{ request.requestedByUser.username }} ({{ formatUserRole(request.requestedByUser.role) }}) for {{ request.requestedForUser.username }} ({{ formatUserRole(request.requestedForUser.role) }})
+                    </p>
+                    <p class="hx-text-muted" v-else-if="rm.selectedScope.value === 'all'">
+                      Requested by {{ request.requestedByUser.username }} ({{ formatUserRole(request.requestedByUser.role) }})
+                    </p>
+                    <p class="hx-text-muted" v-else-if="request.requestedByUser.id !== request.requestedForUser.id">
+                      Requested on your behalf by {{ request.requestedByUser.username }}.
+                    </p>
+                    <p class="hx-text-muted" v-else>Created {{ request.createdAt ?? 'recently' }}</p>
+                  </div>
+                </div>
               <span
                 class="hx-pill"
                 :data-tone="getFulfillmentStatusTone(request.fulfillmentStatus)"
@@ -393,7 +492,8 @@ watch(
               >Reassign</button>
             </div>
           </article>
-        </div>
+          </div>
+          </div>
 
         <template v-if="!rm.isLoading.value && rm.mediaRequests.value.length">
           <div v-if="rm.hasMore.value" class="rm-load-more">
@@ -518,5 +618,80 @@ watch(
   gap: var(--hx-space-3);
   padding-top: var(--hx-space-4);
   justify-content: center;
+}
+
+.rm-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  margin-bottom: var(--hx-space-2);
+  background: var(--hx-bg-surface-muted);
+  border-radius: var(--hx-radius-sm);
+}
+
+.rm-bulk-meta {
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  color: var(--hx-text-strong);
+}
+
+.rm-bulk-fields {
+  display: flex;
+  gap: var(--hx-space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.rm-bulk-reason {
+  flex: 1;
+  min-width: 180px;
+}
+
+.rm-bulk-actions {
+  display: flex;
+  gap: var(--hx-space-2);
+}
+
+.rm-bulk-error {
+  width: 100%;
+  margin: 0;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+}
+
+.rm-request-list-header {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-1) 0;
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+
+.rm-request-list-header-label {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+}
+
+.rm-request-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.rm-request-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.rm-request-item-bulk {
+  background: var(--hx-warning-soft, rgba(192, 138, 22, 0.1));
 }
 </style>
