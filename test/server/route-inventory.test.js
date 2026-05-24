@@ -202,6 +202,7 @@ function collectRegisteredRoutes() {
     buildImportCandidateMediaInspectionSummary: asyncNoopResult({}),
     buildImportPendingCandidateSummary: asyncNoopResult({}),
     buildSelectedImportCandidateSummary: asyncNoopResult({}),
+    bulkReviewImportCandidates: asyncNoopResult({ failed: 0, results: [], succeeded: 0, total: 0 }),
     clearImportCandidateFileDecision: asyncNoopResult({}),
     getImportCandidate: asyncNoopResult({}),
     getRequestMetadata: () => ({}),

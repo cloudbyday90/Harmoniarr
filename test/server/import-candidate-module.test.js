@@ -147,6 +147,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     buildCandidateReputationSummary: importCandidateModule.importCandidateReputationEnrichmentService.buildCandidateReputationSummary,
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
+    bulkReviewImportCandidates: importCandidateModule.importCandidateBulkReviewService.bulkReviewImportCandidates,
     enrichCandidatesWithUploaderReputation: importCandidateModule.importCandidateReputationEnrichmentService.enrichCandidatesWithUploaderReputation,
     getImportCandidate: importCandidateService.getImportCandidate,
     holdImportCandidate: importCandidateService.holdImportCandidate,

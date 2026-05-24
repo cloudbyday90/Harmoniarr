@@ -166,3 +166,11 @@ export function rejectImportCandidate(importCandidateId, reason) {
 export function reopenImportCandidate(importCandidateId, reason) {
   return transitionImportCandidate(importCandidateId, 'reopen', reason);
 }
+
+export function bulkReviewImportCandidates({ action, importCandidateIds, reason } = {}) {
+  return apiRequest('/api/v1/import-candidates/bulk-review', {
+    method: 'POST',
+    includeCsrf: true,
+    body: { action, importCandidateIds, reason: reason || undefined },
+  });
+}

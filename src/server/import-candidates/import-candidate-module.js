@@ -18,6 +18,7 @@
 
 import { createImportCandidateApplyPreviewService } from './import-candidate-apply-preview-service.js';
 import { createImportCandidateApplyOperationService } from './import-candidate-apply-operation-service.js';
+import { createImportCandidateBulkReviewService } from './import-candidate-bulk-review-service.js';
 import { replaceImportApplyRunItems, updateImportApplyRunItem } from './import-candidate-apply-repository.js';
 import { createImportCandidateApplyRunStore } from './import-candidate-apply-run-store.js';
 import { createImportCandidateApplyService } from './import-candidate-apply-service.js';
@@ -269,6 +270,12 @@ export function createImportCandidateModule({
     recordActivityEventFn,
     updateImportExecutionRunItem,
   }),
+  importCandidateBulkReviewService = createImportCandidateBulkReviewService({
+    holdImportCandidate: importCandidateService.holdImportCandidate,
+    rejectImportCandidate: importCandidateService.rejectImportCandidate,
+    reopenImportCandidate: importCandidateService.reopenImportCandidate,
+    selectImportCandidate: importCandidateService.selectImportCandidate,
+  }),
 } = {}) {
   return {
     importCandidateApplyOperationService,
@@ -283,6 +290,7 @@ export function createImportCandidateModule({
     importCandidateApplyService,
     importCandidateApplySummaryService,
     importCandidateApplyWorker,
+    importCandidateBulkReviewService,
     importCandidateFileDecisionService,
     importCandidateExecutionReconciliationService,
     importCandidateExecutionHeartbeatConfig,
@@ -307,6 +315,7 @@ export function createImportCandidateModule({
       buildCandidateReputationSummary: importCandidateReputationEnrichmentService.buildCandidateReputationSummary,
       buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
       buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
+      bulkReviewImportCandidates: importCandidateBulkReviewService.bulkReviewImportCandidates,
       enrichCandidatesWithUploaderReputation: importCandidateReputationEnrichmentService.enrichCandidatesWithUploaderReputation,
       getImportCandidate: importCandidateService.getImportCandidate,
       holdImportCandidate: importCandidateService.holdImportCandidate,

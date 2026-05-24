@@ -66,6 +66,7 @@ export function registerImportCandidateRoutes(app, {
   buildCandidateReputationSummary = () => ({}),
   buildImportPendingCandidateSummary,
   buildSelectedImportCandidateSummary,
+  bulkReviewImportCandidates,
   clearImportCandidateFileDecision,
   enrichCandidatesWithUploaderReputation = async (candidates) => candidates,
   requireAdminSession: requireAdminSessionFn = defaultRequestAuthDependencies.requireAdminSession,
@@ -398,6 +399,24 @@ export function registerImportCandidateRoutes(app, {
   registerReviewTransition('/api/v1/import-candidates/:importCandidateId/hold', holdImportCandidate);
   registerReviewTransition('/api/v1/import-candidates/:importCandidateId/reject', rejectImportCandidate);
   registerReviewTransition('/api/v1/import-candidates/:importCandidateId/reopen', reopenImportCandidate);
+
+  app.post('/api/v1/import-candidates/bulk-review', limitImportCandidateDecision, importCandidateRoute(async (request, response) => {
+    const session = await requireFreshAdminSessionFn(request);
+    requireCsrfFn(request, session);
+
+    const result = await bulkReviewImportCandidates({
+      action: request.body?.action,
+      actorUserId: session.appUserId,
+      importCandidateIds: request.body?.importCandidateIds,
+      reason: request.body?.reason,
+      requestMetadata: getRequestMetadataFn(request),
+    });
+
+    response.json({
+      ok: true,
+      ...result,
+    });
+  }));
 
   app.post('/api/v1/import-candidates/slskd/searches/:searchId', limitImportCandidateSlskdIngest, importCandidateRoute(async (request, response) => {
     const session = await requireFreshAdminSessionFn(request);
