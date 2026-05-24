@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { mapDatabaseError, mapDatabaseErrorWithConstraints } from '../../src/server/database-error-mapper.js';
+import { mapDatabaseError, mapDatabaseErrorWithConstraints, normalizeDatabaseConnectionError } from '../../src/server/database-error-mapper.js';
 
 describe('mapDatabaseError', () => {
   test('maps 23505 unique violation to 409', () => {
@@ -85,5 +85,73 @@ describe('mapDatabaseErrorWithConstraints', () => {
     const mapped = mapper(error);
     assert.equal(mapped.status, 422);
     assert.equal(mapped.code, 'fk_violation');
+  });
+});
+
+describe('normalizeDatabaseConnectionError', () => {
+  test('maps ECONNREFUSED to 503', () => {
+    const error = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+    const mapped = normalizeDatabaseConnectionError(error);
+    assert.equal(mapped.status, 503);
+    assert.equal(mapped.code, 'database_unavailable');
+  });
+
+  test('maps ECONNRESET to 503', () => {
+    const error = Object.assign(new Error('connection reset'), { code: 'ECONNRESET' });
+    const mapped = normalizeDatabaseConnectionError(error);
+    assert.equal(mapped.status, 503);
+  });
+
+  test('maps ENOTFOUND to 503', () => {
+    const error = Object.assign(new Error('not found'), { code: 'ENOTFOUND' });
+    const mapped = normalizeDatabaseConnectionError(error);
+    assert.equal(mapped.status, 503);
+  });
+
+  test('maps ETIMEDOUT to 503', () => {
+    const error = Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' });
+    const mapped = normalizeDatabaseConnectionError(error);
+    assert.equal(mapped.status, 503);
+  });
+
+  test('maps 57P01 admin shutdown to 503', () => {
+    const error = Object.assign(new Error('admin shutdown'), { code: '57P01' });
+    const mapped = normalizeDatabaseConnectionError(error);
+    assert.equal(mapped.status, 503);
+  });
+
+  test('maps 57P03 starting up to 503', () => {
+    const error = Object.assign(new Error('starting up'), { code: '57P03' });
+    const mapped = normalizeDatabaseConnectionError(error);
+    assert.equal(mapped.status, 503);
+  });
+
+  test('maps 08006 connection failure to 503', () => {
+    const error = Object.assign(new Error('connection failure'), { code: '08006' });
+    const mapped = normalizeDatabaseConnectionError(error);
+    assert.equal(mapped.status, 503);
+  });
+
+  test('maps syscall=connect errors to 503', () => {
+    const error = Object.assign(new Error('connect failed'), { code: 'SOME_OTHER', syscall: 'connect' });
+    const mapped = normalizeDatabaseConnectionError(error);
+    assert.equal(mapped.status, 503);
+  });
+
+  test('returns original error for non-connection errors', () => {
+    const error = new Error('some query error');
+    const result = normalizeDatabaseConnectionError(error);
+    assert.equal(result, error);
+  });
+
+  test('returns original error for application errors with status', () => {
+    const error = Object.assign(new Error('not found'), { status: 404, code: 'not_found' });
+    const result = normalizeDatabaseConnectionError(error);
+    assert.equal(result, error);
+  });
+
+  test('returns null for null input', () => {
+    const result = normalizeDatabaseConnectionError(null);
+    assert.equal(result, null);
   });
 });

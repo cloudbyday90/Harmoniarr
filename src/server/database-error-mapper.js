@@ -22,6 +22,28 @@ const PG_UNIQUE_VIOLATION = '23505';
 const PG_FK_VIOLATION = '23503';
 const PG_NOT_NULL_VIOLATION = '23502';
 
+const CONNECTION_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+]);
+
+const CONNECTION_ERROR_SQLSTATES = new Set([
+  '57P01',
+  '57P02',
+  '57P03',
+  '08003',
+  '08006',
+]);
+
+function isDatabaseConnectionError(error) {
+  if (CONNECTION_ERROR_CODES.has(error?.code)) return true;
+  if (CONNECTION_ERROR_SQLSTATES.has(error?.code)) return true;
+  if (error?.syscall === 'connect') return true;
+  return false;
+}
+
 export function mapDatabaseError(error) {
   if (!error?.code) return error;
 
@@ -51,4 +73,9 @@ export function mapDatabaseErrorWithConstraints(constraintMap = {}) {
 
     return mapDatabaseError(error);
   };
+}
+
+export function normalizeDatabaseConnectionError(error) {
+  if (!isDatabaseConnectionError(error)) return error;
+  return createApiError(503, 'database_unavailable', 'Database is temporarily unavailable');
 }

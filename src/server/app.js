@@ -31,6 +31,7 @@ import {
   createHttpsEnforcementMiddleware,
   normalizeApiParsingError,
 } from './http-hardening.js';
+import { normalizeDatabaseConnectionError } from './database-error-mapper.js';
 import { createImportCandidateModule } from './import-candidates/import-candidate-module.js';
 import { createLibraryModule } from './library/library-module.js';
 import { createPushModule } from './push/push-module.js';
@@ -692,7 +693,7 @@ export function createApp({
   });
 
   app.use((error, _request, response, _next) => {
-    const normalizedError = normalizeApiParsingError(error);
+    const normalizedError = normalizeDatabaseConnectionError(normalizeApiParsingError(error));
     const status = Number.isInteger(normalizedError?.status) ? normalizedError.status : 500;
     response.status(status).json({
       ok: false,
