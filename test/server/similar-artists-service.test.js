@@ -599,3 +599,82 @@ test('createSimilarArtistsService returns Last.fm results when other sources are
   assert.equal(result.similar[0].source, 'lastfm');
   assert.equal(result.similar[1].source, 'lastfm');
 });
+
+test('createSimilarArtistsService retries Last.fm with artist name when MBID returns empty', async () => {
+  const lbClient = createTestListenBrainzClient(async () => []);
+  const mbClient = createTestMusicBrainzClient(async () => ({
+    name: 'Micah Tyler',
+    relations: [],
+  }));
+
+  let callCount = 0;
+  const lastFmClient = createTestLastFmClient(async (params) => {
+    callCount += 1;
+    if (params.mbid) {
+      return [];
+    }
+    return [
+      { mbid: 'mb-lf-name', name: 'Name Match Artist', score: 0.75 },
+    ];
+  });
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid' });
+
+  assert.equal(callCount, 2, 'Last.fm should be called twice (MBID then name)');
+  assert.equal(result.similar.length, 1);
+  assert.equal(result.similar[0].name, 'Name Match Artist');
+  assert.equal(result.similar[0].source, 'lastfm');
+});
+
+test('createSimilarArtistsService skips name fallback when MB returns no name', async () => {
+  const lbClient = createTestListenBrainzClient(async () => []);
+  const mbClient = createTestMusicBrainzClient(async () => ({ relations: [] }));
+  let lastfmCallCount = 0;
+  const lastFmClient = createTestLastFmClient(async () => {
+    lastfmCallCount += 1;
+    return [];
+  });
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  await service.getSimilarArtists({ artistMbid: 'test-mbid' });
+
+  assert.equal(lastfmCallCount, 1, 'only MBID call, no name fallback');
+});
+
+test('createSimilarArtistsService name fallback failure is non-fatal', async () => {
+  const lbClient = createTestListenBrainzClient(async () => [
+    { mbid: 'mb-lb', name: 'LB Artist', score: 0.9 },
+  ]);
+  const mbClient = createTestMusicBrainzClient(async () => ({
+    name: 'Micah Tyler',
+    relations: [],
+  }));
+  let callCount = 0;
+  const lastFmClient = createTestLastFmClient(async () => {
+    callCount += 1;
+    if (callCount === 1) return [];
+    throw Object.assign(new Error('Last.fm down'), { code: 'lastfm_unavailable' });
+  });
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid' });
+
+  assert.equal(result.similar.length, 1);
+  assert.equal(result.similar[0].source, 'listenbrainz');
+});

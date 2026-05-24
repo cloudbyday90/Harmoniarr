@@ -157,7 +157,18 @@ export function createSimilarArtistsService({
       ? (mbResult.value?.relations ?? [])
       : [];
     const mbArtists = extractMbRelatedArtists(mbRelations);
-    const lastfmArtists = lastfmResult.status === 'fulfilled' ? lastfmResult.value : [];
+    let lastfmArtists = lastfmResult.status === 'fulfilled' ? lastfmResult.value : [];
+
+    if (lastfmArtists.length === 0 && mbResult.status === 'fulfilled') {
+      const artistName = mbResult.value?.name;
+      if (typeof artistName === 'string' && artistName.length > 0) {
+        try {
+          lastfmArtists = await lastFmClient.getSimilarArtists({ artistName, limit: 100 });
+        } catch {
+          // Fallback failure is non-fatal; proceed with empty Last.fm results.
+        }
+      }
+    }
 
     const merged = mergeSimilarArtists(lbArtists, mbArtists, { limit: 100 }, lastfmArtists);
     ttlCache.set(artistMbid, merged);
