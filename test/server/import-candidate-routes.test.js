@@ -1920,3 +1920,90 @@ test('import candidate bulk review route enforces csrf and returns aggregate res
     assert.equal(payload.results.length, 3);
   });
 });
+
+test('import candidate slskd ingestion route normalizes misconfigured provider failures', async () => {
+  const app = createImportCandidateRouteTestApp({
+    ingestSlskdSearchResponses: async () => {
+      const error = new Error('slskd is not configured: SLSKD_API_KEY is missing');
+      error.code = 'slskd_misconfigured';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/slskd/searches/search-1`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_misconfigured',
+        message: 'slskd is not configured: SLSKD_API_KEY is missing',
+      },
+    });
+  });
+});
+
+test('import candidate slskd ingestion route normalizes unauthorized provider failures', async () => {
+  const app = createImportCandidateRouteTestApp({
+    ingestSlskdSearchResponses: async () => {
+      const error = new Error('slskd rejected credentials');
+      error.code = 'slskd_unauthorized';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/slskd/searches/search-1`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_unauthorized',
+        message: 'slskd authentication failed',
+      },
+    });
+  });
+});
+
+test('import candidate slskd ingestion route normalizes request-failed provider errors to 502', async () => {
+  const app = createImportCandidateRouteTestApp({
+    ingestSlskdSearchResponses: async () => {
+      const error = new Error('slskd returned an invalid response for search results');
+      error.code = 'slskd_request_failed';
+      throw error;
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/slskd/searches/search-1`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 502);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'slskd_request_failed',
+        message: 'slskd returned an invalid response for search results',
+      },
+    });
+  });
+});
