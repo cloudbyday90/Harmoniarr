@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: harmoniarr:walkthrough-local
-    pull_policy: build
+    pull_policy: never
     restart: unless-stopped
     init: true
     stop_grace_period: 60s
@@ -55,12 +55,10 @@ services:
 
   walkthrough-bootstrap:
     image: harmoniarr:walkthrough-local
+    pull_policy: never
     profiles:
       - bootstrap
     restart: "no"
-    depends_on:
-      harmoniarr:
-        condition: service_healthy
     env_file:
       - ./docker/walkthrough.env
     environment:

@@ -78,6 +78,7 @@ APP_PORT="${APP_PORT:-3000}"
 UMASK_VALUE="${UMASK:-0022}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_DB="${POSTGRES_DB:-harmoniarr}"
+POSTGRES_MAINTENANCE_DB="${POSTGRES_MAINTENANCE_DB:-template1}"
 POSTGRES_USER="${POSTGRES_USER:-harmoniarr}"
 PGDATA="${PGDATA:-/app/data/postgres/18/data}"
 
@@ -85,6 +86,7 @@ require_supported_architecture
 require_integer APP_PORT "$APP_PORT"
 require_integer POSTGRES_PORT "$POSTGRES_PORT"
 require_identifier POSTGRES_DB "$POSTGRES_DB"
+require_identifier POSTGRES_MAINTENANCE_DB "$POSTGRES_MAINTENANCE_DB"
 require_identifier POSTGRES_USER "$POSTGRES_USER"
 
 umask "$UMASK_VALUE"
@@ -141,7 +143,7 @@ if ! "$PG_ISREADY_BIN" -h 127.0.0.1 -p "$POSTGRES_PORT" -U "$POSTGRES_USER" >/de
   exit 70
 fi
 
-if ! "$PSQL_BIN" -h 127.0.0.1 -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -Atqc "SELECT datname FROM pg_database WHERE datname = '${POSTGRES_DB}'" | grep -Fxq "$POSTGRES_DB"; then
+if ! "$PSQL_BIN" -h 127.0.0.1 -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_MAINTENANCE_DB" -Atqc "SELECT datname FROM pg_database WHERE datname = '${POSTGRES_DB}'" | grep -Fxq "$POSTGRES_DB"; then
   log "creating application database ${POSTGRES_DB}"
   "$CREATEDB_BIN" -h 127.0.0.1 -p "$POSTGRES_PORT" -U "$POSTGRES_USER" "$POSTGRES_DB"
 fi

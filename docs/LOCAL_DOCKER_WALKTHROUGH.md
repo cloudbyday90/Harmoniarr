@@ -23,8 +23,9 @@ These credentials live in `docker/walkthrough.env` and are only meant for dispos
 From the repository root:
 
 ```powershell
-docker compose -f compose.walkthrough.yaml up --build -d harmoniarr
-docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm walkthrough-bootstrap
+docker compose -f compose.walkthrough.yaml build harmoniarr
+docker compose -f compose.walkthrough.yaml up -d --wait --no-build harmoniarr
+docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm --no-deps walkthrough-bootstrap
 ```
 
 When the stack is ready, open:
@@ -34,6 +35,14 @@ http://127.0.0.1:47956
 ```
 
 The one-shot `walkthrough-bootstrap` helper exits successfully after creating the walkthrough admin. That is expected. Running it through `docker compose run --rm` keeps the normal walkthrough stack clean instead of leaving an exited helper container behind.
+
+If you need a fully clean rebuild while testing Docker changes, use:
+
+```powershell
+docker compose -f compose.walkthrough.yaml build --no-cache harmoniarr
+docker compose -f compose.walkthrough.yaml up -d --wait --no-build harmoniarr
+docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm --no-deps walkthrough-bootstrap
+```
 
 ## Stop
 
