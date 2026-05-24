@@ -28,6 +28,7 @@ import { fetchMyRequestSummary } from '../lib/media-request-api.js';
 import { useTheme } from '../composables/useTheme.js';
 import { buildVisibleNav, notificationTone } from '../lib/app-shell-presentation.js';
 import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
+import { formatDependencyProviderLabel, formatDependencyStatusLabel, getDependencyStatusClass } from '../lib/settings-connections-presentation.js';
 import ToastStack from './ToastStack.vue';
 import PwaUpdateBanner from './PwaUpdateBanner.vue';
 import GlobalSearchPalette from './GlobalSearchPalette.vue';
@@ -64,7 +65,7 @@ const userInitial = computed(() => {
   return name.slice(0, 1).toUpperCase();
 });
 
-const { status: healthStatus, label: healthLabel, detail: healthDetail, activeJobs, refresh: heartbeatRefresh, attachVisibilityListener: attachHeartbeatVisibility, destroy: destroyHeartbeat } = useShellHeartbeat({ revalidateOnFocus: true });
+const { status: healthStatus, label: healthLabel, detail: healthDetail, activeJobs, dependencies, refresh: heartbeatRefresh, attachVisibilityListener: attachHeartbeatVisibility, destroy: destroyHeartbeat } = useShellHeartbeat({ revalidateOnFocus: true });
 
 const {
   data: notificationsPayload,
@@ -142,14 +143,32 @@ function closeUserMenuOnDocument(event) {
   userMenuOpen.value = false;
 }
 
+const healthPanelOpen = ref(false);
+const healthPanelAnchor = ref(null);
+
+function toggleHealthPanel() {
+  healthPanelOpen.value = !healthPanelOpen.value;
+}
+
+function closeHealthPanelOnDocument(event) {
+  if (!healthPanelOpen.value) return;
+  const anchor = healthPanelAnchor.value;
+  if (anchor && event.target instanceof Node && anchor.contains(event.target)) {
+    return;
+  }
+  healthPanelOpen.value = false;
+}
+
 onMounted(() => {
   document.addEventListener('click', closeUserMenuOnDocument);
   document.addEventListener('click', closeNotificationsOnDocument);
+  document.addEventListener('click', closeHealthPanelOnDocument);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeUserMenuOnDocument);
   document.removeEventListener('click', closeNotificationsOnDocument);
+  document.removeEventListener('click', closeHealthPanelOnDocument);
 });
 
 async function logout() {
@@ -235,15 +254,46 @@ onBeforeUnmount(() => {
             <path d="M18 6 6 18M6 6l12 12"/>
           </svg>
         </button>
-        <span
-          class="hx-topbar-pill"
-          :data-status="healthStatus"
-          :title="healthDetail"
-          aria-live="polite"
-        >
-          <span class="hx-topbar-pill-dot" aria-hidden="true"></span>
-          {{ healthLabel }}
-        </span>
+        <div class="hx-topbar-health-wrap" ref="healthPanelAnchor">
+          <button
+            type="button"
+            class="hx-topbar-pill"
+            :data-status="healthStatus"
+            :aria-label="healthDetail"
+            :aria-expanded="healthPanelOpen"
+            aria-haspopup="menu"
+            @click.stop="toggleHealthPanel"
+          >
+            <span class="hx-topbar-pill-dot" aria-hidden="true"></span>
+            {{ healthLabel }}
+          </button>
+
+          <div v-if="healthPanelOpen" class="hx-topbar-health-panel" role="menu">
+            <div class="hx-topbar-health-header">
+              <strong>Provider health</strong>
+              <span class="hx-pill" :data-tone="healthStatus === 'healthy' ? 'success' : healthStatus === 'degraded' ? 'warning' : 'danger'">
+                {{ healthLabel }}
+              </span>
+            </div>
+            <div v-if="!dependencies.length" class="hx-topbar-health-empty">
+              No dependency data available.
+            </div>
+            <ul v-else class="hx-topbar-health-list" role="none">
+              <li v-for="dep in dependencies" :key="dep.provider" class="hx-topbar-health-row" role="none">
+                <span class="hx-topbar-health-provider">{{ formatDependencyProviderLabel(dep.provider) }}</span>
+                <span class="review-status-pill" :class="getDependencyStatusClass(dep.status)">
+                  {{ formatDependencyStatusLabel(dep.status) }}
+                </span>
+                <span v-if="dep.message" class="hx-topbar-health-message">{{ dep.message }}</span>
+              </li>
+            </ul>
+            <div class="hx-topbar-health-footer">
+              <RouterLink :to="{ name: 'settings-connections' }" class="hx-topbar-health-link" @click="healthPanelOpen = false">
+                View in Settings
+              </RouterLink>
+            </div>
+          </div>
+        </div>
 
         <RouterLink
           v-if="activeJobs !== null"
@@ -422,6 +472,74 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.hx-topbar-health-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.hx-topbar-health-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: var(--hx-color-surface, #161821);
+  border: 1px solid var(--hx-color-border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+  overflow: hidden;
+}
+.hx-topbar-health-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hx-color-border, rgba(255, 255, 255, 0.08));
+}
+.hx-topbar-health-empty {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--hx-color-muted, rgba(255, 255, 255, 0.55));
+  font-size: 13px;
+}
+.hx-topbar-health-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hx-topbar-health-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--hx-color-border, rgba(255, 255, 255, 0.04));
+  font-size: 13px;
+}
+.hx-topbar-health-provider {
+  font-weight: 600;
+  min-width: 120px;
+}
+.hx-topbar-health-message {
+  color: var(--hx-color-muted, rgba(255, 255, 255, 0.55));
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-topbar-health-footer {
+  padding: 8px 14px;
+  border-top: 1px solid var(--hx-color-border, rgba(255, 255, 255, 0.08));
+}
+.hx-topbar-health-link {
+  color: var(--hx-accent, #5eadff);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.hx-topbar-health-link:hover {
+  text-decoration: underline;
+}
 .hx-topbar-user-wrap {
   position: relative;
 }

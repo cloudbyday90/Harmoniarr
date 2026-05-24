@@ -133,4 +133,32 @@ describe('useShellHeartbeat SWR', () => {
     assert.ok(label.value.length > 0);
     destroy();
   });
+
+  test('refresh populates dependencies array for provider health panel', async () => {
+    const payload = {
+      dependencies: [
+        { provider: 'slskd', status: 'healthy', observedAt: '2026-05-24T12:00:00.000Z' },
+        { provider: 'musicbrainz', status: 'degraded', code: 'musicbrainz_unavailable', message: 'Throttled', observedAt: '2026-05-24T12:00:00.000Z' },
+        { provider: 'media_tooling', status: 'healthy', observedAt: '2026-05-24T12:00:00.000Z' },
+      ],
+      heartbeats: [],
+      activeJobCount: 0,
+    };
+
+    const { dependencies, status, refresh, destroy } = useShellHeartbeat({
+      fetchSystemOverview: async () => payload,
+      pollIntervalMs: 0,
+    });
+
+    await refresh();
+
+    assert.equal(dependencies.value.length, 3);
+    assert.equal(dependencies.value[0].provider, 'slskd');
+    assert.equal(dependencies.value[0].status, 'healthy');
+    assert.equal(dependencies.value[1].provider, 'musicbrainz');
+    assert.equal(dependencies.value[1].status, 'degraded');
+    assert.equal(dependencies.value[1].message, 'Throttled');
+    assert.equal(status.value, 'degraded');
+    destroy();
+  });
 });
