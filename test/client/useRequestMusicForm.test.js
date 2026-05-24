@@ -676,3 +676,260 @@ test('useRequestMusicForm destroy removes visibility listener', async () => {
     if (origDocAdd === undefined) delete globalThis.document;
   }
 });
+
+// ---------------------------------------------------------------------------
+// loadMoreRequests — cursor pagination edge cases
+// ---------------------------------------------------------------------------
+
+test('useRequestMusicForm loadMoreRequests appends results and advances cursor', async (t) => {
+  const page1 = [makeRequest({ id: 'r1' }), makeRequest({ id: 'r2' })];
+  const page2 = [makeRequest({ id: 'r3' })];
+  let fetchCallCount = 0;
+  const fetchMediaRequestsFn = t.mock.fn(async (params) => {
+    fetchCallCount++;
+    if (fetchCallCount === 1) {
+      return { ok: true, mediaRequests: page1, nextCursor: 'cursor2', totalCount: 3 };
+    }
+    return { ok: true, mediaRequests: page2, nextCursor: null, totalCount: 3 };
+  });
+
+  const { mediaRequests, hasMore, loadRequestDashboard, loadMoreRequests, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn: async () => makeSummaryPayload(),
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard();
+    assert.equal(mediaRequests.value.length, 2);
+    assert.equal(hasMore.value, true);
+
+    await loadMoreRequests();
+    assert.equal(mediaRequests.value.length, 3);
+    assert.equal(mediaRequests.value[2].id, 'r3');
+    assert.equal(hasMore.value, false);
+  } finally {
+    destroy();
+  }
+});
+
+test('useRequestMusicForm loadMoreRequests sets loadMoreError on failure', async (t) => {
+  const page1 = [makeRequest({ id: 'r1' })];
+  let fetchCallCount = 0;
+  const fetchMediaRequestsFn = t.mock.fn(async () => {
+    fetchCallCount++;
+    if (fetchCallCount === 1) {
+      return { ok: true, mediaRequests: page1, nextCursor: 'cursor2' };
+    }
+    throw new Error('loadMore network failure');
+  });
+
+  const { mediaRequests, loadMoreError, loadRequestDashboard, loadMoreRequests, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn: async () => makeSummaryPayload(),
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard();
+    assert.equal(mediaRequests.value.length, 1);
+
+    await loadMoreRequests();
+    assert.equal(loadMoreError.value, 'loadMore network failure');
+    assert.equal(mediaRequests.value.length, 1, 'accumulated results preserved');
+  } finally {
+    destroy();
+  }
+});
+
+test('useRequestMusicForm loadMoreRequests preserves accumulated data on error', async (t) => {
+  const page1 = [makeRequest({ id: 'r1' }), makeRequest({ id: 'r2' })];
+  let fetchCallCount = 0;
+  const fetchMediaRequestsFn = t.mock.fn(async () => {
+    fetchCallCount++;
+    if (fetchCallCount === 1) {
+      return { ok: true, mediaRequests: page1, nextCursor: 'cursor2' };
+    }
+    throw new Error('transient error');
+  });
+
+  const { mediaRequests, loadMoreError, hasMore, loadRequestDashboard, loadMoreRequests, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn: async () => makeSummaryPayload(),
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard();
+
+    await loadMoreRequests();
+    assert.equal(mediaRequests.value.length, 2, 'page 1 results still present');
+    assert.equal(loadMoreError.value, 'transient error');
+    assert.equal(hasMore.value, true, 'cursor unchanged — retry possible');
+  } finally {
+    destroy();
+  }
+});
+
+test('useRequestMusicForm loadMoreRequests is no-op when hasMore is false', async (t) => {
+  const fetchMediaRequestsFn = t.mock.fn(async () => ({
+    ok: true,
+    mediaRequests: [makeRequest()],
+    nextCursor: null,
+  }));
+
+  const { loadRequestDashboard, loadMoreRequests, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn: async () => makeSummaryPayload(),
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard();
+    assert.equal(fetchMediaRequestsFn.mock.callCount(), 1);
+
+    await loadMoreRequests();
+    assert.equal(fetchMediaRequestsFn.mock.callCount(), 1, 'no additional fetch');
+  } finally {
+    destroy();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// switchScope — aborts inflight loadMore
+// ---------------------------------------------------------------------------
+
+test('useRequestMusicForm switchScope aborts inflight loadMore and reloads', async (t) => {
+  let loadMoreResolve;
+  const fetchMediaRequestsFn = t.mock.fn(async (params) => {
+    if (params.cursor) {
+      return new Promise((resolve) => { loadMoreResolve = resolve; });
+    }
+    return { ok: true, mediaRequests: [makeRequest({ id: 'r1' })], nextCursor: 'cursor2' };
+  });
+
+  const { mediaRequests, isLoadingMore, selectedScope, loadRequestDashboard, loadMoreRequests, switchScope, destroy } = useRequestMusicForm({
+    initialScope: 'mine',
+    isAdmin: true,
+    fetchMediaRequestSummaryFn: async () => makeSummaryPayload(),
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard();
+
+    const loadMorePromise = loadMoreRequests();
+    assert.equal(isLoadingMore.value, true);
+
+    const switchPromise = switchScope('all');
+    assert.equal(selectedScope.value, 'all');
+
+    loadMoreResolve({ ok: true, mediaRequests: [makeRequest({ id: 'r2' })], nextCursor: null });
+    await loadMorePromise;
+    await switchPromise;
+
+    assert.equal(mediaRequests.value.length, 1, 'stale loadMore results discarded after scope switch');
+    assert.equal(mediaRequests.value[0].id, 'r1', 'fresh dashboard results from new scope');
+  } finally {
+    destroy();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// submitRequest — preserves filter params
+// ---------------------------------------------------------------------------
+
+test('useRequestMusicForm submitRequest reloads dashboard with lastFilterParams', async (t) => {
+  const createdRequest = makeRequest({ requestState: 'needs_fetch' });
+  const createMediaRequestFn = t.mock.fn(async () => ({ ok: true, mediaRequest: createdRequest }));
+  const fetchMediaRequestsFn = t.mock.fn(async () => makeRequestsPayload());
+  const fetchMediaRequestSummaryFn = t.mock.fn(async () => makeSummaryPayload());
+
+  const { form, loadRequestDashboard, submitRequest, destroy } = useRequestMusicForm({
+    currentUserId: 'u1',
+    createMediaRequestFn,
+    fetchMediaRequestSummaryFn,
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard({ requestState: 'needs_fetch', requestKind: 'release' });
+    const initialCalls = fetchMediaRequestsFn.mock.callCount();
+
+    form.requestKind = 'release';
+    form.artistName = 'Daft Punk';
+    form.releaseTitle = 'Discovery';
+
+    await submitRequest();
+
+    assert.ok(fetchMediaRequestsFn.mock.callCount() > initialCalls, 'dashboard reloaded after submit');
+    const lastCall = fetchMediaRequestsFn.mock.calls[fetchMediaRequestsFn.mock.callCount() - 1].arguments[0];
+    assert.equal(lastCall.requestState, 'needs_fetch', 'filter params preserved');
+    assert.equal(lastCall.requestKind, 'release', 'filter params preserved');
+  } finally {
+    destroy();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// loadRequestDashboard — resets loadMoreError
+// ---------------------------------------------------------------------------
+
+test('useRequestMusicForm loadRequestDashboard clears loadMoreError', async (t) => {
+  let fetchCallCount = 0;
+  const fetchMediaRequestsFn = t.mock.fn(async () => {
+    fetchCallCount++;
+    if (fetchCallCount === 1) {
+      return { ok: true, mediaRequests: [makeRequest()], nextCursor: 'cursor2' };
+    }
+    if (fetchCallCount === 2) {
+      throw new Error('loadMore failed');
+    }
+    return { ok: true, mediaRequests: [makeRequest()], nextCursor: null };
+  });
+
+  const { loadMoreError, loadRequestDashboard, loadMoreRequests, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn: async () => makeSummaryPayload(),
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard();
+    await loadMoreRequests();
+    assert.equal(loadMoreError.value, 'loadMore failed');
+
+    await loadRequestDashboard();
+    assert.equal(loadMoreError.value, '', 'loadMoreError cleared on fresh dashboard load');
+  } finally {
+    destroy();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// destroy — aborts inflight loadMore
+// ---------------------------------------------------------------------------
+
+test('useRequestMusicForm destroy aborts inflight loadMore', async (t) => {
+  let loadMoreResolve;
+  const fetchMediaRequestsFn = t.mock.fn(async (params) => {
+    if (params.cursor) {
+      return new Promise((resolve) => { loadMoreResolve = resolve; });
+    }
+    return { ok: true, mediaRequests: [makeRequest()], nextCursor: 'cursor2' };
+  });
+
+  const { mediaRequests, loadRequestDashboard, loadMoreRequests, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn: async () => makeSummaryPayload(),
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard();
+
+    const loadMorePromise = loadMoreRequests();
+    destroy();
+
+    loadMoreResolve({ ok: true, mediaRequests: [makeRequest({ id: 'r2' })], nextCursor: null });
+    await loadMorePromise;
+
+    assert.equal(mediaRequests.value.length, 1, 'aborted loadMore did not append');
+  } finally {
+    // already destroyed
+  }
+});

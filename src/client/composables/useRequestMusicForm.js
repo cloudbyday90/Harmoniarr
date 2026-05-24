@@ -83,6 +83,8 @@ export function useRequestMusicForm({
 
   const hasMore = computed(() => nextCursor.value !== null);
   const isLoadingMore = ref(false);
+  const loadMoreError = ref('');
+  let inflightLoadMoreController = null;
 
   // ── Request targets (admin only) ─────────────────────────────────────────
   const requestTargets = ref([]);
@@ -148,6 +150,8 @@ export function useRequestMusicForm({
   async function loadRequestDashboard({ requestState, requestKind, search } = {}) {
     if (destroyed) return;
 
+    abortInflightLoadMore();
+
     const isRevalidation = summary.value !== null;
     if (isRevalidation) {
       isRevalidating.value = true;
@@ -155,6 +159,7 @@ export function useRequestMusicForm({
       isLoading.value = true;
     }
     loadError.value = '';
+    loadMoreError.value = '';
     nextCursor.value = null;
 
     const requestParams = { scope: selectedScope.value, requestState, requestKind, search, limit: 50 };
@@ -205,6 +210,7 @@ export function useRequestMusicForm({
   function destroy() {
     destroyed = true;
     clearPollTimer();
+    abortInflightLoadMore();
     if (revalidateOnFocus && typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
@@ -249,9 +255,21 @@ export function useRequestMusicForm({
     }
   }
 
+  function abortInflightLoadMore() {
+    if (inflightLoadMoreController) {
+      inflightLoadMoreController.abort();
+      inflightLoadMoreController = null;
+    }
+  }
+
   async function loadMoreRequests({ requestState, requestKind, search } = {}) {
     if (isLoadingMore.value || !hasMore.value) return;
+    abortInflightLoadMore();
+
+    const controller = new AbortController();
+    inflightLoadMoreController = controller;
     isLoadingMore.value = true;
+    loadMoreError.value = '';
 
     const requestParams = {
       scope: selectedScope.value,
@@ -264,13 +282,20 @@ export function useRequestMusicForm({
 
     try {
       const requestsPayload = await fetchMediaRequestsFn(requestParams);
+      if (controller.signal.aborted) return;
       const newRequests = requestsPayload.mediaRequests ?? [];
       mediaRequests.value = [...mediaRequests.value, ...newRequests];
       nextCursor.value = requestsPayload.nextCursor ?? null;
-    } catch {
-      // silent — user can retry
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      loadMoreError.value = getErrorMessage(error, 'Could not load more requests');
     } finally {
-      isLoadingMore.value = false;
+      if (inflightLoadMoreController === controller) {
+        inflightLoadMoreController = null;
+      }
+      if (!controller.signal.aborted) {
+        isLoadingMore.value = false;
+      }
     }
   }
 
@@ -306,7 +331,7 @@ export function useRequestMusicForm({
       const result = await createMediaRequestFn(buildMediaRequestPayload({ form, isAdmin }));
       successMessage.value = buildMediaRequestSuccessMessage(result.mediaRequest, currentUserId);
       resetForm();
-      await loadRequestDashboard();
+      await loadRequestDashboard(lastFilterParams);
     } catch (error) {
       errorMessage.value = getErrorMessage(error, 'Music request submission failed');
     } finally {
@@ -320,7 +345,8 @@ export function useRequestMusicForm({
     }
 
     selectedScope.value = scope;
-    await loadRequestDashboard();
+    abortInflightLoadMore();
+    await loadRequestDashboard(lastFilterParams);
   }
 
   return {
@@ -337,6 +363,7 @@ export function useRequestMusicForm({
     isRevalidating,
     isSubmitting,
     loadError,
+    loadMoreError,
     loadMoreRequests,
     loadRequestDashboard,
     loadRequestTargets,
