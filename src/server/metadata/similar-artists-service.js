@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { createLastFmClient } from '../integrations/lastfm/lastfm-client.js';
 import { createListenBrainzClient } from '../integrations/listenbrainz/listenbrainz-client.js';
 import { createMusicBrainzClient } from '../integrations/musicbrainz/musicbrainz-client.js';
 
@@ -88,32 +89,12 @@ export function extractMbRelatedArtists(relations) {
   return results;
 }
 
-// Merges ListenBrainz and MusicBrainz similar-artist lists into a single
-// deduplicated list. When a MBID appears in both sources, the higher score wins
-// and the source is recorded as 'both'. Returns items sorted descending by score,
-// capped at `limit`.
-export function mergeSimilarArtists(lbArtists, mbArtists, { limit }) {
+export function mergeSimilarArtists(lbArtists, mbArtists, { limit }, lastfmArtists = []) {
   const byMbid = new Map();
 
-  for (const artist of lbArtists) {
+  function insert(artist, sourceName) {
     if (!artist?.mbid) {
-      continue;
-    }
-
-    const existing = byMbid.get(artist.mbid);
-    if (!existing || artist.score > existing.score) {
-      byMbid.set(artist.mbid, {
-        id: artist.mbid,
-        name: artist.name ?? null,
-        score: artist.score,
-        source: 'listenbrainz',
-      });
-    }
-  }
-
-  for (const artist of mbArtists) {
-    if (!artist?.mbid) {
-      continue;
+      return;
     }
 
     const existing = byMbid.get(artist.mbid);
@@ -122,15 +103,26 @@ export function mergeSimilarArtists(lbArtists, mbArtists, { limit }) {
         id: artist.mbid,
         name: artist.name ?? null,
         score: artist.score,
-        source: 'musicbrainz',
+        source: sourceName,
       });
     } else {
-      // Record that this artist came from both sources.
       const merged = existing.score >= artist.score
         ? { ...existing, source: 'both' }
         : { ...existing, score: artist.score, source: 'both' };
       byMbid.set(artist.mbid, merged);
     }
+  }
+
+  for (const artist of lbArtists) {
+    insert(artist, 'listenbrainz');
+  }
+
+  for (const artist of mbArtists) {
+    insert(artist, 'musicbrainz');
+  }
+
+  for (const artist of lastfmArtists) {
+    insert(artist, 'lastfm');
   }
 
   return [...byMbid.values()]
@@ -139,6 +131,7 @@ export function mergeSimilarArtists(lbArtists, mbArtists, { limit }) {
 }
 
 export function createSimilarArtistsService({
+  lastFmClient = createLastFmClient(),
   listenBrainzClient = createListenBrainzClient(),
   musicBrainzClient = createMusicBrainzClient(),
   cacheTtlMs = 24 * 60 * 60 * 1000,
@@ -146,9 +139,6 @@ export function createSimilarArtistsService({
 } = {}) {
   const ttlCache = cache ?? createSimilarArtistsCache(cacheTtlMs);
 
-  // Returns { similar: [{ id, name, score, source }] } for the given artist MBID.
-  // Both source fetches run in parallel. If one source fails, it is silently
-  // excluded. Results are cached per MBID for cacheTtlMs milliseconds.
   async function getSimilarArtists({ artistMbid, limit = 20 }) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
     const cached = ttlCache.get(artistMbid);
@@ -156,10 +146,10 @@ export function createSimilarArtistsService({
       return { similar: cached.slice(0, safeLimit) };
     }
 
-    // Fetch from both sources concurrently; individual failures are non-fatal.
-    const [lbResult, mbResult] = await Promise.allSettled([
+    const [lbResult, mbResult, lastfmResult] = await Promise.allSettled([
       listenBrainzClient.getSimilarArtists({ mbid: artistMbid, limit: 100 }),
       musicBrainzClient.lookupArtistRelations({ artistId: artistMbid }),
+      lastFmClient.getSimilarArtists({ mbid: artistMbid, limit: 100 }),
     ]);
 
     const lbArtists = lbResult.status === 'fulfilled' ? lbResult.value : [];
@@ -167,9 +157,9 @@ export function createSimilarArtistsService({
       ? (mbResult.value?.relations ?? [])
       : [];
     const mbArtists = extractMbRelatedArtists(mbRelations);
+    const lastfmArtists = lastfmResult.status === 'fulfilled' ? lastfmResult.value : [];
 
-    // Cache up to 100 merged results; requests slice at serve time.
-    const merged = mergeSimilarArtists(lbArtists, mbArtists, { limit: 100 });
+    const merged = mergeSimilarArtists(lbArtists, mbArtists, { limit: 100 }, lastfmArtists);
     ttlCache.set(artistMbid, merged);
 
     return { similar: merged.slice(0, safeLimit) };

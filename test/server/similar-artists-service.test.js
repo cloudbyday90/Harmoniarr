@@ -242,6 +242,12 @@ function createTestMusicBrainzClient(lookupArtistRelationsImpl) {
   };
 }
 
+function createTestLastFmClient(getSimilarArtistsImpl) {
+  return {
+    getSimilarArtists: getSimilarArtistsImpl,
+  };
+}
+
 test('createSimilarArtistsService merges and returns similar artists', async (t) => {
   const lbClient = createTestListenBrainzClient(async () => [
     { mbid: 'mb-lb-1', name: 'LB Artist', score: 0.9 },
@@ -460,4 +466,136 @@ test('createSimilarArtistsService clamps limit exceeding max to 100', async () =
   const result = await service.getSimilarArtists({ artistMbid: 'test-mbid', limit: 999 });
 
   assert.equal(result.similar.length, 50);
+});
+
+// ---------------------------------------------------------------------------
+// mergeSimilarArtists with Last.fm source
+// ---------------------------------------------------------------------------
+
+test('mergeSimilarArtists includes Last.fm artists', () => {
+  const lastfmArtists = [
+    { mbid: 'mb-lf-1', name: 'Last.fm Artist', score: 0.85 },
+  ];
+
+  const result = mergeSimilarArtists([], [], { limit: 20 }, lastfmArtists);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].source, 'lastfm');
+  assert.equal(result[0].score, 0.85);
+});
+
+test('mergeSimilarArtists deduplicates Last.fm with other sources', () => {
+  const lbArtists = [{ mbid: 'mb-shared', name: 'Shared', score: 0.9 }];
+  const lastfmArtists = [{ mbid: 'mb-shared', name: 'Shared', score: 0.7 }];
+
+  const result = mergeSimilarArtists(lbArtists, [], { limit: 20 }, lastfmArtists);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].source, 'both');
+  assert.equal(result[0].score, 0.9);
+});
+
+test('mergeSimilarArtists takes higher score from Last.fm when it wins', () => {
+  const mbArtists = [{ mbid: 'mb-shared', name: 'Shared', score: 0.3 }];
+  const lastfmArtists = [{ mbid: 'mb-shared', name: 'Shared', score: 0.8 }];
+
+  const result = mergeSimilarArtists([], mbArtists, { limit: 20 }, lastfmArtists);
+
+  assert.equal(result[0].score, 0.8);
+  assert.equal(result[0].source, 'both');
+});
+
+test('mergeSimilarArtists works with all three sources', () => {
+  const lbArtists = [{ mbid: 'mb-1', name: 'LB', score: 0.95 }];
+  const mbArtists = [{ mbid: 'mb-2', name: 'MB', score: 0.7 }];
+  const lastfmArtists = [{ mbid: 'mb-3', name: 'LF', score: 0.6 }];
+
+  const result = mergeSimilarArtists(lbArtists, mbArtists, { limit: 20 }, lastfmArtists);
+
+  assert.equal(result.length, 3);
+  assert.equal(result[0].id, 'mb-1');
+  assert.equal(result[1].id, 'mb-2');
+  assert.equal(result[2].id, 'mb-3');
+});
+
+test('mergeSimilarArtists backward-compatible without lastfm parameter', () => {
+  const lbArtists = [{ mbid: 'mb-1', name: 'LB', score: 0.9 }];
+
+  const result = mergeSimilarArtists(lbArtists, [], { limit: 20 });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].source, 'listenbrainz');
+});
+
+// ---------------------------------------------------------------------------
+// createSimilarArtistsService with Last.fm
+// ---------------------------------------------------------------------------
+
+test('createSimilarArtistsService merges all three sources', async () => {
+  const lbClient = createTestListenBrainzClient(async () => [
+    { mbid: 'mb-lb', name: 'LB Artist', score: 0.9 },
+  ]);
+  const mbClient = createTestMusicBrainzClient(async () => ({
+    relations: [
+      { type: 'similar artist', artist: { id: 'mb-mb', name: 'MB Artist' } },
+    ],
+  }));
+  const lastFmClient = createTestLastFmClient(async () => [
+    { mbid: 'mb-lf', name: 'Last.fm Artist', score: 0.75 },
+  ]);
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid' });
+
+  const ids = result.similar.map((a) => a.id);
+  assert.ok(ids.includes('mb-lb'));
+  assert.ok(ids.includes('mb-mb'));
+  assert.ok(ids.includes('mb-lf'));
+});
+
+test('createSimilarArtistsService continues when Last.fm fails', async () => {
+  const lbClient = createTestListenBrainzClient(async () => [
+    { mbid: 'mb-lb', name: 'LB Artist', score: 0.9 },
+  ]);
+  const mbClient = createTestMusicBrainzClient(async () => ({ relations: [] }));
+  const lastFmClient = createTestLastFmClient(async () => {
+    throw Object.assign(new Error('Last.fm down'), { code: 'lastfm_unavailable' });
+  });
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid' });
+
+  assert.equal(result.similar.length, 1);
+  assert.equal(result.similar[0].source, 'listenbrainz');
+});
+
+test('createSimilarArtistsService returns Last.fm results when other sources are empty', async () => {
+  const lbClient = createTestListenBrainzClient(async () => []);
+  const mbClient = createTestMusicBrainzClient(async () => ({ relations: [] }));
+  const lastFmClient = createTestLastFmClient(async () => [
+    { mbid: 'mb-lf-1', name: 'LF Artist 1', score: 0.8 },
+    { mbid: 'mb-lf-2', name: 'LF Artist 2', score: 0.5 },
+  ]);
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid' });
+
+  assert.equal(result.similar.length, 2);
+  assert.equal(result.similar[0].source, 'lastfm');
+  assert.equal(result.similar[1].source, 'lastfm');
 });
