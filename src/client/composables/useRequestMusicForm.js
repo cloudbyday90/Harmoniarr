@@ -262,7 +262,7 @@ export function useRequestMusicForm({
     }
   }
 
-  async function loadMoreRequests({ requestState, requestKind, search } = {}) {
+  async function loadMoreRequests() {
     if (isLoadingMore.value || !hasMore.value) return;
     abortInflightLoadMore();
 
@@ -272,11 +272,7 @@ export function useRequestMusicForm({
     loadMoreError.value = '';
 
     const requestParams = {
-      scope: selectedScope.value,
-      requestState,
-      requestKind,
-      search,
-      limit: 50,
+      ...lastFilterParams,
       cursor: nextCursor.value,
     };
 

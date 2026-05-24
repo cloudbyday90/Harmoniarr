@@ -933,3 +933,34 @@ test('useRequestMusicForm destroy aborts inflight loadMore', async (t) => {
     // already destroyed
   }
 });
+
+test('useRequestMusicForm loadMoreRequests uses frozen lastFilterParams instead of caller args', async (t) => {
+  const page1 = [makeRequest({ id: 'r1' })];
+  const page2 = [makeRequest({ id: 'r2' })];
+  const fetchMediaRequestsFn = t.mock.fn(async (params) => {
+    if (!params.cursor) {
+      return { ok: true, mediaRequests: page1, nextCursor: 'cursor2', totalCount: 2 };
+    }
+    assert.equal(params.requestState, 'needs_fetch', 'loadMore uses lastFilterParams.requestState');
+    assert.equal(params.requestKind, 'release', 'loadMore uses lastFilterParams.requestKind');
+    assert.equal(params.search, 'autechre', 'loadMore uses lastFilterParams.search');
+    assert.equal(params.cursor, 'cursor2', 'loadMore passes cursor from initial load');
+    return { ok: true, mediaRequests: page2, nextCursor: null, totalCount: 2 };
+  });
+
+  const { mediaRequests, loadRequestDashboard, loadMoreRequests, destroy } = useRequestMusicForm({
+    fetchMediaRequestSummaryFn: async () => makeSummaryPayload(),
+    fetchMediaRequestsFn,
+  });
+
+  try {
+    await loadRequestDashboard({ requestState: 'needs_fetch', requestKind: 'release', search: 'autechre' });
+    assert.equal(mediaRequests.value.length, 1);
+
+    await loadMoreRequests();
+    assert.equal(mediaRequests.value.length, 2);
+    assert.equal(fetchMediaRequestsFn.mock.callCount(), 2);
+  } finally {
+    destroy();
+  }
+});
