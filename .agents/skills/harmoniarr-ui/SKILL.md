@@ -25,7 +25,7 @@ src/client/
   styles.css           — Legacy stylesheet (warm aesthetic)
   design-system.css    — Active design system (ops console v2, loads AFTER styles.css)
   components/          — Reusable components (43 files)
-    dashboard/         — Dashboard-specific sub-components
+    home/              — Home/dashboard landing sub-components
     media/             — Media/artwork sub-components
   views/               — Page-level route components (35 files)
   composables/         — Vue 3 composables (60 files)

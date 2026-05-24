@@ -1573,7 +1573,7 @@ label {
 .workspace-section h2,
 .workspace-section h3 { color: var(--hx-text-strong); }
 
-/* Stats grid used by Dashboard top */
+/* Stats grid used by the main dashboard/home landing surface */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

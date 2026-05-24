@@ -18,7 +18,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import RequesterHomePanel from '../components/dashboard/RequesterHomePanel.vue';
+import RequesterHomePanel from '../components/home/RequesterHomePanel.vue';
 import LibraryView from './LibraryView.vue';
 import { sessionStore } from '../state/session.js';
 

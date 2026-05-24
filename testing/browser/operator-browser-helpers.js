@@ -16,8 +16,21 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import assert from 'node:assert/strict';
+
 export async function waitForHeading(page, name) {
   await page.getByRole('heading', { name }).waitFor();
+}
+
+async function assertAuthenticatedLanding(page, username) {
+  const currentUrl = new URL(page.url());
+  assert.match(currentUrl.pathname, /^\/app(?:\/onboarding)?$/);
+
+  if (currentUrl.pathname === '/app') {
+    await waitForHeading(page, 'Library');
+  }
+
+  await page.locator('.hx-topbar-user').filter({ hasText: username }).waitFor();
 }
 
 export async function bootstrapAdminThroughUi(page, {
@@ -34,7 +47,7 @@ export async function bootstrapAdminThroughUi(page, {
   await page.getByRole('button', { name: 'Create bootstrap admin' }).click();
 
   await page.waitForURL(/\/app(?:\/onboarding)?(?:\?.*)?$/);
-  await page.locator('.hx-topbar-user').filter({ hasText: username }).waitFor();
+  await assertAuthenticatedLanding(page, username);
 }
 
 export async function loginThroughUi(page, {
@@ -50,7 +63,7 @@ export async function loginThroughUi(page, {
   await page.getByRole('button', { name: 'Log in' }).click();
 
   await page.waitForURL(/\/app(?:\/onboarding)?(?:\?.*)?$/);
-  await page.locator('.hx-topbar-user').filter({ hasText: username }).waitFor();
+  await assertAuthenticatedLanding(page, username);
 }
 
 export async function logoutThroughUi(page) {
