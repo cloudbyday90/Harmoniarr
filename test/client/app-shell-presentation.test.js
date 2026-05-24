@@ -11,11 +11,11 @@ import {
 // buildOperatorNav
 // ---------------------------------------------------------------------------
 
-test('buildOperatorNav returns 6 items in expected order', () => {
+test('buildOperatorNav returns 5 items in expected order', () => {
   const nav = buildOperatorNav();
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'dashboard-panel', 'discover', 'missing', 'activity', 'settings'],
+    ['dashboard', 'discover', 'missing', 'activity', 'settings'],
   );
 });
 
@@ -92,7 +92,7 @@ test('buildVisibleNav for operator returns operator nav regardless of count', ()
   const nav = buildVisibleNav(false, 0);
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'dashboard-panel', 'discover', 'missing', 'activity', 'settings'],
+    ['dashboard', 'discover', 'missing', 'activity', 'settings'],
   );
 });
 

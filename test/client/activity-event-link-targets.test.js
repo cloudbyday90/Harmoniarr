@@ -233,9 +233,8 @@ test('buildActivityEventLinkTarget handles library_scan drillthrough', () => {
   assert.deepEqual(target, {
     label: 'View library scan',
     to: {
-      hash: '#library-scan-panel',
-      name: 'dashboard-panel',
-      query: { libraryScanRunId: 'run-scan-1' },
+      name: 'jobs',
+      query: { runId: 'run-scan-1' },
     },
   });
 });
@@ -261,9 +260,8 @@ test('buildActivityEventLinkTarget handles artwork_cleanup drillthrough', () => 
   assert.deepEqual(target, {
     label: 'View artwork cleanup',
     to: {
-      hash: '#artwork-maintenance-panel',
-      name: 'dashboard-panel',
-      query: { artworkRunId: 'run-art-1' },
+      name: 'jobs',
+      query: { runId: 'run-art-1' },
     },
   });
 });

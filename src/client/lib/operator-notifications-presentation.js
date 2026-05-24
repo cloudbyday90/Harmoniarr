@@ -85,10 +85,9 @@ export function buildNotificationLink(notification) {
 
   if (notification?.reference?.type === 'heartbeat') {
     return {
-      label: 'Open dashboard',
+      label: 'Open home',
       to: {
-        hash: '#library-discovery-panel',
-        name: 'dashboard-panel',
+        name: 'dashboard',
       },
     };
   }

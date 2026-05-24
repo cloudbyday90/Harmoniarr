@@ -18,10 +18,9 @@ test('operation run link targets resolve shared descriptors by operation type', 
   assert.deepEqual(buildOperationRunLinkTarget({ operationType: 'library_scan', runId: 'run-11' }), {
     label: 'View library scan',
     to: {
-      hash: '#library-scan-panel',
-      name: 'dashboard-panel',
+      name: 'jobs',
       query: {
-        libraryScanRunId: 'run-11',
+        runId: 'run-11',
       },
     },
   });

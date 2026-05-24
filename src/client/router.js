@@ -34,7 +34,7 @@ const ActivityWorkspaceView = () => import('./views/ActivityWorkspaceView.vue');
 const ArtistDetailView = () => import('./views/ArtistDetailView.vue');
 const BootstrapSetupView = () => import('./views/BootstrapSetupView.vue');
 const ClaimAccountView = () => import('./views/ClaimAccountView.vue');
-const DashboardView = () => import('./views/DashboardView.vue');
+const HomeView = () => import('./views/HomeView.vue');
 const ImportReviewView = () => import('./views/ImportReviewView.vue');
 const LoginView = () => import('./views/LoginView.vue');
 const MetadataView = () => import('./views/MetadataView.vue');
@@ -44,7 +44,6 @@ const OperationsView = () => import('./views/OperationsView.vue');
 const RecoveryView = () => import('./views/RecoveryView.vue');
 const RecoveryWorkspaceView = () => import('./views/RecoveryWorkspaceView.vue');
 const DiscoverView = () => import('./views/DiscoverView.vue');
-const LibraryView = () => import('./views/LibraryView.vue');
 const MyRequestsView = () => import('./views/MyRequestsView.vue');
 const RequestDetailView = () => import('./views/RequestDetailView.vue');
 const RequestMusicView = () => import('./views/RequestMusicView.vue');
@@ -102,8 +101,8 @@ const router = createRouter({
       component: AppShell,
       meta: { requiresAuth: true },
       children: [
-        { path: '', name: 'dashboard', component: LibraryView },
-        { path: 'dashboard', name: 'dashboard-panel', component: DashboardView },
+        { path: '', name: 'dashboard', component: HomeView },
+        { path: 'dashboard', redirect: (to) => ({ name: 'dashboard', query: to.query, hash: to.hash }) },
         { path: 'onboarding', name: 'onboarding', component: OnboardingView },
         { path: 'discover', name: 'discover', component: DiscoverView },
         { path: 'library', name: 'library', redirect: { name: 'dashboard' } },

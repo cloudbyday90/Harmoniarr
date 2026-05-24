@@ -1217,7 +1217,7 @@ body,
   /* ── Tables ──────────────────────────────────────────────────────────── */
 
   /*
-   * Tables in cards (e.g. OperatorDashboardPanel) are not wrapped in the
+   * Tables in cards (for example, route-level activity and summary panels) are not wrapped in the
    * .hx-table-scroll helper.  At mobile widths they would overflow the
    * viewport.  Setting display: block allows the table element itself to
    * scroll horizontally without altering how cells are rendered inside.

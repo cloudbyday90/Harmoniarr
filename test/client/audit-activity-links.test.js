@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildAuditActivityLinkTarget } from '../../src/client/lib/audit-activity-links.js';
 
-test('buildAuditActivityLinkTarget links artwork cleanup audit events into the dashboard run detail state', () => {
+test('buildAuditActivityLinkTarget links artwork cleanup audit events into the operations run detail state', () => {
   assert.deepEqual(buildAuditActivityLinkTarget({
     entityId: 'run-22',
     entityType: 'operation_run',
@@ -10,10 +10,9 @@ test('buildAuditActivityLinkTarget links artwork cleanup audit events into the d
   }), {
     label: 'View artwork cleanup',
     to: {
-      hash: '#artwork-maintenance-panel',
-      name: 'dashboard-panel',
+      name: 'jobs',
       query: {
-        artworkRunId: 'run-22',
+        runId: 'run-22',
       },
     },
   });
@@ -51,7 +50,7 @@ test('buildAuditActivityLinkTarget links import execution and apply audit events
   });
 });
 
-test('buildAuditActivityLinkTarget links library scan and discovery audit events into dashboard run detail state', () => {
+test('buildAuditActivityLinkTarget links library scan and discovery audit events into operations run detail state', () => {
   assert.deepEqual(buildAuditActivityLinkTarget({
     entityId: 'scan-run-8',
     entityType: 'operation_run',
@@ -59,10 +58,9 @@ test('buildAuditActivityLinkTarget links library scan and discovery audit events
   }), {
     label: 'View library scan',
     to: {
-      hash: '#library-scan-panel',
-      name: 'dashboard-panel',
+      name: 'jobs',
       query: {
-        libraryScanRunId: 'scan-run-8',
+        runId: 'scan-run-8',
       },
     },
   });
@@ -74,10 +72,9 @@ test('buildAuditActivityLinkTarget links library scan and discovery audit events
   }), {
     label: 'View library discovery',
     to: {
-      hash: '#library-discovery-panel',
-      name: 'dashboard-panel',
+      name: 'jobs',
       query: {
-        libraryDiscoveryRunId: 'discovery-run-5',
+        runId: 'discovery-run-5',
       },
     },
   });

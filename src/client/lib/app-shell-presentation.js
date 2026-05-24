@@ -27,7 +27,6 @@
 
 const OPERATOR_NAV = Object.freeze([
   Object.freeze({ name: 'dashboard', label: 'Home', icon: 'library', exact: true }),
-  Object.freeze({ name: 'dashboard-panel', label: 'Dashboard', icon: 'dashboard' }),
   Object.freeze({ name: 'discover', label: 'Discover', icon: 'discover' }),
   Object.freeze({ name: 'missing', label: 'Missing', icon: 'missing' }),
   Object.freeze({ name: 'activity', label: 'Activity', icon: 'activity' }),

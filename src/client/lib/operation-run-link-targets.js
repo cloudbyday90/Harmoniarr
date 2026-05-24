@@ -17,11 +17,6 @@
  */
 
 import {
-  buildArtworkCleanupRunDashboardLocation,
-  buildLibraryDiscoveryRunDashboardLocation,
-  buildLibraryScanRunDashboardLocation,
-} from './dashboard-route-state.js';
-import {
   buildImportReviewApplyRunLocation,
   buildImportReviewExecutionRunLocation,
 } from './import-review-route-state.js';
@@ -36,7 +31,7 @@ import { buildOperationRunDetailLocation } from './operations-route-state.js';
 
 const operationRunLinkDefinitionsByType = new Map([
   [operationRunRegistry.artworkCleanup.operationType, {
-    buildLocation: buildArtworkCleanupRunDashboardLocation,
+    buildLocation: buildOperationRunDetailLocation,
     openLabel: 'View artwork cleanup',
   }],
   [operationRunRegistry.importCandidateExecutionPlanning.operationType, {
@@ -52,11 +47,11 @@ const operationRunLinkDefinitionsByType = new Map([
     openLabel: 'View organize apply',
   }],
   [operationRunRegistry.libraryScan.operationType, {
-    buildLocation: buildLibraryScanRunDashboardLocation,
+    buildLocation: buildOperationRunDetailLocation,
     openLabel: 'View library scan',
   }],
   [operationRunRegistry.libraryDiscoveryDispatch.operationType, {
-    buildLocation: buildLibraryDiscoveryRunDashboardLocation,
+    buildLocation: buildOperationRunDetailLocation,
     openLabel: 'View library discovery',
   }],
   [operationRunRegistry.backupRestoreApply.operationType, {

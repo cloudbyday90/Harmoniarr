@@ -96,15 +96,14 @@ describe('buildNotificationLink', () => {
     assert.equal(link, null);
   });
 
-  it('returns dashboard link for heartbeat reference', () => {
+  it('returns home link for heartbeat reference', () => {
     const link = buildNotificationLink({
       reference: { type: 'heartbeat' },
     });
     assert.deepEqual(link, {
-      label: 'Open dashboard',
+      label: 'Open home',
       to: {
-        hash: '#library-discovery-panel',
-        name: 'dashboard-panel',
+        name: 'dashboard',
       },
     });
   });

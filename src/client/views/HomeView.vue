@@ -18,15 +18,14 @@
 
 <script setup>
 import { computed } from 'vue';
-import { sessionStore } from '../state/session.js';
 import RequesterHomePanel from '../components/dashboard/RequesterHomePanel.vue';
-import OperatorDashboardPanel from '../components/dashboard/OperatorDashboardPanel.vue';
+import LibraryView from './LibraryView.vue';
+import { sessionStore } from '../state/session.js';
 
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
 </script>
 
 <template>
   <RequesterHomePanel v-if="isRequester" />
-  <OperatorDashboardPanel v-else />
+  <LibraryView v-else />
 </template>
-
