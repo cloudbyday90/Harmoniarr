@@ -25,7 +25,7 @@ test('createLibraryMediaRequestService marks matched local releases as already e
     mediaRequestStore: {
       createMediaRequest,
       getMediaRequestCounts: async () => ({ alreadyExists: 1, needsFetch: 0, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: t.mock.fn(async () => ({
@@ -86,7 +86,7 @@ test('createLibraryMediaRequestService keeps matched releases in needs_fetch whe
       createMediaRequest,
       findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: t.mock.fn(async () => ({
@@ -138,7 +138,7 @@ test('createLibraryMediaRequestService classifies supported external URLs as fet
     mediaRequestStore: {
       createMediaRequest,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -169,7 +169,7 @@ test('createLibraryMediaRequestService rejects invalid request payloads before p
         throw new Error('Should not be called');
       },
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -239,7 +239,7 @@ test('createLibraryMediaRequestService creates fan-out child requests when reque
       updateFanOutChildCount,
       findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: t.mock.fn(async () => ({ results: [] })),
@@ -313,7 +313,7 @@ test('createLibraryMediaRequestService fan-out skips ineligible targets', async 
       updateFanOutChildCount,
       findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: t.mock.fn(async () => ({ results: [] })),
@@ -370,7 +370,7 @@ test('createLibraryMediaRequestService fan-out with single target falls through 
       createFanOutChildRequests,
       findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: t.mock.fn(async () => ({ results: [] })),
@@ -404,7 +404,7 @@ test('createLibraryMediaRequestService fan-out rejects non-admin multi-target re
       createMediaRequest: async () => { throw new Error('should not be called'); },
       findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -447,7 +447,7 @@ test('createLibraryMediaRequestService fan-out rejects when all targets are inel
       createMediaRequest,
       findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: t.mock.fn(async () => ({ results: [] })),
@@ -480,7 +480,7 @@ test('createLibraryMediaRequestService fan-out validates requestedForUserIds arr
       createMediaRequest: async () => { throw new Error('should not be called'); },
       findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -523,7 +523,7 @@ test('createLibraryMediaRequestService preserves lock conflicts from external in
         sourceUrl: 'https://open.spotify.com/playlist/12345',
       }),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -568,47 +568,49 @@ test('buildMediaRequestSummary exposes fulfillment counts and recent request sta
       },
       getMediaRequestCounts: async () => ({ alreadyExists: 1, needsFetch: 1, needsReview: 1, totalRequests: 3 }),
       countMediaRequests: async () => 3,
-      listMediaRequests: async () => ([
-        {
-          id: 'request-1',
-          requestedByUser: {
-            id: 'admin-1',
-            username: 'owner',
+      listMediaRequests: async () => ({
+        mediaRequests: [
+          {
+            id: 'request-1',
+            requestedByUser: {
+              id: 'admin-1',
+              username: 'owner',
+            },
+            requestedForUser: {
+              id: 'user-7',
+              username: 'listener',
+            },
+            requestState: 'already_exists',
+            updatedAt: '2026-05-04T10:00:00.000Z',
           },
-          requestedForUser: {
-            id: 'user-7',
-            username: 'listener',
+          {
+            id: 'request-2',
+            requestedByUser: {
+              id: 'admin-1',
+              username: 'owner',
+            },
+            requestedForUser: {
+              id: 'user-7',
+              username: 'listener',
+            },
+            requestState: 'needs_fetch',
+            updatedAt: '2026-05-04T11:00:00.000Z',
           },
-          requestState: 'already_exists',
-          updatedAt: '2026-05-04T10:00:00.000Z',
-        },
-        {
-          id: 'request-2',
-          requestedByUser: {
-            id: 'admin-1',
-            username: 'owner',
+          {
+            id: 'request-3',
+            requestedByUser: {
+              id: 'user-7',
+              username: 'listener',
+            },
+            requestedForUser: {
+              id: 'user-7',
+              username: 'listener',
+            },
+            requestState: 'needs_review',
+            updatedAt: '2026-05-04T12:00:00.000Z',
           },
-          requestedForUser: {
-            id: 'user-7',
-            username: 'listener',
-          },
-          requestState: 'needs_fetch',
-          updatedAt: '2026-05-04T11:00:00.000Z',
-        },
-        {
-          id: 'request-3',
-          requestedByUser: {
-            id: 'user-7',
-            username: 'listener',
-          },
-          requestedForUser: {
-            id: 'user-7',
-            username: 'listener',
-          },
-          requestState: 'needs_review',
-          updatedAt: '2026-05-04T12:00:00.000Z',
-        },
-      ]),
+        ],
+      }),
     },
     mediaRequestNotificationService: createLibraryMediaRequestNotificationService({
       nowFn: () => new Date('2026-05-04T12:30:00.000Z'),
@@ -671,7 +673,7 @@ test('createLibraryMediaRequestService allows admins to create delegated request
       createMediaRequest,
       findActiveDuplicateRequest: async () => null,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -705,7 +707,7 @@ test('createLibraryMediaRequestService rejects delegated targets for non-admin u
         throw new Error('Should not be called');
       },
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -749,7 +751,7 @@ test('createLibraryMediaRequestService rejects delegated targets that still requ
         throw new Error('Should not be called');
       },
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -795,7 +797,7 @@ test('createLibraryMediaRequestService links duplicate requests to existing prim
         requestState: 'needs_fetch',
       })),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -845,7 +847,7 @@ test('createLibraryMediaRequestService links duplicate requests by text match wh
         return null;
       }),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -883,7 +885,7 @@ test('createLibraryMediaRequestService does not dedup already_exists requests', 
       createMediaRequest,
       findActiveDuplicateRequest,
       getMediaRequestCounts: async () => ({ alreadyExists: 1, needsFetch: 0, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: t.mock.fn(async () => ({
@@ -932,7 +934,7 @@ test('createLibraryMediaRequestService creates unlinked request when no duplicat
       createMediaRequest,
       findActiveDuplicateRequest: t.mock.fn(async () => null),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -970,7 +972,7 @@ test('createLibraryMediaRequestService stores musicbrainzReleaseId on request cr
       createMediaRequest,
       findActiveDuplicateRequest: t.mock.fn(async () => null),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -1013,7 +1015,7 @@ test('createLibraryMediaRequestService records dedup evidence in request evidenc
         requestState: 'needs_fetch',
       })),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -1053,7 +1055,7 @@ test('createLibraryMediaRequestService stores expectedReleaseDate for pre-reques
       createMediaRequest,
       findActiveDuplicateRequest: t.mock.fn(async () => null),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -1091,7 +1093,7 @@ test('createLibraryMediaRequestService passes null expectedReleaseDate when not 
       createMediaRequest,
       findActiveDuplicateRequest: t.mock.fn(async () => null),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -1121,7 +1123,7 @@ test('createLibraryMediaRequestService rejects malformed expectedReleaseDate', a
         throw new Error('Should not be called');
       },
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     metadataSearchService: {
       searchReleases: async () => ({ results: [] }),
@@ -1150,7 +1152,7 @@ test('reassignMediaRequest rejects non-admin callers', async () => {
   const service = createLibraryMediaRequestService({
     mediaRequestStore: {
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     recordAuditEventFn: async () => {},
   });
@@ -1171,7 +1173,7 @@ test('reassignMediaRequest rejects unknown media request ids', async (t) => {
     mediaRequestStore: {
       getMediaRequestById: t.mock.fn(async () => null),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     recordAuditEventFn: async () => {},
   });
@@ -1195,7 +1197,7 @@ test('reassignMediaRequest rejects reassignment to the same user', async (t) => 
         requestedForUser: { id: 'user-2', role: 'requester', username: 'same-user' },
       })),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     recordAuditEventFn: async () => {},
   });
@@ -1225,7 +1227,7 @@ test('reassignMediaRequest rejects ineligible target users', async (t) => {
         requestedForUser: { id: 'user-old', role: 'requester', username: 'old-user' },
       })),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     recordAuditEventFn: async () => {},
   });
@@ -1265,7 +1267,7 @@ test('reassignMediaRequest updates ownership and records both domain event and a
       })),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
       insertMediaRequestEvent,
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
       updateRequestedForUserId,
     },
     recordActivityEventFn,
@@ -1328,7 +1330,7 @@ test('reassignMediaRequest works without a reason', async (t) => {
       })),
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
       insertMediaRequestEvent,
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
       updateRequestedForUserId,
     },
     recordAuditEventFn: async () => {},
@@ -1349,7 +1351,7 @@ test('reassignMediaRequest rejects missing newRequestedForUserId', async () => {
   const service = createLibraryMediaRequestService({
     mediaRequestStore: {
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
     },
     recordAuditEventFn: async () => {},
   });
@@ -1389,7 +1391,7 @@ test('cancelMediaRequest cascades cancellation to fan-out children', async (t) =
       getMediaRequestById,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
       insertMediaRequestEvent,
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
       updateRequestState,
     },
     recordActivityEventFn,
@@ -1442,7 +1444,7 @@ test('cancelMediaRequest skips cascade when request has no fan-out children', as
       getMediaRequestById,
       getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 0, needsReview: 0, totalRequests: 0 }),
       insertMediaRequestEvent,
-      listMediaRequests: async () => [],
+      listMediaRequests: async () => ({ mediaRequests: [] }),
       updateRequestState,
     },
     recordActivityEventFn,
@@ -1458,4 +1460,63 @@ test('cancelMediaRequest skips cascade when request has no fan-out children', as
   assert.equal(cancelFanOutChildren.mock.callCount(), 0);
   assert.equal(insertMediaRequestEvent.mock.callCount(), 1);
   assert.equal(insertMediaRequestEvent.mock.calls[0].arguments[0].mediaRequestId, 'request-1');
+});
+
+test('listMediaRequests with cursor returns hasMore and nextCursor without calling countMediaRequests', async (t) => {
+  const listMediaRequestsStore = t.mock.fn(async () => ({
+    mediaRequests: [
+      { id: 'req-1', requestState: 'needs_fetch', requestedByUser: { id: 'u-1' }, requestedForUser: { id: 'u-1' } },
+    ],
+    hasMore: true,
+    nextCursor: 'cursor-2',
+  }));
+  const countMediaRequests = t.mock.fn(async () => {
+    throw new Error('Should not be called');
+  });
+
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      countMediaRequests,
+      listMediaRequests: listMediaRequestsStore,
+    },
+    mediaRequestFulfillmentService: createLibraryMediaRequestFulfillmentService({
+      listImportCandidatesBySourceMediaRequestIds: async () => [],
+    }),
+  });
+
+  const result = await service.listMediaRequests({ cursor: 'cursor-1' });
+
+  assert.equal(result.mediaRequests.length, 1);
+  assert.equal(result.hasMore, true);
+  assert.equal(result.nextCursor, 'cursor-2');
+  assert.equal('totalCount' in result, false);
+  assert.equal(countMediaRequests.mock.callCount(), 0);
+  assert.equal(listMediaRequestsStore.mock.calls[0].arguments[0].cursor, 'cursor-1');
+});
+
+test('listMediaRequests without cursor returns totalCount from countMediaRequests', async (t) => {
+  const listMediaRequestsStore = t.mock.fn(async () => ({
+    mediaRequests: [
+      { id: 'req-1', requestState: 'needs_fetch', requestedByUser: { id: 'u-1' }, requestedForUser: { id: 'u-1' } },
+    ],
+  }));
+  const countMediaRequests = t.mock.fn(async () => 42);
+
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      countMediaRequests,
+      listMediaRequests: listMediaRequestsStore,
+    },
+    mediaRequestFulfillmentService: createLibraryMediaRequestFulfillmentService({
+      listImportCandidatesBySourceMediaRequestIds: async () => [],
+    }),
+  });
+
+  const result = await service.listMediaRequests({ requestedForUserId: 'u-1' });
+
+  assert.equal(result.mediaRequests.length, 1);
+  assert.equal(result.totalCount, 42);
+  assert.equal('hasMore' in result, false);
+  assert.equal('nextCursor' in result, false);
+  assert.equal(countMediaRequests.mock.callCount(), 1);
 });

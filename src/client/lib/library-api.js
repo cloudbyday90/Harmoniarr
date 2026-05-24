@@ -26,7 +26,7 @@ export function fetchMediaRequestSummary({ scope } = {}) {
   return apiRequest(`/api/v1/library/media-request-summary${buildQueryString({ scope })}`);
 }
 
-export function fetchMediaRequests({ scope, requestState, requestKind, search, limit, offset } = {}) {
+export function fetchMediaRequests({ scope, requestState, requestKind, search, limit, offset, cursor } = {}) {
   const params = new URLSearchParams();
   if (scope) params.set('scope', scope);
   if (requestState) params.set('requestState', requestState);
@@ -34,6 +34,7 @@ export function fetchMediaRequests({ scope, requestState, requestKind, search, l
   if (search) params.set('search', search);
   if (limit != null) params.set('limit', String(limit));
   if (offset != null) params.set('offset', String(offset));
+  if (cursor) params.set('cursor', cursor);
   const query = params.toString();
   return apiRequest(query ? `/api/v1/library/media-requests?${query}` : '/api/v1/library/media-requests');
 }

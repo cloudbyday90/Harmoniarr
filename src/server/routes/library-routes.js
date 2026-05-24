@@ -94,21 +94,31 @@ export function registerLibraryRoutes(app, {
     const session = await requireSession(request);
     const scope = resolveMediaRequestScope(session, request.query.scope);
     const requestedForUserId = scope === 'mine' ? session.appUserId : null;
-    const { requestState, requestKind, search, limit, offset } = request.query;
+    const { requestState, requestKind, search, limit, offset, cursor } = request.query;
     const listResult = await listMediaRequests({
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined,
+      cursor: typeof cursor === 'string' && cursor.length > 0 ? cursor : null,
       requestKind: typeof requestKind === 'string' && requestKind.length > 0 ? requestKind : null,
       requestedForUserId,
       requestState: typeof requestState === 'string' && requestState.length > 0 ? requestState : null,
       search: typeof search === 'string' && search.trim().length > 0 ? search.trim() : null,
     });
-    response.json({
+
+    const payload = {
       mediaRequests: listResult.mediaRequests,
       ok: true,
       scope,
-      totalCount: listResult.totalCount,
-    });
+    };
+
+    if (cursor) {
+      payload.hasMore = listResult.hasMore ?? false;
+      payload.nextCursor = listResult.nextCursor ?? null;
+    } else {
+      payload.totalCount = listResult.totalCount;
+    }
+
+    response.json(payload);
   }));
 
   app.get('/api/v1/library/media-requests/:mediaRequestId', asyncRoute(async (request, response) => {

@@ -671,13 +671,22 @@ export function createLibraryMediaRequestService({
     search = null,
     limit = null,
     offset = null,
+    cursor = null,
   } = {}) {
     const filterParams = { requestedForUserId, requestState, requestKind, search };
-    const [mediaRequests, totalCount] = await Promise.all([
-      mediaRequestStore.listMediaRequests({ ...filterParams, limit, offset }),
-      mediaRequestStore.countMediaRequests(filterParams),
-    ]);
-    const enrichedRequests = await mediaRequestFulfillmentService.enrichMediaRequests(mediaRequests);
+    const storeResult = await mediaRequestStore.listMediaRequests({ ...filterParams, limit, offset, cursor });
+
+    if (cursor) {
+      const enrichedRequests = await mediaRequestFulfillmentService.enrichMediaRequests(storeResult.mediaRequests);
+      return {
+        mediaRequests: enrichedRequests,
+        hasMore: storeResult.hasMore,
+        nextCursor: storeResult.nextCursor,
+      };
+    }
+
+    const totalCount = await mediaRequestStore.countMediaRequests(filterParams);
+    const enrichedRequests = await mediaRequestFulfillmentService.enrichMediaRequests(storeResult.mediaRequests);
     return {
       mediaRequests: enrichedRequests,
       totalCount,

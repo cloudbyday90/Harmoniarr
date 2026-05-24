@@ -206,3 +206,155 @@ test('listMediaRequestEvents with invalid cursor falls back to initial query', a
   const sql = query.mock.calls[0].arguments[0];
   assert.doesNotMatch(sql, /< \(\$2, \$3\)/);
 });
+
+function makeRequestRow(overrides = {}) {
+  return {
+    id: overrides.id ?? 'req-1',
+    request_kind: 'release',
+    request_state: 'needs_fetch',
+    artist_name: 'Artist',
+    release_title: 'Album',
+    track_title: null,
+    source_url: null,
+    source_provider: null,
+    normalized_query: 'artist album',
+    matched_metadata_release_group_id: null,
+    matched_metadata_release_id: null,
+    notes: null,
+    evidence: {},
+    created_at: overrides.created_at ?? '2026-05-01T00:00:00Z',
+    updated_at: '2026-05-01T00:00:00Z',
+    musicbrainz_release_id: null,
+    linked_request_id: null,
+    expected_release_date: null,
+    fan_out_parent_id: null,
+    fan_out_child_count: 0,
+    requested_by_user_id: 'admin-1',
+    requested_by_username: 'admin',
+    requested_by_role: 'admin',
+    requested_for_user_id: 'user-1',
+    requested_for_username: 'listener',
+    requested_for_role: 'requester',
+    matched_release_group_id: null,
+    matched_release_group_title: null,
+    matched_release_title: null,
+    matched_musicbrainz_release_id: null,
+    matched_artist_name: null,
+    ...overrides,
+  };
+}
+
+test('listMediaRequests without cursor returns offset-based results without hasMore/nextCursor', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [makeRequestRow({ id: 'req-1' }), makeRequestRow({ id: 'req-2' })],
+  }));
+
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+  const result = await store.listMediaRequests({ limit: 10, offset: 0 });
+
+  assert.equal(result.mediaRequests.length, 2);
+  assert.equal(result.mediaRequests[0].id, 'req-1');
+  assert.equal('hasMore' in result, false);
+  assert.equal('nextCursor' in result, false);
+  assert.equal(query.mock.callCount(), 1);
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /LIMIT \$\d+/);
+  assert.match(sql, /OFFSET \$\d+/);
+});
+
+test('listMediaRequests with cursor uses keyset filter and returns hasMore false when under limit', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [makeRequestRow({ id: 'req-3', created_at: '2026-05-01T00:00:00Z' })],
+  }));
+
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+  const cursor = Buffer.from(JSON.stringify({ c: '2026-05-02T00:00:00Z', i: 'req-2' })).toString('base64url');
+  const result = await store.listMediaRequests({ limit: 10, cursor });
+
+  assert.equal(result.mediaRequests.length, 1);
+  assert.equal(result.mediaRequests[0].id, 'req-3');
+  assert.equal(result.hasMore, false);
+  assert.equal(result.nextCursor, null);
+  assert.equal(query.mock.callCount(), 1);
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /\(media_requests\.created_at, media_requests\.id\) < \(\$1, \$2\)/);
+  assert.match(sql, /LIMIT \$3/);
+  assert.doesNotMatch(sql, /OFFSET/);
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[0], '2026-05-02T00:00:00Z');
+  assert.equal(params[1], 'req-2');
+  assert.equal(params[2], 11);
+});
+
+test('listMediaRequests with cursor returns hasMore true and nextCursor when results exceed limit', async (t) => {
+  const rows = [];
+  for (let i = 0; i <= 3; i++) {
+    rows.push(makeRequestRow({ id: `req-${i}`, created_at: new Date(Date.now() - i * 60000).toISOString() }));
+  }
+
+  const query = t.mock.fn(async () => ({ rows }));
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+
+  const cursor = Buffer.from(JSON.stringify({ c: '2026-05-02T00:00:00Z', i: 'req-prev' })).toString('base64url');
+  const result = await store.listMediaRequests({ limit: 3, cursor });
+
+  assert.equal(result.mediaRequests.length, 3);
+  assert.equal(result.hasMore, true);
+  assert.ok(result.nextCursor);
+
+  const decoded = JSON.parse(Buffer.from(result.nextCursor, 'base64url').toString('utf8'));
+  assert.equal(decoded.i, 'req-2');
+  assert.equal(decoded.c, rows[2].created_at);
+
+  assert.equal(query.mock.calls[0].arguments[1][2], 4);
+});
+
+test('listMediaRequests with cursor and filters applies keyset after WHERE clause', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [makeRequestRow({ id: 'req-5', created_at: '2026-05-01T00:00:00Z' })],
+  }));
+
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+  const cursor = Buffer.from(JSON.stringify({ c: '2026-05-02T00:00:00Z', i: 'req-4' })).toString('base64url');
+  const result = await store.listMediaRequests({
+    limit: 10,
+    cursor,
+    requestedForUserId: 'user-1',
+    requestState: 'needs_fetch',
+  });
+
+  assert.equal(result.mediaRequests.length, 1);
+  assert.equal(result.mediaRequests[0].id, 'req-5');
+  assert.equal(result.hasMore, false);
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /WHERE/);
+  assert.match(sql, /requested_for_user_id = \$1/);
+  assert.match(sql, /AND \(media_requests\.created_at, media_requests\.id\) < \(\$3, \$4\)/);
+
+  const params = query.mock.calls[0].arguments[1];
+  assert.equal(params[0], 'user-1');
+  assert.equal(params[1], 'needs_fetch');
+  assert.equal(params[2], '2026-05-02T00:00:00Z');
+  assert.equal(params[3], 'req-4');
+});
+
+test('listMediaRequests with invalid cursor falls back to offset-based query', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [makeRequestRow({ id: 'req-1' })],
+  }));
+
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+  const result = await store.listMediaRequests({ limit: 10, cursor: 'not-valid-base64!!!' });
+
+  assert.equal(result.mediaRequests.length, 1);
+  assert.equal('hasMore' in result, false);
+  assert.equal('nextCursor' in result, false);
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.doesNotMatch(sql, /\(media_requests\.created_at, media_requests\.id\) < \(/);
+  assert.match(sql, /OFFSET/);
+});

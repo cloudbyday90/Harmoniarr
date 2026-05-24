@@ -70,8 +70,7 @@ export function useRequestMusicForm({
   const loadError = ref('');
   const selectedScope = ref(initialScope);
   const totalCount = ref(0);
-  const currentOffset = ref(0);
-  const pageSize = 50;
+  const nextCursor = ref(null);
   let pollTimer = null;
   let destroyed = false;
   let lastFilterParams = {};
@@ -82,7 +81,7 @@ export function useRequestMusicForm({
     return (counts.active ?? 0) > 0 || (counts.downloading ?? 0) > 0 || (counts.importPending ?? 0) > 0;
   });
 
-  const hasMore = computed(() => mediaRequests.value.length < totalCount.value);
+  const hasMore = computed(() => nextCursor.value !== null);
   const isLoadingMore = ref(false);
 
   // ── Request targets (admin only) ─────────────────────────────────────────
@@ -156,9 +155,9 @@ export function useRequestMusicForm({
       isLoading.value = true;
     }
     loadError.value = '';
-    currentOffset.value = 0;
+    nextCursor.value = null;
 
-    const requestParams = { scope: selectedScope.value, requestState, requestKind, search, limit: pageSize, offset: 0 };
+    const requestParams = { scope: selectedScope.value, requestState, requestKind, search, limit: 50 };
     lastFilterParams = requestParams;
 
     try {
@@ -171,6 +170,7 @@ export function useRequestMusicForm({
       summary.value = summaryPayload;
       mediaRequests.value = requestsPayload.mediaRequests ?? [];
       totalCount.value = requestsPayload.totalCount ?? mediaRequests.value.length;
+      nextCursor.value = requestsPayload.nextCursor ?? null;
     } catch (error) {
       if (destroyed) return;
       loadError.value = getErrorMessage(error, 'Music request dashboard could not be loaded');
@@ -232,12 +232,13 @@ export function useRequestMusicForm({
     try {
       const [summaryPayload, requestsPayload] = await Promise.all([
         fetchMediaRequestSummaryFn({ scope: selectedScope.value }),
-        fetchMediaRequestsFn({ ...lastFilterParams, offset: 0 }),
+        fetchMediaRequestsFn({ ...lastFilterParams }),
       ]);
       if (destroyed) return;
       summary.value = summaryPayload;
       mediaRequests.value = requestsPayload.mediaRequests ?? [];
       totalCount.value = requestsPayload.totalCount ?? mediaRequests.value.length;
+      nextCursor.value = requestsPayload.nextCursor ?? null;
     } catch {
       // Preserve stale data on revalidation error.
     } finally {
@@ -252,15 +253,20 @@ export function useRequestMusicForm({
     if (isLoadingMore.value || !hasMore.value) return;
     isLoadingMore.value = true;
 
-    const nextOffset = currentOffset.value + pageSize;
-    const requestParams = { scope: selectedScope.value, requestState, requestKind, search, limit: pageSize, offset: nextOffset };
+    const requestParams = {
+      scope: selectedScope.value,
+      requestState,
+      requestKind,
+      search,
+      limit: 50,
+      cursor: nextCursor.value,
+    };
 
     try {
       const requestsPayload = await fetchMediaRequestsFn(requestParams);
       const newRequests = requestsPayload.mediaRequests ?? [];
       mediaRequests.value = [...mediaRequests.value, ...newRequests];
-      totalCount.value = requestsPayload.totalCount ?? totalCount.value;
-      currentOffset.value = nextOffset;
+      nextCursor.value = requestsPayload.nextCursor ?? null;
     } catch {
       // silent — user can retry
     } finally {
@@ -345,5 +351,6 @@ export function useRequestMusicForm({
     summary,
     switchScope,
     targetErrorMessage,
+    totalCount,
   };
 }

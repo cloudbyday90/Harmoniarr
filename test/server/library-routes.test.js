@@ -349,6 +349,7 @@ test('media request list route allows admins to read all requests', async (t) =>
 
     assert.equal(response.status, 200);
     assert.deepEqual(Object.keys(listMediaRequests.mock.calls[0].arguments[0]).sort(), [
+      'cursor',
       'limit',
       'offset',
       'requestKind',
@@ -398,6 +399,46 @@ test('media request list route ignores empty filter params', async (t) => {
     assert.equal(args.requestState, null);
     assert.equal(args.requestKind, null);
     assert.equal(args.search, null);
+  });
+});
+
+test('media request list route passes cursor param and returns hasMore/nextCursor', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-admin', user: { role: 'admin' } }));
+  const listMediaRequests = t.mock.fn(async () => ({
+    mediaRequests: [{ id: 'request-10' }],
+    hasMore: true,
+    nextCursor: 'eyJjIjoiMjAyNi0wNS0wMVQwMDowMDowMFoiLCJpIjoicmVxLTEwIn0=',
+  }));
+  const app = createLibraryRouteTestApp({ listMediaRequests, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests?scope=all&cursor=abc123`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+
+    const args = listMediaRequests.mock.calls[0].arguments[0];
+    assert.equal(args.cursor, 'abc123');
+    assert.equal(payload.hasMore, true);
+    assert.equal(payload.nextCursor, 'eyJjIjoiMjAyNi0wNS0wMVQwMDowMDowMFoiLCJpIjoicmVxLTEwIn0=');
+    assert.equal('totalCount' in payload, false);
+  });
+});
+
+test('media request list route returns totalCount when no cursor is provided', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-admin', user: { role: 'admin' } }));
+  const listMediaRequests = t.mock.fn(async () => ({ mediaRequests: [], totalCount: 42 }));
+  const app = createLibraryRouteTestApp({ listMediaRequests, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests?scope=all`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.totalCount, 42);
+    assert.equal('hasMore' in payload, false);
+    assert.equal('nextCursor' in payload, false);
   });
 });
 

@@ -82,6 +82,20 @@ const ALLOWED_REQUEST_KINDS = new Set(['release', 'track', 'external_url']);
 const DEFAULT_PAGE_LIMIT = 100;
 const MAX_PAGE_LIMIT = 500;
 
+function encodeRequestCursor({ createdAt, id }) {
+  return Buffer.from(JSON.stringify({ c: createdAt, i: id })).toString('base64url');
+}
+
+function decodeRequestCursor(cursor) {
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (!parsed.c || !parsed.i) return null;
+    return { createdAt: parsed.c, id: parsed.i };
+  } catch {
+    return null;
+  }
+}
+
 function buildListFilter({
   requestedForUserId = null,
   requestState = null,
@@ -277,11 +291,42 @@ export function createLibraryMediaRequestStore({
     requestKind = null,
     search = null,
     limit = DEFAULT_PAGE_LIMIT,
-    offset = 0,
+    offset = null,
+    cursor = null,
   } = {}) {
     const pool = getPoolFn();
     const filter = buildListFilter({ requestedForUserId, requestState, requestKind, search });
     const safeLimit = Math.max(1, Math.min(Number(limit) || DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT));
+
+    const decoded = cursor ? decodeRequestCursor(cursor) : null;
+
+    if (decoded) {
+      const fetchLimit = safeLimit + 1;
+      const cursorParams = [...filter.params, decoded.createdAt, decoded.id, fetchLimit];
+      const result = await pool.query(
+        `
+          ${baseSelect}
+          ${filter.sql}
+          ${filter.sql ? 'AND' : 'WHERE'} (media_requests.created_at, media_requests.id) < ($${filter.params.length + 1}, $${filter.params.length + 2})
+          ORDER BY media_requests.created_at DESC, media_requests.id DESC
+          LIMIT $${filter.params.length + 3}
+        `,
+        cursorParams,
+      );
+
+      const hasMore = result.rows.length > safeLimit;
+      const rows = hasMore ? result.rows.slice(0, safeLimit) : result.rows;
+      const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
+
+      return {
+        mediaRequests: rows.map(mapMediaRequestRow),
+        hasMore,
+        nextCursor: hasMore && lastRow
+          ? encodeRequestCursor({ createdAt: lastRow.created_at, id: lastRow.id })
+          : null,
+      };
+    }
+
     const safeOffset = Math.max(0, Number(offset) || 0);
     const result = await pool.query(
       `
@@ -294,7 +339,9 @@ export function createLibraryMediaRequestStore({
       [...filter.params, safeLimit, safeOffset],
     );
 
-    return result.rows.map(mapMediaRequestRow);
+    return {
+      mediaRequests: result.rows.map(mapMediaRequestRow),
+    };
   }
 
   async function countMediaRequests({

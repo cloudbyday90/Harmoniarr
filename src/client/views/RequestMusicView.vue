@@ -504,7 +504,7 @@ watch(
               :disabled="rm.isLoadingMore.value"
               @click="rm.loadMoreRequests(filters.toApiParams())"
             >{{ rm.isLoadingMore.value ? 'Loading\u2026' : 'Load more' }}</button>
-            <p class="hx-text-muted">{{ rm.mediaRequests.value.length }} of {{ rm.totalCount?.value ?? rm.mediaRequests.value.length }}</p>
+            <p class="hx-text-muted">{{ rm.mediaRequests.value.length }}{{ rm.totalCount?.value ? ` of ${rm.totalCount.value}` : '' }} loaded</p>
           </div>
         </template>
 
