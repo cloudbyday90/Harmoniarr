@@ -3958,6 +3958,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_media_requests_linked_per_user
   ON media_requests (linked_request_id, requested_for_user_id)
   WHERE linked_request_id IS NOT NULL;
 
+-- Composite index for keyset (cursor-based) pagination on media_requests.
+-- Supports (created_at, id) < ($N, $N) row-value comparison with backward
+-- index scan, giving O(log n) page lookups at any depth.
+CREATE INDEX IF NOT EXISTS idx_media_requests_created_at_id_desc
+  ON media_requests (created_at DESC, id DESC);
+
 INSERT INTO schema_migrations (
   migration_key,
   filename,
@@ -4199,6 +4205,32 @@ VALUES (
   '20260615_030000_fulfillment_evidence_activity_event_fk.sql',
   'fulfillment_evidence_activity_event_fk',
   'f936ee4413d4823920ecfed6e077105f12e79bba8ebaa9647fc855b063dfe699',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260623_010000',
+  '20260623_010000_media_request_keyset_pagination_index.sql',
+  'media_request_keyset_pagination_index',
+  'f07b77b27e1256a3676383b007e4ce181d9d3aac243101bc59bb766b99a23115',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
