@@ -232,4 +232,36 @@ test('createMusicBrainzSearchService preserves provider failure details', async 
   assert.equal(providerHealthRecorder.recordSuccess.mock.callCount(), 0);
   assert.equal(providerHealthRecorder.recordError.mock.callCount(), 1);
   assert.deepEqual(providerHealthRecorder.recordError.mock.calls[0].arguments, ['musicbrainz', providerError]);
+
+test('createMusicBrainzSearchService checkProviderHealth propagates errors for active health check classification', async (t) => {
+  const providerError = new Error('MusicBrainz is unavailable');
+  providerError.code = 'musicbrainz_unavailable';
+  providerError.details = {
+    status: 503,
+    throttled: false,
+    url: 'https://musicbrainz.org/ws/2/artist?fmt=json',
+  };
+  const providerHealthRecorder = {
+    recordError: t.mock.fn(),
+    recordSuccess: t.mock.fn(),
+  };
+  const service = createMusicBrainzSearchService({
+    musicBrainzClient: {
+      searchArtists: async () => { throw providerError; },
+      searchReleases: async () => ({ releases: [] }),
+    },
+    providerHealthRecorder,
+  });
+
+  await assert.rejects(
+    () => service.checkProviderHealth(),
+    (error) => {
+      assert.equal(error, providerError);
+      assert.equal(error.code, 'musicbrainz_unavailable');
+      return true;
+    },
+  );
+  assert.equal(providerHealthRecorder.recordSuccess.mock.callCount(), 0);
+  assert.equal(providerHealthRecorder.recordError.mock.callCount(), 1);
+});
 });

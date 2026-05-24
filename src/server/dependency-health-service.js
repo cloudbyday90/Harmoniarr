@@ -221,7 +221,7 @@ export function createProviderHealthRecorder({ now = () => new Date() } = {}) {
   };
 }
 
-export function createDependencyHealthService({ checks = [], recorder = null } = {}) {
+export function createDependencyHealthService({ checks = [], recorder = null, now = () => new Date() } = {}) {
   async function getDependencyHealth({ providers = null } = {}) {
     const selectedProviders = Array.isArray(providers) && providers.length > 0
       ? new Set(providers)
@@ -229,11 +229,12 @@ export function createDependencyHealthService({ checks = [], recorder = null } =
     const selectedChecks = selectedProviders
       ? checks.filter(({ provider }) => selectedProviders.has(provider))
       : checks;
+    const observedAt = now().toISOString();
     const checkResults = await Promise.all(selectedChecks.map(async ({ provider, check }) => {
       try {
-        return normalizeDependencyStatus(provider, await check());
+        return addObservedAt(normalizeDependencyStatus(provider, await check()), observedAt);
       } catch (error) {
-        return classifyDependencyError(provider, error);
+        return addObservedAt(classifyDependencyError(provider, error), observedAt);
       }
     }));
 

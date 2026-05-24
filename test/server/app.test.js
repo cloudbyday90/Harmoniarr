@@ -46,7 +46,7 @@ suite('createApp', () => {
   };
   const metadataModule = {
     metadataMonitoringStore: { replaceArtistMonitoringSnapshot: async () => {}, listArtistMonitoringSnapshot: async () => [] },
-    musicBrainzSearchService: { checkProviderHealth: t.mock.fn(async () => ({ status: 'healthy' })) },
+    musicBrainzSearchService: { checkProviderHealth: t.mock.fn(async () => ({ provider: 'musicbrainz', status: 'healthy', message: 'MusicBrainz lookups are reachable.' })) },
     routeDependencies: { metadata: 'deps' },
   };
   const slskdConfigService = { buildRuntimeConfig: t.mock.fn(async () => ({ })) };
@@ -242,6 +242,7 @@ suite('createApp', () => {
   const dependencyHealth = await systemModuleArgs.dependencyHealthService.getDependencyHealth();
   assert.equal(dependencyHealth.length, 3);
   assert.equal(mediaToolingStatusService.getStatus.mock.callCount(), 1);
+  assert.equal(metadataModule.musicBrainzSearchService.checkProviderHealth.mock.callCount(), 1);
   assert.equal(slskdModule.slskdService.getConnectionStatus.mock.callCount(), 1);
   const mediaToolingHealth = dependencyHealth.find((dependency) => dependency.provider === 'media_tooling');
   const musicBrainzHealth = dependencyHealth.find((dependency) => dependency.provider === 'musicbrainz');
@@ -255,33 +256,44 @@ suite('createApp', () => {
     },
     {
       provider: 'musicbrainz',
-      status: 'degraded',
-      code: 'musicbrainz_unavailable',
-      message: 'MusicBrainz is throttling requests',
+      status: 'healthy',
+      message: 'MusicBrainz lookups are reachable.',
+      observedAt: '<observed-at>',
+    },
+  );
+  assert.match(slskdHealth.observedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(
+    {
+      ...slskdHealth,
+      observedAt: '<observed-at>',
+    },
+    {
+      provider: 'slskd',
+      status: 'healthy',
       details: {
-        retryAfterMs: 2000,
-        throttled: true,
+        isConnected: true,
+        isLoggedIn: true,
+        isTransitioning: false,
       },
       observedAt: '<observed-at>',
     },
   );
-  assert.deepEqual(slskdHealth, {
-    provider: 'slskd',
-    status: 'healthy',
-    details: {
-      isConnected: true,
-      isLoggedIn: true,
-      isTransitioning: false,
+  assert.match(mediaToolingHealth.observedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(
+    {
+      ...mediaToolingHealth,
+      observedAt: '<observed-at>',
     },
-  });
-  assert.deepEqual(mediaToolingHealth, {
-    provider: 'media_tooling',
-    status: 'healthy',
-    details: {
-      ffmpegAvailable: true,
-      ffprobeAvailable: true,
+    {
+      provider: 'media_tooling',
+      status: 'healthy',
+      details: {
+        ffmpegAvailable: true,
+        ffprobeAvailable: true,
+      },
+      observedAt: '<observed-at>',
     },
-  });
+  );
 
   assert.deepEqual(systemModuleArgs, {
     appPort: 4510,

@@ -464,6 +464,10 @@ export function createApp({
         check: mediaToolingStatusService.getStatus,
       },
       {
+        provider: 'musicbrainz',
+        check: metadataModule.musicBrainzSearchService.checkProviderHealth,
+      },
+      {
         provider: 'slskd',
         check: slskdModule.slskdService.getConnectionStatus,
       },

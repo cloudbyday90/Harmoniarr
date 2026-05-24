@@ -104,6 +104,7 @@ test('createDependencyHealthService returns healthy checks and classified provid
   };
 
   const service = createDependencyHealthService({
+    now: () => new Date('2026-04-30T10:30:00.000Z'),
     checks: [
       {
         provider: 'database',
@@ -131,6 +132,7 @@ test('createDependencyHealthService returns healthy checks and classified provid
       details: {
         status: 200,
       },
+      observedAt: '2026-04-30T10:30:00.000Z',
     },
     {
       provider: 'musicbrainz',
@@ -145,6 +147,7 @@ test('createDependencyHealthService returns healthy checks and classified provid
         status: 429,
         throttled: true,
       },
+      observedAt: '2026-04-30T10:30:00.000Z',
     },
   ]);
 });
@@ -238,6 +241,7 @@ test('createDependencyHealthService lets live checks replace recorded snapshots 
     },
   });
   const service = createDependencyHealthService({
+    now: () => new Date('2026-04-30T12:01:00.000Z'),
     recorder,
     checks: [{
       provider: 'slskd',
@@ -261,11 +265,13 @@ test('createDependencyHealthService lets live checks replace recorded snapshots 
       isLoggedIn: true,
       isTransitioning: false,
     },
+    observedAt: '2026-04-30T12:01:00.000Z',
   }]);
 });
 
 test('createDependencyHealthService preserves safe slskd connection details from checks', async () => {
   const service = createDependencyHealthService({
+    now: () => new Date('2026-04-30T13:00:00.000Z'),
     checks: [{
       provider: 'slskd',
       check: async () => ({
@@ -290,11 +296,13 @@ test('createDependencyHealthService preserves safe slskd connection details from
       isLoggedIn: false,
       isTransitioning: false,
     },
+    observedAt: '2026-04-30T13:00:00.000Z',
   }]);
 });
 
 test('createDependencyHealthService can scope checks to specific providers', async () => {
   const service = createDependencyHealthService({
+    now: () => new Date('2026-04-30T14:00:00.000Z'),
     checks: [{
       provider: 'slskd',
       check: async () => ({
@@ -325,6 +333,7 @@ test('createDependencyHealthService can scope checks to specific providers', asy
 
 test('createDependencyHealthService preserves safe media tooling flags and strips unsafe details', async () => {
   const service = createDependencyHealthService({
+    now: () => new Date('2026-04-30T15:00:00.000Z'),
     checks: [{
       provider: 'media_tooling',
       check: async () => ({
@@ -345,6 +354,7 @@ test('createDependencyHealthService preserves safe media tooling flags and strip
       ffmpegAvailable: true,
       ffprobeAvailable: true,
     },
+    observedAt: '2026-04-30T15:00:00.000Z',
   }]);
 });
 
@@ -391,4 +401,34 @@ test('classifySlskdDependencyError maps unavailable failures without leaking pro
       status: 503,
     },
   });
+});
+
+test('createDependencyHealthService classifies MusicBrainz active check errors', async () => {
+  const error = new Error('MusicBrainz is unavailable');
+  error.code = 'musicbrainz_unavailable';
+  error.details = {
+    status: 503,
+    throttled: true,
+    url: 'https://musicbrainz.org/ws/2/artist?fmt=json',
+  };
+
+  const service = createDependencyHealthService({
+    now: () => new Date('2026-04-30T16:00:00.000Z'),
+    checks: [{
+      provider: 'musicbrainz',
+      check: async () => { throw error; },
+    }],
+  });
+
+  assert.deepEqual(await service.getDependencyHealth(), [{
+    provider: 'musicbrainz',
+    status: 'degraded',
+    code: 'musicbrainz_unavailable',
+    message: 'MusicBrainz is throttling requests',
+    details: {
+      status: 503,
+      throttled: true,
+    },
+    observedAt: '2026-04-30T16:00:00.000Z',
+  }]);
 });
