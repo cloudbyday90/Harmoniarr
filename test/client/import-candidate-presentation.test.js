@@ -52,6 +52,7 @@ import {
   getPersistedMissingTransfer,
   getPersistedTransferObservation,
   getRunStatusClass,
+  isTransferSnapshotDegraded,
 } from '../../src/client/lib/import-candidate-presentation.js';
 
 // ---------------------------------------------------------------------------
@@ -1047,5 +1048,31 @@ describe('canStartExecutionRun', () => {
 
   it('returns true when run is failed and count > 0', () => {
     assert.equal(canStartExecutionRun({ status: 'failed' }, 1), true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isTransferSnapshotDegraded
+// ---------------------------------------------------------------------------
+
+describe('isTransferSnapshotDegraded', () => {
+  it('returns true when transferSnapshotUnavailable is true', () => {
+    assert.equal(isTransferSnapshotDegraded({ id: 'run-1', transferSnapshotUnavailable: true }), true);
+  });
+
+  it('returns false when transferSnapshotUnavailable is false', () => {
+    assert.equal(isTransferSnapshotDegraded({ id: 'run-1', transferSnapshotUnavailable: false }), false);
+  });
+
+  it('returns false when transferSnapshotUnavailable is absent', () => {
+    assert.equal(isTransferSnapshotDegraded({ id: 'run-1' }), false);
+  });
+
+  it('returns false for null', () => {
+    assert.equal(isTransferSnapshotDegraded(null), false);
+  });
+
+  it('returns false for undefined', () => {
+    assert.equal(isTransferSnapshotDegraded(undefined), false);
   });
 });

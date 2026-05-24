@@ -654,3 +654,7 @@ export function formatUploaderReputationEvidence(reputation) {
     : 'N/A';
   return `${reputation.successCount}/${reputation.evidenceCount} (${rate})`;
 }
+
+export function isTransferSnapshotDegraded(currentRun) {
+  return Boolean(currentRun?.transferSnapshotUnavailable);
+}

@@ -33,6 +33,7 @@ import {
   getPersistedMissingTransfer,
   getPersistedTransferObservation,
   getRunStatusClass,
+  isTransferSnapshotDegraded,
 } from '../lib/import-candidate-presentation.js';
 import {
   formatElapsedDuration,
@@ -239,6 +240,11 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
         <span class="review-status-pill" :class="getRunStatusClass(currentRun.status)">
           {{ formatRunStatus(currentRun.status) }}
         </span>
+      </div>
+
+      <div class="execution-degraded-notice" v-if="isTransferSnapshotDegraded(currentRun)" role="status">
+        <span class="status-chip" data-status="degraded">Degraded</span>
+        <p>Live transfer data is temporarily unavailable. Persisted observations from the last successful sync are shown below. Data will refresh automatically when the connection recovers.</p>
       </div>
 
       <dl class="review-meta-grid review-meta-grid-wide">
@@ -467,5 +473,22 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
   background: var(--hx-accent-soft);
   border-color: rgba(94, 173, 255, 0.32);
   color: var(--hx-accent-strong);
+}
+
+.execution-degraded-notice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--hx-space-3);
+  align-items: start;
+  padding: var(--hx-space-3) var(--hx-space-4);
+  background: var(--hx-warning-soft);
+  border: 1px solid rgba(192, 138, 22, 0.28);
+  border-radius: var(--hx-radius-md);
+}
+
+.execution-degraded-notice p {
+  margin: 0;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-text);
 }
 </style>
