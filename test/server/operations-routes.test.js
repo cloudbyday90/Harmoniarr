@@ -59,7 +59,7 @@ test('operations history route requires an admin session and returns the shared 
 
     assert.equal(response.status, 200);
     assert.equal(requireAdminSession.mock.callCount(), 1);
-    assert.deepEqual(buildOperationHistory.mock.calls[0].arguments, [{ limit: '7' }]);
+    assert.deepEqual(buildOperationHistory.mock.calls[0].arguments, [{ limit: 7 }]);
     assert.equal(payload.runs[0].id, 'run-1');
   });
 });
@@ -85,7 +85,7 @@ test('operations run detail route requires an admin session and returns the sele
 
     assert.equal(response.status, 200);
     assert.equal(requireAdminSession.mock.callCount(), 1);
-    assert.deepEqual(buildOperationRunDetail.mock.calls[0].arguments, [{ auditLimit: '5', runId: 'run-44' }]);
+    assert.deepEqual(buildOperationRunDetail.mock.calls[0].arguments, [{ auditLimit: 5, runId: 'run-44' }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.operationRun.run.id, 'run-44');
   });

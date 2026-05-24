@@ -18,7 +18,7 @@
 
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
-import { asyncRoute, sanitizePageLimit } from '../http.js';
+import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies({
@@ -134,22 +134,22 @@ export function registerMetadataRoutes(app, {
     provider: 'local',
     search: await searchLocalMetadataArtists({
       query: request.query.q,
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 10, max: 25 }),
     }),
   }));
 
   registerSessionGetJsonRoute('/api/v1/search', async (request) => ({
     ...await searchAllLocalMetadata({
       query: request.query.q,
-      artistLimit: request.query.artistLimit,
-      releaseGroupLimit: request.query.releaseGroupLimit,
-      releaseLimit: request.query.releaseLimit,
+      artistLimit: sanitizePageLimit(request.query.artistLimit, { default: 10, max: 25 }),
+      releaseGroupLimit: sanitizePageLimit(request.query.releaseGroupLimit, { default: 10, max: 25 }),
+      releaseLimit: sanitizePageLimit(request.query.releaseLimit, { default: 10, max: 25 }),
     }),
   }));
 
   registerSessionGetJsonRoute('/api/v1/metadata/artists/monitored', async (request) => ({
     ...await listMonitoredArtists({
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 25, max: 25 }),
     }),
   }));
 
@@ -157,7 +157,7 @@ export function registerMetadataRoutes(app, {
     provider: 'local',
     search: await searchLocalMetadataReleaseGroups({
       query: request.query.q,
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 10, max: 25 }),
     }),
   }));
 
@@ -165,7 +165,7 @@ export function registerMetadataRoutes(app, {
     provider: 'local',
     search: await searchLocalMetadataReleases({
       query: request.query.q,
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 10, max: 25 }),
     }),
   }));
 
@@ -192,7 +192,7 @@ export function registerMetadataRoutes(app, {
     const result = await getMetadataArtistDetectionEvents({
       artistId: request.params.artistId,
       before: request.query.before,
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 10, max: 25 }),
     });
 
     return {
@@ -320,7 +320,7 @@ export function registerMetadataRoutes(app, {
     provider: 'musicbrainz',
     search: await searchMusicBrainzArtists({
       query: request.query.q,
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 10, max: 25 }),
     }),
   }));
 
@@ -329,7 +329,7 @@ export function registerMetadataRoutes(app, {
     search: await searchMusicBrainzReleases({
       artist: request.query.artist,
       release: request.query.release,
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 10, max: 25 }),
     }),
   }));
 
@@ -337,8 +337,8 @@ export function registerMetadataRoutes(app, {
     provider: 'musicbrainz',
     browse: await browseMusicBrainzArtistReleaseGroups({
       artistId: request.params.artistId,
-      limit: request.query.limit,
-      offset: request.query.offset,
+      limit: sanitizePageLimit(request.query.limit, { default: 25, max: 25 }),
+      offset: sanitizePageOffset(request.query.offset),
       type: request.query.type,
       releaseGroupStatus: request.query.releaseGroupStatus,
     }),
@@ -348,8 +348,8 @@ export function registerMetadataRoutes(app, {
     provider: 'musicbrainz',
     releases: await getMusicBrainzReleaseGroupReleases({
       releaseGroupId: request.params.releaseGroupId,
-      limit: request.query.limit,
-      offset: request.query.offset,
+      limit: sanitizePageLimit(request.query.limit, { default: 25, max: 25 }),
+      offset: sanitizePageOffset(request.query.offset),
     }),
   }));
 

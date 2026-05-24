@@ -17,7 +17,7 @@
  */
 
 import { createRequestAuthDependencies } from '../auth-module.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
@@ -62,9 +62,7 @@ export function registerActivityRoutes(app, {
   app.get('/api/v1/activity/feed', asyncRoute(async (request, response) => {
     await requireSession(request);
 
-    const limit = request.query.limit !== undefined
-      ? Number(request.query.limit)
-      : undefined;
+    const limit = sanitizePageLimit(request.query.limit, { default: 10, max: 25 });
 
     const eventType = typeof request.query.eventType === 'string'
       ? request.query.eventType
@@ -118,8 +116,8 @@ export function registerActivityRoutes(app, {
       ok: true,
       ...(await getSourceUserDetail({
         username: request.params.username,
-        historyLimit: request.query.historyLimit,
-        historyOffset: request.query.historyOffset,
+        historyLimit: sanitizePageLimit(request.query.historyLimit, { default: 20, max: 100 }),
+        historyOffset: sanitizePageOffset(request.query.historyOffset),
       })),
     });
   }));

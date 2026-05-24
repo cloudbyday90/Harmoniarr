@@ -119,7 +119,7 @@ export function registerAppUserRoutes(app, {
       return;
     }
 
-    const limit = request.query.limit ? Number(request.query.limit) : 25;
+    const limit = sanitizePageLimit(request.query.limit, { default: 25, max: 100 });
     const cursor = request.query.cursor || null;
 
     const result = await listUserAuditEvents({

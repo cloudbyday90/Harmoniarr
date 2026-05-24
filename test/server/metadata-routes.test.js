@@ -117,7 +117,7 @@ test('metadata monitored artists route returns the shared monitored artists payl
 
     assert.equal(response.status, 200);
     assert.equal(listMonitoredArtists.mock.callCount(), 1);
-    assert.deepEqual(listMonitoredArtists.mock.calls[0].arguments[0], { limit: '10' });
+    assert.deepEqual(listMonitoredArtists.mock.calls[0].arguments[0], { limit: 10 });
     assert.deepEqual(payload, {
       ok: true,
       limit: 10,
@@ -231,7 +231,7 @@ test('metadata artist detection-events route returns the shared paginated histor
     assert.deepEqual(getMetadataArtistDetectionEvents.mock.calls[0].arguments, [{
       artistId: 'local-artist-1',
       before: 'cursor-1',
-      limit: '15',
+      limit: 15,
     }]);
     assert.deepEqual(payload, {
       ok: true,
@@ -398,8 +398,8 @@ test('metadata provider release-group releases route returns the shared browse p
     assert.equal(getMusicBrainzReleaseGroupReleases.mock.callCount(), 1);
     assert.deepEqual(getMusicBrainzReleaseGroupReleases.mock.calls[0].arguments, [{
       releaseGroupId: 'mb-rg-1',
-      limit: '5',
-      offset: '10',
+      limit: 5,
+      offset: 10,
     }]);
     assert.deepEqual(payload, {
       ok: true,

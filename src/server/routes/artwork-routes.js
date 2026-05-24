@@ -17,7 +17,7 @@
  */
 
 import { createRequestAuthDependencies } from '../auth-module.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 import { createReadStream } from 'node:fs';
 
@@ -50,7 +50,7 @@ export function registerArtworkRoutes(app, {
   app.get('/api/v1/artwork/cleanup-runs', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
     response.json(await buildArtworkCleanupHistory({
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 10, max: 10 }),
     }));
   }));
 

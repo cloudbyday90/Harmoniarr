@@ -157,7 +157,7 @@ test('activity feed route passes undefined limit when query param is absent', as
     await fetch(`${baseUrl}/api/v1/activity/feed`);
 
     const [args] = buildActivityFeed.mock.calls[0].arguments;
-    assert.equal(args.limit, undefined);
+    assert.equal(args.limit, 10);
     assert.equal(args.eventType, null);
   });
 });

@@ -18,7 +18,7 @@
 
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import {
   assertImportCandidateVisible,
   buildImportCandidateVisibilityFilter,
@@ -111,8 +111,8 @@ export function registerImportCandidateRoutes(app, {
 
     const result = await listImportCandidates({
       folderPath: request.query.folderPath,
-      limit: request.query.limit,
-      offset: request.query.offset,
+      limit: sanitizePageLimit(request.query.limit, { default: 25, max: 100 }),
+      offset: sanitizePageOffset(request.query.offset),
       requestedForUserId: visibility.requestedForUserId,
       sourceSearchId: request.query.sourceSearchId,
       status: request.query.status,
@@ -265,7 +265,7 @@ export function registerImportCandidateRoutes(app, {
       selectedImportCandidates: await buildSelectedImportCandidateSummary({
         actorUserId: session.appUserId,
         actorUserRole: session.user?.role ?? null,
-        limit: request.query.limit,
+        limit: sanitizePageLimit(request.query.limit, { default: 25, max: 1000 }),
         targetUser: { id: session.appUserId },
       }),
     });
@@ -279,7 +279,7 @@ export function registerImportCandidateRoutes(app, {
       importPendingCandidates: await buildImportPendingCandidateSummary({
         actorUserId: session.appUserId,
         actorUserRole: session.user?.role ?? null,
-        limit: request.query.limit,
+        limit: sanitizePageLimit(request.query.limit, { default: 25, max: 1000 }),
         targetUser: { id: session.appUserId },
       }),
     });

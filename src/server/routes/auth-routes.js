@@ -40,7 +40,7 @@ import {
   createSessionResponse as defaultCreateSessionResponse,
   createSessionRevokedResponse as defaultCreateSessionRevokedResponse,
 } from '../auth-response.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultAccountSecurityService = createAccountSecurityService();
@@ -245,7 +245,7 @@ export function registerAuthRoutes(app, {
     const session = await requireSession(request);
     response.json(createRecentActivityResponse({
       events: await listRecentActivity({
-        limit: request.query?.limit,
+        limit: sanitizePageLimit(request.query?.limit, { default: 10, max: 25 }),
         session,
       }),
     }));

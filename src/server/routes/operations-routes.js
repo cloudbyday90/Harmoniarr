@@ -17,7 +17,7 @@
  */
 
 import { createRequestAuthDependencies } from '../auth-module.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
@@ -35,7 +35,7 @@ export function registerOperationsRoutes(app, {
   app.get('/api/v1/operations/history', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
     response.json(await buildOperationHistory({
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 20, max: 25 }),
     }));
   }));
 
@@ -44,7 +44,7 @@ export function registerOperationsRoutes(app, {
     response.json({
       ok: true,
       operationRun: await buildOperationRunDetail({
-        auditLimit: request.query.auditLimit,
+        auditLimit: sanitizePageLimit(request.query.auditLimit, { default: 20, max: 25 }),
         runId: request.params.runId,
       }),
     });

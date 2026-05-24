@@ -197,7 +197,7 @@ export function registerLibraryRoutes(app, {
     response.json({
       ok: true,
       ...(await buildReleaseRadar({
-        limit: Number.parseInt(String(limit), 10) || 100,
+        limit: sanitizePageLimit(limit, { default: 100, max: 200 }),
         recentDays: Number.parseInt(String(recentDays), 10) || 30,
         upcomingDays: Number.parseInt(String(upcomingDays), 10) || 90,
       })),
@@ -209,7 +209,7 @@ export function registerLibraryRoutes(app, {
     const { status: reconciliationStatus = null, limit = '500' } = request.query;
     const validStatuses = ['complete', 'partial', 'duplicate'];
     response.json(await buildLibraryReleases({
-      limit: Number.parseInt(String(limit), 10) || 500,
+      limit: sanitizePageLimit(limit, { default: 500, max: 2000 }),
       reconciliationStatus: validStatuses.includes(reconciliationStatus) ? reconciliationStatus : null,
     }));
   }));
@@ -223,7 +223,7 @@ export function registerLibraryRoutes(app, {
     await requireSession(request);
     const { status: wantedStatus = null, limit = '500' } = request.query;
     response.json(await buildLibraryWantedReleases({
-      limit: Number.parseInt(String(limit), 10) || 500,
+      limit: sanitizePageLimit(limit, { default: 500, max: 2000 }),
       wantedStatus: wantedStatus === 'missing' || wantedStatus === 'partial' ? wantedStatus : null,
     }));
   }));

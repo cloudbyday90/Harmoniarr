@@ -549,8 +549,8 @@ test('import candidate list route returns filtered review queue results', async 
     assert.equal(requireSession.mock.callCount(), 1);
     assert.deepEqual(listImportCandidates.mock.calls[0].arguments, [{
       folderPath: 'Amber',
-      limit: '10',
-      offset: '5',
+      limit: 10,
+      offset: 5,
       requestedForUserId: null,
       sourceSearchId: 'search-1',
       status: 'pending',
@@ -573,8 +573,8 @@ test('import candidate list route returns filtered review queue results', async 
           username: 'source',
         },
         pagination: {
-          limit: '10',
-          offset: '5',
+          limit: 10,
+          offset: 5,
           total: 1,
         },
         reputationSummary: {},
@@ -605,8 +605,8 @@ test('import candidate list route scopes non-admin reads to delegated target own
     assert.equal(response.status, 200);
     assert.deepEqual(listImportCandidates.mock.calls[0].arguments, [{
       folderPath: undefined,
-      limit: undefined,
-      offset: undefined,
+      limit: 25,
+      offset: 0,
       requestedForUserId: 'user-target',
       sourceSearchId: undefined,
       status: 'selected',
@@ -717,7 +717,7 @@ test('import candidate selected summary route returns operator-facing execution 
     assert.deepEqual(buildSelectedImportCandidateSummary.mock.calls[0].arguments, [{
       actorUserId: 'user-1',
       actorUserRole: 'admin',
-      limit: '10',
+      limit: 10,
       targetUser: { id: 'user-1' },
     }]);
     assert.equal(payload.ok, true);
@@ -762,7 +762,7 @@ test('import candidate import-pending summary route returns completed-download i
     assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{
       actorUserId: 'user-1',
       actorUserRole: 'admin',
-      limit: '10',
+      limit: 10,
       targetUser: { id: 'user-1' },
     }]);
     assert.equal(payload.ok, true);

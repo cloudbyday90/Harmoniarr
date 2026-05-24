@@ -159,7 +159,7 @@ test('artwork cleanup history route requires admin session and returns recent cl
 
     assert.equal(response.status, 200);
     assert.equal(requireAdminSession.mock.callCount(), 1);
-    assert.deepEqual(buildArtworkCleanupHistory.mock.calls[0].arguments, [{ limit: '3' }]);
+    assert.deepEqual(buildArtworkCleanupHistory.mock.calls[0].arguments, [{ limit: 3 }]);
     assert.equal(payload.runs[0].id, 'artwork-run-9');
     assert.equal(payload.runs[0].failures[0].code, 'EACCES');
   });

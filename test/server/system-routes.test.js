@@ -570,7 +570,7 @@ test('backup export list route requires admin session and returns backup artifac
     assert.equal(response.status, 200);
     assert.equal(requireAdminSession.mock.callCount(), 1);
     assert.deepEqual(listBackupExports.mock.calls[0].arguments, [{
-      limit: '10',
+      limit: 10,
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.backupArtifacts.length, 1);
@@ -947,7 +947,7 @@ test('queue diagnostics route requires admin session and returns queue state pay
     assert.equal(response.status, 200);
     assert.equal(requireAdminSession.mock.callCount(), 1);
     assert.equal(getQueueDiagnostics.mock.callCount(), 1);
-    assert.deepEqual(getQueueDiagnostics.mock.calls[0].arguments, [{ runLimit: '12' }]);
+    assert.deepEqual(getQueueDiagnostics.mock.calls[0].arguments, [{ runLimit: 12 }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.queueState.totalTracked, 4);
   });
@@ -980,9 +980,9 @@ test('recovery diagnostics route requires admin session and forwards limit and l
     assert.equal(requireAdminSession.mock.callCount(), 1);
     assert.equal(getRecoveryDiagnostics.mock.callCount(), 1);
     assert.deepEqual(getRecoveryDiagnostics.mock.calls[0].arguments, [{
-      auditLimit: '9',
+      auditLimit: 9,
       lockTypes: ['maintenance', 'restore'],
-      runLimit: '11',
+      runLimit: 11,
     }]);
     assert.equal(payload.ok, true);
     assert.equal(payload.recentPrivilegedActions.length, 1);
@@ -1013,21 +1013,21 @@ test('diagnostics export route requires admin session, forwards filters, and ret
     assert.equal(requireAdminSession.mock.callCount(), 1);
     assert.equal(getDiagnosticsExportDownload.mock.callCount(), 1);
     assert.deepEqual(getDiagnosticsExportDownload.mock.calls[0].arguments, [{
-      activityLimit: '12',
-      auditLimit: '9',
+      activityLimit: 12,
+      auditLimit: 9,
       lockTypes: ['maintenance', 'restore'],
-      notificationLimit: '6',
-      runLimit: '11',
+      notificationLimit: 6,
+      runLimit: 11,
     }]);
     assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
     assert.match(response.headers.get('content-disposition') ?? '', /attachment; filename="harmoniarr_diagnostics_/);
     assert.deepEqual(payload, {
-      activityLimit: '12',
-      auditLimit: '9',
+      activityLimit: 12,
+      auditLimit: 9,
       lockTypes: ['maintenance', 'restore'],
-      notificationLimit: '6',
+      notificationLimit: 6,
       ok: true,
-      runLimit: '11',
+      runLimit: 11,
     });
   });
 });
@@ -1571,7 +1571,7 @@ test('system activity feed route returns the shared paginated feed payload', asy
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(getActivityFeed.mock.calls[0].arguments, [{ before: 'cursor-1', limit: '12' }]);
+    assert.deepEqual(getActivityFeed.mock.calls[0].arguments, [{ before: 'cursor-1', limit: 12 }]);
     assert.deepEqual(payload, {
       checkedAt: '2026-05-02T12:15:00.000Z',
       entries: [{

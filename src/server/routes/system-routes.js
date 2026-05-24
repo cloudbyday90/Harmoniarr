@@ -126,7 +126,7 @@ export function registerSystemRoutes(app, {
     await requireAdminSession(request);
     response.json(await getActivityFeed({
       before: request.query.before,
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 10, max: 25 }),
     }));
   }));
 
@@ -214,7 +214,7 @@ export function registerSystemRoutes(app, {
     response.json({
       ok: true,
       ...await listBackupExports({
-        limit: request.query.limit,
+        limit: sanitizePageLimit(request.query.limit, { default: 25, max: 50 }),
       }),
     });
   }));
@@ -347,7 +347,7 @@ export function registerSystemRoutes(app, {
     response.json({
       ok: true,
       ...await getQueueDiagnostics({
-        runLimit: request.query.runLimit,
+        runLimit: sanitizePageLimit(request.query.runLimit, { default: 20, max: 50 }),
       }),
     });
   }));
@@ -362,9 +362,9 @@ export function registerSystemRoutes(app, {
     response.json({
       ok: true,
       ...await getRecoveryDiagnostics({
-        auditLimit: request.query.auditLimit,
+        auditLimit: sanitizePageLimit(request.query.auditLimit, { default: 15, max: 25 }),
         lockTypes,
-        runLimit: request.query.runLimit,
+        runLimit: sanitizePageLimit(request.query.runLimit, { default: 20, max: 50 }),
       }),
     });
   }));
@@ -376,11 +376,11 @@ export function registerSystemRoutes(app, {
       ? request.query.lockTypes.split(',')
       : [];
     const download = await getDiagnosticsExportDownload({
-      activityLimit: request.query.activityLimit,
-      auditLimit: request.query.auditLimit,
+      activityLimit: sanitizePageLimit(request.query.activityLimit, { default: 20, max: 50 }),
+      auditLimit: sanitizePageLimit(request.query.auditLimit, { default: 15, max: 25 }),
       lockTypes,
-      notificationLimit: request.query.notificationLimit,
-      runLimit: request.query.runLimit,
+      notificationLimit: sanitizePageLimit(request.query.notificationLimit, { default: 20, max: 25 }),
+      runLimit: sanitizePageLimit(request.query.runLimit, { default: 20, max: 50 }),
     });
     const safeFilename = String(download.filename ?? 'harmoniarr_diagnostics.json')
       .replaceAll('"', '')
