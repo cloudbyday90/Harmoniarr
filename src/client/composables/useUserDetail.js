@@ -16,14 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { readonly, ref, shallowRef } from 'vue';
-import { getErrorMessage } from '../lib/error-utils.js';
+import { computed, readonly, ref, shallowRef } from 'vue';
 import {
   adminRevokeAllUserSessions as defaultAdminRevokeAllUserSessions,
   adminRevokeUserSession as defaultAdminRevokeUserSession,
   fetchUserDetail as defaultFetchUserDetail,
   fetchUserActivity as defaultFetchUserActivity,
 } from '../lib/users-api.js';
+import { useAsyncResource } from './useAsyncResource.js';
 
 const ACTIVITY_PAGE_SIZE = 25;
 
@@ -36,106 +36,60 @@ export function useUserDetail({
   pollIntervalMs = 0,
   revalidateOnFocus = false,
 } = {}) {
-  const user = shallowRef(null);
-  const requestSummary = shallowRef(null);
-  const sessions = shallowRef([]);
+  let currentUserId = null;
+
+  const {
+    data: detailPayload,
+    destroy: destroyDetail,
+    errorMessage,
+    isLoading,
+    isRevalidating,
+    load: loadDetail,
+    reset: resetDetail,
+  } = useAsyncResource({
+    fetcher: () => fetchUserDetailFn(currentUserId),
+    project: (payload) => ({
+      user: payload.user ?? null,
+      requestSummary: payload.requestSummary ?? null,
+      sessions: payload.sessions ?? [],
+    }),
+    initialData: { user: null, requestSummary: null, sessions: [] },
+    immediate: false,
+    fallbackErrorMessage: 'Failed to load user detail',
+    pollIntervalMs,
+    revalidateOnFocus,
+  });
+
+  const user = computed(() => detailPayload.value.user);
+  const requestSummary = computed(() => detailPayload.value.requestSummary);
+  const sessions = computed(() => detailPayload.value.sessions);
+
   const activityEvents = shallowRef([]);
-  const isLoading = ref(false);
   const isLoadingActivity = ref(false);
-  const errorMessage = ref('');
   const hasMoreActivity = ref(false);
   const nextCursor = ref(null);
+
   const isRevokingSession = ref(false);
   const isRevokingAllSessions = ref(false);
   const revokeErrorMessage = ref('');
   const revokeSuccessMessage = ref('');
-  const isRevalidating = ref(false);
-
-  let pollTimer = null;
-  let destroyed = false;
-  let hasLoaded = false;
-  let currentUserId = null;
-
-  function clearPollTimer() {
-    if (pollTimer !== null) {
-      clearTimeout(pollTimer);
-      pollTimer = null;
-    }
-  }
-
-  function schedulePoll() {
-    clearPollTimer();
-    if (!pollIntervalMs || pollIntervalMs <= 0) return;
-    if (destroyed) return;
-    if (!currentUserId) return;
-
-    pollTimer = setTimeout(async () => {
-      if (destroyed) return;
-      await load({ userId: currentUserId });
-    }, pollIntervalMs);
-  }
-
-  function handleVisibilityChange() {
-    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded || !currentUserId) return;
-    void load({ userId: currentUserId }).then(() => {
-      if (!destroyed) schedulePoll();
-    });
-  }
-
-  function destroy() {
-    destroyed = true;
-    clearPollTimer();
-    if (revalidateOnFocus && typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
-  }
-
-  function attachVisibilityListener() {
-    if (revalidateOnFocus && typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-  }
 
   async function load({ userId }) {
     if (isLoading.value) return;
     currentUserId = userId;
-    errorMessage.value = '';
-
-    const isRevalidation = hasLoaded;
-    if (isRevalidation) {
-      isRevalidating.value = true;
-    } else {
-      isLoading.value = true;
-    }
-
-    try {
-      const payload = await fetchUserDetailFn(userId);
-      user.value = payload.user ?? null;
-      requestSummary.value = payload.requestSummary ?? null;
-      sessions.value = payload.sessions ?? [];
-      hasLoaded = true;
-    } catch (error) {
-      if (!isRevalidation) {
-        user.value = null;
-        requestSummary.value = null;
-        sessions.value = [];
-      }
-      errorMessage.value = getErrorMessage(error, 'Failed to load user detail');
-    } finally {
-      if (!destroyed) {
-        isLoading.value = false;
-        isRevalidating.value = false;
-        schedulePoll();
-      }
-    }
+    activityEvents.value = [];
+    hasMoreActivity.value = false;
+    nextCursor.value = null;
+    await loadDetail();
   }
 
   async function loadActivity({ userId }) {
     if (isLoadingActivity.value) return;
+    if (!currentUserId) currentUserId = userId;
     isLoadingActivity.value = true;
 
     try {
-      const payload = await fetchUserActivityFn(userId, { cursor: nextCursor.value, limit: pageSize });
+      const payload = await fetchUserActivityFn(currentUserId, { cursor: nextCursor.value, limit: pageSize });
       const newEvents = payload.events ?? [];
       if (nextCursor.value) {
         activityEvents.value = [...activityEvents.value, ...newEvents];
@@ -145,45 +99,28 @@ export function useUserDetail({
       hasMoreActivity.value = payload.hasMore ?? false;
       nextCursor.value = payload.nextCursor ?? null;
     } catch {
-      // silently ignore activity load failures
     } finally {
       isLoadingActivity.value = false;
     }
   }
 
   function reset() {
-    clearPollTimer();
-    user.value = null;
-    requestSummary.value = null;
-    sessions.value = [];
+    currentUserId = null;
+    resetDetail();
     activityEvents.value = [];
-    errorMessage.value = '';
     hasMoreActivity.value = false;
     nextCursor.value = null;
     revokeErrorMessage.value = '';
     revokeSuccessMessage.value = '';
-    currentUserId = null;
-    hasLoaded = false;
+  }
+
+  function destroy() {
+    destroyDetail();
   }
 
   async function revalidate() {
-    if (!currentUserId || destroyed) return;
-    errorMessage.value = '';
-    isRevalidating.value = true;
-
-    try {
-      const payload = await fetchUserDetailFn(currentUserId);
-      user.value = payload.user ?? null;
-      requestSummary.value = payload.requestSummary ?? null;
-      sessions.value = payload.sessions ?? [];
-    } catch (error) {
-      errorMessage.value = getErrorMessage(error, 'Failed to refresh user detail');
-    } finally {
-      if (!destroyed) {
-        isRevalidating.value = false;
-        schedulePoll();
-      }
-    }
+    if (!currentUserId) return;
+    await loadDetail();
   }
 
   async function revokeUserSession(refreshTokenId) {
@@ -194,11 +131,14 @@ export function useUserDetail({
 
     try {
       await adminRevokeUserSessionFn(user.value.id, refreshTokenId);
-      sessions.value = sessions.value.map((s) =>
-        s.id === refreshTokenId ? { ...s, isRevoked: true } : s,
-      );
+      detailPayload.value = {
+        ...detailPayload.value,
+        sessions: detailPayload.value.sessions.map((s) =>
+          s.id === refreshTokenId ? { ...s, isRevoked: true } : s,
+        ),
+      };
       revokeSuccessMessage.value = 'Session revoked.';
-      void revalidate();
+      void loadDetail();
     } catch (error) {
       revokeErrorMessage.value = error instanceof Error ? error.message : 'Failed to revoke session';
       throw error;
@@ -215,9 +155,12 @@ export function useUserDetail({
 
     try {
       const result = await adminRevokeAllUserSessionsFn(user.value.id);
-      sessions.value = sessions.value.map((s) => ({ ...s, isRevoked: true }));
+      detailPayload.value = {
+        ...detailPayload.value,
+        sessions: detailPayload.value.sessions.map((s) => ({ ...s, isRevoked: true })),
+      };
       revokeSuccessMessage.value = `Revoked ${result.revokedSessionCount} session${result.revokedSessionCount === 1 ? '' : 's'}.`;
-      void revalidate();
+      void loadDetail();
     } catch (error) {
       revokeErrorMessage.value = error instanceof Error ? error.message : 'Failed to revoke sessions';
       throw error;
@@ -228,7 +171,6 @@ export function useUserDetail({
 
   return {
     activityEvents: readonly(activityEvents),
-    attachVisibilityListener,
     destroy,
     errorMessage: readonly(errorMessage),
     hasMoreActivity: readonly(hasMoreActivity),
@@ -239,14 +181,14 @@ export function useUserDetail({
     isRevokingSession: readonly(isRevokingSession),
     load,
     loadActivity,
-    requestSummary: readonly(requestSummary),
+    requestSummary,
     reset,
     revokeAllUserSessions,
-    revalidate,
     revokeErrorMessage: readonly(revokeErrorMessage),
     revokeUserSession,
     revokeSuccessMessage: readonly(revokeSuccessMessage),
-    sessions: readonly(sessions),
-    user: readonly(user),
+    revalidate,
+    sessions,
+    user,
   };
 }

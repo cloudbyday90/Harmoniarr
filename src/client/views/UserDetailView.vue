@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserDetail } from '../composables/useUserDetail.js';
 import {
@@ -50,8 +50,6 @@ const {
   loadActivity,
   revokeUserSession,
   revokeAllUserSessions,
-  attachVisibilityListener,
-  destroy,
 } = useUserDetail();
 
 const requestStats = computed(() => summarizeRequestCounts(requestSummary.value));
@@ -64,11 +62,6 @@ onMounted(() => {
     void load({ userId });
     void loadActivity({ userId });
   }
-  attachVisibilityListener();
-});
-
-onBeforeUnmount(() => {
-  destroy();
 });
 
 function goBack() {

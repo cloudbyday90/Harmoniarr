@@ -102,6 +102,7 @@ export function useAsyncResource({
       if (!unmounted) {
         isLoading.value = false;
         isRevalidating.value = false;
+        schedulePoll();
       }
     }
   }
@@ -156,12 +157,32 @@ export function useAsyncResource({
     }
   });
 
+  function destroy() {
+    unmounted = true;
+    clearPollTimer();
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  function reset() {
+    clearPollTimer();
+    data.value = initialData;
+    errorMessage.value = '';
+    hasLoaded = false;
+    isLoading.value = false;
+    isRevalidating.value = false;
+    lastRefreshedAt.value = null;
+  }
+
   return {
     data,
+    destroy,
     errorMessage,
     isLoading,
     isRevalidating,
     lastRefreshedAt,
     load,
+    reset,
   };
 }

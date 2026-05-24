@@ -86,4 +86,116 @@ describe('useAsyncResource SWR', () => {
       message: /requires a fetcher function/,
     });
   });
+
+  test('reset clears data and error state', async () => {
+    const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
+
+    const fetcher = async () => ({ items: [1, 2] });
+    const { data, errorMessage, isLoading, isRevalidating, lastRefreshedAt, load, reset } = useAsyncResource({
+      fetcher,
+      immediate: false,
+      project: (p) => p.items,
+    });
+
+    await load();
+    assert.deepEqual(data.value, [1, 2]);
+    assert.ok(lastRefreshedAt.value !== null);
+
+    reset();
+
+    assert.deepEqual(data.value, null, 'data reset to initial');
+    assert.equal(errorMessage.value, '');
+    assert.equal(isLoading.value, false);
+    assert.equal(isRevalidating.value, false);
+    assert.equal(lastRefreshedAt.value, null);
+  });
+
+  test('reset allows next load to be treated as first load', async () => {
+    const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
+
+    const fetcher = async () => ({ items: [1] });
+    const { isLoading, isRevalidating, load, reset } = useAsyncResource({
+      fetcher,
+      immediate: false,
+      project: (p) => p.items,
+    });
+
+    await load();
+    reset();
+
+    const loadPromise = load();
+    assert.equal(isLoading.value, true, 'treated as first load after reset');
+    assert.equal(isRevalidating.value, false);
+    await loadPromise;
+  });
+
+  test('destroy stops polling', async () => {
+    const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
+
+    let callCount = 0;
+    const fetcher = async () => {
+      callCount += 1;
+      return { items: [callCount] };
+    };
+    const { load, destroy } = useAsyncResource({
+      fetcher,
+      immediate: false,
+      project: (p) => p.items,
+      pollIntervalMs: 30,
+    });
+
+    await load();
+    assert.equal(callCount, 1);
+
+    destroy();
+
+    await new Promise((resolve) => { setTimeout(resolve, 80); });
+    assert.equal(callCount, 1, 'no polling after destroy');
+  });
+
+  test('load returns early after destroy', async () => {
+    const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
+
+    let callCount = 0;
+    const fetcher = async () => {
+      callCount += 1;
+      return { items: [callCount] };
+    };
+    const { load, destroy } = useAsyncResource({
+      fetcher,
+      immediate: false,
+      project: (p) => p.items,
+    });
+
+    await load();
+    assert.equal(callCount, 1);
+
+    destroy();
+    await load();
+    assert.equal(callCount, 1, 'no fetch after destroy');
+  });
+
+  test('schedulePoll fires after manual load', async () => {
+    const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
+
+    let callCount = 0;
+    const fetcher = async () => {
+      callCount += 1;
+      return { items: [callCount] };
+    };
+    const { load, destroy } = useAsyncResource({
+      fetcher,
+      immediate: false,
+      project: (p) => p.items,
+      pollIntervalMs: 30,
+    });
+
+    await load();
+    assert.equal(callCount, 1);
+
+    await new Promise((resolve) => { setTimeout(resolve, 80); });
+    assert.ok(callCount >= 2, 'polling started after manual load');
+
+    destroy();
+  });
 });
