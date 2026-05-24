@@ -20,11 +20,15 @@
 import { onMounted } from 'vue';
 import {
   buildSlskdConnectionSubtitle,
+  formatDependencyProviderLabel,
+  formatDependencyStatusLabel,
   formatOAuthStatusLabel,
   formatProviderSecretStatusLabel,
   formatSlskdApiKeyStatusLabel,
+  getDependencyStatusClass,
 } from '../lib/settings-connections-presentation.js';
 import { useConnections } from '../composables/useConnections.js';
+import { useDependencyHealth } from '../composables/useDependencyHealth.js';
 
 const {
   connectSpotifyOAuth,
@@ -45,7 +49,15 @@ const {
   successMessage,
 } = useConnections();
 
-onMounted(() => { void loadSettings(); });
+const {
+  dependencies: providerHealth,
+  loadDependencyHealth,
+} = useDependencyHealth();
+
+onMounted(() => {
+  void loadSettings();
+  void loadDependencyHealth();
+});
 </script>
 
 <template>
@@ -103,6 +115,28 @@ onMounted(() => { void loadSettings(); });
                 <input type="checkbox" v-model="form.slskd.clearApiKey" />
                 <span>Remove the stored API key on save</span>
               </label>
+            </div>
+          </div>
+        </article>
+
+        <!-- Provider operational health -->
+        <article class="hx-card" v-if="providerHealth.length">
+          <header class="hx-card-header">
+            <div>
+              <h3 class="hx-card-title">Provider health</h3>
+              <p class="hx-card-subtitle">Operational status of connected services, updated from the server heartbeat.</p>
+            </div>
+          </header>
+          <div class="hx-card-body">
+            <div class="cfg-health-list">
+              <div class="cfg-health-row" v-for="dep in providerHealth" :key="dep.provider">
+                <span class="cfg-health-provider">{{ formatDependencyProviderLabel(dep.provider) }}</span>
+                <span class="review-status-pill" :class="getDependencyStatusClass(dep.status)">
+                  {{ formatDependencyStatusLabel(dep.status) }}
+                </span>
+                <span class="hx-text-muted" v-if="dep.message">{{ dep.message }}</span>
+                <span class="hx-text-muted" v-if="dep.details?.observedAt">Last checked {{ new Date(dep.details.observedAt).toLocaleString() }}</span>
+              </div>
             </div>
           </div>
         </article>
@@ -327,3 +361,27 @@ onMounted(() => { void loadSettings(); });
     </form>
   </div>
 </template>
+
+<style scoped>
+.cfg-health-list {
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.cfg-health-row {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-2) 0;
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+
+.cfg-health-row:last-child {
+  border-bottom: none;
+}
+
+.cfg-health-provider {
+  font-weight: 600;
+  min-width: 140px;
+}
+</style>

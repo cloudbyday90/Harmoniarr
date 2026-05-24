@@ -34,6 +34,7 @@ export function useShellHeartbeat({
   const status = ref('unknown');
   const detail = ref('Checking dependencies');
   const activeJobs = ref(null);
+  const dependencies = ref([]);
   const isRevalidating = ref(false);
 
   let pollTimer = null;
@@ -88,10 +89,11 @@ export function useShellHeartbeat({
       const payload = await fetchSystemOverview();
       if (destroyed) return;
 
-      const dependencies = Array.isArray(payload?.dependencies) ? payload.dependencies : [];
+      const dependenciesPayload = Array.isArray(payload?.dependencies) ? payload.dependencies : [];
       const heartbeats = Array.isArray(payload?.heartbeats) ? payload.heartbeats : [];
+      dependencies.value = dependenciesPayload;
       const allStatuses = [
-        ...dependencies.map((d) => String(d?.status ?? '').toLowerCase()),
+        ...dependenciesPayload.map((d) => String(d?.status ?? '').toLowerCase()),
         ...heartbeats.map((h) => String(h?.status ?? '').toLowerCase()),
       ].filter(Boolean);
 
@@ -132,10 +134,11 @@ export function useShellHeartbeat({
       const payload = await fetchSystemOverview();
       if (destroyed) return;
 
-      const dependencies = Array.isArray(payload?.dependencies) ? payload.dependencies : [];
+      const dependenciesPayload = Array.isArray(payload?.dependencies) ? payload.dependencies : [];
       const heartbeats = Array.isArray(payload?.heartbeats) ? payload.heartbeats : [];
+      dependencies.value = dependenciesPayload;
       const allStatuses = [
-        ...dependencies.map((d) => String(d?.status ?? '').toLowerCase()),
+        ...dependenciesPayload.map((d) => String(d?.status ?? '').toLowerCase()),
         ...heartbeats.map((h) => String(h?.status ?? '').toLowerCase()),
       ].filter(Boolean);
 
@@ -162,6 +165,7 @@ export function useShellHeartbeat({
   return {
     activeJobs,
     attachVisibilityListener,
+    dependencies,
     detail,
     destroy,
     isRevalidating,

@@ -91,3 +91,41 @@ export function formatOAuthStatusLabel(oauthStatus) {
   }
   return 'Linked';
 }
+
+const PROVIDER_LABELS = {
+  media_tooling: 'Media tooling',
+  musicbrainz: 'MusicBrainz',
+  slskd: 'Soulseek (slskd)',
+};
+
+export function formatDependencyProviderLabel(provider) {
+  return PROVIDER_LABELS[provider] ?? provider;
+}
+
+const STATUS_LABELS = {
+  degraded: 'Degraded',
+  healthy: 'Healthy',
+  misconfigured: 'Misconfigured',
+  rate_limited: 'Rate limited',
+  unavailable: 'Unavailable',
+  unknown: 'Unknown',
+};
+
+export function formatDependencyStatusLabel(status) {
+  return STATUS_LABELS[status] ?? status ?? 'Unknown';
+}
+
+export function getDependencyStatusClass(status) {
+  switch (status) {
+    case 'healthy':
+      return 'review-status-selected';
+    case 'degraded':
+    case 'rate_limited':
+      return 'review-status-held';
+    case 'unavailable':
+    case 'misconfigured':
+      return 'review-status-failed';
+    default:
+      return '';
+  }
+}

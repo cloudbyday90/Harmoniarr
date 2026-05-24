@@ -20,9 +20,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   buildSlskdConnectionSubtitle,
+  formatDependencyProviderLabel,
+  formatDependencyStatusLabel,
   formatOAuthStatusLabel,
   formatProviderSecretStatusLabel,
   formatSlskdApiKeyStatusLabel,
+  getDependencyStatusClass,
 } from '../../src/client/lib/settings-connections-presentation.js';
 
 // ── buildSlskdConnectionSubtitle ──────────────────────────────────────────────
@@ -221,5 +224,85 @@ describe('formatOAuthStatusLabel', () => {
     const result = formatOAuthStatusLabel({ linked: true, tokenExpiresAt: iso });
     assert.notEqual(result, iso);
     assert.ok(result.includes('2026'), `expected year 2026 in: ${result}`);
+  });
+});
+
+// ── formatDependencyProviderLabel ──────────────────────────────────────────
+
+describe('formatDependencyProviderLabel', () => {
+  it('returns "Soulseek (slskd)" for slskd', () => {
+    assert.equal(formatDependencyProviderLabel('slskd'), 'Soulseek (slskd)');
+  });
+
+  it('returns "MusicBrainz" for musicbrainz', () => {
+    assert.equal(formatDependencyProviderLabel('musicbrainz'), 'MusicBrainz');
+  });
+
+  it('returns "Media tooling" for media_tooling', () => {
+    assert.equal(formatDependencyProviderLabel('media_tooling'), 'Media tooling');
+  });
+
+  it('returns raw provider for unknown providers', () => {
+    assert.equal(formatDependencyProviderLabel('some_new_provider'), 'some_new_provider');
+  });
+});
+
+// ── formatDependencyStatusLabel ────────────────────────────────────────────
+
+describe('formatDependencyStatusLabel', () => {
+  it('returns "Healthy" for healthy', () => {
+    assert.equal(formatDependencyStatusLabel('healthy'), 'Healthy');
+  });
+
+  it('returns "Degraded" for degraded', () => {
+    assert.equal(formatDependencyStatusLabel('degraded'), 'Degraded');
+  });
+
+  it('returns "Unavailable" for unavailable', () => {
+    assert.equal(formatDependencyStatusLabel('unavailable'), 'Unavailable');
+  });
+
+  it('returns "Misconfigured" for misconfigured', () => {
+    assert.equal(formatDependencyStatusLabel('misconfigured'), 'Misconfigured');
+  });
+
+  it('returns "Rate limited" for rate_limited', () => {
+    assert.equal(formatDependencyStatusLabel('rate_limited'), 'Rate limited');
+  });
+
+  it('returns "Unknown" for null', () => {
+    assert.equal(formatDependencyStatusLabel(null), 'Unknown');
+  });
+
+  it('returns raw status for unknown values', () => {
+    assert.equal(formatDependencyStatusLabel('custom'), 'custom');
+  });
+});
+
+// ── getDependencyStatusClass ───────────────────────────────────────────────
+
+describe('getDependencyStatusClass', () => {
+  it('returns selected class for healthy', () => {
+    assert.equal(getDependencyStatusClass('healthy'), 'review-status-selected');
+  });
+
+  it('returns held class for degraded', () => {
+    assert.equal(getDependencyStatusClass('degraded'), 'review-status-held');
+  });
+
+  it('returns held class for rate_limited', () => {
+    assert.equal(getDependencyStatusClass('rate_limited'), 'review-status-held');
+  });
+
+  it('returns failed class for unavailable', () => {
+    assert.equal(getDependencyStatusClass('unavailable'), 'review-status-failed');
+  });
+
+  it('returns failed class for misconfigured', () => {
+    assert.equal(getDependencyStatusClass('misconfigured'), 'review-status-failed');
+  });
+
+  it('returns empty string for unknown status', () => {
+    assert.equal(getDependencyStatusClass('custom'), '');
   });
 });
