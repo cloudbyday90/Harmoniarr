@@ -814,3 +814,22 @@ test('metadata canonical release patch route returns 404 when markCanonicalRelea
     });
   });
 });
+
+test('metadata similar artists route returns shared similar payload with sanitized limit', async (t) => {
+  const getSimilarArtists = t.mock.fn(async ({ artistMbid, limit }) => ({
+    similar: [{ mbid: 'mb-1', name: 'Similar Artist', score: 0.9 }],
+  }));
+  const app = createMetadataRouteTestApp({ getSimilarArtists });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/test-mbid/similar?limit=abc`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.similar.length, 1);
+    const callArgs = getSimilarArtists.mock.calls[0].arguments[0];
+    assert.equal(callArgs.artistMbid, 'test-mbid');
+    assert.equal(callArgs.limit, 20);
+  });
+});

@@ -429,3 +429,35 @@ test('createSimilarArtistsService accepts a custom cache implementation', async 
 
   assert.equal(callCount, 1);
 });
+
+test('createSimilarArtistsService clamps NaN limit to default', async () => {
+  const lbClient = createTestListenBrainzClient(async () =>
+    Array.from({ length: 30 }, (_, i) => ({
+      mbid: `mb-${i}`,
+      name: `Artist ${i}`,
+      score: 1 - i * 0.02,
+    })),
+  );
+  const mbClient = createTestMusicBrainzClient(async () => ({ relations: [] }));
+  const service = createSimilarArtistsService({ listenBrainzClient: lbClient, musicBrainzClient: mbClient });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid', limit: Number.NaN });
+
+  assert.equal(result.similar.length, 20);
+});
+
+test('createSimilarArtistsService clamps limit exceeding max to 100', async () => {
+  const lbClient = createTestListenBrainzClient(async () =>
+    Array.from({ length: 50 }, (_, i) => ({
+      mbid: `mb-${i}`,
+      name: `Artist ${i}`,
+      score: 1 - i * 0.01,
+    })),
+  );
+  const mbClient = createTestMusicBrainzClient(async () => ({ relations: [] }));
+  const service = createSimilarArtistsService({ listenBrainzClient: lbClient, musicBrainzClient: mbClient });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid', limit: 999 });
+
+  assert.equal(result.similar.length, 50);
+});

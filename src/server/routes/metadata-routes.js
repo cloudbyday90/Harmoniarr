@@ -18,7 +18,7 @@
 
 import { createApiError, getRequestMetadata, requireCsrf, requireSession } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies({
@@ -208,7 +208,7 @@ export function registerMetadataRoutes(app, {
   registerSessionGetJsonRoute('/api/v1/metadata/artists/:artistId/similar', async (request) => {
     const result = await getSimilarArtists({
       artistMbid: request.params.artistId,
-      limit: request.query.limit != null ? Number(request.query.limit) : undefined,
+      limit: sanitizePageLimit(request.query.limit, { default: 20, max: 100 }),
     });
 
     return { similar: result.similar };

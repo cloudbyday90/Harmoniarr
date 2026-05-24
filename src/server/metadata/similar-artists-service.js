@@ -150,9 +150,10 @@ export function createSimilarArtistsService({
   // Both source fetches run in parallel. If one source fails, it is silently
   // excluded. Results are cached per MBID for cacheTtlMs milliseconds.
   async function getSimilarArtists({ artistMbid, limit = 20 }) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
     const cached = ttlCache.get(artistMbid);
     if (cached !== undefined) {
-      return { similar: cached.slice(0, limit) };
+      return { similar: cached.slice(0, safeLimit) };
     }
 
     // Fetch from both sources concurrently; individual failures are non-fatal.
@@ -171,7 +172,7 @@ export function createSimilarArtistsService({
     const merged = mergeSimilarArtists(lbArtists, mbArtists, { limit: 100 });
     ttlCache.set(artistMbid, merged);
 
-    return { similar: merged.slice(0, limit) };
+    return { similar: merged.slice(0, safeLimit) };
   }
 
   return { getSimilarArtists };
