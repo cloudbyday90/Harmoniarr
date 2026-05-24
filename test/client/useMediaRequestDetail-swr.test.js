@@ -125,10 +125,10 @@ describe('useMediaRequestDetail SWR', () => {
 
     await detail.load({ mediaRequestId: 'req-1' });
 
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
     const countAfterPoll = callCount;
 
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    await new Promise((resolve) => { setTimeout(resolve, 150); });
     assert.equal(callCount, countAfterPoll, 'polling stopped after fulfillment became inactive');
 
     detail.destroy();
