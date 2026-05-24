@@ -207,6 +207,37 @@ test('listMediaRequestEvents with invalid cursor falls back to initial query', a
   assert.doesNotMatch(sql, /< \(\$2, \$3\)/);
 });
 
+test('listMediaRequestEvents with cursor returns empty results and hasMore false when no rows match keyset', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+  const cursor = Buffer.from(JSON.stringify({ o: '2026-05-22T08:00:00Z', i: 'evt-old' })).toString('base64url');
+  const result = await store.listMediaRequestEvents({ mediaRequestId: 'req-1', limit: 50, cursor });
+
+  assert.equal(result.events.length, 0);
+  assert.equal(result.hasMore, false);
+  assert.equal(result.nextCursor, null);
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /\(media_request_events\.occurred_at, media_request_events\.id\) < \(\$2, \$3\)/);
+});
+
+test('listMediaRequestEvents with valid cursor containing non-date value falls back gracefully', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [
+      { id: 'evt-1', event_type: 'created', previous_requested_for_user_id: null, new_requested_for_user_id: null, reason: null, actor_user_id: 'u-1', details: null, occurred_at: '2026-05-22T12:00:00Z', actor_username: 'listener' },
+    ],
+  }));
+
+  const store = createLibraryMediaRequestStore({ getPoolFn: () => ({ query }) });
+  const cursor = Buffer.from(JSON.stringify({ o: '', i: '' })).toString('base64url');
+  const result = await store.listMediaRequestEvents({ mediaRequestId: 'req-1', limit: 50, cursor });
+
+  assert.equal(result.events.length, 1);
+  assert.equal(result.hasMore, false);
+  const sql = query.mock.calls[0].arguments[0];
+  assert.doesNotMatch(sql, /< \(\$2, \$3\)/);
+});
+
 function makeRequestRow(overrides = {}) {
   return {
     id: overrides.id ?? 'req-1',

@@ -554,6 +554,85 @@ test('media request events route caps limit at 100', async (t) => {
   });
 });
 
+test('media request events route treats empty cursor query param as no cursor', async (t) => {
+  const listMediaRequestEventsPage = t.mock.fn(async () => ({
+    events: [{ id: 'evt-1', eventType: 'created', occurredAt: '2026-05-22T10:00:00Z' }],
+    hasMore: false,
+    nextCursor: null,
+  }));
+  const app = createLibraryRouteTestApp({ listMediaRequestEventsPage });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-1/events?cursor=`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    const callArgs = listMediaRequestEventsPage.mock.calls[0].arguments[0];
+    assert.equal(callArgs.cursor, null);
+  });
+});
+
+test('media request events route returns empty events with hasMore false when cursor matches no results', async (t) => {
+  const listMediaRequestEventsPage = t.mock.fn(async () => ({
+    events: [],
+    hasMore: false,
+    nextCursor: null,
+  }));
+  const app = createLibraryRouteTestApp({ listMediaRequestEventsPage });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-1/events?cursor=eyJvIjoiMjAyNi0wNS0yMlQxMjowMDowMFoiLCJpIjoiZXhwaXJlZC1ldnQifQ==`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.deepEqual(payload.events, []);
+    assert.equal(payload.hasMore, false);
+    assert.equal(payload.nextCursor, null);
+  });
+});
+
+test('media request events route passes non-numeric limit through for service-level normalization', async (t) => {
+  const listMediaRequestEventsPage = t.mock.fn(async () => ({
+    events: [],
+    hasMore: false,
+    nextCursor: null,
+  }));
+  const app = createLibraryRouteTestApp({ listMediaRequestEventsPage });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-1/events?limit=abc`);
+    await response.json();
+
+    assert.equal(response.status, 200);
+    const callArgs = listMediaRequestEventsPage.mock.calls[0].arguments[0];
+    assert.ok(Number.isNaN(callArgs.limit));
+  });
+});
+
+test('media request events route preserves not-found errors from the event list service', async (t) => {
+  const app = createLibraryRouteTestApp({
+    listMediaRequestEventsPage: async () => {
+      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/ghost-req/events`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(payload, {
+      ok: false,
+      error: {
+        code: 'media_request_not_found',
+        message: 'The specified media request could not be found',
+      },
+    });
+  });
+});
+
 test('media request create route passes session ownership and request metadata to the shared service', async (t) => {
   const requireSession = t.mock.fn(async () => ({ appUserId: 'user-51', csrfToken: 'csrf-51', user: { role: 'requester' } }));
   const requireCsrf = t.mock.fn();
