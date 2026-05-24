@@ -18,12 +18,14 @@
 
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
 export function registerOperationsRoutes(app, {
   buildOperationHistory,
   buildOperationRunDetail,
+  limitOperationRunMutation = skipRateLimitMiddleware,
   requestOperationRunCancellation,
   requestOperationRunRetry,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
@@ -48,7 +50,7 @@ export function registerOperationsRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/operations/runs/:runId/cancel', asyncRoute(async (request, response) => {
+  app.post('/api/v1/operations/runs/:runId/cancel', limitOperationRunMutation, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
     response.json({
@@ -60,7 +62,7 @@ export function registerOperationsRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/operations/runs/:runId/retry', asyncRoute(async (request, response) => {
+  app.post('/api/v1/operations/runs/:runId/retry', limitOperationRunMutation, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
     response.json({

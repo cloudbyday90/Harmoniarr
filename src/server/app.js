@@ -528,6 +528,11 @@ export function createApp({
       limit: 5,
       windowMs: 10 * 60 * 1000,
     }),
+    limitChangePassword: requestRateLimiterService.createMiddleware({
+      bucketName: 'auth-change-password',
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    }),
     limitClaimComplete: requestRateLimiterService.createMiddleware({
       bucketName: 'auth-claim-complete',
       keyFn: buildLoginRateLimitKey,
@@ -555,6 +560,11 @@ export function createApp({
       limit: 30,
       windowMs: 5 * 60 * 1000,
     }),
+    limitSessionRevoke: requestRateLimiterService.createMiddleware({
+      bucketName: 'auth-session-revoke',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
     startPlexSignIn: plexDirectSignInService.startSignIn,
   });
   mountAdminRecoveryRoutes(app, {
@@ -573,12 +583,42 @@ export function createApp({
   });
   mountAppUserRoutes(app, {
     ...appUserModule.routeDependencies,
+    limitAppUserAdminMutations: requestRateLimiterService.createMiddleware({
+      bucketName: 'app-user-admin-mutations',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
+    limitAppUserPreferencesMutations: requestRateLimiterService.createMiddleware({
+      bucketName: 'app-user-preferences-mutations',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
+    limitAppUserResetPassword: requestRateLimiterService.createMiddleware({
+      bucketName: 'app-user-reset-password',
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    }),
   });
   mountActivityRoutes(app, {
     ...activityModule.routeDependencies,
+    limitActivitySourceUserMutations: requestRateLimiterService.createMiddleware({
+      bucketName: 'activity-source-user-mutations',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
+    limitActivityBlocklistMutations: requestRateLimiterService.createMiddleware({
+      bucketName: 'activity-blocklist-mutations',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
   });
   mountPushRoutes(app, {
     ...pushModule.routeDependencies,
+    limitPushSubscriptionMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'push-subscription-mutation',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
   });
   mountArtworkRoutes(app, {
     ...artworkModule.routeDependencies,
@@ -600,9 +640,38 @@ export function createApp({
       limit: 20,
       windowMs: 60 * 1000,
     }),
+    limitMetadataImport: requestRateLimiterService.createMiddleware({
+      bucketName: 'metadata-import',
+      limit: 20,
+      windowMs: 60 * 1000,
+    }),
+    limitMetadataMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'metadata-mutation',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
   });
-  mountOperationsRoutes(app, operationsModule.routeDependencies);
-  mountProviderRoutes(app, providerModule.routeDependencies);
+  mountOperationsRoutes(app, {
+    ...operationsModule.routeDependencies,
+    limitOperationRunMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'operation-run-mutation',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
+  });
+  mountProviderRoutes(app, {
+    ...providerModule.routeDependencies,
+    limitProviderOAuthStart: requestRateLimiterService.createMiddleware({
+      bucketName: 'provider-oauth-start',
+      limit: 10,
+      windowMs: 60 * 1000,
+    }),
+    limitProviderOAuthClear: requestRateLimiterService.createMiddleware({
+      bucketName: 'provider-oauth-clear',
+      limit: 10,
+      windowMs: 60 * 1000,
+    }),
+  });
   mountPlexWebhookRoutes(app, {
     getWebhookStatus: plexWebhookIngestionService.getWebhookStatus,
     ingestWebhook: plexWebhookIngestionService.ingestWebhook,
@@ -612,7 +681,14 @@ export function createApp({
       windowMs: 60 * 1000,
     }),
   });
-  mountSlskdRoutes(app, slskdModule.routeDependencies);
+  mountSlskdRoutes(app, {
+    ...slskdModule.routeDependencies,
+    limitSlskdSearch: requestRateLimiterService.createMiddleware({
+      bucketName: 'slskd-search',
+      limit: 20,
+      windowMs: 60 * 1000,
+    }),
+  });
   mountImportCandidateRoutes(app, {
     ...importCandidateModule.routeDependencies,
     limitImportCandidateApplyRun: requestRateLimiterService.createMiddleware({
@@ -645,6 +721,11 @@ export function createApp({
       limit: 20,
       windowMs: 60 * 1000,
     }),
+    limitImportCandidateDecision: requestRateLimiterService.createMiddleware({
+      bucketName: 'import-candidate-decision',
+      limit: 60,
+      windowMs: 60 * 1000,
+    }),
   });
   mountLibraryRoutes(app, {
     ...libraryModule.routeDependencies,
@@ -663,6 +744,16 @@ export function createApp({
       limit: 10,
       windowMs: 60 * 1000,
     }),
+    limitMediaRequestMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'media-request-mutation',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
+    limitMediaRequestAdminMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'media-request-admin-mutation',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
   });
   mountSystemRoutes(app, {
     ...systemModule.routeDependencies,
@@ -671,13 +762,28 @@ export function createApp({
       limit: 10,
       windowMs: 60 * 1000,
     }),
+    limitBackupMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'backup-mutation',
+      limit: 10,
+      windowMs: 60 * 1000,
+    }),
     limitDiagnosticsExport: requestRateLimiterService.createMiddleware({
       bucketName: 'system-diagnostics-export',
       limit: 20,
       windowMs: 5 * 60 * 1000,
     }),
+    limitMaintenanceLockMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'maintenance-lock-mutation',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
     limitOperatorNotificationFanoutRun: requestRateLimiterService.createMiddleware({
       bucketName: 'operator-notification-fanout-run',
+      limit: 20,
+      windowMs: 60 * 1000,
+    }),
+    limitSettingsUpdate: requestRateLimiterService.createMiddleware({
+      bucketName: 'settings-update',
       limit: 20,
       windowMs: 60 * 1000,
     }),

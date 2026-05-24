@@ -18,6 +18,7 @@
 
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -36,6 +37,8 @@ export function registerActivityRoutes(app, {
   buildActivityFeed,
   exportSourceUserTrustHistory,
   getSourceUserDetail,
+  limitActivitySourceUserMutations = skipRateLimitMiddleware,
+  limitActivityBlocklistMutations = skipRateLimitMiddleware,
   listBlockedSourceUsers,
   listSourceUsers,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
@@ -143,7 +146,7 @@ export function registerActivityRoutes(app, {
     }
   }));
 
-  app.patch('/api/v1/activity/source-users/:username', asyncRoute(async (request, response) => {
+  app.patch('/api/v1/activity/source-users/:username', limitActivitySourceUserMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -159,7 +162,7 @@ export function registerActivityRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/activity/source-users/bulk-trust', asyncRoute(async (request, response) => {
+  app.post('/api/v1/activity/source-users/bulk-trust', limitActivitySourceUserMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -175,7 +178,7 @@ export function registerActivityRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/activity/blocklist', asyncRoute(async (request, response) => {
+  app.post('/api/v1/activity/blocklist', limitActivityBlocklistMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -192,7 +195,7 @@ export function registerActivityRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/activity/blocklist/bulk', asyncRoute(async (request, response) => {
+  app.post('/api/v1/activity/blocklist/bulk', limitActivityBlocklistMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -207,7 +210,7 @@ export function registerActivityRoutes(app, {
     });
   }));
 
-  app.delete('/api/v1/activity/blocklist/:username', asyncRoute(async (request, response) => {
+  app.delete('/api/v1/activity/blocklist/:username', limitActivityBlocklistMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 

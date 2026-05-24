@@ -19,6 +19,7 @@
 import { createApiError } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -52,6 +53,7 @@ export function registerSlskdRoutes(app, {
   getDownloads,
   getSearchResponses,
   getSearchState,
+  limitSlskdSearch = skipRateLimitMiddleware,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
@@ -76,7 +78,7 @@ export function registerSlskdRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/slskd/searches', slskdRoute(async (request, response) => {
+  app.post('/api/v1/slskd/searches', limitSlskdSearch, slskdRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 

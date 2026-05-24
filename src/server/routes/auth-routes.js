@@ -82,14 +82,16 @@ export function registerAuthRoutes(app, {
   getSessionFromRequest = defaultRequestAuthDependencies.getSessionFromRequest,
   listActiveSessions = defaultAccountSecurityService.listActiveSessions,
   listRecentActivity = defaultAccountSecurityService.listRecentActivity,
-  loginUser = defaultLoginUser,
-  logoutSession = defaultLogoutSession,
   limitBootstrapAdmin = skipRateLimitMiddleware,
+  limitChangePassword = skipRateLimitMiddleware,
   limitClaimComplete = skipRateLimitMiddleware,
   limitLogin = skipRateLimitMiddleware,
   limitPlexSignInCallback = skipRateLimitMiddleware,
   limitPlexSignInStart = skipRateLimitMiddleware,
   limitRefresh = skipRateLimitMiddleware,
+  limitSessionRevoke = skipRateLimitMiddleware,
+  loginUser = defaultLoginUser,
+  logoutSession = defaultLogoutSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
@@ -191,7 +193,7 @@ export function registerAuthRoutes(app, {
     response.json(createRefreshResponse(session.user, issuedSession));
   }));
 
-  app.post('/api/v1/auth/change-password', asyncRoute(async (request, response) => {
+  app.post('/api/v1/auth/change-password', limitChangePassword, asyncRoute(async (request, response) => {
     const session = await requireSession(request);
     requireCsrf(request, session);
     const requestMetadata = getRequestMetadata(request);
@@ -249,7 +251,7 @@ export function registerAuthRoutes(app, {
     }));
   }));
 
-  app.post('/api/v1/auth/sessions/:refreshTokenId/revoke', asyncRoute(async (request, response) => {
+  app.post('/api/v1/auth/sessions/:refreshTokenId/revoke', limitSessionRevoke, asyncRoute(async (request, response) => {
     const session = await requireSession(request);
     requireCsrf(request, session);
     response.json(createSessionRevokedResponse(await revokeSession({

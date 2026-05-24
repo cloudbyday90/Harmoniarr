@@ -79,6 +79,7 @@ export function registerImportCandidateRoutes(app, {
   limitImportCandidateExecutionReconcile = skipRateLimitMiddleware,
   limitImportCandidateExecutionRun = skipRateLimitMiddleware,
   limitImportCandidateSlskdIngest = skipRateLimitMiddleware,
+  limitImportCandidateDecision = skipRateLimitMiddleware,
   listImportCandidates,
   previewImportCandidateApply,
   previewImportCandidate,
@@ -343,7 +344,7 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   function registerFileDecisionRoute(path, decisionHandler, responseKey) {
-    app.post(path, importCandidateRoute(async (request, response) => {
+    app.post(path, limitImportCandidateDecision, importCandidateRoute(async (request, response) => {
       const session = await requireFreshAdminSessionFn(request);
       requireCsrfFn(request, session);
 
@@ -377,7 +378,7 @@ export function registerImportCandidateRoutes(app, {
   );
 
   function registerReviewTransition(path, transitionCandidate) {
-    app.post(path, importCandidateRoute(async (request, response) => {
+    app.post(path, limitImportCandidateDecision, importCandidateRoute(async (request, response) => {
       const session = await requireFreshAdminSessionFn(request);
       requireCsrfFn(request, session);
 

@@ -71,6 +71,8 @@ export function registerMetadataRoutes(app, {
   importMusicBrainzReleaseGroup,
   importMusicBrainzRelease,
   limitMetadataArtistRefreshRun = skipRateLimitMiddleware,
+  limitMetadataImport = skipRateLimitMiddleware,
+  limitMetadataMutation = skipRateLimitMiddleware,
   startMetadataArtistRefresh,
   updateMetadataArtistMonitoring,
   requireCsrf: requireCsrfFn = defaultRequestAuthDependencies.requireCsrf,
@@ -99,7 +101,7 @@ export function registerMetadataRoutes(app, {
   }
 
   function registerImportRoute(path, importEntity, buildImportRequest, buildImportedBody) {
-    app.post(path, metadataRoute(async (request, response) => {
+    app.post(path, limitMetadataImport, metadataRoute(async (request, response) => {
       const session = await requireFreshAdminSessionFn(request);
       requireCsrfFn(request, session);
 
@@ -115,7 +117,7 @@ export function registerMetadataRoutes(app, {
   // Like registerImportRoute, but requires a fresh authenticated session instead
   // of a fresh admin session, so that requesters can import/upsert entities.
   function registerSessionImportRoute(path, importEntity, buildImportRequest, buildImportedBody) {
-    app.post(path, metadataRoute(async (request, response) => {
+    app.post(path, limitMetadataImport, metadataRoute(async (request, response) => {
       const session = await requireFreshSessionFn(request);
       requireCsrfFn(request, session);
 
@@ -231,7 +233,7 @@ export function registerMetadataRoutes(app, {
     };
   });
 
-  app.put('/api/v1/metadata/artists/:artistId/monitoring', metadataRoute(async (request, response) => {
+  app.put('/api/v1/metadata/artists/:artistId/monitoring', limitMetadataMutation, metadataRoute(async (request, response) => {
     const session = await requireFreshSessionFn(request);
     requireCsrfFn(request, session);
 
@@ -416,7 +418,7 @@ export function registerMetadataRoutes(app, {
     });
   }));
 
-  app.patch('/api/v1/metadata/releases/:releaseId/canonical', metadataRoute(async (request, response) => {
+  app.patch('/api/v1/metadata/releases/:releaseId/canonical', limitMetadataMutation, metadataRoute(async (request, response) => {
     const session = await requireFreshAdminSessionFn(request);
     requireCsrfFn(request, session);
 

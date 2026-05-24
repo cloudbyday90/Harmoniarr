@@ -18,6 +18,7 @@
 
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -63,6 +64,8 @@ export function registerProviderRoutes(app, {
   completeSpotifyAuthorization,
   completeYoutubeAuthorization,
   getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
+  limitProviderOAuthStart = skipRateLimitMiddleware,
+  limitProviderOAuthClear = skipRateLimitMiddleware,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
@@ -88,7 +91,7 @@ export function registerProviderRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/providers/plex/link/start', asyncRoute(async (request, response) => {
+  app.post('/api/v1/providers/plex/link/start', limitProviderOAuthStart, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -101,7 +104,7 @@ export function registerProviderRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/providers/spotify/oauth/start', asyncRoute(async (request, response) => {
+  app.post('/api/v1/providers/spotify/oauth/start', limitProviderOAuthStart, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -114,7 +117,7 @@ export function registerProviderRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/providers/youtube/oauth/start', asyncRoute(async (request, response) => {
+  app.post('/api/v1/providers/youtube/oauth/start', limitProviderOAuthStart, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -127,7 +130,7 @@ export function registerProviderRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/providers/spotify/oauth/clear', asyncRoute(async (request, response) => {
+  app.post('/api/v1/providers/spotify/oauth/clear', limitProviderOAuthClear, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -140,7 +143,7 @@ export function registerProviderRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/providers/youtube/oauth/clear', asyncRoute(async (request, response) => {
+  app.post('/api/v1/providers/youtube/oauth/clear', limitProviderOAuthClear, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -153,7 +156,7 @@ export function registerProviderRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/providers/plex/link/clear', asyncRoute(async (request, response) => {
+  app.post('/api/v1/providers/plex/link/clear', limitProviderOAuthClear, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 

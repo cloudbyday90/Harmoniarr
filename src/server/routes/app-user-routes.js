@@ -22,6 +22,7 @@ import { createAppUserService } from '../app-user-service.js';
 import { createAccountSecurityService } from '../account-security-service.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultAppUserService = createAppUserService();
 const defaultAppUserProvisioningService = createAppUserProvisioningService({
@@ -46,6 +47,9 @@ export function registerAppUserRoutes(app, {
   getUserRequestSummary = defaultAppUserDetailService.getUserRequestSummary,
   getUserSessions = defaultAppUserDetailService.getUserSessions,
   issueAppUserClaimCode = null,
+  limitAppUserAdminMutations = skipRateLimitMiddleware,
+  limitAppUserPreferencesMutations = skipRateLimitMiddleware,
+  limitAppUserResetPassword = skipRateLimitMiddleware,
   listAppUsers = defaultAppUserService.listAppUsers,
   listAppUsersPage = defaultAppUserService.listAppUsersPage,
   listUserAuditEvents = defaultAppUserDetailService.listUserAuditEvents,
@@ -132,7 +136,7 @@ export function registerAppUserRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/users', asyncRoute(async (request, response) => {
+  app.post('/api/v1/users', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -152,7 +156,7 @@ export function registerAppUserRoutes(app, {
     });
   }));
 
-  app.patch('/api/v1/users/:userId', asyncRoute(async (request, response) => {
+  app.patch('/api/v1/users/:userId', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -172,7 +176,7 @@ export function registerAppUserRoutes(app, {
   }));
 
   if (typeof issueAppUserClaimCode === 'function') {
-    app.post('/api/v1/users/:userId/claim-code', asyncRoute(async (request, response) => {
+    app.post('/api/v1/users/:userId/claim-code', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
       const session = await requireFreshAdminSession(request);
       requireCsrf(request, session);
 
@@ -193,7 +197,7 @@ export function registerAppUserRoutes(app, {
     }));
   }
 
-  app.post('/api/v1/users/:userId/reset-password', asyncRoute(async (request, response) => {
+  app.post('/api/v1/users/:userId/reset-password', limitAppUserResetPassword, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -211,7 +215,7 @@ export function registerAppUserRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/users/:userId/sessions/:refreshTokenId/revoke', asyncRoute(async (request, response) => {
+  app.post('/api/v1/users/:userId/sessions/:refreshTokenId/revoke', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -227,7 +231,7 @@ export function registerAppUserRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/users/:userId/sessions/revoke-all', asyncRoute(async (request, response) => {
+  app.post('/api/v1/users/:userId/sessions/revoke-all', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -243,7 +247,7 @@ export function registerAppUserRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/users/:userId/provision-managed-library-root', asyncRoute(async (request, response) => {
+  app.post('/api/v1/users/:userId/provision-managed-library-root', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -268,7 +272,7 @@ export function registerAppUserRoutes(app, {
     response.json({ ok: true, preferences });
   }));
 
-  app.patch('/api/v1/users/me/preferences', asyncRoute(async (request, response) => {
+  app.patch('/api/v1/users/me/preferences', limitAppUserPreferencesMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshSession(request);
     requireCsrf(request, session);
 
@@ -282,7 +286,7 @@ export function registerAppUserRoutes(app, {
     response.json({ ok: true, preferences });
   }));
 
-  app.post('/api/v1/users/me/claim-managed-library-root', asyncRoute(async (request, response) => {
+  app.post('/api/v1/users/me/claim-managed-library-root', limitAppUserPreferencesMutations, asyncRoute(async (request, response) => {
     const session = await requireFreshSession(request);
     requireCsrf(request, session);
 
@@ -322,7 +326,7 @@ export function registerAppUserRoutes(app, {
   }
 
   if (typeof applyPlexDirectoryImport === 'function') {
-    app.post('/api/v1/users/imports/plex/apply', asyncRoute(async (request, response) => {
+    app.post('/api/v1/users/imports/plex/apply', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
       const session = await requireFreshAdminSession(request);
       requireCsrf(request, session);
 
@@ -337,7 +341,7 @@ export function registerAppUserRoutes(app, {
   }
 
   if (typeof relinkPlexDirectoryConflict === 'function') {
-    app.post('/api/v1/users/imports/plex/relink', asyncRoute(async (request, response) => {
+    app.post('/api/v1/users/imports/plex/relink', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
       const session = await requireFreshAdminSession(request);
       requireCsrf(request, session);
 
@@ -354,7 +358,7 @@ export function registerAppUserRoutes(app, {
   }
 
   if (typeof reconcilePlexLinkedAccount === 'function') {
-    app.post('/api/v1/users/:userId/plex-reconciliation', asyncRoute(async (request, response) => {
+    app.post('/api/v1/users/:userId/plex-reconciliation', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
       const session = await requireFreshAdminSession(request);
       requireCsrf(request, session);
 
@@ -371,7 +375,7 @@ export function registerAppUserRoutes(app, {
   }
 
   if (typeof unlinkPlexAppUser === 'function') {
-    app.post('/api/v1/users/:userId/unlink-plex', asyncRoute(async (request, response) => {
+    app.post('/api/v1/users/:userId/unlink-plex', limitAppUserAdminMutations, asyncRoute(async (request, response) => {
       const session = await requireFreshAdminSession(request);
       requireCsrf(request, session);
 

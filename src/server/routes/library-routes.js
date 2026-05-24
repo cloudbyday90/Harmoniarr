@@ -45,6 +45,8 @@ export function registerLibraryRoutes(app, {
   limitLibraryDiscoveryRun = skipRateLimitMiddleware,
   limitLibraryOrganizeApplyRun = skipRateLimitMiddleware,
   limitLibraryScanRun = skipRateLimitMiddleware,
+  limitMediaRequestMutation = skipRateLimitMiddleware,
+  limitMediaRequestAdminMutation = skipRateLimitMiddleware,
   listMediaRequestEventsPage,
   listMediaRequests,
   reassignMediaRequest,
@@ -214,7 +216,7 @@ export function registerLibraryRoutes(app, {
     }));
   }));
 
-  app.post('/api/v1/library/media-requests', asyncRoute(async (request, response) => {
+  app.post('/api/v1/library/media-requests', limitMediaRequestMutation, asyncRoute(async (request, response) => {
     const session = await requireSession(request);
     requireCsrf(request, session);
     ensureMediaRequestPermission(session, 'media.request', 'The current user cannot create music requests');
@@ -309,7 +311,7 @@ export function registerLibraryRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/library/media-requests/:mediaRequestId/cancel', asyncRoute(async (request, response) => {
+  app.post('/api/v1/library/media-requests/:mediaRequestId/cancel', limitMediaRequestMutation, asyncRoute(async (request, response) => {
     const session = await requireSession(request);
     requireCsrf(request, session);
 
@@ -327,7 +329,7 @@ export function registerLibraryRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/library/media-requests/:mediaRequestId/reassign', asyncRoute(async (request, response) => {
+  app.post('/api/v1/library/media-requests/:mediaRequestId/reassign', limitMediaRequestAdminMutation, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 

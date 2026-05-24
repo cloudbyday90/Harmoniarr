@@ -19,6 +19,7 @@
 import { createApiError } from '../auth.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute } from '../http.js';
+import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
@@ -63,6 +64,7 @@ export function registerPushRoutes(app, {
   getVapidPublicKey,
   subscribe,
   unsubscribe,
+  limitPushSubscriptionMutation = skipRateLimitMiddleware,
   requireSession = defaultRequestAuthDependencies.requireSession,
 }) {
   /**
@@ -91,7 +93,7 @@ export function registerPushRoutes(app, {
    * }
    * ```
    */
-  app.post('/api/v1/push/subscribe', asyncRoute(async (request, response) => {
+  app.post('/api/v1/push/subscribe', limitPushSubscriptionMutation, asyncRoute(async (request, response) => {
     const session = await requireSession(request);
     const { endpoint, p256dh, auth } = validateSubscriptionBody(request.body);
     const userAgent = typeof request.headers['user-agent'] === 'string'
@@ -119,7 +121,7 @@ export function registerPushRoutes(app, {
    * { "endpoint": "https://push.googleapis.com/..." }
    * ```
    */
-  app.delete('/api/v1/push/subscribe', asyncRoute(async (request, response) => {
+  app.delete('/api/v1/push/subscribe', limitPushSubscriptionMutation, asyncRoute(async (request, response) => {
     const session = await requireSession(request);
     const endpoint = typeof request.body?.endpoint === 'string'
       ? request.body.endpoint.trim()

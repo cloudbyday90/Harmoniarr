@@ -44,6 +44,9 @@ export function registerSystemRoutes(app, {
   limitBackupExport = skipRateLimitMiddleware,
   limitDiagnosticsExport = skipRateLimitMiddleware,
   limitOperatorNotificationFanoutRun = skipRateLimitMiddleware,
+  limitSettingsUpdate = skipRateLimitMiddleware,
+  limitMaintenanceLockMutation = skipRateLimitMiddleware,
+  limitBackupMutation = skipRateLimitMiddleware,
   buildLibraryScanSummary,
   buildOnboardingSummary,
   executeIdempotentMutation = async ({ executeMutation }) => executeMutation(),
@@ -99,7 +102,7 @@ export function registerSystemRoutes(app, {
     });
   }));
 
-  app.put('/api/v1/settings', asyncRoute(async (request, response) => {
+  app.put('/api/v1/settings', limitSettingsUpdate, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
     const updateResult = await updateSettings({
@@ -147,7 +150,7 @@ export function registerSystemRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/recovery/maintenance-locks', asyncRoute(async (request, response) => {
+  app.post('/api/v1/recovery/maintenance-locks', limitMaintenanceLockMutation, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -179,7 +182,7 @@ export function registerSystemRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/recovery/maintenance-locks/:lockId/release', asyncRoute(async (request, response) => {
+  app.post('/api/v1/recovery/maintenance-locks/:lockId/release', limitMaintenanceLockMutation, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -280,7 +283,7 @@ export function registerSystemRoutes(app, {
     });
   }));
 
-  app.delete('/api/v1/recovery/backups/:backupArtifactId', asyncRoute(async (request, response) => {
+  app.delete('/api/v1/recovery/backups/:backupArtifactId', limitBackupMutation, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
@@ -308,7 +311,7 @@ export function registerSystemRoutes(app, {
     });
   }));
 
-  app.post('/api/v1/recovery/backups/:backupArtifactId/restore-apply', asyncRoute(async (request, response) => {
+  app.post('/api/v1/recovery/backups/:backupArtifactId/restore-apply', limitBackupMutation, asyncRoute(async (request, response) => {
     const session = await requireFreshAdminSession(request);
     requireCsrf(request, session);
 
