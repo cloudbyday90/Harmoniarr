@@ -29,6 +29,7 @@ import { useTheme } from '../composables/useTheme.js';
 import { buildVisibleNav, notificationTone } from '../lib/app-shell-presentation.js';
 import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
 import { formatDependencyProviderLabel, formatDependencyStatusLabel, getDependencyStatusClass } from '../lib/settings-connections-presentation.js';
+import { resolveMenuFocus } from '../lib/menu-keyboard-navigation.js';
 import ToastStack from './ToastStack.vue';
 import PwaUpdateBanner from './PwaUpdateBanner.vue';
 import GlobalSearchPalette from './GlobalSearchPalette.vue';
@@ -129,6 +130,55 @@ function closeNotificationsOnDocument(event) {
   const anchor = notificationsAnchor.value;
   if (anchor && event.target instanceof Node && anchor.contains(event.target)) return;
   notificationsOpen.value = false;
+}
+
+function closeNotificationsPanel() {
+  notificationsOpen.value = false;
+  const button = notificationsAnchor.value?.querySelector('button');
+  if (button) button.focus();
+}
+
+function getNotificationMenuItems() {
+  return notificationsAnchor.value
+    ? Array.from(notificationsAnchor.value.querySelectorAll('button[role="menuitem"]'))
+    : [];
+}
+
+function handleNotificationPanelKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeNotificationsPanel();
+    return;
+  }
+
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const items = getNotificationMenuItems();
+  const target = resolveMenuFocus(items, document.activeElement, event.key);
+  if (!target) return;
+
+  event.preventDefault();
+  target.focus();
+}
+
+function handleBellKeydown(event) {
+  if (!notificationsOpen.value) return;
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    notificationsOpen.value = false;
+    return;
+  }
+
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const items = getNotificationMenuItems();
+  if (items.length === 0) return;
+
+  event.preventDefault();
+  if (event.key === 'ArrowDown') {
+    items[0].focus();
+  } else {
+    items[items.length - 1].focus();
+  }
 }
 
 async function openNotificationTarget(notification) {
@@ -328,6 +378,7 @@ onBeforeUnmount(() => {
             aria-haspopup="menu"
             :aria-label="`Notifications (${unacknowledgedCount} unread)`"
             @click.stop="toggleNotifications"
+            @keydown="handleBellKeydown"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9z"/>
@@ -341,7 +392,7 @@ onBeforeUnmount(() => {
             >{{ unacknowledgedCount }}</span>
           </button>
 
-          <div v-if="notificationsOpen" class="hx-topbar-notifications-panel" role="menu">
+          <div v-if="notificationsOpen" class="hx-topbar-notifications-panel" @keydown="handleNotificationPanelKeydown">
             <div class="hx-topbar-notifications-header">
               <strong>Notifications</strong>
               <span class="hx-pill" :data-tone="unacknowledgedCount > 0 ? 'warning' : undefined">
@@ -362,8 +413,8 @@ onBeforeUnmount(() => {
             <div v-else-if="!notifications.length" class="hx-topbar-notifications-empty">
               No active notifications.
             </div>
-            <ul v-else class="hx-topbar-notifications-list" role="none">
-              <li v-for="notification in notifications" :key="notification.id ?? notification.eventId ?? notification.title">
+            <ul v-else class="hx-topbar-notifications-list" role="menu">
+              <li v-for="notification in notifications" :key="notification.id ?? notification.eventId ?? notification.title" role="none">
                 <button
                   type="button"
                   class="hx-topbar-notifications-item"
