@@ -19,6 +19,7 @@
 import { createApiError } from '../../auth.js';
 import { recordAuditEvent } from '../../audit.js';
 import { getPool } from '../../database.js';
+import { mapDatabaseErrorWithConstraints } from '../../database-error-mapper.js';
 
 const VALID_ACTIONS = new Set(['mark_stale', 'refresh_profile', 'safe_relink']);
 
@@ -79,21 +80,20 @@ function resolvePlexSubject(profile) {
   return normalizeOptionalString(profile?.uuid) ?? normalizeOptionalString(profile?.id);
 }
 
-function mapDatabaseError(error) {
-  if (error?.code !== '23505') {
-    return error;
-  }
-
-  switch (error?.constraint) {
-    case 'app_users_auth_provider_subject_unique':
-      return createApiError(409, 'plex_linked_account_subject_conflict', 'Another app user already uses this Plex sign-in identity');
-    case 'app_user_plex_profiles_plex_user_id_key':
-    case 'app_user_plex_profiles_plex_uuid_key':
-      return createApiError(409, 'plex_linked_account_profile_conflict', 'Another app user is already linked to this Plex profile');
-    default:
-      return error;
-  }
-}
+const mapDatabaseError = mapDatabaseErrorWithConstraints({
+  app_users_auth_provider_subject_unique: {
+    code: 'plex_linked_account_subject_conflict',
+    message: 'Another app user already uses this Plex sign-in identity',
+  },
+  app_user_plex_profiles_plex_user_id_key: {
+    code: 'plex_linked_account_profile_conflict',
+    message: 'Another app user is already linked to this Plex profile',
+  },
+  app_user_plex_profiles_plex_uuid_key: {
+    code: 'plex_linked_account_profile_conflict',
+    message: 'Another app user is already linked to this Plex profile',
+  },
+});
 
 async function upsertPlexProfile(client, userId, profile) {
   const updateProfileResult = await client.query(

@@ -19,6 +19,7 @@
 import { createApiError } from './auth.js';
 import { recordAuditEvent } from './audit.js';
 import { getPool } from './database.js';
+import { mapDatabaseErrorWithConstraints } from './database-error-mapper.js';
 import { buildMediaRequestTargetEligibility } from './media-request-target-eligibility.js';
 import { createAppUserPermissionService } from './app-user-permission-service.js';
 import { buildLocalAuthStatus } from './local-auth-readiness.js';
@@ -201,21 +202,20 @@ function mapAppUserRow(row, permissionService) {
   };
 }
 
-function mapDatabaseError(error) {
-  if (error?.code === '23505') {
-    if (error?.constraint === 'app_users_managed_library_relative_root_unique') {
-      throw createApiError(409, 'app_user_managed_library_root_conflict', 'Another user already owns that managed library subdirectory');
-    }
-
-    if (error?.constraint === 'app_users_email_unique') {
-      throw createApiError(409, 'app_user_email_conflict', 'A user with that email already exists');
-    }
-
-    throw createApiError(409, 'app_user_username_conflict', 'A user with that username already exists');
-  }
-
-  throw error;
-}
+const mapDatabaseError = mapDatabaseErrorWithConstraints({
+  app_users_managed_library_relative_root_unique: {
+    code: 'app_user_managed_library_root_conflict',
+    message: 'Another user already owns that managed library subdirectory',
+  },
+  app_users_email_unique: {
+    code: 'app_user_email_conflict',
+    message: 'A user with that email already exists',
+  },
+  app_users_username_unique: {
+    code: 'app_user_username_conflict',
+    message: 'A user with that username already exists',
+  },
+});
 
 export function createAppUserService({
   getPoolFn = getPool,
@@ -345,7 +345,7 @@ export function createAppUserService({
         [normalizedUsername, passwordHash, normalizedRole, normalizedManagedLibraryRelativeRoot],
       );
     } catch (error) {
-      mapDatabaseError(error);
+      throw mapDatabaseError(error);
     }
 
     const user = mapAppUserRow(result.rows[0], permissionService);

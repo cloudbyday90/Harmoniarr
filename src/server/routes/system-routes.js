@@ -423,6 +423,7 @@ export function registerSystemRoutes(app, {
 
     let entries = [];
     let errorMessage = null;
+    let errorStatus = null;
 
     try {
       const dirents = await readdir(safePath, { withFileTypes: true });
@@ -431,18 +432,41 @@ export function registerSystemRoutes(app, {
         .map((d) => ({ name: d.name, path: resolve(safePath, d.name) }))
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     } catch (error) {
-      errorMessage = error?.code === 'EACCES' ? 'Permission denied.' :
-        error?.code === 'ENOENT' ? 'Folder not found.' :
-        error?.code === 'ENOTDIR' ? 'That path is a file, not a folder.' :
-        'Could not read this folder.';
+      switch (error?.code) {
+        case 'EACCES':
+          errorStatus = 403;
+          errorMessage = 'Permission denied.';
+          break;
+        case 'ENOENT':
+          errorStatus = 404;
+          errorMessage = 'Folder not found.';
+          break;
+        case 'ENOTDIR':
+          errorStatus = 400;
+          errorMessage = 'That path is a file, not a folder.';
+          break;
+        default:
+          errorStatus = 500;
+          errorMessage = 'Could not read this folder.';
+          break;
+      }
+    }
+
+    if (errorStatus) {
+      return response.status(errorStatus).json({
+        ok: false,
+        path: safePath,
+        parent: parentPath,
+        entries,
+        error: errorMessage,
+      });
     }
 
     response.json({
-      ok: errorMessage === null,
+      ok: true,
       path: safePath,
       parent: parentPath,
       entries,
-      ...(errorMessage ? { error: errorMessage } : {}),
     });
   }));
 }

@@ -35,6 +35,7 @@ import {
 export { csrfProtectionModeEnvVar, csrfProtectionModes, resolveCsrfProtectionMode };
 import { recordAuditEvent } from './audit.js';
 import { createBootstrapOwnerClaimService } from './bootstrap-owner-claim-service.js';
+import { mapDatabaseError } from './database-error-mapper.js';
 import {
   normalizeLoginIdentifier,
   normalizeOptionalEmail,
@@ -440,14 +441,19 @@ export async function createBootstrapAdmin({
   const validatedPassword = validatePassword(password);
   const passwordHash = await hashPassword(validatedPassword);
 
-  const result = await getPool().query(
-    `
-      INSERT INTO app_users (username, email, password_hash, role, password_changed_at)
-      VALUES ($1, $2, $3, 'admin', NOW())
-      RETURNING *
-    `,
-    [normalizedUsername, normalizedEmail, passwordHash],
-  );
+  let result;
+  try {
+    result = await getPool().query(
+      `
+        INSERT INTO app_users (username, email, password_hash, role, password_changed_at)
+        VALUES ($1, $2, $3, 'admin', NOW())
+        RETURNING *
+      `,
+      [normalizedUsername, normalizedEmail, passwordHash],
+    );
+  } catch (error) {
+    throw mapDatabaseError(error);
+  }
 
   const user = result.rows[0];
   const issuedSession = await issueSession({ userId: user.id, requestMetadata });
