@@ -19,7 +19,7 @@
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { createApiError } from '../auth.js';
 import { hasAppUserPermission } from '../app-user-permission-service.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
@@ -96,8 +96,8 @@ export function registerLibraryRoutes(app, {
     const requestedForUserId = scope === 'mine' ? session.appUserId : null;
     const { requestState, requestKind, search, limit, offset, cursor } = request.query;
     const listResult = await listMediaRequests({
-      limit: limit ? Number(limit) : undefined,
-      offset: offset ? Number(offset) : undefined,
+      limit: limit ? sanitizePageLimit(limit, { default: 100, max: 100 }) : undefined,
+      offset: offset ? sanitizePageOffset(offset) : undefined,
       cursor: typeof cursor === 'string' && cursor.length > 0 ? cursor : null,
       requestKind: typeof requestKind === 'string' && requestKind.length > 0 ? requestKind : null,
       requestedForUserId,
@@ -156,7 +156,7 @@ export function registerLibraryRoutes(app, {
     const result = await listMediaRequestEventsPage({
       mediaRequestId: request.params.mediaRequestId,
       cursor: typeof cursor === 'string' && cursor.length > 0 ? cursor : null,
-      limit: limit ? Math.min(Number(limit), 100) : 50,
+      limit: sanitizePageLimit(limit, { default: 50, max: 100 }),
     });
     response.json({
       events: result.events,

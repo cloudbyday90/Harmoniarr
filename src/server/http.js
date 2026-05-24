@@ -21,3 +21,11 @@ export function asyncRoute(handler) {
     Promise.resolve(handler(request, response, next)).catch(next);
   };
 }
+
+export function sanitizePageLimit(raw, { default: defaultLimit = 50, max = 100 } = {}) {
+  return Math.max(1, Math.min(Number(raw) || defaultLimit, max));
+}
+
+export function sanitizePageOffset(raw) {
+  return Math.max(0, Number(raw) || 0);
+}

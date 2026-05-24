@@ -593,7 +593,7 @@ test('media request events route returns empty events with hasMore false when cu
   });
 });
 
-test('media request events route passes non-numeric limit through for service-level normalization', async (t) => {
+test('media request events route normalizes non-numeric limit to default', async (t) => {
   const listMediaRequestEventsPage = t.mock.fn(async () => ({
     events: [],
     hasMore: false,
@@ -607,7 +607,25 @@ test('media request events route passes non-numeric limit through for service-le
 
     assert.equal(response.status, 200);
     const callArgs = listMediaRequestEventsPage.mock.calls[0].arguments[0];
-    assert.ok(Number.isNaN(callArgs.limit));
+    assert.equal(callArgs.limit, 50);
+  });
+});
+
+test('media request events route normalizes zero limit to default', async (t) => {
+  const listMediaRequestEventsPage = t.mock.fn(async () => ({
+    events: [],
+    hasMore: false,
+    nextCursor: null,
+  }));
+  const app = createLibraryRouteTestApp({ listMediaRequestEventsPage });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-1/events?limit=0`);
+    await response.json();
+
+    assert.equal(response.status, 200);
+    const callArgs = listMediaRequestEventsPage.mock.calls[0].arguments[0];
+    assert.equal(callArgs.limit, 50);
   });
 });
 

@@ -21,7 +21,7 @@ import { createAppUserProvisioningService } from '../app-user-provisioning-servi
 import { createAppUserService } from '../app-user-service.js';
 import { createAccountSecurityService } from '../account-security-service.js';
 import { createRequestAuthDependencies } from '../auth-module.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultAppUserService = createAppUserService();
@@ -77,7 +77,7 @@ export function registerAppUserRoutes(app, {
         search: typeof search === 'string' && search.trim().length > 0 ? search.trim() : null,
       };
       const [users, totalCount] = await Promise.all([
-        listAppUsersPage({ ...filterParams, limit: Number(limit), offset: Number(offset || 0) }),
+        listAppUsersPage({ ...filterParams, limit: sanitizePageLimit(limit), offset: sanitizePageOffset(offset) }),
         countAppUsers(filterParams),
       ]);
       response.json({ ok: true, roleOptions, totalCount, users });

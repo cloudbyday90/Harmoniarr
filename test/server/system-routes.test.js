@@ -1622,7 +1622,7 @@ test('system operator notifications route returns the shared actionable-notifica
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(getOperatorNotifications.mock.calls[0].arguments, [{ limit: '12' }]);
+    assert.deepEqual(getOperatorNotifications.mock.calls[0].arguments, [{ limit: 12 }]);
     assert.equal(payload.counts.actionable, 1);
     assert.equal(payload.notifications[0].title, 'Library scan failed');
   });

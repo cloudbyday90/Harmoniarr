@@ -17,7 +17,7 @@
  */
 
 import { createRequestAuthDependencies } from '../auth-module.js';
-import { asyncRoute } from '../http.js';
+import { asyncRoute, sanitizePageLimit } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 import { readdir } from 'node:fs/promises';
 import { resolve, dirname, sep } from 'node:path';
@@ -133,7 +133,7 @@ export function registerSystemRoutes(app, {
   app.get('/api/v1/system/operator-notifications', asyncRoute(async (request, response) => {
     await requireAdminSession(request);
     response.json(await getOperatorNotifications({
-      limit: request.query.limit,
+      limit: sanitizePageLimit(request.query.limit, { default: 20, max: 25 }),
     }));
   }));
 
