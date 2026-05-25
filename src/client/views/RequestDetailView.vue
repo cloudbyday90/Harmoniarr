@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestEventTimeline from '../components/RequestEventTimeline.vue';
@@ -62,8 +62,6 @@ const {
   isLoadingMoreEvents,
   load,
   loadMoreEvents,
-  destroy,
-  attachVisibilityListener,
 } = useMediaRequestDetail({
   pollIntervalMs: 15000,
   revalidateOnFocus: true,
@@ -74,7 +72,6 @@ const {
   isLoading: isLoadingPipeline,
   isRevalidating: isRevalidatingPipeline,
   load: loadPipeline,
-  destroy: destroyPipeline,
 } = useMediaRequestPipeline({
   pollIntervalMs: 15000,
   revalidateOnFocus: true,
@@ -165,16 +162,10 @@ const candidateCount = computed(() => pipelineCandidates.value.length);
 onMounted(() => {
   const id = route.params.id;
   if (id) {
-    attachVisibilityListener();
     void load({ mediaRequestId: id });
     void loadPipeline({ mediaRequestId: id });
   }
   if (isAdmin.value) void loadEligibleUsers();
-});
-
-onBeforeUnmount(() => {
-  destroy();
-  destroyPipeline();
 });
 
 function goBack() {

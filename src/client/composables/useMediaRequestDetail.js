@@ -16,8 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { readonly, ref, shallowRef } from 'vue';
+import { computed, readonly, ref, shallowRef, watch } from 'vue';
 import { fetchMediaRequestDetail as defaultFetchDetail, fetchMediaRequestEvents as defaultFetchEvents } from '../lib/library-api.js';
+import { useAsyncResource } from './useAsyncResource.js';
 
 const activeFulfillmentCodes = new Set([
   'downloading',
@@ -39,74 +40,55 @@ export function useMediaRequestDetail({
   pollIntervalMs = 0,
   revalidateOnFocus = false,
 } = {}) {
-  const mediaRequest = shallowRef(null);
+  let currentMediaRequestId = null;
+
+  const {
+    data: detailPayload,
+    destroy: destroyResource,
+    errorMessage,
+    isLoading,
+    isRevalidating,
+    load: loadDetail,
+    reset: resetDetail,
+  } = useAsyncResource({
+    fetcher: () => fetchDetailFn({ mediaRequestId: currentMediaRequestId }),
+    project: (payload) => ({
+      mediaRequest: payload.mediaRequest ?? null,
+      events: payload.events ?? [],
+      hasMoreEvents: payload.hasMoreEvents ?? false,
+      nextCursor: payload.nextCursor ?? null,
+    }),
+    initialData: { mediaRequest: null, events: [], hasMoreEvents: false, nextCursor: null },
+    immediate: false,
+    fallbackErrorMessage: 'Failed to load request',
+    pollIntervalMs,
+    revalidateOnFocus,
+    pollWhile: (data) => hasActiveFulfillment(data.mediaRequest),
+  });
+
+  const mediaRequest = computed(() => detailPayload.value.mediaRequest);
+
   const events = shallowRef([]);
-  const isLoading = ref(false);
-  const isRevalidating = ref(false);
-  const errorMessage = ref('');
   const hasMoreEvents = ref(false);
   const isLoadingMoreEvents = ref(false);
   const nextCursor = ref(null);
-  let pollTimer = null;
-  let destroyed = false;
-  let hasLoaded = false;
-  let currentMediaRequestId = null;
 
-  function clearPollTimer() {
-    if (pollTimer !== null) {
-      clearTimeout(pollTimer);
-      pollTimer = null;
-    }
-  }
+  watch(detailPayload, (payload) => {
+    events.value = payload.events;
+    hasMoreEvents.value = payload.hasMoreEvents;
+    nextCursor.value = payload.nextCursor;
+  });
 
-  function schedulePoll() {
-    clearPollTimer();
-    if (!pollIntervalMs || pollIntervalMs <= 0) return;
-    if (destroyed) return;
-    if (!hasActiveFulfillment(mediaRequest.value)) return;
-
-    pollTimer = setTimeout(async () => {
-      if (destroyed || !currentMediaRequestId) return;
-      await load({ mediaRequestId: currentMediaRequestId });
-    }, pollIntervalMs);
+  function syncEventsFromPayload() {
+    events.value = detailPayload.value.events;
+    hasMoreEvents.value = detailPayload.value.hasMoreEvents;
+    nextCursor.value = detailPayload.value.nextCursor;
   }
 
   async function load({ mediaRequestId }) {
-    if (destroyed) return;
     currentMediaRequestId = mediaRequestId;
-
-    const isRevalidation = hasLoaded;
-    if (isRevalidation) {
-      isRevalidating.value = true;
-    } else {
-      isLoading.value = true;
-    }
-    errorMessage.value = '';
-
-    try {
-      const payload = await fetchDetailFn({ mediaRequestId });
-      if (destroyed) return;
-      mediaRequest.value = payload.mediaRequest ?? null;
-      events.value = payload.events ?? [];
-      hasMoreEvents.value = payload.hasMoreEvents ?? false;
-      nextCursor.value = payload.nextCursor ?? null;
-      hasLoaded = true;
-    } catch (error) {
-      if (destroyed) return;
-      errorMessage.value = error instanceof Error ? error.message : 'Failed to load request';
-      if (!isRevalidation) {
-        mediaRequest.value = null;
-        events.value = [];
-        hasMoreEvents.value = false;
-        nextCursor.value = null;
-      }
-    } finally {
-      if (!destroyed) {
-        isLoading.value = false;
-        isRevalidating.value = false;
-        schedulePoll();
-      }
-    }
+    await loadDetail();
+    syncEventsFromPayload();
   }
 
   async function loadMoreEvents({ mediaRequestId }) {
@@ -118,46 +100,25 @@ export function useMediaRequestDetail({
       hasMoreEvents.value = payload.hasMore ?? false;
       nextCursor.value = payload.nextCursor ?? null;
     } catch {
-      // silently ignore load-more failures
     } finally {
       isLoadingMoreEvents.value = false;
     }
   }
 
-  function handleVisibilityChange() {
-    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded || !currentMediaRequestId) return;
-    void load({ mediaRequestId: currentMediaRequestId }).then(() => {
-      if (!destroyed) schedulePoll();
-    });
-  }
-
   function reset() {
-    mediaRequest.value = null;
+    resetDetail();
+    currentMediaRequestId = null;
     events.value = [];
-    errorMessage.value = '';
     hasMoreEvents.value = false;
     isLoadingMoreEvents.value = false;
     nextCursor.value = null;
-    hasLoaded = false;
-    currentMediaRequestId = null;
   }
 
   function destroy() {
-    destroyed = true;
-    clearPollTimer();
-    if (revalidateOnFocus && typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
-  }
-
-  function attachVisibilityListener() {
-    if (revalidateOnFocus && typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
+    destroyResource();
   }
 
   return {
-    attachVisibilityListener,
     destroy,
     errorMessage: readonly(errorMessage),
     events: readonly(events),
