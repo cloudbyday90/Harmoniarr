@@ -18,6 +18,16 @@ Local walkthrough credentials:
 
 These credentials live in `docker/walkthrough.env` and are only meant for disposable local exploration.
 
+## Optional: Last.fm API Key
+
+To enable similar-artist recommendations in Discover, set the `LASTFM_API_KEY` environment variable before starting the stack. The key is free and unlimited — get one at https://www.last.fm/api/account/create.
+
+```powershell
+$env:LASTFM_API_KEY = "your-key-here"
+docker compose -f compose.walkthrough.yaml build harmoniarr
+docker compose -f compose.walkthrough.yaml up -d --wait --no-build harmoniarr
+```
+
 ## Start
 
 From the repository root:

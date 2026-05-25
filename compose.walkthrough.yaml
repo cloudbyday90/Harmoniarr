@@ -21,6 +21,7 @@ services:
       HARMONIARR_CONTACT_EMAIL: ${HARMONIARR_CONTACT_EMAIL:-}
       HARMONIARR_LOG_LEVEL: ${HARMONIARR_LOG_LEVEL:-info}
       HARMONIARR_CSRF_PROTECTION: disabled
+      LASTFM_API_KEY: ${LASTFM_API_KEY:-}
     ports:
       - name: web
         target: 3000

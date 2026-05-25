@@ -33,6 +33,10 @@ export function searchLocalMetadataArtists({ query, limit } = {}) {
   return apiRequest(`/api/v1/metadata/artists/search${buildQueryString({ q: query, limit })}`);
 }
 
+export function fetchAdminMonitoredArtists({ limit, offset, search, sort, signal } = {}) {
+  return apiRequest(`/api/v1/metadata/artists/monitored/admin${buildQueryString({ limit, offset, search, sort })}`, { signal });
+}
+
 export function fetchMonitoredArtists({ limit, signal } = {}) {
   return apiRequest(`/api/v1/metadata/artists/monitored${buildQueryString({ limit })}`, { signal });
 }

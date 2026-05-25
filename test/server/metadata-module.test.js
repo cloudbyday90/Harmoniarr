@@ -111,6 +111,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     searchLocalMetadataReleaseGroups: metadataSearchService.searchReleaseGroups,
     searchLocalMetadataReleases: metadataSearchService.searchReleases,
     listMonitoredArtists: metadataSearchService.listMonitoredArtists,
+    listAllMonitoredArtists: metadataSearchService.listAllMonitoredArtists,
     searchMusicBrainzArtists: musicBrainzSearchService.searchArtists,
     searchMusicBrainzReleases: musicBrainzSearchService.searchReleases,
     getSimilarArtists: similarArtistsService.getSimilarArtists,

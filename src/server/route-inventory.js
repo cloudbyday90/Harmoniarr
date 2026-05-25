@@ -107,6 +107,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/providers/youtube/oauth/clear', access: 'admin', area: 'providers', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/metadata/artists/search', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/artists/monitored', access: 'authenticated', area: 'metadata', kind: 'read' },
+  { method: 'GET', path: '/api/v1/metadata/artists/monitored/admin', access: 'admin', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/release-groups/search', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/releases/search', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/artists/:artistId', access: 'authenticated', area: 'metadata', kind: 'read' },

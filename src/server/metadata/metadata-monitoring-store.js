@@ -60,6 +60,7 @@ export function createMetadataMonitoringStore({
   async function upsertArtistMonitoring({
     isMonitored,
     metadataArtistId,
+    monitoredByUserId = null,
     monitoredReleaseGroupTypes,
   }) {
     const pool = getPoolFn();
@@ -69,17 +70,23 @@ export function createMetadataMonitoringStore({
           metadata_artist_id,
           is_monitored,
           monitored_release_group_types,
+          monitored_by_user_id,
           last_refreshed_at,
           next_refresh_at,
           updated_at
         )
-        VALUES ($1, $2, $3::text[], NULL, NULL, NOW())
+        VALUES ($1, $2, $3::text[], $4, NULL, NULL, NOW())
         ON CONFLICT (metadata_artist_id) DO UPDATE
         SET is_monitored = EXCLUDED.is_monitored,
             monitored_release_group_types = EXCLUDED.monitored_release_group_types,
+            monitored_by_user_id = CASE
+              WHEN EXCLUDED.is_monitored = TRUE AND metadata_artist_monitoring.monitored_by_user_id IS NULL
+              THEN EXCLUDED.monitored_by_user_id
+              ELSE metadata_artist_monitoring.monitored_by_user_id
+            END,
             updated_at = NOW()
       `,
-      [metadataArtistId, isMonitored, monitoredReleaseGroupTypes],
+      [metadataArtistId, isMonitored, monitoredReleaseGroupTypes, monitoredByUserId],
     );
   }
 

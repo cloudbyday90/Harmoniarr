@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import {
+  listAdminMonitoredMetadataArtists,
   listMonitoredMetadataArtists,
   searchMetadataArtists,
   searchMetadataReleaseGroups,
@@ -171,7 +172,12 @@ export function createMetadataSearchService({
     };
   }
 
+  async function listAllMonitoredArtists({ search, sort, limit, offset } = {}) {
+    return listAdminMonitoredMetadataArtists({ search, sort, limit, offset }, pool);
+  }
+
   return {
+    listAllMonitoredArtists,
     listMonitoredArtists,
     searchAll,
     searchArtists,

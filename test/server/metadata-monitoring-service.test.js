@@ -30,6 +30,7 @@ test('updateArtistMonitoring validates and persists monitoring state for an exis
   assert.deepEqual(upsertArtistMonitoring.mock.calls[0].arguments[0], {
     isMonitored: true,
     metadataArtistId: 'artist-1',
+    monitoredByUserId: null,
     monitoredReleaseGroupTypes: ['album'],
   });
   assert.equal(metadataRefreshSchedulerService.ensureArtistRefreshScheduled.mock.callCount(), 1);

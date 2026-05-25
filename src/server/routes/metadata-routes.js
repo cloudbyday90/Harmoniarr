@@ -84,6 +84,7 @@ export function registerMetadataRoutes(app, {
   searchLocalMetadataReleases,
   searchAllLocalMetadata,
   listMonitoredArtists,
+  listAllMonitoredArtists,
   searchMusicBrainzArtists,
   searchMusicBrainzReleases,
   getSimilarArtists,
@@ -151,6 +152,17 @@ export function registerMetadataRoutes(app, {
     ...await listMonitoredArtists({
       limit: sanitizePageLimit(request.query.limit, { default: 25, max: 25 }),
     }),
+  }));
+
+  app.get('/api/v1/metadata/artists/monitored/admin', metadataRoute(async (request, response) => {
+    await requireFreshAdminSessionFn(request);
+    const result = await listAllMonitoredArtists({
+      search: request.query.search || undefined,
+      sort: request.query.sort || undefined,
+      limit: sanitizePageLimit(request.query.limit, { default: 25, max: 100 }),
+      offset: sanitizePageOffset(request.query.offset),
+    });
+    response.json({ ok: true, ...result });
   }));
 
   registerSessionGetJsonRoute('/api/v1/metadata/release-groups/search', async (request) => ({

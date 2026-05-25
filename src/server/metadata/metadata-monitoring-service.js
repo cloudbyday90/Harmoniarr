@@ -98,6 +98,7 @@ export function createMetadataMonitoringService({
     await metadataMonitoringStore.upsertArtistMonitoring({
       ...normalizedPatch,
       metadataArtistId,
+      monitoredByUserId: normalizedPatch.isMonitored ? actorUserId : null,
     });
 
     if (normalizedPatch.isMonitored) {

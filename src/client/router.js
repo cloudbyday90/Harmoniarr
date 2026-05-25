@@ -27,6 +27,7 @@ const ActivityDownloadsView = () => import('./views/ActivityDownloadsView.vue');
 const ActivityFeedView = () => import('./views/ActivityFeedView.vue');
 const ActivityHistoryView = () => import('./views/ActivityHistoryView.vue');
 const ActivityImportsView = () => import('./views/ActivityImportsView.vue');
+const ActivityMonitoredArtistsView = () => import('./views/ActivityMonitoredArtistsView.vue');
 const ActivityReleasesView = () => import('./views/ActivityReleasesView.vue');
 const ActivityUsersView = () => import('./views/ActivityUsersView.vue');
 const ActivityWantedView = () => import('./views/ActivityWantedView.vue');
@@ -72,6 +73,7 @@ const requesterRestrictedRouteNames = new Set([
   'activity-history',
   'activity-blocklist',
   'activity-failed',
+  'activity-monitored-artists',
   'settings',
   'settings-connections',
   'settings-media-storage',
@@ -131,6 +133,7 @@ const router = createRouter({
             { path: 'history', name: 'activity-history', component: ActivityHistoryView },
             { path: 'blocklist', name: 'activity-blocklist', component: ActivityBlocklistView },
             { path: 'failed', name: 'activity-failed', component: ActivityImportsView, props: { status: 'failed', title: 'Failed', subtitle: 'Failed import candidates.', emptyTitle: 'No failed import candidates', emptyCopy: 'Imports that fail will surface here once the apply worker reports them.' } },
+            { path: 'monitored-artists', name: 'activity-monitored-artists', component: ActivityMonitoredArtistsView },
           ],
         },
 

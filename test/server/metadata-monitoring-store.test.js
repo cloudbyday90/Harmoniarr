@@ -50,7 +50,7 @@ test('upsertArtistMonitoring stores the current monitoring policy', async (t) =>
   });
 
   assert.match(query.mock.calls[0].arguments[0], /INSERT INTO metadata_artist_monitoring/);
-  assert.deepEqual(query.mock.calls[0].arguments[1], ['artist-1', true, ['album']]);
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['artist-1', true, ['album'], null]);
 });
 
 test('listArtistsDueForRefresh returns monitored artists without active refresh runs', async (t) => {

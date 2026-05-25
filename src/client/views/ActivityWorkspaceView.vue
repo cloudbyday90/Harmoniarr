@@ -32,6 +32,7 @@ const tabs = [
   { name: 'activity-history', label: 'History', implemented: true },
   { name: 'activity-blocklist', label: 'Blocklist', implemented: true },
   { name: 'activity-failed', label: 'Failed', implemented: true },
+  { name: 'activity-monitored-artists', label: 'Artists', implemented: true },
 ];
 
 const tabbarRef = ref(null);
