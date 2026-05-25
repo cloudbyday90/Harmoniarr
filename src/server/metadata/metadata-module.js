@@ -27,6 +27,8 @@ import { createMetadataMonitoringService } from './metadata-monitoring-service.j
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
+import { createOperatorArtistReconciliationRunStore } from './operator-artist-reconciliation-run-store.js';
+import { createOperatorArtistReconciliationService } from './operator-artist-reconciliation-service.js';
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 import { createOperatorArtistReconciliationSnapshotStore } from './operator-artist-reconciliation-snapshot-store.js';
 import { createOperatorReleaseGroupSelectionService } from './operator-release-group-selection-service.js';
@@ -63,6 +65,8 @@ export function createMetadataModule({
   metadataMonitoringService = null,
   operatorArtistMonitoringStore = null,
   operatorArtistMonitoringService = null,
+  operatorArtistReconciliationRunStore = null,
+  operatorArtistReconciliationService = null,
   operatorArtistReconciliationSnapshotStore = null,
   operatorArtistReconciliationSnapshotService = null,
   operatorReleaseGroupSelectionStore = null,
@@ -74,6 +78,7 @@ export function createMetadataModule({
   metadataSearchService = null,
   providerHealthRecorder = null,
   recordActivityEventFn = null,
+  recordAuditEventFn = undefined,
   musicBrainzCatalogService = null,
   musicBrainzImportService = null,
   musicBrainzSearchService = null,
@@ -102,11 +107,21 @@ export function createMetadataModule({
   const resolvedOperatorArtistMonitoringService = operatorArtistMonitoringService ?? createOperatorArtistMonitoringService({
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
   });
+  const resolvedOperatorArtistReconciliationRunStore = operatorArtistReconciliationRunStore
+    ?? createOperatorArtistReconciliationRunStore();
   const resolvedOperatorArtistReconciliationSnapshotStore = operatorArtistReconciliationSnapshotStore
     ?? createOperatorArtistReconciliationSnapshotStore();
   const resolvedOperatorArtistReconciliationSnapshotService = operatorArtistReconciliationSnapshotService
     ?? createOperatorArtistReconciliationSnapshotService({
       operatorArtistReconciliationSnapshotStore: resolvedOperatorArtistReconciliationSnapshotStore,
+    });
+  const resolvedOperatorArtistReconciliationService = operatorArtistReconciliationService
+    ?? createOperatorArtistReconciliationService({
+      getMetadataArtist: resolvedMetadataReadService.getArtist,
+      getLatestOperatorArtistReconciliationSnapshot: resolvedOperatorArtistReconciliationSnapshotService.getLatestOperatorArtistReconciliationSnapshot,
+      createOperationRun: resolvedOperatorArtistReconciliationRunStore.createOperationRun,
+      getActiveRunByOperatorArtist: resolvedOperatorArtistReconciliationRunStore.getActiveRunByOperatorArtist,
+      recordAuditEventFn,
     });
   const resolvedOperatorReleaseGroupSelectionStore = operatorReleaseGroupSelectionStore
     ?? createOperatorReleaseGroupSelectionStore();
@@ -179,6 +194,8 @@ export function createMetadataModule({
     metadataMonitoringStore: resolvedMetadataMonitoringStore,
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
+    operatorArtistReconciliationRunStore: resolvedOperatorArtistReconciliationRunStore,
+    operatorArtistReconciliationService: resolvedOperatorArtistReconciliationService,
     operatorArtistReconciliationSnapshotService: resolvedOperatorArtistReconciliationSnapshotService,
     operatorArtistReconciliationSnapshotStore: resolvedOperatorArtistReconciliationSnapshotStore,
     operatorReleaseGroupSelectionService: resolvedOperatorReleaseGroupSelectionService,

@@ -105,6 +105,14 @@ export const operationRunRegistry = Object.freeze({
     supportsManualRetry: true,
     title: 'Metadata artist refresh',
   }),
+  operatorArtistReconciliation: Object.freeze({
+    leaseJobType: 'operator_artist_reconciliation',
+    operationType: 'operator_artist_reconciliation',
+    startedEventType: 'operator_artist_reconciliation_started',
+    supportsCancellation: true,
+    supportsManualRetry: true,
+    title: 'Artist reconciliation',
+  }),
   operatorNotificationFanout: Object.freeze({
     leaseJobType: 'operator_notification_fanout',
     operationType: 'operator_notification_fanout',
