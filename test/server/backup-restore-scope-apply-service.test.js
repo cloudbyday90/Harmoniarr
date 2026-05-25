@@ -8,12 +8,14 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   const replaceLibraryWantedReleases = t.mock.fn(async () => {});
   const replaceMetadataArtistMonitoring = t.mock.fn(async () => {});
   const replaceOperatorArtistMonitoring = t.mock.fn(async () => {});
+  const replaceOperatorReleaseGroupSelections = t.mock.fn(async () => {});
   const replaceTrustSnapshot = t.mock.fn(async () => {});
   const service = createBackupRestoreScopeApplyService({
     replaceOverridesSnapshot,
     replaceLibraryWantedReleases,
     replaceMetadataArtistMonitoring,
     replaceOperatorArtistMonitoring,
+    replaceOperatorReleaseGroupSelections,
     replaceTrustSnapshot,
     updateSettingsFn,
   });
@@ -47,6 +49,16 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
                 searchOnAddMode: 'none',
                 selectionSourceMode: 'policy_plus_overrides',
                 wantedAutomationMode: 'future_matching',
+              },
+            ],
+            operatorReleaseGroupSelections: [
+              {
+                appUserId: 'user-1',
+                metadataArtistId: 'artist-1',
+                metadataReleaseGroupId: 'release-group-1',
+                resolvedMetadataReleaseId: 'release-1',
+                selectionSource: 'manual',
+                selectionState: 'partial',
               },
             ],
           },
@@ -100,6 +112,7 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   assert.equal(replaceLibraryWantedReleases.mock.callCount(), 1);
   assert.equal(replaceMetadataArtistMonitoring.mock.callCount(), 1);
   assert.equal(replaceOperatorArtistMonitoring.mock.callCount(), 1);
+  assert.equal(replaceOperatorReleaseGroupSelections.mock.callCount(), 1);
   assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
   assert.deepEqual(result, {
     appliedScopes: ['monitoring', 'wanted', 'trust', 'overrides', 'providers', 'settings'],

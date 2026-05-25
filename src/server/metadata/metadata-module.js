@@ -27,6 +27,8 @@ import { createMetadataMonitoringService } from './metadata-monitoring-service.j
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
+import { createOperatorReleaseGroupSelectionService } from './operator-release-group-selection-service.js';
+import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
 import { createMetadataRefreshSchedulerService } from './metadata-refresh-scheduler-service.js';
 import { createMetadataRefreshSchedulingPolicyService } from './metadata-refresh-scheduling-policy-service.js';
 import { createMetadataReadService } from './metadata-read-service.js';
@@ -57,6 +59,8 @@ export function createMetadataModule({
   metadataMonitoringService = null,
   operatorArtistMonitoringStore = null,
   operatorArtistMonitoringService = null,
+  operatorReleaseGroupSelectionStore = null,
+  operatorReleaseGroupSelectionService = null,
   metadataReadService = null,
   metadataRefreshService = null,
   metadataSearchService = null,
@@ -90,6 +94,12 @@ export function createMetadataModule({
   const resolvedOperatorArtistMonitoringService = operatorArtistMonitoringService ?? createOperatorArtistMonitoringService({
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
   });
+  const resolvedOperatorReleaseGroupSelectionStore = operatorReleaseGroupSelectionStore
+    ?? createOperatorReleaseGroupSelectionStore();
+  const resolvedOperatorReleaseGroupSelectionService = operatorReleaseGroupSelectionService
+    ?? createOperatorReleaseGroupSelectionService({
+      operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
+    });
   const resolvedMetadataRefreshService = metadataRefreshService ?? createMetadataRefreshService({
     getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,
     providerHealthRecorder,
@@ -149,6 +159,8 @@ export function createMetadataModule({
     metadataMonitoringStore: resolvedMetadataMonitoringStore,
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
+    operatorReleaseGroupSelectionService: resolvedOperatorReleaseGroupSelectionService,
+    operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
     metadataRefreshService: resolvedMetadataRefreshService,
     metadataSearchService: resolvedMetadataSearchService,
     providerHealthRecorder,

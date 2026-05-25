@@ -79,6 +79,7 @@ function buildScopeSettings({
   artistMonitoring,
   manualOverrides,
   operatorArtistMonitoring,
+  operatorReleaseGroupSelections,
   settingsSnapshot = {},
   sourceUsers,
   wantedReleases,
@@ -91,6 +92,7 @@ function buildScopeSettings({
     monitoring: {
       artistMonitoring,
       operatorArtistMonitoring,
+      operatorReleaseGroupSelections,
     },
     pathMappings: {
       paths: settingsSnapshot.paths,
@@ -124,6 +126,7 @@ export function createBackupExportService({
   listBackupArtifacts = async () => [],
   listOverridesSnapshotForBackup = async () => [],
   listOperatorArtistMonitoringForBackup = async () => [],
+  listOperatorReleaseGroupSelectionsForBackup = async () => [],
   listTrustSnapshotForBackup = async () => [],
   listWantedReleasesForBackup = async () => [],
   loadSettingsFn = loadSettings,
@@ -143,10 +146,18 @@ export function createBackupExportService({
     const packageMetadata = await readPackageMetadataFn(packageJsonPath);
     const settingsSnapshot = await loadSettingsFn();
     const migrationStatus = await getMigrationStatusFn();
-    const [artistMonitoring, manualOverrides, operatorArtistMonitoring, sourceUsers, wantedReleases] = await Promise.all([
+    const [
+      artistMonitoring,
+      manualOverrides,
+      operatorArtistMonitoring,
+      operatorReleaseGroupSelections,
+      sourceUsers,
+      wantedReleases,
+    ] = await Promise.all([
       listArtistMonitoringForBackup(),
       listOverridesSnapshotForBackup(),
       listOperatorArtistMonitoringForBackup(),
+      listOperatorReleaseGroupSelectionsForBackup(),
       listTrustSnapshotForBackup(),
       listWantedReleasesForBackup(),
     ]);
@@ -170,6 +181,7 @@ export function createBackupExportService({
           artistMonitoring,
           manualOverrides,
           operatorArtistMonitoring,
+          operatorReleaseGroupSelections,
           settingsSnapshot,
           sourceUsers,
           wantedReleases,
