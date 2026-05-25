@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createSimilarArtistsCache,
+  computeGenreOverlapBonus,
   createSimilarArtistsService,
+  extractMbGenreSignals,
   extractMbRelatedArtists,
   mergeSimilarArtists,
 } from '../../src/server/metadata/similar-artists-service.js';
@@ -677,4 +679,386 @@ test('createSimilarArtistsService name fallback failure is non-fatal', async () 
 
   assert.equal(result.similar.length, 1);
   assert.equal(result.similar[0].source, 'listenbrainz');
+});
+
+// ---------------------------------------------------------------------------
+// Expanded MusicBrainz relationship weights
+// ---------------------------------------------------------------------------
+
+test('extractMbRelatedArtists maps "is person" at weight 0.9', () => {
+  const relations = [
+    { type: 'is person', artist: { id: 'mb-persona', name: 'Alternate Persona' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.9);
+});
+
+test('extractMbRelatedArtists maps "artist rename" at weight 0.85', () => {
+  const relations = [
+    { type: 'artist rename', artist: { id: 'mb-renamed', name: 'Renamed Project' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.85);
+});
+
+test('extractMbRelatedArtists maps "subgroup" at weight 0.6', () => {
+  const relations = [
+    { type: 'subgroup', artist: { id: 'mb-sub', name: 'Subgroup' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.6);
+});
+
+test('extractMbRelatedArtists maps "supporting musician" at weight 0.5', () => {
+  const relations = [
+    { type: 'supporting musician', artist: { id: 'mb-supp', name: 'Supporting Artist' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.5);
+});
+
+test('extractMbRelatedArtists maps "founder" at weight 0.5', () => {
+  const relations = [
+    { type: 'founder', artist: { id: 'mb-founder', name: 'Founder' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.5);
+});
+
+test('extractMbRelatedArtists maps "vocal supporting musician" at weight 0.5', () => {
+  const relations = [
+    { type: 'vocal supporting musician', artist: { id: 'mb-vocal', name: 'Vocal Support' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.5);
+});
+
+test('extractMbRelatedArtists maps "instrumental supporting musician" at weight 0.45', () => {
+  const relations = [
+    { type: 'instrumental supporting musician', artist: { id: 'mb-inst', name: 'Instrumental Support' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.45);
+});
+
+test('extractMbRelatedArtists maps "conductor position" at weight 0.3', () => {
+  const relations = [
+    { type: 'conductor position', artist: { id: 'mb-cond', name: 'Conductor' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.3);
+});
+
+test('extractMbRelatedArtists maps "tribute" at weight 0.2', () => {
+  const relations = [
+    { type: 'tribute', artist: { id: 'mb-trib', name: 'Tribute Band' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.2);
+});
+
+test('extractMbRelatedArtists maps "married" at weight 0.15', () => {
+  const relations = [
+    { type: 'married', artist: { id: 'mb-spouse', name: 'Spouse' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.15);
+});
+
+test('extractMbRelatedArtists maps "sibling" at weight 0.15', () => {
+  const relations = [
+    { type: 'sibling', artist: { id: 'mb-sib', name: 'Sibling' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.15);
+});
+
+test('extractMbRelatedArtists now includes "conductor position" which was previously skipped', () => {
+  const relations = [
+    { type: 'conductor position', artist: { id: 'mb-cond', name: 'Conductor' } },
+    { type: 'similar artist', artist: { id: 'mb-sim', name: 'Similar' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 2);
+  assert.equal(result[0].mbid, 'mb-cond');
+  assert.equal(result[0].score, 0.3);
+  assert.equal(result[1].mbid, 'mb-sim');
+  assert.equal(result[1].score, 0.7);
+});
+
+test('extractMbRelatedArtists handles mix of mapped and unmapped relationship types', () => {
+  const relations = [
+    { type: 'similar artist', artist: { id: 'mb-1', name: 'Sim' } },
+    { type: 'is person', artist: { id: 'mb-2', name: 'Persona' } },
+    { type: 'teacher', artist: { id: 'mb-3', name: 'Teacher' } },
+    { type: 'collaboration', artist: { id: 'mb-4', name: 'Collab' } },
+    { type: 'voice actor', artist: { id: 'mb-5', name: 'Voice' } },
+  ];
+
+  const result = extractMbRelatedArtists(relations);
+
+  assert.equal(result.length, 4);
+  const byId = new Map(result.map((r) => [r.mbid, r]));
+  assert.equal(byId.get('mb-1').score, 0.7);
+  assert.equal(byId.get('mb-2').score, 0.9);
+  assert.equal(byId.get('mb-4').score, 0.4);
+  assert.equal(byId.get('mb-5').score, 0.1);
+});
+
+// ---------------------------------------------------------------------------
+// extractMbGenreSignals
+// ---------------------------------------------------------------------------
+
+test('extractMbGenreSignals returns empty sets for null input', () => {
+  const result = extractMbGenreSignals(null);
+  assert.equal(result.genres.size, 0);
+  assert.equal(result.tags.size, 0);
+});
+
+test('extractMbGenreSignals returns empty sets for undefined input', () => {
+  const result = extractMbGenreSignals(undefined);
+  assert.equal(result.genres.size, 0);
+  assert.equal(result.tags.size, 0);
+});
+
+test('extractMbGenreSignals extracts genres from MB artist response', () => {
+  const response = {
+    name: 'Radiohead',
+    genres: [
+      { name: 'alternative rock', id: 'g1', count: 50 },
+      { name: 'art rock', id: 'g2', count: 30 },
+    ],
+    tags: [
+      { name: 'british', count: 10 },
+    ],
+  };
+
+  const result = extractMbGenreSignals(response);
+  assert.equal(result.genres.size, 2);
+  assert.ok(result.genres.has('alternative rock'));
+  assert.ok(result.genres.has('art rock'));
+});
+
+test('extractMbGenreSignals lowercases genre and tag names', () => {
+  const response = {
+    genres: [{ name: 'Alternative Rock', id: 'g1', count: 50 }],
+    tags: [{ name: 'British', count: 10 }],
+  };
+
+  const result = extractMbGenreSignals(response);
+  assert.ok(result.genres.has('alternative rock'));
+  assert.ok(result.tags.has('british'));
+});
+
+test('extractMbGenreSignals skips empty genre and tag names', () => {
+  const response = {
+    genres: [{ name: '', id: 'g1', count: 0 }, { name: 'rock', id: 'g2', count: 5 }],
+    tags: [{ name: '', count: 0 }, { name: 'indie', count: 3 }],
+  };
+
+  const result = extractMbGenreSignals(response);
+  assert.equal(result.genres.size, 1);
+  assert.ok(result.genres.has('rock'));
+  assert.equal(result.tags.size, 1);
+  assert.ok(result.tags.has('indie'));
+});
+
+test('extractMbGenreSignals returns empty sets when genres and tags are missing', () => {
+  const response = { name: 'Unknown Artist' };
+  const result = extractMbGenreSignals(response);
+  assert.equal(result.genres.size, 0);
+  assert.equal(result.tags.size, 0);
+});
+
+// ---------------------------------------------------------------------------
+// computeGenreOverlapBonus
+// ---------------------------------------------------------------------------
+
+test('computeGenreOverlapBonus returns 0 when candidate has no genres or tags', () => {
+  const seedGenres = new Set(['rock', 'alternative']);
+  const result = computeGenreOverlapBonus(null, null, seedGenres, new Set());
+  assert.equal(result, 0);
+});
+
+test('computeGenreOverlapBonus returns 0 when seed has no genres or tags', () => {
+  const candidateGenres = new Set(['rock']);
+  const result = computeGenreOverlapBonus(candidateGenres, new Set(), new Set(), new Set());
+  assert.equal(result, 0);
+});
+
+test('computeGenreOverlapBonus adds bonus for each shared genre', () => {
+  const seedGenres = new Set(['rock', 'alternative', 'electronic']);
+  const candidateGenres = new Set(['rock', 'electronic', 'jazz']);
+  const result = computeGenreOverlapBonus(candidateGenres, new Set(), seedGenres, new Set());
+  assert.equal(result, 0.04 * 2);
+});
+
+test('computeGenreOverlapBonus adds bonus for shared tags at lower rate', () => {
+  const seedTags = new Set(['british', '1990s']);
+  const candidateTags = new Set(['british', '2020s']);
+  const result = computeGenreOverlapBonus(new Set(), candidateTags, new Set(), seedTags);
+  assert.equal(result, 0.02 * 1);
+});
+
+test('computeGenreOverlapBonus counts both genre and tag overlap', () => {
+  const seedGenres = new Set(['rock']);
+  const seedTags = new Set(['british']);
+  const candidateGenres = new Set(['rock']);
+  const candidateTags = new Set(['british']);
+  const result = computeGenreOverlapBonus(candidateGenres, candidateTags, seedGenres, seedTags);
+  assert.equal(result, 0.04 + 0.02);
+});
+
+test('computeGenreOverlapBonus returns empty sets gracefully', () => {
+  const result = computeGenreOverlapBonus(new Set(), new Set(), new Set(), new Set());
+  assert.equal(result, 0);
+});
+
+// ---------------------------------------------------------------------------
+// mergeSimilarArtists with genre overlap bonus
+// ---------------------------------------------------------------------------
+
+test('mergeSimilarArtists applies genre overlap bonus via genreOverrides', () => {
+  const lbArtists = [
+    { mbid: 'mb-1', name: 'Shared Genre Artist', score: 0.5 },
+  ];
+  const seedGenres = new Set(['rock', 'electronic']);
+  const candidateGenres = new Set(['rock']);
+  const genreOverrides = new Map([
+    ['mb-1', { genres: candidateGenres, tags: new Set() }],
+  ]);
+
+  const result = mergeSimilarArtists(lbArtists, [], { limit: 20 }, [], { seedGenres, genreOverrides });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.5 + 0.04);
+});
+
+test('mergeSimilarArtists genre overlap bonus is additive across sources', () => {
+  const mbArtists = [
+    { mbid: 'mb-mb', name: 'MB Artist', score: 0.7 },
+  ];
+  const lastfmArtists = [
+    { mbid: 'mb-lf', name: 'LF Artist', score: 0.6 },
+  ];
+  const seedGenres = new Set(['rock']);
+  const genreOverrides = new Map([
+    ['mb-mb', { genres: new Set(['rock']), tags: new Set() }],
+    ['mb-lf', { genres: new Set(['rock']), tags: new Set() }],
+  ]);
+
+  const result = mergeSimilarArtists([], mbArtists, { limit: 20 }, lastfmArtists, { seedGenres, genreOverrides });
+
+  assert.equal(result.length, 2);
+  const mbEntry = result.find((r) => r.id === 'mb-mb');
+  const lfEntry = result.find((r) => r.id === 'mb-lf');
+  assert.equal(mbEntry.score, 0.7 + 0.04);
+  assert.equal(lfEntry.score, 0.6 + 0.04);
+});
+
+test('mergeSimilarArtists without genreOverrides is backward-compatible', () => {
+  const lbArtists = [{ mbid: 'mb-1', name: 'Artist A', score: 0.9 }];
+
+  const result = mergeSimilarArtists(lbArtists, [], { limit: 20 });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].score, 0.9);
+  assert.equal(result[0].source, 'listenbrainz');
+});
+
+// ---------------------------------------------------------------------------
+// createSimilarArtistsService with genre signals from MB response
+// ---------------------------------------------------------------------------
+
+test('createSimilarArtistsService extracts seed genres from MB response', async () => {
+  const lbClient = createTestListenBrainzClient(async () => [
+    { mbid: 'mb-lb', name: 'LB Artist', score: 0.9 },
+  ]);
+  const mbClient = createTestMusicBrainzClient(async () => ({
+    name: 'Radiohead',
+    genres: [
+      { name: 'alternative rock', id: 'g1', count: 50 },
+    ],
+    relations: [
+      { type: 'similar artist', artist: { id: 'mb-mb', name: 'MB Artist' } },
+    ],
+  }));
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid' });
+  assert.ok(Array.isArray(result.similar));
+  assert.ok(result.similar.length >= 1);
+});
+
+test('createSimilarArtistsService uses genre overlap from related artist data', async () => {
+  const lbClient = createTestListenBrainzClient(async () => []);
+  const mbClient = createTestMusicBrainzClient(async () => ({
+    name: 'Radiohead',
+    genres: [
+      { name: 'alternative rock', id: 'g1', count: 50 },
+      { name: 'art rock', id: 'g2', count: 30 },
+    ],
+    relations: [
+      {
+        type: 'similar artist',
+        artist: {
+          id: 'mb-mb',
+          name: 'MB Artist with Genres',
+          genres: [{ name: 'alternative rock', id: 'g3', count: 20 }],
+          tags: [{ name: 'british', count: 5 }],
+        },
+      },
+    ],
+  }));
+  const lastFmClient = createTestLastFmClient(async () => []);
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'test-mbid' });
+  const mbArtist = result.similar.find((a) => a.id === 'mb-mb');
+  assert.ok(mbArtist, 'MB artist should be in results');
+  assert.ok(mbArtist.score > 0.7, 'Score should include genre overlap bonus');
 });

@@ -319,7 +319,7 @@ export function createMusicBrainzClient({
     return requestJson(`artist/${artistId}`, {
       operation: 'artist relations lookup',
       query: {
-        inc: 'artist-rels',
+        inc: 'artist-rels+genres+tags',
       },
     });
   }
