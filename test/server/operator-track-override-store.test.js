@@ -167,3 +167,37 @@ test('replaceOperatorTrackOverridesSnapshot replaces the snapshot transactionall
   assert.equal(query.mock.calls[3].arguments[0], 'COMMIT');
   assert.equal(release.mock.callCount(), 1);
 });
+
+test('replaceOperatorArtistTrackOverrides replaces one operator artist override set without nested transactions', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const store = createOperatorTrackOverrideStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  await store.replaceOperatorArtistTrackOverrides({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+    operatorTrackOverrides: [{
+      isDesired: true,
+      mediumPosition: 1,
+      metadataReleaseGroupId: 'release-group-1',
+      metadataReleaseId: 'release-1',
+      recordingMbid: '11111111-1111-4111-8111-111111111111',
+      remapStatus: 'resolved',
+      trackLengthMsSnapshot: 215000,
+      trackMbid: '22222222-2222-4222-8222-222222222222',
+      trackPosition: 4,
+      trackTitleSnapshot: 'Example Song',
+    }],
+  });
+
+  assert.match(query.mock.calls[0].arguments[0], /DELETE FROM operator_track_override/);
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['user-1', 'artist-1']);
+  assert.match(query.mock.calls[1].arguments[0], /DELETE FROM operator_track_override/);
+  assert.deepEqual(query.mock.calls[1].arguments[1], [
+    'user-1',
+    'release-group-1',
+    '22222222-2222-4222-8222-222222222222',
+  ]);
+  assert.match(query.mock.calls[2].arguments[0], /INSERT INTO operator_track_override/);
+});

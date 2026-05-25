@@ -129,3 +129,33 @@ test('replaceOperatorReleaseGroupSelectionsSnapshot replaces the backup snapshot
   ]);
   assert.equal(release.mock.callCount(), 1);
 });
+
+test('replaceOperatorArtistReleaseGroupSelections replaces only one operator artist selection set', async (t) => {
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const store = createOperatorReleaseGroupSelectionStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  await store.replaceOperatorArtistReleaseGroupSelections({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+    operatorReleaseGroupSelections: [{
+      metadataReleaseGroupId: 'release-group-1',
+      resolvedMetadataReleaseId: 'release-1',
+      selectionSource: 'manual',
+      selectionState: 'selected',
+    }],
+  });
+
+  assert.match(query.mock.calls[0].arguments[0], /DELETE FROM operator_release_group_selection/);
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['user-1', 'artist-1']);
+  assert.match(query.mock.calls[1].arguments[0], /INSERT INTO operator_release_group_selection/);
+  assert.deepEqual(query.mock.calls[1].arguments[1], [
+    'user-1',
+    'artist-1',
+    'release-group-1',
+    'selected',
+    'release-1',
+    'manual',
+  ]);
+});

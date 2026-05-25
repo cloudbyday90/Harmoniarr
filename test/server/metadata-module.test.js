@@ -19,6 +19,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const operatorArtistProjectionService = {
     getOperatorArtistProjection: () => {},
   };
+  const operatorArtistSaveService = {
+    saveOperatorArtist: () => {},
+  };
   const metadataReadService = {
     getArtist: () => {},
     getArtistByMusicBrainzId: () => {},
@@ -70,6 +73,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     metadataMonitoringService,
     metadataMonitoringStore,
     operatorArtistProjectionService,
+    operatorArtistSaveService,
     metadataReadService,
     metadataRefreshService,
     metadataSearchService,
@@ -89,6 +93,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.metadataMonitoringService, metadataMonitoringService);
   assert.equal(metadataModule.metadataMonitoringStore, metadataMonitoringStore);
   assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
+  assert.equal(metadataModule.operatorArtistSaveService, operatorArtistSaveService);
   assert.equal(metadataModule.metadataRefreshService, metadataRefreshService);
   assert.equal(metadataModule.metadataSearchService, metadataSearchService);
   assert.equal(metadataModule.providerHealthRecorder, providerHealthRecorder);
@@ -107,6 +112,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getMetadataReleaseByMusicBrainzId: metadataReadService.getReleaseByMusicBrainzId,
     getMetadataReleaseGroup: metadataReadService.getReleaseGroup,
     getMetadataReleaseGroupByMusicBrainzId: metadataReadService.getReleaseGroupByMusicBrainzId,
+    saveOperatorArtist: operatorArtistSaveService.saveOperatorArtist,
     startMetadataArtistRefresh: metadataArtistRefreshService.startMetadataArtistRefresh,
     updateMetadataArtistMonitoring: metadataMonitoringService.updateArtistMonitoring,
     importMusicBrainzArtist: musicBrainzImportService.importArtistById,

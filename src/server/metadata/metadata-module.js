@@ -27,6 +27,7 @@ import { createMetadataMonitoringService } from './metadata-monitoring-service.j
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
+import { createOperatorArtistSaveService } from './operator-artist-save-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
 import { createOperatorArtistReconciliationRunStore } from './operator-artist-reconciliation-run-store.js';
 import { createOperatorArtistReconciliationExecutionService } from './operator-artist-reconciliation-execution-service.js';
@@ -69,6 +70,7 @@ export function createMetadataModule({
   operatorArtistMonitoringStore = null,
   operatorArtistMonitoringService = null,
   operatorArtistProjectionService = null,
+  operatorArtistSaveService = null,
   operatorArtistReconciliationRunStore = null,
   operatorArtistReconciliationExecutionService = null,
   operatorArtistReconciliationService = null,
@@ -143,6 +145,15 @@ export function createMetadataModule({
       getRunningRunByOperatorArtist: resolvedOperatorArtistReconciliationRunStore.getRunningRunByOperatorArtist,
       listOperatorReleaseGroupSelections: resolvedOperatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections,
       listOperatorTrackOverrides: resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides,
+    });
+  const resolvedOperatorArtistSaveService = operatorArtistSaveService
+    ?? createOperatorArtistSaveService({
+      getOperatorArtistProjection: resolvedOperatorArtistProjectionService.getOperatorArtistProjection,
+      operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
+      operatorArtistReconciliationRunStore: resolvedOperatorArtistReconciliationRunStore,
+      operatorArtistReconciliationSnapshotStore: resolvedOperatorArtistReconciliationSnapshotStore,
+      operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
+      operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
     });
   const resolvedOperatorArtistReconciliationExecutionService = operatorArtistReconciliationExecutionService
     ?? createOperatorArtistReconciliationExecutionService({
@@ -237,6 +248,7 @@ export function createMetadataModule({
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
     operatorArtistProjectionService: resolvedOperatorArtistProjectionService,
+    operatorArtistSaveService: resolvedOperatorArtistSaveService,
     operatorArtistReconciliationExecutionService: resolvedOperatorArtistReconciliationExecutionService,
     operatorArtistReconciliationRunStore: resolvedOperatorArtistReconciliationRunStore,
     operatorArtistReconciliationService: resolvedOperatorArtistReconciliationService,
@@ -265,6 +277,7 @@ export function createMetadataModule({
       getMetadataReleaseByMusicBrainzId: resolvedMetadataReadService.getReleaseByMusicBrainzId,
       getMetadataReleaseGroup: resolvedMetadataReadService.getReleaseGroup,
       getMetadataReleaseGroupByMusicBrainzId: resolvedMetadataReadService.getReleaseGroupByMusicBrainzId,
+      saveOperatorArtist: resolvedOperatorArtistSaveService.saveOperatorArtist,
       startMetadataArtistRefresh: resolvedMetadataArtistRefreshService.startMetadataArtistRefresh,
       updateMetadataArtistMonitoring: resolvedMetadataMonitoringService.updateArtistMonitoring,
       importMusicBrainzArtist: resolvedMusicBrainzImportService.importArtistById,

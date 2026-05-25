@@ -80,12 +80,13 @@ export function createOperatorReleaseGroupSelectionStore({
     appUserId,
     metadataArtistId,
     metadataReleaseGroupId,
+    queryable = null,
     resolvedMetadataReleaseId = null,
     selectionSource,
     selectionState,
   }) {
-    const pool = getPoolFn();
-    await pool.query(
+    const queryTarget = queryable ?? getPoolFn();
+    await queryTarget.query(
       `
         INSERT INTO operator_release_group_selection (
           app_user_id,
@@ -113,6 +114,35 @@ export function createOperatorReleaseGroupSelectionStore({
         selectionSource,
       ],
     );
+  }
+
+  async function replaceOperatorArtistReleaseGroupSelections({
+    appUserId,
+    metadataArtistId,
+    operatorReleaseGroupSelections = [],
+    queryable = null,
+  }) {
+    const queryTarget = queryable ?? getPoolFn();
+    await queryTarget.query(
+      `
+        DELETE FROM operator_release_group_selection
+        WHERE app_user_id = $1
+          AND metadata_artist_id = $2
+      `,
+      [appUserId, metadataArtistId],
+    );
+
+    for (const selection of operatorReleaseGroupSelections) {
+      await upsertOperatorReleaseGroupSelection({
+        appUserId,
+        metadataArtistId,
+        metadataReleaseGroupId: selection.metadataReleaseGroupId,
+        queryable: queryTarget,
+        resolvedMetadataReleaseId: selection.resolvedMetadataReleaseId ?? null,
+        selectionSource: selection.selectionSource,
+        selectionState: selection.selectionState,
+      });
+    }
   }
 
   async function listOperatorReleaseGroupSelectionsSnapshot() {
@@ -176,6 +206,7 @@ export function createOperatorReleaseGroupSelectionStore({
     getOperatorReleaseGroupSelection,
     listOperatorReleaseGroupSelections,
     listOperatorReleaseGroupSelectionsSnapshot,
+    replaceOperatorArtistReleaseGroupSelections,
     replaceOperatorReleaseGroupSelectionsSnapshot,
     upsertOperatorReleaseGroupSelection,
   };

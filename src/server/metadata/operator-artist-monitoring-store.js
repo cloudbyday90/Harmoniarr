@@ -58,13 +58,14 @@ export function createOperatorArtistMonitoringStore({
     lastSavedSnapshotAt = null,
     metadataArtistId,
     monitoredReleaseGroupTypes,
+    queryable = null,
     releaseScope,
     searchOnAddMode,
     selectionSourceMode,
     wantedAutomationMode,
   }) {
-    const pool = getPoolFn();
-    await pool.query(
+    const queryTarget = queryable ?? getPoolFn();
+    await queryTarget.query(
       `
         INSERT INTO operator_artist_monitoring (
           app_user_id,

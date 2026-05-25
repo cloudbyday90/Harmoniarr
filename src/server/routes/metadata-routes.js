@@ -66,6 +66,7 @@ export function registerMetadataRoutes(app, {
   getMetadataArtistDetectionEvents,
   getMetadataArtistByMusicBrainzId,
   getOperatorArtistProjection,
+  saveOperatorArtist,
   getMetadataRelease,
   getMetadataReleaseByMusicBrainzId,
   getMetadataReleaseGroup,
@@ -219,6 +220,35 @@ export function registerMetadataRoutes(app, {
       operator: result.operator,
       releaseGroups: result.releaseGroups,
       releases: result.releases,
+    });
+  }));
+
+  app.put('/api/v1/metadata/artists/:artistId/operator', limitMetadataMutation, metadataRoute(async (request, response) => {
+    const session = await requireFreshSessionFn(request);
+    requireCsrfFn(request, session);
+
+    const result = await saveOperatorArtist({
+      appUserId: session.appUserId,
+      draft: request.body,
+      metadataArtistId: request.params.artistId,
+      triggeredByUserId: session.appUserId,
+    });
+
+    response.json({
+      ok: true,
+      aliases: result.projection?.aliases ?? [],
+      artist: result.projection?.artist ?? null,
+      artistId: result.artistId,
+      detectionEvents: result.projection?.detectionEvents ?? [],
+      detectionEventsPageInfo: result.projection?.detectionEventsPageInfo ?? {
+        hasMore: false,
+        nextCursor: null,
+      },
+      operator: result.operator,
+      reconciliation: result.reconciliation,
+      releaseGroups: result.projection?.releaseGroups ?? [],
+      releases: result.projection?.releases ?? [],
+      snapshot: result.snapshot,
     });
   }));
 

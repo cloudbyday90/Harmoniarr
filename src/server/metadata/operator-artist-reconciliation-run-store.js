@@ -303,29 +303,32 @@ export function createOperatorArtistReconciliationRunStore({
   async function queueLatestSnapshotRun({
     appUserId,
     artistName,
+    client = null,
     metadataArtistId,
     snapshotId,
     snapshotRevision,
     triggerSource = 'save',
     triggeredByUserId = null,
   }) {
-    const pool = getPoolFn();
+    const pool = client ? null : getPoolFn();
 
     for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
-      const client = await pool.connect();
+      const queryClient = client ?? await pool.connect();
 
       try {
-        await client.query('BEGIN');
+        if (!client) {
+          await queryClient.query('BEGIN');
+        }
 
         const runningRow = await selectRunForStatus({
           appUserId,
-          client,
+          client: queryClient,
           metadataArtistId,
           status: 'running',
         });
         const pendingRow = await selectRunForStatus({
           appUserId,
-          client,
+          client: queryClient,
           metadataArtistId,
           status: 'pending',
         });
@@ -334,7 +337,7 @@ export function createOperatorArtistReconciliationRunStore({
           const updatedPendingRow = await replacePendingRunSummary({
             appUserId,
             artistName,
-            client,
+            client: queryClient,
             metadataArtistId,
             pendingRunId: pendingRow.id,
             snapshotId,
@@ -343,7 +346,9 @@ export function createOperatorArtistReconciliationRunStore({
             triggeredByUserId,
           });
 
-          await client.query('COMMIT');
+          if (!client) {
+            await queryClient.query('COMMIT');
+          }
 
           return {
             action: runningRow ? 'replaced_pending_follow_up' : 'replaced_pending',
@@ -355,7 +360,7 @@ export function createOperatorArtistReconciliationRunStore({
         const insertedPendingRow = await insertPendingRun({
           appUserId,
           artistName,
-          client,
+          client: queryClient,
           metadataArtistId,
           snapshotId,
           snapshotRevision,
@@ -363,7 +368,9 @@ export function createOperatorArtistReconciliationRunStore({
           triggeredByUserId,
         });
 
-        await client.query('COMMIT');
+        if (!client) {
+          await queryClient.query('COMMIT');
+        }
 
         return {
           action: runningRow ? 'queued_follow_up' : 'created',
@@ -371,15 +378,19 @@ export function createOperatorArtistReconciliationRunStore({
           runningRun: normalizeRun(runningRow),
         };
       } catch (error) {
-        await client.query('ROLLBACK');
+        if (!client) {
+          await queryClient.query('ROLLBACK');
+        }
 
-        if (isUniqueViolation(error) && attemptIndex === 0) {
+        if (!client && isUniqueViolation(error) && attemptIndex === 0) {
           continue;
         }
 
         throw error;
       } finally {
-        client.release();
+        if (!client) {
+          queryClient.release();
+        }
       }
     }
 

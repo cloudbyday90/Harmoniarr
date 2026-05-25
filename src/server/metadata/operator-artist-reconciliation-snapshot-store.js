@@ -84,10 +84,11 @@ export function createOperatorArtistReconciliationSnapshotStore({
   async function createOperatorArtistReconciliationSnapshot({
     appUserId,
     metadataArtistId,
+    queryable = null,
     snapshotPayload,
   }) {
-    const pool = getPoolFn();
-    const result = await pool.query(
+    const queryTarget = queryable ?? getPoolFn();
+    const result = await queryTarget.query(
       `
         WITH next_revision AS (
           SELECT COALESCE(MAX(snapshot_revision), 0) + 1 AS snapshot_revision

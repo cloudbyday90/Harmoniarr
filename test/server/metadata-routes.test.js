@@ -59,6 +59,30 @@ function createMetadataRouteTestApp(overrides = {}) {
         releaseGroups: [],
         releases: [],
       }),
+      saveOperatorArtist: async ({ appUserId, draft, metadataArtistId }) => ({
+        artistId: metadataArtistId,
+        operator: {
+          monitoring: {
+            isMonitored: draft?.monitoring?.isMonitored === true,
+          },
+        },
+        projection: {
+          releaseGroups: [],
+          releases: [],
+        },
+        reconciliation: {
+          accepted: true,
+          coalesced: false,
+          queuedBehindRun: false,
+          replacedPending: false,
+          run: { id: 'run-1', status: 'pending' },
+          runningRun: null,
+        },
+        snapshot: {
+          id: `snapshot-${appUserId}`,
+          snapshotRevision: 1,
+        },
+      }),
       getMetadataRelease: async () => ({ artist: null, releaseGroup: null, release: null, media: [] }),
       getMetadataReleaseByMusicBrainzId: async () => ({ artist: null, releaseGroup: null, release: null, media: [] }),
       getMetadataReleaseGroup: async () => ({ artist: null, releaseGroup: null, releases: [] }),
@@ -336,6 +360,116 @@ test('metadata operator artist read route returns the operator-scoped projection
         title: 'Music Has the Right to Children',
       }],
       releases: [{ id: 'release-1', title: 'Music Has the Right to Children' }],
+    });
+  });
+});
+
+test('metadata operator artist save route persists the operator draft payload', async (t) => {
+  const saveOperatorArtist = t.mock.fn(async ({ appUserId, draft, metadataArtistId, triggeredByUserId }) => ({
+    artistId: metadataArtistId,
+    operator: {
+      monitoring: {
+        isMonitored: true,
+        selectionSourceMode: 'policy_plus_overrides',
+      },
+    },
+    projection: {
+      aliases: [{ id: 'alias-1', alias: 'BoC' }],
+      artist: { id: metadataArtistId, name: 'Boards of Canada' },
+      detectionEvents: [],
+      detectionEventsPageInfo: {
+        hasMore: false,
+        nextCursor: null,
+      },
+      releaseGroups: [{ id: 'rg-1' }],
+      releases: [{ id: 'release-1' }],
+    },
+    reconciliation: {
+      accepted: true,
+      coalesced: false,
+      queuedBehindRun: false,
+      replacedPending: false,
+      run: { id: 'run-1', status: 'pending' },
+      runningRun: null,
+    },
+    snapshot: {
+      id: 'snapshot-1',
+      snapshotRevision: 1,
+    },
+    triggeredByUserId,
+    userId: appUserId,
+    wasDraftMonitored: draft.monitoring.isMonitored,
+  }));
+  const app = createMetadataRouteTestApp({ saveOperatorArtist });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/operator`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-token',
+      },
+      body: JSON.stringify({
+        monitoring: {
+          isMonitored: true,
+          selectionSourceMode: 'policy_plus_overrides',
+        },
+        releaseGroupSelections: [{
+          metadataReleaseGroupId: 'rg-1',
+          selectionState: 'selected',
+        }],
+        trackOverrides: [],
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(saveOperatorArtist.mock.calls[0].arguments[0], {
+      appUserId: 'user-1',
+      draft: {
+        monitoring: {
+          isMonitored: true,
+          selectionSourceMode: 'policy_plus_overrides',
+        },
+        releaseGroupSelections: [{
+          metadataReleaseGroupId: 'rg-1',
+          selectionState: 'selected',
+        }],
+        trackOverrides: [],
+      },
+      metadataArtistId: 'local-artist-1',
+      triggeredByUserId: 'user-1',
+    });
+    assert.deepEqual(payload, {
+      ok: true,
+      aliases: [{ id: 'alias-1', alias: 'BoC' }],
+      artist: { id: 'local-artist-1', name: 'Boards of Canada' },
+      artistId: 'local-artist-1',
+      detectionEvents: [],
+      detectionEventsPageInfo: {
+        hasMore: false,
+        nextCursor: null,
+      },
+      operator: {
+        monitoring: {
+          isMonitored: true,
+          selectionSourceMode: 'policy_plus_overrides',
+        },
+      },
+      reconciliation: {
+        accepted: true,
+        coalesced: false,
+        queuedBehindRun: false,
+        replacedPending: false,
+        run: { id: 'run-1', status: 'pending' },
+        runningRun: null,
+      },
+      releaseGroups: [{ id: 'rg-1' }],
+      releases: [{ id: 'release-1' }],
+      snapshot: {
+        id: 'snapshot-1',
+        snapshotRevision: 1,
+      },
     });
   });
 });

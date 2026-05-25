@@ -147,6 +147,7 @@ export function createOperatorTrackOverrideStore({
     metadataArtistId,
     metadataReleaseGroupId,
     metadataReleaseId = null,
+    queryable = null,
     recordingMbid = null,
     remapStatus,
     trackLengthMsSnapshot = null,
@@ -154,8 +155,9 @@ export function createOperatorTrackOverrideStore({
     trackPosition = null,
     trackTitleSnapshot = null,
   }) {
-    const pool = getPoolFn();
-    const client = await pool.connect();
+    const externalClient = queryable ?? null;
+    const pool = externalClient ? null : getPoolFn();
+    const client = externalClient ?? await pool.connect();
     const identityParameters = buildIdentityParameters({
       appUserId,
       metadataReleaseGroupId,
@@ -167,7 +169,9 @@ export function createOperatorTrackOverrideStore({
     });
 
     try {
-      await client.query('BEGIN');
+      if (!externalClient) {
+        await client.query('BEGIN');
+      }
       await client.query(
         `
           DELETE FROM operator_track_override
@@ -209,12 +213,53 @@ export function createOperatorTrackOverrideStore({
           remapStatus,
         ],
       );
-      await client.query('COMMIT');
+      if (!externalClient) {
+        await client.query('COMMIT');
+      }
     } catch (error) {
-      await client.query('ROLLBACK');
+      if (!externalClient) {
+        await client.query('ROLLBACK');
+      }
       throw error;
     } finally {
-      client.release();
+      if (!externalClient) {
+        client.release();
+      }
+    }
+  }
+
+  async function replaceOperatorArtistTrackOverrides({
+    appUserId,
+    metadataArtistId,
+    operatorTrackOverrides = [],
+    queryable = null,
+  }) {
+    const queryTarget = queryable ?? getPoolFn();
+    await queryTarget.query(
+      `
+        DELETE FROM operator_track_override
+        WHERE app_user_id = $1
+          AND metadata_artist_id = $2
+      `,
+      [appUserId, metadataArtistId],
+    );
+
+    for (const trackOverride of operatorTrackOverrides) {
+      await upsertOperatorTrackOverride({
+        appUserId,
+        isDesired: trackOverride.isDesired,
+        mediumPosition: trackOverride.mediumPosition ?? null,
+        metadataArtistId,
+        metadataReleaseGroupId: trackOverride.metadataReleaseGroupId,
+        metadataReleaseId: trackOverride.metadataReleaseId ?? null,
+        queryable: queryTarget,
+        recordingMbid: trackOverride.recordingMbid ?? null,
+        remapStatus: trackOverride.remapStatus,
+        trackLengthMsSnapshot: trackOverride.trackLengthMsSnapshot ?? null,
+        trackMbid: trackOverride.trackMbid ?? null,
+        trackPosition: trackOverride.trackPosition ?? null,
+        trackTitleSnapshot: trackOverride.trackTitleSnapshot ?? null,
+      });
     }
   }
 
@@ -291,6 +336,7 @@ export function createOperatorTrackOverrideStore({
     getOperatorTrackOverride,
     listOperatorTrackOverrides,
     listOperatorTrackOverridesSnapshot,
+    replaceOperatorArtistTrackOverrides,
     replaceOperatorTrackOverridesSnapshot,
     upsertOperatorTrackOverride,
   };

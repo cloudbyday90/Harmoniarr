@@ -247,3 +247,57 @@ test('queueLatestSnapshotRun replaces an existing pending follow-up with the lat
   assert.equal(result.run?.snapshotRevision, 4);
   assert.equal(result.runningRun?.id, 'run-running');
 });
+
+test('queueLatestSnapshotRun can operate within an existing transaction client', async (t) => {
+  const query = t.mock.fn(async (sql, params = []) => {
+    if (sql.includes('FROM operation_runs') && params[1] === 'running') {
+      return { rows: [] };
+    }
+
+    if (sql.includes('FROM operation_runs') && params[1] === 'pending') {
+      return { rows: [] };
+    }
+
+    if (sql.includes('INSERT INTO operation_runs')) {
+      return {
+        rows: [{
+          error_message: null,
+          finished_at: null,
+          id: 'run-pending',
+          operation_type: 'operator_artist_reconciliation',
+          started_at: new Date('2026-05-25T13:01:00.000Z'),
+          status: 'pending',
+          summary: {
+            appUserId: 'user-1',
+            artistName: 'Autechre',
+            metadataArtistId: 'artist-1',
+            snapshotId: 'snapshot-4',
+            snapshotRevision: 4,
+            triggerSource: 'save',
+          },
+        }],
+      };
+    }
+
+    throw new Error(`Unexpected SQL: ${sql}`);
+  });
+  const store = createOperatorArtistReconciliationRunStore({
+    getPoolFn: () => ({
+      connect: async () => {
+        throw new Error('should not connect');
+      },
+    }),
+  });
+
+  const result = await store.queueLatestSnapshotRun({
+    appUserId: 'user-1',
+    artistName: 'Autechre',
+    client: { query },
+    metadataArtistId: 'artist-1',
+    snapshotId: 'snapshot-4',
+    snapshotRevision: 4,
+  });
+
+  assert.equal(result.action, 'created');
+  assert.equal(result.run?.id, 'run-pending');
+});
