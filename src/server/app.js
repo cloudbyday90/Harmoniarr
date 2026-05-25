@@ -490,6 +490,7 @@ export function createApp({
     metadataMonitoringStore: metadataModule.metadataMonitoringStore,
     operatorArtistMonitoringStore: metadataModule.operatorArtistMonitoringStore,
     operatorReleaseGroupSelectionStore: metadataModule.operatorReleaseGroupSelectionStore,
+    operatorTrackOverrideStore: metadataModule.operatorTrackOverrideStore,
     musicBrainzSearchService: metadataModule.musicBrainzSearchService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,

@@ -9,6 +9,7 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   const replaceMetadataArtistMonitoring = t.mock.fn(async () => {});
   const replaceOperatorArtistMonitoring = t.mock.fn(async () => {});
   const replaceOperatorReleaseGroupSelections = t.mock.fn(async () => {});
+  const replaceOperatorTrackOverrides = t.mock.fn(async () => {});
   const replaceTrustSnapshot = t.mock.fn(async () => {});
   const service = createBackupRestoreScopeApplyService({
     replaceOverridesSnapshot,
@@ -16,6 +17,7 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
     replaceMetadataArtistMonitoring,
     replaceOperatorArtistMonitoring,
     replaceOperatorReleaseGroupSelections,
+    replaceOperatorTrackOverrides,
     replaceTrustSnapshot,
     updateSettingsFn,
   });
@@ -59,6 +61,22 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
                 resolvedMetadataReleaseId: 'release-1',
                 selectionSource: 'manual',
                 selectionState: 'partial',
+              },
+            ],
+            operatorTrackOverrides: [
+              {
+                appUserId: 'user-1',
+                isDesired: true,
+                mediumPosition: 1,
+                metadataArtistId: 'artist-1',
+                metadataReleaseGroupId: 'release-group-1',
+                metadataReleaseId: 'release-1',
+                recordingMbid: '11111111-1111-4111-8111-111111111111',
+                remapStatus: 'resolved',
+                trackLengthMsSnapshot: 215000,
+                trackMbid: '22222222-2222-4222-8222-222222222222',
+                trackPosition: 4,
+                trackTitleSnapshot: 'Example Song',
               },
             ],
           },
@@ -113,6 +131,7 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   assert.equal(replaceMetadataArtistMonitoring.mock.callCount(), 1);
   assert.equal(replaceOperatorArtistMonitoring.mock.callCount(), 1);
   assert.equal(replaceOperatorReleaseGroupSelections.mock.callCount(), 1);
+  assert.equal(replaceOperatorTrackOverrides.mock.callCount(), 1);
   assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
   assert.deepEqual(result, {
     appliedScopes: ['monitoring', 'wanted', 'trust', 'overrides', 'providers', 'settings'],

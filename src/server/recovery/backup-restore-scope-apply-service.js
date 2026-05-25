@@ -126,6 +126,37 @@ function normalizeOperatorReleaseGroupSelectionRows(operatorReleaseGroupSelectio
     ));
 }
 
+function normalizeOperatorTrackOverrideRows(operatorTrackOverrides) {
+  if (!Array.isArray(operatorTrackOverrides)) {
+    return null;
+  }
+
+  return operatorTrackOverrides
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({
+      appUserId: row.appUserId,
+      isDesired: row.isDesired === true,
+      mediumPosition: row.mediumPosition ?? null,
+      metadataArtistId: row.metadataArtistId,
+      metadataReleaseGroupId: row.metadataReleaseGroupId,
+      metadataReleaseId: row.metadataReleaseId ?? null,
+      recordingMbid: row.recordingMbid ?? null,
+      remapStatus: row.remapStatus ?? 'resolved',
+      trackLengthMsSnapshot: row.trackLengthMsSnapshot ?? null,
+      trackMbid: row.trackMbid ?? null,
+      trackPosition: row.trackPosition ?? null,
+      trackTitleSnapshot: row.trackTitleSnapshot ?? null,
+    }))
+    .filter((row) => (
+      typeof row.appUserId === 'string'
+      && row.appUserId.trim().length > 0
+      && typeof row.metadataArtistId === 'string'
+      && row.metadataArtistId.trim().length > 0
+      && typeof row.metadataReleaseGroupId === 'string'
+      && row.metadataReleaseGroupId.trim().length > 0
+    ));
+}
+
 function normalizeWantedRows(wantedReleases) {
   if (!Array.isArray(wantedReleases)) {
     return null;
@@ -173,6 +204,7 @@ export function createBackupRestoreScopeApplyService({
   replaceMetadataArtistMonitoring = async () => {},
   replaceOperatorArtistMonitoring = async () => {},
   replaceOperatorReleaseGroupSelections = async () => {},
+  replaceOperatorTrackOverrides = async () => {},
   replaceTrustSnapshot = async () => {},
   updateSettingsFn = async () => {
     throw new Error('updateSettingsFn dependency is required');
@@ -244,7 +276,15 @@ export function createBackupRestoreScopeApplyService({
         const operatorReleaseGroupSelections = normalizeOperatorReleaseGroupSelectionRows(
           scopeSettings?.monitoring?.operatorReleaseGroupSelections,
         );
-        if (!artistMonitoring && !operatorArtistMonitoring && !operatorReleaseGroupSelections) {
+        const operatorTrackOverrides = normalizeOperatorTrackOverrideRows(
+          scopeSettings?.monitoring?.operatorTrackOverrides,
+        );
+        if (
+          !artistMonitoring
+          && !operatorArtistMonitoring
+          && !operatorReleaseGroupSelections
+          && !operatorTrackOverrides
+        ) {
           skippedScopes.push(scope);
           continue;
         }
@@ -257,6 +297,9 @@ export function createBackupRestoreScopeApplyService({
         }
         if (operatorReleaseGroupSelections) {
           await replaceOperatorReleaseGroupSelections({ operatorReleaseGroupSelections });
+        }
+        if (operatorTrackOverrides) {
+          await replaceOperatorTrackOverrides({ operatorTrackOverrides });
         }
         monitoringUpdated = true;
         appliedScopes.push(scope);

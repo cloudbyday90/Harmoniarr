@@ -29,6 +29,8 @@ import { createOperatorArtistMonitoringService } from './operator-artist-monitor
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
 import { createOperatorReleaseGroupSelectionService } from './operator-release-group-selection-service.js';
 import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
+import { createOperatorTrackOverrideService } from './operator-track-override-service.js';
+import { createOperatorTrackOverrideStore } from './operator-track-override-store.js';
 import { createMetadataRefreshSchedulerService } from './metadata-refresh-scheduler-service.js';
 import { createMetadataRefreshSchedulingPolicyService } from './metadata-refresh-scheduling-policy-service.js';
 import { createMetadataReadService } from './metadata-read-service.js';
@@ -61,6 +63,8 @@ export function createMetadataModule({
   operatorArtistMonitoringService = null,
   operatorReleaseGroupSelectionStore = null,
   operatorReleaseGroupSelectionService = null,
+  operatorTrackOverrideStore = null,
+  operatorTrackOverrideService = null,
   metadataReadService = null,
   metadataRefreshService = null,
   metadataSearchService = null,
@@ -99,6 +103,12 @@ export function createMetadataModule({
   const resolvedOperatorReleaseGroupSelectionService = operatorReleaseGroupSelectionService
     ?? createOperatorReleaseGroupSelectionService({
       operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
+    });
+  const resolvedOperatorTrackOverrideStore = operatorTrackOverrideStore
+    ?? createOperatorTrackOverrideStore();
+  const resolvedOperatorTrackOverrideService = operatorTrackOverrideService
+    ?? createOperatorTrackOverrideService({
+      operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
     });
   const resolvedMetadataRefreshService = metadataRefreshService ?? createMetadataRefreshService({
     getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,
@@ -161,6 +171,8 @@ export function createMetadataModule({
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
     operatorReleaseGroupSelectionService: resolvedOperatorReleaseGroupSelectionService,
     operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
+    operatorTrackOverrideService: resolvedOperatorTrackOverrideService,
+    operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
     metadataRefreshService: resolvedMetadataRefreshService,
     metadataSearchService: resolvedMetadataSearchService,
     providerHealthRecorder,

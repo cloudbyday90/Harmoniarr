@@ -80,6 +80,7 @@ function buildScopeSettings({
   manualOverrides,
   operatorArtistMonitoring,
   operatorReleaseGroupSelections,
+  operatorTrackOverrides,
   settingsSnapshot = {},
   sourceUsers,
   wantedReleases,
@@ -93,6 +94,7 @@ function buildScopeSettings({
       artistMonitoring,
       operatorArtistMonitoring,
       operatorReleaseGroupSelections,
+      operatorTrackOverrides,
     },
     pathMappings: {
       paths: settingsSnapshot.paths,
@@ -127,6 +129,7 @@ export function createBackupExportService({
   listOverridesSnapshotForBackup = async () => [],
   listOperatorArtistMonitoringForBackup = async () => [],
   listOperatorReleaseGroupSelectionsForBackup = async () => [],
+  listOperatorTrackOverridesForBackup = async () => [],
   listTrustSnapshotForBackup = async () => [],
   listWantedReleasesForBackup = async () => [],
   loadSettingsFn = loadSettings,
@@ -151,6 +154,7 @@ export function createBackupExportService({
       manualOverrides,
       operatorArtistMonitoring,
       operatorReleaseGroupSelections,
+      operatorTrackOverrides,
       sourceUsers,
       wantedReleases,
     ] = await Promise.all([
@@ -158,6 +162,7 @@ export function createBackupExportService({
       listOverridesSnapshotForBackup(),
       listOperatorArtistMonitoringForBackup(),
       listOperatorReleaseGroupSelectionsForBackup(),
+      listOperatorTrackOverridesForBackup(),
       listTrustSnapshotForBackup(),
       listWantedReleasesForBackup(),
     ]);
@@ -182,6 +187,7 @@ export function createBackupExportService({
           manualOverrides,
           operatorArtistMonitoring,
           operatorReleaseGroupSelections,
+          operatorTrackOverrides,
           settingsSnapshot,
           sourceUsers,
           wantedReleases,
