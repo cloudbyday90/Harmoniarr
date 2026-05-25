@@ -27,6 +27,8 @@ import { createMetadataMonitoringService } from './metadata-monitoring-service.j
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
+import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
+import { createOperatorArtistReconciliationSnapshotStore } from './operator-artist-reconciliation-snapshot-store.js';
 import { createOperatorReleaseGroupSelectionService } from './operator-release-group-selection-service.js';
 import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
 import { createOperatorTrackOverrideService } from './operator-track-override-service.js';
@@ -61,6 +63,8 @@ export function createMetadataModule({
   metadataMonitoringService = null,
   operatorArtistMonitoringStore = null,
   operatorArtistMonitoringService = null,
+  operatorArtistReconciliationSnapshotStore = null,
+  operatorArtistReconciliationSnapshotService = null,
   operatorReleaseGroupSelectionStore = null,
   operatorReleaseGroupSelectionService = null,
   operatorTrackOverrideStore = null,
@@ -98,6 +102,12 @@ export function createMetadataModule({
   const resolvedOperatorArtistMonitoringService = operatorArtistMonitoringService ?? createOperatorArtistMonitoringService({
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
   });
+  const resolvedOperatorArtistReconciliationSnapshotStore = operatorArtistReconciliationSnapshotStore
+    ?? createOperatorArtistReconciliationSnapshotStore();
+  const resolvedOperatorArtistReconciliationSnapshotService = operatorArtistReconciliationSnapshotService
+    ?? createOperatorArtistReconciliationSnapshotService({
+      operatorArtistReconciliationSnapshotStore: resolvedOperatorArtistReconciliationSnapshotStore,
+    });
   const resolvedOperatorReleaseGroupSelectionStore = operatorReleaseGroupSelectionStore
     ?? createOperatorReleaseGroupSelectionStore();
   const resolvedOperatorReleaseGroupSelectionService = operatorReleaseGroupSelectionService
@@ -169,6 +179,8 @@ export function createMetadataModule({
     metadataMonitoringStore: resolvedMetadataMonitoringStore,
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
+    operatorArtistReconciliationSnapshotService: resolvedOperatorArtistReconciliationSnapshotService,
+    operatorArtistReconciliationSnapshotStore: resolvedOperatorArtistReconciliationSnapshotStore,
     operatorReleaseGroupSelectionService: resolvedOperatorReleaseGroupSelectionService,
     operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
     operatorTrackOverrideService: resolvedOperatorTrackOverrideService,
