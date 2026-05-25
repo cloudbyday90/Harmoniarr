@@ -21,6 +21,32 @@ import pg from 'pg';
 const { Pool } = pg;
 
 let sharedPool;
+let sharedPoolRuntimeState;
+
+function writePoolError(stderr, error) {
+  stderr.write(`[harmoniarr-db] pooled idle client error: ${error?.message ?? 'Unknown pool error'}\n`);
+}
+
+export function isIgnorablePoolShutdownError(error) {
+  const message = String(error?.message ?? '').toLowerCase();
+  return message.includes('terminating connection due to administrator command')
+    || message.includes('connection terminated unexpectedly');
+}
+
+export function attachPoolErrorHandler(pool, {
+  runtimeState = { closing: false },
+  stderr = process.stderr,
+} = {}) {
+  pool.on('error', (error) => {
+    if (runtimeState.closing && isIgnorablePoolShutdownError(error)) {
+      return;
+    }
+
+    writePoolError(stderr, error);
+  });
+
+  return pool;
+}
 
 function parseOptionalInteger(value, name) {
   if (value === undefined || value === null || value === '') {
@@ -110,7 +136,11 @@ export function buildPoolConfig(env = process.env) {
 
 export function getPool() {
   if (!sharedPool) {
-    sharedPool = new Pool(buildPoolConfig());
+    sharedPoolRuntimeState = { closing: false };
+    sharedPool = attachPoolErrorHandler(
+      new Pool(buildPoolConfig()),
+      { runtimeState: sharedPoolRuntimeState },
+    );
   }
 
   return sharedPool;
@@ -119,7 +149,12 @@ export function getPool() {
 export async function closePool() {
   if (sharedPool) {
     const pool = sharedPool;
+    const runtimeState = sharedPoolRuntimeState;
     sharedPool = undefined;
+    sharedPoolRuntimeState = undefined;
+    if (runtimeState) {
+      runtimeState.closing = true;
+    }
     await pool.end();
   }
 }

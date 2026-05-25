@@ -22,6 +22,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AuthEntryShell from '../components/AuthEntryShell.vue';
 import { startPlexSignIn } from '../lib/auth-api.js';
 import { buildAuthEntrySupportItems } from '../lib/auth-entry-support.js';
+import { navigateAfterAuthSuccess } from '../lib/auth-navigation.js';
 import { buildClaimAccountRoute, buildLoginDescription, buildLoginInfoMessage } from '../lib/login-presentation.js';
 import { useAutoFocus } from '../composables/useAutoFocus.js';
 import { sessionStore } from '../state/session.js';
@@ -47,7 +48,10 @@ async function submit() {
   isSubmitting.value = true;
   try {
     await sessionStore.login(form);
-    await router.push(typeof route.query.redirect === 'string' ? route.query.redirect : { name: 'dashboard' });
+    await navigateAfterAuthSuccess({
+      router,
+      target: typeof route.query.redirect === 'string' ? route.query.redirect : { name: 'dashboard' },
+    });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Login failed';
   } finally {
@@ -99,11 +103,27 @@ async function startPlex() {
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username or email
-          <input ref="firstInput" v-model="form.username" autocomplete="username" required />
+          <input
+            id="username"
+            ref="firstInput"
+            v-model="form.username"
+            name="username"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          />
         </label>
         <label>
           Password
-          <input v-model="form.password" type="password" autocomplete="current-password" required />
+          <input
+            id="current-password"
+            v-model="form.password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
         </label>
         <p class="error-copy" v-if="errorMessage">{{ errorMessage }}</p>
         <button type="submit" :disabled="isSubmitting">

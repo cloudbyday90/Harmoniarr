@@ -118,6 +118,22 @@ test('computeSuggestions ranks multi-seed artists higher than single-seed artist
   assert.equal(result[1].id, 'artist-solo');
 });
 
+test('computeSuggestions gives a modest ranking boost to artists shared across multiple seeds', () => {
+  const seedResults = makeSeedResults([
+    ['seed-1', [
+      makeSimilar('artist-shared', 'Artist Shared', 0.4),
+      makeSimilar('artist-solo', 'Artist Solo', 0.88),
+    ]],
+    ['seed-2', [
+      makeSimilar('artist-shared', 'Artist Shared', 0.4),
+    ]],
+  ]);
+
+  const result = computeSuggestions(seedResults, new Set());
+  assert.equal(result[0].id, 'artist-shared');
+  assert.ok(result[0].rankScore > result[1].rankScore);
+});
+
 test('computeSuggestions deduplicates artists that appear in multiple seeds', () => {
   const seedResults = makeSeedResults([
     ['seed-1', [makeSimilar('artist-a', 'Artist A', 0.5)]],
@@ -181,6 +197,7 @@ test('computeSuggestions includes all result properties in each output item', ()
   assert.equal(typeof item.name, 'string');
   assert.equal(typeof item.score, 'number');
   assert.equal(typeof item.seedCount, 'number');
+  assert.equal(typeof item.rankScore, 'number');
 });
 
 test('computeSuggestions returns fewer than limit items when fewer results exist', () => {

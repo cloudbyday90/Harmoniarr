@@ -8,8 +8,8 @@ import {
 import {
   bootstrapAdminThroughUi,
   loginThroughUi,
+  navigateWithinApp,
   logoutThroughUi,
-  waitForHeading,
 } from '../../testing/browser/operator-browser-helpers.js';
 import { installMetadataBrowserFixtures } from '../../testing/browser/metadata-browser-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
@@ -53,23 +53,33 @@ suite('browser operator workflow smoke coverage', () => {
     await browserRuntime.runScenario(async ({ baseUrl, page }) => {
       await bootstrapAdminThroughUi(page, { baseUrl });
 
-      await page.getByRole('link', { name: 'Settings' }).click();
-      await page.waitForURL(/\/app\/settings(?:\?.*)?(?:#.*)?$/);
-      await waitForHeading(page, 'Settings');
+      await navigateWithinApp(page, {
+        heading: 'Settings',
+        linkName: 'Settings',
+        urlPattern: /\/app\/settings(?:\?.*)?(?:#.*)?$/,
+      });
 
-      await page.getByRole('link', { name: 'Activity' }).click();
-      await page.waitForURL(/\/app\/activity(?:\/operations)?(?:\?.*)?(?:#.*)?$/);
-      await waitForHeading(page, 'Background Jobs');
+      await navigateWithinApp(page, {
+        heading: 'Background Jobs',
+        linkName: 'Activity',
+        urlPattern: /\/app\/activity(?:\/operations)?(?:\?.*)?(?:#.*)?$/,
+      });
 
-      await page.getByRole('link', { name: 'Candidates' }).click();
-      await page.waitForURL(/\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/);
-      await waitForHeading(page, 'Download candidates');
+      await navigateWithinApp(page, {
+        heading: 'Download candidates',
+        linkName: 'Candidates',
+        urlPattern: /\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/,
+      });
 
-      await page.getByRole('link', { name: 'Settings' }).click();
-      await page.waitForURL(/\/app\/settings(?:\?.*)?(?:#.*)?$/);
-      await page.getByRole('link', { name: 'Backup & Restore' }).click();
-      await page.waitForURL(/\/app\/settings\/recovery(?:\?.*)?(?:#.*)?$/);
-      await waitForHeading(page, 'Backups');
+      await navigateWithinApp(page, {
+        linkName: 'Settings',
+        urlPattern: /\/app\/settings(?:\?.*)?(?:#.*)?$/,
+      });
+      await navigateWithinApp(page, {
+        heading: 'Backups',
+        linkName: 'Backup & Restore',
+        urlPattern: /\/app\/settings\/recovery(?:\?.*)?(?:#.*)?$/,
+      });
 
       await page.getByRole('button', { name: 'Create backup' }).click();
       await page.getByRole('link', { name: 'Download' }).waitFor();
@@ -100,8 +110,11 @@ suite('browser operator workflow smoke coverage', () => {
       await installMetadataBrowserFixtures(browserContext);
       await bootstrapAdminThroughUi(page, { baseUrl });
 
-      await page.goto(`${baseUrl}/app/discover`, { waitUntil: 'networkidle' });
-      await waitForHeading(page, 'Discover');
+      await navigateWithinApp(page, {
+        heading: 'Discover',
+        linkName: 'Discover',
+        urlPattern: /\/app\/discover(?:\?.*)?(?:#.*)?$/,
+      });
       await page.getByLabel('Search for an artist').fill('Boards of Canada');
       await page.getByRole('button', { name: 'Search' }).click();
 
@@ -118,7 +131,7 @@ suite('browser operator workflow smoke coverage', () => {
       await page.getByRole('heading', { name: 'Related artists' }).waitFor();
       await page.getByText('Music Has the Right to Children').waitFor();
 
-      await page.goto(`${baseUrl}/app/search`, { waitUntil: 'networkidle' });
+      await page.goto(`${baseUrl}/app/search`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Search', exact: true }).waitFor();
       await page.getByLabel('Search for an artist or release').fill('Music Has the Right to Children');
       await page.getByRole('button', { name: 'Search' }).click();
@@ -131,8 +144,15 @@ suite('browser operator workflow smoke coverage', () => {
       await releaseArtwork.waitFor();
       assert.match(await releaseArtwork.getAttribute('src') ?? '', /^data:image\/svg\+xml;base64,/);
 
-      await page.goto(`${baseUrl}/app/activity/candidates`, { waitUntil: 'networkidle' });
-      await waitForHeading(page, 'Download candidates');
+      await navigateWithinApp(page, {
+        linkName: 'Activity',
+        urlPattern: /\/app\/activity(?:\/operations)?(?:\?.*)?(?:#.*)?$/,
+      });
+      await navigateWithinApp(page, {
+        heading: 'Download candidates',
+        linkName: 'Candidates',
+        urlPattern: /\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/,
+      });
       await page.getByRole('heading', { name: 'Inspect selected candidate media' }).waitFor();
       await page.getByRole('heading', { name: 'Queue selected for download' }).waitFor();
       await page.getByRole('heading', { name: 'Move downloads to library' }).waitFor();

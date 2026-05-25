@@ -39,8 +39,8 @@
  *   themselves so that seeds do not appear as their own suggestions.
  * @param {number} [limit=20]
  *   Maximum number of suggestions to return, applied after sorting.
- * @returns {Array<{id:string, name:string, score:number, seedCount:number}>}
- *   Suggestions sorted descending by aggregated score, capped to `limit`.
+ * @returns {Array<{id:string, name:string, score:number, seedCount:number, rankScore:number}>}
+ *   Suggestions sorted descending by ranked overlap score, capped to `limit`.
  */
 export function computeSuggestions(seedResults, excludeIds, limit = 20) {
   const tally = new Map();
@@ -60,6 +60,15 @@ export function computeSuggestions(seedResults, excludeIds, limit = 20) {
   }
 
   return [...tally.values()]
-    .sort((a, b) => b.score - a.score)
+    .map((artist) => ({
+      ...artist,
+      rankScore: artist.score + Math.min(0.45, Math.max(0, artist.seedCount - 1) * 0.18),
+    }))
+    .sort((a, b) => (
+      b.rankScore - a.rankScore
+      || b.seedCount - a.seedCount
+      || b.score - a.score
+      || a.name.localeCompare(b.name)
+    ))
     .slice(0, limit);
 }

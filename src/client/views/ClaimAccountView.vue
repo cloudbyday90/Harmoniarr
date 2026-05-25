@@ -85,19 +85,50 @@ async function submit() {
       <form class="stack-form" @submit.prevent="submit">
         <label>
           Username or email
-          <input ref="firstInput" v-model="form.username" autocomplete="username" required />
+          <input
+            id="username"
+            ref="firstInput"
+            v-model="form.username"
+            name="username"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          />
         </label>
         <label>
           Claim code
-          <input v-model="form.claimCode" autocomplete="off" placeholder="HCLM-XXXX-XXXX-XXXX" required />
+          <input
+            id="claim-code"
+            v-model="form.claimCode"
+            name="claimCode"
+            autocomplete="off"
+            placeholder="HCLM-XXXX-XXXX-XXXX"
+            required
+          />
         </label>
         <label>
           New password
-          <input v-model="form.password" type="password" autocomplete="new-password" required />
+          <input
+            id="new-password"
+            v-model="form.password"
+            name="newPassword"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
         </label>
         <label>
           Confirm password
-          <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required @input="markConfirmTouched" />
+          <input
+            id="confirm-new-password"
+            v-model="form.confirmPassword"
+            name="confirmPassword"
+            type="password"
+            autocomplete="new-password"
+            required
+            @input="markConfirmTouched"
+          />
         </label>
         <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
         <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>

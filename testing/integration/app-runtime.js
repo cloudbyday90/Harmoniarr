@@ -18,6 +18,7 @@ import { createSessionHttpClient } from '../server/http-session-client.js';
 import { withServer } from '../server/http-test-helpers.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
+const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
 
 async function withEnvironmentVariables(overrides, run) {
   const previous = new Map();
@@ -70,6 +71,13 @@ async function createRuntimeWorkspace() {
     clientDistDir,
     workspaceDir,
   };
+}
+
+async function waitForScenarioShutdownDrain() {
+  await new Promise((complete) => {
+    const timer = setTimeout(complete, SCENARIO_SHUTDOWN_DRAIN_MS);
+    timer.unref?.();
+  });
 }
 
 export async function createIntegrationAppRuntime({
@@ -158,6 +166,7 @@ export async function createIntegrationAppRuntime({
             scenarioFailed = false;
             return result;
           } finally {
+            await waitForScenarioShutdownDrain();
             await closePool().catch(() => {});
             if (!config.keepArtifactsOnFailure || !scenarioFailed) {
               await rm(scenarioWorkspaceDir, { force: true, recursive: true }).catch(() => {});
@@ -225,6 +234,7 @@ export async function withIntegrationApp({
               },
             );
           } finally {
+            await waitForScenarioShutdownDrain();
             await closePool().catch(() => {});
           }
         });

@@ -195,19 +195,53 @@ function goToLogin() {
         <form class="stack-form" @submit.prevent="submit">
           <label>
             Recovery code
-            <input v-model="form.recoveryCode" placeholder="HARM-XXXX-XXXX-XXXX" autocomplete="off" required :disabled="formDisabled" />
+            <input
+              id="recovery-code"
+              v-model="form.recoveryCode"
+              name="recoveryCode"
+              placeholder="HARM-XXXX-XXXX-XXXX"
+              autocomplete="off"
+              required
+              :disabled="formDisabled"
+            />
           </label>
           <label>
             Username
-            <input v-model="form.username" autocomplete="username" required :disabled="formDisabled" />
+            <input
+              id="username"
+              v-model="form.username"
+              name="username"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              required
+              :disabled="formDisabled"
+            />
           </label>
           <label>
             Password
-            <input v-model="form.password" type="password" autocomplete="new-password" required :disabled="formDisabled" />
+            <input
+              id="new-password"
+              v-model="form.password"
+              name="newPassword"
+              type="password"
+              autocomplete="new-password"
+              required
+              :disabled="formDisabled"
+            />
           </label>
           <label>
             Confirm password
-            <input v-model="form.confirmPassword" type="password" autocomplete="new-password" required :disabled="formDisabled" @input="markConfirmTouched" />
+            <input
+              id="confirm-new-password"
+              v-model="form.confirmPassword"
+              name="confirmPassword"
+              type="password"
+              autocomplete="new-password"
+              required
+              :disabled="formDisabled"
+              @input="markConfirmTouched"
+            />
           </label>
           <p v-if="showPasswordMismatch" class="auth-pw-hint auth-pw-hint--mismatch">Passwords do not match.</p>
           <p v-else-if="showPasswordMatch" class="auth-pw-hint auth-pw-hint--match">Passwords match.</p>

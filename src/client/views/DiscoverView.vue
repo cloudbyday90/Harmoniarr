@@ -119,9 +119,6 @@ const summaryCards = computed(() => ([
   },
 ]));
 
-const featuredSuggestion = computed(() => suggestions.value[0] ?? null);
-const remainingSuggestions = computed(() => suggestions.value.slice(featuredSuggestion.value ? 1 : 0));
-
 function buildSuggestionMeta(suggestion) {
   if (!suggestion) {
     return '';
@@ -146,6 +143,10 @@ function buildSuggestionSupport(suggestion) {
   return 'Worth following if you want similar release activity to enter your request flow.';
 }
 
+function isFollowedArtist(artistId) {
+  return isSeed(artistId) || isMonitored(artistId);
+}
+
 function buildResultMeta(artist) {
   const parts = [];
   if (artist?.type) {
@@ -158,6 +159,10 @@ function buildResultMeta(artist) {
 }
 
 function buildResultSupport(artist) {
+  if (isFollowedArtist(artist?.id)) {
+    return 'Already followed and contributing to your current recommendation graph.';
+  }
+
   if (artist?.disambiguation) {
     return artist.disambiguation;
   }
@@ -284,42 +289,17 @@ function buildArtistLocation(artist) {
           {{ graphError }}
         </p>
 
-        <section v-if="featuredSuggestion" class="discover-feature">
-          <div class="discover-feature__intro">
-            <span class="discover-summary-card__label">Featured suggestion</span>
-            <h3 class="discover-feature__title">Leading recommendation</h3>
-            <p class="discover-feature__copy">
-              This artist currently has the strongest overlap across the graph you have built so far.
-            </p>
-          </div>
-
-          <DiscoverArtistCard
-            class="discover-feature__card"
-            :artist="{ id: featuredSuggestion.id, name: featuredSuggestion.name }"
-            :artwork="getArtistArtwork(featuredSuggestion.id)"
-            :badge="featuredSuggestion.seedCount > 1 ? `${featuredSuggestion.seedCount} overlapping seeds` : 'Suggested'"
-            :badge-tone="featuredSuggestion.seedCount > 1 ? 'success' : 'info'"
-            :meta-text="buildSuggestionMeta(featuredSuggestion)"
-            :supporting-text="buildSuggestionSupport(featuredSuggestion)"
-            :monitored="isMonitored(featuredSuggestion.id)"
-            :monitoring="isMonitoring(featuredSuggestion.id)"
-            :disabled="isSeed(featuredSuggestion.id)"
-            :to="buildArtistLocation(featuredSuggestion)"
-            @monitor="handleMonitor"
-          />
-        </section>
-
-        <section v-if="remainingSuggestions.length > 0" class="discover-suggestions">
+        <section v-if="suggestions.length > 0" class="discover-suggestions">
           <div class="discover-suggestions__header">
             <span class="discover-summary-card__label">Recommendation grid</span>
             <p class="discover-suggestions__copy">
-              Ranked by overlap across the artists you already follow.
+              Ranked by overlap across the artists you already follow, with shared matches pushed toward the top.
             </p>
           </div>
 
           <div class="hx-artwork-grid discover-grid" role="list" aria-label="Artist suggestions">
             <DiscoverArtistCard
-              v-for="suggestion in remainingSuggestions"
+              v-for="suggestion in suggestions"
               :key="suggestion.id"
               :artist="{ id: suggestion.id, name: suggestion.name }"
               :artwork="getArtistArtwork(suggestion.id)"
@@ -327,9 +307,9 @@ function buildArtistLocation(artist) {
               :badge-tone="suggestion.seedCount > 1 ? 'success' : 'info'"
               :meta-text="buildSuggestionMeta(suggestion)"
               :supporting-text="buildSuggestionSupport(suggestion)"
-              :monitored="isMonitored(suggestion.id)"
+              :monitored="isFollowedArtist(suggestion.id)"
               :monitoring="isMonitoring(suggestion.id)"
-              :disabled="isSeed(suggestion.id)"
+              :disabled="isFollowedArtist(suggestion.id)"
               :to="buildArtistLocation(suggestion)"
               @monitor="handleMonitor"
             />
@@ -410,12 +390,13 @@ function buildArtistLocation(artist) {
             :key="artist.id"
             :artist="artist"
             :artwork="getArtistArtwork(artist.id)"
-            badge="Search match"
-            badge-tone="info"
+            :badge="isFollowedArtist(artist.id) ? 'Already followed' : 'Search match'"
+            :badge-tone="isFollowedArtist(artist.id) ? 'success' : 'info'"
             :meta-text="buildResultMeta(artist)"
             :supporting-text="buildResultSupport(artist)"
-            :monitored="isMonitored(artist.id)"
+            :monitored="isFollowedArtist(artist.id)"
             :monitoring="isMonitoring(artist.id)"
+            :disabled="isFollowedArtist(artist.id)"
             :to="buildArtistLocation(artist)"
             @monitor="handleMonitor"
           />
@@ -553,8 +534,7 @@ function buildArtistLocation(artist) {
 }
 
 .discover-seed-band__copy,
-.discover-suggestions__copy,
-.discover-feature__copy {
+.discover-suggestions__copy {
   margin: 0;
   font-size: var(--hx-text-sm);
   color: var(--hx-text-muted);
@@ -621,30 +601,6 @@ function buildArtistLocation(artist) {
   color: var(--hx-text-muted);
 }
 
-.discover-feature {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.9fr);
-  gap: var(--hx-space-4);
-  align-items: start;
-}
-
-.discover-feature__intro {
-  display: grid;
-  gap: var(--hx-space-2);
-}
-
-.discover-feature__title {
-  margin: 0;
-  font-size: clamp(1.35rem, 1.7vw, 1.8rem);
-  line-height: 1.08;
-  letter-spacing: -0.03em;
-  color: var(--hx-text-strong);
-}
-
-.discover-feature__card {
-  min-width: 0;
-}
-
 .discover-suggestions {
   display: grid;
   gap: var(--hx-space-3);
@@ -690,10 +646,6 @@ function buildArtistLocation(artist) {
 @media (max-width: 960px) {
   .discover-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .discover-feature {
-    grid-template-columns: 1fr;
   }
 }
 
