@@ -100,6 +100,7 @@ export function useMediaRequestDetail({
       hasMoreEvents.value = payload.hasMore ?? false;
       nextCursor.value = payload.nextCursor ?? null;
     } catch {
+      // Pagination errors silently degrade on load-more.
     } finally {
       isLoadingMoreEvents.value = false;
     }

@@ -84,7 +84,7 @@ const {
   fallbackErrorMessage: 'Failed to load notifications',
 });
 
-const actionableCount = computed(() => notificationsPayload.value?.counts?.actionable ?? 0);
+const _actionableCount = computed(() => notificationsPayload.value?.counts?.actionable ?? 0);
 const totalNotificationCount = computed(() => notificationsPayload.value?.counts?.total ?? 0);
 const unacknowledgedCount = computed(() => notificationsPayload.value?.counts?.unacknowledged ?? 0);
 const notifications = computed(() => notificationsPayload.value?.notifications ?? []);

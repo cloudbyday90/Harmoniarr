@@ -10,7 +10,7 @@ import { registerSystemRoutes } from '../../src/server/routes/system-routes.js';
 import { createJsonTestApp } from '../../testing/server/http-test-helpers.js';
 import { runPaginationRegressionTests } from '../../testing/server/pagination-regression-runner.js';
 
-function noopMiddleware(_request, _response, next) { next(); }
+function _noopMiddleware(_request, _response, next) { next(); }
 
 const stubSession = async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' });
 const stubAdminSession = async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed', user: { role: 'admin' } });

@@ -232,6 +232,7 @@ test('createMusicBrainzSearchService preserves provider failure details', async 
   assert.equal(providerHealthRecorder.recordSuccess.mock.callCount(), 0);
   assert.equal(providerHealthRecorder.recordError.mock.callCount(), 1);
   assert.deepEqual(providerHealthRecorder.recordError.mock.calls[0].arguments, ['musicbrainz', providerError]);
+});
 
 test('createMusicBrainzSearchService checkProviderHealth propagates errors for active health check classification', async (t) => {
   const providerError = new Error('MusicBrainz is unavailable');
@@ -263,5 +264,4 @@ test('createMusicBrainzSearchService checkProviderHealth propagates errors for a
   );
   assert.equal(providerHealthRecorder.recordSuccess.mock.callCount(), 0);
   assert.equal(providerHealthRecorder.recordError.mock.callCount(), 1);
-});
 });

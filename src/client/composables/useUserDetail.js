@@ -99,6 +99,7 @@ export function useUserDetail({
       hasMoreActivity.value = payload.hasMore ?? false;
       nextCursor.value = payload.nextCursor ?? null;
     } catch {
+      // Pagination errors silently degrade on load-more.
     } finally {
       isLoadingActivity.value = false;
     }

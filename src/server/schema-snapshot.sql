@@ -4214,7 +4214,23 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260622_010000_media_request_cancel_state.sql
--- Checksum: ad21d88d9297d65fb178f947b928ed2c79fb300bde3f1f76e389bb4b42fbd768
+-- Checksum: dad260f68e21a5f14ba197c97974c4e1fd01eb93b4f3365f4bd69e423e91d0c4
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 -- Expand media_requests.request_state to support cancelled and failed states.
 --
 -- The application layer already references these states in dedup queries
@@ -4244,7 +4260,7 @@ VALUES (
   '20260622_010000',
   '20260622_010000_media_request_cancel_state.sql',
   'media_request_cancel_state',
-  'ad21d88d9297d65fb178f947b928ed2c79fb300bde3f1f76e389bb4b42fbd768',
+  'dad260f68e21a5f14ba197c97974c4e1fd01eb93b4f3365f4bd69e423e91d0c4',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -4260,7 +4276,23 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260623_010000_media_request_keyset_pagination_index.sql
--- Checksum: f07b77b27e1256a3676383b007e4ce181d9d3aac243101bc59bb766b99a23115
+-- Checksum: 0e966ef5b177bb0966c56499c95079add9ffddcdadf0f0d086a0e876c17fa5f2
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 -- Composite index for keyset (cursor-based) pagination on media_requests.
 --
 -- The cursor-based listMediaRequests query uses row-value comparison:
@@ -4286,7 +4318,7 @@ VALUES (
   '20260623_010000',
   '20260623_010000_media_request_keyset_pagination_index.sql',
   'media_request_keyset_pagination_index',
-  'f07b77b27e1256a3676383b007e4ce181d9d3aac243101bc59bb766b99a23115',
+  '0e966ef5b177bb0966c56499c95079add9ffddcdadf0f0d086a0e876c17fa5f2',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -4302,7 +4334,23 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260624_010000_monitored_by_user_attribution.sql
--- Checksum: 7eed0d9da11d0201e5e33c4fb4ab5fcbf7969ec320a743470c889ae54f2b8b69
+-- Checksum: 2fe6aaea91bcc5076f22a1fea2b9265ef682df3d895e2b8449b0c90455e6550b
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 ALTER TABLE metadata_artist_monitoring
   ADD COLUMN IF NOT EXISTS monitored_by_user_id UUID NULL REFERENCES app_users(id) ON DELETE SET NULL;
 
@@ -4317,7 +4365,7 @@ VALUES (
   '20260624_010000',
   '20260624_010000_monitored_by_user_attribution.sql',
   'monitored_by_user_attribution',
-  '7eed0d9da11d0201e5e33c4fb4ab5fcbf7969ec320a743470c889ae54f2b8b69',
+  '2fe6aaea91bcc5076f22a1fea2b9265ef682df3d895e2b8449b0c90455e6550b',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
