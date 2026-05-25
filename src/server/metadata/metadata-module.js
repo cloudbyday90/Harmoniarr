@@ -157,6 +157,7 @@ export function createMetadataModule({
     });
   const resolvedOperatorArtistReconciliationExecutionService = operatorArtistReconciliationExecutionService
     ?? createOperatorArtistReconciliationExecutionService({
+      getMetadataArtist: resolvedMetadataReadService.getArtist,
       getOperatorArtistMonitoring: resolvedOperatorArtistMonitoringService.getOperatorArtistMonitoring,
       getOperatorArtistReconciliationSnapshotById: resolvedOperatorArtistReconciliationSnapshotService.getOperatorArtistReconciliationSnapshotById,
       listOperatorReleaseGroupSelections: resolvedOperatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections,

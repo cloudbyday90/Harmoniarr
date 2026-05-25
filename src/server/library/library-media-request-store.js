@@ -456,6 +456,24 @@ export function createLibraryMediaRequestStore({
     return null;
   }
 
+  async function listActiveRequestsByMetadataReleaseIds({ metadataReleaseIds } = {}) {
+    if (!Array.isArray(metadataReleaseIds) || metadataReleaseIds.length < 1) {
+      return [];
+    }
+
+    const result = await getPoolFn().query(
+      `
+        ${baseSelect}
+        WHERE media_requests.matched_metadata_release_id = ANY($1::uuid[])
+          AND media_requests.request_state NOT IN ('cancelled', 'failed')
+        ORDER BY media_requests.created_at ASC, media_requests.id ASC
+      `,
+      [metadataReleaseIds],
+    );
+
+    return result.rows.map(mapMediaRequestRow);
+  }
+
   async function createFanOutChildRequests({ parentRequest, targetUserIds, linkedRequestId = null }) {
     if (!Array.isArray(targetUserIds) || targetUserIds.length === 0) {
       return [];
@@ -724,6 +742,7 @@ export function createLibraryMediaRequestStore({
     getMediaRequestById,
     getMediaRequestCounts,
     insertMediaRequestEvent,
+    listActiveRequestsByMetadataReleaseIds,
     listMediaRequestEvents,
     listMediaRequests,
     mergeMediaRequestEvidence,

@@ -18,62 +18,12 @@
 
 import { createMetadataReadService } from './metadata-read-service.js';
 import { defaultOperatorArtistMonitoringPolicy } from './operator-artist-monitoring-policy.js';
+import { buildOperatorArtistEffectiveReleaseGroups } from './operator-artist-effective-state.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
 import { createOperatorArtistReconciliationRunStore } from './operator-artist-reconciliation-run-store.js';
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
 import { createOperatorTrackOverrideStore } from './operator-track-override-store.js';
-
-function normalizeReleaseGroupPrimaryType(primaryType) {
-  if (typeof primaryType !== 'string' || primaryType.trim().length === 0) {
-    return 'other';
-  }
-
-  return primaryType.trim().toLowerCase();
-}
-
-function createReleaseLookup(releases = []) {
-  return new Map(releases.map((release) => [release.id, release]));
-}
-
-function createCanonicalReleaseLookup(releases = []) {
-  const lookup = new Map();
-
-  for (const release of releases) {
-    if (release?.releaseGroupId && release?.isCanonical === true) {
-      lookup.set(release.releaseGroupId, release);
-    }
-  }
-
-  return lookup;
-}
-
-function createOverrideBucketsByReleaseGroup(trackOverrides = []) {
-  const buckets = new Map();
-
-  for (const trackOverride of trackOverrides) {
-    const bucket = buckets.get(trackOverride.metadataReleaseGroupId) ?? [];
-    bucket.push(trackOverride);
-    buckets.set(trackOverride.metadataReleaseGroupId, bucket);
-  }
-
-  return buckets;
-}
-
-function summarizeTrackOverrides(trackOverrides = []) {
-  const desiredCount = trackOverrides.filter((trackOverride) => trackOverride.isDesired === true).length;
-  const suppressedCount = trackOverrides.filter((trackOverride) => trackOverride.isDesired === false).length;
-  const reviewNeededCount = trackOverrides.filter((trackOverride) => trackOverride.remapStatus === 'review_needed').length;
-  const orphanedCount = trackOverrides.filter((trackOverride) => trackOverride.remapStatus === 'orphaned').length;
-
-  return {
-    desiredCount,
-    orphanedCount,
-    reviewNeededCount,
-    suppressedCount,
-    totalCount: trackOverrides.length,
-  };
-}
 
 function summarizeSnapshot(snapshot) {
   if (!snapshot) {
@@ -85,32 +35,6 @@ function summarizeSnapshot(snapshot) {
     id: snapshot.id,
     snapshotRevision: snapshot.snapshotRevision,
     updatedAt: snapshot.updatedAt ?? null,
-  };
-}
-
-function deriveSelectionState({
-  canonicalRelease,
-  explicitSelection = null,
-  monitoredReleaseGroupTypes = [],
-  releaseGroup,
-}) {
-  if (explicitSelection) {
-    return {
-      isExplicit: true,
-      resolvedMetadataReleaseId: explicitSelection.resolvedMetadataReleaseId ?? canonicalRelease?.id ?? null,
-      selectionSource: explicitSelection.selectionSource ?? 'manual',
-      selectionState: explicitSelection.selectionState ?? 'selected',
-    };
-  }
-
-  const primaryType = normalizeReleaseGroupPrimaryType(releaseGroup?.primaryType);
-  const isSelectedByPolicy = monitoredReleaseGroupTypes.includes(primaryType);
-
-  return {
-    isExplicit: false,
-    resolvedMetadataReleaseId: canonicalRelease?.id ?? null,
-    selectionSource: 'policy',
-    selectionState: isSelectedByPolicy ? 'selected' : 'unselected',
   };
 }
 
@@ -244,47 +168,17 @@ export function createOperatorArtistProjectionService({
       : [];
     const resolvedTrackOverrides = Array.isArray(trackOverrides) ? trackOverrides : [];
 
-    const releaseLookup = createReleaseLookup(artistReleases);
-    const canonicalReleaseLookup = createCanonicalReleaseLookup(artistReleases);
-    const releaseGroupSelectionLookup = new Map(
-      resolvedReleaseGroupSelections.map((selection) => [selection.metadataReleaseGroupId, selection]),
-    );
-    const overrideBucketsByReleaseGroup = createOverrideBucketsByReleaseGroup(resolvedTrackOverrides);
-    const releaseGroupIds = new Set(artistReleaseGroups.map((releaseGroup) => releaseGroup.id));
-
-    const releaseGroups = artistReleaseGroups.map((releaseGroup) => {
-      const explicitSelection = releaseGroupSelectionLookup.get(releaseGroup.id) ?? null;
-      const canonicalRelease = canonicalReleaseLookup.get(releaseGroup.id) ?? null;
-      const selectionState = deriveSelectionState({
-        canonicalRelease,
-        explicitSelection,
-        monitoredReleaseGroupTypes: resolvedMonitoring.monitoredReleaseGroupTypes,
-        releaseGroup,
-      });
-      const releaseGroupTrackOverrides = overrideBucketsByReleaseGroup.get(releaseGroup.id) ?? [];
-      const resolvedRelease = selectionState.resolvedMetadataReleaseId
-        ? (releaseLookup.get(selectionState.resolvedMetadataReleaseId) ?? null)
-        : null;
-
-      return {
-        ...releaseGroup,
-        operatorState: {
-          isExplicitSelection: selectionState.isExplicit,
-          resolvedMetadataReleaseId: selectionState.resolvedMetadataReleaseId,
-          resolvedRelease,
-          selectionSource: selectionState.selectionSource,
-          selectionState: selectionState.selectionState,
-          trackOverrideSummary: summarizeTrackOverrides(releaseGroupTrackOverrides),
-        },
-      };
+    const {
+      effectiveReleaseGroups: releaseGroups,
+      orphanedReleaseGroupSelections,
+      orphanedTrackOverrides,
+    } = buildOperatorArtistEffectiveReleaseGroups({
+      monitoredReleaseGroupTypes: resolvedMonitoring.monitoredReleaseGroupTypes,
+      releaseGroupSelections: resolvedReleaseGroupSelections,
+      releaseGroups: artistReleaseGroups,
+      releases: artistReleases,
+      trackOverrides: resolvedTrackOverrides,
     });
-
-    const orphanedReleaseGroupSelections = resolvedReleaseGroupSelections.filter(
-      (selection) => !releaseGroupIds.has(selection.metadataReleaseGroupId),
-    );
-    const orphanedTrackOverrides = resolvedTrackOverrides.filter(
-      (trackOverride) => !releaseGroupIds.has(trackOverride.metadataReleaseGroupId),
-    );
 
     return {
       aliases: artistAliases,

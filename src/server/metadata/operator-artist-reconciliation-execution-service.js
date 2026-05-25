@@ -17,10 +17,17 @@
  */
 
 import { createApiError } from '../auth.js';
+import { createLibraryDiscoveryRequestStore } from '../library/library-discovery-request-store.js';
+import { createLibraryMediaRequestStore } from '../library/library-media-request-store.js';
+import { createLibraryReleaseReconciliationStore } from '../library/library-release-reconciliation-store.js';
+import { buildOperatorArtistEffectiveReleaseGroups } from './operator-artist-effective-state.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
+import { defaultOperatorArtistMonitoringPolicy } from './operator-artist-monitoring-policy.js';
+import { createOperatorArtistDesiredStateService } from './operator-artist-desired-state-service.js';
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
 import { createOperatorTrackOverrideStore } from './operator-track-override-store.js';
+import { createMetadataReadService } from './metadata-read-service.js';
 
 function toCount(value) {
   return Number.isInteger(value) && value >= 0 ? value : 0;
@@ -49,15 +56,25 @@ function createSnapshotRevisionMismatchError({ expectedSnapshotRevision, snapsho
 }
 
 export function createOperatorArtistReconciliationExecutionService({
+  getMetadataArtist = null,
   getOperatorArtistMonitoring = null,
   getOperatorArtistReconciliationSnapshotById = null,
+  listActiveRequestsByMetadataReleaseIds = null,
+  listDiscoveryRequestsByMetadataReleaseIds = null,
+  listLibraryReleaseReconciliationsByMetadataReleaseIds = null,
   listOperatorReleaseGroupSelections = null,
   listOperatorTrackOverrides = null,
+  libraryDiscoveryRequestStore = null,
+  libraryMediaRequestStore = null,
+  libraryReleaseReconciliationStore = null,
+  metadataReadService = null,
+  operatorArtistDesiredStateService = null,
   operatorArtistMonitoringService = null,
   operatorArtistReconciliationSnapshotService = null,
   operatorReleaseGroupSelectionStore = null,
   operatorTrackOverrideStore = null,
 } = {}) {
+  const resolvedMetadataReadService = metadataReadService ?? createMetadataReadService();
   const resolvedOperatorArtistMonitoringService = operatorArtistMonitoringService
     ?? createOperatorArtistMonitoringService();
   const resolvedOperatorArtistReconciliationSnapshotService = operatorArtistReconciliationSnapshotService
@@ -66,14 +83,30 @@ export function createOperatorArtistReconciliationExecutionService({
     ?? createOperatorReleaseGroupSelectionStore();
   const resolvedOperatorTrackOverrideStore = operatorTrackOverrideStore
     ?? createOperatorTrackOverrideStore();
+  const resolvedLibraryReleaseReconciliationStore = libraryReleaseReconciliationStore
+    ?? createLibraryReleaseReconciliationStore();
+  const resolvedLibraryMediaRequestStore = libraryMediaRequestStore
+    ?? createLibraryMediaRequestStore();
+  const resolvedLibraryDiscoveryRequestStore = libraryDiscoveryRequestStore
+    ?? createLibraryDiscoveryRequestStore();
+  const resolvedOperatorArtistDesiredStateService = operatorArtistDesiredStateService
+    ?? createOperatorArtistDesiredStateService();
+  const readMetadataArtist = getMetadataArtist ?? resolvedMetadataReadService.getArtist;
   const readOperatorArtistMonitoring = getOperatorArtistMonitoring
     ?? resolvedOperatorArtistMonitoringService.getOperatorArtistMonitoring;
   const readSnapshotById = getOperatorArtistReconciliationSnapshotById
     ?? resolvedOperatorArtistReconciliationSnapshotService.getOperatorArtistReconciliationSnapshotById;
+  const readActiveRequests = listActiveRequestsByMetadataReleaseIds
+    ?? resolvedLibraryMediaRequestStore.listActiveRequestsByMetadataReleaseIds;
+  const readDiscoveryRequests = listDiscoveryRequestsByMetadataReleaseIds
+    ?? resolvedLibraryDiscoveryRequestStore.listDiscoveryRequestsByMetadataReleaseIds;
+  const readLibraryReleaseReconciliations = listLibraryReleaseReconciliationsByMetadataReleaseIds
+    ?? resolvedLibraryReleaseReconciliationStore.listReconciliationsByMetadataReleaseIds;
   const readReleaseSelections = listOperatorReleaseGroupSelections
     ?? resolvedOperatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections;
   const readTrackOverrides = listOperatorTrackOverrides
     ?? resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides;
+  const buildDesiredStatePlan = resolvedOperatorArtistDesiredStateService.buildDesiredStatePlan;
 
   async function executeOperatorArtistReconciliation({
     appUserId,
@@ -84,7 +117,8 @@ export function createOperatorArtistReconciliationExecutionService({
   } = {}) {
     await throwIfCancelled();
 
-    const [monitoring, snapshot, releaseSelections, trackOverrides] = await Promise.all([
+    const [artistPayload, monitoring, snapshot, releaseSelections, trackOverrides] = await Promise.all([
+      readMetadataArtist({ artistId: metadataArtistId }),
       readOperatorArtistMonitoring({ appUserId, metadataArtistId }),
       readSnapshotById({ appUserId, metadataArtistId, snapshotId }),
       readReleaseSelections({ appUserId, metadataArtistId }),
@@ -104,32 +138,106 @@ export function createOperatorArtistReconciliationExecutionService({
 
     await throwIfCancelled();
 
-    const selectedReleaseGroupCount = releaseSelections.filter((selection) => selection.selectionState === 'selected').length;
-    const partialReleaseGroupCount = releaseSelections.filter((selection) => selection.selectionState === 'partial').length;
-    const unselectedReleaseGroupCount = releaseSelections.filter((selection) => selection.selectionState === 'unselected').length;
-    const desiredTrackOverrideCount = trackOverrides.filter((override) => override.isDesired === true).length;
-    const suppressedTrackOverrideCount = trackOverrides.filter((override) => override.isDesired === false).length;
+    const resolvedMonitoring = {
+      ...defaultOperatorArtistMonitoringPolicy,
+      ...(monitoring ?? {}),
+    };
+    const resolvedReleaseSelections = Array.isArray(releaseSelections) ? releaseSelections : [];
+    const resolvedTrackOverrides = Array.isArray(trackOverrides) ? trackOverrides : [];
+    const {
+      effectiveReleaseGroups,
+      orphanedReleaseGroupSelections,
+      orphanedTrackOverrides,
+    } = buildOperatorArtistEffectiveReleaseGroups({
+      monitoredReleaseGroupTypes: resolvedMonitoring.monitoredReleaseGroupTypes,
+      releaseGroupSelections: resolvedReleaseSelections,
+      releaseGroups: Array.isArray(artistPayload?.releaseGroups) ? artistPayload.releaseGroups : [],
+      releases: Array.isArray(artistPayload?.releases) ? artistPayload.releases : [],
+      trackOverrides: resolvedTrackOverrides,
+    });
+    const desiredReleaseIds = [
+      ...new Set(
+        effectiveReleaseGroups
+          .filter((releaseGroup) => (
+            releaseGroup?.operatorState?.selectionState === 'selected'
+            || releaseGroup?.operatorState?.selectionState === 'partial'
+          ))
+          .map((releaseGroup) => releaseGroup?.operatorState?.resolvedMetadataReleaseId)
+          .filter((metadataReleaseId) => typeof metadataReleaseId === 'string' && metadataReleaseId.length > 0),
+      ),
+    ];
+
+    const [libraryReleaseReconciliations, activeRequests, discoveryRequests] = await Promise.all([
+      readLibraryReleaseReconciliations({ metadataReleaseIds: desiredReleaseIds }),
+      readActiveRequests({ metadataReleaseIds: desiredReleaseIds }),
+      readDiscoveryRequests({ metadataReleaseIds: desiredReleaseIds }),
+    ]);
+
+    const reconciliationByReleaseId = new Map(
+      libraryReleaseReconciliations.map((entry) => [entry.metadataReleaseId, entry]),
+    );
+    const activeRequestByReleaseId = new Map(
+      activeRequests.map((entry) => [entry.existingMatch?.releaseId ?? null, entry]).filter(([key]) => key),
+    );
+    const discoveryRequestByReleaseId = new Map(
+      discoveryRequests.map((entry) => [entry.metadataReleaseId, entry]),
+    );
+    const desiredStatePlan = buildDesiredStatePlan({
+      activeRequestsByReleaseId: activeRequestByReleaseId,
+      discoveryRequestsByReleaseId: discoveryRequestByReleaseId,
+      monitoring: resolvedMonitoring,
+      releaseGroups: effectiveReleaseGroups,
+      releaseReconciliationsByReleaseId: reconciliationByReleaseId,
+    });
+
+    const selectedReleaseGroupCount = effectiveReleaseGroups.filter(
+      (releaseGroup) => releaseGroup.operatorState.selectionState === 'selected',
+    ).length;
+    const partialReleaseGroupCount = effectiveReleaseGroups.filter(
+      (releaseGroup) => releaseGroup.operatorState.selectionState === 'partial',
+    ).length;
+    const unselectedReleaseGroupCount = effectiveReleaseGroups.filter(
+      (releaseGroup) => releaseGroup.operatorState.selectionState === 'unselected',
+    ).length;
+    const desiredTrackOverrideCount = resolvedTrackOverrides.filter((override) => override.isDesired === true).length;
+    const suppressedTrackOverrideCount = resolvedTrackOverrides.filter((override) => override.isDesired === false).length;
 
     return {
       appUserId,
+      activeRequestBlockedCount: desiredStatePlan.summary.activeRequestBlockedCount,
       completedAt: new Date().toISOString(),
+      completeBlockedCount: desiredStatePlan.summary.completeBlockedCount,
+      cooldownBlockedCount: desiredStatePlan.summary.cooldownBlockedCount,
+      currentAndFutureEligibleCount: desiredStatePlan.summary.currentAndFutureEligibleCount,
       desiredReleaseGroupCount: selectedReleaseGroupCount + partialReleaseGroupCount,
       desiredTrackOverrideCount,
-      monitoredReleaseGroupTypeCount: toCount(monitoring?.monitoredReleaseGroupTypes?.length),
-      monitoredReleaseGroupTypes: Array.isArray(monitoring?.monitoredReleaseGroupTypes)
-        ? [...monitoring.monitoredReleaseGroupTypes]
+      downstreamEligibleReleaseCount: desiredStatePlan.summary.eligibleReleaseCount,
+      duplicateBlockedCount: desiredStatePlan.summary.duplicateBlockedCount,
+      explicitDesiredReleaseCount: desiredStatePlan.summary.explicitDesiredReleaseCount,
+      futureEligibleCount: desiredStatePlan.summary.futureEligibleCount,
+      futureScopeBlockedCount: desiredStatePlan.summary.futureScopeBlockedCount,
+      manualOnlyBlockedCount: desiredStatePlan.summary.manualOnlyBlockedCount,
+      monitoredReleaseGroupTypeCount: toCount(resolvedMonitoring?.monitoredReleaseGroupTypes?.length),
+      monitoredReleaseGroupTypes: Array.isArray(resolvedMonitoring?.monitoredReleaseGroupTypes)
+        ? [...resolvedMonitoring.monitoredReleaseGroupTypes]
         : [],
+      orphanedReleaseGroupSelectionCount: orphanedReleaseGroupSelections.length,
+      orphanedTrackOverrideCount: orphanedTrackOverrides.length,
       partialReleaseGroupCount,
-      releaseGroupSelectionCount: releaseSelections.length,
-      selectionSourceMode: monitoring?.selectionSourceMode ?? null,
+      policyDesiredReleaseCount: desiredStatePlan.summary.policyDesiredReleaseCount,
+      queuedDiscoveryCount: desiredStatePlan.summary.queuedDiscoveryCount,
+      releaseGroupSelectionCount: resolvedReleaseSelections.length,
+      selectionSourceMode: resolvedMonitoring?.selectionSourceMode ?? null,
       snapshotId: snapshot.id,
       snapshotPayloadKeyCount: countPlainObjectKeys(snapshot.snapshotPayload),
       snapshotRevision: snapshot.snapshotRevision,
       snapshotSavedAt: snapshot.updatedAt ?? snapshot.createdAt ?? null,
       suppressedTrackOverrideCount,
-      trackOverrideCount: trackOverrides.length,
+      trackOnlyBlockedCount: desiredStatePlan.summary.trackOnlyBlockedCount,
+      trackOverrideCount: resolvedTrackOverrides.length,
       unselectedReleaseGroupCount,
-      wantedAutomationMode: monitoring?.wantedAutomationMode ?? null,
+      unresolvedReleaseCount: desiredStatePlan.summary.unresolvedReleaseCount,
+      wantedAutomationMode: resolvedMonitoring?.wantedAutomationMode ?? null,
     };
   }
 

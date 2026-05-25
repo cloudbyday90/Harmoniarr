@@ -21,6 +21,47 @@ import { getPool } from '../database.js';
 export function createLibraryReleaseReconciliationStore({
   getPoolFn = getPool,
 } = {}) {
+  async function listReconciliationsByMetadataReleaseIds({ metadataReleaseIds } = {}) {
+    if (!Array.isArray(metadataReleaseIds) || metadataReleaseIds.length < 1) {
+      return [];
+    }
+
+    const result = await getPoolFn().query(
+      `
+        SELECT
+          metadata_artist_id,
+          metadata_release_group_id,
+          metadata_release_id,
+          reconciliation_status,
+          expected_track_count,
+          matched_track_count,
+          missing_track_count,
+          matched_file_count,
+          duplicate_track_count,
+          evidence,
+          last_reconciled_at
+        FROM library_release_reconciliations
+        WHERE metadata_release_id = ANY($1::uuid[])
+        ORDER BY metadata_release_id ASC
+      `,
+      [metadataReleaseIds],
+    );
+
+    return result.rows.map((row) => ({
+      duplicateTrackCount: Number.parseInt(String(row.duplicate_track_count ?? 0), 10) || 0,
+      evidence: row.evidence ?? {},
+      expectedTrackCount: Number.parseInt(String(row.expected_track_count ?? 0), 10) || 0,
+      lastReconciledAt: row.last_reconciled_at ?? null,
+      matchedFileCount: Number.parseInt(String(row.matched_file_count ?? 0), 10) || 0,
+      matchedTrackCount: Number.parseInt(String(row.matched_track_count ?? 0), 10) || 0,
+      metadataArtistId: row.metadata_artist_id,
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id,
+      missingTrackCount: Number.parseInt(String(row.missing_track_count ?? 0), 10) || 0,
+      reconciliationStatus: row.reconciliation_status,
+    }));
+  }
+
   async function replaceLibraryReleaseReconciliations({ reconciliations }) {
     const pool = getPoolFn();
     const client = await pool.connect();
@@ -191,6 +232,7 @@ export function createLibraryReleaseReconciliationStore({
 
   return {
     getFilterOptions,
+    listReconciliationsByMetadataReleaseIds,
     listLibraryReleasesWithMetadata,
     replaceLibraryReleaseReconciliations,
   };

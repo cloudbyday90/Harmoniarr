@@ -43,6 +43,47 @@ function mapDiscoveryDispatchRow(row) {
 export function createLibraryDiscoveryRequestStore({
   getPoolFn = getPool,
 } = {}) {
+  async function listDiscoveryRequestsByMetadataReleaseIds({ metadataReleaseIds } = {}) {
+    if (!Array.isArray(metadataReleaseIds) || metadataReleaseIds.length < 1) {
+      return [];
+    }
+
+    const result = await getPoolFn().query(
+      `
+        SELECT
+          metadata_artist_id,
+          metadata_release_group_id,
+          metadata_release_id,
+          wanted_status,
+          search_mode,
+          request_status,
+          blocked_reason,
+          release_date,
+          last_search_at,
+          next_search_after,
+          evidence
+        FROM library_discovery_requests
+        WHERE metadata_release_id = ANY($1::uuid[])
+        ORDER BY metadata_release_id ASC
+      `,
+      [metadataReleaseIds],
+    );
+
+    return result.rows.map((row) => ({
+      blockedReason: row.blocked_reason ?? null,
+      evidence: row.evidence ?? {},
+      lastSearchAt: row.last_search_at ?? null,
+      metadataArtistId: row.metadata_artist_id,
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id,
+      nextSearchAfter: row.next_search_after ?? null,
+      releaseDate: row.release_date ?? null,
+      requestStatus: row.request_status ?? null,
+      searchMode: row.search_mode ?? null,
+      wantedStatus: row.wanted_status ?? null,
+    }));
+  }
+
   async function claimNextReadyAutomaticDiscoveryRequest({
     dispatchedAt,
     nextSearchAfter,
@@ -249,6 +290,7 @@ export function createLibraryDiscoveryRequestStore({
 
   return {
     claimNextReadyAutomaticDiscoveryRequest,
+    listDiscoveryRequestsByMetadataReleaseIds,
     recordDiscoverySearchFailure,
     recordDiscoverySearchSuccess,
     replaceLibraryDiscoveryRequests,

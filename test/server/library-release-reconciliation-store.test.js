@@ -73,3 +73,45 @@ test('replaceLibraryReleaseReconciliations clears the projection when no reconci
   assert.equal(query.mock.calls[2].arguments[0], 'COMMIT');
   assert.equal(release.mock.callCount(), 1);
 });
+
+test('listReconciliationsByMetadataReleaseIds returns compact reconciliation rows for targeted releases', async (t) => {
+  const query = t.mock.fn(async (_sql, params) => {
+    assert.deepEqual(params, [['release-1', 'release-2']]);
+    return {
+      rows: [{
+        duplicate_track_count: 1,
+        evidence: { source: 'library_scan' },
+        expected_track_count: 10,
+        last_reconciled_at: '2026-05-25T15:00:00.000Z',
+        matched_file_count: 8,
+        matched_track_count: 8,
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'group-1',
+        metadata_release_id: 'release-1',
+        missing_track_count: 2,
+        reconciliation_status: 'partial',
+      }],
+    };
+  });
+  const store = createLibraryReleaseReconciliationStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const reconciliations = await store.listReconciliationsByMetadataReleaseIds({
+    metadataReleaseIds: ['release-1', 'release-2'],
+  });
+
+  assert.deepEqual(reconciliations, [{
+    duplicateTrackCount: 1,
+    evidence: { source: 'library_scan' },
+    expectedTrackCount: 10,
+    lastReconciledAt: '2026-05-25T15:00:00.000Z',
+    matchedFileCount: 8,
+    matchedTrackCount: 8,
+    metadataArtistId: 'artist-1',
+    metadataReleaseGroupId: 'group-1',
+    metadataReleaseId: 'release-1',
+    missingTrackCount: 2,
+    reconciliationStatus: 'partial',
+  }]);
+});

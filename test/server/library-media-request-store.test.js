@@ -443,3 +443,32 @@ test('listMediaRequests with invalid cursor falls back to offset-based query', a
   assert.doesNotMatch(sql, /\(media_requests\.created_at, media_requests\.id\) < \(/);
   assert.match(sql, /OFFSET/);
 });
+
+test('listActiveRequestsByMetadataReleaseIds returns non-terminal requests for targeted releases', async (t) => {
+  const query = t.mock.fn(async (_sql, params) => {
+    assert.deepEqual(params, [['release-1', 'release-2']]);
+    return {
+      rows: [makeRequestRow({
+        id: 'req-active',
+        matched_artist_name: 'Autechre',
+        matched_metadata_release_id: 'release-1',
+        matched_release_group_id: 'group-1',
+        matched_release_group_title: 'Amber',
+        matched_release_title: 'Amber',
+        request_state: 'needs_fetch',
+      })],
+    };
+  });
+  const store = createLibraryMediaRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const requests = await store.listActiveRequestsByMetadataReleaseIds({
+    metadataReleaseIds: ['release-1', 'release-2'],
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].id, 'req-active');
+  assert.equal(requests[0].existingMatch.releaseId, 'release-1');
+  assert.equal(requests[0].requestState, 'needs_fetch');
+});
