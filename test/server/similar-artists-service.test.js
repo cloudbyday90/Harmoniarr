@@ -35,7 +35,7 @@ test('extractMbRelatedArtists maps "similar artist" relations at weight 0.7', ()
   assert.equal(result[0].score, 0.7);
 });
 
-test('extractMbRelatedArtists maps "influenced by" relations at weight 0.5', () => {
+test('extractMbRelatedArtists maps "influenced by" as a strong but secondary similarity hint', () => {
   const relations = [
     {
       type: 'influenced by',
@@ -46,10 +46,10 @@ test('extractMbRelatedArtists maps "influenced by" relations at weight 0.5', () 
   const result = extractMbRelatedArtists(relations);
 
   assert.equal(result.length, 1);
-  assert.equal(result[0].score, 0.5);
+  assert.equal(result[0].score, 0.46);
 });
 
-test('extractMbRelatedArtists maps "collaboration" and "member of band" at weight 0.4', () => {
+test('extractMbRelatedArtists maps "collaboration" and "member of band" as weak relatedness hints', () => {
   const relations = [
     { type: 'collaboration', artist: { id: 'mb-collab-1', name: 'Collaborator' } },
     { type: 'member of band', artist: { id: 'mb-member-1', name: 'Band Member' } },
@@ -58,8 +58,8 @@ test('extractMbRelatedArtists maps "collaboration" and "member of band" at weigh
   const result = extractMbRelatedArtists(relations);
 
   assert.equal(result.length, 2);
-  assert.equal(result[0].score, 0.4);
-  assert.equal(result[1].score, 0.4);
+  assert.equal(result[0].score, 0.24);
+  assert.equal(result[1].score, 0.2);
 });
 
 test('extractMbRelatedArtists is case-insensitive for relation type', () => {
@@ -72,7 +72,7 @@ test('extractMbRelatedArtists is case-insensitive for relation type', () => {
 
   assert.equal(result.length, 2);
   assert.equal(result[0].score, 0.7);
-  assert.equal(result[1].score, 0.5);
+  assert.equal(result[1].score, 0.46);
 });
 
 test('extractMbRelatedArtists skips relations with unknown types', () => {
@@ -232,15 +232,17 @@ test('createSimilarArtistsCache treats expired entries as missing', (t) => {
 // createSimilarArtistsService
 // ---------------------------------------------------------------------------
 
-function createTestListenBrainzClient(getSimilarArtistsImpl) {
+function createTestListenBrainzClient(getSimilarArtistsImpl, getRadioSimilarArtistsImpl = async () => []) {
   return {
+    getRadioSimilarArtists: getRadioSimilarArtistsImpl,
     getSimilarArtists: getSimilarArtistsImpl,
   };
 }
 
-function createTestMusicBrainzClient(lookupArtistRelationsImpl) {
+function createTestMusicBrainzClient(lookupArtistRelationsImpl, searchArtistsImpl = async () => ({ artists: [] })) {
   return {
     lookupArtistRelations: lookupArtistRelationsImpl,
+    searchArtists: searchArtistsImpl,
   };
 }
 
@@ -707,7 +709,7 @@ test('extractMbRelatedArtists maps "artist rename" at weight 0.85', () => {
   assert.equal(result[0].score, 0.85);
 });
 
-test('extractMbRelatedArtists maps "subgroup" at weight 0.6', () => {
+test('extractMbRelatedArtists maps "subgroup" as a moderate project relationship', () => {
   const relations = [
     { type: 'subgroup', artist: { id: 'mb-sub', name: 'Subgroup' } },
   ];
@@ -715,10 +717,10 @@ test('extractMbRelatedArtists maps "subgroup" at weight 0.6', () => {
   const result = extractMbRelatedArtists(relations);
 
   assert.equal(result.length, 1);
-  assert.equal(result[0].score, 0.6);
+  assert.equal(result[0].score, 0.34);
 });
 
-test('extractMbRelatedArtists maps "supporting musician" at weight 0.5', () => {
+test('extractMbRelatedArtists maps "supporting musician" as a weak similarity hint', () => {
   const relations = [
     { type: 'supporting musician', artist: { id: 'mb-supp', name: 'Supporting Artist' } },
   ];
@@ -726,10 +728,10 @@ test('extractMbRelatedArtists maps "supporting musician" at weight 0.5', () => {
   const result = extractMbRelatedArtists(relations);
 
   assert.equal(result.length, 1);
-  assert.equal(result[0].score, 0.5);
+  assert.equal(result[0].score, 0.24);
 });
 
-test('extractMbRelatedArtists maps "founder" at weight 0.5', () => {
+test('extractMbRelatedArtists maps "founder" as a weak organizational relationship', () => {
   const relations = [
     { type: 'founder', artist: { id: 'mb-founder', name: 'Founder' } },
   ];
@@ -737,10 +739,10 @@ test('extractMbRelatedArtists maps "founder" at weight 0.5', () => {
   const result = extractMbRelatedArtists(relations);
 
   assert.equal(result.length, 1);
-  assert.equal(result[0].score, 0.5);
+  assert.equal(result[0].score, 0.2);
 });
 
-test('extractMbRelatedArtists maps "vocal supporting musician" at weight 0.5', () => {
+test('extractMbRelatedArtists maps "vocal supporting musician" as a weak similarity hint', () => {
   const relations = [
     { type: 'vocal supporting musician', artist: { id: 'mb-vocal', name: 'Vocal Support' } },
   ];
@@ -748,10 +750,10 @@ test('extractMbRelatedArtists maps "vocal supporting musician" at weight 0.5', (
   const result = extractMbRelatedArtists(relations);
 
   assert.equal(result.length, 1);
-  assert.equal(result[0].score, 0.5);
+  assert.equal(result[0].score, 0.24);
 });
 
-test('extractMbRelatedArtists maps "instrumental supporting musician" at weight 0.45', () => {
+test('extractMbRelatedArtists maps "instrumental supporting musician" as a weak similarity hint', () => {
   const relations = [
     { type: 'instrumental supporting musician', artist: { id: 'mb-inst', name: 'Instrumental Support' } },
   ];
@@ -759,10 +761,10 @@ test('extractMbRelatedArtists maps "instrumental supporting musician" at weight 
   const result = extractMbRelatedArtists(relations);
 
   assert.equal(result.length, 1);
-  assert.equal(result[0].score, 0.45);
+  assert.equal(result[0].score, 0.22);
 });
 
-test('extractMbRelatedArtists maps "conductor position" at weight 0.3', () => {
+test('extractMbRelatedArtists maps "conductor position" as a weak organizational relationship', () => {
   const relations = [
     { type: 'conductor position', artist: { id: 'mb-cond', name: 'Conductor' } },
   ];
@@ -770,7 +772,7 @@ test('extractMbRelatedArtists maps "conductor position" at weight 0.3', () => {
   const result = extractMbRelatedArtists(relations);
 
   assert.equal(result.length, 1);
-  assert.equal(result[0].score, 0.3);
+  assert.equal(result[0].score, 0.18);
 });
 
 test('extractMbRelatedArtists maps "tribute" at weight 0.2', () => {
@@ -816,7 +818,7 @@ test('extractMbRelatedArtists now includes "conductor position" which was previo
 
   assert.equal(result.length, 2);
   assert.equal(result[0].mbid, 'mb-cond');
-  assert.equal(result[0].score, 0.3);
+  assert.equal(result[0].score, 0.18);
   assert.equal(result[1].mbid, 'mb-sim');
   assert.equal(result[1].score, 0.7);
 });
@@ -836,7 +838,7 @@ test('extractMbRelatedArtists handles mix of mapped and unmapped relationship ty
   const byId = new Map(result.map((r) => [r.mbid, r]));
   assert.equal(byId.get('mb-1').score, 0.7);
   assert.equal(byId.get('mb-2').score, 0.9);
-  assert.equal(byId.get('mb-4').score, 0.4);
+  assert.equal(byId.get('mb-4').score, 0.24);
   assert.equal(byId.get('mb-5').score, 0.1);
 });
 
@@ -1061,4 +1063,107 @@ test('createSimilarArtistsService uses genre overlap from related artist data', 
   const mbArtist = result.similar.find((a) => a.id === 'mb-mb');
   assert.ok(mbArtist, 'MB artist should be in results');
   assert.ok(mbArtist.score > 0.7, 'Score should include genre overlap bonus');
+});
+
+test('createSimilarArtistsService falls back to ListenBrainz radio neighbors when direct similarity is empty', async () => {
+  const lbClient = createTestListenBrainzClient(
+    async () => [],
+    async () => [
+      { mbid: 'lb-radio-1', name: 'Michael W. Smith', score: 0.8 },
+      { mbid: 'lb-radio-2', name: 'Caedmon’s Call', score: 0.76 },
+    ],
+  );
+  const mbClient = createTestMusicBrainzClient(async () => ({
+    country: 'US',
+    disambiguation: 'Christian singer',
+    name: 'Chris Rice',
+    relations: [],
+    type: 'Person',
+  }));
+  const lastFmClient = createTestLastFmClient(async () => []);
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'seed-mbid' });
+
+  assert.deepEqual(result.similar, [
+    { id: 'lb-radio-1', name: 'Michael W. Smith', score: 0.8, source: 'listenbrainz' },
+    { id: 'lb-radio-2', name: 'Caedmon’s Call', score: 0.76, source: 'listenbrainz' },
+  ]);
+});
+
+test('createSimilarArtistsService falls back to MusicBrainz tag search when relations and tags are sparse', async () => {
+  const lbClient = createTestListenBrainzClient(async () => []);
+  const mbClient = createTestMusicBrainzClient(
+    async () => ({
+      country: 'US',
+      disambiguation: 'Christian singer',
+      name: 'Chris Rice',
+      relations: [],
+      type: 'Person',
+    }),
+    async () => ({
+      artists: [
+        { id: 'mb-1', name: 'Michael W. Smith', score: 100, tags: [{ name: 'christian' }] },
+        { id: 'mb-2', name: 'Steven Curtis Chapman', score: 98, tags: [{ name: 'christian' }] },
+      ],
+    }),
+  );
+  const lastFmClient = createTestLastFmClient(async () => []);
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'seed-mbid' });
+
+  assert.deepEqual(result.similar, [
+    { id: 'mb-1', name: 'Michael W. Smith', score: 0.62, source: 'musicbrainz' },
+    { id: 'mb-2', name: 'Steven Curtis Chapman', score: 0.6092, source: 'musicbrainz' },
+  ]);
+});
+
+test('createSimilarArtistsService supplements weak relationship graphs with fallback peers', async () => {
+  const lbClient = createTestListenBrainzClient(async () => []);
+  const mbClient = createTestMusicBrainzClient(
+    async () => ({
+      country: 'US',
+      genres: [{ name: 'southern gospel' }],
+      name: 'Bill Gaither',
+      relations: [
+        { type: 'member of band', artist: { id: 'mb-project', name: 'Gaither Vocal Band' } },
+        { type: 'founder', artist: { id: 'mb-org', name: 'Bill & Gloria Gaither' } },
+      ],
+      tags: [{ name: 'southern gospel' }],
+      type: 'Person',
+    }),
+    async () => ({
+      artists: [
+        { id: 'mb-peer-1', name: 'The Cathedrals', score: 100, tags: [{ name: 'southern gospel' }] },
+        { id: 'mb-peer-2', name: 'The Booth Brothers', score: 97, tags: [{ name: 'southern gospel' }] },
+      ],
+    }),
+  );
+  const lastFmClient = createTestLastFmClient(async () => []);
+
+  const service = createSimilarArtistsService({
+    listenBrainzClient: lbClient,
+    musicBrainzClient: mbClient,
+    lastFmClient,
+  });
+
+  const result = await service.getSimilarArtists({ artistMbid: 'seed-mbid' });
+
+  assert.deepEqual(result.similar, [
+    { id: 'mb-peer-1', name: 'The Cathedrals', score: 0.72, source: 'musicbrainz' },
+    { id: 'mb-peer-2', name: 'The Booth Brothers', score: 0.7008, source: 'musicbrainz' },
+    { id: 'mb-project', name: 'Gaither Vocal Band', score: 0.2, source: 'musicbrainz' },
+    { id: 'mb-org', name: 'Bill & Gloria Gaither', score: 0.2, source: 'musicbrainz' },
+  ]);
 });

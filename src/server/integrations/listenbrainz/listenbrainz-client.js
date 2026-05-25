@@ -200,9 +200,18 @@ export function createListenBrainzClient({
     }
   }
 
-  async function requestJson(pathname, { operation }) {
+  async function requestJson(pathname, { operation, query = null } = {}) {
     return enqueue(async () => {
       const url = new URL(pathname, normalizedBaseUrl);
+      if (query && typeof query === 'object') {
+        for (const [key, value] of Object.entries(query)) {
+          if (value == null || value === '') {
+            continue;
+          }
+
+          url.searchParams.set(key, String(value));
+        }
+      }
 
       for (let attempt = 0; attempt <= effectiveMaxRetries; attempt += 1) {
         let response;
@@ -334,5 +343,83 @@ export function createListenBrainzClient({
       });
   }
 
-  return { getSimilarArtists };
+  async function getRadioSimilarArtists({
+    mbid,
+    limit = 50,
+    mode = 'easy',
+    maxRecordingsPerArtist = 1,
+    popBegin = 0,
+    popEnd = 100,
+  }) {
+    const payload = await requestJson(`1/lb-radio/artist/${encodeURIComponent(mbid)}`, {
+      operation: 'artist radio lookup',
+      query: {
+        max_recordings_per_artist: maxRecordingsPerArtist,
+        max_similar_artists: Math.max(1, Math.min(Number(limit) || 50, 100)),
+        mode,
+        pop_begin: popBegin,
+        pop_end: popEnd,
+      },
+    });
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return [];
+    }
+
+    const candidates = [];
+
+    for (const [artistMbid, recordings] of Object.entries(payload)) {
+      if (typeof artistMbid !== 'string' || artistMbid.length === 0 || artistMbid === mbid) {
+        continue;
+      }
+
+      if (!Array.isArray(recordings) || recordings.length === 0) {
+        continue;
+      }
+
+      let maxListenCount = 0;
+      let artistName = null;
+
+      for (const recording of recordings) {
+        if (typeof recording?.similar_artist_name === 'string' && artistName == null) {
+          artistName = recording.similar_artist_name;
+        }
+
+        if (Number.isFinite(recording?.total_listen_count) && recording.total_listen_count > maxListenCount) {
+          maxListenCount = recording.total_listen_count;
+        }
+      }
+
+      candidates.push({
+        mbid: artistMbid,
+        name: artistName,
+        totalListenCount: maxListenCount,
+      });
+    }
+
+    candidates.sort((a, b) => b.totalListenCount - a.totalListenCount);
+
+    const topListenCount = candidates[0]?.totalListenCount ?? 0;
+    const topListenLog = topListenCount > 0 ? Math.log1p(topListenCount) : 0;
+
+    return candidates
+      .slice(0, limit)
+      .map((candidate) => {
+        const normalizedCount = topListenLog === 0
+          ? 1
+          : Math.log1p(candidate.totalListenCount) / topListenLog;
+
+        return {
+          mbid: candidate.mbid,
+          name: candidate.name,
+          // ListenBrainz radio exposes similar-artist neighborhoods, not a
+          // normalized similarity score. We derive a bounded confidence score
+          // from returned listen counts so the result can merge cleanly with
+          // the existing similarity pipeline.
+          score: Math.min(0.8, Math.max(0.45, 0.45 + (normalizedCount * 0.35))),
+        };
+      });
+  }
+
+  return { getSimilarArtists, getRadioSimilarArtists };
 }

@@ -19,36 +19,30 @@
 import { createLastFmClient } from '../integrations/lastfm/lastfm-client.js';
 import { createListenBrainzClient } from '../integrations/listenbrainz/listenbrainz-client.js';
 import { createMusicBrainzClient } from '../integrations/musicbrainz/musicbrainz-client.js';
+import { createSimilarArtistsFallbackService } from './similar-artists-fallback-service.js';
 
 // MusicBrainz artist-to-artist relationship types and their similarity weights.
 // Lower-cased for case-insensitive matching against MB relation type strings.
-// Weights reflect how strongly the relationship signals musical similarity:
-//   0.9  – same person (is person / performs as)
-//   0.85 – same project renamed
-//   0.7  – explicitly tagged similar
-//   0.6  – subgroup / offshoot project
-//   0.5  – strong collaborative signal (influenced by, supporting, founder)
-//   0.4  – moderate collaborative signal (collaboration, member of band)
-//   0.4  – others with direct musical connection
-//   0.3  – weaker organizational connections (conductor, director)
-//   0.2  – tribute (different identity, same repertoire)
-//   0.15 – very weak personal connections (married, sibling, involved with)
+// Weights reflect how strongly the relationship signals musical similarity.
+// Direct "similar artist" editorial data stays strong, while organizational
+// or personal links are intentionally weaker so they do not outrank genuine
+// stylistic peers from genre/tag or listening-history fallbacks.
 const MB_RELATIONSHIP_WEIGHTS = new Map([
   ['is person', 0.9],
-  ['composer-in-residence', 0.4],
-  ['conductor position', 0.3],
-  ['collaboration', 0.4],
-  ['artistic director', 0.3],
+  ['composer-in-residence', 0.24],
+  ['conductor position', 0.18],
+  ['collaboration', 0.24],
+  ['artistic director', 0.18],
   ['artist rename', 0.85],
-  ['founder', 0.5],
-  ['influenced by', 0.5],
-  ['instrumental supporting musician', 0.45],
-  ['member of band', 0.4],
-  ['named after artist', 0.3],
+  ['founder', 0.2],
+  ['influenced by', 0.46],
+  ['instrumental supporting musician', 0.22],
+  ['member of band', 0.2],
+  ['named after artist', 0.16],
   ['similar artist', 0.7],
-  ['subgroup', 0.6],
-  ['supporting musician', 0.5],
-  ['vocal supporting musician', 0.5],
+  ['subgroup', 0.34],
+  ['supporting musician', 0.24],
+  ['vocal supporting musician', 0.24],
   ['tribute', 0.2],
   ['married', 0.15],
   ['sibling', 0.15],
@@ -199,7 +193,7 @@ export function mergeSimilarArtists(
   mbArtists,
   { limit },
   lastfmArtists = [],
-  { seedGenres = new Set(), genreOverrides = new Map() } = {},
+  { seedGenres = new Set(), seedTags = new Set(), genreOverrides = new Map() } = {},
 ) {
   const byMbid = new Map();
 
@@ -227,21 +221,21 @@ export function mergeSimilarArtists(
 
   for (const artist of lbArtists) {
     const genreOverlap = genreOverrides.has(artist.mbid)
-      ? computeGenreOverlapBonus(genreOverrides.get(artist.mbid).genres, genreOverrides.get(artist.mbid).tags, seedGenres, new Set())
+      ? computeGenreOverlapBonus(genreOverrides.get(artist.mbid).genres, genreOverrides.get(artist.mbid).tags, seedGenres, seedTags)
       : 0;
     insert(artist, 'listenbrainz', genreOverlap);
   }
 
   for (const artist of mbArtists) {
     const genreOverlap = genreOverrides.has(artist.mbid)
-      ? computeGenreOverlapBonus(genreOverrides.get(artist.mbid).genres, genreOverrides.get(artist.mbid).tags, seedGenres, new Set())
+      ? computeGenreOverlapBonus(genreOverrides.get(artist.mbid).genres, genreOverrides.get(artist.mbid).tags, seedGenres, seedTags)
       : 0;
     insert(artist, 'musicbrainz', genreOverlap);
   }
 
   for (const artist of lastfmArtists) {
     const genreOverlap = genreOverrides.has(artist.mbid)
-      ? computeGenreOverlapBonus(genreOverrides.get(artist.mbid).genres, genreOverrides.get(artist.mbid).tags, seedGenres, new Set())
+      ? computeGenreOverlapBonus(genreOverrides.get(artist.mbid).genres, genreOverrides.get(artist.mbid).tags, seedGenres, seedTags)
       : 0;
     insert(artist, 'lastfm', genreOverlap);
   }
@@ -259,6 +253,48 @@ export function createSimilarArtistsService({
   cache = null,
 } = {}) {
   const ttlCache = cache ?? createSimilarArtistsCache(cacheTtlMs);
+  const fallbackService = createSimilarArtistsFallbackService({
+    listenBrainzClient,
+    musicBrainzClient,
+  });
+
+  function shouldUseSimilarityFallback({ lbArtists, mbArtists, lastfmArtists, safeLimit }) {
+    const primaryCandidates = [...lbArtists, ...mbArtists, ...lastfmArtists];
+    const primaryCandidateCount = new Set(primaryCandidates.map((artist) => artist?.mbid).filter(Boolean)).size;
+    const strongestPrimaryScore = primaryCandidates.reduce(
+      (maxScore, artist) => Math.max(maxScore, Number.isFinite(artist?.score) ? artist.score : 0),
+      0,
+    );
+
+    return (
+      primaryCandidateCount < Math.min(12, safeLimit)
+      || strongestPrimaryScore < 0.55
+      || (lbArtists.length === 0 && lastfmArtists.length === 0)
+    );
+  }
+
+  function mergeSourceCandidates(primaryCandidates, fallbackCandidates) {
+    const candidateMap = new Map();
+
+    for (const candidate of primaryCandidates) {
+      if (candidate?.mbid) {
+        candidateMap.set(candidate.mbid, candidate);
+      }
+    }
+
+    for (const candidate of fallbackCandidates) {
+      if (!candidate?.mbid) {
+        continue;
+      }
+
+      const existing = candidateMap.get(candidate.mbid);
+      if (!existing || candidate.score > existing.score) {
+        candidateMap.set(candidate.mbid, candidate);
+      }
+    }
+
+    return [...candidateMap.values()];
+  }
 
   async function getSimilarArtists({ artistMbid, limit = 20 }) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
@@ -273,11 +309,11 @@ export function createSimilarArtistsService({
       lastFmClient.getSimilarArtists({ mbid: artistMbid, limit: 100 }),
     ]);
 
-    const lbArtists = lbResult.status === 'fulfilled' ? lbResult.value : [];
+    let lbArtists = lbResult.status === 'fulfilled' ? lbResult.value : [];
     const mbRelations = mbResult.status === 'fulfilled'
       ? (mbResult.value?.relations ?? [])
       : [];
-    const mbArtists = extractMbRelatedArtists(mbRelations);
+    let mbArtists = extractMbRelatedArtists(mbRelations);
 
     const { seedGenres, seedTags } = enrichMbArtistsWithGenreSignals(
       mbArtists,
@@ -328,12 +364,35 @@ export function createSimilarArtistsService({
       }
     }
 
+    if (shouldUseSimilarityFallback({
+      lbArtists,
+      mbArtists,
+      lastfmArtists,
+      safeLimit,
+    })) {
+      const [lbRadioArtists, mbSearchArtists] = await Promise.all([
+        fallbackService.getListenBrainzRadioFallback({
+          artistMbid,
+          limit: 24,
+          seedArtist: mbResult.status === 'fulfilled' ? mbResult.value : null,
+        }),
+        fallbackService.searchMusicBrainzFallbackArtists({
+          artistMbid,
+          limit: 24,
+          seedArtist: mbResult.status === 'fulfilled' ? mbResult.value : null,
+        }),
+      ]);
+
+      lbArtists = mergeSourceCandidates(lbArtists, lbRadioArtists);
+      mbArtists = mergeSourceCandidates(mbArtists, mbSearchArtists);
+    }
+
     const merged = mergeSimilarArtists(
       lbArtists,
       mbArtists,
       { limit: 100 },
       lastfmArtists,
-      { seedGenres, genreOverrides },
+      { seedGenres, seedTags, genreOverrides },
     );
     ttlCache.set(artistMbid, merged);
 

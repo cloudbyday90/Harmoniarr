@@ -244,6 +244,41 @@ test('ListenBrainz client sends no Authorization header', async (t) => {
   assert.equal(options.headers.Authorization, undefined);
 });
 
+test('ListenBrainz client returns radio-neighborhood similar artists', async (t) => {
+  const fetchImpl = t.mock.fn(async () => createJsonResponse({
+    'seed-mbid': [
+      { similar_artist_mbid: 'seed-mbid', similar_artist_name: 'Seed Artist', total_listen_count: 126 },
+    ],
+    'artist-1': [
+      { similar_artist_mbid: 'artist-1', similar_artist_name: 'Michael W. Smith', total_listen_count: 4471 },
+    ],
+    'artist-2': [
+      { similar_artist_mbid: 'artist-2', similar_artist_name: 'Caedmon’s Call', total_listen_count: 3584 },
+    ],
+  }));
+  const client = createTestClient({ fetchImpl });
+
+  const result = await client.getRadioSimilarArtists({ mbid: 'seed-mbid', limit: 5 });
+
+  assert.equal(result.length, 2);
+  assert.deepEqual(result[0], { mbid: 'artist-1', name: 'Michael W. Smith', score: 0.8 });
+  assert.equal(result[1].mbid, 'artist-2');
+  assert.equal(result[1].name, 'Caedmon’s Call');
+  assert.ok(result[1].score > 0.79 && result[1].score < 0.791);
+
+  const [url] = fetchImpl.mock.calls[0].arguments;
+  assert.equal(url.toString(), 'https://api.listenbrainz.test/1/lb-radio/artist/seed-mbid?max_recordings_per_artist=1&max_similar_artists=5&mode=easy&pop_begin=0&pop_end=100');
+});
+
+test('ListenBrainz client returns empty radio-neighborhood list for invalid payloads', async (t) => {
+  const fetchImpl = t.mock.fn(async () => createJsonResponse([]));
+  const client = createTestClient({ fetchImpl });
+
+  const result = await client.getRadioSimilarArtists({ mbid: 'seed-mbid' });
+
+  assert.deepEqual(result, []);
+});
+
 test('ListenBrainz client throws listenbrainz_misconfigured for an invalid base URL', () => {
   assert.throws(
     () => createListenBrainzClient({
