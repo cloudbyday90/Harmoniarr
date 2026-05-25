@@ -67,6 +67,7 @@ const {
   lastError: graphError,
   isSeed,
   addSeed,
+  hydrateSeeds,
   removeSeed,
 } = useDiscoverGraph();
 
@@ -86,9 +87,7 @@ async function handleMonitor(artist) {
 
 onMounted(async () => {
   await loadMonitoredArtists();
-  for (const artist of monitoredArtists.value) {
-    await addSeed({ id: artist.id, name: artist.name });
-  }
+  await hydrateSeeds(monitoredArtists.value);
 });
 
 onBeforeUnmount(() => {

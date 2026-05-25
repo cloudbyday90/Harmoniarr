@@ -43,6 +43,8 @@ export function useDiscoverGraph({
   fetchSimilar = fetchSimilarArtists,
   suggestionLimit = 20,
 } = {}) {
+  let nextSeedRequestVersion = 0;
+  const seedRequestVersions = new Map();
 
   /**
    * Ordered list of seed artists the user has picked.
@@ -98,6 +100,57 @@ export function useDiscoverGraph({
     return loadingSeeds.value.has(artistId);
   }
 
+  function hasSeed(artistId) {
+    return seeds.value.some((artist) => artist.id === artistId);
+  }
+
+  function ensureSeedPresent({ id, name }) {
+    if (seedIds.value.has(id)) {
+      return false;
+    }
+
+    seeds.value = [...seeds.value, { id, name }];
+    return true;
+  }
+
+  async function loadSeedSimilarArtists(artistId) {
+    const requestVersion = ++nextSeedRequestVersion;
+    seedRequestVersions.set(artistId, requestVersion);
+
+    loadingSeeds.value = new Set([...loadingSeeds.value, artistId]);
+
+    try {
+      const result = await fetchSimilar(artistId, { limit: 50 });
+      const similar = result?.similar ?? [];
+
+      if (!hasSeed(artistId) || seedRequestVersions.get(artistId) !== requestVersion) {
+        return;
+      }
+
+      const next = new Map(seedResults.value);
+      next.set(artistId, similar);
+      seedResults.value = next;
+      lastError.value = null;
+    } catch (error) {
+      if (!hasSeed(artistId) || seedRequestVersions.get(artistId) !== requestVersion) {
+        return;
+      }
+
+      lastError.value = getErrorMessage(error, 'Failed to fetch similar artists.');
+
+      // Store an empty result so the seed is still tracked.
+      const next = new Map(seedResults.value);
+      next.set(artistId, []);
+      seedResults.value = next;
+    } finally {
+      if (seedRequestVersions.get(artistId) === requestVersion) {
+        const next = new Set(loadingSeeds.value);
+        next.delete(artistId);
+        loadingSeeds.value = next;
+      }
+    }
+  }
+
   /**
    * Add an artist as a seed and fetch similar artists for them.
    * Idempotent: calling with an already-seeded artist is a no-op.
@@ -107,34 +160,32 @@ export function useDiscoverGraph({
   async function addSeed(artist) {
     const { id, name } = artist;
 
-    if (seedIds.value.has(id)) return;
-
-    // Append to seeds (reassign for reactivity).
-    seeds.value = [...seeds.value, { id, name }];
-
-    // Mark as loading (reassign for reactivity).
-    loadingSeeds.value = new Set([...loadingSeeds.value, id]);
-
-    try {
-      const result = await fetchSimilar(id, { limit: 50 });
-      const similar = result?.similar ?? [];
-
-      const next = new Map(seedResults.value);
-      next.set(id, similar);
-      seedResults.value = next;
-      lastError.value = null;
-    } catch (error) {
-      lastError.value = getErrorMessage(error, 'Failed to fetch similar artists.');
-
-      // Store an empty result so the seed is still tracked.
-      const next = new Map(seedResults.value);
-      next.set(id, []);
-      seedResults.value = next;
-    } finally {
-      const next = new Set(loadingSeeds.value);
-      next.delete(id);
-      loadingSeeds.value = next;
+    const wasAdded = ensureSeedPresent({ id, name });
+    if (!wasAdded && (seedResults.value.has(id) || loadingSeeds.value.has(id))) {
+      return;
     }
+
+    await loadSeedSimilarArtists(id);
+  }
+
+  async function hydrateSeeds(artists) {
+    const artistsToLoad = [];
+
+    for (const artist of artists) {
+      const id = artist?.id ?? null;
+      const name = artist?.name ?? null;
+      if (!id || !name) {
+        continue;
+      }
+
+      ensureSeedPresent({ id, name });
+
+      if (!seedResults.value.has(id) && !loadingSeeds.value.has(id)) {
+        artistsToLoad.push(id);
+      }
+    }
+
+    await Promise.all(artistsToLoad.map((artistId) => loadSeedSimilarArtists(artistId)));
   }
 
   /**
@@ -147,6 +198,12 @@ export function useDiscoverGraph({
     const next = new Map(seedResults.value);
     next.delete(artistId);
     seedResults.value = next;
+
+    const nextLoading = new Set(loadingSeeds.value);
+    nextLoading.delete(artistId);
+    loadingSeeds.value = nextLoading;
+
+    seedRequestVersions.delete(artistId);
   }
 
   /** Reset all graph state. */
@@ -155,6 +212,7 @@ export function useDiscoverGraph({
     seedResults.value = new Map();
     loadingSeeds.value = new Set();
     lastError.value = null;
+    seedRequestVersions.clear();
   }
 
   return {
@@ -167,6 +225,7 @@ export function useDiscoverGraph({
     isSeed,
     isSeedLoading,
     addSeed,
+    hydrateSeeds,
     removeSeed,
     clearSeeds,
   };
