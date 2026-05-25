@@ -31,6 +31,8 @@ function normalizeMetadataError(error) {
   switch (error?.code) {
     case 'validation_error':
       return createApiError(400, error.code, error.message);
+    case 'app_user_not_found':
+      return createApiError(404, error.code, error.message);
     case 'metadata_not_found':
       return createApiError(404, error.code, error.message);
     case 'musicbrainz_not_found':
@@ -63,6 +65,7 @@ export function registerMetadataRoutes(app, {
   getMetadataArtist,
   getMetadataArtistDetectionEvents,
   getMetadataArtistByMusicBrainzId,
+  getOperatorArtistProjection,
   getMetadataRelease,
   getMetadataReleaseByMusicBrainzId,
   getMetadataReleaseGroup,
@@ -199,6 +202,25 @@ export function registerMetadataRoutes(app, {
       releases: result.releases,
     };
   });
+
+  app.get('/api/v1/metadata/artists/:artistId/operator', metadataRoute(async (request, response) => {
+    const session = await requireSessionFn(request);
+    const result = await getOperatorArtistProjection({
+      appUserId: session.appUserId,
+      metadataArtistId: request.params.artistId,
+    });
+
+    response.json({
+      ok: true,
+      aliases: result.aliases,
+      artist: result.artist,
+      detectionEvents: result.detectionEvents,
+      detectionEventsPageInfo: result.detectionEventsPageInfo,
+      operator: result.operator,
+      releaseGroups: result.releaseGroups,
+      releases: result.releases,
+    });
+  }));
 
   registerSessionGetJsonRoute('/api/v1/metadata/artists/:artistId/detection-events', async (request) => {
     const result = await getMetadataArtistDetectionEvents({

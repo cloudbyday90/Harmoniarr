@@ -113,6 +113,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/metadata/releases/search', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/artists/:artistId', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/artists/:artistId/detection-events', access: 'authenticated', area: 'metadata', kind: 'read' },
+  { method: 'GET', path: '/api/v1/metadata/artists/:artistId/operator', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/artists/:artistId/similar', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'GET', path: '/api/v1/metadata/musicbrainz/artists/:artistId/local', access: 'authenticated', area: 'metadata', kind: 'read' },
   { method: 'PUT', path: '/api/v1/metadata/artists/:artistId/monitoring', access: 'authenticated', area: 'metadata', kind: 'mutation' },

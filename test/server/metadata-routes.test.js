@@ -33,6 +33,32 @@ function createMetadataRouteTestApp(overrides = {}) {
         releaseGroups: [],
         releases: [],
       }),
+      getOperatorArtistProjection: async ({ appUserId, metadataArtistId }) => ({
+        aliases: [],
+        artist: { id: metadataArtistId, name: 'Autechre' },
+        detectionEvents: [],
+        detectionEventsPageInfo: { hasMore: false, nextCursor: null },
+        operator: {
+          monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album', 'ep'] },
+          overview: {
+            desiredReleaseGroupCount: 0,
+            releaseGroupCount: 0,
+            trackOverrideCount: 0,
+          },
+          reconciliation: {
+            latestRun: null,
+            latestSnapshot: null,
+            pendingRun: null,
+            runningRun: null,
+            status: 'idle',
+          },
+          releaseGroupSelections: [],
+          sessionUserId: appUserId,
+          trackOverrides: [],
+        },
+        releaseGroups: [],
+        releases: [],
+      }),
       getMetadataRelease: async () => ({ artist: null, releaseGroup: null, release: null, media: [] }),
       getMetadataReleaseByMusicBrainzId: async () => ({ artist: null, releaseGroup: null, release: null, media: [] }),
       getMetadataReleaseGroup: async () => ({ artist: null, releaseGroup: null, releases: [] }),
@@ -200,6 +226,116 @@ test('metadata local artist read route returns the local canonical payload', asy
       monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album'] },
       releaseGroups: [{ id: 'rg-1', title: 'Music Has the Right to Children' }],
       releases: [{ id: 'release-1', title: 'Geogaddi' }],
+    });
+  });
+});
+
+test('metadata operator artist read route returns the operator-scoped projection payload', async (t) => {
+  const getOperatorArtistProjection = t.mock.fn(async ({ appUserId, metadataArtistId }) => ({
+    aliases: [{ id: 'alias-1', alias: 'BoC' }],
+    artist: { id: metadataArtistId, name: 'Boards of Canada' },
+    detectionEvents: [],
+    detectionEventsPageInfo: {
+      hasMore: false,
+      nextCursor: null,
+    },
+    operator: {
+      monitoring: {
+        acquisitionProfileKey: 'balanced_library',
+        isMonitored: true,
+        monitoredReleaseGroupTypes: ['album', 'ep'],
+      },
+      overview: {
+        desiredReleaseGroupCount: 2,
+        hasManualOverrides: true,
+        releaseGroupCount: 3,
+        trackOverrideCount: 1,
+      },
+      reconciliation: {
+        latestRun: { id: 'run-1', status: 'completed' },
+        latestSnapshot: { id: 'snapshot-2', snapshotRevision: 2 },
+        pendingRun: null,
+        runningRun: null,
+        status: 'completed',
+      },
+      releaseGroupSelections: [{
+        metadataReleaseGroupId: 'rg-1',
+        selectionSource: 'manual',
+        selectionState: 'selected',
+      }],
+      trackOverrides: [{
+        metadataReleaseGroupId: 'rg-1',
+        trackMbid: 'track-1',
+      }],
+    },
+    releaseGroups: [{
+      id: 'rg-1',
+      operatorState: {
+        selectionSource: 'manual',
+        selectionState: 'selected',
+      },
+      title: 'Music Has the Right to Children',
+    }],
+    releases: [{ id: 'release-1', title: 'Music Has the Right to Children' }],
+  }));
+  const app = createMetadataRouteTestApp({ getOperatorArtistProjection });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/operator`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(getOperatorArtistProjection.mock.calls[0].arguments, [{
+      appUserId: 'user-1',
+      metadataArtistId: 'local-artist-1',
+    }]);
+    assert.deepEqual(payload, {
+      ok: true,
+      aliases: [{ id: 'alias-1', alias: 'BoC' }],
+      artist: { id: 'local-artist-1', name: 'Boards of Canada' },
+      detectionEvents: [],
+      detectionEventsPageInfo: {
+        hasMore: false,
+        nextCursor: null,
+      },
+      operator: {
+        monitoring: {
+          acquisitionProfileKey: 'balanced_library',
+          isMonitored: true,
+          monitoredReleaseGroupTypes: ['album', 'ep'],
+        },
+        overview: {
+          desiredReleaseGroupCount: 2,
+          hasManualOverrides: true,
+          releaseGroupCount: 3,
+          trackOverrideCount: 1,
+        },
+        reconciliation: {
+          latestRun: { id: 'run-1', status: 'completed' },
+          latestSnapshot: { id: 'snapshot-2', snapshotRevision: 2 },
+          pendingRun: null,
+          runningRun: null,
+          status: 'completed',
+        },
+        releaseGroupSelections: [{
+          metadataReleaseGroupId: 'rg-1',
+          selectionSource: 'manual',
+          selectionState: 'selected',
+        }],
+        trackOverrides: [{
+          metadataReleaseGroupId: 'rg-1',
+          trackMbid: 'track-1',
+        }],
+      },
+      releaseGroups: [{
+        id: 'rg-1',
+        operatorState: {
+          selectionSource: 'manual',
+          selectionState: 'selected',
+        },
+        title: 'Music Has the Right to Children',
+      }],
+      releases: [{ id: 'release-1', title: 'Music Has the Right to Children' }],
     });
   });
 });

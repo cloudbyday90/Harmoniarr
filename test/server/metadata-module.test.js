@@ -16,6 +16,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     updateArtistMonitoring: () => {},
   };
   const metadataMonitoringStore = {};
+  const operatorArtistProjectionService = {
+    getOperatorArtistProjection: () => {},
+  };
   const metadataReadService = {
     getArtist: () => {},
     getArtistByMusicBrainzId: () => {},
@@ -66,6 +69,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     metadataRefreshDispatchPolicyService,
     metadataMonitoringService,
     metadataMonitoringStore,
+    operatorArtistProjectionService,
     metadataReadService,
     metadataRefreshService,
     metadataSearchService,
@@ -84,6 +88,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.metadataReadService, metadataReadService);
   assert.equal(metadataModule.metadataMonitoringService, metadataMonitoringService);
   assert.equal(metadataModule.metadataMonitoringStore, metadataMonitoringStore);
+  assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
   assert.equal(metadataModule.metadataRefreshService, metadataRefreshService);
   assert.equal(metadataModule.metadataSearchService, metadataSearchService);
   assert.equal(metadataModule.providerHealthRecorder, providerHealthRecorder);
@@ -97,6 +102,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getMetadataArtist: metadataReadService.getArtist,
     getMetadataArtistByMusicBrainzId: metadataReadService.getArtistByMusicBrainzId,
     getMetadataArtistDetectionEvents: metadataReadService.getArtistDetectionEvents,
+    getOperatorArtistProjection: operatorArtistProjectionService.getOperatorArtistProjection,
     getMetadataRelease: metadataReadService.getRelease,
     getMetadataReleaseByMusicBrainzId: metadataReadService.getReleaseByMusicBrainzId,
     getMetadataReleaseGroup: metadataReadService.getReleaseGroup,
