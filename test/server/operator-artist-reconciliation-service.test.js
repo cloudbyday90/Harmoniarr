@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createOperatorArtistReconciliationService } from '../../src/server/metadata/operator-artist-reconciliation-service.js';
 
 test('queueOperatorArtistReconciliation creates a new reconciliation run from the latest snapshot', async (t) => {
-  const createOperationRun = t.mock.fn(async ({
+  const queueLatestSnapshotRun = t.mock.fn(async ({
     appUserId,
     artistName,
     metadataArtistId,
@@ -12,20 +12,22 @@ test('queueOperatorArtistReconciliation creates a new reconciliation run from th
     triggerSource,
     triggeredByUserId,
   }) => ({
-    appUserId,
-    artistName,
-    id: 'run-1',
-    metadataArtistId,
-    snapshotId,
-    snapshotRevision,
-    status: 'pending',
-    triggerSource,
-    triggeredByUserId,
+    runningRun: null,
+    action: 'created',
+    run: {
+      appUserId,
+      artistName,
+      id: 'run-1',
+      metadataArtistId,
+      snapshotId,
+      snapshotRevision,
+      status: 'pending',
+      triggerSource,
+      triggeredByUserId,
+    },
   }));
   const recordAuditEventFn = t.mock.fn(async () => {});
   const service = createOperatorArtistReconciliationService({
-    createOperationRun,
-    getActiveRunByOperatorArtist: async () => null,
     getLatestOperatorArtistReconciliationSnapshot: async () => ({
       id: 'snapshot-4',
       snapshotRevision: 4,
@@ -36,6 +38,7 @@ test('queueOperatorArtistReconciliation creates a new reconciliation run from th
         name: 'Autechre',
       },
     }),
+    queueLatestSnapshotRun,
     recordAuditEventFn,
   });
 
@@ -49,7 +52,7 @@ test('queueOperatorArtistReconciliation creates a new reconciliation run from th
     triggeredByUserId: 'operator-1',
   });
 
-  assert.deepEqual(createOperationRun.mock.calls[0].arguments[0], {
+  assert.deepEqual(queueLatestSnapshotRun.mock.calls[0].arguments[0], {
     appUserId: 'user-1',
     artistName: 'Autechre',
     metadataArtistId: 'artist-1',
@@ -62,6 +65,8 @@ test('queueOperatorArtistReconciliation creates a new reconciliation run from th
   assert.deepEqual(result, {
     accepted: true,
     coalesced: false,
+    queuedBehindRun: false,
+    replacedPending: false,
     run: {
       appUserId: 'user-1',
       artistName: 'Autechre',
@@ -73,22 +78,28 @@ test('queueOperatorArtistReconciliation creates a new reconciliation run from th
       triggerSource: 'save',
       triggeredByUserId: 'operator-1',
     },
+    runningRun: null,
   });
 });
 
-test('queueOperatorArtistReconciliation coalesces onto an existing active run', async (t) => {
-  const createOperationRun = t.mock.fn(async () => {
-    throw new Error('should not create run');
-  });
-  const recordAuditEventFn = t.mock.fn(async () => {});
-  const service = createOperatorArtistReconciliationService({
-    createOperationRun,
-    getActiveRunByOperatorArtist: async () => ({
+test('queueOperatorArtistReconciliation queues a follow-up behind a running run', async (t) => {
+  const queueLatestSnapshotRun = t.mock.fn(async () => ({
+    action: 'queued_follow_up',
+    run: {
+      id: 'run-9b',
+      metadataArtistId: 'artist-1',
+      snapshotRevision: 4,
+      status: 'pending',
+    },
+    runningRun: {
       id: 'run-9',
       metadataArtistId: 'artist-1',
       snapshotRevision: 2,
       status: 'running',
-    }),
+    },
+  }));
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createOperatorArtistReconciliationService({
     getLatestOperatorArtistReconciliationSnapshot: async () => ({
       id: 'snapshot-4',
       snapshotRevision: 4,
@@ -99,6 +110,7 @@ test('queueOperatorArtistReconciliation coalesces onto an existing active run', 
         name: 'Autechre',
       },
     }),
+    queueLatestSnapshotRun,
     recordAuditEventFn,
   });
 
@@ -107,12 +119,19 @@ test('queueOperatorArtistReconciliation coalesces onto an existing active run', 
     metadataArtistId: 'artist-1',
   });
 
-  assert.equal(createOperationRun.mock.callCount(), 0);
-  assert.equal(recordAuditEventFn.mock.callCount(), 0);
+  assert.equal(recordAuditEventFn.mock.callCount(), 1);
   assert.deepEqual(result, {
     accepted: true,
-    coalesced: true,
+    coalesced: false,
+    queuedBehindRun: true,
+    replacedPending: false,
     run: {
+      id: 'run-9b',
+      metadataArtistId: 'artist-1',
+      snapshotRevision: 4,
+      status: 'pending',
+    },
+    runningRun: {
       id: 'run-9',
       metadataArtistId: 'artist-1',
       snapshotRevision: 2,
@@ -121,12 +140,69 @@ test('queueOperatorArtistReconciliation coalesces onto an existing active run', 
   });
 });
 
+test('queueOperatorArtistReconciliation replaces an existing pending follow-up with the latest snapshot', async (t) => {
+  const queueLatestSnapshotRun = t.mock.fn(async () => ({
+    action: 'replaced_pending_follow_up',
+    run: {
+      id: 'run-pending',
+      metadataArtistId: 'artist-1',
+      snapshotRevision: 5,
+      status: 'pending',
+    },
+    runningRun: {
+      id: 'run-running',
+      metadataArtistId: 'artist-1',
+      snapshotRevision: 3,
+      status: 'running',
+    },
+  }));
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createOperatorArtistReconciliationService({
+    getLatestOperatorArtistReconciliationSnapshot: async () => ({
+      id: 'snapshot-5',
+      snapshotRevision: 5,
+    }),
+    getMetadataArtist: async () => ({
+      artist: {
+        id: 'artist-1',
+        name: 'Autechre',
+      },
+    }),
+    queueLatestSnapshotRun,
+    recordAuditEventFn,
+  });
+
+  const result = await service.queueOperatorArtistReconciliation({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+  });
+
+  assert.equal(recordAuditEventFn.mock.callCount(), 0);
+  assert.deepEqual(result, {
+    accepted: true,
+    coalesced: true,
+    queuedBehindRun: true,
+    replacedPending: true,
+    run: {
+      id: 'run-pending',
+      metadataArtistId: 'artist-1',
+      snapshotRevision: 5,
+      status: 'pending',
+    },
+    runningRun: {
+      id: 'run-running',
+      metadataArtistId: 'artist-1',
+      snapshotRevision: 3,
+      status: 'running',
+    },
+  });
+});
+
 test('queueOperatorArtistReconciliation rejects requests without a saved snapshot', async () => {
   const service = createOperatorArtistReconciliationService({
-    createOperationRun: async () => {
+    queueLatestSnapshotRun: async () => {
       throw new Error('should not create run');
     },
-    getActiveRunByOperatorArtist: async () => null,
     getLatestOperatorArtistReconciliationSnapshot: async () => null,
     getMetadataArtist: async () => ({
       artist: {
@@ -151,10 +227,9 @@ test('queueOperatorArtistReconciliation rejects requests without a saved snapsho
 
 test('queueOperatorArtistReconciliation rejects missing metadata artists', async () => {
   const service = createOperatorArtistReconciliationService({
-    createOperationRun: async () => {
+    queueLatestSnapshotRun: async () => {
       throw new Error('should not create run');
     },
-    getActiveRunByOperatorArtist: async () => null,
     getLatestOperatorArtistReconciliationSnapshot: async () => ({
       id: 'snapshot-4',
       snapshotRevision: 4,

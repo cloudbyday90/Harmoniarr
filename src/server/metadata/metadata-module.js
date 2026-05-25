@@ -119,8 +119,7 @@ export function createMetadataModule({
     ?? createOperatorArtistReconciliationService({
       getMetadataArtist: resolvedMetadataReadService.getArtist,
       getLatestOperatorArtistReconciliationSnapshot: resolvedOperatorArtistReconciliationSnapshotService.getLatestOperatorArtistReconciliationSnapshot,
-      createOperationRun: resolvedOperatorArtistReconciliationRunStore.createOperationRun,
-      getActiveRunByOperatorArtist: resolvedOperatorArtistReconciliationRunStore.getActiveRunByOperatorArtist,
+      queueLatestSnapshotRun: resolvedOperatorArtistReconciliationRunStore.queueLatestSnapshotRun,
       recordAuditEventFn,
     });
   const resolvedOperatorReleaseGroupSelectionStore = operatorReleaseGroupSelectionStore

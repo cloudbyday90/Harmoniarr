@@ -4664,3 +4664,62 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260625_050000_operator_artist_reconciliation_follow_up_dedup.sql
+-- Checksum: c3e9a6e6c07f16ec7404b4a5a3ee592ccadcdff1983c07b1c4bdd2628f38948d
+--
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE UNIQUE INDEX IF NOT EXISTS operation_runs_operator_artist_reconciliation_pending_unique_idx
+  ON operation_runs ((summary->>'appUserId'), (summary->>'metadataArtistId'))
+  WHERE operation_type = 'operator_artist_reconciliation'
+    AND status = 'pending'
+    AND summary ? 'appUserId'
+    AND summary ? 'metadataArtistId';
+
+CREATE UNIQUE INDEX IF NOT EXISTS operation_runs_operator_artist_reconciliation_running_unique_idx
+  ON operation_runs ((summary->>'appUserId'), (summary->>'metadataArtistId'))
+  WHERE operation_type = 'operator_artist_reconciliation'
+    AND status = 'running'
+    AND summary ? 'appUserId'
+    AND summary ? 'metadataArtistId';
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260625_050000',
+  '20260625_050000_operator_artist_reconciliation_follow_up_dedup.sql',
+  'operator_artist_reconciliation_follow_up_dedup',
+  'c3e9a6e6c07f16ec7404b4a5a3ee592ccadcdff1983c07b1c4bdd2628f38948d',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

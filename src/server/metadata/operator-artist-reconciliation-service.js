@@ -23,10 +23,9 @@ import { createOperatorArtistReconciliationRunStore } from './operator-artist-re
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 
 export function createOperatorArtistReconciliationService({
-  createOperationRun = null,
-  getActiveRunByOperatorArtist = null,
   getLatestOperatorArtistReconciliationSnapshot = null,
   getMetadataArtist = null,
+  queueLatestSnapshotRun = null,
   recordAuditEventFn = recordAuditEvent,
   snapshotService = null,
   runStore = null,
@@ -34,10 +33,9 @@ export function createOperatorArtistReconciliationService({
   const operationDescriptor = operationRunRegistry.operatorArtistReconciliation;
   const resolvedRunStore = runStore ?? createOperatorArtistReconciliationRunStore();
   const resolvedSnapshotService = snapshotService ?? createOperatorArtistReconciliationSnapshotService();
-  const createRun = createOperationRun ?? resolvedRunStore.createOperationRun;
-  const getActiveRun = getActiveRunByOperatorArtist ?? resolvedRunStore.getActiveRunByOperatorArtist;
   const getLatestSnapshot = getLatestOperatorArtistReconciliationSnapshot
     ?? resolvedSnapshotService.getLatestOperatorArtistReconciliationSnapshot;
+  const queueLatestRun = queueLatestSnapshotRun ?? resolvedRunStore.queueLatestSnapshotRun;
 
   if (typeof getMetadataArtist !== 'function') {
     throw new Error('getMetadataArtist dependency is required');
@@ -58,15 +56,6 @@ export function createOperatorArtistReconciliationService({
     triggerSource = 'save',
     triggeredByUserId = null,
   } = {}) {
-    const activeRun = await getActiveRun({ appUserId, metadataArtistId });
-    if (activeRun) {
-      return {
-        accepted: true,
-        coalesced: true,
-        run: activeRun,
-      };
-    }
-
     const latestSnapshot = await getLatestSnapshot({ appUserId, metadataArtistId });
     if (!latestSnapshot) {
       throw createApiError(
@@ -82,7 +71,7 @@ export function createOperatorArtistReconciliationService({
     }
 
     const artistName = artistPayload?.artist?.name ?? 'Unknown artist';
-    const run = await createRun({
+    const queueResult = await queueLatestRun({
       appUserId,
       artistName,
       metadataArtistId,
@@ -91,31 +80,41 @@ export function createOperatorArtistReconciliationService({
       triggerSource,
       triggeredByUserId,
     });
+    const shouldRecordAuditEvent = queueResult.action === 'created'
+      || queueResult.action === 'queued_follow_up';
 
-    await recordAuditEventFn({
-      actorType: triggeredByUserId ? 'user' : 'system',
-      actorUserId: triggeredByUserId,
-      details: {
-        appUserId,
-        artistName,
-        metadataArtistId,
-        runId: run.id,
-        snapshotId: latestSnapshot.id,
-        snapshotRevision: latestSnapshot.snapshotRevision,
-        triggerSource,
-      },
-      entityId: run.id,
-      entityType: 'operation_run',
-      eventType: operationDescriptor.startedEventType,
-      ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: 'Artist reconciliation queued',
-      userAgent: requestMetadata?.userAgent ?? null,
-    });
+    if (shouldRecordAuditEvent) {
+      await recordAuditEventFn({
+        actorType: triggeredByUserId ? 'user' : 'system',
+        actorUserId: triggeredByUserId,
+        details: {
+          appUserId,
+          artistName,
+          metadataArtistId,
+          runId: queueResult.run.id,
+          runningRunId: queueResult.runningRun?.id ?? null,
+          snapshotId: latestSnapshot.id,
+          snapshotRevision: latestSnapshot.snapshotRevision,
+          triggerSource,
+        },
+        entityId: queueResult.run.id,
+        entityType: 'operation_run',
+        eventType: operationDescriptor.startedEventType,
+        ipAddress: requestMetadata?.ipAddress ?? null,
+        summary: queueResult.action === 'queued_follow_up'
+          ? 'Latest save queued behind running artist reconciliation'
+          : 'Artist reconciliation queued',
+        userAgent: requestMetadata?.userAgent ?? null,
+      });
+    }
 
     return {
       accepted: true,
-      coalesced: false,
-      run,
+      coalesced: queueResult.action === 'replaced_pending' || queueResult.action === 'replaced_pending_follow_up',
+      queuedBehindRun: Boolean(queueResult.runningRun),
+      replacedPending: queueResult.action === 'replaced_pending' || queueResult.action === 'replaced_pending_follow_up',
+      run: queueResult.run,
+      runningRun: queueResult.runningRun ?? null,
     };
   }
 
