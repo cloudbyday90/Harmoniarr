@@ -103,6 +103,23 @@ export function createOperatorArtistReconciliationSnapshotService({
     });
   }
 
+  async function getOperatorArtistReconciliationSnapshotById({
+    appUserId,
+    metadataArtistId,
+    snapshotId,
+  }) {
+    await Promise.all([
+      ensureUserExists(appUserId),
+      ensureArtistExists(metadataArtistId),
+    ]);
+
+    return operatorArtistReconciliationSnapshotStore.getOperatorArtistReconciliationSnapshotById({
+      appUserId,
+      metadataArtistId,
+      snapshotId,
+    });
+  }
+
   async function saveOperatorArtistReconciliationSnapshot({
     appUserId,
     metadataArtistId,
@@ -133,6 +150,7 @@ export function createOperatorArtistReconciliationSnapshotService({
   }
 
   return {
+    getOperatorArtistReconciliationSnapshotById,
     getLatestOperatorArtistReconciliationSnapshot,
     saveOperatorArtistReconciliationSnapshot,
   };

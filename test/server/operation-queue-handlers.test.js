@@ -13,6 +13,7 @@ test('operation queue handlers register shared operation types and map run summa
   const libraryOrganizeApplyStartWorkerRun = t.mock.fn(async () => {});
   const libraryScanStartWorkerRun = t.mock.fn(async () => {});
   const metadataArtistRefreshStartWorkerRun = t.mock.fn(async () => {});
+  const operatorArtistReconciliationStartWorkerRun = t.mock.fn(async () => {});
   const operatorNotificationFanoutStartWorkerRun = t.mock.fn(async () => {});
   const handlers = createOperationQueueHandlers({
     artworkModule: {
@@ -52,6 +53,9 @@ test('operation queue handlers register shared operation types and map run summa
       metadataArtistRefreshWorker: {
         startWorkerRun: metadataArtistRefreshStartWorkerRun,
       },
+      operatorArtistReconciliationWorker: {
+        startWorkerRun: operatorArtistReconciliationStartWorkerRun,
+      },
     },
     systemModule: {
       operatorNotificationFanoutWorker: {
@@ -71,6 +75,7 @@ test('operation queue handlers register shared operation types and map run summa
     'library_organize_apply',
     'library_scan',
     'metadata_artist_refresh',
+    'operator_artist_reconciliation',
     'operator_notification_fanout',
   ]);
 
@@ -159,6 +164,19 @@ test('operation queue handlers register shared operation types and map run summa
       },
     },
   });
+  await handlers.operator_artist_reconciliation({
+    run: {
+      id: 'run-12',
+      summary: {
+        appUserId: 'user-4',
+        artistName: 'Autechre',
+        metadataArtistId: 'artist-44',
+        snapshotId: 'snapshot-4',
+        snapshotRevision: 4,
+        triggerSource: 'save',
+      },
+    },
+  });
   await handlers.library_organize_apply({
     run: {
       id: 'run-8',
@@ -226,6 +244,15 @@ test('operation queue handlers register shared operation types and map run summa
     musicBrainzArtistId: 'mb-artist-1',
     runId: 'run-6',
     triggerSource: 'heartbeat',
+  });
+  assert.deepEqual(operatorArtistReconciliationStartWorkerRun.mock.calls[0].arguments[0], {
+    appUserId: 'user-4',
+    artistName: 'Autechre',
+    metadataArtistId: 'artist-44',
+    runId: 'run-12',
+    snapshotId: 'snapshot-4',
+    snapshotRevision: 4,
+    triggerSource: 'save',
   });
   assert.deepEqual(operatorNotificationFanoutStartWorkerRun.mock.calls[0].arguments[0], {
     notificationDedupeKeys: null,

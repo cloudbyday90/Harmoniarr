@@ -69,6 +69,42 @@ function buildIdentityParameters({
 export function createOperatorTrackOverrideStore({
   getPoolFn = getPool,
 } = {}) {
+  async function listOperatorTrackOverrides({
+    appUserId = null,
+    metadataArtistId = null,
+    metadataReleaseGroupId = null,
+  } = {}) {
+    const pool = getPoolFn();
+    const clauses = [];
+    const params = [];
+
+    if (appUserId) {
+      params.push(appUserId);
+      clauses.push(`app_user_id = $${params.length}`);
+    }
+    if (metadataArtistId) {
+      params.push(metadataArtistId);
+      clauses.push(`metadata_artist_id = $${params.length}`);
+    }
+    if (metadataReleaseGroupId) {
+      params.push(metadataReleaseGroupId);
+      clauses.push(`metadata_release_group_id = $${params.length}`);
+    }
+
+    const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    const result = await pool.query(
+      `
+        SELECT *
+        FROM operator_track_override
+        ${whereClause}
+        ORDER BY app_user_id ASC, metadata_artist_id ASC, metadata_release_group_id ASC, created_at ASC
+      `,
+      params,
+    );
+
+    return result.rows.map((row) => normalizeOperatorTrackOverrideRow(row));
+  }
+
   async function getOperatorTrackOverride({
     appUserId,
     metadataReleaseGroupId,
@@ -253,6 +289,7 @@ export function createOperatorTrackOverrideStore({
 
   return {
     getOperatorTrackOverride,
+    listOperatorTrackOverrides,
     listOperatorTrackOverridesSnapshot,
     replaceOperatorTrackOverridesSnapshot,
     upsertOperatorTrackOverride,

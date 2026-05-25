@@ -71,6 +71,31 @@ test('upsertOperatorReleaseGroupSelection stores the selection policy', async (t
   ]);
 });
 
+test('listOperatorReleaseGroupSelections filters by operator and artist when requested', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      app_user_id: 'user-1',
+      id: 'selection-1',
+      metadata_artist_id: 'artist-1',
+      metadata_release_group_id: 'release-group-1',
+      resolved_metadata_release_id: 'release-1',
+      selection_source: 'manual',
+      selection_state: 'selected',
+    }],
+  }));
+  const store = createOperatorReleaseGroupSelectionStore({ getPoolFn: () => ({ query }) });
+
+  const result = await store.listOperatorReleaseGroupSelections({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+  });
+
+  assert.match(query.mock.calls[0].arguments[0], /WHERE app_user_id = \$1 AND metadata_artist_id = \$2/);
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['user-1', 'artist-1']);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].selectionState, 'selected');
+});
+
 test('replaceOperatorReleaseGroupSelectionsSnapshot replaces the backup snapshot transactionally', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [] }));
   const release = t.mock.fn(() => {});

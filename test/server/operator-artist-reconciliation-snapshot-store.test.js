@@ -49,6 +49,30 @@ test('getLatestOperatorArtistReconciliationSnapshot returns null when no snapsho
   assert.equal(result, null);
 });
 
+test('getOperatorArtistReconciliationSnapshotById returns the requested snapshot row', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      app_user_id: 'user-1',
+      created_at: new Date('2026-05-25T12:06:00.000Z'),
+      id: 'snapshot-7',
+      metadata_artist_id: 'artist-1',
+      snapshot_payload: { mode: 'save', trackOverrideCount: 3 },
+      snapshot_revision: '7',
+      updated_at: new Date('2026-05-25T12:06:00.000Z'),
+    }],
+  }));
+  const store = createOperatorArtistReconciliationSnapshotStore({ getPoolFn: () => ({ query }) });
+
+  const result = await store.getOperatorArtistReconciliationSnapshotById({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+    snapshotId: 'snapshot-7',
+  });
+
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['snapshot-7', 'user-1', 'artist-1']);
+  assert.equal(result.snapshotRevision, 7);
+});
+
 test('createOperatorArtistReconciliationSnapshot inserts the next revision and returns the created row', async (t) => {
   const query = t.mock.fn(async () => ({
     rows: [{

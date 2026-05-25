@@ -146,3 +146,41 @@ test('getLatestOperatorArtistReconciliationSnapshot rejects missing app users', 
     },
   );
 });
+
+test('getOperatorArtistReconciliationSnapshotById returns the requested snapshot row', async (t) => {
+  const query = t.mock.fn(async (sql) => {
+    if (sql.includes('FROM app_users')) {
+      return { rows: [{ id: 'user-1' }] };
+    }
+
+    if (sql.includes('FROM metadata_artists')) {
+      return { rows: [{ id: 'artist-1' }] };
+    }
+
+    return { rows: [] };
+  });
+  const service = createOperatorArtistReconciliationSnapshotService({
+    getPoolFn: () => ({ query }),
+    operatorArtistReconciliationSnapshotStore: {
+      createOperatorArtistReconciliationSnapshot: async () => null,
+      getLatestOperatorArtistReconciliationSnapshot: async () => null,
+      getOperatorArtistReconciliationSnapshotById: async () => ({
+        id: 'snapshot-9',
+        metadataArtistId: 'artist-1',
+        snapshotRevision: 9,
+      }),
+    },
+  });
+
+  const result = await service.getOperatorArtistReconciliationSnapshotById({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+    snapshotId: 'snapshot-9',
+  });
+
+  assert.deepEqual(result, {
+    id: 'snapshot-9',
+    metadataArtistId: 'artist-1',
+    snapshotRevision: 9,
+  });
+});

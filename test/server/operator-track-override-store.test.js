@@ -105,6 +105,37 @@ test('upsertOperatorTrackOverride replaces by logical identity and inserts the n
   assert.equal(release.mock.callCount(), 1);
 });
 
+test('listOperatorTrackOverrides filters by operator and artist when requested', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      app_user_id: 'user-1',
+      id: 'override-1',
+      is_desired: false,
+      medium_position: 1,
+      metadata_artist_id: 'artist-1',
+      metadata_release_group_id: 'release-group-1',
+      metadata_release_id: 'release-1',
+      recording_mbid: '11111111-1111-4111-8111-111111111111',
+      remap_status: 'resolved',
+      track_length_ms_snapshot: 215000,
+      track_mbid: '22222222-2222-4222-8222-222222222222',
+      track_position: 4,
+      track_title_snapshot: 'Example Song',
+    }],
+  }));
+  const store = createOperatorTrackOverrideStore({ getPoolFn: () => ({ query }) });
+
+  const result = await store.listOperatorTrackOverrides({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+  });
+
+  assert.match(query.mock.calls[0].arguments[0], /WHERE app_user_id = \$1 AND metadata_artist_id = \$2/);
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['user-1', 'artist-1']);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].isDesired, false);
+});
+
 test('replaceOperatorTrackOverridesSnapshot replaces the snapshot transactionally', async (t) => {
   const query = t.mock.fn(async () => ({ rows: [] }));
   const release = t.mock.fn(() => {});

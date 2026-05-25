@@ -22,6 +22,37 @@ import { normalizeOperatorReleaseGroupSelectionRow } from './operator-release-gr
 export function createOperatorReleaseGroupSelectionStore({
   getPoolFn = getPool,
 } = {}) {
+  async function listOperatorReleaseGroupSelections({
+    appUserId = null,
+    metadataArtistId = null,
+  } = {}) {
+    const pool = getPoolFn();
+    const clauses = [];
+    const params = [];
+
+    if (appUserId) {
+      params.push(appUserId);
+      clauses.push(`app_user_id = $${params.length}`);
+    }
+    if (metadataArtistId) {
+      params.push(metadataArtistId);
+      clauses.push(`metadata_artist_id = $${params.length}`);
+    }
+
+    const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    const result = await pool.query(
+      `
+        SELECT *
+        FROM operator_release_group_selection
+        ${whereClause}
+        ORDER BY app_user_id ASC, metadata_artist_id ASC, metadata_release_group_id ASC
+      `,
+      params,
+    );
+
+    return result.rows.map((row) => normalizeOperatorReleaseGroupSelectionRow(row));
+  }
+
   async function getOperatorReleaseGroupSelection({
     appUserId,
     metadataReleaseGroupId,
@@ -143,6 +174,7 @@ export function createOperatorReleaseGroupSelectionStore({
 
   return {
     getOperatorReleaseGroupSelection,
+    listOperatorReleaseGroupSelections,
     listOperatorReleaseGroupSelectionsSnapshot,
     replaceOperatorReleaseGroupSelectionsSnapshot,
     upsertOperatorReleaseGroupSelection,

@@ -30,6 +30,7 @@ export const defaultOperationQueueDispatchOperationTypes = Object.freeze([
   operationRunRegistry.libraryOrganizeApply.operationType,
   operationRunRegistry.libraryScan.operationType,
   operationRunRegistry.metadataArtistRefresh.operationType,
+  operationRunRegistry.operatorArtistReconciliation.operationType,
   operationRunRegistry.operatorNotificationFanout.operationType,
 ]);
 
@@ -139,6 +140,18 @@ export function createOperationQueueHandlers({
       musicBrainzArtistId: run.summary.musicBrainzArtistId ?? null,
       runId: run.id,
       triggerSource: run.summary.triggerSource ?? 'manual',
+    });
+  }
+
+  if (metadataModule?.operatorArtistReconciliationWorker?.startWorkerRun) {
+    handlers[operationRunRegistry.operatorArtistReconciliation.operationType] = async ({ run }) => metadataModule.operatorArtistReconciliationWorker.startWorkerRun({
+      appUserId: run.summary.appUserId ?? null,
+      artistName: run.summary.artistName ?? null,
+      metadataArtistId: run.summary.metadataArtistId ?? null,
+      runId: run.id,
+      snapshotId: run.summary.snapshotId ?? null,
+      snapshotRevision: toNumberOrNull(run.summary.snapshotRevision),
+      triggerSource: run.summary.triggerSource ?? 'save',
     });
   }
 

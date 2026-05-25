@@ -40,6 +40,27 @@ function normalizeSnapshotRow(row) {
 export function createOperatorArtistReconciliationSnapshotStore({
   getPoolFn = getPool,
 } = {}) {
+  async function getOperatorArtistReconciliationSnapshotById({
+    appUserId,
+    metadataArtistId,
+    snapshotId,
+  }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT *
+        FROM operator_artist_reconciliation_snapshot
+        WHERE id = $1
+          AND app_user_id = $2
+          AND metadata_artist_id = $3
+        LIMIT 1
+      `,
+      [snapshotId, appUserId, metadataArtistId],
+    );
+
+    return normalizeSnapshotRow(result.rows[0]);
+  }
+
   async function getLatestOperatorArtistReconciliationSnapshot({
     appUserId,
     metadataArtistId,
@@ -128,6 +149,7 @@ export function createOperatorArtistReconciliationSnapshotStore({
 
   return {
     createOperatorArtistReconciliationSnapshot,
+    getOperatorArtistReconciliationSnapshotById,
     getLatestOperatorArtistReconciliationSnapshot,
     listOperatorArtistReconciliationSnapshots,
   };
