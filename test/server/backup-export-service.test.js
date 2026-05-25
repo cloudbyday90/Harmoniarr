@@ -67,6 +67,7 @@ test('createBackupExport writes backup artifact and persists metadata', async (t
   assert.equal(payload.data.scopeSettings.settings.system.baseUrl, 'https://harmoniarr.local');
   assert.equal(payload.data.scopeSettings.pathMappings.paths.downloadMappings.length, 1);
   assert.deepEqual(payload.data.scopeSettings.monitoring.artistMonitoring, []);
+  assert.deepEqual(payload.data.scopeSettings.monitoring.operatorArtistMonitoring, []);
   assert.deepEqual(payload.data.scopeSettings.overrides.manualOverrides, []);
   assert.deepEqual(payload.data.scopeSettings.trust.sourceUsers, []);
   assert.deepEqual(payload.data.scopeSettings.wanted.wantedReleases, []);
@@ -102,6 +103,19 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
         metadataArtistId: 'artist-1',
         isMonitored: true,
         monitoredReleaseGroupTypes: ['album'],
+      },
+    ]),
+    listOperatorArtistMonitoringForBackup: async () => ([
+      {
+        acquisitionProfileKey: 'balanced_library',
+        appUserId: 'user-1',
+        isMonitored: true,
+        metadataArtistId: 'artist-1',
+        monitoredReleaseGroupTypes: ['album', 'single'],
+        releaseScope: 'future_only',
+        searchOnAddMode: 'none',
+        selectionSourceMode: 'policy_plus_overrides',
+        wantedAutomationMode: 'future_matching',
       },
     ]),
     listOverridesSnapshotForBackup: async () => ([
@@ -143,6 +157,8 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
 
   assert.equal(payload.data.scopeSettings.monitoring.artistMonitoring.length, 1);
   assert.equal(payload.data.scopeSettings.monitoring.artistMonitoring[0].metadataArtistId, 'artist-1');
+  assert.equal(payload.data.scopeSettings.monitoring.operatorArtistMonitoring.length, 1);
+  assert.equal(payload.data.scopeSettings.monitoring.operatorArtistMonitoring[0].appUserId, 'user-1');
   assert.equal(payload.data.scopeSettings.overrides.manualOverrides.length, 1);
   assert.equal(payload.data.scopeSettings.overrides.manualOverrides[0].targetId, 'release-1');
   assert.equal(payload.data.scopeSettings.trust.sourceUsers.length, 1);

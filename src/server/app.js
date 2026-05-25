@@ -488,6 +488,7 @@ export function createApp({
     metadataRefreshHeartbeatConfig: metadataModule.metadataRefreshHeartbeatConfig,
     metadataRefreshHeartbeatState: metadataModule.metadataRefreshHeartbeatState,
     metadataMonitoringStore: metadataModule.metadataMonitoringStore,
+    operatorArtistMonitoringStore: metadataModule.operatorArtistMonitoringStore,
     musicBrainzSearchService: metadataModule.musicBrainzSearchService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,

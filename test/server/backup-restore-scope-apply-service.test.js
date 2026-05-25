@@ -7,11 +7,13 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   const replaceOverridesSnapshot = t.mock.fn(async () => {});
   const replaceLibraryWantedReleases = t.mock.fn(async () => {});
   const replaceMetadataArtistMonitoring = t.mock.fn(async () => {});
+  const replaceOperatorArtistMonitoring = t.mock.fn(async () => {});
   const replaceTrustSnapshot = t.mock.fn(async () => {});
   const service = createBackupRestoreScopeApplyService({
     replaceOverridesSnapshot,
     replaceLibraryWantedReleases,
     replaceMetadataArtistMonitoring,
+    replaceOperatorArtistMonitoring,
     replaceTrustSnapshot,
     updateSettingsFn,
   });
@@ -32,6 +34,19 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
                 metadataArtistId: 'artist-1',
                 isMonitored: true,
                 monitoredReleaseGroupTypes: ['album'],
+              },
+            ],
+            operatorArtistMonitoring: [
+              {
+                acquisitionProfileKey: 'balanced_library',
+                appUserId: 'user-1',
+                isMonitored: true,
+                metadataArtistId: 'artist-1',
+                monitoredReleaseGroupTypes: ['album', 'single'],
+                releaseScope: 'future_only',
+                searchOnAddMode: 'none',
+                selectionSourceMode: 'policy_plus_overrides',
+                wantedAutomationMode: 'future_matching',
               },
             ],
           },
@@ -84,6 +99,7 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   assert.equal(replaceOverridesSnapshot.mock.callCount(), 1);
   assert.equal(replaceLibraryWantedReleases.mock.callCount(), 1);
   assert.equal(replaceMetadataArtistMonitoring.mock.callCount(), 1);
+  assert.equal(replaceOperatorArtistMonitoring.mock.callCount(), 1);
   assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
   assert.deepEqual(result, {
     appliedScopes: ['monitoring', 'wanted', 'trust', 'overrides', 'providers', 'settings'],

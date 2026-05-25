@@ -71,6 +71,36 @@ function normalizeMonitoringRows(artistMonitoring) {
     .filter((row) => typeof row.metadataArtistId === 'string' && row.metadataArtistId.trim().length > 0);
 }
 
+function normalizeOperatorMonitoringRows(operatorArtistMonitoring) {
+  if (!Array.isArray(operatorArtistMonitoring)) {
+    return null;
+  }
+
+  return operatorArtistMonitoring
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({
+      acquisitionProfileKey: row.acquisitionProfileKey ?? 'balanced_library',
+      appUserId: row.appUserId,
+      isMonitored: row.isMonitored === true,
+      lastReconciledAt: row.lastReconciledAt ?? null,
+      lastSavedSnapshotAt: row.lastSavedSnapshotAt ?? null,
+      metadataArtistId: row.metadataArtistId,
+      monitoredReleaseGroupTypes: Array.isArray(row.monitoredReleaseGroupTypes)
+        ? row.monitoredReleaseGroupTypes
+        : ['album', 'ep'],
+      releaseScope: row.releaseScope ?? 'future_only',
+      searchOnAddMode: row.searchOnAddMode ?? 'none',
+      selectionSourceMode: row.selectionSourceMode ?? 'policy_only',
+      wantedAutomationMode: row.wantedAutomationMode ?? 'future_matching',
+    }))
+    .filter((row) => (
+      typeof row.appUserId === 'string'
+      && row.appUserId.trim().length > 0
+      && typeof row.metadataArtistId === 'string'
+      && row.metadataArtistId.trim().length > 0
+    ));
+}
+
 function normalizeWantedRows(wantedReleases) {
   if (!Array.isArray(wantedReleases)) {
     return null;
@@ -116,6 +146,7 @@ export function createBackupRestoreScopeApplyService({
   replaceOverridesSnapshot = async () => {},
   replaceLibraryWantedReleases = async () => {},
   replaceMetadataArtistMonitoring = async () => {},
+  replaceOperatorArtistMonitoring = async () => {},
   replaceTrustSnapshot = async () => {},
   updateSettingsFn = async () => {
     throw new Error('updateSettingsFn dependency is required');
@@ -181,12 +212,20 @@ export function createBackupRestoreScopeApplyService({
 
       if (scope === 'monitoring') {
         const artistMonitoring = normalizeMonitoringRows(scopeSettings?.monitoring?.artistMonitoring);
-        if (!artistMonitoring) {
+        const operatorArtistMonitoring = normalizeOperatorMonitoringRows(
+          scopeSettings?.monitoring?.operatorArtistMonitoring,
+        );
+        if (!artistMonitoring && !operatorArtistMonitoring) {
           skippedScopes.push(scope);
           continue;
         }
 
-        await replaceMetadataArtistMonitoring({ artistMonitoring });
+        if (artistMonitoring) {
+          await replaceMetadataArtistMonitoring({ artistMonitoring });
+        }
+        if (operatorArtistMonitoring) {
+          await replaceOperatorArtistMonitoring({ operatorArtistMonitoring });
+        }
         monitoringUpdated = true;
         appliedScopes.push(scope);
         continue;

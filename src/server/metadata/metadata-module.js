@@ -25,6 +25,8 @@ import { createMetadataRefreshHeartbeatState } from './metadata-refresh-heartbea
 import { resolveMetadataRefreshHeartbeatConfig } from './metadata-refresh-heartbeat-config.js';
 import { createMetadataMonitoringService } from './metadata-monitoring-service.js';
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
+import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
+import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
 import { createMetadataRefreshSchedulerService } from './metadata-refresh-scheduler-service.js';
 import { createMetadataRefreshSchedulingPolicyService } from './metadata-refresh-scheduling-policy-service.js';
 import { createMetadataReadService } from './metadata-read-service.js';
@@ -53,6 +55,8 @@ export function createMetadataModule({
   metadataRefreshSchedulingPolicyService = null,
   metadataMonitoringStore = null,
   metadataMonitoringService = null,
+  operatorArtistMonitoringStore = null,
+  operatorArtistMonitoringService = null,
   metadataReadService = null,
   metadataRefreshService = null,
   metadataSearchService = null,
@@ -81,6 +85,10 @@ export function createMetadataModule({
     metadataRefreshSchedulerService: resolvedMetadataRefreshSchedulerService,
     recordActivityEventFn,
     onArtistMonitoredFn,
+  });
+  const resolvedOperatorArtistMonitoringStore = operatorArtistMonitoringStore ?? createOperatorArtistMonitoringStore();
+  const resolvedOperatorArtistMonitoringService = operatorArtistMonitoringService ?? createOperatorArtistMonitoringService({
+    operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
   });
   const resolvedMetadataRefreshService = metadataRefreshService ?? createMetadataRefreshService({
     getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,
@@ -139,6 +147,8 @@ export function createMetadataModule({
     metadataReadService: resolvedMetadataReadService,
     metadataMonitoringService: resolvedMetadataMonitoringService,
     metadataMonitoringStore: resolvedMetadataMonitoringStore,
+    operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
+    operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
     metadataRefreshService: resolvedMetadataRefreshService,
     metadataSearchService: resolvedMetadataSearchService,
     providerHealthRecorder,

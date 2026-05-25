@@ -75,7 +75,14 @@ function resolveArtifactStoragePath({ artifact, backupsDirectory }) {
   return resolvedStoragePath;
 }
 
-function buildScopeSettings({ artistMonitoring, manualOverrides, settingsSnapshot = {}, sourceUsers, wantedReleases }) {
+function buildScopeSettings({
+  artistMonitoring,
+  manualOverrides,
+  operatorArtistMonitoring,
+  settingsSnapshot = {},
+  sourceUsers,
+  wantedReleases,
+}) {
   return {
     mediaManagement: {
       artwork: settingsSnapshot.artwork,
@@ -83,6 +90,7 @@ function buildScopeSettings({ artistMonitoring, manualOverrides, settingsSnapsho
     },
     monitoring: {
       artistMonitoring,
+      operatorArtistMonitoring,
     },
     pathMappings: {
       paths: settingsSnapshot.paths,
@@ -115,6 +123,7 @@ export function createBackupExportService({
   listArtistMonitoringForBackup = async () => [],
   listBackupArtifacts = async () => [],
   listOverridesSnapshotForBackup = async () => [],
+  listOperatorArtistMonitoringForBackup = async () => [],
   listTrustSnapshotForBackup = async () => [],
   listWantedReleasesForBackup = async () => [],
   loadSettingsFn = loadSettings,
@@ -134,9 +143,10 @@ export function createBackupExportService({
     const packageMetadata = await readPackageMetadataFn(packageJsonPath);
     const settingsSnapshot = await loadSettingsFn();
     const migrationStatus = await getMigrationStatusFn();
-    const [artistMonitoring, manualOverrides, sourceUsers, wantedReleases] = await Promise.all([
+    const [artistMonitoring, manualOverrides, operatorArtistMonitoring, sourceUsers, wantedReleases] = await Promise.all([
       listArtistMonitoringForBackup(),
       listOverridesSnapshotForBackup(),
+      listOperatorArtistMonitoringForBackup(),
       listTrustSnapshotForBackup(),
       listWantedReleasesForBackup(),
     ]);
@@ -159,6 +169,7 @@ export function createBackupExportService({
         scopeSettings: buildScopeSettings({
           artistMonitoring,
           manualOverrides,
+          operatorArtistMonitoring,
           settingsSnapshot,
           sourceUsers,
           wantedReleases,
