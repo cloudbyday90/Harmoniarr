@@ -167,6 +167,7 @@ function collectRegisteredRoutes() {
     searchLocalMetadataReleaseGroups: asyncNoopResult({}),
     searchLocalMetadataReleases: asyncNoopResult({}),
     listMonitoredArtists: asyncNoopResult({ artists: [] }),
+    listOperatorMonitoredArtistProjections: asyncNoopResult({ results: [] }),
     searchMusicBrainzArtists: asyncNoopResult({}),
     searchMusicBrainzReleases: asyncNoopResult({}),
     getSimilarArtists: asyncNoopResult({ similar: [] }),

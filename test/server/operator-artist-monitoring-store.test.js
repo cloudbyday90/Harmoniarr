@@ -43,6 +43,66 @@ test('getOperatorArtistMonitoring returns stored operator monitoring state', asy
   });
 });
 
+test('listOperatorMonitoredArtists returns compact monitored artist rows ordered by sort name', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      acquisition_profile_key: 'balanced_library',
+      app_user_id: 'user-1',
+      artist_type: 'Group',
+      country: 'GB',
+      disambiguation: null,
+      id: 'monitoring-1',
+      is_monitored: true,
+      last_reconciled_at: null,
+      last_saved_snapshot_at: null,
+      metadata_artist_id: 'artist-1',
+      monitored_release_group_types: ['album', 'ep'],
+      musicbrainz_artist_id: 'mbid-1',
+      name: 'Autechre',
+      release_scope: 'future_only',
+      search_on_add_mode: 'none',
+      selection_source_mode: 'policy_only',
+      sort_name: 'Autechre',
+      wanted_automation_mode: 'future_matching',
+    }],
+  }));
+  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => ({ query }) });
+
+  const result = await store.listOperatorMonitoredArtists({
+    appUserId: 'user-1',
+    limit: 10,
+    offset: 5,
+  });
+
+  assert.match(query.mock.calls[0].arguments[0], /INNER JOIN metadata_artists/);
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['user-1', 10, 5]);
+  assert.deepEqual(result, [{
+    artist: {
+      country: 'GB',
+      disambiguation: null,
+      id: 'artist-1',
+      musicBrainzArtistId: 'mbid-1',
+      name: 'Autechre',
+      sortName: 'Autechre',
+      type: 'Group',
+    },
+    monitoring: {
+      acquisitionProfileKey: 'balanced_library',
+      appUserId: 'user-1',
+      id: 'monitoring-1',
+      isMonitored: true,
+      lastReconciledAt: null,
+      lastSavedSnapshotAt: null,
+      metadataArtistId: 'artist-1',
+      monitoredReleaseGroupTypes: ['album', 'ep'],
+      releaseScope: 'future_only',
+      searchOnAddMode: 'none',
+      selectionSourceMode: 'policy_only',
+      wantedAutomationMode: 'future_matching',
+    },
+  }]);
+});
+
 test('getOperatorArtistMonitoring returns defaults when no row exists', async () => {
   const store = createOperatorArtistMonitoringStore({
     getPoolFn: () => ({

@@ -59,6 +59,28 @@ function createMetadataRouteTestApp(overrides = {}) {
         releaseGroups: [],
         releases: [],
       }),
+      listOperatorMonitoredArtistProjections: async ({ appUserId, limit }) => ({
+        limit,
+        results: [{
+          artist: { id: 'artist-1', name: 'Autechre', sortName: 'Autechre' },
+          operator: {
+            monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album', 'ep'] },
+            overview: {
+              desiredReleaseGroupCount: 0,
+              releaseGroupCount: 0,
+              trackOverrideCount: 0,
+            },
+            reconciliation: {
+              latestRun: null,
+              latestSnapshot: null,
+              pendingRun: null,
+              runningRun: null,
+              status: 'idle',
+            },
+          },
+          sessionUserId: appUserId,
+        }],
+      }),
       saveOperatorArtist: async ({ appUserId, draft, metadataArtistId }) => ({
         artistId: metadataArtistId,
         operator: {
@@ -183,6 +205,78 @@ test('metadata monitored artists route returns the shared monitored artists payl
           monitored: true,
         },
       ],
+    });
+  });
+});
+
+test('metadata operator monitored artists route returns the operator-scoped projection payload', async (t) => {
+  const listOperatorMonitoredArtistProjections = t.mock.fn(async ({ appUserId, limit }) => ({
+    limit,
+    results: [{
+      artist: {
+        id: 'artist-1',
+        name: 'Autechre',
+        sortName: 'Autechre',
+      },
+      operator: {
+        monitoring: {
+          isMonitored: true,
+          monitoredReleaseGroupTypes: ['album', 'ep'],
+        },
+        overview: {
+          desiredReleaseGroupCount: 2,
+          releaseGroupCount: 4,
+          trackOverrideCount: 1,
+        },
+        reconciliation: {
+          latestRun: null,
+          latestSnapshot: null,
+          pendingRun: null,
+          runningRun: null,
+          status: 'idle',
+        },
+      },
+    }],
+  }));
+  const app = createMetadataRouteTestApp({ listOperatorMonitoredArtistProjections });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/monitored/operator?limit=10`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(listOperatorMonitoredArtistProjections.mock.calls[0].arguments[0], {
+      appUserId: 'user-1',
+      limit: 10,
+    });
+    assert.deepEqual(payload, {
+      ok: true,
+      limit: 10,
+      results: [{
+        artist: {
+          id: 'artist-1',
+          name: 'Autechre',
+          sortName: 'Autechre',
+        },
+        operator: {
+          monitoring: {
+            isMonitored: true,
+            monitoredReleaseGroupTypes: ['album', 'ep'],
+          },
+          overview: {
+            desiredReleaseGroupCount: 2,
+            releaseGroupCount: 4,
+            trackOverrideCount: 1,
+          },
+          reconciliation: {
+            latestRun: null,
+            latestSnapshot: null,
+            pendingRun: null,
+            runningRun: null,
+            status: 'idle',
+          },
+        },
+      }],
     });
   });
 });

@@ -25,6 +25,50 @@ import {
 export function createOperatorArtistMonitoringStore({
   getPoolFn = getPool,
 } = {}) {
+  async function listOperatorMonitoredArtists({
+    appUserId,
+    limit = 25,
+    offset = 0,
+  }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT
+          operator_artist_monitoring.*,
+          metadata_artists.name,
+          metadata_artists.sort_name,
+          metadata_artists.disambiguation,
+          metadata_artists.country,
+          metadata_artists.artist_type,
+          metadata_artists.musicbrainz_artist_id
+        FROM operator_artist_monitoring
+        INNER JOIN metadata_artists
+          ON metadata_artists.id = operator_artist_monitoring.metadata_artist_id
+        WHERE operator_artist_monitoring.app_user_id = $1
+          AND operator_artist_monitoring.is_monitored = TRUE
+        ORDER BY
+          COALESCE(NULLIF(metadata_artists.sort_name, ''), metadata_artists.name) ASC,
+          operator_artist_monitoring.metadata_artist_id ASC
+        LIMIT $2
+        OFFSET $3
+      `,
+      [appUserId, limit, offset],
+    );
+
+    return result.rows.map((row) => ({
+      artist: {
+        country: row.country ?? null,
+        disambiguation: row.disambiguation ?? null,
+        id: row.metadata_artist_id,
+        musicBrainzArtistId: row.musicbrainz_artist_id ?? null,
+        name: row.name,
+        sortName: row.sort_name ?? null,
+        type: row.artist_type ?? null,
+      },
+      monitoring: normalizeOperatorArtistMonitoringRow(row),
+    }));
+  }
+
   async function getOperatorArtistMonitoring({ appUserId, metadataArtistId }) {
     const pool = getPoolFn();
     const result = await pool.query(
@@ -179,6 +223,7 @@ export function createOperatorArtistMonitoringStore({
 
   return {
     getOperatorArtistMonitoring,
+    listOperatorMonitoredArtists,
     listOperatorArtistMonitoringSnapshot,
     replaceOperatorArtistMonitoringSnapshot,
     upsertOperatorArtistMonitoring,

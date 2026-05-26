@@ -26,6 +26,7 @@ import { resolveMetadataRefreshHeartbeatConfig } from './metadata-refresh-heartb
 import { createMetadataMonitoringService } from './metadata-monitoring-service.js';
 import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
+import { createOperatorMonitoredArtistProjectionService } from './operator-monitored-artist-projection-service.js';
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
 import { createOperatorArtistSaveService } from './operator-artist-save-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
@@ -69,6 +70,7 @@ export function createMetadataModule({
   metadataMonitoringService = null,
   operatorArtistMonitoringStore = null,
   operatorArtistMonitoringService = null,
+  operatorMonitoredArtistProjectionService = null,
   operatorArtistProjectionService = null,
   operatorArtistSaveService = null,
   operatorArtistReconciliationRunStore = null,
@@ -145,6 +147,11 @@ export function createMetadataModule({
       getRunningRunByOperatorArtist: resolvedOperatorArtistReconciliationRunStore.getRunningRunByOperatorArtist,
       listOperatorReleaseGroupSelections: resolvedOperatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections,
       listOperatorTrackOverrides: resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides,
+    });
+  const resolvedOperatorMonitoredArtistProjectionService = operatorMonitoredArtistProjectionService
+    ?? createOperatorMonitoredArtistProjectionService({
+      getOperatorArtistProjection: resolvedOperatorArtistProjectionService.getOperatorArtistProjection,
+      listOperatorMonitoredArtists: resolvedOperatorArtistMonitoringStore.listOperatorMonitoredArtists,
     });
   const resolvedOperatorArtistSaveService = operatorArtistSaveService
     ?? createOperatorArtistSaveService({
@@ -248,6 +255,7 @@ export function createMetadataModule({
     metadataMonitoringStore: resolvedMetadataMonitoringStore,
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
+    operatorMonitoredArtistProjectionService: resolvedOperatorMonitoredArtistProjectionService,
     operatorArtistProjectionService: resolvedOperatorArtistProjectionService,
     operatorArtistSaveService: resolvedOperatorArtistSaveService,
     operatorArtistReconciliationExecutionService: resolvedOperatorArtistReconciliationExecutionService,
@@ -270,6 +278,7 @@ export function createMetadataModule({
     routeDependencies: {
       browseMusicBrainzArtistReleaseGroups: resolvedMusicBrainzCatalogService.browseArtistReleaseGroups,
       getMetadataArtistDetectionEvents: resolvedMetadataReadService.getArtistDetectionEvents,
+      listOperatorMonitoredArtistProjections: resolvedOperatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,
       getOperatorArtistProjection: resolvedOperatorArtistProjectionService.getOperatorArtistProjection,
       getMusicBrainzReleaseGroupReleases: resolvedMusicBrainzCatalogService.getReleaseGroupReleases,
       getMetadataArtist: resolvedMetadataReadService.getArtist,

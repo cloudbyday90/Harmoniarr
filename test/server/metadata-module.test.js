@@ -19,6 +19,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const operatorArtistProjectionService = {
     getOperatorArtistProjection: () => {},
   };
+  const operatorMonitoredArtistProjectionService = {
+    listOperatorMonitoredArtistProjections: () => {},
+  };
   const operatorArtistSaveService = {
     saveOperatorArtist: () => {},
   };
@@ -73,6 +76,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     metadataMonitoringService,
     metadataMonitoringStore,
     operatorArtistProjectionService,
+    operatorMonitoredArtistProjectionService,
     operatorArtistSaveService,
     metadataReadService,
     metadataRefreshService,
@@ -92,6 +96,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.metadataReadService, metadataReadService);
   assert.equal(metadataModule.metadataMonitoringService, metadataMonitoringService);
   assert.equal(metadataModule.metadataMonitoringStore, metadataMonitoringStore);
+  assert.equal(metadataModule.operatorMonitoredArtistProjectionService, operatorMonitoredArtistProjectionService);
   assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
   assert.equal(metadataModule.operatorArtistSaveService, operatorArtistSaveService);
   assert.equal(metadataModule.metadataRefreshService, metadataRefreshService);
@@ -107,6 +112,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getMetadataArtist: metadataReadService.getArtist,
     getMetadataArtistByMusicBrainzId: metadataReadService.getArtistByMusicBrainzId,
     getMetadataArtistDetectionEvents: metadataReadService.getArtistDetectionEvents,
+    listOperatorMonitoredArtistProjections: operatorMonitoredArtistProjectionService.listOperatorMonitoredArtistProjections,
     getOperatorArtistProjection: operatorArtistProjectionService.getOperatorArtistProjection,
     getMetadataRelease: metadataReadService.getRelease,
     getMetadataReleaseByMusicBrainzId: metadataReadService.getReleaseByMusicBrainzId,

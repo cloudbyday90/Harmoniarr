@@ -88,6 +88,7 @@ export function registerMetadataRoutes(app, {
   searchLocalMetadataReleases,
   searchAllLocalMetadata,
   listMonitoredArtists,
+  listOperatorMonitoredArtistProjections,
   listAllMonitoredArtists,
   searchMusicBrainzArtists,
   searchMusicBrainzReleases,
@@ -156,6 +157,19 @@ export function registerMetadataRoutes(app, {
     ...await listMonitoredArtists({
       limit: sanitizePageLimit(request.query.limit, { default: 25, max: 25 }),
     }),
+  }));
+
+  app.get('/api/v1/metadata/artists/monitored/operator', metadataRoute(async (request, response) => {
+    const session = await requireSessionFn(request);
+    const result = await listOperatorMonitoredArtistProjections({
+      appUserId: session.appUserId,
+      limit: sanitizePageLimit(request.query.limit, { default: 25, max: 50 }),
+    });
+
+    response.json({
+      ok: true,
+      ...result,
+    });
   }));
 
   app.get('/api/v1/metadata/artists/monitored/admin', metadataRoute(async (request, response) => {
