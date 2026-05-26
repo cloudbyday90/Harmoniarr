@@ -32,6 +32,7 @@ import { createOperatorArtistSaveService } from './operator-artist-save-service.
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
 import { createOperatorArtistReconciliationRunStore } from './operator-artist-reconciliation-run-store.js';
 import { createOperatorArtistReconciliationExecutionService } from './operator-artist-reconciliation-execution-service.js';
+import { createOperatorArtistReconciliationRequestService } from './operator-artist-reconciliation-request-service.js';
 import { createOperatorArtistReconciliationService } from './operator-artist-reconciliation-service.js';
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 import { createOperatorArtistReconciliationSnapshotStore } from './operator-artist-reconciliation-snapshot-store.js';
@@ -56,6 +57,8 @@ import { createOperationRunInterruptionGate } from '../operation-run-cancellatio
 export function createMetadataModule({
   maintenanceLockOperationPauseService = null,
   onArtistMonitoredFn = null,
+  libraryMediaRequestStore = null,
+  reconcileDiscoveryRequests = null,
   reconcileWantedReleases = null,
   metadataArtistRefreshRunStore = null,
   metadataArtistRefreshService = null,
@@ -75,6 +78,7 @@ export function createMetadataModule({
   operatorArtistSaveService = null,
   operatorArtistReconciliationRunStore = null,
   operatorArtistReconciliationExecutionService = null,
+  operatorArtistReconciliationRequestService = null,
   operatorArtistReconciliationService = null,
   operatorArtistReconciliationSnapshotStore = null,
   operatorArtistReconciliationSnapshotService = null,
@@ -162,6 +166,11 @@ export function createMetadataModule({
       operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
       operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
     });
+  const resolvedOperatorArtistReconciliationRequestService = operatorArtistReconciliationRequestService
+    ?? createOperatorArtistReconciliationRequestService({
+      libraryMediaRequestStore,
+      reconcileDiscoveryRequests,
+    });
   const resolvedOperatorArtistReconciliationExecutionService = operatorArtistReconciliationExecutionService
     ?? createOperatorArtistReconciliationExecutionService({
       getMetadataArtist: resolvedMetadataReadService.getArtist,
@@ -169,6 +178,7 @@ export function createMetadataModule({
       getOperatorArtistReconciliationSnapshotById: resolvedOperatorArtistReconciliationSnapshotService.getOperatorArtistReconciliationSnapshotById,
       listOperatorReleaseGroupSelections: resolvedOperatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections,
       listOperatorTrackOverrides: resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides,
+      operatorArtistReconciliationRequestService: resolvedOperatorArtistReconciliationRequestService,
     });
   const resolvedOperatorArtistReconciliationService = operatorArtistReconciliationService
     ?? createOperatorArtistReconciliationService({
@@ -259,6 +269,7 @@ export function createMetadataModule({
     operatorArtistProjectionService: resolvedOperatorArtistProjectionService,
     operatorArtistSaveService: resolvedOperatorArtistSaveService,
     operatorArtistReconciliationExecutionService: resolvedOperatorArtistReconciliationExecutionService,
+    operatorArtistReconciliationRequestService: resolvedOperatorArtistReconciliationRequestService,
     operatorArtistReconciliationRunStore: resolvedOperatorArtistReconciliationRunStore,
     operatorArtistReconciliationService: resolvedOperatorArtistReconciliationService,
     operatorArtistReconciliationSnapshotService: resolvedOperatorArtistReconciliationSnapshotService,

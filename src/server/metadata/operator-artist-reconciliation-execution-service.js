@@ -24,6 +24,7 @@ import { buildOperatorArtistEffectiveReleaseGroups } from './operator-artist-eff
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
 import { defaultOperatorArtistMonitoringPolicy } from './operator-artist-monitoring-policy.js';
 import { createOperatorArtistDesiredStateService } from './operator-artist-desired-state-service.js';
+import { createOperatorArtistReconciliationRequestService } from './operator-artist-reconciliation-request-service.js';
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
 import { createOperatorTrackOverrideStore } from './operator-track-override-store.js';
@@ -70,6 +71,7 @@ export function createOperatorArtistReconciliationExecutionService({
   metadataReadService = null,
   operatorArtistDesiredStateService = null,
   operatorArtistMonitoringService = null,
+  operatorArtistReconciliationRequestService = null,
   operatorArtistReconciliationSnapshotService = null,
   operatorReleaseGroupSelectionStore = null,
   operatorTrackOverrideStore = null,
@@ -91,6 +93,8 @@ export function createOperatorArtistReconciliationExecutionService({
     ?? createLibraryDiscoveryRequestStore();
   const resolvedOperatorArtistDesiredStateService = operatorArtistDesiredStateService
     ?? createOperatorArtistDesiredStateService();
+  const resolvedOperatorArtistReconciliationRequestService = operatorArtistReconciliationRequestService
+    ?? createOperatorArtistReconciliationRequestService();
   const readMetadataArtist = getMetadataArtist ?? resolvedMetadataReadService.getArtist;
   const readOperatorArtistMonitoring = getOperatorArtistMonitoring
     ?? resolvedOperatorArtistMonitoringService.getOperatorArtistMonitoring;
@@ -107,6 +111,8 @@ export function createOperatorArtistReconciliationExecutionService({
   const readTrackOverrides = listOperatorTrackOverrides
     ?? resolvedOperatorTrackOverrideStore.listOperatorTrackOverrides;
   const buildDesiredStatePlan = resolvedOperatorArtistDesiredStateService.buildDesiredStatePlan;
+  const materializeDesiredReleaseRequests = resolvedOperatorArtistReconciliationRequestService
+    .materializeDesiredReleaseRequests;
 
   async function executeOperatorArtistReconciliation({
     appUserId,
@@ -184,10 +190,19 @@ export function createOperatorArtistReconciliationExecutionService({
     );
     const desiredStatePlan = buildDesiredStatePlan({
       activeRequestsByReleaseId: activeRequestByReleaseId,
+      metadataArtistId,
       discoveryRequestsByReleaseId: discoveryRequestByReleaseId,
       monitoring: resolvedMonitoring,
       releaseGroups: effectiveReleaseGroups,
       releaseReconciliationsByReleaseId: reconciliationByReleaseId,
+    });
+    const materializationResult = await materializeDesiredReleaseRequests({
+      appUserId,
+      artistName: artistPayload?.artist?.name ?? null,
+      desiredReleases: desiredStatePlan.desiredReleases,
+      snapshotId: snapshot.id,
+      snapshotRevision: snapshot.snapshotRevision,
+      throwIfCancelled,
     });
 
     const selectedReleaseGroupCount = effectiveReleaseGroups.filter(
@@ -211,8 +226,14 @@ export function createOperatorArtistReconciliationExecutionService({
       currentAndFutureEligibleCount: desiredStatePlan.summary.currentAndFutureEligibleCount,
       desiredReleaseGroupCount: selectedReleaseGroupCount + partialReleaseGroupCount,
       desiredTrackOverrideCount,
+      discoveryReconciled: materializationResult.discoveryReconciled,
+      downstreamCreatedRequestCount: materializationResult.createdRequestCount,
+      downstreamCreatedRequestIds: materializationResult.createdRequestIds,
+      downstreamSkippedRequestCount: materializationResult.skippedRequestCount,
       downstreamEligibleReleaseCount: desiredStatePlan.summary.eligibleReleaseCount,
-      duplicateBlockedCount: desiredStatePlan.summary.duplicateBlockedCount,
+      duplicateBlockedCount: desiredStatePlan.summary.duplicateBlockedCount
+        + materializationResult.duplicateSuppressedCount,
+      downstreamDuplicateSuppressedCount: materializationResult.duplicateSuppressedCount,
       explicitDesiredReleaseCount: desiredStatePlan.summary.explicitDesiredReleaseCount,
       futureEligibleCount: desiredStatePlan.summary.futureEligibleCount,
       futureScopeBlockedCount: desiredStatePlan.summary.futureScopeBlockedCount,

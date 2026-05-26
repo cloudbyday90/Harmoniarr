@@ -72,6 +72,16 @@ test('executeOperatorArtistReconciliation loads the saved snapshot and summarize
       { isDesired: false, metadataReleaseGroupId: 'rg-partial' },
       { isDesired: true, metadataReleaseGroupId: 'rg-partial' },
     ]),
+    operatorArtistReconciliationRequestService: {
+      materializeDesiredReleaseRequests: async ({ desiredReleases }) => ({
+        createdRequestCount: 1,
+        createdRequestIds: ['request-1'],
+        createdRequests: desiredReleases.filter((release) => release.eligibleForDownstreamWork),
+        discoveryReconciled: true,
+        duplicateSuppressedCount: 0,
+        skippedRequestCount: 0,
+      }),
+    },
   });
 
   const result = await service.executeOperatorArtistReconciliation({
@@ -91,6 +101,9 @@ test('executeOperatorArtistReconciliation loads the saved snapshot and summarize
   assert.equal(result.monitoredReleaseGroupTypeCount, 2);
   assert.equal(result.snapshotPayloadKeyCount, 2);
   assert.equal(result.downstreamEligibleReleaseCount, 1);
+  assert.equal(result.downstreamCreatedRequestCount, 1);
+  assert.deepEqual(result.downstreamCreatedRequestIds, ['request-1']);
+  assert.equal(result.discoveryReconciled, true);
   assert.equal(result.futureEligibleCount, 1);
   assert.equal(result.activeRequestBlockedCount, 1);
   assert.equal(result.explicitDesiredReleaseCount, 1);
@@ -116,6 +129,16 @@ test('executeOperatorArtistReconciliation rejects missing saved snapshots', asyn
     getOperatorArtistReconciliationSnapshotById: async () => null,
     listOperatorReleaseGroupSelections: async () => [],
     listOperatorTrackOverrides: async () => [],
+    operatorArtistReconciliationRequestService: {
+      materializeDesiredReleaseRequests: async () => ({
+        createdRequestCount: 0,
+        createdRequestIds: [],
+        createdRequests: [],
+        discoveryReconciled: false,
+        duplicateSuppressedCount: 0,
+        skippedRequestCount: 0,
+      }),
+    },
   });
 
   await assert.rejects(
@@ -157,6 +180,16 @@ test('executeOperatorArtistReconciliation rejects snapshot revision mismatches',
     }),
     listOperatorReleaseGroupSelections: async () => [],
     listOperatorTrackOverrides: async () => [],
+    operatorArtistReconciliationRequestService: {
+      materializeDesiredReleaseRequests: async () => ({
+        createdRequestCount: 0,
+        createdRequestIds: [],
+        createdRequests: [],
+        discoveryReconciled: false,
+        duplicateSuppressedCount: 0,
+        skippedRequestCount: 0,
+      }),
+    },
   });
 
   await assert.rejects(
@@ -212,6 +245,16 @@ test('executeOperatorArtistReconciliation blocks policy-only historical releases
     listLibraryReleaseReconciliationsByMetadataReleaseIds: async () => [],
     listOperatorReleaseGroupSelections: async () => [],
     listOperatorTrackOverrides: async () => [],
+    operatorArtistReconciliationRequestService: {
+      materializeDesiredReleaseRequests: async () => ({
+        createdRequestCount: 0,
+        createdRequestIds: [],
+        createdRequests: [],
+        discoveryReconciled: false,
+        duplicateSuppressedCount: 0,
+        skippedRequestCount: 0,
+      }),
+    },
   });
 
   const result = await service.executeOperatorArtistReconciliation({

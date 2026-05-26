@@ -436,6 +436,7 @@ export function createApp({
     slskdService: slskdModule.slskdService,
   });
   const metadataModule = buildMetadataModule({
+    libraryMediaRequestStore: libraryModule.libraryMediaRequestStore,
     maintenanceLockOperationPauseService,
     onArtistMonitoredFn: ({ actorUserId, artistName }) => broadcastHouseholdNotification({
       category: 'artistMonitored',
@@ -453,6 +454,7 @@ export function createApp({
       suppressUserIds: typeof actorUserId === 'string' && actorUserId.length > 0 ? [actorUserId] : [],
     }),
     providerHealthRecorder,
+    reconcileDiscoveryRequests: libraryModule.libraryDiscoveryRequestService.reconcileDiscoveryRequests,
     reconcileWantedReleases: libraryModule.libraryWantedReleaseService.reconcileWantedReleases,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
   });

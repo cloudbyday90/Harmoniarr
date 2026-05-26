@@ -190,6 +190,20 @@ const baseSelect = `
 export function createLibraryMediaRequestStore({
   getPoolFn = getPool,
 } = {}) {
+  async function getMediaRequestById({ mediaRequestId, queryable = null }) {
+    const queryTarget = queryable ?? getPoolFn();
+    const result = await queryTarget.query(
+      `
+        ${baseSelect}
+        WHERE media_requests.id = $1
+        LIMIT 1
+      `,
+      [mediaRequestId],
+    );
+
+    return mapMediaRequestRow(result.rows[0]);
+  }
+
   async function createMediaRequest({
     artistName,
     evidence,
@@ -208,11 +222,12 @@ export function createLibraryMediaRequestStore({
     sourceProvider,
     sourceUrl,
     trackTitle,
+    queryable = null,
     fanOutParentId = null,
     fanOutChildCount = 0,
   }) {
-    const pool = getPoolFn();
-    const result = await pool.query(
+    const queryTarget = queryable ?? getPoolFn();
+    const result = await queryTarget.query(
       `
         INSERT INTO media_requests (
           requested_by_user_id,
@@ -284,7 +299,7 @@ export function createLibraryMediaRequestStore({
     );
 
     const mediaRequestId = result.rows[0]?.id ?? null;
-    return getMediaRequestById({ mediaRequestId });
+    return getMediaRequestById({ mediaRequestId, queryable: queryTarget });
   }
 
   async function listMediaRequests({
@@ -385,20 +400,6 @@ export function createLibraryMediaRequestStore({
     return mapSummaryCounts(result.rows[0] ?? {});
   }
 
-  async function getMediaRequestById({ mediaRequestId }) {
-    const pool = getPoolFn();
-    const result = await pool.query(
-      `
-        ${baseSelect}
-        WHERE media_requests.id = $1
-        LIMIT 1
-      `,
-      [mediaRequestId],
-    );
-
-    return mapMediaRequestRow(result.rows[0]);
-  }
-
   async function mergeMediaRequestEvidence({ evidencePatch, mediaRequestId }) {
     const pool = getPoolFn();
     await pool.query(
@@ -412,8 +413,14 @@ export function createLibraryMediaRequestStore({
     );
   }
 
-  async function findActiveDuplicateRequest({ musicbrainzReleaseId = null, artistName = null, releaseTitle = null, excludeRequestedForUserId = null }) {
-    const pool = getPoolFn();
+  async function findActiveDuplicateRequest({
+    musicbrainzReleaseId = null,
+    artistName = null,
+    releaseTitle = null,
+    excludeRequestedForUserId = null,
+    queryable = null,
+  }) {
+    const pool = queryable ?? getPoolFn();
 
     if (musicbrainzReleaseId) {
       const result = await pool.query(
@@ -625,9 +632,10 @@ export function createLibraryMediaRequestStore({
     reason = null,
     actorUserId = null,
     details = null,
+    queryable = null,
   }) {
-    const pool = getPoolFn();
-    await pool.query(
+    const queryTarget = queryable ?? getPoolFn();
+    await queryTarget.query(
       `
         INSERT INTO media_request_events (
           media_request_id,
