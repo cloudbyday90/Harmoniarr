@@ -27,6 +27,10 @@ function createMonitorDouble() {
   return async () => ({ ok: true });
 }
 
+function createOperatorSaveDouble() {
+  return async () => ({ ok: true, reconciliation: { accepted: true } });
+}
+
 // ---------------------------------------------------------------------------
 // monitorArtist — happy path
 // ---------------------------------------------------------------------------
@@ -341,4 +345,97 @@ test('useArtistMonitoring isMonitoring reflects in-progress Set membership', asy
 
   assert.equal(inProgressChecked.value, true);
   assert.equal(isMonitoring('mb-check'), false);
+});
+
+// ---------------------------------------------------------------------------
+// addArtistWithPolicy — operator-scoped add flow
+// ---------------------------------------------------------------------------
+
+test('useArtistMonitoring addArtistWithPolicy imports then saves operator draft', async (t) => {
+  const importArtist = t.mock.fn(createImportDouble({ artistId: 'local-artist-77' }));
+  const saveOperatorArtist = t.mock.fn(createOperatorSaveDouble());
+  const toast = createToastDouble(t);
+  const { addArtistWithPolicy } = useArtistMonitoring({
+    importArtist,
+    saveOperatorArtist,
+    toast,
+  });
+
+  const result = await addArtistWithPolicy({
+    id: 'mb-add-1',
+    name: 'Aphex Twin',
+  }, {
+    monitoredReleaseGroupTypes: ['album', 'single'],
+    searchNow: true,
+    wantedAutomationMode: 'current_and_future_matching',
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(importArtist.mock.calls[0].arguments[0], 'mb-add-1');
+  assert.equal(saveOperatorArtist.mock.calls[0].arguments[0], 'local-artist-77');
+  assert.deepEqual(saveOperatorArtist.mock.calls[0].arguments[1], {
+    monitoring: {
+      acquisitionProfileKey: 'balanced_library',
+      isMonitored: true,
+      monitoredReleaseGroupTypes: ['album', 'single'],
+      releaseScope: 'future_only',
+      searchOnAddMode: 'missing_now',
+      selectionSourceMode: 'policy_only',
+      wantedAutomationMode: 'current_and_future_matching',
+    },
+    releaseGroupSelections: [],
+    trackOverrides: [],
+  });
+});
+
+test('useArtistMonitoring addArtistWithPolicy marks the MusicBrainz artist as monitored', async (t) => {
+  const toast = createToastDouble(t);
+  const { addArtistWithPolicy, isMonitored, monitoredIds, monitoringIds } = useArtistMonitoring({
+    importArtist: createImportDouble({ artistId: 'local-artist-2' }),
+    saveOperatorArtist: createOperatorSaveDouble(),
+    toast,
+  });
+
+  await addArtistWithPolicy({ id: 'mb-add-2', name: 'Stereolab' });
+
+  assert.equal(isMonitored('mb-add-2'), true);
+  assert.equal(monitoredIds.value.has('mb-add-2'), true);
+  assert.equal(monitoringIds.value.has('mb-add-2'), false);
+  assert.equal(toast.success.mock.callCount(), 1);
+  assert.match(toast.success.mock.calls[0].arguments[0], /Stereolab/);
+});
+
+test('useArtistMonitoring addArtistWithPolicy keeps state unchanged when save fails', async (t) => {
+  const toast = createToastDouble(t);
+  const { addArtistWithPolicy, isMonitored, monitoringIds } = useArtistMonitoring({
+    importArtist: createImportDouble({ artistId: 'local-artist-3' }),
+    saveOperatorArtist: async () => {
+      throw new Error('operator save failed');
+    },
+    toast,
+  });
+
+  const result = await addArtistWithPolicy({ id: 'mb-add-3', name: 'Failure' });
+
+  assert.equal(result.success, false);
+  assert.equal(isMonitored('mb-add-3'), false);
+  assert.equal(monitoringIds.value.has('mb-add-3'), false);
+  assert.equal(toast.error.mock.callCount(), 1);
+  assert.match(toast.error.mock.calls[0].arguments[0], /operator save failed/);
+});
+
+test('useArtistMonitoring addArtistWithPolicy is a no-op when already monitored', async (t) => {
+  const importArtist = t.mock.fn(createImportDouble());
+  const toast = createToastDouble(t);
+  const { addArtistWithPolicy } = useArtistMonitoring({
+    importArtist,
+    initialMonitoredIds: ['mb-add-known'],
+    saveOperatorArtist: createOperatorSaveDouble(),
+    toast,
+  });
+
+  const result = await addArtistWithPolicy({ id: 'mb-add-known', name: 'Known' });
+
+  assert.equal(result.success, false);
+  assert.equal(importArtist.mock.callCount(), 0);
 });

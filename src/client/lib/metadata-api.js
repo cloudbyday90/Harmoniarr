@@ -119,6 +119,14 @@ export function updateMetadataArtistMonitoring(artistId, patch) {
   });
 }
 
+export function saveOperatorArtistDraft(artistId, draft) {
+  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator`, {
+    method: 'PUT',
+    includeCsrf: true,
+    body: draft,
+  });
+}
+
 export function startMetadataArtistRefresh(artistId) {
   return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/refresh`, {
     method: 'POST',

@@ -19,7 +19,13 @@
 import { computed, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
+  buildOperatorArtistDraftFromAddPolicy,
+  defaultAddArtistPolicyForm,
+  normalizeAddArtistPolicyForm,
+} from '../lib/add-artist-policy.js';
+import {
   importMusicBrainzArtist,
+  saveOperatorArtistDraft,
   updateMetadataArtistMonitoring,
 } from '../lib/metadata-api.js';
 import { useToast } from './useToast.js';
@@ -39,6 +45,7 @@ import { useToast } from './useToast.js';
  * @param {boolean} [options.showToasts] - When true (default), success/error
  *   toasts are shown automatically.
  * @param {function} [options.importArtist] - Override for testing.
+ * @param {function} [options.saveOperatorArtist] - Override for testing.
  * @param {function} [options.updateMonitoring] - Override for testing.
  * @param {object} [options.toast] - Override for testing.
  */
@@ -46,6 +53,7 @@ export function useArtistMonitoring({
   initialMonitoredIds = [],
   showToasts = true,
   importArtist = importMusicBrainzArtist,
+  saveOperatorArtist = saveOperatorArtistDraft,
   updateMonitoring = updateMetadataArtistMonitoring,
   toast = useToast(),
 } = {}) {
@@ -141,7 +149,59 @@ export function useArtistMonitoring({
     }
   }
 
+  async function addArtistWithPolicy(artist, policyForm = defaultAddArtistPolicyForm) {
+    const { id, name } = artist;
+
+    if (monitoringIds.value.has(id) || monitoredIds.value.has(id)) {
+      return { success: false, error: new Error('Already adding or monitored.') };
+    }
+
+    monitoringIds.value = new Set([...monitoringIds.value, id]);
+
+    try {
+      const normalizedPolicy = normalizeAddArtistPolicyForm(policyForm);
+      const importResult = await importArtist(id);
+      const localArtistId = importResult?.imported?.artistId ?? null;
+
+      if (!localArtistId) {
+        throw new Error(`Could not resolve local ID for ${name} after import.`);
+      }
+
+      const draft = buildOperatorArtistDraftFromAddPolicy(normalizedPolicy);
+      const saveResult = await saveOperatorArtist(localArtistId, draft);
+
+      const nextMonitoring = new Set(monitoringIds.value);
+      nextMonitoring.delete(id);
+      monitoringIds.value = nextMonitoring;
+
+      monitoredIds.value = new Set([...monitoredIds.value, id]);
+
+      if (showToasts) {
+        toast.success(`Added ${name} to monitored artists.`);
+      }
+
+      return {
+        draft,
+        localArtistId,
+        policy: normalizedPolicy,
+        saveResult,
+        success: true,
+      };
+    } catch (error) {
+      const nextMonitoring = new Set(monitoringIds.value);
+      nextMonitoring.delete(id);
+      monitoringIds.value = nextMonitoring;
+
+      if (showToasts) {
+        toast.error(getErrorMessage(error, `Could not add ${name}. Please try again.`));
+      }
+
+      return { success: false, error };
+    }
+  }
+
   return {
+    addArtistWithPolicy,
     monitoredIds,
     monitoringIds,
     hasMonitored,

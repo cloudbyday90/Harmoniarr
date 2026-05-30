@@ -36,7 +36,7 @@ import { buildAvatarInitial, buildAvatarStyle } from './artist-avatar.js';
  * @returns {string}
  */
 export function buildDiscoverPageSubtitle() {
-  return 'Follow artists you love and Harmoniarr will track their new releases automatically.';
+  return 'Add artists you trust and Harmoniarr will track their new releases automatically.';
 }
 
 // ── Pre-search empty state ───────────────────────────────────────────────────
@@ -47,7 +47,7 @@ export function buildDiscoverPageSubtitle() {
  * @returns {string}
  */
 export function buildDiscoverPreSearchBody() {
-  return 'Follow an artist and Harmoniarr will automatically watch for their new releases — ready for you to request.';
+  return 'Add an artist and Harmoniarr will automatically watch for matching future releases.';
 }
 
 // ── Search error ─────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ export function buildDiscoverSearchErrorBody() {
  * @returns {string}
  */
 export function buildDiscoverGraphSubtitle() {
-  return "Based on artists you follow";
+  return 'Based on your monitored artists';
 }
 
 /**
@@ -96,7 +96,7 @@ export function buildDiscoverGraphSubtitle() {
  * @returns {string}
  */
 export function buildDiscoverSeedsAriaLabel() {
-  return 'Artists you follow';
+  return 'Monitored artists shaping recommendations';
 }
 
 /**
@@ -106,8 +106,8 @@ export function buildDiscoverSeedsAriaLabel() {
  * @returns {string}
  */
 export function buildDiscoverSeedRemoveAriaLabel(name) {
-  if (!name) return 'Stop following this artist';
-  return `Stop following ${name}`;
+  if (!name) return 'Remove this artist from recommendations';
+  return `Remove ${name} from recommendations`;
 }
 
 /**

@@ -23,7 +23,7 @@ import {
   buildDiscoverAvatarStyle,
 } from '../../lib/discover-presentation.js';
 
-defineProps({
+const props = defineProps({
   artist: {
     type: Object,
     required: true,
@@ -66,10 +66,10 @@ defineProps({
   },
 });
 
-const emit = defineEmits(['monitor']);
+const emit = defineEmits(['add']);
 
-function handleMonitor(artist) {
-  emit('monitor', artist);
+function handleAdd() {
+  emit('add', props.artist);
 }
 </script>
 
@@ -83,7 +83,6 @@ function handleMonitor(artist) {
     :dominant-color="artwork?.dominantColor ?? null"
     :artwork-asset-id="artwork?.assetId ?? null"
     variant="discover"
-    @monitor="handleMonitor"
   >
     <template #artwork>
       <img
@@ -113,6 +112,25 @@ function handleMonitor(artist) {
 
     <template v-if="supportingText" #body-footer>
       <p class="discover-artist-card__supporting">{{ supportingText }}</p>
+    </template>
+
+    <template #actions>
+      <button
+        type="button"
+        class="hx-btn discover-artist-card__add-button"
+        :class="{ 'discover-artist-card__add-button--icon': !monitored }"
+        :data-variant="monitored ? 'ghost' : 'primary'"
+        :disabled="disabled || monitoring || monitored"
+        :aria-busy="monitoring || undefined"
+        :aria-label="monitored ? `${artist.name} is already monitored` : `Add ${artist.name}`"
+        @click="handleAdd"
+      >
+        <template v-if="monitoring">Adding...</template>
+        <template v-else-if="monitored">Already monitored</template>
+        <template v-else>
+          <span aria-hidden="true">+</span>
+        </template>
+      </button>
     </template>
   </ArtistCard>
 </template>
@@ -149,5 +167,16 @@ function handleMonitor(artist) {
   font-size: var(--hx-text-xs);
   line-height: 1.5;
   color: var(--hx-text-muted);
+}
+
+.discover-artist-card__add-button {
+  min-height: 40px;
+}
+
+.discover-artist-card__add-button--icon {
+  width: 40px;
+  padding-inline: 0;
+  font-size: 1.35rem;
+  line-height: 1;
 }
 </style>

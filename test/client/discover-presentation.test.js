@@ -38,8 +38,8 @@ test('buildDiscoverPageSubtitle returns a non-empty string', () => {
   assert.ok(typeof result === 'string' && result.length > 0);
 });
 
-test('buildDiscoverPageSubtitle does not contain "monitor"', () => {
-  assert.ok(!buildDiscoverPageSubtitle().toLowerCase().includes('monitor'));
+test('buildDiscoverPageSubtitle uses add language', () => {
+  assert.ok(buildDiscoverPageSubtitle().toLowerCase().includes('add'));
 });
 
 test('buildDiscoverPageSubtitle is stable across calls', () => {
@@ -53,8 +53,8 @@ test('buildDiscoverPreSearchBody returns a non-empty string', () => {
   assert.ok(typeof result === 'string' && result.length > 0);
 });
 
-test('buildDiscoverPreSearchBody does not contain "monitor"', () => {
-  assert.ok(!buildDiscoverPreSearchBody().toLowerCase().includes('monitor'));
+test('buildDiscoverPreSearchBody uses add language', () => {
+  assert.ok(buildDiscoverPreSearchBody().toLowerCase().includes('add'));
 });
 
 test('buildDiscoverPreSearchBody does not contain "surface"', () => {
@@ -133,8 +133,8 @@ test('buildDiscoverGraphSubtitle returns a non-empty string', () => {
   assert.ok(typeof result === 'string' && result.length > 0);
 });
 
-test('buildDiscoverGraphSubtitle does not contain "monitored"', () => {
-  assert.ok(!buildDiscoverGraphSubtitle().toLowerCase().includes('monitored'));
+test('buildDiscoverGraphSubtitle references monitored artists', () => {
+  assert.ok(buildDiscoverGraphSubtitle().toLowerCase().includes('monitored artists'));
 });
 
 test('buildDiscoverGraphSubtitle is stable across calls', () => {
@@ -152,6 +152,10 @@ test('buildDiscoverSeedsAriaLabel does not contain "seeds"', () => {
   assert.ok(!buildDiscoverSeedsAriaLabel().toLowerCase().includes('seeds'));
 });
 
+test('buildDiscoverSeedsAriaLabel references monitored artists', () => {
+  assert.ok(buildDiscoverSeedsAriaLabel().toLowerCase().includes('monitored artists'));
+});
+
 test('buildDiscoverSeedsAriaLabel is stable across calls', () => {
   assert.equal(buildDiscoverSeedsAriaLabel(), buildDiscoverSeedsAriaLabel());
 });
@@ -163,25 +167,25 @@ test('buildDiscoverSeedRemoveAriaLabel includes the artist name', () => {
 });
 
 test('buildDiscoverSeedRemoveAriaLabel returns fallback for null name', () => {
-  assert.equal(buildDiscoverSeedRemoveAriaLabel(null), 'Stop following this artist');
+  assert.equal(buildDiscoverSeedRemoveAriaLabel(null), 'Remove this artist from recommendations');
 });
 
 test('buildDiscoverSeedRemoveAriaLabel returns fallback for undefined name', () => {
-  assert.equal(buildDiscoverSeedRemoveAriaLabel(undefined), 'Stop following this artist');
+  assert.equal(buildDiscoverSeedRemoveAriaLabel(undefined), 'Remove this artist from recommendations');
 });
 
 test('buildDiscoverSeedRemoveAriaLabel returns fallback for empty string', () => {
-  assert.equal(buildDiscoverSeedRemoveAriaLabel(''), 'Stop following this artist');
+  assert.equal(buildDiscoverSeedRemoveAriaLabel(''), 'Remove this artist from recommendations');
 });
 
-test('buildDiscoverSeedRemoveAriaLabel uses follow-language, not monitor-language', () => {
+test('buildDiscoverSeedRemoveAriaLabel uses remove-language, not seed-language', () => {
   const label = buildDiscoverSeedRemoveAriaLabel('Björk');
-  assert.ok(!label.toLowerCase().includes('monitor'));
   assert.ok(!label.toLowerCase().includes('seed'));
+  assert.ok(label.toLowerCase().includes('remove'));
 });
 
 test('buildDiscoverSeedRemoveAriaLabel produces correct label for known artist', () => {
-  assert.equal(buildDiscoverSeedRemoveAriaLabel('Björk'), 'Stop following Björk');
+  assert.equal(buildDiscoverSeedRemoveAriaLabel('Björk'), 'Remove Björk from recommendations');
 });
 
 // ── buildDiscoverNoSimilarArtistsMessage ──────────────────────────────────────

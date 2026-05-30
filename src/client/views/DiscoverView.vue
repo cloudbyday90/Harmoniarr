@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import AddArtistModal from '../components/media/AddArtistModal.vue';
 import DiscoverArtistCard from '../components/media/DiscoverArtistCard.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
@@ -25,6 +26,10 @@ import { useDiscoverArtistArtwork } from '../composables/useDiscoverArtistArtwor
 import { useDiscoverGraph } from '../composables/useDiscoverGraph.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
 import { useMonitoredArtists } from '../composables/useMonitoredArtists.js';
+import {
+  loadSavedAddArtistPolicyForm,
+  saveAddArtistPolicyForm,
+} from '../lib/add-artist-policy.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import {
   buildDiscoverGraphSubtitle,
@@ -53,9 +58,9 @@ const {
 } = useMonitoredArtists({ limit: 25 });
 
 const {
+  addArtistWithPolicy,
   isMonitored,
   isMonitoring,
-  monitorArtist,
 } = useArtistMonitoring();
 
 const {
@@ -78,10 +83,48 @@ const {
   artistSources: [seeds, suggestions, results],
 });
 
-async function handleMonitor(artist) {
-  const result = await monitorArtist(artist);
+const addArtistModalOpen = ref(false);
+const addArtistCandidate = ref(null);
+const addArtistErrorMessage = ref('');
+const addArtistPolicyDefaults = ref(loadSavedAddArtistPolicyForm());
+
+function openAddArtistModal(artist) {
+  if (!artist?.id || isAddedArtist(artist.id)) {
+    return;
+  }
+
+  addArtistCandidate.value = artist;
+  addArtistErrorMessage.value = '';
+  addArtistModalOpen.value = true;
+}
+
+function closeAddArtistModal() {
+  if (addArtistCandidate.value && isMonitoring(addArtistCandidate.value.id)) {
+    return;
+  }
+
+  addArtistModalOpen.value = false;
+  addArtistCandidate.value = null;
+  addArtistErrorMessage.value = '';
+}
+
+async function handleAddArtistSubmit(policyForm) {
+  if (!addArtistCandidate.value) {
+    return;
+  }
+
+  const artist = addArtistCandidate.value;
+  addArtistErrorMessage.value = '';
+  const result = await addArtistWithPolicy(artist, policyForm);
   if (result?.success) {
+    if (result.policy.useAsDefault) {
+      addArtistPolicyDefaults.value = saveAddArtistPolicyForm(result.policy);
+    }
     await addSeed(artist);
+    await loadMonitoredArtists();
+    closeAddArtistModal();
+  } else if (result?.error) {
+    addArtistErrorMessage.value = result.error.message ?? 'Could not add artist. Please try again.';
   }
 }
 
@@ -97,15 +140,15 @@ onBeforeUnmount(() => {
 const summaryCards = computed(() => ([
   {
     body: hasSeeds.value
-      ? 'Followed artists shape the recommendation graph and unlock related suggestions instantly.'
-      : 'Start with one artist and the recommendation graph will grow from there.',
-    label: 'Following',
+      ? 'Monitored artists shape the recommendation graph and unlock related suggestions instantly.'
+      : 'Add one artist and the recommendation graph will grow from there.',
+    label: 'Monitored',
     value: String(seeds.value.length),
   },
   {
     body: hasSuggestions.value
-      ? 'Suggestions rise when artists appear across multiple followed seeds.'
-      : 'Once artists are followed, Harmoniarr ranks nearby recommendations here.',
+      ? 'Suggestions rise when artists appear across multiple monitored inputs.'
+      : 'Once artists are monitored, Harmoniarr ranks nearby recommendations here.',
     label: 'Suggestions',
     value: String(suggestions.value.length),
   },
@@ -124,10 +167,10 @@ function buildSuggestionMeta(suggestion) {
   }
 
   if (suggestion.seedCount > 1) {
-    return `Shared by ${suggestion.seedCount} followed artists`;
+    return `Shared by ${suggestion.seedCount} monitored artists`;
   }
 
-  return 'Suggested from your current taste graph';
+  return 'Suggested from your monitored profile';
 }
 
 function buildSuggestionSupport(suggestion) {
@@ -139,10 +182,10 @@ function buildSuggestionSupport(suggestion) {
     return 'Strong graph overlap puts this artist near the top of your current taste profile.';
   }
 
-  return 'Worth following if you want similar release activity to enter your request flow.';
+  return 'Worth adding if you want similar release activity to enter your monitoring profile.';
 }
 
-function isFollowedArtist(artistId) {
+function isAddedArtist(artistId) {
   return isSeed(artistId) || isMonitored(artistId);
 }
 
@@ -158,8 +201,8 @@ function buildResultMeta(artist) {
 }
 
 function buildResultSupport(artist) {
-  if (isFollowedArtist(artist?.id)) {
-    return 'Already followed and contributing to your current recommendation graph.';
+  if (isAddedArtist(artist?.id)) {
+    return 'Already monitored and contributing to your current recommendation graph.';
   }
 
   if (artist?.disambiguation) {
@@ -167,10 +210,10 @@ function buildResultSupport(artist) {
   }
 
   if (artist?.country && artist?.type) {
-    return 'Ready to follow and route into future release discovery.';
+    return 'Ready to add and route into future release discovery.';
   }
 
-  return 'Follow this artist to seed related recommendations and future release tracking.';
+  return 'Add this artist to power related recommendations and future release tracking.';
 }
 
 function buildArtistLocation(artist) {
@@ -180,6 +223,17 @@ function buildArtistLocation(artist) {
 
 <template>
   <section class="hx-page discover-view">
+    <AddArtistModal
+      :open="addArtistModalOpen"
+      :artist="addArtistCandidate"
+      :artwork="addArtistCandidate ? getArtistArtwork(addArtistCandidate.id) : null"
+      :initial-policy="addArtistPolicyDefaults"
+      :saving="addArtistCandidate ? isMonitoring(addArtistCandidate.id) : false"
+      :error-message="addArtistErrorMessage"
+      @close="closeAddArtistModal"
+      @submit="handleAddArtistSubmit"
+    />
+
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Discover</h1>
@@ -193,12 +247,12 @@ function buildArtistLocation(artist) {
           <span class="discover-stage__eyebrow">Artist Discovery Workspace</span>
           <h2 class="discover-stage__title">Turn one artist into a living recommendation graph</h2>
           <p class="discover-stage__copy">
-            Search for an artist you already trust, follow them, and let shared artwork plus taste-graph suggestions
-            build the next layer of candidates.
+            Search for an artist you already trust, add them to your monitored profile, and let shared artwork plus
+            recommendation signals build the next layer of candidates.
           </p>
           <div class="discover-stage__signals">
-            <span class="hx-pill" data-tone="success">{{ hasSeeds ? `${seeds.length} followed artist${seeds.length === 1 ? '' : 's'}` : 'No followed seeds yet' }}</span>
-            <span class="hx-pill" data-tone="info">{{ hasSuggestions ? `${suggestions.length} live suggestion${suggestions.length === 1 ? '' : 's'}` : 'Suggestions appear after follow' }}</span>
+            <span class="hx-pill" data-tone="success">{{ hasSeeds ? `${seeds.length} monitored artist${seeds.length === 1 ? '' : 's'}` : 'No monitored artists yet' }}</span>
+            <span class="hx-pill" data-tone="info">{{ hasSuggestions ? `${suggestions.length} live suggestion${suggestions.length === 1 ? '' : 's'}` : 'Suggestions appear after add' }}</span>
             <span v-if="isAnySeedLoading || isResolvingArtistArtwork" class="hx-pill" data-tone="warning">Refreshing graph artwork</span>
           </div>
         </div>
@@ -254,9 +308,9 @@ function buildArtistLocation(artist) {
       <div class="hx-card-body discover-graph-card__body">
         <section class="discover-seed-band">
           <div class="discover-seed-band__header">
-            <span class="discover-summary-card__label">Followed artists</span>
+            <span class="discover-summary-card__label">Monitored artists</span>
             <p class="discover-seed-band__copy">
-              Remove a seed to tighten the graph or add more artists to widen the recommendation field.
+              Remove an artist to tighten the graph or add more artists to widen the recommendation field.
             </p>
           </div>
 
@@ -292,7 +346,7 @@ function buildArtistLocation(artist) {
           <div class="discover-suggestions__header">
             <span class="discover-summary-card__label">Recommendation grid</span>
             <p class="discover-suggestions__copy">
-              Ranked by overlap across the artists you already follow, with shared matches pushed toward the top.
+              Ranked by overlap across the artists you already monitor, with shared matches pushed toward the top.
             </p>
           </div>
 
@@ -302,15 +356,15 @@ function buildArtistLocation(artist) {
               :key="suggestion.id"
               :artist="{ id: suggestion.id, name: suggestion.name }"
               :artwork="getArtistArtwork(suggestion.id)"
-              :badge="suggestion.seedCount > 1 ? `${suggestion.seedCount} seed match` : 'Suggested'"
+              :badge="suggestion.seedCount > 1 ? `${suggestion.seedCount} profile match` : 'Suggested'"
               :badge-tone="suggestion.seedCount > 1 ? 'success' : 'info'"
               :meta-text="buildSuggestionMeta(suggestion)"
               :supporting-text="buildSuggestionSupport(suggestion)"
-              :monitored="isFollowedArtist(suggestion.id)"
+              :monitored="isAddedArtist(suggestion.id)"
               :monitoring="isMonitoring(suggestion.id)"
-              :disabled="isFollowedArtist(suggestion.id)"
+              :disabled="isAddedArtist(suggestion.id)"
               :to="buildArtistLocation(suggestion)"
-              @monitor="handleMonitor"
+              @add="openAddArtistModal"
             />
           </div>
         </section>
@@ -353,7 +407,7 @@ function buildArtistLocation(artist) {
     <article v-else-if="isSearching" class="hx-card discover-loading-card" aria-live="polite" aria-busy="true">
       <div class="hx-card-body">
         <p class="discover-loading-card__title">Searching artist catalog...</p>
-        <p class="discover-loading-card__body">Matching artists and artwork coverage are being prepared for follow actions.</p>
+        <p class="discover-loading-card__body">Matching artists and artwork coverage are being prepared for add actions.</p>
       </div>
     </article>
 
@@ -377,7 +431,7 @@ function buildArtistLocation(artist) {
         <div>
           <h2 class="hx-card-title">Search results</h2>
           <p class="hx-card-subtitle">
-            Direct catalog matches stay separate from recommendations so you can follow with intent.
+            Direct catalog matches stay separate from recommendations so you can add with intent.
           </p>
         </div>
       </header>
@@ -389,15 +443,15 @@ function buildArtistLocation(artist) {
             :key="artist.id"
             :artist="artist"
             :artwork="getArtistArtwork(artist.id)"
-            :badge="isFollowedArtist(artist.id) ? 'Already followed' : 'Search match'"
-            :badge-tone="isFollowedArtist(artist.id) ? 'success' : 'info'"
+            :badge="isAddedArtist(artist.id) ? 'Already monitored' : 'Search match'"
+            :badge-tone="isAddedArtist(artist.id) ? 'success' : 'info'"
             :meta-text="buildResultMeta(artist)"
             :supporting-text="buildResultSupport(artist)"
-            :monitored="isFollowedArtist(artist.id)"
+            :monitored="isAddedArtist(artist.id)"
             :monitoring="isMonitoring(artist.id)"
-            :disabled="isFollowedArtist(artist.id)"
+            :disabled="isAddedArtist(artist.id)"
             :to="buildArtistLocation(artist)"
-            @monitor="handleMonitor"
+            @add="openAddArtistModal"
           />
         </div>
       </div>

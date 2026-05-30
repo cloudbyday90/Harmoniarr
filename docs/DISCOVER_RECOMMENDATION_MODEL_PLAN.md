@@ -1,7 +1,7 @@
 # Discover Recommendation Model Plan
 
-Status: Draft
-Last updated: 2026-05-25
+Status: Accepted platform direction, implementation in progress
+Last updated: 2026-05-30
 Owner: Product + app architecture
 
 ## Purpose
@@ -39,6 +39,21 @@ In plain terms:
 - `Discover` is where the operator evaluates recommendations and new candidates
 - monitored artists are the default input set for recommendations
 - Discover should not ask the user to manage a second persistent "seed" list
+
+## Current Implementation State
+
+As of 2026-05-30, the backend has moved past the original draft architecture in several important areas:
+
+- operator-scoped policy tables now exist for artist monitoring, release-group selection, track overrides, and reconciliation snapshots
+- artist-detail save orchestration persists policy and selection state through modular ESM services
+- save-triggered reconciliation is queued through the existing operation-run system and coalesces repeated saves for the same operator and artist
+- the older `metadata_artist_monitoring` table still exists for legacy read paths and compatibility during transition
+
+The remaining product/design gap is primarily on the Home and artist-detail client surfaces:
+
+- Discover now has the `+` add affordance and compact `Add artist` policy modal wired to operator policy save
+- Home cards still need the policy, coverage, progress, and activity summary treatment
+- artist detail still needs the draft editing, `Save` / `Cancel`, and override visibility experience
 
 ## Locked Design Choices
 
@@ -119,7 +134,7 @@ The following design choices are considered locked unless a later design review 
 - Harmoniarr should be designed as an automation-first system.
 - Admin-managed artist monitoring should naturally feed automated workflows.
 - Auto-approved user requests fit the same product philosophy.
-- Exact default values for the add modal are still open, but the overall posture should favor automation rather than passive observation.
+- The first-pass add modal should favor future-oriented automation while avoiding surprise historical backfill.
 
 ## Canonical Terms
 
@@ -196,21 +211,22 @@ Discover should not communicate:
 
 ## Monitoring Mechanism
 
-`Monitor` in Discover should be the durable promotion action into the operator's working set.
+Adding an artist from Discover should be the durable promotion action into the operator's working set.
 
 Mechanically, that means:
 
 1. The operator evaluates an artist in Discover.
-2. The operator clicks `Monitor`.
-3. The artist is added to the canonical monitored artist profile.
-4. The artist appears in `Home` immediately.
-5. The artist becomes part of the recommendation basis immediately.
-6. Background metadata, release detection, and downstream acquisition workflows continue asynchronously.
+2. The operator clicks the `+` action.
+3. The operator confirms initial policy in the `Add artist` modal.
+4. The artist is added to the canonical monitored artist profile.
+5. The artist appears in `Home` immediately.
+6. The artist becomes part of the recommendation basis immediately.
+7. Background metadata, release detection, and downstream acquisition workflows continue asynchronously.
 
 Important distinction:
 
-- `Monitor` does not mean `download now`
-- `Monitor` means `start tracking this artist operationally`
+- `Add artist` does not mean `download now`
+- `Add artist` means `start tracking this artist operationally with the selected policy`
 
 This keeps Discover as an evaluation surface while Home remains the canonical surface for what the operator has actually committed to managing.
 
@@ -306,7 +322,7 @@ Recommended options:
 Interpretation:
 
 - `Track only`
-  Monitor the artist, but do not automatically mark releases as wanted.
+  Track the artist, but do not automatically mark releases as wanted.
 - `Future releases only`
   Only new releases from this point forward are eligible for automation.
 - `Current and future releases`
@@ -391,7 +407,7 @@ This is intentionally modeled after the official *Arr pattern:
 | Content to track | Checkbox group | Albums, EPs, Singles | Albums + EPs | Gives operators immediate control over release-type breadth without requiring them to manage every release manually after add. |
 | Release scope | Dropdown | Track only, Future releases only, Current and future releases | Future releases only | Makes the automation scope explicit and avoids surprising catalog-wide backfill by default. |
 | Acquisition profile | Dropdown | Balanced library, Lossless archive, Apple friendly portable, Storage saver | Balanced library | Exposes quality/format intent through understandable presets instead of raw codec controls. |
-| Wanted automation | Dropdown | Do not mark wanted automatically, Mark future matching releases as wanted, Mark current and future matching releases as wanted | Do not mark wanted automatically | Keeps monitoring distinct from aggressive acquisition and makes operator intent explicit. |
+| Wanted automation | Dropdown | Do not mark wanted automatically, Mark future matching releases as wanted, Mark current and future matching releases as wanted | Mark future matching releases as wanted | Keeps monitoring distinct from aggressive historical backfill while preserving Harmoniarr's automation-first posture. |
 | Search now | Checkbox | On or Off | Off | Mirrors the official *Arr “start search for missing” pattern and lets operators opt into immediate backfill searches deliberately. |
 | Use these settings next time | Checkbox | On or Off | On | Supports a fast operator workflow similar to Sonarr/Radarr without hiding the chosen policy. |
 
@@ -421,7 +437,7 @@ These all create more power, but they also make the add flow heavier and harder 
 
 ## Default Policy Guidance
 
-The suggested defaults above are intentionally conservative.
+The suggested defaults above are intentionally future-oriented rather than historical-backfill-oriented.
 
 Recommended default behavior:
 
@@ -429,7 +445,7 @@ Recommended default behavior:
 - sync artist metadata and releases
 - track albums and EPs
 - watch future releases by default
-- do not immediately mark all matching releases as wanted
+- mark future matching releases as wanted by default
 - do not automatically trigger a historical search unless the operator explicitly asks for it
 
 This keeps the first add experience transparent and safe while still letting operators broaden scope later from the artist detail surface.
@@ -1092,7 +1108,7 @@ A request:
 - may come from a requester
 - may come from an operator acting on behalf of another user
 - should remain explicit and auditable
-- should not be silently created by Discover's `Monitor` action
+- should not be silently created by Discover's `Add artist` action
 
 ### Desired Track Domain
 
@@ -1109,12 +1125,12 @@ This is not the same as:
 
 Desired tracks should act as precision-level acquisition rules or overrides rather than replacing either monitoring or requests.
 
-## Relationship Between Monitor, Request, and Desired Tracks
+## Relationship Between Adding, Requests, And Desired Tracks
 
 These concepts should answer different product questions.
 
-- `Monitor`
-  What should Harmoniarr keep watching?
+- `Add artist`
+  What should Harmoniarr start watching under operator policy?
 - `Request`
   What does a person explicitly want?
 - `Desired tracks`
@@ -1155,11 +1171,11 @@ The more correct model is:
 - policy is saved
 - automation follows from that saved state
 
-## Immediate vs Deferred Effects of Monitoring
+## Immediate vs Deferred Effects Of Adding An Artist
 
 ### Immediate Effects
 
-When the operator clicks `Monitor` in Discover:
+When the operator confirms `Add artist` in Discover:
 
 - monitored state is persisted
 - the artist appears in Home immediately
@@ -1451,7 +1467,7 @@ The redesign should be considered complete when all of the following are true:
 5. Monitoring an artist updates both Home and Discover consistently.
 6. Refreshing Discover preserves the monitored-artist basis immediately.
 7. Recommendation cards explain their relationship to the monitored profile.
-8. `Monitor` in Discover is clearly understood as an operational tracking action, not a request action.
+8. `Add artist` in Discover is clearly understood as an operational tracking action, not a request action.
 9. The product model distinguishes monitoring, requests, and desired-track intent explicitly.
 10. The add action in Discover is compact, transparent, and does not feel over-engineered.
 11. The add modal gives operators meaningful content, scope, quality-profile, and wanted-automation choices.
@@ -1464,7 +1480,9 @@ The redesign should be considered complete when all of the following are true:
 18. Broad section policy and local manual overrides can coexist without hiding exceptions.
 19. `Save` creates one artist-level reconciliation job and avoids duplicate queueing against known queue or history state.
 
-## Open Decisions
+## Resolved Decisions And Remaining Open Items
+
+Most decisions in this section are now accepted platform direction. Items marked `later` are intentionally deferred rather than undecided.
 
 ### Decision 1: Should Discover use all monitored artists by default?
 
@@ -1498,11 +1516,12 @@ Recommendation:
 
 ### Decision 4: How automatic should acquisition be for monitored artists?
 
-Recommendation:
+Decision:
 
 - monitoring should create observation plus eligibility for automation
 - request creation should remain explicit
 - desired-track rules should remain a separate precision mechanism
+- first-pass defaults should allow future matching releases to become wanted, but should not trigger historical search unless explicitly requested
 
 This means the product still needs a clear policy boundary for when monitored releases become wanted or downloadable.
 
@@ -1514,6 +1533,7 @@ Recommended first-pass modal fields:
 - release scope
 - acquisition profile
 - wanted automation
+- search now
 - use these settings next time
 
 Deferred:
@@ -1538,7 +1558,11 @@ Reason:
 
 ### Decision 7: Should the `Save` workflow appear as one job or multiple jobs?
 
-Recommendation:
+Status:
+
+- resolved and implemented as one artist-level reconciliation run with internal orchestration
+
+Decision:
 
 - one artist-level job in the operator-facing UI
 - internal staged orchestration behind the scenes
@@ -1601,7 +1625,11 @@ Reason:
 
 ### Decision 11: What exact enum values should the new artist-level policy fields use?
 
-Recommendation:
+Status:
+
+- resolved and implemented in `operator_artist_monitoring`
+
+Decision:
 
 - define a complete first-pass policy vocabulary up front rather than growing ad hoc strings later
 - keep the enum set broad enough for current UX and likely near-term expansion
@@ -1637,7 +1665,7 @@ Recommended allowed values:
 Meaning:
 
 - `track_only`
-  Monitor and sync metadata, but do not automatically widen desired state beyond explicit manual selection
+  Track and sync metadata, but do not automatically widen desired state beyond explicit manual selection
 - `future_only`
   Treat future matching releases as eligible for automation based on the rest of policy
 - `current_and_future`
@@ -1708,7 +1736,11 @@ Reason:
 
 ### Decision 12: Should release-level persistence be keyed to release groups, canonical releases, or both?
 
-Recommendation:
+Status:
+
+- resolved and partially implemented through `operator_release_group_selection` and `operator_track_override`
+
+Decision:
 
 - use both, with different responsibilities
 
@@ -1797,7 +1829,11 @@ Reason:
 
 ### Decision 14: Is monitoring global per artist or operator-scoped?
 
-Recommendation:
+Status:
+
+- resolved and implemented as operator-scoped policy in `operator_artist_monitoring`
+
+Decision:
 
 - operator-scoped policy and desired state
 - shared backend media/storage layer where overlap exists
@@ -1863,7 +1899,11 @@ The first implementation pass can keep the user-facing action simple as long as 
 
 ### Decision 17: How should partial track intent be normalized when releases change?
 
-Recommendation:
+Status:
+
+- resolved and partially implemented through `operator_track_override`
+
+Decision:
 
 - persist both the recording identity and the release-track identity
 - treat the recording as the semantic song identity
@@ -2051,34 +2091,31 @@ Likely server touch points:
 
 ### Database / Migration Impact
 
-The current `metadata_artist_monitoring` table is too small for the new model.
+The current implementation has already introduced the first-pass operator-scoped schema instead of extending `metadata_artist_monitoring`.
 
-Current persisted monitoring fields are effectively:
+Implemented canonical tables:
 
-- `is_monitored`
-- `monitored_release_group_types`
-- timestamps / attribution
+1. `operator_artist_monitoring`
+   - operator-scoped broad artist policy
+   - includes `release_scope`, `acquisition_profile_key`, `wanted_automation_mode`, `search_on_add_mode`, and `selection_source_mode`
 
-Expected first-pass schema additions:
+2. `operator_release_group_selection`
+   - operator-scoped release-group selection state
+   - persists `unselected`, `selected`, and `partial`
 
-1. Extend `metadata_artist_monitoring` with artist-level policy fields such as:
-   - `release_scope`
-   - `acquisition_profile_key`
-   - `wanted_automation_mode`
-   - optional `search_on_add`
+3. `operator_track_override`
+   - operator-scoped partial-track intent
+   - stores both release context and track / recording identity where available
 
-2. Add a release-selection table for artist-specific release overrides, for example:
-   - one row per artist/release-group or artist/release selection
-   - persisted selection state (`unselected`, `selected`, `partial`)
-   - counts / timestamps as needed
+4. `operator_artist_reconciliation_snapshot`
+   - immutable saved snapshot used by background reconciliation
+   - supports queued follow-up replacement after repeated saves
 
-3. Add a track-selection override table for partial releases:
-   - one row per artist/release/track override
-   - only needed when a release is no longer fully inherited from broad policy
+Still needed:
 
-4. Optionally add saved default-policy storage if defaults should persist beyond one browser session:
-   - likely per operator / per app user
-   - can live in existing user-preference storage if that model already fits
+- move remaining legacy read paths off `metadata_artist_monitoring` or place a compatibility projection in front of them
+- decide where saved add-artist defaults live, likely per-operator preference storage
+- add `operator_library_item_access` or an equivalent access-link table before destructive delete semantics are exposed
 
 Recommended persistence direction:
 
@@ -2116,7 +2153,7 @@ Recommended columns:
 - `id UUID PRIMARY KEY`
 - `app_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE`
 - `metadata_artist_id UUID NOT NULL REFERENCES metadata_artists(id) ON DELETE CASCADE`
-- `is_monitored BOOLEAN NOT NULL DEFAULT TRUE`
+- `is_monitored BOOLEAN NOT NULL DEFAULT FALSE`
 - `monitored_release_group_types TEXT[] NOT NULL`
 - `release_scope TEXT NOT NULL`
 - `wanted_automation_mode TEXT NOT NULL`
@@ -2140,8 +2177,8 @@ Recommended indexes:
 
 Direction note:
 
-- this likely supersedes the current global `metadata_artist_monitoring` table
-- if compatibility is needed during migration, the current table can be phased into a summary/projection role before removal
+- this supersedes the current global `metadata_artist_monitoring` table as the canonical policy model
+- compatibility is still needed while older read paths depend on the global table shape
 
 2. `operator_release_group_selection`
 
@@ -2431,22 +2468,23 @@ Use this section for incremental updates during implementation.
 - 2026-05-25: Selection model clarified. Artist detail should support section, release, and track hierarchy with `Unselected`, `Selected`, and `Partial` release states, plus bulk operations that update draft state only.
 - 2026-05-25: Home card direction clarified. Cards should emphasize identity, policy summary, coverage/progress, and lightweight activity state rather than dense detail.
 - 2026-05-25: High-level design choices locked. Discover is the add surface, Home is the canonical monitored surface, artist detail is the deep curation surface, `Save` triggers background reevaluation, and Home cards should summarize catalog progress and coverage.
+- 2026-05-30: Plan aligned with implementation. Operator-scoped policy, release selection, track override, reconciliation snapshot tables, and save-triggered reconciliation services now exist; remaining work is centered on Discover/Home/artist-detail client surfaces and legacy monitoring read-path migration.
 
 ## Checklist
 
 - [ ] Phase 1 terminology pass complete
-- [ ] Discover recommendation-basis copy updated
+- [x] Discover recommendation-basis copy updated
 - [ ] Home monitored-profile copy updated
 - [ ] No user-facing seed language remains
 - [ ] Discover recommendation cards show monitored vs recommended correctly
 - [ ] Browser regression test covers refresh after monitoring multiple artists
-- [ ] Discover `Monitor` action is explicitly documented and implemented as promotion into Home's monitored profile
-- [ ] Monitoring vs request vs desired-track intent is reflected in product language
-- [ ] Add-artist modal field set is finalized for first implementation pass
-- [ ] Add-artist modal defaults strategy is finalized
-- [ ] Artist detail `Save` / `Cancel` contract is finalized
-- [ ] Desired-state changes vs delete behavior is finalized
-- [ ] Home artist card v1 content and layout is finalized
-- [ ] Save-triggered background orchestration contract is finalized
+- [x] Discover `Add artist` action is implemented as promotion into Home's monitored profile
+- [x] Monitoring vs request vs desired-track intent is reflected in product language
+- [x] Add-artist modal field set is finalized for first implementation pass
+- [x] Add-artist modal defaults strategy is finalized
+- [x] Artist detail `Save` / `Cancel` contract is finalized
+- [x] Desired-state changes vs delete behavior is finalized
+- [x] Home artist card v1 content and layout is finalized
+- [x] Save-triggered background orchestration contract is finalized
 - [ ] Internal naming cleanup evaluated
 - [ ] Follow-up scoring/explainability work planned
