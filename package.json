@@ -32,6 +32,7 @@
     "check:migration-id-policy": "node scripts/check-migration-id-policy.js",
     "check:migrations": "node dist/server/check-migrations.js",
     "check:migration-checksums": "node dist/server/check-migration-checksums.js",
+    "check:schema-anchors": "node scripts/check-schema-anchors.js",
     "check:schema-snapshot": "node scripts/check-schema-snapshot.js",
     "check:test-hygiene": "node scripts/check-test-hygiene.js",
     "db:check-schema": "node scripts/check-database-schema.js",

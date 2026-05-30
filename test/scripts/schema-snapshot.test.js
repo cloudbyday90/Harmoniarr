@@ -87,10 +87,15 @@ test('checkDatabaseBackedSchema verifies source database, committed snapshot, an
       calls.push('bootstrap');
       return { appliedCount: 2, migrationCount: 2 };
     },
+    validateSchemaAnchorsAgainstSnapshotFn: async () => {
+      calls.push('anchors');
+      return { anchorCount: 3 };
+    },
   });
 
-  assert.deepEqual(calls, ['database', 'snapshot', 'bootstrap']);
+  assert.deepEqual(calls, ['database', 'snapshot', 'bootstrap', 'anchors']);
   assert.equal(result.databaseState.current, true);
   assert.equal(result.snapshot.migrationCount, 2);
   assert.equal(result.bootstrap.appliedCount, 2);
+  assert.equal(result.anchors.anchorCount, 3);
 });

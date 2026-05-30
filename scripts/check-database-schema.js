@@ -12,11 +12,12 @@ import { checkDatabaseBackedSchema } from './schema-snapshot.js';
 
 await runMigrationCli({
   prefix: 'harmoniarr-check-database-schema',
-  renderSuccessMessage: ({ bootstrap, databaseState, snapshot }) => {
+  renderSuccessMessage: ({ anchors, bootstrap, databaseState, snapshot }) => {
     return [
       `source database current (${formatDatabaseMigrationStateSummary(databaseState)})`,
       `committed snapshot current at ${snapshot.snapshotPath} (${snapshot.migrationCount} migration(s))`,
       `fresh snapshot bootstrap valid (${bootstrap.appliedCount}/${bootstrap.migrationCount} migrations applied)`,
+      `critical anchors match (${anchors.anchorCount} anchor(s))`,
     ].join('; ');
   },
   run: checkDatabaseBackedSchema,

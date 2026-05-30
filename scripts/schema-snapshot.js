@@ -12,6 +12,7 @@ import { loadMigrationManifest } from '../src/server/migration-manifest.js';
 import { assertDatabaseMigrationStateCurrent } from '../src/server/schema-migration-state-service.js';
 import { schemaIdFunctionSql, schemaIdPgcryptoSql } from '../src/server/schema-id-function.js';
 import { schemaMigrationsTableSql } from '../src/server/schema-migration-store.js';
+import { validateSchemaAnchorsAgainstSnapshot } from './schema-anchor-validation.js';
 import { validateSchemaBootstrap } from './schema-bootstrap-validation.js';
 
 export const schemaSnapshotPath = resolve(process.cwd(), 'src/server/schema-snapshot.sql');
@@ -152,13 +153,16 @@ export async function updateSchemaSnapshot({
 export async function checkDatabaseBackedSchema({
   assertDatabaseMigrationStateCurrentFn = assertDatabaseMigrationStateCurrent,
   checkSchemaSnapshotFn = checkSchemaSnapshot,
+  validateSchemaAnchorsAgainstSnapshotFn = validateSchemaAnchorsAgainstSnapshot,
   validateSchemaBootstrapFn = validateSchemaBootstrap,
 } = {}) {
   const databaseState = await assertDatabaseMigrationStateCurrentFn();
   const snapshot = await checkSchemaSnapshotFn();
   const bootstrap = await validateSchemaBootstrapFn();
+  const anchors = await validateSchemaAnchorsAgainstSnapshotFn();
 
   return {
+    anchors,
     bootstrap,
     databaseState,
     snapshot,
