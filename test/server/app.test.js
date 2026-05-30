@@ -21,6 +21,9 @@ suite('createApp', () => {
   const authModule = { routeDependencies: { auth: 'deps' } };
   const importCandidateModule = { routeDependencies: { importCandidates: 'deps' } };
   const libraryModule = {
+    libraryDiscoveryRequestService: {
+      reconcileDiscoveryRequests: t.mock.fn(async () => {}),
+    },
     libraryWantedReleaseStore: { replaceLibraryWantedReleases: async () => {}, listLibraryWantedReleases: async () => [] },
     libraryWantedReleaseService: {
       reconcileWantedReleases: t.mock.fn(async () => {}),
@@ -481,6 +484,9 @@ suite('createApp', () => {
     }),
     createImportCandidateModule: () => ({ routeDependencies: {} }),
     createLibraryModule: () => ({
+      libraryDiscoveryRequestService: {
+        reconcileDiscoveryRequests: async () => {},
+      },
       libraryWantedReleaseService: {
         reconcileWantedReleases: async () => {},
       },

@@ -9,8 +9,10 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadMigrationManifest } from '../src/server/migration-manifest.js';
+import { assertDatabaseMigrationStateCurrent } from '../src/server/schema-migration-state-service.js';
 import { schemaIdFunctionSql, schemaIdPgcryptoSql } from '../src/server/schema-id-function.js';
 import { schemaMigrationsTableSql } from '../src/server/schema-migration-store.js';
+import { validateSchemaBootstrap } from './schema-bootstrap-validation.js';
 
 export const schemaSnapshotPath = resolve(process.cwd(), 'src/server/schema-snapshot.sql');
 
@@ -134,8 +136,31 @@ export async function checkSchemaSnapshot() {
   return expected;
 }
 
-export async function updateSchemaSnapshot() {
+export async function updateSchemaSnapshot({
+  assertDatabaseMigrationStateCurrentFn = assertDatabaseMigrationStateCurrent,
+  writeFileFn = writeFile,
+} = {}) {
+  const databaseState = await assertDatabaseMigrationStateCurrentFn();
   const expected = await buildExpectedSchemaSnapshot();
-  await writeFile(schemaSnapshotPath, expected.content, 'utf8');
-  return expected;
+  await writeFileFn(schemaSnapshotPath, expected.content, 'utf8');
+  return {
+    ...expected,
+    databaseState,
+  };
+}
+
+export async function checkDatabaseBackedSchema({
+  assertDatabaseMigrationStateCurrentFn = assertDatabaseMigrationStateCurrent,
+  checkSchemaSnapshotFn = checkSchemaSnapshot,
+  validateSchemaBootstrapFn = validateSchemaBootstrap,
+} = {}) {
+  const databaseState = await assertDatabaseMigrationStateCurrentFn();
+  const snapshot = await checkSchemaSnapshotFn();
+  const bootstrap = await validateSchemaBootstrapFn();
+
+  return {
+    bootstrap,
+    databaseState,
+    snapshot,
+  };
 }

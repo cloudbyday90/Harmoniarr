@@ -21,8 +21,59 @@ permissions:
   contents: read
 
 jobs:
+  validate-schema:
+    name: Validate Schema Snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: harmoniarr
+          POSTGRES_PASSWORD: harmoniarr
+          POSTGRES_USER: harmoniarr
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U harmoniarr -d harmoniarr"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - name: Install root dependencies
+        run: npm ci
+      - name: Build server migration tools
+        run: npm run build:server
+      - name: Prepare source database
+        run: npm run prepare:database
+        env:
+          PGDATABASE: harmoniarr
+          PGHOST: 127.0.0.1
+          PGMAINTENANCE_DB: postgres
+          PGPASSWORD: harmoniarr
+          PGPORT: 5432
+          PGUSER: harmoniarr
+      - name: Check database-backed schema snapshot
+        run: npm run db:check-schema
+        env:
+          PGDATABASE: harmoniarr
+          PGHOST: 127.0.0.1
+          PGMAINTENANCE_DB: postgres
+          PGPASSWORD: harmoniarr
+          PGPORT: 5432
+          PGUSER: harmoniarr
+
   validate:
     name: Validate Repository
+    needs: validate-schema
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:

@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   assertSchemaSnapshotCurrent,
+  checkDatabaseBackedSchema,
   renderSchemaSnapshot,
   schemaSnapshotPath,
+  updateSchemaSnapshot,
 } from '../../scripts/schema-snapshot.js';
 
 test('renderSchemaSnapshot emits deterministic bootstrap SQL from the accepted migration lineage', () => {
@@ -45,4 +47,50 @@ test('assertSchemaSnapshotCurrent rejects stale snapshots with update guidance',
     }),
     /Schema snapshot is stale .* Run npm run update:schema-snapshot\./,
   );
+});
+
+test('updateSchemaSnapshot verifies source database migration state before writing', async () => {
+  const calls = [];
+
+  const result = await updateSchemaSnapshot({
+    assertDatabaseMigrationStateCurrentFn: async () => {
+      calls.push('database');
+      return { current: true };
+    },
+    writeFileFn: async (path, content, encoding) => {
+      calls.push({ content, encoding, path });
+    },
+  });
+
+  assert.equal(calls[0], 'database');
+  assert.equal(calls[1].path, schemaSnapshotPath);
+  assert.equal(calls[1].encoding, 'utf8');
+  assert.match(calls[1].content, /-- Harmoniarr schema snapshot/);
+  assert.equal(result.databaseState.current, true);
+  assert.ok(result.migrationCount > 0);
+  assert.equal(result.snapshotPath, schemaSnapshotPath);
+});
+
+test('checkDatabaseBackedSchema verifies source database, committed snapshot, and fresh bootstrap', async () => {
+  const calls = [];
+
+  const result = await checkDatabaseBackedSchema({
+    assertDatabaseMigrationStateCurrentFn: async () => {
+      calls.push('database');
+      return { current: true };
+    },
+    checkSchemaSnapshotFn: async () => {
+      calls.push('snapshot');
+      return { migrationCount: 2, snapshotPath: 'schema.sql' };
+    },
+    validateSchemaBootstrapFn: async () => {
+      calls.push('bootstrap');
+      return { appliedCount: 2, migrationCount: 2 };
+    },
+  });
+
+  assert.deepEqual(calls, ['database', 'snapshot', 'bootstrap']);
+  assert.equal(result.databaseState.current, true);
+  assert.equal(result.snapshot.migrationCount, 2);
+  assert.equal(result.bootstrap.appliedCount, 2);
 });

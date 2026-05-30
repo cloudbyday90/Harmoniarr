@@ -6,10 +6,10 @@
  * See LICENSE file for details.
  */
 
-import { runDirectScriptTask } from './script-runtime.js';
+import { runMigrationCli } from '../src/server/migration-cli-runtime.js';
 import { updateSchemaSnapshot } from './schema-snapshot.js';
 
-await runDirectScriptTask(import.meta, {
+await runMigrationCli({
   prefix: 'harmoniarr-update-schema-snapshot',
   renderSuccessMessage: ({ migrationCount, snapshotPath }) => {
     return `Updated schema snapshot at ${snapshotPath} from ${migrationCount} migration(s)`;
