@@ -74,6 +74,68 @@ const musicHasTheRightToChildren = {
   title: 'Music Has the Right to Children',
 };
 
+const musicHasTheRightToChildrenRelease = {
+  country: 'GB',
+  id: 'metadata-release-mhtrtc',
+  isCanonical: true,
+  mediumCount: 1,
+  musicbrainzReleaseId: musicHasTheRightToChildren.id,
+  releaseDate: musicHasTheRightToChildren.date,
+  status: 'Official',
+  title: musicHasTheRightToChildren.title,
+  trackCount: 3,
+};
+
+const musicHasTheRightToChildrenMedia = [
+  {
+    format: 'CD',
+    position: 1,
+    title: null,
+    trackCount: 3,
+    tracks: [
+      {
+        artistCredit: 'Boards of Canada',
+        isOwned: true,
+        lengthMs: 301000,
+        numberText: '1',
+        position: 1,
+        recordingMbid: 'mb-recording-wildlife-analysis',
+        title: 'Wildlife Analysis',
+      },
+      {
+        artistCredit: 'Boards of Canada',
+        isOwned: false,
+        lengthMs: 143000,
+        numberText: '2',
+        position: 2,
+        recordingMbid: 'mb-recording-an-eagle-in-your-mind',
+        title: 'An Eagle in Your Mind',
+      },
+      {
+        artistCredit: 'Boards of Canada',
+        isOwned: false,
+        lengthMs: 153000,
+        numberText: '3',
+        position: 3,
+        recordingMbid: 'mb-recording-roygbiv',
+        title: 'Roygbiv',
+      },
+    ],
+  },
+];
+
+const geogaddiRelease = {
+  country: 'GB',
+  id: 'metadata-release-geogaddi',
+  isCanonical: true,
+  mediumCount: 1,
+  musicbrainzReleaseId: 'mb-release-geogaddi',
+  releaseDate: '2002-11-18',
+  status: 'Official',
+  title: 'Geogaddi',
+  trackCount: 1,
+};
+
 const metadataFixture = {
   artistSearchResults: {
     'boards of canada': [boardsOfCanadaArtist],
@@ -102,6 +164,11 @@ const metadataFixture = {
     },
     [buildArtworkKey('musicbrainz_release_group', musicHasTheRightToChildren.releaseGroup.id, 'cover_front')]: {
       assetId: 'asset-mhtrtc-rg',
+      dominantColor: { chroma: 0.1, hex: '#654224', hue: 62, lightness: 0.41 },
+      url: buildArtworkDataUri('MHTRTC', '#654224'),
+    },
+    [buildArtworkKey('musicbrainz_release', musicHasTheRightToChildren.id, 'cover_front')]: {
+      assetId: 'asset-mhtrtc-release',
       dominantColor: { chroma: 0.1, hex: '#654224', hue: 62, lightness: 0.41 },
       url: buildArtworkDataUri('MHTRTC', '#654224'),
     },
@@ -158,6 +225,80 @@ const metadataFixture = {
   releaseSearchResults: {
     'boards of canada': [musicHasTheRightToChildren],
     'music has the right to children': [musicHasTheRightToChildren],
+  },
+  tracklistsByReleaseGroupId: {
+    'mb-rg-geogaddi': {
+      allReleases: [geogaddiRelease],
+      media: [{
+        format: 'CD',
+        position: 1,
+        title: null,
+        trackCount: 1,
+        tracks: [{
+          artistCredit: 'Boards of Canada',
+          isOwned: false,
+          lengthMs: 384000,
+          numberText: '1',
+          position: 1,
+          recordingMbid: 'mb-recording-ready-lets-go',
+          title: 'Ready Lets Go',
+        }],
+      }],
+      ok: true,
+      ownership: null,
+      release: geogaddiRelease,
+      requestState: null,
+      source: 'local',
+    },
+    'mb-rg-mhtrtc': {
+      allReleases: [musicHasTheRightToChildrenRelease],
+      media: musicHasTheRightToChildrenMedia,
+      ok: true,
+      ownership: {
+        expectedTrackCount: 3,
+        matchedTrackCount: 1,
+        reconciliationStatus: 'partial',
+      },
+      release: musicHasTheRightToChildrenRelease,
+      requestState: null,
+      source: 'local',
+    },
+    'metadata-rg-geogaddi': {
+      allReleases: [geogaddiRelease],
+      media: [{
+        format: 'CD',
+        position: 1,
+        title: null,
+        trackCount: 1,
+        tracks: [{
+          artistCredit: 'Boards of Canada',
+          isOwned: false,
+          lengthMs: 384000,
+          numberText: '1',
+          position: 1,
+          recordingMbid: 'mb-recording-ready-lets-go',
+          title: 'Ready Lets Go',
+        }],
+      }],
+      ok: true,
+      ownership: null,
+      release: geogaddiRelease,
+      requestState: null,
+      source: 'local',
+    },
+    'metadata-rg-mhtrtc': {
+      allReleases: [musicHasTheRightToChildrenRelease],
+      media: musicHasTheRightToChildrenMedia,
+      ok: true,
+      ownership: {
+        expectedTrackCount: 3,
+        matchedTrackCount: 1,
+        reconciliationStatus: 'partial',
+      },
+      release: musicHasTheRightToChildrenRelease,
+      requestState: null,
+      source: 'local',
+    },
   },
 };
 
@@ -246,9 +387,8 @@ export async function installMetadataBrowserFixtures(browserContext) {
         const explicitSelection = explicitSelections.get(releaseGroup.id) ?? null;
         const selectedByPolicy = (monitoring.monitoredReleaseGroupTypes ?? [])
           .includes(normalizePrimaryType(releaseGroup.primaryType));
-        const trackOverrideCount = trackOverrides
-          .filter((override) => override.metadataReleaseGroupId === releaseGroup.id)
-          .length;
+        const releaseGroupTrackOverrides = trackOverrides
+          .filter((override) => override.metadataReleaseGroupId === releaseGroup.id);
 
         return {
           ...releaseGroup,
@@ -259,11 +399,15 @@ export async function installMetadataBrowserFixtures(browserContext) {
             selectionSource: explicitSelection?.selectionSource ?? 'policy',
             selectionState: explicitSelection?.selectionState ?? (selectedByPolicy ? 'selected' : 'unselected'),
             trackOverrideSummary: {
-              desiredCount: 0,
+              desiredCount: releaseGroupTrackOverrides
+                .filter((override) => override.isDesired === true)
+                .length,
               orphanedCount: 0,
               reviewNeededCount: 0,
-              suppressedCount: 0,
-              totalCount: trackOverrideCount,
+              suppressedCount: releaseGroupTrackOverrides
+                .filter((override) => override.isDesired === false)
+                .length,
+              totalCount: releaseGroupTrackOverrides.length,
             },
           },
         };
@@ -526,6 +670,20 @@ export async function installMetadataBrowserFixtures(browserContext) {
         });
       }
 
+      if (
+        method === 'GET'
+        && path.startsWith('/api/v1/metadata/musicbrainz/release-groups/')
+        && path.endsWith('/tracklist')
+      ) {
+        const releaseGroupId = decodeURIComponent(
+          path.slice('/api/v1/metadata/musicbrainz/release-groups/'.length, -'/tracklist'.length),
+        );
+        const tracklist = fixture.tracklistsByReleaseGroupId[releaseGroupId] ?? null;
+        if (tracklist) {
+          return buildJsonResponse(clone(tracklist));
+        }
+      }
+
       if (method === 'POST' && path === '/api/v1/artwork/resolve-batch') {
         const rawBody = init?.body
           ?? (typeof input === 'object' && input !== null && 'body' in input ? input.body : '{}');
@@ -575,5 +733,23 @@ export async function installMetadataBrowserFixtures(browserContext) {
 
   await browserContext.route(/^https:\/\/coverartarchive\.org\//, async (route) => {
     await route.abort();
+  });
+
+  await browserContext.route(/\/api\/v1\/metadata\/musicbrainz\/release-groups\/([^/]+)\/tracklist(?:\?.*)?$/, async (route) => {
+    const url = new URL(route.request().url());
+    const match = url.pathname.match(/\/api\/v1\/metadata\/musicbrainz\/release-groups\/([^/]+)\/tracklist$/);
+    const releaseGroupId = match ? decodeURIComponent(match[1]) : null;
+    const tracklist = releaseGroupId ? metadataFixture.tracklistsByReleaseGroupId[releaseGroupId] : null;
+
+    if (!tracklist) {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      body: JSON.stringify(tracklist),
+      contentType: 'application/json',
+      status: 200,
+    });
   });
 }

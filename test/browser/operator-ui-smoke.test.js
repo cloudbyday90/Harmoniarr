@@ -142,6 +142,16 @@ suite('browser operator workflow smoke coverage', () => {
       await page.getByRole('heading', { name: 'Discography' }).waitFor();
       await page.getByRole('heading', { name: 'Related artists' }).waitFor();
       await page.getByText('Music Has the Right to Children').waitFor();
+      await page.locator('.hx-media-card')
+        .filter({ hasText: 'Music Has the Right to Children' })
+        .first()
+        .click();
+      const releaseDetailDialog = page.getByRole('dialog', { name: 'Release detail' });
+      await releaseDetailDialog.getByText('Roygbiv').waitFor();
+      await releaseDetailDialog.getByLabel('Desired state for Roygbiv').selectOption('suppressed');
+      await releaseDetailDialog.getByText('Track overrides are saved with Artist Policy.').waitFor();
+      await releaseDetailDialog.getByRole('button', { name: 'Close' }).click();
+      await page.getByText('1 track override').waitFor();
       await page.getByLabel('Selection state for Geogaddi').selectOption('unselected');
       await page.getByText('Unsaved changes').waitFor();
       await page.getByRole('button', { name: 'Save policy' }).click();

@@ -29,6 +29,10 @@ import {
   formatAlbumRuntime,
   formatTrackDuration,
 } from '../../lib/track-duration.js';
+import {
+  canBuildDraftTrackOverride,
+  getDraftTrackOverrideState,
+} from '../../lib/operator-artist-detail-draft.js';
 
 /**
  * ReleaseDetailModal — full release detail modal with tracklist, edition
@@ -78,9 +82,29 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  /** Artist policy draft used for operator track override editing. */
+  operatorDraft: {
+    type: Object,
+    default: null,
+  },
+  /** Whether track override controls should be shown. */
+  operatorEditingEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  /** Whether track override controls are visible but disabled. */
+  operatorEditingDisabled: {
+    type: Boolean,
+    default: false,
+  },
+  /** Local release-group projection backing the active artist policy draft. */
+  operatorReleaseGroup: {
+    type: Object,
+    default: null,
+  },
 });
 
-const emit = defineEmits(['close', 'requested']);
+const emit = defineEmits(['close', 'requested', 'track-override-change']);
 
 const dialogRef = ref(null);
 const editionMenuOpen = ref(false);
@@ -170,11 +194,32 @@ const musicBrainzReleaseUrl = computed(() => {
   return `https://musicbrainz.org/release/${mbid}`;
 });
 
+const canEditTrackOverrides = computed(() =>
+  props.operatorEditingEnabled
+    && props.operatorDraft
+    && props.operatorReleaseGroup?.id,
+);
+
+const showTrackOverrideControls = computed(() =>
+  canEditTrackOverrides.value && media.value.some((medium) =>
+    (medium.tracks ?? []).some((track) => canBuildTrackOverride(medium, track)),
+  ),
+);
+
 // ── Modal lifecycle ───────────────────────────────────────────────────────────
 
+function openDialogSession() {
+  if (!dialogRef.value) return;
+  if (!dialogRef.value.open) dialogRef.value.showModal();
+  selectedForUserId.value = null;
+  requestError.value = null;
+  editionMenuOpen.value = false;
+  load(props.releaseGroupMbid, { preferReleaseMbid: props.preferReleaseMbid });
+}
+
 onMounted(() => {
-  if (props.open && dialogRef.value && !dialogRef.value.open) {
-    dialogRef.value.showModal();
+  if (props.open) {
+    openDialogSession();
   }
 });
 
@@ -183,16 +228,11 @@ watch(
   (isOpen) => {
     if (!dialogRef.value) return;
     if (isOpen) {
-      if (!dialogRef.value.open) dialogRef.value.showModal();
-      selectedForUserId.value = null;
-      requestError.value = null;
-      editionMenuOpen.value = false;
-      load(props.releaseGroupMbid, { preferReleaseMbid: props.preferReleaseMbid });
+      openDialogSession();
     } else {
       if (dialogRef.value.open) dialogRef.value.close();
     }
   },
-  { immediate: true },
 );
 
 // ── Event handlers ────────────────────────────────────────────────────────────
@@ -235,6 +275,43 @@ async function handleSetDefaultEdition(releaseRow) {
   await setDefaultEdition(props.releaseGroupMbid, releaseRow.id);
 }
 
+function buildTrackOverrideContext(medium) {
+  return {
+    mediumPosition: medium?.position ?? null,
+    metadataReleaseId: currentRelease.value?.id ?? null,
+  };
+}
+
+function canBuildTrackOverride(medium, track) {
+  return canBuildDraftTrackOverride(
+    props.operatorReleaseGroup,
+    track,
+    buildTrackOverrideContext(medium),
+  );
+}
+
+function getTrackOverrideState(medium, track) {
+  return getDraftTrackOverrideState(
+    props.operatorDraft,
+    props.operatorReleaseGroup,
+    track,
+    buildTrackOverrideContext(medium),
+  );
+}
+
+function getTrackOverrideLabel(track) {
+  return `Desired state for ${track?.title ?? 'track'}`;
+}
+
+function handleTrackOverrideChange(medium, track, event) {
+  emit('track-override-change', {
+    medium,
+    overrideState: event.target.value,
+    release: currentRelease.value,
+    releaseGroup: props.operatorReleaseGroup,
+    track,
+  });
+}
 </script>
 
 <template>
@@ -374,6 +451,11 @@ async function handleSetDefaultEdition(releaseRow) {
 
           <p v-if="canonicalError" class="rdm-error" role="alert">{{ canonicalError }}</p>
 
+          <div v-if="showTrackOverrideControls" class="rdm-operator-note" role="note">
+            <span class="hx-pill" data-tone="info">Draft</span>
+            Track overrides are saved with Artist Policy.
+          </div>
+
           <!-- ── Tracklist ───────────────────────────────────────────── -->
           <div v-if="media.length > 0" class="rdm-tracklist">
             <div
@@ -390,14 +472,26 @@ async function handleSetDefaultEdition(releaseRow) {
                   v-for="track in medium.tracks"
                   :key="track.position"
                   class="rdm-track"
-                  :class="{ 'is-owned': track.isOwned }"
-                >
+                  :class="{ 'has-track-override-controls': canEditTrackOverrides, 'is-owned': track.isOwned }"
+                  >
                   <span class="rdm-track-owned" aria-label="In library">
                     {{ track.isOwned ? '●' : '○' }}
                   </span>
                   <span class="rdm-track-num">{{ track.numberText ?? track.position }}</span>
                   <span class="rdm-track-title">{{ track.title }}</span>
                   <span class="rdm-track-duration">{{ formatTrackDuration(track.lengthMs) ?? '' }}</span>
+                  <select
+                    v-if="canEditTrackOverrides"
+                    class="hx-select rdm-track-override-select"
+                    :value="getTrackOverrideState(medium, track)"
+                    :disabled="operatorEditingDisabled || !canBuildTrackOverride(medium, track)"
+                    :aria-label="getTrackOverrideLabel(track)"
+                    @change="handleTrackOverrideChange(medium, track, $event)"
+                  >
+                    <option value="policy">Policy default</option>
+                    <option value="desired">Desired</option>
+                    <option value="suppressed">Suppressed</option>
+                  </select>
                 </li>
               </ol>
             </div>
@@ -536,6 +630,18 @@ async function handleSetDefaultEdition(releaseRow) {
   border-radius: var(--hx-radius-md);
 }
 
+.rdm-operator-note {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-2) var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface-muted);
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+}
+
 /* ── Action row ────────────────────────────────────────────────────────── */
 
 .rdm-action-row {
@@ -668,12 +774,16 @@ async function handleSetDefaultEdition(releaseRow) {
 
 .rdm-track {
   display: grid;
-  grid-template-columns: 1.2rem 2rem 1fr auto;
+  grid-template-columns: 1.2rem 2rem minmax(0, 1fr) auto;
   gap: var(--hx-space-2);
   align-items: center;
   padding: var(--hx-space-1) var(--hx-space-2);
   border-radius: var(--hx-radius-sm);
   font-size: var(--hx-text-sm);
+}
+
+.rdm-track.has-track-override-controls {
+  grid-template-columns: 1.2rem 2rem minmax(0, 1fr) auto auto;
 }
 
 .rdm-track.is-owned {
@@ -707,6 +817,11 @@ async function handleSetDefaultEdition(releaseRow) {
   color: var(--hx-text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.rdm-track-override-select {
+  min-width: 8.5rem;
+  font-size: var(--hx-text-xs);
 }
 
 /* ── Misc ──────────────────────────────────────────────────────────────── */
@@ -756,6 +871,16 @@ async function handleSetDefaultEdition(releaseRow) {
 
   .rdm-body {
     padding: var(--hx-space-4);
+  }
+
+  .rdm-track,
+  .rdm-track.has-track-override-controls {
+    grid-template-columns: 1rem 1.8rem minmax(0, 1fr) auto;
+  }
+
+  .rdm-track-override-select {
+    grid-column: 3 / -1;
+    width: 100%;
   }
 }
 </style>

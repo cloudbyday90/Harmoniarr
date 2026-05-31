@@ -29,6 +29,19 @@ const defaultMonitoring = Object.freeze({
 });
 
 const selectableStates = new Set(['unselected', 'selected', 'partial']);
+const trackOverrideStates = new Set(['policy', 'desired', 'suppressed']);
+
+function normalizeNullableString(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeNullablePositiveInteger(value) {
+  if (value == null || value === '') return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
 function normalizeMonitoring(monitoring = {}) {
   const normalizedPolicy = normalizeAddArtistPolicyForm({
@@ -75,6 +88,57 @@ function normalizeTrackOverride(override = {}) {
     trackPosition: override.trackPosition ?? null,
     trackTitleSnapshot: override.trackTitleSnapshot ?? null,
   };
+}
+
+function buildDraftTrackOverrideIdentity(releaseGroup, track, context = {}) {
+  const metadataReleaseGroupId = normalizeNullableString(releaseGroup?.id ?? context.metadataReleaseGroupId);
+  const trackMbid = normalizeNullableString(
+    track?.trackMbid ?? track?.musicbrainzTrackId ?? track?.musicbrainzTrackMbid,
+  );
+  const recordingMbid = normalizeNullableString(track?.recordingMbid ?? context.recordingMbid);
+  const mediumPosition = normalizeNullablePositiveInteger(context.mediumPosition ?? track?.mediumPosition);
+  const trackPosition = normalizeNullablePositiveInteger(context.trackPosition ?? track?.position);
+
+  if (!metadataReleaseGroupId) {
+    return null;
+  }
+
+  if (!trackMbid && (!recordingMbid || mediumPosition == null || trackPosition == null)) {
+    return null;
+  }
+
+  return {
+    mediumPosition,
+    metadataReleaseGroupId,
+    metadataReleaseId: normalizeNullableString(context.metadataReleaseId),
+    recordingMbid,
+    trackMbid,
+    trackPosition,
+  };
+}
+
+function isSameTrackOverrideIdentity(override, identity) {
+  if (!override || !identity || override.metadataReleaseGroupId !== identity.metadataReleaseGroupId) {
+    return false;
+  }
+
+  if (identity.trackMbid) {
+    return override.trackMbid === identity.trackMbid;
+  }
+
+  return (override.trackMbid ?? null) === null
+    && override.recordingMbid === identity.recordingMbid
+    && override.mediumPosition === identity.mediumPosition
+    && override.trackPosition === identity.trackPosition
+    && (override.metadataReleaseId ?? null) === (identity.metadataReleaseId ?? null);
+}
+
+function findDraftTrackOverrideIndex(draft, releaseGroup, track, context = {}) {
+  const identity = buildDraftTrackOverrideIdentity(releaseGroup, track, context);
+  if (!identity) return -1;
+
+  return (draft?.trackOverrides ?? [])
+    .findIndex((override) => isSameTrackOverrideIdentity(override, identity));
 }
 
 export function createOperatorArtistDetailDraft(projection = {}) {
@@ -131,6 +195,47 @@ export function setDraftReleaseGroupSelectionState(draft, releaseGroup, selectio
   return draft;
 }
 
+export function canBuildDraftTrackOverride(releaseGroup, track, context = {}) {
+  return buildDraftTrackOverrideIdentity(releaseGroup, track, context) !== null;
+}
+
+export function getDraftTrackOverrideState(draft, releaseGroup, track, context = {}) {
+  const overrideIndex = findDraftTrackOverrideIndex(draft, releaseGroup, track, context);
+  if (overrideIndex < 0) return 'policy';
+  return draft.trackOverrides[overrideIndex].isDesired ? 'desired' : 'suppressed';
+}
+
+export function setDraftTrackOverrideState(draft, releaseGroup, track, overrideState, context = {}) {
+  if (!draft || !trackOverrideStates.has(overrideState)) {
+    return draft;
+  }
+
+  const identity = buildDraftTrackOverrideIdentity(releaseGroup, track, context);
+  if (!identity) {
+    return draft;
+  }
+
+  const existingOverrides = Array.isArray(draft.trackOverrides) ? draft.trackOverrides : [];
+  const existingOverride = existingOverrides
+    .find((override) => isSameTrackOverrideIdentity(override, identity));
+  const nextOverrides = existingOverrides
+    .filter((override) => !isSameTrackOverrideIdentity(override, identity));
+
+  if (overrideState !== 'policy') {
+    nextOverrides.push(normalizeTrackOverride({
+      ...existingOverride,
+      ...identity,
+      isDesired: overrideState === 'desired',
+      remapStatus: existingOverride?.remapStatus ?? 'resolved',
+      trackLengthMsSnapshot: track.lengthMs ?? existingOverride?.trackLengthMsSnapshot ?? null,
+      trackTitleSnapshot: track.title ?? existingOverride?.trackTitleSnapshot ?? null,
+    }));
+  }
+
+  draft.trackOverrides = nextOverrides;
+  return draft;
+}
+
 export function buildOperatorArtistSaveDraft(draft = {}) {
   const normalizedDraft = {
     monitoring: normalizeMonitoring(draft.monitoring),
@@ -166,7 +271,12 @@ export function fingerprintOperatorArtistDraft(draft = {}) {
 export function describeReleaseGroupOverride(draft, releaseGroup) {
   const state = getDraftReleaseGroupSelectionState(draft, releaseGroup);
   const policyState = isReleaseGroupSelectedByPolicy(draft, releaseGroup) ? 'selected' : 'unselected';
-  const trackOverrideCount = releaseGroup?.operatorState?.trackOverrideSummary?.totalCount ?? 0;
+  const draftTrackOverrideCount = (draft?.trackOverrides ?? [])
+    .filter((trackOverride) => trackOverride.metadataReleaseGroupId === releaseGroup?.id)
+    .length;
+  const trackOverrideCount = draftTrackOverrideCount
+    || releaseGroup?.operatorState?.trackOverrideSummary?.totalCount
+    || 0;
   const reviewNeededCount = releaseGroup?.operatorState?.trackOverrideSummary?.reviewNeededCount ?? 0;
 
   if (state !== policyState) {

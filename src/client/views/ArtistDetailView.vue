@@ -60,6 +60,7 @@ import {
   fingerprintOperatorArtistDraft,
   getDraftReleaseGroupSelectionState,
   setDraftReleaseGroupSelectionState,
+  setDraftTrackOverrideState,
 } from '../lib/operator-artist-detail-draft.js';
 import {
   calculateOperatorArtistCoveragePercent,
@@ -251,6 +252,19 @@ function updateDraftReleaseGroupSelection(release, selectionState) {
     policyDraft.value,
     release.sourceReleaseGroup,
     selectionState,
+  );
+}
+
+function updateDraftTrackOverride({ medium, overrideState, release, releaseGroup, track }) {
+  setDraftTrackOverrideState(
+    policyDraft.value,
+    releaseGroup,
+    track,
+    overrideState,
+    {
+      mediumPosition: medium?.position ?? null,
+      metadataReleaseId: release?.id ?? null,
+    },
   );
 }
 
@@ -644,11 +658,16 @@ watch(projection, () => {
       v-if="detailRelease"
       :open="detailModalOpen"
       :release-group-mbid="detailRelease?.releaseGroup?.id ?? detailRelease?.releaseGroupId ?? ''"
+      :operator-draft="policyDraft"
+      :operator-editing-disabled="isSavingPolicy || !policyDraft.monitoring.isMonitored"
+      :operator-editing-enabled="canEditOperatorPolicy"
+      :operator-release-group="detailRelease?.sourceReleaseGroup ?? null"
       :release-title="detailRelease?.title ?? null"
       :artist-name="artist?.name ?? null"
       :release-year="detailRelease?.date ? String(detailRelease.date).slice(0, 4) : null"
       @close="closeDetailModal"
       @requested="closeDetailModal"
+      @track-override-change="updateDraftTrackOverride"
     />
   </section>
 </template>

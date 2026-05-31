@@ -23,8 +23,10 @@ import {
   createOperatorArtistDetailDraft,
   describeReleaseGroupOverride,
   fingerprintOperatorArtistDraft,
+  getDraftTrackOverrideState,
   getDraftReleaseGroupSelectionState,
   setDraftReleaseGroupSelectionState,
+  setDraftTrackOverrideState,
 } from '../../src/client/lib/operator-artist-detail-draft.js';
 
 function makeReleaseGroup(overrides = {}) {
@@ -135,4 +137,50 @@ test('describeReleaseGroupOverride explains release and track override visibilit
 
   setDraftReleaseGroupSelectionState(draft, releaseGroup, 'partial');
   assert.equal(describeReleaseGroupOverride(draft, releaseGroup), 'Manual partial selection');
+});
+
+test('setDraftTrackOverrideState records and clears track override intent', () => {
+  const draft = createOperatorArtistDetailDraft({
+    operator: { monitoring: { monitoredReleaseGroupTypes: ['album'] } },
+  });
+  const releaseGroup = makeReleaseGroup();
+  const track = {
+    lengthMs: 153000,
+    position: 3,
+    recordingMbid: 'mb-recording-roygbiv',
+    title: 'Roygbiv',
+  };
+  const context = {
+    mediumPosition: 1,
+    metadataReleaseId: 'local-release-1',
+  };
+
+  assert.equal(getDraftTrackOverrideState(draft, releaseGroup, track, context), 'policy');
+
+  setDraftTrackOverrideState(draft, releaseGroup, track, 'suppressed', context);
+
+  assert.equal(getDraftTrackOverrideState(draft, releaseGroup, track, context), 'suppressed');
+  assert.equal(draft.trackOverrides.length, 1);
+  assert.deepEqual(draft.trackOverrides[0], {
+    isDesired: false,
+    mediumPosition: 1,
+    metadataReleaseGroupId: 'local-rg-1',
+    metadataReleaseId: 'local-release-1',
+    recordingMbid: 'mb-recording-roygbiv',
+    remapStatus: 'resolved',
+    trackLengthMsSnapshot: 153000,
+    trackMbid: null,
+    trackPosition: 3,
+    trackTitleSnapshot: 'Roygbiv',
+  });
+  assert.equal(describeReleaseGroupOverride(draft, releaseGroup), '1 track override');
+
+  setDraftTrackOverrideState(draft, releaseGroup, track, 'desired', context);
+  assert.equal(getDraftTrackOverrideState(draft, releaseGroup, track, context), 'desired');
+  assert.equal(draft.trackOverrides.length, 1);
+  assert.equal(draft.trackOverrides[0].isDesired, true);
+
+  setDraftTrackOverrideState(draft, releaseGroup, track, 'policy', context);
+  assert.equal(getDraftTrackOverrideState(draft, releaseGroup, track, context), 'policy');
+  assert.deepEqual(draft.trackOverrides, []);
 });
