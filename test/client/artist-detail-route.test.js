@@ -105,13 +105,33 @@ test('normalizeReleaseGroupForCard clears id so ArtworkImage uses release-group 
 });
 
 test('normalizeReleaseGroupForCard sets releaseGroupId to the release group MBID', () => {
-  const normalized = normalizeReleaseGroupForCard(makeReleaseGroup({ id: 'rg-abc' }));
+  const normalized = normalizeReleaseGroupForCard(makeReleaseGroup({
+    id: 'local-rg-1',
+    musicbrainzReleaseGroupId: 'rg-abc',
+  }));
   assert.equal(normalized.releaseGroupId, 'rg-abc');
 });
 
 test('normalizeReleaseGroupForCard sets nested releaseGroup.id for ReleaseCard meta', () => {
-  const normalized = normalizeReleaseGroupForCard(makeReleaseGroup({ id: 'rg-abc' }));
+  const normalized = normalizeReleaseGroupForCard(makeReleaseGroup({
+    id: 'local-rg-1',
+    musicbrainzReleaseGroupId: 'rg-abc',
+  }));
   assert.equal(normalized.releaseGroup.id, 'rg-abc');
+});
+
+test('normalizeReleaseGroupForCard preserves local release-group UUID separately', () => {
+  const normalized = normalizeReleaseGroupForCard(makeReleaseGroup({
+    id: 'local-rg-1',
+    musicbrainzReleaseGroupId: 'rg-abc',
+  }));
+  assert.equal(normalized.metadataReleaseGroupId, 'local-rg-1');
+});
+
+test('normalizeReleaseGroupForCard preserves operator release-group state', () => {
+  const operatorState = { selectionState: 'partial', selectionSource: 'manual' };
+  const normalized = normalizeReleaseGroupForCard(makeReleaseGroup({ operatorState }));
+  assert.equal(normalized.operatorState, operatorState);
 });
 
 test('normalizeReleaseGroupForCard sets releaseGroup.primaryType from source primaryType', () => {

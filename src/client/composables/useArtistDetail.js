@@ -20,6 +20,7 @@ import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
   browseMusicBrainzArtistReleaseGroups,
+  fetchOperatorArtistProjection,
   fetchSimilarArtists,
   resolveMusicBrainzArtistLocal,
 } from '../lib/metadata-api.js';
@@ -30,19 +31,21 @@ import {
  * Loads three data sources in parallel for a given MusicBrainz artist MBID:
  *
  * 1. Local metadata (resolveMusicBrainzArtistLocal): artist object, monitoring
- *    state. A 404 is treated as "not imported yet" and surfaces as `null`
- *    artist, not as an error.
- * 2. MusicBrainz release-group browse: raw discography for the artist.
- * 3. Similar artists (fetchSimilarArtists): related artist strip data.
+ *    state. A 404 is treated as "not imported yet" and falls back to
+ *    MusicBrainz browse data.
+ * 2. Operator projection (fetchOperatorArtistProjection): canonical policy,
+ *    selection, override, and local release-group state for imported artists.
+ * 3. MusicBrainz release-group browse: fallback raw discography.
+ * 4. Similar artists (fetchSimilarArtists): related artist strip data.
  *
- * Exposes `setMonitoring(patch)` so the parent view can update cached
- * monitoring state after a successful monitor/unmonitor action without
- * triggering a full reload.
+ * Exposes cache setters so parent views can update monitoring or the operator
+ * projection after successful mutations without triggering a full reload.
  *
  * All returned refs are readonly to prevent accidental external mutation.
  *
  * @param {object} [options]
  * @param {function} [options.resolveLocal] - Override for testing.
+ * @param {function} [options.fetchOperatorProjection] - Override for testing.
  * @param {function} [options.browseReleaseGroups] - Override for testing.
  * @param {function} [options.fetchSimilar] - Override for testing.
  * @param {number} [options.releaseGroupLimit=100] - Max release groups to load.
@@ -50,12 +53,15 @@ import {
  */
 export function useArtistDetail({
   resolveLocal = resolveMusicBrainzArtistLocal,
+  fetchOperatorProjection = fetchOperatorArtistProjection,
   browseReleaseGroups = browseMusicBrainzArtistReleaseGroups,
   fetchSimilar = fetchSimilarArtists,
   releaseGroupLimit = 100,
   similarLimit = 8,
 } = {}) {
   const artist = ref(null);
+  const operator = ref(null);
+  const projection = ref(null);
   const monitoring = ref(null);
   const releaseGroups = ref([]);
   const relatedArtists = ref([]);
@@ -64,14 +70,17 @@ export function useArtistDetail({
   const discographyError = ref(null);
   const relatedError = ref(null);
 
-  /** True when the local metadata indicates the artist is monitored. */
-  const isMonitored = computed(() => monitoring.value?.monitored === true);
+  /** True when the operator projection or legacy metadata indicates the artist is monitored. */
+  const isMonitored = computed(() =>
+    operator.value?.monitoring?.isMonitored === true || monitoring.value?.monitored === true,
+  );
 
   /**
    * Loads all artist detail data for the given MBID.
    *
-   * All three fetches run concurrently via Promise.allSettled so that a
-   * failure in one does not block the others.
+   * Local artist and related-artist fetches run concurrently. The operator
+   * projection is preferred for imported artists; MusicBrainz browse remains
+   * the fallback discography source when no operator projection is available.
    *
    * @param {string} mbid - MusicBrainz artist MBID.
    * @param {{ signal?: AbortSignal }} [opts]
@@ -84,16 +93,41 @@ export function useArtistDetail({
     discographyError.value = null;
     relatedError.value = null;
 
-    const [localResult, discographyResult, similarResult] = await Promise.allSettled([
+    const [localResult, similarResult] = await Promise.allSettled([
       resolveLocal(mbid, { signal }),
-      browseReleaseGroups({ artistId: mbid, limit: releaseGroupLimit, signal }),
       fetchSimilar(mbid, { limit: similarLimit, signal }),
     ]);
+
+    let shouldBrowseDiscography = true;
 
     // Local artist — 404 is not an error (artist not yet imported).
     if (localResult.status === 'fulfilled') {
       artist.value = localResult.value?.artist ?? null;
       monitoring.value = localResult.value?.monitoring ?? null;
+      const localArtistId = localResult.value?.artist?.id ?? null;
+
+      if (localArtistId) {
+        try {
+          const operatorPayload = await fetchOperatorProjection(localArtistId, { signal });
+          projection.value = operatorPayload;
+          operator.value = operatorPayload?.operator ?? null;
+          artist.value = operatorPayload?.artist ?? artist.value;
+          monitoring.value = operatorPayload?.operator?.monitoring ?? monitoring.value;
+          releaseGroups.value = Array.isArray(operatorPayload?.releaseGroups)
+            ? operatorPayload.releaseGroups
+            : [];
+          shouldBrowseDiscography = false;
+        } catch (error) {
+          if (error?.status !== 404) {
+            artistError.value = getErrorMessage(
+              error,
+              'Could not load operator artist policy.',
+            );
+          }
+          projection.value = null;
+          operator.value = null;
+        }
+      }
     } else {
       if (localResult.reason?.status !== 404) {
         artistError.value = getErrorMessage(
@@ -105,17 +139,23 @@ export function useArtistDetail({
       monitoring.value = null;
     }
 
-    // Discography.
-    if (discographyResult.status === 'fulfilled') {
-      releaseGroups.value = Array.isArray(discographyResult.value?.results)
-        ? discographyResult.value.results
-        : [];
-    } else {
-      discographyError.value = getErrorMessage(
-        discographyResult.reason,
-        'Could not load discography.',
-      );
-      releaseGroups.value = [];
+    if (shouldBrowseDiscography) {
+      try {
+        const discographyResult = await browseReleaseGroups({
+          artistId: mbid,
+          limit: releaseGroupLimit,
+          signal,
+        });
+        releaseGroups.value = Array.isArray(discographyResult?.results)
+          ? discographyResult.results
+          : [];
+      } catch (error) {
+        discographyError.value = getErrorMessage(
+          error,
+          'Could not load discography.',
+        );
+        releaseGroups.value = [];
+      }
     }
 
     // Related artists.
@@ -144,8 +184,20 @@ export function useArtistDetail({
     monitoring.value = monitoringPatch;
   }
 
+  function setOperatorProjection(nextProjection) {
+    projection.value = nextProjection ?? null;
+    operator.value = nextProjection?.operator ?? null;
+    artist.value = nextProjection?.artist ?? artist.value;
+    monitoring.value = nextProjection?.operator?.monitoring ?? monitoring.value;
+    releaseGroups.value = Array.isArray(nextProjection?.releaseGroups)
+      ? nextProjection.releaseGroups
+      : releaseGroups.value;
+  }
+
   return {
     artist: readonly(artist),
+    operator: readonly(operator),
+    projection: readonly(projection),
     monitoring: readonly(monitoring),
     releaseGroups: readonly(releaseGroups),
     relatedArtists: readonly(relatedArtists),
@@ -156,5 +208,6 @@ export function useArtistDetail({
     relatedError: readonly(relatedError),
     loadArtistDetail,
     setMonitoring,
+    setOperatorProjection,
   };
 }

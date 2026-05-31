@@ -76,6 +76,22 @@ function createSimilarDouble({ similar = [], throws = null } = {}) {
   };
 }
 
+function createOperatorProjectionDouble({ projection = null, throws = null } = {}) {
+  return async (_artistId, _opts) => {
+    if (throws) throw throws;
+    return projection ?? {
+      artist: makeArtist({ id: 'local-1', name: 'Radiohead' }),
+      operator: {
+        monitoring: {
+          isMonitored: true,
+          monitoredReleaseGroupTypes: ['album', 'ep'],
+        },
+      },
+      releaseGroups: [makeReleaseGroup({ id: 'local-rg-1', musicbrainzReleaseGroupId: 'rg-1' })],
+    };
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Initial state
 // ---------------------------------------------------------------------------
@@ -184,6 +200,63 @@ test('useArtistDetail loadArtistDetail populates relatedArtists from fetchSimila
 
   assert.equal(relatedArtists.value.length, 1);
   assert.equal(relatedArtists.value[0].name, 'Portishead');
+});
+
+test('useArtistDetail loads operator projection for local artist detail', async (t) => {
+  const fetchOperatorProjection = t.mock.fn(createOperatorProjectionDouble());
+  const { operator, projection, loadArtistDetail } = useArtistDetail({
+    resolveLocal: createLocalDouble({ artist: makeArtist({ id: 'local-1' }) }),
+    fetchOperatorProjection,
+    browseReleaseGroups: createBrowseDouble(),
+    fetchSimilar: createSimilarDouble(),
+  });
+
+  await loadArtistDetail('mb-1');
+
+  assert.equal(fetchOperatorProjection.mock.callCount(), 1);
+  assert.equal(fetchOperatorProjection.mock.calls[0].arguments[0], 'local-1');
+  assert.equal(operator.value?.monitoring?.isMonitored, true);
+  assert.equal(projection.value?.artist?.id, 'local-1');
+});
+
+test('useArtistDetail uses operator projection release groups instead of browse fallback', async (t) => {
+  const browseReleaseGroups = t.mock.fn(createBrowseDouble({ results: [makeReleaseGroup({ id: 'browse-rg' })] }));
+  const { releaseGroups, loadArtistDetail } = useArtistDetail({
+    resolveLocal: createLocalDouble({ artist: makeArtist({ id: 'local-1' }) }),
+    fetchOperatorProjection: createOperatorProjectionDouble({
+      projection: {
+        artist: makeArtist({ id: 'local-1' }),
+        operator: { monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album'] } },
+        releaseGroups: [makeReleaseGroup({ id: 'local-rg-1', musicbrainzReleaseGroupId: 'rg-operator' })],
+      },
+    }),
+    browseReleaseGroups,
+    fetchSimilar: createSimilarDouble(),
+  });
+
+  await loadArtistDetail('mb-1');
+
+  assert.equal(browseReleaseGroups.mock.callCount(), 0);
+  assert.equal(releaseGroups.value.length, 1);
+  assert.equal(releaseGroups.value[0].id, 'local-rg-1');
+});
+
+test('useArtistDetail falls back to browse when operator projection is not found', async (t) => {
+  const browseReleaseGroups = t.mock.fn(createBrowseDouble({ results: [makeReleaseGroup({ id: 'browse-rg' })] }));
+  const { artistError, releaseGroups, loadArtistDetail } = useArtistDetail({
+    resolveLocal: createLocalDouble({ artist: makeArtist({ id: 'local-1' }) }),
+    fetchOperatorProjection: createOperatorProjectionDouble({
+      throws: Object.assign(new Error('Not Found'), { status: 404 }),
+    }),
+    browseReleaseGroups,
+    fetchSimilar: createSimilarDouble(),
+  });
+
+  await loadArtistDetail('mb-1');
+
+  assert.equal(artistError.value, null);
+  assert.equal(browseReleaseGroups.mock.callCount(), 1);
+  assert.equal(releaseGroups.value[0].id, 'browse-rg');
 });
 
 test('useArtistDetail loadArtistDetail sets isLoading false after resolution', async () => {
@@ -421,6 +494,24 @@ test('useArtistDetail setMonitoring works even before loadArtistDetail is called
   setMonitoring({ monitored: true });
 
   assert.equal(monitoring.value?.monitored, true);
+});
+
+test('useArtistDetail setOperatorProjection updates projection-backed state without reload', () => {
+  const { artist, isMonitored, releaseGroups, setOperatorProjection } = useArtistDetail({
+    resolveLocal: createLocalDouble(),
+    browseReleaseGroups: createBrowseDouble(),
+    fetchSimilar: createSimilarDouble(),
+  });
+
+  setOperatorProjection({
+    artist: makeArtist({ id: 'local-2', name: 'Portishead' }),
+    operator: { monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album'] } },
+    releaseGroups: [makeReleaseGroup({ id: 'local-rg-2', title: 'Dummy' })],
+  });
+
+  assert.equal(artist.value?.name, 'Portishead');
+  assert.equal(isMonitored.value, true);
+  assert.equal(releaseGroups.value[0].title, 'Dummy');
 });
 
 // ---------------------------------------------------------------------------

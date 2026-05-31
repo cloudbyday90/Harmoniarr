@@ -42,18 +42,18 @@ In plain terms:
 
 ## Current Implementation State
 
-As of 2026-05-30, the backend has moved past the original draft architecture in several important areas:
+As of 2026-05-31, the backend and primary operator client surfaces have moved past the original draft architecture in several important areas:
 
 - operator-scoped policy tables now exist for artist monitoring, release-group selection, track overrides, and reconciliation snapshots
 - artist-detail save orchestration persists policy and selection state through modular ESM services
 - save-triggered reconciliation is queued through the existing operation-run system and coalesces repeated saves for the same operator and artist
 - the older `metadata_artist_monitoring` table still exists for legacy read paths and compatibility during transition
 
-The remaining product/design gap is primarily on the Home and artist-detail client surfaces:
+The remaining product/design gap is primarily in deeper track-level editing, browser regression coverage, and legacy monitoring read-path cleanup:
 
 - Discover now has the `+` add affordance and compact `Add artist` policy modal wired to operator policy save
 - Home now uses the operator monitored projection for artist cards and shows compact policy, coverage, progress, and reconciliation state
-- artist detail still needs the draft editing, `Save` / `Cancel`, and override visibility experience
+- artist detail now loads the operator artist projection, exposes draft policy editing with `Save` / `Cancel`, and shows release-level selection override visibility
 
 ## Locked Design Choices
 
@@ -2469,6 +2469,7 @@ Use this section for incremental updates during implementation.
 - 2026-05-25: Home card direction clarified. Cards should emphasize identity, policy summary, coverage/progress, and lightweight activity state rather than dense detail.
 - 2026-05-25: High-level design choices locked. Discover is the add surface, Home is the canonical monitored surface, artist detail is the deep curation surface, `Save` triggers background reevaluation, and Home cards should summarize catalog progress and coverage.
 - 2026-05-30: Plan aligned with implementation. Operator-scoped policy, release selection, track override, reconciliation snapshot tables, and save-triggered reconciliation services now exist; remaining work is centered on Discover/Home/artist-detail client surfaces and legacy monitoring read-path migration.
+- 2026-05-31: Artist detail moved onto the operator projection route for local artists. The page now exposes the policy draft editor, save/cancel boundary, release-level selection controls, and explicit override status while preserving raw MusicBrainz browse fallback for artists that are not imported locally.
 
 ## Checklist
 
@@ -2483,6 +2484,8 @@ Use this section for incremental updates during implementation.
 - [x] Add-artist modal field set is finalized for first implementation pass
 - [x] Add-artist modal defaults strategy is finalized
 - [x] Artist detail `Save` / `Cancel` contract is finalized
+- [x] Artist detail projection-backed policy draft editing is implemented
+- [x] Artist detail release-level override visibility is implemented
 - [x] Desired-state changes vs delete behavior is finalized
 - [x] Home artist card v1 content and layout is implemented from the operator projection
 - [x] Save-triggered background orchestration contract is finalized

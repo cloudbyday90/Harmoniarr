@@ -23,13 +23,17 @@ import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import ArtistDetailRelatedArtistCard from '../components/media/ArtistDetailRelatedArtistCard.vue';
 import EmptyState from '../components/EmptyState.vue';
-import MonitorButton from '../components/media/MonitorButton.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistDetail } from '../composables/useArtistDetail.js';
 import { useArtistDetailArtwork } from '../composables/useArtistDetailArtwork.js';
-import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
+import {
+  addArtistAcquisitionProfileOptions,
+  addArtistContentTypeOptions,
+  addArtistReleaseScopeOptions,
+  addArtistWantedAutomationOptions,
+} from '../lib/add-artist-policy.js';
 import {
   buildArtistDetailLocation,
   groupReleaseGroupsByType,
@@ -48,6 +52,20 @@ import {
   pluralizeReleaseType,
 } from '../lib/artist-detail-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { saveOperatorArtistDraft } from '../lib/metadata-api.js';
+import {
+  buildOperatorArtistSaveDraft,
+  createOperatorArtistDetailDraft,
+  describeReleaseGroupOverride,
+  fingerprintOperatorArtistDraft,
+  getDraftReleaseGroupSelectionState,
+  setDraftReleaseGroupSelectionState,
+} from '../lib/operator-artist-detail-draft.js';
+import {
+  calculateOperatorArtistCoveragePercent,
+  formatOperatorArtistActivityLine,
+  formatOperatorArtistCoverageLine,
+} from '../lib/operator-artist-card-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
@@ -57,6 +75,8 @@ const nameHint = computed(() => String(route.query.name ?? ''));
 
 const {
   artist,
+  operator,
+  projection,
   releaseGroups,
   relatedArtists,
   isLoading,
@@ -65,13 +85,8 @@ const {
   discographyError,
   relatedError,
   loadArtistDetail,
-  setMonitoring,
+  setOperatorProjection,
 } = useArtistDetail();
-
-const {
-  isMonitoring,
-  monitorArtist,
-} = useArtistMonitoring();
 
 const {
   isRequested,
@@ -128,6 +143,10 @@ async function handleConfirmRequest({ requestedForUserId = null } = {}) {
 
 const detailModalOpen = ref(false);
 const detailRelease = ref(null);
+const policyDraft = ref(createOperatorArtistDetailDraft());
+const savedDraftFingerprint = ref(fingerprintOperatorArtistDraft(policyDraft.value));
+const isSavingPolicy = ref(false);
+const policySaveError = ref('');
 
 function openDetailModal(release) {
   detailRelease.value = release;
@@ -142,12 +161,26 @@ function closeDetailModal() {
 const artistName = computed(() => (artist.value?.name ?? nameHint.value) || 'Artist');
 const artistMeta = computed(() => buildArtistMetaLine(artist.value));
 const musicBrainzUrl = computed(() => buildArtistMusicBrainzUrl(mbid.value));
+const canEditOperatorPolicy = computed(() => Boolean(projection.value?.artist?.id && operator.value));
+const isPolicyDirty = computed(() =>
+  fingerprintOperatorArtistDraft(policyDraft.value) !== savedDraftFingerprint.value,
+);
+const isPolicyFormValid = computed(() =>
+  policyDraft.value.monitoring.monitoredReleaseGroupTypes.length > 0,
+);
+const operatorCoverage = computed(() => operator.value?.coverage ?? {});
+const operatorOverview = computed(() => operator.value?.overview ?? {});
+const operatorReconciliation = computed(() => operator.value?.reconciliation ?? {});
+const coveragePercent = computed(() => calculateOperatorArtistCoveragePercent(operatorCoverage.value));
 
 const discographySections = computed(() =>
   groupReleaseGroupsByType(releaseGroups.value).map((section) => ({
     releaseCount: section.items.length,
     type: section.type,
-    releases: section.items.map(normalizeReleaseGroupForCard),
+    releases: section.items.map((releaseGroup) => ({
+      ...normalizeReleaseGroupForCard(releaseGroup),
+      sourceReleaseGroup: releaseGroup,
+    })),
   })),
 );
 
@@ -155,7 +188,6 @@ const hasDiscography = computed(() => releaseGroups.value.length > 0);
 const isArtistMonitored = computed(() => isMonitored.value);
 const discographyReleaseCount = computed(() => releaseGroups.value.length);
 const discographySectionCount = computed(() => discographySections.value.length);
-const relatedArtistCount = computed(() => relatedArtists.value.length);
 
 const {
   getRelatedArtwork,
@@ -175,24 +207,24 @@ const heroStyle = computed(() => buildArtistHeroBackgroundStyle(heroBackgroundUr
 const overviewCards = computed(() => ([
   {
     body: isArtistMonitored.value
-      ? 'This artist is already feeding your release discovery and request workflow.'
-      : 'Follow this artist to route future releases into the broader metadata workflow.',
+      ? formatOperatorArtistActivityLine(operatorReconciliation.value)
+      : 'Add this artist from Discover to route future releases into the monitored workflow.',
     label: 'Status',
     value: isArtistMonitored.value ? 'Monitored' : 'Available',
   },
   {
     body: hasDiscography.value
-      ? 'Grouped by release type so albums, EPs, and singles stay easy to scan.'
+      ? formatOperatorArtistCoverageLine(operatorCoverage.value)
       : 'The discography panel will populate here once release groups are available.',
-    label: 'Discography',
-    value: String(discographyReleaseCount.value),
+    label: 'Coverage',
+    value: `${coveragePercent.value}%`,
   },
   {
-    body: relatedArtistCount.value > 0
-      ? 'Related artists are resolved alongside the main profile to preserve context.'
-      : 'Related artists appear when MusicBrainz similarity data is available.',
-    label: 'Related',
-    value: String(relatedArtistCount.value),
+    body: operatorOverview.value.hasManualOverrides
+      ? `${operatorOverview.value.manualSelectionCount ?? 0} release overrides and ${operatorOverview.value.trackOverrideCount ?? 0} track overrides are saved.`
+      : 'Broad policy controls this artist without local release or track exceptions.',
+    label: 'Overrides',
+    value: String(operatorOverview.value.trackOverrideCount ?? operatorOverview.value.manualSelectionCount ?? 0),
   },
 ]));
 
@@ -208,10 +240,44 @@ function buildRelatedSupportingText(relatedArtist) {
   return 'Open this artist to compare discography and recommendation context.';
 }
 
-async function handleMonitor() {
-  const result = await monitorArtist({ id: mbid.value, name: artistName.value });
-  if (result?.success) {
-    setMonitoring({ monitored: true });
+function resetPolicyDraft() {
+  policyDraft.value = createOperatorArtistDetailDraft(projection.value);
+  savedDraftFingerprint.value = fingerprintOperatorArtistDraft(policyDraft.value);
+  policySaveError.value = '';
+}
+
+function updateDraftReleaseGroupSelection(release, selectionState) {
+  setDraftReleaseGroupSelectionState(
+    policyDraft.value,
+    release.sourceReleaseGroup,
+    selectionState,
+  );
+}
+
+async function savePolicyDraft() {
+  if (!canEditOperatorPolicy.value || !isPolicyFormValid.value || isSavingPolicy.value) {
+    return;
+  }
+
+  isSavingPolicy.value = true;
+  policySaveError.value = '';
+
+  try {
+    const payload = await saveOperatorArtistDraft(
+      projection.value.artist.id,
+      buildOperatorArtistSaveDraft(policyDraft.value),
+    );
+    if (payload?.projection) {
+      setOperatorProjection(payload.projection);
+    } else if (payload?.artist && payload?.operator) {
+      setOperatorProjection(payload);
+    } else {
+      await loadArtistDetail(mbid.value);
+    }
+  } catch (error) {
+    policySaveError.value = getErrorMessage(error, 'Saving artist policy failed.');
+  } finally {
+    isSavingPolicy.value = false;
   }
 }
 
@@ -220,6 +286,10 @@ watch(mbid, (nextMbid) => {
     void loadArtistDetail(nextMbid);
   }
 }, { immediate: true });
+
+watch(projection, () => {
+  resetPolicyDraft();
+});
 </script>
 
 <template>
@@ -282,11 +352,6 @@ watch(mbid, (nextMbid) => {
               <span v-if="isRefreshingArtwork" class="hx-pill" data-tone="warning">Refreshing artwork</span>
             </div>
             <div class="artist-stage__actions">
-              <MonitorButton
-                :monitored="isArtistMonitored"
-                :loading="isMonitoring(mbid)"
-                @monitor="handleMonitor"
-              />
               <a
                 v-if="musicBrainzUrl"
                 :href="musicBrainzUrl"
@@ -327,6 +392,135 @@ watch(mbid, (nextMbid) => {
       <p v-if="artistError" class="artist-detail-soft-error" role="alert">
         {{ formatArtistDetailError(artistError) }}
       </p>
+
+      <article v-if="canEditOperatorPolicy" class="hx-card artist-policy-card" aria-label="Artist policy">
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">Artist Policy</h2>
+            <p class="hx-card-subtitle">
+              Update broad monitoring rules and release-level overrides before queueing the next reconciliation.
+            </p>
+          </div>
+          <div class="hx-card-actions artist-policy-card__actions">
+            <span
+              class="hx-pill"
+              :data-tone="isPolicyDirty ? 'warning' : 'success'"
+            >
+              {{ isPolicyDirty ? 'Unsaved changes' : 'Saved' }}
+            </span>
+            <button
+              type="button"
+              class="hx-btn"
+              data-variant="ghost"
+              :disabled="!isPolicyDirty || isSavingPolicy"
+              @click="resetPolicyDraft"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="hx-btn"
+              data-variant="primary"
+              :disabled="!isPolicyDirty || !isPolicyFormValid || isSavingPolicy"
+              @click="savePolicyDraft"
+            >
+              {{ isSavingPolicy ? 'Saving...' : 'Save policy' }}
+            </button>
+          </div>
+        </header>
+
+        <div class="hx-card-body artist-policy-card__body">
+          <p v-if="policySaveError" class="artist-detail-soft-error" role="alert">
+            {{ policySaveError }}
+          </p>
+          <p v-if="!isPolicyFormValid" class="artist-detail-soft-error" role="alert">
+            Select at least one release type before saving.
+          </p>
+
+          <label class="artist-policy-card__monitor-toggle">
+            <input
+              v-model="policyDraft.monitoring.isMonitored"
+              type="checkbox"
+              :disabled="isSavingPolicy"
+            />
+            <span>
+              <strong>Monitor this artist</strong>
+              <small>Disabling monitoring clears saved release and track overrides on save.</small>
+            </span>
+          </label>
+
+          <fieldset class="artist-policy-card__fieldset" :disabled="isSavingPolicy || !policyDraft.monitoring.isMonitored">
+            <legend>Content to track</legend>
+            <div class="artist-policy-card__checkbox-grid">
+              <label
+                v-for="option in addArtistContentTypeOptions"
+                :key="option.value"
+                class="artist-policy-card__checkbox"
+              >
+                <input
+                  v-model="policyDraft.monitoring.monitoredReleaseGroupTypes"
+                  type="checkbox"
+                  :value="option.value"
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="artist-policy-card__grid">
+            <label>
+              <span>Release scope</span>
+              <select
+                v-model="policyDraft.monitoring.releaseScope"
+                class="hx-select"
+                :disabled="isSavingPolicy || !policyDraft.monitoring.isMonitored"
+              >
+                <option
+                  v-for="option in addArtistReleaseScopeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+
+            <label>
+              <span>Acquisition profile</span>
+              <select
+                v-model="policyDraft.monitoring.acquisitionProfileKey"
+                class="hx-select"
+                :disabled="isSavingPolicy || !policyDraft.monitoring.isMonitored"
+              >
+                <option
+                  v-for="option in addArtistAcquisitionProfileOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+
+            <label>
+              <span>Wanted automation</span>
+              <select
+                v-model="policyDraft.monitoring.wantedAutomationMode"
+                class="hx-select"
+                :disabled="isSavingPolicy || !policyDraft.monitoring.isMonitored"
+              >
+                <option
+                  v-for="option in addArtistWantedAutomationOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </article>
 
       <article class="hx-card artist-detail-section-card" aria-label="Discography">
         <header class="hx-card-header">
@@ -374,7 +568,26 @@ watch(mbid, (nextMbid) => {
                   :artwork-asset-id="getReleaseArtwork(release.musicbrainzReleaseGroupId)?.assetId ?? null"
                   @request="openConfirmModal"
                   @detail="openDetailModal"
-                />
+                >
+                  <template v-if="canEditOperatorPolicy" #actions>
+                    <div class="artist-detail-selection">
+                      <select
+                        class="hx-select artist-detail-selection__select"
+                        :value="getDraftReleaseGroupSelectionState(policyDraft, release.sourceReleaseGroup)"
+                        :disabled="isSavingPolicy || !policyDraft.monitoring.isMonitored"
+                        :aria-label="`Selection state for ${release.title ?? 'release group'}`"
+                        @change="updateDraftReleaseGroupSelection(release, $event.target.value)"
+                      >
+                        <option value="selected">Selected</option>
+                        <option value="partial">Partial</option>
+                        <option value="unselected">Unselected</option>
+                      </select>
+                      <span class="artist-detail-selection__note">
+                        {{ describeReleaseGroupOverride(policyDraft, release.sourceReleaseGroup) }}
+                      </span>
+                    </div>
+                  </template>
+                </ReleaseCard>
               </div>
             </section>
           </div>
@@ -582,6 +795,82 @@ watch(mbid, (nextMbid) => {
   font-size: var(--hx-text-sm);
 }
 
+.artist-policy-card__actions {
+  align-items: center;
+}
+
+.artist-policy-card__body {
+  display: grid;
+  gap: var(--hx-space-4);
+}
+
+.artist-policy-card__monitor-toggle {
+  display: flex;
+  gap: var(--hx-space-3);
+  align-items: flex-start;
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface-muted);
+}
+
+.artist-policy-card__monitor-toggle input {
+  margin-top: 3px;
+}
+
+.artist-policy-card__monitor-toggle span,
+.artist-policy-card__grid label {
+  display: grid;
+  gap: var(--hx-space-1);
+  min-width: 0;
+}
+
+.artist-policy-card__monitor-toggle strong,
+.artist-policy-card__grid span,
+.artist-policy-card__fieldset legend {
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-sm);
+  font-weight: 700;
+}
+
+.artist-policy-card__monitor-toggle small {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+}
+
+.artist-policy-card__fieldset {
+  display: grid;
+  gap: var(--hx-space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.artist-policy-card__checkbox-grid,
+.artist-policy-card__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--hx-space-3);
+}
+
+.artist-policy-card__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: 36px;
+  padding: 0 var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface);
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+}
+
+.artist-policy-card__grid select {
+  width: 100%;
+}
+
 .artist-detail-section-card__body {
   display: grid;
   gap: var(--hx-space-4);
@@ -619,6 +908,24 @@ watch(mbid, (nextMbid) => {
 
 .artist-detail-grid {
   --hx-artwork-grid-min: 168px;
+}
+
+.artist-detail-selection {
+  display: grid;
+  gap: var(--hx-space-1);
+  width: 100%;
+}
+
+.artist-detail-selection__select {
+  width: 100%;
+  min-width: 0;
+  font-size: var(--hx-text-xs);
+}
+
+.artist-detail-selection__note {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  line-height: 1.35;
 }
 
 .artist-detail-related-strip {

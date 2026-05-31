@@ -67,15 +67,19 @@ export function buildArtistDetailLocation(mbid, nameHint) {
  * @returns {object} ReleaseCard-compatible object.
  */
 export function normalizeReleaseGroupForCard(releaseGroup) {
+  const musicbrainzReleaseGroupId = releaseGroup.musicbrainzReleaseGroupId ?? releaseGroup.id;
+
   return {
     // Clear release MBID so ArtworkImage falls through to release-group artwork.
     id: null,
     musicbrainzReleaseId: null,
     // Release-group MBID for ArtworkImage (mbidType='release-group').
-    releaseGroupId: releaseGroup.id,
+    releaseGroupId: musicbrainzReleaseGroupId,
+    // Local metadata release-group UUID, when available from operator projection.
+    metadataReleaseGroupId: releaseGroup.id,
     // Nested releaseGroup: ReleaseCard reads primaryType from here for the meta line.
     releaseGroup: {
-      id: releaseGroup.id,
+      id: musicbrainzReleaseGroupId,
       primaryType: releaseGroup.primaryType ?? null,
     },
     // Map firstReleaseDate → date so getReleaseYear picks it up.
@@ -86,7 +90,8 @@ export function normalizeReleaseGroupForCard(releaseGroup) {
     disambiguation: releaseGroup.disambiguation ?? null,
     secondaryTypes: releaseGroup.secondaryTypes ?? [],
     sourceProvider: releaseGroup.sourceProvider ?? 'musicbrainz',
-    musicbrainzReleaseGroupId: releaseGroup.musicbrainzReleaseGroupId ?? releaseGroup.id,
+    operatorState: releaseGroup.operatorState ?? null,
+    musicbrainzReleaseGroupId,
   };
 }
 

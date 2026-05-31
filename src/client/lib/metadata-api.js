@@ -45,6 +45,10 @@ export function fetchOperatorMonitoredArtistProjections({ limit, signal } = {}) 
   return apiRequest(`/api/v1/metadata/artists/monitored/operator${buildQueryString({ limit })}`, { signal });
 }
 
+export function fetchOperatorArtistProjection(artistId, { signal } = {}) {
+  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator`, { signal });
+}
+
 export function searchLocalMetadataReleaseGroups({ query, limit } = {}) {
   return apiRequest(`/api/v1/metadata/release-groups/search${buildQueryString({ q: query, limit })}`);
 }

@@ -8,6 +8,7 @@ import {
   fetchMetadataReleaseGroup,
   fetchMonitoredArtists,
   fetchMusicBrainzReleaseGroupReleases,
+  fetchOperatorArtistProjection,
   fetchOperatorMonitoredArtistProjections,
   fetchReleaseGroupTracklist,
   fetchSimilarArtists,
@@ -102,6 +103,16 @@ test('metadata-api fetchOperatorMonitoredArtistProjections sends limit', async (
 
   const url = globalThis.fetch.mock.calls[0].arguments[0];
   assert.equal(url, '/api/v1/metadata/artists/monitored/operator?limit=50');
+});
+
+test('metadata-api fetchOperatorArtistProjection encodes artist id', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchOperatorArtistProjection('artist/operator');
+
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.equal(url, '/api/v1/metadata/artists/artist%2Foperator/operator');
 });
 
 test('metadata-api searchMusicBrainzArtists sends query params', async (t) => {
