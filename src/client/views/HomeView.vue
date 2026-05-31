@@ -18,8 +18,8 @@
 
 <script setup>
 import { computed } from 'vue';
+import OperatorHomePanel from '../components/home/OperatorHomePanel.vue';
 import RequesterHomePanel from '../components/home/RequesterHomePanel.vue';
-import LibraryView from './LibraryView.vue';
 import { sessionStore } from '../state/session.js';
 
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
@@ -27,5 +27,5 @@ const isRequester = computed(() => sessionStore.state.user?.role === 'requester'
 
 <template>
   <RequesterHomePanel v-if="isRequester" />
-  <LibraryView v-else />
+  <OperatorHomePanel v-else />
 </template>

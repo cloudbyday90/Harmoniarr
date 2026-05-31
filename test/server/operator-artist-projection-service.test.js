@@ -42,6 +42,14 @@ test('getOperatorArtistProjection overlays explicit selections, track overrides,
       status: 'pending',
     }),
     getRunningRunByOperatorArtist: async () => null,
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async ({ metadataReleaseIds }) => {
+      assert.deepEqual(metadataReleaseIds, ['release-1']);
+      return [{
+        lastReconciledAt: '2026-05-25T14:00:00.000Z',
+        metadataReleaseId: 'release-1',
+        reconciliationStatus: 'partial',
+      }];
+    },
     listOperatorReleaseGroupSelections: async () => [{
       metadataReleaseGroupId: 'rg-1',
       resolvedMetadataReleaseId: 'release-1',
@@ -69,6 +77,16 @@ test('getOperatorArtistProjection overlays explicit selections, track overrides,
     detectionEvents: [],
     detectionEventsPageInfo: { hasMore: false, nextCursor: null },
     operator: {
+      coverage: {
+        acquiredReleaseCount: 0,
+        coverageRatio: 0,
+        desiredReleaseCount: 1,
+        duplicateReleaseCount: 0,
+        lastReconciledAt: '2026-05-25T14:00:00.000Z',
+        missingReleaseCount: 0,
+        partialReleaseCount: 1,
+        unresolvedReleaseCount: 0,
+      },
       monitoring: {
         acquisitionProfileKey: 'balanced_library',
         isMonitored: true,
@@ -182,6 +200,7 @@ test('getOperatorArtistProjection derives policy-backed release-group defaults a
     getLatestRunByOperatorArtist: async () => null,
     getPendingRunByOperatorArtist: async () => null,
     getRunningRunByOperatorArtist: async () => null,
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async () => [],
     listOperatorReleaseGroupSelections: async () => [{
       metadataReleaseGroupId: 'rg-missing',
       selectionSource: 'manual',
@@ -217,6 +236,16 @@ test('getOperatorArtistProjection derives policy-backed release-group defaults a
     suppressedTrackOverrideCount: 0,
     trackOverrideCount: 1,
     unselectedReleaseGroupCount: 1,
+  });
+  assert.deepEqual(result.operator.coverage, {
+    acquiredReleaseCount: 0,
+    coverageRatio: 0,
+    desiredReleaseCount: 1,
+    duplicateReleaseCount: 0,
+    lastReconciledAt: null,
+    missingReleaseCount: 1,
+    partialReleaseCount: 0,
+    unresolvedReleaseCount: 0,
   });
   assert.deepEqual(result.releaseGroups, [
     {

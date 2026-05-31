@@ -45,6 +45,7 @@ function normalizeLimit(limit, defaultValue = 25, maxValue = 50) {
 
 function summarizeCardState({
   artist,
+  coverage,
   monitoring,
   overview,
   reconciliation,
@@ -60,6 +61,16 @@ function summarizeCardState({
       type: artist?.type ?? null,
     },
     operator: {
+      coverage: {
+        acquiredReleaseCount: coverage?.acquiredReleaseCount ?? 0,
+        coverageRatio: coverage?.coverageRatio ?? 0,
+        desiredReleaseCount: coverage?.desiredReleaseCount ?? 0,
+        duplicateReleaseCount: coverage?.duplicateReleaseCount ?? 0,
+        lastReconciledAt: coverage?.lastReconciledAt ?? null,
+        missingReleaseCount: coverage?.missingReleaseCount ?? 0,
+        partialReleaseCount: coverage?.partialReleaseCount ?? 0,
+        unresolvedReleaseCount: coverage?.unresolvedReleaseCount ?? 0,
+      },
       monitoring,
       overview: {
         desiredReleaseGroupCount: overview?.desiredReleaseGroupCount ?? 0,
@@ -139,6 +150,7 @@ export function createOperatorMonitoredArtistProjectionService({
             type: projection.artist?.type ?? artist.type ?? null,
           },
           monitoring: projection.operator?.monitoring ?? monitoring,
+          coverage: projection.operator?.coverage,
           overview: projection.operator?.overview,
           reconciliation: projection.operator?.reconciliation,
         });

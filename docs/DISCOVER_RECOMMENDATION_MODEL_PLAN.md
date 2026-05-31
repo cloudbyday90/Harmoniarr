@@ -1,7 +1,7 @@
 # Discover Recommendation Model Plan
 
 Status: Accepted platform direction, implementation in progress
-Last updated: 2026-05-30
+Last updated: 2026-05-31
 Owner: Product + app architecture
 
 ## Purpose
@@ -52,7 +52,7 @@ As of 2026-05-30, the backend has moved past the original draft architecture in 
 The remaining product/design gap is primarily on the Home and artist-detail client surfaces:
 
 - Discover now has the `+` add affordance and compact `Add artist` policy modal wired to operator policy save
-- Home cards still need the policy, coverage, progress, and activity summary treatment
+- Home now uses the operator monitored projection for artist cards and shows compact policy, coverage, progress, and reconciliation state
 - artist detail still needs the draft editing, `Save` / `Cancel`, and override visibility experience
 
 ## Locked Design Choices
@@ -2474,7 +2474,7 @@ Use this section for incremental updates during implementation.
 
 - [ ] Phase 1 terminology pass complete
 - [x] Discover recommendation-basis copy updated
-- [ ] Home monitored-profile copy updated
+- [x] Home monitored-profile copy updated
 - [ ] No user-facing seed language remains
 - [ ] Discover recommendation cards show monitored vs recommended correctly
 - [ ] Browser regression test covers refresh after monitoring multiple artists
@@ -2484,7 +2484,7 @@ Use this section for incremental updates during implementation.
 - [x] Add-artist modal defaults strategy is finalized
 - [x] Artist detail `Save` / `Cancel` contract is finalized
 - [x] Desired-state changes vs delete behavior is finalized
-- [x] Home artist card v1 content and layout is finalized
+- [x] Home artist card v1 content and layout is implemented from the operator projection
 - [x] Save-triggered background orchestration contract is finalized
 - [ ] Internal naming cleanup evaluated
 - [ ] Follow-up scoring/explainability work planned

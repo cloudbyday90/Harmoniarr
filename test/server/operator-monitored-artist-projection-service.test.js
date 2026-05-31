@@ -34,6 +34,16 @@ test('listOperatorMonitoredArtistProjections returns compact operator card summa
           isMonitored: true,
           monitoredReleaseGroupTypes: ['album', 'ep'],
         },
+        coverage: {
+          acquiredReleaseCount: 1,
+          coverageRatio: 0.5,
+          desiredReleaseCount: 2,
+          duplicateReleaseCount: 0,
+          lastReconciledAt: '2026-05-25T14:00:00.000Z',
+          missingReleaseCount: 0,
+          partialReleaseCount: 1,
+          unresolvedReleaseCount: 0,
+        },
         overview: {
           desiredReleaseGroupCount: 2,
           desiredTrackOverrideCount: 1,
@@ -75,6 +85,16 @@ test('listOperatorMonitoredArtistProjections returns compact operator card summa
         type: 'Group',
       },
       operator: {
+        coverage: {
+          acquiredReleaseCount: 1,
+          coverageRatio: 0.5,
+          desiredReleaseCount: 2,
+          duplicateReleaseCount: 0,
+          lastReconciledAt: '2026-05-25T14:00:00.000Z',
+          missingReleaseCount: 0,
+          partialReleaseCount: 1,
+          unresolvedReleaseCount: 0,
+        },
         monitoring: {
           acquisitionProfileKey: 'balanced_library',
           isMonitored: true,

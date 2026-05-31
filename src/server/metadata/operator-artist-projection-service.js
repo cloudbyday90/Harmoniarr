@@ -18,8 +18,13 @@
 
 import { createMetadataReadService } from './metadata-read-service.js';
 import { defaultOperatorArtistMonitoringPolicy } from './operator-artist-monitoring-policy.js';
+import { createLibraryReleaseReconciliationStore } from '../library/library-release-reconciliation-store.js';
 import { buildOperatorArtistEffectiveReleaseGroups } from './operator-artist-effective-state.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
+import {
+  listDesiredReleaseIds,
+  summarizeOperatorArtistCoverage,
+} from './operator-artist-coverage-summary-service.js';
 import { createOperatorArtistReconciliationRunStore } from './operator-artist-reconciliation-run-store.js';
 import { createOperatorArtistReconciliationSnapshotService } from './operator-artist-reconciliation-snapshot-service.js';
 import { createOperatorReleaseGroupSelectionStore } from './operator-release-group-selection-store.js';
@@ -90,11 +95,13 @@ function buildOverview({
 
 export function createOperatorArtistProjectionService({
   getMetadataArtist = null,
+  listLibraryReleaseReconciliationsByMetadataReleaseIds = null,
   getOperatorArtistMonitoring = null,
   getLatestOperatorArtistReconciliationSnapshot = null,
   getLatestRunByOperatorArtist = null,
   getPendingRunByOperatorArtist = null,
   getRunningRunByOperatorArtist = null,
+  libraryReleaseReconciliationStore = null,
   listOperatorReleaseGroupSelections = null,
   listOperatorTrackOverrides = null,
   metadataReadService = null,
@@ -105,6 +112,8 @@ export function createOperatorArtistProjectionService({
   operatorTrackOverrideStore = null,
 } = {}) {
   const resolvedMetadataReadService = metadataReadService ?? createMetadataReadService();
+  const resolvedLibraryReleaseReconciliationStore = libraryReleaseReconciliationStore
+    ?? createLibraryReleaseReconciliationStore();
   const resolvedOperatorArtistMonitoringService = operatorArtistMonitoringService
     ?? createOperatorArtistMonitoringService();
   const resolvedOperatorArtistReconciliationSnapshotService = operatorArtistReconciliationSnapshotService
@@ -117,6 +126,8 @@ export function createOperatorArtistProjectionService({
     ?? createOperatorTrackOverrideStore();
 
   const readMetadataArtist = getMetadataArtist ?? resolvedMetadataReadService.getArtist;
+  const readLibraryReleaseReconciliations = listLibraryReleaseReconciliationsByMetadataReleaseIds
+    ?? resolvedLibraryReleaseReconciliationStore.listReconciliationsByMetadataReleaseIds;
   const readOperatorArtistMonitoring = getOperatorArtistMonitoring
     ?? resolvedOperatorArtistMonitoringService.getOperatorArtistMonitoring;
   const readLatestSnapshot = getLatestOperatorArtistReconciliationSnapshot
@@ -179,6 +190,10 @@ export function createOperatorArtistProjectionService({
       releases: artistReleases,
       trackOverrides: resolvedTrackOverrides,
     });
+    const desiredReleaseIds = listDesiredReleaseIds(releaseGroups);
+    const libraryReleaseReconciliations = desiredReleaseIds.length > 0
+      ? await readLibraryReleaseReconciliations({ metadataReleaseIds: desiredReleaseIds })
+      : [];
 
     return {
       aliases: artistAliases,
@@ -190,6 +205,10 @@ export function createOperatorArtistProjectionService({
       },
       operator: {
         monitoring: resolvedMonitoring,
+        coverage: summarizeOperatorArtistCoverage({
+          effectiveReleaseGroups: releaseGroups,
+          libraryReleaseReconciliations,
+        }),
         overview: buildOverview({
           effectiveReleaseGroups: releaseGroups,
           orphanedReleaseGroupSelections,
