@@ -166,7 +166,6 @@ function collectRegisteredRoutes() {
     searchLocalMetadataArtists: asyncNoopResult({}),
     searchLocalMetadataReleaseGroups: asyncNoopResult({}),
     searchLocalMetadataReleases: asyncNoopResult({}),
-    listMonitoredArtists: asyncNoopResult({ artists: [] }),
     listOperatorMonitoredArtistProjections: asyncNoopResult({ results: [] }),
     searchMusicBrainzArtists: asyncNoopResult({}),
     searchMusicBrainzReleases: asyncNoopResult({}),
@@ -291,7 +290,7 @@ test('serverRouteInventory matches the actual registered server route surface', 
 
 test('serverRouteInventory uses supported access and kind classifications', () => {
   const supportedAccess = new Set(['public', 'authenticated', 'admin']);
-  const supportedKinds = new Set(['read', 'mutation', 'diagnostic']);
+  const supportedKinds = new Set(['read', 'mutation', 'diagnostic', 'retired']);
   const uniqueSignatures = new Set();
 
   for (const route of serverRouteInventory) {

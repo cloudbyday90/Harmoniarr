@@ -35,7 +35,6 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getReleaseGroupByMusicBrainzId: () => {},
   };
   const metadataSearchService = {
-    listMonitoredArtists: () => {},
     searchAll: () => {},
     searchArtists: () => {},
     searchReleaseGroups: () => {},
@@ -128,7 +127,6 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     searchAllLocalMetadata: metadataSearchService.searchAll,
     searchLocalMetadataReleaseGroups: metadataSearchService.searchReleaseGroups,
     searchLocalMetadataReleases: metadataSearchService.searchReleases,
-    listMonitoredArtists: metadataSearchService.listMonitoredArtists,
     listAllMonitoredArtists: metadataSearchService.listAllMonitoredArtists,
     searchMusicBrainzArtists: musicBrainzSearchService.searchArtists,
     searchMusicBrainzReleases: musicBrainzSearchService.searchReleases,

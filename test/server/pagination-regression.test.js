@@ -110,7 +110,6 @@ function createMetadataApp() {
       searchLocalMetadataReleaseGroups: async () => ({ results: [] }),
       searchLocalMetadataReleases: async () => ({ results: [] }),
       searchAllLocalMetadata: async () => ({ artists: [], releaseGroups: [], releases: [] }),
-      listMonitoredArtists: async () => ({ results: [] }),
       searchMusicBrainzArtists: async () => ({ results: [] }),
       searchMusicBrainzReleases: async () => ({ results: [] }),
       browseMusicBrainzArtistReleaseGroups: async () => ({ browse: { results: [] } }),
@@ -195,7 +194,6 @@ runPaginationRegressionTests(createLibraryApp, [
 runPaginationRegressionTests(createMetadataApp, [
   { path: '/api/v1/metadata/artists/search', params: ['limit'] },
   { path: '/api/v1/search', params: ['artistLimit', 'releaseGroupLimit', 'releaseLimit'] },
-  { path: '/api/v1/metadata/artists/monitored', params: ['limit'] },
   { path: '/api/v1/metadata/release-groups/search', params: ['limit'] },
   { path: '/api/v1/metadata/releases/search', params: ['limit'] },
   { path: '/api/v1/metadata/artists/:artistId/detection-events', params: ['limit'], pathParams: { artistId: 'artist-1' } },

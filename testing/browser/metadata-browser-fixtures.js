@@ -582,7 +582,11 @@ export async function installMetadataBrowserFixtures(browserContext) {
 
       if (method === 'GET' && path === '/api/v1/metadata/artists/monitored') {
         return buildJsonResponse({
-          error: { message: 'Legacy monitored artist client fixture should not be used.' },
+          error: {
+            code: 'endpoint_retired',
+            message: 'The shared monitored artist list endpoint has been retired. Use the operator-scoped monitored artist projection endpoint instead.',
+            replacementPath: '/api/v1/metadata/artists/monitored/operator',
+          },
           ok: false,
         }, 410);
       }

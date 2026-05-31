@@ -147,7 +147,6 @@ function createMetadataRouteTestApp(overrides = {}) {
       searchLocalMetadataArtists: async ({ query, limit }) => ({ query, limit: Number(limit), results: [{ id: 'artist-1', name: query }] }),
       searchLocalMetadataReleaseGroups: async ({ query, limit }) => ({ query, limit: Number(limit), results: [{ id: 'rg-1', title: query }] }),
       searchLocalMetadataReleases: async ({ query, limit }) => ({ query, limit: Number(limit), results: [{ id: 'release-1', title: query }] }),
-      listMonitoredArtists: async ({ limit }) => ({ limit: Number(limit) || 25, results: [] }),
       searchMusicBrainzArtists: async () => ({ results: [] }),
       searchMusicBrainzReleases: async () => ({ results: [] }),
       getSimilarArtists: async () => ({ similar: [] }),
@@ -165,46 +164,33 @@ function createMetadataRouteTestApp(overrides = {}) {
   });
 }
 
-test('metadata monitored artists route returns the shared monitored artists payload', async (t) => {
-  const listMonitoredArtists = t.mock.fn(async ({ limit }) => ({
-    limit: Number(limit),
-    results: [
-      {
-        id: 'mb-artist-1',
-        localId: 'local-1',
-        name: 'Autechre',
-        sortName: 'Autechre',
-        disambiguation: null,
-        country: 'GB',
-        type: 'Group',
-        monitored: true,
-      },
-    ],
+test('metadata shared monitored artists route returns a retired endpoint response', async (t) => {
+  const getMetadataArtist = t.mock.fn(async ({ artistId }) => ({
+    artist: { id: artistId, name: 'Dynamic artist route should not handle this path' },
+    aliases: [],
+    monitoring: { isMonitored: false, monitoredReleaseGroupTypes: ['album', 'ep'] },
+    releaseGroups: [],
+    releases: [],
   }));
-  const app = createMetadataRouteTestApp({ listMonitoredArtists });
+  const listMonitoredArtists = t.mock.fn(async () => {
+    throw new Error('retired route must not read shared monitored artist payloads');
+  });
+  const app = createMetadataRouteTestApp({ getMetadataArtist, listMonitoredArtists });
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/metadata/artists/monitored?limit=10`);
     const payload = await response.json();
 
-    assert.equal(response.status, 200);
-    assert.equal(listMonitoredArtists.mock.callCount(), 1);
-    assert.deepEqual(listMonitoredArtists.mock.calls[0].arguments[0], { limit: 10 });
+    assert.equal(response.status, 410);
+    assert.equal(getMetadataArtist.mock.callCount(), 0);
+    assert.equal(listMonitoredArtists.mock.callCount(), 0);
     assert.deepEqual(payload, {
-      ok: true,
-      limit: 10,
-      results: [
-        {
-          id: 'mb-artist-1',
-          localId: 'local-1',
-          name: 'Autechre',
-          sortName: 'Autechre',
-          disambiguation: null,
-          country: 'GB',
-          type: 'Group',
-          monitored: true,
-        },
-      ],
+      ok: false,
+      error: {
+        code: 'endpoint_retired',
+        message: 'The shared monitored artist list endpoint has been retired. Use the operator-scoped monitored artist projection endpoint instead.',
+        replacementPath: '/api/v1/metadata/artists/monitored/operator',
+      },
     });
   });
 });

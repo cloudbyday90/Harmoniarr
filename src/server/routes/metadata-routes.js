@@ -20,6 +20,7 @@ import { createApiError, getRequestMetadata, requireCsrf, requireSession } from 
 import { createRequestAuthDependencies } from '../auth-module.js';
 import { asyncRoute, sanitizePageLimit, sanitizePageOffset } from '../http.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
+import { sendRetiredRouteResponse } from './retired-route-response.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies({
   getRequestMetadata,
@@ -87,7 +88,6 @@ export function registerMetadataRoutes(app, {
   searchLocalMetadataReleaseGroups,
   searchLocalMetadataReleases,
   searchAllLocalMetadata,
-  listMonitoredArtists,
   listOperatorMonitoredArtistProjections,
   listAllMonitoredArtists,
   searchMusicBrainzArtists,
@@ -153,10 +153,12 @@ export function registerMetadataRoutes(app, {
     }),
   }));
 
-  registerSessionGetJsonRoute('/api/v1/metadata/artists/monitored', async (request) => ({
-    ...await listMonitoredArtists({
-      limit: sanitizePageLimit(request.query.limit, { default: 25, max: 25 }),
-    }),
+  app.get('/api/v1/metadata/artists/monitored', metadataRoute(async (request, response) => {
+    await requireSessionFn(request);
+    sendRetiredRouteResponse(response, {
+      message: 'The shared monitored artist list endpoint has been retired. Use the operator-scoped monitored artist projection endpoint instead.',
+      replacementPath: '/api/v1/metadata/artists/monitored/operator',
+    });
   }));
 
   app.get('/api/v1/metadata/artists/monitored/operator', metadataRoute(async (request, response) => {
