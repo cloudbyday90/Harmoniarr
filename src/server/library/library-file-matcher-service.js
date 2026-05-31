@@ -18,22 +18,10 @@
 
 import { getPool } from '../database.js';
 import { createLibraryFileMatchStore } from './library-file-match-store.js';
-
-function normalizeText(value) {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
-
-  return normalized || null;
-}
+import {
+  findConventionalTagMatches,
+  normalizeMatchText,
+} from './conventional-tag-matching.js';
 
 function buildTrackLookupRows(rows) {
   return rows.map((row) => ({
@@ -53,9 +41,9 @@ function buildTrackLookupRows(rows) {
   }));
 }
 
-function buildMatchedResult(candidate, evidence) {
+function buildMatchedResult(candidate, evidence, { confidence = 'high' } = {}) {
   return {
-    confidence: 'high',
+    confidence,
     evidence,
     matchStatus: 'matched',
     matchedBy: evidence.strategy,
@@ -96,14 +84,14 @@ function matchByRecordingId({ candidates, normalizedTags }) {
 function matchByReleaseTitleAndTrackPosition({ candidates, normalizedTags }) {
   const releaseId = normalizedTags?.musicBrainz?.releaseId ?? null;
   const trackPosition = normalizedTags?.track?.number ?? null;
-  const normalizedTitle = normalizeText(normalizedTags?.title ?? null);
+  const normalizedTitle = normalizeMatchText(normalizedTags?.title ?? null);
   if (!releaseId || !Number.isInteger(trackPosition) || !normalizedTitle) {
     return null;
   }
 
   const matches = buildReleaseScopedCandidates(candidates, releaseId)
     .filter((candidate) => candidate.trackPosition === trackPosition)
-    .filter((candidate) => normalizeText(candidate.trackTitle) === normalizedTitle);
+    .filter((candidate) => normalizeMatchText(candidate.trackTitle) === normalizedTitle);
 
   if (matches.length !== 1) {
     return null;
@@ -117,10 +105,15 @@ function matchByReleaseTitleAndTrackPosition({ candidates, normalizedTags }) {
   });
 }
 
-function buildAmbiguousResult({ candidates, normalizedTags, strategy }) {
+function buildAmbiguousResult({
+  candidates,
+  evidence = null,
+  normalizedTags,
+  strategy,
+}) {
   return {
     confidence: 'low',
-    evidence: {
+    evidence: evidence ?? {
       candidateCount: candidates.length,
       releaseId: normalizedTags?.musicBrainz?.releaseId ?? null,
       strategy,
@@ -146,14 +139,83 @@ function buildUnmatchedResult({ reason, normalizedTags }) {
   };
 }
 
-function resolveMatchResult({ candidates, normalizedTags }) {
+function matchByConventionalTags({ candidates, file, normalizedTags }) {
+  const matchResult = findConventionalTagMatches({
+    candidates,
+    normalizedTags,
+    scopeMetadataReleaseId: file?.scopeMetadataReleaseId ?? null,
+  });
+
+  if (matchResult.reason) {
+    return null;
+  }
+
+  if (matchResult.scopeMatches.length === 1) {
+    return buildMatchedResult(matchResult.scopeMatches[0], {
+      matchedAlbum: matchResult.normalizedAlbum,
+      matchedArtist: matchResult.normalizedArtist,
+      matchedTitle: matchResult.normalizedTitle,
+      matchedTrackPosition: matchResult.trackPosition,
+      scopeMetadataReleaseId: file.scopeMetadataReleaseId,
+      strategy: 'conventional_tags',
+    });
+  }
+
+  if (matchResult.scopeMatches.length > 1) {
+    return buildAmbiguousResult({
+      candidates: matchResult.scopeMatches,
+      evidence: {
+        candidateCount: matchResult.scopeMatches.length,
+        matchedTitle: matchResult.normalizedTitle,
+        matchedTrackPosition: matchResult.trackPosition,
+        scopeMetadataReleaseId: file.scopeMetadataReleaseId,
+        strategy: 'conventional_tags_scope_multiple_candidates',
+      },
+      normalizedTags,
+      strategy: 'conventional_tags_scope_multiple_candidates',
+    });
+  }
+
+  if (matchResult.globalMatches.length === 1) {
+    return buildMatchedResult(matchResult.globalMatches[0], {
+      matchedAlbum: matchResult.normalizedAlbum,
+      matchedArtist: matchResult.normalizedArtist,
+      matchedTitle: matchResult.normalizedTitle,
+      matchedTrackPosition: matchResult.trackPosition,
+      scopeMetadataReleaseId: file?.scopeMetadataReleaseId ?? null,
+      strategy: 'conventional_tags',
+    }, { confidence: 'medium' });
+  }
+
+  if (matchResult.globalMatches.length > 1) {
+    return buildAmbiguousResult({
+      candidates: matchResult.globalMatches,
+      evidence: {
+        candidateCount: matchResult.globalMatches.length,
+        matchedAlbum: matchResult.normalizedAlbum,
+        matchedArtist: matchResult.normalizedArtist,
+        matchedTitle: matchResult.normalizedTitle,
+        matchedTrackPosition: matchResult.trackPosition,
+        scopeMetadataReleaseId: file?.scopeMetadataReleaseId ?? null,
+        strategy: 'conventional_tags_multiple_candidates',
+      },
+      normalizedTags,
+      strategy: 'conventional_tags_multiple_candidates',
+    });
+  }
+
+  return null;
+}
+
+function resolveMatchResult({ candidates, file, normalizedTags }) {
   const strategies = [
     matchByRecordingId,
     matchByReleaseTitleAndTrackPosition,
+    matchByConventionalTags,
   ];
 
   for (const strategy of strategies) {
-    const result = strategy({ candidates, normalizedTags });
+    const result = strategy({ candidates, file, normalizedTags });
     if (result) {
       return result;
     }
@@ -237,7 +299,7 @@ export function createLibraryFileMatcherService({
         continue;
       }
 
-      const result = resolveMatchResult({ candidates, normalizedTags });
+      const result = resolveMatchResult({ candidates, file, normalizedTags });
       await libraryFileMatchStore.writeLibraryFileMatch({
         ...result,
         libraryFileId: file.id,
