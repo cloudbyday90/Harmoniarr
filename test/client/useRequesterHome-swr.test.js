@@ -25,30 +25,47 @@ function makeRadarPayload({ recent = [], upcoming = [] } = {}) {
   };
 }
 
-describe('useMonitoredArtists SWR', () => {
-  test('isRevalidating is false initially and after first load', async () => {
-    const { useMonitoredArtists } = await import('../../src/client/composables/useMonitoredArtists.js');
+function makeOperatorProjection(overrides = {}) {
+  return {
+    artist: {
+      id: 'metadata-artist-1',
+      musicBrainzArtistId: 'mb-artist-1',
+      name: 'Radiohead',
+      ...overrides.artist,
+    },
+    operator: {
+      monitoring: {
+        isMonitored: true,
+        ...overrides.monitoring,
+      },
+    },
+  };
+}
 
-    const { isRevalidating, loadMonitoredArtists, destroy } = useMonitoredArtists({
-      fetchArtists: async () => ({ results: [{ id: '1', name: 'Radiohead' }] }),
+describe('useMonitoredArtistSummaries SWR', () => {
+  test('isRevalidating is false initially and after first load', async () => {
+    const { useMonitoredArtistSummaries } = await import('../../src/client/composables/useMonitoredArtistSummaries.js');
+
+    const { isRevalidating, loadMonitoredArtistSummaries, destroy } = useMonitoredArtistSummaries({
+      fetchArtists: async () => ({ results: [makeOperatorProjection()] }),
     });
 
     assert.equal(isRevalidating.value, false);
-    await loadMonitoredArtists();
+    await loadMonitoredArtistSummaries();
     assert.equal(isRevalidating.value, false);
 
     destroy();
   });
 
   test('isRevalidating is true during revalidation', async () => {
-    const { useMonitoredArtists } = await import('../../src/client/composables/useMonitoredArtists.js');
+    const { useMonitoredArtistSummaries } = await import('../../src/client/composables/useMonitoredArtistSummaries.js');
 
-    const { isRevalidating, loadMonitoredArtists, destroy } = useMonitoredArtists({
-      fetchArtists: async () => ({ results: [{ id: '1', name: 'Radiohead' }] }),
+    const { isRevalidating, loadMonitoredArtistSummaries, destroy } = useMonitoredArtistSummaries({
+      fetchArtists: async () => ({ results: [makeOperatorProjection()] }),
     });
 
-    await loadMonitoredArtists();
-    const secondLoad = loadMonitoredArtists();
+    await loadMonitoredArtistSummaries();
+    const secondLoad = loadMonitoredArtistSummaries();
     assert.equal(isRevalidating.value, true);
     await secondLoad;
     assert.equal(isRevalidating.value, false);
@@ -57,38 +74,38 @@ describe('useMonitoredArtists SWR', () => {
   });
 
   test('preserves stale artists on revalidation error', async () => {
-    const { useMonitoredArtists } = await import('../../src/client/composables/useMonitoredArtists.js');
+    const { useMonitoredArtistSummaries } = await import('../../src/client/composables/useMonitoredArtistSummaries.js');
 
     let callCount = 0;
     const fetchArtists = async () => {
       callCount += 1;
-      if (callCount === 1) return { results: [{ id: '1', name: 'Radiohead' }] };
+      if (callCount === 1) return { results: [makeOperatorProjection()] };
       throw new Error('network fail');
     };
 
-    const { artists, loadMonitoredArtists, destroy } = useMonitoredArtists({ fetchArtists });
+    const { artists, loadMonitoredArtistSummaries, destroy } = useMonitoredArtistSummaries({ fetchArtists });
 
-    await loadMonitoredArtists();
+    await loadMonitoredArtistSummaries();
     assert.equal(artists.value.length, 1);
 
-    await loadMonitoredArtists();
+    await loadMonitoredArtistSummaries();
     assert.equal(artists.value.length, 1, 'stale artists preserved');
 
     destroy();
   });
 
   test('pollIntervalMs schedules recurring loads', async () => {
-    const { useMonitoredArtists } = await import('../../src/client/composables/useMonitoredArtists.js');
+    const { useMonitoredArtistSummaries } = await import('../../src/client/composables/useMonitoredArtistSummaries.js');
 
     let callCount = 0;
     const fetchArtists = async () => {
       callCount += 1;
-      return { results: [{ id: '1', name: 'Radiohead' }] };
+      return { results: [makeOperatorProjection()] };
     };
 
-    const { loadMonitoredArtists, destroy } = useMonitoredArtists({ fetchArtists, pollIntervalMs: 30 });
+    const { loadMonitoredArtistSummaries, destroy } = useMonitoredArtistSummaries({ fetchArtists, pollIntervalMs: 30 });
 
-    await loadMonitoredArtists();
+    await loadMonitoredArtistSummaries();
     assert.equal(callCount, 1);
 
     await new Promise((resolve) => { setTimeout(resolve, 80); });
@@ -98,17 +115,17 @@ describe('useMonitoredArtists SWR', () => {
   });
 
   test('destroy stops polling', async () => {
-    const { useMonitoredArtists } = await import('../../src/client/composables/useMonitoredArtists.js');
+    const { useMonitoredArtistSummaries } = await import('../../src/client/composables/useMonitoredArtistSummaries.js');
 
     let callCount = 0;
     const fetchArtists = async () => {
       callCount += 1;
-      return { results: [{ id: '1', name: 'Radiohead' }] };
+      return { results: [makeOperatorProjection()] };
     };
 
-    const { loadMonitoredArtists, destroy } = useMonitoredArtists({ fetchArtists, pollIntervalMs: 30 });
+    const { loadMonitoredArtistSummaries, destroy } = useMonitoredArtistSummaries({ fetchArtists, pollIntervalMs: 30 });
 
-    await loadMonitoredArtists();
+    await loadMonitoredArtistSummaries();
     destroy();
 
     await new Promise((resolve) => { setTimeout(resolve, 80); });
@@ -116,17 +133,17 @@ describe('useMonitoredArtists SWR', () => {
   });
 
   test('pollIntervalMs=0 does not schedule polling', async () => {
-    const { useMonitoredArtists } = await import('../../src/client/composables/useMonitoredArtists.js');
+    const { useMonitoredArtistSummaries } = await import('../../src/client/composables/useMonitoredArtistSummaries.js');
 
     let callCount = 0;
     const fetchArtists = async () => {
       callCount += 1;
-      return { results: [{ id: '1', name: 'Radiohead' }] };
+      return { results: [makeOperatorProjection()] };
     };
 
-    const { loadMonitoredArtists, destroy } = useMonitoredArtists({ fetchArtists, pollIntervalMs: 0 });
+    const { loadMonitoredArtistSummaries, destroy } = useMonitoredArtistSummaries({ fetchArtists, pollIntervalMs: 0 });
 
-    await loadMonitoredArtists();
+    await loadMonitoredArtistSummaries();
     assert.equal(callCount, 1);
 
     await new Promise((resolve) => { setTimeout(resolve, 60); });

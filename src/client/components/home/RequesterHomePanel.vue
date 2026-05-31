@@ -27,7 +27,7 @@ import ReleaseCard from '../media/ReleaseCard.vue';
 import RequestButton from '../media/RequestButton.vue';
 import { useGridState } from '../../composables/useGridState.js';
 import { useActivityFeed } from '../../composables/useActivityFeed.js';
-import { useMonitoredArtists } from '../../composables/useMonitoredArtists.js';
+import { useMonitoredArtistSummaries } from '../../composables/useMonitoredArtistSummaries.js';
 import { useReleaseRadar } from '../../composables/useReleaseRadar.js';
 import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../../composables/useRequestUsers.js';
@@ -37,7 +37,14 @@ import { formatActivityEventTime, getActivityEventDetail, getActivityEventLabel 
 import { getRadarWindowLabel } from '../../lib/release-radar-normalization.js';
 import { sessionStore } from '../../state/session.js';
 
-const { artists, errorMessage, isLoading, loadMonitoredArtists, destroy: destroyArtists, attachVisibilityListener: attachArtistsVisibility } = useMonitoredArtists({ limit: 25, pollIntervalMs: 30000, revalidateOnFocus: true });
+const {
+  artists,
+  errorMessage,
+  isLoading,
+  loadMonitoredArtistSummaries: loadMonitoredArtists,
+  destroy: destroyArtists,
+  attachVisibilityListener: attachArtistsVisibility,
+} = useMonitoredArtistSummaries({ limit: 25, pollIntervalMs: 30000, revalidateOnFocus: true });
 
 const activityFeed = useActivityFeed({ limit: 10, pollIntervalMs: 30000, revalidateOnFocus: true });
 const currentUserId = sessionStore.state.user?.id ?? null;

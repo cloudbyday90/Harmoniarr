@@ -18,11 +18,16 @@
 
 import { readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
-import { fetchMonitoredArtists as defaultFetchMonitoredArtists } from '../lib/metadata-api.js';
+import { fetchOperatorMonitoredArtistProjections } from '../lib/metadata-api.js';
+import { mapOperatorProjectionsToMonitoredArtistSummaries } from '../lib/operator-monitored-artist-summary.js';
 
-export function useMonitoredArtists({
+function isAbortError(error) {
+  return error?.name === 'AbortError';
+}
+
+export function useMonitoredArtistSummaries({
   limit = 25,
-  fetchArtists = defaultFetchMonitoredArtists,
+  fetchArtists = fetchOperatorMonitoredArtistProjections,
   pollIntervalMs = 0,
   revalidateOnFocus = false,
 } = {}) {
@@ -30,6 +35,8 @@ export function useMonitoredArtists({
   const errorMessage = ref('');
   const isLoading = ref(true);
   const isRevalidating = ref(false);
+  let activeAbortController = null;
+  let loadGeneration = 0;
   let pollTimer = null;
   let destroyed = false;
   let hasLoaded = false;
@@ -41,31 +48,43 @@ export function useMonitoredArtists({
     }
   }
 
+  function createAbortController() {
+    if (typeof AbortController === 'undefined') {
+      return null;
+    }
+
+    return new AbortController();
+  }
+
+  function clearActiveAbortController(controller) {
+    if (activeAbortController === controller) {
+      activeAbortController = null;
+    }
+  }
+
   function schedulePoll() {
     clearPollTimer();
-    if (!pollIntervalMs || pollIntervalMs <= 0) return;
-    if (destroyed) return;
-    if (artists.value.length === 0) return;
+    if (!pollIntervalMs || pollIntervalMs <= 0 || destroyed || artists.value.length === 0) {
+      return;
+    }
 
     pollTimer = setTimeout(async () => {
-      if (destroyed) return;
-      await loadMonitoredArtists();
+      if (!destroyed) {
+        await loadMonitoredArtistSummaries();
+      }
     }, pollIntervalMs);
   }
 
   function handleVisibilityChange() {
-    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) return;
-    void loadMonitoredArtists().then(() => {
-      if (!destroyed) schedulePoll();
-    });
-  }
-
-  function destroy() {
-    destroyed = true;
-    clearPollTimer();
-    if (revalidateOnFocus && typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if (typeof document === 'undefined' || document.hidden || destroyed || !hasLoaded) {
+      return;
     }
+
+    void loadMonitoredArtistSummaries().then(() => {
+      if (!destroyed) {
+        schedulePoll();
+      }
+    });
   }
 
   function attachVisibilityListener() {
@@ -74,8 +93,25 @@ export function useMonitoredArtists({
     }
   }
 
-  async function loadMonitoredArtists() {
-    if (destroyed) return;
+  function destroy() {
+    destroyed = true;
+    clearPollTimer();
+    activeAbortController?.abort();
+    activeAbortController = null;
+    if (revalidateOnFocus && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
+  }
+
+  async function loadMonitoredArtistSummaries() {
+    if (destroyed) {
+      return;
+    }
+
+    activeAbortController?.abort();
+    const abortController = createAbortController();
+    activeAbortController = abortController;
+    const currentGeneration = ++loadGeneration;
     errorMessage.value = '';
 
     const isRevalidation = hasLoaded;
@@ -86,16 +122,28 @@ export function useMonitoredArtists({
     }
 
     try {
-      const payload = await fetchArtists({ limit });
-      artists.value = Array.isArray(payload?.results) ? payload.results : [];
+      const payload = await fetchArtists({
+        limit,
+        signal: abortController?.signal,
+      });
+      if (destroyed || currentGeneration !== loadGeneration) {
+        return;
+      }
+
+      artists.value = mapOperatorProjectionsToMonitoredArtistSummaries(payload?.results);
       hasLoaded = true;
     } catch (error) {
+      if (isAbortError(error) || currentGeneration !== loadGeneration) {
+        return;
+      }
+
       if (!isRevalidation) {
         artists.value = [];
       }
       errorMessage.value = getErrorMessage(error, 'Could not load your monitored artists.');
     } finally {
-      if (!destroyed) {
+      clearActiveAbortController(abortController);
+      if (!destroyed && currentGeneration === loadGeneration) {
         isLoading.value = false;
         isRevalidating.value = false;
         schedulePoll();
@@ -108,8 +156,8 @@ export function useMonitoredArtists({
     attachVisibilityListener,
     destroy,
     errorMessage,
-    isLoading,
+    isLoading: readonly(isLoading),
     isRevalidating: readonly(isRevalidating),
-    loadMonitoredArtists,
+    loadMonitoredArtistSummaries,
   };
 }

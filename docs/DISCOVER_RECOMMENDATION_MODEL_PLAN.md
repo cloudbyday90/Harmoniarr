@@ -1439,8 +1439,9 @@ Likely client-touch points:
 - `src/client/views/HomeView.vue`
 - `src/client/views/DiscoverView.vue`
 - `src/client/composables/useDiscoverGraph.js`
-- `src/client/composables/useMonitoredArtists.js`
+- `src/client/composables/useMonitoredArtistSummaries.js`
 - `src/client/composables/useArtistMonitoring.js`
+- `src/client/lib/operator-monitored-artist-summary.js`
 - `src/client/lib/discover-presentation.js`
 - `src/client/components/media/DiscoverArtistCard.vue`
 

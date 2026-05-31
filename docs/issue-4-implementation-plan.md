@@ -19,7 +19,7 @@
 
 **Step 1 — Complete:** Navigation & shell — `AppShell.vue` now has two distinct nav configurations. Operator nav: Home, Discover, Missing, Activity, Settings. Requester nav: Home, Discover, Search, My Requests. `<ToastStack>` is mounted in `AppShell.vue`. Note: requester nav includes a Search entry (not in original spec) and does not surface Account as a top-level nav item (Account remains in the sidebar footer).
 
-**Step 2 — Complete:** Requester home page — `RequesterHomePanel.vue` ships the artwork-first artist card grid using `ArtistCard.vue` and `ArtworkImage.vue`, backed by `useMonitoredArtists`. Cold-start `EmptyState` with CTA to Discover is implemented. The persistent "Find more artists" tail card is present at the end of the grid — same dimensions as an artist card, dashed border, compass/discover SVG icon, routes to `/app/discover`. Visible whenever `artists.length > 0`; hidden in cold-start state where the full `EmptyState` takes its place.
+**Step 2 — Complete:** Requester home page — `RequesterHomePanel.vue` ships the artwork-first artist card grid using `ArtistCard.vue` and `ArtworkImage.vue`, backed by projection summaries from `useMonitoredArtistSummaries`. Cold-start `EmptyState` with CTA to Discover is implemented. The persistent "Find more artists" tail card is present at the end of the grid — same dimensions as an artist card, dashed border, compass/discover SVG icon, routes to `/app/discover`. Visible whenever `artists.length > 0`; hidden in cold-start state where the full `EmptyState` takes its place.
 
 **Step 26 — Complete:** Operator dashboard — `DashboardView.vue` uses a `v-if isRequester` to render either `RequesterHomePanel.vue` or `OperatorDashboardPanel.vue`. The operator panel includes: all-user request queue (scoped to `mine` vs. all), active Soulseek downloads strip, library wanted summary, and onboarding panel. `OnboardingSummaryPanel` is preserved.
 
@@ -110,7 +110,7 @@ The re-scope is in active progress. The screens below have shipped:
 **New composables:**
 - `useArtistMonitoring.js` — import + monitor flow with toast feedback
 - `useDiscoverSearch.js` — MusicBrainz artist search state for Discover
-- `useMonitoredArtists.js` — fetches the current user’s monitored artist list
+- `useMonitoredArtistSummaries.js` — fetches operator-scoped projection data and maps it to routable monitored artist summaries
 - `useMyRequests.js` — fetches paginated request history
 - `useReleaseRequest.js` — request creation + state tracking with toast feedback
 
@@ -241,7 +241,7 @@ Required server route: `GET /api/v1/metadata/artists/:id/similar` — fetches fr
 Required:
 - Full rewrite of `DashboardView.vue`
 - Uses `ArtworkImage.vue`
-- Sources monitored artists from `searchLocalMetadataArtists` or a new `fetchMonitoredArtists` API call
+- Sources monitored artists from operator projection summaries, keeping MusicBrainz IDs as the route/artwork identifiers
 - Cold-start state (no monitored artists) renders a full-width Discover CTA
 
 ### 3.5 Nav Is a Filtered Single Experience, Not Two Distinct Experiences
@@ -427,7 +427,7 @@ Account link moves to the sidebar footer for both roles (as it is currently). Gl
 `DashboardView.vue` uses a top-level `v-if isOperator` to render one of two entirely distinct layouts. No partial overlap — they share only the route and the outer `AppShell`.
 
 **Requester layout** (top to bottom):
-1. **Monitored artist card grid** — `fetchMonitoredArtists()`. Each card: `ArtworkImage` + artist name + missing-release count badge. Click → navigates to `ArtistDetailView`. The final slot in the grid is always a **"Find more artists" card** — same dimensions as an artist card, dashed border, compass/discover icon, label "Find more artists", routes to `/app/discover`. Visible whenever `artists.length > 0`; it is the persistent, low-key Discover entry point for users who already have some library.
+1. **Monitored artist card grid** — projection-backed summaries from `useMonitoredArtistSummaries()`. Each card: `ArtworkImage` + artist name + missing-release count badge. Click → navigates to `ArtistDetailView` using the MusicBrainz artist ID from the projection. The final slot in the grid is always a **"Find more artists" card** — same dimensions as an artist card, dashed border, compass/discover icon, label "Find more artists", routes to `/app/discover`. Visible whenever `artists.length > 0`; it is the persistent, low-key Discover entry point for users who already have some library.
 2. **Cold-start state** (v-if no monitored artists) — renders a full-page `EmptyState` with title "Start building your music home", body copy, and a "Discover artists" CTA button routing to `{ name: 'discover' }`. **No auto-redirect on mount** — see Q7.4 resolution. The empty state disappears naturally when any artist is monitored household-wide. The "Find more artists" tail card is not shown in this state (the full `EmptyState` takes its place).
 3. **Onboarding panel** (v-if issues exist) — `OnboardingSummaryPanel`, below the card grid.
 

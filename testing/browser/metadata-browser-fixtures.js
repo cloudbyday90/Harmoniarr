@@ -582,17 +582,9 @@ export async function installMetadataBrowserFixtures(browserContext) {
 
       if (method === 'GET' && path === '/api/v1/metadata/artists/monitored') {
         return buildJsonResponse({
-          limit: 25,
-          offset: 0,
-          ok: true,
-          results: state.boardsIsAdded
-            ? [{
-              id: fixture.boardsLocalArtistPayload.artist.musicbrainzArtistId,
-              name: fixture.boardsLocalArtistPayload.artist.name,
-            }]
-            : [],
-          total: state.boardsIsAdded ? 1 : 0,
-        });
+          error: { message: 'Legacy monitored artist client fixture should not be used.' },
+          ok: false,
+        }, 410);
       }
 
       if (method === 'GET' && path === '/api/v1/metadata/artists/monitored/operator') {

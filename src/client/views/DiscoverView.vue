@@ -25,7 +25,7 @@ import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useDiscoverArtistArtwork } from '../composables/useDiscoverArtistArtwork.js';
 import { useDiscoverGraph } from '../composables/useDiscoverGraph.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
-import { useMonitoredArtists } from '../composables/useMonitoredArtists.js';
+import { useMonitoredArtistSummaries } from '../composables/useMonitoredArtistSummaries.js';
 import {
   loadSavedAddArtistPolicyForm,
   saveAddArtistPolicyForm,
@@ -53,9 +53,9 @@ const {
 
 const {
   artists: monitoredArtists,
-  loadMonitoredArtists,
+  loadMonitoredArtistSummaries: loadMonitoredArtists,
   destroy: destroyMonitoredArtists,
-} = useMonitoredArtists({ limit: 25 });
+} = useMonitoredArtistSummaries({ limit: 25 });
 
 const {
   addArtistWithPolicy,

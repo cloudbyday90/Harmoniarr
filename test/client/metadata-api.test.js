@@ -6,7 +6,6 @@ import {
   fetchMetadataArtistDetectionEvents,
   fetchMetadataRelease,
   fetchMetadataReleaseGroup,
-  fetchMonitoredArtists,
   fetchMusicBrainzReleaseGroupReleases,
   fetchOperatorArtistProjection,
   fetchOperatorMonitoredArtistProjections,
@@ -84,15 +83,6 @@ test('metadata-api search endpoints send query params', async (t) => {
   assert.ok(urls[0].includes('limit=5'));
   assert.ok(urls[1].includes('q=discovery'));
   assert.ok(urls[2].includes('q=homework'));
-});
-
-test('metadata-api fetchMonitoredArtists sends limit', async (t) => {
-  globalThis.document = { cookie: '' };
-  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
-
-  await fetchMonitoredArtists({ limit: 25 });
-
-  assert.ok(globalThis.fetch.mock.calls[0].arguments[0].includes('limit=25'));
 });
 
 test('metadata-api fetchOperatorMonitoredArtistProjections sends limit', async (t) => {

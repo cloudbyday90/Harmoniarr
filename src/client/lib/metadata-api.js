@@ -37,10 +37,6 @@ export function fetchAdminMonitoredArtists({ limit, offset, search, sort, signal
   return apiRequest(`/api/v1/metadata/artists/monitored/admin${buildQueryString({ limit, offset, search, sort })}`, { signal });
 }
 
-export function fetchMonitoredArtists({ limit, signal } = {}) {
-  return apiRequest(`/api/v1/metadata/artists/monitored${buildQueryString({ limit })}`, { signal });
-}
-
 export function fetchOperatorMonitoredArtistProjections({ limit, signal } = {}) {
   return apiRequest(`/api/v1/metadata/artists/monitored/operator${buildQueryString({ limit })}`, { signal });
 }
