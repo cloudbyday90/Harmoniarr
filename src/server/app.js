@@ -299,6 +299,7 @@ export function createApp({
     }),
   });
   const plexDirectSignInService = createPlexDirectSignInService();
+  let libraryModule = null;
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
@@ -372,10 +373,19 @@ export function createApp({
     maintenanceLockOperationPauseService,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
+    scheduleLibraryScan: async () => {
+      if (!libraryModule?.libraryScanService?.startLibraryScan) {
+        throw new Error('Library scan service is not initialized');
+      }
+
+      return libraryModule.libraryScanService.startLibraryScan({
+        triggeredByUserId: null,
+      });
+    },
     slskdTransferSnapshotService: slskdModule.slskdTransferSnapshotService,
     slskdService: slskdModule.slskdService,
   });
-  const libraryModule = buildLibraryModule({
+  libraryModule = buildLibraryModule({
     artworkAssignmentService: artworkModule.artworkAssignmentService,
     artworkIngestionService: artworkModule.artworkIngestionService,
     getAppUserById: appUserModule.appUserService.getAppUserById,

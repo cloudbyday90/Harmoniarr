@@ -132,6 +132,7 @@ export function createImportCandidateApplyWorker({
   releaseLease,
   renewLease,
   replaceImportApplyRunItems = async () => [],
+  scheduleLibraryScan = null,
   sendFulfillmentNotificationFn = null,
   onReleaseAddedFn = null,
   recordActivityEventFn = null,
@@ -324,6 +325,15 @@ export function createImportCandidateApplyWorker({
           totalImportPending: importPendingSummary.counts?.totalImportPending ?? runItems.length,
         },
       });
+
+      if (typeof scheduleLibraryScan === 'function' && (counts.applied + counts.appliedWithWarnings) > 0) {
+        try {
+          await scheduleLibraryScan({ triggeredByRunId: runId });
+        } catch {
+          // A scan that is already queued/running, or a scan readiness failure, should not
+          // turn an otherwise successful import apply run into a failed operation.
+        }
+      }
     } catch (error) {
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';

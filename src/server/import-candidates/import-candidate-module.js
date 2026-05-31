@@ -69,6 +69,7 @@ export function createImportCandidateModule({
   onReleaseAddedFn = null,
   recordActivityEventFn = null,
   recordSourceUserOutcomeEvidenceFn = async () => null,
+  scheduleLibraryScan = null,
   sendFulfillmentNotificationFn = null,
   slskdService,
   mediaInspectionService = createMediaInspectionService({
@@ -171,6 +172,7 @@ export function createImportCandidateModule({
     releaseLease: importCandidateApplyRunStore.releaseLease,
     renewLease: importCandidateApplyRunStore.renewLease,
     replaceImportApplyRunItems,
+    scheduleLibraryScan,
     sendFulfillmentNotificationFn,
     onReleaseAddedFn,
     recordActivityEventFn,

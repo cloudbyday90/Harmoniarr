@@ -28,6 +28,9 @@ suite('createApp', () => {
     libraryWantedReleaseService: {
       reconcileWantedReleases: t.mock.fn(async () => {}),
     },
+    libraryScanService: {
+      startLibraryScan: t.mock.fn(async () => ({ accepted: true, run: { id: 'scan-run-1' } })),
+    },
     libraryScanSummaryService: { buildLibraryScanSummary: () => ({}) },
     routeDependencies: { library: 'deps' },
   };
@@ -211,6 +214,11 @@ suite('createApp', () => {
   assert.equal(importCandidateModuleArgs.getMediaToolingStatus, mediaToolingStatusService.getStatus);
   assert.equal(typeof importCandidateModuleArgs.mediaInspectionService.inspectSourceFile, 'function');
   assert.equal(typeof importCandidateModuleArgs.mediaTranscodeExecutionService.executeCandidate, 'function');
+  assert.equal(typeof importCandidateModuleArgs.scheduleLibraryScan, 'function');
+  assert.deepEqual(await importCandidateModuleArgs.scheduleLibraryScan(), { accepted: true, run: { id: 'scan-run-1' } });
+  assert.deepEqual(libraryModule.libraryScanService.startLibraryScan.mock.calls[0].arguments[0], {
+    triggeredByUserId: null,
+  });
   assert.equal(typeof importCandidateModuleArgs.maintenanceLockService.listActiveMaintenanceLocks, 'function');
   assert.equal(artworkModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
   assert.equal(libraryModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);

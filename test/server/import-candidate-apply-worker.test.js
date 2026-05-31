@@ -2,6 +2,27 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createImportCandidateApplyWorker } from '../../src/server/import-candidates/import-candidate-apply-worker.js';
 
+function createReadyImportCandidate(overrides = {}) {
+  return {
+    applyPreview: {
+      counts: { totalFiles: 1 },
+      summary: { status: 'ready' },
+    },
+    fileCount: 1,
+    folderPath: 'Artist/Album',
+    id: 'candidate-ready-1',
+    importPendingAt: '2026-04-30T12:00:00.000Z',
+    importStatus: { code: 'ready', message: 'Ready.' },
+    lockedFileCount: 0,
+    planning: {},
+    sourceProvider: 'slskd',
+    sourceSearchId: 'search-ready-1',
+    totalSizeBytes: 50000,
+    username: 'source-user',
+    ...overrides,
+  };
+}
+
 test('import apply worker applies ready candidates and persists per-item outcomes', async (t) => {
   const markImportCandidateApplied = t.mock.fn(async () => ({}));
   const replaceImportApplyRunItems = t.mock.fn(async () => []);
@@ -135,6 +156,219 @@ test('import apply worker applies ready candidates and persists per-item outcome
       totalImportPending: 2,
     },
   }]);
+});
+
+test('import apply worker schedules one library scan after a completed run with applied candidates', async (t) => {
+  const callOrder = [];
+  let resolveScheduled;
+  const scheduled = new Promise((resolve) => {
+    resolveScheduled = resolve;
+  });
+  const scheduleLibraryScan = t.mock.fn(async (payload) => {
+    callOrder.push('schedule');
+    resolveScheduled(payload);
+  });
+
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview: async () => ({
+      executionMode: 'move',
+      fileOperations: [{ status: 'applied' }],
+      summary: {
+        appliedFileCount: 1,
+        failedFileCount: 0,
+        notAttemptedCount: 0,
+        stagedFromSourceCount: 1,
+        totalFiles: 1,
+      },
+    }),
+    buildImportPendingCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
+      importPendingCandidates: [createReadyImportCandidate()],
+    }),
+    markImportCandidateApplied: async () => ({}),
+    markRunCompleted: async () => {
+      callOrder.push('completed');
+    },
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => ({
+      counts: { totalFiles: 1 },
+      files: [],
+      summary: { status: 'ready' },
+    }),
+    releaseLease: async () => {},
+    replaceImportApplyRunItems: async () => [],
+    scheduleLibraryScan,
+    updateImportApplyRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId: 'run-auto-scan-1',
+  });
+
+  assert.deepEqual(await scheduled, { triggeredByRunId: 'run-auto-scan-1' });
+  assert.equal(scheduleLibraryScan.mock.callCount(), 1);
+  assert.deepEqual(callOrder, ['completed', 'schedule']);
+});
+
+test('import apply worker does not schedule a library scan when every candidate fails or is blocked', async (t) => {
+  const scheduleLibraryScan = t.mock.fn(async () => {});
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview: async () => ({
+      executionMode: 'move',
+      fileOperations: [{ status: 'failed' }],
+      summary: {
+        appliedFileCount: 0,
+        failedFileCount: 1,
+        notAttemptedCount: 0,
+        stagedFromSourceCount: 0,
+        totalFiles: 1,
+      },
+    }),
+    buildImportPendingCandidateSummary: async () => ({
+      counts: { blocked: 1, ready: 1, readyWithWarnings: 0, totalImportPending: 2 },
+      importPendingCandidates: [
+        createReadyImportCandidate({ id: 'candidate-failed-1' }),
+        createReadyImportCandidate({
+          id: 'candidate-blocked-1',
+          importStatus: { code: 'blocked', message: 'Collision review is required.' },
+        }),
+      ],
+    }),
+    markImportCandidateApplied: async () => ({}),
+    markRunCompleted: async () => {
+      resolveCompleted();
+    },
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => ({
+      counts: { totalFiles: 1 },
+      files: [],
+      summary: { status: 'ready' },
+    }),
+    releaseLease: async () => {},
+    replaceImportApplyRunItems: async () => [],
+    scheduleLibraryScan,
+    updateImportApplyRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 1,
+    requestedCandidateCount: 2,
+    runId: 'run-auto-scan-none',
+  });
+
+  await completed;
+
+  assert.equal(scheduleLibraryScan.mock.callCount(), 0);
+});
+
+test('import apply worker swallows library scan scheduling errors after successful apply', async (t) => {
+  const markRunFailed = t.mock.fn(async () => {});
+  const scheduleLibraryScan = t.mock.fn(async () => {
+    const error = new Error('A library scan is already running or queued');
+    error.status = 409;
+    error.code = 'library_scan_in_progress';
+    throw error;
+  });
+  let resolveReleased;
+  const released = new Promise((resolve) => {
+    resolveReleased = resolve;
+  });
+
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview: async () => ({
+      executionMode: 'move',
+      fileOperations: [{ status: 'applied' }],
+      summary: {
+        appliedFileCount: 1,
+        failedFileCount: 0,
+        notAttemptedCount: 0,
+        stagedFromSourceCount: 1,
+        totalFiles: 1,
+      },
+    }),
+    buildImportPendingCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
+      importPendingCandidates: [createReadyImportCandidate()],
+    }),
+    markImportCandidateApplied: async () => ({}),
+    markRunCompleted: async () => {},
+    markRunFailed,
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => ({
+      counts: { totalFiles: 1 },
+      files: [],
+      summary: { status: 'ready' },
+    }),
+    releaseLease: async (payload) => {
+      resolveReleased(payload);
+    },
+    replaceImportApplyRunItems: async () => [],
+    scheduleLibraryScan,
+    updateImportApplyRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId: 'run-auto-scan-error',
+  });
+
+  assert.deepEqual(await released, {
+    runId: 'run-auto-scan-error',
+    status: 'completed',
+  });
+  assert.equal(scheduleLibraryScan.mock.callCount(), 1);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+});
+
+test('import apply worker does not schedule a library scan after cancellation', async (t) => {
+  const markRunCancelled = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const scheduleLibraryScan = t.mock.fn(async () => {});
+  let resolveReleased;
+  const released = new Promise((resolve) => {
+    resolveReleased = resolve;
+  });
+
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    isCancellationRequested: async () => true,
+    markRunCancelled,
+    markRunCompleted,
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    releaseLease: async (payload) => {
+      resolveReleased(payload);
+    },
+    replaceImportApplyRunItems: async () => [],
+    scheduleLibraryScan,
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId: 'run-auto-scan-cancelled',
+  });
+
+  assert.deepEqual(await released, {
+    runId: 'run-auto-scan-cancelled',
+    status: 'cancelled',
+  });
+  assert.equal(markRunCancelled.mock.callCount(), 1);
+  assert.equal(markRunCompleted.mock.callCount(), 0);
+  assert.equal(scheduleLibraryScan.mock.callCount(), 0);
 });
 
 test('import apply worker upgrades skipped-file applies to applied_with_warnings', async (t) => {
