@@ -58,7 +58,7 @@ async function assertAuthenticatedLanding(page, username) {
   assert.match(currentUrl.pathname, /^\/app(?:\/onboarding)?$/);
 
   if (currentUrl.pathname === '/app') {
-    await waitForHeading(page, 'Library');
+    await page.getByRole('heading', { name: /^(Home|Library)$/ }).waitFor();
   }
 
   await page.locator('.hx-topbar-user').filter({ hasText: username }).waitFor();

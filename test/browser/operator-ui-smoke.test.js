@@ -98,7 +98,7 @@ suite('browser operator workflow smoke coverage', () => {
     });
   });
 
-  test('discover, artist detail, search, and import review render with deterministic metadata fixtures', {
+  test('discover add, home projection, artist detail draft save, search, and import review render with deterministic metadata fixtures', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -119,17 +119,42 @@ suite('browser operator workflow smoke coverage', () => {
       await page.getByRole('button', { name: 'Search' }).click();
 
       await page.getByRole('link', { name: 'Boards of Canada' }).waitFor();
-      await page.getByRole('button', { name: 'Monitor Boards of Canada' }).click();
+      await page.getByRole('button', { name: 'Add Boards of Canada' }).click();
+      const addArtistDialog = page.getByRole('dialog', { name: 'Boards of Canada' });
+      await addArtistDialog.waitFor();
+      await addArtistDialog.getByRole('button', { name: 'Add artist', exact: true }).click();
 
       await page.getByRole('heading', { name: 'Artists you might like' }).waitFor();
       await page.getByText('Autechre').waitFor();
 
-      await page.getByRole('link', { name: 'Boards of Canada' }).click();
+      await navigateWithinApp(page, {
+        heading: 'Home',
+        linkName: 'Home',
+        urlPattern: /\/app(?:\?.*)?(?:#.*)?$/,
+      });
+      await page.getByRole('heading', { name: 'Monitored Artists' }).waitFor();
+      const monitoredArtistsRegion = page.locator('section[aria-label="Monitored artists"]');
+      await monitoredArtistsRegion.getByText('Boards of Canada').waitFor();
+      await page.goto(`${baseUrl}/app/artists/mb-artist-boards?name=Boards%20of%20Canada`, { waitUntil: 'domcontentloaded' });
       await page.waitForURL(/\/app\/artists\/mb-artist-boards(?:\?.*)?$/);
       await page.getByRole('heading', { name: 'Boards of Canada' }).waitFor();
+      await page.getByRole('heading', { name: 'Artist Policy' }).waitFor();
       await page.getByRole('heading', { name: 'Discography' }).waitFor();
       await page.getByRole('heading', { name: 'Related artists' }).waitFor();
       await page.getByText('Music Has the Right to Children').waitFor();
+      await page.getByLabel('Selection state for Geogaddi').selectOption('unselected');
+      await page.getByText('Unsaved changes').waitFor();
+      await page.getByRole('button', { name: 'Save policy' }).click();
+      await page.getByText('Reconciliation queued').waitFor();
+      await page.getByText('Manual exclusion').waitFor();
+
+      await navigateWithinApp(page, {
+        heading: 'Home',
+        linkName: 'Home',
+        urlPattern: /\/app(?:\?.*)?(?:#.*)?$/,
+      });
+      await page.getByRole('heading', { name: 'Monitored Artists' }).waitFor();
+      await page.getByText('Reconciliation queued').waitFor();
 
       await page.goto(`${baseUrl}/app/search`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Search', exact: true }).waitFor();

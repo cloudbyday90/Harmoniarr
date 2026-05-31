@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harmoniarr Testing Validation"
+  short_description: "Choose and run the right validation path"
+  default_prompt: "Use $harmoniarr-testing-validation to choose the smallest reliable test and validation plan for this Harmoniarr change."

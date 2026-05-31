@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harmoniarr Backend Architecture"
+  short_description: "Backend services, routes, stores, and jobs"
+  default_prompt: "Use $harmoniarr-backend-architecture to implement a backend Harmoniarr feature through the right service, route, store, and validation boundaries."

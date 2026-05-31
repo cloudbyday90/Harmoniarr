@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harmoniarr Product Language"
+  short_description: "Keep monitored, recommended, wanted terms clear"
+  default_prompt: "Use $harmoniarr-product-language to review Harmoniarr UI copy, docs, and code naming for platform terminology consistency."

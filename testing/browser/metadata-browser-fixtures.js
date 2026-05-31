@@ -131,7 +131,7 @@ const metadataFixture = {
     {
       artistCredit: 'Boards of Canada',
       firstReleaseDate: '1998-04-20',
-      id: 'mb-rg-mhtrtc',
+      id: 'metadata-rg-mhtrtc',
       musicbrainzReleaseGroupId: 'mb-rg-mhtrtc',
       primaryType: 'Album',
       title: 'Music Has the Right to Children',
@@ -139,7 +139,7 @@ const metadataFixture = {
     {
       artistCredit: 'Boards of Canada',
       firstReleaseDate: '2002-11-18',
-      id: 'mb-rg-geogaddi',
+      id: 'metadata-rg-geogaddi',
       musicbrainzReleaseGroupId: 'mb-rg-geogaddi',
       primaryType: 'Album',
       title: 'Geogaddi',
@@ -164,6 +164,53 @@ const metadataFixture = {
 export async function installMetadataBrowserFixtures(browserContext) {
   await browserContext.addInitScript(({ fixture }) => {
     const originalFetch = globalThis.fetch.bind(globalThis);
+    const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
+    const state = loadFixtureState();
+
+    function createInitialFixtureState() {
+      return {
+        boardsIsAdded: false,
+        boardsOperatorProjection: buildOperatorProjection({
+          monitoring: {
+            acquisitionProfileKey: 'balanced_library',
+            isMonitored: true,
+            monitoredReleaseGroupTypes: ['album', 'ep'],
+            releaseScope: 'future_only',
+            searchOnAddMode: 'none',
+            selectionSourceMode: 'policy_only',
+            wantedAutomationMode: 'future_matching',
+          },
+          reconciliationStatus: 'idle',
+          releaseGroupSelections: [],
+          trackOverrides: [],
+        }),
+        operatorSaveCount: 0,
+      };
+    }
+
+    function loadFixtureState() {
+      try {
+        const rawState = globalThis.sessionStorage.getItem(fixtureStateStorageKey);
+        if (rawState) {
+          return {
+            ...createInitialFixtureState(),
+            ...JSON.parse(rawState),
+          };
+        }
+      } catch {
+        // Fall through to a clean state when storage is unavailable or stale.
+      }
+
+      return createInitialFixtureState();
+    }
+
+    function persistFixtureState() {
+      globalThis.sessionStorage.setItem(fixtureStateStorageKey, JSON.stringify({
+        boardsIsAdded: state.boardsIsAdded,
+        boardsOperatorProjection: state.boardsOperatorProjection,
+        operatorSaveCount: state.operatorSaveCount,
+      }));
+    }
 
     function buildJsonResponse(body, status = 200) {
       return new Response(JSON.stringify(body), {
@@ -180,6 +227,157 @@ export async function installMetadataBrowserFixtures(browserContext) {
 
     function buildFixtureArtworkKey(ownerType, ownerId, artworkRole = 'cover_front') {
       return `${ownerType}:${ownerId}:${artworkRole}`;
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function normalizePrimaryType(primaryType) {
+      return String(primaryType ?? 'other').trim().toLowerCase();
+    }
+
+    function buildReleaseGroups({ monitoring, releaseGroupSelections = [], trackOverrides = [] } = {}) {
+      const explicitSelections = new Map(
+        releaseGroupSelections.map((selection) => [selection.metadataReleaseGroupId, selection]),
+      );
+
+      return fixture.boardsReleaseGroups.map((releaseGroup) => {
+        const explicitSelection = explicitSelections.get(releaseGroup.id) ?? null;
+        const selectedByPolicy = (monitoring.monitoredReleaseGroupTypes ?? [])
+          .includes(normalizePrimaryType(releaseGroup.primaryType));
+        const trackOverrideCount = trackOverrides
+          .filter((override) => override.metadataReleaseGroupId === releaseGroup.id)
+          .length;
+
+        return {
+          ...releaseGroup,
+          operatorState: {
+            isExplicitSelection: Boolean(explicitSelection),
+            resolvedMetadataReleaseId: explicitSelection?.resolvedMetadataReleaseId ?? null,
+            resolvedRelease: null,
+            selectionSource: explicitSelection?.selectionSource ?? 'policy',
+            selectionState: explicitSelection?.selectionState ?? (selectedByPolicy ? 'selected' : 'unselected'),
+            trackOverrideSummary: {
+              desiredCount: 0,
+              orphanedCount: 0,
+              reviewNeededCount: 0,
+              suppressedCount: 0,
+              totalCount: trackOverrideCount,
+            },
+          },
+        };
+      });
+    }
+
+    function buildCoverage(releaseGroups) {
+      const desiredReleaseCount = releaseGroups
+        .filter((releaseGroup) => ['selected', 'partial'].includes(releaseGroup.operatorState.selectionState))
+        .length;
+      const partialReleaseCount = releaseGroups
+        .filter((releaseGroup) => releaseGroup.operatorState.selectionState === 'partial')
+        .length;
+
+      return {
+        acquiredReleaseCount: 0,
+        desiredReleaseCount,
+        missingReleaseCount: desiredReleaseCount,
+        partialReleaseCount,
+        unresolvedReleaseCount: 0,
+      };
+    }
+
+    function buildOverview({ releaseGroups, releaseGroupSelections = [], trackOverrides = [] } = {}) {
+      const selectedReleaseGroupCount = releaseGroups
+        .filter((releaseGroup) => releaseGroup.operatorState.selectionState === 'selected')
+        .length;
+      const partialReleaseGroupCount = releaseGroups
+        .filter((releaseGroup) => releaseGroup.operatorState.selectionState === 'partial')
+        .length;
+      const unselectedReleaseGroupCount = releaseGroups
+        .filter((releaseGroup) => releaseGroup.operatorState.selectionState === 'unselected')
+        .length;
+
+      return {
+        desiredReleaseGroupCount: selectedReleaseGroupCount + partialReleaseGroupCount,
+        desiredTrackOverrideCount: trackOverrides.filter((override) => override.isDesired === true).length,
+        hasManualOverrides: releaseGroupSelections.length > 0 || trackOverrides.length > 0,
+        manualSelectionCount: releaseGroupSelections.length,
+        orphanedReleaseGroupSelectionCount: 0,
+        orphanedTrackOverrideCount: 0,
+        partialReleaseGroupCount,
+        policySelectionCount: releaseGroups.length - releaseGroupSelections.length,
+        releaseGroupCount: releaseGroups.length,
+        reviewNeededTrackOverrideCount: 0,
+        selectedReleaseGroupCount,
+        suppressedTrackOverrideCount: trackOverrides.filter((override) => override.isDesired === false).length,
+        trackOverrideCount: trackOverrides.length,
+        unselectedReleaseGroupCount,
+      };
+    }
+
+    function buildOperatorProjection({
+      monitoring,
+      reconciliationStatus,
+      releaseGroupSelections = [],
+      trackOverrides = [],
+    }) {
+      const releaseGroups = buildReleaseGroups({
+        monitoring,
+        releaseGroupSelections,
+        trackOverrides,
+      });
+
+      return {
+        aliases: [],
+        artist: clone(fixture.boardsLocalArtistPayload.artist),
+        detectionEvents: [],
+        detectionEventsPageInfo: {
+          hasMore: false,
+          nextCursor: null,
+        },
+        operator: {
+          coverage: buildCoverage(releaseGroups),
+          monitoring,
+          overview: buildOverview({
+            releaseGroups,
+            releaseGroupSelections,
+            trackOverrides,
+          }),
+          reconciliation: {
+            latestRun: null,
+            latestSnapshot: null,
+            pendingRun: reconciliationStatus === 'queued'
+              ? { id: 'operator-reconciliation-run-1', status: 'pending' }
+              : null,
+            runningRun: null,
+            status: reconciliationStatus,
+          },
+          releaseGroupSelections,
+          trackOverrides,
+        },
+        releaseGroups,
+        releases: [],
+      };
+    }
+
+    function updateOperatorProjectionFromDraft(draft) {
+      state.operatorSaveCount += 1;
+      state.boardsIsAdded = true;
+      state.boardsOperatorProjection = buildOperatorProjection({
+        monitoring: {
+          ...state.boardsOperatorProjection.operator.monitoring,
+          ...(draft.monitoring ?? {}),
+        },
+        reconciliationStatus: state.operatorSaveCount > 1 ? 'queued' : 'idle',
+        releaseGroupSelections: Array.isArray(draft.releaseGroupSelections)
+          ? draft.releaseGroupSelections
+          : [],
+        trackOverrides: Array.isArray(draft.trackOverrides)
+          ? draft.trackOverrides
+          : [],
+      });
+      persistFixtureState();
     }
 
     globalThis.fetch = async (input, init) => {
@@ -236,6 +434,61 @@ export async function installMetadataBrowserFixtures(browserContext) {
           },
           ok: true,
         }, 201);
+      }
+
+      if (method === 'GET' && path === '/api/v1/metadata/artists/monitored') {
+        return buildJsonResponse({
+          limit: 25,
+          offset: 0,
+          ok: true,
+          results: state.boardsIsAdded
+            ? [{
+              id: fixture.boardsLocalArtistPayload.artist.musicbrainzArtistId,
+              name: fixture.boardsLocalArtistPayload.artist.name,
+            }]
+            : [],
+          total: state.boardsIsAdded ? 1 : 0,
+        });
+      }
+
+      if (method === 'GET' && path === '/api/v1/metadata/artists/monitored/operator') {
+        const results = state.boardsIsAdded ? [clone(state.boardsOperatorProjection)] : [];
+        return buildJsonResponse({
+          limit: 50,
+          offset: 0,
+          ok: true,
+          results,
+          total: results.length,
+        });
+      }
+
+      if (method === 'GET' && path === `/api/v1/metadata/artists/${fixture.boardsLocalArtistPayload.artist.id}/operator`) {
+        if (!state.boardsIsAdded) {
+          return buildJsonResponse({ error: { message: 'Not found' }, ok: false }, 404);
+        }
+
+        return buildJsonResponse({
+          ok: true,
+          ...clone(state.boardsOperatorProjection),
+        });
+      }
+
+      if (method === 'PUT' && path === `/api/v1/metadata/artists/${fixture.boardsLocalArtistPayload.artist.id}/operator`) {
+        const rawBody = init?.body
+          ?? (typeof input === 'object' && input !== null && 'body' in input ? input.body : '{}');
+        const draft = JSON.parse(typeof rawBody === 'string' ? rawBody : '{}');
+        updateOperatorProjectionFromDraft(draft);
+
+        return buildJsonResponse({
+          ok: true,
+          ...clone(state.boardsOperatorProjection),
+          artistId: fixture.boardsLocalArtistPayload.artist.id,
+          reconciliation: state.boardsOperatorProjection.operator.reconciliation,
+          snapshot: {
+            id: 'operator-snapshot-1',
+            snapshotRevision: state.operatorSaveCount,
+          },
+        });
       }
 
       if (method === 'PUT' && path === `/api/v1/metadata/artists/${fixture.boardsLocalArtistPayload.artist.id}/monitoring`) {
