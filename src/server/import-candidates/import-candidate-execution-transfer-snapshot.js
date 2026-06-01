@@ -58,6 +58,7 @@ export function buildPersistedExecutionTransferSnapshot({
       missingTransfer: liveTransferSummary.missingTransfer ?? null,
       percentComplete: liveTransferSummary.percentComplete ?? null,
       queued: liveTransferSummary.queued ?? 0,
+      rejected: liveTransferSummary.rejected ?? 0,
       status: liveTransferSummary.status ?? null,
       total: liveTransferSummary.total ?? transfers.length,
       totalBytes: liveTransferSummary.totalBytes ?? 0,

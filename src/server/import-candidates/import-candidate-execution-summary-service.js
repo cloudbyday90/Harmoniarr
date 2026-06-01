@@ -22,6 +22,7 @@ import { resolveImportCandidateExecutionMissingTransferConfig } from './import-c
 import { createImportCandidateExecutionHeartbeatState } from './import-candidate-execution-heartbeat-state.js';
 import { createImportCandidateExecutionRunStore } from './import-candidate-execution-run-store.js';
 import { createImportCandidateRunSummaryService } from './import-candidate-run-summary-service.js';
+import { classifySlskdTransferState } from './import-candidate-transfer-state-policy.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
 
 function isSlskdError(error) {
@@ -35,15 +36,6 @@ function parseIsoDate(value) {
 
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function normalizeTransferState(state) {
-  return typeof state === 'string' ? state : 'Unknown';
-}
-
-function isTerminalTransferState(state) {
-  const normalized = normalizeTransferState(state);
-  return normalized.includes('Completed');
 }
 
 function resolveMissingSince(item, now) {
@@ -74,10 +66,15 @@ function buildMissingTransferSummary({ item, missingTransferConfig, now }) {
 
 function buildLiveTransferSummary(transfers, { item, missingTransferConfig, now }) {
   const total = transfers.length;
-  const active = transfers.filter((transfer) => !isTerminalTransferState(transfer.state)).length;
-  const failed = transfers.filter((transfer) => String(transfer.exception || '').trim()).length;
-  const completed = transfers.filter((transfer) => normalizeTransferState(transfer.state).includes('Completed, Succeeded')).length;
-  const queued = transfers.filter((transfer) => normalizeTransferState(transfer.state).includes('Queued')).length;
+  const classifiedTransfers = transfers.map((transfer) => ({
+    classification: classifySlskdTransferState(transfer),
+    transfer,
+  }));
+  const active = classifiedTransfers.filter(({ classification }) => classification.code === 'active').length;
+  const completed = classifiedTransfers.filter(({ classification }) => classification.code === 'succeeded').length;
+  const failed = classifiedTransfers.filter(({ classification }) => classification.code === 'failed').length;
+  const queued = classifiedTransfers.filter(({ classification }) => classification.code === 'queued').length;
+  const rejected = classifiedTransfers.filter(({ classification }) => classification.code === 'rejected').length;
   const bytesTransferred = transfers.reduce((sum, transfer) => sum + (Number(transfer.bytesTransferred) || 0), 0);
   const totalBytes = transfers.reduce((sum, transfer) => sum + (Number(transfer.size) || 0), 0);
 
@@ -85,7 +82,7 @@ function buildLiveTransferSummary(transfers, { item, missingTransferConfig, now 
   let message;
   let missingTransfer = null;
 
-  if (total > 0 && active > 0) {
+  if (total > 0 && (active > 0 || queued > 0)) {
     status = queued > 0 ? 'queued' : 'active';
     message = queued > 0
       ? `${queued} transfer${queued === 1 ? '' : 's'} are still queued or waiting remotely.`
@@ -93,6 +90,9 @@ function buildLiveTransferSummary(transfers, { item, missingTransferConfig, now 
   } else if (completed > 0 && completed === total && failed === 0) {
     status = 'completed';
     message = `${completed} transfer${completed === 1 ? '' : 's'} completed successfully.`;
+  } else if (rejected > 0 && failed === 0) {
+    status = 'rejected';
+    message = `${rejected} transfer${rejected === 1 ? ' was' : 's were'} rejected by the remote peer; Harmoniarr will retry this candidate before cascading.`;
   } else if (failed > 0) {
     status = 'failed';
     message = `${failed} transfer${failed === 1 ? '' : 's'} reported a terminal slskd error.`;
@@ -116,6 +116,7 @@ function buildLiveTransferSummary(transfers, { item, missingTransferConfig, now 
     missingTransfer,
     percentComplete: totalBytes > 0 ? Math.max(0, Math.min(100, Math.round((bytesTransferred / totalBytes) * 100))) : null,
     queued,
+    rejected,
     status,
     total,
     totalBytes,

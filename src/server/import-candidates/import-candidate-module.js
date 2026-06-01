@@ -134,6 +134,8 @@ export function createImportCandidateModule({
   importCandidateRecoveryService = createImportCandidateRecoveryService({
     createRecoveryExecutionRun: importCandidateExecutionRunStore.createOperationRun,
     getImportCandidate: importCandidateService.getImportCandidate,
+    markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
+    retryImportCandidateDownload: importCandidateService.retryImportCandidateDownload,
   }),
   importCandidateFileDecisionService = createImportCandidateFileDecisionService({
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
@@ -280,6 +282,7 @@ export function createImportCandidateModule({
     buildImportCandidateExecutionSummary: importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
     getImportCandidate: importCandidateService.getImportCandidate,
     handleImportCandidateDownloadFailure: importCandidateRecoveryService.handleImportCandidateDownloadFailure,
+    handleImportCandidateRejectedTransfer: importCandidateRecoveryService.handleImportCandidateRejectedTransfer,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
     markImportCandidateDownloading: importCandidateService.markImportCandidateDownloading,
     markImportCandidateImportPending: importCandidateService.markImportCandidateImportPending,

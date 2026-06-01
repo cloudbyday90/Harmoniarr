@@ -151,6 +151,66 @@ test('buildImportCandidateExecutionSummary reconciles live slskd transfers for e
   assert.equal(summary.currentRun.items[0].persistedTransferObservation, null);
 });
 
+test('buildImportCandidateExecutionSummary classifies terminal transfer states without relying on exceptions', async () => {
+  const service = createImportCandidateExecutionSummaryService({
+    buildTransferSnapshot: async () => ({
+      getTransfer: ({ id, username }) => ({
+        bytesTransferred: 0,
+        exception: null,
+        filename: `${id}.flac`,
+        id,
+        size: 1000,
+        state: id === 'transfer-rejected'
+          ? 'Completed, Rejected'
+          : 'Completed, TimedOut',
+        username,
+      }),
+    }),
+    importCandidateExecutionRunStore: {
+      getActiveRun: async () => ({
+        executionMode: 'download_enqueue',
+        id: 'run-terminal-states',
+        status: 'running',
+      }),
+      getLatestRun: async () => null,
+    },
+    listImportExecutionRunItemsFn: async () => [{
+      id: 'item-rejected',
+      itemStatus: 'queued',
+      planningSnapshot: {
+        candidate: { id: 'candidate-rejected' },
+        execution: {
+          enqueuedTransfers: [{
+            id: 'transfer-rejected',
+            username: 'source-user',
+          }],
+        },
+      },
+      statusMessage: '1 file accepted by slskd for download.',
+    }, {
+      id: 'item-timed-out',
+      itemStatus: 'queued',
+      planningSnapshot: {
+        candidate: { id: 'candidate-timed-out' },
+        execution: {
+          enqueuedTransfers: [{
+            id: 'transfer-timed-out',
+            username: 'source-user',
+          }],
+        },
+      },
+      statusMessage: '1 file accepted by slskd for download.',
+    }],
+  });
+
+  const summary = await service.buildImportCandidateExecutionSummary();
+
+  assert.equal(summary.currentRun.items[0].liveTransferSummary.status, 'rejected');
+  assert.equal(summary.currentRun.items[0].liveTransferSummary.rejected, 1);
+  assert.equal(summary.currentRun.items[1].liveTransferSummary.status, 'failed');
+  assert.equal(summary.currentRun.items[1].liveTransferSummary.failed, 1);
+});
+
 test('buildImportCandidateExecutionSummary falls back to removed downloads and delays orphan handling inside the grace window', async () => {
   const service = createImportCandidateExecutionSummaryService({
     buildTransferSnapshot: async () => ({

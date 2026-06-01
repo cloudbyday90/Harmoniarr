@@ -61,6 +61,7 @@ export function createImportCandidateExecutionRunStore({
 
   async function createOperationRun({
     executionMode = 'download_enqueue',
+    nextAttemptAt = null,
     requestedCandidateCount,
     status = 'pending',
     summary = null,
@@ -73,6 +74,7 @@ export function createImportCandidateExecutionRunStore({
         executionMode,
         requestedCandidateCount,
       },
+      nextAttemptAt,
       triggeredByUserId,
     });
 

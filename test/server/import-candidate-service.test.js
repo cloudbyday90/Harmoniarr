@@ -658,6 +658,7 @@ test('createImportCandidateService marks download workflow transitions with shar
   });
 
   await service.markImportCandidateDownloading({ importCandidateId: 'candidate-1', reason: 'Queued remotely' });
+  await service.retryImportCandidateDownload({ importCandidateId: 'candidate-1', reason: 'Remote peer rejected the transfer' });
   await service.markImportCandidateImportPending({ importCandidateId: 'candidate-1', reason: 'Completed' });
   await service.markImportCandidateApplied({ importCandidateId: 'candidate-1', reason: 'Imported cleanly' });
   await service.markImportCandidateDownloadFailed({ importCandidateId: 'candidate-1', reason: 'Remote transfer failed' });
@@ -668,24 +669,30 @@ test('createImportCandidateService marks download workflow transitions with shar
     toStatus: 'downloading',
   }, client]);
   assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[1].arguments, [{
+    fromStatuses: ['downloading'],
+    importCandidateId: 'candidate-1',
+    toStatus: 'selected',
+  }, client]);
+  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[2].arguments, [{
     fromStatuses: ['selected', 'downloading'],
     importCandidateId: 'candidate-1',
     toStatus: 'import_pending',
   }, client]);
-  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[2].arguments, [{
+  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[3].arguments, [{
     fromStatuses: ['import_pending'],
     importCandidateId: 'candidate-1',
     toStatus: 'applied',
   }, client]);
-  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[3].arguments, [{
+  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[4].arguments, [{
     fromStatuses: ['selected', 'downloading'],
     importCandidateId: 'candidate-1',
     toStatus: 'failed',
   }, client]);
   assert.equal(insertImportCandidateEventFn.mock.calls[0].arguments[0].eventType, 'import_candidate_downloading');
-  assert.equal(insertImportCandidateEventFn.mock.calls[1].arguments[0].eventType, 'import_candidate_import_pending');
-  assert.equal(insertImportCandidateEventFn.mock.calls[2].arguments[0].eventType, 'import_candidate_applied');
-  assert.equal(insertImportCandidateEventFn.mock.calls[3].arguments[0].eventType, 'import_candidate_download_failed');
+  assert.equal(insertImportCandidateEventFn.mock.calls[1].arguments[0].eventType, 'import_candidate_download_retry_scheduled');
+  assert.equal(insertImportCandidateEventFn.mock.calls[2].arguments[0].eventType, 'import_candidate_import_pending');
+  assert.equal(insertImportCandidateEventFn.mock.calls[3].arguments[0].eventType, 'import_candidate_applied');
+  assert.equal(insertImportCandidateEventFn.mock.calls[4].arguments[0].eventType, 'import_candidate_download_failed');
   assert.deepEqual(recordSourceUserOutcomeEvidenceFn.mock.calls.map((call) => call.arguments[0]), [
     {
       actorUserId: null,

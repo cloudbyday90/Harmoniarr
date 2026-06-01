@@ -169,3 +169,64 @@ test('reconcileImportCandidateExecutionState only fails missing transfers after 
   assert.equal(result.summary.snapshotsUpdated, 2);
   assert.equal(result.summary.transitioned, 1);
 });
+
+test('reconcileImportCandidateExecutionState schedules rejected-transfer retries before cascading', async (t) => {
+  const handleImportCandidateRejectedTransfer = t.mock.fn(async ({ failedCandidateId }) => ({
+    failedCandidateId,
+    nextCandidateId: failedCandidateId,
+    reason: 'candidate_retry_scheduled',
+    recovered: true,
+    retryAt: '2026-05-01T00:10:00.000Z',
+    retrySameCandidate: true,
+  }));
+  const markImportCandidateDownloadFailed = t.mock.fn(async () => ({
+    candidate: { id: 'unexpected', status: 'failed' },
+  }));
+  const service = createImportCandidateExecutionReconciliationService({
+    buildImportCandidateExecutionSummary: async () => ({
+      currentRun: {
+        id: 'run-rejected',
+        status: 'completed',
+        items: [{
+          itemStatus: 'queued',
+          liveTransfers: [{
+            exception: null,
+            filename: 'Rejected.flac',
+            id: 'transfer-rejected',
+            size: 100,
+            state: 'Completed, Rejected',
+            username: 'source-user',
+          }],
+          liveTransferSummary: {
+            message: '1 transfer was rejected by the remote peer; Harmoniarr will retry this candidate before cascading.',
+            rejected: 1,
+            status: 'rejected',
+          },
+          planningSnapshot: { candidate: { id: 'candidate-rejected' }, execution: { enqueuedTransfers: [{ id: 'transfer-rejected', username: 'source-user' }] } },
+          statusMessage: 'Rejected',
+        }],
+      },
+    }),
+    getImportCandidate: async ({ importCandidateId }) => ({
+      id: importCandidateId,
+      status: 'downloading',
+    }),
+    handleImportCandidateRejectedTransfer,
+    markImportCandidateDownloadFailed,
+    updateImportExecutionRunItem: async () => null,
+  });
+
+  const result = await service.reconcileImportCandidateExecutionState();
+
+  assert.equal(handleImportCandidateRejectedTransfer.mock.callCount(), 1);
+  assert.deepEqual(handleImportCandidateRejectedTransfer.mock.calls[0].arguments[0], {
+    failedCandidateId: 'candidate-rejected',
+    failureReason: '1 transfer was rejected by the remote peer; Harmoniarr will retry this candidate before cascading.',
+    operationRunId: 'run-rejected',
+    scheduleFollowUpRun: true,
+  });
+  assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 0);
+  assert.equal(result.summary.retried, 1);
+  assert.equal(result.summary.transitioned, 1);
+  assert.equal(result.retries[0].retrySameCandidate, true);
+});

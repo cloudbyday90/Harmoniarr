@@ -572,6 +572,24 @@ export function createImportCandidateService({
     });
   }
 
+  function retryImportCandidateDownload({
+    actorUserId = null,
+    importCandidateId,
+    reason = null,
+    requestMetadata = null,
+  }) {
+    return transitionCandidateReviewStatus({
+      actorUserId,
+      eventType: 'import_candidate_download_retry_scheduled',
+      fromStatuses: ['downloading'],
+      importCandidateId,
+      reason,
+      requestMetadata,
+      summary: 'Import candidate download retry scheduled',
+      toStatus: 'selected',
+    });
+  }
+
   function markImportCandidateImportPending({
     actorUserId = null,
     importCandidateId,
@@ -787,6 +805,7 @@ export function createImportCandidateService({
     markImportCandidateImportPending,
     rejectImportCandidate,
     reopenImportCandidate,
+    retryImportCandidateDownload,
     selectImportCandidate,
   };
 }

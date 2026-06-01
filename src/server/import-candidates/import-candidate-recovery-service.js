@@ -23,6 +23,7 @@ import {
 } from './import-candidate-repository.js';
 
 export const MAX_CANDIDATE_DOWNLOAD_ATTEMPTS = 3;
+export const RETRY_REJECTED_TRANSFER_DELAY_MS = 10 * 60 * 1000;
 
 function normalizeOptionalString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
@@ -56,15 +57,21 @@ function buildRecoveryResult({
 export function createImportCandidateRecoveryService({
   createRecoveryExecutionRun = null,
   findNextCandidateForRecoveryFn = findNextCandidateForRecovery,
+  getNow = () => new Date(),
   getImportCandidate = async () => null,
   incrementImportCandidateDownloadAttemptCountFn = incrementImportCandidateDownloadAttemptCount,
+  markImportCandidateDownloadFailed = async () => null,
   maxCandidateDownloadAttempts = MAX_CANDIDATE_DOWNLOAD_ATTEMPTS,
   promoteImportCandidateForRecoveryFn = promoteImportCandidateForRecovery,
+  retryImportCandidateDownload = async () => null,
+  retryRejectedTransferDelayMs = RETRY_REJECTED_TRANSFER_DELAY_MS,
 } = {}) {
   async function scheduleRecoveryExecutionRun({
     nextCandidate,
+    nextAttemptAt = null,
     operationRunId,
     scheduleFollowUpRun,
+    summaryReason = 'transfer_recovery_cascade',
     triggeredByFailedCandidateId,
   }) {
     if (!scheduleFollowUpRun || typeof createRecoveryExecutionRun !== 'function') {
@@ -73,13 +80,17 @@ export function createImportCandidateRecoveryService({
 
     return createRecoveryExecutionRun({
       executionMode: 'download_enqueue',
+      nextAttemptAt,
       requestedCandidateCount: 1,
       status: 'pending',
       summary: {
-        currentStep: 'queued by transfer recovery cascade',
+        currentStep: nextAttemptAt
+          ? 'queued for delayed transfer retry'
+          : 'queued by transfer recovery cascade',
         executionMode: 'download_enqueue',
         recoveryCascade: {
           nextCandidateId: nextCandidate.id,
+          reason: summaryReason,
           sourceOperationRunId: operationRunId ?? null,
           triggeredByFailedCandidateId,
         },
@@ -89,24 +100,13 @@ export function createImportCandidateRecoveryService({
     });
   }
 
-  async function handleImportCandidateDownloadFailure({
-    failedCandidateId,
+  async function promoteNextRecoveryCandidate({
+    failedCandidate,
     failureReason = null,
+    failedCandidateId,
     operationRunId = null,
     scheduleFollowUpRun = false,
   } = {}) {
-    const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
-    if (!failedBeforeAttempt) {
-      return buildRecoveryResult({
-        failedCandidate: null,
-        reason: 'failed_candidate_not_found',
-        recovered: false,
-      });
-    }
-
-    const failedCandidate = await incrementImportCandidateDownloadAttemptCountFn({
-      importCandidateId: failedCandidateId,
-    }) ?? failedBeforeAttempt;
     const sourceSearchId = normalizeOptionalString(failedCandidate.sourceSearchId);
     const metadataReleaseId = resolveMetadataReleaseId(failedCandidate);
 
@@ -165,7 +165,97 @@ export function createImportCandidateRecoveryService({
     });
   }
 
+  async function handleImportCandidateDownloadFailure({
+    failedCandidateId,
+    failureReason = null,
+    operationRunId = null,
+    scheduleFollowUpRun = false,
+  } = {}) {
+    const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
+    if (!failedBeforeAttempt) {
+      return buildRecoveryResult({
+        failedCandidate: null,
+        reason: 'failed_candidate_not_found',
+        recovered: false,
+      });
+    }
+
+    const failedCandidate = await incrementImportCandidateDownloadAttemptCountFn({
+      importCandidateId: failedCandidateId,
+    }) ?? failedBeforeAttempt;
+
+    return promoteNextRecoveryCandidate({
+      failedCandidate,
+      failedCandidateId,
+      failureReason,
+      operationRunId,
+      scheduleFollowUpRun,
+    });
+  }
+
+  async function handleImportCandidateRejectedTransfer({
+    failedCandidateId,
+    failureReason = null,
+    operationRunId = null,
+    scheduleFollowUpRun = true,
+  } = {}) {
+    const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
+    if (!failedBeforeAttempt) {
+      return buildRecoveryResult({
+        failedCandidate: null,
+        reason: 'failed_candidate_not_found',
+        recovered: false,
+      });
+    }
+
+    const failedCandidate = await incrementImportCandidateDownloadAttemptCountFn({
+      importCandidateId: failedCandidateId,
+    }) ?? failedBeforeAttempt;
+
+    if ((failedCandidate.downloadAttemptCount ?? 0) < maxCandidateDownloadAttempts) {
+      const retryTransition = await retryImportCandidateDownload({
+        importCandidateId: failedCandidateId,
+        reason: failureReason,
+      });
+      const retryAt = new Date(getNow().getTime() + retryRejectedTransferDelayMs).toISOString();
+      const retryRun = await scheduleRecoveryExecutionRun({
+        nextAttemptAt: retryAt,
+        nextCandidate: retryTransition?.candidate ?? failedCandidate,
+        operationRunId,
+        scheduleFollowUpRun,
+        summaryReason: 'retry_rejected_transfer',
+        triggeredByFailedCandidateId: failedCandidateId,
+      });
+
+      return {
+        ...buildRecoveryResult({
+          attemptedCandidate: retryTransition?.candidate ?? failedCandidate,
+          failedCandidate,
+          reason: 'candidate_retry_scheduled',
+          recoveryRun: retryRun,
+          recovered: true,
+        }),
+        retryAt,
+        retrySameCandidate: true,
+      };
+    }
+
+    await markImportCandidateDownloadFailed({
+      importCandidateId: failedCandidateId,
+      reason: `${failureReason ?? 'Transfer was rejected by the remote peer.'} Retry attempts exhausted.`,
+    });
+
+    return promoteNextRecoveryCandidate({
+      failedCandidate,
+      failedCandidateId,
+      failureReason,
+      operationRunId,
+      scheduleFollowUpRun,
+    });
+  }
+
   return {
     handleImportCandidateDownloadFailure,
+    handleImportCandidateRejectedTransfer,
   };
 }

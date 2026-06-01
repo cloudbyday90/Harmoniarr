@@ -39,6 +39,19 @@ test('shouldRunImportCandidateExecutionHeartbeat requires actionable download-en
         executionMode: 'download_enqueue',
         items: [{
           liveTransferSummary: {
+            status: 'rejected',
+          },
+        }],
+      },
+    },
+  }), true);
+
+  assert.equal(shouldRunImportCandidateExecutionHeartbeat({
+    executionSummary: {
+      currentRun: {
+        executionMode: 'download_enqueue',
+        items: [{
+          liveTransferSummary: {
             status: 'not_found',
           },
         }],

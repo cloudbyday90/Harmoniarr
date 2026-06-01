@@ -37,10 +37,20 @@ function resolveTargetStatus(item) {
   }
 }
 
+function resolveTransferAction(item) {
+  if (item?.liveTransferSummary?.status === 'rejected') {
+    return 'retry_rejected';
+  }
+
+  return resolveTargetStatus(item);
+}
+
 function canTransition(currentStatus, targetStatus) {
   switch (targetStatus) {
     case 'downloading':
       return currentStatus === 'selected';
+    case 'retry_rejected':
+      return currentStatus === 'downloading';
     case 'import_pending':
     case 'failed':
       return currentStatus === 'selected' || currentStatus === 'downloading';
@@ -101,6 +111,7 @@ export function createImportCandidateExecutionReconciliationService({
   markImportCandidateDownloading = async () => null,
   markImportCandidateImportPending = async () => null,
   handleImportCandidateDownloadFailure = async () => ({ recovered: false }),
+  handleImportCandidateRejectedTransfer = async () => ({ recovered: false }),
   onDownloadCompletedFn = null,
   recordActivityEventFn = null,
   updateImportExecutionRunItem = async () => null,
@@ -114,12 +125,13 @@ export function createImportCandidateExecutionReconciliationService({
     const run = executionSummary.currentRun;
     const items = run?.items ?? [];
     let snapshotsUpdated = 0;
+    const retries = [];
     const transitions = [];
     const recoveries = [];
 
     for (const item of items) {
       const importCandidateId = item?.planningSnapshot?.candidate?.id ?? item?.importCandidateId ?? null;
-      const targetStatus = resolveTargetStatus(item);
+      const targetStatus = resolveTransferAction(item);
 
       if (run?.id && importCandidateId && shouldPersistExecutionState(item)) {
         await updateImportExecutionRunItem({
@@ -151,6 +163,18 @@ export function createImportCandidateExecutionReconciliationService({
           reason,
           requestMetadata,
         });
+      } else if (targetStatus === 'retry_rejected') {
+        result = await handleImportCandidateRejectedTransfer({
+          failedCandidateId: importCandidateId,
+          failureReason: reason,
+          operationRunId: run?.id ?? null,
+          scheduleFollowUpRun: true,
+        });
+        if (result?.retrySameCandidate) {
+          retries.push(result);
+        } else if (result?.recovered) {
+          recoveries.push(result);
+        }
       } else if (targetStatus === 'import_pending') {
         result = await markImportCandidateImportPending({
           actorUserId,
@@ -201,6 +225,13 @@ export function createImportCandidateExecutionReconciliationService({
           liveTransferStatus: item.liveTransferSummary?.status ?? null,
           toStatus: result.candidate.status,
         });
+      } else if (targetStatus === 'retry_rejected' && result?.retrySameCandidate) {
+        transitions.push({
+          fromStatus: candidate.status,
+          importCandidateId,
+          liveTransferStatus: item.liveTransferSummary?.status ?? null,
+          toStatus: 'selected',
+        });
       }
     }
 
@@ -209,11 +240,13 @@ export function createImportCandidateExecutionReconciliationService({
       currentRunId: run?.id ?? null,
       summary: {
         recovered: recoveries.length,
+        retried: retries.length,
         snapshotsUpdated,
         transitioned: transitions.length,
       },
       transitions,
       recoveries,
+      retries,
     };
   }
 

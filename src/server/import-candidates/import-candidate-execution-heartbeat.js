@@ -28,6 +28,7 @@ function hasActionableTransfers(items) {
       || liveStatus === 'active'
       || liveStatus === 'completed'
       || liveStatus === 'failed'
+      || liveStatus === 'rejected'
       || (liveStatus === 'not_found' && item?.liveTransferSummary?.missingTransfer?.isPastGracePeriod);
   });
 }
