@@ -394,11 +394,11 @@ test('createImportCandidateService rejects invalid candidate list filters', asyn
     },
   );
   await assert.rejects(
-    () => service.listImportCandidates({ limit: '500' }),
+    () => service.listImportCandidates({ limit: '1001' }),
     (error) => {
       assert.equal(error.status, 400);
       assert.equal(error.code, 'validation_error');
-      assert.equal(error.message, 'limit must be an integer between 1 and 100');
+      assert.equal(error.message, 'limit must be an integer between 1 and 1000');
       return true;
     },
   );

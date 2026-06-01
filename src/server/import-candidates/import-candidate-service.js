@@ -375,7 +375,7 @@ export function createImportCandidateService({
       limit: normalizeInteger(limit, {
         fallback: 25,
         fieldName: 'limit',
-        max: 100,
+        max: 1000,
         min: 1,
       }),
       offset: normalizeInteger(offset, {

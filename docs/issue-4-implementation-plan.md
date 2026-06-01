@@ -3958,7 +3958,7 @@ export function createImportCandidateApplyWorker({
 
 ### 5.29 Conventional-Tag File Matching Strategy
 
-**Status:** Implemented in `conventional-tag-matching.js`, `library-file-matcher-service.js`, `import-candidate-release-hint-service.js`, `import-candidate-post-apply-scan-service.js`, `library-scan-release-hints.js`, and `library-scan-worker.js`. Conventional `title` + `track.number` + artist/album tags now match MusicBrainz-backed track candidates after MBID strategies fail. Post-apply scans carry durable release hints from successful import file operations into the scan worker, so files imported from a discovery-linked release can be scoped to that release before global fallback.
+**Status:** Implemented in `conventional-tag-matching.js`, `library-file-matcher-service.js`, `import-candidate-release-hint-service.js`, `import-candidate-post-apply-scan-service.js`, `library-scan-release-hints.js`, and `library-scan-worker.js`. Conventional `title` + `track.number` + artist/album tags now match MusicBrainz-backed track candidates after MBID strategies fail. Post-apply scans carry durable release hints from successful import file operations into the scan worker, so files imported from a discovery-linked release can be scoped to that release before global fallback. `test/integration/import-apply-post-apply-scan.test.js` now protects the full request-owned import apply -> post-apply scan -> tag extraction -> conventional match -> release reconciliation -> request fulfillment path.
 
 **Original gap:** `library-file-matcher-service.js` had two strategies, both of which required MusicBrainz IDs embedded in the audio file's tags:
 
@@ -4083,6 +4083,7 @@ const strategies = [
 - Two releases with same artist + position + title → `ambiguous`
 - File with no title tag → passes through to `unmatched` (unchanged existing behavior)
 - File with MBID tags → still matched by strategy 1 or 2 first; strategy 3 never called (unchanged)
+- Request-owned import candidate with no MBID tags → successful apply schedules a post-apply scan with release hints, the scan extracts conventional tags, the release reconciles to `complete`, and the linked media request reports `fulfilled`
 
 ---
 
