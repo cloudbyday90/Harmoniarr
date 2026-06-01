@@ -3649,6 +3649,53 @@ SET migration_key = EXCLUDED.migration_key,
     application_version = NULL,
     updated_at = NOW();
 
+-- Migration: 20260601_014806_add_operation_runs_type_started_index.sql
+-- Checksum: 8db85275cf87ae50b65e2b14a157fb11fd604ef10102213278b07cd8d3b30da0
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+CREATE INDEX IF NOT EXISTS operation_runs_type_started_idx
+  ON operation_runs (operation_type, started_at DESC, created_at DESC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260601_014806',
+  '20260601_014806_add_operation_runs_type_started_index.sql',
+  'add_operation_runs_type_started_index',
+  '8db85275cf87ae50b65e2b14a157fb11fd604ef10102213278b07cd8d3b30da0',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
 -- Migration: 20260601_070000_add_canonical_to_metadata_releases.sql
 -- Checksum: 3cdb7a9ff0a5d86e1a08cb42158aee161e5419fa264057a6e41b9cdf39e47f35
 -- Harmoniarr - Soulseek-native music library management

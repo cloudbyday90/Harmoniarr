@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   assertSchemaAnchorComparisonClean,
   compareSchemaAnchorSnapshots,
+  criticalSchemaAnchors,
   inspectSchemaAnchors,
 } from '../../src/server/schema-anchor-service.js';
 
@@ -61,6 +62,13 @@ test('inspectSchemaAnchors collects table, column, constraint, and index metadat
   assert.match(
     snapshot.indexes['index.operation_runs_pending_dispatch_idx'].actual.indexDefinition,
     /CREATE INDEX operation_runs_pending_dispatch_idx/,
+  );
+});
+
+test('critical schema anchors include operation run lookup index', () => {
+  assert.deepEqual(
+    criticalSchemaAnchors.indexes.find((anchor) => anchor.index === 'operation_runs_type_started_idx'),
+    { index: 'operation_runs_type_started_idx' },
   );
 });
 

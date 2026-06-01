@@ -2221,20 +2221,20 @@ ALTER TABLE library_files
 
 No index needed. Both columns are only read during the scan worker's pre-extraction filter pass; this is a per-file equality check on a small in-memory result set already materialized by `recordLibraryFiles`. Existing rows will have `NULL` for both columns until their next scan, at which point the file will be extracted and stamped. No backfill query is required.
 
-### 6.13 Compound Index on `operation_runs (operation_type, started_at DESC)`
+### 6.13 Compound Index on `operation_runs (operation_type, started_at DESC, created_at DESC)`
 
-Required for `getActiveRun()` and `getLatestRun()` lookups (Section 5.33). Both queries filter on `operation_type` (equality) and sort by `started_at DESC LIMIT 1`. Without this index both queries perform a full sequential scan on `operation_runs`, which grows unboundedly (one row per run, never pruned). The equality-prefix + DESC-sort index structure allows the planner to resolve a `LIMIT 1` lookup in a single index page read.
+Required for `getActiveRun()` and `getLatestRun()` lookups (Section 5.33). Both queries filter on `operation_type` (equality) and sort by `started_at DESC, created_at DESC LIMIT 1`. Without this index both queries perform a full sequential scan on `operation_runs`, which grows unboundedly (one row per run, never pruned). The equality-prefix plus matching newest-first sort structure allows the planner to resolve a `LIMIT 1` lookup in index order.
 
 ```
-20260601_140000_add_operation_run_type_order_index.sql
+20260601_014806_add_operation_runs_type_started_index.sql
 ```
 
 ```sql
 -- operation_runs_type_started_idx: serves getActiveRun() and getLatestRun() in
 --   operation-run-store.js. Both queries filter on operation_type = $1 (equality)
---   and order by started_at DESC LIMIT 1. The (operation_type, started_at DESC)
---   composite structure lets PostgreSQL seek directly to the operation_type prefix
---   and read the first row in index order without a sort step.
+--   and order by started_at DESC, created_at DESC LIMIT 1. The composite index
+--   lets PostgreSQL seek directly to the operation_type prefix and read the
+--   first row in query order without a separate sort step.
 --
 -- A partial index WHERE status IN ('pending','running') would produce a smaller
 --   index but cannot serve getLatestRun() (no status predicate). A single
@@ -2245,7 +2245,7 @@ Required for `getActiveRun()` and `getLatestRun()` lookups (Section 5.33). Both 
 --   Migrations run at startup before traffic is served, so the ShareLock is
 --   acceptable.
 CREATE INDEX IF NOT EXISTS operation_runs_type_started_idx
-  ON operation_runs (operation_type, started_at DESC);
+  ON operation_runs (operation_type, started_at DESC, created_at DESC);
 ```
 
 The existing `operation_runs_running_recovery_idx` (partial `WHERE status = 'running'` ordered `started_at ASC`) is preserved — it serves the stranded-run recovery query and does not overlap with this index. No data backfill or schema change to rows is required.
@@ -4500,10 +4500,12 @@ async function matchLibraryFiles({ files }) {
 
 ### 5.33 Missing Compound Index on `operation_runs` for Active and Latest Run Lookups
 
-**Current gap:** `operation_runs` has one index today: `operation_runs_running_recovery_idx` (migration `20260501_000017`), a partial index `WHERE status = 'running'` ordered `(started_at ASC, created_at ASC)`. This index was added to support `operation-stranded-run-recovery-service.js`, which scans for old running jobs. Two entirely separate hot query paths in `operation-run-store.js` are not served by this index:
+**Status:** Implemented in `20260601_014806_add_operation_runs_type_started_index.sql`. `operation_runs_type_started_idx` now covers the active/latest lookup shape with `(operation_type, started_at DESC, created_at DESC)`, and the index is registered as a critical schema anchor.
 
-- `getActiveRun()`: `WHERE operation_type = $1 AND status IN ('pending', 'running') ORDER BY started_at DESC LIMIT 1`
-- `getLatestRun()`: `WHERE operation_type = $1 ORDER BY started_at DESC LIMIT 1`
+**Original gap:** `operation_runs` had one index before this fix: `operation_runs_running_recovery_idx` (migration `20260501_000017`), a partial index `WHERE status = 'running'` ordered `(started_at ASC, created_at ASC)`. This index was added to support `operation-stranded-run-recovery-service.js`, which scans for old running jobs. Two entirely separate hot query paths in `operation-run-store.js` were not served by this index:
+
+- `getActiveRun()`: `WHERE operation_type = $1 AND status IN ('pending', 'running') ORDER BY started_at DESC, created_at DESC LIMIT 1`
+- `getLatestRun()`: `WHERE operation_type = $1 ORDER BY started_at DESC, created_at DESC LIMIT 1`
 
 The recovery index fails both queries on three grounds: it has no `operation_type` column (so the planner cannot use it for the equality prefix), it uses ascending sort (these queries need descending), and for `getActiveRun()` it misses `status = 'pending'`. Both queries perform a full sequential scan on `operation_runs` on every execution.
 
@@ -4516,11 +4518,11 @@ The recovery index fails both queries on three grounds: it has no `operation_typ
 
 The `operation_runs` table is never pruned — every completed, failed, and cancelled run persists forever. At 10 run cycles per day across 7+ operation types, the table accumulates thousands of rows per month. The `operation_type = $1` filter is highly selective (1–5 rows typically match `'pending'` or `'running'` per type), but without an index the planner reads every row to apply the filter.
 
-**Design: single non-partial index `(operation_type, started_at DESC)`**
+**Design: single non-partial index `(operation_type, started_at DESC, created_at DESC)`**
 
-Per PostgreSQL documentation §11.8 and independent benchmarks (Cybertec, QueryPlane), the optimal index for a `WHERE col = $1 ORDER BY ts DESC LIMIT 1` query is `(col, ts DESC)` — equality predicate first, then the sort column in the query's sort direction. This structure allows the planner to seek directly to the `operation_type` prefix and read at most one row for `LIMIT 1` queries without a sort step.
+Per PostgreSQL documentation on multicolumn B-tree indexes and indexes satisfying `ORDER BY`, the appropriate index for these lookups places the equality predicate first, then the sort columns in query order. This structure allows the planner to seek directly to the `operation_type` prefix and read at most one row for `LIMIT 1` queries without a separate sort step.
 
-A partial index `WHERE status IN ('pending','running')` would produce a slightly smaller index (excluding completed/failed rows) and could be matched by `getActiveRun()` since the query text uses literal status values (`status IN ('pending', 'running')` as constants, not bind parameters). However, a partial index cannot serve `getLatestRun()`, which has no status predicate. Creating two indexes — one partial for active, one non-partial for latest — adds maintenance overhead for no practical gain at Harmoniarr's row counts. A single non-partial `(operation_type, started_at DESC)` index serves both queries correctly with one structure.
+A partial index `WHERE status IN ('pending','running')` would produce a slightly smaller index (excluding completed/failed rows) and could be matched by `getActiveRun()` since the query text uses literal status values (`status IN ('pending', 'running')` as constants, not bind parameters). However, a partial index cannot serve `getLatestRun()`, which has no status predicate. Creating two indexes — one partial for active, one non-partial for latest — adds maintenance overhead for no practical gain at Harmoniarr's row counts. A single non-partial `(operation_type, started_at DESC, created_at DESC)` index serves both queries correctly with one structure.
 
 **Important note on partial index planning:** Per PostgreSQL documentation §11.8, partial index predicates are only matched when the query's WHERE clause implies the predicate at planning time, using literal constant values. Parameterized clauses (`WHERE status = $2`) are never matched. Both `getActiveRun()` and `getLatestRun()` pass `operation_type` as a bind parameter ($1) — this is fine and does not affect whether the partial predicate is matched, because the partial predicate would be on `status`, which is a literal in `getActiveRun()`.
 
@@ -4535,7 +4537,7 @@ A partial index `WHERE status IN ('pending','running')` would produce a slightly
 | Multiple `'pending'` or `'running'` runs for the same type | `getActiveRun()` returns the newest by `started_at DESC`. This is already the intended behavior (the lease mechanism prevents true concurrent runs; pending runs are enqueued). |
 | `operation_runs` has 0 rows for a given type | Index scan returns immediately with 0 rows; no table scan. Correct behavior for workers checking if a run exists before starting. |
 | New operation types added in future | The non-partial index covers all `operation_type` values automatically; no index update required. |
-| `started_at` tie (two runs share the same microsecond timestamp) | The query's secondary sort `created_at DESC` acts as tiebreaker. The index does not cover `created_at`, so the planner may emit a minor sort step for ties. Ties are functionally impossible (microsecond timestamps + separate INSERT statements); the behavior is a no-op in practice. |
+| `started_at` tie (two runs share the same microsecond timestamp) | The query's secondary sort `created_at DESC` acts as tiebreaker and is covered by the index. |
 | `CREATE INDEX` lock during migration | Plain `CREATE INDEX` takes a ShareLock (blocks concurrent writes for the build duration). The migration runner applies migrations at startup before traffic is served, making the lock acceptable. `CREATE INDEX CONCURRENTLY` cannot be used because the migration runner wraps every migration in a `BEGIN/COMMIT` transaction, which is incompatible with `CONCURRENTLY`. |
 | Existing recovery index untouched | `operation_runs_running_recovery_idx` (`WHERE status = 'running'` ordered by `started_at ASC`) serves the stranded-run recovery query and is preserved unchanged. The two indexes serve different access patterns with no redundancy. |
 
