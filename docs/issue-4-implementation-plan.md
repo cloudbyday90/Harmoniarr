@@ -4350,7 +4350,9 @@ if (dedupedFiles.length > 0) {
 
 ### 5.32 UNNEST Batch Flush in `matchLibraryFiles`
 
-**Current gap:** `matchLibraryFiles` in `library-file-matcher-service.js` iterates all files in an in-memory loop, resolves each file's match result, and immediately calls `libraryFileMatchStore.writeLibraryFileMatch(...)` for every file. Each call to `writeLibraryFileMatch` checks out a pool connection, executes a single `INSERT INTO library_file_matches ... ON CONFLICT (library_file_id) DO UPDATE`, and releases the connection. For 6,000 files this is 6,000 pool checkout/query/release cycles — all sequential and serialized by `await`. The match computation itself is in-memory and fast; only the write loop is expensive.
+**Status:** Implemented in `library-file-matcher-service.js` and `library-file-match-store.js`. `matchLibraryFiles` now accumulates resolved match projections in memory and flushes them through `writeLibraryFileMatchBatch`; the store uses a parameterized `UNNEST` upsert and keeps `writeLibraryFileMatch` as a single-row compatibility wrapper. The batch path defensively deduplicates duplicate `libraryFileId` entries with last-write-wins behavior before sending the SQL statement.
+
+**Original gap:** `matchLibraryFiles` in `library-file-matcher-service.js` iterated all files in an in-memory loop, resolved each file's match result, and immediately called `libraryFileMatchStore.writeLibraryFileMatch(...)` for every file. Each call to `writeLibraryFileMatch` checked out a pool connection, executed a single `INSERT INTO library_file_matches ... ON CONFLICT (library_file_id) DO UPDATE`, and released the connection. For 6,000 files this meant 6,000 pool checkout/query/release cycles — all sequential and serialized by `await`. The match computation itself was in-memory and fast; only the write loop was expensive.
 
 **Why this is high priority:** `matchLibraryFiles` runs inside `library-scan-worker.js` on every scan, after tag extraction. On a library of 6,000 files with a co-located PostgreSQL instance, 6,000 sequential `pool.query` calls add seconds of overhead from pool checkout latency and per-statement round-trips even before any DB execution time is counted. On a remote PostgreSQL instance, the overhead grows proportionally with RTT. Unlike the extraction step (which Section 5.30 gates with a skip guard), the match write loop has no incremental optimization before this fix.
 
@@ -4360,7 +4362,7 @@ Note: Section 5.30 adds a skip gate before `matchLibraryFiles` so that unchanged
 
 Modify `matchLibraryFiles` to push each resolved `{ libraryFileId, ...result }` object into a local array during the loop, then call a new `writeLibraryFileMatchBatch` function once after the loop. The batch function uses `INSERT INTO library_file_matches (...) SELECT ... FROM UNNEST(...)` with `ON CONFLICT (library_file_id) DO UPDATE`.
 
-Since `library_file_matches` has UNIQUE on `library_file_id`, and each file appears at most once in the scan's file list, there are no intra-batch key conflicts. The `ON CONFLICT DO UPDATE` clause only arbitrates between an incoming row and an existing table row (a previous scan's result), never between two rows within the same batch insert. No deduplication of input is required.
+Since `library_file_matches` has UNIQUE on `library_file_id`, and each file appears at most once in the scan's file list, normal scan inputs have no intra-batch key conflicts. The implemented store still deduplicates defensively before `UNNEST` so a future caller bug cannot trigger PostgreSQL's "ON CONFLICT DO UPDATE command cannot affect row a second time" failure.
 
 Null FK values (for `unmatched` results where `metadataArtistId` etc. are absent) are handled correctly: `$1::uuid[]` with a null element in the JavaScript array becomes SQL NULL in the UNNEST output, which is correct for the nullable FK columns.
 

@@ -279,6 +279,7 @@ export function createLibraryFileMatcherService({
 
   async function matchLibraryFiles({ files }) {
     const candidates = await loadTrackLookupRows();
+    const matchResults = [];
 
     for (const file of files) {
       if (file.fileState !== 'observed') {
@@ -287,7 +288,7 @@ export function createLibraryFileMatcherService({
 
       const normalizedTags = file.tagPayload ?? null;
       if (!normalizedTags) {
-        await libraryFileMatchStore.writeLibraryFileMatch({
+        matchResults.push({
           confidence: 'low',
           evidence: {
             reason: 'missing_tag_payload',
@@ -300,11 +301,15 @@ export function createLibraryFileMatcherService({
       }
 
       const result = resolveMatchResult({ candidates, file, normalizedTags });
-      await libraryFileMatchStore.writeLibraryFileMatch({
+      matchResults.push({
         ...result,
         libraryFileId: file.id,
       });
     }
+
+    await libraryFileMatchStore.writeLibraryFileMatchBatch({
+      matches: matchResults,
+    });
   }
 
   return {

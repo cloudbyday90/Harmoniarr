@@ -18,22 +18,62 @@
 
 import { getPool } from '../database.js';
 
+function normalizeMatch(match) {
+  return {
+    confidence: match.confidence,
+    evidence: match.evidence ?? null,
+    libraryFileId: match.libraryFileId,
+    matchStatus: match.matchStatus,
+    matchedBy: match.matchedBy,
+    metadataArtistId: match.metadataArtistId ?? null,
+    metadataMediumId: match.metadataMediumId ?? null,
+    metadataRecordingId: match.metadataRecordingId ?? null,
+    metadataReleaseGroupId: match.metadataReleaseGroupId ?? null,
+    metadataReleaseId: match.metadataReleaseId ?? null,
+    metadataTrackId: match.metadataTrackId ?? null,
+  };
+}
+
+function dedupeMatchesByLibraryFileId(matches) {
+  const matchMap = new Map();
+
+  for (const match of matches) {
+    const normalizedMatch = normalizeMatch(match);
+    if (matchMap.has(normalizedMatch.libraryFileId)) {
+      matchMap.delete(normalizedMatch.libraryFileId);
+    }
+
+    matchMap.set(normalizedMatch.libraryFileId, normalizedMatch);
+  }
+
+  return [...matchMap.values()];
+}
+
+function buildBatchValues(matches) {
+  return [
+    matches.map((match) => match.libraryFileId),
+    matches.map((match) => match.metadataArtistId),
+    matches.map((match) => match.metadataReleaseGroupId),
+    matches.map((match) => match.metadataReleaseId),
+    matches.map((match) => match.metadataMediumId),
+    matches.map((match) => match.metadataTrackId),
+    matches.map((match) => match.metadataRecordingId),
+    matches.map((match) => match.matchStatus),
+    matches.map((match) => match.confidence),
+    matches.map((match) => match.matchedBy),
+    matches.map((match) => (match.evidence ? JSON.stringify(match.evidence) : null)),
+  ];
+}
+
 export function createLibraryFileMatchStore({
   getPoolFn = getPool,
 } = {}) {
-  async function writeLibraryFileMatch({
-    confidence,
-    evidence = null,
-    libraryFileId,
-    matchStatus,
-    matchedBy,
-    metadataArtistId = null,
-    metadataMediumId = null,
-    metadataRecordingId = null,
-    metadataReleaseGroupId = null,
-    metadataReleaseId = null,
-    metadataTrackId = null,
-  }) {
+  async function writeLibraryFileMatchBatch({ matches }) {
+    const normalizedMatches = dedupeMatchesByLibraryFileId(Array.isArray(matches) ? matches : []);
+    if (normalizedMatches.length === 0) {
+      return;
+    }
+
     const pool = getPoolFn();
     await pool.query(
       `
@@ -52,7 +92,45 @@ export function createLibraryFileMatchStore({
           matched_at,
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, NOW(), NOW())
+        SELECT
+          t.library_file_id,
+          t.metadata_artist_id,
+          t.metadata_release_group_id,
+          t.metadata_release_id,
+          t.metadata_medium_id,
+          t.metadata_track_id,
+          t.metadata_recording_id,
+          t.match_status,
+          t.confidence,
+          t.matched_by,
+          t.evidence,
+          NOW(),
+          NOW()
+        FROM UNNEST(
+          $1::uuid[],
+          $2::uuid[],
+          $3::uuid[],
+          $4::uuid[],
+          $5::uuid[],
+          $6::uuid[],
+          $7::uuid[],
+          $8::text[],
+          $9::text[],
+          $10::text[],
+          $11::jsonb[]
+        ) AS t(
+          library_file_id,
+          metadata_artist_id,
+          metadata_release_group_id,
+          metadata_release_id,
+          metadata_medium_id,
+          metadata_track_id,
+          metadata_recording_id,
+          match_status,
+          confidence,
+          matched_by,
+          evidence
+        )
         ON CONFLICT (library_file_id) DO UPDATE
         SET metadata_artist_id = EXCLUDED.metadata_artist_id,
             metadata_release_group_id = EXCLUDED.metadata_release_group_id,
@@ -67,23 +145,16 @@ export function createLibraryFileMatchStore({
             matched_at = NOW(),
             updated_at = NOW()
       `,
-      [
-        libraryFileId,
-        metadataArtistId,
-        metadataReleaseGroupId,
-        metadataReleaseId,
-        metadataMediumId,
-        metadataTrackId,
-        metadataRecordingId,
-        matchStatus,
-        confidence,
-        matchedBy,
-        evidence ? JSON.stringify(evidence) : null,
-      ],
+      buildBatchValues(normalizedMatches),
     );
+  }
+
+  async function writeLibraryFileMatch(match) {
+    await writeLibraryFileMatchBatch({ matches: [match] });
   }
 
   return {
     writeLibraryFileMatch,
+    writeLibraryFileMatchBatch,
   };
 }
