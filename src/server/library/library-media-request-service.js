@@ -250,6 +250,57 @@ function findExistingRelease(results, { artistName, releaseTitle }) {
   }) ?? null;
 }
 
+async function findLocalMetadataRelease({
+  artistName,
+  metadataSearchService,
+  normalizedQuery,
+  releaseTitle,
+}) {
+  const releaseSearch = await metadataSearchService.searchReleases({
+    limit: 5,
+    query: normalizedQuery,
+  });
+  let matchedRelease = findExistingRelease(releaseSearch.results, {
+    artistName,
+    releaseTitle,
+  });
+
+  const searchEvidence = {
+    localReleaseMatchStrategy: matchedRelease ? 'combined_query' : 'none',
+    localReleaseResultCount: releaseSearch.results.length,
+  };
+
+  if (
+    matchedRelease
+    || !releaseTitle
+    || typeof metadataSearchService.searchReleasesByArtistAndTitle !== 'function'
+  ) {
+    return {
+      matchedRelease,
+      searchEvidence,
+    };
+  }
+
+  const structuredReleaseSearch = await metadataSearchService.searchReleasesByArtistAndTitle({
+    artistName,
+    limit: 5,
+    releaseTitle,
+  });
+  matchedRelease = findExistingRelease(structuredReleaseSearch.results, {
+    artistName,
+    releaseTitle,
+  });
+
+  return {
+    matchedRelease,
+    searchEvidence: {
+      ...searchEvidence,
+      localReleaseMatchStrategy: matchedRelease ? 'structured_artist_title' : 'none',
+      structuredLocalReleaseResultCount: structuredReleaseSearch.results.length,
+    },
+  };
+}
+
 function normalizeOptionalUserIdList(value, fieldName) {
   if (!Array.isArray(value)) {
     return null;
@@ -422,18 +473,16 @@ export function createLibraryMediaRequestService({
         providerSupported: Boolean(sourceProvider),
       };
     } else {
-      const releaseSearch = await metadataSearchService.searchReleases({
-        limit: 5,
-        query: normalizedQuery,
-      });
-      const matchedRelease = findExistingRelease(releaseSearch.results, {
+      const { matchedRelease, searchEvidence } = await findLocalMetadataRelease({
         artistName: draft.artistName,
+        metadataSearchService,
+        normalizedQuery,
         releaseTitle: draft.releaseTitle,
       });
 
       evidence = {
         ...evidence,
-        localReleaseResultCount: releaseSearch.results.length,
+        ...searchEvidence,
       };
 
       if (matchedRelease) {

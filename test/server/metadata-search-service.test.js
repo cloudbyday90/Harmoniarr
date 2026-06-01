@@ -111,6 +111,58 @@ test('createMetadataSearchService maps release-group and release search results'
   assert.equal(releaseResult.results[0].source.musicbrainzReleaseId, 'mb-release-1');
 });
 
+test('createMetadataSearchService normalizes and maps structured release searches', async (t) => {
+  const searchReleasesByArtistAndTitleQuery = t.mock.fn(async ({ artistName, releaseTitle, limit }, pool) => {
+    assert.equal(artistName, 'Autechre');
+    assert.equal(releaseTitle, 'Amber');
+    assert.equal(limit, 3);
+    assert.equal(pool, 'pool-token');
+
+    return [{
+      id: 'release-1',
+      metadata_release_group_id: 'rg-1',
+      metadata_artist_id: 'artist-1',
+      artist_name: 'Autechre',
+      release_group_title: 'Amber',
+      title: 'Amber',
+      status: 'Official',
+      release_date: '1994-11-07',
+      country: 'GB',
+      barcode: null,
+      disambiguation: null,
+      track_count: 11,
+      medium_count: 1,
+      source_provider: 'musicbrainz',
+      source_release_id: 'release-source-1',
+      musicbrainz_release_id: 'mb-release-1',
+      fetched_at: '2026-04-28T00:00:00.000Z',
+      updated_at: '2026-04-28T00:00:00.000Z',
+    }];
+  });
+
+  const service = createMetadataSearchService({
+    pool: 'pool-token',
+    searchArtistsQuery: async () => [],
+    searchReleaseGroupsQuery: async () => [],
+    searchReleasesByArtistAndTitleQuery,
+    searchReleasesQuery: async () => [],
+  });
+
+  const result = await service.searchReleasesByArtistAndTitle({
+    artistName: '  Autechre  ',
+    limit: '3',
+    releaseTitle: '  Amber  ',
+  });
+
+  assert.equal(searchReleasesByArtistAndTitleQuery.mock.callCount(), 1);
+  assert.equal(result.artistName, 'Autechre');
+  assert.equal(result.releaseTitle, 'Amber');
+  assert.equal(result.limit, 3);
+  assert.equal(result.results[0].artistName, 'Autechre');
+  assert.equal(result.results[0].releaseGroupTitle, 'Amber');
+  assert.equal(result.results[0].source.musicbrainzReleaseId, 'mb-release-1');
+});
+
 test('createMetadataSearchService rejects invalid empty search queries', async () => {
   const service = createMetadataSearchService({
     pool: 'pool-token',

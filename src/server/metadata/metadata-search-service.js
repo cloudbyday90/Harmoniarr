@@ -23,6 +23,7 @@ import {
   searchMetadataArtists,
   searchMetadataReleaseGroups,
   searchMetadataReleases,
+  searchMetadataReleasesByArtistAndTitle,
 } from './metadata-repository.js';
 import {
   normalizeSearchLimit,
@@ -98,6 +99,7 @@ export function createMetadataSearchService({
   searchArtistsQuery = searchMetadataArtists,
   listMonitoredArtistsQuery = listMonitoredMetadataArtists,
   searchReleaseGroupsQuery = searchMetadataReleaseGroups,
+  searchReleasesByArtistAndTitleQuery = searchMetadataReleasesByArtistAndTitle,
   searchReleasesQuery = searchMetadataReleases,
 } = {}) {
   async function searchArtists({ query, limit }) {
@@ -132,6 +134,24 @@ export function createMetadataSearchService({
     return {
       query: normalizedQuery,
       limit: normalizedLimit,
+      results: results.map(mapRelease),
+    };
+  }
+
+  async function searchReleasesByArtistAndTitle({ artistName, releaseTitle, limit }) {
+    const normalizedArtistName = normalizeSearchText(artistName, 'artistName');
+    const normalizedReleaseTitle = normalizeSearchText(releaseTitle, 'releaseTitle');
+    const normalizedLimit = normalizeSearchLimit(limit);
+    const results = await searchReleasesByArtistAndTitleQuery({
+      artistName: normalizedArtistName,
+      limit: normalizedLimit,
+      releaseTitle: normalizedReleaseTitle,
+    }, pool);
+
+    return {
+      artistName: normalizedArtistName,
+      limit: normalizedLimit,
+      releaseTitle: normalizedReleaseTitle,
       results: results.map(mapRelease),
     };
   }
@@ -182,6 +202,7 @@ export function createMetadataSearchService({
     searchAll,
     searchArtists,
     searchReleaseGroups,
+    searchReleasesByArtistAndTitle,
     searchReleases,
   };
 }

@@ -17,6 +17,7 @@ import { persistSettings } from '../../src/server/settings.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { seedImportCandidateFixture } from '../../testing/integration/import-candidate-fixtures.js';
+import { seedMetadataReleaseFixture } from '../../testing/integration/metadata-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -94,121 +95,6 @@ function createConventionalTagExtractionRecorder({ releaseTitle, artistName, tra
         };
       },
     },
-  };
-}
-
-async function seedMetadataReleaseFixture(pool) {
-  const artistResult = await pool.query(
-    `
-      INSERT INTO metadata_artists (
-        source_provider,
-        source_artist_id,
-        musicbrainz_artist_id,
-        name,
-        sort_name
-      )
-      VALUES ('musicbrainz', $1, $2, 'Autechre', 'Autechre')
-      RETURNING id
-    `,
-    [`artist-${randomUUID()}`, randomUUID()],
-  );
-  const metadataArtistId = artistResult.rows[0].id;
-
-  const releaseGroupResult = await pool.query(
-    `
-      INSERT INTO metadata_release_groups (
-        metadata_artist_id,
-        source_provider,
-        source_release_group_id,
-        musicbrainz_release_group_id,
-        title,
-        primary_type,
-        first_release_date
-      )
-      VALUES ($1, 'musicbrainz', $2, $3, 'Amber', 'Album', '1994-11-07')
-      RETURNING id
-    `,
-    [metadataArtistId, `release-group-${randomUUID()}`, randomUUID()],
-  );
-  const metadataReleaseGroupId = releaseGroupResult.rows[0].id;
-
-  const releaseResult = await pool.query(
-    `
-      INSERT INTO metadata_releases (
-        metadata_release_group_id,
-        source_provider,
-        source_release_id,
-        musicbrainz_release_id,
-        title,
-        status,
-        release_date,
-        track_count,
-        medium_count,
-        is_canonical
-      )
-      VALUES ($1, 'musicbrainz', $2, $3, 'Amber', 'Official', '1994-11-07', 1, 1, TRUE)
-      RETURNING id
-    `,
-    [metadataReleaseGroupId, `release-${randomUUID()}`, randomUUID()],
-  );
-  const metadataReleaseId = releaseResult.rows[0].id;
-
-  const mediumResult = await pool.query(
-    `
-      INSERT INTO metadata_media (
-        metadata_release_id,
-        position,
-        format,
-        track_count
-      )
-      VALUES ($1, 1, 'CD', 1)
-      RETURNING id
-    `,
-    [metadataReleaseId],
-  );
-  const metadataMediumId = mediumResult.rows[0].id;
-
-  const recordingResult = await pool.query(
-    `
-      INSERT INTO metadata_recordings (
-        source_provider,
-        source_recording_id,
-        musicbrainz_recording_id,
-        title,
-        length_ms,
-        artist_credit
-      )
-      VALUES ('musicbrainz', $1, $2, 'Foil', 322000, 'Autechre')
-      RETURNING id
-    `,
-    [`recording-${randomUUID()}`, randomUUID()],
-  );
-  const metadataRecordingId = recordingResult.rows[0].id;
-
-  const trackResult = await pool.query(
-    `
-      INSERT INTO metadata_tracks (
-        metadata_medium_id,
-        metadata_recording_id,
-        position,
-        number_text,
-        title,
-        length_ms,
-        artist_credit
-      )
-      VALUES ($1, $2, 1, '1', 'Foil', 322000, 'Autechre')
-      RETURNING id
-    `,
-    [metadataMediumId, metadataRecordingId],
-  );
-
-  return {
-    metadataArtistId,
-    metadataMediumId,
-    metadataRecordingId,
-    metadataReleaseGroupId,
-    metadataReleaseId,
-    metadataTrackId: trackResult.rows[0].id,
   };
 }
 
@@ -505,7 +391,7 @@ suite('integration import apply post-apply scan', () => {
           { namespace: 'paths', settingKey: 'userMusicRoots', value: [] },
         ], adminUserId, pool);
 
-        const metadataFixture = await seedMetadataReleaseFixture(pool);
+        const metadataFixture = await seedMetadataReleaseFixture({ queryable: pool });
         await seedDiscoveryRequest(pool, {
           ...metadataFixture,
           searchId: sourceSearchId,

@@ -68,6 +68,137 @@ test('createLibraryMediaRequestService marks matched local releases as already e
   assert.equal(mediaRequest.requestState, 'already_exists');
 });
 
+test('createLibraryMediaRequestService falls back to structured artist and release matching for local metadata', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-structured-match',
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+    existingMatch: {
+      artistName: 'Autechre',
+      releaseGroupId: payload.matchedMetadataReleaseGroupId,
+      releaseGroupTitle: 'Amber',
+      releaseId: payload.matchedMetadataReleaseId,
+      releaseTitle: 'Amber',
+    },
+  }));
+  const searchReleases = t.mock.fn(async ({ query, limit }) => {
+    assert.equal(query, 'Autechre Amber');
+    assert.equal(limit, 5);
+    return { results: [] };
+  });
+  const searchReleasesByArtistAndTitle = t.mock.fn(async ({ artistName, releaseTitle, limit }) => {
+    assert.equal(artistName, 'Autechre');
+    assert.equal(releaseTitle, 'Amber');
+    assert.equal(limit, 5);
+    return {
+      results: [{
+        artistName: 'Autechre',
+        id: 'release-amber',
+        releaseGroupId: 'release-group-amber',
+        title: 'Amber',
+      }],
+    };
+  });
+
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: async () => null,
+      getMediaRequestCounts: async () => ({ alreadyExists: 1, needsFetch: 0, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => ({ mediaRequests: [] }),
+    },
+    metadataSearchService: {
+      searchReleases,
+      searchReleasesByArtistAndTitle,
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: t.mock.fn(async () => ({
+        metadataArtistId: 'artist-autechre',
+        metadataReleaseGroupId: 'release-group-amber',
+        metadataReleaseId: 'release-amber',
+        reconciliationStatus: 'complete',
+      })),
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  const mediaRequest = await service.createMediaRequest({
+    actorUserId: 'user-1',
+    payload: {
+      artistName: 'Autechre',
+      releaseTitle: 'Amber',
+      requestKind: 'release',
+    },
+  });
+
+  const storedRequest = createMediaRequest.mock.calls[0].arguments[0];
+  assert.equal(searchReleases.mock.callCount(), 1);
+  assert.equal(searchReleasesByArtistAndTitle.mock.callCount(), 1);
+  assert.equal(storedRequest.requestState, 'already_exists');
+  assert.equal(storedRequest.matchedMetadataReleaseId, 'release-amber');
+  assert.equal(storedRequest.evidence.localReleaseMatchStrategy, 'structured_artist_title');
+  assert.equal(storedRequest.evidence.localReleaseResultCount, 0);
+  assert.equal(storedRequest.evidence.structuredLocalReleaseResultCount, 1);
+  assert.equal(mediaRequest.requestState, 'already_exists');
+});
+
+test('createLibraryMediaRequestService does not run structured lookup after combined search matches', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-combined-match',
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+    existingMatch: null,
+  }));
+  const searchReleasesByArtistAndTitle = t.mock.fn(async () => {
+    throw new Error('structured lookup should not be called');
+  });
+
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: async () => null,
+      getMediaRequestCounts: async () => ({ alreadyExists: 1, needsFetch: 0, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => ({ mediaRequests: [] }),
+    },
+    metadataSearchService: {
+      searchReleases: t.mock.fn(async () => ({
+        results: [{
+          artistName: 'Daft Punk',
+          id: 'release-1',
+          releaseGroupId: 'release-group-1',
+          title: 'Discovery',
+        }],
+      })),
+      searchReleasesByArtistAndTitle,
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => ({
+        metadataArtistId: 'artist-1',
+        metadataReleaseGroupId: 'release-group-1',
+        metadataReleaseId: 'release-1',
+        reconciliationStatus: 'complete',
+      }),
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await service.createMediaRequest({
+    actorUserId: 'user-1',
+    payload: {
+      artistName: 'Daft Punk',
+      releaseTitle: 'Discovery',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(searchReleasesByArtistAndTitle.mock.callCount(), 0);
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].evidence.localReleaseMatchStrategy, 'combined_query');
+});
+
 test('createLibraryMediaRequestService keeps matched releases in needs_fetch when the library is incomplete', async (t) => {
   const createMediaRequest = t.mock.fn(async (payload) => ({
     id: 'request-3',

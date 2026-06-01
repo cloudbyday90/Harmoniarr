@@ -718,6 +718,54 @@ export async function searchMetadataReleases({ query, limit }, queryable) {
   return result.rows;
 }
 
+export async function searchMetadataReleasesByArtistAndTitle({
+  artistName,
+  limit,
+  releaseTitle,
+}, queryable) {
+  const db = resolveQueryable(queryable);
+  const artistPattern = `%${artistName}%`;
+  const releasePattern = `%${releaseTitle}%`;
+  const artistPrefixPattern = `${artistName}%`;
+  const releasePrefixPattern = `${releaseTitle}%`;
+  const result = await db.query(
+    `
+      SELECT
+        metadata_releases.*,
+        metadata_release_groups.title AS release_group_title,
+        metadata_artists.id AS metadata_artist_id,
+        metadata_artists.name AS artist_name
+      FROM metadata_releases
+      JOIN metadata_release_groups
+        ON metadata_release_groups.id = metadata_releases.metadata_release_group_id
+      JOIN metadata_artists
+        ON metadata_artists.id = metadata_release_groups.metadata_artist_id
+      WHERE (
+          metadata_releases.title ILIKE $1
+          OR metadata_release_groups.title ILIKE $1
+        )
+        AND (
+          metadata_artists.name ILIKE $2
+          OR COALESCE(metadata_artists.sort_name, '') ILIKE $2
+        )
+      ORDER BY
+        CASE
+          WHEN metadata_releases.title ILIKE $3 AND metadata_artists.name ILIKE $4 THEN 0
+          WHEN metadata_release_groups.title ILIKE $3 AND metadata_artists.name ILIKE $4 THEN 1
+          WHEN metadata_releases.title ILIKE $3 THEN 2
+          WHEN metadata_release_groups.title ILIKE $3 THEN 3
+          ELSE 4
+        END,
+        metadata_releases.updated_at DESC,
+        metadata_releases.title ASC
+      LIMIT $5
+    `,
+    [releasePattern, artistPattern, releasePrefixPattern, artistPrefixPattern, limit],
+  );
+
+  return result.rows;
+}
+
 export async function listReleasesWithCanonicalByReleaseGroupId(metadataReleaseGroupId, queryable) {
   const db = resolveQueryable(queryable);
   const result = await db.query(

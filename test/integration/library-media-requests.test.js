@@ -3,6 +3,7 @@ import { after, before, suite, test } from 'node:test';
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession, loginWithPassword } from '../../testing/integration/auth-helpers.js';
 import { seedImportCandidateFixture } from '../../testing/integration/import-candidate-fixtures.js';
+import { seedMetadataReleaseFixture } from '../../testing/integration/metadata-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -180,6 +181,65 @@ suite('integration library media request routes', () => {
       assert.equal(hiddenDetailResponse.payload.error.code, 'import_candidate_not_found');
     }, {
       scenarioName: 'delegated_media_request_visibility',
+    });
+  });
+
+  test('release media requests detect already existing local metadata through structured artist and release matching', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
+      const bootstrapResponse = await bootstrapAdminSession(client);
+      assert.equal(bootstrapResponse.response.status, 201);
+
+      const pool = getPoolFn();
+      const metadataFixture = await seedMetadataReleaseFixture({ queryable: pool });
+      await pool.query(
+        `
+          INSERT INTO library_release_reconciliations (
+            metadata_artist_id,
+            metadata_release_group_id,
+            metadata_release_id,
+            reconciliation_status,
+            expected_track_count,
+            matched_track_count,
+            missing_track_count,
+            matched_file_count,
+            duplicate_track_count,
+            evidence
+          )
+          VALUES ($1, $2, $3, 'complete', 1, 1, 0, 1, 0, $4::jsonb)
+        `,
+        [
+          metadataFixture.metadataArtistId,
+          metadataFixture.metadataReleaseGroupId,
+          metadataFixture.metadataReleaseId,
+          JSON.stringify({ source: 'integration-test' }),
+        ],
+      );
+
+      const response = await client.requestJson('/api/v1/library/media-requests', {
+        csrf: true,
+        json: {
+          artistName: 'Autechre',
+          releaseTitle: 'Amber',
+          requestKind: 'release',
+        },
+        method: 'POST',
+      });
+
+      assert.equal(response.response.status, 201);
+      assert.equal(response.payload.mediaRequest.requestState, 'already_exists');
+      assert.equal(response.payload.mediaRequest.existingMatch.releaseId, metadataFixture.metadataReleaseId);
+      assert.equal(response.payload.mediaRequest.existingMatch.releaseGroupId, metadataFixture.metadataReleaseGroupId);
+      assert.equal(response.payload.mediaRequest.evidence.localReleaseMatchStrategy, 'structured_artist_title');
+      assert.equal(response.payload.mediaRequest.evidence.releaseAvailabilityStatus, 'complete');
+    }, {
+      scenarioName: 'structured_local_media_request_match',
     });
   });
 });
