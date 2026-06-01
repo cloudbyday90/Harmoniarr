@@ -4245,7 +4245,9 @@ On a 7200 RPM HDD NAS (~80ms per file read for a 30MB FLAC), a 6000-file library
 
 ### 5.31 UNNEST Batch Upsert in `recordLibraryFiles`
 
-**Current gap:** `recordLibraryFiles` in `library-catalog-store.js` iterates `normalizedFiles` and for each file executes one `INSERT INTO library_files ... ON CONFLICT (canonical_path) DO UPDATE ... RETURNING` statement inside a single `BEGIN/COMMIT` transaction. For a 6,000-file library this is 6,000 individual SQL round-trips. Per Cybertec's PostgreSQL bulk-load benchmark, N individual INSERTs within a single transaction are approximately 16× slower than a batched multi-row insert at equivalent scale. The per-statement cost (query parsing, plan cache lookup, execution setup, and one client→server→client round-trip even over a local Unix socket) accumulates linearly with N regardless of how fast each individual statement is.
+**Status:** Implemented in `library-catalog-store.js`. `recordLibraryFiles` now deduplicates by canonical path, writes files through parameterized `UNNEST` batch upserts in 5,000-row chunks, preserves returned file order per chunk, and keeps the existing root upsert plus tombstone update transaction boundary.
+
+**Original gap:** `recordLibraryFiles` in `library-catalog-store.js` iterated `normalizedFiles` and for each file executed one `INSERT INTO library_files ... ON CONFLICT (canonical_path) DO UPDATE ... RETURNING` statement inside a single `BEGIN/COMMIT` transaction. For a 6,000-file library this meant 6,000 individual SQL round-trips. Per Cybertec's PostgreSQL bulk-load benchmark, N individual INSERTs within a single transaction are approximately 16x slower than a batched multi-row insert at equivalent scale. The per-statement cost (query parsing, plan cache lookup, execution setup, and one client-to-server-to-client round-trip even over a local Unix socket) accumulated linearly with N regardless of how fast each individual statement was.
 
 **Why this is high priority:** `recordLibraryFiles` is the first step of every library scan. It must complete before tag extraction, matching, reconciliation, and fulfillment can run. For a 6,000-file library, the per-file INSERT loop is the dominant CPU and latency cost of the scan pass even before any audio I/O. After Section 5.28 lands (auto-scan on apply), this path is also hit on every successful import apply run. On a remote PostgreSQL instance with 2 ms RTT, 6,000 individual statements add 12 seconds of pure round-trip latency with zero DB work counted.
 
@@ -4324,7 +4326,7 @@ if (dedupedFiles.length > 0) {
 
 **Chunking for very large libraries:** Research recommends chunking UNNEST batches above 10,000 rows to bound server-side memory allocation. At a practical maximum of ~50,000 audio files per library root, add application-side chunking at 5,000 files per batch (all chunks run inside the same transaction). For Harmoniarr's typical library size (500–6,000 files), a single batch is the normal path.
 
-**Section 5.30 compatibility:** When migration 6.12 lands, add `size_bytes, modified_at, tag_extracted_size_bytes, tag_extracted_modified_at` to the RETURNING clause. The UNNEST query is structurally compatible with any RETURNING extension.
+**Section 5.30 compatibility:** The implemented `RETURNING` clause includes `size_bytes`, `modified_at`, `tag_extracted_size_bytes`, and `tag_extracted_modified_at`, so incremental tag extraction continues to receive the current filesystem metadata and prior extraction stamps.
 
 **Edge cases:**
 

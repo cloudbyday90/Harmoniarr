@@ -19,6 +19,8 @@
 import { basename } from 'node:path';
 import { getPool } from '../database.js';
 
+const libraryFileUpsertBatchSize = 5_000;
+
 function buildLibraryRootName(canonicalPath) {
   return basename(canonicalPath) || canonicalPath;
 }
@@ -60,11 +62,48 @@ function mapPersistedFile(row) {
   };
 }
 
+function dedupeFilesByCanonicalPath(files) {
+  const fileMap = new Map();
+
+  for (const file of files) {
+    if (fileMap.has(file.canonicalPath)) {
+      fileMap.delete(file.canonicalPath);
+    }
+
+    fileMap.set(file.canonicalPath, file);
+  }
+
+  return [...fileMap.values()];
+}
+
+function buildFileBatchValues({ files, libraryRootId }) {
+  return [
+    libraryRootId,
+    files.map((file) => file.canonicalPath),
+    files.map((file) => file.relativePath),
+    files.map((file) => file.filename),
+    files.map((file) => file.extension),
+    files.map((file) => file.sizeBytes),
+    files.map((file) => file.modifiedAt),
+    files.map((file) => file.fileState),
+  ];
+}
+
+function chunkFiles(files, chunkSize = libraryFileUpsertBatchSize) {
+  const chunks = [];
+
+  for (let index = 0; index < files.length; index += chunkSize) {
+    chunks.push(files.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
 export function createLibraryCatalogStore({
   getPoolFn = getPool,
 } = {}) {
   async function recordLibraryFiles({ files, libraryRootPath }) {
-    const normalizedFiles = files.map(normalizeObservedFile);
+    const normalizedFiles = dedupeFilesByCanonicalPath(files.map(normalizeObservedFile));
     const pool = getPoolFn();
     const client = await pool.connect();
 
@@ -94,58 +133,108 @@ export function createLibraryCatalogStore({
 
       const persistedFiles = [];
 
-      for (const file of normalizedFiles) {
-        const result = await client.query(
+      for (const fileBatch of chunkFiles(normalizedFiles)) {
+        const batchResult = await client.query(
           `
-            INSERT INTO library_files (
-              library_root_id,
-              canonical_path,
-              relative_path,
-              filename,
-              extension,
-              size_bytes,
-              modified_at,
-              file_state,
-              updated_at,
-              deleted_at
+            WITH input_rows AS (
+              SELECT
+                $1::uuid AS library_root_id,
+                t.canonical_path,
+                t.relative_path,
+                t.filename,
+                t.extension,
+                t.size_bytes,
+                t.modified_at,
+                t.file_state,
+                t.row_order
+              FROM UNNEST(
+                $2::text[],
+                $3::text[],
+                $4::text[],
+                $5::text[],
+                $6::bigint[],
+                $7::timestamptz[],
+                $8::text[]
+              ) WITH ORDINALITY AS t(
+                canonical_path,
+                relative_path,
+                filename,
+                extension,
+                size_bytes,
+                modified_at,
+                file_state,
+                row_order
+              )
+            ),
+            upserted AS (
+              INSERT INTO library_files (
+                library_root_id,
+                canonical_path,
+                relative_path,
+                filename,
+                extension,
+                size_bytes,
+                modified_at,
+                file_state,
+                updated_at,
+                deleted_at
+              )
+              SELECT
+                library_root_id,
+                canonical_path,
+                relative_path,
+                filename,
+                extension,
+                size_bytes,
+                modified_at,
+                file_state,
+                NOW(),
+                NULL
+              FROM input_rows
+              ON CONFLICT (canonical_path) DO UPDATE
+              SET library_root_id = EXCLUDED.library_root_id,
+                  relative_path = EXCLUDED.relative_path,
+                  filename = EXCLUDED.filename,
+                  extension = EXCLUDED.extension,
+                  size_bytes = EXCLUDED.size_bytes,
+                  modified_at = EXCLUDED.modified_at,
+                  file_state = EXCLUDED.file_state,
+                  updated_at = NOW(),
+                  deleted_at = NULL
+              RETURNING
+                id,
+                canonical_path,
+                relative_path,
+                filename,
+                extension,
+                size_bytes,
+                modified_at,
+                file_state,
+                tag_payload,
+                tag_extracted_size_bytes,
+                tag_extracted_modified_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NULL)
-            ON CONFLICT (canonical_path) DO UPDATE
-            SET library_root_id = EXCLUDED.library_root_id,
-                relative_path = EXCLUDED.relative_path,
-                filename = EXCLUDED.filename,
-                extension = EXCLUDED.extension,
-                size_bytes = EXCLUDED.size_bytes,
-                modified_at = EXCLUDED.modified_at,
-                file_state = EXCLUDED.file_state,
-                updated_at = NOW(),
-                deleted_at = NULL
-            RETURNING
-              id,
-              canonical_path,
-              relative_path,
-              filename,
-              extension,
-              size_bytes,
-              modified_at,
-              file_state,
-              tag_payload,
-              tag_extracted_size_bytes,
-              tag_extracted_modified_at
+            SELECT
+              upserted.id,
+              upserted.canonical_path,
+              upserted.relative_path,
+              upserted.filename,
+              upserted.extension,
+              upserted.size_bytes,
+              upserted.modified_at,
+              upserted.file_state,
+              upserted.tag_payload,
+              upserted.tag_extracted_size_bytes,
+              upserted.tag_extracted_modified_at
+            FROM upserted
+            INNER JOIN input_rows
+              ON input_rows.canonical_path = upserted.canonical_path
+            ORDER BY input_rows.row_order ASC
           `,
-          [
-            libraryRootId,
-            file.canonicalPath,
-            file.relativePath,
-            file.filename,
-            file.extension,
-            file.sizeBytes,
-            file.modifiedAt,
-            file.fileState,
-          ],
+          buildFileBatchValues({ files: fileBatch, libraryRootId }),
         );
 
-        persistedFiles.push(mapPersistedFile(result.rows[0]));
+        persistedFiles.push(...batchResult.rows.map(mapPersistedFile));
       }
 
       await client.query(
