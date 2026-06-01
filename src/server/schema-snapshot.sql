@@ -3843,6 +3843,56 @@ SET migration_key = EXCLUDED.migration_key,
     application_version = NULL,
     updated_at = NOW();
 
+-- Migration: 20260601_114544_search_attempt_tracking_library_discovery_requests.sql
+-- Checksum: 6a085d894cabc8e6f4336c07764f0c82937cd4fd98d77b5c6778da42b8e103ac
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE library_discovery_requests
+  ADD COLUMN IF NOT EXISTS search_attempt_count INTEGER NOT NULL DEFAULT 0
+    CHECK (search_attempt_count >= 0),
+  ADD COLUMN IF NOT EXISTS research_attempt_count INTEGER NOT NULL DEFAULT 0
+    CHECK (research_attempt_count >= 0);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260601_114544',
+  '20260601_114544_search_attempt_tracking_library_discovery_requests.sql',
+  'search_attempt_tracking_library_discovery_requests',
+  '6a085d894cabc8e6f4336c07764f0c82937cd4fd98d77b5c6778da42b8e103ac',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
 -- Migration: 20260602_010000_create_push_subscriptions.sql
 -- Checksum: 5aabea0e5a4037bc6edbffe6bf869643a851a4c87a646a8c09ca081b72e0d83f
 -- Harmoniarr - Soulseek-native music library management

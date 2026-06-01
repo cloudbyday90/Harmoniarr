@@ -31,10 +31,12 @@ function mapDiscoveryDispatchRow(row) {
     metadataReleaseGroupId: row.metadata_release_group_id,
     metadataReleaseId: row.metadata_release_id,
     nextSearchAfter: row.next_search_after ?? null,
+    researchAttemptCount: Number.parseInt(String(row.research_attempt_count ?? 0), 10) || 0,
     releaseDate: row.release_date ?? null,
     releaseGroupTitle: row.release_group_title ?? null,
     releaseTitle: row.release_title ?? null,
     requestStatus: row.request_status ?? null,
+    searchAttemptCount: Number.parseInt(String(row.search_attempt_count ?? 0), 10) || 0,
     searchMode: row.search_mode ?? null,
     wantedStatus: row.wanted_status ?? null,
   };
@@ -61,6 +63,8 @@ export function createLibraryDiscoveryRequestStore({
           release_date,
           last_search_at,
           next_search_after,
+          search_attempt_count,
+          research_attempt_count,
           evidence
         FROM library_discovery_requests
         WHERE metadata_release_id = ANY($1::uuid[])
@@ -77,8 +81,10 @@ export function createLibraryDiscoveryRequestStore({
       metadataReleaseGroupId: row.metadata_release_group_id,
       metadataReleaseId: row.metadata_release_id,
       nextSearchAfter: row.next_search_after ?? null,
+      researchAttemptCount: Number.parseInt(String(row.research_attempt_count ?? 0), 10) || 0,
       releaseDate: row.release_date ?? null,
       requestStatus: row.request_status ?? null,
+      searchAttemptCount: Number.parseInt(String(row.search_attempt_count ?? 0), 10) || 0,
       searchMode: row.search_mode ?? null,
       wantedStatus: row.wanted_status ?? null,
     }));
@@ -101,6 +107,8 @@ export function createLibraryDiscoveryRequestStore({
             library_discovery_requests.search_mode,
             library_discovery_requests.request_status,
             library_discovery_requests.release_date,
+            library_discovery_requests.search_attempt_count,
+            library_discovery_requests.research_attempt_count,
             library_discovery_requests.evidence,
             metadata_artists.name AS artist_name,
             metadata_release_groups.title AS release_group_title,
@@ -148,6 +156,8 @@ export function createLibraryDiscoveryRequestStore({
           claimed.release_date,
           claimed.last_search_at,
           claimed.next_search_after,
+          claimed.search_attempt_count,
+          claimed.research_attempt_count,
           claimed.evidence,
           candidate.artist_name,
           candidate.release_group_title,
@@ -192,7 +202,9 @@ export function createLibraryDiscoveryRequestStore({
     candidateCount,
     fileCount,
     metadataReleaseId,
+    nextSearchAfter = undefined,
     searchId,
+    searchAttemptCount = undefined,
     searchQuery,
   }) {
     const pool = getPoolFn();
@@ -209,12 +221,46 @@ export function createLibraryDiscoveryRequestStore({
               'candidateCount', $3,
               'fileCount', $4,
               'sourceProvider', 'slskd'
-            )
+            ),
+            'lastSearchAttemptCount', COALESCE($6::integer, search_attempt_count)
           ),
+          next_search_after = COALESCE($7::timestamptz, next_search_after),
+          search_attempt_count = COALESCE($6::integer, search_attempt_count),
           updated_at = NOW()
         WHERE metadata_release_id = $5
       `,
-      [searchId, searchQuery, candidateCount, fileCount, metadataReleaseId],
+      [searchId, searchQuery, candidateCount, fileCount, metadataReleaseId, searchAttemptCount, nextSearchAfter],
+    );
+  }
+
+  async function markDiscoveryRequestExhausted({
+    metadataReleaseId,
+    reasonCode = 'discovery_search_attempts_exhausted',
+    searchAttemptCount,
+    searchQuery,
+  }) {
+    const pool = getPoolFn();
+    await pool.query(
+      `
+        UPDATE library_discovery_requests
+        SET
+          request_status = 'blocked',
+          blocked_reason = 'search_attempts_exhausted',
+          next_search_after = NULL,
+          search_attempt_count = GREATEST(search_attempt_count, COALESCE($3::integer, search_attempt_count)),
+          evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
+            'dispatchStrategy', 'slskd_search_dispatch',
+            'lastDispatchFailure', NULL,
+            'lastSearchQuery', $2,
+            'searchExhausted', jsonb_build_object(
+              'reasonCode', $4,
+              'searchAttemptCount', GREATEST(search_attempt_count, COALESCE($3::integer, search_attempt_count))
+            )
+          ),
+          updated_at = NOW()
+        WHERE metadata_release_id = $1
+      `,
+      [metadataReleaseId, searchQuery, searchAttemptCount, reasonCode],
     );
   }
 
@@ -241,6 +287,8 @@ export function createLibraryDiscoveryRequestStore({
               last_search_at,
               next_search_after,
               manual_requested_at,
+              search_attempt_count,
+              research_attempt_count,
               evidence,
               last_evaluated_at,
               updated_at
@@ -257,7 +305,9 @@ export function createLibraryDiscoveryRequestStore({
               $9,
               $10,
               $11,
-              $12::jsonb,
+              $12,
+              $13,
+              $14::jsonb,
               NOW(),
               NOW()
             )
@@ -274,6 +324,8 @@ export function createLibraryDiscoveryRequestStore({
             discoveryRequest.lastSearchAt,
             discoveryRequest.nextSearchAfter,
             discoveryRequest.manualRequestedAt,
+            discoveryRequest.searchAttemptCount ?? 0,
+            discoveryRequest.researchAttemptCount ?? 0,
             JSON.stringify(discoveryRequest.evidence ?? {}),
           ],
         );
@@ -291,6 +343,7 @@ export function createLibraryDiscoveryRequestStore({
   return {
     claimNextReadyAutomaticDiscoveryRequest,
     listDiscoveryRequestsByMetadataReleaseIds,
+    markDiscoveryRequestExhausted,
     recordDiscoverySearchFailure,
     recordDiscoverySearchSuccess,
     replaceLibraryDiscoveryRequests,

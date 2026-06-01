@@ -17,58 +17,26 @@
  */
 
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
-import { buildFormatSearchTerm } from './format-preference-scoring.js';
+import {
+  MAX_DISCOVERY_SEARCH_ATTEMPTS,
+  buildDiscoverySearchQuery,
+} from './library-discovery-search-query.js';
 
 const defaultAutomaticCooldownMs = 6 * 60 * 60 * 1000;
 const defaultDispatchBatchSize = 5;
+const defaultFallbackCooldownMs = 2 * 60 * 60 * 1000;
 
-function normalizeQueryPart(value) {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value.replace(/\s+/g, ' ').trim();
-  return normalized || null;
-}
-
-function getReleaseYear(releaseDate) {
-  if (typeof releaseDate !== 'string') {
-    return null;
-  }
-
-  const match = releaseDate.match(/^(\d{4})-/);
-  return match?.[1] ?? null;
-}
-
-export function buildDiscoverySearchQuery({
-  artistName,
-  preferredFormat,
-  releaseDate,
-  releaseGroupTitle,
-  releaseTitle,
-}) {
-  const title = normalizeQueryPart(releaseTitle) ?? normalizeQueryPart(releaseGroupTitle);
-  const queryParts = [
-    normalizeQueryPart(artistName),
-    title,
-    getReleaseYear(releaseDate),
-  ].filter(Boolean);
-
-  const formatTerm = buildFormatSearchTerm(preferredFormat);
-  if (formatTerm) {
-    queryParts.push(formatTerm);
-  }
-
-  return queryParts.join(' ');
-}
+export { buildDiscoverySearchQuery };
 
 export function createLibraryDiscoveryDispatchService({
   automaticCooldownMs = defaultAutomaticCooldownMs,
   dispatchBatchSize = defaultDispatchBatchSize,
+  fallbackCooldownMs = defaultFallbackCooldownMs,
   getNow = () => new Date(),
   getUserPreferencesFn = null,
   importCandidateService = null,
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
+  onDiscoveryRequestExhaustedFn = null,
   slskdService = null,
 } = {}) {
   function buildRequestOwnershipContext(claimedRequest) {
@@ -86,6 +54,35 @@ export function createLibraryDiscoveryDispatchService({
       sourceRequestedForUserId,
       sourceType: 'media_request',
     };
+  }
+
+  function buildNextZeroCandidateSchedule({ dispatchedAt, searchAttemptCount }) {
+    const completedAttemptCount = (Number.isInteger(searchAttemptCount) && searchAttemptCount > 0
+      ? searchAttemptCount
+      : 0) + 1;
+
+    if (completedAttemptCount >= MAX_DISCOVERY_SEARCH_ATTEMPTS) {
+      return {
+        exhausted: true,
+        nextSearchAfter: null,
+        searchAttemptCount: completedAttemptCount,
+      };
+    }
+
+    const cooldownMs = searchAttemptCount >= 1 ? fallbackCooldownMs : automaticCooldownMs;
+    return {
+      exhausted: false,
+      nextSearchAfter: new Date(dispatchedAt.getTime() + cooldownMs).toISOString(),
+      searchAttemptCount: completedAttemptCount,
+    };
+  }
+
+  function notifyDiscoveryExhausted(payload) {
+    if (typeof onDiscoveryRequestExhaustedFn !== 'function') {
+      return;
+    }
+
+    void onDiscoveryRequestExhaustedFn(payload).catch(() => {});
   }
 
   async function dispatchReadyDiscoveryRequests({
@@ -140,17 +137,32 @@ export function createLibraryDiscoveryDispatchService({
         preferredFormat: userPreferences?.preferredFormat,
       });
       if (!searchQuery) {
+        const terminalSearchAttemptCount = Math.max(
+          claimedRequest.searchAttemptCount ?? 0,
+          MAX_DISCOVERY_SEARCH_ATTEMPTS,
+        );
         const failure = {
-          code: 'discovery_search_query_invalid',
-          message: 'Discovery request did not contain enough metadata to build a search query',
+          code: claimedRequest.searchAttemptCount >= MAX_DISCOVERY_SEARCH_ATTEMPTS
+            ? 'discovery_search_attempts_exhausted'
+            : 'discovery_search_query_invalid',
+          message: claimedRequest.searchAttemptCount >= MAX_DISCOVERY_SEARCH_ATTEMPTS
+            ? 'Discovery request exhausted all automatic search query fallback attempts'
+            : 'Discovery request did not contain enough metadata to build a search query',
           metadataReleaseId: claimedRequest.metadataReleaseId,
         };
         failures.push(failure);
-        await libraryDiscoveryRequestStore.recordDiscoverySearchFailure({
-          errorCode: failure.code,
-          errorMessage: failure.message,
+        await libraryDiscoveryRequestStore.markDiscoveryRequestExhausted({
           metadataReleaseId: claimedRequest.metadataReleaseId,
+          reasonCode: failure.code,
+          searchAttemptCount: terminalSearchAttemptCount,
           searchQuery: null,
+        });
+        notifyDiscoveryExhausted({
+          artistName: claimedRequest.artistName,
+          metadataReleaseId: claimedRequest.metadataReleaseId,
+          reasonCode: failure.code,
+          releaseTitle: claimedRequest.releaseTitle ?? claimedRequest.releaseGroupTitle ?? null,
+          searchAttemptCount: terminalSearchAttemptCount,
         });
         continue;
       }
@@ -173,6 +185,12 @@ export function createLibraryDiscoveryDispatchService({
 
         candidateCount += ingestionResult.candidateCount;
         fileCount += ingestionResult.fileCount;
+        const zeroCandidateSchedule = ingestionResult.candidateCount === 0
+          ? buildNextZeroCandidateSchedule({
+            dispatchedAt,
+            searchAttemptCount: claimedRequest.searchAttemptCount ?? 0,
+          })
+          : null;
         dispatchedSearches.push({
           candidateCount: ingestionResult.candidateCount,
           fileCount: ingestionResult.fileCount,
@@ -181,13 +199,35 @@ export function createLibraryDiscoveryDispatchService({
           searchId: search.id,
         });
 
-        await libraryDiscoveryRequestStore.recordDiscoverySearchSuccess({
+        const successPayload = {
           candidateCount: ingestionResult.candidateCount,
           fileCount: ingestionResult.fileCount,
           metadataReleaseId: claimedRequest.metadataReleaseId,
           searchId: search.id,
           searchQuery,
-        });
+        };
+        if (zeroCandidateSchedule) {
+          successPayload.nextSearchAfter = zeroCandidateSchedule.nextSearchAfter;
+          successPayload.searchAttemptCount = zeroCandidateSchedule.searchAttemptCount;
+        }
+
+        await libraryDiscoveryRequestStore.recordDiscoverySearchSuccess(successPayload);
+
+        if (zeroCandidateSchedule?.exhausted) {
+          await libraryDiscoveryRequestStore.markDiscoveryRequestExhausted({
+            metadataReleaseId: claimedRequest.metadataReleaseId,
+            reasonCode: 'discovery_search_attempts_exhausted',
+            searchAttemptCount: zeroCandidateSchedule.searchAttemptCount,
+            searchQuery,
+          });
+          notifyDiscoveryExhausted({
+            artistName: claimedRequest.artistName,
+            metadataReleaseId: claimedRequest.metadataReleaseId,
+            reasonCode: 'discovery_search_attempts_exhausted',
+            releaseTitle: claimedRequest.releaseTitle ?? claimedRequest.releaseGroupTitle ?? null,
+            searchAttemptCount: zeroCandidateSchedule.searchAttemptCount,
+          });
+        }
       } catch (error) {
         const failure = {
           code: error?.code ?? 'discovery_dispatch_failed',

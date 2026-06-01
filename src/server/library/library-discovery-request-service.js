@@ -20,6 +20,13 @@ import { getPool } from '../database.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 
 const defaultAutomaticCooldownMs = 6 * 60 * 60 * 1000;
+const exhaustedBlockedReason = 'search_attempts_exhausted';
+const exhaustedSearchAttemptCount = 3;
+
+function toNonNegativeInteger(value) {
+  const parsed = Number.parseInt(String(value ?? 0), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
 
 function toIsoStringOrNull(value) {
   if (!value) {
@@ -81,6 +88,8 @@ function resolveAutomaticState({ cooldownDeadline, now, releaseDateDeadline }) {
 
 function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   const searchMode = row.search_mode ?? 'automatic';
+  const researchAttemptCount = toNonNegativeInteger(row.research_attempt_count);
+  const searchAttemptCount = toNonNegativeInteger(row.search_attempt_count);
   const priorEvidence = row.prior_evidence && typeof row.prior_evidence === 'object'
     ? row.prior_evidence
     : {};
@@ -113,6 +122,37 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       nextSearchAfter: now.toISOString(),
       releaseDate: row.release_date ?? null,
       requestStatus: 'ready',
+      researchAttemptCount,
+      searchAttemptCount: 0,
+      searchMode,
+      wantedStatus: row.wanted_status,
+    };
+  }
+
+  if (row.blocked_reason === exhaustedBlockedReason || searchAttemptCount >= exhaustedSearchAttemptCount) {
+    return {
+      blockedReason: exhaustedBlockedReason,
+      evidence: {
+        ...priorEvidence,
+        ...requestSourceEvidence,
+        priorBlockedReason: row.blocked_reason ?? null,
+        searchExhausted: {
+          reasonCode: priorEvidence.searchExhausted?.reasonCode ?? 'discovery_search_attempts_exhausted',
+          searchAttemptCount: Math.max(searchAttemptCount, exhaustedSearchAttemptCount),
+        },
+        strategy: 'search_attempts_exhausted',
+        wantedStrategy: row.wanted_strategy ?? null,
+      },
+      lastSearchAt: toIsoStringOrNull(row.last_search_at),
+      manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
+      metadataArtistId: row.metadata_artist_id,
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id,
+      nextSearchAfter: null,
+      releaseDate: row.release_date ?? null,
+      requestStatus: 'blocked',
+      researchAttemptCount,
+      searchAttemptCount: Math.max(searchAttemptCount, exhaustedSearchAttemptCount),
       searchMode,
       wantedStatus: row.wanted_status,
     };
@@ -143,6 +183,8 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
     nextSearchAfter: automaticState.nextSearchAfter,
     releaseDate: row.release_date ?? null,
     requestStatus: automaticState.requestStatus,
+    researchAttemptCount,
+    searchAttemptCount,
     searchMode,
     wantedStatus: row.wanted_status,
   };
@@ -166,7 +208,9 @@ export function createLibraryDiscoveryRequestService({
             blocked_reason,
             evidence,
             last_search_at,
-            manual_requested_at
+            manual_requested_at,
+            search_attempt_count,
+            research_attempt_count
           FROM library_discovery_requests
         ),
         monitored_sources AS (
@@ -186,7 +230,9 @@ export function createLibraryDiscoveryRequestService({
             current_discovery.blocked_reason,
             current_discovery.evidence AS prior_evidence,
             current_discovery.last_search_at,
-            current_discovery.manual_requested_at
+            current_discovery.manual_requested_at,
+            current_discovery.search_attempt_count,
+            current_discovery.research_attempt_count
           FROM library_wanted_releases
           LEFT JOIN current_discovery
             ON current_discovery.metadata_release_id = library_wanted_releases.metadata_release_id
@@ -211,7 +257,9 @@ export function createLibraryDiscoveryRequestService({
             current_discovery.blocked_reason,
             current_discovery.evidence AS prior_evidence,
             current_discovery.last_search_at,
-            current_discovery.manual_requested_at
+            current_discovery.manual_requested_at,
+            current_discovery.search_attempt_count,
+            current_discovery.research_attempt_count
           FROM media_requests
           JOIN metadata_releases
             ON metadata_releases.id = media_requests.matched_metadata_release_id
@@ -245,7 +293,9 @@ export function createLibraryDiscoveryRequestService({
             source_rows.blocked_reason,
             source_rows.prior_evidence,
             source_rows.last_search_at,
-            source_rows.manual_requested_at
+            source_rows.manual_requested_at,
+            source_rows.search_attempt_count,
+            source_rows.research_attempt_count
           FROM (
             SELECT * FROM request_sources
             UNION ALL
@@ -268,7 +318,9 @@ export function createLibraryDiscoveryRequestService({
           deduped_sources.blocked_reason,
           deduped_sources.prior_evidence,
           deduped_sources.last_search_at,
-          deduped_sources.manual_requested_at
+          deduped_sources.manual_requested_at,
+          deduped_sources.search_attempt_count,
+          deduped_sources.research_attempt_count
         FROM deduped_sources
         ORDER BY deduped_sources.release_date NULLS LAST, deduped_sources.metadata_release_id ASC
       `,

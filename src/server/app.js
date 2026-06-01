@@ -401,6 +401,22 @@ export function createApp({
     importCandidateService: importCandidateModule.importCandidateService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,
+    onDiscoveryRequestExhaustedFn: ({ artistName, releaseTitle }) => broadcastAdminNotification({
+      category: 'discoveryRequestExhausted',
+      cooldownKey: `discoveryRequestExhausted:${artistName ?? ''}:${releaseTitle ?? ''}`,
+      cooldownMs: householdNotificationCooldowns.requestCreatedMs,
+      dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: releaseTitle
+          ? `${artistName ? `${artistName} - ` : ''}${releaseTitle} did not return usable Soulseek results after fallback searches`
+          : 'A discovery request did not return usable Soulseek results after fallback searches',
+        title: 'Discovery search exhausted',
+        url: '/app/activity/wanted',
+      },
+    }),
     onOrganizeReleaseAddedFn: ({ artistName, movedCount, releaseCount, releaseTitle }) => broadcastHouseholdNotification({
       category: 'releaseAdded',
       cooldownKey: buildReleaseAddedCooldownKey({

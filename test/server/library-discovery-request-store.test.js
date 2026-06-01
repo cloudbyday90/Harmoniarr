@@ -15,8 +15,10 @@ test('listDiscoveryRequestsByMetadataReleaseIds returns current request state fo
         metadata_release_group_id: 'group-1',
         metadata_release_id: 'release-1',
         next_search_after: '2026-05-25T21:00:00.000Z',
+        research_attempt_count: 1,
         release_date: '2026-05-01',
         request_status: 'cooldown',
+        search_attempt_count: 2,
         search_mode: 'automatic',
         wanted_status: 'missing',
       }],
@@ -38,9 +40,65 @@ test('listDiscoveryRequestsByMetadataReleaseIds returns current request state fo
     metadataReleaseGroupId: 'group-1',
     metadataReleaseId: 'release-1',
     nextSearchAfter: '2026-05-25T21:00:00.000Z',
+    researchAttemptCount: 1,
     releaseDate: '2026-05-01',
     requestStatus: 'cooldown',
+    searchAttemptCount: 2,
     searchMode: 'automatic',
     wantedStatus: 'missing',
   }]);
+});
+
+test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async (t) => {
+  const query = t.mock.fn(async (_sql, params) => {
+    assert.deepEqual(params, [
+      'search-1',
+      'Bjork Vespertine Live',
+      0,
+      0,
+      'release-1',
+      2,
+      '2026-04-30T16:00:00.000Z',
+    ]);
+    return { rows: [] };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  await store.recordDiscoverySearchSuccess({
+    candidateCount: 0,
+    fileCount: 0,
+    metadataReleaseId: 'release-1',
+    nextSearchAfter: '2026-04-30T16:00:00.000Z',
+    searchAttemptCount: 2,
+    searchId: 'search-1',
+    searchQuery: 'Bjork Vespertine Live',
+  });
+
+  assert.equal(query.mock.callCount(), 1);
+});
+
+test('markDiscoveryRequestExhausted blocks automatic discovery retries', async (t) => {
+  const query = t.mock.fn(async (_sql, params) => {
+    assert.deepEqual(params, [
+      'release-1',
+      'Selected Ambient Works Volume II',
+      3,
+      'discovery_search_attempts_exhausted',
+    ]);
+    return { rows: [] };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  await store.markDiscoveryRequestExhausted({
+    metadataReleaseId: 'release-1',
+    reasonCode: 'discovery_search_attempts_exhausted',
+    searchAttemptCount: 3,
+    searchQuery: 'Selected Ambient Works Volume II',
+  });
+
+  assert.equal(query.mock.callCount(), 1);
 });

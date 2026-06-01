@@ -1533,6 +1533,8 @@ return {
 
 ### 5.26 Search Query Fallback Ladder
 
+**Status:** Implemented in `library-discovery-search-query.js`, `library-discovery-dispatch-service.js`, and `library-discovery-request-store.js`. Automatic discovery now tracks `search_attempt_count`, tries raw `artist title year`, then normalized `artist title`, then guarded title-only search for long/specific titles, and marks the request blocked with `search_attempts_exhausted` after fallback attempts are spent. Zero-candidate first attempts keep the normal 6-hour cooldown; later fallback rungs use a 2-hour cooldown. Exhausted requests stay blocked across reconciliation, and admins receive a `discoveryRequestExhausted` notification.
+
 **Problem:** `buildDiscoverySearchQuery` produces a single string: `"Artist Title Year"`. When a search returns zero import candidates, the dispatch service records a success with `candidateCount: 0` and applies the 6-hour cooldown. After 6 hours, the same query is retried and usually produces the same zero result. This loop continues indefinitely, silently.
 
 Common causes of zero-result first attempts:

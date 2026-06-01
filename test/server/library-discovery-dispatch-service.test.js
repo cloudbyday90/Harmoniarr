@@ -14,6 +14,39 @@ test('buildDiscoverySearchQuery uses canonical artist, release title, and year',
   }), 'Boards of Canada Geogaddi 2002');
 });
 
+test('buildDiscoverySearchQuery relaxes second attempt by removing year and normalizing punctuation', () => {
+  assert.equal(buildDiscoverySearchQuery({
+    artistName: 'Björk',
+    releaseDate: '2001-08-27',
+    releaseGroupTitle: 'Vespertine: Live!',
+    releaseTitle: null,
+    searchAttemptCount: 1,
+  }), 'Bjork Vespertine Live');
+});
+
+test('buildDiscoverySearchQuery uses guarded title-only fallback on third attempt', () => {
+  assert.equal(buildDiscoverySearchQuery({
+    artistName: 'Aphex Twin',
+    preferredFormat: 'flac',
+    releaseDate: '1994-03-07',
+    releaseGroupTitle: 'Selected Ambient Works Volume II',
+    searchAttemptCount: 2,
+  }), 'Selected Ambient Works Volume II FLAC');
+});
+
+test('buildDiscoverySearchQuery rejects unsafe title-only and exhausted fallback attempts', () => {
+  assert.equal(buildDiscoverySearchQuery({
+    artistName: 'Autechre',
+    releaseGroupTitle: 'Amber',
+    searchAttemptCount: 2,
+  }), null);
+  assert.equal(buildDiscoverySearchQuery({
+    artistName: 'Autechre',
+    releaseGroupTitle: 'Tri Repetae',
+    searchAttemptCount: 3,
+  }), null);
+});
+
 test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts searches, and ingests candidates', async (t) => {
   const claimedRequests = [{
     artistName: 'Autechre',
@@ -47,6 +80,7 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
     },
     libraryDiscoveryRequestStore: {
       claimNextReadyAutomaticDiscoveryRequest,
+      markDiscoveryRequestExhausted: t.mock.fn(async () => {}),
       recordDiscoverySearchFailure,
       recordDiscoverySearchSuccess,
     },
@@ -184,6 +218,7 @@ test('dispatchReadyDiscoveryRequests looks up user preferences and passes them t
     importCandidateService: { ingestSlskdSearchResponses },
     libraryDiscoveryRequestStore: {
       claimNextReadyAutomaticDiscoveryRequest,
+      markDiscoveryRequestExhausted: t.mock.fn(async () => {}),
       recordDiscoverySearchFailure: t.mock.fn(async () => {}),
       recordDiscoverySearchSuccess,
     },
@@ -244,6 +279,153 @@ test('dispatchReadyDiscoveryRequests continues when getUserPreferencesFn throws'
   assert.equal(startSearch.mock.callCount(), 1);
   assert.equal(startSearch.mock.calls[0].arguments[0].query, 'Autechre Confield 2001');
   assert.equal(ingestSlskdSearchResponses.mock.calls[0].arguments[0].formatPreferences, null);
+  assert.deepEqual(recordDiscoverySearchSuccess.mock.calls[0].arguments[0], {
+    candidateCount: 0,
+    fileCount: 0,
+    metadataReleaseId: 'release-1',
+    nextSearchAfter: '2026-04-30T20:00:00.000Z',
+    searchAttemptCount: 1,
+    searchId: 'search-1',
+    searchQuery: 'Autechre Confield 2001',
+  });
+});
+
+test('dispatchReadyDiscoveryRequests schedules faster fallback after a zero-candidate second attempt', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Björk',
+    evidence: {},
+    metadataReleaseId: 'release-vespertine',
+    releaseDate: '2001-08-27',
+    releaseGroupTitle: 'Vespertine: Live!',
+    releaseTitle: null,
+    searchAttemptCount: 1,
+  }];
+  const claimNextReadyAutomaticDiscoveryRequest = t.mock.fn(async () => claimedRequests.shift() ?? null);
+  const recordDiscoverySearchSuccess = t.mock.fn(async () => {});
+  const startSearch = t.mock.fn(async () => ({ id: 'search-fallback' }));
+
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    fallbackCooldownMs: 2 * 60 * 60 * 1000,
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    importCandidateService: {
+      ingestSlskdSearchResponses: t.mock.fn(async () => ({
+        candidateCount: 0,
+        fileCount: 0,
+      })),
+    },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest,
+      markDiscoveryRequestExhausted: t.mock.fn(async () => {}),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess,
+    },
+    slskdService: { startSearch },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+
+  assert.equal(startSearch.mock.calls[0].arguments[0].query, 'Bjork Vespertine Live');
+  assert.deepEqual(recordDiscoverySearchSuccess.mock.calls[0].arguments[0], {
+    candidateCount: 0,
+    fileCount: 0,
+    metadataReleaseId: 'release-vespertine',
+    nextSearchAfter: '2026-04-30T16:00:00.000Z',
+    searchAttemptCount: 2,
+    searchId: 'search-fallback',
+    searchQuery: 'Bjork Vespertine Live',
+  });
+});
+
+test('dispatchReadyDiscoveryRequests exhausts after a zero-candidate third attempt', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Aphex Twin',
+    evidence: {},
+    metadataReleaseId: 'release-saw2',
+    releaseDate: '1994-03-07',
+    releaseGroupTitle: 'Selected Ambient Works Volume II',
+    releaseTitle: null,
+    searchAttemptCount: 2,
+  }];
+  const claimNextReadyAutomaticDiscoveryRequest = t.mock.fn(async () => claimedRequests.shift() ?? null);
+  const markDiscoveryRequestExhausted = t.mock.fn(async () => {});
+  const onDiscoveryRequestExhaustedFn = t.mock.fn(async () => {});
+  const recordDiscoverySearchSuccess = t.mock.fn(async () => {});
+  const startSearch = t.mock.fn(async () => ({ id: 'search-title-only' }));
+
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    importCandidateService: {
+      ingestSlskdSearchResponses: t.mock.fn(async () => ({
+        candidateCount: 0,
+        fileCount: 0,
+      })),
+    },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest,
+      markDiscoveryRequestExhausted,
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess,
+    },
+    onDiscoveryRequestExhaustedFn,
+    slskdService: { startSearch },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+
+  assert.equal(startSearch.mock.calls[0].arguments[0].query, 'Selected Ambient Works Volume II');
+  assert.deepEqual(recordDiscoverySearchSuccess.mock.calls[0].arguments[0], {
+    candidateCount: 0,
+    fileCount: 0,
+    metadataReleaseId: 'release-saw2',
+    nextSearchAfter: null,
+    searchAttemptCount: 3,
+    searchId: 'search-title-only',
+    searchQuery: 'Selected Ambient Works Volume II',
+  });
+  assert.deepEqual(markDiscoveryRequestExhausted.mock.calls[0].arguments[0], {
+    metadataReleaseId: 'release-saw2',
+    reasonCode: 'discovery_search_attempts_exhausted',
+    searchAttemptCount: 3,
+    searchQuery: 'Selected Ambient Works Volume II',
+  });
+  assert.equal(onDiscoveryRequestExhaustedFn.mock.callCount(), 1);
+});
+
+test('dispatchReadyDiscoveryRequests marks already-exhausted automatic requests without starting a search', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {},
+    metadataReleaseId: 'release-exhausted',
+    releaseGroupTitle: 'Amber',
+    searchAttemptCount: 3,
+  }];
+  const markDiscoveryRequestExhausted = t.mock.fn(async () => {});
+  const startSearch = t.mock.fn(async () => {
+    throw new Error('search should not start');
+  });
+
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    importCandidateService: {
+      ingestSlskdSearchResponses: t.mock.fn(async () => ({ candidateCount: 0, fileCount: 0 })),
+    },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      markDiscoveryRequestExhausted,
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    slskdService: { startSearch },
+  });
+
+  const result = await service.dispatchReadyDiscoveryRequests();
+
+  assert.equal(startSearch.mock.callCount(), 0);
+  assert.equal(markDiscoveryRequestExhausted.mock.callCount(), 1);
+  assert.equal(result.failedCount, 1);
+  assert.equal(result.failures[0].code, 'discovery_search_attempts_exhausted');
 });
 
 test('dispatchReadyDiscoveryRequests records failures without failing the whole batch', async (t) => {

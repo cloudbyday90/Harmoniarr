@@ -76,6 +76,8 @@ test('reconcileDiscoveryRequests records ready, cooldown, and blocked automatic 
         nextSearchAfter: '2026-04-30T14:00:00.000Z',
         releaseDate: '2026-04-01',
         requestStatus: 'ready',
+        researchAttemptCount: 0,
+        searchAttemptCount: 0,
         searchMode: 'automatic',
         wantedStatus: 'missing',
       },
@@ -96,6 +98,8 @@ test('reconcileDiscoveryRequests records ready, cooldown, and blocked automatic 
         nextSearchAfter: '2026-04-30T18:00:00.000Z',
         releaseDate: '2026-04-15',
         requestStatus: 'cooldown',
+        researchAttemptCount: 0,
+        searchAttemptCount: 0,
         searchMode: 'automatic',
         wantedStatus: 'partial',
       },
@@ -116,6 +120,8 @@ test('reconcileDiscoveryRequests records ready, cooldown, and blocked automatic 
         nextSearchAfter: '2026-05-15T00:00:00.000Z',
         releaseDate: '2026-05-15',
         requestStatus: 'blocked',
+        researchAttemptCount: 0,
+        searchAttemptCount: 0,
         searchMode: 'automatic',
         wantedStatus: 'missing',
       },
@@ -167,6 +173,8 @@ test('reconcileDiscoveryRequests preserves manual override readiness', async (t)
       nextSearchAfter: '2026-04-30T14:00:00.000Z',
       releaseDate: '2026-05-15',
       requestStatus: 'ready',
+      researchAttemptCount: 0,
+      searchAttemptCount: 0,
       searchMode: 'manual',
       wantedStatus: 'missing',
     }],
@@ -227,6 +235,72 @@ test('reconcileDiscoveryRequests includes request-driven release matches in disc
       nextSearchAfter: '2026-05-02T15:00:00.000Z',
       releaseDate: '2026-05-01',
       requestStatus: 'ready',
+      researchAttemptCount: 0,
+      searchAttemptCount: 0,
+      searchMode: 'automatic',
+      wantedStatus: 'missing',
+    }],
+  });
+});
+
+test('reconcileDiscoveryRequests preserves exhausted automatic discovery requests', async (t) => {
+  const replaceLibraryDiscoveryRequests = t.mock.fn(async () => {});
+  const now = new Date('2026-05-02T15:00:00.000Z');
+  const service = createLibraryDiscoveryRequestService({
+    getNow: () => now,
+    getPoolFn: () => ({
+      query: async () => ({
+        rows: [{
+          blocked_reason: 'search_attempts_exhausted',
+          last_search_at: '2026-05-02T10:00:00.000Z',
+          manual_requested_at: null,
+          metadata_artist_id: 'artist-8',
+          metadata_release_group_id: 'release-group-8',
+          metadata_release_id: 'release-8',
+          prior_evidence: {
+            searchExhausted: {
+              reasonCode: 'discovery_search_attempts_exhausted',
+              searchAttemptCount: 3,
+            },
+          },
+          release_date: '2026-05-01',
+          research_attempt_count: 1,
+          search_attempt_count: 3,
+          search_mode: 'automatic',
+          wanted_status: 'missing',
+          wanted_strategy: 'media_request_intake',
+        }],
+      }),
+    }),
+    libraryDiscoveryRequestStore: {
+      replaceLibraryDiscoveryRequests,
+    },
+  });
+
+  await service.reconcileDiscoveryRequests();
+
+  assert.deepEqual(replaceLibraryDiscoveryRequests.mock.calls[0].arguments[0], {
+    discoveryRequests: [{
+      blockedReason: 'search_attempts_exhausted',
+      evidence: {
+        priorBlockedReason: 'search_attempts_exhausted',
+        searchExhausted: {
+          reasonCode: 'discovery_search_attempts_exhausted',
+          searchAttemptCount: 3,
+        },
+        strategy: 'search_attempts_exhausted',
+        wantedStrategy: 'media_request_intake',
+      },
+      lastSearchAt: '2026-05-02T10:00:00.000Z',
+      manualRequestedAt: null,
+      metadataArtistId: 'artist-8',
+      metadataReleaseGroupId: 'release-group-8',
+      metadataReleaseId: 'release-8',
+      nextSearchAfter: null,
+      releaseDate: '2026-05-01',
+      requestStatus: 'blocked',
+      researchAttemptCount: 1,
+      searchAttemptCount: 3,
       searchMode: 'automatic',
       wantedStatus: 'missing',
     }],

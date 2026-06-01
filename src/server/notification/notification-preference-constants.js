@@ -29,6 +29,7 @@ export const NOTIFICATION_CATEGORIES = /** @type {const} */ ({
   releaseAdded: { label: 'Release added', adminOnly: false, defaultEnabled: true },
   artistMonitored: { label: 'Artist monitored', adminOnly: false, defaultEnabled: true },
   requestCreated: { label: 'Request created', adminOnly: false, defaultEnabled: true },
+  discoveryRequestExhausted: { label: 'Discovery request exhausted', adminOnly: true, defaultEnabled: true },
   trustOverride: { label: 'Trust override', adminOnly: true, defaultEnabled: true },
   blocklistEvent: { label: 'Blocklist change', adminOnly: true, defaultEnabled: true },
   trustThresholdCrossed: { label: 'Trust threshold crossed', adminOnly: true, defaultEnabled: true },
