@@ -306,3 +306,71 @@ test('reconcileDiscoveryRequests preserves exhausted automatic discovery request
     }],
   });
 });
+
+test('reconcileDiscoveryRequests preserves pending download recovery rediscovery', async (t) => {
+  const replaceLibraryDiscoveryRequests = t.mock.fn(async () => {});
+  const now = new Date('2026-05-02T15:00:00.000Z');
+  const service = createLibraryDiscoveryRequestService({
+    getNow: () => now,
+    getPoolFn: () => ({
+      query: async () => ({
+        rows: [{
+          blocked_reason: null,
+          last_search_at: '2026-05-02T10:00:00.000Z',
+          manual_requested_at: null,
+          metadata_artist_id: 'artist-9',
+          metadata_release_group_id: 'release-group-9',
+          metadata_release_id: 'release-9',
+          prior_evidence: {
+            downloadRecoveryRediscovery: {
+              failedCandidateId: 'candidate-9',
+              nextSearchAfter: '2026-05-02T17:00:00.000Z',
+              researchAttemptCount: 1,
+              searchAttemptCount: 1,
+            },
+          },
+          release_date: '2026-05-01',
+          research_attempt_count: 1,
+          search_attempt_count: 1,
+          search_mode: 'automatic',
+          wanted_status: 'missing',
+          wanted_strategy: 'media_request_intake',
+        }],
+      }),
+    }),
+    libraryDiscoveryRequestStore: {
+      replaceLibraryDiscoveryRequests,
+    },
+  });
+
+  await service.reconcileDiscoveryRequests();
+
+  assert.deepEqual(replaceLibraryDiscoveryRequests.mock.calls[0].arguments[0], {
+    discoveryRequests: [{
+      blockedReason: null,
+      evidence: {
+        downloadRecoveryRediscovery: {
+          failedCandidateId: 'candidate-9',
+          nextSearchAfter: '2026-05-02T17:00:00.000Z',
+          researchAttemptCount: 1,
+          searchAttemptCount: 1,
+        },
+        priorBlockedReason: null,
+        strategy: 'download_recovery_rediscovery',
+        wantedStrategy: 'media_request_intake',
+      },
+      lastSearchAt: '2026-05-02T10:00:00.000Z',
+      manualRequestedAt: null,
+      metadataArtistId: 'artist-9',
+      metadataReleaseGroupId: 'release-group-9',
+      metadataReleaseId: 'release-9',
+      nextSearchAfter: '2026-05-02T17:00:00.000Z',
+      releaseDate: '2026-05-01',
+      requestStatus: 'ready',
+      researchAttemptCount: 1,
+      searchAttemptCount: 1,
+      searchMode: 'automatic',
+      wantedStatus: 'missing',
+    }],
+  });
+});

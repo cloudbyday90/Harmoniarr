@@ -59,6 +59,28 @@ function buildCooldownDeadline(lastSearchAt, cooldownMs) {
   return new Date(date.getTime() + cooldownMs);
 }
 
+function resolvePendingDownloadRecoveryRediscovery({ now, priorEvidence }) {
+  const rediscovery = priorEvidence.downloadRecoveryRediscovery;
+  if (!rediscovery || typeof rediscovery !== 'object' || Array.isArray(rediscovery)) {
+    return null;
+  }
+
+  const nextSearchAfter = toIsoStringOrNull(rediscovery.nextSearchAfter);
+  if (!nextSearchAfter) {
+    return null;
+  }
+
+  const deadline = new Date(nextSearchAfter);
+  if (deadline.getTime() <= now.getTime()) {
+    return null;
+  }
+
+  return {
+    nextSearchAfter,
+    rediscovery,
+  };
+}
+
 function resolveAutomaticState({ cooldownDeadline, now, releaseDateDeadline }) {
   if (releaseDateDeadline && releaseDateDeadline.getTime() > now.getTime()) {
     return {
@@ -153,6 +175,35 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       requestStatus: 'blocked',
       researchAttemptCount,
       searchAttemptCount: Math.max(searchAttemptCount, exhaustedSearchAttemptCount),
+      searchMode,
+      wantedStatus: row.wanted_status,
+    };
+  }
+
+  const pendingDownloadRecoveryRediscovery = resolvePendingDownloadRecoveryRediscovery({
+    now,
+    priorEvidence,
+  });
+  if (pendingDownloadRecoveryRediscovery) {
+    return {
+      blockedReason: null,
+      evidence: {
+        ...priorEvidence,
+        ...requestSourceEvidence,
+        priorBlockedReason: row.blocked_reason ?? null,
+        strategy: 'download_recovery_rediscovery',
+        wantedStrategy: row.wanted_strategy ?? null,
+      },
+      lastSearchAt: toIsoStringOrNull(row.last_search_at),
+      manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
+      metadataArtistId: row.metadata_artist_id,
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id,
+      nextSearchAfter: pendingDownloadRecoveryRediscovery.nextSearchAfter,
+      releaseDate: row.release_date ?? null,
+      requestStatus: 'ready',
+      researchAttemptCount,
+      searchAttemptCount,
       searchMode,
       wantedStatus: row.wanted_status,
     };

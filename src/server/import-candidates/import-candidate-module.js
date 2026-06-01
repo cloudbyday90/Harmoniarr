@@ -73,6 +73,7 @@ export function createImportCandidateModule({
   recordActivityEventFn = null,
   recordSourceUserOutcomeEvidenceFn = async () => null,
   scheduleLibraryScan = null,
+  scheduleDownloadRecoveryRediscovery = null,
   postApplyScanService = createImportCandidatePostApplyScanService({
     startLibraryScan: scheduleLibraryScan,
   }),
@@ -136,6 +137,7 @@ export function createImportCandidateModule({
     getImportCandidate: importCandidateService.getImportCandidate,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
     retryImportCandidateDownload: importCandidateService.retryImportCandidateDownload,
+    scheduleDownloadRecoveryRediscovery,
   }),
   importCandidateFileDecisionService = createImportCandidateFileDecisionService({
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,

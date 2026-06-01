@@ -38,6 +38,7 @@ function normalizeRun(run) {
     fileCount: toNumberOrNull(run.summary.fileCount),
     finishedAt: run.finishedAt,
     id: run.id,
+    nextAttemptAt: run.nextAttemptAt ?? null,
     startedAt: run.startedAt,
     status: run.status,
     triggerSource: run.summary.triggerSource ?? null,
@@ -54,10 +55,18 @@ export function createLibraryDiscoveryRunStore({
     operationType: operationDescriptor.operationType,
   });
 
-  async function createOperationRun({ status = 'pending', triggerSource = 'manual', triggeredByUserId = null }) {
+  async function createOperationRun({
+    nextAttemptAt = null,
+    status = 'pending',
+    summary = {},
+    triggerSource = 'manual',
+    triggeredByUserId = null,
+  }) {
     const run = await operationRunStore.createOperationRun({
+      nextAttemptAt,
       status,
       summary: {
+        ...summary,
         triggerSource,
       },
       triggeredByUserId,

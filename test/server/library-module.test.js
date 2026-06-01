@@ -37,6 +37,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryDiscoveryRunStore = {};
   const libraryDiscoveryRequestService = { reconcileDiscoveryRequests };
   const libraryDiscoveryRequestStore = {};
+  const libraryDiscoveryRediscoveryService = {};
   const libraryDiscoverySummaryService = { buildLibraryDiscoveryRunDetail, buildLibraryDiscoverySummary };
   const libraryDiscoverySummaryStore = {};
   const libraryDiscoveryWorker = {};
@@ -89,6 +90,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryDiscoveryRunStore,
     libraryDiscoveryRequestService,
     libraryDiscoveryRequestStore,
+    libraryDiscoveryRediscoveryService,
     libraryDiscoverySummaryService,
     libraryDiscoverySummaryStore,
     libraryDiscoveryWorker,
@@ -137,6 +139,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.libraryDiscoveryRunStore, libraryDiscoveryRunStore);
   assert.equal(libraryModule.libraryDiscoveryRequestService, libraryDiscoveryRequestService);
   assert.equal(libraryModule.libraryDiscoveryRequestStore, libraryDiscoveryRequestStore);
+  assert.equal(libraryModule.libraryDiscoveryRediscoveryService, libraryDiscoveryRediscoveryService);
   assert.equal(libraryModule.libraryDiscoverySummaryService, libraryDiscoverySummaryService);
   assert.equal(libraryModule.libraryDiscoverySummaryStore, libraryDiscoverySummaryStore);
   assert.equal(libraryModule.libraryDiscoveryWorker, libraryDiscoveryWorker);
@@ -220,6 +223,7 @@ test('createLibraryModule initializes the default discovery worker after pause s
       reconcileDiscoveryRequests: async () => {},
     },
     libraryDiscoveryRequestStore: {},
+    libraryDiscoveryRediscoveryService: {},
     libraryDiscoveryRunService: {
       startLibraryDiscoveryRun: () => {},
     },

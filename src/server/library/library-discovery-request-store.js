@@ -233,6 +233,92 @@ export function createLibraryDiscoveryRequestStore({
     );
   }
 
+  async function scheduleDownloadRecoveryRediscovery({
+    failureReason = null,
+    maxResearchAttemptCount,
+    metadataReleaseId,
+    nextSearchAfter,
+    searchAttemptCount,
+    sourceOperationRunId = null,
+    sourceSearchId = null,
+    triggeredByFailedCandidateId,
+  }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        UPDATE library_discovery_requests
+        SET
+          request_status = 'ready',
+          blocked_reason = NULL,
+          next_search_after = $2::timestamptz,
+          search_attempt_count = $3::integer,
+          research_attempt_count = research_attempt_count + 1,
+          evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
+            'downloadRecoveryRediscovery',
+            jsonb_build_object(
+              'failureReason', $6::text,
+              'nextSearchAfter', $2::timestamptz,
+              'researchAttemptCount', research_attempt_count + 1,
+              'searchAttemptCount', $3::integer,
+              'sourceOperationRunId', $7::text,
+              'sourceSearchId', $8::text,
+              'triggeredByFailedCandidateId', $5::text
+            )
+          ),
+          updated_at = NOW()
+        WHERE metadata_release_id = $1
+          AND search_mode = 'automatic'
+          AND research_attempt_count < $4::integer
+          AND NOT (
+            request_status = 'ready'
+            AND next_search_after IS NOT NULL
+            AND next_search_after > NOW()
+            AND evidence ? 'downloadRecoveryRediscovery'
+          )
+        RETURNING
+          metadata_artist_id,
+          metadata_release_group_id,
+          metadata_release_id,
+          wanted_status,
+          search_mode,
+          request_status,
+          blocked_reason,
+          release_date,
+          last_search_at,
+          next_search_after,
+          search_attempt_count,
+          research_attempt_count,
+          evidence
+      `,
+      [
+        metadataReleaseId,
+        nextSearchAfter,
+        searchAttemptCount,
+        maxResearchAttemptCount,
+        triggeredByFailedCandidateId,
+        failureReason,
+        sourceOperationRunId,
+        sourceSearchId,
+      ],
+    );
+
+    return result.rows[0] ? {
+      blockedReason: result.rows[0].blocked_reason ?? null,
+      evidence: result.rows[0].evidence ?? {},
+      lastSearchAt: result.rows[0].last_search_at ?? null,
+      metadataArtistId: result.rows[0].metadata_artist_id,
+      metadataReleaseGroupId: result.rows[0].metadata_release_group_id,
+      metadataReleaseId: result.rows[0].metadata_release_id,
+      nextSearchAfter: result.rows[0].next_search_after ?? null,
+      researchAttemptCount: Number.parseInt(String(result.rows[0].research_attempt_count ?? 0), 10) || 0,
+      releaseDate: result.rows[0].release_date ?? null,
+      requestStatus: result.rows[0].request_status ?? null,
+      searchAttemptCount: Number.parseInt(String(result.rows[0].search_attempt_count ?? 0), 10) || 0,
+      searchMode: result.rows[0].search_mode ?? null,
+      wantedStatus: result.rows[0].wanted_status ?? null,
+    } : null;
+  }
+
   async function markDiscoveryRequestExhausted({
     metadataReleaseId,
     reasonCode = 'discovery_search_attempts_exhausted',
@@ -346,6 +432,7 @@ export function createLibraryDiscoveryRequestStore({
     markDiscoveryRequestExhausted,
     recordDiscoverySearchFailure,
     recordDiscoverySearchSuccess,
+    scheduleDownloadRecoveryRediscovery,
     replaceLibraryDiscoveryRequests,
   };
 }

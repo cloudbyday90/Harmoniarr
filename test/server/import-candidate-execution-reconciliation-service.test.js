@@ -101,6 +101,7 @@ test('reconcileImportCandidateExecutionState persists workflow transitions from 
   assert.equal(updateImportExecutionRunItem.mock.calls[1].arguments[0].planningSnapshot.execution.latestTransferSnapshot.summary.status, 'completed');
   assert.equal(updateImportExecutionRunItem.mock.calls[2].arguments[0].planningSnapshot.execution.latestTransferSnapshot.summary.status, 'failed');
   assert.equal(result.currentRunId, 'run-1');
+  assert.equal(result.summary.rediscovered, 0);
   assert.equal(result.summary.snapshotsUpdated, 3);
   assert.equal(result.summary.transitioned, 3);
 });
@@ -166,6 +167,7 @@ test('reconcileImportCandidateExecutionState only fails missing transfers after 
     reason: 'No live slskd transfers were found for this execution item after the 5 minutes grace window; Harmoniarr will treat it as orphaned.',
     requestMetadata: null,
   });
+  assert.equal(result.summary.rediscovered, 0);
   assert.equal(result.summary.snapshotsUpdated, 2);
   assert.equal(result.summary.transitioned, 1);
 });
@@ -226,7 +228,62 @@ test('reconcileImportCandidateExecutionState schedules rejected-transfer retries
     scheduleFollowUpRun: true,
   });
   assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 0);
+  assert.equal(result.summary.rediscovered, 0);
   assert.equal(result.summary.retried, 1);
   assert.equal(result.summary.transitioned, 1);
   assert.equal(result.retries[0].retrySameCandidate, true);
+});
+
+test('reconcileImportCandidateExecutionState reports rediscovery scheduled after failed cascade exhaustion', async (t) => {
+  const markImportCandidateDownloadFailed = t.mock.fn(async ({ importCandidateId }) => ({
+    candidate: { id: importCandidateId, status: 'failed' },
+  }));
+  const handleImportCandidateDownloadFailure = t.mock.fn(async () => ({
+    failedCandidateId: 'candidate-failed',
+    reason: 'rediscovery_scheduled',
+    recovered: false,
+    rediscovery: {
+      discoveryRunId: 'discovery-run-1',
+      metadataReleaseId: 'release-1',
+      nextSearchAfter: '2026-05-01T02:00:00.000Z',
+      scheduled: true,
+    },
+  }));
+  const service = createImportCandidateExecutionReconciliationService({
+    buildImportCandidateExecutionSummary: async () => ({
+      currentRun: {
+        id: 'run-failed',
+        status: 'completed',
+        items: [{
+          itemStatus: 'queued_with_warnings',
+          liveTransferSummary: {
+            message: '1 transfer reported a terminal slskd error.',
+            status: 'failed',
+          },
+          planningSnapshot: { candidate: { id: 'candidate-failed' }, execution: {} },
+          statusMessage: 'Failed',
+        }],
+      },
+    }),
+    getImportCandidate: async ({ importCandidateId }) => ({
+      id: importCandidateId,
+      status: 'downloading',
+    }),
+    handleImportCandidateDownloadFailure,
+    markImportCandidateDownloadFailed,
+    updateImportExecutionRunItem: async () => null,
+  });
+
+  const result = await service.reconcileImportCandidateExecutionState();
+
+  assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 1);
+  assert.equal(handleImportCandidateDownloadFailure.mock.callCount(), 1);
+  assert.equal(result.summary.rediscovered, 1);
+  assert.equal(result.summary.recovered, 0);
+  assert.deepEqual(result.rediscoveries, [{
+    discoveryRunId: 'discovery-run-1',
+    metadataReleaseId: 'release-1',
+    nextSearchAfter: '2026-05-01T02:00:00.000Z',
+    scheduled: true,
+  }]);
 });

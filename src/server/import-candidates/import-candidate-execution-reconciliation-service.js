@@ -128,6 +128,7 @@ export function createImportCandidateExecutionReconciliationService({
     const retries = [];
     const transitions = [];
     const recoveries = [];
+    const rediscoveries = [];
 
     for (const item of items) {
       const importCandidateId = item?.planningSnapshot?.candidate?.id ?? item?.importCandidateId ?? null;
@@ -174,6 +175,8 @@ export function createImportCandidateExecutionReconciliationService({
           retries.push(result);
         } else if (result?.recovered) {
           recoveries.push(result);
+        } else if (result?.rediscovery?.scheduled) {
+          rediscoveries.push(result.rediscovery);
         }
       } else if (targetStatus === 'import_pending') {
         result = await markImportCandidateImportPending({
@@ -215,6 +218,8 @@ export function createImportCandidateExecutionReconciliationService({
         });
         if (recovery?.recovered) {
           recoveries.push(recovery);
+        } else if (recovery?.rediscovery?.scheduled) {
+          rediscoveries.push(recovery.rediscovery);
         }
       }
 
@@ -240,12 +245,14 @@ export function createImportCandidateExecutionReconciliationService({
       currentRunId: run?.id ?? null,
       summary: {
         recovered: recoveries.length,
+        rediscovered: rediscoveries.length,
         retried: retries.length,
         snapshotsUpdated,
         transitioned: transitions.length,
       },
       transitions,
       recoveries,
+      rediscoveries,
       retries,
     };
   }

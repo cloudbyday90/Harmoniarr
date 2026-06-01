@@ -390,6 +390,13 @@ export function createApp({
         triggerReason,
       });
     },
+    scheduleDownloadRecoveryRediscovery: async (payload) => {
+      if (!libraryModule?.libraryDiscoveryRediscoveryService?.scheduleDownloadRecoveryRediscovery) {
+        throw new Error('Library discovery rediscovery service is not initialized');
+      }
+
+      return libraryModule.libraryDiscoveryRediscoveryService.scheduleDownloadRecoveryRediscovery(payload);
+    },
     slskdTransferSnapshotService: slskdModule.slskdTransferSnapshotService,
     slskdService: slskdModule.slskdService,
   });

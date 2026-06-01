@@ -40,8 +40,9 @@ function buildRecoveryResult({
   reason,
   recoveryRun = null,
   recovered,
+  rediscovery = null,
 }) {
-  return {
+  const result = {
     attemptedCandidateId: attemptedCandidate?.id ?? null,
     failedAttemptCount: failedCandidate?.downloadAttemptCount ?? null,
     failedCandidateId: failedCandidate?.id ?? null,
@@ -52,6 +53,12 @@ function buildRecoveryResult({
     recoveryRunId: recoveryRun?.id ?? null,
     sourceSearchId: failedCandidate?.sourceSearchId ?? null,
   };
+
+  if (rediscovery) {
+    result.rediscovery = rediscovery;
+  }
+
+  return result;
 }
 
 export function createImportCandidateRecoveryService({
@@ -65,6 +72,7 @@ export function createImportCandidateRecoveryService({
   promoteImportCandidateForRecoveryFn = promoteImportCandidateForRecovery,
   retryImportCandidateDownload = async () => null,
   retryRejectedTransferDelayMs = RETRY_REJECTED_TRANSFER_DELAY_MS,
+  scheduleDownloadRecoveryRediscovery = null,
 } = {}) {
   async function scheduleRecoveryExecutionRun({
     nextCandidate,
@@ -126,10 +134,30 @@ export function createImportCandidateRecoveryService({
     });
 
     if (!nextCandidate) {
+      const rediscovery = typeof scheduleDownloadRecoveryRediscovery === 'function'
+        ? await scheduleDownloadRecoveryRediscovery({
+          failedCandidateId,
+          failureReason,
+          metadataReleaseId,
+          operationRunId,
+          sourceSearchId,
+        })
+        : null;
+
+      if (rediscovery?.scheduled) {
+        return buildRecoveryResult({
+          failedCandidate,
+          reason: 'rediscovery_scheduled',
+          recovered: false,
+          rediscovery,
+        });
+      }
+
       return buildRecoveryResult({
         failedCandidate,
         reason: 'no_recovery_candidate_available',
         recovered: false,
+        rediscovery,
       });
     }
 

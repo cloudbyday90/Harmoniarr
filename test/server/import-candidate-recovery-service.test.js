@@ -103,6 +103,59 @@ test('import candidate recovery reports exhaustion when no scoped candidate rema
   assert.equal(result.failedAttemptCount, 3);
 });
 
+test('import candidate recovery schedules rediscovery when candidate cascade is exhausted', async (t) => {
+  const scheduleDownloadRecoveryRediscovery = t.mock.fn(async () => ({
+    discoveryRunId: 'discovery-run-1',
+    metadataReleaseId: 'release-1',
+    nextSearchAfter: '2026-05-01T02:00:00.000Z',
+    reason: 'rediscovery_scheduled',
+    researchAttemptCount: 1,
+    scheduled: true,
+    searchAttemptCount: 1,
+  }));
+  const service = createImportCandidateRecoveryService({
+    findNextCandidateForRecoveryFn: async () => null,
+    getImportCandidate: async () => ({
+      id: 'failed-candidate',
+      normalizedPayload: {
+        requestOwnership: {
+          metadataReleaseId: 'release-1',
+        },
+      },
+      sourceSearchId: 'search-1',
+    }),
+    incrementImportCandidateDownloadAttemptCountFn: async () => ({
+      id: 'failed-candidate',
+      downloadAttemptCount: 3,
+      normalizedPayload: {
+        requestOwnership: {
+          metadataReleaseId: 'release-1',
+        },
+      },
+      sourceSearchId: 'search-1',
+    }),
+    scheduleDownloadRecoveryRediscovery,
+  });
+
+  const result = await service.handleImportCandidateDownloadFailure({
+    failedCandidateId: 'failed-candidate',
+    failureReason: 'Download enqueue failed.',
+    operationRunId: 'source-run-1',
+    scheduleFollowUpRun: true,
+  });
+
+  assert.deepEqual(scheduleDownloadRecoveryRediscovery.mock.calls[0].arguments[0], {
+    failedCandidateId: 'failed-candidate',
+    failureReason: 'Download enqueue failed.',
+    metadataReleaseId: 'release-1',
+    operationRunId: 'source-run-1',
+    sourceSearchId: 'search-1',
+  });
+  assert.equal(result.recovered, false);
+  assert.equal(result.reason, 'rediscovery_scheduled');
+  assert.equal(result.rediscovery.discoveryRunId, 'discovery-run-1');
+});
+
 test('import candidate recovery schedules delayed same-candidate retry for rejected transfers', async (t) => {
   const createRecoveryExecutionRun = t.mock.fn(async ({ nextAttemptAt, summary }) => ({
     id: 'retry-run-1',

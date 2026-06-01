@@ -31,6 +31,7 @@ import { createLibraryProviderIngestRequestStore } from './library-provider-inge
 import { createLibraryDiscoveryRequestService } from './library-discovery-request-service.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 import { createLibraryDiscoveryDispatchService } from './library-discovery-dispatch-service.js';
+import { createLibraryDiscoveryRediscoveryService } from './library-discovery-rediscovery-service.js';
 import { createLibraryDiscoveryRunService } from './library-discovery-run-service.js';
 import { createLibraryDiscoveryRunStore } from './library-discovery-run-store.js';
 import { createLibraryDiscoverySummaryService } from './library-discovery-summary-service.js';
@@ -276,6 +277,10 @@ export function createLibraryModule({
     createOperationRun: libraryDiscoveryRunStore.createOperationRun,
     getActiveRun: libraryDiscoveryRunStore.getActiveRun,
   }),
+  libraryDiscoveryRediscoveryService = createLibraryDiscoveryRediscoveryService({
+    createDiscoveryRun: libraryDiscoveryRunStore.createOperationRun,
+    libraryDiscoveryRequestStore,
+  }),
   libraryDiscoverySummaryStore = createLibraryDiscoverySummaryStore(),
   libraryDiscoverySummaryService = createLibraryDiscoverySummaryService({
     libraryDiscoveryHeartbeatState,
@@ -344,6 +349,7 @@ export function createLibraryModule({
     libraryDiscoveryHeartbeatState,
     libraryDiscoveryRunService,
     libraryDiscoveryRunStore,
+    libraryDiscoveryRediscoveryService,
     libraryDiscoveryRequestService,
     libraryDiscoveryRequestStore,
     libraryDiscoverySummaryService,
