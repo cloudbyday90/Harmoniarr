@@ -215,9 +215,14 @@ suite('createApp', () => {
   assert.equal(typeof importCandidateModuleArgs.mediaInspectionService.inspectSourceFile, 'function');
   assert.equal(typeof importCandidateModuleArgs.mediaTranscodeExecutionService.executeCandidate, 'function');
   assert.equal(typeof importCandidateModuleArgs.scheduleLibraryScan, 'function');
-  assert.deepEqual(await importCandidateModuleArgs.scheduleLibraryScan(), { accepted: true, run: { id: 'scan-run-1' } });
+  assert.deepEqual(await importCandidateModuleArgs.scheduleLibraryScan({
+    triggeredByRunId: 'apply-run-1',
+    triggerReason: 'import_candidate_apply',
+  }), { accepted: true, run: { id: 'scan-run-1' } });
   assert.deepEqual(libraryModule.libraryScanService.startLibraryScan.mock.calls[0].arguments[0], {
+    triggeredByRunId: 'apply-run-1',
     triggeredByUserId: null,
+    triggerReason: 'import_candidate_apply',
   });
   assert.equal(typeof importCandidateModuleArgs.maintenanceLockService.listActiveMaintenanceLocks, 'function');
   assert.equal(artworkModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);

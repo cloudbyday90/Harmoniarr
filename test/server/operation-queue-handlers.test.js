@@ -150,6 +150,8 @@ test('operation queue handlers register shared operation types and map run summa
       id: 'run-5',
       summary: {
         libraryRoot: 'D:/music',
+        triggeredByRunId: 'apply-run-1',
+        triggerReason: 'import_candidate_apply',
       },
     },
   });
@@ -223,6 +225,8 @@ test('operation queue handlers register shared operation types and map run summa
   assert.deepEqual(libraryScanStartWorkerRun.mock.calls[0].arguments[0], {
     libraryRoot: 'D:/music',
     runId: 'run-5',
+    triggeredByRunId: 'apply-run-1',
+    triggerReason: 'import_candidate_apply',
   });
   assert.deepEqual(libraryOrganizeApplyStartWorkerRun.mock.calls[0].arguments[0], {
     plannedRenameCount: 3,

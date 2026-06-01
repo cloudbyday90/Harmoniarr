@@ -3898,7 +3898,9 @@ The following three items address the pipeline that runs after slskd completes a
 
 ### 5.28 Post-Apply Auto-Scan Trigger
 
-**Current gap:** `import-candidate-apply-worker.js` calls `markRunCompleted` after all candidates are processed but has no `scheduleLibraryScan` dependency. After files land on disk, no scan is started automatically. The operator must manually navigate to Library → Scan. Until that manual scan runs, `library_files` has no rows for the newly applied audio, `library_file_matches` has no match results, `library_release_reconciliations` shows no progress, and `library-media-request-fulfillment-service.js` cannot advance any request from `downloading`/`selected` to a fulfilled state. The gap between "files on disk" and "request satisfied" is entirely manual.
+**Status:** Implemented in `import-candidate-apply-worker.js`, `import-candidate-post-apply-scan-service.js`, `import-candidate-module.js`, `app.js`, `library-scan-service.js`, and `library-scan-run-store.js`. Successful import-apply runs now trigger one system library scan after the apply run is marked complete. The scan carries `triggerReason: 'import_candidate_apply'` and the source apply run ID in its operation summary/audit details.
+
+**Original gap:** `import-candidate-apply-worker.js` called `markRunCompleted` after all candidates were processed but had no durable library-scan trigger. After files landed on disk, no scan was started automatically. The operator had to manually navigate to Library -> Scan. Until that manual scan ran, `library_files` had no rows for the newly applied audio, `library_file_matches` had no match results, `library_release_reconciliations` showed no progress, and `library-media-request-fulfillment-service.js` could not advance any request from `downloading`/`selected` to a fulfilled state. The gap between "files on disk" and "request satisfied" was entirely manual.
 
 **Why this is the highest priority:** Every single import apply operation requires a follow-on manual action that is invisible to the operator unless they know the scan must be triggered. New installs and less-technical operators will see requests stuck in non-fulfilled states indefinitely. Lidarr, Radarr, and Sonarr all trigger a media file scan automatically after a download completes — this is industry-standard behavior for a *arr-class media manager.
 
@@ -3906,7 +3908,7 @@ The following three items address the pipeline that runs after slskd completes a
 
 **Design decision — guard against 409 and unconfigured library root:** The library scan service already throws a 409 if a scan is active. The auto-trigger must catch and ignore that error — a concurrent scan is the desired outcome. If no library root is configured, the scan service throws a different error that should also be suppressed (the scan would fail immediately anyway for the same reason; surfacing it here adds noise without helping).
 
-**Code location:** `src/server/import-candidates/import-candidate-apply-worker.js`. Add `scheduleLibraryScan` to the dependency object (defaulting to `null` so existing tests do not require changes). After `markRunCompleted`:
+**Code location:** `src/server/import-candidates/import-candidate-apply-worker.js` accepts `scheduleLibraryScan` in the dependency object (defaulting to `null` for tests and alternate composition paths). After `markRunCompleted`:
 
 ```js
 export function createImportCandidateApplyWorker({
@@ -3931,7 +3933,7 @@ export function createImportCandidateApplyWorker({
 }
 ```
 
-**`scheduleLibraryScan` implementation:** Wraps `createLibraryScanService().startLibraryScanRun({ triggeredByUserId: null })`, which already handles the 409 guard and records an audit event. Inject the concrete implementation in `library-module.js` where the apply worker is instantiated.
+**`scheduleLibraryScan` implementation:** `createImportCandidatePostApplyScanService()` wraps the library scan service, calls `startLibraryScan({ triggeredByUserId: null, triggeredByRunId, triggerReason: 'import_candidate_apply' })`, and returns a normalized scheduling outcome. The concrete start function is injected from `app.js` so the import-candidate module does not directly own the library module.
 
 **Edge cases:**
 

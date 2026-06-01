@@ -124,6 +124,8 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   await worker.startWorkerRun({
     libraryRoot: rootDir,
     runId: 'run-1',
+    triggeredByRunId: 'apply-run-1',
+    triggerReason: 'import_candidate_apply',
   });
 
   const completionArgs = await completion;
@@ -139,6 +141,8 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     runId: 'run-1',
     summary: {
       libraryRoot: rootDir,
+      triggeredByRunId: 'apply-run-1',
+      triggerReason: 'import_candidate_apply',
     },
   }]);
   assert.equal(markRunFailed.mock.callCount(), 0);
@@ -227,6 +231,8 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   assert.equal(completionArgs.summary.filesMatched, 1);
   assert.equal(completionArgs.summary.filesUnmatched, 1);
   assert.equal(completionArgs.summary.libraryRoot, rootDir);
+  assert.equal(completionArgs.summary.triggeredByRunId, 'apply-run-1');
+  assert.equal(completionArgs.summary.triggerReason, 'import_candidate_apply');
   assert.equal(releaseLease.mock.callCount(), 1);
   assert.equal(stopLeaseHeartbeat.mock.callCount(), 1);
   assert.deepEqual(releasedLeaseArgs, {

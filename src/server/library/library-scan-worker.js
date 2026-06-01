@@ -86,6 +86,13 @@ export function shouldExtractLibraryFileTags(file) {
     || currentModifiedAt !== extractedModifiedAt;
 }
 
+function buildScanTriggerSummary({ triggeredByRunId, triggerReason }) {
+  return {
+    ...(triggeredByRunId ? { triggeredByRunId } : {}),
+    ...(triggerReason ? { triggerReason } : {}),
+  };
+}
+
 export function createLibraryScanWorker({
   acquireLease,
   captureLibrarySidecarArtwork = null,
@@ -108,9 +115,15 @@ export function createLibraryScanWorker({
 } = {}) {
   const activeRunIds = new Set();
 
-  async function runScan({ libraryRoot, runId }) {
+  async function runScan({
+    libraryRoot,
+    runId,
+    triggeredByRunId = null,
+    triggerReason = null,
+  }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
+    const triggerSummary = buildScanTriggerSummary({ triggeredByRunId, triggerReason });
 
     try {
       await acquireLease({ runId });
@@ -123,6 +136,7 @@ export function createLibraryScanWorker({
         runId,
         summary: {
           libraryRoot,
+          ...triggerSummary,
         },
       });
 
@@ -216,6 +230,7 @@ export function createLibraryScanWorker({
           ...summary,
           observedFileCount: observedFiles.length,
           phases: phaseTiming.toJson(),
+          ...triggerSummary,
         },
       });
     } catch (error) {
@@ -230,6 +245,7 @@ export function createLibraryScanWorker({
             pauseCode: error.pauseCode ?? null,
             pauseMessage: error.message,
             pauseProvider: error.pauseProvider ?? null,
+            ...triggerSummary,
           },
         });
         return;
@@ -242,6 +258,7 @@ export function createLibraryScanWorker({
           summary: {
             currentStep: 'Library scan cancelled',
             libraryRoot,
+            ...triggerSummary,
           },
         });
         return;
@@ -253,6 +270,7 @@ export function createLibraryScanWorker({
         errorMessage: error.message,
         summary: {
           libraryRoot,
+          ...triggerSummary,
         },
       });
     } finally {
@@ -262,14 +280,24 @@ export function createLibraryScanWorker({
     }
   }
 
-  async function startWorkerRun({ libraryRoot, runId }) {
+  async function startWorkerRun({
+    libraryRoot,
+    runId,
+    triggeredByRunId = null,
+    triggerReason = null,
+  }) {
     if (activeRunIds.has(runId)) {
       return;
     }
 
     activeRunIds.add(runId);
     queueMicrotask(() => {
-      void runScan({ libraryRoot, runId });
+      void runScan({
+        libraryRoot,
+        runId,
+        triggeredByRunId,
+        triggerReason,
+      });
     });
   }
 

@@ -123,6 +123,8 @@ export function createOperationQueueHandlers({
     handlers[operationRunRegistry.libraryScan.operationType] = async ({ run }) => libraryModule.libraryScanWorker.startWorkerRun({
       libraryRoot: run.summary.libraryRoot ?? null,
       runId: run.id,
+      triggeredByRunId: run.summary.triggeredByRunId ?? null,
+      triggerReason: run.summary.triggerReason ?? null,
     });
   }
 

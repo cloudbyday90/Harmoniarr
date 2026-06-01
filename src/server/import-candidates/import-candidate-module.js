@@ -18,6 +18,7 @@
 
 import { createImportCandidateApplyPreviewService } from './import-candidate-apply-preview-service.js';
 import { createImportCandidateApplyOperationService } from './import-candidate-apply-operation-service.js';
+import { createImportCandidatePostApplyScanService } from './import-candidate-post-apply-scan-service.js';
 import { createImportCandidateBulkReviewService } from './import-candidate-bulk-review-service.js';
 import { replaceImportApplyRunItems, updateImportApplyRunItem } from './import-candidate-apply-repository.js';
 import { createImportCandidateApplyRunStore } from './import-candidate-apply-run-store.js';
@@ -70,6 +71,9 @@ export function createImportCandidateModule({
   recordActivityEventFn = null,
   recordSourceUserOutcomeEvidenceFn = async () => null,
   scheduleLibraryScan = null,
+  postApplyScanService = createImportCandidatePostApplyScanService({
+    startLibraryScan: scheduleLibraryScan,
+  }),
   sendFulfillmentNotificationFn = null,
   slskdService,
   mediaInspectionService = createMediaInspectionService({
@@ -172,7 +176,7 @@ export function createImportCandidateModule({
     releaseLease: importCandidateApplyRunStore.releaseLease,
     renewLease: importCandidateApplyRunStore.renewLease,
     replaceImportApplyRunItems,
-    scheduleLibraryScan,
+    scheduleLibraryScan: postApplyScanService.schedulePostApplyLibraryScan,
     sendFulfillmentNotificationFn,
     onReleaseAddedFn,
     recordActivityEventFn,
@@ -304,6 +308,7 @@ export function createImportCandidateModule({
     importCandidateImportPendingSummaryService,
     importCandidateApplyPreviewService,
     importCandidatePreviewService,
+    postApplyScanService,
     importCandidateReputationEnrichmentService,
     importCandidateSelectionSummaryService,
     importCandidateService,

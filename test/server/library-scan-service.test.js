@@ -37,11 +37,19 @@ test('createLibraryScanService blocks new runs when shared path validation is no
 });
 
 test('createLibraryScanService persists a pending run for durable dispatch when paths are ready', async (t) => {
-  const createOperationRun = t.mock.fn(async ({ libraryRoot, status, triggeredByUserId }) => ({
+  const createOperationRun = t.mock.fn(async ({
+    libraryRoot,
+    status,
+    triggeredByRunId,
+    triggeredByUserId,
+    triggerReason,
+  }) => ({
     id: 'run-1',
     libraryRoot,
     status,
+    triggeredByRunId,
     triggeredByUserId,
+    triggerReason,
   }));
   const service = createLibraryScanService({
     createOperationRun,
@@ -64,12 +72,18 @@ test('createLibraryScanService persists a pending run for durable dispatch when 
     },
   });
 
-  const result = await service.startLibraryScan({ triggeredByUserId: 'user-7' });
+  const result = await service.startLibraryScan({
+    triggeredByRunId: 'apply-run-1',
+    triggeredByUserId: 'user-7',
+    triggerReason: 'import_candidate_apply',
+  });
 
   assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
     libraryRoot: '/srv/music',
     status: 'pending',
+    triggeredByRunId: 'apply-run-1',
     triggeredByUserId: 'user-7',
+    triggerReason: 'import_candidate_apply',
   }]);
   assert.deepEqual(result, {
     accepted: true,
@@ -77,7 +91,9 @@ test('createLibraryScanService persists a pending run for durable dispatch when 
       id: 'run-1',
       libraryRoot: '/srv/music',
       status: 'pending',
+      triggeredByRunId: 'apply-run-1',
       triggeredByUserId: 'user-7',
+      triggerReason: 'import_candidate_apply',
     },
   });
 });

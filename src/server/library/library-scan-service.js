@@ -33,7 +33,12 @@ export function createLibraryScanService({
 } = {}) {
   const operationDescriptor = operationRunRegistry.libraryScan;
 
-  async function startLibraryScan({ requestMetadata = null, triggeredByUserId = null } = {}) {
+  async function startLibraryScan({
+    requestMetadata = null,
+    triggeredByRunId = null,
+    triggeredByUserId = null,
+    triggerReason = null,
+  } = {}) {
     await assertMaintenanceWriteAllowed();
 
     const activeRun = await getActiveRun();
@@ -51,7 +56,9 @@ export function createLibraryScanService({
     const run = await createOperationRun({
       libraryRoot,
       status: 'pending',
+      triggeredByRunId,
       triggeredByUserId,
+      triggerReason,
     });
 
     await recordAuditEventFn({
@@ -60,6 +67,8 @@ export function createLibraryScanService({
       details: {
         libraryRoot,
         runId: run.id,
+        triggeredByRunId,
+        triggerReason,
       },
       entityId: run.id,
       entityType: 'operation_run',

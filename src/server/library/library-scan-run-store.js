@@ -48,6 +48,8 @@ function normalizeRun(row) {
     filesMatched: toNumberOrNull(summary.filesMatched),
     filesUnmatched: toNumberOrNull(summary.filesUnmatched),
     libraryRoot: summary.libraryRoot ?? null,
+    triggeredByRunId: summary.triggeredByRunId ?? null,
+    triggerReason: summary.triggerReason ?? null,
     errorMessage: row.error_message ?? null,
   };
 }
@@ -62,10 +64,20 @@ export function createLibraryScanRunStore({
     operationType: operationDescriptor.operationType,
   });
 
-  async function createOperationRun({ libraryRoot, status = 'pending', triggeredByUserId = null }) {
+  async function createOperationRun({
+    libraryRoot,
+    status = 'pending',
+    triggeredByRunId = null,
+    triggeredByUserId = null,
+    triggerReason = null,
+  }) {
     const run = await operationRunStore.createOperationRun({
       status,
-      summary: { libraryRoot },
+      summary: {
+        libraryRoot,
+        triggeredByRunId,
+        triggerReason,
+      },
       triggeredByUserId,
     });
 

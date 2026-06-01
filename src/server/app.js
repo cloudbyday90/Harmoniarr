@@ -373,13 +373,19 @@ export function createApp({
     maintenanceLockOperationPauseService,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
-    scheduleLibraryScan: async () => {
+    scheduleLibraryScan: async ({
+      triggeredByRunId = null,
+      triggeredByUserId = null,
+      triggerReason = null,
+    } = {}) => {
       if (!libraryModule?.libraryScanService?.startLibraryScan) {
         throw new Error('Library scan service is not initialized');
       }
 
       return libraryModule.libraryScanService.startLibraryScan({
-        triggeredByUserId: null,
+        triggeredByRunId,
+        triggeredByUserId,
+        triggerReason,
       });
     },
     slskdTransferSnapshotService: slskdModule.slskdTransferSnapshotService,
