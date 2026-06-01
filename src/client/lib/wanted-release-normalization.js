@@ -72,9 +72,85 @@ export function normalizeWantedReleaseForCard(release) {
     expectedTrackCount: release.expectedTrackCount ?? 0,
     matchedTrackCount: release.matchedTrackCount ?? 0,
     missingTrackCount: release.missingTrackCount ?? 0,
+    discoveryRequest: release.discoveryRequest ?? null,
 
     // Forwarded for potential artist-detail navigation.
     metadataArtistId: release.metadataArtistId ?? null,
+  };
+}
+
+function formatAttemptCount(value, maxValue = null) {
+  const count = Number.parseInt(String(value ?? 0), 10) || 0;
+  const max = Number.parseInt(String(maxValue ?? 0), 10) || 0;
+  return max > 0 ? `${count}/${max}` : String(count);
+}
+
+function formatShortIdentifier(value) {
+  if (!value || typeof value !== 'string') return null;
+  return value.length > 12 ? `${value.slice(0, 8)}...` : value;
+}
+
+function formatEvidenceTimestamp(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
+
+/**
+ * Builds the operator-facing download-recovery notice for a wanted release.
+ *
+ * @param {object} release - Raw or normalized wanted release object.
+ * @returns {{title: string, message: string, details: Array<{label: string, value: string}>}|null}
+ */
+export function buildDownloadRecoveryNotice(release) {
+  const discoveryRequest = release?.discoveryRequest;
+  if (discoveryRequest?.blockedReason !== 'download_recovery_exhausted') {
+    return null;
+  }
+
+  const exhaustedEvidence = discoveryRequest.evidence?.downloadRecoveryExhausted ?? {};
+  const details = [
+    {
+      label: 'Research attempts',
+      value: formatAttemptCount(
+        discoveryRequest.researchAttemptCount,
+        exhaustedEvidence.maxResearchAttemptCount,
+      ),
+    },
+    {
+      label: 'Search attempts',
+      value: formatAttemptCount(discoveryRequest.searchAttemptCount),
+    },
+  ];
+
+  const lastSearchAt = formatEvidenceTimestamp(discoveryRequest.lastSearchAt);
+  if (lastSearchAt) {
+    details.push({ label: 'Last search', value: lastSearchAt });
+  }
+
+  const failedCandidateId = formatShortIdentifier(exhaustedEvidence.triggeredByFailedCandidateId);
+  if (failedCandidateId) {
+    details.push({ label: 'Failed candidate', value: failedCandidateId });
+  }
+
+  const operationRunId = formatShortIdentifier(exhaustedEvidence.sourceOperationRunId);
+  if (operationRunId) {
+    details.push({ label: 'Operation run', value: operationRunId });
+  }
+
+  const sourceSearchId = formatShortIdentifier(exhaustedEvidence.sourceSearchId);
+  if (sourceSearchId) {
+    details.push({ label: 'Search', value: sourceSearchId });
+  }
+
+  return {
+    details,
+    message: 'Automatic download recovery has stopped for this release. Review import candidates or start a manual search before retrying acquisition.',
+    title: 'Download recovery needs review',
   };
 }
 

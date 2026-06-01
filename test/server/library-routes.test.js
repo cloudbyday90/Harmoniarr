@@ -1209,6 +1209,44 @@ test('library filter-options route rejects unauthenticated requests', async (t) 
   });
 });
 
+test('library wanted-releases route includes discovery details for admin sessions', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-1', user: { role: 'admin' } }));
+  const buildLibraryWantedReleases = t.mock.fn(async () => ({
+    total: 0,
+    wantedReleases: [],
+  }));
+  const app = createLibraryRouteTestApp({ buildLibraryWantedReleases, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/wanted-releases?status=missing&limit=25`);
+
+    assert.equal(response.status, 200);
+    assert.equal(buildLibraryWantedReleases.mock.callCount(), 1);
+    assert.deepEqual(buildLibraryWantedReleases.mock.calls[0].arguments[0], {
+      includeDiscoveryRequestDetails: true,
+      limit: 25,
+      wantedStatus: 'missing',
+    });
+  });
+});
+
+test('library wanted-releases route omits discovery details for requester sessions', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-1', csrfToken: 'csrf-1', user: { role: 'requester' } }));
+  const buildLibraryWantedReleases = t.mock.fn(async () => ({
+    total: 0,
+    wantedReleases: [],
+  }));
+  const app = createLibraryRouteTestApp({ buildLibraryWantedReleases, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/wanted-releases`);
+
+    assert.equal(response.status, 200);
+    assert.equal(buildLibraryWantedReleases.mock.callCount(), 1);
+    assert.equal(buildLibraryWantedReleases.mock.calls[0].arguments[0].includeDiscoveryRequestDetails, false);
+  });
+});
+
 test('release radar route requires a session and returns the radar payload', async (t) => {
   const requireSession = t.mock.fn(async () => ({ appUserId: 'user-1', csrfToken: 'csrf-1', user: { role: 'requester' } }));
   const buildReleaseRadar = t.mock.fn(async () => ({

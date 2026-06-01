@@ -31,6 +31,7 @@ import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
+  buildDownloadRecoveryNotice,
   buildMissingPageSubtitle,
   buildMissingStatCards,
   buildWantedReleasesCardSubtitle,
@@ -104,7 +105,10 @@ const filteredReleases = computed(() => {
 });
 
 const normalizedReleases = computed(() =>
-  filteredReleases.value.map(normalizeWantedReleaseForCard),
+  filteredReleases.value.map((release) => ({
+    ...normalizeWantedReleaseForCard(release),
+    downloadRecoveryNotice: buildDownloadRecoveryNotice(release),
+  })),
 );
 
 const confirmModalOpen = ref(false);
@@ -318,6 +322,20 @@ onBeforeUnmount(() => {
                     {{ formatWantedTrackCounts(release) }}
                   </span>
                 </div>
+                <div
+                  v-if="release.downloadRecoveryNotice"
+                  class="hx-wanted-recovery-notice"
+                  role="status"
+                >
+                  <p class="hx-wanted-recovery-title">{{ release.downloadRecoveryNotice.title }}</p>
+                  <p>{{ release.downloadRecoveryNotice.message }}</p>
+                  <dl>
+                    <template v-for="detail in release.downloadRecoveryNotice.details" :key="detail.label">
+                      <dt>{{ detail.label }}</dt>
+                      <dd>{{ detail.value }}</dd>
+                    </template>
+                  </dl>
+                </div>
                 <RequestButton
                   :requested="isRequested(release)"
                   :loading="isRequesting(release)"
@@ -435,5 +453,43 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--hx-space-2);
   flex-wrap: wrap;
+}
+
+.hx-wanted-recovery-notice {
+  display: grid;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3);
+  border: 1px solid color-mix(in oklab, var(--hx-danger) 35%, var(--hx-border));
+  border-radius: var(--hx-radius-md);
+  background: color-mix(in oklab, var(--hx-danger) 8%, transparent);
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+}
+
+.hx-wanted-recovery-title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--hx-danger);
+}
+
+.hx-wanted-recovery-notice p {
+  margin: 0;
+}
+
+.hx-wanted-recovery-notice dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--hx-space-1) var(--hx-space-2);
+  margin: 0;
+}
+
+.hx-wanted-recovery-notice dt {
+  color: var(--hx-text-muted);
+}
+
+.hx-wanted-recovery-notice dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 </style>

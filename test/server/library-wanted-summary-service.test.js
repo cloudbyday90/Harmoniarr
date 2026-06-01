@@ -64,3 +64,46 @@ test('buildLibraryWantedSummary reports wanted state when missing releases remai
   assert.equal(summary.summary.status, 'wanted');
   assert.equal(summary.summary.message, '3 monitored releases still need files, including fully missing and partially satisfied releases.');
 });
+
+test('buildLibraryWantedReleases strips discovery request details by default', async () => {
+  const service = createLibraryWantedSummaryService({
+    libraryWantedReleaseStore: {
+      listWantedReleasesWithMetadata: async () => ([{
+        discoveryRequest: {
+          blockedReason: 'download_recovery_exhausted',
+          requestStatus: 'blocked',
+        },
+        id: 'wanted-1',
+        releaseTitle: 'Kid A',
+      }]),
+    },
+  });
+
+  const result = await service.buildLibraryWantedReleases();
+
+  assert.equal(result.total, 1);
+  assert.deepEqual(result.wantedReleases, [{
+    id: 'wanted-1',
+    releaseTitle: 'Kid A',
+  }]);
+});
+
+test('buildLibraryWantedReleases includes discovery request details for admin projections', async () => {
+  const discoveryRequest = {
+    blockedReason: 'download_recovery_exhausted',
+    requestStatus: 'blocked',
+  };
+  const service = createLibraryWantedSummaryService({
+    libraryWantedReleaseStore: {
+      listWantedReleasesWithMetadata: async () => ([{
+        discoveryRequest,
+        id: 'wanted-1',
+        releaseTitle: 'Kid A',
+      }]),
+    },
+  });
+
+  const result = await service.buildLibraryWantedReleases({ includeDiscoveryRequestDetails: true });
+
+  assert.deepEqual(result.wantedReleases[0].discoveryRequest, discoveryRequest);
+});

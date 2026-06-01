@@ -220,9 +220,10 @@ export function registerLibraryRoutes(app, {
   }));
 
   app.get('/api/v1/library/wanted-releases', asyncRoute(async (request, response) => {
-    await requireSession(request);
+    const session = await requireSession(request);
     const { status: wantedStatus = null, limit = '500' } = request.query;
     response.json(await buildLibraryWantedReleases({
+      includeDiscoveryRequestDetails: session?.user?.role === 'admin',
       limit: sanitizePageLimit(limit, { default: 500, max: 2000 }),
       wantedStatus: wantedStatus === 'missing' || wantedStatus === 'partial' ? wantedStatus : null,
     }));

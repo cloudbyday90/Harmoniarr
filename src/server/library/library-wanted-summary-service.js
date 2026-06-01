@@ -58,14 +58,24 @@ export function createLibraryWantedSummaryService({
   libraryWantedReleaseStore = createLibraryWantedReleaseStore(),
   libraryWantedSummaryStore = createLibraryWantedSummaryStore(),
 } = {}) {
-  async function buildLibraryWantedReleases({ limit = 500, wantedStatus = null } = {}) {
+  async function buildLibraryWantedReleases({
+    includeDiscoveryRequestDetails = false,
+    limit = 500,
+    wantedStatus = null,
+  } = {}) {
     const checkedAt = new Date().toISOString();
     const releases = await libraryWantedReleaseStore.listWantedReleasesWithMetadata({ limit, wantedStatus });
 
     return {
       checkedAt,
       total: releases.length,
-      wantedReleases: releases,
+      wantedReleases: includeDiscoveryRequestDetails
+        ? releases
+        : releases.map((release) => {
+            const publicRelease = { ...release };
+            delete publicRelease.discoveryRequest;
+            return publicRelease;
+          }),
     };
   }
 

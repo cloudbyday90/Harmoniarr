@@ -21,6 +21,7 @@ import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import {
+  buildDownloadRecoveryNotice,
   buildWantedReleasesCardSubtitle,
   formatLastReconciledAt,
   getWantedStatusLabel,
@@ -31,6 +32,13 @@ const wanted = useLibraryWantedSummary({ pollIntervalMs: 30000, revalidateOnFocu
 const releases = useLibraryWantedReleases({ pollIntervalMs: 30000, revalidateOnFocus: true });
 
 const isRefreshing = computed(() => wanted.isRevalidating.value || releases.isRevalidating.value);
+
+const wantedReleasesWithNotices = computed(() =>
+  releases.wantedReleases.value.map((release) => ({
+    notice: buildDownloadRecoveryNotice(release),
+    release,
+  })),
+);
 
 function refresh() {
   wanted.loadLibraryWantedSummary();
@@ -124,24 +132,42 @@ onBeforeUnmount(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="release in releases.wantedReleases.value" :key="release.id">
-              <td>{{ release.artistName }}</td>
-              <td>{{ release.releaseGroupTitle }}</td>
-              <td>
-                {{ release.releaseTitle }}
-                <span v-if="release.releaseDisambiguation" class="hx-muted"> ({{ release.releaseDisambiguation }})</span>
-              </td>
-              <td>{{ release.releaseGroupType ?? '—' }}</td>
-              <td>
-                <span class="hx-pill" :data-tone="getWantedStatusTone(release.wantedStatus)">
-                  {{ getWantedStatusLabel(release.wantedStatus) }}
-                </span>
-              </td>
-              <td class="hx-table-num">{{ release.expectedTrackCount }}</td>
-              <td class="hx-table-num">{{ release.matchedTrackCount }}</td>
-              <td class="hx-table-num">{{ release.missingTrackCount }}</td>
-              <td>{{ release.releaseDate ?? '—' }}</td>
-            </tr>
+            <template v-for="item in wantedReleasesWithNotices" :key="item.release.id">
+              <tr>
+                <td>{{ item.release.artistName }}</td>
+                <td>{{ item.release.releaseGroupTitle }}</td>
+                <td>
+                  {{ item.release.releaseTitle }}
+                  <span v-if="item.release.releaseDisambiguation" class="hx-muted"> ({{ item.release.releaseDisambiguation }})</span>
+                </td>
+                <td>{{ item.release.releaseGroupType ?? '—' }}</td>
+                <td>
+                  <span class="hx-pill" :data-tone="getWantedStatusTone(item.release.wantedStatus)">
+                    {{ getWantedStatusLabel(item.release.wantedStatus) }}
+                  </span>
+                </td>
+                <td class="hx-table-num">{{ item.release.expectedTrackCount }}</td>
+                <td class="hx-table-num">{{ item.release.matchedTrackCount }}</td>
+                <td class="hx-table-num">{{ item.release.missingTrackCount }}</td>
+                <td>{{ item.release.releaseDate ?? '—' }}</td>
+              </tr>
+              <tr v-if="item.notice" :key="`${item.release.id}-recovery`">
+                <td colspan="9">
+                  <div class="hx-recovery-notice" role="status">
+                    <div>
+                      <p class="hx-recovery-notice-title">{{ item.notice.title }}</p>
+                      <p class="hx-text-muted">{{ item.notice.message }}</p>
+                    </div>
+                    <dl class="hx-recovery-notice-details">
+                      <template v-for="detail in item.notice.details" :key="detail.label">
+                        <dt>{{ detail.label }}</dt>
+                        <dd>{{ detail.value }}</dd>
+                      </template>
+                    </dl>
+                  </div>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -157,3 +183,44 @@ onBeforeUnmount(() => {
     </article>
   </section>
 </template>
+
+<style scoped>
+.hx-recovery-notice {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-3);
+  border: 1px solid color-mix(in oklab, var(--hx-danger) 35%, var(--hx-border));
+  border-radius: var(--hx-radius-md);
+  background: color-mix(in oklab, var(--hx-danger) 8%, transparent);
+}
+
+.hx-recovery-notice-title {
+  margin: 0 0 var(--hx-space-1);
+  font-weight: 700;
+  color: var(--hx-danger);
+}
+
+.hx-recovery-notice-details {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: var(--hx-space-1) var(--hx-space-3);
+  margin: 0;
+  font-size: var(--hx-text-sm);
+}
+
+.hx-recovery-notice-details dt {
+  color: var(--hx-text-muted);
+}
+
+.hx-recovery-notice-details dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .hx-recovery-notice {
+    flex-direction: column;
+  }
+}
+</style>

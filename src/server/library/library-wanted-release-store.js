@@ -181,11 +181,19 @@ export function createLibraryWantedReleaseStore({
           mr.title AS release_title,
           mr.disambiguation AS release_disambiguation,
           mr.country AS release_country,
-          mr.musicbrainz_release_id AS musicbrainz_release_id
+          mr.musicbrainz_release_id AS musicbrainz_release_id,
+          ldr.request_status AS discovery_request_status,
+          ldr.blocked_reason AS discovery_blocked_reason,
+          ldr.last_search_at AS discovery_last_search_at,
+          ldr.next_search_after AS discovery_next_search_after,
+          ldr.search_attempt_count AS discovery_search_attempt_count,
+          ldr.research_attempt_count AS discovery_research_attempt_count,
+          ldr.evidence AS discovery_evidence
         FROM library_wanted_releases lwr
         JOIN metadata_artists ma ON ma.id = lwr.metadata_artist_id
         JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
         JOIN metadata_releases mr ON mr.id = lwr.metadata_release_id
+        LEFT JOIN library_discovery_requests ldr ON ldr.metadata_release_id = lwr.metadata_release_id
         ${whereClause}
         ORDER BY ma.sort_name ASC NULLS LAST, ma.name ASC, mrg.first_release_date ASC NULLS LAST, mr.release_date ASC NULLS LAST
         ${limitClause}
@@ -197,6 +205,17 @@ export function createLibraryWantedReleaseStore({
       id: row.id,
       artistName: row.artist_name,
       artistSortName: row.artist_sort_name ?? row.artist_name,
+      discoveryRequest: row.discovery_request_status
+        ? {
+            blockedReason: row.discovery_blocked_reason ?? null,
+            evidence: row.discovery_evidence ?? {},
+            lastSearchAt: row.discovery_last_search_at ?? null,
+            nextSearchAfter: row.discovery_next_search_after ?? null,
+            requestStatus: row.discovery_request_status,
+            researchAttemptCount: Number.parseInt(String(row.discovery_research_attempt_count ?? 0), 10) || 0,
+            searchAttemptCount: Number.parseInt(String(row.discovery_search_attempt_count ?? 0), 10) || 0,
+          }
+        : null,
       expectedTrackCount: Number.parseInt(String(row.expected_track_count ?? 0), 10) || 0,
       lastReconciledAt: row.last_reconciled_at ?? null,
       matchedTrackCount: Number.parseInt(String(row.matched_track_count ?? 0), 10) || 0,

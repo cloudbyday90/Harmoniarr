@@ -19,6 +19,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildDownloadRecoveryNotice,
   buildMissingPageSubtitle,
   buildMissingStatCards,
   buildWantedReleasesCardSubtitle,
@@ -136,6 +137,15 @@ test('normalizeWantedReleaseForCard forwards metadataArtistId', () => {
 test('normalizeWantedReleaseForCard sets metadataArtistId to null when absent', () => {
   const result = normalizeWantedReleaseForCard({ releaseTitle: 'Album' });
   assert.equal(result.metadataArtistId, null);
+});
+
+test('normalizeWantedReleaseForCard forwards discoveryRequest for operator evidence', () => {
+  const discoveryRequest = {
+    blockedReason: 'download_recovery_exhausted',
+    requestStatus: 'blocked',
+  };
+  const result = normalizeWantedReleaseForCard({ discoveryRequest, releaseTitle: 'Album' });
+  assert.deepEqual(result.discoveryRequest, discoveryRequest);
 });
 
 test('normalizeWantedReleaseForCard does not mutate the input object', () => {
@@ -541,4 +551,52 @@ test('formatWantedTrackCounts returns "0 of 1 track" for a single missing releas
 test('formatWantedTrackCounts regression: single track is not pluralised as "0 / 1 tracks"', () => {
   const result = formatWantedTrackCounts({ expectedTrackCount: 1, matchedTrackCount: 0 });
   assert.notEqual(result, '0 / 1 tracks', 'single-track count must not use old slash format or plural form');
+});
+
+// ── buildDownloadRecoveryNotice ──────────────────────────────────────────────
+
+test('buildDownloadRecoveryNotice returns null without a discovery request', () => {
+  assert.equal(buildDownloadRecoveryNotice({ releaseTitle: 'Kid A' }), null);
+});
+
+test('buildDownloadRecoveryNotice returns null for non-exhausted discovery requests', () => {
+  const notice = buildDownloadRecoveryNotice({
+    discoveryRequest: {
+      blockedReason: 'automatic_cooldown',
+      requestStatus: 'cooldown',
+    },
+  });
+
+  assert.equal(notice, null);
+});
+
+test('buildDownloadRecoveryNotice summarizes exhausted recovery evidence', () => {
+  const notice = buildDownloadRecoveryNotice({
+    discoveryRequest: {
+      blockedReason: 'download_recovery_exhausted',
+      evidence: {
+        downloadRecoveryExhausted: {
+          maxResearchAttemptCount: 3,
+          sourceOperationRunId: 'operation-run-123456789',
+          sourceSearchId: 'search-123456789',
+          triggeredByFailedCandidateId: 'candidate-123456789',
+        },
+      },
+      lastSearchAt: '2026-05-31T14:30:00.000Z',
+      requestStatus: 'blocked',
+      researchAttemptCount: 3,
+      searchAttemptCount: 2,
+    },
+  });
+
+  assert.equal(notice.title, 'Download recovery needs review');
+  assert.match(notice.message, /Automatic download recovery has stopped/);
+  assert.deepEqual(notice.details.slice(0, 2), [
+    { label: 'Research attempts', value: '3/3' },
+    { label: 'Search attempts', value: '2' },
+  ]);
+  assert.ok(notice.details.some((detail) => detail.label === 'Last search' && detail.value.length > 0));
+  assert.ok(notice.details.some((detail) => detail.label === 'Failed candidate' && detail.value === 'candidat...'));
+  assert.ok(notice.details.some((detail) => detail.label === 'Operation run' && detail.value === 'operatio...'));
+  assert.ok(notice.details.some((detail) => detail.label === 'Search' && detail.value === 'search-1...'));
 });
