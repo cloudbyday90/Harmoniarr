@@ -21,6 +21,7 @@ import { createLibraryDiscoveryRequestStore } from './library-discovery-request-
 
 const defaultAutomaticCooldownMs = 6 * 60 * 60 * 1000;
 const exhaustedBlockedReason = 'search_attempts_exhausted';
+const downloadRecoveryExhaustedBlockedReason = 'download_recovery_exhausted';
 const exhaustedSearchAttemptCount = 3;
 
 function toNonNegativeInteger(value) {
@@ -175,6 +176,31 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       requestStatus: 'blocked',
       researchAttemptCount,
       searchAttemptCount: Math.max(searchAttemptCount, exhaustedSearchAttemptCount),
+      searchMode,
+      wantedStatus: row.wanted_status,
+    };
+  }
+
+  if (row.blocked_reason === downloadRecoveryExhaustedBlockedReason) {
+    return {
+      blockedReason: downloadRecoveryExhaustedBlockedReason,
+      evidence: {
+        ...priorEvidence,
+        ...requestSourceEvidence,
+        priorBlockedReason: row.blocked_reason ?? null,
+        strategy: 'download_recovery_exhausted',
+        wantedStrategy: row.wanted_strategy ?? null,
+      },
+      lastSearchAt: toIsoStringOrNull(row.last_search_at),
+      manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
+      metadataArtistId: row.metadata_artist_id,
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id,
+      nextSearchAfter: null,
+      releaseDate: row.release_date ?? null,
+      requestStatus: 'blocked',
+      researchAttemptCount,
+      searchAttemptCount,
       searchMode,
       wantedStatus: row.wanted_status,
     };

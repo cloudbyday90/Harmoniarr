@@ -24,15 +24,43 @@ function normalizeOptionalString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function isFuturePendingRediscovery(discoveryRequest, now) {
+  const marker = discoveryRequest?.evidence?.downloadRecoveryRediscovery;
+  const nextSearchAfter = discoveryRequest?.nextSearchAfter ?? marker?.nextSearchAfter ?? null;
+  if (!nextSearchAfter) {
+    return false;
+  }
+
+  const deadline = new Date(nextSearchAfter);
+  return discoveryRequest?.requestStatus === 'ready'
+    && !Number.isNaN(deadline.getTime())
+    && deadline.getTime() > now.getTime();
+}
+
+function notifyDownloadRecoveryExhausted(onDownloadRecoveryExhaustedFn, payload) {
+  if (typeof onDownloadRecoveryExhaustedFn !== 'function') {
+    return;
+  }
+
+  void onDownloadRecoveryExhaustedFn(payload).catch(() => {});
+}
+
 export function createLibraryDiscoveryRediscoveryService({
   createDiscoveryRun = async () => null,
   getNow = () => new Date(),
   libraryDiscoveryRequestStore,
   maxResearchAttemptCount = MAX_DOWNLOAD_RECOVERY_RESEARCH_ATTEMPTS,
+  onDownloadRecoveryExhaustedFn = null,
   rediscoveryDelayMs = DOWNLOAD_RECOVERY_REDISCOVERY_DELAY_MS,
 } = {}) {
   if (!libraryDiscoveryRequestStore?.scheduleDownloadRecoveryRediscovery) {
     throw new Error('libraryDiscoveryRequestStore.scheduleDownloadRecoveryRediscovery dependency is required');
+  }
+  if (!libraryDiscoveryRequestStore?.getDownloadRecoveryRediscoveryState) {
+    throw new Error('libraryDiscoveryRequestStore.getDownloadRecoveryRediscoveryState dependency is required');
+  }
+  if (!libraryDiscoveryRequestStore?.markDownloadRecoveryRediscoveryExhausted) {
+    throw new Error('libraryDiscoveryRequestStore.markDownloadRecoveryRediscoveryExhausted dependency is required');
   }
 
   async function scheduleDownloadRecoveryRediscovery({
@@ -50,7 +78,8 @@ export function createLibraryDiscoveryRediscoveryService({
       };
     }
 
-    const nextSearchAfter = new Date(getNow().getTime() + rediscoveryDelayMs).toISOString();
+    const now = getNow();
+    const nextSearchAfter = new Date(now.getTime() + rediscoveryDelayMs).toISOString();
     const discoveryRequest = await libraryDiscoveryRequestStore.scheduleDownloadRecoveryRediscovery({
       failureReason,
       maxResearchAttemptCount,
@@ -63,6 +92,50 @@ export function createLibraryDiscoveryRediscoveryService({
     });
 
     if (!discoveryRequest) {
+      const currentRequest = await libraryDiscoveryRequestStore.getDownloadRecoveryRediscoveryState({
+        metadataReleaseId: releaseId,
+      });
+
+      if (isFuturePendingRediscovery(currentRequest, now)) {
+        return {
+          metadataReleaseId: releaseId,
+          nextSearchAfter: currentRequest.nextSearchAfter,
+          reason: 'rediscovery_already_pending',
+          researchAttemptCount: currentRequest.researchAttemptCount,
+          scheduled: false,
+          searchAttemptCount: currentRequest.searchAttemptCount,
+        };
+      }
+
+      const exhaustedRequest = (currentRequest?.researchAttemptCount ?? 0) >= maxResearchAttemptCount
+        ? await libraryDiscoveryRequestStore.markDownloadRecoveryRediscoveryExhausted({
+          failureReason,
+          maxResearchAttemptCount,
+          metadataReleaseId: releaseId,
+          sourceOperationRunId: operationRunId,
+          sourceSearchId,
+          triggeredByFailedCandidateId: failedCandidateId,
+        }) ?? currentRequest
+        : null;
+
+      if (exhaustedRequest) {
+        notifyDownloadRecoveryExhausted(onDownloadRecoveryExhaustedFn, {
+          artistName: exhaustedRequest.artistName ?? null,
+          maxResearchAttemptCount,
+          metadataReleaseId: releaseId,
+          releaseTitle: exhaustedRequest.releaseTitle ?? exhaustedRequest.releaseGroupTitle ?? null,
+          researchAttemptCount: exhaustedRequest.researchAttemptCount,
+        });
+
+        return {
+          exhausted: true,
+          metadataReleaseId: releaseId,
+          reason: 'rediscovery_exhausted',
+          researchAttemptCount: exhaustedRequest.researchAttemptCount,
+          scheduled: false,
+        };
+      }
+
       return {
         metadataReleaseId: releaseId,
         reason: 'rediscovery_not_scheduled',

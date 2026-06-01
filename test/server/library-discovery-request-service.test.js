@@ -374,3 +374,67 @@ test('reconcileDiscoveryRequests preserves pending download recovery rediscovery
     }],
   });
 });
+
+test('reconcileDiscoveryRequests preserves download recovery exhausted requests', async (t) => {
+  const replaceLibraryDiscoveryRequests = t.mock.fn(async () => {});
+  const now = new Date('2026-05-02T15:00:00.000Z');
+  const service = createLibraryDiscoveryRequestService({
+    getNow: () => now,
+    getPoolFn: () => ({
+      query: async () => ({
+        rows: [{
+          blocked_reason: 'download_recovery_exhausted',
+          last_search_at: '2026-05-02T10:00:00.000Z',
+          manual_requested_at: null,
+          metadata_artist_id: 'artist-10',
+          metadata_release_group_id: 'release-group-10',
+          metadata_release_id: 'release-10',
+          prior_evidence: {
+            downloadRecoveryExhausted: {
+              maxResearchAttemptCount: 2,
+              researchAttemptCount: 2,
+            },
+          },
+          release_date: '2026-05-01',
+          research_attempt_count: 2,
+          search_attempt_count: 1,
+          search_mode: 'automatic',
+          wanted_status: 'missing',
+          wanted_strategy: 'media_request_intake',
+        }],
+      }),
+    }),
+    libraryDiscoveryRequestStore: {
+      replaceLibraryDiscoveryRequests,
+    },
+  });
+
+  await service.reconcileDiscoveryRequests();
+
+  assert.deepEqual(replaceLibraryDiscoveryRequests.mock.calls[0].arguments[0], {
+    discoveryRequests: [{
+      blockedReason: 'download_recovery_exhausted',
+      evidence: {
+        downloadRecoveryExhausted: {
+          maxResearchAttemptCount: 2,
+          researchAttemptCount: 2,
+        },
+        priorBlockedReason: 'download_recovery_exhausted',
+        strategy: 'download_recovery_exhausted',
+        wantedStrategy: 'media_request_intake',
+      },
+      lastSearchAt: '2026-05-02T10:00:00.000Z',
+      manualRequestedAt: null,
+      metadataArtistId: 'artist-10',
+      metadataReleaseGroupId: 'release-group-10',
+      metadataReleaseId: 'release-10',
+      nextSearchAfter: null,
+      releaseDate: '2026-05-01',
+      requestStatus: 'blocked',
+      researchAttemptCount: 2,
+      searchAttemptCount: 1,
+      searchMode: 'automatic',
+      wantedStatus: 'missing',
+    }],
+  });
+});

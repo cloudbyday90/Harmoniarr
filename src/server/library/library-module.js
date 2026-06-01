@@ -83,6 +83,7 @@ export function createLibraryModule({
   importCandidateService = null,
   onOrganizeReleaseAddedFn = null,
   onDiscoveryRequestExhaustedFn = null,
+  onDownloadRecoveryExhaustedFn = null,
   onRequestCreatedFn = null,
   prefetchMonitoredArtistArtwork = null,
   recordActivityEventFn = null,
@@ -280,6 +281,7 @@ export function createLibraryModule({
   libraryDiscoveryRediscoveryService = createLibraryDiscoveryRediscoveryService({
     createDiscoveryRun: libraryDiscoveryRunStore.createOperationRun,
     libraryDiscoveryRequestStore,
+    onDownloadRecoveryExhaustedFn,
   }),
   libraryDiscoverySummaryStore = createLibraryDiscoverySummaryStore(),
   libraryDiscoverySummaryService = createLibraryDiscoverySummaryService({

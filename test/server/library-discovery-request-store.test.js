@@ -155,6 +155,7 @@ test('scheduleDownloadRecoveryRediscovery records delayed automatic rediscovery 
   });
 
   assert.deepEqual(result, {
+    artistName: null,
     blockedReason: null,
     evidence: {
       downloadRecoveryRediscovery: {
@@ -168,9 +169,104 @@ test('scheduleDownloadRecoveryRediscovery records delayed automatic rediscovery 
     nextSearchAfter: '2026-05-01T02:00:00.000Z',
     researchAttemptCount: 1,
     releaseDate: '2026-04-25',
+    releaseGroupTitle: null,
+    releaseTitle: null,
     requestStatus: 'ready',
     searchAttemptCount: 1,
     searchMode: 'automatic',
     wantedStatus: 'missing',
   });
+});
+
+test('getDownloadRecoveryRediscoveryState returns joined release context', async (t) => {
+  const query = t.mock.fn(async (_sql, params) => {
+    assert.deepEqual(params, ['release-1']);
+    return {
+      rows: [{
+        artist_name: 'Autechre',
+        blocked_reason: null,
+        evidence: { downloadRecoveryRediscovery: {} },
+        last_search_at: '2026-05-01T00:00:00.000Z',
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'group-1',
+        metadata_release_id: 'release-1',
+        next_search_after: '2026-05-01T02:00:00.000Z',
+        release_date: '2026-04-25',
+        release_group_title: 'Amber',
+        release_title: 'Amber',
+        request_status: 'ready',
+        research_attempt_count: 2,
+        search_attempt_count: 1,
+        search_mode: 'automatic',
+        wanted_status: 'missing',
+      }],
+    };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const result = await store.getDownloadRecoveryRediscoveryState({
+    metadataReleaseId: 'release-1',
+  });
+
+  assert.equal(result.artistName, 'Autechre');
+  assert.equal(result.releaseTitle, 'Amber');
+  assert.equal(result.researchAttemptCount, 2);
+});
+
+test('markDownloadRecoveryRediscoveryExhausted blocks the request with recovery evidence', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /blocked_reason = 'download_recovery_exhausted'/);
+    assert.match(sql, /research_attempt_count >= \$2::integer/);
+    assert.deepEqual(params, [
+      'release-1',
+      2,
+      'candidate-1',
+      'Download enqueue failed.',
+      'run-1',
+      'search-1',
+    ]);
+    return {
+      rows: [{
+        artist_name: 'Autechre',
+        blocked_reason: 'download_recovery_exhausted',
+        evidence: {
+          downloadRecoveryExhausted: {
+            maxResearchAttemptCount: 2,
+          },
+        },
+        last_search_at: '2026-05-01T00:00:00.000Z',
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'group-1',
+        metadata_release_id: 'release-1',
+        next_search_after: null,
+        release_date: '2026-04-25',
+        release_group_title: 'Amber',
+        release_title: 'Amber',
+        request_status: 'blocked',
+        research_attempt_count: 2,
+        search_attempt_count: 1,
+        search_mode: 'automatic',
+        wanted_status: 'missing',
+      }],
+    };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const result = await store.markDownloadRecoveryRediscoveryExhausted({
+    failureReason: 'Download enqueue failed.',
+    maxResearchAttemptCount: 2,
+    metadataReleaseId: 'release-1',
+    sourceOperationRunId: 'run-1',
+    sourceSearchId: 'search-1',
+    triggeredByFailedCandidateId: 'candidate-1',
+  });
+
+  assert.equal(result.blockedReason, 'download_recovery_exhausted');
+  assert.equal(result.requestStatus, 'blocked');
+  assert.equal(result.artistName, 'Autechre');
+  assert.equal(result.releaseTitle, 'Amber');
 });

@@ -22,6 +22,8 @@ export const NOTIFICATION_CATEGORIES = [
   { key: 'releaseAdded', label: 'Release added', description: 'When a new release is added to the library', adminOnly: false },
   { key: 'artistMonitored', label: 'Artist monitored', description: 'When an artist is added to monitoring', adminOnly: false },
   { key: 'requestCreated', label: 'Request created', description: 'When a new music request is submitted', adminOnly: false },
+  { key: 'discoveryRequestExhausted', label: 'Discovery request exhausted', description: 'When automatic discovery cannot find usable Soulseek results', adminOnly: true },
+  { key: 'downloadRecoveryExhausted', label: 'Download recovery exhausted', description: 'When all download recovery searches have been spent', adminOnly: true },
   { key: 'trustOverride', label: 'Trust override', description: 'When a source user trust level is changed', adminOnly: true },
   { key: 'blocklistEvent', label: 'Blocklist change', description: 'When a source user is blocked or unblocked', adminOnly: true },
   { key: 'trustThresholdCrossed', label: 'Trust threshold crossed', description: 'When source user delivery evidence drops into a review state', adminOnly: true },

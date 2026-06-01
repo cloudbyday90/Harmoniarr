@@ -49,6 +49,8 @@ test('includes requestFulfilled category', () => {
 test('includes admin-only categories', () => {
   const adminOnly = NOTIFICATION_CATEGORIES.filter((c) => c.adminOnly);
   assert.ok(adminOnly.length > 0, 'must have at least one admin-only category');
+  assert.ok(adminOnly.some((c) => c.key === 'discoveryRequestExhausted'));
+  assert.ok(adminOnly.some((c) => c.key === 'downloadRecoveryExhausted'));
 });
 
 test('includes non-admin categories', () => {

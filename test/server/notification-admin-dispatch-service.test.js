@@ -96,6 +96,36 @@ test('broadcastAdminNotification does not send to non-admin users', async () => 
   assert.equal(sent.length, 0);
 });
 
+test('broadcastAdminNotification forwards cooldown controls for admin recipients', async (t) => {
+  const shouldDispatch = t.mock.fn(async () => true);
+  const markDispatched = t.mock.fn(async () => {});
+  const sendNotificationToUser = t.mock.fn(async () => ({ sent: 1, failed: 0, removed: 0 }));
+
+  await broadcastAdminNotification({
+    category: 'downloadRecoveryExhausted',
+    cooldownKey: 'downloadRecoveryExhausted:Autechre:Amber',
+    cooldownMs: 300000,
+    dispatchCooldownService: {
+      markDispatched,
+      shouldDispatch,
+    },
+    payload: { title: 'Download recovery exhausted', body: 'Amber needs operator review', url: '/app/activity/wanted' },
+    listAppUsers: async () => [{ id: 'admin-1', role: 'admin' }],
+    getUserPreferences: async () => ({ notificationPreferences: ALL_ENABLED }),
+    sendNotificationToUser,
+  });
+
+  assert.deepEqual(shouldDispatch.mock.calls[0].arguments[0], {
+    category: 'downloadRecoveryExhausted',
+    cooldownKey: 'downloadRecoveryExhausted:Autechre:Amber',
+    cooldownMs: 300000,
+    userId: 'admin-1',
+  });
+  assert.equal(sendNotificationToUser.mock.callCount(), 1);
+  assert.equal(sendNotificationToUser.mock.calls[0].arguments[0].coalesceKey, 'downloadRecoveryExhausted:Autechre:Amber');
+  assert.equal(markDispatched.mock.callCount(), 1);
+});
+
 test('broadcastAdminNotification swallows listAppUsers errors', async () => {
   const listAppUsers = async () => { throw new Error('db down'); };
   const sendNotificationToUser = async () => { throw new Error('should not be called'); };

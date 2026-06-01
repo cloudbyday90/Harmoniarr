@@ -424,6 +424,22 @@ export function createApp({
         url: '/app/activity/wanted',
       },
     }),
+    onDownloadRecoveryExhaustedFn: ({ artistName, maxResearchAttemptCount, releaseTitle, researchAttemptCount }) => broadcastAdminNotification({
+      category: 'downloadRecoveryExhausted',
+      cooldownKey: `downloadRecoveryExhausted:${artistName ?? ''}:${releaseTitle ?? ''}`,
+      cooldownMs: householdNotificationCooldowns.requestCreatedMs,
+      dispatchCooldownService: notificationDispatchDeps.dispatchCooldownService,
+      listAppUsers: notificationDispatchDeps.listAppUsers,
+      getUserPreferences: notificationDispatchDeps.getUserPreferences,
+      sendNotificationToUser: notificationDispatchDeps.sendNotificationToUser,
+      payload: {
+        body: releaseTitle
+          ? `${artistName ? `${artistName} - ` : ''}${releaseTitle} exhausted download recovery after ${researchAttemptCount ?? maxResearchAttemptCount ?? 0} rediscovery attempt${(researchAttemptCount ?? maxResearchAttemptCount) === 1 ? '' : 's'}`
+          : 'A release exhausted download recovery and needs operator review',
+        title: 'Download recovery exhausted',
+        url: '/app/activity/wanted',
+      },
+    }),
     onOrganizeReleaseAddedFn: ({ artistName, movedCount, releaseCount, releaseTitle }) => broadcastHouseholdNotification({
       category: 'releaseAdded',
       cooldownKey: buildReleaseAddedCooldownKey({

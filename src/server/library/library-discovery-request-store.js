@@ -42,6 +42,31 @@ function mapDiscoveryDispatchRow(row) {
   };
 }
 
+function mapDiscoveryRequestStateRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    artistName: row.artist_name ?? null,
+    blockedReason: row.blocked_reason ?? null,
+    evidence: row.evidence ?? {},
+    lastSearchAt: row.last_search_at ?? null,
+    metadataArtistId: row.metadata_artist_id,
+    metadataReleaseGroupId: row.metadata_release_group_id,
+    metadataReleaseId: row.metadata_release_id,
+    nextSearchAfter: row.next_search_after ?? null,
+    releaseDate: row.release_date ?? null,
+    releaseGroupTitle: row.release_group_title ?? null,
+    releaseTitle: row.release_title ?? null,
+    requestStatus: row.request_status ?? null,
+    researchAttemptCount: Number.parseInt(String(row.research_attempt_count ?? 0), 10) || 0,
+    searchAttemptCount: Number.parseInt(String(row.search_attempt_count ?? 0), 10) || 0,
+    searchMode: row.search_mode ?? null,
+    wantedStatus: row.wanted_status ?? null,
+  };
+}
+
 export function createLibraryDiscoveryRequestStore({
   getPoolFn = getPool,
 } = {}) {
@@ -302,21 +327,122 @@ export function createLibraryDiscoveryRequestStore({
       ],
     );
 
-    return result.rows[0] ? {
-      blockedReason: result.rows[0].blocked_reason ?? null,
-      evidence: result.rows[0].evidence ?? {},
-      lastSearchAt: result.rows[0].last_search_at ?? null,
-      metadataArtistId: result.rows[0].metadata_artist_id,
-      metadataReleaseGroupId: result.rows[0].metadata_release_group_id,
-      metadataReleaseId: result.rows[0].metadata_release_id,
-      nextSearchAfter: result.rows[0].next_search_after ?? null,
-      researchAttemptCount: Number.parseInt(String(result.rows[0].research_attempt_count ?? 0), 10) || 0,
-      releaseDate: result.rows[0].release_date ?? null,
-      requestStatus: result.rows[0].request_status ?? null,
-      searchAttemptCount: Number.parseInt(String(result.rows[0].search_attempt_count ?? 0), 10) || 0,
-      searchMode: result.rows[0].search_mode ?? null,
-      wantedStatus: result.rows[0].wanted_status ?? null,
-    } : null;
+    return mapDiscoveryRequestStateRow(result.rows[0]);
+  }
+
+  async function getDownloadRecoveryRediscoveryState({ metadataReleaseId }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT
+          library_discovery_requests.metadata_artist_id,
+          library_discovery_requests.metadata_release_group_id,
+          library_discovery_requests.metadata_release_id,
+          library_discovery_requests.wanted_status,
+          library_discovery_requests.search_mode,
+          library_discovery_requests.request_status,
+          library_discovery_requests.blocked_reason,
+          library_discovery_requests.release_date,
+          library_discovery_requests.last_search_at,
+          library_discovery_requests.next_search_after,
+          library_discovery_requests.search_attempt_count,
+          library_discovery_requests.research_attempt_count,
+          library_discovery_requests.evidence,
+          metadata_artists.name AS artist_name,
+          metadata_release_groups.title AS release_group_title,
+          metadata_releases.title AS release_title
+        FROM library_discovery_requests
+        JOIN metadata_artists
+          ON metadata_artists.id = library_discovery_requests.metadata_artist_id
+        JOIN metadata_release_groups
+          ON metadata_release_groups.id = library_discovery_requests.metadata_release_group_id
+        JOIN metadata_releases
+          ON metadata_releases.id = library_discovery_requests.metadata_release_id
+        WHERE library_discovery_requests.metadata_release_id = $1
+        LIMIT 1
+      `,
+      [metadataReleaseId],
+    );
+
+    return mapDiscoveryRequestStateRow(result.rows[0]);
+  }
+
+  async function markDownloadRecoveryRediscoveryExhausted({
+    failureReason = null,
+    maxResearchAttemptCount,
+    metadataReleaseId,
+    sourceOperationRunId = null,
+    sourceSearchId = null,
+    triggeredByFailedCandidateId,
+  }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        WITH exhausted AS (
+          UPDATE library_discovery_requests
+          SET
+            request_status = 'blocked',
+            blocked_reason = 'download_recovery_exhausted',
+            next_search_after = NULL,
+            evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
+              'downloadRecoveryExhausted',
+              jsonb_build_object(
+                'failureReason', $4::text,
+                'maxResearchAttemptCount', $2::integer,
+                'researchAttemptCount', research_attempt_count,
+                'sourceOperationRunId', $5::text,
+                'sourceSearchId', $6::text,
+                'triggeredByFailedCandidateId', $3::text
+              )
+            ),
+            updated_at = NOW()
+          WHERE metadata_release_id = $1
+            AND search_mode = 'automatic'
+            AND research_attempt_count >= $2::integer
+            AND NOT (
+              request_status = 'ready'
+              AND next_search_after IS NOT NULL
+              AND next_search_after > NOW()
+              AND evidence ? 'downloadRecoveryRediscovery'
+            )
+          RETURNING *
+        )
+        SELECT
+          exhausted.metadata_artist_id,
+          exhausted.metadata_release_group_id,
+          exhausted.metadata_release_id,
+          exhausted.wanted_status,
+          exhausted.search_mode,
+          exhausted.request_status,
+          exhausted.blocked_reason,
+          exhausted.release_date,
+          exhausted.last_search_at,
+          exhausted.next_search_after,
+          exhausted.search_attempt_count,
+          exhausted.research_attempt_count,
+          exhausted.evidence,
+          metadata_artists.name AS artist_name,
+          metadata_release_groups.title AS release_group_title,
+          metadata_releases.title AS release_title
+        FROM exhausted
+        JOIN metadata_artists
+          ON metadata_artists.id = exhausted.metadata_artist_id
+        JOIN metadata_release_groups
+          ON metadata_release_groups.id = exhausted.metadata_release_group_id
+        JOIN metadata_releases
+          ON metadata_releases.id = exhausted.metadata_release_id
+      `,
+      [
+        metadataReleaseId,
+        maxResearchAttemptCount,
+        triggeredByFailedCandidateId,
+        failureReason,
+        sourceOperationRunId,
+        sourceSearchId,
+      ],
+    );
+
+    return mapDiscoveryRequestStateRow(result.rows[0]);
   }
 
   async function markDiscoveryRequestExhausted({
@@ -428,7 +554,9 @@ export function createLibraryDiscoveryRequestStore({
 
   return {
     claimNextReadyAutomaticDiscoveryRequest,
+    getDownloadRecoveryRediscoveryState,
     listDiscoveryRequestsByMetadataReleaseIds,
+    markDownloadRecoveryRediscoveryExhausted,
     markDiscoveryRequestExhausted,
     recordDiscoverySearchFailure,
     recordDiscoverySearchSuccess,

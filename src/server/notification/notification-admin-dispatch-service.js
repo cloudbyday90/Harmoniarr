@@ -31,9 +31,15 @@ import { broadcastNotification } from './notification-broadcast-service.js';
  * @param {function} options.listAppUsers - Returns all app users.
  * @param {function} options.getUserPreferences - Reads a user's preferences.
  * @param {function} options.sendNotificationToUser - Sends push to one user.
+ * @param {string|null} [options.cooldownKey]
+ * @param {number} [options.cooldownMs]
+ * @param {object|null} [options.dispatchCooldownService]
  */
 export async function broadcastAdminNotification({
   category,
+  cooldownKey = null,
+  cooldownMs = 0,
+  dispatchCooldownService = null,
   payload,
   listAppUsers,
   getUserPreferences,
@@ -41,6 +47,9 @@ export async function broadcastAdminNotification({
 }) {
   return broadcastNotification({
     category,
+    cooldownKey,
+    cooldownMs,
+    dispatchCooldownService,
     getUserPreferences,
     listAppUsers,
     payload,
