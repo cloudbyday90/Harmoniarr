@@ -73,6 +73,7 @@ export function createImportCandidateExecutionWorker({
     failed: [],
   }),
   getImportCandidate = async () => null,
+  handleImportCandidateDownloadFailure = async () => ({ recovered: false }),
   isCancellationRequested,
   markRunPaused,
   markImportCandidateDownloadFailed = async () => null,
@@ -85,28 +86,31 @@ export function createImportCandidateExecutionWorker({
   renewLease,
   replaceImportExecutionRunItems = async () => [],
   updateImportExecutionRunItem = async () => null,
+  upsertImportExecutionRunItem = async () => null,
 } = {}) {
   const activeRunIds = new Set();
 
-  function buildRunItems(selectedCandidates) {
+  function buildRunItems(selectedCandidates, { startPosition = 1 } = {}) {
     return selectedCandidates.map((candidate, index) => ({
       importCandidateId: candidate.id,
       itemStatus: candidate.executionStatus.code,
       planningSnapshot: {
-        candidate: {
-          fileCount: candidate.fileCount,
-          folderPath: candidate.folderPath,
-          id: candidate.id,
-          lockedFileCount: candidate.lockedFileCount,
-          selectedAt: candidate.selectedAt,
-          sourceProvider: candidate.sourceProvider,
-          sourceSearchId: candidate.sourceSearchId,
+          candidate: {
+            downloadAttemptCount: candidate.downloadAttemptCount ?? 0,
+            fileCount: candidate.fileCount,
+            folderPath: candidate.folderPath,
+            id: candidate.id,
+            lockedFileCount: candidate.lockedFileCount,
+            selectedAt: candidate.selectedAt,
+            selectionReason: candidate.selectionReason ?? null,
+            sourceProvider: candidate.sourceProvider,
+            sourceSearchId: candidate.sourceSearchId,
           totalSizeBytes: candidate.totalSizeBytes,
           username: candidate.username,
         },
         planning: candidate.planning,
       },
-      position: index + 1,
+      position: startPosition + index,
       statusMessage: candidate.executionStatus.message,
     }));
   }
@@ -132,7 +136,8 @@ export function createImportCandidateExecutionWorker({
       });
 
       const selectedSummary = await buildSelectedImportCandidateSummary({ limit: 1000 });
-      const runItems = buildRunItems(selectedSummary.selectedCandidates ?? []);
+      const candidateQueue = [...(selectedSummary.selectedCandidates ?? [])];
+      const runItems = buildRunItems(candidateQueue);
       await replaceImportExecutionRunItems(runId, runItems);
 
       const counts = {
@@ -140,17 +145,57 @@ export function createImportCandidateExecutionWorker({
         queueFailed: 0,
         queued: 0,
         queuedWithWarnings: 0,
+        recovered: 0,
       };
+      const processedCandidateIds = new Set();
 
-      for (const summaryCandidate of selectedSummary.selectedCandidates ?? []) {
+      async function appendRecoveryCandidate(recoveryResult) {
+        if (!recoveryResult?.recovered || !recoveryResult.nextCandidateId) {
+          return null;
+        }
+
+        if (processedCandidateIds.has(recoveryResult.nextCandidateId)
+          || candidateQueue.some((candidate) => candidate.id === recoveryResult.nextCandidateId)) {
+          return null;
+        }
+
+        const refreshedSummary = await buildSelectedImportCandidateSummary({ limit: 1000 });
+        const recoveryCandidate = (refreshedSummary.selectedCandidates ?? [])
+          .find((candidate) => candidate.id === recoveryResult.nextCandidateId);
+
+        if (!recoveryCandidate) {
+          return null;
+        }
+
+        const [runItem] = buildRunItems([recoveryCandidate], {
+          startPosition: candidateQueue.length + 1,
+        });
+        await upsertImportExecutionRunItem({
+          ...runItem,
+          operationRunId: runId,
+        });
+        candidateQueue.push(recoveryCandidate);
+        counts.recovered += 1;
+        return recoveryCandidate;
+      }
+
+      for (let queueIndex = 0; queueIndex < candidateQueue.length; queueIndex += 1) {
+        const summaryCandidate = candidateQueue[queueIndex];
+        if (processedCandidateIds.has(summaryCandidate.id)) {
+          continue;
+        }
+
+        processedCandidateIds.add(summaryCandidate.id);
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
         const baseSnapshot = {
           candidate: {
+            downloadAttemptCount: summaryCandidate.downloadAttemptCount ?? 0,
             fileCount: summaryCandidate.fileCount,
             folderPath: summaryCandidate.folderPath,
             id: summaryCandidate.id,
             lockedFileCount: summaryCandidate.lockedFileCount,
             selectedAt: summaryCandidate.selectedAt,
+            selectionReason: summaryCandidate.selectionReason ?? null,
             sourceProvider: summaryCandidate.sourceProvider,
             sourceSearchId: summaryCandidate.sourceSearchId,
             totalSizeBytes: summaryCandidate.totalSizeBytes,
@@ -259,6 +304,33 @@ export function createImportCandidateExecutionWorker({
             importCandidateId: summaryCandidate.id,
             reason: statusMessage,
           });
+          const recoveryResult = await handleImportCandidateDownloadFailure({
+            failedCandidateId: summaryCandidate.id,
+            failureReason: statusMessage,
+            operationRunId: runId,
+            scheduleFollowUpRun: false,
+          });
+          if (recoveryResult?.recovered) {
+            const recoveryMessage = `Recovery cascade promoted candidate ${recoveryResult.nextCandidateId}.`;
+            await updateImportExecutionRunItem({
+              importCandidateId: summaryCandidate.id,
+              itemStatus,
+              operationRunId: runId,
+              planningSnapshot: {
+                ...baseSnapshot,
+                execution: {
+                  ...baseSnapshot.execution,
+                  enqueuedTransfers: enqueueResult.enqueued,
+                  failedFilenames: enqueueResult.failed,
+                  outcome: itemStatus,
+                  recovery: recoveryResult,
+                  requestedFiles,
+                },
+              },
+              statusMessage: `${statusMessage} ${recoveryMessage}`,
+            });
+            await appendRecoveryCandidate(recoveryResult);
+          }
         } else {
           await markImportCandidateDownloading({
             importCandidateId: summaryCandidate.id,
@@ -273,14 +345,15 @@ export function createImportCandidateExecutionWorker({
           blockedCount: counts.blocked,
           currentStep: 'Download enqueue complete',
           executionMode: 'download_enqueue',
-          processedCandidateCount: runItems.length,
+          processedCandidateCount: processedCandidateIds.size,
           queueFailedCount: counts.queueFailed,
           queuedCount: counts.queued,
           queuedWithWarningsCount: counts.queuedWithWarnings,
           readyCount: selectedSummary.counts?.ready ?? 0,
           readyWithWarningsCount: selectedSummary.counts?.readyWithWarnings ?? 0,
+          recoveredCandidateCount: counts.recovered,
           requestedCandidateCount,
-          totalSelected: selectedSummary.counts?.totalSelected ?? runItems.length,
+          totalSelected: (selectedSummary.counts?.totalSelected ?? runItems.length) + counts.recovered,
         },
       });
     } catch (error) {

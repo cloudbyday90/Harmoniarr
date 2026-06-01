@@ -48,6 +48,9 @@ export function createLibraryDiscoveryDispatchService({
     }
 
     return {
+      metadataArtistId: claimedRequest?.metadataArtistId ?? null,
+      metadataReleaseGroupId: claimedRequest?.metadataReleaseGroupId ?? null,
+      metadataReleaseId: claimedRequest?.metadataReleaseId ?? null,
       sourceMediaRequestId: claimedRequest?.evidence?.sourceMediaRequestId ?? null,
       sourceRequestKind: claimedRequest?.evidence?.sourceRequestKind ?? null,
       sourceRequestedByUserId,

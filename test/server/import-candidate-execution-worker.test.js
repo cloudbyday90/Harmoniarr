@@ -115,6 +115,7 @@ test('import execution worker enqueues ready candidates and persists per-item ou
       queuedWithWarningsCount: 0,
       readyCount: 1,
       readyWithWarningsCount: 0,
+      recoveredCandidateCount: 0,
       requestedCandidateCount: 2,
       totalSelected: 2,
     },
@@ -205,4 +206,129 @@ test('import execution worker requeues the run when a maintenance pause is reque
     runId: 'run-paused',
     status: 'paused',
   });
+});
+
+test('import execution worker cascades all-failed enqueue results to the next recovery candidate', async (t) => {
+  const initialCandidate = {
+    executionStatus: {
+      code: 'ready',
+      message: 'Ready for download enqueue.',
+    },
+    fileCount: 1,
+    folderPath: 'Autechre/Amber',
+    id: 'candidate-1',
+    lockedFileCount: 0,
+    planning: {
+      libraryFolderPath: '/music/Autechre/Amber',
+      sourceFolderPath: '/downloads/Autechre/Amber',
+      stagingFolderPath: '/staging/import-candidates/candidate-1/Autechre/Amber',
+    },
+    selectedAt: '2026-04-30T12:00:00.000Z',
+    sourceProvider: 'slskd',
+    sourceSearchId: 'search-1',
+    totalSizeBytes: 123456,
+    username: 'source-user',
+  };
+  const recoveryCandidate = {
+    ...initialCandidate,
+    id: 'candidate-2',
+    planning: {
+      ...initialCandidate.planning,
+      stagingFolderPath: '/staging/import-candidates/candidate-2/Autechre/Amber',
+    },
+    username: 'recovery-user',
+  };
+  let summaryCallCount = 0;
+  const buildSelectedImportCandidateSummary = t.mock.fn(async () => {
+    summaryCallCount += 1;
+    return {
+      counts: {
+        blocked: 0,
+        ready: 1,
+        readyWithWarnings: 0,
+        totalSelected: 1,
+      },
+      selectedCandidates: summaryCallCount === 1
+        ? [initialCandidate]
+        : [recoveryCandidate],
+    };
+  });
+  const enqueueDownloads = t.mock.fn(async ({ username }) => username === 'source-user'
+    ? {
+        enqueued: [],
+        failed: ['Autechre\\Amber\\01 Foil.flac'],
+      }
+    : {
+        enqueued: [{
+          id: 'transfer-2',
+          filename: 'Autechre\\Amber\\01 Foil.flac',
+          state: 'Queued, Remotely',
+          username,
+        }],
+        failed: [],
+      });
+  const markImportCandidateDownloadFailed = t.mock.fn(async () => ({}));
+  const markImportCandidateDownloading = t.mock.fn(async () => ({}));
+  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  const upsertImportExecutionRunItem = t.mock.fn(async () => null);
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const markRunCompleted = t.mock.fn(async (args) => {
+    resolveCompleted(args);
+  });
+  const worker = createImportCandidateExecutionWorker({
+    acquireLease: async () => {},
+    buildSelectedImportCandidateSummary,
+    enqueueDownloads,
+    getImportCandidate: async ({ importCandidateId }) => ({
+      id: importCandidateId,
+      files: [{
+        filename: '01 Foil.flac',
+        folderPath: 'Autechre/Amber',
+        isLocked: false,
+        rawPayload: {
+          filename: 'Autechre\\Amber\\01 Foil.flac',
+        },
+        sizeBytes: 123456,
+      }],
+    }),
+    handleImportCandidateDownloadFailure: t.mock.fn(async () => ({
+      failedCandidateId: 'candidate-1',
+      nextCandidateId: 'candidate-2',
+      reason: 'candidate_promoted',
+      recovered: true,
+    })),
+    markImportCandidateDownloadFailed,
+    markImportCandidateDownloading,
+    markRunCompleted,
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    releaseLease: async () => {},
+    replaceImportExecutionRunItems: async () => [],
+    updateImportExecutionRunItem,
+    upsertImportExecutionRunItem,
+  });
+
+  await worker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: 'run-recovery',
+  });
+
+  const completedArgs = await completed;
+
+  assert.equal(enqueueDownloads.mock.callCount(), 2);
+  assert.equal(enqueueDownloads.mock.calls[0].arguments[0].username, 'source-user');
+  assert.equal(enqueueDownloads.mock.calls[1].arguments[0].username, 'recovery-user');
+  assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 1);
+  assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
+  assert.equal(markImportCandidateDownloading.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
+  assert.equal(upsertImportExecutionRunItem.mock.callCount(), 1);
+  assert.equal(upsertImportExecutionRunItem.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
+  assert.equal(updateImportExecutionRunItem.mock.calls[1].arguments[0].planningSnapshot.execution.recovery.nextCandidateId, 'candidate-2');
+  assert.equal(completedArgs.summary.queueFailedCount, 1);
+  assert.equal(completedArgs.summary.queuedCount, 1);
+  assert.equal(completedArgs.summary.recoveredCandidateCount, 1);
+  assert.equal(completedArgs.summary.processedCandidateCount, 2);
 });

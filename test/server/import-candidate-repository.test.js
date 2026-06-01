@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  findNextCandidateForRecovery,
   getImportCandidateById,
+  incrementImportCandidateDownloadAttemptCount,
   insertImportCandidateEvent,
   listImportCandidateFiles,
   listImportCandidates,
   listImportCandidatesBySourceMediaRequestIds,
+  promoteImportCandidateForRecovery,
   replaceImportCandidateFiles,
   transitionImportCandidateStatus,
   upsertImportCandidate,
@@ -190,6 +193,131 @@ test('transitionImportCandidateStatus returns null when no row transitions', asy
   }, queryable), null);
 });
 
+test('incrementImportCandidateDownloadAttemptCount atomically bumps recovery attempts', async (t) => {
+  const queryable = {
+    query: t.mock.fn(async (_sql, values) => ({
+      rows: [{
+        id: values[0],
+        source_provider: 'slskd',
+        source_search_id: 'search-1',
+        source_response_key: 'response-key',
+        username: 'source-user',
+        folder_path: 'Autechre\\Amber',
+        candidate_type: 'manual_search',
+        status: 'failed',
+        download_attempt_count: 2,
+        file_count: 1,
+        locked_file_count: 0,
+        total_size_bytes: '123',
+        raw_payload: { raw: true },
+        normalized_payload: { normalized: true },
+        selection_reason: null,
+        discovered_at: '2026-04-30T14:00:00.000Z',
+        created_at: '2026-04-30T14:00:00.000Z',
+        updated_at: '2026-04-30T14:05:00.000Z',
+      }],
+    })),
+  };
+
+  const candidate = await incrementImportCandidateDownloadAttemptCount({
+    importCandidateId: 'candidate-1',
+  }, queryable);
+
+  const [sql, values] = queryable.query.mock.calls[0].arguments;
+  assert.match(sql, /download_attempt_count = download_attempt_count \+ 1/);
+  assert.deepEqual(values, ['candidate-1']);
+  assert.equal(candidate.downloadAttemptCount, 2);
+});
+
+test('findNextCandidateForRecovery scopes by search or metadata release and excludes exhausted attempts', async (t) => {
+  const queryable = {
+    query: t.mock.fn(async (_sql, values) => ({
+      rows: [{
+        id: 'candidate-2',
+        source_provider: 'slskd',
+        source_search_id: values[1],
+        source_response_key: 'response-key-2',
+        username: 'source-user-2',
+        folder_path: 'Autechre\\Amber',
+        candidate_type: 'manual_search',
+        status: 'pending',
+        download_attempt_count: 0,
+        file_count: 2,
+        locked_file_count: 0,
+        total_size_bytes: '456',
+        raw_payload: { raw: true },
+        normalized_payload: { requestOwnership: { metadataReleaseId: values[2] }, compositeScore: 91 },
+        selection_reason: null,
+        discovered_at: '2026-04-30T14:00:00.000Z',
+        created_at: '2026-04-30T14:00:00.000Z',
+        updated_at: '2026-04-30T14:05:00.000Z',
+      }],
+    })),
+  };
+
+  const candidate = await findNextCandidateForRecovery({
+    excludeCandidateId: 'candidate-1',
+    maxDownloadAttemptCount: 3,
+    metadataReleaseId: 'release-1',
+    sourceSearchId: 'search-1',
+  }, queryable);
+
+  const [sql, values] = queryable.query.mock.calls[0].arguments;
+  assert.match(sql, /status IN \('pending', 'held'\)/);
+  assert.match(sql, /download_attempt_count < \$4/);
+  assert.match(sql, /source_search_id = \$2::text/);
+  assert.match(sql, /normalized_payload #>> '\{requestOwnership,metadataReleaseId\}' = \$3::text/);
+  assert.deepEqual(values, ['candidate-1', 'search-1', 'release-1', 3]);
+  assert.equal(candidate.id, 'candidate-2');
+});
+
+test('promoteImportCandidateForRecovery selects a recovery candidate with observability metadata', async (t) => {
+  const queryable = {
+    query: t.mock.fn(async (_sql, values) => ({
+      rows: [{
+        id: values[0],
+        source_provider: 'slskd',
+        source_search_id: 'search-1',
+        source_response_key: 'response-key-2',
+        username: 'source-user-2',
+        folder_path: 'Autechre\\Amber',
+        candidate_type: 'manual_search',
+        status: 'selected',
+        download_attempt_count: 0,
+        file_count: 2,
+        locked_file_count: 0,
+        total_size_bytes: '456',
+        raw_payload: { raw: true },
+        normalized_payload: {
+          recoveryCascade: {
+            reason: values[2],
+            triggeredByFailedCandidateId: values[1],
+          },
+        },
+        selection_reason: 'recovery_cascade',
+        discovered_at: '2026-04-30T14:00:00.000Z',
+        created_at: '2026-04-30T14:00:00.000Z',
+        updated_at: '2026-04-30T14:05:00.000Z',
+      }],
+    })),
+  };
+
+  const candidate = await promoteImportCandidateForRecovery({
+    importCandidateId: 'candidate-2',
+    maxDownloadAttemptCount: 3,
+    reason: 'Download enqueue failed.',
+    triggeredByFailedCandidateId: 'candidate-1',
+  }, queryable);
+
+  const [sql, values] = queryable.query.mock.calls[0].arguments;
+  assert.match(sql, /selection_reason = 'recovery_cascade'/);
+  assert.match(sql, /status IN \('pending', 'held'\)/);
+  assert.match(sql, /download_attempt_count < \$4/);
+  assert.deepEqual(values, ['candidate-2', 'candidate-1', 'Download enqueue failed.', 3]);
+  assert.equal(candidate.status, 'selected');
+  assert.equal(candidate.selectionReason, 'recovery_cascade');
+});
+
 test('insertImportCandidateEvent writes append-only review history', async (t) => {
   const queryable = {
     query: t.mock.fn(async (_sql, values) => ({
@@ -272,11 +400,13 @@ test('upsertImportCandidate writes normalized and raw payloads as jsonb', async 
     folderPath: 'Autechre\\Amber',
     candidateType: 'manual_search',
     status: 'pending',
+    downloadAttemptCount: 0,
     fileCount: 1,
     lockedFileCount: 0,
     totalSizeBytes: 123,
     rawPayload: { provider: 'raw' },
     normalizedPayload: { provider: 'normalized' },
+    selectionReason: null,
     discoveredAt: '2026-04-30T14:00:00.000Z',
   }, queryable);
 
@@ -293,11 +423,13 @@ test('upsertImportCandidate writes normalized and raw payloads as jsonb', async 
     folderPath: 'Autechre\\Amber',
     candidateType: 'manual_search',
     status: 'pending',
+    downloadAttemptCount: 0,
     fileCount: 1,
     lockedFileCount: 0,
     totalSizeBytes: 123,
     rawPayload: { provider: 'raw' },
     normalizedPayload: { provider: 'normalized' },
+    selectionReason: null,
     discoveredAt: '2026-04-30T14:00:00.000Z',
     createdAt: '2026-04-30T14:00:00.000Z',
     updatedAt: '2026-04-30T14:00:00.000Z',

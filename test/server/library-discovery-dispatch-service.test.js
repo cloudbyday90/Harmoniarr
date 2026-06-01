@@ -111,6 +111,9 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
     actorUserId: 'user-1',
     formatPreferences: null,
     requestOwnership: {
+      metadataArtistId: null,
+      metadataReleaseGroupId: null,
+      metadataReleaseId: 'release-1',
       sourceMediaRequestId: 'request-1',
       sourceRequestKind: 'release',
       sourceRequestedByUserId: 'admin-1',

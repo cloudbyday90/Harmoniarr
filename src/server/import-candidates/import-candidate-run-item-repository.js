@@ -133,9 +133,52 @@ export function createImportCandidateRunItemRepository({
     return result.rows[0] ? mapRunItem(result.rows[0]) : null;
   }
 
+  async function upsertRunItem({
+    importCandidateId,
+    itemStatus,
+    operationRunId,
+    position,
+    snapshot,
+    statusMessage,
+  }, queryable) {
+    const db = resolveQueryable(queryable);
+    const result = await db.query(
+      `
+        INSERT INTO ${tableName} (
+          operation_run_id,
+          import_candidate_id,
+          position,
+          item_status,
+          status_message,
+          ${snapshotColumn},
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())
+        ON CONFLICT (operation_run_id, import_candidate_id) DO UPDATE
+        SET position = EXCLUDED.position,
+            item_status = EXCLUDED.item_status,
+            status_message = EXCLUDED.status_message,
+            ${snapshotColumn} = EXCLUDED.${snapshotColumn},
+            updated_at = NOW()
+        RETURNING *
+      `,
+      [
+        operationRunId,
+        importCandidateId,
+        position,
+        itemStatus,
+        statusMessage,
+        JSON.stringify(snapshot ?? {}),
+      ],
+    );
+
+    return mapRunItem(result.rows[0]);
+  }
+
   return {
     listRunItems,
     replaceRunItems,
     updateRunItem,
+    upsertRunItem,
   };
 }

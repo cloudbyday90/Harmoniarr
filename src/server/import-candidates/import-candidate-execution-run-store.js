@@ -59,10 +59,16 @@ export function createImportCandidateExecutionRunStore({
     operationType: operationDescriptor.operationType,
   });
 
-  async function createOperationRun({ executionMode = 'download_enqueue', requestedCandidateCount, status = 'pending', triggeredByUserId = null }) {
+  async function createOperationRun({
+    executionMode = 'download_enqueue',
+    requestedCandidateCount,
+    status = 'pending',
+    summary = null,
+    triggeredByUserId = null,
+  }) {
     const run = await operationRunStore.createOperationRun({
       status,
-      summary: {
+      summary: summary ?? {
         currentStep: 'queued',
         executionMode,
         requestedCandidateCount,

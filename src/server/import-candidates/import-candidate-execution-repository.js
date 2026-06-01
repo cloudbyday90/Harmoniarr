@@ -62,3 +62,26 @@ export async function updateImportExecutionRunItem({
     planningSnapshot: item.snapshot,
   } : null;
 }
+
+export async function upsertImportExecutionRunItem({
+  importCandidateId,
+  itemStatus,
+  operationRunId,
+  planningSnapshot,
+  position,
+  statusMessage,
+}, queryable) {
+  const item = await importExecutionRunItemRepository.upsertRunItem({
+    importCandidateId,
+    itemStatus,
+    operationRunId,
+    position,
+    snapshot: planningSnapshot,
+    statusMessage,
+  }, queryable);
+
+  return {
+    ...item,
+    planningSnapshot: item.snapshot,
+  };
+}

@@ -36,11 +36,13 @@ function mapImportCandidate(row) {
     folderPath: row.folder_path,
     candidateType: row.candidate_type,
     status: row.status,
+    downloadAttemptCount: Number.parseInt(String(row.download_attempt_count ?? 0), 10) || 0,
     fileCount: row.file_count,
     lockedFileCount: row.locked_file_count,
     totalSizeBytes: numberOrNull(row.total_size_bytes),
     rawPayload: row.raw_payload,
     normalizedPayload: row.normalized_payload,
+    selectionReason: row.selection_reason ?? null,
     discoveredAt: row.discovered_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -208,6 +210,101 @@ export async function transitionImportCandidateStatus({
       RETURNING *
     `,
     [importCandidateId, toStatus, fromStatuses],
+  );
+
+  return result.rows[0] ? mapImportCandidate(result.rows[0]) : null;
+}
+
+export async function incrementImportCandidateDownloadAttemptCount({
+  importCandidateId,
+}, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      UPDATE import_candidates
+      SET download_attempt_count = download_attempt_count + 1,
+          updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `,
+    [importCandidateId],
+  );
+
+  return result.rows[0] ? mapImportCandidate(result.rows[0]) : null;
+}
+
+export async function findNextCandidateForRecovery({
+  excludeCandidateId,
+  maxDownloadAttemptCount,
+  metadataReleaseId = null,
+  sourceSearchId = null,
+}, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      SELECT *
+      FROM import_candidates
+      WHERE id <> $1
+        AND status IN ('pending', 'held')
+        AND download_attempt_count < $4
+        AND (
+          ($2::text IS NOT NULL AND source_search_id = $2::text)
+          OR (
+            $3::text IS NOT NULL
+            AND normalized_payload #>> '{requestOwnership,metadataReleaseId}' = $3::text
+          )
+        )
+      ORDER BY
+        CASE WHEN $2::text IS NOT NULL AND source_search_id = $2::text THEN 0 ELSE 1 END ASC,
+        (normalized_payload->>'compositeScore')::numeric DESC NULLS LAST,
+        file_count DESC,
+        discovered_at ASC,
+        id ASC
+      LIMIT 1
+    `,
+    [
+      excludeCandidateId,
+      sourceSearchId,
+      metadataReleaseId,
+      maxDownloadAttemptCount,
+    ],
+  );
+
+  return result.rows[0] ? mapImportCandidate(result.rows[0]) : null;
+}
+
+export async function promoteImportCandidateForRecovery({
+  importCandidateId,
+  maxDownloadAttemptCount,
+  reason = null,
+  triggeredByFailedCandidateId,
+}, queryable) {
+  const db = resolveQueryable(queryable);
+  const result = await db.query(
+    `
+      UPDATE import_candidates
+      SET status = 'selected',
+          selection_reason = 'recovery_cascade',
+          normalized_payload = COALESCE(normalized_payload, '{}'::jsonb) || jsonb_build_object(
+            'recoveryCascade',
+            jsonb_build_object(
+              'promotedAt', NOW(),
+              'reason', $3,
+              'triggeredByFailedCandidateId', $2
+            )
+          ),
+          updated_at = NOW()
+      WHERE id = $1
+        AND status IN ('pending', 'held')
+        AND download_attempt_count < $4
+      RETURNING *
+    `,
+    [
+      importCandidateId,
+      triggeredByFailedCandidateId,
+      reason,
+      maxDownloadAttemptCount,
+    ],
   );
 
   return result.rows[0] ? mapImportCandidate(result.rows[0]) : null;

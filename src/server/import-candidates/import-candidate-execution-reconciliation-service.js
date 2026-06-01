@@ -100,6 +100,7 @@ export function createImportCandidateExecutionReconciliationService({
   markImportCandidateDownloadFailed = async () => null,
   markImportCandidateDownloading = async () => null,
   markImportCandidateImportPending = async () => null,
+  handleImportCandidateDownloadFailure = async () => ({ recovered: false }),
   onDownloadCompletedFn = null,
   recordActivityEventFn = null,
   updateImportExecutionRunItem = async () => null,
@@ -114,6 +115,7 @@ export function createImportCandidateExecutionReconciliationService({
     const items = run?.items ?? [];
     let snapshotsUpdated = 0;
     const transitions = [];
+    const recoveries = [];
 
     for (const item of items) {
       const importCandidateId = item?.planningSnapshot?.candidate?.id ?? item?.importCandidateId ?? null;
@@ -181,6 +183,15 @@ export function createImportCandidateExecutionReconciliationService({
           reason,
           requestMetadata,
         });
+        const recovery = await handleImportCandidateDownloadFailure({
+          failedCandidateId: importCandidateId,
+          failureReason: reason,
+          operationRunId: run?.id ?? null,
+          scheduleFollowUpRun: run?.status !== 'pending' && run?.status !== 'running',
+        });
+        if (recovery?.recovered) {
+          recoveries.push(recovery);
+        }
       }
 
       if (result?.candidate) {
@@ -197,10 +208,12 @@ export function createImportCandidateExecutionReconciliationService({
       checkedAt,
       currentRunId: run?.id ?? null,
       summary: {
+        recovered: recoveries.length,
         snapshotsUpdated,
         transitioned: transitions.length,
       },
       transitions,
+      recoveries,
     };
   }
 

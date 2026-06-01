@@ -38,12 +38,13 @@ import { createImportCandidateExecutionRunStore } from './import-candidate-execu
 import { resolveImportCandidateExecutionHeartbeatConfig } from './import-candidate-execution-heartbeat-config.js';
 import { createImportCandidateExecutionHeartbeatState } from './import-candidate-execution-heartbeat-state.js';
 import { createImportCandidateExecutionReconciliationService } from './import-candidate-execution-reconciliation-service.js';
+import { createImportCandidateRecoveryService } from './import-candidate-recovery-service.js';
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
 import { createImportCandidateExecutionWorker } from './import-candidate-execution-worker.js';
 import { createImportCandidateImportPendingSummaryService } from './import-candidate-import-pending-summary-service.js';
 import { listImportCandidateFileDecisions } from './import-candidate-file-decision-repository.js';
-import { replaceImportExecutionRunItems, updateImportExecutionRunItem } from './import-candidate-execution-repository.js';
+import { replaceImportExecutionRunItems, updateImportExecutionRunItem, upsertImportExecutionRunItem } from './import-candidate-execution-repository.js';
 import { createImportCandidateReputationEnrichmentService } from './import-candidate-reputation-enrichment-service.js';
 import { createImportCandidateService } from './import-candidate-service.js';
 import { createImportCandidatePreviewService } from './import-candidate-preview-service.js';
@@ -130,6 +131,10 @@ export function createImportCandidateModule({
   importCandidateTranscodeRunStore = createImportCandidateTranscodeRunStore(),
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
+  importCandidateRecoveryService = createImportCandidateRecoveryService({
+    createRecoveryExecutionRun: importCandidateExecutionRunStore.createOperationRun,
+    getImportCandidate: importCandidateService.getImportCandidate,
+  }),
   importCandidateFileDecisionService = createImportCandidateFileDecisionService({
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
   }),
@@ -138,6 +143,7 @@ export function createImportCandidateModule({
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     enqueueDownloads: slskdService.enqueueDownloads,
     getImportCandidate: importCandidateService.getImportCandidate,
+    handleImportCandidateDownloadFailure: importCandidateRecoveryService.handleImportCandidateDownloadFailure,
     isCancellationRequested: maintenanceLockOperationPauseService
       ? createOperationRunInterruptionGate({
         isCancellationRequested: importCandidateExecutionRunStore.isCancellationRequested,
@@ -156,6 +162,7 @@ export function createImportCandidateModule({
     renewLease: importCandidateExecutionRunStore.renewLease,
     replaceImportExecutionRunItems,
     updateImportExecutionRunItem,
+    upsertImportExecutionRunItem,
   }),
   importCandidateApplyWorker = createImportCandidateApplyWorker({
     acquireLease: importCandidateApplyRunStore.acquireLease,
@@ -272,6 +279,7 @@ export function createImportCandidateModule({
   importCandidateExecutionReconciliationService = createImportCandidateExecutionReconciliationService({
     buildImportCandidateExecutionSummary: importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary,
     getImportCandidate: importCandidateService.getImportCandidate,
+    handleImportCandidateDownloadFailure: importCandidateRecoveryService.handleImportCandidateDownloadFailure,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
     markImportCandidateDownloading: importCandidateService.markImportCandidateDownloading,
     markImportCandidateImportPending: importCandidateService.markImportCandidateImportPending,
@@ -309,6 +317,7 @@ export function createImportCandidateModule({
     importCandidateExecutionService,
     importCandidateExecutionSummaryService,
     importCandidateExecutionWorker,
+    importCandidateRecoveryService,
     importCandidateImportPendingSummaryService,
     importCandidateApplyPreviewService,
     importCandidatePreviewService,
