@@ -25,6 +25,7 @@ import { createImportCandidateApplyRunStore } from './import-candidate-apply-run
 import { createImportCandidateApplyService } from './import-candidate-apply-service.js';
 import { createImportCandidateApplySummaryService } from './import-candidate-apply-summary-service.js';
 import { createImportCandidateApplyWorker } from './import-candidate-apply-worker.js';
+import { createImportCandidateReleaseHintService } from './import-candidate-release-hint-service.js';
 import { createImportCandidateMediaInspectionRunStore } from './import-candidate-media-inspection-run-store.js';
 import { createImportCandidateMediaInspectionService } from './import-candidate-media-inspection-service.js';
 import { createImportCandidateMediaInspectionSummaryService } from './import-candidate-media-inspection-summary-service.js';
@@ -106,6 +107,7 @@ export function createImportCandidateModule({
   importCandidateApplyOperationService = createImportCandidateApplyOperationService({
     mediaTranscodeExecutionService,
   }),
+  importCandidateReleaseHintService = createImportCandidateReleaseHintService(),
   importCandidateSelectionSummaryService = createImportCandidateSelectionSummaryService({
     listImportCandidates: importCandidateService.listImportCandidates,
     previewImportCandidate: importCandidatePreviewService.previewImportCandidate,
@@ -159,6 +161,7 @@ export function createImportCandidateModule({
     acquireLease: importCandidateApplyRunStore.acquireLease,
     applyImportCandidatePreview: importCandidateApplyOperationService.applyImportCandidatePreview,
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
+    buildPostApplyReleaseHints: importCandidateReleaseHintService.buildPostApplyReleaseHints,
     isCancellationRequested: maintenanceLockOperationPauseService
       ? createOperationRunInterruptionGate({
         isCancellationRequested: importCandidateApplyRunStore.isCancellationRequested,
@@ -296,6 +299,7 @@ export function createImportCandidateModule({
     importCandidateApplyService,
     importCandidateApplySummaryService,
     importCandidateApplyWorker,
+    importCandidateReleaseHintService,
     importCandidateBulkReviewService,
     importCandidateFileDecisionService,
     importCandidateExecutionReconciliationService,

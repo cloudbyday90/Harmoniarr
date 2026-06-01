@@ -66,6 +66,7 @@ export function createLibraryScanRunStore({
 
   async function createOperationRun({
     libraryRoot,
+    releaseHints = [],
     status = 'pending',
     triggeredByRunId = null,
     triggeredByUserId = null,
@@ -75,6 +76,7 @@ export function createLibraryScanRunStore({
       status,
       summary: {
         libraryRoot,
+        releaseHints: Array.isArray(releaseHints) ? releaseHints : [],
         triggeredByRunId,
         triggerReason,
       },

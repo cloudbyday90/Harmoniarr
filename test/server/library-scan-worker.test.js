@@ -123,6 +123,10 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
 
   await worker.startWorkerRun({
     libraryRoot: rootDir,
+    releaseHints: [{
+      canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
+      metadataReleaseId: 'release-1',
+    }],
     runId: 'run-1',
     triggeredByRunId: 'apply-run-1',
     triggerReason: 'import_candidate_apply',
@@ -141,6 +145,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
     runId: 'run-1',
     summary: {
       libraryRoot: rootDir,
+      releaseHintCount: 1,
       triggeredByRunId: 'apply-run-1',
       triggerReason: 'import_candidate_apply',
     },
@@ -157,6 +162,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       id: 'file-1',
       modifiedAt: '2026-04-30T18:00:00.000Z',
       relativePath: 'Artist/track-01.flac',
+      scopeMetadataReleaseId: 'release-1',
       sizeBytes: 123,
       tagExtractedModifiedAt: null,
       tagExtractedSizeBytes: null,
@@ -178,6 +184,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       id: 'file-1',
       modifiedAt: '2026-04-30T18:00:00.000Z',
       relativePath: 'Artist/track-01.flac',
+      scopeMetadataReleaseId: 'release-1',
       sizeBytes: 123,
       tagExtractedModifiedAt: null,
       tagExtractedSizeBytes: null,
@@ -194,6 +201,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       id: 'file-1',
       modifiedAt: '2026-04-30T18:00:00.000Z',
       relativePath: 'Artist/track-01.flac',
+      scopeMetadataReleaseId: 'release-1',
       sizeBytes: 123,
       tagExtractedModifiedAt: null,
       tagExtractedSizeBytes: null,
@@ -231,6 +239,7 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
   assert.equal(completionArgs.summary.filesMatched, 1);
   assert.equal(completionArgs.summary.filesUnmatched, 1);
   assert.equal(completionArgs.summary.libraryRoot, rootDir);
+  assert.equal(completionArgs.summary.releaseHintCount, 1);
   assert.equal(completionArgs.summary.triggeredByRunId, 'apply-run-1');
   assert.equal(completionArgs.summary.triggerReason, 'import_candidate_apply');
   assert.equal(releaseLease.mock.callCount(), 1);

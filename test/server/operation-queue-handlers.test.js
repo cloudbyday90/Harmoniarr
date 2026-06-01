@@ -150,6 +150,10 @@ test('operation queue handlers register shared operation types and map run summa
       id: 'run-5',
       summary: {
         libraryRoot: 'D:/music',
+        releaseHints: [{
+          canonicalPath: 'D:/music/Autechre/Amber/01 Foil.flac',
+          metadataReleaseId: 'release-1',
+        }],
         triggeredByRunId: 'apply-run-1',
         triggerReason: 'import_candidate_apply',
       },
@@ -224,6 +228,10 @@ test('operation queue handlers register shared operation types and map run summa
   });
   assert.deepEqual(libraryScanStartWorkerRun.mock.calls[0].arguments[0], {
     libraryRoot: 'D:/music',
+    releaseHints: [{
+      canonicalPath: 'D:/music/Autechre/Amber/01 Foil.flac',
+      metadataReleaseId: 'release-1',
+    }],
     runId: 'run-5',
     triggeredByRunId: 'apply-run-1',
     triggerReason: 'import_candidate_apply',

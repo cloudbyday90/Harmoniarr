@@ -186,6 +186,14 @@ test('import apply worker schedules one library scan after a completed run with 
       counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
       importPendingCandidates: [createReadyImportCandidate()],
     }),
+    buildPostApplyReleaseHints: t.mock.fn(async ({ applyResult, summaryCandidate }) => {
+      assert.equal(summaryCandidate.id, 'candidate-ready-1');
+      assert.equal(applyResult.summary.appliedFileCount, 1);
+      return [{
+        canonicalPath: '/library/Artist/Album/01 Track.flac',
+        metadataReleaseId: 'release-ready-1',
+      }];
+    }),
     markImportCandidateApplied: async () => ({}),
     markRunCompleted: async () => {
       callOrder.push('completed');
@@ -209,7 +217,13 @@ test('import apply worker schedules one library scan after a completed run with 
     runId: 'run-auto-scan-1',
   });
 
-  assert.deepEqual(await scheduled, { triggeredByRunId: 'run-auto-scan-1' });
+  assert.deepEqual(await scheduled, {
+    releaseHints: [{
+      canonicalPath: '/library/Artist/Album/01 Track.flac',
+      metadataReleaseId: 'release-ready-1',
+    }],
+    triggeredByRunId: 'run-auto-scan-1',
+  });
   assert.equal(scheduleLibraryScan.mock.callCount(), 1);
   assert.deepEqual(callOrder, ['completed', 'schedule']);
 });

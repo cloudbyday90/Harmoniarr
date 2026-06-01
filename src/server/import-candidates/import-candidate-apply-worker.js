@@ -116,6 +116,7 @@ export function createImportCandidateApplyWorker({
     },
     importPendingCandidates: [],
   }),
+  buildPostApplyReleaseHints = async () => [],
   createOperationRunLeaseHeartbeatFn = createOperationRunLeaseHeartbeat,
   isCancellationRequested,
   markImportCandidateApplied = async () => null,
@@ -171,6 +172,7 @@ export function createImportCandidateApplyWorker({
         applyFailed: 0,
         blocked: 0,
       };
+      const postApplyReleaseHints = [];
 
       for (const summaryCandidate of importPendingSummary.importPendingCandidates ?? []) {
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
@@ -248,6 +250,19 @@ export function createImportCandidateApplyWorker({
               importCandidateId: summaryCandidate.id,
               reason: statusMessage,
             });
+
+            try {
+              const releaseHints = await buildPostApplyReleaseHints({
+                applyResult,
+                summaryCandidate,
+              });
+              if (Array.isArray(releaseHints) && releaseHints.length > 0) {
+                postApplyReleaseHints.push(...releaseHints);
+              }
+            } catch {
+              // Release hints improve post-apply matching, but a hint lookup must not
+              // reclassify files that were already moved into the library.
+            }
 
             const notifyUserId = summaryCandidate.requestOwnership?.sourceRequestedForUserId
               ?? summaryCandidate.requestOwnership?.sourceRequestedByUserId
@@ -328,7 +343,10 @@ export function createImportCandidateApplyWorker({
 
       if (typeof scheduleLibraryScan === 'function' && (counts.applied + counts.appliedWithWarnings) > 0) {
         try {
-          await scheduleLibraryScan({ triggeredByRunId: runId });
+          await scheduleLibraryScan({
+            releaseHints: postApplyReleaseHints,
+            triggeredByRunId: runId,
+          });
         } catch {
           // A scan that is already queued/running, or a scan readiness failure, should not
           // turn an otherwise successful import apply run into a failed operation.

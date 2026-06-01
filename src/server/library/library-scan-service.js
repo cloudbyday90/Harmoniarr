@@ -21,6 +21,7 @@ import { recordAuditEvent } from '../audit.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
 import { createSettingsService } from '../settings-service.js';
 import { buildLibraryScanContext } from './library-scan-readiness.js';
+import { countLibraryScanReleaseHints } from './library-scan-release-hints.js';
 
 export function createLibraryScanService({
   assertMaintenanceWriteAllowed = async () => {},
@@ -35,6 +36,7 @@ export function createLibraryScanService({
 
   async function startLibraryScan({
     requestMetadata = null,
+    releaseHints = [],
     triggeredByRunId = null,
     triggeredByUserId = null,
     triggerReason = null,
@@ -55,6 +57,7 @@ export function createLibraryScanService({
 
     const run = await createOperationRun({
       libraryRoot,
+      releaseHints,
       status: 'pending',
       triggeredByRunId,
       triggeredByUserId,
@@ -66,6 +69,7 @@ export function createLibraryScanService({
       actorUserId: triggeredByUserId,
       details: {
         libraryRoot,
+        releaseHintCount: countLibraryScanReleaseHints(releaseHints),
         runId: run.id,
         triggeredByRunId,
         triggerReason,

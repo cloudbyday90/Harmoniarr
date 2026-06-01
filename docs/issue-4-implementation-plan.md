@@ -3958,7 +3958,9 @@ export function createImportCandidateApplyWorker({
 
 ### 5.29 Conventional-Tag File Matching Strategy
 
-**Current gap:** `library-file-matcher-service.js` has two strategies, both of which require MusicBrainz IDs embedded in the audio file's tags:
+**Status:** Implemented in `conventional-tag-matching.js`, `library-file-matcher-service.js`, `import-candidate-release-hint-service.js`, `import-candidate-post-apply-scan-service.js`, `library-scan-release-hints.js`, and `library-scan-worker.js`. Conventional `title` + `track.number` + artist/album tags now match MusicBrainz-backed track candidates after MBID strategies fail. Post-apply scans carry durable release hints from successful import file operations into the scan worker, so files imported from a discovery-linked release can be scoped to that release before global fallback.
+
+**Original gap:** `library-file-matcher-service.js` had two strategies, both of which required MusicBrainz IDs embedded in the audio file's tags:
 
 1. `matchByRecordingId` — requires `tags.musicBrainz.recordingId` to match exactly one `metadata_recordings` row
 2. `matchByReleaseTitleAndTrackPosition` — requires `tags.musicBrainz.releaseId` + `track.number` + normalized title
@@ -4041,9 +4043,9 @@ buildMatchedResult(candidate, {
 
 **Threading `scopeMetadataReleaseId` through to the matcher:**
 
-The scan worker calls `matchLibraryFiles({ files: catalogResult.files })`. Today `files` carry only filesystem-level fields (`id`, `canonicalPath`, `fileState`, `tagPayload`). To provide a release scope hint without a DB join inside the matcher, add an optional `scopeMetadataReleaseId` field to the file object when the catalog records it.
+The scan worker calls `matchLibraryFiles({ files })` after cataloging and tag extraction. To provide a release scope hint without a DB join inside the matcher, post-apply scan scheduling now passes optional release hints into the durable library scan operation summary. The scan worker merges those hints into `catalogResult.files` as `scopeMetadataReleaseId` before tag extraction, sidecar artwork capture, and matching.
 
-In `library-module.js`, the apply worker completion path creates import candidates that each carry a `metadata_release_id` (from the discovery request). When the scan worker is invoked post-apply (Section 5.28), it can be provided with a `releaseHints: Map<canonicalPath, metadataReleaseId>` that the scan worker merges into the `catalogResult.files` before calling `matchLibraryFiles`. The matcher receives this as an optional `scopeMetadataReleaseId` per file.
+The import candidate apply worker resolves `sourceSearchId -> library_discovery_requests.metadata_release_id`, collects successful applied `libraryPath` values from `fileOperations`, and schedules the post-apply scan with `releaseHints: Array<{ canonicalPath, metadataReleaseId }>` payloads. `library-scan-release-hints.js` applies only unambiguous exact-path hints; conflicting hints for the same path are ignored rather than risking a false high-confidence match. The matcher receives the surviving value as optional `scopeMetadataReleaseId` per file.
 
 When not called post-apply (i.e., manual scan), `releaseHints` is absent and all files go through Pass 2 only. No behavior change for existing scan paths.
 

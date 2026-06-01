@@ -122,6 +122,7 @@ export function createOperationQueueHandlers({
   if (libraryModule?.libraryScanWorker?.startWorkerRun) {
     handlers[operationRunRegistry.libraryScan.operationType] = async ({ run }) => libraryModule.libraryScanWorker.startWorkerRun({
       libraryRoot: run.summary.libraryRoot ?? null,
+      releaseHints: Array.isArray(run.summary.releaseHints) ? run.summary.releaseHints : [],
       runId: run.id,
       triggeredByRunId: run.summary.triggeredByRunId ?? null,
       triggerReason: run.summary.triggerReason ?? null,

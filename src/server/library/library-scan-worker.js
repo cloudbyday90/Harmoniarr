@@ -17,6 +17,10 @@
  */
 
 import { executeLibraryScan } from './library-scan-executor.js';
+import {
+  applyLibraryScanReleaseHints,
+  countLibraryScanReleaseHints,
+} from './library-scan-release-hints.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -86,8 +90,11 @@ export function shouldExtractLibraryFileTags(file) {
     || currentModifiedAt !== extractedModifiedAt;
 }
 
-function buildScanTriggerSummary({ triggeredByRunId, triggerReason }) {
+function buildScanTriggerSummary({ releaseHints, triggeredByRunId, triggerReason }) {
+  const releaseHintCount = countLibraryScanReleaseHints(releaseHints);
+
   return {
+    ...(releaseHintCount > 0 ? { releaseHintCount } : {}),
     ...(triggeredByRunId ? { triggeredByRunId } : {}),
     ...(triggerReason ? { triggerReason } : {}),
   };
@@ -117,13 +124,14 @@ export function createLibraryScanWorker({
 
   async function runScan({
     libraryRoot,
+    releaseHints = [],
     runId,
     triggeredByRunId = null,
     triggerReason = null,
   }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
-    const triggerSummary = buildScanTriggerSummary({ triggeredByRunId, triggerReason });
+    const triggerSummary = buildScanTriggerSummary({ releaseHints, triggeredByRunId, triggerReason });
 
     try {
       await acquireLease({ runId });
@@ -163,7 +171,15 @@ export function createLibraryScanWorker({
           files: observedFiles,
           libraryRootPath: summary.libraryRoot,
         });
-        observedCatalogFiles = (catalogResult.files ?? [])
+        const hintedCatalogFiles = applyLibraryScanReleaseHints({
+          files: catalogResult.files ?? [],
+          releaseHints,
+        });
+        catalogResult = {
+          ...catalogResult,
+          files: hintedCatalogFiles,
+        };
+        observedCatalogFiles = hintedCatalogFiles
           .filter((file) => file.fileState === 'observed');
         filesToExtract = observedCatalogFiles;
         phaseTiming.finishPhase('catalog');
@@ -282,6 +298,7 @@ export function createLibraryScanWorker({
 
   async function startWorkerRun({
     libraryRoot,
+    releaseHints = [],
     runId,
     triggeredByRunId = null,
     triggerReason = null,
@@ -294,6 +311,7 @@ export function createLibraryScanWorker({
     queueMicrotask(() => {
       void runScan({
         libraryRoot,
+        releaseHints,
         runId,
         triggeredByRunId,
         triggerReason,

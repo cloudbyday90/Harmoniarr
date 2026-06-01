@@ -73,6 +73,10 @@ test('createLibraryScanService persists a pending run for durable dispatch when 
   });
 
   const result = await service.startLibraryScan({
+    releaseHints: [{
+      canonicalPath: '/srv/music/Autechre/Amber/01 Foil.flac',
+      metadataReleaseId: 'release-1',
+    }],
     triggeredByRunId: 'apply-run-1',
     triggeredByUserId: 'user-7',
     triggerReason: 'import_candidate_apply',
@@ -80,6 +84,10 @@ test('createLibraryScanService persists a pending run for durable dispatch when 
 
   assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
     libraryRoot: '/srv/music',
+    releaseHints: [{
+      canonicalPath: '/srv/music/Autechre/Amber/01 Foil.flac',
+      metadataReleaseId: 'release-1',
+    }],
     status: 'pending',
     triggeredByRunId: 'apply-run-1',
     triggeredByUserId: 'user-7',

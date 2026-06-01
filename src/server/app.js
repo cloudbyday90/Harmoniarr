@@ -374,6 +374,7 @@ export function createApp({
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
     scheduleLibraryScan: async ({
+      releaseHints = [],
       triggeredByRunId = null,
       triggeredByUserId = null,
       triggerReason = null,
@@ -383,6 +384,7 @@ export function createApp({
       }
 
       return libraryModule.libraryScanService.startLibraryScan({
+        releaseHints,
         triggeredByRunId,
         triggeredByUserId,
         triggerReason,

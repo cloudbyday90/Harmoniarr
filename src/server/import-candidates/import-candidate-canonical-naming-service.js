@@ -17,9 +17,9 @@
  */
 
 import { posix as path } from 'node:path';
-import { getPool } from '../database.js';
 import { isAudioFileExtension, normalizeFileExtension } from '../library/library-file-type-policy.js';
 import { createLibraryNamingService } from '../library/library-naming-service.js';
+import { findMetadataReleaseIdBySearchId } from './import-candidate-release-hint-service.js';
 import {
   getMetadataArtistById,
   getMetadataReleaseById,
@@ -62,24 +62,9 @@ function buildOrderedReleaseTracks({ mediaRows, trackRows }) {
     })));
 }
 
-async function defaultFindMetadataReleaseIdBySearchId({ searchId, queryable = null }) {
-  const db = queryable ?? getPool();
-  const result = await db.query(
-    `
-      SELECT metadata_release_id
-      FROM library_discovery_requests
-      WHERE evidence->>'lastSearchId' = $1
-      ORDER BY updated_at DESC, id DESC
-      LIMIT 1
-    `,
-    [searchId],
-  );
-
-  return result.rows[0]?.metadata_release_id ?? null;
-}
-
 export function createImportCandidateCanonicalNamingService({
-  findMetadataReleaseIdBySearchId = defaultFindMetadataReleaseIdBySearchId,
+  findMetadataReleaseIdBySearchId: legacyFindMetadataReleaseIdBySearchId = null,
+  findMetadataReleaseIdBySearchIdFn = legacyFindMetadataReleaseIdBySearchId ?? findMetadataReleaseIdBySearchId,
   getMetadataArtistByIdFn = getMetadataArtistById,
   getMetadataReleaseByIdFn = getMetadataReleaseById,
   getMetadataReleaseGroupByIdFn = getMetadataReleaseGroupById,
@@ -96,7 +81,7 @@ export function createImportCandidateCanonicalNamingService({
       return null;
     }
 
-    const metadataReleaseId = await findMetadataReleaseIdBySearchId({
+    const metadataReleaseId = await findMetadataReleaseIdBySearchIdFn({
       queryable,
       searchId,
     });
@@ -212,6 +197,7 @@ export function createImportCandidateCanonicalNamingService({
       artistName: artist.name,
       canApply: true,
       fileNamesById,
+      metadataReleaseId,
       relativeFolderPath: path.join(...folderSegments),
       releaseTitle: releaseGroup.title ?? release.title,
       strategy: 'canonical_release_default_template',

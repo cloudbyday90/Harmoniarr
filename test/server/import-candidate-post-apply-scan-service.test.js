@@ -15,10 +15,18 @@ test('post-apply scan service queues a system library scan with apply-run contex
   const service = createImportCandidatePostApplyScanService({ startLibraryScan });
 
   const result = await service.schedulePostApplyLibraryScan({
+    releaseHints: [{
+      canonicalPath: '/music/Autechre/Amber/01 Foil.flac',
+      metadataReleaseId: 'release-1',
+    }],
     triggeredByRunId: 'apply-run-1',
   });
 
   assert.deepEqual(startLibraryScan.mock.calls[0].arguments, [{
+    releaseHints: [{
+      canonicalPath: '/music/Autechre/Amber/01 Foil.flac',
+      metadataReleaseId: 'release-1',
+    }],
     triggeredByRunId: 'apply-run-1',
     triggeredByUserId: null,
     triggerReason: postApplyScanTriggerReason,
@@ -26,6 +34,7 @@ test('post-apply scan service queues a system library scan with apply-run contex
   assert.deepEqual(result, {
     accepted: true,
     reason: null,
+    releaseHintCount: 1,
     scanRunId: 'scan-run-1',
     status: 'scheduled',
     triggeredByRunId: 'apply-run-1',
@@ -46,6 +55,7 @@ test('post-apply scan service suppresses expected scan concurrency and readiness
   assert.deepEqual(await service.schedulePostApplyLibraryScan({ triggeredByRunId: 'apply-run-2' }), {
     accepted: false,
     reason: 'library_scan_in_progress',
+    releaseHintCount: 0,
     scanRunId: null,
     status: 'suppressed',
     triggeredByRunId: 'apply-run-2',
@@ -62,6 +72,7 @@ test('post-apply scan service returns failed for unexpected scan errors without 
   assert.deepEqual(await service.schedulePostApplyLibraryScan({ triggeredByRunId: 'apply-run-3' }), {
     accepted: false,
     reason: 'database_unavailable',
+    releaseHintCount: 0,
     scanRunId: null,
     status: 'failed',
     triggeredByRunId: 'apply-run-3',
@@ -74,6 +85,7 @@ test('post-apply scan service reports unavailable when no scan service is wired'
   assert.deepEqual(await service.schedulePostApplyLibraryScan({ triggeredByRunId: 'apply-run-4' }), {
     accepted: false,
     reason: 'library_scan_service_unavailable',
+    releaseHintCount: 0,
     scanRunId: null,
     status: 'unavailable',
     triggeredByRunId: 'apply-run-4',

@@ -232,6 +232,7 @@ export function createImportCandidatePreviewService({
         releaseIdentity: canonicalNamingPlan?.canApply
           ? {
             artistName: canonicalNamingPlan.artistName ?? null,
+            metadataReleaseId: canonicalNamingPlan.metadataReleaseId ?? null,
             releaseTitle: canonicalNamingPlan.releaseTitle ?? null,
           }
           : null,

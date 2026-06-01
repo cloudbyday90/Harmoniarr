@@ -31,6 +31,10 @@ function normalizeError(error) {
   };
 }
 
+function normalizeReleaseHints(releaseHints) {
+  return Array.isArray(releaseHints) ? releaseHints : [];
+}
+
 export function isSafePostApplyScanError(error) {
   return error?.status === 409 && safePostApplyScanErrorCodes.has(error?.code);
 }
@@ -38,11 +42,17 @@ export function isSafePostApplyScanError(error) {
 export function createImportCandidatePostApplyScanService({
   startLibraryScan = null,
 } = {}) {
-  async function schedulePostApplyLibraryScan({ triggeredByRunId = null } = {}) {
+  async function schedulePostApplyLibraryScan({
+    releaseHints = [],
+    triggeredByRunId = null,
+  } = {}) {
+    const normalizedReleaseHints = normalizeReleaseHints(releaseHints);
+
     if (typeof startLibraryScan !== 'function') {
       return {
         accepted: false,
         reason: 'library_scan_service_unavailable',
+        releaseHintCount: normalizedReleaseHints.length,
         scanRunId: null,
         status: 'unavailable',
         triggeredByRunId,
@@ -51,6 +61,7 @@ export function createImportCandidatePostApplyScanService({
 
     try {
       const result = await startLibraryScan({
+        releaseHints: normalizedReleaseHints,
         triggeredByRunId,
         triggeredByUserId: null,
         triggerReason: postApplyScanTriggerReason,
@@ -59,6 +70,7 @@ export function createImportCandidatePostApplyScanService({
       return {
         accepted: result?.accepted === true,
         reason: null,
+        releaseHintCount: normalizedReleaseHints.length,
         scanRunId: result?.run?.id ?? null,
         status: 'scheduled',
         triggeredByRunId,
@@ -70,6 +82,7 @@ export function createImportCandidatePostApplyScanService({
       return {
         accepted: false,
         reason: normalizedError.code ?? normalizedError.message,
+        releaseHintCount: normalizedReleaseHints.length,
         scanRunId: null,
         status: safeToSuppress ? 'suppressed' : 'failed',
         triggeredByRunId,
