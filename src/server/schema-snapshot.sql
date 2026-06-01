@@ -4771,3 +4771,52 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260625_060000_library_file_tag_extraction_stamp.sql
+-- Checksum: b1f013b9d4126cff0ede569513242380ca39aacac2cd6b5454b18439af5fbb2e
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE library_files
+  ADD COLUMN IF NOT EXISTS tag_extracted_size_bytes BIGINT NULL
+    CHECK (tag_extracted_size_bytes IS NULL OR tag_extracted_size_bytes >= 0),
+  ADD COLUMN IF NOT EXISTS tag_extracted_modified_at TIMESTAMPTZ NULL;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260625_060000',
+  '20260625_060000_library_file_tag_extraction_stamp.sql',
+  'library_file_tag_extraction_stamp',
+  'b1f013b9d4126cff0ede569513242380ca39aacac2cd6b5454b18439af5fbb2e',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

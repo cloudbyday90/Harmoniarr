@@ -121,6 +121,8 @@ export function createLibraryTagExtractionService({
   libraryTagSnapshotStore = createLibraryTagSnapshotStore(),
 } = {}) {
   async function extractLibraryFileTags({ files }) {
+    const extractedFiles = [];
+
     for (const file of files) {
       if (file.fileState !== 'observed') {
         continue;
@@ -128,11 +130,18 @@ export function createLibraryTagExtractionService({
 
       try {
         const metadata = await extractMetadata(file.canonicalPath);
+        const extractionPayload = buildExtractionPayload(metadata);
         await libraryTagSnapshotStore.writeLibraryFileTagSnapshot({
-          ...buildExtractionPayload(metadata),
+          ...extractionPayload,
           extractor,
           extractorVersion,
           libraryFileId: file.id,
+          sourceModifiedAt: file.modifiedAt ?? null,
+          sourceSizeBytes: file.sizeBytes ?? null,
+        });
+        extractedFiles.push({
+          ...file,
+          tagPayload: extractionPayload.normalizedTags,
         });
 
         if (libraryEmbeddedArtworkService) {
@@ -155,8 +164,16 @@ export function createLibraryTagExtractionService({
           },
           status: 'failed',
         });
+        extractedFiles.push({
+          ...file,
+          tagPayload: null,
+        });
       }
     }
+
+    return {
+      files: extractedFiles,
+    };
   }
 
   return {

@@ -3,7 +3,48 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { createLibraryScanWorker } from '../../src/server/library/library-scan-worker.js';
+import {
+  createLibraryScanWorker,
+  shouldExtractLibraryFileTags,
+} from '../../src/server/library/library-scan-worker.js';
+
+test('shouldExtractLibraryFileTags skips observed files with unchanged tag extraction stamps', () => {
+  assert.equal(shouldExtractLibraryFileTags({
+    fileState: 'observed',
+    modifiedAt: '2026-04-30T18:00:00.000Z',
+    sizeBytes: 123,
+    tagExtractedModifiedAt: '2026-04-30T18:00:00.000Z',
+    tagExtractedSizeBytes: 123,
+    tagPayload: { title: 'Foil' },
+  }), false);
+  assert.equal(shouldExtractLibraryFileTags({
+    fileState: 'observed',
+    modifiedAt: '2026-04-30T18:01:00.000Z',
+    sizeBytes: 123,
+    tagExtractedModifiedAt: '2026-04-30T18:00:00.000Z',
+    tagExtractedSizeBytes: 123,
+    tagPayload: { title: 'Foil' },
+  }), true);
+  assert.equal(shouldExtractLibraryFileTags({
+    fileState: 'observed',
+    modifiedAt: '2026-04-30T18:00:00.000Z',
+    sizeBytes: 124,
+    tagExtractedModifiedAt: '2026-04-30T18:00:00.000Z',
+    tagExtractedSizeBytes: 123,
+    tagPayload: { title: 'Foil' },
+  }), true);
+  assert.equal(shouldExtractLibraryFileTags({
+    fileState: 'observed',
+    modifiedAt: '2026-04-30T18:00:00.000Z',
+    sizeBytes: 123,
+    tagExtractedModifiedAt: '2026-04-30T18:00:00.000Z',
+    tagExtractedSizeBytes: 123,
+    tagPayload: null,
+  }), true);
+  assert.equal(shouldExtractLibraryFileTags({
+    fileState: 'ignored',
+  }), false);
+});
 
 test('createLibraryScanWorker executes a scan and records completion summary', async (t) => {
   const rootDir = await mkdtemp(join(tmpdir(), 'harmoniarr-library-scan-'));
@@ -34,7 +75,11 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',
       id: 'file-1',
+      modifiedAt: '2026-04-30T18:00:00.000Z',
       relativePath: 'Artist/track-01.flac',
+      sizeBytes: 123,
+      tagExtractedModifiedAt: null,
+      tagExtractedSizeBytes: null,
       tagPayload: {
         title: 'Foil',
       },
@@ -106,7 +151,11 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',
       id: 'file-1',
+      modifiedAt: '2026-04-30T18:00:00.000Z',
       relativePath: 'Artist/track-01.flac',
+      sizeBytes: 123,
+      tagExtractedModifiedAt: null,
+      tagExtractedSizeBytes: null,
       tagPayload: {
         title: 'Foil',
       },
@@ -123,7 +172,11 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',
       id: 'file-1',
+      modifiedAt: '2026-04-30T18:00:00.000Z',
       relativePath: 'Artist/track-01.flac',
+      sizeBytes: 123,
+      tagExtractedModifiedAt: null,
+      tagExtractedSizeBytes: null,
       tagPayload: {
         title: 'Foil',
       },
@@ -135,7 +188,11 @@ test('createLibraryScanWorker executes a scan and records completion summary', a
       canonicalPath: join(rootDir, 'Artist', 'track-01.flac'),
       fileState: 'observed',
       id: 'file-1',
+      modifiedAt: '2026-04-30T18:00:00.000Z',
       relativePath: 'Artist/track-01.flac',
+      sizeBytes: 123,
+      tagExtractedModifiedAt: null,
+      tagExtractedSizeBytes: null,
       tagPayload: {
         title: 'Foil',
       },
@@ -310,5 +367,128 @@ test('createLibraryScanWorker requeues the run when a maintenance pause is reque
   assert.deepEqual(releasedLeaseArgs, {
     runId: 'run-paused',
     status: 'paused',
+  });
+});
+
+test('createLibraryScanWorker skips extraction and matching for unchanged files', async (t) => {
+  const executeScan = t.mock.fn(async () => ({
+    filesMatched: 1,
+    filesSeen: 1,
+    filesUnmatched: 0,
+    libraryRoot: '/library',
+  }));
+  const extractLibraryFileTags = t.mock.fn(async () => {});
+  const matchLibraryFiles = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const worker = createLibraryScanWorker({
+    acquireLease: async () => {},
+    executeScan,
+    extractLibraryFileTags,
+    markRunCompleted,
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    matchLibraryFiles,
+    recordLibraryFiles: async () => ({
+      files: [{
+        canonicalPath: '/library/Artist/track-01.flac',
+        fileState: 'observed',
+        id: 'file-1',
+        modifiedAt: '2026-04-30T18:00:00.000Z',
+        relativePath: 'Artist/track-01.flac',
+        sizeBytes: 123,
+        tagExtractedModifiedAt: '2026-04-30T18:00:00.000Z',
+        tagExtractedSizeBytes: 123,
+        tagPayload: { title: 'Foil' },
+      }],
+      libraryRootId: 'root-1',
+      observedFileCount: 1,
+    }),
+    releaseLease,
+  });
+
+  const completion = new Promise((resolve) => {
+    markRunCompleted.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({
+    libraryRoot: '/library',
+    runId: 'run-skip-tags',
+  });
+
+  await completion;
+
+  assert.equal(extractLibraryFileTags.mock.callCount(), 0);
+  assert.equal(matchLibraryFiles.mock.callCount(), 0);
+});
+
+test('createLibraryScanWorker matches freshly extracted tag payloads in the same scan', async (t) => {
+  const extractLibraryFileTags = t.mock.fn(async ({ files }) => ({
+    files: files.map((file) => ({
+      ...file,
+      tagPayload: { title: 'Freshly Extracted Title' },
+    })),
+  }));
+  const matchLibraryFiles = t.mock.fn(async () => {});
+  const markRunCompleted = t.mock.fn(async () => {});
+  const worker = createLibraryScanWorker({
+    acquireLease: async () => {},
+    executeScan: async () => ({
+      filesMatched: 1,
+      filesSeen: 1,
+      filesUnmatched: 0,
+      libraryRoot: '/library',
+    }),
+    extractLibraryFileTags,
+    markRunCompleted,
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    matchLibraryFiles,
+    recordLibraryFiles: async () => ({
+      files: [{
+        canonicalPath: '/library/Artist/track-01.flac',
+        fileState: 'observed',
+        id: 'file-1',
+        modifiedAt: '2026-04-30T18:00:00.000Z',
+        relativePath: 'Artist/track-01.flac',
+        sizeBytes: 123,
+        tagExtractedModifiedAt: null,
+        tagExtractedSizeBytes: null,
+        tagPayload: null,
+      }],
+      libraryRootId: 'root-1',
+      observedFileCount: 1,
+    }),
+    releaseLease: async () => {},
+  });
+
+  const completion = new Promise((resolve) => {
+    markRunCompleted.mock.mockImplementation(async (args) => {
+      resolve(args);
+    });
+  });
+
+  await worker.startWorkerRun({
+    libraryRoot: '/library',
+    runId: 'run-fresh-tags',
+  });
+
+  await completion;
+
+  assert.equal(extractLibraryFileTags.mock.callCount(), 1);
+  assert.deepEqual(matchLibraryFiles.mock.calls[0].arguments[0], {
+    files: [{
+      canonicalPath: '/library/Artist/track-01.flac',
+      fileState: 'observed',
+      id: 'file-1',
+      modifiedAt: '2026-04-30T18:00:00.000Z',
+      relativePath: 'Artist/track-01.flac',
+      sizeBytes: 123,
+      tagExtractedModifiedAt: null,
+      tagExtractedSizeBytes: null,
+      tagPayload: { title: 'Freshly Extracted Title' },
+    }],
   });
 });

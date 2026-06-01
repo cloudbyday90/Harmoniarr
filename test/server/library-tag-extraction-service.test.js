@@ -72,7 +72,7 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
     libraryTagSnapshotStore: { writeLibraryFileTagSnapshot },
   });
 
-  await service.extractLibraryFileTags({
+  const result = await service.extractLibraryFileTags({
     files: [
       {
         canonicalPath: '/data/music/Artist/cover.jpg',
@@ -83,11 +83,15 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
         canonicalPath: '/data/music/Artist/track-01.flac',
         fileState: 'observed',
         id: 'file-1',
+        modifiedAt: '2026-04-30T18:00:00.000Z',
+        sizeBytes: 123,
       },
       {
         canonicalPath: '/data/music/Artist/track-02.flac',
         fileState: 'observed',
         id: 'file-2',
+        modifiedAt: '2026-04-30T18:01:00.000Z',
+        sizeBytes: 456,
       },
     ],
   });
@@ -101,6 +105,55 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
   );
   assert.equal(writeLibraryFileTagSnapshot.mock.callCount(), 2);
   assert.equal(captureEmbeddedArtwork.mock.callCount(), 2);
+  assert.deepEqual(result.files.map((file) => ({
+    id: file.id,
+    tagPayload: file.tagPayload,
+  })), [
+    {
+      id: 'file-1',
+      tagPayload: {
+        album: 'Amber',
+        albumArtist: 'Autechre',
+        artist: 'Autechre',
+        artists: ['Autechre'],
+        disk: { number: 1, of: 1 },
+        genre: [],
+        musicBrainz: {
+          albumArtistId: null,
+          artistId: null,
+          recordingId: null,
+          releaseGroupId: null,
+          releaseId: null,
+          trackId: null,
+        },
+        title: 'Foil',
+        track: { number: 1, of: 11 },
+        year: 1994,
+      },
+    },
+    {
+      id: 'file-2',
+      tagPayload: {
+        album: 'Amber',
+        albumArtist: 'Autechre',
+        artist: 'Autechre',
+        artists: ['Autechre'],
+        disk: { number: 1, of: 1 },
+        genre: [],
+        musicBrainz: {
+          albumArtistId: null,
+          artistId: null,
+          recordingId: null,
+          releaseGroupId: null,
+          releaseId: null,
+          trackId: null,
+        },
+        title: 'Montreal',
+        track: { number: 2, of: 11 },
+        year: 1994,
+      },
+    },
+  ]);
   assert.deepEqual(captureEmbeddedArtwork.mock.calls[0].arguments[0], {
     libraryFileId: 'file-1',
     metadata: metadataByPath.get('/data/music/Artist/track-01.flac'),
@@ -141,6 +194,8 @@ test('extractLibraryFileTags parses observed files sequentially and persists nor
       tagTypes: ['vorbis'],
     },
     sampleRateHz: 44100,
+    sourceModifiedAt: '2026-04-30T18:00:00.000Z',
+    sourceSizeBytes: 123,
     status: 'extracted',
     tagFormat: 'vorbis',
   });
@@ -155,7 +210,7 @@ test('extractLibraryFileTags records failed extraction attempts without throwing
     libraryTagSnapshotStore: { writeLibraryFileTagSnapshot },
   });
 
-  await service.extractLibraryFileTags({
+  const result = await service.extractLibraryFileTags({
     files: [{
       canonicalPath: '/data/music/Artist/track-01.flac',
       fileState: 'observed',
@@ -172,6 +227,12 @@ test('extractLibraryFileTags records failed extraction attempts without throwing
     },
     status: 'failed',
   });
+  assert.deepEqual(result.files, [{
+    canonicalPath: '/data/music/Artist/track-01.flac',
+    fileState: 'observed',
+    id: 'file-1',
+    tagPayload: null,
+  }]);
 });
 
 test('extractLibraryFileTags treats embedded artwork capture as best effort after snapshot persistence', async (t) => {

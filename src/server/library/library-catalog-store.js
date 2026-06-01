@@ -35,6 +35,31 @@ function normalizeObservedFile(file) {
   };
 }
 
+function toNullableNumber(value) {
+  if (value == null) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function mapPersistedFile(row) {
+  return {
+    canonicalPath: row.canonical_path,
+    extension: row.extension,
+    fileState: row.file_state,
+    filename: row.filename,
+    id: row.id,
+    modifiedAt: row.modified_at ?? null,
+    relativePath: row.relative_path,
+    sizeBytes: toNullableNumber(row.size_bytes),
+    tagExtractedModifiedAt: row.tag_extracted_modified_at ?? null,
+    tagExtractedSizeBytes: toNullableNumber(row.tag_extracted_size_bytes),
+    tagPayload: row.tag_payload,
+  };
+}
+
 export function createLibraryCatalogStore({
   getPoolFn = getPool,
 } = {}) {
@@ -95,7 +120,18 @@ export function createLibraryCatalogStore({
                 file_state = EXCLUDED.file_state,
                 updated_at = NOW(),
                 deleted_at = NULL
-            RETURNING id, canonical_path, relative_path, filename, extension, file_state, tag_payload
+            RETURNING
+              id,
+              canonical_path,
+              relative_path,
+              filename,
+              extension,
+              size_bytes,
+              modified_at,
+              file_state,
+              tag_payload,
+              tag_extracted_size_bytes,
+              tag_extracted_modified_at
           `,
           [
             libraryRootId,
@@ -109,15 +145,7 @@ export function createLibraryCatalogStore({
           ],
         );
 
-        persistedFiles.push({
-          canonicalPath: result.rows[0].canonical_path,
-          extension: result.rows[0].extension,
-          fileState: result.rows[0].file_state,
-          filename: result.rows[0].filename,
-          id: result.rows[0].id,
-          relativePath: result.rows[0].relative_path,
-          tagPayload: result.rows[0].tag_payload,
-        });
+        persistedFiles.push(mapPersistedFile(result.rows[0]));
       }
 
       await client.query(

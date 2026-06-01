@@ -19,7 +19,12 @@
 import { getPool } from '../database.js';
 
 function toNullableInteger(value) {
-  return Number.isFinite(value) ? Math.round(value) : null;
+  if (value == null) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed) : null;
 }
 
 export function createLibraryTagSnapshotStore({
@@ -38,6 +43,8 @@ export function createLibraryTagSnapshotStore({
     normalizedTags = null,
     rawTags = null,
     sampleRateHz = null,
+    sourceModifiedAt = null,
+    sourceSizeBytes = null,
     status,
     tagFormat = null,
   }) {
@@ -84,6 +91,16 @@ export function createLibraryTagSnapshotStore({
               channels = $6,
               duration_ms = $7,
               tag_payload = $8::jsonb,
+              tag_extracted_size_bytes = CASE
+                WHEN $9 = 'extracted' AND $10::bigint IS NOT NULL AND $11::timestamptz IS NOT NULL
+                  THEN $10::bigint
+                ELSE tag_extracted_size_bytes
+              END,
+              tag_extracted_modified_at = CASE
+                WHEN $9 = 'extracted' AND $10::bigint IS NOT NULL AND $11::timestamptz IS NOT NULL
+                  THEN $11::timestamptz
+                ELSE tag_extracted_modified_at
+              END,
               file_state = 'observed',
               updated_at = NOW()
           WHERE id = $1
@@ -97,6 +114,9 @@ export function createLibraryTagSnapshotStore({
           toNullableInteger(channels),
           toNullableInteger(durationMs),
           normalizedTags ? JSON.stringify(normalizedTags) : null,
+          status,
+          toNullableInteger(sourceSizeBytes),
+          sourceModifiedAt,
         ],
       );
 

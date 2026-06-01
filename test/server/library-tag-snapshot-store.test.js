@@ -26,6 +26,8 @@ test('writeLibraryFileTagSnapshot appends a snapshot and updates the current fil
     normalizedTags: { album: 'Amber', title: 'Foil' },
     rawTags: { native: { vorbis: [{ id: 'TITLE', value: 'Foil' }] } },
     sampleRateHz: 44100,
+    sourceModifiedAt: '2026-04-30T18:00:00.000Z',
+    sourceSizeBytes: 123,
     status: 'extracted',
     tagFormat: 'vorbis',
   });
@@ -52,8 +54,13 @@ test('writeLibraryFileTagSnapshot appends a snapshot and updates the current fil
     2,
     183412,
     '{"album":"Amber","title":"Foil"}',
+    'extracted',
+    123,
+    '2026-04-30T18:00:00.000Z',
   ]);
   assert.match(query.mock.calls[2].arguments[0], /file_state = 'observed'/);
+  assert.match(query.mock.calls[2].arguments[0], /tag_extracted_size_bytes/);
+  assert.match(query.mock.calls[2].arguments[0], /tag_extracted_modified_at/);
   assert.equal(query.mock.calls[3].arguments[0], 'COMMIT');
   assert.equal(release.mock.callCount(), 1);
 });

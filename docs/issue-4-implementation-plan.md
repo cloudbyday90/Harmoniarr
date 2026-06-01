@@ -2203,7 +2203,7 @@ No index needed. `download_attempt_count` is only read in `findNextCandidateForR
 Required for incremental tag re-extraction (Section 5.30). Tracks the filesystem metadata (size and mtime) observed at the time of the most recent successful tag extraction, enabling the scan worker to skip unchanged files.
 
 ```
-20260601_130000_add_tag_extraction_stamps_to_library_files.sql
+20260625_060000_library_file_tag_extraction_stamp.sql
 ```
 
 ```sql
@@ -4084,7 +4084,9 @@ const strategies = [
 
 ### 5.30 Incremental Tag Re-Extraction (Skip Unchanged Files)
 
-**Current gap:** On every library scan, `extractLibraryFileTags` calls `parseFile(file.canonicalPath)` (via `music-metadata`) for every `observed` file regardless of whether the file has changed since it was last extracted. For a library of 500 albums (≈6000 files), this means 6000 disk reads per scan, even for a scan triggered by a single newly applied album. Each `parseFile` call opens the file, reads its headers, parses tag frames, and closes it — sequential I/O that dominates scan duration on spinning-disk NAS deployments.
+**Status:** Implemented in `20260625_060000_library_file_tag_extraction_stamp.sql`, `library-scan-worker.js`, `library-tag-extraction-service.js`, `library-tag-snapshot-store.js`, and `library-catalog-store.js`. The scan worker now skips unchanged observed files with valid extraction stamps, and same-scan matching receives freshly extracted tag payloads.
+
+**Original gap:** On every library scan, `extractLibraryFileTags` calls `parseFile(file.canonicalPath)` (via `music-metadata`) for every `observed` file regardless of whether the file has changed since it was last extracted. For a library of 500 albums (≈6000 files), this means 6000 disk reads per scan, even for a scan triggered by a single newly applied album. Each `parseFile` call opens the file, reads its headers, parses tag frames, and closes it — sequential I/O that dominates scan duration on spinning-disk NAS deployments.
 
 The tag extraction service already writes `audio_codec`, `bitrate_kbps`, `bit_depth`, `channels`, `duration_ms`, `tag_payload`, and `sample_rate_hz` into `library_files` on each extraction. These values will not change unless the file itself is replaced or retagged. A file is changed if and only if its `modifiedAt` timestamp or `sizeBytes` has changed since the last extraction.
 
@@ -4197,7 +4199,7 @@ The returned object adds:
 
 **Failure mode — extraction fails for a file:**
 
-If `parseFile` throws, `writeLibraryFileTagSnapshot` writes `status: 'error'` and does NOT set `tag_extracted_size_bytes` / `tag_extracted_modified_at`. On the next scan, the failure condition (`file.tagPayload === null`) re-triggers extraction, giving the file another chance. This is correct: a transient I/O failure should not permanently skip a file.
+If `parseFile` throws, `writeLibraryFileTagSnapshot` writes `status: 'failed'` and does NOT set `tag_extracted_size_bytes` / `tag_extracted_modified_at`. On the next scan, the failure condition (`file.tagPayload === null`) re-triggers extraction, giving the file another chance. This is correct: a transient I/O failure should not permanently skip a file.
 
 **Skip also gates re-matching:** Once a file's tags are stable (skip condition true), its match result is also stable — the matcher operates on `tagPayload`, which hasn't changed. Add the same skip gate before `matchLibraryFiles`:
 

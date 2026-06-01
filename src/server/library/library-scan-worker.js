@@ -46,6 +46,46 @@ function buildPhaseTiming() {
   };
 }
 
+function toComparableSize(value) {
+  if (value == null) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toComparableTime(value) {
+  if (value == null) {
+    return null;
+  }
+
+  const timestamp = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+export function shouldExtractLibraryFileTags(file) {
+  if (file?.fileState !== 'observed') {
+    return false;
+  }
+
+  if (file.tagPayload == null) {
+    return true;
+  }
+
+  const currentSize = toComparableSize(file.sizeBytes);
+  const extractedSize = toComparableSize(file.tagExtractedSizeBytes);
+  const currentModifiedAt = toComparableTime(file.modifiedAt);
+  const extractedModifiedAt = toComparableTime(file.tagExtractedModifiedAt);
+
+  return currentSize == null
+    || extractedSize == null
+    || currentModifiedAt == null
+    || extractedModifiedAt == null
+    || currentSize !== extractedSize
+    || currentModifiedAt !== extractedModifiedAt;
+}
+
 export function createLibraryScanWorker({
   acquireLease,
   captureLibrarySidecarArtwork = null,
@@ -101,20 +141,31 @@ export function createLibraryScanWorker({
       phaseTiming.finishPhase('filesystem_walk');
 
       let catalogResult = null;
+      let observedCatalogFiles = [];
+      let filesToExtract = [];
       if (recordLibraryFiles) {
         phaseTiming.startPhase('catalog');
         catalogResult = await recordLibraryFiles({
           files: observedFiles,
           libraryRootPath: summary.libraryRoot,
         });
+        observedCatalogFiles = (catalogResult.files ?? [])
+          .filter((file) => file.fileState === 'observed');
+        filesToExtract = observedCatalogFiles;
         phaseTiming.finishPhase('catalog');
       }
 
-      if (extractLibraryFileTags && catalogResult?.files?.length) {
+      if (extractLibraryFileTags && observedCatalogFiles.length) {
+        filesToExtract = observedCatalogFiles.filter(shouldExtractLibraryFileTags);
         phaseTiming.startPhase('tag_extraction');
-        await extractLibraryFileTags({
-          files: catalogResult.files.filter((file) => file.fileState === 'observed'),
-        });
+        if (filesToExtract.length > 0) {
+          const extractionResult = await extractLibraryFileTags({
+            files: filesToExtract,
+          });
+          filesToExtract = Array.isArray(extractionResult?.files)
+            ? extractionResult.files
+            : filesToExtract;
+        }
         phaseTiming.finishPhase('tag_extraction');
       }
 
@@ -130,11 +181,14 @@ export function createLibraryScanWorker({
         phaseTiming.finishPhase('sidecar_artwork');
       }
 
-      if (matchLibraryFiles && catalogResult?.files?.length) {
+      if (matchLibraryFiles && observedCatalogFiles.length) {
         phaseTiming.startPhase('file_matching');
-        await matchLibraryFiles({
-          files: catalogResult.files.filter((file) => file.fileState === 'observed'),
-        });
+        const filesToMatch = extractLibraryFileTags ? filesToExtract : observedCatalogFiles;
+        if (filesToMatch.length > 0) {
+          await matchLibraryFiles({
+            files: filesToMatch,
+          });
+        }
         phaseTiming.finishPhase('file_matching');
       }
 

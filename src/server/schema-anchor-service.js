@@ -41,6 +41,8 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'operator_track_override', column: 'track_mbid' },
     { table: 'operator_artist_reconciliation_snapshot', column: 'snapshot_revision' },
     { table: 'operator_artist_reconciliation_snapshot', column: 'snapshot_payload' },
+    { table: 'library_files', column: 'tag_extracted_size_bytes' },
+    { table: 'library_files', column: 'tag_extracted_modified_at' },
   ]),
   constraints: Object.freeze([
     { table: 'schema_migrations', constraint: 'schema_migrations_filename_key' },
@@ -78,6 +80,7 @@ export const criticalSchemaAnchors = Object.freeze({
     { table: 'operator_release_group_selection' },
     { table: 'operator_track_override' },
     { table: 'operator_artist_reconciliation_snapshot' },
+    { table: 'library_files' },
   ]),
 });
 

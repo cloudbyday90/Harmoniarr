@@ -26,7 +26,7 @@ test('executeOperatorArtistReconciliation loads the saved snapshot and summarize
       releases: [{
         id: 'release-selected',
         isCanonical: true,
-        releaseDate: '2026-06-01',
+        releaseDate: '2026-12-01',
         releaseGroupId: 'rg-selected',
         title: 'Amber',
       }, {
