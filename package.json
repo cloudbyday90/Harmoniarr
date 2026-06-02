@@ -75,6 +75,7 @@
     "validate:security": "npm run check:image-tags && npm run validate:security:npm",
     "validate:security:npm": "node scripts/check-npm-audit.js",
     "wait:database": "node scripts/wait-for-postgres.js",
+    "write:issue-4-evidence-map": "node scripts/render-issue-4-release-evidence-map.js",
     "validate:database": "npm run wait:database && npm run build:server && npm run prepare:database && npm run validate:schema-bootstrap",
     "update-copyright": "node scripts/update-copyright.js",
     "add-copyright-headers": "node scripts/add-copyright-headers.js"

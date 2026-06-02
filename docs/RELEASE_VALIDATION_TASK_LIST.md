@@ -4,6 +4,7 @@ Implementation source: `docs/harmoniarr.md`
 Master execution tracker: `docs/IMPLEMENTATION_TASK_LIST.md`
 Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 Security source: `docs/SECURITY_POLICY.md`
+Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 
 ## Current Status (2026-04-27)
 
@@ -19,6 +20,7 @@ Security source: `docs/SECURITY_POLICY.md`
 
 ## Test And Validation Gates
 
+- [ ] Use `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md` to confirm each shipped Issue #4 platform step has focused tests, browser scenarios, schema evidence, and release evidence tasks before closing release readiness.
 - [ ] Run unit tests for validators, service logic, and normalization helpers.
 - [ ] Run integration tests for auth/session, settings, import review, jobs, and recovery-sensitive operations.
 	- Native integration coverage now also exercises the public app-user claim completion route end to end against the real HTTP and database-backed server graph, including admin-issued claim code creation, no auto-login on completion, and a subsequent normal login with the claimed password.
