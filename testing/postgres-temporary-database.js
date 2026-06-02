@@ -7,7 +7,7 @@
  */
 
 import pg from 'pg';
-import { buildConnectionConfig } from '../src/server/database.js';
+import { attachPoolErrorHandler, buildConnectionConfig } from '../src/server/database.js';
 
 const { Client, Pool } = pg;
 
@@ -86,12 +86,16 @@ export async function withTemporaryPostgresDatabase({
     database: databaseName,
   };
   const adminClient = adminClientFactory(adminConfig);
+  const databasePoolRuntimeState = { closing: false };
   let databasePool;
 
   try {
     await adminClient.connect();
     await adminClient.query(`CREATE DATABASE ${quoteIdentifier(databaseName)}`);
     databasePool = createPool(databaseConfig);
+    if (typeof databasePool?.on === 'function') {
+      attachPoolErrorHandler(databasePool, { runtimeState: databasePoolRuntimeState });
+    }
 
     return await run({
       databaseConfig,
@@ -99,6 +103,7 @@ export async function withTemporaryPostgresDatabase({
       getPoolFn: () => databasePool,
     });
   } finally {
+    databasePoolRuntimeState.closing = true;
     await databasePool?.end().catch(() => {});
 
     if (typeof adminClient.query === 'function') {

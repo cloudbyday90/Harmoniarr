@@ -37,6 +37,7 @@ const BootstrapSetupView = () => import('./views/BootstrapSetupView.vue');
 const ClaimAccountView = () => import('./views/ClaimAccountView.vue');
 const HomeView = () => import('./views/HomeView.vue');
 const ImportReviewView = () => import('./views/ImportReviewView.vue');
+const LibraryView = () => import('./views/LibraryView.vue');
 const LoginView = () => import('./views/LoginView.vue');
 const MetadataView = () => import('./views/MetadataView.vue');
 const MissingView = () => import('./views/MissingView.vue');
@@ -107,7 +108,7 @@ const router = createRouter({
         { path: 'dashboard', redirect: (to) => ({ name: 'dashboard', query: to.query, hash: to.hash }) },
         { path: 'onboarding', name: 'onboarding', component: OnboardingView },
         { path: 'discover', name: 'discover', component: DiscoverView },
-        { path: 'library', name: 'library', redirect: { name: 'dashboard' } },
+        { path: 'library', name: 'library', component: LibraryView },
         { path: 'missing', name: 'missing', component: MissingView },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
