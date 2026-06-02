@@ -18,6 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { computed, ref } from 'vue';
 import { parseAndValidateQuery, useGridState } from '../../src/client/composables/useGridState.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -152,6 +153,16 @@ test('parseAndValidateQuery handles array with unknown entry: filters out unknow
   assert.equal(result.filters.status, 'complete');
 });
 
+test('parseAndValidateQuery falls back to default filters when query omits the key', () => {
+  const result = parseAndValidateQuery({}, {
+    sortOptions: SORT_OPTIONS,
+    filterGroups: FILTER_GROUPS,
+    defaults: { ...DEFAULTS, filters: { status: 'partial' } },
+  });
+
+  assert.equal(result.filters.status, 'partial');
+});
+
 // ── useGridState — filterState computed ──────────────────────────────────────
 
 test('useGridState filterState defaults when no query params', () => {
@@ -215,6 +226,34 @@ test('useGridState filterState drops unknown filter value from URL', () => {
   });
 
   assert.equal(filterState.value.filters.status, undefined);
+});
+
+test('useGridState reads filter values from reactive filter groups after options load', () => {
+  const route = makeRoute({ format: 'FLAC' });
+  const router = makeRouter();
+  const dynamicFormats = ref([]);
+  const filterGroups = computed(() => [
+    ...FILTER_GROUPS,
+    {
+      key: 'format',
+      label: 'Format',
+      options: dynamicFormats.value.map((format) => ({ value: format, label: format })),
+    },
+  ]);
+
+  const { filterState } = useGridState(DEFAULTS, {
+    filterGroupKeys: ['status', 'format'],
+    sortOptions: SORT_OPTIONS,
+    filterGroups,
+    route,
+    router,
+  });
+
+  assert.equal(filterState.value.filters.format, undefined);
+
+  dynamicFormats.value = ['FLAC', 'MP3'];
+
+  assert.equal(filterState.value.filters.format, 'FLAC');
 });
 
 test('useGridState does not call router.replace on init (no URL write on mount)', () => {
@@ -391,6 +430,30 @@ test('clearAll removes all sort and filter keys', () => {
   assert.equal(router.calls[0].query.order, undefined);
   assert.equal(router.calls[0].query.status, undefined);
   // Unrelated params are preserved
+  assert.equal(router.calls[0].query.unrelated, 'keep');
+});
+
+test('clearAll removes dynamic filter keys declared by reactive filter groups', () => {
+  const route = makeRoute({ sort: 'title', order: 'desc', format: 'FLAC', unrelated: 'keep' });
+  const router = makeRouter();
+  const filterGroups = computed(() => [
+    ...FILTER_GROUPS,
+    { key: 'format', label: 'Format', options: [{ value: 'FLAC', label: 'FLAC' }] },
+  ]);
+
+  const { clearAll } = useGridState(DEFAULTS, {
+    filterGroupKeys: ['status', 'format'],
+    sortOptions: SORT_OPTIONS,
+    filterGroups,
+    route,
+    router,
+  });
+
+  clearAll();
+
+  assert.equal(router.calls[0].query.sort, undefined);
+  assert.equal(router.calls[0].query.order, undefined);
+  assert.equal(router.calls[0].query.format, undefined);
   assert.equal(router.calls[0].query.unrelated, 'keep');
 });
 

@@ -18,6 +18,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { ref } from 'vue';
 import { useLibraryReleases } from '../../src/client/composables/useLibraryReleases.js';
 
 function makeRelease(overrides = {}) {
@@ -500,6 +501,30 @@ describe('useLibraryReleases', () => {
 
     await c.revalidate();
     assert.equal(captured.reconciliationStatus, 'partial', 'revalidate uses last params');
+    c.destroy();
+  });
+
+  test('retry maps URL-backed filter state into status, format, sort, and order params', async () => {
+    let captured = null;
+    const filterState = ref({
+      filters: { status: 'partial', format: 'FLAC' },
+      sort: { field: 'artist', order: 'asc' },
+    });
+    const c = useLibraryReleases({
+      filterState,
+      fetchLibraryReleases: async (params) => {
+        captured = params;
+        return { total: 0, releases: [] };
+      },
+    });
+
+    c.retry();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    assert.equal(captured.reconciliationStatus, 'partial');
+    assert.equal(captured.format, 'FLAC');
+    assert.equal(captured.sort, 'artist');
+    assert.equal(captured.order, 'asc');
     c.destroy();
   });
 });

@@ -50,26 +50,12 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'duplicate', label: 'Duplicate' },
 ];
 
-const FILTER_GROUP_KEYS = ['status'];
+const FILTER_GROUP_KEYS = ['status', 'format'];
 
 const LIBRARY_DEFAULTS = {
   sort: { field: 'artist', order: 'asc' },
   filters: {},
 };
-
-// ── Grid state (URL-synced) ───────────────────────────────────────────────────
-
-const {
-  clearAll,
-  filterState,
-  isDefault,
-  updateState,
-} = useGridState(LIBRARY_DEFAULTS, {
-  filterGroupKeys: FILTER_GROUP_KEYS,
-  restoreKey: 'library',
-  sortOptions: SORT_OPTIONS,
-  filterGroups: [{ key: 'status', label: 'Status', options: STATUS_FILTER_OPTIONS }],
-});
 
 // ── Dynamic filter options (60s background poll) ──────────────────────────────
 
@@ -86,6 +72,20 @@ const filterGroups = computed(() => {
     });
   }
   return groups;
+});
+
+// ── Grid state (URL-synced) ───────────────────────────────────────────────────
+
+const {
+  clearAll,
+  filterState,
+  isDefault,
+  updateState,
+} = useGridState(LIBRARY_DEFAULTS, {
+  filterGroupKeys: FILTER_GROUP_KEYS,
+  restoreKey: 'library',
+  sortOptions: SORT_OPTIONS,
+  filterGroups,
 });
 
 // ── Library releases (server-side, SWR) ──────────────────────────────────────

@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, getCurrentInstance, onMounted, onUnmounted, watch } from 'vue';
+import { computed, getCurrentInstance, onMounted, onUnmounted, toValue, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -36,13 +36,16 @@ export function parseAndValidateQuery(query, { sortOptions, filterGroups, defaul
   const sortOrder =
     query.order === 'asc' || query.order === 'desc' ? query.order : (defaults.sort?.order ?? 'desc');
 
-  const filters = {};
+  const filters = { ...(defaults.filters ?? {}) };
   for (const group of filterGroups) {
     const raw = query[group.key];
+    if (raw === undefined) continue;
+
     // Vue Router 4 returns string[] for repeated params, string for single
     const values = Array.isArray(raw) ? raw : raw ? [raw] : [];
     const validValues = new Set(group.options.map((o) => o.value));
     const accepted = values.filter((v) => validValues.has(v));
+    delete filters[group.key];
     if (accepted.length === 1) filters[group.key] = accepted[0]; // v1: single string
     if (accepted.length > 1) filters[group.key] = accepted; // v1.1: string[] safe
   }
@@ -100,11 +103,35 @@ export function useGridState(
   const defaultSortOrder = defaults.sort?.order ?? 'desc';
   const defaultFilters = defaults.filters ?? {};
 
+  function getSortOptions() {
+    return toValue(sortOptions) ?? [];
+  }
+
+  function getFilterGroups() {
+    return toValue(filterGroups) ?? [];
+  }
+
+  function getFilterGroupKeys() {
+    return [
+      ...new Set([
+        ...(toValue(filterGroupKeys) ?? []),
+        ...getFilterGroups().map((group) => group.key),
+        ...Object.keys(defaultFilters),
+      ]),
+    ];
+  }
+
   // ── Derived filter state (reactive read from URL) ──────────────────────────
 
   const filterState = computed(() => {
-    if (sortOptions.length > 0 || filterGroups.length > 0) {
-      return parseAndValidateQuery(route.query, { sortOptions, filterGroups, defaults });
+    const resolvedSortOptions = getSortOptions();
+    const resolvedFilterGroups = getFilterGroups();
+    if (resolvedSortOptions.length > 0 || resolvedFilterGroups.length > 0) {
+      return parseAndValidateQuery(route.query, {
+        sortOptions: resolvedSortOptions,
+        filterGroups: resolvedFilterGroups,
+        defaults,
+      });
     }
     // Fast path when no option sets are provided (e.g. simple sort-only views)
     const sortField =
@@ -115,9 +142,13 @@ export function useGridState(
         : defaultSortOrder;
 
     const filters = {};
-    for (const key of filterGroupKeys) {
+    for (const key of getFilterGroupKeys()) {
       const val = route.query[key];
-      if (val !== undefined) filters[key] = val;
+      if (val !== undefined) {
+        filters[key] = val;
+      } else if (defaultFilters[key] !== undefined) {
+        filters[key] = defaultFilters[key];
+      }
     }
     return { sort: { field: sortField, order: sortOrder }, filters };
   });
@@ -151,13 +182,13 @@ export function useGridState(
     // Build the new query: preserve unrelated params, overlay sort + filter keys
     const unrelated = Object.fromEntries(
       Object.entries(route.query).filter(
-        ([k]) => k !== 'sort' && k !== 'order' && !filterGroupKeys.includes(k),
+        ([k]) => k !== 'sort' && k !== 'order' && !getFilterGroupKeys().includes(k),
       ),
     );
 
     const filterParams = {};
     for (const [k, v] of Object.entries(next.filters)) {
-      if (v !== undefined && v !== null) filterParams[k] = v;
+      if (v !== undefined && v !== null && defaultFilters[k] !== v) filterParams[k] = v;
     }
 
     router.replace({
@@ -186,7 +217,7 @@ export function useGridState(
   function clearAll() {
     const cleaned = Object.fromEntries(
       Object.entries(route.query).filter(
-        ([k]) => k !== 'sort' && k !== 'order' && !filterGroupKeys.includes(k),
+        ([k]) => k !== 'sort' && k !== 'order' && !getFilterGroupKeys().includes(k),
       ),
     );
     router.replace({ query: cleaned });
@@ -209,7 +240,7 @@ export function useGridState(
     return (
       Object.hasOwn(route.query, 'sort') ||
       Object.hasOwn(route.query, 'order') ||
-      filterGroupKeys.some((k) => Object.hasOwn(route.query, k))
+      getFilterGroupKeys().some((k) => Object.hasOwn(route.query, k))
     );
   }
 
