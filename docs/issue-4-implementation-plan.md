@@ -1,6 +1,16 @@
 # Issue #4 — Full App Re-scope: Harmoniarr as a Media Consumption App
 
-## Status: In Progress
+## Status: Core Implementation Complete; Plan Reconciliation Active
+
+Last reconciled: 2026-06-02.
+
+This document is now both a completed implementation ledger and a historical design archive for Issue #4. The **Implementation Progress** section is the source of truth for shipped work. Sections that still use first-pass language such as "Gaps", "Required", or speculative route/API sketches are retained for rationale unless they are repeated in the **Open Follow-Up Backlog** below.
+
+Use this order when reading the plan:
+
+1. **Implementation Progress** — what has shipped.
+2. **Open Follow-Up Backlog** — current actionable work that remains after the core re-scope.
+3. **Historical Design Archive** — original problem framing, gaps, decisions, and specs kept for traceability.
 
 ### Core Design Shifts
 
@@ -12,6 +22,14 @@
 - **The app finds music for you.** Release Radar surfaces new releases from artists you monitor. The "Coming Soon" watchlist pre-queues upcoming albums. You shouldn't have to check manually.
 - **Smart acquisition.** Download result scoring, per-user format preferences, and cross-user deduplication mean the right file gets downloaded once for everyone.
 - **Installable and notifying.** PWA support makes Harmoniarr a first-class mobile app. Push notifications tell you when your request is ready.
+
+---
+
+### Open Follow-Up Backlog
+
+- [ ] Split this plan into a concise current-state summary plus archived design/spec sections, so new contributors do not read historical "Required" language as unfinished implementation.
+- [ ] Add a release-validation evidence map that links each shipped Issue #4 step to its focused tests, browser scenarios, schema checks, and release evidence tasks.
+- [ ] Add browser visual evidence for the highest-risk media surfaces: Library grid/list display modes, Needs Attention actions, Discover recommendations, requester Home, and mobile navigation.
 
 ---
 
@@ -89,9 +107,9 @@ Implementation:
 
 ---
 
-### Current State Snapshot (Shipped Infrastructure)
+### Current State Snapshot (Historical Baseline)
 
-The re-scope is in active progress. The screens below have shipped:
+This snapshot was captured while the re-scope was still in active progress. It is retained for orientation around early files, routes, and reusable pieces. Use **Implementation Progress** above for current completeness and **Open Follow-Up Backlog** for remaining work.
 
 **New / rewritten screens:**
 - `DashboardView.vue` — role-split: `RequesterHomePanel.vue` (artwork-first artist grid with "Find more artists" tail card) + `OperatorDashboardPanel.vue` (request queue, downloads, library stats)
@@ -202,7 +220,9 @@ The operator controls don't disappear — they move where they belong: Settings.
 
 ---
 
-## 3. Gaps (What Is Missing)
+## 3. Historical Gaps (Resolved Design Targets)
+
+This section captures the original gaps that drove Issue #4. Treat these entries as historical design rationale unless the same work appears in **Open Follow-Up Backlog** or has a later explicit `Status:` block.
 
 ### 3.1 No Taste-Seeding / Discovery Flow
 
