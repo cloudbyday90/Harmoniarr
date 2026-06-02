@@ -77,14 +77,15 @@ export function registerArtworkRoutes(app, {
   }));
 
   app.patch('/api/v1/artwork/assets/:assetId/dominant-color', asyncRoute(async (request, response) => {
-    await requireSession(request);
+    const session = await requireSession(request);
+    requireCsrf(request, session);
     const { hue, chroma, lightness } = request.body ?? {};
 
     const result = await writeDominantColor({
       artworkAssetId: request.params.assetId,
-      hue: Number(hue),
-      chroma: Number(chroma),
-      lightness: Number(lightness),
+      hue,
+      chroma,
+      lightness,
     });
 
     response.json({ ok: result.ok, updated: result.updated });

@@ -287,21 +287,24 @@ test('artwork cleanup run route returns lock conflicts from the run service', as
   });
 });
 
-test('dominant color patch route requires an authenticated session and returns the write result', async (t) => {
-  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-5', user: { role: 'user' } }));
+test('dominant color patch route requires an authenticated session and CSRF token and returns the write result', async (t) => {
+  const requireCsrf = t.mock.fn();
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'user-5', csrfToken: 'csrf-5', user: { role: 'user' } }));
   const writeDominantColor = t.mock.fn(async () => ({ ok: true, updated: true }));
-  const app = createArtworkRouteTestApp({ requireSession, writeDominantColor });
+  const app = createArtworkRouteTestApp({ requireCsrf, requireSession, writeDominantColor });
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/artwork/assets/asset-xyz/dominant-color`, {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-csrf-token': 'csrf-5' },
       body: JSON.stringify({ hue: 180, chroma: 0.2, lightness: 0.5 }),
     });
     const payload = await response.json();
 
     assert.equal(response.status, 200);
     assert.equal(requireSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.calls[0].arguments[1].csrfToken, 'csrf-5');
     assert.equal(writeDominantColor.mock.callCount(), 1);
     assert.deepEqual(writeDominantColor.mock.calls[0].arguments, [{
       artworkAssetId: 'asset-xyz',
@@ -332,6 +335,31 @@ test('dominant color patch route returns 401 when session is not authenticated',
     assert.equal(response.status, 401);
     assert.equal(payload.ok, false);
     assert.equal(payload.error.code, 'auth_required');
+  });
+});
+
+test('dominant color patch route requires CSRF before writing', async (t) => {
+  const writeDominantColor = t.mock.fn(async () => ({ ok: true, updated: true }));
+  const app = createArtworkRouteTestApp({
+    requireCsrf: () => {
+      throw createApiError(403, 'csrf_invalid', 'CSRF token is invalid');
+    },
+    requireSession: async () => ({ appUserId: 'user-5', csrfToken: 'csrf-5', user: { role: 'user' } }),
+    writeDominantColor,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/artwork/assets/asset-xyz/dominant-color`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ hue: 180, chroma: 0.2, lightness: 0.5 }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.code, 'csrf_invalid');
+    assert.equal(writeDominantColor.mock.callCount(), 0);
   });
 });
 

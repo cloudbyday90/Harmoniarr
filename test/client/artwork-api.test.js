@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveArtwork, batchResolveArtwork, fetchArtworkQuotaHistory } from '../../src/client/lib/artwork-api.js';
+import {
+  batchResolveArtwork,
+  fetchArtworkQuotaHistory,
+  patchArtworkDominantColor,
+  resolveArtwork,
+} from '../../src/client/lib/artwork-api.js';
 
 function createJsonResponse(payload = {}) {
   return {
@@ -61,6 +66,21 @@ test('batchResolveArtwork sends requests with refresh in body', async (t) => {
   const body = typeof opts.body === 'string' ? JSON.parse(opts.body) : opts.body;
   assert.equal(body.requests[0].refresh, true);
   assert.equal(body.requests[1].refresh, undefined);
+});
+
+test('patchArtworkDominantColor sends a JSON object body with CSRF credentials', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-token' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({ ok: true, updated: true }));
+
+  await patchArtworkDominantColor('asset/with unsafe chars', { hue: 180, chroma: 0.2, lightness: 0.5 });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  const [url, opts] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/artwork/assets/asset%2Fwith%20unsafe%20chars/dominant-color');
+  assert.equal(opts.method, 'PATCH');
+  assert.equal(opts.credentials, 'same-origin');
+  assert.equal(opts.headers.get('X-CSRF-Token'), 'csrf-token');
+  assert.deepEqual(JSON.parse(opts.body), { hue: 180, chroma: 0.2, lightness: 0.5 });
 });
 
 test('fetchArtworkQuotaHistory builds URL with days parameter', async (t) => {

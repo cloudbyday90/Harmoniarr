@@ -39,7 +39,7 @@ export function startArtworkCleanupRun() {
 
 export function patchArtworkDominantColor(assetId, { hue, chroma, lightness }) {
   return apiRequest(`/api/v1/artwork/assets/${encodeURIComponent(assetId)}/dominant-color`, {
-    body: JSON.stringify({ hue, chroma, lightness }),
+    body: { hue, chroma, lightness },
     includeCsrf: true,
     method: 'PATCH',
   });

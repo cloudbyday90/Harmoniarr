@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ref } from 'vue';
+import { createRenderer, h, ref } from 'vue';
 import { useArtworkColor } from '../../src/client/composables/useArtworkColor.js';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +40,35 @@ function createExtractFn(result = vibrantColor(), t = null) {
     ? t.mock.fn(async () => result)
     : async () => result;
   return fn;
+}
+
+function createNoopRenderer() {
+  return createRenderer({
+    createElement: (type) => ({ type, children: [] }),
+    createText: (text) => ({ text }),
+    createComment: (text) => ({ comment: text }),
+    setText: (node, text) => { node.text = text; },
+    setElementText: (node, text) => { node.text = text; },
+    patchProp: (node, key, _previousValue, nextValue) => { node[key] = nextValue; },
+    insert: (child, parent) => { parent.children.push(child); },
+    remove: () => {},
+    parentNode: () => null,
+    nextSibling: () => null,
+  });
+}
+
+function createLoadedImageStub() {
+  return {
+    complete: true,
+    naturalWidth: 64,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+}
+
+async function flushPromises() {
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +192,39 @@ test('useArtworkColor patchFn is not called when dominantColor is already presen
   // dominantColor takes precedence and extraction is skipped.
   await Promise.resolve();
   assert.equal(patchFn.mock.callCount(), 0);
+});
+
+test('useArtworkColor extracts and patches dominant color for loaded same-origin artwork in a component', async (t) => {
+  const extractedColor = vibrantColor({ hue: 220, chroma: 0.18, lightness: 0.62 });
+  const extractColorFn = t.mock.fn(async () => extractedColor);
+  const patchFn = t.mock.fn(async () => {});
+  const imgEl = createLoadedImageStub();
+  const { createApp } = createNoopRenderer();
+  const root = { children: [] };
+  let accent;
+
+  const app = createApp({
+    setup() {
+      ({ accent } = useArtworkColor(ref(imgEl), {
+        artworkAssetId: 'asset-1',
+        dominantColor: null,
+        extractColorFn,
+        isSameOriginFn: () => true,
+        patchFn,
+      }));
+      return () => h('div');
+    },
+  });
+
+  app.mount(root);
+  await flushPromises();
+
+  assert.equal(extractColorFn.mock.callCount(), 1);
+  assert.deepEqual(accent.value, extractedColor);
+  assert.equal(patchFn.mock.callCount(), 1);
+  assert.deepEqual(patchFn.mock.calls[0].arguments, ['asset-1', extractedColor]);
+
+  app.unmount();
 });
 
 test('useArtworkColor accepts all options without throwing', () => {
