@@ -179,7 +179,7 @@ const metadataFixture = {
       beginDate: '1986-01-01',
       country: 'GB',
       id: 'metadata-artist-boards',
-      musicbrainzArtistId: boardsOfCanadaArtist.id,
+      musicBrainzArtistId: boardsOfCanadaArtist.id,
       name: boardsOfCanadaArtist.name,
       type: boardsOfCanadaArtist.type,
     },

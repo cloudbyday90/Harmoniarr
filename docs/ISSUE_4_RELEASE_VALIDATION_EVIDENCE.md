@@ -60,7 +60,7 @@ Release evidence tasks:
 - Capture requester Home cold-start and populated grid paths in packaged browser evidence.
 - Archive Home smoke evidence with the release evidence pack.
 
-Remaining release gap: Requester Home cold-start visual evidence is covered; add populated-card Home evidence if the release requires it.
+Remaining release gap: Native populated requester Home visual evidence is covered; archive the generated screenshot with release evidence.
 
 ## Step 3 - Discover screen
 

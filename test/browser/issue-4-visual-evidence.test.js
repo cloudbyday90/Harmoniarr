@@ -92,6 +92,7 @@ async function addBoardsOfCanadaFromDiscover(page) {
 
 async function loginRequesterThroughUi(page, {
   baseUrl,
+  beforeReadyNavigation = null,
   initialPassword,
   readyPassword,
   username,
@@ -135,6 +136,10 @@ async function loginRequesterThroughUi(page, {
 
   assert.equal(result.status, 200);
   assert.equal(result.payload?.user?.mustChangePassword, false);
+
+  if (typeof beforeReadyNavigation === 'function') {
+    await beforeReadyNavigation(page);
+  }
 
   await page.goto(`${baseUrl}/app`, { waitUntil: 'domcontentloaded' });
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -230,14 +235,18 @@ suite('Issue #4 browser visual evidence', () => {
       await logoutThroughUi(page);
       await loginRequesterThroughUi(page, {
         baseUrl,
+        beforeReadyNavigation: markBoardsOfCanadaAddedInMetadataBrowserFixture,
         initialPassword: 'RequesterPass123!',
         readyPassword: 'RequesterReady123!',
         username: 'listener',
       });
       await page.getByRole('heading', { exact: true, name: 'Home' }).waitFor();
       await page.getByText('Artists you\'re monitoring and music you care about.').waitFor();
+      const monitoredArtistsRegion = page.locator('section[aria-label="Monitored artists"]');
+      await monitoredArtistsRegion.getByText('Boards of Canada').waitFor();
+      await monitoredArtistsRegion.getByRole('link', { name: 'Find more artists' }).waitFor();
       await evidence.capture(page, {
-        description: 'Requester Home at phone-ready cold-start boundary with Discover CTA and requester navigation.',
+        description: 'Requester Home populated with monitored artist artwork cards and the Discover tail card.',
         name: 'requester-home',
         surface: 'requester-home',
       });

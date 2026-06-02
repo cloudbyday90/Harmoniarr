@@ -92,7 +92,7 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
       'Capture requester Home cold-start and populated grid paths in packaged browser evidence.',
       'Archive Home smoke evidence with the release evidence pack.',
     ],
-    releaseGap: 'Requester Home cold-start visual evidence is covered; add populated-card Home evidence if the release requires it.',
+    releaseGap: 'Native populated requester Home visual evidence is covered; archive the generated screenshot with release evidence.',
     schemaEvidence: ['No schema change; projection behavior is covered by service and client tests.'],
     step: 2,
     title: 'Requester home page',

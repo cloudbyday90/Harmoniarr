@@ -34,7 +34,7 @@ Issue #4 platform evidence map: `docs/ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md`
 - [x] Run UI/end-to-end coverage for bootstrap, login, settings, review queue, jobs/history, and restore preview/apply where practical.
 	- The shared Docker smoke contract now covers one packaged-runtime Request Music user journey through real HTTP APIs, but browser-driven UI coverage for the operator surfaces is still open.
 	- Native ESM browser smoke coverage now also exercises bootstrap, login, settings, review queue, jobs/history, and recovery backup preview through a real temporary PostgreSQL-backed app runtime using Playwright as the browser engine while keeping the repository on `node:test`; remaining work is broader packaged-runtime browser execution and any restore-apply mutation proof the release wants beyond preview-plus-confirmation gating.
-	- Native Issue #4 browser visual evidence now captures Library grid/list display modes, Needs Attention actions, Discover recommendations, requester Home, and mobile navigation to `artifacts/browser-visual-evidence/issue-4-media-surfaces/` during `test/browser/issue-4-visual-evidence.test.js`; remaining work is archiving those screenshots from a release run.
+	- Native Issue #4 browser visual evidence now captures Library grid/list display modes, Needs Attention actions, Discover recommendations, populated requester Home, and mobile navigation to `artifacts/browser-visual-evidence/issue-4-media-surfaces/` during `test/browser/issue-4-visual-evidence.test.js`; remaining work is archiving those screenshots from a release run.
 
 ## Deployment-Path Validation
 
