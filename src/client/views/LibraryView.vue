@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import ArtworkImage from '../components/ArtworkImage.vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
@@ -30,6 +31,11 @@ import {
   buildReleaseArtworkRequests,
   getPreferredReleaseArtwork,
 } from '../lib/release-artwork-resolve.js';
+import {
+  LIBRARY_DISPLAY_MODE_OPTIONS,
+  readLibraryDisplayModePreference,
+  writeLibraryDisplayModePreference,
+} from '../lib/library-display-preference.js';
 import {
   buildLibraryDuplicateReviewLocation,
   buildLibraryNeedsAttention,
@@ -124,13 +130,23 @@ function readDuplicateReviewExpandedPreference() {
 
 const libraryGridCard = ref(null);
 const duplicateReviewExpanded = ref(readDuplicateReviewExpandedPreference());
+const displayMode = ref(readLibraryDisplayModePreference());
 const detailModalOpen = ref(false);
 const detailRelease = ref(null);
 
+const displayModeOptions = LIBRARY_DISPLAY_MODE_OPTIONS;
 const needsAttention = computed(() => buildLibraryNeedsAttention(displayReleases.value));
 
 function getReleaseArtwork(release) {
   return getPreferredReleaseArtwork(getResolvedArtwork, release);
+}
+
+function getReleaseArtworkMbid(release) {
+  return release?.musicbrainzReleaseId ?? release?.releaseGroupId ?? null;
+}
+
+function getReleaseArtworkMbidType(release) {
+  return release?.musicbrainzReleaseId ? 'release' : 'release-group';
 }
 
 function openPartialReleaseDetail(release) {
@@ -185,6 +201,16 @@ watch(
       globalThis.localStorage?.setItem(DUPLICATES_EXPANDED_STORAGE_KEY, isExpanded ? 'true' : 'false');
     } catch {
       // Local UI preference only; failure should not affect Library rendering.
+    }
+  },
+);
+
+watch(
+  displayMode,
+  (mode) => {
+    const normalizedMode = writeLibraryDisplayModePreference(mode);
+    if (normalizedMode !== mode) {
+      displayMode.value = normalizedMode;
     }
   },
 );
@@ -382,15 +408,35 @@ function refreshAll() {
 
       <!-- GridControls bar -->
       <div class="hx-card-body library-controls-bar">
-        <GridControls
-          :model-value="gridControlsValue"
-          :sort-options="SORT_OPTIONS"
-          :filter-groups="filterGroups"
-          :is-default="isDefault"
-          :is-loading="library.isLoading.value && !library.isFirstLoad.value"
-          @clear-all="clearAll"
-          @update:model-value="onGridControlsUpdate"
-        />
+        <div class="library-controls-row">
+          <GridControls
+            :model-value="gridControlsValue"
+            :sort-options="SORT_OPTIONS"
+            :filter-groups="filterGroups"
+            :is-default="isDefault"
+            :is-loading="library.isLoading.value && !library.isFirstLoad.value"
+            @clear-all="clearAll"
+            @update:model-value="onGridControlsUpdate"
+          />
+
+          <fieldset class="library-display-mode-toggle">
+            <legend class="library-sr-only">Display mode</legend>
+            <label
+              v-for="option in displayModeOptions"
+              :key="option.value"
+              class="library-display-mode-option"
+              :data-active="displayMode === option.value ? 'true' : 'false'"
+            >
+              <input
+                v-model="displayMode"
+                type="radio"
+                name="library-display-mode"
+                :value="option.value"
+              />
+              <span>{{ option.label }}</span>
+            </label>
+          </fieldset>
+        </div>
 
         <!-- Non-first-load error callout above stale data -->
         <div
@@ -434,10 +480,11 @@ function refreshAll() {
       <!-- Release grid — stale at 60% opacity during subsequent loads -->
       <div
         v-else-if="displayReleases.length > 0"
+        id="library-release-results"
         class="hx-card-body hx-card-body--flush"
         :class="{ 'library-grid--stale': library.isLoading.value && !library.isFirstLoad.value }"
       >
-        <div class="hx-artwork-grid">
+        <div v-if="displayMode === 'grid'" class="hx-artwork-grid">
           <ReleaseCard
             v-for="(release, index) in displayReleases"
             :key="library.data.value[index]?.id ?? library.staleData.value[index]?.id ?? index"
@@ -467,6 +514,62 @@ function refreshAll() {
             </template>
           </ReleaseCard>
         </div>
+
+        <div v-else class="library-release-list" role="list" aria-label="Library releases">
+          <article
+            v-for="(release, index) in displayReleases"
+            :key="library.data.value[index]?.id ?? library.staleData.value[index]?.id ?? index"
+            class="library-release-row"
+            role="listitem"
+          >
+            <div class="library-release-row__artwork">
+              <ArtworkImage
+                :mbid="getReleaseArtworkMbid(release)"
+                :mbid-type="getReleaseArtworkMbidType(release)"
+                :local-src="getReleaseArtwork(release)?.url ?? null"
+                :alt="release.title ? `${release.title} artwork` : 'Release artwork'"
+              />
+            </div>
+
+            <div class="library-release-row__main">
+              <h3 class="library-release-row__title">{{ release.title ?? 'Untitled release' }}</h3>
+              <p class="library-release-row__artist">{{ release.artistCredit ?? 'Unknown artist' }}</p>
+              <p class="library-release-row__meta">
+                <span v-if="release.date">{{ release.date }}</span>
+                <span v-if="release.date && release.releaseGroup?.primaryType"> · </span>
+                <span v-if="release.releaseGroup?.primaryType">{{ release.releaseGroup.primaryType }}</span>
+              </p>
+            </div>
+
+            <dl class="library-release-row__facts">
+              <div class="library-release-row__fact">
+                <dt>Status</dt>
+                <dd>
+                  <span
+                    class="hx-pill"
+                    :data-tone="getReconciliationStatusTone(release.reconciliationStatus)"
+                  >
+                    {{ getReconciliationStatusLabel(release.reconciliationStatus) }}
+                  </span>
+                </dd>
+              </div>
+              <div
+                v-if="formatLibraryTrackCounts(release)"
+                class="library-release-row__fact"
+              >
+                <dt>Tracks</dt>
+                <dd>{{ formatLibraryTrackCounts(release) }}</dd>
+              </div>
+              <div
+                v-if="release.reconciliationStatus === 'duplicate'"
+                class="library-release-row__fact"
+              >
+                <dt>Duplicates</dt>
+                <dd>{{ formatLibraryDuplicateFileCount(release) }}</dd>
+              </div>
+            </dl>
+          </article>
+        </div>
       </div>
     </article>
 
@@ -493,6 +596,66 @@ function refreshAll() {
   gap: var(--hx-space-2);
 }
 
+.library-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+  flex-wrap: wrap;
+}
+
+.library-controls-row > :first-child {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.library-display-mode-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface-sunken);
+}
+
+.library-display-mode-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 30px;
+  padding: 0 var(--hx-space-3);
+  border-radius: var(--hx-radius-xs);
+  color: var(--hx-text-muted);
+  cursor: pointer;
+  font-size: var(--hx-text-sm);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+
+.library-display-mode-option[data-active='true'] {
+  background: var(--hx-bg-surface);
+  box-shadow: var(--hx-shadow-sm);
+  color: var(--hx-text-strong);
+}
+
+.library-display-mode-option input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.library-display-mode-option:focus-within {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
 .library-error-callout {
   display: flex;
   align-items: center;
@@ -503,6 +666,88 @@ function refreshAll() {
 .library-grid--stale {
   opacity: 0.6;
   transition: opacity 0.15s;
+}
+
+.library-release-list {
+  display: grid;
+}
+
+.library-release-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) minmax(220px, auto);
+  align-items: center;
+  gap: var(--hx-space-3);
+  min-height: 88px;
+  padding: var(--hx-space-3) var(--hx-space-4);
+  border-top: 1px solid var(--hx-border-subtle);
+}
+
+.library-release-row:first-child {
+  border-top: 0;
+}
+
+.library-release-row__artwork {
+  width: 64px;
+  min-width: 64px;
+}
+
+.library-release-row__main {
+  display: grid;
+  min-width: 0;
+  gap: var(--hx-space-1);
+}
+
+.library-release-row__title {
+  overflow: hidden;
+  margin: 0;
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-base);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-release-row__artist,
+.library-release-row__meta {
+  overflow: hidden;
+  margin: 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-release-row__facts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--hx-space-3);
+  min-width: 0;
+  margin: 0;
+}
+
+.library-release-row__fact {
+  display: grid;
+  gap: var(--hx-space-1);
+  justify-items: end;
+  min-width: max-content;
+}
+
+.library-release-row__fact dt {
+  color: var(--hx-text-faint);
+  font-size: var(--hx-text-xs);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.library-release-row__fact dd {
+  margin: 0;
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .library-needs-attention {
@@ -611,7 +856,48 @@ function refreshAll() {
   font-size: var(--hx-text-sm);
 }
 
+.library-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-width: 640px) {
+  .library-display-mode-toggle {
+    width: 100%;
+  }
+
+  .library-display-mode-option {
+    flex: 1 1 0;
+  }
+
+  .library-release-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+    align-items: start;
+    min-height: 0;
+  }
+
+  .library-release-row__artwork {
+    width: 56px;
+    min-width: 56px;
+  }
+
+  .library-release-row__facts {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .library-release-row__fact {
+    justify-items: start;
+  }
+
   .library-partial-strip {
     grid-auto-columns: minmax(164px, 78vw);
   }

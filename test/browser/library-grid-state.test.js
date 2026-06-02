@@ -177,4 +177,45 @@ suite('browser Library grid state coverage', () => {
       scenarioName: 'library_needs_attention_browser',
     });
   });
+
+  test('Library display mode toggles to list view and persists outside the URL', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installLibraryBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+
+      await page.goto(`${baseUrl}/app/library`, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      await page.getByRole('radio', { name: 'Grid' }).waitFor();
+      await page.getByRole('radio', { name: 'List' }).check();
+
+      const list = page.getByRole('list', { name: 'Library releases' });
+      await list.getByText("Tomorrow's Harvest").waitFor();
+      await list.getByText('Boards of Canada').first().waitFor();
+      await list.getByText('17 tracks').waitFor();
+      assert.equal(
+        new URL(page.url()).searchParams.has('display'),
+        false,
+        'display preference must not be written to URL query state',
+      );
+
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.getByRole('radio', { name: 'List' }).waitFor();
+      assert.equal(await page.getByRole('radio', { name: 'List' }).isChecked(), true);
+      await page.getByRole('list', { name: 'Library releases' }).getByText('Tri Repetae').waitFor();
+
+      await page.getByRole('radio', { name: 'Grid' }).check();
+      assert.equal(await page.getByRole('radio', { name: 'Grid' }).isChecked(), true);
+    }, {
+      scenarioName: 'library_display_mode_browser',
+    });
+  });
 });
