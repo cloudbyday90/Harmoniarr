@@ -106,6 +106,76 @@ test('createLibraryScanService persists a pending run for durable dispatch when 
   });
 });
 
+test('createLibraryScanService queues a deferred pending run without checking active scan state', async (t) => {
+  const getActiveRun = t.mock.fn(async () => ({ id: 'running-scan-1', status: 'running' }));
+  const createOperationRun = t.mock.fn(async (input) => ({
+    id: 'deferred-scan-1',
+    ...input,
+  }));
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createLibraryScanService({
+    createOperationRun,
+    getActiveRun,
+    recordAuditEventFn,
+    settingsService: {
+      buildSettingsPayload: async () => ({
+        settings: {
+          paths: {
+            music: '/srv/music',
+          },
+        },
+        pathValidation: {
+          summary: {
+            status: 'healthy',
+            message: 'Validated',
+          },
+        },
+      }),
+    },
+  });
+
+  const result = await service.queueDeferredLibraryScan({
+    deferredReason: 'library_scan_in_progress',
+    releaseHints: [{
+      canonicalPath: '/srv/music/Autechre/Amber/01 Foil.flac',
+      metadataReleaseId: 'release-1',
+    }],
+    triggeredByRunId: 'apply-run-1',
+    triggerReason: 'import_candidate_apply',
+  });
+
+  assert.equal(getActiveRun.mock.callCount(), 0);
+  assert.deepEqual(createOperationRun.mock.calls[0].arguments[0], {
+    deferredReason: 'library_scan_in_progress',
+    libraryRoot: '/srv/music',
+    releaseHints: [{
+      canonicalPath: '/srv/music/Autechre/Amber/01 Foil.flac',
+      metadataReleaseId: 'release-1',
+    }],
+    status: 'pending',
+    triggeredByRunId: 'apply-run-1',
+    triggeredByUserId: null,
+    triggerReason: 'import_candidate_apply',
+  });
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].summary, 'Library scan queued');
+  assert.deepEqual(result, {
+    accepted: true,
+    run: {
+      deferredReason: 'library_scan_in_progress',
+      id: 'deferred-scan-1',
+      libraryRoot: '/srv/music',
+      releaseHints: [{
+        canonicalPath: '/srv/music/Autechre/Amber/01 Foil.flac',
+        metadataReleaseId: 'release-1',
+      }],
+      status: 'pending',
+      triggeredByRunId: 'apply-run-1',
+      triggeredByUserId: null,
+      triggerReason: 'import_candidate_apply',
+    },
+  });
+});
+
 test('createLibraryScanService rejects when maintenance lock blocks unsafe writes', async () => {
   const service = createLibraryScanService({
     assertMaintenanceWriteAllowed: async () => {

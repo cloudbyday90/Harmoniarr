@@ -390,6 +390,25 @@ export function createApp({
         triggerReason,
       });
     },
+    queueDeferredLibraryScan: async ({
+      deferredReason = null,
+      releaseHints = [],
+      triggeredByRunId = null,
+      triggeredByUserId = null,
+      triggerReason = null,
+    } = {}) => {
+      if (!libraryModule?.libraryScanService?.queueDeferredLibraryScan) {
+        throw new Error('Library scan service is not initialized');
+      }
+
+      return libraryModule.libraryScanService.queueDeferredLibraryScan({
+        deferredReason,
+        releaseHints,
+        triggeredByRunId,
+        triggeredByUserId,
+        triggerReason,
+      });
+    },
     scheduleDownloadRecoveryRediscovery: async (payload) => {
       if (!libraryModule?.libraryDiscoveryRediscoveryService?.scheduleDownloadRecoveryRediscovery) {
         throw new Error('Library discovery rediscovery service is not initialized');

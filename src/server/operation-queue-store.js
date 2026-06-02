@@ -120,6 +120,20 @@ export function createOperationQueueStore({
               claimed_at IS NULL
               OR claimed_at <= NOW() - ($3 * INTERVAL '1 millisecond')
             )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM operation_runs AS active_runs
+              WHERE active_runs.id <> operation_runs.id
+                AND active_runs.operation_type = operation_runs.operation_type
+                AND (
+                  active_runs.status = 'running'
+                  OR (
+                    active_runs.status = 'pending'
+                    AND active_runs.claimed_at IS NOT NULL
+                    AND active_runs.claimed_at > NOW() - ($3 * INTERVAL '1 millisecond')
+                  )
+                )
+            )
           ORDER BY next_attempt_at ASC, started_at ASC, created_at ASC
           LIMIT 1
           FOR UPDATE SKIP LOCKED

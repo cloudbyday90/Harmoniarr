@@ -40,6 +40,7 @@ export function isSafePostApplyScanError(error) {
 }
 
 export function createImportCandidatePostApplyScanService({
+  queueDeferredLibraryScan = null,
   startLibraryScan = null,
 } = {}) {
   async function schedulePostApplyLibraryScan({
@@ -76,6 +77,39 @@ export function createImportCandidatePostApplyScanService({
         triggeredByRunId,
       };
     } catch (error) {
+      if (error?.status === 409 && error?.code === 'library_scan_in_progress' && typeof queueDeferredLibraryScan === 'function') {
+        try {
+          const queuedResult = await queueDeferredLibraryScan({
+            deferredReason: 'library_scan_in_progress',
+            releaseHints: normalizedReleaseHints,
+            triggeredByRunId,
+            triggeredByUserId: null,
+            triggerReason: postApplyScanTriggerReason,
+          });
+
+          return {
+            accepted: queuedResult?.accepted === true,
+            reason: 'library_scan_in_progress',
+            releaseHintCount: normalizedReleaseHints.length,
+            scanRunId: queuedResult?.run?.id ?? null,
+            status: 'deferred',
+            triggeredByRunId,
+          };
+        } catch (queueError) {
+          const normalizedQueueError = normalizeError(queueError);
+          const queueSafeToSuppress = isSafePostApplyScanError(queueError);
+
+          return {
+            accepted: false,
+            reason: normalizedQueueError.code ?? normalizedQueueError.message,
+            releaseHintCount: normalizedReleaseHints.length,
+            scanRunId: null,
+            status: queueSafeToSuppress ? 'suppressed' : 'failed',
+            triggeredByRunId,
+          };
+        }
+      }
+
       const normalizedError = normalizeError(error);
       const safeToSuppress = isSafePostApplyScanError(error);
 

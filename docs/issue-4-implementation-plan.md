@@ -3902,7 +3902,7 @@ The following three items address the pipeline that runs after slskd completes a
 
 ### 5.28 Post-Apply Auto-Scan Trigger
 
-**Status:** Implemented in `import-candidate-apply-worker.js`, `import-candidate-post-apply-scan-service.js`, `import-candidate-module.js`, `app.js`, `library-scan-service.js`, and `library-scan-run-store.js`. Successful import-apply runs now trigger one system library scan after the apply run is marked complete. The scan carries `triggerReason: 'import_candidate_apply'` and the source apply run ID in its operation summary/audit details.
+**Status:** Implemented in `import-candidate-apply-worker.js`, `import-candidate-post-apply-scan-service.js`, `import-candidate-module.js`, `app.js`, `library-scan-service.js`, `library-scan-run-store.js`, and `operation-queue-store.js`. Successful import-apply runs now trigger one system library scan after the apply run is marked complete. The scan carries `triggerReason: 'import_candidate_apply'` and the source apply run ID in its operation summary/audit details. If an active or already-queued library scan blocks immediate scheduling, post-apply queues a deferred pending scan with the same release hints instead of suppressing the conflict; the operation queue prevents same-operation claimed/running work from being claimed concurrently, so the deferred scan runs after the current library scan finishes.
 
 **Original gap:** `import-candidate-apply-worker.js` called `markRunCompleted` after all candidates were processed but had no durable library-scan trigger. After files landed on disk, no scan was started automatically. The operator had to manually navigate to Library -> Scan. Until that manual scan ran, `library_files` had no rows for the newly applied audio, `library_file_matches` had no match results, `library_release_reconciliations` showed no progress, and `library-media-request-fulfillment-service.js` could not advance any request from `downloading`/`selected` to a fulfilled state. The gap between "files on disk" and "request satisfied" was entirely manual.
 
@@ -3910,7 +3910,7 @@ The following three items address the pipeline that runs after slskd completes a
 
 **Design decision — trigger a scan after every successful apply run, not per-candidate:** The apply worker iterates multiple candidates in one run. Triggering one scan per candidate creates concurrency problems (the second scan starts before the first finishes). Instead: collect the set of applied candidate IDs during the run, and after `markRunCompleted`, trigger one library scan. The scan will cover all applied files in a single pass.
 
-**Design decision — guard against 409 and unconfigured library root:** The library scan service already throws a 409 if a scan is active. The auto-trigger must catch and ignore that error — a concurrent scan is the desired outcome. If no library root is configured, the scan service throws a different error that should also be suppressed (the scan would fail immediately anyway for the same reason; surfacing it here adds noise without helping).
+**Design decision — defer active-scan conflicts, still suppress readiness failures:** The library scan service throws a 409 if a scan is active or queued. Earlier implementation suppressed that error, assuming the active scan would see newly applied files. That assumption is not durable when the active scan has already walked the target directory, and it also loses post-apply release hints needed for conventional tag matching. The post-apply scan service now handles `library_scan_in_progress` by queuing a second pending library scan with `deferredReason: 'library_scan_in_progress'`, `triggerReason: 'import_candidate_apply'`, the source apply run ID, and the collected release hints. If no library root is configured, readiness errors remain suppressed because the deferred scan would fail immediately for the same reason and would add noise without progress.
 
 **Code location:** `src/server/import-candidates/import-candidate-apply-worker.js` accepts `scheduleLibraryScan` in the dependency object (defaulting to `null` for tests and alternate composition paths). After `markRunCompleted`:
 
@@ -3929,8 +3929,8 @@ export function createImportCandidateApplyWorker({
       try {
         await scheduleLibraryScan({ triggeredByRunId: runId });
       } catch {
-        // 409 (scan already active) and configuration errors are intentionally swallowed.
-        // The scan that is already running will pick up the applied files.
+        // Readiness errors are intentionally swallowed. Active-scan conflicts are
+        // converted into a deferred follow-on scan by the post-apply scan service.
       }
     }
   }
@@ -3944,18 +3944,20 @@ export function createImportCandidateApplyWorker({
 | Scenario | Expected behavior |
 |---|---|
 | All candidates failed (`counts.applied === 0`) | No scan triggered — nothing on disk changed |
-| Scan already active when apply completes | `scheduleLibraryScan` receives the 409 response and swallows it — the existing scan will process the newly applied files when it runs its `walkDirectory` pass (as long as apply finished before the existing scan reaches the relevant directory) |
+| Scan already active when apply completes | `scheduleLibraryScan` receives the 409 response and queues a deferred pending scan with the post-apply release hints. The operation queue leaves that scan pending until same-operation claimed/running work clears. |
 | Library root not configured | `startLibraryScanRun` throws its readiness error; swallowed; no scan scheduled |
 | Apply cancelled mid-run | `markRunCancelled` is called instead of `markRunCompleted` — auto-scan not triggered |
-| Multiple apply runs overlap (rare) | Each run's `scheduleLibraryScan` call races at the library scan service; the first succeeds, the rest receive 409 and are swallowed; single scan covers all applied files from both runs |
-| Apply run completes during an active library scan | Newly applied files may not be present in the current scan's walked set. The auto-trigger fires; library scan service returns 409. These files will not be picked up until the next manual or scheduled scan. A future enhancement could queue a follow-on scan when one is already running (deferred). |
+| Multiple apply runs overlap (rare) | Each run's `scheduleLibraryScan` call races at the library scan service; the first succeeds, the rest queue deferred scans with their own release hints. The operation queue serializes same-operation dispatch so library scans do not run concurrently. |
+| Apply run completes during an active library scan | Newly applied files may not be present in the current scan's walked set. The deferred scan guarantees a follow-on scan with release hints after the active scan finishes. |
 
-**No schema changes required.** The apply worker already tracks `counts.applied` and `counts.appliedWithWarnings`. The library scan service and its run creation are unchanged.
+**No schema changes required.** The apply worker already tracks `counts.applied` and `counts.appliedWithWarnings`. Deferred follow-on scans use ordinary `operation_runs` rows with pending status.
 
 **Testing contract:**
 - `scheduleLibraryScan` is called exactly once when `counts.applied > 0`
 - `scheduleLibraryScan` is NOT called when all candidates failed
-- Any error thrown by `scheduleLibraryScan` does not cause the apply worker to fail or re-throw
+- `library_scan_in_progress` from immediate scheduling calls `queueDeferredLibraryScan` with the original release hints
+- Readiness errors remain suppressed and do not cause the apply worker to fail or re-throw
+- The operation queue does not claim a second run for an operation type while another run of that type is running or actively claimed
 - `scheduleLibraryScan` is NOT called after `markRunCancelled` or `markRunFailed`
 
 ---

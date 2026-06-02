@@ -34,20 +34,7 @@ export function createLibraryScanService({
 } = {}) {
   const operationDescriptor = operationRunRegistry.libraryScan;
 
-  async function startLibraryScan({
-    requestMetadata = null,
-    releaseHints = [],
-    triggeredByRunId = null,
-    triggeredByUserId = null,
-    triggerReason = null,
-  } = {}) {
-    await assertMaintenanceWriteAllowed();
-
-    const activeRun = await getActiveRun();
-    if (activeRun) {
-      throw createApiError(409, 'library_scan_in_progress', 'A library scan is already running or queued');
-    }
-
+  async function buildReadyLibraryScanRoot() {
     const settingsPayload = await settingsService.buildSettingsPayload();
     const { libraryRoot, readiness } = buildLibraryScanContext(settingsPayload);
 
@@ -55,15 +42,19 @@ export function createLibraryScanService({
       throw createApiError(409, 'library_scan_not_ready', readiness.message);
     }
 
-    const run = await createOperationRun({
-      libraryRoot,
-      releaseHints,
-      status: 'pending',
-      triggeredByRunId,
-      triggeredByUserId,
-      triggerReason,
-    });
+    return libraryRoot;
+  }
 
+  async function writeLibraryScanAuditEvent({
+    libraryRoot,
+    releaseHints,
+    requestMetadata = null,
+    run,
+    summary = 'Library scan started',
+    triggeredByRunId = null,
+    triggeredByUserId = null,
+    triggerReason = null,
+  }) {
     await recordAuditEventFn({
       actorType: triggeredByUserId ? 'user' : 'system',
       actorUserId: triggeredByUserId,
@@ -78,8 +69,82 @@ export function createLibraryScanService({
       entityType: 'operation_run',
       eventType: operationDescriptor.startedEventType,
       ipAddress: requestMetadata?.ipAddress ?? null,
-      summary: 'Library scan started',
+      summary,
       userAgent: requestMetadata?.userAgent ?? null,
+    });
+  }
+
+  async function startLibraryScan({
+    requestMetadata = null,
+    releaseHints = [],
+    triggeredByRunId = null,
+    triggeredByUserId = null,
+    triggerReason = null,
+  } = {}) {
+    await assertMaintenanceWriteAllowed();
+
+    const activeRun = await getActiveRun();
+    if (activeRun) {
+      throw createApiError(409, 'library_scan_in_progress', 'A library scan is already running or queued');
+    }
+
+    const libraryRoot = await buildReadyLibraryScanRoot();
+
+    const run = await createOperationRun({
+      libraryRoot,
+      releaseHints,
+      status: 'pending',
+      triggeredByRunId,
+      triggeredByUserId,
+      triggerReason,
+    });
+
+    await writeLibraryScanAuditEvent({
+      libraryRoot,
+      releaseHints,
+      requestMetadata,
+      run,
+      triggeredByRunId,
+      triggeredByUserId,
+      triggerReason,
+    });
+
+    return {
+      accepted: true,
+      run,
+    };
+  }
+
+  async function queueDeferredLibraryScan({
+    deferredReason = null,
+    requestMetadata = null,
+    releaseHints = [],
+    triggeredByRunId = null,
+    triggeredByUserId = null,
+    triggerReason = null,
+  } = {}) {
+    await assertMaintenanceWriteAllowed();
+    const libraryRoot = await buildReadyLibraryScanRoot();
+
+    const run = await createOperationRun({
+      deferredReason,
+      libraryRoot,
+      releaseHints,
+      status: 'pending',
+      triggeredByRunId,
+      triggeredByUserId,
+      triggerReason,
+    });
+
+    await writeLibraryScanAuditEvent({
+      libraryRoot,
+      releaseHints,
+      requestMetadata,
+      run,
+      summary: 'Library scan queued',
+      triggeredByRunId,
+      triggeredByUserId,
+      triggerReason,
     });
 
     return {
@@ -89,6 +154,7 @@ export function createLibraryScanService({
   }
 
   return {
+    queueDeferredLibraryScan,
     startLibraryScan,
   };
 }

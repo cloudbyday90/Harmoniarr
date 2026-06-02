@@ -35,6 +35,10 @@ test('operation queue store claims the next runnable run for the configured inst
   assert.equal(query.mock.callCount(), 1);
   assert.match(query.mock.calls[0].arguments[0], /UPDATE operation_runs AS runs/);
   assert.match(query.mock.calls[0].arguments[0], /RETURNING\s+runs\.\*/);
+  assert.match(query.mock.calls[0].arguments[0], /NOT EXISTS/);
+  assert.match(query.mock.calls[0].arguments[0], /active_runs\.operation_type = operation_runs\.operation_type/);
+  assert.match(query.mock.calls[0].arguments[0], /active_runs\.status = 'running'/);
+  assert.match(query.mock.calls[0].arguments[0], /active_runs\.claimed_at > NOW\(\) - \(\$3 \* INTERVAL '1 millisecond'\)/);
   assert.deepEqual(query.mock.calls[0].arguments[1], [['library_scan', 'artwork_cleanup'], 'instance-a', 60000]);
   assert.deepEqual(run, {
     attemptCount: 1,

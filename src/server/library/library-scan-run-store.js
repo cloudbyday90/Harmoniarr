@@ -65,6 +65,7 @@ export function createLibraryScanRunStore({
   });
 
   async function createOperationRun({
+    deferredReason = null,
     libraryRoot,
     releaseHints = [],
     status = 'pending',
@@ -75,6 +76,7 @@ export function createLibraryScanRunStore({
     const run = await operationRunStore.createOperationRun({
       status,
       summary: {
+        ...(deferredReason ? { deferredReason } : {}),
         libraryRoot,
         releaseHints: Array.isArray(releaseHints) ? releaseHints : [],
         triggeredByRunId,

@@ -73,8 +73,10 @@ export function createImportCandidateModule({
   recordActivityEventFn = null,
   recordSourceUserOutcomeEvidenceFn = async () => null,
   scheduleLibraryScan = null,
+  queueDeferredLibraryScan = null,
   scheduleDownloadRecoveryRediscovery = null,
   postApplyScanService = createImportCandidatePostApplyScanService({
+    queueDeferredLibraryScan,
     startLibraryScan: scheduleLibraryScan,
   }),
   sendFulfillmentNotificationFn = null,

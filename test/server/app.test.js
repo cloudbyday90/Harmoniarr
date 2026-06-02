@@ -29,6 +29,7 @@ suite('createApp', () => {
       reconcileWantedReleases: t.mock.fn(async () => {}),
     },
     libraryScanService: {
+      queueDeferredLibraryScan: t.mock.fn(async () => ({ accepted: true, run: { id: 'deferred-scan-run-1' } })),
       startLibraryScan: t.mock.fn(async () => ({ accepted: true, run: { id: 'scan-run-1' } })),
     },
     libraryScanSummaryService: { buildLibraryScanSummary: () => ({}) },
@@ -215,6 +216,7 @@ suite('createApp', () => {
   assert.equal(typeof importCandidateModuleArgs.mediaInspectionService.inspectSourceFile, 'function');
   assert.equal(typeof importCandidateModuleArgs.mediaTranscodeExecutionService.executeCandidate, 'function');
   assert.equal(typeof importCandidateModuleArgs.scheduleLibraryScan, 'function');
+  assert.equal(typeof importCandidateModuleArgs.queueDeferredLibraryScan, 'function');
   assert.deepEqual(await importCandidateModuleArgs.scheduleLibraryScan({
     releaseHints: [{
       canonicalPath: '/music/Autechre/Amber/01 Foil.flac',
@@ -229,6 +231,25 @@ suite('createApp', () => {
       metadataReleaseId: 'release-1',
     }],
     triggeredByRunId: 'apply-run-1',
+    triggeredByUserId: null,
+    triggerReason: 'import_candidate_apply',
+  });
+  assert.deepEqual(await importCandidateModuleArgs.queueDeferredLibraryScan({
+    deferredReason: 'library_scan_in_progress',
+    releaseHints: [{
+      canonicalPath: '/music/Autechre/Amber/02 Montreal.flac',
+      metadataReleaseId: 'release-2',
+    }],
+    triggeredByRunId: 'apply-run-2',
+    triggerReason: 'import_candidate_apply',
+  }), { accepted: true, run: { id: 'deferred-scan-run-1' } });
+  assert.deepEqual(libraryModule.libraryScanService.queueDeferredLibraryScan.mock.calls[0].arguments[0], {
+    deferredReason: 'library_scan_in_progress',
+    releaseHints: [{
+      canonicalPath: '/music/Autechre/Amber/02 Montreal.flac',
+      metadataReleaseId: 'release-2',
+    }],
+    triggeredByRunId: 'apply-run-2',
     triggeredByUserId: null,
     triggerReason: 'import_candidate_apply',
   });
