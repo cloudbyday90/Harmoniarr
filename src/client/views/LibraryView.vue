@@ -221,6 +221,7 @@ function refreshAll() {
           :filter-groups="filterGroups"
           :is-default="isDefault"
           :is-loading="library.isLoading.value && !library.isFirstLoad.value"
+          @clear-all="clearAll"
           @update:model-value="onGridControlsUpdate"
         />
 

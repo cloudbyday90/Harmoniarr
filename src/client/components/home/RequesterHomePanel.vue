@@ -127,6 +127,7 @@ const ARTIST_DEFAULTS = {
 // ── Grid state (URL-synced) ───────────────────────────────────────────────────
 
 const {
+  clearAll,
   filterState,
   isDefault,
   updateState,
@@ -251,6 +252,7 @@ onBeforeUnmount(() => {
           :filter-groups="[]"
           :is-default="isDefault"
           :is-loading="false"
+          @clear-all="clearAll"
           @update:model-value="updateState"
         />
       </div>

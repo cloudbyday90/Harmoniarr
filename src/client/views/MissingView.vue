@@ -278,6 +278,7 @@ onBeforeUnmount(() => {
           :filter-groups="[{ key: 'status', label: 'Status', options: STATUS_FILTER_OPTIONS }]"
           :is-default="isDefault"
           :is-loading="false"
+          @clear-all="clearAll"
           @update:model-value="updateState"
         />
       </div>

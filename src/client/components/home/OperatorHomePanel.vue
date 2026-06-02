@@ -60,6 +60,7 @@ const {
 });
 
 const {
+  clearAll,
   filterState,
   isDefault,
   updateState,
@@ -209,6 +210,7 @@ onBeforeUnmount(() => {
             :filter-groups="[]"
             :is-default="isDefault"
             :is-loading="isRevalidating || isResolvingArtistArtwork"
+            @clear-all="clearAll"
             @update:model-value="updateState"
           />
         </div>

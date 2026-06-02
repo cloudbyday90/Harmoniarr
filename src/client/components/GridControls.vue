@@ -28,6 +28,7 @@
 
   Emits:
     update:modelValue(newState: GridFilterState)
+    clearAll()
 
   This component holds NO internal state. All persistence is owned by useGridState
   via URL query params. It simply translates user interactions into emitted state.
@@ -59,7 +60,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'clearAll']);
 
 // ── Sort ──────────────────────────────────────────────────────────────────────
 
@@ -120,10 +121,7 @@ function clearFilter(key) {
 }
 
 function clearAll() {
-  emit('update:modelValue', {
-    ...props.modelValue,
-    filters: {},
-  });
+  emit('clearAll');
 }
 
 function setFilter(key, value) {
@@ -233,17 +231,17 @@ const sortOrderLabel = computed(() =>
             </svg>
           </button>
 
-          <!-- Clear all link -->
-          <button
-            v-if="!isDefault"
-            type="button"
-            class="grid-controls-clear-all"
-            @click="clearAll"
-          >
-            Clear all
-          </button>
         </div>
       </template>
+
+      <button
+        v-if="!isDefault"
+        type="button"
+        class="grid-controls-clear-all"
+        @click="clearAll"
+      >
+        Clear all
+      </button>
 
       <!-- Filter panel trigger (only shown when there are filter groups) -->
       <div v-if="filterGroups.length > 0" class="grid-controls-filter-trigger-wrap">
@@ -307,7 +305,7 @@ const sortOrderLabel = computed(() =>
               class="grid-controls-panel-clear"
               @click="clearAll(); closeFilterPanel();"
             >
-              Clear all filters
+              Clear all
             </button>
           </div>
         </div>
