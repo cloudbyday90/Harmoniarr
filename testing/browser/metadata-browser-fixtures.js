@@ -302,6 +302,18 @@ const metadataFixture = {
   },
 };
 
+export async function markBoardsOfCanadaAddedInMetadataBrowserFixture(page) {
+  await page.evaluate(() => {
+    const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
+    const rawState = globalThis.sessionStorage.getItem(fixtureStateStorageKey);
+    const state = rawState ? JSON.parse(rawState) : {};
+    globalThis.sessionStorage.setItem(fixtureStateStorageKey, JSON.stringify({
+      ...state,
+      boardsIsAdded: true,
+    }));
+  });
+}
+
 export async function installMetadataBrowserFixtures(browserContext) {
   await browserContext.addInitScript(({ fixture }) => {
     const originalFetch = globalThis.fetch.bind(globalThis);
@@ -524,6 +536,11 @@ export async function installMetadataBrowserFixtures(browserContext) {
       persistFixtureState();
     }
 
+    function markBoardsAsAdded() {
+      state.boardsIsAdded = true;
+      persistFixtureState();
+    }
+
     globalThis.fetch = async (input, init) => {
       const requestUrl = typeof input === 'string'
         ? input
@@ -571,6 +588,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
       }
 
       if (method === 'POST' && path === '/api/v1/metadata/musicbrainz/artists/mb-artist-boards/import') {
+        markBoardsAsAdded();
         return buildJsonResponse({
           imported: {
             artistId: fixture.boardsLocalArtistPayload.artist.id,
@@ -592,7 +610,8 @@ export async function installMetadataBrowserFixtures(browserContext) {
       }
 
       if (method === 'GET' && path === '/api/v1/metadata/artists/monitored/operator') {
-        const results = state.boardsIsAdded ? [clone(state.boardsOperatorProjection)] : [];
+        const currentState = loadFixtureState();
+        const results = currentState.boardsIsAdded ? [clone(currentState.boardsOperatorProjection)] : [];
         return buildJsonResponse({
           limit: 50,
           offset: 0,
@@ -603,13 +622,14 @@ export async function installMetadataBrowserFixtures(browserContext) {
       }
 
       if (method === 'GET' && path === `/api/v1/metadata/artists/${fixture.boardsLocalArtistPayload.artist.id}/operator`) {
-        if (!state.boardsIsAdded) {
+        const currentState = loadFixtureState();
+        if (!currentState.boardsIsAdded) {
           return buildJsonResponse({ error: { message: 'Not found' }, ok: false }, 404);
         }
 
         return buildJsonResponse({
           ok: true,
-          ...clone(state.boardsOperatorProjection),
+          ...clone(currentState.boardsOperatorProjection),
         });
       }
 
@@ -632,6 +652,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
       }
 
       if (method === 'PUT' && path === `/api/v1/metadata/artists/${fixture.boardsLocalArtistPayload.artist.id}/monitoring`) {
+        markBoardsAsAdded();
         return buildJsonResponse({
           artistId: fixture.boardsLocalArtistPayload.artist.id,
           monitoring: {

@@ -28,7 +28,7 @@ Use this order when reading the plan:
 ### Open Follow-Up Backlog
 
 - [x] Add a release-validation evidence map that links each shipped Issue #4 step to its focused tests, browser scenarios, schema checks, and release evidence tasks. See [ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md](ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md).
-- [ ] Add browser visual evidence for the highest-risk media surfaces: Library grid/list display modes, Needs Attention actions, Discover recommendations, requester Home, and mobile navigation.
+- [x] Add browser visual evidence for the highest-risk media surfaces: Library grid/list display modes, Needs Attention actions, Discover recommendations, requester Home, and mobile navigation. Covered by `test/browser/issue-4-visual-evidence.test.js`, which writes screenshots and `manifest.json` under `artifacts/browser-visual-evidence/issue-4-media-surfaces/`.
 - [ ] Create GitHub sub-issues for the remaining follow-up backlog and link them from this plan.
 
 ---

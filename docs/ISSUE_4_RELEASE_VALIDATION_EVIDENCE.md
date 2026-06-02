@@ -31,6 +31,7 @@ Focused tests:
 
 Browser scenarios:
 - `test/browser/operator-ui-smoke.test.js`
+- `test/browser/issue-4-visual-evidence.test.js`
 
 Schema evidence:
 - No schema change; covered by migration and schema gates.
@@ -39,7 +40,7 @@ Release evidence tasks:
 - Capture role-specific navigation proof in the browser evidence pack.
 - Confirm requester-restricted route inventory remains fail-closed.
 
-Remaining release gap: Add visual screenshot proof for mobile requester navigation before final release sign-off.
+Remaining release gap: Native visual evidence is covered; archive the generated screenshots as release artifacts before final sign-off.
 
 ## Step 2 - Requester home page
 
@@ -50,6 +51,7 @@ Focused tests:
 
 Browser scenarios:
 - `test/browser/operator-ui-smoke.test.js`
+- `test/browser/issue-4-visual-evidence.test.js`
 
 Schema evidence:
 - No schema change; projection behavior is covered by service and client tests.
@@ -58,7 +60,7 @@ Release evidence tasks:
 - Capture requester Home cold-start and populated grid paths in packaged browser evidence.
 - Archive Home smoke evidence with the release evidence pack.
 
-Remaining release gap: Add artwork-grid visual evidence for requester Home.
+Remaining release gap: Requester Home cold-start visual evidence is covered; add populated-card Home evidence if the release requires it.
 
 ## Step 3 - Discover screen
 
@@ -70,6 +72,7 @@ Focused tests:
 
 Browser scenarios:
 - `test/browser/operator-ui-smoke.test.js`
+- `test/browser/issue-4-visual-evidence.test.js`
 
 Schema evidence:
 - No schema change; monitored-artist persistence is covered by existing metadata gates.
@@ -78,7 +81,7 @@ Release evidence tasks:
 - Capture Discover search, add-to-monitored-artists, and recommendation states in browser evidence.
 - Confirm recommendation empty/error states remain readable on mobile.
 
-Remaining release gap: Add visual screenshot proof for Discover recommendation cards and selected artist chips.
+Remaining release gap: Native visual evidence is covered; archive the generated Discover recommendation screenshot in release evidence.
 
 ## Step 4 - External similarity service integration
 
@@ -171,6 +174,7 @@ Focused tests:
 
 Browser scenarios:
 - `test/browser/library-grid-state.test.js`
+- `test/browser/issue-4-visual-evidence.test.js`
 
 Schema evidence:
 - Wanted release joins are covered by schema snapshot and migration replay gates.
@@ -179,7 +183,7 @@ Release evidence tasks:
 - Capture Missing/Wanted filter states and request action behavior in browser evidence.
 - Retain wanted status normalization tests as focused proof.
 
-Remaining release gap: Add visual proof for Needs Attention and wanted release actions.
+Remaining release gap: Native Needs Attention visual evidence is covered; archive the generated screenshot in release evidence.
 
 ## Step 9 - Multi-user awareness pass
 
@@ -211,6 +215,7 @@ Focused tests:
 Browser scenarios:
 - `test/browser/operator-ui-smoke.test.js`
 - `test/browser/library-grid-state.test.js`
+- `test/browser/issue-4-visual-evidence.test.js`
 
 Schema evidence:
 - No schema change.
@@ -219,7 +224,7 @@ Release evidence tasks:
 - Run browser smoke at desktop and mobile viewport sizes before release sign-off.
 - Capture responsive navigation and grid behavior in visual evidence.
 
-Remaining release gap: This remains a high-priority visual-evidence gap for mobile navigation and media grids.
+Remaining release gap: Native mobile-navigation and media-grid visual evidence is covered; packaged-runtime visual capture remains release evidence work.
 
 ## Step 11 - Release Radar
 
@@ -413,6 +418,7 @@ Focused tests:
 
 Browser scenarios:
 - `test/browser/library-grid-state.test.js`
+- `test/browser/issue-4-visual-evidence.test.js`
 
 Schema evidence:
 - Library reconciliation schema is covered by schema snapshot and migration replay gates.
@@ -421,7 +427,7 @@ Release evidence tasks:
 - Capture Library grid/list mode, dynamic filters, and clear-all behavior in browser evidence.
 - Archive Library display-mode proof in packaged-runtime visual evidence.
 
-Remaining release gap: This remains a high-priority visual-evidence gap for grid/list media surfaces.
+Remaining release gap: Native grid/list visual evidence is covered; package the generated screenshots with release evidence.
 
 ## Step 21 - Album art color extraction
 
@@ -433,6 +439,7 @@ Focused tests:
 
 Browser scenarios:
 - `test/browser/library-grid-state.test.js`
+- `test/browser/issue-4-visual-evidence.test.js`
 
 Schema evidence:
 - Artwork dominant color storage is covered by schema snapshot gates.
@@ -498,7 +505,7 @@ Release evidence tasks:
 - Capture deep-link filter and sort persistence in browser evidence.
 - Verify clear-all preserves unrelated query params.
 
-Remaining release gap: Add visual proof for filter panel overflow and touch behavior.
+Remaining release gap: Native Library filter/display visual evidence is covered; add focused filter-panel overflow screenshots if release review calls for them.
 
 ## Step 25 - System-aware dark and light theme
 

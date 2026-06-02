@@ -61,7 +61,10 @@ export const issue4ReleaseEvidenceGates = Object.freeze([
 
 export const issue4ReleaseEvidenceSteps = Object.freeze([
   {
-    browserTests: ['test/browser/operator-ui-smoke.test.js'],
+    browserTests: [
+      'test/browser/operator-ui-smoke.test.js',
+      'test/browser/issue-4-visual-evidence.test.js',
+    ],
     focusedTests: [
       'test/client/app-shell-presentation.test.js',
       'test/server/route-inventory.test.js',
@@ -70,13 +73,16 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
       'Capture role-specific navigation proof in the browser evidence pack.',
       'Confirm requester-restricted route inventory remains fail-closed.',
     ],
-    releaseGap: 'Add visual screenshot proof for mobile requester navigation before final release sign-off.',
+    releaseGap: 'Native visual evidence is covered; archive the generated screenshots as release artifacts before final sign-off.',
     schemaEvidence: ['No schema change; covered by migration and schema gates.'],
     step: 1,
     title: 'Navigation and shell',
   },
   {
-    browserTests: ['test/browser/operator-ui-smoke.test.js'],
+    browserTests: [
+      'test/browser/operator-ui-smoke.test.js',
+      'test/browser/issue-4-visual-evidence.test.js',
+    ],
     focusedTests: [
       'test/client/useMonitoredArtistSummaries.test.js',
       'test/client/useRequesterHome-swr.test.js',
@@ -86,13 +92,16 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
       'Capture requester Home cold-start and populated grid paths in packaged browser evidence.',
       'Archive Home smoke evidence with the release evidence pack.',
     ],
-    releaseGap: 'Add artwork-grid visual evidence for requester Home.',
+    releaseGap: 'Requester Home cold-start visual evidence is covered; add populated-card Home evidence if the release requires it.',
     schemaEvidence: ['No schema change; projection behavior is covered by service and client tests.'],
     step: 2,
     title: 'Requester home page',
   },
   {
-    browserTests: ['test/browser/operator-ui-smoke.test.js'],
+    browserTests: [
+      'test/browser/operator-ui-smoke.test.js',
+      'test/browser/issue-4-visual-evidence.test.js',
+    ],
     focusedTests: [
       'test/client/discover-graph.test.js',
       'test/client/discover-presentation.test.js',
@@ -103,7 +112,7 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
       'Capture Discover search, add-to-monitored-artists, and recommendation states in browser evidence.',
       'Confirm recommendation empty/error states remain readable on mobile.',
     ],
-    releaseGap: 'Add visual screenshot proof for Discover recommendation cards and selected artist chips.',
+    releaseGap: 'Native visual evidence is covered; archive the generated Discover recommendation screenshot in release evidence.',
     schemaEvidence: ['No schema change; monitored-artist persistence is covered by existing metadata gates.'],
     step: 3,
     title: 'Discover screen',
@@ -178,7 +187,10 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
     title: 'Search screen',
   },
   {
-    browserTests: ['test/browser/library-grid-state.test.js'],
+    browserTests: [
+      'test/browser/library-grid-state.test.js',
+      'test/browser/issue-4-visual-evidence.test.js',
+    ],
     focusedTests: [
       'test/client/wanted-release-normalization.test.js',
       'test/client/useLibraryWantedReleases.test.js',
@@ -189,7 +201,7 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
       'Capture Missing/Wanted filter states and request action behavior in browser evidence.',
       'Retain wanted status normalization tests as focused proof.',
     ],
-    releaseGap: 'Add visual proof for Needs Attention and wanted release actions.',
+    releaseGap: 'Native Needs Attention visual evidence is covered; archive the generated screenshot in release evidence.',
     schemaEvidence: ['Wanted release joins are covered by schema snapshot and migration replay gates.'],
     step: 8,
     title: 'Missing and wanted screen',
@@ -215,6 +227,7 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
     browserTests: [
       'test/browser/operator-ui-smoke.test.js',
       'test/browser/library-grid-state.test.js',
+      'test/browser/issue-4-visual-evidence.test.js',
     ],
     focusedTests: [
       'test/client/app-shell-presentation.test.js',
@@ -225,7 +238,7 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
       'Run browser smoke at desktop and mobile viewport sizes before release sign-off.',
       'Capture responsive navigation and grid behavior in visual evidence.',
     ],
-    releaseGap: 'This remains a high-priority visual-evidence gap for mobile navigation and media grids.',
+    releaseGap: 'Native mobile-navigation and media-grid visual evidence is covered; packaged-runtime visual capture remains release evidence work.',
     schemaEvidence: ['No schema change.'],
     step: 10,
     title: 'Responsive and mobile',
@@ -385,7 +398,10 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
     title: 'Rich release detail modal',
   },
   {
-    browserTests: ['test/browser/library-grid-state.test.js'],
+    browserTests: [
+      'test/browser/library-grid-state.test.js',
+      'test/browser/issue-4-visual-evidence.test.js',
+    ],
     focusedTests: [
       'test/client/library-api.test.js',
       'test/client/library-display-preference.test.js',
@@ -397,13 +413,16 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
       'Capture Library grid/list mode, dynamic filters, and clear-all behavior in browser evidence.',
       'Archive Library display-mode proof in packaged-runtime visual evidence.',
     ],
-    releaseGap: 'This remains a high-priority visual-evidence gap for grid/list media surfaces.',
+    releaseGap: 'Native grid/list visual evidence is covered; package the generated screenshots with release evidence.',
     schemaEvidence: ['Library reconciliation schema is covered by schema snapshot and migration replay gates.'],
     step: 20,
     title: 'Library view',
   },
   {
-    browserTests: ['test/browser/library-grid-state.test.js'],
+    browserTests: [
+      'test/browser/library-grid-state.test.js',
+      'test/browser/issue-4-visual-evidence.test.js',
+    ],
     focusedTests: [
       'test/client/artwork-color-worker-client.test.js',
       'test/client/useArtworkColor.test.js',
@@ -462,7 +481,7 @@ export const issue4ReleaseEvidenceSteps = Object.freeze([
       'Capture deep-link filter and sort persistence in browser evidence.',
       'Verify clear-all preserves unrelated query params.',
     ],
-    releaseGap: 'Add visual proof for filter panel overflow and touch behavior.',
+    releaseGap: 'Native Library filter/display visual evidence is covered; add focused filter-panel overflow screenshots if release review calls for them.',
     schemaEvidence: ['No schema change.'],
     step: 24,
     title: 'Filter and sort controls on card grids',
