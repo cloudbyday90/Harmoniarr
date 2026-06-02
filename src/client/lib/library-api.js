@@ -65,6 +65,16 @@ export function startLibraryDiscoveryRun() {
   });
 }
 
+export function retryDownloadRecoveryDiscoveryRequest({ metadataReleaseId }) {
+  return apiRequest(
+    `/api/v1/library/discovery-requests/${encodeURIComponent(metadataReleaseId)}/retry-download-recovery`,
+    {
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}
+
 export function fetchLibraryReconciliationSummary() {
   return apiRequest('/api/v1/library/reconciliation-summary');
 }

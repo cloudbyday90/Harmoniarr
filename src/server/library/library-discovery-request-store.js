@@ -445,6 +445,77 @@ export function createLibraryDiscoveryRequestStore({
     return mapDiscoveryRequestStateRow(result.rows[0]);
   }
 
+  async function resetDownloadRecoveryExhaustion({
+    metadataReleaseId,
+    resetAt,
+    resetByUserId = null,
+  }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        WITH reset AS (
+          UPDATE library_discovery_requests
+          SET
+            search_mode = 'automatic',
+            request_status = 'ready',
+            blocked_reason = NULL,
+            last_search_at = NULL,
+            next_search_after = $2::timestamptz,
+            manual_requested_at = NULL,
+            search_attempt_count = 0,
+            research_attempt_count = 0,
+            evidence = (
+              COALESCE(evidence, '{}'::jsonb)
+                - 'downloadRecoveryExhausted'
+                - 'downloadRecoveryRediscovery'
+            ) || jsonb_build_object(
+              'manualDownloadRecoveryRetry',
+              jsonb_build_object(
+                'priorBlockedReason', blocked_reason,
+                'priorResearchAttemptCount', research_attempt_count,
+                'priorSearchAttemptCount', search_attempt_count,
+                'resetAt', $2::timestamptz,
+                'resetByUserId', $3::text
+              )
+            ),
+            updated_at = NOW()
+          WHERE metadata_release_id = $1
+            AND search_mode = 'automatic'
+            AND request_status = 'blocked'
+            AND blocked_reason = 'download_recovery_exhausted'
+          RETURNING *
+        )
+        SELECT
+          reset.metadata_artist_id,
+          reset.metadata_release_group_id,
+          reset.metadata_release_id,
+          reset.wanted_status,
+          reset.search_mode,
+          reset.request_status,
+          reset.blocked_reason,
+          reset.release_date,
+          reset.last_search_at,
+          reset.next_search_after,
+          reset.search_attempt_count,
+          reset.research_attempt_count,
+          reset.evidence,
+          metadata_artists.name AS artist_name,
+          metadata_release_groups.title AS release_group_title,
+          metadata_releases.title AS release_title
+        FROM reset
+        JOIN metadata_artists
+          ON metadata_artists.id = reset.metadata_artist_id
+        JOIN metadata_release_groups
+          ON metadata_release_groups.id = reset.metadata_release_group_id
+        JOIN metadata_releases
+          ON metadata_releases.id = reset.metadata_release_id
+      `,
+      [metadataReleaseId, resetAt, resetByUserId],
+    );
+
+    return mapDiscoveryRequestStateRow(result.rows[0]);
+  }
+
   async function markDiscoveryRequestExhausted({
     metadataReleaseId,
     reasonCode = 'discovery_search_attempts_exhausted',
@@ -560,6 +631,7 @@ export function createLibraryDiscoveryRequestStore({
     markDiscoveryRequestExhausted,
     recordDiscoverySearchFailure,
     recordDiscoverySearchSuccess,
+    resetDownloadRecoveryExhaustion,
     scheduleDownloadRecoveryRediscovery,
     replaceLibraryDiscoveryRequests,
   };

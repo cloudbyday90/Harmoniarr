@@ -10,6 +10,7 @@ import {
   fetchMediaRequestReassignmentHistory,
   fetchMediaRequestSummary,
   reassignMediaRequest,
+  retryDownloadRecoveryDiscoveryRequest,
 } from '../../src/client/lib/library-api.js';
 
 function createJsonResponse({ ok = true, payload = { ok: true }, status = 200 } = {}) {
@@ -85,6 +86,21 @@ test('library-api reassignMediaRequest encodes mediaRequestId in URL', async (t)
   await reassignMediaRequest({ mediaRequestId: 'req/slash', newRequestedForUserId: 'u-1', reason: null });
 
   assert.ok(globalThis.fetch.mock.calls[0].arguments[0].includes('req%2Fslash'));
+});
+
+test('library-api retryDownloadRecoveryDiscoveryRequest sends encoded POST with CSRF', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-retry' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await retryDownloadRecoveryDiscoveryRequest({ metadataReleaseId: 'release/slash' });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  assert.equal(
+    globalThis.fetch.mock.calls[0].arguments[0],
+    '/api/v1/library/discovery-requests/release%2Fslash/retry-download-recovery',
+  );
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'POST');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].headers.get('X-CSRF-Token'), 'csrf-retry');
 });
 
 test('library-api fetchMediaRequestDetail sends GET with encoded id', async (t) => {

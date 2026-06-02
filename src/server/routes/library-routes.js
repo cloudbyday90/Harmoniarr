@@ -55,6 +55,9 @@ export function registerLibraryRoutes(app, {
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  retryDownloadRecoveryDiscoveryRequest = async () => {
+    throw new Error('retryDownloadRecoveryDiscoveryRequest dependency is required');
+  },
   startLibraryOrganizeApplyRun,
   startLibraryDiscoveryRun,
   startLibraryScan,
@@ -302,6 +305,22 @@ export function registerLibraryRoutes(app, {
     requireCsrf(request, session);
 
     const result = await startLibraryDiscoveryRun({
+      requestMetadata: getRequestMetadata(request),
+      triggeredByUserId: session.appUserId,
+    });
+
+    response.status(202).json({
+      ok: true,
+      ...result,
+    });
+  }));
+
+  app.post('/api/v1/library/discovery-requests/:metadataReleaseId/retry-download-recovery', limitLibraryDiscoveryRun, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await retryDownloadRecoveryDiscoveryRequest({
+      metadataReleaseId: request.params.metadataReleaseId,
       requestMetadata: getRequestMetadata(request),
       triggeredByUserId: session.appUserId,
     });

@@ -162,6 +162,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/library/media-requests/:mediaRequestId/reassign', access: 'admin', area: 'requests', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/library/media-requests/:mediaRequestId/reassignment-history', access: 'admin', area: 'requests', kind: 'read' },
   { method: 'POST', path: '/api/v1/library/discovery-runs', access: 'admin', area: 'library', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/library/discovery-requests/:metadataReleaseId/retry-download-recovery', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/library/organize-runs', access: 'admin', area: 'library', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/library/scan-runs/:runId', access: 'authenticated', area: 'library', kind: 'read' },
   { method: 'POST', path: '/api/v1/library/scan-runs', access: 'admin', area: 'library', kind: 'mutation' },

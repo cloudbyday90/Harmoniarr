@@ -140,6 +140,7 @@ function collectRegisteredRoutes() {
     listMediaRequests: asyncNoopResult([]),
     cancelMediaRequest: asyncNoopResult({}),
     reassignMediaRequest: asyncNoopResult({}),
+    retryDownloadRecoveryDiscoveryRequest: asyncNoopResult({}),
     startLibraryOrganizeApplyRun: asyncNoopResult({}),
     startLibraryDiscoveryRun: asyncNoopResult({}),
     startLibraryScan: asyncNoopResult({}),

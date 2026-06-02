@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { useDownloadRecoveryRetry } from '../composables/useDownloadRecoveryRetry.js';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import {
@@ -30,6 +31,7 @@ import {
 
 const wanted = useLibraryWantedSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
 const releases = useLibraryWantedReleases({ pollIntervalMs: 30000, revalidateOnFocus: true });
+const recoveryRetry = useDownloadRecoveryRetry();
 
 const isRefreshing = computed(() => wanted.isRevalidating.value || releases.isRevalidating.value);
 
@@ -43,6 +45,13 @@ const wantedReleasesWithNotices = computed(() =>
 function refresh() {
   wanted.loadLibraryWantedSummary();
   releases.loadWantedReleases();
+}
+
+async function retryDownloadRecovery(release) {
+  const result = await recoveryRetry.retryDownloadRecovery(release);
+  if (result.ok) {
+    refresh();
+  }
 }
 
 onMounted(() => {
@@ -164,6 +173,18 @@ onBeforeUnmount(() => {
                         <dd>{{ detail.value }}</dd>
                       </template>
                     </dl>
+                    <div class="hx-recovery-notice-actions">
+                      <button
+                        type="button"
+                        class="hx-btn"
+                        data-variant="primary"
+                        :disabled="recoveryRetry.isRetrying(item.release)"
+                        :aria-label="`Retry discovery for ${item.release.releaseTitle ?? 'this release'}`"
+                        @click="retryDownloadRecovery(item.release)"
+                      >
+                        {{ recoveryRetry.isRetrying(item.release) ? 'Retrying…' : 'Retry discovery' }}
+                      </button>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -216,6 +237,11 @@ onBeforeUnmount(() => {
 .hx-recovery-notice-details dd {
   margin: 0;
   font-weight: 600;
+}
+
+.hx-recovery-notice-actions {
+  display: flex;
+  align-items: flex-start;
 }
 
 @media (max-width: 720px) {

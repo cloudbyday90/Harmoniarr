@@ -24,6 +24,7 @@ import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import RequestButton from '../components/media/RequestButton.vue';
 import { useGridState } from '../composables/useGridState.js';
+import { useDownloadRecoveryRetry } from '../composables/useDownloadRecoveryRetry.js';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
 import { useLibraryReconciliationSummary } from '../composables/useLibraryReconciliationSummary.js';
@@ -56,6 +57,7 @@ const {
   isRequesting,
   requestRelease,
 } = useReleaseRequest();
+const recoveryRetry = useDownloadRecoveryRetry();
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
@@ -176,6 +178,13 @@ function refreshAll() {
   wanted.loadLibraryWantedSummary();
   releases.loadWantedReleases();
   reconciliation.loadLibraryReconciliationSummary();
+}
+
+async function retryDownloadRecovery(release) {
+  const result = await recoveryRetry.retryDownloadRecovery(release);
+  if (result.ok) {
+    refreshAll();
+  }
 }
 
 onMounted(() => {
@@ -335,6 +344,16 @@ onBeforeUnmount(() => {
                       <dd>{{ detail.value }}</dd>
                     </template>
                   </dl>
+                  <button
+                    type="button"
+                    class="hx-btn"
+                    data-variant="primary"
+                    :disabled="recoveryRetry.isRetrying(release)"
+                    :aria-label="`Retry discovery for ${release.title ?? 'this release'}`"
+                    @click="retryDownloadRecovery(release)"
+                  >
+                    {{ recoveryRetry.isRetrying(release) ? 'Retrying…' : 'Retry discovery' }}
+                  </button>
                 </div>
                 <RequestButton
                   :requested="isRequested(release)"
@@ -491,5 +510,9 @@ onBeforeUnmount(() => {
   margin: 0;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.hx-wanted-recovery-notice .hx-btn {
+  justify-self: start;
 }
 </style>

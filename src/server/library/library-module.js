@@ -32,6 +32,7 @@ import { createLibraryDiscoveryRequestService } from './library-discovery-reques
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 import { createLibraryDiscoveryDispatchService } from './library-discovery-dispatch-service.js';
 import { createLibraryDiscoveryRediscoveryService } from './library-discovery-rediscovery-service.js';
+import { createLibraryDiscoveryRecoveryRetryService } from './library-discovery-recovery-retry-service.js';
 import { createLibraryDiscoveryRunService } from './library-discovery-run-service.js';
 import { createLibraryDiscoveryRunStore } from './library-discovery-run-store.js';
 import { createLibraryDiscoverySummaryService } from './library-discovery-summary-service.js';
@@ -283,6 +284,13 @@ export function createLibraryModule({
     libraryDiscoveryRequestStore,
     onDownloadRecoveryExhaustedFn,
   }),
+  libraryDiscoveryRecoveryRetryService = createLibraryDiscoveryRecoveryRetryService({
+    assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
+      operationLabel: 'library discovery recovery retry',
+    }),
+    libraryDiscoveryRequestStore,
+    startLibraryDiscoveryRun: libraryDiscoveryRunService.startLibraryDiscoveryRun,
+  }),
   libraryDiscoverySummaryStore = createLibraryDiscoverySummaryStore(),
   libraryDiscoverySummaryService = createLibraryDiscoverySummaryService({
     libraryDiscoveryHeartbeatState,
@@ -351,6 +359,7 @@ export function createLibraryModule({
     libraryDiscoveryHeartbeatState,
     libraryDiscoveryRunService,
     libraryDiscoveryRunStore,
+    libraryDiscoveryRecoveryRetryService,
     libraryDiscoveryRediscoveryService,
     libraryDiscoveryRequestService,
     libraryDiscoveryRequestStore,
@@ -414,6 +423,7 @@ export function createLibraryModule({
       getMediaRequestReassignmentHistory: libraryMediaRequestService.getMediaRequestReassignmentHistory,
       listMediaRequests: libraryMediaRequestService.listMediaRequests,
       reassignMediaRequest: libraryMediaRequestService.reassignMediaRequest,
+      retryDownloadRecoveryDiscoveryRequest: libraryDiscoveryRecoveryRetryService.retryDownloadRecoveryDiscoveryRequest,
       startLibraryOrganizeApplyRun: libraryOrganizeApplyService.startLibraryOrganizeApplyRun,
       startLibraryDiscoveryRun: libraryDiscoveryRunService.startLibraryDiscoveryRun,
       startLibraryScan: libraryScanService.startLibraryScan,

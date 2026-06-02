@@ -270,3 +270,61 @@ test('markDownloadRecoveryRediscoveryExhausted blocks the request with recovery 
   assert.equal(result.artistName, 'Autechre');
   assert.equal(result.releaseTitle, 'Amber');
 });
+
+test('resetDownloadRecoveryExhaustion clears exhausted state and records manual retry evidence', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /blocked_reason = 'download_recovery_exhausted'/);
+    assert.match(sql, /search_attempt_count = 0/);
+    assert.match(sql, /research_attempt_count = 0/);
+    assert.match(sql, /- 'downloadRecoveryExhausted'/);
+    assert.match(sql, /manualDownloadRecoveryRetry/);
+    assert.deepEqual(params, [
+      'release-1',
+      '2026-06-01T12:00:00.000Z',
+      'admin-1',
+    ]);
+    return {
+      rows: [{
+        artist_name: 'Autechre',
+        blocked_reason: null,
+        evidence: {
+          manualDownloadRecoveryRetry: {
+            priorBlockedReason: 'download_recovery_exhausted',
+            priorResearchAttemptCount: 2,
+            priorSearchAttemptCount: 1,
+            resetAt: '2026-06-01T12:00:00.000Z',
+            resetByUserId: 'admin-1',
+          },
+        },
+        last_search_at: null,
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'group-1',
+        metadata_release_id: 'release-1',
+        next_search_after: '2026-06-01T12:00:00.000Z',
+        release_date: '2026-04-25',
+        release_group_title: 'Amber',
+        release_title: 'Amber',
+        request_status: 'ready',
+        research_attempt_count: 0,
+        search_attempt_count: 0,
+        search_mode: 'automatic',
+        wanted_status: 'missing',
+      }],
+    };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const result = await store.resetDownloadRecoveryExhaustion({
+    metadataReleaseId: 'release-1',
+    resetAt: '2026-06-01T12:00:00.000Z',
+    resetByUserId: 'admin-1',
+  });
+
+  assert.equal(result.blockedReason, null);
+  assert.equal(result.requestStatus, 'ready');
+  assert.equal(result.researchAttemptCount, 0);
+  assert.equal(result.searchAttemptCount, 0);
+  assert.equal(result.evidence.manualDownloadRecoveryRetry.resetByUserId, 'admin-1');
+});

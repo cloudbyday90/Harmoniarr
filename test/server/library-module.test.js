@@ -37,6 +37,8 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryDiscoveryRunStore = {};
   const libraryDiscoveryRequestService = { reconcileDiscoveryRequests };
   const libraryDiscoveryRequestStore = {};
+  const retryDownloadRecoveryDiscoveryRequest = () => {};
+  const libraryDiscoveryRecoveryRetryService = { retryDownloadRecoveryDiscoveryRequest };
   const libraryDiscoveryRediscoveryService = {};
   const libraryDiscoverySummaryService = { buildLibraryDiscoveryRunDetail, buildLibraryDiscoverySummary };
   const libraryDiscoverySummaryStore = {};
@@ -90,6 +92,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryDiscoveryRunStore,
     libraryDiscoveryRequestService,
     libraryDiscoveryRequestStore,
+    libraryDiscoveryRecoveryRetryService,
     libraryDiscoveryRediscoveryService,
     libraryDiscoverySummaryService,
     libraryDiscoverySummaryStore,
@@ -139,6 +142,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.libraryDiscoveryRunStore, libraryDiscoveryRunStore);
   assert.equal(libraryModule.libraryDiscoveryRequestService, libraryDiscoveryRequestService);
   assert.equal(libraryModule.libraryDiscoveryRequestStore, libraryDiscoveryRequestStore);
+  assert.equal(libraryModule.libraryDiscoveryRecoveryRetryService, libraryDiscoveryRecoveryRetryService);
   assert.equal(libraryModule.libraryDiscoveryRediscoveryService, libraryDiscoveryRediscoveryService);
   assert.equal(libraryModule.libraryDiscoverySummaryService, libraryDiscoverySummaryService);
   assert.equal(libraryModule.libraryDiscoverySummaryStore, libraryDiscoverySummaryStore);
@@ -198,6 +202,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     getMediaRequestReassignmentHistory,
     listMediaRequests,
     reassignMediaRequest,
+    retryDownloadRecoveryDiscoveryRequest,
     startLibraryOrganizeApplyRun,
     startLibraryDiscoveryRun,
     startLibraryScan,

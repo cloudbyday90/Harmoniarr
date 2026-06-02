@@ -162,6 +162,12 @@ function createLibraryRouteTestApp(overrides = {}) {
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'admin' } }),
       requireSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', user: { role: 'requester' } }),
+      retryDownloadRecoveryDiscoveryRequest: async () => ({
+        accepted: true,
+        discoveryRequest: { metadataReleaseId: 'release-1', requestStatus: 'ready' },
+        dispatchAlreadyActive: false,
+        run: { id: 'discovery-run-1', status: 'pending' },
+      }),
       startLibraryDiscoveryRun: async () => ({
         accepted: true,
         run: {
@@ -843,6 +849,59 @@ test('library discovery run start route requires a session and returns the accep
         triggeredByUserId: 'user-23',
       },
     });
+  });
+});
+
+test('download recovery retry route requires fresh admin csrf and queues discovery', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-7', csrfToken: 'csrf-7', user: { role: 'admin' } }));
+  const requireCsrf = t.mock.fn();
+  const retryDownloadRecoveryDiscoveryRequest = t.mock.fn(async ({ metadataReleaseId, requestMetadata, triggeredByUserId }) => ({
+    accepted: true,
+    discoveryRequest: {
+      metadataReleaseId,
+      requestStatus: 'ready',
+    },
+    dispatchAlreadyActive: false,
+    run: {
+      id: 'discovery-run-7',
+      requestMetadata,
+      triggeredByUserId,
+    },
+  }));
+  const app = createLibraryRouteTestApp({
+    requireCsrf,
+    requireFreshAdminSession,
+    retryDownloadRecoveryDiscoveryRequest,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/discovery-requests/release-7/retry-download-recovery`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-7',
+        'x-forwarded-for': '203.0.113.77',
+        'user-agent': 'HarmoniarrRecoveryRetryRouteTest/1.0',
+      },
+      body: JSON.stringify({}),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(retryDownloadRecoveryDiscoveryRequest.mock.calls[0].arguments[0], {
+      metadataReleaseId: 'release-7',
+      requestMetadata: {
+        ipAddress: '203.0.113.77',
+        userAgent: 'HarmoniarrRecoveryRetryRouteTest/1.0',
+      },
+      triggeredByUserId: 'admin-7',
+    });
+    assert.equal(payload.ok, true);
+    assert.equal(payload.accepted, true);
+    assert.equal(payload.discoveryRequest.metadataReleaseId, 'release-7');
+    assert.equal(payload.run.id, 'discovery-run-7');
   });
 });
 

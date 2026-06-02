@@ -134,6 +134,11 @@ test('normalizeWantedReleaseForCard forwards metadataArtistId', () => {
   assert.equal(result.metadataArtistId, 'local-artist-uuid');
 });
 
+test('normalizeWantedReleaseForCard forwards metadataReleaseId for recovery actions', () => {
+  const result = normalizeWantedReleaseForCard({ metadataReleaseId: 'local-release-uuid' });
+  assert.equal(result.metadataReleaseId, 'local-release-uuid');
+});
+
 test('normalizeWantedReleaseForCard sets metadataArtistId to null when absent', () => {
   const result = normalizeWantedReleaseForCard({ releaseTitle: 'Album' });
   assert.equal(result.metadataArtistId, null);
@@ -191,6 +196,7 @@ test('normalizeWantedReleaseForCard maps a full realistic wanted release', () =>
   assert.equal(result.matchedTrackCount, 0);
   assert.equal(result.missingTrackCount, 10);
   assert.equal(result.metadataArtistId, 'local-artist-1');
+  assert.equal(result.metadataReleaseId, 'local-release-1');
 });
 
 // ── getWantedStatusLabel ───────────────────────────────────────────────────────
