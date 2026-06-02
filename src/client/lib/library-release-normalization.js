@@ -75,9 +75,119 @@ export function normalizeLibraryReleaseForCard(release) {
     missingTrackCount: release.missingTrackCount ?? 0,
     matchedFileCount: release.matchedFileCount ?? 0,
     duplicateTrackCount: release.duplicateTrackCount ?? 0,
+    duplicateFileCount: release.duplicateFileCount ?? release.duplicateTrackCount ?? 0,
 
-    // Forwarded for artist-detail navigation.
+    // Forwarded for local metadata navigation and artist-detail navigation.
     metadataArtistId: release.metadataArtistId ?? null,
+    metadataReleaseGroupId: release.metadataReleaseGroupId ?? null,
+    metadataReleaseId: release.metadataReleaseId ?? null,
+  };
+}
+
+function normalizePositiveInteger(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return 0;
+  }
+
+  return Math.floor(numeric);
+}
+
+function normalizeNullableString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Returns the number of missing tracks for a partial library release.
+ *
+ * @param {object|null} release
+ * @returns {number}
+ */
+export function getRemainingLibraryTrackCount(release) {
+  if (!release) return 0;
+  const explicitMissing = normalizePositiveInteger(release.missingTrackCount);
+  if (explicitMissing > 0) return explicitMissing;
+
+  const expected = normalizePositiveInteger(release.expectedTrackCount);
+  const matched = normalizePositiveInteger(release.matchedTrackCount);
+  return Math.max(expected - matched, 0);
+}
+
+/**
+ * Returns the number of duplicate files for a duplicate library release.
+ *
+ * @param {object|null} release
+ * @returns {number}
+ */
+export function getLibraryDuplicateFileCount(release) {
+  return normalizePositiveInteger(release?.duplicateFileCount ?? release?.duplicateTrackCount);
+}
+
+/**
+ * Returns the CTA label for a partial release.
+ *
+ * @param {object|null} release
+ * @returns {string}
+ */
+export function formatRemainingTrackRequestLabel(release) {
+  const remaining = getRemainingLibraryTrackCount(release);
+  const noun = remaining === 1 ? 'track' : 'tracks';
+  return `Request remaining ${remaining} ${noun}`;
+}
+
+/**
+ * Returns a duplicate-file count label for duplicate release rows.
+ *
+ * @param {object|null} release
+ * @returns {string}
+ */
+export function formatLibraryDuplicateFileCount(release) {
+  const count = getLibraryDuplicateFileCount(release);
+  const noun = count === 1 ? 'file' : 'files';
+  return `${count} duplicate ${noun}`;
+}
+
+/**
+ * Builds the structured "Needs Attention" groups shown above the Library grid.
+ *
+ * @param {ReadonlyArray<object>} releases
+ * @param {{partialLimit?: number}} options
+ * @returns {Readonly<{partialReleases: ReadonlyArray<object>, partialOverflowCount: number, duplicateReleases: ReadonlyArray<object>, hasAttention: boolean}>}
+ */
+export function buildLibraryNeedsAttention(releases, { partialLimit = 5 } = {}) {
+  const source = Array.isArray(releases) ? releases : [];
+  const limit = Math.max(Math.floor(Number(partialLimit) || 0), 0);
+  const allPartialReleases = source.filter((release) =>
+    release?.reconciliationStatus === 'partial' && getRemainingLibraryTrackCount(release) > 0,
+  );
+  const partialReleases = allPartialReleases.slice(0, limit);
+  const duplicateReleases = source.filter((release) =>
+    release?.reconciliationStatus === 'duplicate' && getLibraryDuplicateFileCount(release) > 0,
+  );
+
+  return Object.freeze({
+    partialReleases: Object.freeze(partialReleases),
+    partialOverflowCount: Math.max(allPartialReleases.length - partialReleases.length, 0),
+    duplicateReleases: Object.freeze(duplicateReleases),
+    hasAttention: partialReleases.length > 0 || duplicateReleases.length > 0,
+  });
+}
+
+/**
+ * Builds the exact Library Browser deep link for reviewing duplicate files.
+ *
+ * @param {object|null} release
+ * @returns {{name: string, query: {releaseGroupId: string}}|null}
+ */
+export function buildLibraryDuplicateReviewLocation(release) {
+  const releaseGroupId = normalizeNullableString(release?.metadataReleaseGroupId);
+  if (!releaseGroupId) {
+    return null;
+  }
+
+  return {
+    name: 'settings-library-browser',
+    query: { releaseGroupId },
   };
 }
 

@@ -17,19 +17,28 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
+import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import { useArtworkBatchResolve } from '../composables/useArtworkBatchResolve.js';
 import { useGridState } from '../composables/useGridState.js';
 import { useLibraryFilterOptions } from '../composables/useLibraryFilterOptions.js';
 import { useLibraryReleases } from '../composables/useLibraryReleases.js';
 import {
+  buildReleaseArtworkRequests,
+  getPreferredReleaseArtwork,
+} from '../lib/release-artwork-resolve.js';
+import {
+  buildLibraryDuplicateReviewLocation,
+  buildLibraryNeedsAttention,
   buildLibraryPageSubtitle,
   buildLibraryReleasesCardSubtitle,
   buildLibraryStatCards,
+  formatLibraryDuplicateFileCount,
   formatLibraryTrackCounts,
+  formatRemainingTrackRequestLabel,
   getReconciliationStatusLabel,
   getReconciliationStatusTone,
   normalizeLibraryReleaseForCard,
@@ -56,6 +65,8 @@ const LIBRARY_DEFAULTS = {
   sort: { field: 'artist', order: 'asc' },
   filters: {},
 };
+
+const DUPLICATES_EXPANDED_STORAGE_KEY = 'harmoniarr:library:duplicates-expanded:v1';
 
 // ── Dynamic filter options (60s background poll) ──────────────────────────────
 
@@ -103,6 +114,51 @@ const displayReleases = computed(() =>
 
 const { getResolved: getResolvedArtwork, resolve: resolveArtworkBatch } = useArtworkBatchResolve();
 
+function readDuplicateReviewExpandedPreference() {
+  try {
+    return globalThis.localStorage?.getItem(DUPLICATES_EXPANDED_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+const libraryGridCard = ref(null);
+const duplicateReviewExpanded = ref(readDuplicateReviewExpandedPreference());
+const detailModalOpen = ref(false);
+const detailRelease = ref(null);
+
+const needsAttention = computed(() => buildLibraryNeedsAttention(displayReleases.value));
+
+function getReleaseArtwork(release) {
+  return getPreferredReleaseArtwork(getResolvedArtwork, release);
+}
+
+function openPartialReleaseDetail(release) {
+  if (!release?.releaseGroupId) {
+    return;
+  }
+
+  detailRelease.value = release;
+  detailModalOpen.value = true;
+}
+
+function closeDetailModal() {
+  detailModalOpen.value = false;
+  detailRelease.value = null;
+}
+
+async function showPartialGrid() {
+  updateState({
+    ...filterState.value,
+    filters: {
+      ...filterState.value.filters,
+      status: 'partial',
+    },
+  });
+  await nextTick();
+  libraryGridCard.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 onMounted(() => {
   attachFilterVisibility();
   library.attachVisibilityListener();
@@ -117,17 +173,20 @@ onBeforeUnmount(() => {
 watch(
   displayReleases,
   (releases) => {
-    const requests = [];
-    for (const release of releases) {
-      const mbid = release.musicbrainzReleaseId ?? release.releaseGroupId;
-      if (mbid) {
-        const ownerType = release.musicbrainzReleaseId ? 'musicbrainz_release' : 'musicbrainz_release_group';
-        requests.push({ ownerType, ownerId: mbid, artworkRole: 'cover_front' });
-      }
-    }
-    void resolveArtworkBatch(requests);
+    void resolveArtworkBatch(buildReleaseArtworkRequests(releases));
   },
   { immediate: true },
+);
+
+watch(
+  duplicateReviewExpanded,
+  (isExpanded) => {
+    try {
+      globalThis.localStorage?.setItem(DUPLICATES_EXPANDED_STORAGE_KEY, isExpanded ? 'true' : 'false');
+    } catch {
+      // Local UI preference only; failure should not affect Library rendering.
+    }
+  },
 );
 
 // ── Stats (computed from current data) ────────────────────────────────────────
@@ -202,8 +261,116 @@ function refreshAll() {
       </article>
     </section>
 
+    <section
+      v-if="needsAttention.hasAttention"
+      class="library-needs-attention"
+      aria-labelledby="library-needs-attention-title"
+    >
+      <header class="library-needs-attention__header">
+        <div>
+          <h2 id="library-needs-attention-title" class="library-needs-attention__title">Needs Attention</h2>
+          <p class="library-needs-attention__subtitle">
+            Complete partial releases or review duplicate files from one place.
+          </p>
+        </div>
+      </header>
+
+      <article v-if="needsAttention.partialReleases.length > 0" class="hx-card library-attention-card">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Complete your collection</h3>
+            <p class="hx-card-subtitle">Partial releases with requestable missing tracks.</p>
+          </div>
+          <div v-if="needsAttention.partialOverflowCount > 0" class="hx-card-actions">
+            <button type="button" class="hx-btn hx-btn--sm" @click="showPartialGrid">
+              + {{ needsAttention.partialOverflowCount }} more
+            </button>
+          </div>
+        </header>
+        <div class="hx-card-body hx-card-body--flush">
+          <div class="library-partial-strip" aria-label="Partial releases">
+            <ReleaseCard
+              v-for="release in needsAttention.partialReleases"
+              :key="release.musicbrainzReleaseId ?? release.releaseGroupId ?? release.title"
+              :release="release"
+              :requestable="false"
+              :local-src="getReleaseArtwork(release)?.url ?? null"
+              :dominant-color="getReleaseArtwork(release)?.dominantColor ?? null"
+              :artwork-asset-id="getReleaseArtwork(release)?.assetId ?? null"
+              @detail="openPartialReleaseDetail"
+            >
+              <template #actions>
+                <div class="hx-library-card-actions">
+                  <span class="hx-text-muted">{{ formatLibraryTrackCounts(release) }}</span>
+                  <button
+                    type="button"
+                    class="hx-btn hx-btn--sm"
+                    data-variant="primary"
+                    @click="openPartialReleaseDetail(release)"
+                  >
+                    {{ formatRemainingTrackRequestLabel(release) }}
+                  </button>
+                </div>
+              </template>
+            </ReleaseCard>
+          </div>
+        </div>
+      </article>
+
+      <article v-if="needsAttention.duplicateReleases.length > 0" class="hx-card library-attention-card">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Duplicates to review</h3>
+            <p class="hx-card-subtitle">
+              {{ needsAttention.duplicateReleases.length }}
+              {{ needsAttention.duplicateReleases.length === 1 ? 'release' : 'releases' }} with duplicate files.
+            </p>
+          </div>
+          <div class="hx-card-actions">
+            <button
+              type="button"
+              class="hx-btn hx-btn--sm"
+              :aria-expanded="duplicateReviewExpanded"
+              aria-controls="library-duplicate-review-list"
+              @click="duplicateReviewExpanded = !duplicateReviewExpanded"
+            >
+              {{ duplicateReviewExpanded ? 'Hide duplicates' : 'Review duplicates' }}
+            </button>
+          </div>
+        </header>
+        <div
+          v-if="duplicateReviewExpanded"
+          id="library-duplicate-review-list"
+          class="hx-card-body hx-card-body--flush"
+        >
+          <ul class="library-duplicate-list" aria-label="Duplicate releases">
+            <li
+              v-for="release in needsAttention.duplicateReleases"
+              :key="release.metadataReleaseGroupId ?? release.musicbrainzReleaseId ?? release.title"
+              class="library-duplicate-row"
+            >
+              <div class="library-duplicate-row__main">
+                <span class="library-duplicate-row__title">{{ release.title }}</span>
+                <span class="library-duplicate-row__meta">
+                  {{ release.artistCredit }} · {{ formatLibraryDuplicateFileCount(release) }}
+                </span>
+              </div>
+              <RouterLink
+                v-if="buildLibraryDuplicateReviewLocation(release)"
+                class="hx-link"
+                :to="buildLibraryDuplicateReviewLocation(release)"
+              >
+                Review files
+              </RouterLink>
+              <span v-else class="hx-text-muted">Missing metadata link</span>
+            </li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
     <!-- Card grid with GridControls -->
-    <article class="hx-card">
+    <article ref="libraryGridCard" class="hx-card">
       <header class="hx-card-header">
         <div>
           <h2 class="hx-card-title">Releases</h2>
@@ -276,9 +443,9 @@ function refreshAll() {
             :key="library.data.value[index]?.id ?? library.staleData.value[index]?.id ?? index"
             :release="release"
             :requestable="false"
-            :local-src="getResolvedArtwork('musicbrainz_release', release.musicbrainzReleaseId, 'cover_front')?.url ?? getResolvedArtwork('musicbrainz_release_group', release.releaseGroupId, 'cover_front')?.url ?? null"
-            :dominant-color="getResolvedArtwork('musicbrainz_release', release.musicbrainzReleaseId, 'cover_front')?.dominantColor ?? getResolvedArtwork('musicbrainz_release_group', release.releaseGroupId, 'cover_front')?.dominantColor ?? null"
-            :artwork-asset-id="getResolvedArtwork('musicbrainz_release', release.musicbrainzReleaseId, 'cover_front')?.assetId ?? getResolvedArtwork('musicbrainz_release_group', release.releaseGroupId, 'cover_front')?.assetId ?? null"
+            :local-src="getReleaseArtwork(release)?.url ?? null"
+            :dominant-color="getReleaseArtwork(release)?.dominantColor ?? null"
+            :artwork-asset-id="getReleaseArtwork(release)?.assetId ?? null"
           >
             <template #actions>
               <div class="hx-library-card-actions">
@@ -302,6 +469,20 @@ function refreshAll() {
         </div>
       </div>
     </article>
+
+    <ReleaseDetailModal
+      v-if="detailRelease"
+      :open="detailModalOpen"
+      :release-group-mbid="detailRelease?.releaseGroupId ?? ''"
+      :release-group-id="detailRelease?.metadataReleaseGroupId ?? null"
+      :release-title="detailRelease?.title ?? null"
+      :artist-name="detailRelease?.artistCredit ?? null"
+      :release-year="detailRelease?.date ? String(detailRelease.date).slice(0, 4) : null"
+      :artwork-url="getReleaseArtwork(detailRelease)?.url ?? null"
+      :prefer-release-mbid="detailRelease?.musicbrainzReleaseId ?? null"
+      @close="closeDetailModal"
+      @requested="closeDetailModal"
+    />
   </section>
 </template>
 
@@ -324,6 +505,93 @@ function refreshAll() {
   transition: opacity 0.15s;
 }
 
+.library-needs-attention {
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.library-needs-attention__header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+}
+
+.library-needs-attention__title {
+  margin: 0;
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-lg);
+  line-height: 1.2;
+}
+
+.library-needs-attention__subtitle {
+  margin: var(--hx-space-1) 0 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+}
+
+.library-attention-card {
+  overflow: hidden;
+}
+
+.library-partial-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 210px);
+  gap: var(--hx-space-3);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: var(--hx-space-4);
+  scroll-snap-type: inline proximity;
+}
+
+.library-partial-strip > * {
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.library-duplicate-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.library-duplicate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  border-top: 1px solid var(--hx-border-subtle);
+}
+
+.library-duplicate-row:first-child {
+  border-top: 0;
+}
+
+.library-duplicate-row__main {
+  display: grid;
+  min-width: 0;
+  gap: var(--hx-space-1);
+}
+
+.library-duplicate-row__title {
+  overflow: hidden;
+  color: var(--hx-text-strong);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-duplicate-row__meta {
+  overflow: hidden;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .hx-library-card-actions {
   display: flex;
   flex-direction: column;
@@ -339,7 +607,18 @@ function refreshAll() {
 }
 
 .hx-text-muted {
-  font-size: var(--hx-font-size-sm);
-  color: var(--hx-text-secondary);
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+}
+
+@media (max-width: 640px) {
+  .library-partial-strip {
+    grid-auto-columns: minmax(164px, 78vw);
+  }
+
+  .library-duplicate-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
 }
 </style>

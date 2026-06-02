@@ -24,6 +24,8 @@ const libraryReleases = Object.freeze([
     matchedFileCount: 17,
     matchedTrackCount: 17,
     metadataArtistId: 'metadata-artist-boards',
+    metadataReleaseGroupId: 'metadata-rg-tomorrows-harvest',
+    metadataReleaseId: 'metadata-release-tomorrows-harvest',
     missingTrackCount: 0,
     musicbrainzReleaseGroupId: 'mb-rg-tomorrows-harvest',
     musicbrainzReleaseId: 'mb-release-tomorrows-harvest-flac',
@@ -41,6 +43,8 @@ const libraryReleases = Object.freeze([
     matchedFileCount: 10,
     matchedTrackCount: 10,
     metadataArtistId: 'metadata-artist-aphex',
+    metadataReleaseGroupId: 'metadata-rg-saw-85-92',
+    metadataReleaseId: 'metadata-release-saw-85-92',
     missingTrackCount: 0,
     musicbrainzReleaseGroupId: 'mb-rg-saw-85-92',
     musicbrainzReleaseId: 'mb-release-saw-85-92-mp3',
@@ -50,6 +54,45 @@ const libraryReleases = Object.freeze([
     releaseGroupType: 'Album',
     releaseTitle: 'Selected Ambient Works 85-92',
     sourceFormats: ['MP3'],
+  }),
+  Object.freeze({
+    artistName: 'Boards of Canada',
+    duplicateTrackCount: 0,
+    expectedTrackCount: 23,
+    matchedFileCount: 18,
+    matchedTrackCount: 18,
+    metadataArtistId: 'metadata-artist-boards',
+    metadataReleaseGroupId: 'metadata-rg-geogaddi',
+    metadataReleaseId: 'metadata-release-geogaddi',
+    missingTrackCount: 5,
+    musicbrainzReleaseGroupId: 'mb-rg-geogaddi',
+    musicbrainzReleaseId: 'mb-release-geogaddi-flac',
+    reconciliationStatus: 'partial',
+    releaseDate: '2002-02-18',
+    releaseDisambiguation: null,
+    releaseGroupType: 'Album',
+    releaseTitle: 'Geogaddi',
+    sourceFormats: ['FLAC'],
+  }),
+  Object.freeze({
+    artistName: 'Autechre',
+    duplicateFileCount: 3,
+    duplicateTrackCount: 3,
+    expectedTrackCount: 14,
+    matchedFileCount: 17,
+    matchedTrackCount: 14,
+    metadataArtistId: 'metadata-artist-autechre',
+    metadataReleaseGroupId: 'metadata-rg-tri-repetae',
+    metadataReleaseId: 'metadata-release-tri-repetae',
+    missingTrackCount: 0,
+    musicbrainzReleaseGroupId: 'mb-rg-tri-repetae',
+    musicbrainzReleaseId: 'mb-release-tri-repetae-flac',
+    reconciliationStatus: 'duplicate',
+    releaseDate: '1995-11-06',
+    releaseDisambiguation: null,
+    releaseGroupType: 'Album',
+    releaseTitle: 'Tri Repetae',
+    sourceFormats: ['FLAC'],
   }),
 ]);
 
@@ -63,12 +106,21 @@ function buildJsonResponse(body, status = 200) {
 
 function filterLibraryReleases(url) {
   const format = url.searchParams.get('format');
-  if (!format) return [...libraryReleases];
+  const status = url.searchParams.get('status');
+  let releases = [...libraryReleases];
 
-  const normalizedFormat = format.toUpperCase();
-  return libraryReleases.filter((release) =>
-    release.sourceFormats.some((sourceFormat) => sourceFormat.toUpperCase() === normalizedFormat),
-  );
+  if (format) {
+    const normalizedFormat = format.toUpperCase();
+    releases = releases.filter((release) =>
+      release.sourceFormats.some((sourceFormat) => sourceFormat.toUpperCase() === normalizedFormat),
+    );
+  }
+
+  if (status) {
+    releases = releases.filter((release) => release.reconciliationStatus === status);
+  }
+
+  return releases;
 }
 
 export async function installLibraryBrowserFixtures(browserContext) {
@@ -97,6 +149,59 @@ export async function installLibraryBrowserFixtures(browserContext) {
     await route.fulfill(buildJsonResponse({
       ok: true,
       resolved: {},
+    }));
+  });
+
+  await browserContext.route(/\/api\/v1\/metadata\/musicbrainz\/release-groups\/mb-rg-geogaddi\/tracklist(?:\?.*)?$/, async (route) => {
+    await route.fulfill(buildJsonResponse({
+      allReleases: [
+        {
+          country: 'GB',
+          id: 'metadata-release-geogaddi',
+          musicbrainzReleaseId: 'mb-release-geogaddi-flac',
+          releaseDate: '2002-02-18',
+          trackCount: 23,
+        },
+      ],
+      media: [
+        {
+          format: 'CD',
+          position: 1,
+          title: null,
+          tracks: [
+            {
+              isOwned: true,
+              lengthMs: 147000,
+              numberText: '1',
+              position: 1,
+              title: 'Ready Lets Go',
+            },
+            {
+              isOwned: false,
+              lengthMs: 360000,
+              numberText: '2',
+              position: 2,
+              title: 'Music Is Math',
+            },
+          ],
+        },
+      ],
+      ok: true,
+      ownership: {
+        expectedTrackCount: 23,
+        matchedTrackCount: 18,
+        releaseId: 'metadata-release-geogaddi',
+      },
+      release: {
+        id: 'metadata-release-geogaddi',
+        musicbrainzReleaseId: 'mb-release-geogaddi-flac',
+        releaseDate: '2002-02-18',
+        status: 'Official',
+        title: 'Geogaddi',
+        trackCount: 23,
+      },
+      requestState: { status: 'available' },
+      source: 'local',
     }));
   });
 }

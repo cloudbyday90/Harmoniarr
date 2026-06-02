@@ -129,4 +129,52 @@ suite('browser Library grid state coverage', () => {
       scenarioName: 'library_grid_state_browser',
     });
   });
+
+  test('Library Needs Attention exposes partial request and duplicate review actions', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installLibraryBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+
+      await page.goto(`${baseUrl}/app/library`, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      await page.getByRole('heading', { name: 'Needs Attention' }).waitFor();
+      await page.getByRole('heading', { name: 'Complete your collection' }).waitFor();
+      await page.getByRole('heading', { name: 'Duplicates to review' }).waitFor();
+      await page.getByRole('button', { name: 'Request remaining 5 tracks' }).waitFor();
+
+      await page.getByRole('button', { name: 'Review duplicates' }).click();
+      const needsAttention = page.getByLabel('Needs Attention');
+      await needsAttention.getByText('Tri Repetae').waitFor();
+      await needsAttention.getByText('Autechre · 3 duplicate files').waitFor();
+
+      const reviewLink = needsAttention.getByRole('link', { name: 'Review files' });
+      const reviewHref = await reviewLink.getAttribute('href');
+      assert.ok(reviewHref, 'Review files link must render an href');
+      const reviewUrl = new URL(reviewHref, baseUrl);
+      assert.equal(reviewUrl.pathname, '/app/settings/library-browser');
+      assert.equal(reviewUrl.searchParams.get('releaseGroupId'), 'metadata-rg-tri-repetae');
+
+      const tracklistResponse = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === '/api/v1/metadata/musicbrainz/release-groups/mb-rg-geogaddi/tracklist',
+      );
+      await page.getByRole('button', { name: 'Request remaining 5 tracks' }).click();
+      await tracklistResponse;
+
+      await page.getByRole('dialog', { name: 'Release detail' }).waitFor();
+      await page.getByText('Geogaddi').last().waitFor();
+      await page.getByText('18 of 23 tracks in library').waitFor();
+      await page.getByText('Music Is Math').waitFor();
+    }, {
+      scenarioName: 'library_needs_attention_browser',
+    });
+  });
 });

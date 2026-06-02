@@ -19,12 +19,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildLibraryDuplicateReviewLocation,
+  buildLibraryNeedsAttention,
   buildLibraryPageSubtitle,
   buildLibraryReleasesCardSubtitle,
   buildLibraryStatCards,
+  formatLibraryDuplicateFileCount,
   formatLibraryTrackCounts,
+  formatRemainingTrackRequestLabel,
+  getLibraryDuplicateFileCount,
   getReconciliationStatusLabel,
   getReconciliationStatusTone,
+  getRemainingLibraryTrackCount,
   normalizeLibraryReleaseForCard,
 } from '../../src/client/lib/library-release-normalization.js';
 
@@ -103,6 +109,7 @@ test('normalizeLibraryReleaseForCard forwards reconciliationStatus', () => {
 
 test('normalizeLibraryReleaseForCard forwards all track counts', () => {
   const result = normalizeLibraryReleaseForCard({
+    duplicateFileCount: 2,
     expectedTrackCount: 12,
     matchedTrackCount: 10,
     missingTrackCount: 2,
@@ -114,6 +121,7 @@ test('normalizeLibraryReleaseForCard forwards all track counts', () => {
   assert.equal(result.missingTrackCount, 2);
   assert.equal(result.matchedFileCount, 11);
   assert.equal(result.duplicateTrackCount, 1);
+  assert.equal(result.duplicateFileCount, 2);
 });
 
 test('normalizeLibraryReleaseForCard defaults track counts to 0 when absent', () => {
@@ -123,6 +131,7 @@ test('normalizeLibraryReleaseForCard defaults track counts to 0 when absent', ()
   assert.equal(result.missingTrackCount, 0);
   assert.equal(result.matchedFileCount, 0);
   assert.equal(result.duplicateTrackCount, 0);
+  assert.equal(result.duplicateFileCount, 0);
 });
 
 test('normalizeLibraryReleaseForCard forwards metadataArtistId', () => {
@@ -133,6 +142,22 @@ test('normalizeLibraryReleaseForCard forwards metadataArtistId', () => {
 test('normalizeLibraryReleaseForCard sets metadataArtistId to null when absent', () => {
   const result = normalizeLibraryReleaseForCard({ releaseTitle: 'Album' });
   assert.equal(result.metadataArtistId, null);
+});
+
+test('normalizeLibraryReleaseForCard forwards local metadata release identifiers', () => {
+  const result = normalizeLibraryReleaseForCard({
+    metadataReleaseGroupId: 'local-rg-uuid',
+    metadataReleaseId: 'local-release-uuid',
+  });
+
+  assert.equal(result.metadataReleaseGroupId, 'local-rg-uuid');
+  assert.equal(result.metadataReleaseId, 'local-release-uuid');
+});
+
+test('normalizeLibraryReleaseForCard sets local metadata release identifiers to null when absent', () => {
+  const result = normalizeLibraryReleaseForCard({ releaseTitle: 'Album' });
+  assert.equal(result.metadataReleaseGroupId, null);
+  assert.equal(result.metadataReleaseId, null);
 });
 
 test('normalizeLibraryReleaseForCard does not mutate the input object', () => {
@@ -181,6 +206,111 @@ test('normalizeLibraryReleaseForCard maps a full realistic library release', () 
   assert.equal(result.matchedTrackCount, 12);
   assert.equal(result.missingTrackCount, 0);
   assert.equal(result.metadataArtistId, 'local-artist-1');
+  assert.equal(result.metadataReleaseGroupId, 'local-rg-1');
+  assert.equal(result.metadataReleaseId, 'local-release-1');
+});
+
+// ── Needs Attention helpers ──────────────────────────────────────────────────
+
+test('getRemainingLibraryTrackCount prefers explicit missingTrackCount', () => {
+  assert.equal(getRemainingLibraryTrackCount({
+    expectedTrackCount: 12,
+    matchedTrackCount: 8,
+    missingTrackCount: 3,
+  }), 3);
+});
+
+test('getRemainingLibraryTrackCount derives remaining count from expected and matched counts', () => {
+  assert.equal(getRemainingLibraryTrackCount({
+    expectedTrackCount: 12,
+    matchedTrackCount: 8,
+    missingTrackCount: 0,
+  }), 4);
+});
+
+test('getRemainingLibraryTrackCount never returns a negative number', () => {
+  assert.equal(getRemainingLibraryTrackCount({
+    expectedTrackCount: 8,
+    matchedTrackCount: 12,
+  }), 0);
+});
+
+test('formatRemainingTrackRequestLabel pluralizes remaining tracks', () => {
+  assert.equal(formatRemainingTrackRequestLabel({ missingTrackCount: 1 }), 'Request remaining 1 track');
+  assert.equal(formatRemainingTrackRequestLabel({ missingTrackCount: 3 }), 'Request remaining 3 tracks');
+});
+
+test('getLibraryDuplicateFileCount prefers duplicateFileCount over duplicateTrackCount', () => {
+  assert.equal(getLibraryDuplicateFileCount({
+    duplicateFileCount: 5,
+    duplicateTrackCount: 2,
+  }), 5);
+});
+
+test('formatLibraryDuplicateFileCount pluralizes duplicate file counts', () => {
+  assert.equal(formatLibraryDuplicateFileCount({ duplicateFileCount: 1 }), '1 duplicate file');
+  assert.equal(formatLibraryDuplicateFileCount({ duplicateFileCount: 2 }), '2 duplicate files');
+});
+
+test('buildLibraryNeedsAttention separates partial and duplicate releases', () => {
+  const releases = [
+    { id: 'complete', reconciliationStatus: 'complete', expectedTrackCount: 10, matchedTrackCount: 10 },
+    { id: 'partial', reconciliationStatus: 'partial', expectedTrackCount: 10, matchedTrackCount: 8 },
+    { id: 'duplicate', reconciliationStatus: 'duplicate', duplicateFileCount: 2 },
+  ];
+
+  const result = buildLibraryNeedsAttention(releases);
+
+  assert.deepEqual(result.partialReleases.map((release) => release.id), ['partial']);
+  assert.deepEqual(result.duplicateReleases.map((release) => release.id), ['duplicate']);
+  assert.equal(result.partialOverflowCount, 0);
+  assert.equal(result.hasAttention, true);
+});
+
+test('buildLibraryNeedsAttention limits partial releases and reports overflow', () => {
+  const releases = Array.from({ length: 7 }, (_, index) => ({
+    id: `partial-${index + 1}`,
+    reconciliationStatus: 'partial',
+    expectedTrackCount: 10,
+    matchedTrackCount: 8,
+  }));
+
+  const result = buildLibraryNeedsAttention(releases, { partialLimit: 5 });
+
+  assert.deepEqual(result.partialReleases.map((release) => release.id), [
+    'partial-1',
+    'partial-2',
+    'partial-3',
+    'partial-4',
+    'partial-5',
+  ]);
+  assert.equal(result.partialOverflowCount, 2);
+});
+
+test('buildLibraryNeedsAttention omits partial releases with no remaining tracks and duplicates with zero duplicates', () => {
+  const result = buildLibraryNeedsAttention([
+    { id: 'partial-complete', reconciliationStatus: 'partial', expectedTrackCount: 10, matchedTrackCount: 10 },
+    { id: 'duplicate-empty', reconciliationStatus: 'duplicate', duplicateFileCount: 0 },
+  ]);
+
+  assert.deepEqual(result.partialReleases, []);
+  assert.deepEqual(result.duplicateReleases, []);
+  assert.equal(result.hasAttention, false);
+});
+
+test('buildLibraryDuplicateReviewLocation deep-links to the Library Browser release-group state', () => {
+  assert.deepEqual(
+    buildLibraryDuplicateReviewLocation({ metadataReleaseGroupId: ' local-rg-1 ' }),
+    {
+      name: 'settings-library-browser',
+      query: { releaseGroupId: 'local-rg-1' },
+    },
+  );
+});
+
+test('buildLibraryDuplicateReviewLocation returns null when local release-group id is absent', () => {
+  assert.equal(buildLibraryDuplicateReviewLocation({ releaseGroupId: 'musicbrainz-rg-mbid' }), null);
+  assert.equal(buildLibraryDuplicateReviewLocation(null), null);
 });
 
 // ── getReconciliationStatusLabel ──────────────────────────────────────────────
