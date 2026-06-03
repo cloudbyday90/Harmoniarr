@@ -20,6 +20,7 @@ import { createActivityEventService } from './activity-event-service.js';
 import { createActivityEventStore } from './activity-event-store.js';
 import { createSourceUserBlocklistService } from './source-user-blocklist-service.js';
 import { createSourceUserBulkOperationService } from './source-user-bulk-operation-service.js';
+import { createSourceUserOutcomeLedgerStore } from './source-user-outcome-ledger-store.js';
 import { createSourceUserTrustDetailService } from './source-user-trust-detail-service.js';
 import { createSourceUserTrustEvidenceService } from './source-user-trust-evidence-service.js';
 import { createSourceUserTrustExportService } from './source-user-trust-export-service.js';
@@ -42,6 +43,7 @@ export function createActivityModule({
   onTrustOverrideFn = async () => {},
   onBlockEventFn = async () => {},
   onTrustThresholdCrossedFn = async () => {},
+  sourceUserOutcomeLedgerStore = createSourceUserOutcomeLedgerStore(),
   sourceUserBlocklistService = createSourceUserBlocklistService({
     listTrustSnapshot,
     replaceTrustSnapshot,
@@ -57,6 +59,8 @@ export function createActivityModule({
     listTrustSnapshot,
   }),
   sourceUserTrustEvidenceService = createSourceUserTrustEvidenceService({
+    appendOutcomeEventFn: sourceUserOutcomeLedgerStore.appendOutcomeEvent,
+    listRecentOutcomeEventsFn: sourceUserOutcomeLedgerStore.listRecentOutcomeEvents,
     listTrustSnapshot,
     onTrustThresholdCrossedFn,
     replaceTrustSnapshot,
@@ -76,6 +80,7 @@ export function createActivityModule({
     activityEventStore,
     sourceUserBlocklistService,
     sourceUserBulkOperationService,
+    sourceUserOutcomeLedgerStore,
     sourceUserTrustDetailService,
     sourceUserTrustExportService,
     sourceUserTrustEvidenceService,

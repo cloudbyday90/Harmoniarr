@@ -214,3 +214,90 @@ test('recordSourceUserOutcomeEvidence swallows onTrustThresholdCrossedFn errors'
 
   assert.equal(row.username, 'borderline-peer');
 });
+
+test('recordSourceUserOutcomeEvidence appends an immutable ledger event', async (t) => {
+  const appendOutcomeEventFn = t.mock.fn(async () => ({ id: 'evt-1' }));
+  const service = createSourceUserTrustEvidenceService({
+    appendOutcomeEventFn,
+    listTrustSnapshot: async () => ([]),
+    replaceTrustSnapshot: async () => {},
+  });
+
+  await service.recordSourceUserOutcomeEvidence({
+    actorUserId: 'admin-1',
+    eventType: 'import_candidate_applied',
+    outcome: 'success',
+    reason: 'Imported cleanly',
+    username: 'New-Peer',
+  });
+
+  assert.equal(appendOutcomeEventFn.mock.callCount(), 1);
+  const args = appendOutcomeEventFn.mock.calls[0].arguments[0];
+  assert.equal(args.outcome, 'success');
+  assert.equal(args.username, 'New-Peer');
+  assert.equal(args.eventType, 'import_candidate_applied');
+  assert.equal(args.actorUserId, 'admin-1');
+});
+
+test('recordSourceUserOutcomeEvidence still persists when the ledger append fails', async (t) => {
+  const replaceTrustSnapshot = t.mock.fn(async () => {});
+  const service = createSourceUserTrustEvidenceService({
+    appendOutcomeEventFn: async () => { throw new Error('ledger offline'); },
+    listTrustSnapshot: async () => ([]),
+    replaceTrustSnapshot,
+  });
+
+  const row = await service.recordSourceUserOutcomeEvidence({
+    eventType: 'import_candidate_applied',
+    outcome: 'success',
+    username: 'new-peer',
+  });
+
+  assert.equal(row.successCount, 1);
+  assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
+});
+
+test('listSourceUserReputationIndex enriches rows with recency-weighted reputation and auto-ignore suggestions', async () => {
+  const now = Date.now();
+  const recentFailures = Array.from({ length: 10 }, (_, index) => ({
+    username: 'Flaky-Peer',
+    usernameKey: 'flaky-peer',
+    outcome: index === 0 ? 'success' : 'failure',
+    occurredAt: new Date(now - index * 24 * 60 * 60 * 1000).toISOString(),
+  }));
+  const service = createSourceUserTrustEvidenceService({
+    listRecentOutcomeEventsFn: async () => recentFailures,
+    listTrustSnapshot: async () => ([
+      { failureCount: 9, successCount: 1, trustState: 'neutral', username: 'Flaky-Peer' },
+    ]),
+    replaceTrustSnapshot: async () => {},
+  });
+
+  const index = await service.listSourceUserReputationIndex({ usernames: ['flaky-peer'] });
+  const entry = index.get('flaky-peer');
+
+  assert.equal(entry.failureCount, 9);
+  assert.ok(entry.recencyWeighted);
+  assert.equal(entry.recencyWeighted.sampleSize, 10);
+  assert.equal(entry.autoIgnoreSuggestion.suggested, true);
+  assert.match(entry.autoIgnoreSuggestion.reason, /failure-dominated/);
+});
+
+test('listSourceUserReputationIndex stays backward compatible when ledger reads fail', async () => {
+  const service = createSourceUserTrustEvidenceService({
+    listRecentOutcomeEventsFn: async () => { throw new Error('ledger offline'); },
+    listTrustSnapshot: async () => ([
+      { failureCount: 2, successCount: 5, trustState: 'trusted', username: 'Trusted-Peer' },
+    ]),
+    replaceTrustSnapshot: async () => {},
+  });
+
+  const index = await service.listSourceUserReputationIndex({ usernames: ['trusted-peer'] });
+
+  assert.deepEqual(index.get('trusted-peer'), {
+    failureCount: 2,
+    successCount: 5,
+    trustState: 'trusted',
+    username: 'Trusted-Peer',
+  });
+});

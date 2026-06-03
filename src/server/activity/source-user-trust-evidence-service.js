@@ -31,6 +31,10 @@ import {
   normalizeSourceUserTrustSnapshotRows,
   resolveSourceUserTrustState,
 } from './source-user-trust-service.js';
+import {
+  buildRecencyWeightedReputation,
+  evaluateAutoIgnoreSuggestion,
+} from './source-user-reputation-model.js';
 import { HISTORY_RETENTION_MS, MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
 
 const ALERTABLE_REVIEW_STATES = new Set(['watch', 'excluded']);
@@ -93,16 +97,55 @@ function shouldAlertOnReviewTransition(previousState, nextState) {
 }
 
 export function createSourceUserTrustEvidenceService({
+  appendOutcomeEventFn = null,
+  listRecentOutcomeEventsFn = null,
   listTrustSnapshot = async () => [],
   onTrustThresholdCrossedFn = null,
   replaceTrustSnapshot = async () => {},
 } = {}) {
+  async function loadRecencyEnrichment(usernameKeys) {
+    if (typeof listRecentOutcomeEventsFn !== 'function' || usernameKeys.length === 0) {
+      return new Map();
+    }
+
+    let events;
+    try {
+      events = await listRecentOutcomeEventsFn({ usernameKeys });
+    } catch {
+      return new Map();
+    }
+
+    const eventsByKey = new Map();
+    for (const event of Array.isArray(events) ? events : []) {
+      const key = buildSourceUserUsernameKey(event?.usernameKey ?? event?.username);
+      if (!key) {
+        continue;
+      }
+      const bucket = eventsByKey.get(key);
+      if (bucket) {
+        bucket.push(event);
+      } else {
+        eventsByKey.set(key, [event]);
+      }
+    }
+
+    const enrichmentByKey = new Map();
+    for (const [key, keyEvents] of eventsByKey) {
+      const recencyWeighted = buildRecencyWeightedReputation({ events: keyEvents });
+      const autoIgnoreSuggestion = evaluateAutoIgnoreSuggestion({ reputation: recencyWeighted });
+      enrichmentByKey.set(key, { autoIgnoreSuggestion, recencyWeighted });
+    }
+
+    return enrichmentByKey;
+  }
+
   async function listSourceUserReputationIndex({ usernames } = {}) {
     const rows = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot());
     const usernameFilter = Array.isArray(usernames)
       ? new Set(usernames.map((value) => buildSourceUserUsernameKey(value)).filter(Boolean))
       : null;
     const reputationIndex = new Map();
+    const includedKeys = [];
 
     for (const row of rows) {
       const reputation = mapReputationRow(row);
@@ -116,6 +159,15 @@ export function createSourceUserTrustEvidenceService({
       }
 
       reputationIndex.set(usernameKey, reputation);
+      includedKeys.push(usernameKey);
+    }
+
+    const enrichmentByKey = await loadRecencyEnrichment(includedKeys);
+    for (const [usernameKey, enrichment] of enrichmentByKey) {
+      const reputation = reputationIndex.get(usernameKey);
+      if (reputation) {
+        reputationIndex.set(usernameKey, { ...reputation, ...enrichment });
+      }
     }
 
     return reputationIndex;
@@ -181,6 +233,26 @@ export function createSourceUserTrustEvidenceService({
       rows.splice(existingIndex, 1, nextRow);
     } else {
       rows.push(nextRow);
+    }
+
+    // Append-only ledger write: a pure INSERT that is inherently free of the
+    // read-modify-write lost-update race in the snapshot rewrite below. This is
+    // the durable, concurrency-safe evidence source for recency-weighted
+    // reputation. Best-effort so a ledger hiccup never blocks the outcome path.
+    if (typeof appendOutcomeEventFn === 'function') {
+      try {
+        await appendOutcomeEventFn({
+          actorUserId,
+          eventType: normalizedEventType,
+          occurredAt: updatedAt,
+          outcome,
+          reason: normalizedReason,
+          username: normalizedUsername,
+        });
+      } catch {
+        // Intentionally swallowed: ledger durability is best-effort relative to
+        // the operator-facing trust snapshot.
+      }
     }
 
     await replaceTrustSnapshot({ sourceUsers: rows });
