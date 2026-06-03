@@ -23,6 +23,15 @@ const DEFAULT_MAX_BACKLOG = 500;
 const DEFAULT_CLAIM_LIMIT = 4;
 const MAX_CLAIM_LIMIT = 50;
 const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_SHARED_FINGERPRINT_LIMIT = 200;
+const MAX_SHARED_FINGERPRINT_LIMIT = 1000;
+
+// Sentinel identity for retroactive library re-grade jobs. These jobs are not
+// tied to a real source user, but the queue's username columns are NOT NULL, so
+// a reserved non-blank sentinel keeps the schema invariant intact while clearly
+// marking the rows that must be excluded from peer reputation merges and
+// cross-peer collusion correlation.
+export const RETROACTIVE_SCAN_USERNAME = '__retroactive_library_scan__';
 
 function normalizeOptionalString(value) {
   if (typeof value !== 'string') {
@@ -77,6 +86,9 @@ function mapSpectralJobRow(row) {
       : Number(row.estimated_source_bitrate),
     analysis: row.analysis ?? null,
     lastError: row.last_error ?? null,
+    origin: row.origin ?? 'apply',
+    contentHash: row.content_hash ?? null,
+    libraryFileId: row.library_file_id ?? null,
     claimedAt: toIso(row.claimed_at),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
@@ -192,6 +204,7 @@ export function createSourceUserSpectralJobStore({
     cutoffHz = null,
     estimatedSourceBitrate = null,
     analysis = null,
+    contentHash = null,
   }) {
     if (typeof id !== 'string' || id.trim().length === 0) {
       throw new Error('completeSpectralJob requires id');
@@ -204,6 +217,7 @@ export function createSourceUserSpectralJobStore({
            cutoff_hz = $3,
            estimated_source_bitrate = $4,
            analysis = $5,
+           content_hash = COALESCE($6, content_hash),
            last_error = NULL,
            updated_at = NOW()
        WHERE id = $1
@@ -214,10 +228,124 @@ export function createSourceUserSpectralJobStore({
         normalizePositiveInteger(cutoffHz),
         normalizePositiveInteger(estimatedSourceBitrate),
         analysis === null || analysis === undefined ? null : JSON.stringify(analysis),
+        normalizeOptionalString(contentHash),
       ],
     );
 
     return result.rows.length === 0 ? null : mapSpectralJobRow(result.rows[0]);
+  }
+
+  /**
+   * Enqueues a batch of retroactive library re-grade jobs under the reserved
+   * sentinel identity. Each insert is guarded by both the global backlog cap and
+   * a per-library-file dedupe (no second open job for a file already queued),
+   * so repeated scans are idempotent and cannot overrun the queue.
+   *
+   * @param {object} input
+   * @param {Array<{ libraryFileId: string, filePath: string, declaredCodec?: string|null, declaredExtension?: string|null, sampleRate?: number|null, bitRate?: number|null }>} input.files
+   * @returns {Promise<{ enqueued: number, skipped: number }>}
+   */
+  async function enqueueRetroactiveLibraryJobs({ files = [] } = {}) {
+    const summary = { enqueued: 0, skipped: 0 };
+    if (!Array.isArray(files) || files.length === 0) {
+      return summary;
+    }
+
+    const usernameKey = buildSourceUserUsernameKey(RETROACTIVE_SCAN_USERNAME);
+
+    for (const file of files) {
+      const filePath = typeof file?.filePath === 'string' ? file.filePath.trim() : '';
+      const libraryFileId = normalizeOptionalString(file?.libraryFileId);
+      if (!filePath || !libraryFileId) {
+        summary.skipped += 1;
+        continue;
+      }
+
+      const result = await getPoolFn().query(
+        `INSERT INTO source_user_spectral_jobs (
+           username_key, username, file_path, declared_codec, declared_extension,
+           sample_rate, bit_rate, origin, library_file_id, state
+         )
+         SELECT $1, $2, $3, $4, $5, $6, $7, 'retroactive', $8, 'pending'
+         WHERE (
+           SELECT COUNT(*) FROM source_user_spectral_jobs
+           WHERE state IN ('pending', 'active')
+         ) < $9
+         AND NOT EXISTS (
+           SELECT 1 FROM source_user_spectral_jobs
+           WHERE library_file_id = $8 AND state IN ('pending', 'active')
+         )
+         RETURNING id`,
+        [
+          usernameKey,
+          RETROACTIVE_SCAN_USERNAME,
+          filePath,
+          normalizeOptionalString(file?.declaredCodec),
+          normalizeOptionalString(file?.declaredExtension),
+          normalizePositiveInteger(file?.sampleRate),
+          normalizeNonNegativeBigInt(file?.bitRate),
+          libraryFileId,
+          backlogCap,
+        ],
+      );
+
+      if (result.rows.length > 0) {
+        summary.enqueued += 1;
+      } else {
+        summary.skipped += 1;
+      }
+    }
+
+    return summary;
+  }
+
+  /**
+   * Returns content fingerprints whose lossless-claimed files were confirmed as
+   * transcodes for two or more distinct apply-path peers. This is the raw signal
+   * for cross-peer collusion / duplicate-source detection: the same fake file
+   * surfacing from multiple uploaders strongly implies a shared upstream source.
+   *
+   * Retroactive (sentinel) jobs are excluded so a library copy never counts as a
+   * peer.
+   */
+  async function listSharedTranscodeFingerprints({
+    minDistinctUsers = 2,
+    limit = DEFAULT_SHARED_FINGERPRINT_LIMIT,
+  } = {}) {
+    const minUsers = Math.max(2, normalizePositiveInteger(minDistinctUsers) ?? 2);
+    const rowLimit = Math.min(
+      normalizePositiveInteger(limit) ?? DEFAULT_SHARED_FINGERPRINT_LIMIT,
+      MAX_SHARED_FINGERPRINT_LIMIT,
+    );
+
+    const result = await getPoolFn().query(
+      `SELECT content_hash,
+              COUNT(DISTINCT username_key)::int AS distinct_users,
+              JSONB_AGG(DISTINCT JSONB_BUILD_OBJECT('usernameKey', username_key, 'username', username)) AS members,
+              MAX(estimated_source_bitrate) AS estimated_source_bitrate
+       FROM source_user_spectral_jobs
+       WHERE origin = 'apply'
+         AND verdict = 'transcoded'
+         AND content_hash IS NOT NULL
+       GROUP BY content_hash
+       HAVING COUNT(DISTINCT username_key) >= $1
+       ORDER BY COUNT(DISTINCT username_key) DESC, content_hash ASC
+       LIMIT $2`,
+      [minUsers, rowLimit],
+    );
+
+    return result.rows.map((row) => ({
+      contentHash: row.content_hash,
+      distinctUsers: Number(row.distinct_users ?? 0),
+      members: Array.isArray(row.members)
+        ? row.members
+          .filter((member) => member && typeof member.usernameKey === 'string')
+          .map((member) => ({ usernameKey: member.usernameKey, username: member.username ?? null }))
+        : [],
+      estimatedSourceBitrate: row.estimated_source_bitrate === null || row.estimated_source_bitrate === undefined
+        ? null
+        : Number(row.estimated_source_bitrate),
+    }));
   }
 
   /**
@@ -292,8 +420,10 @@ export function createSourceUserSpectralJobStore({
     claimNextSpectralJobs,
     completeSpectralJob,
     countPendingSpectralJobs,
+    enqueueRetroactiveLibraryJobs,
     enqueueSpectralJob,
     failSpectralJob,
+    listSharedTranscodeFingerprints,
     pruneSpectralJobs,
     requeueStaleActiveJobs,
   };

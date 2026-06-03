@@ -39,6 +39,7 @@ import { createFulfillmentModule } from './fulfillment/fulfillment-module.js';
 import { createPlexWebhookIngestionService } from './integrations/plex/plex-webhook-ingestion-service.js';
 import { createSlskdWebhookIngestionService } from './integrations/slskd/slskd-webhook-ingestion-service.js';
 import { createMediaCommandService } from './media/media-command-service.js';
+import { createFfmpegSpectralAnalyzer } from './media/ffmpeg-spectral-analyzer.js';
 import { createMediaInspectionService } from './media/media-inspection-service.js';
 import { createMetadataModule } from './metadata/metadata-module.js';
 import { createMediaToolingStatusService } from './media/media-tooling-status-service.js';
@@ -186,6 +187,10 @@ export function createApp({
     ffprobeBinary,
     mediaCommandService,
   });
+  const spectralAnalyzer = createFfmpegSpectralAnalyzer({
+    ffmpegBin: ffmpegBinary,
+    mediaCommandService,
+  });
   const requestRateLimiterService = createRequestRateLimiterService({
     onLimit: createSecurityEventLogger(),
   });
@@ -266,6 +271,7 @@ export function createApp({
   const activityModule = buildActivityModule({
     listTrustSnapshot: restoreScopeRuntimeSnapshotStore.listTrustSnapshot,
     replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
+    analyzeSpectralCutoffFn: spectralAnalyzer.analyzeSpectralCutoff,
     onTrustOverrideFn: ({ _actorUserId, _reason, trustState, username }) => broadcastAdminNotification({
       category: 'trustOverride',
       listAppUsers: notificationDispatchDeps.listAppUsers,
@@ -378,6 +384,7 @@ export function createApp({
     maintenanceLockOperationPauseService,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     recordSourceUserOutcomeEvidenceFn: activityModule.sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
+    sourceUserSpectralSidecarService: activityModule.sourceUserSpectralSidecarService,
     scheduleLibraryScan: async ({
       releaseHints = [],
       triggeredByRunId = null,

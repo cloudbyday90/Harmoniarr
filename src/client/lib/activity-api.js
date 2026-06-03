@@ -123,3 +123,26 @@ export function removeIgnoredSourceUser(username) {
     method: 'DELETE',
   });
 }
+
+export function fetchSourceUserCollusionReport({ minDistinctUsers, signal } = {}) {
+  return apiRequest(
+    `/api/v1/activity/source-user-collusion${buildQueryString({ minDistinctUsers })}`,
+    { signal },
+  );
+}
+
+export function simulateSourceUserTrustPolicy({ thresholds } = {}) {
+  return apiRequest('/api/v1/activity/source-user-trust-policy-simulation', {
+    body: { thresholds },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function rescanLibrarySpectral({ limit } = {}) {
+  return apiRequest('/api/v1/activity/source-user-spectral-rescan', {
+    body: { limit },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}

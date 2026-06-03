@@ -37,6 +37,7 @@ export function registerActivityRoutes(app, {
   bulkUpdateSourceUserTrust,
   buildActivityFeed,
   exportSourceUserTrustHistory,
+  getSourceUserCollusionReport,
   getSourceUserDetail,
   limitActivitySourceUserMutations = skipRateLimitMiddleware,
   limitActivityBlocklistMutations = skipRateLimitMiddleware,
@@ -44,11 +45,14 @@ export function registerActivityRoutes(app, {
   listIgnoredSourceUsers,
   listSourceUserAutoIgnoreSuggestions,
   listSourceUsers,
+  processSpectralBacklog,
   removeIgnoredSourceUser,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  scanLibrarySpectral,
+  simulateSourceUserTrustPolicy,
   updateSourceUserTrust,
   unblockSourceUser,
 }) {
@@ -197,6 +201,73 @@ export function registerActivityRoutes(app, {
         trustState: request.body?.trustState,
         usernames: request.body?.usernames,
       })),
+    });
+  }));
+
+  /**
+   * GET /api/v1/activity/source-user-collusion
+   *
+   * Read-only cross-peer collusion report: confirmed-transcode content
+   * fingerprints shared by two or more distinct peers, grouped into rings.
+   */
+  app.get('/api/v1/activity/source-user-collusion', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const minDistinctUsers = typeof request.query.minDistinctUsers === 'string'
+      ? Number.parseInt(request.query.minDistinctUsers, 10)
+      : undefined;
+
+    const report = await getSourceUserCollusionReport({ minDistinctUsers });
+
+    response.json({
+      ok: true,
+      ...report,
+    });
+  }));
+
+  /**
+   * POST /api/v1/activity/source-user-trust-policy-simulation
+   *
+   * Read-only "what-if": projects how a proposed set of review thresholds would
+   * reclassify the current peer population. Performs no mutation.
+   */
+  app.post('/api/v1/activity/source-user-trust-policy-simulation', limitActivitySourceUserMutations, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const simulation = await simulateSourceUserTrustPolicy({
+      thresholds: request.body?.thresholds ?? {},
+    });
+
+    response.json({
+      ok: true,
+      ...simulation,
+    });
+  }));
+
+  /**
+   * POST /api/v1/activity/source-user-spectral-rescan
+   *
+   * Enqueues a bounded batch of lossless library files for retroactive spectral
+   * re-grading, then drains a batch immediately for operator feedback. The
+   * content-addressed cache means already-measured files skip a second decode.
+   */
+  app.post('/api/v1/activity/source-user-spectral-rescan', limitActivitySourceUserMutations, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const limit = typeof request.body?.limit === 'number' ? request.body.limit : undefined;
+    const scan = await scanLibrarySpectral({ limit });
+
+    let processed = null;
+    if (typeof processSpectralBacklog === 'function') {
+      processed = await processSpectralBacklog({ limit: 8 });
+    }
+
+    response.json({
+      ok: true,
+      scan,
+      processed,
     });
   }));
 

@@ -59,6 +59,8 @@ export function createSourceUserSpectralSidecarService({
   analyzeSpectralCutoffFn,
   recordSourceUserOutcomeEvidenceFn = async () => null,
   classifySpectralCutoffFn = classifySpectralCutoff,
+  spectralCacheStore = null,
+  hashFileFn = null,
   maxAttempts = 3,
   onWarning = () => {},
 } = {}) {
@@ -157,6 +159,7 @@ export function createSourceUserSpectralSidecarService({
     const summary = {
       claimed: 0,
       analyzed: 0,
+      cacheHits: 0,
       transcodedConfirmed: 0,
       suspicious: 0,
       authentic: 0,
@@ -175,21 +178,64 @@ export function createSourceUserSpectralSidecarService({
     summary.claimed = jobs.length;
 
     for (const job of jobs) {
-      let measurement;
-      try {
-        measurement = await analyzeSpectralCutoffFn({ filePath: job.filePath });
-      } catch (error) {
-        summary.failed += 1;
+      // Derive the content fingerprint first so an identical file already
+      // measured (by any peer or library copy) reuses the cached measurement and
+      // skips the expensive ffmpeg decode. Fingerprinting is best-effort: an IO
+      // error simply falls through to a normal decode.
+      let contentHash = job.contentHash ?? null;
+      if (!contentHash && typeof hashFileFn === 'function') {
         try {
-          await spectralJobStore.failSpectralJob({
-            id: job.id,
-            error: error?.message ?? 'spectral analysis failed',
-            maxAttempts: attemptCap,
-          });
-        } catch (failError) {
-          onWarning('Failed to record spectral analysis failure', failError);
+          contentHash = await hashFileFn({ filePath: job.filePath });
+        } catch (error) {
+          contentHash = null;
+          onWarning('Failed to fingerprint file for spectral cache', error);
         }
-        continue;
+      }
+
+      let measurement = null;
+      let servedFromCache = false;
+      if (contentHash && spectralCacheStore && typeof spectralCacheStore.getCachedMeasurement === 'function') {
+        try {
+          const cached = await spectralCacheStore.getCachedMeasurement({ contentHash });
+          if (cached) {
+            measurement = { cutoffHz: cached.cutoffHz, frameCount: cached.frameCount };
+            servedFromCache = true;
+            summary.cacheHits += 1;
+          }
+        } catch (error) {
+          onWarning('Failed to read spectral cache', error);
+        }
+      }
+
+      if (!servedFromCache) {
+        try {
+          measurement = await analyzeSpectralCutoffFn({ filePath: job.filePath });
+        } catch (error) {
+          summary.failed += 1;
+          try {
+            await spectralJobStore.failSpectralJob({
+              id: job.id,
+              error: error?.message ?? 'spectral analysis failed',
+              maxAttempts: attemptCap,
+            });
+          } catch (failError) {
+            onWarning('Failed to record spectral analysis failure', failError);
+          }
+          continue;
+        }
+
+        if (contentHash && spectralCacheStore && typeof spectralCacheStore.putCachedMeasurement === 'function') {
+          try {
+            await spectralCacheStore.putCachedMeasurement({
+              contentHash,
+              cutoffHz: measurement?.cutoffHz ?? null,
+              frameCount: measurement?.frameCount ?? 0,
+              durationMs: measurement?.durationMs ?? null,
+            });
+          } catch (error) {
+            onWarning('Failed to write spectral cache', error);
+          }
+        }
       }
 
       const classification = classifySpectralCutoffFn({
@@ -209,7 +255,10 @@ export function createSourceUserSpectralSidecarService({
         summary.inconclusive += 1;
       }
 
-      if (classification.penalize === true) {
+      // Only apply-path jobs are tied to a real source user; retroactive library
+      // re-grades use a sentinel identity and must never write reputation.
+      // Jobs without an explicit origin predate the column and are apply-path.
+      if (classification.penalize === true && job.origin !== 'retroactive') {
         await mergeConfirmedTranscode({ job, classification });
       }
 
@@ -219,11 +268,13 @@ export function createSourceUserSpectralSidecarService({
           verdict: classification.verdict,
           cutoffHz: classification.cutoffHz,
           estimatedSourceBitrate: classification.estimatedSourceBitrate,
+          contentHash,
           analysis: {
             confidence: classification.confidence,
             frameCount: measurement?.frameCount ?? 0,
             nyquistHz: classification.nyquistHz,
             reason: classification.reason,
+            servedFromCache,
           },
         });
       } catch (error) {

@@ -181,16 +181,15 @@ a DOM-free SVG sparkline component.
 
 ## 7. Three more high-value design areas
 
-1. **Library-wide retroactive spectral scan + result cache.** Today analysis only runs for
-   freshly applied candidates. Add an operator-triggered batch that walks the existing
-   library through the same queue, plus a content-addressed result cache (keyed by file hash)
-   so re-imports and re-scans skip redundant decodes and historical fakes get re-graded.
+1. **Library-wide retroactive spectral scan + result cache.** _(Implemented — see
+   [SOURCE_USER_SPECTRAL_SCALE_DESIGN.md](SOURCE_USER_SPECTRAL_SCALE_DESIGN.md).)_ An
+   operator-triggered batch now walks the existing library through the same queue, with a
+   content-addressed SHA-256 result cache so re-imports and re-scans skip redundant decodes.
 
-2. **Cross-peer collusion / duplicate-source detection.** Correlate identical confirmed-fake
-   fingerprints (cutoff signature + hash) across multiple source users to surface rings that
-   reshare the same transcode, and an operator-tunable trust-threshold + policy simulator to
-   preview how a threshold change would reclassify the current peer population before applying
-   it.
+2. **Cross-peer collusion / duplicate-source detection.** _(Implemented — see
+   [SOURCE_USER_SPECTRAL_SCALE_DESIGN.md](SOURCE_USER_SPECTRAL_SCALE_DESIGN.md).)_ Identical
+   confirmed-transcode fingerprints are now correlated across peers into rings via union-find,
+   alongside a read-only trust-threshold policy simulator.
 
 3. **Ledger & ignore lifecycle: retention, backup, export.** (Carried forward.) Decide and
    document whether `source_user_outcome_events`, `source_user_spectral_jobs`, and

@@ -20,14 +20,24 @@ import { createActivityEventService } from './activity-event-service.js';
 import { createActivityEventStore } from './activity-event-store.js';
 import { createSourceUserBlocklistService } from './source-user-blocklist-service.js';
 import { createSourceUserBulkOperationService } from './source-user-bulk-operation-service.js';
+import { createSourceUserCollusionService } from './source-user-collusion-service.js';
 import { createSourceUserIgnoreService } from './source-user-ignore-service.js';
 import { createSourceUserIgnoreStore } from './source-user-ignore-store.js';
 import { createSourceUserOutcomeLedgerStore } from './source-user-outcome-ledger-store.js';
+import { createSourceUserPolicySimulationService } from './source-user-policy-simulation-service.js';
+import { createSourceUserSpectralCacheStore } from './source-user-spectral-cache-store.js';
+import { createSourceUserSpectralJobStore } from './source-user-spectral-job-store.js';
+import { createSourceUserSpectralRetroactiveScanService } from './source-user-spectral-retroactive-service.js';
+import { createSourceUserSpectralSidecarService } from './source-user-spectral-sidecar-service.js';
 import { createSourceUserTrustDetailService } from './source-user-trust-detail-service.js';
 import { createSourceUserTrustEvidenceService } from './source-user-trust-evidence-service.js';
 import { createSourceUserTrustExportService } from './source-user-trust-export-service.js';
 import { createSourceUserTrustOverrideService } from './source-user-trust-override-service.js';
 import { createSourceUserTrustService } from './source-user-trust-service.js';
+import { createFileContentHasher } from '../media/file-content-hasher.js';
+import { createLibrarySpectralScanSource } from '../library/library-spectral-scan-source.js';
+
+const DEFAULT_SPECTRAL_ANALYZER = async () => ({ cutoffHz: null, frameCount: 0 });
 
 /**
  * Activity module factory. Wires together the activity event store and service.
@@ -82,15 +92,43 @@ export function createActivityModule({
     blockSourceUser: sourceUserBlocklistService.blockSourceUser,
     updateSourceUserTrust: sourceUserTrustOverrideService.updateSourceUserTrust,
   }),
+  analyzeSpectralCutoffFn = null,
+  spectralJobStore = createSourceUserSpectralJobStore(),
+  spectralCacheStore = createSourceUserSpectralCacheStore(),
+  fileContentHasher = createFileContentHasher(),
+  librarySpectralScanSource = createLibrarySpectralScanSource(),
+  sourceUserSpectralSidecarService = createSourceUserSpectralSidecarService({
+    spectralJobStore,
+    analyzeSpectralCutoffFn: typeof analyzeSpectralCutoffFn === 'function'
+      ? analyzeSpectralCutoffFn
+      : DEFAULT_SPECTRAL_ANALYZER,
+    recordSourceUserOutcomeEvidenceFn: sourceUserTrustEvidenceService.recordSourceUserOutcomeEvidence,
+    spectralCacheStore,
+    hashFileFn: fileContentHasher.hashFile,
+  }),
+  sourceUserSpectralRetroactiveScanService = createSourceUserSpectralRetroactiveScanService({
+    listLosslessLibraryFilesFn: librarySpectralScanSource.listLosslessLibraryFiles,
+    enqueueRetroactiveLibraryJobsFn: spectralJobStore.enqueueRetroactiveLibraryJobs,
+  }),
+  sourceUserCollusionService = createSourceUserCollusionService({
+    listSharedTranscodeFingerprintsFn: spectralJobStore.listSharedTranscodeFingerprints,
+  }),
+  sourceUserPolicySimulationService = createSourceUserPolicySimulationService({
+    listSourceUsersFn: sourceUserTrustService.listSourceUsers,
+  }),
 } = {}) {
   return {
     activityEventService,
     activityEventStore,
     sourceUserBlocklistService,
     sourceUserBulkOperationService,
+    sourceUserCollusionService,
     sourceUserIgnoreService,
     sourceUserIgnoreStore,
     sourceUserOutcomeLedgerStore,
+    sourceUserPolicySimulationService,
+    sourceUserSpectralRetroactiveScanService,
+    sourceUserSpectralSidecarService,
     sourceUserTrustDetailService,
     sourceUserTrustExportService,
     sourceUserTrustEvidenceService,
@@ -102,6 +140,7 @@ export function createActivityModule({
       bulkUpdateSourceUserTrust: sourceUserBulkOperationService.bulkUpdateSourceUserTrust,
       buildActivityFeed: activityEventService.buildActivityFeed,
       exportSourceUserTrustHistory: sourceUserTrustExportService.exportSourceUserTrustHistory,
+      getSourceUserCollusionReport: sourceUserCollusionService.getCollusionReport,
       getSourceUserDetail: sourceUserTrustDetailService.getSourceUserDetail,
       applyIgnoreSuggestion: sourceUserIgnoreService.applyIgnoreSuggestion,
       listIgnoredSourceUsers: sourceUserIgnoreService.listIgnoredSourceUsers,
@@ -109,6 +148,9 @@ export function createActivityModule({
       removeIgnoredSourceUser: sourceUserIgnoreService.removeIgnoredUser,
       listBlockedSourceUsers: sourceUserBlocklistService.listBlockedSourceUsers,
       listSourceUsers: sourceUserTrustService.listSourceUsers,
+      scanLibrarySpectral: sourceUserSpectralRetroactiveScanService.scanLibrary,
+      processSpectralBacklog: sourceUserSpectralSidecarService.processPendingSpectralJobs,
+      simulateSourceUserTrustPolicy: sourceUserPolicySimulationService.simulatePolicy,
       updateSourceUserTrust: sourceUserTrustOverrideService.updateSourceUserTrust,
       unblockSourceUser: sourceUserBlocklistService.unblockSourceUser,
     },

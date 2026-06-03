@@ -19,6 +19,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import SourceUserTrustDetailPanel from '../components/SourceUserTrustDetailPanel.vue';
+import SourceUserIntegrityToolsPanel from '../components/SourceUserIntegrityToolsPanel.vue';
 import { useSourceUserBulkOperation } from '../composables/useSourceUserBulkOperation.js';
 import { useSourceUserTrust } from '../composables/useSourceUserTrust.js';
 import { useSourceUserTrustDetail } from '../composables/useSourceUserTrustDetail.js';
@@ -437,6 +438,8 @@ onMounted(() => {
         @save-trust="handleSaveTrust"
       />
     </div>
+
+    <SourceUserIntegrityToolsPanel />
   </section>
 </template>
 
