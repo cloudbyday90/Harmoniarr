@@ -297,6 +297,8 @@ export function createSlskdService({
     query,
     fileLimit,
     filterResponses,
+    maximumPeerQueueLength,
+    minimumPeerUploadSpeed,
     responseLimit,
     searchTimeoutMs,
   }) {
@@ -319,6 +321,18 @@ export function createSlskdService({
       max: 120000,
       min: 1000,
     });
+    const normalizedMaximumPeerQueueLength = normalizeInteger(maximumPeerQueueLength, {
+      fallback: 1000000,
+      fieldName: 'maximumPeerQueueLength',
+      max: 1000000,
+      min: 0,
+    });
+    const normalizedMinimumPeerUploadSpeed = normalizeInteger(minimumPeerUploadSpeed, {
+      fallback: 0,
+      fieldName: 'minimumPeerUploadSpeed',
+      max: 1000000000,
+      min: 0,
+    });
     const normalizedFilterResponses = normalizeBoolean(filterResponses, true);
 
     const payload = await observeSlskdProviderCall(
@@ -327,6 +341,8 @@ export function createSlskdService({
         query: normalizedQuery,
         fileLimit: normalizedFileLimit,
         filterResponses: normalizedFilterResponses,
+        maximumPeerQueueLength: normalizedMaximumPeerQueueLength,
+        minimumPeerUploadSpeed: normalizedMinimumPeerUploadSpeed,
         responseLimit: normalizedResponseLimit,
         searchTimeoutMs: normalizedSearchTimeoutMs,
       })),

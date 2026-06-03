@@ -190,12 +190,16 @@ test('createSlskdService normalizes search requests and search responses', async
     query,
     fileLimit,
     filterResponses,
+    maximumPeerQueueLength,
+    minimumPeerUploadSpeed,
     responseLimit,
     searchTimeoutMs,
   }) => {
     assert.equal(query, 'Autechre Amber');
     assert.equal(fileLimit, 20);
     assert.equal(filterResponses, false);
+    assert.equal(maximumPeerQueueLength, 1000000);
+    assert.equal(minimumPeerUploadSpeed, 0);
     assert.equal(responseLimit, 5);
     assert.equal(searchTimeoutMs, 3000);
 
@@ -274,6 +278,38 @@ test('createSlskdService normalizes search requests and search responses', async
       lockedFiles: [],
     }],
   });
+});
+
+test('createSlskdService forwards and bounds peer filter thresholds', async (t) => {
+  const startSearch = t.mock.fn(async ({ maximumPeerQueueLength, minimumPeerUploadSpeed }) => {
+    assert.equal(maximumPeerQueueLength, 50);
+    assert.equal(minimumPeerUploadSpeed, 100000);
+    return { id: 'search-2', searchText: 'q', state: 'Completed', token: 1, isComplete: true, responseCount: 0, fileCount: 0, lockedFileCount: 0 };
+  });
+  const service = createSlskdService({ slskdClient: { startSearch } });
+
+  await service.startSearch({
+    query: 'Autechre Amber',
+    maximumPeerQueueLength: '50',
+    minimumPeerUploadSpeed: '100000',
+  });
+
+  assert.equal(startSearch.mock.callCount(), 1);
+});
+
+test('createSlskdService rejects invalid peer filter thresholds', async (t) => {
+  const startSearch = t.mock.fn(async () => ({ id: 'search-3' }));
+  const service = createSlskdService({ slskdClient: { startSearch } });
+
+  await assert.rejects(
+    () => service.startSearch({ query: 'Autechre Amber', maximumPeerQueueLength: -1 }),
+    /maximumPeerQueueLength/,
+  );
+  await assert.rejects(
+    () => service.startSearch({ query: 'Autechre Amber', minimumPeerUploadSpeed: -5 }),
+    /minimumPeerUploadSpeed/,
+  );
+  assert.equal(startSearch.mock.callCount(), 0);
 });
 
 test('createSlskdService normalizes search state polling requests', async (t) => {

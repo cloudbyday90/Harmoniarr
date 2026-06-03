@@ -31,6 +31,8 @@ import { createLibraryProviderIngestRequestStore } from './library-provider-inge
 import { createLibraryDiscoveryRequestService } from './library-discovery-request-service.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 import { createLibraryDiscoveryDispatchService } from './library-discovery-dispatch-service.js';
+import { buildReleaseTracklistExpectations } from './candidate-track-matcher.js';
+import { listMetadataTracksByReleaseId } from '../metadata/metadata-repository.js';
 import { createLibraryDiscoveryRediscoveryService } from './library-discovery-rediscovery-service.js';
 import { createLibraryDiscoveryRecoveryRetryService } from './library-discovery-recovery-retry-service.js';
 import { createLibraryDiscoveryRunService } from './library-discovery-run-service.js';
@@ -96,6 +98,10 @@ export function createLibraryModule({
     libraryDiscoveryRequestStore,
   }),
   libraryDiscoveryDispatchService = createLibraryDiscoveryDispatchService({
+    getReleaseTracklistExpectationsFn: async ({ metadataReleaseId }) => {
+      const trackRows = await listMetadataTracksByReleaseId(metadataReleaseId);
+      return buildReleaseTracklistExpectations(trackRows);
+    },
     getUserPreferencesFn,
     importCandidateService,
     libraryDiscoveryRequestStore,

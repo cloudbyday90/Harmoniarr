@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   scoreAudioDepth,
+  scoreCandidateTrackMatch,
   scoreDownloadResult,
   scoreDuration,
   scoreFormatConsistency,
@@ -295,7 +296,7 @@ test('scoreDownloadResult uses default weights when none provided', () => {
 
   assert.ok(typeof result.compositeScore === 'number');
   const formatEntry = result.breakdown.find((b) => b.name === 'formatTier');
-  assert.equal(formatEntry.weight, 0.30);
+  assert.equal(formatEntry.weight, 0.25);
 });
 
 test('scoreDownloadResult skips uploaderReputation when reputation is null', () => {
@@ -325,4 +326,67 @@ test('scoreDownloadResult scores uploaderReputation at 50 when reputation is pro
 
   const repEntry = result.breakdown.find((b) => b.name === 'uploaderReputation');
   assert.equal(repEntry.score, 50);
+});
+
+test('scoreCandidateTrackMatch returns neutral 50 with no expected titles', () => {
+  const result = scoreCandidateTrackMatch({
+    expectedTrackTitles: null,
+    files: [{ filename: '01 - Track.flac' }],
+  });
+
+  assert.equal(result.name, 'candidateTrackMatch');
+  assert.equal(result.score, 50);
+  assert.equal(result.summary, null);
+});
+
+test('scoreCandidateTrackMatch scores a clean folder near 100', () => {
+  const result = scoreCandidateTrackMatch({
+    expectedTrackTitles: ['Come Together', 'Something'],
+    files: [
+      { filename: '01 - Come Together.flac' },
+      { filename: '02 - Something.flac' },
+    ],
+  });
+
+  assert.ok(result.score >= 90);
+  assert.equal(result.summary.matchedTrackCount, 2);
+});
+
+test('scoreCandidateTrackMatch reads filenames from the name field as a fallback', () => {
+  const result = scoreCandidateTrackMatch({
+    expectedTrackTitles: ['Yesterday'],
+    files: [{ name: '01 - Yesterday.mp3' }],
+  });
+
+  assert.equal(result.summary.matchedTrackCount, 1);
+});
+
+test('scoreDownloadResult includes candidateTrackMatch only when expected titles are provided', () => {
+  const withTitles = scoreDownloadResult({
+    candidate: {
+      extensions: ['flac'],
+      files: [{ filename: '01 - Come Together.flac', extension: 'flac', lengthSeconds: 300 }],
+      normalizedPayload: { extensions: ['flac'] },
+    },
+    expectedTrackTitles: ['Come Together'],
+    albumTitle: 'Abbey Road',
+  });
+
+  const matchEntry = withTitles.breakdown.find((b) => b.name === 'candidateTrackMatch');
+  assert.ok(matchEntry);
+  assert.equal(matchEntry.weight, 0.20);
+  assert.ok(withTitles.trackMatchSummary);
+  assert.equal(withTitles.trackMatchSummary.matchedTrackCount, 1);
+
+  const withoutTitles = scoreDownloadResult({
+    candidate: {
+      extensions: ['flac'],
+      files: [{ filename: '01 - Come Together.flac', extension: 'flac', lengthSeconds: 300 }],
+      normalizedPayload: { extensions: ['flac'] },
+    },
+  });
+
+  const absentEntry = withoutTitles.breakdown.find((b) => b.name === 'candidateTrackMatch');
+  assert.equal(absentEntry, undefined);
+  assert.equal(withoutTitles.trackMatchSummary, null);
 });

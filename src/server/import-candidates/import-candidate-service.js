@@ -710,7 +710,9 @@ export function createImportCandidateService({
 
   async function ingestSlskdSearchResponses({
     actorUserId = null,
+    albumTitle = null,
     expectedTrackCount = null,
+    expectedTrackTitles = null,
     expectedDurationSeconds = null,
     formatPreferences = null,
     requestOwnership = null,
@@ -737,7 +739,9 @@ export function createImportCandidateService({
       const scoring = scoreDownloadResultFn({
         candidate,
         formatPreferences,
+        albumTitle,
         expectedTrackCount,
+        expectedTrackTitles,
         expectedDurationSeconds,
         uploaderReputation: reputationIndex.get(buildUsernameKey(candidate.username)) ?? null,
       });
@@ -745,6 +749,10 @@ export function createImportCandidateService({
       if (scoring.compositeScore !== null) {
         candidate.normalizedPayload.compositeScore = scoring.compositeScore;
         candidate.normalizedPayload.scoreBreakdown = scoring.breakdown;
+      }
+
+      if (scoring.trackMatchSummary) {
+        candidate.normalizedPayload.trackMatchSummary = scoring.trackMatchSummary;
       }
     }
 

@@ -33,6 +33,7 @@ export function createLibraryDiscoveryDispatchService({
   dispatchBatchSize = defaultDispatchBatchSize,
   fallbackCooldownMs = defaultFallbackCooldownMs,
   getNow = () => new Date(),
+  getReleaseTracklistExpectationsFn = null,
   getUserPreferencesFn = null,
   importCandidateService = null,
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
@@ -175,8 +176,24 @@ export function createLibraryDiscoveryDispatchService({
           query: searchQuery,
         });
         const requestOwnership = ownership;
+
+        let tracklistExpectations = null;
+        if (getReleaseTracklistExpectationsFn && claimedRequest.metadataReleaseId) {
+          try {
+            tracklistExpectations = await getReleaseTracklistExpectationsFn({
+              metadataReleaseId: claimedRequest.metadataReleaseId,
+            });
+          } catch {
+            tracklistExpectations = null;
+          }
+        }
+
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
           actorUserId,
+          albumTitle: claimedRequest.releaseTitle ?? claimedRequest.releaseGroupTitle ?? null,
+          expectedTrackTitles: tracklistExpectations?.expectedTrackTitles ?? null,
+          expectedTrackCount: tracklistExpectations?.expectedTrackCount ?? null,
+          expectedDurationSeconds: tracklistExpectations?.expectedDurationSeconds ?? null,
           formatPreferences: userPreferences ? {
             minimumQuality: userPreferences.minimumQuality,
             preferredFormat: userPreferences.preferredFormat,

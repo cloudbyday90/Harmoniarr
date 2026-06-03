@@ -109,6 +109,10 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
   assert.equal(ingestSlskdSearchResponses.mock.callCount(), 1);
   assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0], {
     actorUserId: 'user-1',
+    albumTitle: 'Confield',
+    expectedTrackTitles: null,
+    expectedTrackCount: null,
+    expectedDurationSeconds: null,
     formatPreferences: null,
     requestOwnership: {
       metadataArtistId: null,
@@ -150,6 +154,84 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
     failures: [],
     fileCount: 5,
   });
+});
+
+test('dispatchReadyDiscoveryRequests threads release tracklist expectations into ingestion', async (t) => {
+  const claimedRequests = [{
+    metadataReleaseId: 'release-9',
+    artistName: 'Autechre',
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+  }];
+  const claimNextReadyAutomaticDiscoveryRequest = t.mock.fn(async () => claimedRequests.shift() ?? null);
+  const startSearch = t.mock.fn(async () => ({ id: 'search-9' }));
+  const ingestSlskdSearchResponses = t.mock.fn(async () => ({ candidateCount: 1, fileCount: 3 }));
+  const getReleaseTracklistExpectationsFn = t.mock.fn(async () => ({
+    expectedTrackTitles: ['VI Scose Poise', 'Cfern'],
+    expectedTrackCount: 2,
+    expectedDurationSeconds: 480,
+  }));
+  const now = new Date('2026-04-30T14:00:00.000Z');
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 3,
+    getNow: () => now,
+    getReleaseTracklistExpectationsFn,
+    importCandidateService: { ingestSlskdSearchResponses },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest,
+      markDiscoveryRequestExhausted: t.mock.fn(async () => {}),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    slskdService: { startSearch },
+  });
+
+  await service.dispatchReadyDiscoveryRequests({ actorUserId: 'user-1', requestMetadata: {} });
+
+  assert.equal(getReleaseTracklistExpectationsFn.mock.callCount(), 1);
+  assert.deepEqual(getReleaseTracklistExpectationsFn.mock.calls[0].arguments[0], {
+    metadataReleaseId: 'release-9',
+  });
+  const ingestArgs = ingestSlskdSearchResponses.mock.calls[0].arguments[0];
+  assert.deepEqual(ingestArgs.expectedTrackTitles, ['VI Scose Poise', 'Cfern']);
+  assert.equal(ingestArgs.expectedTrackCount, 2);
+  assert.equal(ingestArgs.expectedDurationSeconds, 480);
+  assert.equal(ingestArgs.albumTitle, 'Confield');
+});
+
+test('dispatchReadyDiscoveryRequests still ingests when tracklist expectations lookup fails', async (t) => {
+  const claimedRequests = [{
+    metadataReleaseId: 'release-9',
+    artistName: 'Autechre',
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+  }];
+  const ingestSlskdSearchResponses = t.mock.fn(async () => ({ candidateCount: 1, fileCount: 3 }));
+  const getReleaseTracklistExpectationsFn = t.mock.fn(async () => {
+    throw new Error('lookup failed');
+  });
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 3,
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    getReleaseTracklistExpectationsFn,
+    importCandidateService: { ingestSlskdSearchResponses },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      markDiscoveryRequestExhausted: t.mock.fn(async () => {}),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    slskdService: { startSearch: t.mock.fn(async () => ({ id: 'search-9' })) },
+  });
+
+  await service.dispatchReadyDiscoveryRequests({ actorUserId: 'user-1', requestMetadata: {} });
+
+  assert.equal(ingestSlskdSearchResponses.mock.callCount(), 1);
+  const ingestArgs = ingestSlskdSearchResponses.mock.calls[0].arguments[0];
+  assert.equal(ingestArgs.expectedTrackTitles, null);
+  assert.equal(ingestArgs.expectedTrackCount, null);
 });
 
 test('buildDiscoverySearchQuery appends FLAC when preferredFormat is flac', () => {

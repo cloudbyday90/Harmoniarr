@@ -16,6 +16,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  DEFAULT_MINIMUM_MATCH_RATIO,
+  matchExpectedTracklist,
+  scoreTracklistMatch,
+} from './candidate-track-matcher.js';
+
 const LOSSLESS_EXTENSIONS = new Set(['flac', 'wav', 'aiff', 'alac', 'ape', 'wv']);
 const LOSSY_EXTENSIONS = new Set(['mp3', 'aac', 'ogg', 'opus', 'wma', 'm4a']);
 
@@ -100,6 +106,26 @@ export function scoreAudioDepth({ files = [] }) {
   if (highResRatio > 0.5) return { name: 'audioDepth', score: 100 };
   if (losslessRatio > 0.5) return { name: 'audioDepth', score: 90 };
   return { name: 'audioDepth', score: 70 };
+}
+
+export function scoreCandidateTrackMatch({
+  expectedTrackTitles = null,
+  albumTitle = null,
+  files = [],
+  minimumRatio = DEFAULT_MINIMUM_MATCH_RATIO,
+}) {
+  const candidateFilenames = (Array.isArray(files) ? files : [])
+    .map((file) => (typeof file?.filename === 'string' ? file.filename : file?.name))
+    .filter((name) => typeof name === 'string' && name.length > 0);
+
+  const summary = matchExpectedTracklist({
+    expectedTrackTitles,
+    candidateFilenames,
+    albumTitle,
+    minimumRatio,
+  });
+
+  return { name: 'candidateTrackMatch', score: scoreTracklistMatch(summary), summary };
 }
 
 export function scoreTrackCount({ candidateFileCount = 0, expectedTrackCount = null }) {
@@ -207,12 +233,13 @@ export function scoreUploaderReputation({ successCount = 0, failureCount = 0 }) 
 }
 
 const DEFAULT_SCORERS = [
-  { name: 'formatTier', weight: 0.30, fn: scoreFormatTier },
-  { name: 'audioDepth', weight: 0.15, fn: scoreAudioDepth },
-  { name: 'trackCount', weight: 0.15, fn: scoreTrackCount },
-  { name: 'duration', weight: 0.15, fn: scoreDuration },
+  { name: 'formatTier', weight: 0.25, fn: scoreFormatTier },
+  { name: 'candidateTrackMatch', weight: 0.20, fn: scoreCandidateTrackMatch },
+  { name: 'audioDepth', weight: 0.12, fn: scoreAudioDepth },
+  { name: 'duration', weight: 0.12, fn: scoreDuration },
   { name: 'formatConsistency', weight: 0.10, fn: scoreFormatConsistency },
-  { name: 'peerDelivery', weight: 0.10, fn: scorePeerDelivery },
+  { name: 'trackCount', weight: 0.08, fn: scoreTrackCount },
+  { name: 'peerDelivery', weight: 0.08, fn: scorePeerDelivery },
   { name: 'uploaderReputation', weight: 0.05, fn: scoreUploaderReputation },
 ];
 
@@ -220,7 +247,10 @@ export function scoreDownloadResult({
   candidate,
   formatPreferences = null,
   expectedTrackCount = null,
+  expectedTrackTitles = null,
   expectedDurationSeconds = null,
+  albumTitle = null,
+  minimumTrackMatchRatio = DEFAULT_MINIMUM_MATCH_RATIO,
   uploaderReputation = null,
   scorers = DEFAULT_SCORERS,
 }) {
@@ -248,8 +278,19 @@ export function scoreDownloadResult({
     }
     : null;
 
+  const hasExpectedTrackTitles = Array.isArray(expectedTrackTitles)
+    && expectedTrackTitles.some((title) => typeof title === 'string' && title.trim().length > 0);
+
   const inputs = {
     formatTier: formatInput,
+    candidateTrackMatch: hasExpectedTrackTitles
+      ? {
+        expectedTrackTitles,
+        albumTitle,
+        files,
+        minimumRatio: minimumTrackMatchRatio,
+      }
+      : null,
     audioDepth: { files },
     trackCount: { candidateFileCount, expectedTrackCount },
     duration: { candidateDurationSeconds, expectedDurationSeconds },
@@ -265,6 +306,7 @@ export function scoreDownloadResult({
   const breakdown = [];
   let totalWeight = 0;
   let weightedSum = 0;
+  let trackMatchSummary = null;
 
   for (const scorer of scorers) {
     const input = inputs[scorer.name];
@@ -272,6 +314,10 @@ export function scoreDownloadResult({
 
     const result = scorer.fn(input);
     if (result.score === null || result.score === undefined) continue;
+
+    if (scorer.name === 'candidateTrackMatch' && result.summary) {
+      trackMatchSummary = result.summary;
+    }
 
     breakdown.push({ name: scorer.name, score: result.score, weight: scorer.weight });
     weightedSum += result.score * scorer.weight;
@@ -282,5 +328,5 @@ export function scoreDownloadResult({
     ? Math.round((weightedSum / totalWeight) * 100) / 100
     : null;
 
-  return { compositeScore, breakdown };
+  return { compositeScore, breakdown, trackMatchSummary };
 }
