@@ -69,6 +69,7 @@ export function createImportCandidateModule({
     status: 'healthy',
   }),
   getAppUserById = null,
+  listIgnoredUsernamesFn = async () => [],
   listSourceUserReputationIndexFn = async () => new Map(),
   onDownloadCompletedFn = null,
   onReleaseAddedFn = null,
@@ -102,6 +103,7 @@ export function createImportCandidateModule({
     })
     : null,
   importCandidateService = createImportCandidateService({
+    listIgnoredUsernamesFn,
     listSourceUserReputationIndexFn,
     recordSourceUserOutcomeEvidenceFn,
     slskdService,

@@ -17,6 +17,7 @@
  */
 
 import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
+import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-quality.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import {
   isOperationRunCancellationError,
@@ -246,8 +247,14 @@ export function createImportCandidateApplyWorker({
           });
 
           if (itemStatus !== 'apply_failed') {
+            const outcomeQuality = classifyApplyOutcomeQuality({
+              status: itemStatus,
+              summary: applyResult.summary,
+            });
             await markImportCandidateApplied({
               importCandidateId: summaryCandidate.id,
+              qualityLabel: outcomeQuality.qualityLabel,
+              qualityWeight: outcomeQuality.qualityWeight,
               reason: statusMessage,
             });
 

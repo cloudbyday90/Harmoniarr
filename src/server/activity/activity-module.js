@@ -20,6 +20,8 @@ import { createActivityEventService } from './activity-event-service.js';
 import { createActivityEventStore } from './activity-event-store.js';
 import { createSourceUserBlocklistService } from './source-user-blocklist-service.js';
 import { createSourceUserBulkOperationService } from './source-user-bulk-operation-service.js';
+import { createSourceUserIgnoreService } from './source-user-ignore-service.js';
+import { createSourceUserIgnoreStore } from './source-user-ignore-store.js';
 import { createSourceUserOutcomeLedgerStore } from './source-user-outcome-ledger-store.js';
 import { createSourceUserTrustDetailService } from './source-user-trust-detail-service.js';
 import { createSourceUserTrustEvidenceService } from './source-user-trust-evidence-service.js';
@@ -44,6 +46,10 @@ export function createActivityModule({
   onBlockEventFn = async () => {},
   onTrustThresholdCrossedFn = async () => {},
   sourceUserOutcomeLedgerStore = createSourceUserOutcomeLedgerStore(),
+  sourceUserIgnoreStore = createSourceUserIgnoreStore(),
+  sourceUserIgnoreService = createSourceUserIgnoreService({
+    ignoreStore: sourceUserIgnoreStore,
+  }),
   sourceUserBlocklistService = createSourceUserBlocklistService({
     listTrustSnapshot,
     replaceTrustSnapshot,
@@ -62,6 +68,7 @@ export function createActivityModule({
     appendOutcomeEventFn: sourceUserOutcomeLedgerStore.appendOutcomeEvent,
     listRecentOutcomeEventsFn: sourceUserOutcomeLedgerStore.listRecentOutcomeEvents,
     listTrustSnapshot,
+    onAutoIgnoreEvaluationFn: sourceUserIgnoreService.evaluateAutoIgnoreForUser,
     onTrustThresholdCrossedFn,
     replaceTrustSnapshot,
   }),
@@ -80,6 +87,8 @@ export function createActivityModule({
     activityEventStore,
     sourceUserBlocklistService,
     sourceUserBulkOperationService,
+    sourceUserIgnoreService,
+    sourceUserIgnoreStore,
     sourceUserOutcomeLedgerStore,
     sourceUserTrustDetailService,
     sourceUserTrustExportService,
@@ -93,6 +102,9 @@ export function createActivityModule({
       buildActivityFeed: activityEventService.buildActivityFeed,
       exportSourceUserTrustHistory: sourceUserTrustExportService.exportSourceUserTrustHistory,
       getSourceUserDetail: sourceUserTrustDetailService.getSourceUserDetail,
+      applyIgnoreSuggestion: sourceUserIgnoreService.applyIgnoreSuggestion,
+      listIgnoredSourceUsers: sourceUserIgnoreService.listIgnoredSourceUsers,
+      removeIgnoredSourceUser: sourceUserIgnoreService.removeIgnoredUser,
       listBlockedSourceUsers: sourceUserBlocklistService.listBlockedSourceUsers,
       listSourceUsers: sourceUserTrustService.listSourceUsers,
       updateSourceUserTrust: sourceUserTrustOverrideService.updateSourceUserTrust,

@@ -339,6 +339,7 @@ export function createImportCandidateService({
   listImportCandidateFilesFn = listImportCandidateFiles,
   listImportCandidatesFn = listImportCandidatesFromRepository,
   listImportCandidatesBySourceMediaRequestIdsFn = listImportCandidatesBySourceMediaRequestIdsFromRepository,
+  listIgnoredUsernamesFn = async () => [],
   listSourceUserReputationIndexFn = async () => new Map(),
   normalizeSlskdResponsesFn = normalizeSlskdResponsesToImportCandidates,
   pool = getPool(),
@@ -634,6 +635,8 @@ export function createImportCandidateService({
   function markImportCandidateApplied({
     actorUserId = null,
     importCandidateId,
+    qualityLabel = null,
+    qualityWeight = 1,
     reason = null,
     requestMetadata = null,
   }) {
@@ -653,6 +656,8 @@ export function createImportCandidateService({
           eventType: 'import_candidate_applied',
           occurredAt: transitionResult?.candidate?.updatedAt ?? null,
           outcome: 'success',
+          qualityLabel,
+          qualityWeight,
           reason,
           username: transitionResult?.candidate?.username,
         });
@@ -745,10 +750,23 @@ export function createImportCandidateService({
     searchId,
   }) {
     const searchResponses = await slskdService.getSearchResponses({ searchId });
+    // Feed the G6 candidate source filter from the operator-controlled ignore
+    // list (the "act" side of the learn->act loop). An explicit ignoredUsernames
+    // argument still wins; otherwise the current ignore list is resolved here so
+    // every ingest path (album + per-track fallback) drops ignored peers before
+    // any candidate is built. Best-effort: a lookup failure must not block ingest.
+    let effectiveIgnoredUsernames = ignoredUsernames;
+    if (effectiveIgnoredUsernames === null) {
+      try {
+        effectiveIgnoredUsernames = await listIgnoredUsernamesFn();
+      } catch {
+        effectiveIgnoredUsernames = null;
+      }
+    }
     const candidates = normalizeSlskdResponsesFn({
       blacklistedTitleTerms,
       formatPreferences,
-      ignoredUsernames,
+      ignoredUsernames: effectiveIgnoredUsernames,
       requestOwnership,
       responses: searchResponses.responses,
       searchId: searchResponses.searchId,

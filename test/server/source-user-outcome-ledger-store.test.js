@@ -66,7 +66,31 @@ test('appendOutcomeEvent inserts a normalized event with a derived username key'
   assert.equal(pool.calls[0].params[0], 'flac-peer');
   assert.equal(pool.calls[0].params[1], 'FLAC-Peer');
   assert.equal(pool.calls[0].params[2], 'success');
-  assert.equal(pool.calls[0].params[5], 'admin-1');
+  assert.equal(pool.calls[0].params[7], 'admin-1');
+});
+
+test('appendOutcomeEvent persists a clamped quality weight and label, defaulting to full quality', async () => {
+  const pool = createFakePool(() => ({ rows: [{ id: 'evt-2', username: 'peer', username_key: 'peer', outcome: 'success', quality_weight: 0.5, quality_label: 'partial_apply' }] }));
+  const store = createSourceUserOutcomeLedgerStore({ getPoolFn: pool.getPoolFn });
+
+  const event = await store.appendOutcomeEvent({
+    outcome: 'success',
+    qualityWeight: 0.5,
+    qualityLabel: 'partial_apply',
+    username: 'peer',
+  });
+
+  assert.equal(event.qualityWeight, 0.5);
+  assert.equal(event.qualityLabel, 'partial_apply');
+  assert.match(pool.calls[0].text, /quality_weight/);
+  assert.equal(pool.calls[0].params[3], 0.5);
+  assert.equal(pool.calls[0].params[4], 'partial_apply');
+
+  await store.appendOutcomeEvent({ outcome: 'success', qualityWeight: 9, username: 'peer' });
+  assert.equal(pool.calls[1].params[3], 1);
+
+  await store.appendOutcomeEvent({ outcome: 'success', username: 'peer' });
+  assert.equal(pool.calls[2].params[3], 1);
 });
 
 test('appendOutcomeEvent rejects blank usernames and invalid outcomes without querying', async () => {

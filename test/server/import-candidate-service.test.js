@@ -699,6 +699,8 @@ test('createImportCandidateService marks download workflow transitions with shar
       eventType: 'import_candidate_applied',
       occurredAt: '2026-04-30T14:00:00.000Z',
       outcome: 'success',
+      qualityLabel: null,
+      qualityWeight: 1,
       reason: 'Imported cleanly',
       username: 'source-user',
     },

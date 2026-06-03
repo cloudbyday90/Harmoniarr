@@ -278,6 +278,18 @@ const settingDefinitions = {
       },
     },
   },
+  acquisition: {
+    autoIgnoreEnabled: {
+      defaultValue: false,
+      normalize: normalizeBooleanSetting('acquisition.autoIgnoreEnabled'),
+    },
+    autoIgnoreCooldownHours: {
+      defaultValue: 24,
+      normalize(value) {
+        return normalizeIntegerSetting('acquisition.autoIgnoreCooldownHours', value, { min: 0, max: 8760 });
+      },
+    },
+  },
   providers: {
     spotifyClientId: {
       defaultValue: process.env.SPOTIFY_CLIENT_ID ?? '',

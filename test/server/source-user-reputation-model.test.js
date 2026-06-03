@@ -82,6 +82,30 @@ test('computeDecayedOutcomeCounts discards outcomes beyond the max age window', 
   assert.ok(Math.abs(decayed.decayedFailure - 1) < 1e-9);
 });
 
+test('computeDecayedOutcomeCounts splits a quality-weighted success between success and failure mass', () => {
+  const now = Date.parse('2026-06-27T00:00:00.000Z');
+  const decayed = computeDecayedOutcomeCounts(
+    [{ outcome: 'success', qualityWeight: 0.4, occurredAt: new Date(now).toISOString() }],
+    { now },
+  );
+
+  // A 0.4-quality success contributes 0.4 to success and 0.6 to failure mass.
+  assert.ok(Math.abs(decayed.decayedSuccess - 0.4) < 1e-9);
+  assert.ok(Math.abs(decayed.decayedFailure - 0.6) < 1e-9);
+  assert.ok(Math.abs(decayed.decayedTotal - 1) < 1e-9);
+});
+
+test('computeDecayedOutcomeCounts treats an absent quality weight as a full-quality success', () => {
+  const now = Date.parse('2026-06-27T00:00:00.000Z');
+  const decayed = computeDecayedOutcomeCounts(
+    [{ outcome: 'success', occurredAt: new Date(now).toISOString() }],
+    { now },
+  );
+
+  assert.ok(Math.abs(decayed.decayedSuccess - 1) < 1e-9);
+  assert.equal(decayed.decayedFailure, 0);
+});
+
 test('computeDecayedOutcomeCounts ignores malformed events', () => {
   const decayed = computeDecayedOutcomeCounts([
     { outcome: 'maybe', occurredAt: new Date().toISOString() },

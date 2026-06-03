@@ -307,6 +307,7 @@ export function createApp({
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,
+    listIgnoredUsernamesFn: activityModule.sourceUserIgnoreService.listIgnoredUsernamesForFilter,
     listSourceUserReputationIndexFn: activityModule.sourceUserTrustEvidenceService.listSourceUserReputationIndex,
     onDownloadCompletedFn: ({ folderPath, username }) => broadcastHouseholdNotification({
       category: 'downloadCompleted',

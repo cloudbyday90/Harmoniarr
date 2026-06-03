@@ -100,6 +100,7 @@ export function createSourceUserTrustEvidenceService({
   appendOutcomeEventFn = null,
   listRecentOutcomeEventsFn = null,
   listTrustSnapshot = async () => [],
+  onAutoIgnoreEvaluationFn = null,
   onTrustThresholdCrossedFn = null,
   replaceTrustSnapshot = async () => {},
 } = {}) {
@@ -178,6 +179,8 @@ export function createSourceUserTrustEvidenceService({
     eventType = null,
     occurredAt = new Date().toISOString(),
     outcome,
+    qualityLabel = null,
+    qualityWeight = 1,
     reason = null,
     username,
   } = {}) {
@@ -246,6 +249,8 @@ export function createSourceUserTrustEvidenceService({
           eventType: normalizedEventType,
           occurredAt: updatedAt,
           outcome,
+          qualityLabel,
+          qualityWeight,
           reason: normalizedReason,
           username: normalizedUsername,
         });
@@ -256,6 +261,31 @@ export function createSourceUserTrustEvidenceService({
     }
 
     await replaceTrustSnapshot({ sourceUsers: rows });
+
+    // Closed-loop hook: after the durable ledger write, recompute this single
+    // peer's recency-weighted reputation and hand the explainable suggestion to
+    // the opt-in auto-ignore policy. Fire-and-forget so it never blocks or
+    // breaks the outcome path; gated entirely by the injected handler.
+    if (typeof onAutoIgnoreEvaluationFn === 'function' && typeof listRecentOutcomeEventsFn === 'function') {
+      void (async () => {
+        try {
+          const events = await listRecentOutcomeEventsFn({ usernameKeys: [usernameKey] });
+          const recencyWeighted = buildRecencyWeightedReputation({ events: Array.isArray(events) ? events : [] });
+          const suggestion = evaluateAutoIgnoreSuggestion({ reputation: recencyWeighted });
+          if (!suggestion.suggested) {
+            return;
+          }
+          await onAutoIgnoreEvaluationFn({
+            actorUserId,
+            reputation: recencyWeighted,
+            suggestion,
+            username: normalizedUsername,
+          });
+        } catch {
+          // Advisory convenience: a failure here must not affect outcome recording.
+        }
+      })();
+    }
 
     const nextView = mapSourceUserTrustRow(nextRow);
     if (typeof onTrustThresholdCrossedFn === 'function' && shouldAlertOnReviewTransition(previousReviewState, nextView.review?.state)) {

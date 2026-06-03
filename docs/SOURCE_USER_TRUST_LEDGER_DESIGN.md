@@ -233,6 +233,9 @@ ledger is empty or unavailable.
 
 ## 7. Three more high-value design areas
 
+> **Update:** Items 1 and 2 below are now **implemented** — see
+> [SOURCE_USER_TRUST_CLOSED_LOOP_DESIGN.md](SOURCE_USER_TRUST_CLOSED_LOOP_DESIGN.md).
+
 1. **Auto-ignore → settings + G6 closed loop.** Surface the auto-ignore
    suggestion in the authenticated settings/source-users UI with one-click
    "apply to ignore list", an opt-in *auto-apply* policy (with an audit trail and

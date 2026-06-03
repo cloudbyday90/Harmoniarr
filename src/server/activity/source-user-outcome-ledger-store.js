@@ -20,6 +20,27 @@ import { getPool } from '../database.js';
 import { buildSourceUserUsernameKey } from './source-user-trust-service.js';
 
 const MAX_LIST_LIMIT = 5000;
+const DEFAULT_QUALITY_WEIGHT = 1;
+
+/**
+ * Clamps a delivered-quality weight into the [0, 1] unit interval. A non-finite
+ * or missing value falls back to a clean full-quality success (1.0) so callers
+ * and historical rows that never supply quality keep the prior binary
+ * success/failure semantics.
+ */
+function normalizeQualityWeight(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_QUALITY_WEIGHT;
+  }
+  if (parsed < 0) {
+    return 0;
+  }
+  if (parsed > 1) {
+    return 1;
+  }
+  return parsed;
+}
 
 function normalizeOptionalString(value) {
   if (typeof value !== 'string') {
@@ -47,6 +68,10 @@ function mapOutcomeEventRow(row) {
     username: row.username,
     usernameKey: row.username_key,
     outcome: row.outcome,
+    qualityWeight: row.quality_weight === null || row.quality_weight === undefined
+      ? DEFAULT_QUALITY_WEIGHT
+      : Number(row.quality_weight),
+    qualityLabel: row.quality_label ?? null,
     eventType: row.event_type ?? null,
     reason: row.reason ?? null,
     actorUserId: row.actor_user_id ?? null,
@@ -66,6 +91,8 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
     eventType = null,
     occurredAt = null,
     outcome,
+    qualityLabel = null,
+    qualityWeight = DEFAULT_QUALITY_WEIGHT,
     reason = null,
     username,
   } = {}) {
@@ -84,17 +111,21 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
           username_key,
           username,
           outcome,
+          quality_weight,
+          quality_label,
           event_type,
           reason,
           actor_user_id,
           occurred_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING
           id,
           username_key,
           username,
           outcome,
+          quality_weight,
+          quality_label,
           event_type,
           reason,
           actor_user_id,
@@ -105,6 +136,8 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
         usernameKey,
         normalizedUsername,
         outcome,
+        normalizeQualityWeight(qualityWeight),
+        normalizeOptionalString(qualityLabel),
         normalizeOptionalString(eventType),
         normalizeOptionalString(reason),
         actorUserId === null || actorUserId === undefined ? null : String(actorUserId),
@@ -150,6 +183,8 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
           username_key,
           username,
           outcome,
+          quality_weight,
+          quality_label,
           event_type,
           reason,
           actor_user_id,

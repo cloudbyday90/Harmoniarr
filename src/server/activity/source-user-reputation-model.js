@@ -82,6 +82,19 @@ function resolveOutcome(event) {
 }
 
 /**
+ * Resolves the delivered-quality weight of an outcome event into the [0, 1]
+ * unit interval. Absent/invalid quality defaults to 1.0 so legacy events
+ * (recorded before quality weighting) and plain failures keep binary semantics.
+ */
+function resolveQualityWeight(event) {
+  const raw = event?.qualityWeight ?? event?.quality_weight;
+  if (raw === null || raw === undefined) {
+    return 1;
+  }
+  return clampUnitInterval(toFiniteNumber(raw));
+}
+
+/**
  * Wilson score interval bounds for a binomial proportion. Handles fractional
  * (decay-weighted) pseudo-counts and the empty-sample case (returns a
  * zero-width interval at 0). Reference: Evan Miller, "How Not To Sort By
@@ -158,7 +171,14 @@ export function computeDecayedOutcomeCounts(events, {
     const weight = Math.pow(0.5, ageDays / safeHalfLifeDays);
 
     if (outcome === 'success') {
-      decayedSuccess += weight;
+      // Quality-weighted success: a clean apply (quality 1.0) contributes its
+      // full decay weight to success. A partially-delivered success (e.g. half
+      // the files applied, or transcode/format degradation) splits its weight
+      // between success and failure mass, so reputation reflects delivered
+      // fidelity rather than mere completion.
+      const quality = resolveQualityWeight(event);
+      decayedSuccess += weight * quality;
+      decayedFailure += weight * (1 - quality);
     } else {
       decayedFailure += weight;
     }
