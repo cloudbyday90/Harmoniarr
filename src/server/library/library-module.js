@@ -81,6 +81,7 @@ import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-
 export function createLibraryModule({
   artworkAssignmentService = null,
   artworkIngestionService = null,
+  enableTrackFallback = process.env.HARMONIARR_ENABLE_TRACK_FALLBACK === 'true',
   getAppUserById = null,
   getUserPreferencesFn = null,
   importCandidateService = null,
@@ -98,6 +99,7 @@ export function createLibraryModule({
     libraryDiscoveryRequestStore,
   }),
   libraryDiscoveryDispatchService = createLibraryDiscoveryDispatchService({
+    enableTrackFallback,
     getReleaseTracklistExpectationsFn: async ({ metadataReleaseId }) => {
       const trackRows = await listMetadataTracksByReleaseId(metadataReleaseId);
       return buildReleaseTracklistExpectations(trackRows);

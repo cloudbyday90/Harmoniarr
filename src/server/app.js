@@ -37,6 +37,7 @@ import { createLibraryModule } from './library/library-module.js';
 import { createPushModule } from './push/push-module.js';
 import { createFulfillmentModule } from './fulfillment/fulfillment-module.js';
 import { createPlexWebhookIngestionService } from './integrations/plex/plex-webhook-ingestion-service.js';
+import { createSlskdWebhookIngestionService } from './integrations/slskd/slskd-webhook-ingestion-service.js';
 import { createMediaCommandService } from './media/media-command-service.js';
 import { createMediaInspectionService } from './media/media-inspection-service.js';
 import { createMetadataModule } from './metadata/metadata-module.js';
@@ -54,6 +55,7 @@ import { createControlPlaneRedactionService } from './control-plane-redaction-se
 import { createRestoreScopeRuntimeSnapshotStore } from './recovery/restore-scope-runtime-snapshot-store.js';
 import { createMaintenanceLockOperationPauseService } from './recovery/maintenance-lock-operation-pause-service.js';
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
+import { createControlPlaneIdempotencyService } from './recovery/control-plane-idempotency-service.js';
 import { registerArtworkRoutes } from './routes/artwork-routes.js';
 import { registerActivityRoutes } from './routes/activity-routes.js';
 import { registerAppUserRoutes } from './routes/app-user-routes.js';
@@ -67,6 +69,7 @@ import { registerProviderRoutes } from './routes/provider-routes.js';
 import { registerPushRoutes } from './routes/push-routes.js';
 import { registerPlexWebhookRoutes } from './routes/plex-webhook-routes.js';
 import { registerSlskdRoutes } from './routes/slskd-routes.js';
+import { registerSlskdWebhookRoutes } from './routes/slskd-webhook-routes.js';
 import { registerSystemRoutes } from './routes/system-routes.js';
 import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { loadSettings } from './settings.js';
@@ -163,6 +166,7 @@ export function createApp({
   registerPushRoutes: mountPushRoutes = registerPushRoutes,
   registerPlexWebhookRoutes: mountPlexWebhookRoutes = registerPlexWebhookRoutes,
   registerSlskdRoutes: mountSlskdRoutes = registerSlskdRoutes,
+  registerSlskdWebhookRoutes: mountSlskdWebhookRoutes = registerSlskdWebhookRoutes,
   registerSystemRoutes: mountSystemRoutes = registerSystemRoutes,
 } = {}) {
   const app = express();
@@ -763,6 +767,26 @@ export function createApp({
     limitWebhook: requestRateLimiterService.createMiddleware({
       bucketName: 'plex-webhook',
       limit: 60,
+      windowMs: 60 * 1000,
+    }),
+  });
+  const slskdWebhookIdempotencyService = createControlPlaneIdempotencyService();
+  const slskdWebhookIngestionService = createSlskdWebhookIngestionService({
+    executeIdempotentMutation: slskdWebhookIdempotencyService.executeIdempotentMutation,
+    getWebhookSecret: () => process.env.HARMONIARR_SLSKD_WEBHOOK_SECRET ?? null,
+    nudgeReconciliationFn: async () => {
+      const executionSummary = await importCandidateModule
+        .importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary();
+      await importCandidateModule
+        .importCandidateExecutionReconciliationService
+        .reconcileImportCandidateExecutionState({ executionSummary });
+    },
+  });
+  mountSlskdWebhookRoutes(app, {
+    ingestWebhookEvent: slskdWebhookIngestionService.ingestWebhookEvent,
+    limitSlskdWebhook: requestRateLimiterService.createMiddleware({
+      bucketName: 'slskd-webhook',
+      limit: 120,
       windowMs: 60 * 1000,
     }),
   });

@@ -19,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
+import { filterSlskdResponsesForCandidates } from '../library/candidate-source-filter.js';
 import { scoreDownloadResult } from '../library/download-result-scoring.js';
 import { scoreCandidateFormatMatch } from '../library/format-preference-scoring.js';
 import { getPool } from '../database.js';
@@ -209,8 +210,10 @@ function normalizeResponseFile(file, {
 }
 
 export function normalizeSlskdResponsesToImportCandidates({
+  blacklistedTitleTerms = null,
   formatPreferences = null,
   discoveredAt = new Date(),
+  ignoredUsernames = null,
   requestOwnership = null,
   responses = [],
   searchId,
@@ -218,7 +221,13 @@ export function normalizeSlskdResponsesToImportCandidates({
   const groups = new Map();
   let sourceFileIndex = 0;
 
-  for (const response of responses) {
+  const { responses: filteredResponses } = filterSlskdResponsesForCandidates({
+    responses,
+    ignoredUsernames,
+    blacklistedTitleTerms,
+  });
+
+  for (const response of filteredResponses) {
     const username = typeof response?.username === 'string' ? response.username.trim() : '';
     if (!username) {
       continue;
@@ -725,17 +734,21 @@ export function createImportCandidateService({
   async function ingestSlskdSearchResponses({
     actorUserId = null,
     albumTitle = null,
+    blacklistedTitleTerms = null,
     expectedTrackCount = null,
     expectedTrackTitles = null,
     expectedDurationSeconds = null,
     formatPreferences = null,
+    ignoredUsernames = null,
     requestOwnership = null,
     requestMetadata = null,
     searchId,
   }) {
     const searchResponses = await slskdService.getSearchResponses({ searchId });
     const candidates = normalizeSlskdResponsesFn({
+      blacklistedTitleTerms,
       formatPreferences,
+      ignoredUsernames,
       requestOwnership,
       responses: searchResponses.responses,
       searchId: searchResponses.searchId,

@@ -571,3 +571,93 @@ test('dispatchReadyDiscoveryRequests records failures without failing the whole 
     fileCount: 0,
   });
 });
+
+test('dispatchReadyDiscoveryRequests runs per-track fallback on album exhaustion when enabled', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Aphex Twin',
+    evidence: {},
+    metadataReleaseId: 'release-rdj',
+    releaseDate: '1996-11-04',
+    releaseGroupTitle: 'Richard D. James Album',
+    releaseTitle: 'Richard D. James Album',
+    searchAttemptCount: 2,
+  }];
+  const claimNextReadyAutomaticDiscoveryRequest = t.mock.fn(async () => claimedRequests.shift() ?? null);
+  const markDiscoveryRequestExhausted = t.mock.fn(async () => {});
+  const onDiscoveryRequestExhaustedFn = t.mock.fn(async () => {});
+  const recordDiscoverySearchSuccess = t.mock.fn(async () => {});
+  const startSearch = t.mock.fn(async () => ({ id: `search-${startSearch.mock.callCount()}` }));
+  const ingestSlskdSearchResponses = t.mock.fn(async ({ expectedTrackTitles }) => (
+    expectedTrackTitles?.length === 1
+      ? { candidateCount: 1, fileCount: 3 }
+      : { candidateCount: 0, fileCount: 0 }
+  ));
+
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    enableTrackFallback: true,
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    getReleaseTracklistExpectationsFn: t.mock.fn(async () => ({
+      expectedTrackTitles: ['4', 'Cornish Acid', 'Peek 824545201'],
+      expectedTrackCount: 3,
+    })),
+    importCandidateService: { ingestSlskdSearchResponses },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest,
+      markDiscoveryRequestExhausted,
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess,
+    },
+    onDiscoveryRequestExhaustedFn,
+    slskdService: { startSearch },
+  });
+
+  const result = await service.dispatchReadyDiscoveryRequests();
+
+  // 1 album-level search + 2 per-track searches (the single-char "4" title is skipped as unsafe).
+  assert.equal(startSearch.mock.callCount(), 3);
+  assert.equal(result.candidateCount, 2);
+  assert.equal(result.fileCount, 6);
+  assert.equal(result.dispatchedSearches.filter((entry) => entry.mode === 'track_fallback').length, 2);
+  assert.equal(markDiscoveryRequestExhausted.mock.calls[0].arguments[0].reasonCode, 'discovery_track_fallback_exhausted');
+  assert.equal(onDiscoveryRequestExhaustedFn.mock.calls[0].arguments[0].reasonCode, 'discovery_track_fallback_exhausted');
+});
+
+test('dispatchReadyDiscoveryRequests skips per-track fallback when disabled by default', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Aphex Twin',
+    evidence: {},
+    metadataReleaseId: 'release-rdj',
+    releaseDate: '1996-11-04',
+    releaseGroupTitle: 'Richard D. James Album',
+    releaseTitle: 'Richard D. James Album',
+    searchAttemptCount: 2,
+  }];
+  const claimNextReadyAutomaticDiscoveryRequest = t.mock.fn(async () => claimedRequests.shift() ?? null);
+  const markDiscoveryRequestExhausted = t.mock.fn(async () => {});
+  const startSearch = t.mock.fn(async () => ({ id: 'search-album' }));
+
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    getReleaseTracklistExpectationsFn: t.mock.fn(async () => ({
+      expectedTrackTitles: ['Cornish Acid', 'Peek 824545201'],
+      expectedTrackCount: 2,
+    })),
+    importCandidateService: {
+      ingestSlskdSearchResponses: t.mock.fn(async () => ({ candidateCount: 0, fileCount: 0 })),
+    },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest,
+      markDiscoveryRequestExhausted,
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    slskdService: { startSearch },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+
+  assert.equal(startSearch.mock.callCount(), 1);
+  assert.equal(markDiscoveryRequestExhausted.mock.calls[0].arguments[0].reasonCode, 'discovery_search_attempts_exhausted');
+});
