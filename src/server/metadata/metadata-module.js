@@ -165,6 +165,10 @@ export function createMetadataModule({
       operatorArtistReconciliationSnapshotStore: resolvedOperatorArtistReconciliationSnapshotStore,
       operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
       operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
+      // Late-bound: the metadata artist refresh service is resolved further
+      // below. Adding/monitoring an artist queues a per-artist discography
+      // refresh so their releases populate without waiting on the heartbeat.
+      startMetadataArtistRefresh: (input) => resolvedMetadataArtistRefreshService.startMetadataArtistRefresh(input),
     });
   const resolvedOperatorArtistReconciliationRequestService = operatorArtistReconciliationRequestService
     ?? createOperatorArtistReconciliationRequestService({

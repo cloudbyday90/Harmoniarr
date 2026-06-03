@@ -22,6 +22,11 @@ import {
   resolveAllowedOutboundHostSuffixes,
 } from '../../outbound-url-policy.js';
 
+// Last-resort contact used in the User-Agent when no HARMONIARR_CONTACT_URL or
+// HARMONIARR_CONTACT_EMAIL is configured. Operators are encouraged to override
+// this with their own contact, but this keeps the provider usable out of the box.
+const DEFAULT_CONTACT_URL = 'https://github.com/cloudbyday90/harmoniarr';
+
 function parsePositiveInteger(value, fallback) {
   if (value == null || value === '') {
     return fallback;
@@ -92,13 +97,11 @@ function normalizeBaseUrl(value, { allowedHosts, allowedHostSuffixes }) {
 }
 
 function resolveUserAgent({ applicationName, applicationVersion, contactEmail, contactUrl }) {
-  const contact = contactUrl ?? contactEmail ?? null;
-  if (!contact) {
-    throw createMusicBrainzError(
-      'musicbrainz_misconfigured',
-      'MusicBrainz requests require HARMONIARR_CONTACT_URL or HARMONIARR_CONTACT_EMAIL',
-    );
-  }
+  // MusicBrainz only requires that the User-Agent carry a reachable contact for
+  // the operator. Prefer an explicitly configured contact, but fall back to the
+  // project URL so a missing HARMONIARR_CONTACT_* env var degrades to a valid,
+  // reachable identifier instead of disabling the provider entirely.
+  const contact = contactUrl ?? contactEmail ?? DEFAULT_CONTACT_URL;
 
   return `${applicationName}/${applicationVersion} (${contact})`;
 }

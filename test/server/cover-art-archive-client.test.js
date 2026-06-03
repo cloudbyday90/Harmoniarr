@@ -13,10 +13,9 @@ function createFakeResponse({ status = 200, headers = {}, body = null, url = 'ht
   };
 }
 
-test('createCoverArtArchiveClient throws when contact info is missing', () => {
-  assert.throws(
+test('createCoverArtArchiveClient falls back to a default contact when none is configured', () => {
+  assert.doesNotThrow(
     () => createCoverArtArchiveClient({ contactEmail: undefined, contactUrl: undefined }),
-    (error) => error.code === 'coverartarchive_misconfigured',
   );
 });
 

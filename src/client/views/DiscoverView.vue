@@ -201,8 +201,11 @@ async function handleAddArtistSubmit(policyForm) {
       addArtistPolicyDefaults.value = saveAddArtistPolicyForm(result.policy);
     }
     lastAddedArtistId.value = artist.id;
-    await addSeed(artist);
-    await loadMonitoredArtists();
+    // The artist is already persisted. Refresh recommendations and the
+    // monitored list in the background and close the dialog immediately — a slow
+    // or unavailable similar-artists fetch must not keep the modal open.
+    void addSeed(artist);
+    void loadMonitoredArtists();
     closeAddArtistModal();
   } else if (result?.error) {
     addArtistErrorMessage.value = result.error.message ?? 'Could not add artist. Please try again.';

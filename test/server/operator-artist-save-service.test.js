@@ -372,3 +372,136 @@ test('saveOperatorArtist retries the transaction once on unique constraint races
   assert.equal(connect.mock.callCount(), 2);
   assert.equal(result.snapshot.snapshotRevision, 3);
 });
+
+function createMonitoringSaveHarness() {
+  const query = async (sql) => {
+    if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+      return { rows: [] };
+    }
+    if (sql.includes('FROM app_users')) {
+      return { rows: [{ id: 'user-1' }] };
+    }
+    if (sql.includes('FROM metadata_artists')) {
+      return { rows: [{ id: 'artist-1', name: 'Autechre' }] };
+    }
+    if (sql.includes('FROM operator_artist_monitoring')) {
+      return { rows: [] };
+    }
+    if (sql.includes('FROM metadata_release_groups')) {
+      return { rows: [] };
+    }
+    if (sql.includes('FROM metadata_releases')) {
+      return { rows: [] };
+    }
+    throw new Error(`Unexpected SQL: ${sql}`);
+  };
+  const connect = async () => ({ query, release: () => {} });
+
+  return {
+    getOperatorArtistProjection: async () => null,
+    getPoolFn: () => ({ connect }),
+    operatorArtistMonitoringStore: {
+      upsertOperatorArtistMonitoring: async () => {},
+    },
+    operatorArtistReconciliationRunStore: {
+      queueLatestSnapshotRun: async () => ({
+        action: 'created',
+        run: { id: 'run-9', status: 'pending' },
+        runningRun: null,
+      }),
+    },
+    operatorArtistReconciliationSnapshotStore: {
+      createOperatorArtistReconciliationSnapshot: async () => ({
+        createdAt: '2026-05-25T12:00:00.000Z',
+        id: 'snapshot-9',
+        snapshotRevision: 1,
+        updatedAt: '2026-05-25T12:00:00.000Z',
+      }),
+    },
+    operatorReleaseGroupSelectionStore: {
+      replaceOperatorArtistReleaseGroupSelections: async () => {},
+    },
+    operatorTrackOverrideStore: {
+      replaceOperatorArtistTrackOverrides: async () => {},
+    },
+  };
+}
+
+test('saveOperatorArtist queues a metadata discography refresh when an artist is monitored', async (t) => {
+  const startMetadataArtistRefresh = t.mock.fn(async () => ({ accepted: true }));
+  const service = createOperatorArtistSaveService({
+    ...createMonitoringSaveHarness(),
+    startMetadataArtistRefresh,
+  });
+
+  await service.saveOperatorArtist({
+    appUserId: 'user-1',
+    draft: {
+      monitoring: { isMonitored: true },
+      releaseGroupSelections: [],
+      trackOverrides: [],
+    },
+    metadataArtistId: 'artist-1',
+    triggeredByUserId: 'operator-1',
+  });
+
+  // The refresh is dispatched fire-and-forget after commit; allow the
+  // microtask queue to drain before asserting.
+  await new Promise((resolve) => { setImmediate(resolve); });
+
+  assert.equal(startMetadataArtistRefresh.mock.callCount(), 1);
+  assert.deepEqual(startMetadataArtistRefresh.mock.calls[0].arguments[0], {
+    metadataArtistId: 'artist-1',
+    triggerSource: 'monitor_added',
+    triggeredByUserId: 'operator-1',
+  });
+});
+
+test('saveOperatorArtist does not queue a metadata refresh when the artist is not monitored', async (t) => {
+  const startMetadataArtistRefresh = t.mock.fn(async () => ({ accepted: true }));
+  const service = createOperatorArtistSaveService({
+    ...createMonitoringSaveHarness(),
+    startMetadataArtistRefresh,
+  });
+
+  await service.saveOperatorArtist({
+    appUserId: 'user-1',
+    draft: {
+      monitoring: { isMonitored: false },
+      releaseGroupSelections: [],
+      trackOverrides: [],
+    },
+    metadataArtistId: 'artist-1',
+  });
+
+  await new Promise((resolve) => { setImmediate(resolve); });
+
+  assert.equal(startMetadataArtistRefresh.mock.callCount(), 0);
+});
+
+test('saveOperatorArtist still resolves when a queued discography refresh is already in progress', async (t) => {
+  const startMetadataArtistRefresh = t.mock.fn(async () => {
+    const error = new Error('A metadata refresh is already running or queued for this artist');
+    error.code = 'metadata_artist_refresh_in_progress';
+    throw error;
+  });
+  const service = createOperatorArtistSaveService({
+    ...createMonitoringSaveHarness(),
+    startMetadataArtistRefresh,
+  });
+
+  const result = await service.saveOperatorArtist({
+    appUserId: 'user-1',
+    draft: {
+      monitoring: { isMonitored: true },
+      releaseGroupSelections: [],
+      trackOverrides: [],
+    },
+    metadataArtistId: 'artist-1',
+  });
+
+  await new Promise((resolve) => { setImmediate(resolve); });
+
+  assert.equal(startMetadataArtistRefresh.mock.callCount(), 1);
+  assert.equal(result.artistId, 'artist-1');
+});

@@ -22,6 +22,11 @@ import {
   resolveAllowedOutboundHostSuffixes,
 } from '../../outbound-url-policy.js';
 
+// Last-resort contact used in the User-Agent when no HARMONIARR_CONTACT_URL or
+// HARMONIARR_CONTACT_EMAIL is configured. Operators are encouraged to override
+// this with their own contact, but this keeps artwork fetches usable out of the box.
+const DEFAULT_CONTACT_URL = 'https://github.com/cloudbyday90/harmoniarr';
+
 function createCoverArtArchiveError(code, message, details = {}) {
   const error = new Error(message);
   error.code = code;
@@ -92,13 +97,11 @@ function normalizeBaseUrl(value, { allowedHosts, allowedHostSuffixes }) {
 }
 
 function resolveUserAgent({ applicationName, applicationVersion, contactEmail, contactUrl }) {
-  const contact = contactUrl ?? contactEmail ?? null;
-  if (!contact) {
-    throw createCoverArtArchiveError(
-      'coverartarchive_misconfigured',
-      'Cover Art Archive requests require HARMONIARR_CONTACT_URL or HARMONIARR_CONTACT_EMAIL',
-    );
-  }
+  // Cover Art Archive shares MusicBrainz's User-Agent contact requirement.
+  // Prefer an explicit contact, but fall back to the project URL so a missing
+  // HARMONIARR_CONTACT_* env var degrades to a valid, reachable identifier
+  // instead of disabling artwork fetches entirely.
+  const contact = contactUrl ?? contactEmail ?? DEFAULT_CONTACT_URL;
 
   return `${applicationName}/${applicationVersion} (${contact})`;
 }

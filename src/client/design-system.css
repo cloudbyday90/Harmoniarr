@@ -1547,6 +1547,24 @@ textarea {
   margin-top: 6px;
 }
 
+/*
+ * Checkboxes and radios are not text fields: the box padding, border,
+ * background, and margin-top above are meant for text-style inputs only.
+ * Applying them to checkboxes/radios renders an oversized, mis-aligned control
+ * (e.g. a stray box floating mid-row). Reset them to their native appearance
+ * and let layout/accent come from the surrounding control styles.
+ */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  padding: 0;
+  margin-top: 0;
+  border: 0;
+  background: none;
+  border-radius: 0;
+  accent-color: var(--hx-accent);
+}
+
 input:focus,
 select:focus,
 textarea:focus {

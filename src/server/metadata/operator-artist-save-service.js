@@ -312,6 +312,7 @@ export function createOperatorArtistSaveService({
   operatorArtistReconciliationSnapshotStore = createOperatorArtistReconciliationSnapshotStore(),
   operatorReleaseGroupSelectionStore = createOperatorReleaseGroupSelectionStore(),
   operatorTrackOverrideStore = createOperatorTrackOverrideStore(),
+  startMetadataArtistRefresh = null,
 } = {}) {
   const resolvedOperatorArtistProjectionService = operatorArtistProjectionService
     ?? createOperatorArtistProjectionService();
@@ -452,6 +453,26 @@ export function createOperatorArtistSaveService({
         });
 
         await client.query('COMMIT');
+
+        if (normalizedMonitoringPatch.isMonitored === true && typeof startMetadataArtistRefresh === 'function') {
+          // Kick off a metadata catalog refresh so the artist's discography is
+          // fetched as soon as they are monitored. Each artist queues its own
+          // run; successive adds are independent. A run that is already queued
+          // or running for this artist surfaces as a 409 which we ignore.
+          void Promise.resolve()
+            .then(() => startMetadataArtistRefresh({
+              metadataArtistId,
+              triggerSource: 'monitor_added',
+              triggeredByUserId,
+            }))
+            .catch((error) => {
+              if (error?.code === 'metadata_artist_refresh_in_progress') {
+                return;
+              }
+              // Swallow remaining errors: the scheduled heartbeat refresh
+              // remains the durable fallback, so add must not fail on this.
+            });
+        }
 
         let projection = null;
         try {

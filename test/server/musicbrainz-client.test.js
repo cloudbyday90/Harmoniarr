@@ -140,3 +140,30 @@ test('MusicBrainz client rejects insecure or private override base URLs', async 
       && error?.message === 'Invalid MusicBrainz base URL: http://127.0.0.1:8080/ws/2',
   );
 });
+
+test('MusicBrainz client falls back to the project contact when none is configured', async (t) => {
+  const fetchImpl = t.mock.fn(async () => createJsonResponse({
+    count: 1,
+    offset: 0,
+    artists: [{ id: 'mb-artist-1', name: 'Autechre' }],
+  }));
+  const client = createMusicBrainzClient({
+    allowedHosts: ['musicbrainz.test'],
+    baseUrl: 'https://musicbrainz.test/ws/2',
+    contactEmail: undefined,
+    contactUrl: undefined,
+    fetchImpl,
+    maxRetries: 0,
+    minIntervalMs: 1000,
+    requestTimeoutMs: 1000,
+    sleepImpl: async () => {},
+  });
+
+  await client.searchArtists({ query: 'Autechre', limit: 1 });
+
+  const [, options] = fetchImpl.mock.calls[0].arguments;
+  assert.equal(
+    options.headers['User-Agent'],
+    'Harmoniarr/0.1.0-beta (https://github.com/cloudbyday90/harmoniarr)',
+  );
+});
