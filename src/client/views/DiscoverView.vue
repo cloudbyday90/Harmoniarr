@@ -19,7 +19,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AddArtistModal from '../components/media/AddArtistModal.vue';
-import DiscoverArtistCard from '../components/media/DiscoverArtistCard.vue';
+import DiscoverRecommendationsPanel from '../components/media/DiscoverRecommendationsPanel.vue';
+import DiscoverSearchBar from '../components/media/DiscoverSearchBar.vue';
+import DiscoverSearchResultsPanel from '../components/media/DiscoverSearchResultsPanel.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
 import { useDiscoverArtistArtwork } from '../composables/useDiscoverArtistArtwork.js';
@@ -32,14 +34,20 @@ import {
 } from '../lib/add-artist-policy.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import {
-  buildDiscoverGraphSubtitle,
-  buildDiscoverNoSimilarArtistsMessage,
+  buildDiscoverMonitoredArtistNavAriaLabel,
+  buildDiscoverMonitoredArtistsAriaLabel,
   buildDiscoverPageSubtitle,
   buildDiscoverPreSearchBody,
   buildDiscoverSearchErrorBody,
-  buildDiscoverSeedRemoveAriaLabel,
-  buildDiscoverSeedsAriaLabel,
+  buildRecommendationMeta,
+  buildRecommendationProvenance,
+  buildRecommendationSupport,
+  buildSearchResultBadgeLabel,
+  buildSearchResultBadgeTone,
+  buildSearchResultMeta,
+  buildSearchResultSupport,
   formatDiscoverSearchError,
+  resolveDiscoverSearchPanelMode,
 } from '../lib/discover-presentation.js';
 
 const {
@@ -67,13 +75,11 @@ const {
   seeds,
   suggestions,
   isAnySeedLoading,
-  hasSuggestions,
   hasSeeds,
   lastError: graphError,
   isSeed,
   addSeed,
   hydrateSeeds,
-  removeSeed,
 } = useDiscoverGraph();
 
 const {
@@ -87,6 +93,70 @@ const addArtistModalOpen = ref(false);
 const addArtistCandidate = ref(null);
 const addArtistErrorMessage = ref('');
 const addArtistPolicyDefaults = ref(loadSavedAddArtistPolicyForm());
+
+// ── View models ──────────────────────────────────────────────────────────────
+// The container assembles plain, presentation-ready objects so child panels
+// stay free of business logic and the template stays declarative.
+
+const monitoredChips = computed(() =>
+  seeds.value.map((seed) => ({
+    id: seed.id,
+    name: seed.name,
+    initial: seed.name?.trim()?.charAt(0)?.toUpperCase() ?? '?',
+    artworkUrl: getArtistArtwork(seed.id)?.url ?? null,
+    to: buildArtistLocation(seed),
+    ariaLabel: buildDiscoverMonitoredArtistNavAriaLabel(seed.name),
+  })),
+);
+
+const recommendationCards = computed(() =>
+  suggestions.value.map((suggestion) => {
+    const provenance = buildRecommendationProvenance(suggestion);
+    const added = isAddedArtist(suggestion.id);
+    return {
+      id: suggestion.id,
+      artist: { id: suggestion.id, name: suggestion.name },
+      artwork: getArtistArtwork(suggestion.id),
+      badge: provenance.label,
+      badgeTone: provenance.tone,
+      metaText: buildRecommendationMeta(suggestion),
+      supportingText: buildRecommendationSupport(suggestion),
+      monitored: added,
+      monitoring: isMonitoring(suggestion.id),
+      disabled: added,
+      to: buildArtistLocation(suggestion),
+    };
+  }),
+);
+
+const searchResultCards = computed(() =>
+  results.value.map((artist) => {
+    const added = isAddedArtist(artist.id);
+    return {
+      id: artist.id,
+      artist,
+      artwork: getArtistArtwork(artist.id),
+      badge: buildSearchResultBadgeLabel(added),
+      badgeTone: buildSearchResultBadgeTone(added),
+      metaText: buildSearchResultMeta(artist),
+      supportingText: buildSearchResultSupport(artist, added),
+      monitored: added,
+      monitoring: isMonitoring(artist.id),
+      disabled: added,
+      to: buildArtistLocation(artist),
+    };
+  }),
+);
+
+const searchPanelMode = computed(() =>
+  resolveDiscoverSearchPanelMode({
+    searchError: searchError.value,
+    hasSearched: hasSearched.value,
+    isSearching: isSearching.value,
+    resultCount: results.value.length,
+    hasSeeds: hasSeeds.value,
+  }),
+);
 
 function openAddArtistModal(artist) {
   if (!artist?.id || isAddedArtist(artist.id)) {
@@ -137,83 +207,8 @@ onBeforeUnmount(() => {
   destroyMonitoredArtists();
 });
 
-const summaryCards = computed(() => ([
-  {
-    body: hasSeeds.value
-      ? 'Monitored artists shape the recommendation graph and unlock related suggestions instantly.'
-      : 'Add one artist and the recommendation graph will grow from there.',
-    label: 'Monitored',
-    value: String(seeds.value.length),
-  },
-  {
-    body: hasSuggestions.value
-      ? 'Suggestions rise when artists appear across multiple monitored inputs.'
-      : 'Once artists are monitored, Harmoniarr ranks nearby recommendations here.',
-    label: 'Suggestions',
-    value: String(suggestions.value.length),
-  },
-  {
-    body: hasSearched.value
-      ? 'Search results stay separate from the graph so you can compare direct matches and recommendations.'
-      : 'Search results and artwork coverage appear after your first artist lookup.',
-    label: 'Search results',
-    value: String(results.value.length),
-  },
-]));
-
-function buildSuggestionMeta(suggestion) {
-  if (!suggestion) {
-    return '';
-  }
-
-  if (suggestion.seedCount > 1) {
-    return `Shared by ${suggestion.seedCount} monitored artists`;
-  }
-
-  return 'Suggested from your monitored profile';
-}
-
-function buildSuggestionSupport(suggestion) {
-  if (!suggestion) {
-    return '';
-  }
-
-  if (suggestion.score >= 1.5) {
-    return 'Strong graph overlap puts this artist near the top of your current taste profile.';
-  }
-
-  return 'Worth adding if you want similar release activity to enter your monitoring profile.';
-}
-
 function isAddedArtist(artistId) {
   return isSeed(artistId) || isMonitored(artistId);
-}
-
-function buildResultMeta(artist) {
-  const parts = [];
-  if (artist?.type) {
-    parts.push(artist.type);
-  }
-  if (artist?.country) {
-    parts.push(artist.country);
-  }
-  return parts.join(' · ');
-}
-
-function buildResultSupport(artist) {
-  if (isAddedArtist(artist?.id)) {
-    return 'Already monitored and contributing to your current recommendation graph.';
-  }
-
-  if (artist?.disambiguation) {
-    return artist.disambiguation;
-  }
-
-  if (artist?.country && artist?.type) {
-    return 'Ready to add and route into future release discovery.';
-  }
-
-  return 'Add this artist to power related recommendations and future release tracking.';
 }
 
 function buildArtistLocation(artist) {
@@ -234,149 +229,38 @@ function buildArtistLocation(artist) {
       @submit="handleAddArtistSubmit"
     />
 
-    <header class="hx-page-header">
-      <div>
+    <header class="hx-page-header discover-header">
+      <div class="discover-header__intro">
         <h1 class="hx-page-title">Discover</h1>
         <p class="hx-page-subtitle">{{ buildDiscoverPageSubtitle() }}</p>
       </div>
+
+      <DiscoverSearchBar
+        v-model="query"
+        :is-searching="isSearching"
+        @submit="runSearch"
+      />
+
+      <div class="discover-counts" role="list" aria-label="Discover summary">
+        <span class="hx-pill" data-tone="success" role="listitem">{{ seeds.length }} monitored</span>
+        <span class="hx-pill" data-tone="info" role="listitem">{{ suggestions.length }} recommended</span>
+        <span class="hx-pill" role="listitem">{{ results.length }} results</span>
+        <span v-if="isAnySeedLoading || isResolvingArtistArtwork" class="hx-pill" data-tone="warning" role="listitem">Refreshing</span>
+      </div>
     </header>
 
-    <article class="hx-card discover-stage">
-      <div class="hx-card-body discover-stage__body">
-        <div class="discover-stage__intro">
-          <span class="discover-stage__eyebrow">Artist Discovery Workspace</span>
-          <h2 class="discover-stage__title">Turn one artist into a living recommendation graph</h2>
-          <p class="discover-stage__copy">
-            Search for an artist you already trust, add them to your monitored profile, and let shared artwork plus
-            recommendation signals build the next layer of candidates.
-          </p>
-          <div class="discover-stage__signals">
-            <span class="hx-pill" data-tone="success">{{ hasSeeds ? `${seeds.length} monitored artist${seeds.length === 1 ? '' : 's'}` : 'No monitored artists yet' }}</span>
-            <span class="hx-pill" data-tone="info">{{ hasSuggestions ? `${suggestions.length} live suggestion${suggestions.length === 1 ? '' : 's'}` : 'Suggestions appear after add' }}</span>
-            <span v-if="isAnySeedLoading || isResolvingArtistArtwork" class="hx-pill" data-tone="warning">Refreshing graph artwork</span>
-          </div>
-        </div>
-
-        <form class="discover-command-form" role="search" @submit.prevent="runSearch">
-          <label class="discover-command-form__label" for="discover-query">
-            Start with an artist you love
-          </label>
-          <div class="discover-command-form__row">
-            <input
-              id="discover-query"
-              v-model="query"
-              class="hx-input discover-command-form__input"
-              type="search"
-              placeholder="e.g. Radiohead, Björk, Kendrick Lamar..."
-              autocomplete="off"
-              :disabled="isSearching"
-              aria-label="Search for an artist"
-            />
-            <button
-              type="submit"
-              class="hx-btn"
-              data-variant="primary"
-              :disabled="isSearching || !query.trim()"
-              :aria-busy="isSearching"
-            >
-              {{ isSearching ? 'Searching...' : 'Search' }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </article>
-
-    <section class="discover-summary-grid" aria-label="Discover summary">
-      <article v-for="card in summaryCards" :key="card.label" class="hx-card discover-summary-card">
-        <div class="hx-card-body">
-          <span class="discover-summary-card__label">{{ card.label }}</span>
-          <strong class="discover-summary-card__value">{{ card.value }}</strong>
-          <p class="discover-summary-card__body">{{ card.body }}</p>
-        </div>
-      </article>
-    </section>
-
-    <article v-if="hasSeeds" class="hx-card discover-graph-card" aria-label="Artists you might like">
-      <header class="hx-card-header discover-graph-card__header">
-        <div>
-          <h2 class="hx-card-title">Artists you might like</h2>
-          <p class="hx-card-subtitle">{{ buildDiscoverGraphSubtitle() }}</p>
-        </div>
-        <span v-if="isAnySeedLoading" class="hx-pill" data-tone="warning">Refreshing recommendations</span>
-      </header>
-
-      <div class="hx-card-body discover-graph-card__body">
-        <section class="discover-seed-band">
-          <div class="discover-seed-band__header">
-            <span class="discover-summary-card__label">Monitored artists</span>
-            <p class="discover-seed-band__copy">
-              Remove an artist to tighten the graph or add more artists to widen the recommendation field.
-            </p>
-          </div>
-
-          <div class="discover-seeds" role="list" :aria-label="buildDiscoverSeedsAriaLabel()">
-            <button
-              v-for="seed in seeds"
-              :key="seed.id"
-              type="button"
-              class="discover-seed-chip"
-              role="listitem"
-              :aria-label="buildDiscoverSeedRemoveAriaLabel(seed.name)"
-              @click="removeSeed(seed.id)"
-            >
-              <img
-                v-if="getArtistArtwork(seed.id)?.url"
-                :src="getArtistArtwork(seed.id)?.url"
-                :alt="seed.name"
-                class="discover-seed-chip__avatar"
-                loading="lazy"
-              />
-              <span v-else class="discover-seed-chip__initial" aria-hidden="true">{{ seed.name?.trim()?.charAt(0)?.toUpperCase() ?? '?' }}</span>
-              <span class="discover-seed-chip__name">{{ seed.name }}</span>
-              <span class="discover-seed-chip__remove" aria-hidden="true">Remove</span>
-            </button>
-          </div>
-        </section>
-
-        <p v-if="graphError" class="discover-graph-card__error" role="alert">
-          {{ graphError }}
-        </p>
-
-        <section v-if="suggestions.length > 0" class="discover-suggestions">
-          <div class="discover-suggestions__header">
-            <span class="discover-summary-card__label">Recommendation grid</span>
-            <p class="discover-suggestions__copy">
-              Ranked by overlap across the artists you already monitor, with shared matches pushed toward the top.
-            </p>
-          </div>
-
-          <div class="hx-artwork-grid discover-grid" role="list" aria-label="Artist suggestions">
-            <DiscoverArtistCard
-              v-for="suggestion in suggestions"
-              :key="suggestion.id"
-              :artist="{ id: suggestion.id, name: suggestion.name }"
-              :artwork="getArtistArtwork(suggestion.id)"
-              :badge="suggestion.seedCount > 1 ? `${suggestion.seedCount} profile match` : 'Suggested'"
-              :badge-tone="suggestion.seedCount > 1 ? 'success' : 'info'"
-              :meta-text="buildSuggestionMeta(suggestion)"
-              :supporting-text="buildSuggestionSupport(suggestion)"
-              :monitored="isAddedArtist(suggestion.id)"
-              :monitoring="isMonitoring(suggestion.id)"
-              :disabled="isAddedArtist(suggestion.id)"
-              :to="buildArtistLocation(suggestion)"
-              @add="openAddArtistModal"
-            />
-          </div>
-        </section>
-
-        <p v-else-if="!isAnySeedLoading" class="discover-graph-card__empty">
-          {{ buildDiscoverNoSimilarArtistsMessage() }}
-        </p>
-      </div>
-    </article>
+    <DiscoverRecommendationsPanel
+      v-if="hasSeeds"
+      :chips="monitoredChips"
+      :cards="recommendationCards"
+      :is-loading="isAnySeedLoading"
+      :error-message="graphError"
+      :monitored-aria-label="buildDiscoverMonitoredArtistsAriaLabel()"
+      @add="openAddArtistModal"
+    />
 
     <EmptyState
-      v-if="searchError"
+      v-if="searchPanelMode === 'error'"
       :title="formatDiscoverSearchError(searchError)"
       :body="buildDiscoverSearchErrorBody()"
       variant="discover"
@@ -390,7 +274,7 @@ function buildArtistLocation(artist) {
     </EmptyState>
 
     <EmptyState
-      v-else-if="!hasSearched && !hasSeeds"
+      v-else-if="searchPanelMode === 'pre-search'"
       title="Search for an artist to get started"
       :body="buildDiscoverPreSearchBody()"
       variant="discover"
@@ -404,7 +288,7 @@ function buildArtistLocation(artist) {
       </template>
     </EmptyState>
 
-    <article v-else-if="isSearching" class="hx-card discover-loading-card" aria-live="polite" aria-busy="true">
+    <article v-else-if="searchPanelMode === 'searching'" class="hx-card discover-loading-card" role="status" aria-live="polite" aria-busy="true">
       <div class="hx-card-body">
         <p class="discover-loading-card__title">Searching artist catalog...</p>
         <p class="discover-loading-card__body">Matching artists and artwork coverage are being prepared for add actions.</p>
@@ -412,7 +296,7 @@ function buildArtistLocation(artist) {
     </article>
 
     <EmptyState
-      v-else-if="hasSearched && results.length === 0"
+      v-else-if="searchPanelMode === 'empty'"
       title="No artists found"
       body="Try a different spelling or a broader search term."
       variant="discover"
@@ -426,36 +310,11 @@ function buildArtistLocation(artist) {
       </template>
     </EmptyState>
 
-    <article v-else-if="hasSearched && results.length > 0" class="hx-card discover-results-card">
-      <header class="hx-card-header">
-        <div>
-          <h2 class="hx-card-title">Search results</h2>
-          <p class="hx-card-subtitle">
-            Direct catalog matches stay separate from recommendations so you can add with intent.
-          </p>
-        </div>
-      </header>
-
-      <div class="hx-card-body">
-        <div class="hx-artwork-grid discover-grid" aria-label="Artist search results">
-          <DiscoverArtistCard
-            v-for="artist in results"
-            :key="artist.id"
-            :artist="artist"
-            :artwork="getArtistArtwork(artist.id)"
-            :badge="isAddedArtist(artist.id) ? 'Already monitored' : 'Search match'"
-            :badge-tone="isAddedArtist(artist.id) ? 'success' : 'info'"
-            :meta-text="buildResultMeta(artist)"
-            :supporting-text="buildResultSupport(artist)"
-            :monitored="isAddedArtist(artist.id)"
-            :monitoring="isMonitoring(artist.id)"
-            :disabled="isAddedArtist(artist.id)"
-            :to="buildArtistLocation(artist)"
-            @add="openAddArtistModal"
-          />
-        </div>
-      </div>
-    </article>
+    <DiscoverSearchResultsPanel
+      v-else-if="searchPanelMode === 'results'"
+      :cards="searchResultCards"
+      @add="openAddArtistModal"
+    />
   </section>
 </template>
 
@@ -466,222 +325,20 @@ function buildArtistLocation(artist) {
   align-content: start;
 }
 
-.discover-stage {
-  overflow: hidden;
-}
-
-.discover-stage__body {
-  display: grid;
-  gap: var(--hx-space-4);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--hx-accent-soft) 72%, transparent) 0%, transparent 54%),
-    linear-gradient(180deg, color-mix(in srgb, var(--hx-bg-surface-muted) 76%, transparent) 0%, transparent 100%);
-}
-
-.discover-stage__intro {
-  display: grid;
-  gap: var(--hx-space-2);
-}
-
-.discover-stage__eyebrow {
-  font-size: var(--hx-text-xs);
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--hx-accent-strong);
-}
-
-.discover-stage__title {
-  margin: 0;
-  font-size: clamp(1.5rem, 2vw, 2.1rem);
-  line-height: 1.08;
-  letter-spacing: -0.03em;
-  color: var(--hx-text-strong);
-  max-width: 18ch;
-}
-
-.discover-stage__copy {
-  margin: 0;
-  max-width: 64ch;
-  color: var(--hx-text-muted);
-}
-
-.discover-stage__signals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hx-space-2);
-}
-
-.discover-command-form {
-  display: grid;
-  gap: var(--hx-space-2);
-}
-
-.discover-command-form__label {
-  font-size: var(--hx-text-sm);
-  font-weight: 600;
-  color: var(--hx-text-strong);
-}
-
-.discover-command-form__row {
-  display: flex;
-  gap: var(--hx-space-2);
-  align-items: center;
-}
-
-.discover-command-form__input {
-  flex: 1;
-  min-width: 0;
-}
-
-.discover-summary-grid {
+.discover-header {
   display: grid;
   gap: var(--hx-space-3);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.discover-summary-card__label {
-  display: inline-block;
-  margin-bottom: var(--hx-space-2);
-  font-size: var(--hx-text-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--hx-text-muted);
-}
-
-.discover-summary-card__value {
-  display: block;
-  font-size: clamp(1.35rem, 1.5vw, 1.7rem);
-  line-height: 1.05;
-  color: var(--hx-text-strong);
-}
-
-.discover-summary-card__body {
-  margin: var(--hx-space-2) 0 0;
-  font-size: var(--hx-text-sm);
-  line-height: 1.55;
-  color: var(--hx-text-muted);
-}
-
-.discover-graph-card__header {
-  align-items: flex-start;
-}
-
-.discover-graph-card__body {
-  display: grid;
-  gap: var(--hx-space-4);
-}
-
-.discover-seed-band {
-  display: grid;
-  gap: var(--hx-space-3);
-  padding: var(--hx-space-3);
-  border-radius: var(--hx-radius-lg);
-  background: color-mix(in srgb, var(--hx-bg-surface-muted) 84%, transparent);
-  border: 1px solid var(--hx-border-subtle);
-}
-
-.discover-seed-band__header {
+.discover-header__intro {
   display: grid;
   gap: var(--hx-space-1);
 }
 
-.discover-seed-band__copy,
-.discover-suggestions__copy {
-  margin: 0;
-  font-size: var(--hx-text-sm);
-  color: var(--hx-text-muted);
-  line-height: 1.55;
-}
-
-.discover-seeds {
+.discover-counts {
   display: flex;
   flex-wrap: wrap;
   gap: var(--hx-space-2);
-}
-
-.discover-seed-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--hx-space-2);
-  min-height: 40px;
-  padding: 0.4rem 0.7rem 0.4rem 0.45rem;
-  border-radius: var(--hx-radius-pill);
-  border: 1px solid var(--hx-border);
-  background: var(--hx-bg-surface);
-  color: var(--hx-text-strong);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.discover-seed-chip:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--hx-accent) 40%, var(--hx-border));
-  background: color-mix(in srgb, var(--hx-accent-soft) 18%, var(--hx-bg-surface));
-}
-
-.discover-seed-chip__avatar,
-.discover-seed-chip__initial {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.discover-seed-chip__avatar {
-  object-fit: cover;
-}
-
-.discover-seed-chip__initial {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--hx-bg-surface-sunken);
-  color: var(--hx-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.discover-seed-chip__name {
-  font-size: var(--hx-text-sm);
-  font-weight: 600;
-}
-
-.discover-seed-chip__remove {
-  font-size: var(--hx-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--hx-text-muted);
-}
-
-.discover-suggestions {
-  display: grid;
-  gap: var(--hx-space-3);
-}
-
-.discover-suggestions__header {
-  display: grid;
-  gap: var(--hx-space-1);
-}
-
-.discover-grid {
-  --hx-artwork-grid-min: 180px;
-}
-
-.discover-grid .hx-media-card {
-  cursor: default;
-}
-
-.discover-graph-card__error {
-  margin: 0;
-  color: var(--hx-danger);
-  font-size: var(--hx-text-sm);
-}
-
-.discover-graph-card__empty {
-  margin: 0;
-  color: var(--hx-text-muted);
-  font-size: var(--hx-text-sm);
 }
 
 .discover-loading-card__title {
@@ -694,30 +351,5 @@ function buildArtistLocation(artist) {
 .discover-loading-card__body {
   margin: var(--hx-space-2) 0 0;
   color: var(--hx-text-muted);
-}
-
-@media (max-width: 960px) {
-  .discover-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .discover-command-form__row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .discover-summary-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .discover-grid {
-    --hx-artwork-grid-min: 140px;
-  }
-
-  .discover-stage__title {
-    max-width: none;
-  }
 }
 </style>

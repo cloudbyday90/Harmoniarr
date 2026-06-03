@@ -21,14 +21,24 @@ import test from 'node:test';
 import {
   buildDiscoverArtistInitial,
   buildDiscoverAvatarStyle,
-  buildDiscoverGraphSubtitle,
+  buildDiscoverMonitoredArtistNavAriaLabel,
+  buildDiscoverMonitoredArtistsAriaLabel,
+  buildDiscoverMonitoredBandCopy,
   buildDiscoverNoSimilarArtistsMessage,
   buildDiscoverPageSubtitle,
   buildDiscoverPreSearchBody,
+  buildDiscoverRecommendationsSubtitle,
   buildDiscoverSearchErrorBody,
-  buildDiscoverSeedRemoveAriaLabel,
-  buildDiscoverSeedsAriaLabel,
+  buildDiscoverSuggestionsCopy,
+  buildRecommendationMeta,
+  buildRecommendationProvenance,
+  buildRecommendationSupport,
+  buildSearchResultBadgeLabel,
+  buildSearchResultBadgeTone,
+  buildSearchResultMeta,
+  buildSearchResultSupport,
   formatDiscoverSearchError,
+  resolveDiscoverSearchPanelMode,
 } from '../../src/client/lib/discover-presentation.js';
 
 // ── buildDiscoverPageSubtitle ─────────────────────────────────────────────────
@@ -126,66 +136,93 @@ test('buildDiscoverSearchErrorBody is stable across calls', () => {
   assert.equal(buildDiscoverSearchErrorBody(), buildDiscoverSearchErrorBody());
 });
 
-// ── buildDiscoverGraphSubtitle ────────────────────────────────────────────────
+// ── buildDiscoverRecommendationsSubtitle ──────────────────────────────────────
 
-test('buildDiscoverGraphSubtitle returns a non-empty string', () => {
-  const result = buildDiscoverGraphSubtitle();
+test('buildDiscoverRecommendationsSubtitle returns a non-empty string', () => {
+  const result = buildDiscoverRecommendationsSubtitle();
   assert.ok(typeof result === 'string' && result.length > 0);
 });
 
-test('buildDiscoverGraphSubtitle references monitored artists', () => {
-  assert.ok(buildDiscoverGraphSubtitle().toLowerCase().includes('monitored artists'));
+test('buildDiscoverRecommendationsSubtitle references monitored artists', () => {
+  assert.ok(buildDiscoverRecommendationsSubtitle().toLowerCase().includes('monitored artists'));
 });
 
-test('buildDiscoverGraphSubtitle is stable across calls', () => {
-  assert.equal(buildDiscoverGraphSubtitle(), buildDiscoverGraphSubtitle());
+test('buildDiscoverRecommendationsSubtitle does not use graph language', () => {
+  assert.ok(!buildDiscoverRecommendationsSubtitle().toLowerCase().includes('graph'));
 });
 
-// ── buildDiscoverSeedsAriaLabel ───────────────────────────────────────────────
+test('buildDiscoverRecommendationsSubtitle is stable across calls', () => {
+  assert.equal(buildDiscoverRecommendationsSubtitle(), buildDiscoverRecommendationsSubtitle());
+});
 
-test('buildDiscoverSeedsAriaLabel returns a non-empty string', () => {
-  const result = buildDiscoverSeedsAriaLabel();
+// ── buildDiscoverMonitoredArtistsAriaLabel ────────────────────────────────────
+
+test('buildDiscoverMonitoredArtistsAriaLabel returns a non-empty string', () => {
+  const result = buildDiscoverMonitoredArtistsAriaLabel();
   assert.ok(typeof result === 'string' && result.length > 0);
 });
 
-test('buildDiscoverSeedsAriaLabel does not contain "seeds"', () => {
-  assert.ok(!buildDiscoverSeedsAriaLabel().toLowerCase().includes('seeds'));
+test('buildDiscoverMonitoredArtistsAriaLabel does not contain "seeds"', () => {
+  assert.ok(!buildDiscoverMonitoredArtistsAriaLabel().toLowerCase().includes('seeds'));
 });
 
-test('buildDiscoverSeedsAriaLabel references monitored artists', () => {
-  assert.ok(buildDiscoverSeedsAriaLabel().toLowerCase().includes('monitored artists'));
+test('buildDiscoverMonitoredArtistsAriaLabel references monitored artists', () => {
+  assert.ok(buildDiscoverMonitoredArtistsAriaLabel().toLowerCase().includes('monitored artists'));
 });
 
-test('buildDiscoverSeedsAriaLabel is stable across calls', () => {
-  assert.equal(buildDiscoverSeedsAriaLabel(), buildDiscoverSeedsAriaLabel());
+test('buildDiscoverMonitoredArtistsAriaLabel is stable across calls', () => {
+  assert.equal(buildDiscoverMonitoredArtistsAriaLabel(), buildDiscoverMonitoredArtistsAriaLabel());
 });
 
-// ── buildDiscoverSeedRemoveAriaLabel ──────────────────────────────────────────
+// ── buildDiscoverMonitoredArtistNavAriaLabel ──────────────────────────────────
 
-test('buildDiscoverSeedRemoveAriaLabel includes the artist name', () => {
-  assert.ok(buildDiscoverSeedRemoveAriaLabel('Radiohead').includes('Radiohead'));
+test('buildDiscoverMonitoredArtistNavAriaLabel includes the artist name', () => {
+  assert.ok(buildDiscoverMonitoredArtistNavAriaLabel('Radiohead').includes('Radiohead'));
 });
 
-test('buildDiscoverSeedRemoveAriaLabel returns fallback for null name', () => {
-  assert.equal(buildDiscoverSeedRemoveAriaLabel(null), 'Remove this artist from recommendations');
+test('buildDiscoverMonitoredArtistNavAriaLabel returns fallback for null name', () => {
+  assert.equal(buildDiscoverMonitoredArtistNavAriaLabel(null), 'View this monitored artist');
 });
 
-test('buildDiscoverSeedRemoveAriaLabel returns fallback for undefined name', () => {
-  assert.equal(buildDiscoverSeedRemoveAriaLabel(undefined), 'Remove this artist from recommendations');
+test('buildDiscoverMonitoredArtistNavAriaLabel returns fallback for undefined name', () => {
+  assert.equal(buildDiscoverMonitoredArtistNavAriaLabel(undefined), 'View this monitored artist');
 });
 
-test('buildDiscoverSeedRemoveAriaLabel returns fallback for empty string', () => {
-  assert.equal(buildDiscoverSeedRemoveAriaLabel(''), 'Remove this artist from recommendations');
+test('buildDiscoverMonitoredArtistNavAriaLabel returns fallback for empty string', () => {
+  assert.equal(buildDiscoverMonitoredArtistNavAriaLabel(''), 'View this monitored artist');
 });
 
-test('buildDiscoverSeedRemoveAriaLabel uses remove-language, not seed-language', () => {
-  const label = buildDiscoverSeedRemoveAriaLabel('Björk');
+test('buildDiscoverMonitoredArtistNavAriaLabel uses navigation language, not destructive language', () => {
+  const label = buildDiscoverMonitoredArtistNavAriaLabel('Björk');
+  assert.ok(!label.toLowerCase().includes('remove'));
   assert.ok(!label.toLowerCase().includes('seed'));
-  assert.ok(label.toLowerCase().includes('remove'));
+  assert.ok(label.toLowerCase().includes('view'));
 });
 
-test('buildDiscoverSeedRemoveAriaLabel produces correct label for known artist', () => {
-  assert.equal(buildDiscoverSeedRemoveAriaLabel('Björk'), 'Remove Björk from recommendations');
+test('buildDiscoverMonitoredArtistNavAriaLabel produces correct label for known artist', () => {
+  assert.equal(buildDiscoverMonitoredArtistNavAriaLabel('Björk'), 'View Björk');
+});
+
+// ── buildDiscoverMonitoredBandCopy ────────────────────────────────────────────
+
+test('buildDiscoverMonitoredBandCopy returns a non-empty string', () => {
+  const result = buildDiscoverMonitoredBandCopy();
+  assert.ok(typeof result === 'string' && result.length > 0);
+});
+
+test('buildDiscoverMonitoredBandCopy does not use destructive language', () => {
+  assert.ok(!buildDiscoverMonitoredBandCopy().toLowerCase().includes('remove'));
+});
+
+// ── buildDiscoverSuggestionsCopy ──────────────────────────────────────────────
+
+test('buildDiscoverSuggestionsCopy returns a non-empty string', () => {
+  const result = buildDiscoverSuggestionsCopy();
+  assert.ok(typeof result === 'string' && result.length > 0);
+});
+
+test('buildDiscoverSuggestionsCopy references monitored artists', () => {
+  assert.ok(buildDiscoverSuggestionsCopy().toLowerCase().includes('monitored artists'));
 });
 
 // ── buildDiscoverNoSimilarArtistsMessage ──────────────────────────────────────
@@ -237,6 +274,189 @@ test('buildDiscoverAvatarStyle is stable — same inputs produce same output', (
 
 test('buildDiscoverAvatarStyle handles null id without throwing', () => {
   assert.doesNotThrow(() => buildDiscoverAvatarStyle(null, 'Test Artist'));
+});
+
+// ── buildRecommendationProvenance ─────────────────────────────────────────────
+
+test('buildRecommendationProvenance returns related badge for musicbrainz source', () => {
+  const result = buildRecommendationProvenance({ sources: ['musicbrainz'] });
+  assert.equal(result.label, 'Related artist');
+  assert.equal(result.tone, 'info');
+});
+
+test('buildRecommendationProvenance returns listener badge for listenbrainz source', () => {
+  const result = buildRecommendationProvenance({ sources: ['listenbrainz'] });
+  assert.equal(result.label, 'Listener overlap');
+  assert.equal(result.tone, 'info');
+});
+
+test('buildRecommendationProvenance treats lastfm as listener data', () => {
+  assert.equal(buildRecommendationProvenance({ sources: ['lastfm'] }).label, 'Listener overlap');
+});
+
+test('buildRecommendationProvenance returns combined badge when both categories present', () => {
+  const result = buildRecommendationProvenance({ sources: ['musicbrainz', 'listenbrainz'] });
+  assert.equal(result.label, 'Related + listeners');
+  assert.equal(result.tone, 'success');
+});
+
+test('buildRecommendationProvenance expands the "both" source into both categories', () => {
+  const result = buildRecommendationProvenance({ sources: ['both'] });
+  assert.equal(result.label, 'Related + listeners');
+  assert.equal(result.tone, 'success');
+});
+
+test('buildRecommendationProvenance falls back to Recommended for unknown or empty sources', () => {
+  assert.equal(buildRecommendationProvenance({ sources: [] }).label, 'Recommended');
+  assert.equal(buildRecommendationProvenance({ sources: ['mystery'] }).label, 'Recommended');
+  assert.equal(buildRecommendationProvenance(null).label, 'Recommended');
+});
+
+test('buildRecommendationProvenance label is always from the fixed enumeration (injection-safe)', () => {
+  const allowed = new Set(['Related + listeners', 'Related artist', 'Listener overlap', 'Recommended']);
+  const evil = buildRecommendationProvenance({ sources: ['<img src=x onerror=alert(1)>'] });
+  assert.ok(allowed.has(evil.label));
+});
+
+// ── buildRecommendationMeta ───────────────────────────────────────────────────
+
+test('buildRecommendationMeta references monitored artists for multiple matches', () => {
+  const meta = buildRecommendationMeta({ seedCount: 4 });
+  assert.ok(meta.includes('4'));
+  assert.ok(meta.toLowerCase().includes('monitored artists'));
+});
+
+test('buildRecommendationMeta returns single-source copy for one match', () => {
+  assert.equal(buildRecommendationMeta({ seedCount: 1 }), 'From your monitored artists');
+});
+
+test('buildRecommendationMeta returns empty string for null', () => {
+  assert.equal(buildRecommendationMeta(null), '');
+});
+
+// ── buildRecommendationSupport ────────────────────────────────────────────────
+
+test('buildRecommendationSupport returns strong-overlap copy for high score', () => {
+  assert.ok(buildRecommendationSupport({ score: 2 }).toLowerCase().includes('overlap'));
+});
+
+test('buildRecommendationSupport returns add-prompt copy for low score', () => {
+  assert.ok(buildRecommendationSupport({ score: 0.5 }).toLowerCase().includes('add'));
+});
+
+test('buildRecommendationSupport does not use graph or taste-profile jargon', () => {
+  const high = buildRecommendationSupport({ score: 2 }).toLowerCase();
+  const low = buildRecommendationSupport({ score: 0.5 }).toLowerCase();
+  assert.ok(!high.includes('graph') && !high.includes('taste profile'));
+  assert.ok(!low.includes('graph') && !low.includes('taste profile'));
+});
+
+test('buildRecommendationSupport returns empty string for null', () => {
+  assert.equal(buildRecommendationSupport(null), '');
+});
+
+// ── buildSearchResultBadgeLabel / Tone ────────────────────────────────────────
+
+test('buildSearchResultBadgeLabel returns "Monitored" when added', () => {
+  assert.equal(buildSearchResultBadgeLabel(true), 'Monitored');
+});
+
+test('buildSearchResultBadgeLabel returns "Search match" when not added', () => {
+  assert.equal(buildSearchResultBadgeLabel(false), 'Search match');
+});
+
+test('buildSearchResultBadgeTone returns success when added', () => {
+  assert.equal(buildSearchResultBadgeTone(true), 'success');
+});
+
+test('buildSearchResultBadgeTone returns info when not added', () => {
+  assert.equal(buildSearchResultBadgeTone(false), 'info');
+});
+
+// ── buildSearchResultMeta ─────────────────────────────────────────────────────
+
+test('buildSearchResultMeta joins type and country', () => {
+  assert.equal(buildSearchResultMeta({ type: 'Group', country: 'GB' }), 'Group · GB');
+});
+
+test('buildSearchResultMeta returns only available parts', () => {
+  assert.equal(buildSearchResultMeta({ type: 'Person' }), 'Person');
+});
+
+test('buildSearchResultMeta returns empty string for null', () => {
+  assert.equal(buildSearchResultMeta(null), '');
+});
+
+// ── buildSearchResultSupport ──────────────────────────────────────────────────
+
+test('buildSearchResultSupport references monitoring when already added', () => {
+  assert.ok(buildSearchResultSupport({}, true).toLowerCase().includes('monitored'));
+});
+
+test('buildSearchResultSupport prefers disambiguation when present', () => {
+  assert.equal(
+    buildSearchResultSupport({ disambiguation: 'British band' }, false),
+    'British band',
+  );
+});
+
+test('buildSearchResultSupport returns add-prompt copy as a fallback', () => {
+  assert.ok(buildSearchResultSupport({}, false).toLowerCase().includes('add'));
+});
+
+// ── resolveDiscoverSearchPanelMode ────────────────────────────────────────────
+
+const baseModeFlags = {
+  searchError: null,
+  hasSearched: false,
+  isSearching: false,
+  resultCount: 0,
+  hasSeeds: false,
+};
+
+test('resolveDiscoverSearchPanelMode returns "error" when a search error is present', () => {
+  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, searchError: 'boom', hasSeeds: true });
+  assert.equal(mode, 'error');
+});
+
+test('resolveDiscoverSearchPanelMode error takes precedence over every other flag', () => {
+  const mode = resolveDiscoverSearchPanelMode({
+    searchError: 'boom',
+    hasSearched: true,
+    isSearching: true,
+    resultCount: 5,
+    hasSeeds: true,
+  });
+  assert.equal(mode, 'error');
+});
+
+test('resolveDiscoverSearchPanelMode returns "pre-search" before any search with no seeds', () => {
+  assert.equal(resolveDiscoverSearchPanelMode(baseModeFlags), 'pre-search');
+});
+
+test('resolveDiscoverSearchPanelMode returns "searching" when a request is in flight', () => {
+  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, hasSearched: true, isSearching: true });
+  assert.equal(mode, 'searching');
+});
+
+test('resolveDiscoverSearchPanelMode returns "empty" when a completed search has no results', () => {
+  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, hasSearched: true, resultCount: 0 });
+  assert.equal(mode, 'empty');
+});
+
+test('resolveDiscoverSearchPanelMode returns "results" when a completed search has results', () => {
+  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, hasSearched: true, resultCount: 3 });
+  assert.equal(mode, 'results');
+});
+
+test('resolveDiscoverSearchPanelMode returns "idle" with seeds present but no search run', () => {
+  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, hasSeeds: true });
+  assert.equal(mode, 'idle');
+});
+
+test('resolveDiscoverSearchPanelMode does not show pre-search once seeds exist', () => {
+  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, hasSeeds: true });
+  assert.notEqual(mode, 'pre-search');
 });
 
 test('buildDiscoverAvatarStyle handles null name without throwing', () => {

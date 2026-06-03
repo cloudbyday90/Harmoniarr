@@ -207,3 +207,39 @@ test('computeSuggestions returns fewer than limit items when fewer results exist
   const result = computeSuggestions(seedResults, new Set(), 20);
   assert.equal(result.length, 1);
 });
+
+// ── computeSuggestions: provenance sources ────────────────────────────────────
+
+test('computeSuggestions exposes the source as a sources array', () => {
+  const seedResults = makeSeedResults([
+    ['seed-1', [{ id: 'artist-a', name: 'Artist A', score: 0.7, source: 'listenbrainz' }]],
+  ]);
+  const result = computeSuggestions(seedResults, new Set());
+  assert.deepEqual(result[0].sources, ['listenbrainz']);
+});
+
+test('computeSuggestions aggregates distinct sources across seeds', () => {
+  const seedResults = makeSeedResults([
+    ['seed-1', [{ id: 'artist-a', name: 'Artist A', score: 0.5, source: 'musicbrainz' }]],
+    ['seed-2', [{ id: 'artist-a', name: 'Artist A', score: 0.5, source: 'listenbrainz' }]],
+  ]);
+  const result = computeSuggestions(seedResults, new Set());
+  assert.deepEqual(result[0].sources, ['listenbrainz', 'musicbrainz']);
+});
+
+test('computeSuggestions de-duplicates repeated sources', () => {
+  const seedResults = makeSeedResults([
+    ['seed-1', [{ id: 'artist-a', name: 'Artist A', score: 0.5, source: 'musicbrainz' }]],
+    ['seed-2', [{ id: 'artist-a', name: 'Artist A', score: 0.5, source: 'musicbrainz' }]],
+  ]);
+  const result = computeSuggestions(seedResults, new Set());
+  assert.deepEqual(result[0].sources, ['musicbrainz']);
+});
+
+test('computeSuggestions yields an empty sources array when source is missing', () => {
+  const seedResults = makeSeedResults([
+    ['seed-1', [{ id: 'artist-a', name: 'Artist A', score: 0.7 }]],
+  ]);
+  const result = computeSuggestions(seedResults, new Set());
+  assert.deepEqual(result[0].sources, []);
+});

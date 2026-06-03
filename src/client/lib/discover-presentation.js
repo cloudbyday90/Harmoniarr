@@ -36,7 +36,7 @@ import { buildAvatarInitial, buildAvatarStyle } from './artist-avatar.js';
  * @returns {string}
  */
 export function buildDiscoverPageSubtitle() {
-  return 'Add artists you trust and Harmoniarr will track their new releases automatically.';
+  return 'Search for an artist, then add them to your monitored artists to track releases and find similar artists.';
 }
 
 // ── Pre-search empty state ───────────────────────────────────────────────────
@@ -47,7 +47,7 @@ export function buildDiscoverPageSubtitle() {
  * @returns {string}
  */
 export function buildDiscoverPreSearchBody() {
-  return 'Add an artist and Harmoniarr will automatically watch for matching future releases.';
+  return 'Add an artist you trust and Harmoniarr tracks their future releases and recommends similar artists to monitor.';
 }
 
 // ── Search error ─────────────────────────────────────────────────────────────
@@ -79,44 +79,266 @@ export function buildDiscoverSearchErrorBody() {
   return 'Try again or search for a different artist.';
 }
 
-// ── Taste graph ──────────────────────────────────────────────────────────────
+// ── Search-panel view state ──────────────────────────────────────────────────
 
 /**
- * Subtitle for the taste graph section.
+ * Resolve the Discover search panel's view mode from the current flags.
+ *
+ * Replaces a long `v-if / v-else-if` ladder with a single, testable state
+ * function. Precedence is significant and intentionally preserved:
+ *
+ *   1. `'error'`      — a search request failed.
+ *   2. `'pre-search'` — nothing searched yet and no monitored artists to show.
+ *   3. `'searching'`  — a search request is in flight.
+ *   4. `'empty'`      — a search completed with zero results.
+ *   5. `'results'`    — a search completed with at least one result.
+ *   6. `'idle'`       — no search has run but monitored artists are present, so
+ *                       the panel yields to the recommendations section.
+ *
+ * @param {object} flags
+ * @param {string|null|undefined} flags.searchError
+ * @param {boolean} flags.hasSearched
+ * @param {boolean} flags.isSearching
+ * @param {number} flags.resultCount
+ * @param {boolean} flags.hasSeeds
+ * @returns {'error'|'pre-search'|'searching'|'empty'|'results'|'idle'}
+ */
+export function resolveDiscoverSearchPanelMode({
+  searchError,
+  hasSearched,
+  isSearching,
+  resultCount,
+  hasSeeds,
+}) {
+  if (searchError) {
+    return 'error';
+  }
+  if (!hasSearched && !hasSeeds) {
+    return 'pre-search';
+  }
+  if (isSearching) {
+    return 'searching';
+  }
+  if (hasSearched && resultCount === 0) {
+    return 'empty';
+  }
+  if (hasSearched && resultCount > 0) {
+    return 'results';
+  }
+  return 'idle';
+}
+
+// ── Recommendations ──────────────────────────────────────────────────────────
+
+/**
+ * Subtitle for the recommended-artists section.
  *
  * @returns {string}
  */
-export function buildDiscoverGraphSubtitle() {
+export function buildDiscoverRecommendationsSubtitle() {
   return 'Based on your monitored artists';
 }
 
 /**
- * Aria label for the seeds chip list.
+ * Aria label for the monitored-artist navigation list.
  *
  * @returns {string}
  */
-export function buildDiscoverSeedsAriaLabel() {
-  return 'Monitored artists shaping recommendations';
+export function buildDiscoverMonitoredArtistsAriaLabel() {
+  return 'Your monitored artists';
 }
 
 /**
- * Aria label for a seed chip's remove button.
+ * Aria label for a monitored-artist chip that navigates to the artist detail
+ * page. The chip is a navigation link, not a destructive control.
  *
  * @param {string|null|undefined} name - Artist name.
  * @returns {string}
  */
-export function buildDiscoverSeedRemoveAriaLabel(name) {
-  if (!name) return 'Remove this artist from recommendations';
-  return `Remove ${name} from recommendations`;
+export function buildDiscoverMonitoredArtistNavAriaLabel(name) {
+  if (!name) return 'View this monitored artist';
+  return `View ${name}`;
 }
 
 /**
- * Text shown when the taste graph has seeds but no suggestions were returned.
+ * Helper copy for the monitored-artist band, pointing users to the detail page
+ * where monitoring is managed (Discover does not manage monitoring state).
+ *
+ * @returns {string}
+ */
+export function buildDiscoverMonitoredBandCopy() {
+  return 'Open an artist to manage their policy and tracked releases.';
+}
+
+/**
+ * Helper copy describing how recommendations are ranked.
+ *
+ * @returns {string}
+ */
+export function buildDiscoverSuggestionsCopy() {
+  return 'Ranked by how many of your monitored artists point to them.';
+}
+
+/**
+ * Text shown when monitored artists exist but no recommendations were returned.
  *
  * @returns {string}
  */
 export function buildDiscoverNoSimilarArtistsMessage() {
-  return 'No similar artists found based on your current selection.';
+  return 'No recommendations yet. Add more monitored artists to widen the field.';
+}
+
+// ── Recommendation cards ─────────────────────────────────────────────────────
+
+/**
+ * Map a raw engine source string to a normalized provenance category.
+ *
+ * The recommendation engine tags each candidate with a `source`
+ * (`'musicbrainz'`, `'listenbrainz'`, `'lastfm'`, or `'both'`). MusicBrainz is
+ * editorial/relationship data ("related"); ListenBrainz and Last.fm are
+ * listening-history data ("listeners"); `'both'` contributes both categories.
+ *
+ * @param {string} source
+ * @returns {Array<'related'|'listeners'>}
+ */
+function provenanceCategoriesForSource(source) {
+  switch (source) {
+    case 'musicbrainz':
+      return ['related'];
+    case 'listenbrainz':
+    case 'lastfm':
+      return ['listeners'];
+    case 'both':
+      return ['related', 'listeners'];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Provenance badge (label + tone) for a recommended artist card.
+ *
+ * Aggregates the engine sources that contributed an artist into a single,
+ * explainable badge so operators understand *why* an artist was recommended.
+ * The label is drawn from a fixed enumeration — no engine or user string is
+ * ever rendered as the badge — which keeps the badge injection-free.
+ *
+ * @param {{ sources?: string[] }|null|undefined} suggestion
+ * @returns {{ label: string, tone: string }}
+ */
+export function buildRecommendationProvenance(suggestion) {
+  const sources = Array.isArray(suggestion?.sources) ? suggestion.sources : [];
+  const categories = new Set();
+  for (const source of sources) {
+    for (const category of provenanceCategoriesForSource(source)) {
+      categories.add(category);
+    }
+  }
+
+  const hasRelated = categories.has('related');
+  const hasListeners = categories.has('listeners');
+
+  if (hasRelated && hasListeners) {
+    return { label: 'Related + listeners', tone: 'success' };
+  }
+  if (hasRelated) {
+    return { label: 'Related artist', tone: 'info' };
+  }
+  if (hasListeners) {
+    return { label: 'Listener overlap', tone: 'info' };
+  }
+  return { label: 'Recommended', tone: 'info' };
+}
+
+/**
+ * Meta line for a recommended artist card.
+ *
+ * @param {{ seedCount?: number }|null|undefined} suggestion
+ * @returns {string}
+ */
+export function buildRecommendationMeta(suggestion) {
+  if (!suggestion) {
+    return '';
+  }
+  if (suggestion.seedCount > 1) {
+    return `Shared by ${suggestion.seedCount} of your monitored artists`;
+  }
+  return 'From your monitored artists';
+}
+
+/**
+ * Supporting line for a recommended artist card.
+ *
+ * @param {{ score?: number }|null|undefined} suggestion
+ * @returns {string}
+ */
+export function buildRecommendationSupport(suggestion) {
+  if (!suggestion) {
+    return '';
+  }
+  if (suggestion.score >= 1.5) {
+    return 'Strong overlap with the artists you already monitor.';
+  }
+  return 'Add to bring similar release activity into your library.';
+}
+
+// ── Search result cards ──────────────────────────────────────────────────────
+
+/**
+ * Badge label for a search-result artist card.
+ *
+ * @param {boolean} isAdded - Whether the artist is already monitored.
+ * @returns {string}
+ */
+export function buildSearchResultBadgeLabel(isAdded) {
+  return isAdded ? 'Monitored' : 'Search match';
+}
+
+/**
+ * Badge tone for a search-result artist card.
+ *
+ * @param {boolean} isAdded - Whether the artist is already monitored.
+ * @returns {string}
+ */
+export function buildSearchResultBadgeTone(isAdded) {
+  return isAdded ? 'success' : 'info';
+}
+
+/**
+ * Meta line for a search-result artist card (type and country).
+ *
+ * @param {{ type?: string, country?: string }|null|undefined} artist
+ * @returns {string}
+ */
+export function buildSearchResultMeta(artist) {
+  const parts = [];
+  if (artist?.type) {
+    parts.push(artist.type);
+  }
+  if (artist?.country) {
+    parts.push(artist.country);
+  }
+  return parts.join(' · ');
+}
+
+/**
+ * Supporting line for a search-result artist card.
+ *
+ * @param {{ disambiguation?: string, country?: string, type?: string }|null|undefined} artist
+ * @param {boolean} isAdded - Whether the artist is already monitored.
+ * @returns {string}
+ */
+export function buildSearchResultSupport(artist, isAdded) {
+  if (isAdded) {
+    return 'Already monitored. Open the artist to manage releases.';
+  }
+  if (artist?.disambiguation) {
+    return artist.disambiguation;
+  }
+  if (artist?.country && artist?.type) {
+    return 'Ready to add and track for future releases.';
+  }
+  return 'Add this artist to track future releases and unlock recommendations.';
 }
 
 // ── Artist avatar ────────────────────────────────────────────────────────────

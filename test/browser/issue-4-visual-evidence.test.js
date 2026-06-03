@@ -227,7 +227,7 @@ suite('Issue #4 browser visual evidence', () => {
       await page.getByText('Autechre').waitFor();
       await page.getByText('Tycho').waitFor();
       await evidence.capture(page, {
-        description: 'Discover recommendation graph after monitoring an artist.',
+        description: 'Discover recommended artists after monitoring an artist.',
         name: 'discover-recommendations',
         surface: 'discover-recommendations',
       });
