@@ -46,9 +46,11 @@ import { createImportCandidateImportPendingSummaryService } from './import-candi
 import { listImportCandidateFileDecisions } from './import-candidate-file-decision-repository.js';
 import { replaceImportExecutionRunItems, updateImportExecutionRunItem, upsertImportExecutionRunItem } from './import-candidate-execution-repository.js';
 import { createImportCandidateReputationEnrichmentService } from './import-candidate-reputation-enrichment-service.js';
-import { createImportCandidateService } from './import-candidate-service.js';
+import { createImportCandidateService, normalizeSlskdResponsesToImportCandidates } from './import-candidate-service.js';
 import { createImportCandidatePreviewService } from './import-candidate-preview-service.js';
 import { createImportCandidateSelectionSummaryService } from './import-candidate-selection-summary-service.js';
+import { createCandidateBrowseEnrichmentService } from '../library/candidate-browse-enrichment-service.js';
+import { createSlskdBrowseCacheStore } from '../slskd/slskd-browse-cache-store.js';
 import { createMediaInspectionService } from '../media/media-inspection-service.js';
 import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
 import { createMediaTranscodeExecutionService } from '../media/media-transcode-execution-service.js';
@@ -92,10 +94,18 @@ export function createImportCandidateModule({
   importCandidateReputationEnrichmentService = createImportCandidateReputationEnrichmentService({
     listSourceUserReputationIndexFn,
   }),
+  browseEnrichmentService = typeof slskdService?.browseUserDirectory === 'function'
+    ? createCandidateBrowseEnrichmentService({
+      browseUserDirectoryFn: slskdService.browseUserDirectory,
+      normalizeSlskdResponsesFn: normalizeSlskdResponsesToImportCandidates,
+      browseCacheStore: createSlskdBrowseCacheStore(),
+    })
+    : null,
   importCandidateService = createImportCandidateService({
     listSourceUserReputationIndexFn,
     recordSourceUserOutcomeEvidenceFn,
     slskdService,
+    browseEnrichmentService,
   }),
   importCandidatePreviewService = createImportCandidatePreviewService({
     getImportCandidate: importCandidateService.getImportCandidate,

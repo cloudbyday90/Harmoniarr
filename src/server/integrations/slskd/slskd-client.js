@@ -264,6 +264,32 @@ export function createSlskdClient({
     });
   }
 
+  function browseUserDirectory({ directory, username }) {
+    const normalizedUsername = typeof username === 'string' ? username.trim() : '';
+    if (!normalizedUsername) {
+      throw createSlskdError(
+        'slskd_misconfigured',
+        'Expected a username when browsing a user directory',
+      );
+    }
+
+    const normalizedDirectory = typeof directory === 'string' ? directory.trim() : '';
+    if (!normalizedDirectory) {
+      throw createSlskdError(
+        'slskd_misconfigured',
+        'Expected a directory when browsing a user directory',
+      );
+    }
+
+    return requestJson(`users/${encodeURIComponent(normalizedUsername)}/directory`, {
+      method: 'POST',
+      operation: 'user directory browse',
+      body: {
+        directory: normalizedDirectory,
+      },
+    });
+  }
+
   function getDownloads({ includeRemoved = false, username } = {}) {
     const normalizedUsername = typeof username === 'string' ? username.trim() : '';
     const pathname = normalizedUsername
@@ -343,5 +369,6 @@ export function createSlskdClient({
     isAuthenticationValid,
     startSearch,
     stopSearch,
+    browseUserDirectory,
   };
 }

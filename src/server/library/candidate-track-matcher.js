@@ -37,7 +37,7 @@ const MAX_COMPARE_LENGTH = 300;
 const MAX_EXPECTED_TRACKS = 200;
 const MAX_CANDIDATE_FILES = 400;
 
-const AUDIO_EXTENSIONS = new Set([
+export const AUDIO_EXTENSIONS = new Set([
   'flac', 'wav', 'aiff', 'aif', 'alac', 'ape', 'wv',
   'mp3', 'aac', 'ogg', 'opus', 'wma', 'm4a',
 ]);

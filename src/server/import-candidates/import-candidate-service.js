@@ -171,6 +171,19 @@ function buildUsernameKey(username) {
   })?.toLowerCase() ?? '';
 }
 
+function deriveTrustedUsernames(reputationIndex) {
+  const trusted = new Set();
+  if (!(reputationIndex instanceof Map)) {
+    return trusted;
+  }
+  for (const reputation of reputationIndex.values()) {
+    if (reputation?.trustState === 'trusted' && typeof reputation.username === 'string' && reputation.username) {
+      trusted.add(reputation.username);
+    }
+  }
+  return trusted;
+}
+
 function normalizeResponseFile(file, {
   fallbackIndex,
   isLocked,
@@ -325,6 +338,7 @@ export function createImportCandidateService({
   replaceImportCandidateFilesFn = replaceImportCandidateFiles,
   scoreDownloadResultFn = scoreDownloadResult,
   slskdService,
+  browseEnrichmentService = null,
   transitionImportCandidateStatusFn = transitionImportCandidateStatus,
   upsertImportCandidateFn = upsertImportCandidate,
 } = {}) {
@@ -735,7 +749,24 @@ export function createImportCandidateService({
       reputationIndex = new Map();
     }
 
-    for (const candidate of candidates) {
+    let enrichedCandidates = candidates;
+    if (browseEnrichmentService) {
+      try {
+        enrichedCandidates = await browseEnrichmentService.enrichCandidatesWithBrowse({
+          candidates,
+          albumTitle,
+          expectedTrackCount,
+          trustedUsernames: deriveTrustedUsernames(reputationIndex),
+          formatPreferences,
+          requestOwnership,
+          searchId: searchResponses.searchId,
+        });
+      } catch {
+        enrichedCandidates = candidates;
+      }
+    }
+
+    for (const candidate of enrichedCandidates) {
       const scoring = scoreDownloadResultFn({
         candidate,
         formatPreferences,
@@ -759,7 +790,7 @@ export function createImportCandidateService({
     const storedCandidates = await withTransaction(async (client) => {
       const stored = [];
 
-      for (const candidate of candidates) {
+      for (const candidate of enrichedCandidates) {
         const storedCandidate = await upsertImportCandidateFn(candidate, client);
         const storedFiles = await replaceImportCandidateFilesFn(
           storedCandidate.id,

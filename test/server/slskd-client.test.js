@@ -171,3 +171,58 @@ test('createSlskdClient enqueues downloads through the transfers API', async (t)
     size: 123456,
   }]);
 });
+
+test('createSlskdClient browses a single user directory via the users API', async (t) => {
+  const fetchImpl = t.mock.fn(async () => createJsonResponse([{
+    name: 'Autechre\\Amber',
+    fileCount: 1,
+    files: [{ filename: '01 Foil.flac', size: 123456 }],
+  }]));
+  const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
+    apiKey: 'test-slskd-api-key',
+    baseUrl: 'http://slskd.test:5030',
+    fetchImpl,
+    requestTimeoutMs: 1000,
+  });
+
+  const payload = await client.browseUserDirectory({
+    directory: 'Autechre\\Amber',
+    username: 'source-user',
+  });
+
+  const [url, options] = fetchImpl.mock.calls[0].arguments;
+  assert.equal(url.toString(), 'http://slskd.test:5030/api/v0/users/source-user/directory');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers['Content-Type'], 'application/json');
+  assert.equal(options.redirect, 'error');
+  assert.deepEqual(JSON.parse(options.body), { directory: 'Autechre\\Amber' });
+  assert.deepEqual(payload, [{
+    name: 'Autechre\\Amber',
+    fileCount: 1,
+    files: [{ filename: '01 Foil.flac', size: 123456 }],
+  }]);
+});
+
+test('createSlskdClient browseUserDirectory rejects blank username and directory', async (t) => {
+  const fetchImpl = t.mock.fn(async () => createJsonResponse([]));
+  const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
+    apiKey: 'test-slskd-api-key',
+    baseUrl: 'http://slskd.test:5030',
+    fetchImpl,
+    requestTimeoutMs: 1000,
+  });
+
+  await assert.rejects(
+    async () => client.browseUserDirectory({ directory: 'Autechre\\Amber', username: '   ' }),
+    (error) => error.code === 'slskd_misconfigured',
+  );
+  await assert.rejects(
+    async () => client.browseUserDirectory({ directory: '   ', username: 'source-user' }),
+    (error) => error.code === 'slskd_misconfigured',
+  );
+
+  assert.equal(fetchImpl.mock.callCount(), 0);
+});
+

@@ -517,3 +517,94 @@ test('createSlskdService validates and normalizes download enqueue responses', a
     failed: [],
   });
 });
+
+test('createSlskdService browseUserDirectory reconstructs leaf filenames into full paths', async (t) => {
+  const browseUserDirectory = t.mock.fn(async ({ directory, username }) => {
+    assert.equal(username, 'source-user');
+    assert.equal(directory, 'Boards of Canada\\Music Has the Right to Children');
+
+    return [{
+      name: 'Boards of Canada\\Music Has the Right to Children',
+      fileCount: 2,
+      files: [
+        { filename: '01 Wildlife Analysis.flac', size: 12345, extension: '.flac' },
+        { filename: '02 An Eagle in Your Mind.flac', size: 23456, extension: '.flac' },
+      ],
+    }];
+  });
+  const service = createSlskdService({
+    slskdClient: {
+      browseUserDirectory,
+    },
+  });
+
+  const result = await service.browseUserDirectory({
+    directory: ' Boards of Canada\\Music Has the Right to Children ',
+    username: ' source-user ',
+  });
+
+  assert.equal(browseUserDirectory.mock.callCount(), 1);
+  assert.equal(result.username, 'source-user');
+  assert.equal(result.directory, 'Boards of Canada\\Music Has the Right to Children');
+  assert.equal(result.directoryCount, 1);
+  assert.equal(result.fileCount, 2);
+  assert.deepEqual(result.files.map((file) => file.filename), [
+    'Boards of Canada\\Music Has the Right to Children\\01 Wildlife Analysis.flac',
+    'Boards of Canada\\Music Has the Right to Children\\02 An Eagle in Your Mind.flac',
+  ]);
+});
+
+test('createSlskdService browseUserDirectory uses forward-slash separator for posix folders', async (t) => {
+  const browseUserDirectory = t.mock.fn(async () => [{
+    name: 'music/Album',
+    files: [{ filename: 'track.mp3', size: 100, extension: '.mp3' }],
+  }]);
+  const service = createSlskdService({
+    slskdClient: { browseUserDirectory },
+  });
+
+  const result = await service.browseUserDirectory({
+    directory: 'music/Album',
+    username: 'user',
+  });
+
+  assert.deepEqual(result.files.map((file) => file.filename), ['music/Album/track.mp3']);
+});
+
+test('createSlskdService browseUserDirectory rejects blank directory and username', async (t) => {
+  const browseUserDirectory = t.mock.fn();
+  const service = createSlskdService({
+    slskdClient: { browseUserDirectory },
+  });
+
+  await assert.rejects(
+    () => service.browseUserDirectory({ directory: '   ', username: 'user' }),
+    (error) => error.status === 400 && error.code === 'validation_error',
+  );
+  await assert.rejects(
+    () => service.browseUserDirectory({ directory: 'music/Album', username: '   ' }),
+    (error) => error.status === 400 && error.code === 'validation_error',
+  );
+
+  assert.equal(browseUserDirectory.mock.callCount(), 0);
+});
+
+test('createSlskdService browseUserDirectory ignores files with non-string names', async (t) => {
+  const browseUserDirectory = t.mock.fn(async () => [{
+    name: 'Album',
+    files: [
+      { filename: 'good.flac', size: 1 },
+      { filename: '   ', size: 2 },
+      { filename: null, size: 3 },
+    ],
+  }]);
+  const service = createSlskdService({
+    slskdClient: { browseUserDirectory },
+  });
+
+  const result = await service.browseUserDirectory({ directory: 'Album', username: 'user' });
+
+  assert.equal(result.fileCount, 1);
+  assert.deepEqual(result.files.map((file) => file.filename), ['Album\\good.flac']);
+});
+

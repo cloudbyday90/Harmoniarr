@@ -92,6 +92,23 @@ function normalizeSearchId(value) {
   return normalized;
 }
 
+function normalizeBrowseDirectoryPath(value) {
+  if (typeof value !== 'string') {
+    throw createApiError(400, 'validation_error', 'directory must be a string');
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    throw createApiError(400, 'validation_error', 'directory is required');
+  }
+
+  if (normalized.length > 1024) {
+    throw createApiError(400, 'validation_error', 'directory must be 1024 characters or less');
+  }
+
+  return normalized;
+}
+
 function normalizeServerState(payload) {
   const server = payload?.server ?? payload ?? {};
   const isConnected = server.isConnected ?? false;
@@ -155,6 +172,30 @@ function normalizeSearchResponse(response) {
     lockedFiles: Array.isArray(response.lockedFiles)
       ? response.lockedFiles.map(normalizeSearchFile)
       : [],
+  };
+}
+
+function joinRemotePath(folderPath, leaf) {
+  const separator = folderPath.includes('/') && !folderPath.includes('\\') ? '/' : '\\';
+  const trimmedFolder = folderPath.replace(/[\\/]+$/, '');
+  return trimmedFolder ? `${trimmedFolder}${separator}${leaf}` : leaf;
+}
+
+function normalizeBrowsedDirectory(directory) {
+  const name = typeof directory?.name === 'string' ? directory.name : '';
+  const files = Array.isArray(directory?.files)
+    ? directory.files
+      .filter((file) => typeof file?.filename === 'string' && file.filename.trim())
+      .map((file) => normalizeSearchFile({
+        ...file,
+        filename: joinRemotePath(name, file.filename),
+      }))
+    : [];
+
+  return {
+    name,
+    fileCount: files.length,
+    files,
   };
 }
 
@@ -437,6 +478,32 @@ export function createSlskdService({
     return normalizeTransfer(payload);
   }
 
+  async function browseUserDirectory({ directory, username }) {
+    const normalizedUsername = normalizeSearchId(username);
+    const normalizedDirectory = normalizeBrowseDirectoryPath(directory);
+    const payload = await observeSlskdProviderCall(
+      providerHealthRecorder,
+      () => withClient((client) => client.browseUserDirectory({
+        directory: normalizedDirectory,
+        username: normalizedUsername,
+      })),
+    );
+
+    const directories = Array.isArray(payload)
+      ? payload.map(normalizeBrowsedDirectory)
+      : [];
+    const files = directories.flatMap((entry) => entry.files);
+
+    return {
+      username: normalizedUsername,
+      directory: normalizedDirectory,
+      directoryCount: directories.length,
+      fileCount: files.length,
+      directories,
+      files,
+    };
+  }
+
   return {
     enqueueDownloads,
     getConnectionStatus,
@@ -446,5 +513,6 @@ export function createSlskdService({
     getSearchState,
     startSearch,
     validateAuthentication,
+    browseUserDirectory,
   };
 }
