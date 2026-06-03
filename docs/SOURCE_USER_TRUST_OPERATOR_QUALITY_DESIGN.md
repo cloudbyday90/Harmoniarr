@@ -223,17 +223,19 @@ control — with no migration and no new trust boundary.
 
 ## 7. Three more high-value design areas
 
-1. **Spectral-cutoff DSP sidecar.** Build the *heavy* half of fake-FLAC detection as an
-   asynchronous, off-path worker: decode each applied track, FFT a few windows, detect the
-   high-frequency cutoff (e.g. 16 kHz ⇒ 128 kbps-sourced), and emit a definitive
-   `transcode_confirmed` signal that augments — never blocks — the apply. This closes the
-   gap the lightweight heuristics intentionally leave open, with a clear queue/back-pressure
-   and result-merge contract.
-2. **Per-peer delivered-quality trend visualization.** Surface a small time-series on the
-   source-user detail panel — quality-weight over the last N deliveries, signal mix
-   (mismatch / under-bitrate / tags), and a sparkline — so operators can distinguish a peer
-   that *degraded recently* from one that was *always poor*, informing whether to ignore,
-   watch, or wait.
+1. **Spectral-cutoff DSP sidecar.** ✅ **Implemented** — see
+   [SOURCE_USER_SPECTRAL_TREND_DESIGN.md](SOURCE_USER_SPECTRAL_TREND_DESIGN.md). Build the
+   *heavy* half of fake-FLAC detection as an asynchronous, off-path worker: decode each
+   applied track, measure the high-frequency cutoff (e.g. 16 kHz ⇒ 128 kbps-sourced), and
+   emit a definitive `transcode_confirmed` signal that augments — never blocks — the apply.
+   This closes the gap the lightweight heuristics intentionally leave open, with a clear
+   queue/back-pressure and result-merge contract.
+2. **Per-peer delivered-quality trend visualization.** ✅ **Implemented** — see
+   [SOURCE_USER_SPECTRAL_TREND_DESIGN.md](SOURCE_USER_SPECTRAL_TREND_DESIGN.md). Surface a
+   small time-series on the source-user detail panel — quality-weight over the last N
+   deliveries, signal mix (mismatch / under-bitrate / tags), and a sparkline — so operators
+   can distinguish a peer that *degraded recently* from one that was *always poor*, informing
+   whether to ignore, watch, or wait.
 3. **Ledger & ignore lifecycle: retention, backup, export.** (Carried forward.) Decide and
    document whether `source_user_outcome_events` and `source_user_ignore_entries`
    participate in backup/restore scopes, add a scheduled `pruneOutcomeEvents` maintenance

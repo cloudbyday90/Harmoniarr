@@ -37,6 +37,7 @@ import {
   sourceUserTrustStateOptions,
 } from '../lib/source-user-trust-presentation.js';
 import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
+import QualityTrendSparkline from './QualityTrendSparkline.vue';
 
 const props = defineProps({
   actionErrorMessage: { type: String, default: '' },
@@ -145,6 +146,8 @@ function submitOverride() {
             <span class="hx-stat-meta">{{ checkedAt ? `Read ${formatOperationTimestampShort(checkedAt)}` : 'Server detail snapshot' }}</span>
           </div>
         </div>
+
+        <QualityTrendSparkline v-if="detail.qualityTrend" :trend="detail.qualityTrend" />
 
         <div class="source-user-detail-copy">
           <p class="hx-text-muted"><strong>Current rationale:</strong> {{ detail.review.reason }}</p>

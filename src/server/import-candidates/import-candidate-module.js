@@ -55,6 +55,9 @@ import { createMediaInspectionService } from '../media/media-inspection-service.
 import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
 import { createMediaTranscodeExecutionService } from '../media/media-transcode-execution-service.js';
 import { createMediaTranscodePlanningService } from '../media/media-transcode-planning-service.js';
+import { createFfmpegSpectralAnalyzer } from '../media/ffmpeg-spectral-analyzer.js';
+import { createSourceUserSpectralJobStore } from '../activity/source-user-spectral-job-store.js';
+import { createSourceUserSpectralSidecarService } from '../activity/source-user-spectral-sidecar-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
@@ -92,6 +95,11 @@ export function createImportCandidateModule({
   }),
   mediaLosslessRetentionPolicyService = createMediaLosslessRetentionPolicyService(),
   mediaTranscodePlanningService = createMediaTranscodePlanningService(),
+  sourceUserSpectralSidecarService = createSourceUserSpectralSidecarService({
+    spectralJobStore: createSourceUserSpectralJobStore(),
+    analyzeSpectralCutoffFn: createFfmpegSpectralAnalyzer().analyzeSpectralCutoff,
+    recordSourceUserOutcomeEvidenceFn,
+  }),
   importCandidateReputationEnrichmentService = createImportCandidateReputationEnrichmentService({
     listSourceUserReputationIndexFn,
   }),
@@ -208,6 +216,8 @@ export function createImportCandidateModule({
     sendFulfillmentNotificationFn,
     onReleaseAddedFn,
     recordActivityEventFn,
+    enqueueSpectralAnalysisFn: sourceUserSpectralSidecarService.enqueueForAppliedCandidate,
+    processPendingSpectralJobsFn: sourceUserSpectralSidecarService.processPendingSpectralJobs,
     updateImportApplyRunItem,
   }),
   importCandidateMediaInspectionWorker = createImportCandidateMediaInspectionWorker({

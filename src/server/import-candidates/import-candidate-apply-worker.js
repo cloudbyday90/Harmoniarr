@@ -96,6 +96,47 @@ function buildApplyStatusMessage({ applyResult, importStatusCode }) {
     : message;
 }
 
+function extractFileExtension(filename) {
+  if (typeof filename !== 'string') {
+    return null;
+  }
+  const trimmed = filename.trim().toLowerCase();
+  const dotIndex = trimmed.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex === trimmed.length - 1) {
+    return null;
+  }
+  return trimmed.slice(dotIndex + 1);
+}
+
+// Builds spectral-analysis descriptors for files that were just moved into the
+// library, pointing at their final library path (the file the FFT pass must
+// decode). Only successfully applied files with a known library path are
+// eligible; the sidecar service filters down to lossless-claimed candidates.
+function buildSpectralFileDescriptors(applyPreview) {
+  const files = Array.isArray(applyPreview?.files) ? applyPreview.files : [];
+  const descriptors = [];
+  for (const file of files) {
+    const libraryPath = file?.libraryTarget?.path;
+    if (typeof libraryPath !== 'string' || libraryPath.trim().length === 0) {
+      continue;
+    }
+    if (file?.status?.code && file.status.code !== 'ready') {
+      continue;
+    }
+    const metadata = file?.inspection && typeof file.inspection === 'object'
+      ? file.inspection.metadata
+      : null;
+    descriptors.push({
+      bitRate: metadata?.bitRate ?? null,
+      declaredCodec: metadata?.primaryAudioCodec ?? null,
+      declaredExtension: extractFileExtension(file?.filename),
+      filePath: libraryPath,
+      sampleRate: metadata?.sampleRate ?? null,
+    });
+  }
+  return descriptors;
+}
+
 export function createImportCandidateApplyWorker({
   acquireLease,
   applyImportCandidatePreview = async () => ({
@@ -139,6 +180,9 @@ export function createImportCandidateApplyWorker({
   sendFulfillmentNotificationFn = null,
   onReleaseAddedFn = null,
   recordActivityEventFn = null,
+  enqueueSpectralAnalysisFn = null,
+  processPendingSpectralJobsFn = null,
+  spectralDrainLimit = 8,
   updateImportApplyRunItem = async () => null,
 } = {}) {
   const activeRunIds = new Set();
@@ -265,6 +309,18 @@ export function createImportCandidateApplyWorker({
               reason: statusMessage,
             });
 
+            // Off-path producer: queue the heavy spectral-cutoff FFT analysis for
+            // lossless-claimed files now living in the library. This is fire and
+            // forget and honours queue back-pressure, so it can never stall or
+            // fail the apply run.
+            if (typeof enqueueSpectralAnalysisFn === 'function' && summaryCandidate.username) {
+              void Promise.resolve(enqueueSpectralAnalysisFn({
+                files: buildSpectralFileDescriptors(applyPreview),
+                importCandidateId: summaryCandidate.id,
+                username: summaryCandidate.username,
+              })).catch(() => {});
+            }
+
             try {
               const releaseHints = await buildPostApplyReleaseHints({
                 applyResult,
@@ -364,6 +420,18 @@ export function createImportCandidateApplyWorker({
         } catch {
           // A scan that is already queued/running, or a scan readiness failure, should not
           // turn an otherwise successful import apply run into a failed operation.
+        }
+      }
+
+      // Off-path consumer: drain a bounded batch of queued spectral-analysis
+      // jobs at the tail of the run. Confirmed transcodes are merged back into
+      // the reputation ledger by the sidecar service. Bounded + best-effort so
+      // the heavy FFT work never extends or fails an apply run.
+      if (typeof processPendingSpectralJobsFn === 'function') {
+        try {
+          await processPendingSpectralJobsFn({ limit: spectralDrainLimit });
+        } catch {
+          // Spectral analysis is advisory; a drain failure must not fail the run.
         }
       }
     } catch (error) {

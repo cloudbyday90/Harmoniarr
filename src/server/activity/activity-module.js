@@ -60,6 +60,7 @@ export function createActivityModule({
   }),
   sourceUserTrustDetailService = createSourceUserTrustDetailService({
     listTrustSnapshot,
+    listRecentOutcomeEventsFn: sourceUserOutcomeLedgerStore.listRecentOutcomeEvents,
   }),
   sourceUserTrustExportService = createSourceUserTrustExportService({
     listTrustSnapshot,

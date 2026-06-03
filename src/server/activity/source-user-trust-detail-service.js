@@ -22,6 +22,7 @@ import {
   mapSourceUserTrustRow,
   normalizeSourceUserTrustSnapshotRows,
 } from './source-user-trust-service.js';
+import { buildQualityTrend } from './source-user-quality-trend.js';
 import { DEFAULT_HISTORY_PAGE_SIZE, MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
 
 function normalizeUsername(value) {
@@ -90,7 +91,32 @@ function normalizeTrustHistory(entries) {
 
 export function createSourceUserTrustDetailService({
   listTrustSnapshot = async () => [],
+  listRecentOutcomeEventsFn = null,
+  qualityTrendWindowDays = 30,
+  qualityTrendEventLimit = 500,
 } = {}) {
+  // Reads the durable outcome ledger for one source user and projects a compact
+  // delivered-quality trend. Backward compatible: when no ledger function is
+  // wired (or it fails) the detail payload simply omits the trend (null) rather
+  // than failing the request.
+  async function buildSourceUserQualityTrend(usernameKey) {
+    if (typeof listRecentOutcomeEventsFn !== 'function') {
+      return null;
+    }
+    try {
+      const events = await listRecentOutcomeEventsFn({
+        usernameKeys: [usernameKey],
+        limit: qualityTrendEventLimit,
+      });
+      return buildQualityTrend({
+        events: Array.isArray(events) ? events : [],
+        recentWindowDays: qualityTrendWindowDays,
+      });
+    } catch {
+      return null;
+    }
+  }
+
   async function getSourceUserDetail({ username, historyLimit, historyOffset } = {}) {
     const normalizedUsername = normalizeUsername(username);
     const limit = normalizeHistoryLimit(historyLimit);
@@ -106,11 +132,13 @@ export function createSourceUserTrustDetailService({
     const fullHistory = normalizeTrustHistory(row.trustHistory);
     const totalCount = fullHistory.length;
     const pagedHistory = fullHistory.slice(offset, offset + limit);
+    const qualityTrend = await buildSourceUserQualityTrend(usernameKey);
 
     return {
       checkedAt: new Date().toISOString(),
       sourceUser: {
         ...mapSourceUserTrustRow(row),
+        qualityTrend,
         trustHistory: pagedHistory,
         trustHistoryPagination: {
           limit,

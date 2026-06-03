@@ -125,3 +125,45 @@ test('getSourceUserDetail rejects missing peers', async () => {
     (error) => error?.status === 404 && error?.code === 'source_user_not_found',
   );
 });
+
+test('getSourceUserDetail omits the quality trend when no ledger function is wired', async () => {
+  const service = createSourceUserTrustDetailService({
+    listTrustSnapshot: async () => ([{ trustState: 'neutral', updatedAt: '2026-06-01T00:00:00.000Z', username: 'peer' }]),
+  });
+
+  const result = await service.getSourceUserDetail({ username: 'peer' });
+
+  assert.equal(result.sourceUser.qualityTrend, null);
+});
+
+test('getSourceUserDetail projects a quality trend from the outcome ledger', async () => {
+  let receivedQuery = null;
+  const service = createSourceUserTrustDetailService({
+    listTrustSnapshot: async () => ([{ trustState: 'neutral', updatedAt: '2026-06-01T00:00:00.000Z', username: 'FLAC-Peer' }]),
+    listRecentOutcomeEventsFn: async (query) => {
+      receivedQuery = query;
+      return [
+        { occurredAt: '2026-05-01T00:00:00.000Z', outcome: 'success', qualityWeight: 1 },
+        { occurredAt: '2026-05-20T00:00:00.000Z', outcome: 'success', qualityWeight: 0.9, qualityLabel: 'low_bitrate' },
+      ];
+    },
+  });
+
+  const result = await service.getSourceUserDetail({ username: 'FLAC-Peer' });
+
+  assert.ok(Array.isArray(receivedQuery.usernameKeys));
+  assert.equal(receivedQuery.usernameKeys[0], 'flac-peer');
+  assert.equal(result.sourceUser.qualityTrend.sampleCount, 2);
+  assert.equal(result.sourceUser.qualityTrend.series.length, 2);
+});
+
+test('getSourceUserDetail tolerates a failing outcome-ledger lookup', async () => {
+  const service = createSourceUserTrustDetailService({
+    listTrustSnapshot: async () => ([{ trustState: 'neutral', updatedAt: '2026-06-01T00:00:00.000Z', username: 'peer' }]),
+    listRecentOutcomeEventsFn: async () => { throw new Error('ledger down'); },
+  });
+
+  const result = await service.getSourceUserDetail({ username: 'peer' });
+
+  assert.equal(result.sourceUser.qualityTrend, null);
+});
