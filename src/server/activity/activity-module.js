@@ -104,6 +104,7 @@ export function createActivityModule({
       getSourceUserDetail: sourceUserTrustDetailService.getSourceUserDetail,
       applyIgnoreSuggestion: sourceUserIgnoreService.applyIgnoreSuggestion,
       listIgnoredSourceUsers: sourceUserIgnoreService.listIgnoredSourceUsers,
+      listSourceUserAutoIgnoreSuggestions: sourceUserTrustEvidenceService.listSourceUserAutoIgnoreSuggestions,
       removeIgnoredSourceUser: sourceUserIgnoreService.removeIgnoredUser,
       listBlockedSourceUsers: sourceUserBlocklistService.listBlockedSourceUsers,
       listSourceUsers: sourceUserTrustService.listSourceUsers,

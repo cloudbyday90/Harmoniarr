@@ -174,6 +174,32 @@ export function createSourceUserTrustEvidenceService({
     return reputationIndex;
   }
 
+  // Route-friendly projection of the reputation index: returns a JSON-serializable
+  // array of peers the auto-ignore heuristic currently flags, newest signal first.
+  // Operators consume this to action one-click ignores without auto-apply enabled.
+  async function listSourceUserAutoIgnoreSuggestions() {
+    const reputationIndex = await listSourceUserReputationIndex();
+    const suggestions = [];
+    for (const reputation of reputationIndex.values()) {
+      const suggestion = reputation?.autoIgnoreSuggestion;
+      if (suggestion?.suggested === true) {
+        suggestions.push({
+          username: reputation.username,
+          trustState: reputation.trustState ?? null,
+          successCount: reputation.successCount ?? 0,
+          failureCount: reputation.failureCount ?? 0,
+          recencyWeighted: reputation.recencyWeighted ?? null,
+          suggestion: {
+            reason: suggestion.reason ?? null,
+            signals: suggestion.signals ?? null,
+          },
+        });
+      }
+    }
+    suggestions.sort((a, b) => (b.failureCount ?? 0) - (a.failureCount ?? 0));
+    return { suggestions, total: suggestions.length };
+  }
+
   async function recordSourceUserOutcomeEvidence({
     actorUserId = null,
     eventType = null,
@@ -305,6 +331,7 @@ export function createSourceUserTrustEvidenceService({
   }
 
   return {
+    listSourceUserAutoIgnoreSuggestions,
     listSourceUserReputationIndex,
     recordSourceUserOutcomeEvidence,
   };

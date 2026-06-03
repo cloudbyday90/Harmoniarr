@@ -31,6 +31,7 @@ const tabs = [
   { name: 'activity-users', label: 'Users', implemented: true },
   { name: 'activity-history', label: 'History', implemented: true },
   { name: 'activity-blocklist', label: 'Blocklist', implemented: true },
+  { name: 'activity-ignored', label: 'Ignored', implemented: true },
   { name: 'activity-failed', label: 'Failed', implemented: true },
   { name: 'activity-monitored-artists', label: 'Artists', implemented: true },
 ];

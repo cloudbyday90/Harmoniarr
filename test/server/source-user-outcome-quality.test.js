@@ -89,3 +89,41 @@ test('normalizeQualityWeight clamps to the unit interval and defaults to 1', () 
   assert.equal(normalizeQualityWeight('nope'), 1);
   assert.equal(normalizeQualityWeight(undefined), 1);
 });
+
+test('classifyApplyOutcomeQuality downgrades an otherwise-clean apply by delivery fidelity', () => {
+  const result = classifyApplyOutcomeQuality({
+    status: 'applied',
+    summary: { appliedFileCount: 10, failedFileCount: 0, totalFiles: 10 },
+    deliveryQuality: { penaltyWeight: 0.6, signals: ['codec_extension_mismatch'] },
+  });
+
+  assert.equal(result.outcome, 'success');
+  assert.equal(result.qualityWeight, 0.4);
+  assert.equal(result.qualityLabel, 'codec_extension_mismatch');
+  assert.match(result.reason, /delivery quality: codec_extension_mismatch/);
+});
+
+test('classifyApplyOutcomeQuality folds delivery penalty into a warned partial apply', () => {
+  const result = classifyApplyOutcomeQuality({
+    status: 'applied_with_warnings',
+    summary: { appliedFileCount: 8, failedFileCount: 2, totalFiles: 10 },
+    deliveryQuality: { penaltyWeight: 0.2, signals: ['low_bitrate'] },
+  });
+
+  // completion 0.8 minus delivery 0.2 = 0.6.
+  assert.ok(Math.abs(result.qualityWeight - 0.6) < 1e-9);
+  assert.equal(result.qualityLabel, 'partial_apply');
+  assert.match(result.reason, /delivery quality: low_bitrate/);
+});
+
+test('classifyApplyOutcomeQuality ignores a zero or malformed delivery penalty', () => {
+  const result = classifyApplyOutcomeQuality({
+    status: 'applied',
+    summary: { appliedFileCount: 5, failedFileCount: 0, totalFiles: 5 },
+    deliveryQuality: { penaltyWeight: 0, signals: [] },
+  });
+
+  assert.equal(result.qualityWeight, 1);
+  assert.equal(result.qualityLabel, 'clean');
+  assert.equal(result.reason, null);
+});

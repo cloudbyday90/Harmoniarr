@@ -258,18 +258,18 @@ and audit log:
 
 ## 7. Three more high-value design areas
 
-1. **Operator-facing trust & ignore UI.** Build the authenticated source-users
-   surface: a reputation table (Wilson lower bound, decayed failure ratio,
-   quality mix), the auto-ignore *suggestion* with one-click apply, an
-   enable/disable toggle for auto-apply + cool-down, and a reviewable ignore
-   list with un-ignore. The backend route dependencies
-   (`applyIgnoreSuggestion`, `listIgnoredSourceUsers`, `removeIgnoredSourceUser`)
-   are already exposed and waiting for a UI.
-2. **Quality signal sources beyond the apply result.** Feed the `quality_weight`
-   from richer evidence — post-apply library scan deltas (actual bitrate/format
-   vs. requested), tag-completeness checks, and transcode-detection heuristics —
-   so fake/transcoded FLAC is graded down at the source, and surface a
-   per-peer "delivered quality" trend.
+1. **Operator-facing trust & ignore UI.** ✅ **Implemented** in
+   [SOURCE_USER_TRUST_OPERATOR_QUALITY_DESIGN.md](SOURCE_USER_TRUST_OPERATOR_QUALITY_DESIGN.md).
+   The authenticated **Activity → Ignored** view ships a reputation-driven
+   "suggested to ignore" table with one-click apply, a manual ignore form, an
+   auto-apply enable/disable toggle + cool-down, and a reviewable ignore list
+   with un-ignore — all wired to the previously-exposed route dependencies.
+2. **Quality signal sources beyond the apply result.** ✅ **Implemented** in
+   [SOURCE_USER_TRUST_OPERATOR_QUALITY_DESIGN.md](SOURCE_USER_TRUST_OPERATOR_QUALITY_DESIGN.md).
+   The apply preview's ffprobe inspection now yields decode-free fidelity
+   signals (codec↔extension mismatch, lossless under-bitrate, low lossy bitrate,
+   incomplete tags) that fold into `quality_weight`, grading fake/transcoded
+   FLAC down at the source.
 3. **Ledger & ignore lifecycle: retention, backup, export.** Decide and document
    whether `source_user_outcome_events` and `source_user_ignore_entries`
    participate in backup/restore scopes, add a scheduled `pruneOutcomeEvents`

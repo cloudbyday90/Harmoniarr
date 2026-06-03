@@ -19,6 +19,7 @@
 import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
 import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-quality.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
+import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
 import {
   isOperationRunCancellationError,
   isOperationRunPauseError,
@@ -247,9 +248,15 @@ export function createImportCandidateApplyWorker({
           });
 
           if (itemStatus !== 'apply_failed') {
+            // Grade the *fidelity* of what was delivered (fake/transcoded
+            // lossless, low bitrate, missing tags) from the preview inspection
+            // metadata, so the reputation ledger downgrades poor sources even
+            // when the apply itself completed cleanly.
+            const deliveryQuality = assessDeliveredQuality({ files: applyPreview.files });
             const outcomeQuality = classifyApplyOutcomeQuality({
               status: itemStatus,
               summary: applyResult.summary,
+              deliveryQuality,
             });
             await markImportCandidateApplied({
               importCandidateId: summaryCandidate.id,

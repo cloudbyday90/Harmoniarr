@@ -31,6 +31,7 @@ const defaultRequestAuthDependencies = createRequestAuthDependencies();
  * @param {function} [deps.requireSession]
  */
 export function registerActivityRoutes(app, {
+  applyIgnoreSuggestion,
   blockSourceUser,
   bulkBlockSourceUsers,
   bulkUpdateSourceUserTrust,
@@ -40,7 +41,10 @@ export function registerActivityRoutes(app, {
   limitActivitySourceUserMutations = skipRateLimitMiddleware,
   limitActivityBlocklistMutations = skipRateLimitMiddleware,
   listBlockedSourceUsers,
+  listIgnoredSourceUsers,
+  listSourceUserAutoIgnoreSuggestions,
   listSourceUsers,
+  removeIgnoredSourceUser,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
   requireCsrf = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
@@ -88,6 +92,26 @@ export function registerActivityRoutes(app, {
     response.json({
       ok: true,
       ...blocklist,
+    });
+  }));
+
+  app.get('/api/v1/activity/ignored-source-users', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const ignoredSourceUsers = await listIgnoredSourceUsers();
+
+    response.json({
+      ok: true,
+      ignoredSourceUsers: Array.isArray(ignoredSourceUsers) ? ignoredSourceUsers : [],
+    });
+  }));
+
+  app.get('/api/v1/activity/source-user-ignore-suggestions', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    response.json({
+      ok: true,
+      ...(await listSourceUserAutoIgnoreSuggestions()),
     });
   }));
 
@@ -213,6 +237,38 @@ export function registerActivityRoutes(app, {
     requireCsrf(request, session);
 
     const result = await unblockSourceUser({
+      actorUserId: session.appUserId,
+      username: request.params.username,
+    });
+
+    response.json({
+      ok: true,
+      ...result,
+    });
+  }));
+
+  app.post('/api/v1/activity/ignored-source-users', limitActivitySourceUserMutations, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await applyIgnoreSuggestion({
+      actorUserId: session.appUserId,
+      reason: request.body?.reason,
+      suggestionSignals: request.body?.suggestionSignals,
+      username: request.body?.username,
+    });
+
+    response.status(201).json({
+      ok: true,
+      ...result,
+    });
+  }));
+
+  app.delete('/api/v1/activity/ignored-source-users/:username', limitActivitySourceUserMutations, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const result = await removeIgnoredSourceUser({
       actorUserId: session.appUserId,
       username: request.params.username,
     });

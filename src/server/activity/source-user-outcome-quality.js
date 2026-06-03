@@ -30,12 +30,43 @@ const DEFAULT_QUALITY_WEIGHT = 1;
 // prevents a single warning from being treated as a hard failure.
 const MIN_DEGRADED_QUALITY_WEIGHT = 0.25;
 
+// Delivery-quality signals, ordered strongest-first, so a clean apply that still
+// shipped a fake/transcoded file can be labelled by its dominant defect.
+const DELIVERY_SIGNAL_PRIORITY = [
+  'codec_extension_mismatch',
+  'lossless_low_bitrate',
+  'low_bitrate',
+  'incomplete_tags',
+];
+
 function toNonNegativeInteger(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return 0;
   }
   return Math.floor(parsed);
+}
+
+function normalizeDeliveryPenalty(deliveryQuality) {
+  if (!deliveryQuality || typeof deliveryQuality !== 'object') {
+    return { penalty: 0, signals: [] };
+  }
+  const parsed = Number(deliveryQuality.penaltyWeight);
+  const penalty = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 1) : 0;
+  const rawSignals = Array.isArray(deliveryQuality.signals)
+    ? deliveryQuality.signals
+    : (Array.isArray(deliveryQuality.labels) ? deliveryQuality.labels : []);
+  const signals = rawSignals.filter((signal) => typeof signal === 'string' && signal.length > 0);
+  return { penalty, signals };
+}
+
+function pickDominantDeliverySignal(signals) {
+  for (const candidate of DELIVERY_SIGNAL_PRIORITY) {
+    if (signals.includes(candidate)) {
+      return candidate;
+    }
+  }
+  return signals[0] ?? 'delivery_quality';
 }
 
 /**
@@ -76,10 +107,18 @@ export function normalizeQualityWeight(value) {
  * @param {number} [params.summary.totalFiles]
  * @param {number} [params.summary.transcodePreflightFailedCount]
  * @param {number} [params.summary.transcodePreflightUnavailableCount]
+ * @param {object} [params.deliveryQuality] optional fidelity assessment derived
+ *   from the delivered files' inspection metadata (codec/extension mismatch,
+ *   transcode-suspicious bitrate, incomplete tags). When present its penalty is
+ *   folded into the quality weight even for an otherwise-clean apply, so fake or
+ *   transcoded "lossless" deliveries are downgraded at the source.
+ * @param {number} [params.deliveryQuality.penaltyWeight]
+ * @param {string[]} [params.deliveryQuality.signals]
  * @returns {{ outcome: 'success', qualityWeight: number, qualityLabel: string, reason: string|null }}
  */
-export function classifyApplyOutcomeQuality({ status = null, summary = null } = {}) {
+export function classifyApplyOutcomeQuality({ status = null, summary = null, deliveryQuality = null } = {}) {
   const safeSummary = summary && typeof summary === 'object' ? summary : {};
+  const { penalty: deliveryPenalty, signals: deliverySignals } = normalizeDeliveryPenalty(deliveryQuality);
 
   const appliedFileCount = toNonNegativeInteger(safeSummary.appliedFileCount);
   const failedFileCount = toNonNegativeInteger(safeSummary.failedFileCount);
@@ -100,7 +139,7 @@ export function classifyApplyOutcomeQuality({ status = null, summary = null } = 
     || transcodeFailedCount > 0
     || transcodeUnavailableCount > 0;
 
-  if (!hasWarnings) {
+  if (!hasWarnings && deliveryPenalty <= 0) {
     return {
       outcome: 'success',
       qualityWeight: DEFAULT_QUALITY_WEIGHT,
@@ -109,40 +148,50 @@ export function classifyApplyOutcomeQuality({ status = null, summary = null } = 
     };
   }
 
-  // Completion ratio: how much of the expected payload actually applied.
+  // Completion ratio: how much of the expected payload actually applied. A clean
+  // apply with only a delivery-quality defect still has a completion ratio of 1.
   const completionRatio = totalFiles > 0
     ? appliedFileCount / totalFiles
-    : (appliedFileCount > 0 ? 1 : 0);
+    : (appliedFileCount > 0 || !hasWarnings ? 1 : 0);
 
   // Transcode preflight problems degrade fidelity even when the file applied,
   // because the delivered encoding could not be verified/normalized.
   const transcodePenalty = (transcodeFailedCount + transcodeUnavailableCount) > 0 ? 0.2 : 0;
 
-  const rawQuality = completionRatio - transcodePenalty;
+  const rawQuality = completionRatio - transcodePenalty - deliveryPenalty;
   const qualityWeight = normalizeQualityWeight(
     Math.max(MIN_DEGRADED_QUALITY_WEIGHT, rawQuality),
   );
 
   let qualityLabel = 'partial_apply';
-  if (completionRatio >= 1 && (transcodeFailedCount + transcodeUnavailableCount) > 0) {
+  if (!hasWarnings && deliveryPenalty > 0) {
+    // Otherwise-clean apply downgraded purely by delivery fidelity.
+    qualityLabel = pickDominantDeliverySignal(deliverySignals);
+  } else if (completionRatio >= 1 && (transcodeFailedCount + transcodeUnavailableCount) > 0) {
     qualityLabel = 'transcode_warning';
   } else if (completionRatio >= 1 && skippedFileCount > 0) {
     qualityLabel = 'skipped_files';
   }
 
-  const appliedPercent = Math.round(completionRatio * 100);
-  const reasonParts = [`${appliedFileCount} of ${totalFiles || appliedFileCount} files applied (${appliedPercent}%)`];
-  if ((transcodeFailedCount + transcodeUnavailableCount) > 0) {
-    reasonParts.push('transcode preflight warnings present');
+  const reasonParts = [];
+  if (hasWarnings) {
+    const appliedPercent = Math.round(completionRatio * 100);
+    reasonParts.push(`${appliedFileCount} of ${totalFiles || appliedFileCount} files applied (${appliedPercent}%)`);
+    if ((transcodeFailedCount + transcodeUnavailableCount) > 0) {
+      reasonParts.push('transcode preflight warnings present');
+    }
+    if (skippedFileCount > 0) {
+      reasonParts.push(`${skippedFileCount} skipped`);
+    }
   }
-  if (skippedFileCount > 0) {
-    reasonParts.push(`${skippedFileCount} skipped`);
+  if (deliveryPenalty > 0 && deliverySignals.length > 0) {
+    reasonParts.push(`delivery quality: ${deliverySignals.join(', ')}`);
   }
 
   return {
     outcome: 'success',
     qualityWeight,
     qualityLabel,
-    reason: reasonParts.join('; '),
+    reason: reasonParts.length > 0 ? reasonParts.join('; ') : null,
   };
 }

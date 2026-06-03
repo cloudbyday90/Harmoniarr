@@ -100,3 +100,26 @@ export function unblockActivitySourceUser(username) {
     method: 'DELETE',
   });
 }
+
+export function fetchIgnoredSourceUsers({ signal } = {}) {
+  return apiRequest('/api/v1/activity/ignored-source-users', { signal });
+}
+
+export function fetchSourceUserIgnoreSuggestions({ signal } = {}) {
+  return apiRequest('/api/v1/activity/source-user-ignore-suggestions', { signal });
+}
+
+export function applyIgnoredSourceUser({ username, reason, suggestionSignals } = {}) {
+  return apiRequest('/api/v1/activity/ignored-source-users', {
+    body: { reason, suggestionSignals, username },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function removeIgnoredSourceUser(username) {
+  return apiRequest(`/api/v1/activity/ignored-source-users/${encodeURIComponent(username)}`, {
+    includeCsrf: true,
+    method: 'DELETE',
+  });
+}

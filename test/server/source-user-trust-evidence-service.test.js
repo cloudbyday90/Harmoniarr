@@ -283,6 +283,40 @@ test('listSourceUserReputationIndex enriches rows with recency-weighted reputati
   assert.match(entry.autoIgnoreSuggestion.reason, /failure-dominated/);
 });
 
+test('listSourceUserAutoIgnoreSuggestions projects flagged peers into a sorted array', async () => {
+  const now = Date.now();
+  const buildFailures = (username, usernameKey) => Array.from({ length: 10 }, (_, index) => ({
+    username,
+    usernameKey,
+    outcome: index === 0 ? 'success' : 'failure',
+    occurredAt: new Date(now - index * 24 * 60 * 60 * 1000).toISOString(),
+  }));
+  const events = [
+    ...buildFailures('Flaky-Peer', 'flaky-peer'),
+    ...buildFailures('Worse-Peer', 'worse-peer'),
+  ];
+  const service = createSourceUserTrustEvidenceService({
+    listRecentOutcomeEventsFn: async () => events,
+    listTrustSnapshot: async () => ([
+      { failureCount: 9, successCount: 1, trustState: 'neutral', username: 'Flaky-Peer' },
+      { failureCount: 12, successCount: 1, trustState: 'watch', username: 'Worse-Peer' },
+      { failureCount: 0, successCount: 8, trustState: 'trusted', username: 'Good-Peer' },
+    ]),
+    replaceTrustSnapshot: async () => {},
+  });
+
+  const result = await service.listSourceUserAutoIgnoreSuggestions();
+
+  assert.equal(result.total, 2);
+  assert.equal(result.suggestions.length, 2);
+  // Sorted by failureCount descending.
+  assert.equal(result.suggestions[0].username, 'Worse-Peer');
+  assert.equal(result.suggestions[1].username, 'Flaky-Peer');
+  assert.ok(!result.suggestions.some((entry) => entry.username === 'Good-Peer'));
+  assert.match(result.suggestions[0].suggestion.reason, /failure-dominated/);
+  assert.ok(result.suggestions[0].suggestion.signals);
+});
+
 test('listSourceUserReputationIndex stays backward compatible when ledger reads fail', async () => {
   const service = createSourceUserTrustEvidenceService({
     listRecentOutcomeEventsFn: async () => { throw new Error('ledger offline'); },

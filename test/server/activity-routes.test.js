@@ -40,6 +40,11 @@ function createActivityRouteTestApp(overrides = {}) {
         query: null,
         total: 0,
       }),
+      applyIgnoreSuggestion: async ({ username }) => ({ ignoredSourceUser: { username } }),
+      limitActivitySourceUserMutations: (request, response, next) => next(),
+      listIgnoredSourceUsers: async () => [],
+      listSourceUserAutoIgnoreSuggestions: async () => ({ suggestions: [], total: 0 }),
+      removeIgnoredSourceUser: async ({ username }) => ({ removed: true, username }),
       listSourceUsers: async () => ({
         checkedAt: '2026-06-01T12:00:00.000Z',
         counts: { blocked: 0, needsReview: 0, neutral: 0, preferred: 0, total: 0, trusted: 0, unknown: 0, withEvidence: 0 },
@@ -319,6 +324,92 @@ test('activity blocklist delete route requires fresh admin csrf and returns clea
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.equal(unblockSourceUser.mock.callCount(), 1);
     assert.equal(payload.sourceUser.username, 'peer-1');
+  });
+});
+
+test('activity ignored-source-users list route requires an admin session and wraps the array', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
+  const listIgnoredSourceUsers = t.mock.fn(async () => ([
+    { username: 'peer-1', reason: 'Repeated fakes', source: 'manual', createdAt: '2026-06-01T00:00:00.000Z' },
+  ]));
+  const app = createActivityRouteTestApp({ listIgnoredSourceUsers, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/ignored-source-users`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(listIgnoredSourceUsers.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.ignoredSourceUsers.length, 1);
+    assert.equal(payload.ignoredSourceUsers[0].username, 'peer-1');
+  });
+});
+
+test('activity ignore-suggestions route requires an admin session and spreads the result', async (t) => {
+  const requireAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1' }));
+  const listSourceUserAutoIgnoreSuggestions = t.mock.fn(async () => ({
+    suggestions: [{ username: 'flaky', failureCount: 9, suggestion: { reason: 'bad', signals: {} } }],
+    total: 1,
+  }));
+  const app = createActivityRouteTestApp({ listSourceUserAutoIgnoreSuggestions, requireAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/source-user-ignore-suggestions`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireAdminSession.mock.callCount(), 1);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.total, 1);
+    assert.equal(payload.suggestions[0].username, 'flaky');
+  });
+});
+
+test('activity ignored-source-users create route requires fresh admin csrf and returns 201', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const applyIgnoreSuggestion = t.mock.fn(async ({ username }) => ({ ignoredSourceUser: { username } }));
+  const app = createActivityRouteTestApp({ applyIgnoreSuggestion, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/ignored-source-users`, {
+      body: JSON.stringify({ reason: 'Repeated fakes', suggestionSignals: { sampleSize: 10 }, username: 'peer-1' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 201);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(applyIgnoreSuggestion.mock.callCount(), 1);
+    const [args] = applyIgnoreSuggestion.mock.calls[0].arguments;
+    assert.equal(args.actorUserId, 'admin-1');
+    assert.equal(args.username, 'peer-1');
+    assert.equal(payload.ignoredSourceUser.username, 'peer-1');
+  });
+});
+
+test('activity ignored-source-users delete route requires fresh admin csrf and returns removal', async (t) => {
+  const requireFreshAdminSession = t.mock.fn(async () => ({ appUserId: 'admin-1', csrfToken: 'csrf-token' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const removeIgnoredSourceUser = t.mock.fn(async ({ username }) => ({ removed: true, username }));
+  const app = createActivityRouteTestApp({ removeIgnoredSourceUser, requireCsrf, requireFreshAdminSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/ignored-source-users/peer-1`, {
+      method: 'DELETE',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requireFreshAdminSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(removeIgnoredSourceUser.mock.callCount(), 1);
+    assert.equal(payload.removed, true);
+    assert.equal(payload.username, 'peer-1');
   });
 });
 
