@@ -60,6 +60,14 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  strengthLabel: {
+    type: String,
+    default: '',
+  },
+  strengthTier: {
+    type: String,
+    default: '',
+  },
   to: {
     type: [String, Object],
     default: null,
@@ -102,8 +110,15 @@ function handleAdd() {
       </div>
     </template>
 
-    <template v-if="badge" #eyebrow>
-      <span class="discover-artist-card__badge hx-pill" :data-tone="badgeTone">{{ badge }}</span>
+    <template v-if="badge || strengthLabel" #eyebrow>
+      <span class="discover-artist-card__eyebrow">
+        <span v-if="badge" class="discover-artist-card__badge hx-pill" :data-tone="badgeTone">{{ badge }}</span>
+        <span
+          v-if="strengthLabel"
+          class="discover-artist-card__strength"
+          :data-tier="strengthTier || undefined"
+        >{{ strengthLabel }}</span>
+      </span>
     </template>
 
     <template v-if="metaText" #meta>
@@ -160,6 +175,48 @@ function handleAdd() {
 .discover-artist-card__badge {
   width: fit-content;
   margin-bottom: var(--hx-space-1);
+}
+
+.discover-artist-card__eyebrow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-1);
+  margin-bottom: var(--hx-space-1);
+}
+
+.discover-artist-card__eyebrow .discover-artist-card__badge {
+  margin-bottom: 0;
+}
+
+.discover-artist-card__strength {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--hx-text-muted);
+}
+
+.discover-artist-card__strength::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: var(--hx-border-strong, var(--hx-border));
+}
+
+.discover-artist-card__strength[data-tier='strong']::before {
+  background: var(--hx-success, var(--hx-accent));
+}
+
+.discover-artist-card__strength[data-tier='moderate']::before {
+  background: var(--hx-accent);
+}
+
+.discover-artist-card__strength[data-tier='emerging']::before {
+  background: var(--hx-text-muted);
 }
 
 .discover-artist-card__supporting {

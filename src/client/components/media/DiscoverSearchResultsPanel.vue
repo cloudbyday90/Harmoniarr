@@ -20,6 +20,7 @@
 // Direct catalog search results for Discover. Receives ready-to-render card
 // view models from the container and re-emits add intents upward.
 import DiscoverArtistCard from './DiscoverArtistCard.vue';
+import PaginatedArtworkGrid from './PaginatedArtworkGrid.vue';
 
 defineProps({
   cards: {
@@ -43,39 +44,28 @@ defineEmits(['add']);
     </header>
 
     <div class="hx-card-body">
-      <div class="hx-artwork-grid discover-grid" aria-label="Artist search results">
-        <DiscoverArtistCard
-          v-for="card in cards"
-          :key="card.id"
-          :artist="card.artist"
-          :artwork="card.artwork"
-          :badge="card.badge"
-          :badge-tone="card.badgeTone"
-          :meta-text="card.metaText"
-          :supporting-text="card.supportingText"
-          :monitored="card.monitored"
-          :monitoring="card.monitoring"
-          :disabled="card.disabled"
-          :to="card.to"
-          @add="$emit('add', $event)"
-        />
-      </div>
+      <PaginatedArtworkGrid
+        :items="cards"
+        :initial-visible="12"
+        :step="12"
+        aria-label="Artist search results"
+      >
+        <template #default="{ item: card }">
+          <DiscoverArtistCard
+            :artist="card.artist"
+            :artwork="card.artwork"
+            :badge="card.badge"
+            :badge-tone="card.badgeTone"
+            :meta-text="card.metaText"
+            :supporting-text="card.supportingText"
+            :monitored="card.monitored"
+            :monitoring="card.monitoring"
+            :disabled="card.disabled"
+            :to="card.to"
+            @add="$emit('add', $event)"
+          />
+        </template>
+      </PaginatedArtworkGrid>
     </div>
   </article>
 </template>
-
-<style scoped>
-.discover-grid {
-  --hx-artwork-grid-min: 180px;
-}
-
-.discover-grid .hx-media-card {
-  cursor: default;
-}
-
-@media (max-width: 640px) {
-  .discover-grid {
-    --hx-artwork-grid-min: 140px;
-  }
-}
-</style>

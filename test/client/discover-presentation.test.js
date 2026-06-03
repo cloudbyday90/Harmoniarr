@@ -32,6 +32,7 @@ import {
   buildDiscoverSuggestionsCopy,
   buildRecommendationMeta,
   buildRecommendationProvenance,
+  buildRecommendationStrength,
   buildRecommendationSupport,
   buildSearchResultBadgeLabel,
   buildSearchResultBadgeTone,
@@ -497,4 +498,71 @@ test('buildDiscoverArtistInitial is stable — same inputs produce same output',
 
 test('buildDiscoverArtistInitial handles null id without throwing', () => {
   assert.doesNotThrow(() => buildDiscoverArtistInitial(null, 'Test Artist'));
+});
+
+// ── buildRecommendationStrength ───────────────────────────────────────────────
+
+test('buildRecommendationStrength returns the strong tier at or above 1.5', () => {
+  assert.deepEqual(buildRecommendationStrength({ rankScore: 1.5 }), {
+    tier: 'strong',
+    label: 'Strong overlap',
+  });
+  assert.deepEqual(buildRecommendationStrength({ rankScore: 2.3 }), {
+    tier: 'strong',
+    label: 'Strong overlap',
+  });
+});
+
+test('buildRecommendationStrength returns the moderate tier between 0.8 and 1.5', () => {
+  assert.deepEqual(buildRecommendationStrength({ rankScore: 0.8 }), {
+    tier: 'moderate',
+    label: 'Moderate overlap',
+  });
+  assert.deepEqual(buildRecommendationStrength({ rankScore: 1.49 }), {
+    tier: 'moderate',
+    label: 'Moderate overlap',
+  });
+});
+
+test('buildRecommendationStrength returns the emerging tier below 0.8', () => {
+  assert.deepEqual(buildRecommendationStrength({ rankScore: 0.79 }), {
+    tier: 'emerging',
+    label: 'Emerging overlap',
+  });
+  assert.deepEqual(buildRecommendationStrength({ rankScore: 0 }), {
+    tier: 'emerging',
+    label: 'Emerging overlap',
+  });
+});
+
+test('buildRecommendationStrength falls back to score when rankScore is absent', () => {
+  assert.equal(buildRecommendationStrength({ score: 1.6 }).tier, 'strong');
+  assert.equal(buildRecommendationStrength({ score: 0.9 }).tier, 'moderate');
+  assert.equal(buildRecommendationStrength({ score: 0.2 }).tier, 'emerging');
+});
+
+test('buildRecommendationStrength prefers rankScore over score', () => {
+  assert.equal(buildRecommendationStrength({ rankScore: 1.7, score: 0.1 }).tier, 'strong');
+});
+
+test('buildRecommendationStrength treats null/undefined as emerging', () => {
+  assert.equal(buildRecommendationStrength(null).tier, 'emerging');
+  assert.equal(buildRecommendationStrength(undefined).tier, 'emerging');
+  assert.equal(buildRecommendationStrength({}).tier, 'emerging');
+});
+
+test('buildRecommendationStrength ignores non-finite scores', () => {
+  assert.equal(buildRecommendationStrength({ rankScore: Number.NaN }).tier, 'emerging');
+  assert.equal(buildRecommendationStrength({ rankScore: Infinity }).tier, 'emerging');
+});
+
+test('buildRecommendationStrength labels are a fixed, markup-free enumeration', () => {
+  const labels = [
+    buildRecommendationStrength({ rankScore: 2 }).label,
+    buildRecommendationStrength({ rankScore: 1 }).label,
+    buildRecommendationStrength({ rankScore: 0 }).label,
+  ];
+  for (const label of labels) {
+    assert.ok(!/[<>]/.test(label), `label must not contain markup: ${label}`);
+  }
 });

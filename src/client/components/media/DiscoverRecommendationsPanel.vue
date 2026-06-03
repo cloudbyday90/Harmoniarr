@@ -22,6 +22,7 @@
 // of business logic. Static copy is sourced from the presentation library so
 // the wording lives in one tested place.
 import DiscoverArtistCard from './DiscoverArtistCard.vue';
+import PaginatedArtworkGrid from './PaginatedArtworkGrid.vue';
 import {
   buildDiscoverMonitoredBandCopy,
   buildDiscoverNoSimilarArtistsMessage,
@@ -53,6 +54,30 @@ defineProps({
 });
 
 defineEmits(['add']);
+
+// Map of artist id -> seed-chip element, so the container can return focus to a
+// freshly added artist's chip after the add dialog closes (APG dialog pattern:
+// when the invoking control is gone/disabled, focus a logical follow-on element).
+const chipRefs = new Map();
+
+function setChipRef(id, el) {
+  if (el) {
+    chipRefs.set(id, el.$el ?? el);
+  } else {
+    chipRefs.delete(id);
+  }
+}
+
+function focusArtistChip(artistId) {
+  const el = chipRefs.get(artistId);
+  if (el && typeof el.focus === 'function') {
+    el.focus();
+    return true;
+  }
+  return false;
+}
+
+defineExpose({ focusArtistChip });
 </script>
 
 <template>
@@ -76,6 +101,7 @@ defineEmits(['add']);
           <RouterLink
             v-for="chip in chips"
             :key="chip.id"
+            :ref="(el) => setChipRef(chip.id, el)"
             :to="chip.to"
             class="discover-seed-chip"
             role="listitem"
@@ -104,23 +130,30 @@ defineEmits(['add']);
           <p class="discover-suggestions__copy">{{ buildDiscoverSuggestionsCopy() }}</p>
         </div>
 
-        <div class="hx-artwork-grid discover-grid" role="list" aria-label="Recommended artists">
-          <DiscoverArtistCard
-            v-for="card in cards"
-            :key="card.id"
-            :artist="card.artist"
-            :artwork="card.artwork"
-            :badge="card.badge"
-            :badge-tone="card.badgeTone"
-            :meta-text="card.metaText"
-            :supporting-text="card.supportingText"
-            :monitored="card.monitored"
-            :monitoring="card.monitoring"
-            :disabled="card.disabled"
-            :to="card.to"
-            @add="$emit('add', $event)"
-          />
-        </div>
+        <PaginatedArtworkGrid
+          :items="cards"
+          :initial-visible="8"
+          :step="8"
+          aria-label="Recommended artists"
+        >
+          <template #default="{ item: card }">
+            <DiscoverArtistCard
+              :artist="card.artist"
+              :artwork="card.artwork"
+              :badge="card.badge"
+              :badge-tone="card.badgeTone"
+              :strength-label="card.strengthLabel"
+              :strength-tier="card.strengthTier"
+              :meta-text="card.metaText"
+              :supporting-text="card.supportingText"
+              :monitored="card.monitored"
+              :monitoring="card.monitoring"
+              :disabled="card.disabled"
+              :to="card.to"
+              @add="$emit('add', $event)"
+            />
+          </template>
+        </PaginatedArtworkGrid>
       </section>
 
       <p v-else-if="!isLoading" class="discover-graph-card__empty">
@@ -240,14 +273,6 @@ defineEmits(['add']);
   gap: var(--hx-space-1);
 }
 
-.discover-grid {
-  --hx-artwork-grid-min: 180px;
-}
-
-.discover-grid .hx-media-card {
-  cursor: default;
-}
-
 .discover-graph-card__error {
   margin: 0;
   color: var(--hx-danger);
@@ -258,11 +283,5 @@ defineEmits(['add']);
   margin: 0;
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
-}
-
-@media (max-width: 640px) {
-  .discover-grid {
-    --hx-artwork-grid-min: 140px;
-  }
 }
 </style>

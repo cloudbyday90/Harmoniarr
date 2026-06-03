@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import AddArtistModal from '../components/media/AddArtistModal.vue';
 import DiscoverRecommendationsPanel from '../components/media/DiscoverRecommendationsPanel.vue';
 import DiscoverSearchBar from '../components/media/DiscoverSearchBar.vue';
@@ -41,6 +41,7 @@ import {
   buildDiscoverSearchErrorBody,
   buildRecommendationMeta,
   buildRecommendationProvenance,
+  buildRecommendationStrength,
   buildRecommendationSupport,
   buildSearchResultBadgeLabel,
   buildSearchResultBadgeTone,
@@ -94,6 +95,12 @@ const addArtistCandidate = ref(null);
 const addArtistErrorMessage = ref('');
 const addArtistPolicyDefaults = ref(loadSavedAddArtistPolicyForm());
 
+// Ref to the recommendations panel + the id of the most recently added artist,
+// so focus can return to that artist's seed chip once the add dialog closes (the
+// invoking "Add" button is disabled by then). See `handleFocusReturnUnavailable`.
+const recommendationsPanelRef = ref(null);
+const lastAddedArtistId = ref(null);
+
 // ── View models ──────────────────────────────────────────────────────────────
 // The container assembles plain, presentation-ready objects so child panels
 // stay free of business logic and the template stays declarative.
@@ -112,6 +119,7 @@ const monitoredChips = computed(() =>
 const recommendationCards = computed(() =>
   suggestions.value.map((suggestion) => {
     const provenance = buildRecommendationProvenance(suggestion);
+    const strength = buildRecommendationStrength(suggestion);
     const added = isAddedArtist(suggestion.id);
     return {
       id: suggestion.id,
@@ -119,6 +127,8 @@ const recommendationCards = computed(() =>
       artwork: getArtistArtwork(suggestion.id),
       badge: provenance.label,
       badgeTone: provenance.tone,
+      strengthLabel: strength.label,
+      strengthTier: strength.tier,
       metaText: buildRecommendationMeta(suggestion),
       supportingText: buildRecommendationSupport(suggestion),
       monitored: added,
@@ -190,12 +200,27 @@ async function handleAddArtistSubmit(policyForm) {
     if (result.policy.useAsDefault) {
       addArtistPolicyDefaults.value = saveAddArtistPolicyForm(result.policy);
     }
+    lastAddedArtistId.value = artist.id;
     await addSeed(artist);
     await loadMonitoredArtists();
     closeAddArtistModal();
   } else if (result?.error) {
     addArtistErrorMessage.value = result.error.message ?? 'Could not add artist. Please try again.';
   }
+}
+
+// When the add dialog closes and its invoking "Add" button is no longer
+// focusable (it became disabled after the add), move focus to the newly added
+// artist's seed chip — the logical follow-on element per the W3C APG dialog
+// pattern. Falls back to no-op if the chip is not yet rendered.
+async function handleFocusReturnUnavailable() {
+  const artistId = lastAddedArtistId.value;
+  lastAddedArtistId.value = null;
+  if (!artistId) {
+    return;
+  }
+  await nextTick();
+  recommendationsPanelRef.value?.focusArtistChip?.(artistId);
 }
 
 onMounted(async () => {
@@ -227,6 +252,7 @@ function buildArtistLocation(artist) {
       :error-message="addArtistErrorMessage"
       @close="closeAddArtistModal"
       @submit="handleAddArtistSubmit"
+      @focus-return-unavailable="handleFocusReturnUnavailable"
     />
 
     <header class="hx-page-header discover-header">
@@ -251,6 +277,7 @@ function buildArtistLocation(artist) {
 
     <DiscoverRecommendationsPanel
       v-if="hasSeeds"
+      ref="recommendationsPanelRef"
       :chips="monitoredChips"
       :cards="recommendationCards"
       :is-loading="isAnySeedLoading"

@@ -251,6 +251,36 @@ export function buildRecommendationProvenance(suggestion) {
 }
 
 /**
+ * Overlap-strength disclosure for a recommended artist card.
+ *
+ * Surfaces *how strong* a recommendation is — progressive disclosure on top of
+ * the provenance badge, which only says *why* an artist surfaced. The engine's
+ * raw `rankScore` is intentionally bucketed into a small fixed enumeration of
+ * tiers rather than rendered directly, so internal scoring semantics stay
+ * private and the label can never carry engine- or user-supplied markup.
+ *
+ * Tiers (by ranked overlap score, which already folds in the multi-seed boost):
+ *   - `>= 1.5` → `strong`   ("Strong overlap")
+ *   - `>= 0.8` → `moderate` ("Moderate overlap")
+ *   - else     → `emerging` ("Emerging overlap")
+ *
+ * @param {{ rankScore?: number, score?: number }|null|undefined} suggestion
+ * @returns {{ tier: 'strong'|'moderate'|'emerging', label: string }}
+ */
+export function buildRecommendationStrength(suggestion) {
+  const rankScore = Number(suggestion?.rankScore ?? suggestion?.score ?? 0);
+  const value = Number.isFinite(rankScore) ? rankScore : 0;
+
+  if (value >= 1.5) {
+    return { tier: 'strong', label: 'Strong overlap' };
+  }
+  if (value >= 0.8) {
+    return { tier: 'moderate', label: 'Moderate overlap' };
+  }
+  return { tier: 'emerging', label: 'Emerging overlap' };
+}
+
+/**
  * Meta line for a recommended artist card.
  *
  * @param {{ seedCount?: number }|null|undefined} suggestion

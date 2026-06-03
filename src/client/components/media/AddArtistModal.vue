@@ -30,6 +30,7 @@ import {
   buildDiscoverArtistInitial,
   buildDiscoverAvatarStyle,
 } from '../../lib/discover-presentation.js';
+import { describeInvoker, shouldRestoreInvokerFocus } from '../../lib/focus-return.js';
 
 const props = defineProps({
   artist: {
@@ -58,7 +59,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'submit']);
+const emit = defineEmits(['close', 'submit', 'focus-return-unavailable']);
 
 const panelRef = ref(null);
 const titleRef = ref(null);
@@ -152,8 +153,17 @@ watch(() => props.open, async (isOpen) => {
     await nextTick();
     titleRef.value?.focus();
   } else if (previouslyFocusedElement) {
-    previouslyFocusedElement.focus();
+    // APG Dialog pattern: restore focus to the invoker, but only if it can still
+    // receive focus. After a successful add the invoking "Add" button becomes
+    // disabled, so we hand off to the parent to focus a logical follow-on
+    // element (e.g. the newly added artist's chip) instead of dropping to body.
+    const invoker = previouslyFocusedElement;
     previouslyFocusedElement = null;
+    if (shouldRestoreInvokerFocus(describeInvoker(invoker))) {
+      invoker.focus();
+    } else {
+      emit('focus-return-unavailable');
+    }
   }
 });
 
