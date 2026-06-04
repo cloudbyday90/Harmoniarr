@@ -17,6 +17,7 @@
  */
 
 import { readonly, ref } from 'vue';
+import { resolveToastDuration } from '../lib/toast-feedback.js';
 
 /**
  * Lightweight modular toast system.
@@ -25,17 +26,27 @@ import { readonly, ref } from 'vue';
  * `useToast()` operate on the same queue. `ToastStack.vue` reads from this
  * store and renders the visible stack.
  *
+ * Feedback convention (see `lib/toast-feedback.js`):
+ *   - Errors persist until dismissed; success / info / warning auto-dismiss.
+ *   - Identical (tone + message) toasts are de-duplicated.
+ *   - Tone maps to an ARIA role in the renderer (alert vs status).
+ *
  * Usage:
  *   const toast = useToast();
  *   toast.success('Artist monitored.');
  *   toast.error('Could not submit request.');
  *   toast.info('Searching…');
+ *   toast.success('Saved.', { action: { label: 'View', onClick: () => {} } });
  *   toast.dismiss(id);
  */
 
-const DEFAULT_DURATION_MS = 4000;
+/**
+ * @typedef {object} ToastAction
+ * @property {string} label Button label.
+ * @property {() => void} onClick Invoked when the action button is activated.
+ */
 
-/** @type {import('vue').Ref<Array<{id: string, tone: string, message: string, durationMs: number}>>} */
+/** @type {import('vue').Ref<Array<{id: string, tone: string, message: string, durationMs: number, action: ToastAction|null}>>} */
 const toasts = ref([]);
 
 let _nextId = 1;
@@ -45,18 +56,32 @@ function generateId() {
 }
 
 /**
- * Add a toast to the stack and schedule auto-dismiss.
+ * Add a toast to the stack and schedule auto-dismiss. Identical (tone + message)
+ * toasts already on screen are suppressed and the existing toast's id is
+ * returned instead.
  *
  * @param {'success'|'error'|'info'|'warning'} tone
  * @param {string} message
- * @param {{ durationMs?: number }} [options]
+ * @param {{ durationMs?: number, action?: ToastAction }} [options]
  * @returns {string} toast id
  */
-function push(tone, message, { durationMs = DEFAULT_DURATION_MS } = {}) {
+function push(tone, message, { durationMs, action } = {}) {
+  const existing = toasts.value.find((t) => t.tone === tone && t.message === message);
+  if (existing) {
+    return existing.id;
+  }
+
   const id = generateId();
-  toasts.value.push({ id, tone, message, durationMs });
-  if (durationMs > 0) {
-    setTimeout(() => dismiss(id), durationMs);
+  const resolvedDuration = resolveToastDuration(tone, durationMs);
+  toasts.value.push({
+    id,
+    tone,
+    message,
+    durationMs: resolvedDuration,
+    action: action ?? null,
+  });
+  if (resolvedDuration > 0) {
+    setTimeout(() => dismiss(id), resolvedDuration);
   }
   return id;
 }

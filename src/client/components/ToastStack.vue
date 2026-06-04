@@ -18,8 +18,16 @@
 
 <script setup>
 import { useToast } from '../composables/useToast.js';
+import { resolveToastRole } from '../lib/toast-feedback.js';
 
 const { toasts, dismiss } = useToast();
+
+function handleAction(toast) {
+  if (typeof toast.action?.onClick === 'function') {
+    toast.action.onClick();
+  }
+  dismiss(toast.id);
+}
 </script>
 
 <template>
@@ -27,7 +35,6 @@ const { toasts, dismiss } = useToast();
     v-if="toasts.length"
     class="hx-toast-stack"
     role="region"
-    aria-live="polite"
     aria-label="Notifications"
   >
     <TransitionGroup name="hx-toast" tag="ul" class="hx-toast-list">
@@ -36,9 +43,17 @@ const { toasts, dismiss } = useToast();
         :key="toast.id"
         class="hx-toast"
         :data-tone="toast.tone"
-        role="status"
+        :role="resolveToastRole(toast.tone)"
       >
         <span class="hx-toast__message">{{ toast.message }}</span>
+        <button
+          v-if="toast.action"
+          type="button"
+          class="hx-toast__action"
+          @click="handleAction(toast)"
+        >
+          {{ toast.action.label }}
+        </button>
         <button
           type="button"
           class="hx-toast__dismiss"
@@ -107,6 +122,23 @@ const { toasts, dismiss } = useToast();
 .hx-toast__message {
   flex: 1;
   line-height: 1.45;
+}
+
+.hx-toast__action {
+  flex-shrink: 0;
+  align-self: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  color: var(--hx-accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hx-toast__action:hover {
+  text-decoration: underline;
 }
 
 .hx-toast__dismiss {

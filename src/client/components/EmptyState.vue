@@ -35,11 +35,18 @@ defineProps({
   },
   /**
    * When provided, the CTA renders as a `<RouterLink>` pointing to this route
-   * name. When omitted, the `cta` slot is used for custom CTA content.
+   * name (navigational affordance). When omitted but `ctaLabel` is set, the CTA
+   * renders as a `<button>` that emits `cta-click` (action affordance). When
+   * both are omitted, the `cta` slot is used for custom CTA content.
    */
   ctaTo: {
     type: [String, Object],
     default: null,
+  },
+  /** Button variant for the action-mode CTA (primary, ghost, danger). */
+  ctaVariant: {
+    type: String,
+    default: 'primary',
   },
   /**
    * Visual variant. Currently 'default' and 'discover' are defined;
@@ -50,6 +57,8 @@ defineProps({
     default: 'default',
   },
 });
+
+defineEmits(['cta-click']);
 </script>
 
 <template>
@@ -68,7 +77,7 @@ defineProps({
 
     <p v-if="body" class="hx-empty-copy">{{ body }}</p>
 
-    <div v-if="ctaTo || $slots.cta" class="hx-empty-actions">
+    <div v-if="ctaTo || ctaLabel || $slots.cta" class="hx-empty-actions">
       <RouterLink
         v-if="ctaTo"
         :to="typeof ctaTo === 'string' ? { name: ctaTo } : ctaTo"
@@ -77,6 +86,15 @@ defineProps({
       >
         {{ ctaLabel || 'Get started' }}
       </RouterLink>
+      <button
+        v-else-if="ctaLabel"
+        type="button"
+        class="hx-btn"
+        :data-variant="ctaVariant"
+        @click="$emit('cta-click')"
+      >
+        {{ ctaLabel }}
+      </button>
       <slot v-else name="cta" />
     </div>
   </div>
