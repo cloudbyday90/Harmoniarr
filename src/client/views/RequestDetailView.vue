@@ -21,6 +21,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ReassignRequestModal from '../components/ReassignRequestModal.vue';
 import RequestEventTimeline from '../components/RequestEventTimeline.vue';
+import RequestJourneyTimeline from '../components/RequestJourneyTimeline.vue';
 import { useMediaRequestDetail } from '../composables/useMediaRequestDetail.js';
 import { useMediaRequestPipeline } from '../composables/useMediaRequestPipeline.js';
 import { useMediaRequestReassignment } from '../composables/useMediaRequestReassignment.js';
@@ -46,6 +47,7 @@ import {
   buildPipelineSteps,
 } from '../lib/request-pipeline-presentation.js';
 import { formatUserRole } from '../lib/settings-users-presentation.js';
+import { buildRequestJourney } from '../lib/request-journey.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
@@ -169,6 +171,10 @@ const importReviewLink = computed(() => {
 const hasPipeline = computed(() => pipelineCandidates.value.length > 0);
 const candidateCount = computed(() => pipelineCandidates.value.length);
 
+const journey = computed(() =>
+  buildRequestJourney({ mediaRequest: mediaRequest.value, candidates: pipelineCandidates.value }),
+);
+
 onMounted(() => {
   const id = route.params.id;
   if (id) {
@@ -230,6 +236,18 @@ function formatTimestamp(ts) {
           <span class="hx-stat-value">{{ mediaRequest.fanOutChildCount }}</span>
         </article>
       </div>
+
+      <article v-if="journey.stages.length" class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">Request journey</h2>
+            <p class="hx-card-subtitle">Where this request is right now, from submission to your library.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <RequestJourneyTimeline :stages="journey.stages" :current-stage-key="journey.currentStageKey" />
+        </div>
+      </article>
 
       <article class="hx-card">
         <header class="hx-card-header">
