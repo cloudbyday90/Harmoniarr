@@ -243,13 +243,12 @@ services.
    already exposes `pruneCache`), and define export/redaction semantics so the evidence
    log, job queue, cache, and ignore list have a first-class, governed lifecycle.
 
-2. **Operator-tunable spectral thresholds with live preview.** The cutoff-to-verdict
-   thresholds (and the trust thresholds the new simulator previews) are currently
-   constants. Promote them to persisted, admin-editable settings with the same
-   simulate-before-apply pattern — re-run classification over a recent sample of cached
-   measurements and show the projected verdict distribution before committing.
+2. **Operator-tunable spectral thresholds with live preview.** _Implemented — see
+   `docs/SOURCE_USER_FIDELITY_GOVERNANCE_DESIGN.md`._ The cutoff-to-verdict thresholds
+   (and the trust thresholds the simulator previews) are now persisted, admin-editable
+   `fidelity`-namespace settings with a simulate-before-apply spectral simulator.
 
-3. **Library-wide fidelity health dashboard.** With retroactive scanning populating the
-   cache, aggregate the results into a catalog-level quality dashboard — fidelity
-   distribution by codec/source, trend over time, and a worst-offenders list — so the
-   spectral signal becomes a library-health KPI rather than a per-peer detail.
+3. **Library-wide fidelity health dashboard.** _Implemented — see
+   `docs/SOURCE_USER_FIDELITY_GOVERNANCE_DESIGN.md`._ The completed-measurement ledger
+   is aggregated into a catalog-level quality KPI (health score, verdict distribution,
+   by-codec breakdown, worst offenders, daily trend).

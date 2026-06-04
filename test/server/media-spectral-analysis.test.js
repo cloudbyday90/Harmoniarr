@@ -22,6 +22,9 @@ import {
   classifySpectralCutoff,
   estimateCutoffFromRolloffSamples,
   isDeclaredLossless,
+  DEFAULT_SPECTRAL_THRESHOLDS,
+  buildCutoffBands,
+  resolveSpectralThresholds,
 } from '../../src/server/media/media-spectral-analysis.js';
 
 test('estimateCutoffFromRolloffSamples returns the brightest frame, ignoring noise', () => {
@@ -89,3 +92,46 @@ test('isDeclaredLossless recognizes lossless codecs and extensions', () => {
   assert.equal(isDeclaredLossless({ codec: 'mp3', extension: '.mp3' }), false);
   assert.equal(isDeclaredLossless({}), false);
 });
+
+test('resolveSpectralThresholds falls back to defaults and enforces monotonic ordering', () => {
+  assert.deepEqual(resolveSpectralThresholds(undefined), DEFAULT_SPECTRAL_THRESHOLDS);
+  // Inverted edges (suspicious above authentic) collapse rather than cross over.
+  const inverted = resolveSpectralThresholds({ authenticMinCutoffHz: 18000, suspiciousMinCutoffHz: 21000, transcodeMidCutoffHz: 25000 });
+  assert.ok(inverted.suspiciousMinCutoffHz <= inverted.authenticMinCutoffHz);
+  assert.ok(inverted.transcodeMidCutoffHz <= inverted.suspiciousMinCutoffHz);
+  // Garbage values fall back.
+  const garbage = resolveSpectralThresholds({ authenticMinCutoffHz: 'nope', minTrustworthySampleRate: -5 });
+  assert.equal(garbage.authenticMinCutoffHz, DEFAULT_SPECTRAL_THRESHOLDS.authenticMinCutoffHz);
+  assert.equal(garbage.minTrustworthySampleRate, DEFAULT_SPECTRAL_THRESHOLDS.minTrustworthySampleRate);
+});
+
+test('buildCutoffBands reflects tuned boundaries', () => {
+  const bands = buildCutoffBands({ authenticMinCutoffHz: 21000, suspiciousMinCutoffHz: 20000, transcodeMidCutoffHz: 17000 });
+  assert.equal(bands[0].minCutoffHz, 21000);
+  assert.equal(bands[1].minCutoffHz, 20000);
+  assert.equal(bands[2].minCutoffHz, 17000);
+});
+
+test('classifySpectralCutoff re-grades a 19500 Hz file when the authentic edge is lowered', () => {
+  // Default: 19500 Hz is suspicious. Lower the authentic edge to 19000 -> authentic.
+  const tuned = classifySpectralCutoff({
+    cutoffHz: 19500,
+    sampleRate: 44100,
+    declaredLossless: true,
+    thresholds: { authenticMinCutoffHz: 19000, suspiciousMinCutoffHz: 18000 },
+  });
+  assert.equal(tuned.verdict, 'authentic');
+  assert.equal(tuned.penalize, false);
+});
+
+test('classifySpectralCutoff respects a tuned minimum sample-rate floor', () => {
+  // Default floor 44100 makes 22050 inconclusive; lowering the floor allows a verdict.
+  const tuned = classifySpectralCutoff({
+    cutoffHz: 10000,
+    sampleRate: 22050,
+    declaredLossless: true,
+    thresholds: { minTrustworthySampleRate: 16000 },
+  });
+  assert.equal(tuned.verdict, 'transcoded');
+});
+

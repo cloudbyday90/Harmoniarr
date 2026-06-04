@@ -74,6 +74,7 @@ import { registerSlskdWebhookRoutes } from './routes/slskd-webhook-routes.js';
 import { registerSystemRoutes } from './routes/system-routes.js';
 import { createRuntimeResourceService } from './runtime-resource-service.js';
 import { loadSettings } from './settings.js';
+import { createFidelityThresholdLoaders } from './fidelity-threshold-settings.js';
 import { createSettingsService } from './settings-service.js';
 import { shouldSendNotification } from './notification/notification-preference-service.js';
 import { broadcastAdminNotification } from './notification/notification-admin-dispatch-service.js';
@@ -272,6 +273,7 @@ export function createApp({
     listTrustSnapshot: restoreScopeRuntimeSnapshotStore.listTrustSnapshot,
     replaceTrustSnapshot: restoreScopeRuntimeSnapshotStore.replaceTrustSnapshot,
     analyzeSpectralCutoffFn: spectralAnalyzer.analyzeSpectralCutoff,
+    ...createFidelityThresholdLoaders({ loadSettingsFn: loadSettings }),
     onTrustOverrideFn: ({ _actorUserId, _reason, trustState, username }) => broadcastAdminNotification({
       category: 'trustOverride',
       listAppUsers: notificationDispatchDeps.listAppUsers,

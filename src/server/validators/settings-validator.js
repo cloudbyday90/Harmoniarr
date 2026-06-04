@@ -355,6 +355,62 @@ const settingDefinitions = {
       },
     },
   },
+  fidelity: {
+    spectralAuthenticMinCutoffHz: {
+      defaultValue: 20000,
+      normalize(value) {
+        return normalizeIntegerSetting('fidelity.spectralAuthenticMinCutoffHz', value, { min: 10000, max: 24000 });
+      },
+    },
+    spectralSuspiciousMinCutoffHz: {
+      defaultValue: 19000,
+      normalize(value) {
+        return normalizeIntegerSetting('fidelity.spectralSuspiciousMinCutoffHz', value, { min: 8000, max: 24000 });
+      },
+    },
+    spectralTranscodeMidCutoffHz: {
+      defaultValue: 16000,
+      normalize(value) {
+        return normalizeIntegerSetting('fidelity.spectralTranscodeMidCutoffHz', value, { min: 4000, max: 24000 });
+      },
+    },
+    spectralMinSampleRateHz: {
+      defaultValue: 44100,
+      normalize(value) {
+        return normalizeIntegerSetting('fidelity.spectralMinSampleRateHz', value, { min: 8000, max: 192000 });
+      },
+    },
+    trustWatchFailureCount: {
+      defaultValue: 3,
+      normalize(value) {
+        return normalizeIntegerSetting('fidelity.trustWatchFailureCount', value, { min: 1, max: 100 });
+      },
+    },
+    trustWatchMaxSuccessRate: {
+      defaultValue: 0.5,
+      normalize(value) {
+        return normalizeRateSetting('fidelity.trustWatchMaxSuccessRate', value);
+      },
+    },
+    trustWatchEvidenceCount: {
+      defaultValue: 3,
+      normalize(value) {
+        return normalizeIntegerSetting('fidelity.trustWatchEvidenceCount', value, { min: 1, max: 1000 });
+      },
+    },
+    trustHealthyEvidenceCount: {
+      defaultValue: 5,
+      normalize(value) {
+        return normalizeIntegerSetting('fidelity.trustHealthyEvidenceCount', value, { min: 1, max: 1000 });
+      },
+    },
+    trustHealthyMinSuccessRate: {
+      defaultValue: 0.8,
+      normalize(value) {
+        return normalizeRateSetting('fidelity.trustHealthyMinSuccessRate', value);
+      },
+    },
+  },
 };
 
 function normalizeStringAllowEmpty(settingName) {
@@ -401,6 +457,18 @@ function normalizeIntegerSetting(settingName, value, { min, max } = {}) {
 
   if (max !== undefined && value > max) {
     throw createSettingsValidationError(`${settingName} must be less than or equal to ${max}`);
+  }
+
+  return value;
+}
+
+function normalizeRateSetting(settingName, value, { min = 0, max = 1 } = {}) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw createSettingsValidationError(`${settingName} must be a number`);
+  }
+
+  if (value < min || value > max) {
+    throw createSettingsValidationError(`${settingName} must be between ${min} and ${max}`);
   }
 
   return value;

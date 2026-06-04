@@ -120,8 +120,13 @@ function emptyStateCounts() {
  * @param {object} input
  * @param {Array<{ username?: string|null, usernameKey?: string|null, successCount?: number, failureCount?: number, trustState?: string }>} input.peers
  * @param {object} [input.thresholds] - Proposed thresholds (partial; missing keys fall back to defaults).
+ * @param {object} [input.currentThresholds] - Baseline ("current") thresholds the
+ *   proposed set is compared against. Defaults to DEFAULT_TRUST_THRESHOLDS, but
+ *   callers pass the persisted live thresholds so the projection reflects the
+ *   operator's actual policy, not the hard-coded shipping defaults.
  * @returns {{
  *   thresholds: object,
+ *   currentThresholds: object,
  *   defaultThresholds: object,
  *   evaluatedPeerCount: number,
  *   changedPeerCount: number,
@@ -130,8 +135,9 @@ function emptyStateCounts() {
  *   projection: Array<object>
  * }}
  */
-export function simulateTrustThresholdPolicy({ peers = [], thresholds = {} } = {}) {
+export function simulateTrustThresholdPolicy({ peers = [], thresholds = {}, currentThresholds } = {}) {
   const proposed = resolveThresholds(thresholds);
+  const baseline = resolveThresholds(currentThresholds);
   const peerList = Array.isArray(peers) ? peers : [];
 
   const currentCounts = emptyStateCounts();
@@ -147,7 +153,7 @@ export function simulateTrustThresholdPolicy({ peers = [], thresholds = {} } = {
       trustState: typeof peer?.trustState === 'string' ? peer.trustState : 'neutral',
     };
 
-    const currentState = classifyReviewState(stats, DEFAULT_TRUST_THRESHOLDS);
+    const currentState = classifyReviewState(stats, baseline);
     const projectedState = classifyReviewState(stats, proposed);
     const changed = currentState !== projectedState;
 
@@ -182,6 +188,7 @@ export function simulateTrustThresholdPolicy({ peers = [], thresholds = {} } = {
 
   return {
     thresholds: proposed,
+    currentThresholds: baseline,
     defaultThresholds: { ...DEFAULT_TRUST_THRESHOLDS },
     evaluatedPeerCount: peerList.length,
     changedPeerCount,

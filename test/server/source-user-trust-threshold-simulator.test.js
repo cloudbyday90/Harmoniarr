@@ -77,3 +77,18 @@ test('simulateTrustThresholdPolicy reports no change when thresholds match defau
   assert.equal(result.changedPeerCount, 0);
   assert.equal(result.transitions.length, 0);
 });
+
+test('simulateTrustThresholdPolicy classifies the current state under a supplied baseline', () => {
+  const peers = [{ username: 'edge-peer', successCount: 8, failureCount: 2, trustState: 'neutral' }];
+  // Baseline already raised so 80% is NOT healthy now; proposing the default
+  // (0.8 healthy bar) would promote it back to healthy.
+  const result = simulateTrustThresholdPolicy({
+    peers,
+    currentThresholds: { healthyMinSuccessRate: 0.85 },
+    thresholds: { healthyMinSuccessRate: 0.8 },
+  });
+  assert.equal(result.summary.current.healthy, 0);
+  assert.equal(result.summary.projected.healthy, 1);
+  assert.equal(result.changedPeerCount, 1);
+  assert.equal(result.currentThresholds.healthyMinSuccessRate, 0.85);
+});

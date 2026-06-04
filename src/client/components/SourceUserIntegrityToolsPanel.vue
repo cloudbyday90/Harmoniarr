@@ -18,10 +18,13 @@
 <script setup>
 import { reactive, ref } from 'vue';
 import {
+  fetchLibraryFidelityDashboard,
   fetchSourceUserCollusionReport,
   rescanLibrarySpectral,
+  simulateSourceUserSpectralPolicy,
   simulateSourceUserTrustPolicy,
 } from '../lib/activity-api.js';
+import { updateSettings } from '../lib/settings-api.js';
 import {
   buildCollusionViewModel,
   formatEstimatedBitrate,
@@ -35,6 +38,14 @@ import {
   formatReviewStateTone,
   formatSimulationHeadline,
 } from '../lib/source-user-trust-policy-presentation.js';
+import {
+  SPECTRAL_THRESHOLD_FIELDS,
+  buildFidelityDashboardViewModel,
+  buildSpectralThresholdSettingsPatch,
+  buildVerdictComparisonRows,
+  formatSpectralSimulationHeadline,
+  formatVerdictTone,
+} from '../lib/library-fidelity-presentation.js';
 
 const DEFAULT_THRESHOLDS = {
   watchFailureCount: 3,
@@ -42,6 +53,13 @@ const DEFAULT_THRESHOLDS = {
   watchEvidenceCount: 3,
   healthyEvidenceCount: 5,
   healthyMinSuccessRate: 0.8,
+};
+
+const DEFAULT_SPECTRAL_THRESHOLDS = {
+  authenticMinCutoffHz: 20000,
+  suspiciousMinCutoffHz: 19000,
+  transcodeMidCutoffHz: 16000,
+  minTrustworthySampleRate: 44100,
 };
 
 // --- Retroactive spectral rescan ------------------------------------------
@@ -104,6 +122,64 @@ async function runSimulation() {
     simulationError.value = error?.message ?? 'Failed to run policy simulation.';
   } finally {
     isSimulating.value = false;
+  }
+}
+
+// --- Library fidelity health dashboard -------------------------------------
+const fidelityDashboard = ref(null);
+const isLoadingDashboard = ref(false);
+const dashboardError = ref('');
+
+async function loadFidelityDashboard() {
+  isLoadingDashboard.value = true;
+  dashboardError.value = '';
+  try {
+    const response = await fetchLibraryFidelityDashboard({});
+    fidelityDashboard.value = buildFidelityDashboardViewModel(response);
+  } catch (error) {
+    dashboardError.value = error?.message ?? 'Failed to load fidelity dashboard.';
+  } finally {
+    isLoadingDashboard.value = false;
+  }
+}
+
+// --- Spectral threshold simulator + apply ----------------------------------
+const spectralThresholds = reactive({ ...DEFAULT_SPECTRAL_THRESHOLDS });
+const spectralSimulation = ref(null);
+const isSimulatingSpectral = ref(false);
+const spectralSimulationError = ref('');
+const isApplyingSpectral = ref(false);
+const spectralApplyMessage = ref('');
+
+function resetSpectralThresholds() {
+  Object.assign(spectralThresholds, DEFAULT_SPECTRAL_THRESHOLDS);
+}
+
+async function runSpectralSimulation() {
+  isSimulatingSpectral.value = true;
+  spectralSimulationError.value = '';
+  spectralApplyMessage.value = '';
+  try {
+    const response = await simulateSourceUserSpectralPolicy({ thresholds: { ...spectralThresholds } });
+    spectralSimulation.value = response;
+  } catch (error) {
+    spectralSimulationError.value = error?.message ?? 'Failed to run spectral simulation.';
+  } finally {
+    isSimulatingSpectral.value = false;
+  }
+}
+
+async function applySpectralThresholds() {
+  isApplyingSpectral.value = true;
+  spectralSimulationError.value = '';
+  spectralApplyMessage.value = '';
+  try {
+    await updateSettings({ fidelity: buildSpectralThresholdSettingsPatch(spectralThresholds) });
+    spectralApplyMessage.value = 'Spectral thresholds saved. New analysis will use the updated policy.';
+  } catch (error) {
+    spectralSimulationError.value = error?.message ?? 'Failed to save spectral thresholds.';
+  } finally {
+    isApplyingSpectral.value = false;
   }
 }
 </script>
@@ -250,6 +326,145 @@ async function runSimulation() {
             watch ≤ {{ formatRatePercent(simulation.thresholds?.watchMaxSuccessRate) }},
             healthy ≥ {{ formatRatePercent(simulation.thresholds?.healthyMinSuccessRate) }}.
           </p>
+        </template>
+      </div>
+    </article>
+
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Library fidelity health</h3>
+          <p class="hx-card-subtitle">
+            Catalog-level quality KPI aggregated from every completed spectral measurement:
+            a health score, verdict distribution, by-codec breakdown, worst offenders, and trend.
+          </p>
+        </div>
+        <button type="button" class="hx-btn" :disabled="isLoadingDashboard" @click="loadFidelityDashboard">
+          {{ isLoadingDashboard ? 'Loading…' : 'Load dashboard' }}
+        </button>
+      </header>
+      <div class="hx-card-body">
+        <p v-if="dashboardError" class="hx-alert" data-tone="danger">{{ dashboardError }}</p>
+        <template v-else-if="fidelityDashboard">
+          <dl class="integrity-metrics">
+            <div>
+              <dt>Health score</dt>
+              <dd>
+                <span class="hx-badge" :data-tone="fidelityDashboard.healthScore.tone">
+                  {{ fidelityDashboard.healthScore.label }}
+                </span>
+              </dd>
+            </div>
+            <div><dt>Measurements</dt><dd>{{ fidelityDashboard.totalMeasurements }}</dd></div>
+            <div><dt>Conclusive</dt><dd>{{ fidelityDashboard.conclusiveMeasurements }}</dd></div>
+            <div>
+              <dt>Transcode rate</dt>
+              <dd>{{ fidelityDashboard.transcodeRatePercent === null ? '—' : `${fidelityDashboard.transcodeRatePercent}%` }}</dd>
+            </div>
+          </dl>
+
+          <table class="hx-table" style="margin-top: var(--hx-space-3)">
+            <thead><tr><th>Verdict</th><th>Count</th></tr></thead>
+            <tbody>
+              <tr v-for="row in fidelityDashboard.verdictRows" :key="row.verdict">
+                <td><span class="hx-badge" :data-tone="formatVerdictTone(row.verdict)">{{ row.verdict }}</span></td>
+                <td>{{ row.count }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <template v-if="fidelityDashboard.codecBreakdown.length">
+            <h4 class="hx-card-title" style="font-size: var(--hx-text-sm); margin-top: var(--hx-space-3)">By codec</h4>
+            <table class="hx-table">
+              <thead><tr><th>Codec</th><th>Total</th><th>Transcoded</th><th>Suspicious</th></tr></thead>
+              <tbody>
+                <tr v-for="row in fidelityDashboard.codecBreakdown" :key="row.codec">
+                  <td><code>{{ row.codec }}</code></td>
+                  <td>{{ row.count }}</td>
+                  <td>{{ row.transcoded }}</td>
+                  <td>{{ row.suspicious }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+
+          <template v-if="fidelityDashboard.worstOffenders.length">
+            <h4 class="hx-card-title" style="font-size: var(--hx-text-sm); margin-top: var(--hx-space-3)">Worst offenders</h4>
+            <table class="hx-table">
+              <thead><tr><th>Source</th><th>Transcoded</th><th>Total</th><th>Rate</th></tr></thead>
+              <tbody>
+                <tr v-for="row in fidelityDashboard.worstOffenders" :key="row.username">
+                  <td>{{ row.username }}</td>
+                  <td>{{ row.transcoded }}</td>
+                  <td>{{ row.count }}</td>
+                  <td>{{ Math.round((row.transcodeRate ?? 0) * 100) }}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+        </template>
+      </div>
+    </article>
+
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Spectral threshold policy simulator</h3>
+          <p class="hx-card-subtitle">
+            Preview how proposed cutoff-band thresholds would re-grade the measured population.
+            Simulation is read-only; “Apply” persists the thresholds for all future analysis.
+          </p>
+        </div>
+      </header>
+      <div class="hx-card-body">
+        <div class="threshold-grid">
+          <div v-for="field in SPECTRAL_THRESHOLD_FIELDS" :key="field.key" class="hx-field">
+            <label class="hx-field-label" :for="`spectral-${field.key}`">{{ field.label }}</label>
+            <input
+              :id="`spectral-${field.key}`"
+              v-model.number="spectralThresholds[field.key]"
+              class="hx-input"
+              type="number"
+              :min="field.min"
+              :max="field.max"
+              step="100"
+            />
+          </div>
+        </div>
+        <div class="hx-form-row" style="margin-top: var(--hx-space-3)">
+          <button type="button" class="hx-btn" data-variant="primary" :disabled="isSimulatingSpectral" @click="runSpectralSimulation">
+            {{ isSimulatingSpectral ? 'Simulating…' : 'Simulate' }}
+          </button>
+          <button type="button" class="hx-btn" :disabled="isApplyingSpectral" @click="applySpectralThresholds">
+            {{ isApplyingSpectral ? 'Saving…' : 'Apply thresholds' }}
+          </button>
+          <button type="button" class="hx-btn" data-variant="ghost" @click="resetSpectralThresholds">
+            Reset to defaults
+          </button>
+        </div>
+
+        <p v-if="spectralApplyMessage" class="hx-alert" data-tone="success">{{ spectralApplyMessage }}</p>
+        <p v-if="spectralSimulationError" class="hx-alert" data-tone="danger">{{ spectralSimulationError }}</p>
+        <template v-if="spectralSimulation">
+          <p class="hx-card-subtitle">{{ formatSpectralSimulationHeadline(spectralSimulation) }}</p>
+          <table class="hx-table">
+            <thead><tr><th>Verdict</th><th>Current</th><th>Projected</th></tr></thead>
+            <tbody>
+              <tr v-for="row in buildVerdictComparisonRows(spectralSimulation.summary)" :key="row.verdict">
+                <td><span class="hx-badge" :data-tone="formatVerdictTone(row.verdict)">{{ row.verdict }}</span></td>
+                <td>{{ row.current }}</td>
+                <td>{{ row.projected }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <ul v-if="spectralSimulation.transitions?.length" class="transition-list">
+            <li v-for="transition in spectralSimulation.transitions" :key="`${transition.from}->${transition.to}`">
+              <span class="hx-badge" :data-tone="formatVerdictTone(transition.from)">{{ transition.from }}</span>
+              →
+              <span class="hx-badge" :data-tone="formatVerdictTone(transition.to)">{{ transition.to }}</span>
+              <span>×{{ transition.count }}</span>
+            </li>
+          </ul>
         </template>
       </div>
     </article>

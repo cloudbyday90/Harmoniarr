@@ -25,6 +25,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/activity/source-users/bulk-trust', access: 'admin', area: 'activity', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/activity/source-user-collusion', access: 'admin', area: 'activity', kind: 'read' },
   { method: 'POST', path: '/api/v1/activity/source-user-trust-policy-simulation', access: 'admin', area: 'activity', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/activity/source-user-spectral-policy-simulation', access: 'admin', area: 'activity', kind: 'mutation' },
+  { method: 'GET', path: '/api/v1/activity/library-fidelity-dashboard', access: 'admin', area: 'activity', kind: 'read' },
   { method: 'POST', path: '/api/v1/activity/source-user-spectral-rescan', access: 'admin', area: 'activity', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/activity/blocklist', access: 'admin', area: 'activity', kind: 'read' },
   { method: 'POST', path: '/api/v1/activity/blocklist', access: 'admin', area: 'activity', kind: 'mutation' },

@@ -139,6 +139,21 @@ export function simulateSourceUserTrustPolicy({ thresholds } = {}) {
   });
 }
 
+export function simulateSourceUserSpectralPolicy({ thresholds } = {}) {
+  return apiRequest('/api/v1/activity/source-user-spectral-policy-simulation', {
+    body: { thresholds },
+    includeCsrf: true,
+    method: 'POST',
+  });
+}
+
+export function fetchLibraryFidelityDashboard({ trendDays, worstOffenderLimit, signal } = {}) {
+  return apiRequest(
+    `/api/v1/activity/library-fidelity-dashboard${buildQueryString({ trendDays, worstOffenderLimit })}`,
+    { signal },
+  );
+}
+
 export function rescanLibrarySpectral({ limit } = {}) {
   return apiRequest('/api/v1/activity/source-user-spectral-rescan', {
     body: { limit },

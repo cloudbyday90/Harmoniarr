@@ -222,3 +222,45 @@ test('normalizeSettingsPatch rejects per-user music roots with traversal segment
       && error?.message === 'paths.userMusicRoots[0].relativeRoot must not contain dot traversal segments',
   );
 });
+
+test('normalizeSettingsPatch accepts fidelity threshold settings', () => {
+  const updates = normalizeSettingsPatch({
+    fidelity: {
+      spectralAuthenticMinCutoffHz: 21000,
+      spectralSuspiciousMinCutoffHz: 19500,
+      spectralTranscodeMidCutoffHz: 16000,
+      spectralMinSampleRateHz: 48000,
+      trustWatchFailureCount: 4,
+      trustWatchMaxSuccessRate: 0.45,
+      trustWatchEvidenceCount: 3,
+      trustHealthyEvidenceCount: 6,
+      trustHealthyMinSuccessRate: 0.82,
+    },
+  });
+
+  assert.deepEqual(updates, [
+    { namespace: 'fidelity', settingKey: 'spectralAuthenticMinCutoffHz', value: 21000 },
+    { namespace: 'fidelity', settingKey: 'spectralSuspiciousMinCutoffHz', value: 19500 },
+    { namespace: 'fidelity', settingKey: 'spectralTranscodeMidCutoffHz', value: 16000 },
+    { namespace: 'fidelity', settingKey: 'spectralMinSampleRateHz', value: 48000 },
+    { namespace: 'fidelity', settingKey: 'trustWatchFailureCount', value: 4 },
+    { namespace: 'fidelity', settingKey: 'trustWatchMaxSuccessRate', value: 0.45 },
+    { namespace: 'fidelity', settingKey: 'trustWatchEvidenceCount', value: 3 },
+    { namespace: 'fidelity', settingKey: 'trustHealthyEvidenceCount', value: 6 },
+    { namespace: 'fidelity', settingKey: 'trustHealthyMinSuccessRate', value: 0.82 },
+  ]);
+});
+
+test('normalizeSettingsPatch rejects an out-of-range fidelity cutoff', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ fidelity: { spectralAuthenticMinCutoffHz: 99999 } }),
+    (error) => error?.status === 400 && error?.code === 'validation_error',
+  );
+});
+
+test('normalizeSettingsPatch rejects an out-of-range fidelity success rate', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ fidelity: { trustWatchMaxSuccessRate: 1.5 } }),
+    (error) => error?.status === 400 && error?.code === 'validation_error',
+  );
+});

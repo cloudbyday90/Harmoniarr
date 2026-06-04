@@ -17,6 +17,7 @@
  */
 
 import { createApiError } from '../auth.js';
+import { DEFAULT_TRUST_THRESHOLDS } from './source-user-trust-threshold-simulator.js';
 
 const TRUST_STATE_FILTERS = new Set(['blocked', 'neutral', 'trusted']);
 const REVIEW_PRIORITY = Object.freeze({
@@ -134,7 +135,7 @@ function buildReputation({ failureCount, successCount }) {
   };
 }
 
-function buildReview({ blockReason, reputation, trustState }) {
+function buildReview({ blockReason, reputation, trustState, thresholds = DEFAULT_TRUST_THRESHOLDS }) {
   if (trustState === 'blocked') {
     return {
       reason: blockReason || 'Operator blocked this peer from future trust decisions.',
@@ -165,21 +166,21 @@ function buildReview({ blockReason, reputation, trustState }) {
     };
   }
 
-  if (reputation.failureCount >= 3 && (reputation.successRate ?? 1) < 0.5) {
+  if (reputation.failureCount >= thresholds.watchFailureCount && (reputation.successRate ?? 1) < thresholds.watchMaxSuccessRate) {
     return {
       reason: `${reputation.failureCount} failures across ${reputation.evidenceCount} recorded attempts.`,
       state: 'watch',
     };
   }
 
-  if (reputation.evidenceCount >= 5 && (reputation.successRate ?? 0) >= 0.8) {
+  if (reputation.evidenceCount >= thresholds.healthyEvidenceCount && (reputation.successRate ?? 0) >= thresholds.healthyMinSuccessRate) {
     return {
       reason: `${reputation.successCount} successful deliveries across ${reputation.evidenceCount} attempts.`,
       state: 'healthy',
     };
   }
 
-  if (reputation.evidenceCount >= 3 && reputation.failureCount > reputation.successCount) {
+  if (reputation.evidenceCount >= thresholds.watchEvidenceCount && reputation.failureCount > reputation.successCount) {
     return {
       reason: `Failures currently outweigh successes (${reputation.failureCount}/${reputation.evidenceCount}).`,
       state: 'watch',
@@ -212,7 +213,7 @@ function resolveLatestManualReason(row) {
   return typeof manualOverride?.reason === 'string' ? manualOverride.reason : '';
 }
 
-export function mapSourceUserTrustRow(row) {
+export function mapSourceUserTrustRow(row, { reviewThresholds } = {}) {
   const trustState = resolveSourceUserTrustState(row);
   const reputation = buildReputation({
     failureCount: toNonNegativeInteger(row?.failureCount),
@@ -222,6 +223,7 @@ export function mapSourceUserTrustRow(row) {
     blockReason: row?.blockReason ?? resolveLatestManualReason(row) ?? row?.reason ?? '',
     reputation,
     trustState,
+    thresholds: reviewThresholds ?? DEFAULT_TRUST_THRESHOLDS,
   });
 
   return {
@@ -303,12 +305,26 @@ function summarizeSourceUsers(rows) {
 
 export function createSourceUserTrustService({
   listTrustSnapshot = async () => [],
+  loadTrustReviewThresholdsFn = null,
 } = {}) {
+  async function resolveReviewThresholds() {
+    if (typeof loadTrustReviewThresholdsFn !== 'function') {
+      return DEFAULT_TRUST_THRESHOLDS;
+    }
+    try {
+      const loaded = await loadTrustReviewThresholdsFn();
+      return loaded && typeof loaded === 'object' ? loaded : DEFAULT_TRUST_THRESHOLDS;
+    } catch {
+      return DEFAULT_TRUST_THRESHOLDS;
+    }
+  }
+
   async function listSourceUsers({ query, trustState } = {}) {
     const normalizedQuery = normalizeQuery(query);
     const normalizedTrustState = normalizeTrustStateFilter(trustState);
+    const reviewThresholds = await resolveReviewThresholds();
     const sourceUsers = normalizeSourceUserTrustSnapshotRows(await listTrustSnapshot())
-      .map(mapSourceUserTrustRow)
+      .map((row) => mapSourceUserTrustRow(row, { reviewThresholds }))
       .filter((row) => (normalizedTrustState ? row.trustState === normalizedTrustState : true))
       .filter((row) => (normalizedQuery ? buildSearchText(row).includes(normalizedQuery) : true))
       .sort(sortSourceUsers);

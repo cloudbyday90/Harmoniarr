@@ -33,24 +33,105 @@
 
 const MIN_TRUSTWORTHY_SAMPLE_RATE = 44100;
 
-// Cutoff (Hz) -> verdict bands. Ordered high to low. `weight` is the delivered
-// quality weight merged back into the reputation ledger when the band confirms
-// a transcode (lower = worse). Bands at/above AUTHENTIC are not penalised.
-const CUTOFF_BANDS = [
-  { maxCutoffHz: Infinity, minCutoffHz: 20000, verdict: 'authentic', weight: 1, estimatedSourceBitrate: null },
-  { maxCutoffHz: 20000, minCutoffHz: 19000, verdict: 'suspicious', weight: 0.35, estimatedSourceBitrate: 256 },
-  { maxCutoffHz: 19000, minCutoffHz: 16000, verdict: 'transcoded', weight: 0.15, estimatedSourceBitrate: 192 },
-  { maxCutoffHz: 16000, minCutoffHz: 0, verdict: 'transcoded', weight: 0.05, estimatedSourceBitrate: 128 },
-];
+// Default cutoff-band boundary thresholds (Hz). These are the operator-tunable
+// knobs promoted to persisted admin settings (`fidelity` namespace): an operator
+// can shift the authentic/suspicious/transcoded edges and preview the impact via
+// the spectral-threshold simulator before applying. Keeping them in one frozen
+// object — rather than inline magic numbers — lets the live classifier, the
+// what-if simulator, and the settings layer all agree on a single source of truth.
+//
+//   authenticMinCutoffHz : at/above => authentic (genuine lossless edge)
+//   suspiciousMinCutoffHz: at/above (but below authentic) => suspicious (~256 kbps)
+//   transcodeMidCutoffHz : boundary between the two transcoded tiers (~192 vs ~128 kbps)
+//   minTrustworthySampleRate: below this the Nyquist limit constrains the cutoff,
+//     so a low measurement is expected and never penalised.
+export const DEFAULT_SPECTRAL_THRESHOLDS = Object.freeze({
+  authenticMinCutoffHz: 20000,
+  suspiciousMinCutoffHz: 19000,
+  transcodeMidCutoffHz: 16000,
+  minTrustworthySampleRate: MIN_TRUSTWORTHY_SAMPLE_RATE,
+});
 
 function toFiniteNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function selectBand(cutoffHz) {
-  return CUTOFF_BANDS.find((band) => cutoffHz >= band.minCutoffHz && cutoffHz < band.maxCutoffHz)
-    ?? CUTOFF_BANDS[CUTOFF_BANDS.length - 1];
+function clampCutoffHz(value, fallback) {
+  const parsed = toFiniteNumber(value);
+  if (parsed === null || parsed <= 0 || parsed > 96000) {
+    return fallback;
+  }
+  return parsed;
+}
+
+/**
+ * Normalises a (possibly partial / operator-supplied) threshold object into a
+ * complete, monotonically ordered set. Invalid or inverted inputs fall back to
+ * the defaults so the live classifier can never be wedged into an impossible
+ * configuration (e.g. suspicious edge above the authentic edge).
+ *
+ * @param {object} [input]
+ * @returns {{ authenticMinCutoffHz: number, suspiciousMinCutoffHz: number, transcodeMidCutoffHz: number, minTrustworthySampleRate: number }}
+ */
+export function resolveSpectralThresholds(input) {
+  const provided = input && typeof input === 'object' ? input : {};
+
+  const authenticMinCutoffHz = clampCutoffHz(
+    provided.authenticMinCutoffHz,
+    DEFAULT_SPECTRAL_THRESHOLDS.authenticMinCutoffHz,
+  );
+  let suspiciousMinCutoffHz = clampCutoffHz(
+    provided.suspiciousMinCutoffHz,
+    DEFAULT_SPECTRAL_THRESHOLDS.suspiciousMinCutoffHz,
+  );
+  let transcodeMidCutoffHz = clampCutoffHz(
+    provided.transcodeMidCutoffHz,
+    DEFAULT_SPECTRAL_THRESHOLDS.transcodeMidCutoffHz,
+  );
+
+  // Enforce authentic >= suspicious >= transcodeMid. An inverted edge collapses
+  // a tier rather than producing nonsense, but never crosses over.
+  if (suspiciousMinCutoffHz > authenticMinCutoffHz) {
+    suspiciousMinCutoffHz = authenticMinCutoffHz;
+  }
+  if (transcodeMidCutoffHz > suspiciousMinCutoffHz) {
+    transcodeMidCutoffHz = suspiciousMinCutoffHz;
+  }
+
+  const minSampleRate = toFiniteNumber(provided.minTrustworthySampleRate);
+
+  return {
+    authenticMinCutoffHz,
+    suspiciousMinCutoffHz,
+    transcodeMidCutoffHz,
+    minTrustworthySampleRate: minSampleRate !== null && minSampleRate > 0
+      ? minSampleRate
+      : DEFAULT_SPECTRAL_THRESHOLDS.minTrustworthySampleRate,
+  };
+}
+
+/**
+ * Builds the ordered cutoff -> verdict bands from a resolved threshold set. The
+ * delivered quality `weight` and `estimatedSourceBitrate` are tied to the verdict
+ * tier (not the boundary), so only the band edges move when thresholds change.
+ *
+ * @param {object} [thresholds]
+ * @returns {Array<{ maxCutoffHz: number, minCutoffHz: number, verdict: string, weight: number, estimatedSourceBitrate: number | null }>}
+ */
+export function buildCutoffBands(thresholds = DEFAULT_SPECTRAL_THRESHOLDS) {
+  const resolved = resolveSpectralThresholds(thresholds);
+  return [
+    { maxCutoffHz: Infinity, minCutoffHz: resolved.authenticMinCutoffHz, verdict: 'authentic', weight: 1, estimatedSourceBitrate: null },
+    { maxCutoffHz: resolved.authenticMinCutoffHz, minCutoffHz: resolved.suspiciousMinCutoffHz, verdict: 'suspicious', weight: 0.35, estimatedSourceBitrate: 256 },
+    { maxCutoffHz: resolved.suspiciousMinCutoffHz, minCutoffHz: resolved.transcodeMidCutoffHz, verdict: 'transcoded', weight: 0.15, estimatedSourceBitrate: 192 },
+    { maxCutoffHz: resolved.transcodeMidCutoffHz, minCutoffHz: 0, verdict: 'transcoded', weight: 0.05, estimatedSourceBitrate: 128 },
+  ];
+}
+
+function selectBand(cutoffHz, bands) {
+  return bands.find((band) => cutoffHz >= band.minCutoffHz && cutoffHz < band.maxCutoffHz)
+    ?? bands[bands.length - 1];
 }
 
 /**
@@ -61,6 +142,8 @@ function selectBand(cutoffHz) {
  *   (the max spectral rolloff across analysed frames).
  * @param {number} [input.sampleRate] - Declared sample rate (Hz).
  * @param {boolean} [input.declaredLossless] - Whether the file claims a lossless codec.
+ * @param {object} [input.thresholds] - Operator-tuned cutoff thresholds (partial;
+ *   missing/invalid keys fall back to DEFAULT_SPECTRAL_THRESHOLDS).
  * @returns {{
  *   verdict: 'authentic' | 'suspicious' | 'transcoded' | 'inconclusive',
  *   confidence: number,
@@ -72,7 +155,8 @@ function selectBand(cutoffHz) {
  *   penalize: boolean
  * }}
  */
-export function classifySpectralCutoff({ cutoffHz, sampleRate = null, declaredLossless = true } = {}) {
+export function classifySpectralCutoff({ cutoffHz, sampleRate = null, declaredLossless = true, thresholds } = {}) {
+  const resolvedThresholds = resolveSpectralThresholds(thresholds);
   const normalizedCutoff = toFiniteNumber(cutoffHz);
   const normalizedSampleRate = toFiniteNumber(sampleRate);
   const nyquistHz = normalizedSampleRate && normalizedSampleRate > 0 ? normalizedSampleRate / 2 : null;
@@ -105,9 +189,9 @@ export function classifySpectralCutoff({ cutoffHz, sampleRate = null, declaredLo
     };
   }
 
-  // Below 44.1 kHz the Nyquist limit itself constrains the cutoff, so a low
-  // measurement is expected and not evidence of transcoding.
-  if (normalizedSampleRate !== null && normalizedSampleRate < MIN_TRUSTWORTHY_SAMPLE_RATE) {
+  // Below the trustworthy sample-rate floor the Nyquist limit itself constrains
+  // the cutoff, so a low measurement is expected and not evidence of transcoding.
+  if (normalizedSampleRate !== null && normalizedSampleRate < resolvedThresholds.minTrustworthySampleRate) {
     return {
       verdict: 'inconclusive',
       confidence: 0,
@@ -115,12 +199,12 @@ export function classifySpectralCutoff({ cutoffHz, sampleRate = null, declaredLo
       estimatedSourceBitrate: null,
       cutoffHz: Math.round(normalizedCutoff),
       nyquistHz,
-      reason: `Sample rate ${normalizedSampleRate} Hz is below the ${MIN_TRUSTWORTHY_SAMPLE_RATE} Hz threshold required for a reliable cutoff verdict.`,
+      reason: `Sample rate ${normalizedSampleRate} Hz is below the ${resolvedThresholds.minTrustworthySampleRate} Hz threshold required for a reliable cutoff verdict.`,
       penalize: false,
     };
   }
 
-  const band = selectBand(normalizedCutoff);
+  const band = selectBand(normalizedCutoff, buildCutoffBands(resolvedThresholds));
   const roundedCutoff = Math.round(normalizedCutoff);
 
   if (band.verdict === 'authentic') {
@@ -137,8 +221,9 @@ export function classifySpectralCutoff({ cutoffHz, sampleRate = null, declaredLo
   }
 
   // Confidence grows the further the cutoff sits below the genuine-lossless edge.
+  const authenticEdge = resolvedThresholds.authenticMinCutoffHz;
   const confidence = band.verdict === 'transcoded'
-    ? Math.min(0.99, 0.6 + (20000 - normalizedCutoff) / 20000)
+    ? Math.min(0.99, 0.6 + Math.max(0, authenticEdge - normalizedCutoff) / authenticEdge)
     : 0.5;
 
   return {

@@ -39,6 +39,7 @@ export function registerActivityRoutes(app, {
   exportSourceUserTrustHistory,
   getSourceUserCollusionReport,
   getSourceUserDetail,
+  getLibraryFidelityDashboard,
   limitActivitySourceUserMutations = skipRateLimitMiddleware,
   limitActivityBlocklistMutations = skipRateLimitMiddleware,
   listBlockedSourceUsers,
@@ -53,6 +54,7 @@ export function registerActivityRoutes(app, {
   requireSession = defaultRequestAuthDependencies.requireSession,
   scanLibrarySpectral,
   simulateSourceUserTrustPolicy,
+  simulateSourceUserSpectralPolicy,
   updateSourceUserTrust,
   unblockSourceUser,
 }) {
@@ -246,7 +248,52 @@ export function registerActivityRoutes(app, {
   }));
 
   /**
-   * POST /api/v1/activity/source-user-spectral-rescan
+   * POST /api/v1/activity/source-user-spectral-policy-simulation
+   *
+   * Read-only "what-if": projects how a proposed set of spectral cutoff-band
+   * thresholds would re-grade the existing measured population. Performs no
+   * mutation. Applying the change is done via PUT /api/v1/settings (fidelity).
+   */
+  app.post('/api/v1/activity/source-user-spectral-policy-simulation', limitActivitySourceUserMutations, asyncRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+
+    const simulation = await simulateSourceUserSpectralPolicy({
+      thresholds: request.body?.thresholds ?? {},
+    });
+
+    response.json({
+      ok: true,
+      ...simulation,
+    });
+  }));
+
+  /**
+   * GET /api/v1/activity/library-fidelity-dashboard
+   *
+   * Read-only catalog-level fidelity health KPI: verdict distribution and a
+   * derived health score, by-codec breakdown, per-source worst offenders, and a
+   * daily transcode trend, aggregated from the completed spectral-job ledger.
+   */
+  app.get('/api/v1/activity/library-fidelity-dashboard', asyncRoute(async (request, response) => {
+    await requireAdminSession(request);
+
+    const trendDays = typeof request.query.trendDays === 'string'
+      ? Number.parseInt(request.query.trendDays, 10)
+      : undefined;
+    const worstOffenderLimit = typeof request.query.worstOffenderLimit === 'string'
+      ? Number.parseInt(request.query.worstOffenderLimit, 10)
+      : undefined;
+
+    const dashboard = await getLibraryFidelityDashboard({ trendDays, worstOffenderLimit });
+
+    response.json({
+      ok: true,
+      ...dashboard,
+    });
+  }));
+
+  /**
    *
    * Enqueues a bounded batch of lossless library files for retroactive spectral
    * re-grading, then drains a batch immediately for operator feedback. The

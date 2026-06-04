@@ -23,6 +23,7 @@ import {
   normalizeSourceUserTrustSnapshotRows,
 } from './source-user-trust-service.js';
 import { buildQualityTrend } from './source-user-quality-trend.js';
+import { DEFAULT_TRUST_THRESHOLDS } from './source-user-trust-threshold-simulator.js';
 import { DEFAULT_HISTORY_PAGE_SIZE, MAX_TRUST_HISTORY_ENTRIES } from './trust-history-constants.js';
 
 function normalizeUsername(value) {
@@ -92,6 +93,7 @@ function normalizeTrustHistory(entries) {
 export function createSourceUserTrustDetailService({
   listTrustSnapshot = async () => [],
   listRecentOutcomeEventsFn = null,
+  loadTrustReviewThresholdsFn = null,
   qualityTrendWindowDays = 30,
   qualityTrendEventLimit = 500,
 } = {}) {
@@ -129,6 +131,18 @@ export function createSourceUserTrustDetailService({
       throw createApiError(404, 'source_user_not_found', 'Source user was not found');
     }
 
+    let reviewThresholds = DEFAULT_TRUST_THRESHOLDS;
+    if (typeof loadTrustReviewThresholdsFn === 'function') {
+      try {
+        const loaded = await loadTrustReviewThresholdsFn();
+        if (loaded && typeof loaded === 'object') {
+          reviewThresholds = loaded;
+        }
+      } catch {
+        reviewThresholds = DEFAULT_TRUST_THRESHOLDS;
+      }
+    }
+
     const fullHistory = normalizeTrustHistory(row.trustHistory);
     const totalCount = fullHistory.length;
     const pagedHistory = fullHistory.slice(offset, offset + limit);
@@ -137,7 +151,7 @@ export function createSourceUserTrustDetailService({
     return {
       checkedAt: new Date().toISOString(),
       sourceUser: {
-        ...mapSourceUserTrustRow(row),
+        ...mapSourceUserTrustRow(row, { reviewThresholds }),
         qualityTrend,
         trustHistory: pagedHistory,
         trustHistoryPagination: {

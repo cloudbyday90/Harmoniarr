@@ -51,6 +51,9 @@ function normalizePositiveInteger(value) {
  * @param {(input: { filePath: string }) => Promise<{ cutoffHz: number | null, frameCount: number }>} deps.analyzeSpectralCutoffFn
  * @param {Function} [deps.recordSourceUserOutcomeEvidenceFn] - Merge sink for confirmed transcodes.
  * @param {Function} [deps.classifySpectralCutoffFn]
+ * @param {() => Promise<object>} [deps.loadSpectralThresholdsFn] - Best-effort loader
+ *   for the persisted operator-tuned cutoff thresholds. Resolved once per batch
+ *   and passed to the classifier; failures fall back to the shipping defaults.
  * @param {number} [deps.maxAttempts]
  * @param {(message: string, error?: Error) => void} [deps.onWarning]
  */
@@ -61,6 +64,7 @@ export function createSourceUserSpectralSidecarService({
   classifySpectralCutoffFn = classifySpectralCutoff,
   spectralCacheStore = null,
   hashFileFn = null,
+  loadSpectralThresholdsFn = null,
   maxAttempts = 3,
   onWarning = () => {},
 } = {}) {
@@ -177,6 +181,21 @@ export function createSourceUserSpectralSidecarService({
 
     summary.claimed = jobs.length;
 
+    // Resolve the operator-tuned thresholds once for the whole batch so every
+    // job is graded under a single consistent policy. Best-effort: a loader
+    // failure falls through to the classifier's built-in defaults.
+    let spectralThresholds;
+    if (typeof loadSpectralThresholdsFn === 'function') {
+      try {
+        const loaded = await loadSpectralThresholdsFn();
+        if (loaded && typeof loaded === 'object') {
+          spectralThresholds = loaded;
+        }
+      } catch (error) {
+        onWarning('Failed to load spectral thresholds; using defaults', error);
+      }
+    }
+
     for (const job of jobs) {
       // Derive the content fingerprint first so an identical file already
       // measured (by any peer or library copy) reuses the cached measurement and
@@ -242,6 +261,7 @@ export function createSourceUserSpectralSidecarService({
         cutoffHz: measurement?.cutoffHz ?? null,
         sampleRate: job.sampleRate,
         declaredLossless: isDeclaredLossless({ codec: job.declaredCodec, extension: job.declaredExtension }),
+        thresholds: spectralThresholds,
       });
 
       summary.analyzed += 1;
