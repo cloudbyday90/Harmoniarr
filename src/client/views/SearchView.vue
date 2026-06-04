@@ -19,11 +19,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import ArtistCard from '../components/media/ArtistCard.vue';
+import AddArtistModal from '../components/media/AddArtistModal.vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
+import { useAddArtistModal } from '../composables/useAddArtistModal.js';
 import { useArtworkBatchResolve } from '../composables/useArtworkBatchResolve.js';
 import { useNetworkSearchWorkflow } from '../composables/useNetworkSearchWorkflow.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
@@ -52,11 +54,18 @@ import { sessionStore } from '../state/session.js';
 
 const searchMode = ref('music');
 
+const monitoring = useArtistMonitoring();
+const { isMonitored, isMonitoring } = monitoring;
+
 const {
-  isMonitored,
-  isMonitoring,
-  monitorArtist,
-} = useArtistMonitoring();
+  addArtistModalOpen,
+  addArtistCandidate,
+  addArtistErrorMessage,
+  addArtistPolicyDefaults,
+  openAddArtistModal,
+  closeAddArtistModal,
+  submitAddArtist,
+} = useAddArtistModal({ monitoring });
 
 const {
   isRequested,
@@ -68,6 +77,19 @@ const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const { users: requestForUsers, loadUsers: loadRequestForUsers } = useRequestUsers();
 
 const { getResolved: getResolvedArtwork, resolve: resolveArtworkBatch } = useArtworkBatchResolve();
+
+const addArtistCandidateArtwork = computed(() => {
+  const id = addArtistCandidate.value?.id;
+  return id ? getResolvedArtwork('musicbrainz_artist', id, 'artist_thumbnail') ?? null : null;
+});
+
+function handleAddArtist(artist) {
+  openAddArtistModal(artist);
+}
+
+function handleAddArtistSubmit(policyForm) {
+  return submitAddArtist(policyForm);
+}
 
 const musicWorkflow = useSearchMusicWorkflow({
   resolveArtworkFn: resolveArtworkBatch,
@@ -475,7 +497,7 @@ onBeforeUnmount(() => destroyNetworkWorkflow());
                 :local-src="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.url ?? null : null"
                 :dominant-color="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.dominantColor ?? null : null"
                 :artwork-asset-id="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.assetId ?? null : null"
-                @monitor="monitorArtist"
+                @monitor="handleAddArtist"
               />
             </div>
           </div>
@@ -624,6 +646,17 @@ onBeforeUnmount(() => destroyNetworkWorkflow());
       :users="isAdmin ? requestForUsers : []"
       @confirm="handleConfirmRequest"
       @close="closeConfirmModal"
+    />
+
+    <AddArtistModal
+      :open="addArtistModalOpen"
+      :artist="addArtistCandidate"
+      :artwork="addArtistCandidateArtwork"
+      :initial-policy="addArtistPolicyDefaults"
+      :saving="addArtistCandidate ? isMonitoring(addArtistCandidate.id) : false"
+      :error-message="addArtistErrorMessage"
+      @close="closeAddArtistModal"
+      @submit="handleAddArtistSubmit"
     />
 
     <ReleaseDetailModal

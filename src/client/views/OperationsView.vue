@@ -23,6 +23,7 @@ import { useToast } from '../composables/useToast.js';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import OperationJobDetailPanel from '../components/OperationJobDetailPanel.vue';
+import OperationStatusBadge from '../components/OperationStatusBadge.vue';
 import {
   buildOperationsRouteQuery,
   getOperationsRouteStateKey,
@@ -32,14 +33,8 @@ import {
   getOperationRunDescriptor,
 } from '../lib/operation-run-link-targets.js';
 import {
-  getOperationRunStatusLabel,
-} from '../lib/operation-run-status.js';
-import {
   formatElapsedDuration,
-  formatOperationRunStatusTone,
   formatOperationTimestampShort,
-  formatQueueRunStatusLabel,
-  formatQueueRunStatusTone,
 } from '../lib/operation-run-presentation.js';
 import {
   triggerArtworkCleanup,
@@ -389,10 +384,8 @@ watch(
                     {{ job.title }}
                   </td>
                   <td>
-                    <span v-if="job.latestRun" class="hx-pill" :data-tone="formatOperationRunStatusTone(job.latestRun.status)">
-                      {{ getOperationRunStatusLabel(job.latestRun.status, { defaultLabel: 'Unknown' }) }}
-                    </span>
-                    <span v-else class="hx-pill">Never run</span>
+                    <OperationStatusBadge v-if="job.latestRun" :status="job.latestRun.status" variant="run" />
+                    <OperationStatusBadge v-else :status="null" variant="run" unknown-label="Never run" />
                   </td>
                   <td class="ops-time-cell">
                     <span v-if="job.latestRun" class="hx-text-muted">{{ formatOperationTimestampShort(job.latestRun.startedAt) }}</span>
@@ -432,7 +425,7 @@ watch(
                           :class="{ 'ops-run-row--selected': run.id === selectedRunId }"
                         >
                           <td>
-                            <span class="hx-pill" :data-tone="formatQueueRunStatusTone(run.status)">{{ formatQueueRunStatusLabel(run.status) }}</span>
+                            <OperationStatusBadge :status="run.status" variant="queue" />
                           </td>
                           <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatOperationTimestampShort(run.startedAt) }}</span></td>
                           <td><span class="hx-text-muted" style="font-size: var(--hx-text-xs);">{{ formatElapsedDuration(run.startedAt, run.finishedAt) }}</span></td>

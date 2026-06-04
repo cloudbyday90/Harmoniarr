@@ -24,14 +24,11 @@ import DiscoverSearchBar from '../components/media/DiscoverSearchBar.vue';
 import DiscoverSearchResultsPanel from '../components/media/DiscoverSearchResultsPanel.vue';
 import EmptyState from '../components/EmptyState.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
+import { useAddArtistModal } from '../composables/useAddArtistModal.js';
 import { useDiscoverArtistArtwork } from '../composables/useDiscoverArtistArtwork.js';
 import { useDiscoverGraph } from '../composables/useDiscoverGraph.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
 import { useMonitoredArtistSummaries } from '../composables/useMonitoredArtistSummaries.js';
-import {
-  loadSavedAddArtistPolicyForm,
-  saveAddArtistPolicyForm,
-} from '../lib/add-artist-policy.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import {
   buildDiscoverMonitoredArtistNavAriaLabel,
@@ -66,11 +63,19 @@ const {
   destroy: destroyMonitoredArtists,
 } = useMonitoredArtistSummaries({ limit: 25 });
 
+const monitoring = useArtistMonitoring();
+const { isMonitored, isMonitoring } = monitoring;
+
 const {
-  addArtistWithPolicy,
-  isMonitored,
-  isMonitoring,
-} = useArtistMonitoring();
+  addArtistModalOpen,
+  addArtistCandidate,
+  addArtistErrorMessage,
+  addArtistPolicyDefaults,
+  lastAddedArtistId,
+  openAddArtistModal,
+  closeAddArtistModal,
+  submitAddArtist,
+} = useAddArtistModal({ monitoring });
 
 const {
   seeds,
@@ -90,16 +95,10 @@ const {
   artistSources: [seeds, suggestions, results],
 });
 
-const addArtistModalOpen = ref(false);
-const addArtistCandidate = ref(null);
-const addArtistErrorMessage = ref('');
-const addArtistPolicyDefaults = ref(loadSavedAddArtistPolicyForm());
-
-// Ref to the recommendations panel + the id of the most recently added artist,
-// so focus can return to that artist's seed chip once the add dialog closes (the
-// invoking "Add" button is disabled by then). See `handleFocusReturnUnavailable`.
+// Ref to the recommendations panel so focus can return to a newly added artist's
+// seed chip once the add dialog closes (the invoking "Add" button is disabled by
+// then). See `handleFocusReturnUnavailable`.
 const recommendationsPanelRef = ref(null);
-const lastAddedArtistId = ref(null);
 
 // ── View models ──────────────────────────────────────────────────────────────
 // The container assembles plain, presentation-ready objects so child panels
@@ -168,48 +167,20 @@ const searchPanelMode = computed(() =>
   }),
 );
 
-function openAddArtistModal(artist) {
-  if (!artist?.id || isAddedArtist(artist.id)) {
-    return;
-  }
-
-  addArtistCandidate.value = artist;
-  addArtistErrorMessage.value = '';
-  addArtistModalOpen.value = true;
-}
-
-function closeAddArtistModal() {
-  if (addArtistCandidate.value && isMonitoring(addArtistCandidate.value.id)) {
-    return;
-  }
-
-  addArtistModalOpen.value = false;
-  addArtistCandidate.value = null;
-  addArtistErrorMessage.value = '';
+function openAddArtist(artist) {
+  openAddArtistModal(artist, isAddedArtist);
 }
 
 async function handleAddArtistSubmit(policyForm) {
-  if (!addArtistCandidate.value) {
-    return;
-  }
-
-  const artist = addArtistCandidate.value;
-  addArtistErrorMessage.value = '';
-  const result = await addArtistWithPolicy(artist, policyForm);
-  if (result?.success) {
-    if (result.policy.useAsDefault) {
-      addArtistPolicyDefaults.value = saveAddArtistPolicyForm(result.policy);
-    }
-    lastAddedArtistId.value = artist.id;
-    // The artist is already persisted. Refresh recommendations and the
-    // monitored list in the background and close the dialog immediately — a slow
-    // or unavailable similar-artists fetch must not keep the modal open.
-    void addSeed(artist);
-    void loadMonitoredArtists();
-    closeAddArtistModal();
-  } else if (result?.error) {
-    addArtistErrorMessage.value = result.error.message ?? 'Could not add artist. Please try again.';
-  }
+  await submitAddArtist(policyForm, {
+    onAdded: (artist) => {
+      // The artist is already persisted. Refresh recommendations and the
+      // monitored list in the background — a slow or unavailable similar-artists
+      // fetch must not keep the modal open.
+      void addSeed(artist);
+      void loadMonitoredArtists();
+    },
+  });
 }
 
 // When the add dialog closes and its invoking "Add" button is no longer
@@ -286,7 +257,7 @@ function buildArtistLocation(artist) {
       :is-loading="isAnySeedLoading"
       :error-message="graphError"
       :monitored-aria-label="buildDiscoverMonitoredArtistsAriaLabel()"
-      @add="openAddArtistModal"
+      @add="openAddArtist"
     />
 
     <EmptyState
@@ -343,7 +314,7 @@ function buildArtistLocation(artist) {
     <DiscoverSearchResultsPanel
       v-else-if="searchPanelMode === 'results'"
       :cards="searchResultCards"
-      @add="openAddArtistModal"
+      @add="openAddArtist"
     />
   </section>
 </template>

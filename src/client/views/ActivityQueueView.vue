@@ -20,11 +20,10 @@
 import { computed } from 'vue';
 import { fetchOperationHistory } from '../lib/operations-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
+import OperationStatusBadge from '../components/OperationStatusBadge.vue';
 import {
   formatElapsedDuration,
   formatOperationTimestampShort,
-  formatQueueRunStatusLabel,
-  formatQueueRunStatusTone,
 } from '../lib/operation-run-presentation.js';
 import { getOperationRunDescriptor } from '../lib/operation-run-link-targets.js';
 
@@ -108,7 +107,7 @@ const recentRuns = computed(() => runs.value.slice(0, 25));
               <tr v-for="run in recentRuns" :key="run.id">
                 <td>{{ getOperationRunDescriptor(run.operationType).title }}</td>
                 <td>
-                  <span class="hx-pill" :data-tone="formatQueueRunStatusTone(run.status)">{{ formatQueueRunStatusLabel(run.status) }}</span>
+                  <OperationStatusBadge :status="run.status" variant="queue" />
                 </td>
                 <td class="hx-table-num">
                   {{ run.attemptCount ?? 0 }}<span v-if="run.maxAttempts">/{{ run.maxAttempts }}</span>

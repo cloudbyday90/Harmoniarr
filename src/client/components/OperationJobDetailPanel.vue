@@ -20,6 +20,7 @@
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import OperationRunDrilldownPanel from './OperationRunDrilldownPanel.vue';
+import OperationStatusBadge from './OperationStatusBadge.vue';
 import {
   getOperationRunDrilldownSummaryKeys,
 } from '../lib/operation-run-drilldown-presentation.js';
@@ -30,13 +31,9 @@ import {
   getOperationRunDescriptor,
 } from '../lib/operation-run-link-targets.js';
 import {
-  getOperationRunStatusLabel,
-} from '../lib/operation-run-status.js';
-import {
   buildOperationSummaryEntries,
   formatLeaseStateLabel,
   formatLeaseStateTone,
-  formatOperationRunStatusTone,
   formatOperationSummaryLabel,
   formatOperationSummaryValue,
   formatOperationTimestamp,
@@ -159,9 +156,7 @@ function runDuration(run) {
               Started {{ formatOperationTimestampShort(run.startedAt) }}<template v-if="runDuration(run)"> · {{ runDuration(run) }}</template><template v-if="run.triggeredByUserId"> · by {{ run.triggeredByUserId }}</template>
             </p>
           </div>
-          <span class="hx-pill" :data-tone="formatOperationRunStatusTone(run.status)">
-            {{ getOperationRunStatusLabel(run.status, { defaultLabel: 'Unknown' }) }}
-          </span>
+          <OperationStatusBadge :status="run.status" variant="run" />
         </div>
 
         <div class="operations-insight-grid">
