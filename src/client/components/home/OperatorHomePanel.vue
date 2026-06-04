@@ -26,10 +26,6 @@ import { useDiscoverArtistArtwork } from '../../composables/useDiscoverArtistArt
 import { useGridState } from '../../composables/useGridState.js';
 import { useOperatorMonitoredArtists } from '../../composables/useOperatorMonitoredArtists.js';
 import {
-  buildDiscoverArtistInitial,
-  buildDiscoverAvatarStyle,
-} from '../../lib/discover-presentation.js';
-import {
   buildOperatorHomeStats,
   calculateOperatorArtistCoveragePercent,
 } from '../../lib/operator-artist-card-presentation.js';
@@ -237,14 +233,24 @@ onBeforeUnmount(() => {
             >
               <div
                 class="hx-artwork hx-artwork--dashed operator-home__discover-art"
-                :style="buildDiscoverAvatarStyle('discover-more', 'Add')"
                 aria-hidden="true"
               >
-                <span>{{ buildDiscoverArtistInitial('discover-more', 'Add') }}</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
               </div>
               <div class="hx-media-card__body">
                 <p class="hx-media-card__title">Add more artists</p>
-                <p class="hx-media-card__meta">Open Discover</p>
+                <p class="hx-media-card__meta">Search Discover</p>
               </div>
             </RouterLink>
           </section>
@@ -292,6 +298,12 @@ onBeforeUnmount(() => {
   text-decoration: none;
 }
 
+.operator-home__discover-card:hover .operator-home__discover-art,
+.operator-home__discover-card:focus-visible .operator-home__discover-art {
+  color: var(--hx-accent);
+  border-color: var(--hx-accent);
+}
+
 .operator-home__discover-art {
   display: flex;
   align-items: center;
@@ -299,9 +311,9 @@ onBeforeUnmount(() => {
   color: var(--hx-text-muted);
 }
 
-.operator-home__discover-art span {
-  font-size: var(--hx-text-2xl);
-  font-weight: 800;
+.operator-home__discover-art svg {
+  width: 40%;
+  height: 40%;
 }
 
 @media (max-width: 640px) {

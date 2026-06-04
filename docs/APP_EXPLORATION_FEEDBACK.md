@@ -109,6 +109,8 @@ What felt confusing:
 
 Status: **Resolved** (2026-05-04 — Background Jobs redesign).
 
+Follow-up (2026-05 — Phase 7): the inline "Job detail" panel (~175 lines) was extracted into a dedicated presentational child component `src/client/components/OperationJobDetailPanel.vue` (data-down/events-up: plain props in, `request-cancel` / `request-retry` events out). The parent `OperationsView.vue` keeps all orchestration and the cancel/retry mutations; the view shed five computeds, two helpers, and eleven unused imports. Buttons gained `:title` affordances and the loading line gained `aria-live`/`aria-busy`. See `docs/OPERATIONS_JOB_DETAIL_AND_HOME_AFFORDANCE_DESIGN.md`.
+
 Redesign implemented:
 - Page title changed from "Operations" to "Background Jobs" with operator-friendly subtitle.
 - Card title changed from "Run monitor" to "Job queue".

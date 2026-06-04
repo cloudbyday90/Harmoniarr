@@ -18,43 +18,28 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../composables/useToast.js';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
-import OperationRunDrilldownPanel from '../components/OperationRunDrilldownPanel.vue';
+import OperationJobDetailPanel from '../components/OperationJobDetailPanel.vue';
 import {
   buildOperationsRouteQuery,
   getOperationsRouteStateKey,
   normalizeOperationsRouteState,
 } from '../lib/operations-route-state.js';
 import {
-  getOperationRunDrilldownSummaryKeys,
-} from '../lib/operation-run-drilldown-presentation.js';
-import {
-  buildOperationRunLinkTarget,
-  canRequestOperationRunCancellation,
-  canRequestOperationRunRetry,
   getOperationRunDescriptor,
 } from '../lib/operation-run-link-targets.js';
 import {
   getOperationRunStatusLabel,
 } from '../lib/operation-run-status.js';
 import {
-  buildOperationSummaryEntries,
   formatElapsedDuration,
-  formatLeaseStateLabel,
-  formatLeaseStateTone,
   formatOperationRunStatusTone,
-  formatOperationSummaryLabel,
-  formatOperationSummaryValue,
-  formatOperationTimestamp,
   formatOperationTimestampShort,
   formatQueueRunStatusLabel,
   formatQueueRunStatusTone,
-  getOperationRunDurationLabel,
-  getOperationRunNextStep,
-  getOperationRunOperatorSummary,
 } from '../lib/operation-run-presentation.js';
 import {
   triggerArtworkCleanup,
@@ -97,18 +82,6 @@ const {
 
 const operationsRouteState = computed(() => normalizeOperationsRouteState(route.query));
 const selectedRun = computed(() => selectedRunDetail.value?.run ?? null);
-const selectedRunLease = computed(() => selectedRun.value?.lease ?? null);
-const selectedRunSummaryEntries = computed(() => {
-  const hiddenKeys = new Set(getOperationRunDrilldownSummaryKeys(selectedRun.value));
-  return buildOperationSummaryEntries(selectedRun.value?.summary)
-    .filter((entry) => !hiddenKeys.has(entry.key));
-});
-const canRequestCancellation = computed(() => canRequestOperationRunCancellation(selectedRun.value));
-const canRequestRetry = computed(() => canRequestOperationRunRetry(selectedRun.value));
-const selectedRunWorkflowTarget = computed(() => buildOperationRunLinkTarget({
-  operationType: selectedRun.value?.operationType,
-  runId: selectedRun.value?.id,
-}));
 
 const JOB_CATALOG_DEFS = [
   {
@@ -239,10 +212,6 @@ async function replaceOperationsRouteState(nextState, { hash = route.hash } = {}
 
 function operationTitle(operationType) {
   return getOperationRunDescriptor(operationType).title;
-}
-
-function runDuration(run) {
-  return getOperationRunDurationLabel(run);
 }
 
 async function handleSelectRun(runId) {
@@ -493,174 +462,18 @@ watch(
       </article>
 
       <!-- Job detail -->
-      <article id="operation-run-detail-panel" class="hx-card">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Job detail</h3>
-            <p class="hx-card-subtitle" v-if="!selectedRun && !isLoadingDetail">Select a job to see what happened and what to do next.</p>
-          </div>
-          <div class="hx-card-actions" v-if="selectedRun">
-            <button
-              v-if="canRequestCancellation"
-              type="button"
-              class="hx-btn"
-              @click="handleRequestCancellation"
-              :disabled="isCancellingRun"
-            >
-              {{ isCancellingRun ? 'Cancelling…' : 'Cancel run' }}
-            </button>
-            <button
-              v-if="canRequestRetry"
-              type="button"
-              class="hx-btn"
-              @click="handleRequestRetry"
-              :disabled="isRetryingRun"
-            >
-              {{ isRetryingRun ? 'Retrying…' : 'Retry' }}
-            </button>
-            <RouterLink v-if="selectedRunWorkflowTarget" class="hx-btn" :to="selectedRunWorkflowTarget.to">
-              {{ selectedRunWorkflowTarget.label }}
-            </RouterLink>
-          </div>
-        </header>
-
-        <div class="hx-card-body">
-          <div v-if="cancellationErrorMessage || retryErrorMessage || detailErrorMessage" class="ops-error-strip">
-            <span v-if="cancellationErrorMessage" class="hx-pill" data-tone="danger">{{ cancellationErrorMessage }}</span>
-            <span v-if="retryErrorMessage" class="hx-pill" data-tone="danger">{{ retryErrorMessage }}</span>
-            <span v-if="detailErrorMessage" class="hx-pill" data-tone="danger">{{ detailErrorMessage }}</span>
-          </div>
-
-          <p v-if="isLoadingDetail" class="hx-text-muted">Loading run detail and timeline…</p>
-
-          <template v-else-if="selectedRun">
-            <div class="ops-run-detail-header">
-              <div>
-                <strong class="ops-run-detail-name">{{ operationTitle(selectedRun.operationType) }}</strong>
-                <p class="hx-text-muted">
-                  Started {{ formatOperationTimestampShort(selectedRun.startedAt) }}<template v-if="runDuration(selectedRun)"> · {{ runDuration(selectedRun) }}</template><template v-if="selectedRun.triggeredByUserId"> · by {{ selectedRun.triggeredByUserId }}</template>
-                </p>
-              </div>
-              <span class="hx-pill" :data-tone="formatOperationRunStatusTone(selectedRun.status)">
-                {{ getOperationRunStatusLabel(selectedRun.status, { defaultLabel: 'Unknown' }) }}
-              </span>
-            </div>
-
-            <div class="operations-insight-grid">
-              <article class="operations-insight-card" v-if="selectedRun.errorMessage">
-                <p class="ops-section-label">Error detail</p>
-                <strong>{{ selectedRun.errorMessage }}</strong>
-              </article>
-              <article class="operations-insight-card" v-if="!selectedRun.errorMessage">
-                <p class="ops-section-label">What happened</p>
-                <strong>{{ getOperationRunOperatorSummary(selectedRun) }}</strong>
-              </article>
-              <article class="operations-insight-card">
-                <p class="ops-section-label">What to do next</p>
-                <strong>{{ getOperationRunNextStep(selectedRun) }}</strong>
-              </article>
-            </div>
-
-            <div class="ops-timeline" v-if="selectedRunDetail?.auditEvents?.length">
-              <p class="ops-section-label">Run timeline</p>
-              <div class="ops-timeline-list">
-                <div class="ops-timeline-event" v-for="event in selectedRunDetail.auditEvents" :key="event.id">
-                    <span class="ops-timeline-time">{{ formatOperationTimestampShort(event.occurredAt) }}</span>
-                  <span class="ops-timeline-dot"></span>
-                  <div class="ops-timeline-body">
-                    <strong>{{ event.summary }}</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <OperationRunDrilldownPanel :run="selectedRun" />
-
-            <details class="ops-technical-details">
-              <summary>Technical detail</summary>
-              <dl class="ops-meta-dl">
-                <div>
-                  <dt>Operation type</dt>
-                  <dd>{{ operationTitle(selectedRun.operationType) }}</dd>
-                </div>
-                <div>
-                  <dt>Run ID</dt>
-                  <dd class="ops-run-id">{{ selectedRun.id }}</dd>
-                </div>
-                <div>
-                  <dt>Started</dt>
-                  <dd>{{ formatOperationTimestamp(selectedRun.startedAt) }}</dd>
-                </div>
-                <div>
-                  <dt>Finished</dt>
-                  <dd>{{ formatOperationTimestamp(selectedRun.finishedAt) }}</dd>
-                </div>
-                <div v-if="selectedRun.attemptCount || selectedRun.maxAttempts">
-                  <dt>Attempts</dt>
-                  <dd>{{ selectedRun.attemptCount ?? 0 }} of {{ selectedRun.maxAttempts ?? 1 }}</dd>
-                </div>
-                <div v-if="selectedRun.nextAttemptAt">
-                  <dt>Next attempt</dt>
-                  <dd>{{ formatOperationTimestamp(selectedRun.nextAttemptAt) }}</dd>
-                </div>
-                <div v-if="selectedRun.cancelRequestedAt">
-                  <dt>Cancellation requested</dt>
-                  <dd>{{ formatOperationTimestamp(selectedRun.cancelRequestedAt) }}</dd>
-                </div>
-                <div v-if="selectedRun.cancelRequestedByUserId">
-                  <dt>Cancelled by</dt>
-                  <dd>{{ selectedRun.cancelRequestedByUserId }}</dd>
-                </div>
-                <div v-if="selectedRun.claimedAt">
-                  <dt>Processing started</dt>
-                  <dd>{{ formatOperationTimestamp(selectedRun.claimedAt) }}</dd>
-                </div>
-                <div v-if="selectedRun.claimedByInstanceId">
-                  <dt>Worker instance</dt>
-                  <dd>{{ selectedRun.claimedByInstanceId }}</dd>
-                </div>
-                <div v-if="selectedRunLease">
-                  <dt>Lock state</dt>
-                  <dd>
-                    <span class="hx-pill" :data-tone="formatLeaseStateTone(selectedRunLease.state)">
-                      {{ formatLeaseStateLabel(selectedRunLease.state) }}
-                    </span>
-                  </dd>
-                </div>
-                <div v-if="selectedRunLease">
-                  <dt>Lock held by</dt>
-                  <dd>{{ selectedRunLease.ownerInstanceId }}</dd>
-                </div>
-                <div v-if="selectedRunLease">
-                  <dt>Last check-in</dt>
-                  <dd>{{ formatOperationTimestamp(selectedRunLease.heartbeatAt) }}</dd>
-                </div>
-                <div v-if="selectedRunLease">
-                  <dt>Lock expiry</dt>
-                  <dd>{{ formatOperationTimestamp(selectedRunLease.expiresAt) }}</dd>
-                </div>
-              </dl>
-
-              <div v-if="selectedRunSummaryEntries.length" class="ops-sub-section">
-                <p class="ops-section-label">Recorded outcome</p>
-                <dl class="ops-meta-dl">
-                  <div v-for="entry in selectedRunSummaryEntries" :key="entry.key">
-                    <dt>{{ formatOperationSummaryLabel(entry.key) }}</dt>
-                    <dd>{{ formatOperationSummaryValue(entry.value) }}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <div v-if="Object.keys(selectedRun.summary ?? {}).length && !selectedRunSummaryEntries.length && !getOperationRunDrilldownSummaryKeys(selectedRun).length" class="ops-sub-section">
-                <p class="ops-section-label">Raw JSON</p>
-                <pre class="ops-pre">{{ JSON.stringify(selectedRun.summary, null, 2) }}</pre>
-              </div>
-            </details>
-          </template>
-
-          <p v-else class="hx-text-muted">Select a job from the queue to see what happened, what to do next, and the full run detail.</p>
-        </div>
-      </article>
+      <OperationJobDetailPanel
+        :run="selectedRun"
+        :detail="selectedRunDetail"
+        :is-loading="isLoadingDetail"
+        :is-cancelling="isCancellingRun"
+        :is-retrying="isRetryingRun"
+        :cancellation-error="cancellationErrorMessage"
+        :retry-error="retryErrorMessage"
+        :detail-error="detailErrorMessage"
+        @request-cancel="handleRequestCancellation"
+        @request-retry="handleRequestRetry"
+      />
 
     </div>
   </section>
