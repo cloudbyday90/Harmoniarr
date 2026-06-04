@@ -138,3 +138,25 @@ test('evaluateAutoIgnoreForUser never throws on a downstream failure', async (t)
   assert.equal(result.applied, false);
   assert.equal(result.skipReason, 'error');
 });
+
+test('exportIgnoredSourceUsers returns a machine-readable snapshot and records an audit event', async (t) => {
+  const entries = [
+    { username: 'Bad-Peer', usernameKey: 'bad-peer', source: 'manual', reason: 'bad' },
+    { username: 'Worse-Peer', usernameKey: 'worse-peer', source: 'auto_suggested', reason: null },
+  ];
+  const ignoreStore = createStoreStub(t, { listIgnoreEntries: t.mock.fn(async () => entries) });
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createSourceUserIgnoreService({ ignoreStore, loadSettingsFn: async () => ({}), recordAuditEventFn });
+
+  const snapshot = await service.exportIgnoredSourceUsers({ actorUserId: 'admin-1' });
+
+  assert.equal(snapshot.format, 'harmoniarr.source-user-ignore-list.v1');
+  assert.equal(snapshot.total, 2);
+  assert.deepEqual(snapshot.entries, entries);
+  assert.match(snapshot.exportedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(recordAuditEventFn.mock.calls.length, 1);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].eventType, 'source_user_ignore_list_exported');
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].actorType, 'user');
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.total, 2);
+});
+

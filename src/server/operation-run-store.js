@@ -32,6 +32,94 @@ function normalizeRunSummary(summary) {
   return summary;
 }
 
+function clampRetainCountPerType(retainCountPerType) {
+  return Math.max(1, Math.min(Number.isInteger(retainCountPerType) ? retainCountPerType : 50, 1000));
+}
+
+/**
+ * Global, cross-operation-type retention sweep for the operation-run ledger.
+ *
+ * Honors both an age ceiling (delete terminal runs older than `olderThanIso`)
+ * and a per-type minimum-retention floor (always keep the newest
+ * `retainCountPerType` terminal runs of each operation type, oldest deleted
+ * first). This is the explicit, policy-driven replacement for the legacy
+ * inline pruning that ran as part of normal operation completion.
+ */
+export async function pruneOperationRunsLedger({
+  getPoolFn = getPool,
+  olderThanIso,
+  retainCountPerType,
+} = {}) {
+  if (!olderThanIso) {
+    return { prunedCount: 0 };
+  }
+
+  const clampedRetainCount = clampRetainCountPerType(retainCountPerType);
+  const result = await getPoolFn().query(
+    `
+      DELETE FROM operation_runs
+      WHERE status IN ('completed', 'failed', 'cancelled')
+        AND COALESCE(finished_at, cancelled_at, started_at, created_at) < $1
+        AND id NOT IN (
+          SELECT id
+          FROM (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY operation_type
+                     ORDER BY COALESCE(started_at, created_at) DESC
+                   ) AS rn
+            FROM operation_runs
+            WHERE status IN ('completed', 'failed', 'cancelled')
+          ) ranked
+          WHERE ranked.rn <= $2
+        )
+    `,
+    [olderThanIso, clampedRetainCount],
+  );
+
+  return { prunedCount: result.rowCount ?? 0 };
+}
+
+/**
+ * Counts the operation runs that {@link pruneOperationRunsLedger} would delete
+ * for the same inputs, without mutating the ledger (dry-run / preview).
+ */
+export async function countPrunableOperationRuns({
+  getPoolFn = getPool,
+  olderThanIso,
+  retainCountPerType,
+} = {}) {
+  if (!olderThanIso) {
+    return { prunableCount: 0 };
+  }
+
+  const clampedRetainCount = clampRetainCountPerType(retainCountPerType);
+  const result = await getPoolFn().query(
+    `
+      SELECT COUNT(*)::int AS prunable_count
+      FROM operation_runs
+      WHERE status IN ('completed', 'failed', 'cancelled')
+        AND COALESCE(finished_at, cancelled_at, started_at, created_at) < $1
+        AND id NOT IN (
+          SELECT id
+          FROM (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY operation_type
+                     ORDER BY COALESCE(started_at, created_at) DESC
+                   ) AS rn
+            FROM operation_runs
+            WHERE status IN ('completed', 'failed', 'cancelled')
+          ) ranked
+          WHERE ranked.rn <= $2
+        )
+    `,
+    [olderThanIso, clampedRetainCount],
+  );
+
+  return { prunableCount: result.rows[0]?.prunable_count ?? 0 };
+}
+
 function normalizeOperationRun(row) {
   if (!row) {
     return null;
@@ -206,7 +294,6 @@ export function createOperationRunStore({
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary))],
     );
-    await pruneOldRuns();
   }
 
   async function markRunFailed({ runId, summary = {}, errorMessage }) {
@@ -258,7 +345,6 @@ export function createOperationRunStore({
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary)), errorMessage],
     );
-    await pruneOldRuns();
   }
 
   async function pruneOldRuns({ retainCount = 20 } = {}) {
@@ -315,7 +401,6 @@ export function createOperationRunStore({
       `,
       [runId, JSON.stringify(normalizeRunSummary(summary))],
     );
-    await pruneOldRuns();
   }
 
   async function markRunPaused({ nextAttemptAt = null, runId, summary = {} }) {

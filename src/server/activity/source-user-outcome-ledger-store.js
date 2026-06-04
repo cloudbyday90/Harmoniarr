@@ -218,8 +218,27 @@ export function createSourceUserOutcomeLedgerStore({ getPoolFn = getPool } = {})
     return { prunedCount: result.rowCount ?? 0 };
   }
 
+  async function countExpiredOutcomeEvents({ olderThan } = {}) {
+    const olderThanIso = normalizeTimestamp(olderThan, null);
+    if (!olderThanIso) {
+      return { prunableCount: 0 };
+    }
+
+    const result = await getPoolFn().query(
+      `
+        SELECT COUNT(*)::int AS prunable_count
+        FROM source_user_outcome_events
+        WHERE occurred_at < $1
+      `,
+      [olderThanIso],
+    );
+
+    return { prunableCount: result.rows[0]?.prunable_count ?? 0 };
+  }
+
   return {
     appendOutcomeEvent,
+    countExpiredOutcomeEvents,
     listRecentOutcomeEvents,
     pruneOutcomeEvents,
   };

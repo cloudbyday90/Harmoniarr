@@ -59,6 +59,31 @@ export function createSourceUserIgnoreService({
   }
 
   /**
+   * Produces a machine-readable snapshot of the entire ignore list for export
+   * or backup. Per OWASP logging guidance, a data export is itself a logged
+   * event, so a successful export records an audit trail entry.
+   */
+  async function exportIgnoredSourceUsers({ actorUserId = null } = {}) {
+    const entries = await ignoreStore.listIgnoreEntries();
+    const snapshot = {
+      entries,
+      exportedAt: new Date().toISOString(),
+      format: 'harmoniarr.source-user-ignore-list.v1',
+      total: entries.length,
+    };
+
+    await recordAuditEventFn({
+      actorUserId,
+      actorType: actorUserId ? 'user' : 'system',
+      eventType: 'source_user_ignore_list_exported',
+      summary: `Source-user ignore list exported (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'})`,
+      details: { total: entries.length },
+    });
+
+    return snapshot;
+  }
+
+  /**
    * Applies an ignore decision made by an operator (one-click "apply suggestion
    * to ignore list" or a direct ignore).
    */
@@ -185,6 +210,7 @@ export function createSourceUserIgnoreService({
   return {
     applyIgnoreSuggestion,
     evaluateAutoIgnoreForUser,
+    exportIgnoredSourceUsers,
     listIgnoredSourceUsers,
     listIgnoredUsernamesForFilter,
     removeIgnoredUser,

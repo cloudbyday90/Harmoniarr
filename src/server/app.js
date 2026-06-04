@@ -937,6 +937,7 @@ export function createApp({
   return {
     app,
     appPort,
+    activityModule,
     artworkModule,
     fulfillmentModule,
     importCandidateModule,

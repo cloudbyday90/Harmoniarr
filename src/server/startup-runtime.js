@@ -22,6 +22,8 @@ import { createImportCandidateExecutionHeartbeat } from './import-candidates/imp
 import { createFulfillmentCorrelationHeartbeat } from './fulfillment/fulfillment-correlation-heartbeat.js';
 import { createLibraryDiscoveryHeartbeat } from './library/library-discovery-heartbeat.js';
 import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discovery-heartbeat-config.js';
+import { createLedgerRetentionHeartbeat } from './ledger-retention-heartbeat.js';
+import { createLedgerRetentionService } from './ledger-retention-service.js';
 import { createMetadataRefreshHeartbeat } from './metadata/metadata-refresh-heartbeat.js';
 import { assertNoPendingMigrations } from './migrations.js';
 import { createOperationQueueDispatcher } from './operation-queue-dispatcher.js';
@@ -53,6 +55,8 @@ export async function startServerRuntime({
   createApp: buildApp = createApp,
   createImportCandidateExecutionHeartbeat: buildImportCandidateExecutionHeartbeat = createImportCandidateExecutionHeartbeat,
   createFulfillmentCorrelationHeartbeat: buildFulfillmentCorrelationHeartbeat = createFulfillmentCorrelationHeartbeat,
+  createLedgerRetentionHeartbeat: buildLedgerRetentionHeartbeat = createLedgerRetentionHeartbeat,
+  createLedgerRetentionService: buildLedgerRetentionService = createLedgerRetentionService,
   createLibraryDiscoveryHeartbeat: buildLibraryDiscoveryHeartbeat = createLibraryDiscoveryHeartbeat,
   createMetadataRefreshHeartbeat: buildMetadataRefreshHeartbeat = createMetadataRefreshHeartbeat,
   createOperationQueueDispatcher: buildOperationQueueDispatcher = createOperationQueueDispatcher,
@@ -90,6 +94,7 @@ export async function startServerRuntime({
   const {
     app,
     appPort,
+    activityModule,
     artworkModule,
     fulfillmentModule,
     importCandidateModule,
@@ -157,6 +162,16 @@ export async function startServerRuntime({
       runtimeReporter.writeError(error, { label: 'fulfillment correlation heartbeat failed' });
     },
   });
+  const ledgerRetentionService = buildLedgerRetentionService({
+    outcomeLedgerStore: activityModule.sourceUserOutcomeLedgerStore,
+  });
+  const ledgerRetentionHeartbeat = buildLedgerRetentionHeartbeat({
+    applyLedgerRetention: ledgerRetentionService.applyLedgerRetention,
+    heartbeatPauseService: maintenanceLockHeartbeatPauseService,
+    onError: (error) => {
+      runtimeReporter.writeError(error, { label: 'ledger retention heartbeat failed' });
+    },
+  });
   const operationStrandedRunRecoveryService = buildOperationStrandedRunRecoveryService({
     operationQueueStore,
   });
@@ -188,6 +203,7 @@ export async function startServerRuntime({
   startupServiceSupervisor.registerService(libraryDiscoveryHeartbeat);
   startupServiceSupervisor.registerService(importExecutionHeartbeat);
   startupServiceSupervisor.registerService(fulfillmentCorrelationHeartbeat);
+  startupServiceSupervisor.registerService(ledgerRetentionHeartbeat);
   startupServiceSupervisor.registerService(systemModule.operatorNotificationFanoutHeartbeat);
   if (pushModule?.pushNotificationDeliveryHeartbeat) {
     startupServiceSupervisor.registerService(pushModule.pushNotificationDeliveryHeartbeat);

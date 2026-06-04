@@ -86,6 +86,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       callOrder.push('stop:fulfillment-correlation');
     },
   };
+  const ledgerRetentionHeartbeat = {
+    start() {
+      callOrder.push('start:ledger-retention');
+    },
+    async stop() {
+      callOrder.push('stop:ledger-retention');
+    },
+  };
   const operationStrandedRunRecoveryService = {
     recoverStrandedRuns: async () => ({
       activeLeaseCount: 0,
@@ -152,6 +160,12 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         },
       },
       appPort: 4123,
+      activityModule: {
+        sourceUserOutcomeLedgerStore: {
+          countExpiredOutcomeEvents: async () => ({ prunableCount: 0 }),
+          pruneOutcomeEvents: async () => ({ prunedCount: 0 }),
+        },
+      },
       artworkModule: {
         artworkCleanupWorker: {
           startWorkerRun: async () => {},
@@ -295,6 +309,14 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       assert.equal(typeof options.onError, 'function');
       return fulfillmentCorrelationHeartbeat;
     },
+    createLedgerRetentionService: (options) => {
+      assert.equal(typeof options.outcomeLedgerStore.pruneOutcomeEvents, 'function');
+      return { applyLedgerRetention: async () => ({ totalPruned: 0 }) };
+    },
+    createLedgerRetentionHeartbeat: (options) => {
+      assert.equal(typeof options.applyLedgerRetention, 'function');
+      return ledgerRetentionHeartbeat;
+    },
     createStartupServiceSupervisor: ({ processEmitter: injectedProcessEmitter }) => {
       assert.equal(injectedProcessEmitter, processEmitter);
 
@@ -351,6 +373,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     libraryDiscoveryHeartbeat,
     importExecutionHeartbeat,
     fulfillmentCorrelationHeartbeat,
+    ledgerRetentionHeartbeat,
     operatorNotificationFanoutHeartbeat,
     pushNotificationDeliveryHeartbeat,
     pushNotificationHistoryCleanupHeartbeat,
@@ -370,6 +393,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:library',
     'start:import',
     'start:fulfillment-correlation',
+    'start:ledger-retention',
     'start:operator-fanout',
     'start:push-delivery',
     'start:push-history-cleanup',
@@ -397,6 +421,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'start:library',
     'start:import',
     'start:fulfillment-correlation',
+    'start:ledger-retention',
     'start:operator-fanout',
     'start:push-delivery',
     'start:push-history-cleanup',
@@ -408,6 +433,7 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
     'stop:push-history-cleanup',
     'stop:push-delivery',
     'stop:operator-fanout',
+    'stop:ledger-retention',
     'stop:fulfillment-correlation',
     'stop:import',
     'stop:library',
@@ -449,6 +475,12 @@ test('startServerRuntime reports shutdown errors through stderr and sets exitCod
         },
       },
       appPort: 4123,
+      activityModule: {
+        sourceUserOutcomeLedgerStore: {
+          countExpiredOutcomeEvents: async () => ({ prunableCount: 0 }),
+          pruneOutcomeEvents: async () => ({ prunedCount: 0 }),
+        },
+      },
       artworkModule: {
         artworkCleanupWorker: {
           startWorkerRun: async () => {},

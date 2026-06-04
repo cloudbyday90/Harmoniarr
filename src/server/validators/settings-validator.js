@@ -290,6 +290,26 @@ const settingDefinitions = {
       },
     },
   },
+  retention: {
+    operationRunMaxAgeDays: {
+      defaultValue: 90,
+      normalize(value) {
+        return normalizeIntegerSetting('retention.operationRunMaxAgeDays', value, { min: 7, max: 3650 });
+      },
+    },
+    operationRunRetainCountPerType: {
+      defaultValue: 50,
+      normalize(value) {
+        return normalizeIntegerSetting('retention.operationRunRetainCountPerType', value, { min: 10, max: 1000 });
+      },
+    },
+    outcomeEventMaxAgeDays: {
+      defaultValue: 180,
+      normalize(value) {
+        return normalizeIntegerSetting('retention.outcomeEventMaxAgeDays', value, { min: 30, max: 3650 });
+      },
+    },
+  },
   providers: {
     spotifyClientId: {
       defaultValue: process.env.SPOTIFY_CLIENT_ID ?? '',
