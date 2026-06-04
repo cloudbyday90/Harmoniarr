@@ -20,8 +20,8 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useOperationHistory } from '../composables/useOperationHistory.js';
-import ConfirmDialog from '../components/ConfirmDialog.vue';
 import OperationJobDetailPanel from '../components/OperationJobDetailPanel.vue';
 import OperationStatusBadge from '../components/OperationStatusBadge.vue';
 import {
@@ -51,6 +51,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const confirm = useConfirm();
 
 const {
   attachVisibilityListener,
@@ -120,21 +121,6 @@ const DESTRUCTIVE_OPERATIONS = Object.freeze({
 const triggeringJobs = reactive({});
 const triggerErrors = reactive({});
 const expandedJobType = ref(null);
-
-const confirmDialogOpen = ref(false);
-const confirmOperationType = ref(null);
-const confirmTyped = ref('');
-const confirmAcknowledged = ref(false);
-
-const pendingConfirmJob = computed(() => {
-  if (!confirmOperationType.value) return null;
-  return jobCatalog.value.find((j) => j.operationType === confirmOperationType.value) ?? null;
-});
-
-const destructiveConfig = computed(() => {
-  if (!confirmOperationType.value) return null;
-  return DESTRUCTIVE_OPERATIONS[confirmOperationType.value] ?? null;
-});
 
 const jobCatalog = computed(() =>
   JOB_CATALOG_DEFS.map((def) => {
@@ -229,11 +215,16 @@ async function handleTriggerJob(operationType, triggerFn) {
 
   const destructive = DESTRUCTIVE_OPERATIONS[operationType];
   if (destructive) {
-    confirmOperationType.value = operationType;
-    confirmTyped.value = '';
-    confirmAcknowledged.value = false;
-    confirmDialogOpen.value = true;
-    return;
+    const job = jobCatalog.value.find((j) => j.operationType === operationType) ?? null;
+    const confirmed = await confirm({
+      title: job ? `Start ${job.title}?` : 'Confirm',
+      level: destructive.confirmLevel,
+      confirmText: destructive.confirmText,
+      gateLabel: destructive.gateLabel,
+      confirmLabel: 'Start',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
   }
 
   await executeJobTrigger(operationType, triggerFn);
@@ -253,21 +244,6 @@ async function executeJobTrigger(operationType, triggerFn) {
   } finally {
     delete triggeringJobs[operationType];
   }
-}
-
-async function onConfirmJobExecute() {
-  if (!confirmOperationType.value) return;
-  const job = pendingConfirmJob.value;
-  const config = destructiveConfig.value;
-  if (!job || !config) return;
-
-  confirmDialogOpen.value = false;
-  await executeJobTrigger(confirmOperationType.value, job.triggerFn);
-}
-
-function closeConfirmDialog() {
-  confirmDialogOpen.value = false;
-  confirmOperationType.value = null;
 }
 
 onMounted(() => {
@@ -470,27 +446,6 @@ watch(
 
     </div>
   </section>
-
-  <ConfirmDialog
-    :is-open="confirmDialogOpen"
-    :is-confirming="true"
-    :is-executing="false"
-    :is-done="false"
-    :title="pendingConfirmJob ? `Start ${pendingConfirmJob.title}?` : 'Confirm'"
-    :confirm-level="destructiveConfig?.confirmLevel ?? 'checkbox'"
-    :confirm-text="destructiveConfig?.confirmText ?? ''"
-    :gate-label="destructiveConfig?.gateLabel ?? ''"
-    :typed="confirmTyped"
-    :acknowledged="confirmAcknowledged"
-    :matches="destructiveConfig?.confirmText ? confirmTyped === destructiveConfig.confirmText : true"
-    :can-confirm="destructiveConfig?.confirmLevel === 'type_to_confirm' ? confirmAcknowledged && confirmTyped === (destructiveConfig?.confirmText ?? '') : confirmAcknowledged"
-    :button-enabled="destructiveConfig?.confirmLevel === 'type_to_confirm' ? confirmAcknowledged && confirmTyped === (destructiveConfig?.confirmText ?? '') : confirmAcknowledged"
-    :error="''"
-    @close="closeConfirmDialog"
-    @execute="onConfirmJobExecute"
-    @update:typed="confirmTyped = $event"
-    @update:acknowledged="confirmAcknowledged = $event"
-  />
 </template>
 
 <style scoped>

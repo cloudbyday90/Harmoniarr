@@ -25,6 +25,7 @@ import { useMediaRequestDetail } from '../composables/useMediaRequestDetail.js';
 import { useMediaRequestPipeline } from '../composables/useMediaRequestPipeline.js';
 import { useMediaRequestReassignment } from '../composables/useMediaRequestReassignment.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { formatSourceProvider } from '../lib/import-candidate-presentation.js';
 import {
   getCancelToastMessage,
@@ -92,6 +93,7 @@ const {
 } = useMediaRequestReassignment();
 
 const toast = useToast();
+const confirm = useConfirm();
 
 const reassignModalOpen = ref(false);
 const reassignTarget = ref(null);
@@ -129,6 +131,14 @@ const isCancelling = ref(false);
 
 async function handleCancel() {
   if (!mediaRequest.value || isCancelling.value) return;
+  const confirmed = await confirm({
+    title: 'Cancel request?',
+    message: 'This request will be cancelled and any in-flight fulfillment work will stop.',
+    confirmLabel: 'Cancel request',
+    cancelLabel: 'Keep',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
   isCancelling.value = true;
   try {
     const result = await cancelMediaRequest({ mediaRequestId: mediaRequest.value.id });

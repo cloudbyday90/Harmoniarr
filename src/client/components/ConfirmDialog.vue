@@ -18,12 +18,14 @@
 
 <script setup>
 import { nextTick, watch } from 'vue';
-import { CONFIRM_LEVEL } from '../composables/useConfirmDialog.js';
+import { CONFIRM_LEVEL } from '../lib/confirm-intent.js';
 
 const props = defineProps({
   acknowledged: { type: Boolean, default: false },
   buttonEnabled: { type: Boolean, default: false },
   canConfirm: { type: Boolean, default: false },
+  cancelLabel: { type: String, default: 'Cancel' },
+  confirmLabel: { type: String, default: 'Confirm' },
   confirmLevel: { type: String, default: CONFIRM_LEVEL.CHECKBOX },
   confirmText: { type: String, default: '' },
   error: { type: String, default: '' },
@@ -33,8 +35,10 @@ const props = defineProps({
   isExecuting: { type: Boolean, default: false },
   isOpen: { type: Boolean, default: false },
   matches: { type: Boolean, default: false },
+  message: { type: String, default: '' },
   result: { type: Object, default: null },
   title: { type: String, default: 'Confirm' },
+  tone: { type: String, default: 'danger' },
   typed: { type: String, default: '' },
 });
 
@@ -102,6 +106,7 @@ watch(() => props.isOpen, async (open) => {
     role="alertdialog"
     aria-modal="true"
     :aria-labelledby="isConfirming ? 'confirm-heading' : 'confirm-result-heading'"
+    :aria-describedby="isConfirming && message ? 'confirm-message' : undefined"
     @cancel="onCancel"
     @click="onBackdropClick"
   >
@@ -115,7 +120,8 @@ watch(() => props.isOpen, async (open) => {
 
       <div class="hx-confirm-dialog-body">
         <slot name="body">
-          <p class="hx-text-muted">{{ gateLabel }}</p>
+          <p v-if="message" id="confirm-message" class="hx-text-muted">{{ message }}</p>
+          <p v-else class="hx-text-muted">{{ gateLabel }}</p>
         </slot>
 
         <label
@@ -163,16 +169,16 @@ watch(() => props.isOpen, async (open) => {
           :disabled="isExecuting"
           @click="emit('close')"
         >
-          Cancel
+          {{ cancelLabel }}
         </button>
         <button
           type="button"
           class="hx-btn hx-btn-danger-confirm"
-          :class="{ 'is-ready': buttonEnabled }"
+          :class="{ 'is-ready': buttonEnabled, 'hx-btn-primary-confirm': tone === 'primary' }"
           :disabled="!buttonEnabled || isExecuting"
           @click="emit('execute')"
         >
-          {{ isExecuting ? 'Running...' : 'Confirm' }}
+          {{ isExecuting ? 'Running...' : confirmLabel }}
         </button>
       </footer>
     </template>

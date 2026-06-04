@@ -31,6 +31,7 @@ import { formatOperationTimestampShort } from '../lib/operation-run-presentation
 import { formatDependencyProviderLabel, formatDependencyStatusLabel, getDependencyStatusClass } from '../lib/settings-connections-presentation.js';
 import { resolveMenuFocus } from '../lib/menu-keyboard-navigation.js';
 import ToastStack from './ToastStack.vue';
+import ConfirmDialogHost from './ConfirmDialogHost.vue';
 import PwaUpdateBanner from './PwaUpdateBanner.vue';
 import GlobalSearchPalette from './GlobalSearchPalette.vue';
 
@@ -540,6 +541,7 @@ onBeforeUnmount(() => {
     </nav>
 
     <ToastStack />
+    <ConfirmDialogHost />
     <PwaUpdateBanner />
     <GlobalSearchPalette :open="searchOpen" @close="closeSearch" />
   </div>

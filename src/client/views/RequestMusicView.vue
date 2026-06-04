@@ -40,6 +40,7 @@ import {
 import { cancelMediaRequest } from '../lib/library-api.js';
 import { formatUserRole } from '../lib/settings-users-presentation.js';
 import { useToast } from '../composables/useToast.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { sessionStore } from '../state/session.js';
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
@@ -57,6 +58,7 @@ const rm = useRequestMusicForm({
 });
 
 const toast = useToast();
+const confirm = useConfirm();
 
 const filters = useRequestListFilters({
   applyFiltersFn: () => applyFilters(),
@@ -148,6 +150,18 @@ async function handleBulkCancel() {
   const ids = Array.from(selectedBulkIds);
   if (ids.length === 0) return;
 
+  const confirmed = await confirm({
+    title: ids.length === 1 ? 'Cancel request?' : `Cancel ${ids.length} requests?`,
+    message:
+      ids.length === 1
+        ? 'This request will be cancelled and any in-flight fulfillment work will stop.'
+        : `These ${ids.length} requests will be cancelled and any in-flight fulfillment work will stop.`,
+    confirmLabel: ids.length === 1 ? 'Cancel request' : 'Cancel requests',
+    cancelLabel: 'Keep',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
+
   const result = await bulkCancel.execute({
     mediaRequestIds: ids,
     reason: bulkCancelReason.value || undefined,
@@ -167,6 +181,14 @@ async function handleBulkCancel() {
 
 async function handleCancelRequest(request) {
   if (cancellingId.value) return;
+  const confirmed = await confirm({
+    title: 'Cancel request?',
+    message: 'This request will be cancelled and any in-flight fulfillment work will stop.',
+    confirmLabel: 'Cancel request',
+    cancelLabel: 'Keep',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
   cancellingId.value = request.id;
   try {
     const result = await cancelMediaRequest({ mediaRequestId: request.id });

@@ -3058,6 +3058,19 @@ body {
   cursor: not-allowed;
 }
 
+/* Primary-tone confirm button (significant but non-destructive actions) */
+
+.hx-btn-danger-confirm.hx-btn-primary-confirm:not(:disabled) {
+  background: var(--hx-accent);
+  border-color: var(--hx-accent);
+  color: var(--hx-accent-contrast, #fff);
+}
+
+.hx-btn-danger-confirm.hx-btn-primary-confirm:not(:disabled):hover {
+  background: var(--hx-accent-strong, var(--hx-accent));
+  border-color: var(--hx-accent-strong, var(--hx-accent));
+}
+
 .hx-btn-danger-confirm.is-ready {
   animation: hx-confirm-ready 1.5s ease-in-out 1;
 }

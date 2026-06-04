@@ -18,12 +18,9 @@
 
 import { computed, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { CONFIRM_LEVEL } from '../lib/confirm-intent.js';
 
-export const CONFIRM_LEVEL = Object.freeze({
-  NONE: 'none',
-  CHECKBOX: 'checkbox',
-  TYPE_TO_CONFIRM: 'type_to_confirm',
-});
+export { CONFIRM_LEVEL };
 
 export function useConfirmDialog({
   confirmLevel = CONFIRM_LEVEL.CHECKBOX,

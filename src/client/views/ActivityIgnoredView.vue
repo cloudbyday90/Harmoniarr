@@ -19,6 +19,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useSourceUserIgnore } from '../composables/useSourceUserIgnore.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { fetchSettings, updateSettings } from '../lib/settings-api.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import {
@@ -64,6 +65,8 @@ const {
 } = useSourceUserIgnore();
 
 const visibleEntries = computed(() => filterIgnoredSourceUsers(ignoredSourceUsers.value, filterQuery.value));
+
+const confirm = useConfirm();
 
 async function handleRefresh() {
   await Promise.all([load(), loadAutoApply()]);
@@ -129,6 +132,14 @@ async function handleApplySuggestion(suggestion) {
 }
 
 async function handleRemove(username) {
+  const confirmed = await confirm({
+    title: 'Remove from ignore list?',
+    message: `${formatSourceUsername(username)} will be eligible for acquisition again.`,
+    confirmLabel: 'Remove',
+    cancelLabel: 'Keep ignored',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
   await removeIgnore(username);
 }
 
