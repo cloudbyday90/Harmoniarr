@@ -59,22 +59,27 @@ test('buildPipeline authorizes the request before loading candidates', async (t)
   }]);
 });
 
-test('buildPipeline returns an allowlisted transfer projection without the internal snapshot', async () => {
+test('buildPipeline returns requester-safe candidates without peer, folder, or run diagnostics', async () => {
   const service = createLibraryMediaRequestPipelineService({
     getReadableMediaRequest: async () => ({ id: 'req-1' }),
     pipelineStore: {
       listPipelineCandidates: async () => [{
         id: 'candidate-1',
+        username: 'remote-peer',
+        folderPath: '/private/staging/artist/album',
+        candidateType: 'manual_search',
         status: 'downloading',
+        fileCount: 3,
+        totalSizeBytes: 1200,
         execution: {
           operationRunId: 'run-1',
           importCandidateId: 'candidate-1',
           itemStatus: 'in_progress',
-          statusMessage: 'Downloading',
+          statusMessage: 'Downloading from remote-peer',
           startedAt: '2026-05-31T12:00:00.000Z',
           finishedAt: null,
           runStatus: 'running',
-          runErrorMessage: null,
+          runErrorMessage: '/private/staging/artist/album/private-track.flac failed',
           planningSnapshot: {
             candidate: {
               folderPath: '/private/staging/artist/album',
@@ -104,7 +109,16 @@ test('buildPipeline returns an allowlisted transfer projection without the inter
             },
           },
         },
-        apply: null,
+        apply: {
+          operationRunId: 'apply-run-1',
+          importCandidateId: 'candidate-1',
+          itemStatus: 'pending',
+          statusMessage: 'Apply queued',
+          startedAt: null,
+          finishedAt: null,
+          runStatus: 'pending',
+          runErrorMessage: 'Pending apply diagnostics',
+        },
       }],
     },
   });
@@ -116,13 +130,155 @@ test('buildPipeline returns an allowlisted transfer projection without the inter
   });
   const candidate = result.candidates[0];
 
+  assert.deepEqual(Object.keys(candidate).sort(), [
+    'apply',
+    'execution',
+    'fileCount',
+    'sourceKey',
+    'sourceLabel',
+    'status',
+    'totalSizeBytes',
+    'transferProgress',
+  ].sort());
+  assert.equal(candidate.sourceKey, 'source-1');
+  assert.equal(candidate.sourceLabel, 'Source 1');
+  assert.equal(candidate.fileCount, 3);
+  assert.equal(candidate.totalSizeBytes, 1200);
+  assert.deepEqual(candidate.execution, {
+    finishedAt: null,
+    itemStatus: 'in_progress',
+    runStatus: 'running',
+    startedAt: '2026-05-31T12:00:00.000Z',
+  });
+  assert.deepEqual(candidate.apply, {
+    finishedAt: null,
+    itemStatus: 'pending',
+    runStatus: 'pending',
+    startedAt: null,
+  });
+  assert.deepEqual(candidate.transferProgress, {
+    observedAt: '2026-05-31T12:01:02.000Z',
+    percentComplete: 42,
+    status: 'active',
+  });
+  const serializedCandidate = JSON.stringify(candidate);
+  assert.equal(serializedCandidate.includes('candidate-1'), false);
+  assert.equal(serializedCandidate.includes('run-1'), false);
+  assert.equal(serializedCandidate.includes('remote-peer'), false);
+  assert.equal(serializedCandidate.includes('/private/staging'), false);
+  assert.equal(serializedCandidate.includes('private-track.flac'), false);
+  assert.equal(serializedCandidate.includes('Downloading from'), false);
+  assert.equal(serializedCandidate.includes('failed'), false);
+});
+
+test('buildPipeline preserves operator diagnostics for admin roles', async () => {
+  const service = createLibraryMediaRequestPipelineService({
+    getReadableMediaRequest: async () => ({ id: 'req-1' }),
+    pipelineStore: {
+      listPipelineCandidates: async () => [{
+        id: 'candidate-1',
+        username: 'remote-peer',
+        folderPath: '/private/staging/artist/album',
+        candidateType: 'manual_search',
+        status: 'downloading',
+        fileCount: 3,
+        totalSizeBytes: 1200,
+        execution: {
+          operationRunId: 'run-1',
+          importCandidateId: 'candidate-1',
+          itemStatus: 'in_progress',
+          statusMessage: 'Downloading from remote-peer',
+          startedAt: '2026-05-31T12:00:00.000Z',
+          finishedAt: null,
+          runStatus: 'running',
+          runErrorMessage: '/private/staging/artist/album/private-track.flac failed',
+          planningSnapshot: {
+            execution: {
+              latestTransferSnapshot: {
+                lastReconciledAt: '2026-05-31T12:01:02.000Z',
+                summary: {
+                  percentComplete: 42,
+                  status: 'active',
+                },
+              },
+            },
+          },
+        },
+        apply: null,
+      }],
+    },
+  });
+
+  const result = await service.buildPipeline({
+    actorUserId: 'admin-1',
+    actorUserRole: 'admin',
+    mediaRequestId: 'req-1',
+  });
+  const candidate = result.candidates[0];
+
+  assert.equal(candidate.id, 'candidate-1');
+  assert.equal(candidate.sourceKey, 'candidate-1');
+  assert.equal(candidate.sourceLabel, 'Source 1');
+  assert.equal(candidate.username, 'remote-peer');
+  assert.equal(candidate.folderPath, '/private/staging/artist/album');
+  assert.equal(candidate.candidateType, 'manual_search');
+  assert.deepEqual(candidate.execution, {
+    operationRunId: 'run-1',
+    importCandidateId: 'candidate-1',
+    itemStatus: 'in_progress',
+    statusMessage: 'Downloading from remote-peer',
+    startedAt: '2026-05-31T12:00:00.000Z',
+    finishedAt: null,
+    runStatus: 'running',
+    runErrorMessage: '/private/staging/artist/album/private-track.flac failed',
+  });
   assert.deepEqual(candidate.transferProgress, {
     observedAt: '2026-05-31T12:01:02.000Z',
     percentComplete: 42,
     status: 'active',
   });
   assert.equal('planningSnapshot' in candidate.execution, false);
-  assert.equal(JSON.stringify(candidate).includes('private-track.flac'), false);
+});
+
+test('buildPipeline withholds operator diagnostics for unknown roles', async () => {
+  const service = createLibraryMediaRequestPipelineService({
+    getReadableMediaRequest: async () => ({ id: 'req-1' }),
+    pipelineStore: {
+      listPipelineCandidates: async () => [{
+        id: 'candidate-1',
+        username: 'remote-peer',
+        folderPath: '/private/staging/artist/album',
+        status: 'downloading',
+        fileCount: 1,
+        totalSizeBytes: 100,
+        execution: {
+          operationRunId: 'run-1',
+          importCandidateId: 'candidate-1',
+          itemStatus: 'in_progress',
+          statusMessage: 'Downloading from remote-peer',
+          startedAt: '2026-05-31T12:00:00.000Z',
+          finishedAt: null,
+          runStatus: 'running',
+          runErrorMessage: 'private path failed',
+          planningSnapshot: null,
+        },
+        apply: null,
+      }],
+    },
+  });
+
+  const result = await service.buildPipeline({
+    actorUserId: 'user-1',
+    actorUserRole: null,
+    mediaRequestId: 'req-1',
+  });
+  const candidate = result.candidates[0];
+
+  assert.equal(candidate.sourceLabel, 'Source 1');
+  assert.equal('id' in candidate, false);
+  assert.equal('username' in candidate, false);
+  assert.equal('folderPath' in candidate, false);
+  assert.equal('operationRunId' in candidate.execution, false);
 });
 
 test('buildPipeline does not query pipeline data when request access is denied', async (t) => {

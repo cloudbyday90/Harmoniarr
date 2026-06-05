@@ -41,6 +41,7 @@ import { cancelMediaRequest } from '../lib/library-api.js';
 import {
   candidateStatusLabel,
   candidateStatusTone,
+  formatCandidateSourceLabel,
   formatBytes,
   runItemStatusLabel,
   runItemStatusTone,
@@ -54,6 +55,7 @@ const route = useRoute();
 const router = useRouter();
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+const canOpenImportReview = computed(() => sessionStore.state.user?.role !== 'requester');
 
 const {
   mediaRequest,
@@ -307,10 +309,14 @@ function formatTimestamp(ts) {
         <div class="hx-card-body hx-card-body--flush">
           <p v-if="isLoadingPipeline" class="hx-text-muted rdl-pipeline-loading">Loading pipeline data.</p>
           <div v-else class="rdl-pipeline-list">
-            <details v-for="candidate in pipelineCandidates" :key="candidate.id" class="rdl-candidate">
+            <details
+              v-for="(candidate, index) in pipelineCandidates"
+              :key="candidate.sourceKey ?? candidate.id ?? index"
+              class="rdl-candidate"
+            >
               <summary class="rdl-candidate-summary">
                 <span class="hx-pill" :data-tone="candidateStatusTone(candidate.status)">{{ candidateStatusLabel(candidate.status) }}</span>
-                <span class="rdl-candidate-source">{{ candidate.username ?? 'unknown' }} &mdash; {{ candidate.folderPath?.split(/[/\\]/).pop() ?? 'unknown folder' }}</span>
+                <span class="rdl-candidate-source">{{ formatCandidateSourceLabel(candidate, index) }}</span>
                 <span class="rdl-candidate-meta">{{ candidate.fileCount ?? 0 }} files{{ candidate.totalSizeBytes ? `, ${formatBytes(candidate.totalSizeBytes)}` : '' }}</span>
               </summary>
               <div class="rdl-candidate-body">
@@ -340,6 +346,7 @@ function formatTimestamp(ts) {
                   </div>
                 </dl>
                 <router-link
+                  v-if="canOpenImportReview && candidate.id"
                   :to="{ name: 'activity-candidates', query: { candidate: candidate.id } }"
                   class="hx-btn rdl-candidate-link"
                   data-variant="ghost"
@@ -365,7 +372,7 @@ function formatTimestamp(ts) {
             </div>
             <p class="hx-text-muted" v-if="mediaRequest?.fulfillmentStatus?.detail">{{ mediaRequest.fulfillmentStatus.detail }}</p>
             <router-link
-              v-if="importReviewLink"
+              v-if="canOpenImportReview && importReviewLink"
               :to="importReviewLink"
               class="hx-btn"
               data-variant="ghost"

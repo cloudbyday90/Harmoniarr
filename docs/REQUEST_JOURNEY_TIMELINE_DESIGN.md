@@ -120,6 +120,11 @@ without adding percentage ticks to the live region announcement.
 fresh, stale, and unknown observation states so the Downloading stage does not
 present old persisted progress as a live reading.
 
+`REQUESTER_SAFE_CANDIDATE_LABELS_DESIGN.md` narrows requester-facing pipeline
+candidate labels to generic `Source N` text and moves peer/folder minimization
+to the server projection boundary, while preserving full operator diagnostics
+in Activity and admin/operator views.
+
 ## Future areas
 
 1. **Per-request scoped downloads & transfer actions.** The existing
@@ -131,6 +136,6 @@ present old persisted progress as a live reading.
    progress — instead of a single "Importing" label, and reflect a future
    ClamAV quarantine gate (staging → scan → clean/quarantine) as an explicit
    sub-step.
-3. **Requester-safe candidate labels.** Explore replacing peer/folder labels in
-   requester views with generic source labels while preserving full operator
-   diagnostics in Activity.
+3. **Requester-safe import-candidate detail contract.** Decide whether owned
+   requester access to `/api/v1/import-candidates/:id` should remain available
+   or receive a separate minimal projection aligned with the request journey.

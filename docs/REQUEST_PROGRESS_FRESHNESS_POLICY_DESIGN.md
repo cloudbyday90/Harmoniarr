@@ -145,11 +145,12 @@ retaining useful context for requesters.
 
 ## Future Design Areas
 
-1. **Retry-aware journey messaging.** Distinguish stale active transfer
+1. **Requester-safe candidate labels.** Completed in
+   `REQUESTER_SAFE_CANDIDATE_LABELS_DESIGN.md`; requesters now receive generic
+   source labels from the server pipeline projection while operator diagnostics
+   stay available outside requester views.
+2. **Retry-aware journey messaging.** Distinguish stale active transfer
    progress from "trying another source" after a failed or abandoned candidate.
-2. **Requester-safe candidate labels.** Replace peer/folder labels in requester
-   contexts with generic source labels while retaining operator diagnostics in
-   Activity.
 3. **Importing-stage freshness and explanation.** Apply the same observed-age
    vocabulary to future Importing-stage validation, scan, and quarantine
    progress.

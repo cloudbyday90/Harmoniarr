@@ -218,14 +218,22 @@ suite('integration library media request routes', () => {
       );
       assert.equal(targetPipelineResponse.response.status, 200);
       assert.equal(targetPipelineResponse.payload.candidates.length, 1);
+      assert.equal(targetPipelineResponse.payload.candidates[0].sourceKey, 'source-1');
+      assert.equal(targetPipelineResponse.payload.candidates[0].sourceLabel, 'Source 1');
+      assert.equal('id' in targetPipelineResponse.payload.candidates[0], false);
+      assert.equal('username' in targetPipelineResponse.payload.candidates[0], false);
+      assert.equal('folderPath' in targetPipelineResponse.payload.candidates[0], false);
+      assert.equal('candidateType' in targetPipelineResponse.payload.candidates[0], false);
       assert.deepEqual(targetPipelineResponse.payload.candidates[0].transferProgress, {
         observedAt: '2026-05-04T13:06:00.000Z',
         percentComplete: 42,
         status: 'active',
       });
       assert.equal('planningSnapshot' in targetPipelineResponse.payload.candidates[0].execution, false);
+      assert.equal('operationRunId' in targetPipelineResponse.payload.candidates[0].execution, false);
       assert.equal(JSON.stringify(targetPipelineResponse.payload).includes('/private/staging'), false);
       assert.equal(JSON.stringify(targetPipelineResponse.payload).includes('01 Foil.flac'), false);
+      assert.equal(JSON.stringify(targetPipelineResponse.payload).includes('source-user'), false);
 
       const visibleImportCandidatesResponse = await targetClient.requestJson('/api/v1/import-candidates?status=downloading&limit=10');
       assert.equal(visibleImportCandidatesResponse.response.status, 200);

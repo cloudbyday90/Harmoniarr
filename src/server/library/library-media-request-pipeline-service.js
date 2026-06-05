@@ -17,6 +17,7 @@
  */
 
 import { createLibraryMediaRequestPipelineStore } from './library-media-request-pipeline-store.js';
+import { projectMediaRequestPipelineCandidate } from './library-media-request-pipeline-projection.js';
 import { buildMediaRequestTransferProgress } from './library-media-request-transfer-progress.js';
 
 export function createLibraryMediaRequestPipelineService({
@@ -43,28 +44,13 @@ export function createLibraryMediaRequestPipelineService({
     const candidates = await pipelineStore.listPipelineCandidates({ mediaRequestId });
 
     return {
-      candidates: candidates.map((candidate) => {
-        const execution = candidate.execution
-          ? {
-              operationRunId: candidate.execution.operationRunId,
-              importCandidateId: candidate.execution.importCandidateId,
-              itemStatus: candidate.execution.itemStatus,
-              statusMessage: candidate.execution.statusMessage,
-              startedAt: candidate.execution.startedAt,
-              finishedAt: candidate.execution.finishedAt,
-              runStatus: candidate.execution.runStatus,
-              runErrorMessage: candidate.execution.runErrorMessage,
-            }
-          : null;
-
-        return {
-          ...candidate,
-          execution,
-          transferProgress: buildMediaRequestTransferProgress(
-            candidate.execution?.planningSnapshot,
-          ),
-        };
-      }),
+      candidates: candidates.map((candidate, index) => projectMediaRequestPipelineCandidate(candidate, {
+        actorUserRole,
+        index,
+        transferProgress: buildMediaRequestTransferProgress(
+          candidate.execution?.planningSnapshot,
+        ),
+      })),
     };
   }
 

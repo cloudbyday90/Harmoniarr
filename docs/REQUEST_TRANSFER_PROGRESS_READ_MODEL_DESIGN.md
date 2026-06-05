@@ -191,11 +191,10 @@ Applied here:
 - Internal JSONB is never spread into the response. The service constructs the
   transfer DTO field by field and reconstructs the execution DTO without its
   `planningSnapshot`.
-- The endpoint retains its pre-existing candidate summary contract, including
-  the source username and candidate folder label used by the current request
-  detail UI. This phase prevents additional snapshot disclosure; narrowing the
-  broader candidate contract requires a separate compatibility and product
-  decision.
+- Phase 16 narrows the broader candidate contract for requester sessions in
+  `REQUESTER_SAFE_CANDIDATE_LABELS_DESIGN.md`: requesters receive generic
+  `Source N` labels and minimal run state, while admin/operator sessions retain
+  peer/folder diagnostics.
 - The endpoint remains read-only and session-protected. No CSRF requirement is
   added because GET does not mutate state.
 - The request path makes no outbound call, preventing a polling client from
@@ -250,6 +249,9 @@ coupling them to server projection code.
    single Importing label with safe reasons such as validation, match review,
    tag reconciliation, and a future staging scan/clean/quarantine gate without
    exposing filesystem paths or internal exception details.
-3. **Retry-aware transfer progress.** Distinguish stale progress caused by a
+3. **Requester-safe import-candidate detail contract.** Decide whether owned
+   requester access to import-candidate detail should remain available or be
+   replaced by a minimal request-progress projection.
+4. **Retry-aware transfer progress.** Distinguish stale progress caused by a
    paused or abandoned candidate from active retry progress on a replacement
    candidate.

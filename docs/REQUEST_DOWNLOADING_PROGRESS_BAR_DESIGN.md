@@ -198,14 +198,21 @@ metadata derived from `observedAt`, and `RequestStageProgressBar` marks stale
 or unknown observations without hiding the last known percentage or adding
 polling ticks to the live region announcement.
 
+## Phase 16 Update
+
+`REQUESTER_SAFE_CANDIDATE_LABELS_DESIGN.md` completes the compact
+requester-safe candidate-label area. Requester pipeline responses now carry
+generic `Source N` labels and omit raw peer/folder/run diagnostic fields at the
+server boundary; admin/operator diagnostics remain available.
+
 ## Future Design Areas
 
 1. **Retry-aware journey messaging.** Distinguish "trying another source" from
    a failed Downloading stage when the system has queued a replacement
    candidate.
-2. **Compact requester-safe candidate labels.** Explore replacing peer/folder
-   candidate labels in requester views with generic source labels while keeping
-   operator detail available in Activity.
+2. **Requester-safe import-candidate detail contract.** Decide whether owned
+   requester access to import-candidate detail should remain operator-rich or
+   receive a minimal projection.
 3. **Importing-stage freshness and explanation.** Apply observed-age language
    to validation, scan, and quarantine progress once the Importing stage grows
    a persisted progress projection.

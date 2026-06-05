@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 import {
   candidateStatusLabel,
   candidateStatusTone,
+  formatCandidateSourceLabel,
   formatBytes,
   runItemStatusLabel,
   runItemStatusTone,
@@ -64,6 +65,27 @@ describe('formatBytes', () => {
 
   test('formats gigabytes', () => {
     assert.equal(formatBytes(1073741824), '1.0 GB');
+  });
+});
+
+describe('formatCandidateSourceLabel', () => {
+  test('prefers the server-provided safe source label', () => {
+    assert.equal(formatCandidateSourceLabel({
+      sourceLabel: 'Source 2',
+      username: 'remote-peer',
+      folderPath: 'Artist\\Album',
+    }, 1), 'Source 2');
+  });
+
+  test('falls back to operator peer and folder context when no safe label exists', () => {
+    assert.equal(formatCandidateSourceLabel({
+      username: 'remote-peer',
+      folderPath: 'Artist\\Album',
+    }), 'remote-peer - Album');
+  });
+
+  test('falls back to a generic source label when no source fields exist', () => {
+    assert.equal(formatCandidateSourceLabel({}, 2), 'Source 3');
   });
 });
 

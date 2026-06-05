@@ -58,6 +58,32 @@ export function formatBytes(bytes) {
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+export function formatCandidateSourceLabel(candidate, index = 0) {
+  if (typeof candidate?.sourceLabel === 'string' && candidate.sourceLabel.trim()) {
+    return candidate.sourceLabel.trim();
+  }
+
+  const username = typeof candidate?.username === 'string' && candidate.username.trim()
+    ? candidate.username.trim()
+    : null;
+  const folderPath = typeof candidate?.folderPath === 'string' && candidate.folderPath.trim()
+    ? candidate.folderPath.trim()
+    : null;
+  const folderName = folderPath?.split(/[/\\]/).filter(Boolean).pop() ?? null;
+
+  if (username && folderName) {
+    return `${username} - ${folderName}`;
+  }
+  if (username) {
+    return username;
+  }
+  if (folderName) {
+    return folderName;
+  }
+
+  return `Source ${index + 1}`;
+}
+
 export function runItemStatusLabel(runItem) {
   if (!runItem) return null;
   const status = runItem.itemStatus;
