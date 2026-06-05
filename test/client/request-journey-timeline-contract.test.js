@@ -69,12 +69,19 @@ test('RequestStageProgressBar follows APG progressbar value semantics', async ()
   assert.match(source, /:aria-valuenow="isDeterminate \? percentComplete : undefined"/);
   assert.match(source, /:aria-valuetext="valueText"/);
   assert.match(source, /:aria-describedby="descriptionId"/);
+  assert.match(source, /:data-freshness="freshness"/);
 });
 
 test('RequestStageProgressBar keeps progress text outside the progressbar element', async () => {
   const source = await read(PROGRESS_BAR);
   assert.match(source, /class="rsp-track"[\s\S]*role="progressbar"[\s\S]*>\s*<span class="rsp-fill"/);
   assert.match(source, /<span :id="descriptionId" class="rsp-text">/);
+});
+
+test('RequestStageProgressBar renders observed time with machine-readable datetime', async () => {
+  const source = await read(PROGRESS_BAR);
+  assert.match(source, /<time[\s\S]*v-if="observedAtLabel"[\s\S]*:datetime="progress\.observedAt"/);
+  assert.match(source, /class="rsp-freshness"/);
 });
 
 test('RequestDetailView mounts the journey timeline from existing read models', async () => {

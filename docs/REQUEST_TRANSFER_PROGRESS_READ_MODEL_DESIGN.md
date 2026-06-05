@@ -250,6 +250,6 @@ coupling them to server projection code.
    single Importing label with safe reasons such as validation, match review,
    tag reconciliation, and a future staging scan/clean/quarantine gate without
    exposing filesystem paths or internal exception details.
-3. **Progress freshness policy.** Decide whether stale transfer observations
-   should be visually degraded or hidden after a threshold such as two
-   reconciliation intervals.
+3. **Retry-aware transfer progress.** Distinguish stale progress caused by a
+   paused or abandoned candidate from active retry progress on a replacement
+   candidate.

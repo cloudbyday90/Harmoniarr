@@ -116,6 +116,10 @@ listed future area. The Downloading stage now consumes
 the pure journey library, and renders determinate or indeterminate progress
 without adding percentage ticks to the live region announcement.
 
+`REQUEST_PROGRESS_FRESHNESS_POLICY_DESIGN.md` extends that progress model with
+fresh, stale, and unknown observation states so the Downloading stage does not
+present old persisted progress as a live reading.
+
 ## Future areas
 
 1. **Per-request scoped downloads & transfer actions.** The existing

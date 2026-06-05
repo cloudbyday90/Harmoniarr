@@ -22,6 +22,8 @@ import { test } from 'node:test';
 import {
   JOURNEY_STAGE,
   STAGE_STATUS,
+  TRANSFER_PROGRESS_FRESHNESS,
+  TRANSFER_PROGRESS_STALE_AFTER_MS,
   buildRequestJourney,
   journeyStatusLabel,
   journeyStatusTone,
@@ -79,6 +81,7 @@ test('a downloading candidate marks searching complete and downloading active', 
 test('a downloading candidate carries determinate progress into the downloading stage', () => {
   const journey = buildRequestJourney({
     mediaRequest: { requestState: 'needs_review' },
+    nowMs: Date.parse('2026-05-31T12:01:32.000Z'),
     candidates: [{
       id: 'c1',
       status: 'downloading',
@@ -91,9 +94,12 @@ test('a downloading candidate carries determinate progress into the downloading 
   });
 
   assert.deepEqual(stageByKey(journey, JOURNEY_STAGE.DOWNLOADING).progress, {
+    freshness: TRANSFER_PROGRESS_FRESHNESS.FRESH,
     mode: 'determinate',
+    observedAgeMs: 30000,
     observedAt: '2026-05-31T12:01:02.000Z',
     percentComplete: 42,
+    staleAfterMs: TRANSFER_PROGRESS_STALE_AFTER_MS,
     status: 'active',
   });
 });
@@ -101,6 +107,7 @@ test('a downloading candidate carries determinate progress into the downloading 
 test('active downloading without a known percentage uses indeterminate progress', () => {
   const journey = buildRequestJourney({
     mediaRequest: { requestState: 'needs_review' },
+    nowMs: Date.parse('2026-05-31T12:01:32.000Z'),
     candidates: [{
       id: 'c1',
       status: 'downloading',
@@ -113,9 +120,63 @@ test('active downloading without a known percentage uses indeterminate progress'
   });
 
   assert.deepEqual(stageByKey(journey, JOURNEY_STAGE.DOWNLOADING).progress, {
+    freshness: TRANSFER_PROGRESS_FRESHNESS.FRESH,
     mode: 'indeterminate',
+    observedAgeMs: 30000,
     observedAt: '2026-05-31T12:01:02.000Z',
     percentComplete: null,
+    staleAfterMs: TRANSFER_PROGRESS_STALE_AFTER_MS,
+    status: 'active',
+  });
+});
+
+test('old transfer observations are marked stale without hiding the percentage', () => {
+  const journey = buildRequestJourney({
+    mediaRequest: { requestState: 'needs_review' },
+    nowMs: Date.parse('2026-05-31T12:04:03.000Z'),
+    candidates: [{
+      id: 'c1',
+      status: 'downloading',
+      transferProgress: {
+        observedAt: '2026-05-31T12:01:02.000Z',
+        percentComplete: 42,
+        status: 'active',
+      },
+    }],
+  });
+
+  assert.deepEqual(stageByKey(journey, JOURNEY_STAGE.DOWNLOADING).progress, {
+    freshness: TRANSFER_PROGRESS_FRESHNESS.STALE,
+    mode: 'determinate',
+    observedAgeMs: 181000,
+    observedAt: '2026-05-31T12:01:02.000Z',
+    percentComplete: 42,
+    staleAfterMs: TRANSFER_PROGRESS_STALE_AFTER_MS,
+    status: 'active',
+  });
+});
+
+test('missing transfer observation time is freshness unknown', () => {
+  const journey = buildRequestJourney({
+    mediaRequest: { requestState: 'needs_review' },
+    nowMs: Date.parse('2026-05-31T12:04:03.000Z'),
+    candidates: [{
+      id: 'c1',
+      status: 'downloading',
+      transferProgress: {
+        percentComplete: 42,
+        status: 'active',
+      },
+    }],
+  });
+
+  assert.deepEqual(stageByKey(journey, JOURNEY_STAGE.DOWNLOADING).progress, {
+    freshness: TRANSFER_PROGRESS_FRESHNESS.UNKNOWN,
+    mode: 'determinate',
+    observedAgeMs: null,
+    observedAt: null,
+    percentComplete: 42,
+    staleAfterMs: TRANSFER_PROGRESS_STALE_AFTER_MS,
     status: 'active',
   });
 });

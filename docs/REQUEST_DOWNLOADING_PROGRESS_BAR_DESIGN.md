@@ -190,13 +190,22 @@ when active transfer work exists but no percentage is available. The user sees
 one request-level progress signal, and the request journey remains a pure
 composition of existing read models.
 
+## Phase 15 Update
+
+`REQUEST_PROGRESS_FRESHNESS_POLICY_DESIGN.md` completes the first previously
+listed future design area. The stage progress model now carries freshness
+metadata derived from `observedAt`, and `RequestStageProgressBar` marks stale
+or unknown observations without hiding the last known percentage or adding
+polling ticks to the live region announcement.
+
 ## Future Design Areas
 
-1. **Progress freshness policy.** Decide whether stale observations should be
-   visually degraded after a threshold such as two reconciliation intervals.
-2. **Retry-aware journey messaging.** Distinguish "trying another source" from
+1. **Retry-aware journey messaging.** Distinguish "trying another source" from
    a failed Downloading stage when the system has queued a replacement
    candidate.
-3. **Compact requester-safe candidate labels.** Explore replacing peer/folder
+2. **Compact requester-safe candidate labels.** Explore replacing peer/folder
    candidate labels in requester views with generic source labels while keeping
    operator detail available in Activity.
+3. **Importing-stage freshness and explanation.** Apply observed-age language
+   to validation, scan, and quarantine progress once the Importing stage grows
+   a persisted progress projection.

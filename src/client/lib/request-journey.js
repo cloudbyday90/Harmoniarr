@@ -88,6 +88,14 @@ const STATUS_TONES = Object.freeze({
   [STAGE_STATUS.CANCELLED]: 'muted',
 });
 
+export const TRANSFER_PROGRESS_FRESHNESS = Object.freeze({
+  FRESH: 'fresh',
+  STALE: 'stale',
+  UNKNOWN: 'unknown',
+});
+
+export const TRANSFER_PROGRESS_STALE_AFTER_MS = 120000;
+
 /**
  * Human-readable label for a journey stage status.
  *
@@ -154,14 +162,42 @@ function normalizeTransferPercent(value) {
 
 function observedAtTime(value) {
   if (typeof value !== 'string' || value.length === 0) {
-    return 0;
+    return null;
   }
 
   const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
-function buildDownloadingProgress(candidate) {
+function resolveTransferProgressFreshness({ nowMs, observedAt, staleAfterMs }) {
+  const observedAtMs = observedAtTime(observedAt);
+  if (
+    observedAtMs == null
+    || !Number.isFinite(nowMs)
+    || !Number.isFinite(staleAfterMs)
+    || staleAfterMs < 0
+  ) {
+    return {
+      freshness: TRANSFER_PROGRESS_FRESHNESS.UNKNOWN,
+      observedAgeMs: null,
+      staleAfterMs: Number.isFinite(staleAfterMs) && staleAfterMs >= 0 ? staleAfterMs : null,
+    };
+  }
+
+  const observedAgeMs = Math.max(0, nowMs - observedAtMs);
+  return {
+    freshness: observedAgeMs > staleAfterMs
+      ? TRANSFER_PROGRESS_FRESHNESS.STALE
+      : TRANSFER_PROGRESS_FRESHNESS.FRESH,
+    observedAgeMs,
+    staleAfterMs,
+  };
+}
+
+function buildDownloadingProgress(candidate, {
+  nowMs,
+  staleAfterMs,
+} = {}) {
   if (!candidate) {
     return null;
   }
@@ -174,11 +210,17 @@ function buildDownloadingProgress(candidate) {
   const status = typeof transferProgress?.status === 'string'
     ? transferProgress.status
     : null;
+  const freshness = resolveTransferProgressFreshness({
+    nowMs,
+    observedAt,
+    staleAfterMs,
+  });
 
   if (percentComplete != null) {
     return {
       mode: 'determinate',
       observedAt,
+      ...freshness,
       percentComplete,
       status,
     };
@@ -187,6 +229,7 @@ function buildDownloadingProgress(candidate) {
   return {
     mode: 'indeterminate',
     observedAt,
+    ...freshness,
     percentComplete: null,
     status,
   };
@@ -228,7 +271,12 @@ function resolveSearching({ requestState, candidates }) {
   return { status: STAGE_STATUS.ACTIVE, detail: 'Searching Soulseek for matching sources.' };
 }
 
-function resolveDownloading({ requestState, candidates }) {
+function resolveDownloading({
+  candidates,
+  nowMs,
+  requestState,
+  transferProgressStaleAfterMs,
+}) {
   if (requestState === 'already_exists') {
     return { status: STAGE_STATUS.SKIPPED, detail: 'Already present in the library; no download needed.' };
   }
@@ -251,7 +299,10 @@ function resolveDownloading({ requestState, candidates }) {
     return {
       status: STAGE_STATUS.ACTIVE,
       detail: 'Transferring files from Soulseek.',
-      progress: buildDownloadingProgress(selectDownloadingProgressCandidate(candidates)),
+      progress: buildDownloadingProgress(selectDownloadingProgressCandidate(candidates), {
+        nowMs,
+        staleAfterMs: transferProgressStaleAfterMs,
+      }),
     };
   }
   if (anyDownloadFailed) {
@@ -314,7 +365,12 @@ function resolveLibrary({ requestState, candidates }) {
  * @param {Array<object>} [options.candidates] - linked import candidates.
  * @returns {{ stages: Array<{ key: string, label: string, status: string, detail: string }>, currentStageKey: string|null }}
  */
-export function buildRequestJourney({ mediaRequest, candidates } = {}) {
+export function buildRequestJourney({
+  candidates,
+  mediaRequest,
+  nowMs = Date.now(),
+  transferProgressStaleAfterMs = TRANSFER_PROGRESS_STALE_AFTER_MS,
+} = {}) {
   if (!mediaRequest) {
     return { stages: [], currentStageKey: null };
   }
@@ -331,7 +387,12 @@ export function buildRequestJourney({ mediaRequest, candidates } = {}) {
   const resolvedByKey = {
     [JOURNEY_STAGE.REQUESTED]: requested,
     [JOURNEY_STAGE.SEARCHING]: resolveSearching({ requestState, candidates: normalizedCandidates }),
-    [JOURNEY_STAGE.DOWNLOADING]: resolveDownloading({ requestState, candidates: normalizedCandidates }),
+    [JOURNEY_STAGE.DOWNLOADING]: resolveDownloading({
+      candidates: normalizedCandidates,
+      nowMs,
+      requestState,
+      transferProgressStaleAfterMs,
+    }),
     [JOURNEY_STAGE.IMPORTING]: resolveImporting({ requestState, candidates: normalizedCandidates }),
     [JOURNEY_STAGE.LIBRARY]: resolveLibrary({ requestState, candidates: normalizedCandidates }),
   };
