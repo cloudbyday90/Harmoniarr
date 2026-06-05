@@ -2,7 +2,8 @@
 
 > Phase 13 of the request-experience hardening track. This document covers the
 > requester-safe transfer-progress read model and its persisted-snapshot source.
-> Rendering the APG progress bar remains a separate frontend phase.
+> Phase 14 renders the APG progress bar from this projection in
+> `REQUEST_DOWNLOADING_PROGRESS_BAR_DESIGN.md`.
 
 ## Problem
 
@@ -224,9 +225,10 @@ type mismatch: UUID candidate IDs were compared against `text[]`. Both execution
 and apply lookups now use `ANY($1::uuid[])`, allowing the pipeline endpoint to
 load run items instead of failing once a linked candidate had execution data.
 
-The frontend journey does not render this data yet. That remains intentionally
-separate so progress aggregation and APG semantics can be designed and tested
-without coupling them to the backend projection.
+The frontend journey now renders this data through the Phase 14 Downloading
+progressbar design. That phase remains intentionally separate from this backend
+read model so progress aggregation and APG semantics are tested without
+coupling them to server projection code.
 
 ## Validation
 
@@ -240,15 +242,14 @@ without coupling them to the backend projection.
 
 ## Future Design Areas
 
-1. **APG progress bar and candidate selection policy.** Select the candidate
-   driving the active Downloading stage, carry its projection into
-   `buildRequestJourney`, and render determinate or indeterminate progress
-   without announcing every polling update.
-2. **Requester-scoped transfer actions.** Design cancel, retry, and re-queue
+1. **Requester-scoped transfer actions.** Design cancel, retry, and re-queue
    capabilities with per-request authorization, idempotency, audit events,
    rate limits, and explicit eligibility rules instead of exposing operator
    execution controls.
-3. **Importing-stage explanation and quarantine visibility.** Replace the
+2. **Importing-stage explanation and quarantine visibility.** Replace the
    single Importing label with safe reasons such as validation, match review,
    tag reconciliation, and a future staging scan/clean/quarantine gate without
    exposing filesystem paths or internal exception details.
+3. **Progress freshness policy.** Decide whether stale transfer observations
+   should be visually degraded or hidden after a threshold such as two
+   reconciliation intervals.

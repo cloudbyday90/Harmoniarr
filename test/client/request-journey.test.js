@@ -26,6 +26,7 @@ import {
   journeyStatusLabel,
   journeyStatusTone,
   resolveCurrentStageKey,
+  selectDownloadingProgressCandidate,
 } from '../../src/client/lib/request-journey.js';
 
 function stageByKey(journey, key) {
@@ -73,6 +74,67 @@ test('a downloading candidate marks searching complete and downloading active', 
   assert.equal(statusOf(journey, JOURNEY_STAGE.DOWNLOADING), STAGE_STATUS.ACTIVE);
   assert.equal(statusOf(journey, JOURNEY_STAGE.IMPORTING), STAGE_STATUS.PENDING);
   assert.equal(journey.currentStageKey, JOURNEY_STAGE.DOWNLOADING);
+});
+
+test('a downloading candidate carries determinate progress into the downloading stage', () => {
+  const journey = buildRequestJourney({
+    mediaRequest: { requestState: 'needs_review' },
+    candidates: [{
+      id: 'c1',
+      status: 'downloading',
+      transferProgress: {
+        observedAt: '2026-05-31T12:01:02.000Z',
+        percentComplete: 42,
+        status: 'active',
+      },
+    }],
+  });
+
+  assert.deepEqual(stageByKey(journey, JOURNEY_STAGE.DOWNLOADING).progress, {
+    mode: 'determinate',
+    observedAt: '2026-05-31T12:01:02.000Z',
+    percentComplete: 42,
+    status: 'active',
+  });
+});
+
+test('active downloading without a known percentage uses indeterminate progress', () => {
+  const journey = buildRequestJourney({
+    mediaRequest: { requestState: 'needs_review' },
+    candidates: [{
+      id: 'c1',
+      status: 'downloading',
+      transferProgress: {
+        observedAt: '2026-05-31T12:01:02.000Z',
+        percentComplete: null,
+        status: 'active',
+      },
+    }],
+  });
+
+  assert.deepEqual(stageByKey(journey, JOURNEY_STAGE.DOWNLOADING).progress, {
+    mode: 'indeterminate',
+    observedAt: '2026-05-31T12:01:02.000Z',
+    percentComplete: null,
+    status: 'active',
+  });
+});
+
+test('progress stays off completed downloading stages to avoid stale percentages', () => {
+  const journey = buildRequestJourney({
+    mediaRequest: { requestState: 'needs_review' },
+    candidates: [{
+      id: 'c1',
+      status: 'import_pending',
+      transferProgress: {
+        observedAt: '2026-05-31T12:01:02.000Z',
+        percentComplete: 100,
+        status: 'completed',
+      },
+    }],
+  });
+
+  assert.equal(stageByKey(journey, JOURNEY_STAGE.DOWNLOADING).progress, null);
 });
 
 test('an import_pending candidate completes downloading and waits on importing', () => {
@@ -156,6 +218,40 @@ test('aggregates the most-progressed candidate across multiple candidates', () =
     ],
   });
   assert.equal(statusOf(journey, JOURNEY_STAGE.LIBRARY), STAGE_STATUS.COMPLETE);
+});
+
+test('selectDownloadingProgressCandidate prefers determinate active progress', () => {
+  const selected = selectDownloadingProgressCandidate([
+    {
+      id: 'queued',
+      status: 'downloading',
+      transferProgress: { observedAt: '2026-05-31T12:05:00.000Z', percentComplete: null },
+    },
+    {
+      id: 'older',
+      status: 'downloading',
+      transferProgress: { observedAt: '2026-05-31T12:00:00.000Z', percentComplete: 40 },
+    },
+    {
+      id: 'newer',
+      status: 'downloading',
+      transferProgress: { observedAt: '2026-05-31T12:01:00.000Z', percentComplete: 40 },
+    },
+    {
+      id: 'higher',
+      status: 'downloading',
+      transferProgress: { observedAt: '2026-05-31T11:59:00.000Z', percentComplete: 70 },
+    },
+  ]);
+
+  assert.equal(selected.id, 'higher');
+});
+
+test('selectDownloadingProgressCandidate ignores non-active candidates', () => {
+  assert.equal(selectDownloadingProgressCandidate([
+    { id: 'pending', status: 'selected', transferProgress: { percentComplete: 80 } },
+    { id: 'done', status: 'import_pending', transferProgress: { percentComplete: 100 } },
+  ]), null);
 });
 
 test('exactly one stage is ever the current stage', () => {

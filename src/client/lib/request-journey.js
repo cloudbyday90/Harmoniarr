@@ -135,6 +135,84 @@ function runCompleted(runItem) {
   return runItem.runStatus === 'completed' && runItem.itemStatus === 'completed';
 }
 
+function candidateDownloadActive(candidate) {
+  return candidate?.status === 'downloading' || runActive(candidate?.execution);
+}
+
+function normalizeTransferPercent(value) {
+  if (value == null || (typeof value === 'string' && value.trim() === '')) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function observedAtTime(value) {
+  if (typeof value !== 'string' || value.length === 0) {
+    return 0;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function buildDownloadingProgress(candidate) {
+  if (!candidate) {
+    return null;
+  }
+
+  const transferProgress = candidate.transferProgress ?? null;
+  const percentComplete = normalizeTransferPercent(transferProgress?.percentComplete);
+  const observedAt = typeof transferProgress?.observedAt === 'string'
+    ? transferProgress.observedAt
+    : null;
+  const status = typeof transferProgress?.status === 'string'
+    ? transferProgress.status
+    : null;
+
+  if (percentComplete != null) {
+    return {
+      mode: 'determinate',
+      observedAt,
+      percentComplete,
+      status,
+    };
+  }
+
+  return {
+    mode: 'indeterminate',
+    observedAt,
+    percentComplete: null,
+    status,
+  };
+}
+
+function compareDownloadingProgressCandidate(left, right) {
+  const leftPercent = normalizeTransferPercent(left?.transferProgress?.percentComplete);
+  const rightPercent = normalizeTransferPercent(right?.transferProgress?.percentComplete);
+
+  if (leftPercent != null && rightPercent == null) return -1;
+  if (leftPercent == null && rightPercent != null) return 1;
+  if (leftPercent != null && rightPercent != null && leftPercent !== rightPercent) {
+    return rightPercent - leftPercent;
+  }
+
+  const leftObservedAt = observedAtTime(left?.transferProgress?.observedAt);
+  const rightObservedAt = observedAtTime(right?.transferProgress?.observedAt);
+  return rightObservedAt - leftObservedAt;
+}
+
+export function selectDownloadingProgressCandidate(candidates) {
+  return asArray(candidates)
+    .filter(candidateDownloadActive)
+    .sort(compareDownloadingProgressCandidate)[0] ?? null;
+}
+
 // ── Per-stage resolution ─────────────────────────────────────────────────────
 
 function resolveSearching({ requestState, candidates }) {
@@ -170,7 +248,11 @@ function resolveDownloading({ requestState, candidates }) {
     return { status: STAGE_STATUS.COMPLETE, detail: 'Download finished.' };
   }
   if (anyDownloading) {
-    return { status: STAGE_STATUS.ACTIVE, detail: 'Transferring files from Soulseek.' };
+    return {
+      status: STAGE_STATUS.ACTIVE,
+      detail: 'Transferring files from Soulseek.',
+      progress: buildDownloadingProgress(selectDownloadingProgressCandidate(candidates)),
+    };
   }
   if (anyDownloadFailed) {
     return { status: STAGE_STATUS.FAILED, detail: 'A download failed; Harmoniarr may retry another source.' };
@@ -259,6 +341,7 @@ export function buildRequestJourney({ mediaRequest, candidates } = {}) {
     label: STAGE_LABELS[key],
     status: resolvedByKey[key].status,
     detail: resolvedByKey[key].detail,
+    progress: resolvedByKey[key].progress ?? null,
   }));
 
   return {

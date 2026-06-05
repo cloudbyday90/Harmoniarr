@@ -21,6 +21,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const TIMELINE = new URL('../../src/client/components/RequestJourneyTimeline.vue', import.meta.url);
+const PROGRESS_BAR = new URL('../../src/client/components/RequestStageProgressBar.vue', import.meta.url);
 const REQUEST_DETAIL = new URL('../../src/client/views/RequestDetailView.vue', import.meta.url);
 
 async function read(url) {
@@ -51,6 +52,29 @@ test('RequestJourneyTimeline derives tone and label from the pure journey lib', 
   assert.match(source, /from '\.\.\/lib\/request-journey\.js'/);
   assert.match(source, /journeyStatusLabel/);
   assert.match(source, /journeyStatusTone/);
+});
+
+test('RequestJourneyTimeline renders stage progress when the journey model provides it', async () => {
+  const source = await read(TIMELINE);
+  assert.match(source, /import RequestStageProgressBar from '\.\/RequestStageProgressBar\.vue'/);
+  assert.match(source, /v-if="stage\.progress"/);
+  assert.match(source, /:progress="stage\.progress"/);
+});
+
+test('RequestStageProgressBar follows APG progressbar value semantics', async () => {
+  const source = await read(PROGRESS_BAR);
+  assert.match(source, /role="progressbar"/);
+  assert.match(source, /aria-valuemin="0"/);
+  assert.match(source, /aria-valuemax="100"/);
+  assert.match(source, /:aria-valuenow="isDeterminate \? percentComplete : undefined"/);
+  assert.match(source, /:aria-valuetext="valueText"/);
+  assert.match(source, /:aria-describedby="descriptionId"/);
+});
+
+test('RequestStageProgressBar keeps progress text outside the progressbar element', async () => {
+  const source = await read(PROGRESS_BAR);
+  assert.match(source, /class="rsp-track"[\s\S]*role="progressbar"[\s\S]*>\s*<span class="rsp-fill"/);
+  assert.match(source, /<span :id="descriptionId" class="rsp-text">/);
 });
 
 test('RequestDetailView mounts the journey timeline from existing read models', async () => {

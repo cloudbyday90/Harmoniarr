@@ -38,11 +38,11 @@ Findings from the WAI-ARIA Authoring Practices Guide (APG):
   the set carries `aria-current`.
 - **Quantitative progress → `progressbar` role.** `aria-valuenow` with implicit
   `aria-valuemin=0` / `aria-valuemax=100`, `aria-valuetext` for a human string,
-  and the value omitted when indeterminate. At the time of Phase 12, the
-  pipeline read model did not expose a per-candidate transfer percent. Phase 13
-  adds the requester-safe persisted projection documented in
-  `REQUEST_TRANSFER_PROGRESS_READ_MODEL_DESIGN.md`; rendering remains a future
-  frontend phase.
+  and the value omitted when indeterminate. Phase 13 added the requester-safe
+  persisted projection documented in
+  `REQUEST_TRANSFER_PROGRESS_READ_MODEL_DESIGN.md`; Phase 14 renders that value
+  in the Downloading stage as documented in
+  `REQUEST_DOWNLOADING_PROGRESS_BAR_DESIGN.md`.
 - **Status changes → polite live region.** Announce stage transitions with
   `aria-live="polite"` / `role="status"`.
 - Because the journey is **non-interactive** (it only reports state), no keyboard
@@ -87,6 +87,7 @@ stage.
 | --- | --- |
 | `src/client/lib/request-journey.js` | Pure, framework-free derivation: `JOURNEY_STAGE`, `STAGE_STATUS`, `journeyStatusLabel`, `journeyStatusTone`, `resolveCurrentStageKey`, `buildRequestJourney`. |
 | `src/client/components/RequestJourneyTimeline.vue` | Presentational `<ol>` timeline; `aria-current="step"` on the active step; polite live region; design-token styling. |
+| `src/client/components/RequestStageProgressBar.vue` | Phase 14 APG progressbar for Downloading-stage persisted transfer progress. |
 | `src/client/views/RequestDetailView.vue` | Wires the timeline in after the stat grid, composed from `mediaRequest` + `pipelineCandidates`. |
 | `test/client/request-journey.test.js` | Pure unit tests across every state. |
 | `test/client/request-journey-timeline-contract.test.js` | a11y / wiring contract assertions. |
@@ -107,20 +108,25 @@ stage.
   without a container runtime, as expected).
 - `node scripts/check-copyright.js` — GPL headers present on all new files.
 
+## Phase 14 Update
+
+`REQUEST_DOWNLOADING_PROGRESS_BAR_DESIGN.md` completes the first previously
+listed future area. The Downloading stage now consumes
+`candidate.transferProgress`, selects the active progress-driving candidate in
+the pure journey library, and renders determinate or indeterminate progress
+without adding percentage ticks to the live region announcement.
+
 ## Future areas
 
-1. **Persisted transfer percentage in the Downloading stage.** Consume the
-   Phase 13 `candidate.transferProgress` projection as an APG `progressbar`
-   (`aria-valuenow` / `aria-valuetext`, indeterminate when unknown) inside the
-   Downloading stage. The UI must select the candidate driving the active stage
-   and treat `observedAt` as near-live observation time rather than claiming a
-   request-time slskd reading.
-2. **Per-request scoped downloads & transfer actions.** The existing
+1. **Per-request scoped downloads & transfer actions.** The existing
    `ActivityDownloadsView` is admin-global and read-only. A requester-scoped
    view (cancel / retry / re-queue a specific transfer) would let the journey's
    Downloading stage become actionable.
-3. **Analyze-stage visibility.** Make the Importing stage explain *why* it is
+2. **Analyze-stage visibility.** Make the Importing stage explain *why* it is
    waiting — match confidence, tag reconciliation, transcode/validation
    progress — instead of a single "Importing" label, and reflect a future
    ClamAV quarantine gate (staging → scan → clean/quarantine) as an explicit
    sub-step.
+3. **Requester-safe candidate labels.** Explore replacing peer/folder labels in
+   requester views with generic source labels while preserving full operator
+   diagnostics in Activity.

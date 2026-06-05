@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import RequestStageProgressBar from './RequestStageProgressBar.vue';
 import { journeyStatusLabel, journeyStatusTone } from '../lib/request-journey.js';
 
 const props = defineProps({
@@ -62,6 +63,11 @@ const announcement = computed(() => {
             <span class="hx-pill" :data-tone="journeyStatusTone(stage.status)">{{ journeyStatusLabel(stage.status) }}</span>
           </span>
           <span class="rjt-detail">{{ stage.detail }}</span>
+          <RequestStageProgressBar
+            v-if="stage.progress"
+            :label="`${stage.label} progress`"
+            :progress="stage.progress"
+          />
         </span>
       </li>
     </ol>
