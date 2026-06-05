@@ -4,6 +4,7 @@ import { createIntegrationAppRuntime } from '../../testing/integration/app-runti
 import { bootstrapAdminSession, loginWithPassword } from '../../testing/integration/auth-helpers.js';
 import { seedImportCandidateFixture } from '../../testing/integration/import-candidate-fixtures.js';
 import { seedMetadataReleaseFixture } from '../../testing/integration/metadata-fixtures.js';
+import { seedOperationRunFixture } from '../../testing/integration/operation-run-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -129,6 +130,55 @@ suite('integration library media request routes', () => {
         queryable: getPoolFn(),
       });
 
+      const executionRun = await seedOperationRunFixture({
+        queryable: getPoolFn(),
+        runOverrides: {
+          operationType: 'import_candidate_execution_planning',
+          startedAt: '2026-05-04T13:05:00.000Z',
+          status: 'completed',
+        },
+      });
+      await getPoolFn().query(
+        `
+          INSERT INTO import_execution_run_items (
+            operation_run_id,
+            import_candidate_id,
+            position,
+            item_status,
+            status_message,
+            planning_snapshot
+          )
+          VALUES ($1, $2, 1, 'queued', 'Downloading', $3::jsonb)
+        `,
+        [
+          executionRun.id,
+          linkedCandidate.id,
+          JSON.stringify({
+            candidate: {
+              folderPath: '/private/staging/Autechre/Amber',
+              username: 'source-user',
+            },
+            execution: {
+              enqueuedTransfers: [{
+                filename: '01 Foil.flac',
+                id: 'transfer-1',
+                username: 'source-user',
+              }],
+              latestTransferSnapshot: {
+                lastReconciledAt: '2026-05-04T13:06:00.000Z',
+                summary: {
+                  bytesTransferred: 17_640_000,
+                  message: '1 transfer is actively progressing.',
+                  percentComplete: 42,
+                  status: 'active',
+                  totalBytes: 42_000_000,
+                },
+              },
+            },
+          }),
+        ],
+      );
+
       const targetClient = createSessionHttpClient(baseUrl, {
         requestTimeoutMs: integrationRuntimeConfig.httpRequestTimeoutMs,
       });
@@ -163,6 +213,20 @@ suite('integration library media request routes', () => {
       assert.equal(targetListResponse.payload.mediaRequests[0].requestedForUser.username, 'listener-target');
       assert.equal(targetListResponse.payload.mediaRequests[0].fulfillmentStatus.code, 'downloading');
 
+      const targetPipelineResponse = await targetClient.requestJson(
+        `/api/v1/library/media-requests/${mediaRequest.id}/pipeline`,
+      );
+      assert.equal(targetPipelineResponse.response.status, 200);
+      assert.equal(targetPipelineResponse.payload.candidates.length, 1);
+      assert.deepEqual(targetPipelineResponse.payload.candidates[0].transferProgress, {
+        observedAt: '2026-05-04T13:06:00.000Z',
+        percentComplete: 42,
+        status: 'active',
+      });
+      assert.equal('planningSnapshot' in targetPipelineResponse.payload.candidates[0].execution, false);
+      assert.equal(JSON.stringify(targetPipelineResponse.payload).includes('/private/staging'), false);
+      assert.equal(JSON.stringify(targetPipelineResponse.payload).includes('01 Foil.flac'), false);
+
       const visibleImportCandidatesResponse = await targetClient.requestJson('/api/v1/import-candidates?status=downloading&limit=10');
       assert.equal(visibleImportCandidatesResponse.response.status, 200);
       assert.equal(visibleImportCandidatesResponse.payload.importCandidates.pagination.total, 1);
@@ -179,6 +243,26 @@ suite('integration library media request routes', () => {
       const hiddenDetailResponse = await targetClient.requestJson(`/api/v1/import-candidates/${unrelatedCandidate.id}`);
       assert.equal(hiddenDetailResponse.response.status, 404);
       assert.equal(hiddenDetailResponse.payload.error.code, 'import_candidate_not_found');
+
+      const unrelatedUser = await createRequesterUser(client, {
+        password: 'UnrelatedPass123!',
+        username: 'listener-unrelated',
+      });
+      assert.ok(unrelatedUser.id);
+      const unrelatedClient = createSessionHttpClient(baseUrl, {
+        requestTimeoutMs: integrationRuntimeConfig.httpRequestTimeoutMs,
+      });
+      const unrelatedLoginResponse = await loginWithPassword(unrelatedClient, {
+        password: 'UnrelatedPass123!',
+        username: 'listener-unrelated',
+      });
+      assert.equal(unrelatedLoginResponse.response.status, 200);
+
+      const hiddenPipelineResponse = await unrelatedClient.requestJson(
+        `/api/v1/library/media-requests/${mediaRequest.id}/pipeline`,
+      );
+      assert.equal(hiddenPipelineResponse.response.status, 404);
+      assert.equal(hiddenPipelineResponse.payload.error.code, 'media_request_not_found');
     }, {
       scenarioName: 'delegated_media_request_visibility',
     });

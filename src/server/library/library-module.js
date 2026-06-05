@@ -47,6 +47,7 @@ import { createLibraryFileMatchStore } from './library-file-match-store.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
 import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
 import { createLibraryMediaRequestPipelineService } from './library-media-request-pipeline-service.js';
+import { createLibraryMediaRequestPipelineStore } from './library-media-request-pipeline-store.js';
 import { createLibraryMediaRequestBulkCancelService } from './library-media-request-bulk-cancel-service.js';
 import { createLibraryMediaRequestService } from './library-media-request-service.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
@@ -117,7 +118,8 @@ export function createLibraryModule({
     getMediaRequestById: libraryMediaRequestStore.getMediaRequestById,
   }),
   libraryMediaRequestNotificationService = createLibraryMediaRequestNotificationService(),
-  libraryMediaRequestPipelineService = createLibraryMediaRequestPipelineService(),
+  libraryMediaRequestPipelineService = null,
+  libraryMediaRequestPipelineStore = createLibraryMediaRequestPipelineStore(),
   providerClientResolverService = createProviderClientResolverService(),
   libraryProviderIngestRequestStore = createLibraryProviderIngestRequestStore(),
   maintenanceLockService = createMaintenanceLockService(),
@@ -361,6 +363,12 @@ export function createLibraryModule({
     settingsService,
   }),
 } = {}) {
+  const resolvedLibraryMediaRequestPipelineService = libraryMediaRequestPipelineService
+    ?? createLibraryMediaRequestPipelineService({
+      getReadableMediaRequest: libraryMediaRequestService.getReadableMediaRequest,
+      pipelineStore: libraryMediaRequestPipelineStore,
+    });
+
   return {
     libraryCatalogStore,
     libraryDiscoveryDispatchService,
@@ -382,6 +390,8 @@ export function createLibraryModule({
     libraryExternalIntakeWorker,
     libraryMediaRequestService,
     libraryMediaRequestBulkCancelService,
+    libraryMediaRequestPipelineService: resolvedLibraryMediaRequestPipelineService,
+    libraryMediaRequestPipelineStore,
     libraryMediaRequestStore,
     libraryOrganizeApplyRunStore,
     libraryOrganizeApplyService,
@@ -420,7 +430,7 @@ export function createLibraryModule({
       buildLibraryWantedReleases: libraryWantedSummaryService.buildLibraryWantedReleases,
       buildReleaseRadar: libraryReleaseRadarService.buildReleaseRadar,
       buildMediaRequestDetail: libraryMediaRequestService.buildMediaRequestDetail,
-      buildMediaRequestPipeline: libraryMediaRequestPipelineService.buildPipeline,
+      buildMediaRequestPipeline: resolvedLibraryMediaRequestPipelineService.buildPipeline,
       buildMediaRequestSummary: libraryMediaRequestService.buildMediaRequestSummary,
       bulkCancelMediaRequests: libraryMediaRequestBulkCancelService.bulkCancelMediaRequests,
       buildLibraryReconciliationSummary: libraryReconciliationSummaryService.buildLibraryReconciliationSummary,

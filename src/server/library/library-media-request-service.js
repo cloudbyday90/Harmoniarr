@@ -25,6 +25,7 @@ import { createLibraryMediaRequestFulfillmentService } from './library-media-req
 import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
 import { createLibraryReleaseAvailabilityStore } from './library-release-availability-store.js';
 import { createLibraryMediaRequestStore } from './library-media-request-store.js';
+import { canReadMediaRequest } from './library-media-request-access-policy.js';
 
 const supportedExternalProviders = new Map([
   ['spotify.com', 'spotify'],
@@ -338,6 +339,20 @@ export function createLibraryMediaRequestService({
   recordAuditEventFn = recordAuditEvent,
   onRequestCreatedFn = null,
 } = {}) {
+  async function getReadableMediaRequest({
+    actorUserId,
+    actorUserRole,
+    mediaRequestId,
+  }) {
+    const mediaRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
+
+    if (!canReadMediaRequest({ actorUserId, actorUserRole, mediaRequest })) {
+      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
+    }
+
+    return mediaRequest;
+  }
+
   async function resolveRequestedForUserId({ actorUserId, actorUserRole, requestedForUserId }) {
     const normalizedRequestedForUserId = normalizeOptionalUserId(requestedForUserId, 'requestedForUserId');
 
@@ -863,16 +878,31 @@ export function createLibraryMediaRequestService({
     return result.events;
   }
 
-  async function listMediaRequestEventsPage({ mediaRequestId, cursor, limit = 50 }) {
+  async function listMediaRequestEventsPage({
+    actorUserId,
+    actorUserRole,
+    mediaRequestId,
+    cursor,
+    limit = 50,
+  }) {
+    await getReadableMediaRequest({
+      actorUserId,
+      actorUserRole,
+      mediaRequestId,
+    });
     return mediaRequestStore.listMediaRequestEvents({ mediaRequestId, cursor, limit });
   }
 
-  async function buildMediaRequestDetail({ mediaRequestId }) {
-    const mediaRequest = await mediaRequestStore.getMediaRequestById({ mediaRequestId });
-
-    if (!mediaRequest) {
-      throw createApiError(404, 'media_request_not_found', 'The specified media request could not be found');
-    }
+  async function buildMediaRequestDetail({
+    actorUserId,
+    actorUserRole,
+    mediaRequestId,
+  }) {
+    const mediaRequest = await getReadableMediaRequest({
+      actorUserId,
+      actorUserRole,
+      mediaRequestId,
+    });
 
     const [enriched] = await mediaRequestFulfillmentService.enrichMediaRequests([mediaRequest]);
     const eventResult = await mediaRequestStore.listMediaRequestEvents({ mediaRequestId, limit: 50 });
@@ -1019,6 +1049,7 @@ export function createLibraryMediaRequestService({
     buildMediaRequestSummary,
     cancelMediaRequest,
     createMediaRequest,
+    getReadableMediaRequest,
     getMediaRequestReassignmentHistory,
     listMediaRequestEventsPage,
     listMediaRequests,

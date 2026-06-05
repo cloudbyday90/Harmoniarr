@@ -89,6 +89,9 @@ function createLibraryRouteTestApp(overrides = {}) {
           nextCursor: null,
         };
       },
+      buildMediaRequestPipeline: async () => ({
+        candidates: [],
+      }),
       buildLibraryReconciliationSummary: async () => ({
         fileCounts: {
           ambiguous: 1,
@@ -478,7 +481,38 @@ test('media request detail route returns enriched request with events', async (t
     assert.equal(payload.events.length, 1);
     assert.equal(payload.hasMoreEvents, false);
     assert.equal(payload.nextCursor, null);
-    assert.equal(buildMediaRequestDetail.mock.calls[0].arguments[0].mediaRequestId, 'req-42');
+    assert.deepEqual(buildMediaRequestDetail.mock.calls[0].arguments, [{
+      actorUserId: 'user-1',
+      actorUserRole: 'requester',
+      mediaRequestId: 'req-42',
+    }]);
+  });
+});
+
+test('media request pipeline route passes request-read identity and returns candidates', async (t) => {
+  const buildMediaRequestPipeline = t.mock.fn(async () => ({
+    candidates: [{
+      id: 'candidate-1',
+      transferProgress: {
+        observedAt: '2026-05-31T12:01:02.000Z',
+        percentComplete: 42,
+        status: 'active',
+      },
+    }],
+  }));
+  const app = createLibraryRouteTestApp({ buildMediaRequestPipeline });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/media-requests/req-42/pipeline`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.candidates[0].transferProgress.percentComplete, 42);
+    assert.deepEqual(buildMediaRequestPipeline.mock.calls[0].arguments, [{
+      actorUserId: 'user-1',
+      actorUserRole: 'requester',
+      mediaRequestId: 'req-42',
+    }]);
   });
 });
 
@@ -520,6 +554,8 @@ test('media request events route returns paginated events with cursor', async (t
     assert.equal(callArgs.mediaRequestId, 'req-1');
     assert.equal(callArgs.cursor, 'abc');
     assert.equal(callArgs.limit, 25);
+    assert.equal(callArgs.actorUserId, 'user-1');
+    assert.equal(callArgs.actorUserRole, 'requester');
   });
 });
 

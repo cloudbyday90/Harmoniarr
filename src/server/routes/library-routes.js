@@ -125,9 +125,11 @@ export function registerLibraryRoutes(app, {
   }));
 
   app.get('/api/v1/library/media-requests/:mediaRequestId', asyncRoute(async (request, response) => {
-    await requireSession(request);
+    const session = await requireSession(request);
 
     const detail = await buildMediaRequestDetail({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
       mediaRequestId: request.params.mediaRequestId,
     });
 
@@ -141,9 +143,11 @@ export function registerLibraryRoutes(app, {
   }));
 
   app.get('/api/v1/library/media-requests/:mediaRequestId/pipeline', asyncRoute(async (request, response) => {
-    await requireSession(request);
+    const session = await requireSession(request);
 
     const pipeline = await buildMediaRequestPipeline({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
       mediaRequestId: request.params.mediaRequestId,
     });
 
@@ -154,9 +158,11 @@ export function registerLibraryRoutes(app, {
   }));
 
   app.get('/api/v1/library/media-requests/:mediaRequestId/events', asyncRoute(async (request, response) => {
-    await requireSession(request);
+    const session = await requireSession(request);
     const { cursor, limit } = request.query;
     const result = await listMediaRequestEventsPage({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
       mediaRequestId: request.params.mediaRequestId,
       cursor: typeof cursor === 'string' && cursor.length > 0 ? cursor : null,
       limit: sanitizePageLimit(limit, { default: 50, max: 100 }),

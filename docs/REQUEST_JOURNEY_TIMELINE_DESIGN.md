@@ -38,9 +38,11 @@ Findings from the WAI-ARIA Authoring Practices Guide (APG):
   the set carries `aria-current`.
 - **Quantitative progress → `progressbar` role.** `aria-valuenow` with implicit
   `aria-valuemin=0` / `aria-valuemax=100`, `aria-valuetext` for a human string,
-  and the value omitted when indeterminate. (Reserved for a future phase — see
-  Future areas — because the current pipeline read model does not expose a
-  per-candidate transfer percent.)
+  and the value omitted when indeterminate. At the time of Phase 12, the
+  pipeline read model did not expose a per-candidate transfer percent. Phase 13
+  adds the requester-safe persisted projection documented in
+  `REQUEST_TRANSFER_PROGRESS_READ_MODEL_DESIGN.md`; rendering remains a future
+  frontend phase.
 - **Status changes → polite live region.** Announce stage transitions with
   `aria-live="polite"` / `role="status"`.
 - Because the journey is **non-interactive** (it only reports state), no keyboard
@@ -107,11 +109,12 @@ stage.
 
 ## Future areas
 
-1. **Live transfer percentage in the Downloading stage.** Surface the server
-   `liveTransferSummary.percentComplete` as an APG `progressbar`
+1. **Persisted transfer percentage in the Downloading stage.** Consume the
+   Phase 13 `candidate.transferProgress` projection as an APG `progressbar`
    (`aria-valuenow` / `aria-valuetext`, indeterminate when unknown) inside the
-   Downloading stage, so the spine shows a real percentage, not just "in
-   progress."
+   Downloading stage. The UI must select the candidate driving the active stage
+   and treat `observedAt` as near-live observation time rather than claiming a
+   request-time slskd reading.
 2. **Per-request scoped downloads & transfer actions.** The existing
    `ActivityDownloadsView` is admin-global and read-only. A requester-scoped
    view (cancel / retry / re-queue a specific transfer) would let the journey's
