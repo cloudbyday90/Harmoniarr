@@ -23,7 +23,6 @@ import { sessionStore } from './state/session.js';
 
 const ActivityBlocklistView = () => import('./views/ActivityBlocklistView.vue');
 const AccountSecurityView = () => import('./views/AccountSecurityView.vue');
-const ActivityDownloadsView = () => import('./views/ActivityDownloadsView.vue');
 const ActivityFeedView = () => import('./views/ActivityFeedView.vue');
 const ActivityHistoryView = () => import('./views/ActivityHistoryView.vue');
 const ActivityIgnoredView = () => import('./views/ActivityIgnoredView.vue');
@@ -47,6 +46,7 @@ const OperationsView = () => import('./views/OperationsView.vue');
 const RecoveryView = () => import('./views/RecoveryView.vue');
 const RecoveryWorkspaceView = () => import('./views/RecoveryWorkspaceView.vue');
 const DiscoverView = () => import('./views/DiscoverView.vue');
+const DownloaderView = () => import('./views/DownloaderView.vue');
 const MyRequestsView = () => import('./views/MyRequestsView.vue');
 const RequestDetailView = () => import('./views/RequestDetailView.vue');
 const RequestMusicView = () => import('./views/RequestMusicView.vue');
@@ -77,6 +77,7 @@ const requesterRestrictedRouteNames = new Set([
   'activity-ignored',
   'activity-failed',
   'activity-monitored-artists',
+  'downloader',
   'settings',
   'settings-connections',
   'settings-media-storage',
@@ -112,6 +113,7 @@ const router = createRouter({
         { path: 'discover', name: 'discover', component: DiscoverView },
         { path: 'library', name: 'library', component: LibraryView },
         { path: 'missing', name: 'missing', component: MissingView },
+        { path: 'downloader', name: 'downloader', component: DownloaderView },
         { path: 'search', name: 'search', component: SearchView },
         { path: 'requests', name: 'request-music', component: RequestMusicView },
         { path: 'requests/:id', name: 'request-detail', component: RequestDetailView },
@@ -128,7 +130,7 @@ const router = createRouter({
             { path: 'requests', name: 'activity-requests', component: RequestMusicView },
             { path: 'queue', name: 'activity-queue', redirect: { name: 'activity-operations' } },
             { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
-            { path: 'downloads', name: 'activity-downloads', component: ActivityDownloadsView },
+            { path: 'downloads', name: 'activity-downloads', redirect: (to) => ({ name: 'downloader', query: to.query, hash: to.hash }) },
             { path: 'imports', name: 'activity-imports', component: ActivityImportsView },
             { path: 'releases', name: 'activity-releases', component: ActivityReleasesView },
             { path: 'feed', name: 'activity-feed', component: ActivityFeedView },

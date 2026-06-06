@@ -17,7 +17,7 @@
  */
 
 /**
- * Activity → Downloads screen presentation helpers.
+ * Downloader screen presentation helpers.
  *
  * Pure functions only — no Vue, no reactive state, no side-effects.
  * All UI string literals live here so they can be tested independently
@@ -26,6 +26,10 @@
  * The Soulseek transfer state machine uses PascalCase enum names sourced
  * from the slskd API. These helpers translate them to plain English labels
  * and UI affordances appropriate for a self-hosting admin.
+ *
+ * These helpers translate the download client transfer state into the
+ * operator-facing Downloader page without coupling Vue components to the
+ * upstream response shape.
  */
 
 // ── Soulseek transfer state classification ───────────────────────────────────
@@ -35,6 +39,7 @@
  * Matches slskd TransferStates: InProgress, Queued, Initializing, Negotiating.
  */
 const ACTIVE_STATE_RE = /InProgress|Queued|Initializing|Negotiating/i;
+const QUEUED_STATE_RE = /Queued/i;
 
 /**
  * States where a transfer finished normally without error.
@@ -56,6 +61,17 @@ const FAILED_STATE_RE = /Errored|Cancelled|Rejected|TimedOut|Aborted/i;
  */
 export function isActiveTransferState(state) {
   return typeof state === 'string' && ACTIVE_STATE_RE.test(state);
+}
+
+/**
+ * Returns true if the slskd transfer state string represents a queued
+ * transfer that is waiting for an available slot or remote peer.
+ *
+ * @param {string|null|undefined} state
+ * @returns {boolean}
+ */
+export function isQueuedTransferState(state) {
+  return typeof state === 'string' && QUEUED_STATE_RE.test(state);
 }
 
 /**
@@ -179,6 +195,69 @@ export function calculateTransferProgress(file) {
   return Math.min(100, Math.round((transferred / size) * 100));
 }
 
+// ── Download group normalization ────────────────────────────────────────────
+
+/**
+ * Flattens the slskd downloads response into file rows for the Downloader UI.
+ *
+ * @param {Array<{ username?: string|null, directories?: Array<{ directory?: string|null, files?: Array<object> }> }>|null|undefined} groups
+ * @returns {Array<object>}
+ */
+export function flattenDownloadGroups(groups) {
+  if (!Array.isArray(groups)) return [];
+
+  const out = [];
+  for (const group of groups) {
+    const username = group?.username ?? '—';
+    const directories = Array.isArray(group?.directories) ? group.directories : [];
+    for (const directory of directories) {
+      const files = Array.isArray(directory?.files) ? directory.files : [];
+      for (const file of files) {
+        out.push({
+          ...file,
+          username,
+          directory: directory?.directory ?? file?.directory ?? null,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Builds aggregate counts for the Downloader page.
+ *
+ * @param {Array<{ state?: string|null }>|null|undefined} files
+ * @returns {{ total: number, active: number, queued: number, completed: number, failed: number, other: number }}
+ */
+export function buildDownloadActivityCounts(files) {
+  const rows = Array.isArray(files) ? files : [];
+  const counts = {
+    total: rows.length,
+    active: 0,
+    queued: 0,
+    completed: 0,
+    failed: 0,
+    other: 0,
+  };
+
+  for (const file of rows) {
+    if (isQueuedTransferState(file?.state)) {
+      counts.queued += 1;
+    } else if (isActiveTransferState(file?.state)) {
+      counts.active += 1;
+    } else if (isCompletedTransferState(file?.state)) {
+      counts.completed += 1;
+    } else if (isFailedTransferState(file?.state)) {
+      counts.failed += 1;
+    } else {
+      counts.other += 1;
+    }
+  }
+
+  return counts;
+}
+
 // ── File path ────────────────────────────────────────────────────────────────
 
 /**
@@ -200,12 +279,14 @@ export function formatTransferFilename(filePath) {
 // ── Summary counts ───────────────────────────────────────────────────────────
 
 /**
- * Returns a plain-English activity summary string for the download screen
- * subtitle, e.g. "3 active · 12 complete · 0 failed".
+ * Returns a plain-English activity summary string for the Downloader page
+ * subtitle, e.g. "3 active · 1 queued · 12 complete · 0 failed".
  *
- * @param {{ active: number, completed: number, failed: number }} counts
+ * @param {{ active: number, queued?: number|null, completed: number, failed: number }} counts
  * @returns {string}
  */
-export function formatDownloadActivitySummary({ active, completed, failed }) {
-  return `${active} active · ${completed} complete · ${failed} failed`;
+export function formatDownloadActivitySummary({ active, queued = null, completed, failed }) {
+  const hasQueuedCount = queued !== null && queued !== undefined && Number.isFinite(Number(queued));
+  const queuedSegment = hasQueuedCount ? ` · ${queued} queued` : '';
+  return `${active} active${queuedSegment} · ${completed} complete · ${failed} failed`;
 }

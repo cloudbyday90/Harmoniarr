@@ -25,7 +25,6 @@ const tabs = [
   { name: 'activity-candidates', label: 'Candidates', implemented: true },
   { name: 'activity-requests', label: 'Requests', implemented: true },
   { name: 'activity-wanted', label: 'Wanted', implemented: true },
-  { name: 'activity-downloads', label: 'Downloads', implemented: true },
   { name: 'activity-imports', label: 'Imports', implemented: true },
   { name: 'activity-releases', label: 'Releases', implemented: true },
   { name: 'activity-users', label: 'Users', implemented: true },
@@ -47,7 +46,7 @@ onUnmounted(cleanup);
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Activity</h1>
-        <p class="hx-page-subtitle">Operational workbench: queues, history, downloads, imports, source users.</p>
+        <p class="hx-page-subtitle">Operational workbench: queues, history, imports, requests, and source users.</p>
       </div>
     </header>
 

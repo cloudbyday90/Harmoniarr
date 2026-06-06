@@ -5956,7 +5956,7 @@ The first UI element work should focus on the screens most likely to define the 
 5. Activity queue view.
 6. Activity wanted view.
 7. Activity candidate review view.
-8. Activity downloads view.
+8. Dedicated Downloader page.
 9. Activity import review view.
 10. Activity users, blocklist, and history views.
 11. Search page.

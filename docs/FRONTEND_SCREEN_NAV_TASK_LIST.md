@@ -37,6 +37,9 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 - The dashboard discovery panel now also exposes a protected manual dispatch action and latest-run status, so operators can trigger discovery work without rerunning the full library scan.
 - The dashboard now also surfaces automatic discovery heartbeat cadence through both the discovery panel and overview status pills, so the background dispatch interval is visible without opening server configuration directly.
 - The auth shell now also redirects forced re-authentication failures back to login with a distinct reason, so privileged mutation denials and refresh failures reuse the same fallback path as ordinary session expiry without inventing a separate dead-end screen before password-management flows exist.
+- The live transfer table has moved from Activity into a dedicated top-level
+  Downloader page with summary counts, filters, accessible progress indicators,
+  and a backwards-compatible redirect from the old Activity downloads route.
 
 ## Global UI Rules
 
@@ -79,6 +82,7 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 
 - [x] Create job queue/history screens with status, timings, and failure reasons.
 - [x] Create job detail/event views for audit-friendly troubleshooting.
+- [x] Promote live downloader operations into a dedicated top-level operator page.
 - [ ] Create durable operator-attention or notifications surface if server-backed notifications are accepted.
 - [ ] Define toast-only vs durable-history UI boundaries.
 

@@ -11,11 +11,11 @@ import {
 // buildOperatorNav
 // ---------------------------------------------------------------------------
 
-test('buildOperatorNav returns 5 items in expected order', () => {
+test('buildOperatorNav returns 6 items in expected order', () => {
   const nav = buildOperatorNav();
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'discover', 'missing', 'activity', 'settings'],
+    ['dashboard', 'discover', 'missing', 'downloader', 'activity', 'settings'],
   );
 });
 
@@ -34,6 +34,13 @@ test('buildOperatorNav missing item does not use an info icon', () => {
     'missing releases should not be represented by an info icon');
   assert.notEqual(missingItem.icon, 'info-circle',
     'missing releases should not be represented by an info-circle icon');
+});
+
+test('buildOperatorNav downloader item uses icon "download"', () => {
+  const nav = buildOperatorNav();
+  const downloader = nav.find((item) => item.name === 'downloader');
+  assert.ok(downloader, 'downloader item must exist in operator nav');
+  assert.equal(downloader.icon, 'download');
 });
 
 test('buildOperatorNav dashboard item has exact: true', () => {
@@ -92,7 +99,7 @@ test('buildVisibleNav for operator returns operator nav regardless of count', ()
   const nav = buildVisibleNav(false, 0);
   assert.deepEqual(
     nav.map((item) => item.name),
-    ['dashboard', 'discover', 'missing', 'activity', 'settings'],
+    ['dashboard', 'discover', 'missing', 'downloader', 'activity', 'settings'],
   );
 });
 

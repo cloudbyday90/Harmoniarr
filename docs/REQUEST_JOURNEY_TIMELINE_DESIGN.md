@@ -127,10 +127,11 @@ in Activity and admin/operator views.
 
 ## Future areas
 
-1. **Per-request scoped downloads & transfer actions.** The existing
-   `ActivityDownloadsView` is admin-global and read-only. A requester-scoped
-   view (cancel / retry / re-queue a specific transfer) would let the journey's
-   Downloading stage become actionable.
+1. **Downloader read model and queue health contract.** The dedicated
+   Downloader page now exists as a top-level operator surface, but it still
+   reads the live download client response directly. A Harmoniarr-owned read
+   model should combine live transfers, queue health, retry state, stale
+   progress, and action eligibility.
 2. **Analyze-stage visibility.** Make the Importing stage explain *why* it is
    waiting — match confidence, tag reconciliation, transcode/validation
    progress — instead of a single "Importing" label, and reflect a future
@@ -153,3 +154,10 @@ diagnostics.
 preview/apply-preview contract decision. The path-planning preview endpoints are
 admin-only, so requester journey detail remains tied to safe progress
 projections.
+
+## Downloader Page Update
+
+`DEDICATED_DOWNLOADER_PAGE_DESIGN.md` promotes live transfer visibility out of
+Activity and into `/app/downloader`. Activity's old downloads route now redirects
+to the dedicated page, while requester journey detail remains on scoped,
+requester-safe request projections.

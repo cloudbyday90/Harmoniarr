@@ -30,6 +30,10 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 - The protected `PUT /api/v1/metadata/artists/:artistId/monitoring` route now updates canonical artist monitoring state through the shared metadata monitoring service and returns the current artist monitoring payload used by local metadata reads.
 - The system overview route now also returns a lightweight path-validation summary derived from the shared settings payload for authenticated dashboard consumers.
 - The protected `POST /api/v1/auth/refresh` route and privileged admin mutation routes now return a normalized `reauth_required` error when the authenticated session is flagged for forced re-authentication, while read-side routes remain accessible until password-management and session-management routes are defined.
+- The dedicated Downloader page now reuses the existing admin-only
+  `GET /api/v1/slskd/downloads` contract instead of adding a parallel route;
+  the next contract step is a Harmoniarr-owned downloader read model for queue
+  health, stale progress, retry state, and action eligibility.
 
 ## Global Contract Rules
 

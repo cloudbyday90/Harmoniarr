@@ -19,7 +19,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildDownloadActivityCounts,
   calculateTransferProgress,
+  flattenDownloadGroups,
   formatDownloadActivitySummary,
   formatTransferFilename,
   formatTransferStateLabel,
@@ -27,6 +29,7 @@ import {
   isActiveTransferState,
   isCompletedTransferState,
   isFailedTransferState,
+  isQueuedTransferState,
 } from '../../src/client/lib/activity-downloads-presentation.js';
 
 // ---------------------------------------------------------------------------
@@ -72,6 +75,23 @@ describe('isActiveTransferState', () => {
   it('is case-insensitive', () => {
     assert.equal(isActiveTransferState('inprogress'), true);
     assert.equal(isActiveTransferState('QUEUED'), true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isQueuedTransferState
+// ---------------------------------------------------------------------------
+describe('isQueuedTransferState', () => {
+  it('returns true for Queued', () => {
+    assert.equal(isQueuedTransferState('Queued'), true);
+  });
+
+  it('returns false for InProgress', () => {
+    assert.equal(isQueuedTransferState('InProgress'), false);
+  });
+
+  it('returns false for null', () => {
+    assert.equal(isQueuedTransferState(null), false);
   });
 });
 
@@ -362,6 +382,77 @@ describe('calculateTransferProgress', () => {
 });
 
 // ---------------------------------------------------------------------------
+// flattenDownloadGroups
+// ---------------------------------------------------------------------------
+describe('flattenDownloadGroups', () => {
+  it('returns an empty array for non-arrays', () => {
+    assert.deepEqual(flattenDownloadGroups(null), []);
+  });
+
+  it('flattens groups and carries username and directory context', () => {
+    const result = flattenDownloadGroups([
+      {
+        username: 'source-user',
+        directories: [
+          {
+            directory: 'Artist/Album',
+            files: [{ id: 'f1', filename: '01 Track.flac', state: 'Queued' }],
+          },
+        ],
+      },
+    ]);
+
+    assert.deepEqual(result, [{
+      id: 'f1',
+      filename: '01 Track.flac',
+      state: 'Queued',
+      username: 'source-user',
+      directory: 'Artist/Album',
+    }]);
+  });
+
+  it('skips malformed directories without throwing', () => {
+    assert.deepEqual(flattenDownloadGroups([{ username: 'u', directories: [{ files: null }] }]), []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildDownloadActivityCounts
+// ---------------------------------------------------------------------------
+describe('buildDownloadActivityCounts', () => {
+  it('returns zero counts for non-arrays', () => {
+    assert.deepEqual(buildDownloadActivityCounts(null), {
+      total: 0,
+      active: 0,
+      queued: 0,
+      completed: 0,
+      failed: 0,
+      other: 0,
+    });
+  });
+
+  it('separates active transfers from queued transfers', () => {
+    const counts = buildDownloadActivityCounts([
+      { state: 'InProgress' },
+      { state: 'Initializing' },
+      { state: 'Queued' },
+      { state: 'Completed, Succeeded' },
+      { state: 'Errored' },
+      { state: 'UnknownState' },
+    ]);
+
+    assert.deepEqual(counts, {
+      total: 6,
+      active: 2,
+      queued: 1,
+      completed: 1,
+      failed: 1,
+      other: 1,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // formatTransferFilename
 // ---------------------------------------------------------------------------
 describe('formatTransferFilename', () => {
@@ -409,6 +500,13 @@ describe('formatDownloadActivitySummary', () => {
     assert.equal(
       formatDownloadActivitySummary({ active: 0, completed: 0, failed: 0 }),
       '0 active · 0 complete · 0 failed',
+    );
+  });
+
+  it('includes queued count when provided', () => {
+    assert.equal(
+      formatDownloadActivitySummary({ active: 3, queued: 2, completed: 12, failed: 1 }),
+      '3 active · 2 queued · 12 complete · 1 failed',
     );
   });
 
