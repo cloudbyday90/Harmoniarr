@@ -136,6 +136,14 @@ in Activity and admin/operator views.
    progress — instead of a single "Importing" label, and reflect a future
    ClamAV quarantine gate (staging → scan → clean/quarantine) as an explicit
    sub-step.
-3. **Requester-safe import-candidate detail contract.** Decide whether owned
-   requester access to `/api/v1/import-candidates/:id` should remain available
-   or receive a separate minimal projection aligned with the request journey.
+3. **Requester-safe preview and apply-preview contracts.** Decide whether
+   `/api/v1/import-candidates/:id/preview` and `/apply-preview` should stay
+   admin-only or receive separate requester-safe projections aligned with the
+   request journey.
+
+## Phase 17 update
+
+`REQUESTER_SAFE_IMPORT_CANDIDATE_DETAIL_CONTRACT_DESIGN.md` completes the
+requester-safe import-candidate list/detail contract. Owned requester reads now
+return minimal `Source` summaries while admin import review keeps full
+diagnostics.

@@ -585,15 +585,50 @@ test('import candidate list route returns filtered review queue results', async 
 
 test('import candidate list route scopes non-admin reads to delegated target ownership', async (t) => {
   const listImportCandidates = t.mock.fn(async () => ({
-    candidates: [],
-    filters: {},
+    candidates: [{
+      id: 'candidate-owned',
+      sourceProvider: 'slskd',
+      sourceSearchId: 'search-1',
+      sourceResponseKey: 'source-response-1',
+      username: 'source-user',
+      folderPath: 'Autechre\\Amber',
+      candidateType: 'media_request',
+      status: 'selected',
+      fileCount: 2,
+      lockedFileCount: 0,
+      totalSizeBytes: 2048,
+      rawPayload: { username: 'source-user' },
+      normalizedPayload: {
+        extensions: ['FLAC', 'flac', 'mp3'],
+        requestOwnership: {
+          sourceRequestedByUserId: 'admin-1',
+          sourceRequestedForUserId: 'user-target',
+        },
+      },
+      selectionReason: 'best_scored_candidate',
+      discoveredAt: '2026-05-04T13:00:00.000Z',
+      createdAt: '2026-05-04T13:01:00.000Z',
+      updatedAt: '2026-05-04T13:02:00.000Z',
+    }],
+    filters: {
+      folderPath: undefined,
+      requestedForUserId: 'user-target',
+      sourceSearchId: undefined,
+      status: 'selected',
+      username: undefined,
+    },
     pagination: {
       limit: 25,
       offset: 0,
-      total: 0,
+      total: 1,
     },
   }));
+  const enrichCandidatesWithUploaderReputation = t.mock.fn(async (candidates) => candidates.map((candidate) => ({
+    ...candidate,
+    uploaderReputation: { username: candidate.username },
+  })));
   const app = createImportCandidateRouteTestApp({
+    enrichCandidatesWithUploaderReputation,
     listImportCandidates,
     requireSession: async () => ({ appUserId: 'user-target', csrfToken: 'csrf-token', user: { role: 'user' } }),
   });
@@ -612,7 +647,37 @@ test('import candidate list route scopes non-admin reads to delegated target own
       status: 'selected',
       username: undefined,
     }]);
-    assert.equal(payload.ok, true);
+    assert.equal(enrichCandidatesWithUploaderReputation.mock.callCount(), 0);
+    assert.deepEqual(payload, {
+      ok: true,
+      importCandidates: {
+        candidates: [{
+          sourceKey: 'source-1',
+          sourceLabel: 'Source 1',
+          sourceProvider: 'slskd',
+          status: 'selected',
+          fileCount: 2,
+          totalSizeBytes: 2048,
+          formats: ['flac', 'mp3'],
+          discoveredAt: '2026-05-04T13:00:00.000Z',
+          updatedAt: '2026-05-04T13:02:00.000Z',
+        }],
+        filters: {
+          status: 'selected',
+        },
+        pagination: {
+          limit: 25,
+          offset: 0,
+          total: 1,
+        },
+        reputationSummary: {},
+      },
+    });
+    const responseJson = JSON.stringify(payload);
+    assert.equal(responseJson.includes('candidate-owned'), false);
+    assert.equal(responseJson.includes('source-user'), false);
+    assert.equal(responseJson.includes('Autechre'), false);
+    assert.equal(responseJson.includes('sourceRequestedForUserId'), false);
   });
 });
 
@@ -650,6 +715,80 @@ test('import candidate detail route returns candidate files', async (t) => {
         }],
       },
     });
+  });
+});
+
+test('import candidate detail route returns requester-safe detail for owned non-admin candidates', async (t) => {
+  const getImportCandidate = t.mock.fn(async ({ importCandidateId }) => ({
+    id: importCandidateId,
+    sourceProvider: 'slskd',
+    sourceSearchId: 'search-1',
+    sourceResponseKey: 'source-response-1',
+    username: 'source-user',
+    folderPath: 'Autechre\\Amber',
+    candidateType: 'media_request',
+    status: 'downloading',
+    fileCount: 1,
+    lockedFileCount: 0,
+    totalSizeBytes: 1024,
+    rawPayload: { username: 'source-user' },
+    normalizedPayload: {
+      extensions: ['flac'],
+      requestOwnership: {
+        sourceMediaRequestId: 'media-request-1',
+        sourceRequestKind: 'release',
+        sourceRequestedByUserId: 'admin-1',
+        sourceRequestedForUserId: 'user-target',
+        sourceType: 'media_request',
+      },
+    },
+    selectionReason: 'best_scored_candidate',
+    discoveredAt: '2026-05-04T13:00:00.000Z',
+    createdAt: '2026-05-04T13:01:00.000Z',
+    updatedAt: '2026-05-04T13:02:00.000Z',
+    files: [{
+      id: 'file-1',
+      filename: '01 Foil.flac',
+      folderPath: 'Autechre\\Amber',
+      rawPayload: { filename: '01 Foil.flac' },
+    }],
+  }));
+  const enrichCandidatesWithUploaderReputation = t.mock.fn(async (candidates) => candidates.map((candidate) => ({
+    ...candidate,
+    uploaderReputation: { username: candidate.username },
+  })));
+  const app = createImportCandidateRouteTestApp({
+    enrichCandidatesWithUploaderReputation,
+    getImportCandidate,
+    requireSession: async () => ({ appUserId: 'user-target', csrfToken: 'csrf-token', user: { role: 'user' } }),
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(enrichCandidatesWithUploaderReputation.mock.callCount(), 0);
+    assert.deepEqual(payload, {
+      ok: true,
+      importCandidate: {
+        sourceKey: 'source',
+        sourceLabel: 'Source',
+        sourceProvider: 'slskd',
+        status: 'downloading',
+        fileCount: 1,
+        totalSizeBytes: 1024,
+        formats: ['flac'],
+        discoveredAt: '2026-05-04T13:00:00.000Z',
+        updatedAt: '2026-05-04T13:02:00.000Z',
+      },
+    });
+    const responseJson = JSON.stringify(payload);
+    assert.equal(responseJson.includes('candidate-1'), false);
+    assert.equal(responseJson.includes('source-user'), false);
+    assert.equal(responseJson.includes('Autechre'), false);
+    assert.equal(responseJson.includes('01 Foil.flac'), false);
+    assert.equal(responseJson.includes('sourceRequestedForUserId'), false);
   });
 });
 

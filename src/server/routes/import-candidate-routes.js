@@ -23,6 +23,11 @@ import {
   assertImportCandidateVisible,
   buildImportCandidateVisibilityFilter,
 } from '../import-candidates/import-candidate-visibility.js';
+import {
+  canViewImportCandidateDiagnosticFields,
+  projectImportCandidateDetailForRead,
+  projectImportCandidateListResultForRead,
+} from '../import-candidates/import-candidate-read-projection.js';
 import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 
 const defaultRequestAuthDependencies = createRequestAuthDependencies({
@@ -108,6 +113,7 @@ export function registerImportCandidateRoutes(app, {
   app.get('/api/v1/import-candidates', importCandidateRoute(async (request, response) => {
     const session = await requireSessionFn(request);
     const visibility = buildReadVisibility(session);
+    const actorUserRole = session?.user?.role ?? null;
 
     const result = await listImportCandidates({
       folderPath: request.query.folderPath,
@@ -119,14 +125,22 @@ export function registerImportCandidateRoutes(app, {
       username: request.query.username,
     });
 
-    const enrichedCandidates = await enrichCandidatesWithUploaderReputation(result.candidates);
-    const reputationSummary = buildCandidateReputationSummary(enrichedCandidates);
+    const canViewDiagnosticFields = canViewImportCandidateDiagnosticFields(actorUserRole);
+    const enrichedCandidates = canViewDiagnosticFields
+      ? await enrichCandidatesWithUploaderReputation(result.candidates)
+      : result.candidates;
+    const reputationSummary = canViewDiagnosticFields
+      ? buildCandidateReputationSummary(enrichedCandidates)
+      : {};
+    const projectedResult = projectImportCandidateListResultForRead({
+      ...result,
+      candidates: enrichedCandidates,
+    }, { actorUserRole });
 
     response.json({
       ok: true,
       importCandidates: {
-        ...result,
-        candidates: enrichedCandidates,
+        ...projectedResult,
         reputationSummary,
       },
     });
@@ -287,6 +301,7 @@ export function registerImportCandidateRoutes(app, {
 
   app.get('/api/v1/import-candidates/:importCandidateId', importCandidateRoute(async (request, response) => {
     const session = await requireSessionFn(request);
+    const actorUserRole = session?.user?.role ?? null;
     const importCandidate = await getImportCandidate({
       importCandidateId: request.params.importCandidateId,
     });
@@ -296,11 +311,13 @@ export function registerImportCandidateRoutes(app, {
       candidate: importCandidate,
     });
 
-    const [enrichedCandidate] = await enrichCandidatesWithUploaderReputation([importCandidate]);
+    const [readCandidate] = canViewImportCandidateDiagnosticFields(actorUserRole)
+      ? await enrichCandidatesWithUploaderReputation([importCandidate])
+      : [importCandidate];
 
     response.json({
       ok: true,
-      importCandidate: enrichedCandidate,
+      importCandidate: projectImportCandidateDetailForRead(readCandidate, { actorUserRole }),
     });
   }));
 

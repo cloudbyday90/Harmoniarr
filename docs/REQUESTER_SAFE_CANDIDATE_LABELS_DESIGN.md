@@ -166,13 +166,20 @@ full details needed for review and troubleshooting.
 
 ## Future Design Areas
 
-1. **Requester-safe import-candidate detail contract.** The owned
-   import-candidate API remains request-scoped, but still returns operator-rich
-   detail. Decide whether requesters need that endpoint at all or whether it
-   should receive a separate minimal projection.
+1. **Requester-safe preview and apply-preview contracts.** Decide whether the
+   import-candidate preview endpoints should be admin-only or receive separate
+   requester-safe projections that omit staging paths, collision paths, and file
+   names.
 2. **Retry-aware journey messaging.** Distinguish `trying another source` from
    a failed Downloading stage when a replacement source is selected after a
    failed transfer.
 3. **Importing-stage freshness and explanation.** Apply the same safe-label and
    observed-age vocabulary to validation, scan, transcode, and quarantine
    progress.
+
+## Phase 17 Update
+
+`REQUESTER_SAFE_IMPORT_CANDIDATE_DETAIL_CONTRACT_DESIGN.md` completes the
+requester-safe import-candidate read contract. Owned requester reads remain
+available, but the list and detail endpoints now return minimal `Source`
+summaries instead of operator-rich candidate objects.

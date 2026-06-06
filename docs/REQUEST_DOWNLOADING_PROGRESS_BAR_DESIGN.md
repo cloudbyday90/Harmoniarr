@@ -210,9 +210,15 @@ server boundary; admin/operator diagnostics remain available.
 1. **Retry-aware journey messaging.** Distinguish "trying another source" from
    a failed Downloading stage when the system has queued a replacement
    candidate.
-2. **Requester-safe import-candidate detail contract.** Decide whether owned
-   requester access to import-candidate detail should remain operator-rich or
-   receive a minimal projection.
+2. **Requester-safe preview and apply-preview contracts.** Decide whether
+   candidate preview endpoints should stay admin-only or expose separate
+   requester-safe projections without paths, file names, or collision details.
 3. **Importing-stage freshness and explanation.** Apply observed-age language
    to validation, scan, and quarantine progress once the Importing stage grows
    a persisted progress projection.
+
+## Phase 17 Update
+
+`REQUESTER_SAFE_IMPORT_CANDIDATE_DETAIL_CONTRACT_DESIGN.md` completes the
+requester-safe import-candidate list/detail contract. Requester reads now use a
+minimal server projection while admin import review keeps full diagnostics.

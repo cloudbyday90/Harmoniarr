@@ -249,9 +249,17 @@ coupling them to server projection code.
    single Importing label with safe reasons such as validation, match review,
    tag reconciliation, and a future staging scan/clean/quarantine gate without
    exposing filesystem paths or internal exception details.
-3. **Requester-safe import-candidate detail contract.** Decide whether owned
-   requester access to import-candidate detail should remain available or be
-   replaced by a minimal request-progress projection.
+3. **Requester-safe preview and apply-preview contracts.** Decide whether
+   import-candidate preview endpoints should stay admin-only or expose separate
+   requester-safe projections without staging paths, collision paths, or file
+   names.
 4. **Retry-aware transfer progress.** Distinguish stale progress caused by a
    paused or abandoned candidate from active retry progress on a replacement
    candidate.
+
+## Phase 17 Update
+
+`REQUESTER_SAFE_IMPORT_CANDIDATE_DETAIL_CONTRACT_DESIGN.md` completes the
+requester-safe import-candidate list/detail read contract. Owned non-admin
+candidate reads now return minimal `Source` summaries and no longer expose raw
+candidate diagnostics.

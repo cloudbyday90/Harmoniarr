@@ -238,15 +238,42 @@ suite('integration library media request routes', () => {
       const visibleImportCandidatesResponse = await targetClient.requestJson('/api/v1/import-candidates?status=downloading&limit=10');
       assert.equal(visibleImportCandidatesResponse.response.status, 200);
       assert.equal(visibleImportCandidatesResponse.payload.importCandidates.pagination.total, 1);
-      assert.equal(visibleImportCandidatesResponse.payload.importCandidates.candidates[0].id, linkedCandidate.id);
+      const [visibleImportCandidate] = visibleImportCandidatesResponse.payload.importCandidates.candidates;
+      const { updatedAt: visibleCandidateUpdatedAt, ...visibleCandidateProjection } = visibleImportCandidate;
+      assert.deepEqual(visibleCandidateProjection, {
+        sourceKey: 'source-1',
+        sourceLabel: 'Source 1',
+        sourceProvider: 'slskd',
+        status: 'downloading',
+        fileCount: 1,
+        totalSizeBytes: linkedCandidate.totalSizeBytes,
+        formats: ['flac'],
+        discoveredAt: '2026-05-04T13:00:00.000Z',
+      });
+      assert.equal(typeof visibleCandidateUpdatedAt, 'string');
+      assert.equal('id' in visibleImportCandidate, false);
+      assert.equal('username' in visibleImportCandidate, false);
+      assert.equal('folderPath' in visibleImportCandidate, false);
+      assert.equal('requestedForUserId' in visibleImportCandidatesResponse.payload.importCandidates.filters, false);
 
       const linkedDetailResponse = await targetClient.requestJson(`/api/v1/import-candidates/${linkedCandidate.id}`);
       assert.equal(linkedDetailResponse.response.status, 200);
-      assert.equal(linkedDetailResponse.payload.importCandidate.id, linkedCandidate.id);
-      assert.equal(
-        linkedDetailResponse.payload.importCandidate.normalizedPayload.requestOwnership.sourceRequestedForUserId,
-        targetUser.id,
-      );
+      const { updatedAt: linkedDetailUpdatedAt, ...linkedDetailProjection } = linkedDetailResponse.payload.importCandidate;
+      assert.deepEqual(linkedDetailProjection, {
+        sourceKey: 'source',
+        sourceLabel: 'Source',
+        sourceProvider: 'slskd',
+        status: 'downloading',
+        fileCount: 1,
+        totalSizeBytes: linkedCandidate.totalSizeBytes,
+        formats: ['flac'],
+        discoveredAt: '2026-05-04T13:00:00.000Z',
+      });
+      assert.equal(typeof linkedDetailUpdatedAt, 'string');
+      assert.equal('id' in linkedDetailResponse.payload.importCandidate, false);
+      assert.equal('username' in linkedDetailResponse.payload.importCandidate, false);
+      assert.equal('folderPath' in linkedDetailResponse.payload.importCandidate, false);
+      assert.equal('normalizedPayload' in linkedDetailResponse.payload.importCandidate, false);
 
       const hiddenDetailResponse = await targetClient.requestJson(`/api/v1/import-candidates/${unrelatedCandidate.id}`);
       assert.equal(hiddenDetailResponse.response.status, 404);
