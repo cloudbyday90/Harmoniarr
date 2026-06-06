@@ -149,8 +149,15 @@ retaining useful context for requesters.
    `REQUESTER_SAFE_CANDIDATE_LABELS_DESIGN.md`; requesters now receive generic
    source labels from the server pipeline projection while operator diagnostics
    stay available outside requester views.
-2. **Retry-aware journey messaging.** Distinguish stale active transfer
-   progress from "trying another source" after a failed or abandoned candidate.
-3. **Importing-stage freshness and explanation.** Apply the same observed-age
+2. **Importing-stage freshness and explanation.** Apply the same observed-age
    vocabulary to future Importing-stage validation, scan, and quarantine
    progress.
+3. **Requester-safe failure and blocker reasons.** Define a bounded requester
+   vocabulary for failed search, failed download, import blocked, operator
+   review needed, and unavailable source states.
+
+## Phase 19 Update
+
+`REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes retry-aware
+Downloading-stage messaging. Stale progress remains a freshness concern, while
+replacement-source retries are now described as active request progress.

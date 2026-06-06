@@ -162,3 +162,10 @@ Activity and into `/app/downloader`. The follow-up
 `DEDICATED_DOWNLOADER_ROUTE_DEPRECATION_DESIGN.md` removes Activity's old
 downloads route entirely, while requester journey detail remains on scoped,
 requester-safe request projections.
+
+## Phase 19 update
+
+`REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes retry-aware
+Downloading-stage messaging. A failed candidate no longer makes Downloading look
+failed when a replacement source is selected or actively transferring; the
+current stage remains active with generic requester-safe copy.

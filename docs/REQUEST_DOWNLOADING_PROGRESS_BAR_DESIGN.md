@@ -207,15 +207,15 @@ server boundary; admin/operator diagnostics remain available.
 
 ## Future Design Areas
 
-1. **Retry-aware journey messaging.** Distinguish "trying another source" from
-   a failed Downloading stage when the system has queued a replacement
-   candidate.
-2. **Importing-stage freshness and explanation.** Apply observed-age language
+1. **Importing-stage freshness and explanation.** Apply observed-age language
    to validation, scan, and quarantine progress once the Importing stage grows
    a persisted progress projection.
-3. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, and audit
    events before exposing requester mutations.
+3. **Requester-safe failure and blocker reasons.** Define a bounded requester
+   vocabulary for failed search, failed download, import blocked, operator
+   review needed, and unavailable source states.
 
 ## Phase 17 Update
 
@@ -229,3 +229,10 @@ minimal server projection while admin import review keeps full diagnostics.
 preview/apply-preview contract decision. Those HTTP endpoints are admin-only;
 requester progress remains on the safe journey and import-candidate read
 projections.
+
+## Phase 19 Update
+
+`REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes retry-aware
+Downloading-stage messaging. Replacement sources now keep the request journey in
+an active Downloading state instead of presenting an older failed candidate as
+the current stage.

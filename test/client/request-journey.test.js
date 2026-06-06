@@ -256,8 +256,67 @@ test('a failed download surfaces on the downloading stage', () => {
     mediaRequest: { requestState: 'needs_review' },
     candidates: [{ id: 'c1', status: 'selected', execution: { runStatus: 'failed' } }],
   });
-  assert.equal(statusOf(journey, JOURNEY_STAGE.DOWNLOADING), STAGE_STATUS.FAILED);
+  const downloading = stageByKey(journey, JOURNEY_STAGE.DOWNLOADING);
+  assert.equal(downloading.status, STAGE_STATUS.FAILED);
+  assert.equal(downloading.detail, 'Download did not finish, and no replacement source is active yet.');
   assert.equal(journey.currentStageKey, JOURNEY_STAGE.DOWNLOADING);
+});
+
+test('a queued replacement source keeps downloading active after an earlier download failed', () => {
+  const journey = buildRequestJourney({
+    mediaRequest: { requestState: 'needs_review' },
+    candidates: [
+      { id: 'failed', status: 'failed', execution: { runStatus: 'failed' } },
+      { id: 'replacement', status: 'selected' },
+    ],
+  });
+  const downloading = stageByKey(journey, JOURNEY_STAGE.DOWNLOADING);
+  assert.equal(downloading.status, STAGE_STATUS.ACTIVE);
+  assert.equal(downloading.detail, 'Trying another source. Waiting for transfer to start.');
+  assert.equal(downloading.progress, null);
+  assert.equal(journey.currentStageKey, JOURNEY_STAGE.DOWNLOADING);
+});
+
+test('an active replacement source explains retry without surfacing the earlier failure as current', () => {
+  const journey = buildRequestJourney({
+    mediaRequest: { requestState: 'needs_review' },
+    nowMs: Date.parse('2026-05-31T12:01:32.000Z'),
+    candidates: [
+      { id: 'failed', status: 'failed', execution: { runStatus: 'failed' } },
+      {
+        id: 'replacement',
+        status: 'downloading',
+        transferProgress: {
+          observedAt: '2026-05-31T12:01:02.000Z',
+          percentComplete: 18,
+          status: 'active',
+        },
+      },
+    ],
+  });
+  const downloading = stageByKey(journey, JOURNEY_STAGE.DOWNLOADING);
+  assert.equal(downloading.status, STAGE_STATUS.ACTIVE);
+  assert.equal(downloading.detail, 'Trying another source after an earlier download did not finish.');
+  assert.equal(downloading.progress.percentComplete, 18);
+  assert.equal(journey.currentStageKey, JOURNEY_STAGE.DOWNLOADING);
+});
+
+test('failed candidates are ignored when choosing active replacement progress', () => {
+  const selected = selectDownloadingProgressCandidate([
+    {
+      id: 'failed-high',
+      status: 'failed',
+      execution: { runStatus: 'failed' },
+      transferProgress: { observedAt: '2026-05-31T12:05:00.000Z', percentComplete: 80 },
+    },
+    {
+      id: 'replacement',
+      status: 'downloading',
+      transferProgress: { observedAt: '2026-05-31T12:01:00.000Z', percentComplete: 12 },
+    },
+  ]);
+
+  assert.equal(selected.id, 'replacement');
 });
 
 test('a cancelled request before any candidate marks downstream stages cancelled', () => {

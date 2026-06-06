@@ -253,6 +253,7 @@ coupling them to server projection code.
    single Importing label with safe reasons such as validation, match review,
    tag reconciliation, and a future staging scan/clean/quarantine gate without
    exposing filesystem paths or internal exception details.
+>>>>>>> codex/retry-aware-journey-messaging
 
 ## Phase 17 Update
 
@@ -275,3 +276,9 @@ Activity into `/app/downloader`. The follow-up
 downloads route instead of preserving it as a redirect. This does not change the
 requester-safe transfer progress read model; it clarifies the operator surface
 where future queue health and action eligibility contracts should land.
+
+## Phase 19 Update
+
+`REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes retry-aware transfer
+messaging in the request journey. Replacement sources are now presented as
+active Downloading progress, while failed-only candidates remain failed.
