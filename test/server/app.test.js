@@ -19,6 +19,7 @@ suite('createApp', () => {
     artworkSummaryService: { buildArtworkSummary: () => ({}) },
   };
   const authModule = { routeDependencies: { auth: 'deps' } };
+  const downloaderModule = { routeDependencies: { downloader: 'deps' } };
   const importCandidateModule = { routeDependencies: { importCandidates: 'deps' } };
   const libraryModule = {
     libraryDiscoveryRequestService: {
@@ -97,6 +98,7 @@ suite('createApp', () => {
     getPolicy: t.mock.fn(async () => deploymentSecurityPolicy),
   };
   const createDeploymentSecurityService = t.mock.fn(() => deploymentSecurityService);
+  const createDownloaderModule = t.mock.fn(() => downloaderModule);
   const createImportCandidateModule = t.mock.fn(() => importCandidateModule);
   const mediaToolingStatusService = {
     getStatus: t.mock.fn(async () => ({
@@ -126,6 +128,7 @@ suite('createApp', () => {
   });
   const registerAdminRecoveryRoutes = t.mock.fn();
   const registerArtworkRoutes = t.mock.fn();
+  const registerDownloaderRoutes = t.mock.fn();
   const registerImportCandidateRoutes = t.mock.fn();
   const registerLibraryRoutes = t.mock.fn();
   const registerMetadataRoutes = t.mock.fn();
@@ -153,6 +156,7 @@ suite('createApp', () => {
     createArtworkModule,
     createAuthModule,
     createDeploymentSecurityService,
+    createDownloaderModule,
     createImportCandidateModule,
     createLibraryModule,
     createMediaToolingStatusService,
@@ -166,6 +170,7 @@ suite('createApp', () => {
     registerArtworkRoutes,
     registerAuthRoutes,
     registerAdminRecoveryRoutes,
+    registerDownloaderRoutes,
     registerImportCandidateRoutes,
     registerLibraryRoutes,
     registerMetadataRoutes,
@@ -180,6 +185,7 @@ suite('createApp', () => {
   assert.equal(createArtworkModule.mock.callCount(), 1);
   assert.equal(createAuthModule.mock.callCount(), 1);
   assert.equal(createDeploymentSecurityService.mock.callCount(), 1);
+  assert.equal(createDownloaderModule.mock.callCount(), 1);
   assert.equal(createImportCandidateModule.mock.callCount(), 1);
   assert.equal(createMediaToolingStatusService.mock.callCount(), 1);
   assert.equal(createLibraryModule.mock.callCount(), 1);
@@ -193,6 +199,7 @@ suite('createApp', () => {
   const artworkModuleArgs = createArtworkModule.mock.calls[0].arguments[0];
   const authModuleArgs = createAuthModule.mock.calls[0].arguments[0];
   const metadataModuleArgs = createMetadataModule.mock.calls[0].arguments[0];
+  const downloaderModuleArgs = createDownloaderModule.mock.calls[0].arguments[0];
   const importCandidateModuleArgs = createImportCandidateModule.mock.calls[0].arguments[0];
   const libraryModuleArgs = createLibraryModule.mock.calls[0].arguments[0];
   const slskdModuleArgs = createSlskdModule.mock.calls[0].arguments[0];
@@ -210,6 +217,7 @@ suite('createApp', () => {
   assert.equal(typeof metadataModuleArgs.providerHealthRecorder.recordSuccess, 'function');
   assert.equal(slskdModuleArgs.providerHealthRecorder, metadataModuleArgs.providerHealthRecorder);
   assert.equal(slskdModuleArgs.slskdConfigService, slskdConfigService);
+  assert.equal(downloaderModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(importCandidateModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(importCandidateModuleArgs.slskdTransferSnapshotService, slskdTransferSnapshotService);
   assert.equal(importCandidateModuleArgs.getMediaToolingStatus, mediaToolingStatusService.getStatus);
@@ -373,6 +381,7 @@ suite('createApp', () => {
   });
   assert.equal(registerAuthRoutes.mock.callCount(), 1);
   assert.equal(registerArtworkRoutes.mock.callCount(), 1);
+  assert.equal(registerDownloaderRoutes.mock.callCount(), 1);
   assert.equal(registerImportCandidateRoutes.mock.callCount(), 1);
   assert.equal(registerLibraryRoutes.mock.callCount(), 1);
   assert.equal(registerMetadataRoutes.mock.callCount(), 1);
@@ -390,6 +399,9 @@ suite('createApp', () => {
   assert.equal(registerArtworkRoutes.mock.calls[0].arguments[0], app);
   assert.equal(typeof registerArtworkRoutes.mock.calls[0].arguments[1].limitArtworkCleanupRun, 'function');
   assert.equal(registerArtworkRoutes.mock.calls[0].arguments[1].artwork, 'deps');
+  assert.equal(registerDownloaderRoutes.mock.calls[0].arguments[0], app);
+  assert.equal(registerDownloaderRoutes.mock.calls[0].arguments[1].downloader, 'deps');
+  assert.equal(typeof registerDownloaderRoutes.mock.calls[0].arguments[1].limitDownloaderQueueRead, 'function');
   assert.equal(registerImportCandidateRoutes.mock.calls[0].arguments[0], app);
   assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateExecutionRun, 'function');
   assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateApplyRun, 'function');
@@ -524,6 +536,7 @@ suite('createApp', () => {
       getCachedPolicy: t.mock.fn(() => deploymentSecurityPolicy),
       getPolicy: t.mock.fn(async () => deploymentSecurityPolicy),
     }),
+    createDownloaderModule: () => ({ routeDependencies: {} }),
     createImportCandidateModule: () => ({ routeDependencies: {} }),
     createLibraryModule: () => ({
       libraryDiscoveryRequestService: {
@@ -572,6 +585,7 @@ suite('createApp', () => {
     registerSystemRoutes: () => {},
     registerArtworkRoutes: () => {},
     registerAdminRecoveryRoutes: () => {},
+    registerDownloaderRoutes: () => {},
   });
 
   await withServer(app, async (baseUrl) => {

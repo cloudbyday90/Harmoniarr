@@ -11,12 +11,12 @@ This phase is intentionally limited to the operational read surface:
 
 - add a top-level `/app/downloader` route and sidebar entry
 - make `/app/downloader` the canonical Downloader route
-- reuse the current admin-only `/api/v1/slskd/downloads` contract
+- consume a Harmoniarr-owned Downloader read model
 - improve the frontend transfer presentation with summary counts, filters, and
   accessible progress indicators
 
-This phase does not add transfer actions, queue mutation controls, or a new
-database-backed downloader read model.
+This phase does not add transfer actions, queue mutation controls, or a
+database-backed downloader history store.
 
 ## Official Research Baseline
 
@@ -107,7 +107,6 @@ Pros:
 Cons:
 
 - still depends on the upstream grouped slskd response shape
-- does not yet provide a Harmoniarr-owned aggregate queue health contract
 - no durable historical downloader read model yet
 - required a follow-up route deprecation pass to remove the temporary Activity
   downloads compatibility redirect
@@ -138,11 +137,10 @@ Recommended stack:
 - Navigation: top-level operator nav item labeled `Downloader`.
 - Legacy URL: no Activity downloads compatibility route; `/app/activity/downloads`
   is deprecated and no longer registered.
-- Authorization: no new backend route; continue using the existing admin-only
-  `/api/v1/slskd/downloads` API.
-- Presentation: pure helper functions flatten the upstream grouped downloads
-  response, classify active/queued/completed/failed states, and format compact
-  operator copy.
+- Authorization: use the admin-only `GET /api/v1/downloader/queue` read model,
+  backed by the existing slskd service.
+- Presentation: consume normalized transfer rows, queue health, source groups,
+  and disabled future action eligibility from the read model.
 - Accessibility: use semantic page headings, existing labeled nav landmarks,
   button `aria-pressed` for filters, and native `<progress>` elements for
   determinate and indeterminate active transfer progress.
@@ -166,12 +164,15 @@ Recommended stack:
 - Added filters for all, active, queued, completed, and failed transfers.
 - Added summary cards for active, queued, complete, and failed transfer counts.
 - Added native transfer progress elements for accessible progress display.
+- Added the follow-up `GET /api/v1/downloader/queue` read model documented in
+  `DOWNLOADER_QUEUE_READ_MODEL_DESIGN.md`, and moved the page off the raw
+  `/api/v1/slskd/downloads` provider response.
 
 ## Security Outcome
 
 - Requesters cannot access the new route through the existing requester route
   restriction list.
-- The page reuses an existing admin-only API route and does not add new
+- The page uses an admin-only Downloader read model and does not add new
   requester-visible transfer data.
 - No new secrets, API keys, source credentials, raw backend errors, or file
   operations are exposed.
@@ -193,12 +194,18 @@ Activity downloads compatibility route. The canonical Downloader surface is now
 only `/app/downloader`; Activity no longer owns or redirects a Downloads child
 route.
 
+## Queue Read Model Update
+
+`DOWNLOADER_QUEUE_READ_MODEL_DESIGN.md` completes the first future area from
+this page. The Downloader page now reads `GET /api/v1/downloader/queue`, which
+normalizes transfer state, progress, aggregate queue health, source groups, and
+disabled future action eligibility on the server.
+
 ## Next High-Value Design Areas
 
-1. **Downloader read model and queue health contract.** Create a Harmoniarr-owned
-   API contract that combines live transfer rows, queue health, stale progress,
-   retry state, and action eligibility without making the UI depend directly on
-   the upstream download client shape.
+1. **Downloader action eligibility and operator controls.** Design cancel,
+   retry, clear, and pause/resume controls with fresh-session, CSRF,
+   idempotency, rate limits, and audit events.
 2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, CSRF,
    audit events, and safe requester-facing labels.

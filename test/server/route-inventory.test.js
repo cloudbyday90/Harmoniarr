@@ -6,6 +6,7 @@ import { registerPushRoutes } from '../../src/server/routes/push-routes.js';
 import { registerAppUserRoutes } from '../../src/server/routes/app-user-routes.js';
 import { registerAuthRoutes } from '../../src/server/routes/auth-routes.js';
 import { registerAdminRecoveryRoutes } from '../../src/server/routes/admin-recovery-routes.js';
+import { registerDownloaderRoutes } from '../../src/server/routes/downloader-routes.js';
 import { registerImportCandidateRoutes } from '../../src/server/routes/import-candidate-routes.js';
 import { registerLibraryRoutes } from '../../src/server/routes/library-routes.js';
 import { registerMetadataRoutes } from '../../src/server/routes/metadata-routes.js';
@@ -185,6 +186,11 @@ function collectRegisteredRoutes() {
     requireFreshAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
     requireCsrf: () => {},
     startSearch: asyncNoopResult({}),
+  });
+
+  registerDownloaderRoutes(app, {
+    buildDownloaderQueue: asyncNoopResult({}),
+    requireAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
   });
 
   registerOperationsRoutes(app, {

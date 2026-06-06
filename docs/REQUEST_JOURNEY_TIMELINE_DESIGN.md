@@ -127,11 +127,10 @@ in Activity and admin/operator views.
 
 ## Future areas
 
-1. **Downloader read model and queue health contract.** The dedicated
-   Downloader page now exists as a top-level operator surface, but it still
-   reads the live download client response directly. A Harmoniarr-owned read
-   model should combine live transfers, queue health, retry state, stale
-   progress, and action eligibility.
+1. **Downloader action eligibility and operator controls.** The dedicated
+   Downloader page now has a Harmoniarr-owned queue read model; the next
+   operator step is designing safe cancel, retry, clear, and pause/resume
+   actions with explicit eligibility.
 2. **Analyze-stage visibility.** Make the Importing stage explain *why* it is
    waiting — match confidence, tag reconciliation, transcode/validation
    progress — instead of a single "Importing" label, and reflect a future
@@ -169,3 +168,10 @@ requester-safe request projections.
 Downloading-stage messaging. A failed candidate no longer makes Downloading look
 failed when a replacement source is selected or actively transferring; the
 current stage remains active with generic requester-safe copy.
+
+## Downloader Queue Read Model Update
+
+`DOWNLOADER_QUEUE_READ_MODEL_DESIGN.md` completes the previously listed
+Downloader read model and queue health contract. The dedicated Downloader page
+now reads normalized queue health from `/api/v1/downloader/queue` instead of the
+raw slskd downloads response.

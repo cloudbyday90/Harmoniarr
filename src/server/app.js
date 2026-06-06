@@ -24,6 +24,7 @@ import { createArtworkModule } from './artwork/artwork-module.js';
 import { createAuthModule } from './auth-module.js';
 import { createDeploymentSecurityService } from './deployment-security-service.js';
 import { createDependencyHealthService, createProviderHealthRecorder } from './dependency-health-service.js';
+import { createDownloaderModule } from './downloader/downloader-module.js';
 import {
   createApiJsonBodyParser,
   createApiRequestContractMiddleware,
@@ -62,6 +63,7 @@ import { registerActivityRoutes } from './routes/activity-routes.js';
 import { registerAppUserRoutes } from './routes/app-user-routes.js';
 import { registerAuthRoutes } from './routes/auth-routes.js';
 import { registerAdminRecoveryRoutes } from './routes/admin-recovery-routes.js';
+import { registerDownloaderRoutes } from './routes/downloader-routes.js';
 import { registerImportCandidateRoutes } from './routes/import-candidate-routes.js';
 import { registerLibraryRoutes } from './routes/library-routes.js';
 import { registerMetadataRoutes } from './routes/metadata-routes.js';
@@ -143,6 +145,7 @@ export function createApp({
   createAppUserModule: buildAppUserModule = createAppUserModule,
   createAuthModule: buildAuthModule = createAuthModule,
   createDeploymentSecurityService: buildDeploymentSecurityService = createDeploymentSecurityService,
+  createDownloaderModule: buildDownloaderModule = createDownloaderModule,
   createImportCandidateModule: buildImportCandidateModule = createImportCandidateModule,
   createLibraryModule: buildLibraryModule = createLibraryModule,
   createPushModule: buildPushModule = createPushModule,
@@ -160,6 +163,7 @@ export function createApp({
   registerAppUserRoutes: mountAppUserRoutes = registerAppUserRoutes,
   registerAuthRoutes: mountAuthRoutes = registerAuthRoutes,
   registerAdminRecoveryRoutes: mountAdminRecoveryRoutes = registerAdminRecoveryRoutes,
+  registerDownloaderRoutes: mountDownloaderRoutes = registerDownloaderRoutes,
   registerImportCandidateRoutes: mountImportCandidateRoutes = registerImportCandidateRoutes,
   registerLibraryRoutes: mountLibraryRoutes = registerLibraryRoutes,
   registerMetadataRoutes: mountMetadataRoutes = registerMetadataRoutes,
@@ -244,6 +248,9 @@ export function createApp({
   });
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
+  const downloaderModule = buildDownloaderModule({
+    slskdService: slskdModule.slskdService,
+  });
   const restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore();
   const pushModule = buildPushModule();
   const fulfillmentModule = buildFulfillmentModule();
@@ -808,6 +815,14 @@ export function createApp({
       windowMs: 60 * 1000,
     }),
   });
+  mountDownloaderRoutes(app, {
+    ...downloaderModule.routeDependencies,
+    limitDownloaderQueueRead: requestRateLimiterService.createMiddleware({
+      bucketName: 'downloader-queue-read',
+      limit: 120,
+      windowMs: 60 * 1000,
+    }),
+  });
   mountImportCandidateRoutes(app, {
     ...importCandidateModule.routeDependencies,
     limitImportCandidateApplyRun: requestRateLimiterService.createMiddleware({
@@ -939,6 +954,7 @@ export function createApp({
     appPort,
     activityModule,
     artworkModule,
+    downloaderModule,
     fulfillmentModule,
     importCandidateModule,
     libraryModule,

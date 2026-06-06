@@ -154,10 +154,10 @@ Validation for this route cleanup:
 
 ## Next High-Value Design Areas
 
-1. **Downloader read model and queue health contract.** Replace direct
-   dependency on the upstream downloads response with a Harmoniarr-owned DTO
-   that combines live transfer rows, queue health, stale-progress policy, retry
-   state, and action eligibility.
+1. **Downloader action eligibility and operator controls.** Build on
+   `DOWNLOADER_QUEUE_READ_MODEL_DESIGN.md` by designing cancel, retry, clear,
+   and pause/resume controls with fresh-session, CSRF, idempotency, rate limits,
+   and audit events.
 2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    behavior with per-request authorization, CSRF, idempotency, rate limits, and
    audit events before exposing transfer mutations.

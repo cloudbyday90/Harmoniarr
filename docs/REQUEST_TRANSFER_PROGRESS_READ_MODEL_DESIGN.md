@@ -241,10 +241,10 @@ coupling them to server projection code.
 
 ## Future Design Areas
 
-1. **Downloader read model and queue health contract.** `DEDICATED_DOWNLOADER_PAGE_DESIGN.md`
-   establishes the top-level operator page, but the page should eventually read
-   a Harmoniarr-owned contract that combines live transfers, stale-progress
-   policy, retry state, and action eligibility.
+1. **Downloader action eligibility and operator controls.** `DOWNLOADER_QUEUE_READ_MODEL_DESIGN.md`
+   establishes the Harmoniarr-owned queue read contract; the next operator
+   contract should define cancel, retry, clear, and pause/resume eligibility
+   plus audit behavior.
 2. **Requester-scoped transfer actions.** Design cancel, retry, and re-queue
    capabilities with per-request authorization, idempotency, audit events,
    rate limits, and explicit eligibility rules instead of exposing operator
@@ -253,7 +253,6 @@ coupling them to server projection code.
    single Importing label with safe reasons such as validation, match review,
    tag reconciliation, and a future staging scan/clean/quarantine gate without
    exposing filesystem paths or internal exception details.
->>>>>>> codex/retry-aware-journey-messaging
 
 ## Phase 17 Update
 
@@ -275,10 +274,17 @@ Activity into `/app/downloader`. The follow-up
 `DEDICATED_DOWNLOADER_ROUTE_DEPRECATION_DESIGN.md` removes the old Activity
 downloads route instead of preserving it as a redirect. This does not change the
 requester-safe transfer progress read model; it clarifies the operator surface
-where future queue health and action eligibility contracts should land.
+where future action eligibility contracts should land.
 
 ## Phase 19 Update
 
 `REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes retry-aware transfer
 messaging in the request journey. Replacement sources are now presented as
 active Downloading progress, while failed-only candidates remain failed.
+
+## Downloader Queue Read Model Update
+
+`DOWNLOADER_QUEUE_READ_MODEL_DESIGN.md` completes the Downloader read model and
+queue health contract. The dedicated Downloader page now reads normalized live
+transfer rows and aggregate queue health from `/api/v1/downloader/queue`, while
+requester-safe transfer progress remains scoped to request detail projections.

@@ -19,21 +19,11 @@
 <script setup>
 import { computed, ref } from 'vue';
 import {
-  buildDownloadActivityCounts,
-  calculateTransferProgress,
-  flattenDownloadGroups,
-  formatDownloadActivitySummary,
   formatTransferFilename,
-  formatTransferStateLabel,
-  formatTransferStateTone,
-  isActiveTransferState,
-  isCompletedTransferState,
-  isFailedTransferState,
-  isQueuedTransferState,
 } from '../lib/activity-downloads-presentation.js';
 import { formatBytes, formatSpeed } from '../lib/search-presentation.js';
 import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
-import { fetchSlskdDownloads } from '../lib/slskd-search-api.js';
+import { fetchDownloaderQueue } from '../lib/downloader-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const POLL_INTERVAL_MS = 5000;
@@ -49,23 +39,38 @@ const filterOptions = Object.freeze([
 const selectedFilter = ref('all');
 
 const {
-  data: groups,
+  data: downloaderQueue,
   errorMessage,
   isLoading,
   lastRefreshedAt,
   load,
 } = useAsyncResource({
-  fetcher: () => fetchSlskdDownloads({ includeRemoved: false }),
-  project: (payload) => (Array.isArray(payload) ? payload : []),
-  initialData: [],
+  fetcher: () => fetchDownloaderQueue({ includeRemoved: false }),
+  project: (payload) => (payload && typeof payload === 'object' ? payload : null),
+  initialData: null,
   pollIntervalMs: POLL_INTERVAL_MS,
   fallbackErrorMessage: 'Failed to load downloads',
 });
 
-const allFiles = computed(() => flattenDownloadGroups(groups.value));
-const counts = computed(() => buildDownloadActivityCounts(allFiles.value));
+const emptyCounts = Object.freeze({
+  active: 0,
+  completed: 0,
+  failed: 0,
+  other: 0,
+  queued: 0,
+  total: 0,
+});
 
-const activitySummary = computed(() => formatDownloadActivitySummary(counts.value));
+const allFiles = computed(() => (
+  Array.isArray(downloaderQueue.value?.transfers)
+    ? downloaderQueue.value.transfers
+    : []
+));
+const counts = computed(() => downloaderQueue.value?.queueHealth?.counts ?? emptyCounts);
+
+const activitySummary = computed(() =>
+  downloaderQueue.value?.queueHealth?.message ?? 'No transfers are currently visible.',
+);
 
 const statusCards = computed(() => [
   { key: 'active', label: 'Active', value: counts.value.active, tone: counts.value.active > 0 ? 'warning' : 'info' },
@@ -75,15 +80,16 @@ const statusCards = computed(() => [
 ]);
 
 function matchesFilter(file) {
+  const stateCode = file?.state?.code;
   switch (selectedFilter.value) {
     case 'active':
-      return isActiveTransferState(file.state) && !isQueuedTransferState(file.state);
+      return stateCode === 'active';
     case 'queued':
-      return isQueuedTransferState(file.state);
+      return stateCode === 'queued';
     case 'completed':
-      return isCompletedTransferState(file.state);
+      return stateCode === 'completed';
     case 'failed':
-      return isFailedTransferState(file.state);
+      return stateCode === 'failed';
     default:
       return true;
   }
@@ -91,14 +97,19 @@ function matchesFilter(file) {
 
 const visibleFiles = computed(() =>
   allFiles.value
-    .filter(matchesFilter)
-    .map((file) => ({ ...file, progress: calculateTransferProgress(file) })),
+    .filter(matchesFilter),
 );
 
 function progressLabel(file) {
-  if (file.progress !== null) return `${file.progress}%`;
-  if (isActiveTransferState(file.state)) return 'Waiting for progress';
+  if (file.progress?.percentComplete !== null && file.progress?.percentComplete !== undefined) {
+    return `${file.progress.percentComplete}%`;
+  }
+  if (file.state?.code === 'active' || file.state?.code === 'queued') return 'Waiting for progress';
   return '—';
+}
+
+function shouldShowIndeterminateProgress(file) {
+  return file?.state?.code === 'active' || file?.state?.code === 'queued';
 }
 </script>
 
@@ -109,7 +120,8 @@ function progressLabel(file) {
         <h1 class="hx-page-title">Downloader</h1>
         <p class="hx-page-subtitle">
           Live transfer queue, active downloads, and recent outcomes from your download client.
-          {{ activitySummary }}.
+          {{ activitySummary }}
+          <span v-if="downloaderQueue?.observedAt">Observed {{ formatOperationTimestampShort(downloaderQueue.observedAt) }}.</span>
           <span v-if="lastRefreshedAt">Refreshed {{ formatOperationTimestampShort(lastRefreshedAt) }}.</span>
         </p>
       </div>
@@ -191,34 +203,34 @@ function progressLabel(file) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="file in visibleFiles" :key="`${file.username}::${file.id}`">
+              <tr v-for="file in visibleFiles" :key="file.transferKey">
                 <td>
                   <span class="downloader-file" :title="file.filename">{{ formatTransferFilename(file.filename) }}</span>
                   <span v-if="file.directory" class="downloader-file-directory">{{ file.directory }}</span>
                 </td>
-                <td>{{ file.username }}</td>
+                <td>{{ file.sourceUser ?? '—' }}</td>
                 <td>
-                  <span class="hx-pill" :data-tone="formatTransferStateTone(file.state)">
-                    {{ formatTransferStateLabel(file.state) }}
+                  <span class="hx-pill" :data-tone="file.state?.tone ?? 'info'">
+                    {{ file.state?.label ?? 'Unknown' }}
                   </span>
                 </td>
                 <td class="hx-table-num">
                   <div class="downloader-progress-cell">
                     <progress
-                      v-if="file.progress !== null"
+                      v-if="file.progress?.percentComplete !== null && file.progress?.percentComplete !== undefined"
                       class="downloader-progress"
-                      :value="file.progress"
+                      :value="file.progress.percentComplete"
                       max="100"
-                    >{{ file.progress }}%</progress>
+                    >{{ file.progress.percentComplete }}%</progress>
                     <progress
-                      v-else-if="isActiveTransferState(file.state)"
+                      v-else-if="shouldShowIndeterminateProgress(file)"
                       class="downloader-progress"
                       max="100"
                     >Waiting for progress</progress>
                     <span>{{ progressLabel(file) }}</span>
                   </div>
                 </td>
-                <td class="hx-table-num">{{ formatBytes(file.size) }}</td>
+                <td class="hx-table-num">{{ formatBytes(file.progress?.size) }}</td>
                 <td class="hx-table-num">{{ formatSpeed(file.averageSpeed) }}</td>
                 <td class="hx-table-num">
                   <span v-if="file.placeInQueue !== null && file.placeInQueue !== undefined">{{ file.placeInQueue }}</span>
