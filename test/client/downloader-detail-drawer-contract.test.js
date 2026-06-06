@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const drawerPath = new URL('../../src/client/components/downloader/DownloaderTransferDetailDrawer.vue', import.meta.url);
+const viewPath = new URL('../../src/client/views/DownloaderView.vue', import.meta.url);
+
+test('DownloaderTransferDetailDrawer follows the modal dialog accessibility contract', async () => {
+  const source = await readFile(drawerPath, 'utf8');
+
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /aria-modal="true"/);
+  assert.match(source, /aria-labelledby="downloader-detail-title"/);
+  assert.match(source, /@cancel="onCancel"/);
+  assert.match(source, /dialogRef\.showModal\(\)/);
+  assert.match(source, /aria-label="Close transfer diagnostics"/);
+  assert.match(source, /min-width: 44px/);
+  assert.match(source, /min-height: 44px/);
+});
+
+test('DownloaderView opens diagnostics from an explicit Details action', async () => {
+  const source = await readFile(viewPath, 'utf8');
+
+  assert.match(source, /DownloaderTransferDetailDrawer/);
+  assert.match(source, /selectedTransferKey/);
+  assert.match(source, /@click="openTransferDetail\(file\)"/);
+  assert.match(source, />\s*Details\s*<\/button>/);
+});

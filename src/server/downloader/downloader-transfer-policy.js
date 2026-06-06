@@ -42,6 +42,14 @@ const transferStateTones = Object.freeze({
   queued: 'warning',
 });
 
+const diagnosticSeverityByState = Object.freeze({
+  active: 'info',
+  completed: 'success',
+  failed: 'attention',
+  other: 'unknown',
+  queued: 'info',
+});
+
 function normalizeState(value) {
   return typeof value === 'string' && value.trim()
     ? value.replace(/\s+/g, ' ').trim()
@@ -58,6 +66,79 @@ function hasException(transfer) {
 
 function includesFailureToken(stateKey) {
   return terminalFailureTokens.some((token) => stateKey.includes(token));
+}
+
+function normalizeQueuePosition(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getLastKnownEventAt(timestamps = {}) {
+  const values = [
+    timestamps.endedAt,
+    timestamps.startedAt,
+    timestamps.enqueuedAt,
+    timestamps.requestedAt,
+  ].filter((value) => typeof value === 'string' && value);
+
+  return values[0] ?? null;
+}
+
+function buildStateSummary(state, progress) {
+  switch (state.code) {
+    case 'active':
+      return progress.percentComplete == null
+        ? 'The transfer is active, but the provider has not reported a measurable percent yet.'
+        : `The transfer is actively downloading at ${progress.percentComplete}%.`;
+    case 'queued':
+      return 'The transfer is queued and waiting for the provider or remote source.';
+    case 'completed':
+      return 'The transfer has completed and is ready for downstream import review when applicable.';
+    case 'failed':
+      return 'The transfer failed or reported a provider error. Raw provider error text is intentionally withheld.';
+    default:
+      return 'The provider returned a transfer state that Harmoniarr does not recognize yet.';
+  }
+}
+
+function buildRecommendedNextAction(state) {
+  switch (state.code) {
+    case 'active':
+      return {
+        code: 'monitor_progress',
+        description: 'Keep watching progress and speed before taking operator action.',
+        label: 'Monitor progress',
+        tone: 'info',
+      };
+    case 'queued':
+      return {
+        code: 'wait_for_source',
+        description: 'Wait for the remote source or inspect queue position if this remains queued.',
+        label: 'Wait for source',
+        tone: 'warning',
+      };
+    case 'completed':
+      return {
+        code: 'review_import',
+        description: 'Review import workflow status when this transfer is tied to a request or candidate.',
+        label: 'Review import',
+        tone: 'success',
+      };
+    case 'failed':
+      return {
+        code: 'inspect_before_retry',
+        description: 'Inspect state, source, and future action eligibility before retrying.',
+        label: 'Inspect before retry',
+        tone: 'danger',
+      };
+    default:
+      return {
+        code: 'review_provider_state',
+        description: 'Review the provider state and update Harmoniarr normalization if this state is expected.',
+        label: 'Review provider state',
+        tone: 'info',
+      };
+  }
 }
 
 export function classifyDownloaderTransferState(transfer) {
@@ -152,5 +233,45 @@ export function buildDownloaderActionEligibility() {
     canClear: false,
     canRetry: false,
     reason: 'actions_not_designed',
+  };
+}
+
+export function buildDownloaderTransferDiagnostics(transfer, {
+  progress,
+  state,
+  timestamps,
+} = {}) {
+  const normalizedState = state ?? classifyDownloaderTransferState(transfer);
+  const normalizedProgress = progress ?? calculateDownloaderTransferProgress(transfer);
+  const normalizedTimestamps = timestamps ?? {};
+  const placeInQueue = normalizeQueuePosition(transfer?.placeInQueue);
+
+  return {
+    importLinkage: {
+      candidateId: null,
+      requestId: null,
+      status: 'not_linked',
+      summary: 'No request or import-candidate linkage is exposed for this live provider row yet.',
+    },
+    provider: {
+      hasProviderError: hasException(transfer),
+      name: 'slskd',
+      state: normalizedState.raw,
+    },
+    queue: {
+      hasQueuePosition: placeInQueue !== null,
+      placeInQueue,
+    },
+    recommendedNextAction: buildRecommendedNextAction(normalizedState),
+    retry: {
+      attempts: null,
+      status: 'not_tracked',
+      summary: 'Retry attempts are not tracked by Harmoniarr for live provider rows yet.',
+    },
+    severity: diagnosticSeverityByState[normalizedState.code] ?? 'unknown',
+    summary: buildStateSummary(normalizedState, normalizedProgress),
+    timing: {
+      lastKnownEventAt: getLastKnownEventAt(normalizedTimestamps),
+    },
   };
 }

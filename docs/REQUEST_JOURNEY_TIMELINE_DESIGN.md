@@ -128,17 +128,15 @@ in Activity and admin/operator views.
 ## Future areas
 
 1. **Downloader action eligibility and operator controls.** The dedicated
-   Downloader page now has a Harmoniarr-owned queue read model; the next
-   operator step is designing safe cancel, retry, clear, and pause/resume
-   actions with explicit eligibility.
-2. **Analyze-stage visibility.** Make the Importing stage explain *why* it is
-   waiting — match confidence, tag reconciliation, transcode/validation
-   progress — instead of a single "Importing" label, and reflect a future
-   ClamAV quarantine gate (staging → scan → clean/quarantine) as an explicit
-   sub-step.
-3. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+   Downloader page now has a Harmoniarr-owned queue read model and transfer
+   diagnostics drawer; the next operator step is designing safe cancel, retry,
+   clear, and pause/resume actions with explicit eligibility.
+2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, and audit
    events before exposing requester mutations.
+3. **Downloader event history and audit trail.** Persist meaningful downloader
+   events so operator diagnostics can explain how a transfer reached its current
+   state before requester-facing action controls are considered.
 
 ## Phase 17 update
 
@@ -175,3 +173,11 @@ current stage remains active with generic requester-safe copy.
 Downloader read model and queue health contract. The dedicated Downloader page
 now reads normalized queue health from `/api/v1/downloader/queue` instead of the
 raw slskd downloads response.
+
+## Downloader Detail Drawer Update
+
+`DOWNLOADER_DETAIL_DRAWER_DIAGNOSTICS_DESIGN.md` completes the operator detail
+surface for one selected live transfer. This does not change requester-safe
+journey projections; it gives operators a safe diagnostics panel for queue
+position, provider state, retry posture, linkage placeholders, and recommended
+next action.

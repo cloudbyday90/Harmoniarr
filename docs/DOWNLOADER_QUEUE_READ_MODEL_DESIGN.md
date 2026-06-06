@@ -153,6 +153,8 @@ Recommended stack:
 - Updated the Downloader page to call the new read model.
 - Kept `/api/v1/slskd/downloads` available as the lower-level admin provider
   route for existing integrations and tests.
+- Added safe per-transfer diagnostics for the Downloader detail drawer in the
+  follow-up `DOWNLOADER_DETAIL_DRAWER_DIAGNOSTICS_DESIGN.md`.
 
 ## Contract Sketch
 
@@ -182,7 +184,17 @@ Recommended stack:
       }
     },
     "sourceGroups": [],
-    "transfers": []
+    "transfers": [{
+      "transferKey": "source-user::transfer-1",
+      "diagnostics": {
+        "severity": "info",
+        "summary": "The transfer is actively downloading at 42%.",
+        "recommendedNextAction": {
+          "code": "monitor_progress",
+          "label": "Monitor progress"
+        }
+      }
+    }]
   }
 }
 ```
@@ -220,6 +232,6 @@ Validation for this phase:
    idempotency, rate limits, and audit events.
 2. **Requester-scoped transfer actions.** Design requester-owned cancel, retry,
    and requeue behavior with per-request authorization and safe labels.
-3. **Downloader detail drawer and diagnostics panel.** Add a focused transfer
-   detail surface for queue position, retry attempts, stale observations,
-   request/candidate linkage, and recommended next action.
+3. **Downloader event history and audit trail.** Persist meaningful downloader
+   events so operator diagnostics can explain how a transfer reached its current
+   state, not only what the live provider reports now.

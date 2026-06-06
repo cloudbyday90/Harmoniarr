@@ -161,7 +161,6 @@ Validation for this route cleanup:
 2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    behavior with per-request authorization, CSRF, idempotency, rate limits, and
    audit events before exposing transfer mutations.
-3. **Importing-stage freshness and explanation.** Extend requester-safe journey
-   language beyond Downloading so Importing can explain validation, matching,
-   staging, blocked, stale, and completed states without leaking filesystem or
-   peer details.
+3. **Downloader event history and audit trail.** Persist meaningful downloader
+   events so the detail drawer can explain how a transfer reached its current
+   state, not only what the live provider reports now.

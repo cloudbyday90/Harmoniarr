@@ -84,6 +84,8 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 - [x] Create job queue/history screens with status, timings, and failure reasons.
 - [x] Create job detail/event views for audit-friendly troubleshooting.
 - [x] Promote live downloader operations into a dedicated top-level operator page.
+- [x] Add Downloader transfer detail drawer diagnostics for one selected live
+  transfer without expanding the queue table.
 - [ ] Create durable operator-attention or notifications surface if server-backed notifications are accepted.
 - [ ] Define toast-only vs durable-history UI boundaries.
 

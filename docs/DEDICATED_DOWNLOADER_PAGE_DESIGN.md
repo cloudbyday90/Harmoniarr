@@ -167,6 +167,9 @@ Recommended stack:
 - Added the follow-up `GET /api/v1/downloader/queue` read model documented in
   `DOWNLOADER_QUEUE_READ_MODEL_DESIGN.md`, and moved the page off the raw
   `/api/v1/slskd/downloads` provider response.
+- Added the follow-up detail drawer documented in
+  `DOWNLOADER_DETAIL_DRAWER_DIAGNOSTICS_DESIGN.md`, giving operators a focused
+  diagnostics panel for one selected transfer without expanding the queue table.
 
 ## Security Outcome
 
@@ -201,6 +204,13 @@ this page. The Downloader page now reads `GET /api/v1/downloader/queue`, which
 normalizes transfer state, progress, aggregate queue health, source groups, and
 disabled future action eligibility on the server.
 
+## Detail Drawer Update
+
+`DOWNLOADER_DETAIL_DRAWER_DIAGNOSTICS_DESIGN.md` completes the focused
+diagnostics surface for one selected transfer. The queue read model now includes
+safe per-transfer diagnostics, and the page renders those diagnostics through a
+native dialog side drawer.
+
 ## Next High-Value Design Areas
 
 1. **Downloader action eligibility and operator controls.** Design cancel,
@@ -209,6 +219,6 @@ disabled future action eligibility on the server.
 2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, CSRF,
    audit events, and safe requester-facing labels.
-3. **Importing-stage freshness and explanation.** Apply the same freshness and
-   safe explanation model to validation/import work so requesters and operators
-   can distinguish active import, waiting, stale, blocked, and completed states.
+3. **Downloader event history and audit trail.** Persist meaningful downloader
+   events so the diagnostics drawer can explain how a transfer reached its
+   current state instead of only showing the live provider observation.

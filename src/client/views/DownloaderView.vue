@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
+import DownloaderTransferDetailDrawer from '../components/downloader/DownloaderTransferDetailDrawer.vue';
 import {
   formatTransferFilename,
 } from '../lib/activity-downloads-presentation.js';
@@ -37,6 +38,7 @@ const filterOptions = Object.freeze([
 ]);
 
 const selectedFilter = ref('all');
+const selectedTransferKey = ref(null);
 
 const {
   data: downloaderQueue,
@@ -100,6 +102,12 @@ const visibleFiles = computed(() =>
     .filter(matchesFilter),
 );
 
+const selectedTransfer = computed(() => (
+  selectedTransferKey.value
+    ? allFiles.value.find((file) => file.transferKey === selectedTransferKey.value) ?? null
+    : null
+));
+
 function progressLabel(file) {
   if (file.progress?.percentComplete !== null && file.progress?.percentComplete !== undefined) {
     return `${file.progress.percentComplete}%`;
@@ -110,6 +118,15 @@ function progressLabel(file) {
 
 function shouldShowIndeterminateProgress(file) {
   return file?.state?.code === 'active' || file?.state?.code === 'queued';
+}
+
+function openTransferDetail(file) {
+  if (!file?.transferKey) return;
+  selectedTransferKey.value = file.transferKey;
+}
+
+function closeTransferDetail() {
+  selectedTransferKey.value = null;
 }
 </script>
 
@@ -200,6 +217,7 @@ function shouldShowIndeterminateProgress(file) {
                 <th class="hx-table-num">Size</th>
                 <th class="hx-table-num">Speed</th>
                 <th class="hx-table-num">Queue</th>
+                <th class="hx-table-num">Diagnostics</th>
               </tr>
             </thead>
             <tbody>
@@ -236,12 +254,28 @@ function shouldShowIndeterminateProgress(file) {
                   <span v-if="file.placeInQueue !== null && file.placeInQueue !== undefined">{{ file.placeInQueue }}</span>
                   <span v-else>—</span>
                 </td>
+                <td class="hx-table-num">
+                  <button
+                    type="button"
+                    class="hx-btn downloader-detail-button"
+                    @click="openTransferDetail(file)"
+                  >
+                    Details
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
     </article>
+
+    <DownloaderTransferDetailDrawer
+      :open="Boolean(selectedTransfer)"
+      :observed-at="downloaderQueue?.observedAt ?? null"
+      :transfer="selectedTransfer"
+      @close="closeTransferDetail"
+    />
   </section>
 </template>
 
@@ -284,5 +318,10 @@ function shouldShowIndeterminateProgress(file) {
   width: 150px;
   height: 8px;
   accent-color: var(--hx-accent);
+}
+
+.downloader-detail-button {
+  min-height: 32px;
+  padding: 0 var(--hx-space-3);
 }
 </style>

@@ -32,8 +32,9 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 - The protected `POST /api/v1/auth/refresh` route and privileged admin mutation routes now return a normalized `reauth_required` error when the authenticated session is flagged for forced re-authentication, while read-side routes remain accessible until password-management and session-management routes are defined.
 - The dedicated Downloader page now consumes a Harmoniarr-owned admin-only
   `GET /api/v1/downloader/queue` read model for normalized transfer rows,
-  queue health, source groups, and disabled future action eligibility while the
-  lower-level `GET /api/v1/slskd/downloads` provider route remains available.
+  queue health, source groups, safe per-transfer diagnostics, and disabled
+  future action eligibility while the lower-level `GET /api/v1/slskd/downloads`
+  provider route remains available.
 
 ## Global Contract Rules
 
@@ -75,6 +76,9 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 - [x] Define the Downloader queue read model route contract for live transfer
   rows, aggregate queue health, source groups, provider error normalization, and
   admin-only access.
+- [x] Define the Downloader transfer diagnostics contract for detail-drawer
+  fields, safe provider-state exposure, recommended next action, retry/linkage
+  placeholders, and raw provider exception redaction.
 
 ## Route Family 4 - Import Review And Canonical Metadata
 

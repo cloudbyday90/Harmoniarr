@@ -242,17 +242,17 @@ coupling them to server projection code.
 ## Future Design Areas
 
 1. **Downloader action eligibility and operator controls.** `DOWNLOADER_QUEUE_READ_MODEL_DESIGN.md`
-   establishes the Harmoniarr-owned queue read contract; the next operator
-   contract should define cancel, retry, clear, and pause/resume eligibility
-   plus audit behavior.
+   establishes the Harmoniarr-owned queue read contract, and
+   `DOWNLOADER_DETAIL_DRAWER_DIAGNOSTICS_DESIGN.md` adds the operator detail
+   diagnostics panel; the next operator contract should define cancel, retry,
+   clear, and pause/resume eligibility plus audit behavior.
 2. **Requester-scoped transfer actions.** Design cancel, retry, and re-queue
    capabilities with per-request authorization, idempotency, audit events,
    rate limits, and explicit eligibility rules instead of exposing operator
    execution controls.
-3. **Importing-stage explanation and quarantine visibility.** Replace the
-   single Importing label with safe reasons such as validation, match review,
-   tag reconciliation, and a future staging scan/clean/quarantine gate without
-   exposing filesystem paths or internal exception details.
+3. **Downloader event history and audit trail.** Persist meaningful downloader
+   events so diagnostics can explain how a transfer reached its current state,
+   not only what the live provider reports now.
 
 ## Phase 17 Update
 
@@ -288,3 +288,10 @@ active Downloading progress, while failed-only candidates remain failed.
 queue health contract. The dedicated Downloader page now reads normalized live
 transfer rows and aggregate queue health from `/api/v1/downloader/queue`, while
 requester-safe transfer progress remains scoped to request detail projections.
+
+## Downloader Detail Drawer Update
+
+`DOWNLOADER_DETAIL_DRAWER_DIAGNOSTICS_DESIGN.md` completes the operator
+diagnostics panel for one selected live transfer. It extends the downloader
+queue read model with safe per-transfer diagnostics while leaving requester-safe
+transfer progress scoped to minimized request detail projections.

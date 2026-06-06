@@ -18,6 +18,7 @@
 
 import {
   buildDownloaderActionEligibility,
+  buildDownloaderTransferDiagnostics,
   calculateDownloaderTransferProgress,
   classifyDownloaderTransferState,
 } from './downloader-transfer-policy.js';
@@ -80,10 +81,21 @@ function flattenDownloadGroups(groups) {
 function normalizeTransfer(transfer, index) {
   const state = classifyDownloaderTransferState(transfer);
   const progress = calculateDownloaderTransferProgress(transfer);
+  const timestamps = {
+    endedAt: normalizeTimestamp(transfer?.endedAt),
+    enqueuedAt: normalizeTimestamp(transfer?.enqueuedAt),
+    requestedAt: normalizeTimestamp(transfer?.requestedAt),
+    startedAt: normalizeTimestamp(transfer?.startedAt),
+  };
 
   return {
     actionEligibility: buildDownloaderActionEligibility(),
     averageSpeed: normalizeNumber(transfer?.averageSpeed),
+    diagnostics: buildDownloaderTransferDiagnostics(transfer, {
+      progress,
+      state,
+      timestamps,
+    }),
     directory: normalizeString(transfer?.directory),
     filename: normalizeString(transfer?.filename),
     id: normalizeString(transfer?.id),
@@ -91,12 +103,7 @@ function normalizeTransfer(transfer, index) {
     progress,
     sourceUser: normalizeString(transfer?.username),
     state,
-    timestamps: {
-      endedAt: normalizeTimestamp(transfer?.endedAt),
-      enqueuedAt: normalizeTimestamp(transfer?.enqueuedAt),
-      requestedAt: normalizeTimestamp(transfer?.requestedAt),
-      startedAt: normalizeTimestamp(transfer?.startedAt),
-    },
+    timestamps,
     transferKey: [
       normalizeString(transfer?.username) ?? 'unknown-source',
       normalizeString(transfer?.id) ?? `row-${index + 1}`,

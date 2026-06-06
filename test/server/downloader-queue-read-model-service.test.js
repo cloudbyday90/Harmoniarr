@@ -84,6 +84,39 @@ test('buildDownloaderQueueReadModelFromDownloads normalizes transfers, counts, p
     percentComplete: 50,
     size: 100,
   });
+  assert.deepEqual(result.transfers[0].diagnostics, {
+    importLinkage: {
+      candidateId: null,
+      requestId: null,
+      status: 'not_linked',
+      summary: 'No request or import-candidate linkage is exposed for this live provider row yet.',
+    },
+    provider: {
+      hasProviderError: false,
+      name: 'slskd',
+      state: 'InProgress',
+    },
+    queue: {
+      hasQueuePosition: true,
+      placeInQueue: 0,
+    },
+    recommendedNextAction: {
+      code: 'monitor_progress',
+      description: 'Keep watching progress and speed before taking operator action.',
+      label: 'Monitor progress',
+      tone: 'info',
+    },
+    retry: {
+      attempts: null,
+      status: 'not_tracked',
+      summary: 'Retry attempts are not tracked by Harmoniarr for live provider rows yet.',
+    },
+    severity: 'info',
+    summary: 'The transfer is actively downloading at 50%.',
+    timing: {
+      lastKnownEventAt: '2026-06-06T11:59:30.000Z',
+    },
+  });
   assert.equal(result.transfers[0].timestamps.startedAt, '2026-06-06T11:59:30.000Z');
   assert.deepEqual(result.transfers[0].actionEligibility, {
     canCancel: false,
@@ -92,6 +125,8 @@ test('buildDownloaderQueueReadModelFromDownloads normalizes transfers, counts, p
     reason: 'actions_not_designed',
   });
   assert.equal(result.transfers[1].state.code, 'failed');
+  assert.equal(result.transfers[1].diagnostics.provider.hasProviderError, true);
+  assert.equal(result.transfers[1].diagnostics.summary.includes('withheld'), true);
   assert.equal(Object.hasOwn(result.transfers[1], 'exception'), false);
   assert.equal(result.transfers[2].state.code, 'queued');
   assert.equal(result.transfers[2].timestamps.requestedAt, null);
