@@ -153,3 +153,10 @@ diagnostics.
 preview/apply-preview contract decision. The path-planning preview endpoints are
 admin-only, so requester journey detail remains tied to safe progress
 projections.
+
+## Phase 19 update
+
+`REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes retry-aware
+Downloading-stage messaging. A failed candidate no longer makes Downloading look
+failed when a replacement source is selected or actively transferring; the
+current stage remains active with generic requester-safe copy.

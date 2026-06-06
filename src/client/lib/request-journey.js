@@ -143,8 +143,17 @@ function runCompleted(runItem) {
   return runItem.runStatus === 'completed' && runItem.itemStatus === 'completed';
 }
 
+function candidateDownloadFailed(candidate) {
+  return candidate?.status === 'failed' || runFailed(candidate?.execution);
+}
+
 function candidateDownloadActive(candidate) {
-  return candidate?.status === 'downloading' || runActive(candidate?.execution);
+  return !candidateDownloadFailed(candidate)
+    && (candidate?.status === 'downloading' || runActive(candidate?.execution));
+}
+
+function candidateDownloadQueued(candidate) {
+  return !candidateDownloadFailed(candidate) && candidate?.status === 'selected';
 }
 
 function normalizeTransferPercent(value) {
@@ -288,9 +297,9 @@ function resolveDownloading({
 
   const anyDownloadComplete = someCandidate(candidates, (c) =>
     c.status === 'import_pending' || c.status === 'applied' || runCompleted(c.execution));
-  const anyDownloading = someCandidate(candidates, (c) =>
-    c.status === 'downloading' || runActive(c.execution));
-  const anyDownloadFailed = someCandidate(candidates, (c) => runFailed(c.execution));
+  const anyDownloading = someCandidate(candidates, candidateDownloadActive);
+  const anyDownloadQueued = someCandidate(candidates, candidateDownloadQueued);
+  const anyDownloadFailed = someCandidate(candidates, candidateDownloadFailed);
 
   if (anyDownloadComplete) {
     return { status: STAGE_STATUS.COMPLETE, detail: 'Download finished.' };
@@ -298,15 +307,23 @@ function resolveDownloading({
   if (anyDownloading) {
     return {
       status: STAGE_STATUS.ACTIVE,
-      detail: 'Transferring files from Soulseek.',
+      detail: anyDownloadFailed
+        ? 'Trying another source after an earlier download did not finish.'
+        : 'Transferring files from Soulseek.',
       progress: buildDownloadingProgress(selectDownloadingProgressCandidate(candidates), {
         nowMs,
         staleAfterMs: transferProgressStaleAfterMs,
       }),
     };
   }
+  if (anyDownloadFailed && anyDownloadQueued) {
+    return {
+      status: STAGE_STATUS.ACTIVE,
+      detail: 'Trying another source. Waiting for transfer to start.',
+    };
+  }
   if (anyDownloadFailed) {
-    return { status: STAGE_STATUS.FAILED, detail: 'A download failed; Harmoniarr may retry another source.' };
+    return { status: STAGE_STATUS.FAILED, detail: 'Download did not finish, and no replacement source is active yet.' };
   }
   if (requestState === 'cancelled') {
     return { status: STAGE_STATUS.CANCELLED, detail: 'Cancelled before downloading.' };

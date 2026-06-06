@@ -249,12 +249,12 @@ coupling them to server projection code.
    single Importing label with safe reasons such as validation, match review,
    tag reconciliation, and a future staging scan/clean/quarantine gate without
    exposing filesystem paths or internal exception details.
-3. **Retry-aware transfer progress.** Distinguish stale progress caused by a
-   paused or abandoned candidate from active retry progress on a replacement
-   candidate.
-4. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+3. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, and audit
    events before exposing requester mutations.
+4. **Requester-safe failure and blocker reasons.** Define a bounded requester
+   vocabulary for failed search, failed download, import blocked, operator
+   review needed, and unavailable source states.
 
 ## Phase 17 Update
 
@@ -268,3 +268,9 @@ candidate diagnostics.
 `REQUESTER_SAFE_IMPORT_CANDIDATE_PREVIEW_CONTRACTS_DESIGN.md` completes the
 preview/apply-preview contract decision. The path-planning preview endpoints are
 admin-only and requester progress stays on minimized read projections.
+
+## Phase 19 Update
+
+`REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes retry-aware transfer
+messaging in the request journey. Replacement sources are now presented as
+active Downloading progress, while failed-only candidates remain failed.

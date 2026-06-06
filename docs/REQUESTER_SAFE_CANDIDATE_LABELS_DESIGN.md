@@ -166,15 +166,15 @@ full details needed for review and troubleshooting.
 
 ## Future Design Areas
 
-1. **Retry-aware journey messaging.** Distinguish `trying another source` from
-   a failed Downloading stage when a replacement source is selected after a
-   failed transfer.
-2. **Importing-stage freshness and explanation.** Apply the same safe-label and
+1. **Importing-stage freshness and explanation.** Apply the same safe-label and
    observed-age vocabulary to validation, scan, transcode, and quarantine
    progress.
-3. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, and audit
    events before exposing requester mutations.
+3. **Requester-safe failure and blocker reasons.** Define a bounded requester
+   vocabulary for failed search, failed download, import blocked, operator
+   review needed, and unavailable source states.
 
 ## Phase 17 Update
 
@@ -189,3 +189,10 @@ summaries instead of operator-rich candidate objects.
 requester-safe preview/apply-preview contract decision. The preview endpoints
 are admin-only because they expose path-planning diagnostics outside the
 requester journey contract.
+
+## Phase 19 Update
+
+`REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes the retry-aware
+Downloading-stage messaging item. The requester journey now treats queued or
+active replacement sources as active progress instead of surfacing an earlier
+candidate failure as the current request state.

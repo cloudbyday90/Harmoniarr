@@ -182,15 +182,15 @@ The implementation now:
 
 ## Next High-Value Design Areas
 
-1. **Retry-aware journey messaging.** Distinguish an abandoned source from
-   `trying another source` when a failed candidate is replaced, and ensure stale
-   transfer progress does not look like an active failure.
-2. **Importing-stage freshness and explanation.** Extend safe observed-age
+1. **Importing-stage freshness and explanation.** Extend safe observed-age
    language to validation, scan, transcode, post-apply scan, and quarantine
    progress without exposing filesystem or exception detail.
-3. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, and audit
    events before exposing any requester mutation.
+3. **Requester-safe failure and blocker reasons.** Define a bounded requester
+   vocabulary for failed search, failed download, import blocked, operator
+   review needed, and unavailable source states.
 
 ## Phase 18 Update
 
@@ -198,3 +198,9 @@ The implementation now:
 requester-safe preview/apply-preview decision. The HTTP endpoints are now
 admin-only because they expose path-planning and file-inspection diagnostics
 that requesters do not need.
+
+## Phase 19 Update
+
+`REQUEST_RETRY_AWARE_JOURNEY_MESSAGING_DESIGN.md` completes retry-aware
+Downloading-stage messaging. The journey now presents selected or active
+replacement sources as active progress without exposing candidate identities.
