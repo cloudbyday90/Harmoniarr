@@ -10,7 +10,7 @@ transfer visibility inside Activity.
 This phase is intentionally limited to the operational read surface:
 
 - add a top-level `/app/downloader` route and sidebar entry
-- keep the existing Activity downloads deep link working through a redirect
+- make `/app/downloader` the canonical Downloader route
 - reuse the current admin-only `/api/v1/slskd/downloads` contract
 - improve the frontend transfer presentation with summary counts, filters, and
   accessible progress indicators
@@ -39,6 +39,16 @@ database-backed downloader read model.
 - Vue Router official nested-route guidance supports keeping old URL structures
   stable through route configuration and redirects:
   https://router.vuejs.org/guide/essentials/nested-routes.html
+- Vue Router's redirect and alias guidance documents redirects as explicit
+  route records and notes that navigation guards run on the resolved target,
+  not on the redirecting route:
+  https://router.vuejs.org/guide/essentials/redirect-and-alias.html
+- Vue Router's route matching guidance describes static route paths as the
+  normal path for most applications:
+  https://router.vuejs.org/guide/essentials/route-matching-syntax.html
+- Vue Router route meta fields provide the official mechanism for attaching
+  route authorization metadata that global guards can evaluate:
+  https://router.vuejs.org/guide/advanced/meta
 - OWASP Authorization Cheat Sheet recommends least privilege, deny-by-default,
   and validating permissions on every request:
   https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
@@ -92,7 +102,6 @@ Pros:
 - establishes Downloader as a first-class platform component immediately
 - keeps backend risk low by reusing the current admin-only slskd downloads read
   contract
-- preserves old Activity deep links through a redirect
 - lets UI and product language mature before adding queue mutations
 
 Cons:
@@ -100,6 +109,8 @@ Cons:
 - still depends on the upstream grouped slskd response shape
 - does not yet provide a Harmoniarr-owned aggregate queue health contract
 - no durable historical downloader read model yet
+- required a follow-up route deprecation pass to remove the temporary Activity
+  downloads compatibility redirect
 
 ### Option C: Build New Backend Downloader Read Model First
 
@@ -125,8 +136,8 @@ Recommended stack:
 
 - Route: `/app/downloader`, lazy-loaded through Vue Router dynamic imports.
 - Navigation: top-level operator nav item labeled `Downloader`.
-- Legacy URL: redirect `/app/activity/downloads` to `downloader`, preserving
-  query and hash.
+- Legacy URL: no Activity downloads compatibility route; `/app/activity/downloads`
+  is deprecated and no longer registered.
 - Authorization: no new backend route; continue using the existing admin-only
   `/api/v1/slskd/downloads` API.
 - Presentation: pure helper functions flatten the upstream grouped downloads
@@ -145,7 +156,9 @@ Recommended stack:
 - Added the top-level `downloader` route at `/app/downloader`.
 - Added a top-level operator nav item for Downloader.
 - Added a distinct download icon in desktop and mobile navigation.
-- Redirected `/app/activity/downloads` to the new Downloader route.
+- Removed the temporary `/app/activity/downloads` redirect in the follow-up
+  route deprecation pass documented in
+  `DEDICATED_DOWNLOADER_ROUTE_DEPRECATION_DESIGN.md`.
 - Removed the Activity Downloads tab and deleted the old Activity-specific
   downloads view.
 - Extended `activity-downloads-presentation.js` with tested flattening and
@@ -172,6 +185,13 @@ Recommended stack:
 - `npm run lint:client`
 - `npm run build:client`
 - Full validation is recorded in the implementation commit notes.
+
+## Route Deprecation Update
+
+`DEDICATED_DOWNLOADER_ROUTE_DEPRECATION_DESIGN.md` removes the temporary
+Activity downloads compatibility route. The canonical Downloader surface is now
+only `/app/downloader`; Activity no longer owns or redirects a Downloads child
+route.
 
 ## Next High-Value Design Areas
 

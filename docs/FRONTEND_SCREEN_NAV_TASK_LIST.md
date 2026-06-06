@@ -39,7 +39,8 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 - The auth shell now also redirects forced re-authentication failures back to login with a distinct reason, so privileged mutation denials and refresh failures reuse the same fallback path as ordinary session expiry without inventing a separate dead-end screen before password-management flows exist.
 - The live transfer table has moved from Activity into a dedicated top-level
   Downloader page with summary counts, filters, accessible progress indicators,
-  and a backwards-compatible redirect from the old Activity downloads route.
+  and a canonical `/app/downloader` route. The old Activity downloads route is
+  deprecated and no longer registered.
 
 ## Global UI Rules
 

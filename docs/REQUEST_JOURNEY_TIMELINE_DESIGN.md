@@ -158,6 +158,7 @@ projections.
 ## Downloader Page Update
 
 `DEDICATED_DOWNLOADER_PAGE_DESIGN.md` promotes live transfer visibility out of
-Activity and into `/app/downloader`. Activity's old downloads route now redirects
-to the dedicated page, while requester journey detail remains on scoped,
+Activity and into `/app/downloader`. The follow-up
+`DEDICATED_DOWNLOADER_ROUTE_DEPRECATION_DESIGN.md` removes Activity's old
+downloads route entirely, while requester journey detail remains on scoped,
 requester-safe request projections.

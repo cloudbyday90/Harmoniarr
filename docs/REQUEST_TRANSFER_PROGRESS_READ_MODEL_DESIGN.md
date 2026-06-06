@@ -270,7 +270,8 @@ admin-only and requester progress stays on minimized read projections.
 ## Dedicated Downloader Page Update
 
 `DEDICATED_DOWNLOADER_PAGE_DESIGN.md` promotes global transfer visibility from
-Activity into `/app/downloader` while preserving the old Activity downloads deep
-link as a redirect. This does not change the requester-safe transfer progress
-read model; it clarifies the operator surface where future queue health and
-action eligibility contracts should land.
+Activity into `/app/downloader`. The follow-up
+`DEDICATED_DOWNLOADER_ROUTE_DEPRECATION_DESIGN.md` removes the old Activity
+downloads route instead of preserving it as a redirect. This does not change the
+requester-safe transfer progress read model; it clarifies the operator surface
+where future queue health and action eligibility contracts should land.
