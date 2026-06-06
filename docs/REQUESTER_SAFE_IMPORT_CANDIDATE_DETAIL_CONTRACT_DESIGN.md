@@ -182,13 +182,19 @@ The implementation now:
 
 ## Next High-Value Design Areas
 
-1. **Requester-safe preview and apply-preview contracts.** Decide whether
-   `/preview` and `/apply-preview` should be admin-only or receive separate
-   requester-safe projections that omit staging paths, collision paths, and file
-   names.
-2. **Retry-aware journey messaging.** Distinguish an abandoned source from
+1. **Retry-aware journey messaging.** Distinguish an abandoned source from
    `trying another source` when a failed candidate is replaced, and ensure stale
    transfer progress does not look like an active failure.
-3. **Importing-stage freshness and explanation.** Extend safe observed-age
+2. **Importing-stage freshness and explanation.** Extend safe observed-age
    language to validation, scan, transcode, post-apply scan, and quarantine
    progress without exposing filesystem or exception detail.
+3. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+   actions with per-request authorization, idempotency, rate limits, and audit
+   events before exposing any requester mutation.
+
+## Phase 18 Update
+
+`REQUESTER_SAFE_IMPORT_CANDIDATE_PREVIEW_CONTRACTS_DESIGN.md` completes the
+requester-safe preview/apply-preview decision. The HTTP endpoints are now
+admin-only because they expose path-planning and file-inspection diagnostics
+that requesters do not need.

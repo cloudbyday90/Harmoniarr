@@ -322,15 +322,7 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/:importCandidateId/preview', importCandidateRoute(async (request, response) => {
-    const session = await requireSessionFn(request);
-    const importCandidate = await getImportCandidate({
-      importCandidateId: request.params.importCandidateId,
-    });
-    assertImportCandidateVisible({
-      actorUserId: session.appUserId,
-      actorUserRole: session.user?.role ?? null,
-      candidate: importCandidate,
-    });
+    const session = await requireAdminSessionFn(request);
 
     response.json({
       ok: true,
@@ -342,15 +334,7 @@ export function registerImportCandidateRoutes(app, {
   }));
 
   app.get('/api/v1/import-candidates/:importCandidateId/apply-preview', importCandidateRoute(async (request, response) => {
-    const session = await requireSessionFn(request);
-    const importCandidate = await getImportCandidate({
-      importCandidateId: request.params.importCandidateId,
-    });
-    assertImportCandidateVisible({
-      actorUserId: session.appUserId,
-      actorUserRole: session.user?.role ?? null,
-      candidate: importCandidate,
-    });
+    const session = await requireAdminSessionFn(request);
 
     response.json({
       ok: true,

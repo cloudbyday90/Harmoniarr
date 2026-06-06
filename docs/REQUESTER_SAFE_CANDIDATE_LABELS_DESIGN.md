@@ -166,16 +166,15 @@ full details needed for review and troubleshooting.
 
 ## Future Design Areas
 
-1. **Requester-safe preview and apply-preview contracts.** Decide whether the
-   import-candidate preview endpoints should be admin-only or receive separate
-   requester-safe projections that omit staging paths, collision paths, and file
-   names.
-2. **Retry-aware journey messaging.** Distinguish `trying another source` from
+1. **Retry-aware journey messaging.** Distinguish `trying another source` from
    a failed Downloading stage when a replacement source is selected after a
    failed transfer.
-3. **Importing-stage freshness and explanation.** Apply the same safe-label and
+2. **Importing-stage freshness and explanation.** Apply the same safe-label and
    observed-age vocabulary to validation, scan, transcode, and quarantine
    progress.
+3. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+   actions with per-request authorization, idempotency, rate limits, and audit
+   events before exposing requester mutations.
 
 ## Phase 17 Update
 
@@ -183,3 +182,10 @@ full details needed for review and troubleshooting.
 requester-safe import-candidate read contract. Owned requester reads remain
 available, but the list and detail endpoints now return minimal `Source`
 summaries instead of operator-rich candidate objects.
+
+## Phase 18 Update
+
+`REQUESTER_SAFE_IMPORT_CANDIDATE_PREVIEW_CONTRACTS_DESIGN.md` completes the
+requester-safe preview/apply-preview contract decision. The preview endpoints
+are admin-only because they expose path-planning diagnostics outside the
+requester journey contract.

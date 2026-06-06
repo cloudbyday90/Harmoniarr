@@ -1319,7 +1319,7 @@ test('import candidate preview route returns read-only planning preview data', a
   });
 });
 
-test('import candidate preview route fails closed when the session user does not own the delegated target', async (t) => {
+test('import candidate preview route requires admin access before candidate lookup', async (t) => {
   const getImportCandidate = t.mock.fn(async ({ importCandidateId }) => ({
     id: importCandidateId,
     normalizedPayload: {
@@ -1333,15 +1333,18 @@ test('import candidate preview route fails closed when the session user does not
   const app = createImportCandidateRouteTestApp({
     getImportCandidate,
     previewImportCandidate,
-    requireSession: async () => ({ appUserId: 'other-user', csrfToken: 'csrf-token', user: { role: 'user' } }),
+    requireAdminSession: async () => {
+      throw createApiError(403, 'admin_required', 'Administrator access is required');
+    },
   });
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/preview`);
     const payload = await response.json();
 
-    assert.equal(response.status, 404);
-    assert.equal(payload.error.code, 'import_candidate_not_found');
+    assert.equal(response.status, 403);
+    assert.equal(payload.error.code, 'admin_required');
+    assert.equal(getImportCandidate.mock.callCount(), 0);
     assert.equal(previewImportCandidate.mock.callCount(), 0);
   });
 });
@@ -1387,6 +1390,25 @@ test('import candidate apply preview route returns file-level import apply safet
     assert.equal(payload.ok, true);
     assert.equal(payload.importCandidateApplyPreview.summary.status, 'blocked');
     assert.equal(payload.importCandidateApplyPreview.files[0].status.code, 'collision');
+  });
+});
+
+test('import candidate apply preview route requires admin access before planning', async (t) => {
+  const previewImportCandidateApply = t.mock.fn(async () => ({ ok: true }));
+  const app = createImportCandidateRouteTestApp({
+    previewImportCandidateApply,
+    requireAdminSession: async () => {
+      throw createApiError(403, 'admin_required', 'Administrator access is required');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/candidate-1/apply-preview`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.equal(payload.error.code, 'admin_required');
+    assert.equal(previewImportCandidateApply.mock.callCount(), 0);
   });
 });
 
