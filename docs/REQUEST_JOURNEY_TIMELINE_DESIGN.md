@@ -127,16 +127,15 @@ in Activity and admin/operator views.
 
 ## Future areas
 
-1. **Downloader action eligibility and operator controls.** The dedicated
-   Downloader page now has a Harmoniarr-owned queue read model and transfer
-   diagnostics drawer; the next operator step is designing safe cancel, retry,
-   clear, and pause/resume actions with explicit eligibility.
-2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+1. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, and audit
    events before exposing requester mutations.
-3. **Downloader event history and audit trail.** Persist meaningful downloader
+2. **Downloader event history and audit trail.** Persist meaningful downloader
    events so operator diagnostics can explain how a transfer reached its current
    state before requester-facing action controls are considered.
+3. **Transfer-to-request and import-candidate linkage contract.** Link live
+   provider rows to request/candidate context while keeping requester journey
+   labels generic and minimized.
 
 ## Phase 17 update
 
@@ -181,3 +180,10 @@ surface for one selected live transfer. This does not change requester-safe
 journey projections; it gives operators a safe diagnostics panel for queue
 position, provider state, retry posture, linkage placeholders, and recommended
 next action.
+
+## Downloader Operator Controls Update
+
+`DOWNLOADER_ACTION_ELIGIBILITY_OPERATOR_CONTROLS_DESIGN.md` completes the
+operator action eligibility phase. Cancel/remove and clear-completed controls
+are now admin-only Downloader mutations, while requester journey surfaces remain
+read-only until requester-scoped action ownership is designed.

@@ -11,6 +11,10 @@ function createJsonResponse(body, { status = 200 } = {}) {
   });
 }
 
+function createNoContentResponse() {
+  return new Response(null, { status: 204 });
+}
+
 test('createSlskdClient sends API-key authenticated requests to the v0 API base', async (t) => {
   const fetchImpl = t.mock.fn(async () => createJsonResponse({
     server: {
@@ -172,6 +176,43 @@ test('createSlskdClient enqueues downloads through the transfers API', async (t)
   }]);
 });
 
+test('createSlskdClient cancels and removes downloads through the transfers API', async (t) => {
+  const fetchImpl = t.mock.fn(async () => createNoContentResponse());
+  const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
+    baseUrl: 'http://slskd.test:5030',
+    fetchImpl,
+    requestTimeoutMs: 1000,
+  });
+
+  await client.cancelDownload({
+    id: 'transfer-1',
+    remove: true,
+    username: 'source-user',
+  });
+
+  const [url, options] = fetchImpl.mock.calls[0].arguments;
+  assert.equal(url.toString(), 'http://slskd.test:5030/api/v0/transfers/downloads/source-user/transfer-1?remove=true');
+  assert.equal(options.method, 'DELETE');
+  assert.equal(options.redirect, 'error');
+});
+
+test('createSlskdClient clears completed downloads through the transfers API', async (t) => {
+  const fetchImpl = t.mock.fn(async () => createNoContentResponse());
+  const client = createSlskdClient({
+    allowedHosts: ['slskd.test'],
+    baseUrl: 'http://slskd.test:5030',
+    fetchImpl,
+    requestTimeoutMs: 1000,
+  });
+
+  await client.clearCompletedDownloads();
+
+  const [url, options] = fetchImpl.mock.calls[0].arguments;
+  assert.equal(url.toString(), 'http://slskd.test:5030/api/v0/transfers/downloads/all/completed');
+  assert.equal(options.method, 'DELETE');
+});
+
 test('createSlskdClient browses a single user directory via the users API', async (t) => {
   const fetchImpl = t.mock.fn(async () => createJsonResponse([{
     name: 'Autechre\\Amber',
@@ -225,4 +266,3 @@ test('createSlskdClient browseUserDirectory rejects blank username and directory
 
   assert.equal(fetchImpl.mock.callCount(), 0);
 });
-

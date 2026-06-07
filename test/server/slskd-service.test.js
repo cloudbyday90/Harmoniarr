@@ -518,6 +518,52 @@ test('createSlskdService validates and normalizes download enqueue responses', a
   });
 });
 
+test('createSlskdService cancels and removes downloads through the provider client', async (t) => {
+  const cancelDownload = t.mock.fn(async ({ id, remove, username }) => {
+    assert.equal(username, 'source-user');
+    assert.equal(id, 'transfer-1');
+    assert.equal(remove, true);
+  });
+  const service = createSlskdService({
+    slskdClient: {
+      cancelDownload,
+    },
+  });
+
+  const result = await service.cancelDownload({
+    id: ' transfer-1 ',
+    remove: 'true',
+    username: ' source-user ',
+  });
+
+  assert.equal(cancelDownload.mock.callCount(), 1);
+  assert.deepEqual(result, {
+    action: 'remove',
+    id: 'transfer-1',
+    ok: true,
+    provider: 'slskd',
+    sourceUser: 'source-user',
+  });
+});
+
+test('createSlskdService clears completed downloads through the provider client', async (t) => {
+  const clearCompletedDownloads = t.mock.fn(async () => {});
+  const service = createSlskdService({
+    slskdClient: {
+      clearCompletedDownloads,
+    },
+  });
+
+  const result = await service.clearCompletedDownloads();
+
+  assert.equal(clearCompletedDownloads.mock.callCount(), 1);
+  assert.deepEqual(result, {
+    action: 'clear_completed',
+    ok: true,
+    provider: 'slskd',
+  });
+});
+
 test('createSlskdService browseUserDirectory reconstructs leaf filenames into full paths', async (t) => {
   const browseUserDirectory = t.mock.fn(async ({ directory, username }) => {
     assert.equal(username, 'source-user');
@@ -607,4 +653,3 @@ test('createSlskdService browseUserDirectory ignores files with non-string names
   assert.equal(result.fileCount, 1);
   assert.deepEqual(result.files.map((file) => file.filename), ['Album\\good.flac']);
 });
-

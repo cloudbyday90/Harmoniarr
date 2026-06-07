@@ -41,6 +41,9 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
   Downloader page with summary counts, filters, accessible progress indicators,
   and a canonical `/app/downloader` route. The old Activity downloads route is
   deprecated and no longer registered.
+- The Downloader detail drawer now renders server-owned operator action
+  eligibility and exposes supported cancel/remove controls, while the
+  Downloader page header exposes a protected Clear Completed action.
 
 ## Global UI Rules
 
@@ -86,6 +89,8 @@ Recovery source: `docs/BACKUP_RESTORE_DESIGN.md`
 - [x] Promote live downloader operations into a dedicated top-level operator page.
 - [x] Add Downloader transfer detail drawer diagnostics for one selected live
   transfer without expanding the queue table.
+- [x] Add Downloader operator controls for supported provider-backed transfer
+  and queue cleanup actions.
 - [ ] Create durable operator-attention or notifications surface if server-backed notifications are accepted.
 - [ ] Define toast-only vs durable-history UI boundaries.
 

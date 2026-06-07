@@ -170,6 +170,11 @@ Recommended stack:
 - Added the follow-up detail drawer documented in
   `DOWNLOADER_DETAIL_DRAWER_DIAGNOSTICS_DESIGN.md`, giving operators a focused
   diagnostics panel for one selected transfer without expanding the queue table.
+- Added the follow-up action eligibility and operator controls contract
+  documented in
+  `DOWNLOADER_ACTION_ELIGIBILITY_OPERATOR_CONTROLS_DESIGN.md`, enabling
+  supported cancel/remove and clear-completed actions through protected
+  Downloader mutation routes.
 
 ## Security Outcome
 
@@ -179,8 +184,8 @@ Recommended stack:
   requester-visible transfer data.
 - No new secrets, API keys, source credentials, raw backend errors, or file
   operations are exposed.
-- No mutation controls were added; future controls need fresh-session, CSRF,
-  idempotency, state eligibility, and audit coverage.
+- Mutation controls now require fresh admin session, CSRF validation,
+  state-specific eligibility, mutation rate limiting, and audit coverage.
 
 ## Validation
 
@@ -211,14 +216,22 @@ diagnostics surface for one selected transfer. The queue read model now includes
 safe per-transfer diagnostics, and the page renders those diagnostics through a
 native dialog side drawer.
 
+## Operator Controls Update
+
+`DOWNLOADER_ACTION_ELIGIBILITY_OPERATOR_CONTROLS_DESIGN.md` completes the first
+previously listed future area. The Downloader page now exposes Clear Completed
+from the page header and cancel/remove controls inside the detail drawer. Retry,
+pause, and resume remain disabled because a stable official provider mutation
+contract was not identified.
+
 ## Next High-Value Design Areas
 
-1. **Downloader action eligibility and operator controls.** Design cancel,
-   retry, clear, and pause/resume controls with fresh-session, CSRF,
-   idempotency, rate limits, and audit events.
-2. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
+1. **Requester-scoped transfer actions.** Design cancel, retry, and requeue
    actions with per-request authorization, idempotency, rate limits, CSRF,
    audit events, and safe requester-facing labels.
-3. **Downloader event history and audit trail.** Persist meaningful downloader
+2. **Downloader event history and audit trail.** Persist meaningful downloader
    events so the diagnostics drawer can explain how a transfer reached its
    current state instead of only showing the live provider observation.
+3. **Transfer-to-request and import-candidate linkage contract.** Link live
+   provider rows to request and import-candidate context without expanding
+   requester-visible peer or path detail.

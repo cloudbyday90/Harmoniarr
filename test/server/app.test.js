@@ -401,6 +401,7 @@ suite('createApp', () => {
   assert.equal(registerArtworkRoutes.mock.calls[0].arguments[1].artwork, 'deps');
   assert.equal(registerDownloaderRoutes.mock.calls[0].arguments[0], app);
   assert.equal(registerDownloaderRoutes.mock.calls[0].arguments[1].downloader, 'deps');
+  assert.equal(typeof registerDownloaderRoutes.mock.calls[0].arguments[1].limitDownloaderMutation, 'function');
   assert.equal(typeof registerDownloaderRoutes.mock.calls[0].arguments[1].limitDownloaderQueueRead, 'function');
   assert.equal(registerImportCandidateRoutes.mock.calls[0].arguments[0], app);
   assert.equal(typeof registerImportCandidateRoutes.mock.calls[0].arguments[1].limitImportCandidateExecutionRun, 'function');

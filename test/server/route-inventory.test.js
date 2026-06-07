@@ -190,7 +190,11 @@ function collectRegisteredRoutes() {
 
   registerDownloaderRoutes(app, {
     buildDownloaderQueue: asyncNoopResult({}),
+    clearCompletedDownloaderTransfers: asyncNoopResult({}),
+    requestDownloaderTransferAction: asyncNoopResult({}),
     requireAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
+    requireCsrf: () => {},
+    requireFreshAdminSession: asyncNoopResult({ appUserId: 'user-1' }),
   });
 
   registerOperationsRoutes(app, {

@@ -118,13 +118,27 @@ test('buildDownloaderQueueReadModelFromDownloads normalizes transfers, counts, p
     },
   });
   assert.equal(result.transfers[0].timestamps.startedAt, '2026-06-06T11:59:30.000Z');
-  assert.deepEqual(result.transfers[0].actionEligibility, {
-    canCancel: false,
-    canClear: false,
-    canRetry: false,
-    reason: 'actions_not_designed',
-  });
+  assert.equal(result.transfers[0].actionEligibility.canCancel, true);
+  assert.equal(result.transfers[0].actionEligibility.canRemove, false);
+  assert.equal(result.transfers[0].actionEligibility.reason, 'cancel_available');
+  assert.deepEqual(
+    result.transfers[0].actionEligibility.actions.map((action) => ({
+      code: action.code,
+      enabled: action.enabled,
+      reason: action.reason,
+      requiresFreshSession: action.requiresFreshSession,
+    })),
+    [
+      { code: 'cancel', enabled: true, reason: 'transfer_can_be_cancelled', requiresFreshSession: true },
+      { code: 'remove', enabled: false, reason: 'remove_not_allowed_for_active', requiresFreshSession: true },
+      { code: 'retry', enabled: false, reason: 'retry_provider_contract_not_available', requiresFreshSession: true },
+      { code: 'pause', enabled: false, reason: 'pause_provider_contract_not_available', requiresFreshSession: true },
+      { code: 'resume', enabled: false, reason: 'resume_provider_contract_not_available', requiresFreshSession: true },
+    ],
+  );
   assert.equal(result.transfers[1].state.code, 'failed');
+  assert.equal(result.transfers[1].actionEligibility.canRemove, true);
+  assert.equal(result.transfers[1].actionEligibility.reason, 'remove_available');
   assert.equal(result.transfers[1].diagnostics.provider.hasProviderError, true);
   assert.equal(result.transfers[1].diagnostics.summary.includes('withheld'), true);
   assert.equal(Object.hasOwn(result.transfers[1], 'exception'), false);

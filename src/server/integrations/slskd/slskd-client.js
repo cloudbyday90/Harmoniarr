@@ -327,6 +327,40 @@ export function createSlskdClient({
     });
   }
 
+  function cancelDownload({ id, remove = false, username }) {
+    const normalizedUsername = typeof username === 'string' ? username.trim() : '';
+    const normalizedId = typeof id === 'string' ? id.trim() : '';
+
+    if (!normalizedUsername) {
+      throw createSlskdError(
+        'slskd_misconfigured',
+        'Expected a username when cancelling a download transfer',
+      );
+    }
+
+    if (!normalizedId) {
+      throw createSlskdError(
+        'slskd_misconfigured',
+        'Expected a transfer id when cancelling a download transfer',
+      );
+    }
+
+    return requestJson(`transfers/downloads/${encodeURIComponent(normalizedUsername)}/${encodeURIComponent(normalizedId)}`, {
+      method: 'DELETE',
+      operation: remove ? 'download remove' : 'download cancel',
+      query: {
+        remove: remove ? 'true' : null,
+      },
+    });
+  }
+
+  function clearCompletedDownloads() {
+    return requestJson('transfers/downloads/all/completed', {
+      method: 'DELETE',
+      operation: 'completed download clear',
+    });
+  }
+
   function enqueueDownloads({ files, username }) {
     const normalizedUsername = typeof username === 'string' ? username.trim() : '';
     if (!normalizedUsername) {
@@ -358,6 +392,8 @@ export function createSlskdClient({
   }
 
   return {
+    cancelDownload,
+    clearCompletedDownloads,
     enqueueDownloads,
     deleteSearch,
     getApplicationState,

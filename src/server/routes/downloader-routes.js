@@ -50,8 +50,13 @@ function downloaderRoute(handler) {
 
 export function registerDownloaderRoutes(app, {
   buildDownloaderQueue,
+  clearCompletedDownloaderTransfers,
+  limitDownloaderMutation = skipRateLimitMiddleware,
   limitDownloaderQueueRead = skipRateLimitMiddleware,
+  requestDownloaderTransferAction,
   requireAdminSession = defaultRequestAuthDependencies.requireAdminSession,
+  requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshAdminSession = defaultRequestAuthDependencies.requireFreshAdminSession,
 }) {
   app.get('/api/v1/downloader/queue', limitDownloaderQueueRead, downloaderRoute(async (request, response) => {
     await requireAdminSession(request);
@@ -59,6 +64,33 @@ export function registerDownloaderRoutes(app, {
       ok: true,
       downloader: await buildDownloaderQueue({
         includeRemoved: request.query.includeRemoved,
+      }),
+    });
+  }));
+
+  app.post('/api/v1/downloader/transfers/:username/:id/actions', limitDownloaderMutation, downloaderRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+    response.json({
+      ok: true,
+      downloaderAction: await requestDownloaderTransferAction({
+        action: request.body?.action,
+        actorUserId: session.appUserId,
+        id: request.params.id,
+        request,
+        username: request.params.username,
+      }),
+    });
+  }));
+
+  app.post('/api/v1/downloader/actions/clear-completed', limitDownloaderMutation, downloaderRoute(async (request, response) => {
+    const session = await requireFreshAdminSession(request);
+    requireCsrf(request, session);
+    response.json({
+      ok: true,
+      downloaderAction: await clearCompletedDownloaderTransfers({
+        actorUserId: session.appUserId,
+        request,
       }),
     });
   }));

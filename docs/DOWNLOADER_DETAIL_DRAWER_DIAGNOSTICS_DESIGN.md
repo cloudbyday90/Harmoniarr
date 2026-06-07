@@ -219,12 +219,20 @@ Validation for this phase:
 
 ## Next High-Value Design Areas
 
-1. **Downloader action eligibility and operator controls.** Now that the
-   detail drawer has a recommended-action slot, define the actual cancel,
-   retry, clear, pause, and resume eligibility contract.
-2. **Requester-scoped transfer actions.** Decide which transfer actions a
+1. **Requester-scoped transfer actions.** Decide which transfer actions a
    requester can perform on their own request-linked downloads without seeing
    the global provider queue.
-3. **Downloader event history and audit trail.** Persist meaningful downloader
+2. **Downloader event history and audit trail.** Persist meaningful downloader
    events so diagnostics can explain how a transfer reached its current state,
    not only what the live provider reports now.
+3. **Transfer-to-request and import-candidate linkage contract.** Connect live
+   provider rows to request and import-candidate context while preserving
+   requester-safe data minimization.
+
+## Operator Controls Update
+
+`DOWNLOADER_ACTION_ELIGIBILITY_OPERATOR_CONTROLS_DESIGN.md` completes the first
+previously listed future area. The detail drawer now renders server-owned
+operator action eligibility and exposes supported cancel/remove controls, while
+unsupported retry, pause, and resume controls remain disabled until a stable
+provider mutation contract exists.

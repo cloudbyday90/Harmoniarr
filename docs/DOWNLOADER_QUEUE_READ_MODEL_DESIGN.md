@@ -137,8 +137,9 @@ Recommended stack:
 - Progress normalization: provide `percentComplete`, `bytesTransferred`, and
   `size` per row, clamped and nullable.
 - Resource posture: cap returned transfer rows and expose a `truncated` flag.
-- Security posture: omit raw exception text and mutation controls; expose future
-  action eligibility as disabled until action contracts are designed.
+- Security posture: omit raw exception text and expose server-owned action
+  eligibility; only provider-supported actions become enabled, and mutation
+  execution remains on fresh-session CSRF-protected POST routes.
 - Client posture: make the Downloader page consume only the Harmoniarr-owned
   contract.
 
@@ -155,6 +156,9 @@ Recommended stack:
   route for existing integrations and tests.
 - Added safe per-transfer diagnostics for the Downloader detail drawer in the
   follow-up `DOWNLOADER_DETAIL_DRAWER_DIAGNOSTICS_DESIGN.md`.
+- Added state-aware transfer action eligibility and operator mutation controls
+  in the follow-up
+  `DOWNLOADER_ACTION_ELIGIBILITY_OPERATOR_CONTROLS_DESIGN.md`.
 
 ## Contract Sketch
 
@@ -227,11 +231,19 @@ Validation for this phase:
 
 ## Next High-Value Design Areas
 
-1. **Downloader action eligibility and operator controls.** Design cancel,
-   retry, clear, and pause/resume controls with fresh-session, CSRF,
-   idempotency, rate limits, and audit events.
-2. **Requester-scoped transfer actions.** Design requester-owned cancel, retry,
+1. **Requester-scoped transfer actions.** Design requester-owned cancel, retry,
    and requeue behavior with per-request authorization and safe labels.
-3. **Downloader event history and audit trail.** Persist meaningful downloader
+2. **Downloader event history and audit trail.** Persist meaningful downloader
    events so operator diagnostics can explain how a transfer reached its current
    state, not only what the live provider reports now.
+3. **Transfer-to-request and import-candidate linkage contract.** Link live
+   provider rows to request/candidate context without leaking peer or path
+   diagnostics outside authorized operator views.
+
+## Operator Controls Update
+
+`DOWNLOADER_ACTION_ELIGIBILITY_OPERATOR_CONTROLS_DESIGN.md` completes the first
+previously listed future area. The queue read model now exposes state-aware
+eligibility for cancel/remove/retry/pause/resume, and only official
+provider-supported cancel/remove actions are executable through protected
+Downloader mutation routes.

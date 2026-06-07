@@ -478,6 +478,40 @@ export function createSlskdService({
     return normalizeTransfer(payload);
   }
 
+  async function cancelDownload({ id, remove = false, username }) {
+    const normalizedUsername = normalizeSearchId(username);
+    const normalizedId = normalizeSearchId(id);
+    await observeSlskdProviderCall(
+      providerHealthRecorder,
+      () => withClient((client) => client.cancelDownload({
+        id: normalizedId,
+        remove: normalizeBoolean(remove, false),
+        username: normalizedUsername,
+      })),
+    );
+
+    return {
+      action: remove ? 'remove' : 'cancel',
+      id: normalizedId,
+      ok: true,
+      provider: 'slskd',
+      sourceUser: normalizedUsername,
+    };
+  }
+
+  async function clearCompletedDownloads() {
+    await observeSlskdProviderCall(
+      providerHealthRecorder,
+      () => withClient((client) => client.clearCompletedDownloads()),
+    );
+
+    return {
+      action: 'clear_completed',
+      ok: true,
+      provider: 'slskd',
+    };
+  }
+
   async function browseUserDirectory({ directory, username }) {
     const normalizedUsername = normalizeSearchId(username);
     const normalizedDirectory = normalizeBrowseDirectoryPath(directory);
@@ -505,6 +539,8 @@ export function createSlskdService({
   }
 
   return {
+    cancelDownload,
+    clearCompletedDownloads,
     enqueueDownloads,
     getConnectionStatus,
     getDownload,

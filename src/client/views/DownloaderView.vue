@@ -24,7 +24,11 @@ import {
 } from '../lib/activity-downloads-presentation.js';
 import { formatBytes, formatSpeed } from '../lib/search-presentation.js';
 import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
-import { fetchDownloaderQueue } from '../lib/downloader-api.js';
+import {
+  clearCompletedDownloaderTransfers,
+  fetchDownloaderQueue,
+  requestDownloaderTransferAction,
+} from '../lib/downloader-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const POLL_INTERVAL_MS = 5000;
@@ -39,6 +43,8 @@ const filterOptions = Object.freeze([
 
 const selectedFilter = ref('all');
 const selectedTransferKey = ref(null);
+const actionErrorMessage = ref('');
+const pendingAction = ref('');
 
 const {
   data: downloaderQueue,
@@ -80,6 +86,7 @@ const statusCards = computed(() => [
   { key: 'completed', label: 'Complete', value: counts.value.completed, tone: 'success' },
   { key: 'failed', label: 'Failed', value: counts.value.failed, tone: counts.value.failed > 0 ? 'danger' : 'info' },
 ]);
+const clearableTransferCount = computed(() => counts.value.completed + counts.value.failed);
 
 function matchesFilter(file) {
   const stateCode = file?.state?.code;
@@ -127,6 +134,41 @@ function openTransferDetail(file) {
 
 function closeTransferDetail() {
   selectedTransferKey.value = null;
+  actionErrorMessage.value = '';
+  pendingAction.value = '';
+}
+
+async function performTransferAction(action) {
+  if (!selectedTransfer.value || pendingAction.value) return;
+  actionErrorMessage.value = '';
+  pendingAction.value = action;
+  try {
+    await requestDownloaderTransferAction({
+      action,
+      id: selectedTransfer.value.id,
+      username: selectedTransfer.value.sourceUser,
+    });
+    await load();
+    closeTransferDetail();
+  } catch (error) {
+    actionErrorMessage.value = error?.message ?? 'Downloader action failed';
+  } finally {
+    pendingAction.value = '';
+  }
+}
+
+async function clearCompletedTransfers() {
+  if (pendingAction.value) return;
+  actionErrorMessage.value = '';
+  pendingAction.value = 'clear_completed';
+  try {
+    await clearCompletedDownloaderTransfers();
+    await load();
+  } catch (error) {
+    actionErrorMessage.value = error?.message ?? 'Failed to clear completed transfers';
+  } finally {
+    pendingAction.value = '';
+  }
 }
 </script>
 
@@ -143,6 +185,15 @@ function closeTransferDetail() {
         </p>
       </div>
       <div class="hx-page-actions">
+        <button
+          type="button"
+          class="hx-btn"
+          data-variant="ghost"
+          :disabled="pendingAction === 'clear_completed' || clearableTransferCount < 1"
+          @click="clearCompletedTransfers"
+        >
+          {{ pendingAction === 'clear_completed' ? 'Clearing...' : 'Clear Completed' }}
+        </button>
         <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
           {{ isLoading ? 'Loading…' : 'Refresh' }}
         </button>
@@ -160,6 +211,12 @@ function closeTransferDetail() {
     <article v-if="errorMessage" class="hx-card" role="status" aria-live="polite">
       <div class="hx-card-body">
         <span class="hx-pill" data-tone="danger">{{ errorMessage }}</span>
+      </div>
+    </article>
+
+    <article v-if="actionErrorMessage && !selectedTransfer" class="hx-card" role="status" aria-live="polite">
+      <div class="hx-card-body">
+        <span class="hx-pill" data-tone="danger">{{ actionErrorMessage }}</span>
       </div>
     </article>
 
@@ -271,10 +328,13 @@ function closeTransferDetail() {
     </article>
 
     <DownloaderTransferDetailDrawer
+      :action-error="actionErrorMessage"
+      :action-pending="pendingAction"
       :open="Boolean(selectedTransfer)"
       :observed-at="downloaderQueue?.observedAt ?? null"
       :transfer="selectedTransfer"
       @close="closeTransferDetail"
+      @request-action="performTransferAction"
     />
   </section>
 </template>

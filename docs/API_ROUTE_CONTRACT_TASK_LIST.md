@@ -35,6 +35,9 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
   queue health, source groups, safe per-transfer diagnostics, and disabled
   future action eligibility while the lower-level `GET /api/v1/slskd/downloads`
   provider route remains available.
+- Downloader routes now also include fresh-admin, CSRF-protected mutation
+  contracts for state-eligible transfer cancel/remove actions and queue-level
+  clear-completed behavior, with mutation rate limiting and audit events.
 
 ## Global Contract Rules
 
@@ -79,6 +82,8 @@ Admin recovery source: `docs/ADMIN_RECOVERY_RUNBOOK.md`
 - [x] Define the Downloader transfer diagnostics contract for detail-drawer
   fields, safe provider-state exposure, recommended next action, retry/linkage
   placeholders, and raw provider exception redaction.
+- [x] Define Downloader action eligibility and operator mutation routes for
+  supported transfer cancel/remove and clear-completed actions.
 
 ## Route Family 4 - Import Review And Canonical Metadata
 

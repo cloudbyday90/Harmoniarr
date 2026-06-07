@@ -17,8 +17,10 @@
  */
 
 import { createDownloaderQueueReadModelService } from './downloader-queue-read-model-service.js';
+import { createDownloaderActionService } from './downloader-action-service.js';
 
 export function createDownloaderModule({
+  downloaderActionService = null,
   downloaderQueueReadModelService = null,
   slskdService,
 } = {}) {
@@ -26,11 +28,20 @@ export function createDownloaderModule({
     ?? createDownloaderQueueReadModelService({
       getDownloads: slskdService?.getDownloads,
     });
+  const resolvedDownloaderActionService = downloaderActionService
+    ?? createDownloaderActionService({
+      cancelDownload: slskdService?.cancelDownload,
+      clearCompletedDownloads: slskdService?.clearCompletedDownloads,
+      getDownload: slskdService?.getDownload,
+    });
 
   return {
+    downloaderActionService: resolvedDownloaderActionService,
     downloaderQueueReadModelService: resolvedDownloaderQueueReadModelService,
     routeDependencies: {
       buildDownloaderQueue: resolvedDownloaderQueueReadModelService.buildDownloaderQueue,
+      clearCompletedDownloaderTransfers: resolvedDownloaderActionService.clearCompleted,
+      requestDownloaderTransferAction: resolvedDownloaderActionService.requestTransferAction,
     },
   };
 }

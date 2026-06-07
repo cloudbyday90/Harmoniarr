@@ -89,7 +89,7 @@ function normalizeTransfer(transfer, index) {
   };
 
   return {
-    actionEligibility: buildDownloaderActionEligibility(),
+    actionEligibility: buildDownloaderActionEligibility(transfer),
     averageSpeed: normalizeNumber(transfer?.averageSpeed),
     diagnostics: buildDownloaderTransferDiagnostics(transfer, {
       progress,

@@ -23,3 +23,30 @@ export async function fetchDownloaderQueue({ includeRemoved = false, signal } = 
   const payload = await apiRequest(`/api/v1/downloader/queue${query}`, { signal });
   return payload?.downloader ?? null;
 }
+
+export async function requestDownloaderTransferAction({
+  action,
+  id,
+  signal,
+  username,
+} = {}) {
+  const encodedUsername = encodeURIComponent(username ?? '');
+  const encodedId = encodeURIComponent(id ?? '');
+  const payload = await apiRequest(`/api/v1/downloader/transfers/${encodedUsername}/${encodedId}/actions`, {
+    body: { action },
+    includeCsrf: true,
+    method: 'POST',
+    signal,
+  });
+  return payload?.downloaderAction ?? null;
+}
+
+export async function clearCompletedDownloaderTransfers({ signal } = {}) {
+  const payload = await apiRequest('/api/v1/downloader/actions/clear-completed', {
+    body: {},
+    includeCsrf: true,
+    method: 'POST',
+    signal,
+  });
+  return payload?.downloaderAction ?? null;
+}

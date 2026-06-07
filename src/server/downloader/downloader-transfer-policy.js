@@ -42,6 +42,39 @@ const transferStateTones = Object.freeze({
   queued: 'warning',
 });
 
+const downloaderActionDefinitions = Object.freeze([
+  Object.freeze({
+    code: 'cancel',
+    destructive: true,
+    label: 'Cancel transfer',
+    providerAction: 'cancelDownload',
+  }),
+  Object.freeze({
+    code: 'remove',
+    destructive: true,
+    label: 'Remove transfer',
+    providerAction: 'removeDownload',
+  }),
+  Object.freeze({
+    code: 'retry',
+    destructive: false,
+    label: 'Retry transfer',
+    providerAction: null,
+  }),
+  Object.freeze({
+    code: 'pause',
+    destructive: false,
+    label: 'Pause transfer',
+    providerAction: null,
+  }),
+  Object.freeze({
+    code: 'resume',
+    destructive: false,
+    label: 'Resume transfer',
+    providerAction: null,
+  }),
+]);
+
 const diagnosticSeverityByState = Object.freeze({
   active: 'info',
   completed: 'success',
@@ -141,6 +174,24 @@ function buildRecommendedNextAction(state) {
   }
 }
 
+function buildAction({
+  code,
+  enabled,
+  reason,
+  state,
+}) {
+  const definition = downloaderActionDefinitions.find((entry) => entry.code === code);
+  return {
+    code,
+    destructive: definition?.destructive ?? false,
+    enabled,
+    label: definition?.label ?? code,
+    reason,
+    requiresFreshSession: true,
+    state: state.code,
+  };
+}
+
 export function classifyDownloaderTransferState(transfer) {
   const raw = normalizeState(transfer?.state);
   const stateKey = normalizeStateKey(raw);
@@ -227,12 +278,59 @@ export function calculateDownloaderTransferProgress(transfer) {
   };
 }
 
-export function buildDownloaderActionEligibility() {
+export function buildDownloaderActionEligibility(transfer = null) {
+  const state = transfer
+    ? classifyDownloaderTransferState(transfer)
+    : { code: 'other' };
+  const canCancel = state.code === 'active' || state.code === 'queued';
+  const canRemove = state.code === 'completed' || state.code === 'failed';
+
+  const actions = [
+    buildAction({
+      code: 'cancel',
+      enabled: canCancel,
+      reason: canCancel ? 'transfer_can_be_cancelled' : `cancel_not_allowed_for_${state.code}`,
+      state,
+    }),
+    buildAction({
+      code: 'remove',
+      enabled: canRemove,
+      reason: canRemove ? 'terminal_transfer_can_be_removed' : `remove_not_allowed_for_${state.code}`,
+      state,
+    }),
+    buildAction({
+      code: 'retry',
+      enabled: false,
+      reason: 'retry_provider_contract_not_available',
+      state,
+    }),
+    buildAction({
+      code: 'pause',
+      enabled: false,
+      reason: 'pause_provider_contract_not_available',
+      state,
+    }),
+    buildAction({
+      code: 'resume',
+      enabled: false,
+      reason: 'resume_provider_contract_not_available',
+      state,
+    }),
+  ];
+
   return {
-    canCancel: false,
+    actions,
+    canCancel,
     canClear: false,
+    canPause: false,
+    canRemove,
+    canResume: false,
     canRetry: false,
-    reason: 'actions_not_designed',
+    reason: canCancel
+      ? 'cancel_available'
+      : canRemove
+        ? 'remove_available'
+        : `no_actions_available_for_${state.code}`,
   };
 }
 

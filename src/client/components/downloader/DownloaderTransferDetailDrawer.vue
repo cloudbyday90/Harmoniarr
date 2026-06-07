@@ -23,12 +23,14 @@ import { formatOperationTimestampShort } from '../../lib/operation-run-presentat
 import { formatBytes, formatSpeed } from '../../lib/search-presentation.js';
 
 const props = defineProps({
+  actionError: { type: String, default: '' },
+  actionPending: { type: String, default: '' },
   observedAt: { type: String, default: null },
   open: { type: Boolean, default: false },
   transfer: { type: Object, default: null },
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'request-action']);
 
 let dialogRef = null;
 
@@ -41,6 +43,14 @@ const title = computed(() => (
 const diagnostics = computed(() => props.transfer?.diagnostics ?? {});
 const recommendedAction = computed(() => diagnostics.value.recommendedNextAction ?? null);
 const timestamps = computed(() => props.transfer?.timestamps ?? {});
+const transferActions = computed(() => (
+  Array.isArray(props.transfer?.actionEligibility?.actions)
+    ? props.transfer.actionEligibility.actions
+    : []
+));
+const visibleActions = computed(() => transferActions.value.filter((action) => (
+  action.code === 'cancel' || action.code === 'remove' || action.code === 'retry'
+)));
 
 const detailRows = computed(() => [
   { label: 'Source user', value: props.transfer?.sourceUser ?? 'Unknown source' },
@@ -153,6 +163,28 @@ onBeforeUnmount(() => {
           </span>
           <p>{{ recommendedAction.description }}</p>
         </div>
+      </section>
+
+      <section class="downloader-detail-panel" aria-label="Operator controls">
+        <h3>Operator controls</h3>
+        <p class="downloader-detail-muted">
+          Actions are evaluated from the latest observed provider state and rechecked on the server before execution.
+        </p>
+        <div class="downloader-detail-actions">
+          <button
+            v-for="action in visibleActions"
+            :key="action.code"
+            type="button"
+            class="hx-btn"
+            :data-variant="action.destructive ? 'danger' : undefined"
+            :disabled="!action.enabled || Boolean(actionPending)"
+            :title="action.enabled ? action.label : action.reason"
+            @click="emit('request-action', action.code)"
+          >
+            {{ actionPending === action.code ? 'Working...' : action.label }}
+          </button>
+        </div>
+        <p v-if="actionError" class="downloader-detail-error" role="alert">{{ actionError }}</p>
       </section>
 
       <section class="downloader-detail-panel" aria-label="Transfer facts">
@@ -284,6 +316,30 @@ onBeforeUnmount(() => {
   margin: 0;
   color: var(--hx-text-muted);
   line-height: 1.5;
+}
+
+.downloader-detail-muted {
+  margin: 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+
+.downloader-detail-actions {
+  display: flex;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
+}
+
+.downloader-detail-actions .hx-btn {
+  min-height: 36px;
+}
+
+.downloader-detail-error {
+  margin: 0;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+  font-weight: 700;
 }
 
 .downloader-detail-grid {

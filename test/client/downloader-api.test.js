@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fetchDownloaderQueue } from '../../src/client/lib/downloader-api.js';
+import {
+  clearCompletedDownloaderTransfers,
+  fetchDownloaderQueue,
+  requestDownloaderTransferAction,
+} from '../../src/client/lib/downloader-api.js';
 
 function createJsonResponse({ payload = { ok: true } } = {}) {
   return {
@@ -49,4 +53,65 @@ test('downloader-api fetchDownloaderQueue returns null when the payload is absen
   const result = await fetchDownloaderQueue();
 
   assert.equal(result, null);
+});
+
+test('downloader-api requestDownloaderTransferAction posts csrf-protected transfer actions', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-token' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({
+    payload: {
+      downloaderAction: {
+        action: 'cancel',
+        id: 'transfer/1',
+        ok: true,
+        provider: 'slskd',
+        sourceUser: 'source user',
+      },
+    },
+  }));
+
+  const result = await requestDownloaderTransferAction({
+    action: 'cancel',
+    id: 'transfer/1',
+    username: 'source user',
+  });
+
+  const [path, options] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(path, '/api/v1/downloader/transfers/source%20user/transfer%2F1/actions');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.credentials, 'same-origin');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-token');
+  assert.equal(options.body, JSON.stringify({ action: 'cancel' }));
+  assert.deepEqual(result, {
+    action: 'cancel',
+    id: 'transfer/1',
+    ok: true,
+    provider: 'slskd',
+    sourceUser: 'source user',
+  });
+});
+
+test('downloader-api clearCompletedDownloaderTransfers posts csrf-protected queue actions', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-token' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse({
+    payload: {
+      downloaderAction: {
+        action: 'clear_completed',
+        ok: true,
+        provider: 'slskd',
+      },
+    },
+  }));
+
+  const result = await clearCompletedDownloaderTransfers();
+
+  const [path, options] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(path, '/api/v1/downloader/actions/clear-completed');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-token');
+  assert.equal(options.body, JSON.stringify({}));
+  assert.deepEqual(result, {
+    action: 'clear_completed',
+    ok: true,
+    provider: 'slskd',
+  });
 });

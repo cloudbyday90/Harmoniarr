@@ -31,7 +31,21 @@ function createDownloaderRouteTestApp(overrides = {}) {
         transfers: [],
         truncated: false,
       }),
+      clearCompletedDownloaderTransfers: async () => ({
+        action: 'clear_completed',
+        ok: true,
+        provider: 'slskd',
+      }),
+      requestDownloaderTransferAction: async ({ action, id, username }) => ({
+        action,
+        id,
+        ok: true,
+        provider: 'slskd',
+        sourceUser: username,
+      }),
       requireAdminSession: async () => ({ appUserId: 'admin-1' }),
+      requireCsrf: () => {},
+      requireFreshAdminSession: async () => ({ appUserId: 'admin-1' }),
       ...overrides,
     });
   });
@@ -158,6 +172,109 @@ test('downloader queue route normalizes slskd provider errors', async () => {
       error: {
         code: 'slskd_unavailable',
         message: 'slskd is temporarily unavailable',
+      },
+    });
+  });
+});
+
+test('downloader transfer action route enforces mutation middleware and delegates with decoded route params', async (t) => {
+  const calls = [];
+  const requestDownloaderTransferAction = t.mock.fn(async (input) => {
+    calls.push('action');
+    assert.equal(input.action, 'cancel');
+    assert.equal(input.actorUserId, 'admin-1');
+    assert.equal(input.id, 'transfer/id');
+    assert.equal(input.username, 'source user');
+    assert.equal(typeof input.request.headers, 'object');
+    return {
+      action: 'cancel',
+      id: input.id,
+      ok: true,
+      provider: 'slskd',
+      sourceUser: input.username,
+    };
+  });
+  const app = createDownloaderRouteTestApp({
+    limitDownloaderMutation: (_request, _response, next) => {
+      calls.push('limit');
+      next();
+    },
+    requestDownloaderTransferAction,
+    requireCsrf: () => {
+      calls.push('csrf');
+    },
+    requireFreshAdminSession: async () => {
+      calls.push('fresh-auth');
+      return { appUserId: 'admin-1' };
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/downloader/transfers/source%20user/transfer%2Fid/actions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(calls, ['limit', 'fresh-auth', 'csrf', 'action']);
+    assert.deepEqual(payload, {
+      ok: true,
+      downloaderAction: {
+        action: 'cancel',
+        id: 'transfer/id',
+        ok: true,
+        provider: 'slskd',
+        sourceUser: 'source user',
+      },
+    });
+  });
+});
+
+test('downloader clear completed route requires a fresh csrf-checked admin session', async (t) => {
+  const calls = [];
+  const clearCompletedDownloaderTransfers = t.mock.fn(async ({ actorUserId, request }) => {
+    calls.push('clear');
+    assert.equal(actorUserId, 'admin-1');
+    assert.equal(typeof request.headers, 'object');
+    return {
+      action: 'clear_completed',
+      ok: true,
+      provider: 'slskd',
+    };
+  });
+  const app = createDownloaderRouteTestApp({
+    clearCompletedDownloaderTransfers,
+    limitDownloaderMutation: (_request, _response, next) => {
+      calls.push('limit');
+      next();
+    },
+    requireCsrf: () => {
+      calls.push('csrf');
+    },
+    requireFreshAdminSession: async () => {
+      calls.push('fresh-auth');
+      return { appUserId: 'admin-1' };
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/downloader/actions/clear-completed`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(calls, ['limit', 'fresh-auth', 'csrf', 'clear']);
+    assert.deepEqual(payload, {
+      ok: true,
+      downloaderAction: {
+        action: 'clear_completed',
+        ok: true,
+        provider: 'slskd',
       },
     });
   });

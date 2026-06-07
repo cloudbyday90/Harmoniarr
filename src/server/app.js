@@ -817,6 +817,11 @@ export function createApp({
   });
   mountDownloaderRoutes(app, {
     ...downloaderModule.routeDependencies,
+    limitDownloaderMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'downloader-mutation',
+      limit: 30,
+      windowMs: 60 * 1000,
+    }),
     limitDownloaderQueueRead: requestRateLimiterService.createMiddleware({
       bucketName: 'downloader-queue-read',
       limit: 120,

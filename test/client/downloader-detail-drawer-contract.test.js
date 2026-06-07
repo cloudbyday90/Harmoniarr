@@ -18,6 +18,17 @@ test('DownloaderTransferDetailDrawer follows the modal dialog accessibility cont
   assert.match(source, /min-height: 44px/);
 });
 
+test('DownloaderTransferDetailDrawer exposes server-owned operator action eligibility', async () => {
+  const source = await readFile(drawerPath, 'utf8');
+
+  assert.match(source, /aria-label="Operator controls"/);
+  assert.match(source, /actionEligibility\?\.actions/);
+  assert.match(source, /defineEmits\(\['close', 'request-action'\]\)/);
+  assert.match(source, /@click="emit\('request-action', action\.code\)"/);
+  assert.match(source, /:disabled="!action\.enabled \|\| Boolean\(actionPending\)"/);
+  assert.match(source, /retry_provider_contract_not_available|action\.reason/);
+});
+
 test('DownloaderView opens diagnostics from an explicit Details action', async () => {
   const source = await readFile(viewPath, 'utf8');
 
@@ -25,4 +36,14 @@ test('DownloaderView opens diagnostics from an explicit Details action', async (
   assert.match(source, /selectedTransferKey/);
   assert.match(source, /@click="openTransferDetail\(file\)"/);
   assert.match(source, />\s*Details\s*<\/button>/);
+});
+
+test('DownloaderView wires operator controls to downloader mutation APIs', async () => {
+  const source = await readFile(viewPath, 'utf8');
+
+  assert.match(source, /requestDownloaderTransferAction/);
+  assert.match(source, /clearCompletedDownloaderTransfers/);
+  assert.match(source, /@request-action="performTransferAction"/);
+  assert.match(source, /Clear Completed/);
+  assert.match(source, /pendingAction === 'clear_completed'/);
 });

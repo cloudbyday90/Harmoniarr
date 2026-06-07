@@ -148,6 +148,8 @@ export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/slskd/searches/:searchId', access: 'admin', area: 'slskd', kind: 'read' },
   { method: 'GET', path: '/api/v1/slskd/searches/:searchId/responses', access: 'admin', area: 'slskd', kind: 'read' },
   { method: 'GET', path: '/api/v1/downloader/queue', access: 'admin', area: 'downloader', kind: 'diagnostic' },
+  { method: 'POST', path: '/api/v1/downloader/transfers/:username/:id/actions', access: 'admin', area: 'downloader', kind: 'mutation' },
+  { method: 'POST', path: '/api/v1/downloader/actions/clear-completed', access: 'admin', area: 'downloader', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/operations/history', access: 'admin', area: 'operations', kind: 'read' },
   { method: 'GET', path: '/api/v1/operations/runs/:runId', access: 'admin', area: 'operations', kind: 'read' },
   { method: 'POST', path: '/api/v1/operations/runs/:runId/cancel', access: 'admin', area: 'operations', kind: 'mutation' },
