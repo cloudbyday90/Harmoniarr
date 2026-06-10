@@ -62,6 +62,12 @@ export function useSettingsForm({
       baseUrl: '',
       logLevel: 'info',
     },
+    library: {
+      discoveryCooldownHours: 6,
+      discoveryFallbackCooldownHours: 2,
+      discoveryBatchSize: 5,
+      maxSearchAttempts: 3,
+    },
     paths: {
       downloadMappings: [],
       downloads: '',
@@ -111,6 +117,7 @@ export function useSettingsForm({
     });
     Object.assign(form.security, payload.settings.security);
     Object.assign(form.system, payload.settings.system);
+    Object.assign(form.library, payload.settings.library);
     Object.assign(form.paths, {
       ...payload.settings.paths,
       downloadMappings: form.paths.downloadMappings,

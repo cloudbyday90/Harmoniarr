@@ -18,30 +18,55 @@
 
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 import {
-  MAX_DISCOVERY_SEARCH_ATTEMPTS,
   buildDiscoverySearchQuery,
 } from './library-discovery-search-query.js';
 import {
   MAX_TRACK_FALLBACK_QUERIES,
   buildPerTrackDiscoveryQueries,
 } from './library-discovery-track-fallback-query.js';
+import { loadSettings } from '../settings.js';
 
-const defaultAutomaticCooldownMs = 6 * 60 * 60 * 1000;
-const defaultDispatchBatchSize = 5;
-const defaultFallbackCooldownMs = 2 * 60 * 60 * 1000;
+export const DEFAULT_DISCOVERY_SETTINGS = Object.freeze({
+  automaticCooldownMs: 6 * 60 * 60 * 1000,
+  dispatchBatchSize: 5,
+  fallbackCooldownMs: 2 * 60 * 60 * 1000,
+  maxSearchAttempts: 3,
+});
 
 export { buildDiscoverySearchQuery };
 
+export function resolveDiscoverySettings(settings) {
+  const library = settings?.library && typeof settings.library === 'object'
+    ? settings.library
+    : {};
+
+  return {
+    automaticCooldownMs: Number.isInteger(library.discoveryCooldownHours)
+      ? library.discoveryCooldownHours * 60 * 60 * 1000
+      : DEFAULT_DISCOVERY_SETTINGS.automaticCooldownMs,
+    dispatchBatchSize: Number.isInteger(library.discoveryBatchSize)
+      ? library.discoveryBatchSize
+      : DEFAULT_DISCOVERY_SETTINGS.dispatchBatchSize,
+    fallbackCooldownMs: Number.isInteger(library.discoveryFallbackCooldownHours)
+      ? library.discoveryFallbackCooldownHours * 60 * 60 * 1000
+      : DEFAULT_DISCOVERY_SETTINGS.fallbackCooldownMs,
+    maxSearchAttempts: Number.isInteger(library.maxSearchAttempts)
+      ? library.maxSearchAttempts
+      : DEFAULT_DISCOVERY_SETTINGS.maxSearchAttempts,
+  };
+}
+
 export function createLibraryDiscoveryDispatchService({
-  automaticCooldownMs = defaultAutomaticCooldownMs,
-  dispatchBatchSize = defaultDispatchBatchSize,
+  automaticCooldownMs: _automaticCooldownMs = DEFAULT_DISCOVERY_SETTINGS.automaticCooldownMs,
+  dispatchBatchSize: _dispatchBatchSize = DEFAULT_DISCOVERY_SETTINGS.dispatchBatchSize,
   enableTrackFallback = false,
-  fallbackCooldownMs = defaultFallbackCooldownMs,
+  fallbackCooldownMs: _fallbackCooldownMs = DEFAULT_DISCOVERY_SETTINGS.fallbackCooldownMs,
   getNow = () => new Date(),
   getReleaseTracklistExpectationsFn = null,
   getUserPreferencesFn = null,
   importCandidateService = null,
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
+  loadSettingsFn = loadSettings,
   onDiscoveryRequestExhaustedFn = null,
   slskdService = null,
   trackFallbackMaxQueries = MAX_TRACK_FALLBACK_QUERIES,
@@ -66,12 +91,18 @@ export function createLibraryDiscoveryDispatchService({
     };
   }
 
-  function buildNextZeroCandidateSchedule({ dispatchedAt, searchAttemptCount }) {
+  function buildNextZeroCandidateSchedule({
+    automaticCooldownMs: effectiveAutomaticCooldownMs,
+    dispatchedAt,
+    fallbackCooldownMs: effectiveFallbackCooldownMs,
+    maxSearchAttempts: effectiveMaxSearchAttempts,
+    searchAttemptCount,
+  }) {
     const completedAttemptCount = (Number.isInteger(searchAttemptCount) && searchAttemptCount > 0
       ? searchAttemptCount
       : 0) + 1;
 
-    if (completedAttemptCount >= MAX_DISCOVERY_SEARCH_ATTEMPTS) {
+    if (completedAttemptCount >= effectiveMaxSearchAttempts) {
       return {
         exhausted: true,
         nextSearchAfter: null,
@@ -79,7 +110,7 @@ export function createLibraryDiscoveryDispatchService({
       };
     }
 
-    const cooldownMs = searchAttemptCount >= 1 ? fallbackCooldownMs : automaticCooldownMs;
+    const cooldownMs = searchAttemptCount >= 1 ? effectiveFallbackCooldownMs : effectiveAutomaticCooldownMs;
     return {
       exhausted: false,
       nextSearchAfter: new Date(dispatchedAt.getTime() + cooldownMs).toISOString(),
@@ -180,16 +211,27 @@ export function createLibraryDiscoveryDispatchService({
       };
     }
 
+    let effectiveSettings;
+    try {
+      effectiveSettings = resolveDiscoverySettings(await loadSettingsFn());
+    } catch {
+      effectiveSettings = DEFAULT_DISCOVERY_SETTINGS;
+    }
+    const effectiveAutomaticCooldownMs = effectiveSettings.automaticCooldownMs;
+    const effectiveDispatchBatchSize = effectiveSettings.dispatchBatchSize;
+    const effectiveFallbackCooldownMs = effectiveSettings.fallbackCooldownMs;
+    const effectiveMaxSearchAttempts = effectiveSettings.maxSearchAttempts;
+
     const failures = [];
     const dispatchedSearches = [];
     let attemptedCount = 0;
     let candidateCount = 0;
     let fileCount = 0;
 
-    for (let index = 0; index < dispatchBatchSize; index += 1) {
+    for (let index = 0; index < effectiveDispatchBatchSize; index += 1) {
       const dispatchedAt = getNow();
       const dispatchedAtIso = dispatchedAt.toISOString();
-      const nextSearchAfter = new Date(dispatchedAt.getTime() + automaticCooldownMs).toISOString();
+      const nextSearchAfter = new Date(dispatchedAt.getTime() + effectiveAutomaticCooldownMs).toISOString();
       const claimedRequest = await libraryDiscoveryRequestStore.claimNextReadyAutomaticDiscoveryRequest({
         dispatchedAt: dispatchedAtIso,
         nextSearchAfter,
@@ -218,13 +260,13 @@ export function createLibraryDiscoveryDispatchService({
       if (!searchQuery) {
         const terminalSearchAttemptCount = Math.max(
           claimedRequest.searchAttemptCount ?? 0,
-          MAX_DISCOVERY_SEARCH_ATTEMPTS,
+          effectiveMaxSearchAttempts,
         );
         const failure = {
-          code: claimedRequest.searchAttemptCount >= MAX_DISCOVERY_SEARCH_ATTEMPTS
+          code: claimedRequest.searchAttemptCount >= effectiveMaxSearchAttempts
             ? 'discovery_search_attempts_exhausted'
             : 'discovery_search_query_invalid',
-          message: claimedRequest.searchAttemptCount >= MAX_DISCOVERY_SEARCH_ATTEMPTS
+          message: claimedRequest.searchAttemptCount >= effectiveMaxSearchAttempts
             ? 'Discovery request exhausted all automatic search query fallback attempts'
             : 'Discovery request did not contain enough metadata to build a search query',
           metadataReleaseId: claimedRequest.metadataReleaseId,
@@ -283,7 +325,10 @@ export function createLibraryDiscoveryDispatchService({
         fileCount += ingestionResult.fileCount;
         const zeroCandidateSchedule = ingestionResult.candidateCount === 0
           ? buildNextZeroCandidateSchedule({
+            automaticCooldownMs: effectiveAutomaticCooldownMs,
             dispatchedAt,
+            fallbackCooldownMs: effectiveFallbackCooldownMs,
+            maxSearchAttempts: effectiveMaxSearchAttempts,
             searchAttemptCount: claimedRequest.searchAttemptCount ?? 0,
           })
           : null;

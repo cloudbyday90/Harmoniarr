@@ -431,6 +431,32 @@ const settingDefinitions = {
       },
     },
   },
+  library: {
+    discoveryCooldownHours: {
+      defaultValue: 6,
+      normalize(value) {
+        return normalizeIntegerSetting('library.discoveryCooldownHours', value, { min: 1, max: 168 });
+      },
+    },
+    discoveryFallbackCooldownHours: {
+      defaultValue: 2,
+      normalize(value) {
+        return normalizeIntegerSetting('library.discoveryFallbackCooldownHours', value, { min: 1, max: 168 });
+      },
+    },
+    discoveryBatchSize: {
+      defaultValue: 5,
+      normalize(value) {
+        return normalizeIntegerSetting('library.discoveryBatchSize', value, { min: 1, max: 50 });
+      },
+    },
+    maxSearchAttempts: {
+      defaultValue: 3,
+      normalize(value) {
+        return normalizeIntegerSetting('library.maxSearchAttempts', value, { min: 1, max: 10 });
+      },
+    },
+  },
 };
 
 function normalizeStringAllowEmpty(settingName) {

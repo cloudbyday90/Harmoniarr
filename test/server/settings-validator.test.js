@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeSettingsPatch } from '../../src/server/validators/settings-validator.js';
+import { getDefaultSettings, normalizeSettingsPatch } from '../../src/server/validators/settings-validator.js';
 
 test('normalizeSettingsPatch accepts artwork worker configuration settings', () => {
   const updates = normalizeSettingsPatch({
@@ -263,4 +263,86 @@ test('normalizeSettingsPatch rejects an out-of-range fidelity success rate', () 
     () => normalizeSettingsPatch({ fidelity: { trustWatchMaxSuccessRate: 1.5 } }),
     (error) => error?.status === 400 && error?.code === 'validation_error',
   );
+});
+
+test('normalizeSettingsPatch accepts library discovery scheduling settings', () => {
+  const updates = normalizeSettingsPatch({
+    library: {
+      discoveryCooldownHours: 12,
+      discoveryFallbackCooldownHours: 4,
+      discoveryBatchSize: 10,
+      maxSearchAttempts: 5,
+    },
+  });
+
+  assert.deepEqual(updates, [
+    { namespace: 'library', settingKey: 'discoveryCooldownHours', value: 12 },
+    { namespace: 'library', settingKey: 'discoveryFallbackCooldownHours', value: 4 },
+    { namespace: 'library', settingKey: 'discoveryBatchSize', value: 10 },
+    { namespace: 'library', settingKey: 'maxSearchAttempts', value: 5 },
+  ]);
+});
+
+test('normalizeSettingsPatch rejects library discoveryCooldownHours below minimum', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ library: { discoveryCooldownHours: 0 } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'library.discoveryCooldownHours must be greater than or equal to 1',
+  );
+});
+
+test('normalizeSettingsPatch rejects library discoveryCooldownHours above maximum', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ library: { discoveryCooldownHours: 200 } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'library.discoveryCooldownHours must be less than or equal to 168',
+  );
+});
+
+test('normalizeSettingsPatch rejects non-integer library discoveryBatchSize', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ library: { discoveryBatchSize: 'five' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'library.discoveryBatchSize must be an integer',
+  );
+});
+
+test('normalizeSettingsPatch rejects float library maxSearchAttempts', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ library: { maxSearchAttempts: 2.5 } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'library.maxSearchAttempts must be an integer',
+  );
+});
+
+test('getDefaultSettings includes library namespace with all four defaults', () => {
+  const defaults = getDefaultSettings();
+
+  assert.ok(defaults.library);
+  assert.equal(defaults.library.discoveryCooldownHours, 6);
+  assert.equal(defaults.library.discoveryFallbackCooldownHours, 2);
+  assert.equal(defaults.library.discoveryBatchSize, 5);
+  assert.equal(defaults.library.maxSearchAttempts, 3);
+});
+
+test('normalizeSettingsPatch accepts library settings at exact range boundaries', () => {
+  const updates = normalizeSettingsPatch({
+    library: {
+      discoveryCooldownHours: 168,
+      discoveryFallbackCooldownHours: 168,
+      discoveryBatchSize: 50,
+      maxSearchAttempts: 10,
+    },
+  });
+
+  assert.deepEqual(updates, [
+    { namespace: 'library', settingKey: 'discoveryCooldownHours', value: 168 },
+    { namespace: 'library', settingKey: 'discoveryFallbackCooldownHours', value: 168 },
+    { namespace: 'library', settingKey: 'discoveryBatchSize', value: 50 },
+    { namespace: 'library', settingKey: 'maxSearchAttempts', value: 10 },
+  ]);
 });

@@ -27,9 +27,19 @@ function createArtworkForm() {
   };
 }
 
+function createLibraryForm() {
+  return {
+    discoveryCooldownHours: 6,
+    discoveryFallbackCooldownHours: 2,
+    discoveryBatchSize: 5,
+    maxSearchAttempts: 3,
+  };
+}
+
 test('buildSettingsUpdatePayload preserves the existing slskd api key when the field is left blank', () => {
   const payload = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
+    library: createLibraryForm(),
     security: {
       csrfProtectionMode: 'disabled',
       enforceHttps: false,
@@ -87,6 +97,12 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
       transcodeTemp: '/data/transcode-temp',
       userMusicRoots: [{ userId: 'user-1', relativeRoot: 'family/alice' }],
     },
+    library: {
+      discoveryCooldownHours: 6,
+      discoveryFallbackCooldownHours: 2,
+      discoveryBatchSize: 5,
+      maxSearchAttempts: 3,
+    },
     slskd: {
       baseUrl: 'http://slskd.internal:5030',
       requestTimeoutMs: 15000,
@@ -97,6 +113,7 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
 test('buildSettingsUpdatePayload includes slskd api key updates and explicit clear requests', () => {
   const withSecret = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
+    library: createLibraryForm(),
     security: {
       csrfProtectionMode: 'required',
       enforceHttps: true,
@@ -121,6 +138,7 @@ test('buildSettingsUpdatePayload includes slskd api key updates and explicit cle
   });
   const cleared = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
+    library: createLibraryForm(),
     security: {
       csrfProtectionMode: 'required',
       enforceHttps: true,
@@ -167,6 +185,7 @@ test('normalizeUserMusicRoots keeps only string mapping values', () => {
 test('buildSettingsUpdatePayload includes provider intake settings and secret mutations when present', () => {
   const payload = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
+    library: createLibraryForm(),
     security: {
       csrfProtectionMode: 'required',
       enforceHttps: true,
@@ -227,5 +246,45 @@ test('buildSettingsUpdatePayload includes provider intake settings and secret mu
     youtubeClientId: 'youtube-client',
     youtubeClientSecret: 'youtube-secret',
     youtubeEnabled: true,
+  });
+});
+
+test('buildSettingsUpdatePayload includes library discovery scheduling fields', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    library: {
+      discoveryCooldownHours: 12,
+      discoveryFallbackCooldownHours: 4,
+      discoveryBatchSize: 10,
+      maxSearchAttempts: 5,
+    },
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.library, {
+    discoveryCooldownHours: 12,
+    discoveryFallbackCooldownHours: 4,
+    discoveryBatchSize: 10,
+    maxSearchAttempts: 5,
   });
 });

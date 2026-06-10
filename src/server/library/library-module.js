@@ -18,6 +18,7 @@
 
 import { createLibraryScanSummaryService } from '../library-scan-summary-service.js';
 import { createSettingsService } from '../settings-service.js';
+import { loadSettings } from '../settings.js';
 import { createProviderClientResolverService } from '../integrations/providers/provider-client-resolver-service.js';
 import { createLibraryCatalogStore } from './library-catalog-store.js';
 import { createLibraryExternalIntakeRunStore } from './library-external-intake-run-store.js';
@@ -108,6 +109,7 @@ export function createLibraryModule({
     getUserPreferencesFn,
     importCandidateService,
     libraryDiscoveryRequestStore,
+    loadSettingsFn: loadSettings,
     onDiscoveryRequestExhaustedFn,
     slskdService,
   }),
