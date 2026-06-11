@@ -105,6 +105,7 @@ export function buildSettingsUpdatePayload(form) {
     },
     library: { ...form.library },
     scoring: { ...form.scoring },
+    acquisition: { ...form.acquisition },
     slskd: {
       baseUrl: form.slskd.baseUrl,
       requestTimeoutMs: form.slskd.requestTimeoutMs,

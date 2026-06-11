@@ -114,6 +114,29 @@ onMounted(() => { void loadSettings(); });
       <article class="hx-card">
         <header class="hx-card-header">
           <div>
+            <h3 class="hx-card-title">Acquisition policy</h3>
+            <p class="hx-card-subtitle">Control how Harmoniarr handles source users with poor delivery records. When enabled, peers flagged by the reputation heuristic are added to the ignore list automatically.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <label class="cfg-check">
+              <input type="checkbox" v-model="form.acquisition.autoIgnoreEnabled" />
+              <span>Automatically ignore low-reputation source users</span>
+            </label>
+            <p class="cfg-field-hint">When enabled, Harmoniarr evaluates each source user's reputation after recording delivery outcomes. Peers that exceed the failure threshold are added to the ignore list after the cooldown period elapses.</p>
+            <div class="hx-field">
+              <label class="hx-field-label">Cooldown (hours)</label>
+              <input class="hx-input" v-model.number="form.acquisition.autoIgnoreCooldownHours" type="number" min="0" max="8760" step="1" :disabled="!form.acquisition.autoIgnoreEnabled" />
+              <p class="cfg-field-hint">Minimum hours between auto-ignore evaluations for the same peer. A longer cooldown reduces noise but delays ignoring problematic peers. Default is 24 hours. Range: 0–8760 (1 year).</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
             <h3 class="hx-card-title">Download scoring weights <span class="hx-pill" data-tone="info" style="font-size: var(--hx-text-xs); vertical-align: middle; margin-left: 6px">advanced</span></h3>
             <p class="hx-card-subtitle">Control how much each quality factor contributes to a candidate's overall score. Weights determine which downloads Harmoniarr prioritizes.</p>
           </div>

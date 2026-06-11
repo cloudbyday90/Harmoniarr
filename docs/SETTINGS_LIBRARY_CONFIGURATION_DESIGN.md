@@ -617,6 +617,108 @@ added to `test/server/import-candidate-service.test.js`:
 
 ---
 
+## Acquisition Policy Implementation Plan
+
+> Phase 3 of the Settings Library track. Surfaces the existing `acquisition` settings
+> namespace (2 fields: auto-ignore toggle + cooldown hours) as a card in
+> `SettingsLibraryView.vue`. No backend changes needed — the validator, resolver,
+> and consumption path are all complete.
+
+### Architecture Context
+
+The `acquisition` namespace already exists with full backend support:
+
+1. **Validator** (`settings-validator.js:282-293`): `autoIgnoreEnabled` (boolean,
+   default false) + `autoIgnoreCooldownHours` (integer, 0–8760, default 24).
+2. **Resolver** (`source-user-ignore-service.js:24-32`): `resolveAcquisitionSettings`
+   projects the raw namespace with fallbacks.
+3. **Consumption** (`source-user-ignore-service.js:151`): `evaluateAutoIgnoreForUser`
+   reads via injected `loadSettingsFn`, resolves, checks enabled flag, passes to
+   `evaluateAutoIgnoreApplication`.
+4. **Existing UI** (`ActivityIgnoredView.vue:294-339`): Already surfaces both fields
+   in a separate "Auto-apply" card with independent load/save.
+
+**Dual-surface design:** Both `ActivityIgnoredView` and `SettingsLibraryView` will
+write to the same `acquisition` namespace. This is safe because both use the same
+validated `updateSettings()` API. The Activity view provides context-aware config
+(while managing the ignore list); Settings Library provides centralized config.
+
+**No backend work needed:** No refactors, no new resolvers, no injection wiring, no
+validator changes. Phase 3 is purely frontend surfacing.
+
+### A) Payload Builder + Composable
+
+These changes add the `acquisition` namespace to the client-side form pipeline.
+
+#### A1. Add `acquisition` spread to `buildSettingsUpdatePayload`
+
+`ACQUISITION_SETTINGS_PAYLOAD_BUILDER_DESIGN.md` completes the payload builder
+addition. The `acquisition` namespace is added as a shallow spread
+`{ ...form.acquisition }` after `scoring` in the payload object, matching the
+`security`/`system`/`library`/`scoring` pattern. The first test fixture was updated
+to include `acquisition` in both input and expected output. All 7 tests pass, 0 lint
+warnings.
+
+#### A2. Add `acquisition` form defaults to `useSettingsForm.js` composable
+
+`ACQUISITION_SETTINGS_COMPOSABLE_DESIGN.md` completes the composable wiring. Two
+changes:
+
+1. Added `acquisition: { autoIgnoreEnabled: false, autoIgnoreCooldownHours: 24 }`
+   defaults after `scoring` in the `form` reactive (matching server validator
+   defaults at `settings-validator.js:282-293`).
+2. Added `Object.assign(form.acquisition, payload.settings.acquisition)` in
+   `applySettings` after the `scoring` spread.
+
+Defaults are duplicated (not imported from server) to maintain the client/server
+module boundary. All 7 form tests + 14 contract tests pass, 0 lint warnings.
+
+### B) View
+
+#### B1. SettingsLibraryView "Acquisition policy" card
+
+`ACQUISITION_SETTINGS_VIEW_CARD_DESIGN.md` completes the frontend view. A new
+`hx-card` between the Discovery and Scoring cards with:
+
+1. **Header**: "Acquisition policy" title, descriptive subtitle.
+2. **Toggle**: `cfg-check` checkbox bound to `form.acquisition.autoIgnoreEnabled`.
+3. **Cooldown input**: Number input with `:disabled="!form.acquisition.autoIgnoreEnabled"`
+   binding, `min="0"`, `max="8760"`, `step="1"`.
+4. **Helper text**: Explains auto-ignore behavior and cooldown range.
+
+Uses `:disabled` (not `v-if`) per parent design doc specification — the cooldown
+value remains visible and persists in the form for pre-configuration. Native
+`<input type="checkbox">` provides built-in accessibility per WAI-ARIA practices.
+21/21 tests pass, 0 lint warnings.
+
+### C) Tests
+
+#### C1. Extend `test/client/settings-library-view-contract.test.js`
+
+`ACQUISITION_SETTINGS_CONTRACT_TEST_DESIGN.md` completes the contract tests. 5 new
+tests added between Discovery and Scoring sections:
+
+1. Card presence (title + subtitle).
+2. Toggle wiring (`form.acquisition.autoIgnoreEnabled`).
+3. Cooldown wiring + input constraints (`min="0" max="8760" step="1"`).
+4. Disabled binding (`:disabled="!form.acquisition.autoIgnoreEnabled"`).
+5. Cooldown field label (`hx-field-label`).
+
+19/19 tests pass (14 existing + 5 new), 0 lint warnings.
+
+#### C2. Extend `test/client/settings-form.test.js`
+
+`ACQUISITION_SETTINGS_PAYLOAD_TEST_DESIGN.md` completes the payload tests. 2 new
+tests added after the scoring test:
+
+1. Custom acquisition values (`true`, `48`) pass through correctly.
+2. Default acquisition values from `createAcquisitionForm()` pass through correctly.
+
+Both use `assert.deepEqual(payload.acquisition, {...})` namespace-slice pattern.
+9/9 form tests pass, 19/19 contract tests pass, 0 lint warnings.
+
+---
+
 ## Files
 
 | File | Role |
@@ -625,11 +727,13 @@ added to `test/server/import-candidate-service.test.js`:
 | `src/server/library/library-discovery-dispatch-service.js` | Accept `loadSettingsFn`, add `resolveDiscoverySettings`, read settings per cycle with graceful fallback, parameterize `buildNextZeroCandidateSchedule`. |
 | `src/server/library/library-module.js` | Pass `loadSettingsFn` to dispatch service factory. |
 | `src/client/lib/settings-form.js` | Add `library` spread to `buildSettingsUpdatePayload`. |
-| `src/client/views/SettingsLibraryView.vue` | Add "Discovery scheduling" section with four fields. |
+| `src/client/views/SettingsLibraryView.vue` | Add "Discovery scheduling", "Acquisition policy" sections. |
+| `src/client/composables/useSettingsForm.js` | Add `acquisition` form defaults + apply spread. |
+| `src/client/lib/settings-form.js` | Add `acquisition` spread to payload builder. |
 | `test/server/library-discovery-dispatch-settings.test.js` | New: resolver, settings consumption, backward compatibility. |
-| `test/client/settings-library-view-contract.test.js` | New: section visibility, field wiring. |
+| `test/client/settings-library-view-contract.test.js` | New: section visibility, field wiring, acquisition tests. |
 | `test/server/settings-validator.test.js` | Extend: `library` namespace validation cases. |
-| `test/client/settings-form.test.js` | Extend: `library` payload building cases. |
+| `test/client/settings-form.test.js` | Extend: `library` + `acquisition` payload building cases. |
 | `test/server/library-discovery-dispatch-service.test.js` | Extend: settings injection backward compatibility. |
 
 ## Security

@@ -78,6 +78,10 @@ export function useSettingsForm({
       weightPeerDelivery: 0.08,
       weightUploaderReputation: 0.05,
     },
+    acquisition: {
+      autoIgnoreEnabled: false,
+      autoIgnoreCooldownHours: 24,
+    },
     paths: {
       downloadMappings: [],
       downloads: '',
@@ -129,6 +133,7 @@ export function useSettingsForm({
     Object.assign(form.system, payload.settings.system);
     Object.assign(form.library, payload.settings.library);
     Object.assign(form.scoring, payload.settings.scoring);
+    Object.assign(form.acquisition, payload.settings.acquisition);
     Object.assign(form.paths, {
       ...payload.settings.paths,
       downloadMappings: form.paths.downloadMappings,

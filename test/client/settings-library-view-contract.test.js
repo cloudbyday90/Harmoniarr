@@ -89,6 +89,38 @@ test('SettingsLibraryView renders loading state before settings are fetched', as
   assert.match(source, /Loading settings\.\.\./);
 });
 
+test('SettingsLibraryView renders the Acquisition policy card in the default branch', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<h3 class="hx-card-title">Acquisition policy<\/h3>/);
+  assert.match(source, /Control how Harmoniarr handles source users/);
+});
+
+test('SettingsLibraryView wires the auto-ignore toggle to form.acquisition.autoIgnoreEnabled', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /v-model="form\.acquisition\.autoIgnoreEnabled"/);
+});
+
+test('SettingsLibraryView wires the cooldown field to form.acquisition.autoIgnoreCooldownHours', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /v-model\.number="form\.acquisition\.autoIgnoreCooldownHours"/);
+  assert.match(source, /autoIgnoreCooldownHours.*min="0" max="8760" step="1"/);
+});
+
+test('SettingsLibraryView disables the cooldown input when auto-ignore is off', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /:disabled="!form\.acquisition\.autoIgnoreEnabled"/);
+});
+
+test('SettingsLibraryView labels the acquisition cooldown field with hx-field-label', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<label class="hx-field-label">Cooldown \(hours\)<\/label>/);
+});
+
 test('SettingsLibraryView renders the Download scoring weights card', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
