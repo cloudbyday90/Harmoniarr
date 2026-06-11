@@ -88,3 +88,56 @@ test('SettingsLibraryView renders loading state before settings are fetched', as
   assert.match(source, /v-if="isLoading"/);
   assert.match(source, /Loading settings\.\.\./);
 });
+
+test('SettingsLibraryView renders the Download scoring weights card', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /Download scoring weights/);
+  assert.match(source, /Control how much each quality factor contributes/);
+});
+
+test('SettingsLibraryView wires all eight scoring fields to form.scoring.*', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /v-model\.number="form\.scoring\.weightFormatTier"/);
+  assert.match(source, /v-model\.number="form\.scoring\.weightCandidateTrackMatch"/);
+  assert.match(source, /v-model\.number="form\.scoring\.weightAudioDepth"/);
+  assert.match(source, /v-model\.number="form\.scoring\.weightDuration"/);
+  assert.match(source, /v-model\.number="form\.scoring\.weightFormatConsistency"/);
+  assert.match(source, /v-model\.number="form\.scoring\.weightTrackCount"/);
+  assert.match(source, /v-model\.number="form\.scoring\.weightPeerDelivery"/);
+  assert.match(source, /v-model\.number="form\.scoring\.weightUploaderReputation"/);
+});
+
+test('SettingsLibraryView constrains scoring inputs to validator ranges', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /weightFormatTier[^]*min="0\.01" max="1" step="0\.01"/);
+});
+
+test('SettingsLibraryView includes a scoring sum indicator', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /scoringSum/);
+  assert.match(source, /scoringSum\.toFixed\(2\)/);
+});
+
+test('SettingsLibraryView includes a reset to defaults button for scoring', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /resetScoringDefaults/);
+  assert.match(source, /Reset to defaults/);
+});
+
+test('SettingsLibraryView labels all eight scoring fields with hx-field-label', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<label class="hx-field-label">Format tier<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Track match<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Audio depth<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Duration<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Format consistency<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Track count<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Peer delivery<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Uploader reputation<\/label>/);
+});

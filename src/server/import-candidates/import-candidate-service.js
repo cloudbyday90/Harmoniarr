@@ -20,7 +20,8 @@ import { createHash } from 'node:crypto';
 import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
 import { filterSlskdResponsesForCandidates } from '../library/candidate-source-filter.js';
-import { scoreDownloadResult } from '../library/download-result-scoring.js';
+import { resolveScoringSettings, scoreDownloadResult } from '../library/download-result-scoring.js';
+import { loadSettings } from '../settings.js';
 import { scoreCandidateFormatMatch } from '../library/format-preference-scoring.js';
 import { getPool } from '../database.js';
 import {
@@ -347,6 +348,7 @@ export function createImportCandidateService({
   recordSourceUserOutcomeEvidenceFn = async () => null,
   replaceImportCandidateFilesFn = replaceImportCandidateFiles,
   scoreDownloadResultFn = scoreDownloadResult,
+  loadSettingsFn = loadSettings,
   slskdService,
   browseEnrichmentService = null,
   transitionImportCandidateStatusFn = transitionImportCandidateStatus,
@@ -797,6 +799,13 @@ export function createImportCandidateService({
       }
     }
 
+    let effectiveScorers;
+    try {
+      effectiveScorers = resolveScoringSettings(await loadSettingsFn());
+    } catch {
+      effectiveScorers = resolveScoringSettings(undefined);
+    }
+
     for (const candidate of enrichedCandidates) {
       const scoring = scoreDownloadResultFn({
         candidate,
@@ -806,6 +815,7 @@ export function createImportCandidateService({
         expectedTrackTitles,
         expectedDurationSeconds,
         uploaderReputation: reputationIndex.get(buildUsernameKey(candidate.username)) ?? null,
+        scorers: effectiveScorers,
       });
 
       if (scoring.compositeScore !== null) {

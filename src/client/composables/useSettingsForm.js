@@ -68,6 +68,16 @@ export function useSettingsForm({
       discoveryBatchSize: 5,
       maxSearchAttempts: 3,
     },
+    scoring: {
+      weightFormatTier: 0.25,
+      weightCandidateTrackMatch: 0.20,
+      weightAudioDepth: 0.12,
+      weightDuration: 0.12,
+      weightFormatConsistency: 0.10,
+      weightTrackCount: 0.08,
+      weightPeerDelivery: 0.08,
+      weightUploaderReputation: 0.05,
+    },
     paths: {
       downloadMappings: [],
       downloads: '',
@@ -118,6 +128,7 @@ export function useSettingsForm({
     Object.assign(form.security, payload.settings.security);
     Object.assign(form.system, payload.settings.system);
     Object.assign(form.library, payload.settings.library);
+    Object.assign(form.scoring, payload.settings.scoring);
     Object.assign(form.paths, {
       ...payload.settings.paths,
       downloadMappings: form.paths.downloadMappings,

@@ -36,10 +36,24 @@ function createLibraryForm() {
   };
 }
 
+function createScoringForm() {
+  return {
+    weightFormatTier: 0.25,
+    weightCandidateTrackMatch: 0.20,
+    weightAudioDepth: 0.12,
+    weightDuration: 0.12,
+    weightFormatConsistency: 0.10,
+    weightTrackCount: 0.08,
+    weightPeerDelivery: 0.08,
+    weightUploaderReputation: 0.05,
+  };
+}
+
 test('buildSettingsUpdatePayload preserves the existing slskd api key when the field is left blank', () => {
   const payload = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
     library: createLibraryForm(),
+    scoring: createScoringForm(),
     security: {
       csrfProtectionMode: 'disabled',
       enforceHttps: false,
@@ -102,6 +116,16 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
       discoveryFallbackCooldownHours: 2,
       discoveryBatchSize: 5,
       maxSearchAttempts: 3,
+    },
+    scoring: {
+      weightFormatTier: 0.25,
+      weightCandidateTrackMatch: 0.20,
+      weightAudioDepth: 0.12,
+      weightDuration: 0.12,
+      weightFormatConsistency: 0.10,
+      weightTrackCount: 0.08,
+      weightPeerDelivery: 0.08,
+      weightUploaderReputation: 0.05,
     },
     slskd: {
       baseUrl: 'http://slskd.internal:5030',
@@ -286,5 +310,54 @@ test('buildSettingsUpdatePayload includes library discovery scheduling fields', 
     discoveryFallbackCooldownHours: 4,
     discoveryBatchSize: 10,
     maxSearchAttempts: 5,
+  });
+});
+
+test('buildSettingsUpdatePayload includes scoring weight fields', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    library: createLibraryForm(),
+    scoring: {
+      weightFormatTier: 0.30,
+      weightCandidateTrackMatch: 0.15,
+      weightAudioDepth: 0.10,
+      weightDuration: 0.10,
+      weightFormatConsistency: 0.12,
+      weightTrackCount: 0.08,
+      weightPeerDelivery: 0.10,
+      weightUploaderReputation: 0.05,
+    },
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.scoring, {
+    weightFormatTier: 0.30,
+    weightCandidateTrackMatch: 0.15,
+    weightAudioDepth: 0.10,
+    weightDuration: 0.10,
+    weightFormatConsistency: 0.12,
+    weightTrackCount: 0.08,
+    weightPeerDelivery: 0.10,
+    weightUploaderReputation: 0.05,
   });
 });

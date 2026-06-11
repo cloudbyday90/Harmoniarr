@@ -232,16 +232,55 @@ export function scoreUploaderReputation({ successCount = 0, failureCount = 0 }) 
   return { name: 'uploaderReputation', score: 20 };
 }
 
-const DEFAULT_SCORERS = [
-  { name: 'formatTier', weight: 0.25, fn: scoreFormatTier },
-  { name: 'candidateTrackMatch', weight: 0.20, fn: scoreCandidateTrackMatch },
-  { name: 'audioDepth', weight: 0.12, fn: scoreAudioDepth },
-  { name: 'duration', weight: 0.12, fn: scoreDuration },
-  { name: 'formatConsistency', weight: 0.10, fn: scoreFormatConsistency },
-  { name: 'trackCount', weight: 0.08, fn: scoreTrackCount },
-  { name: 'peerDelivery', weight: 0.08, fn: scorePeerDelivery },
-  { name: 'uploaderReputation', weight: 0.05, fn: scoreUploaderReputation },
-];
+export const DEFAULT_SCORING_WEIGHTS = Object.freeze({
+  weightFormatTier: 0.25,
+  weightCandidateTrackMatch: 0.20,
+  weightAudioDepth: 0.12,
+  weightDuration: 0.12,
+  weightFormatConsistency: 0.10,
+  weightTrackCount: 0.08,
+  weightPeerDelivery: 0.08,
+  weightUploaderReputation: 0.05,
+});
+
+export function buildScorersFromWeights(weights) {
+  return [
+    { name: 'formatTier', weight: weights.weightFormatTier, fn: scoreFormatTier },
+    { name: 'candidateTrackMatch', weight: weights.weightCandidateTrackMatch, fn: scoreCandidateTrackMatch },
+    { name: 'audioDepth', weight: weights.weightAudioDepth, fn: scoreAudioDepth },
+    { name: 'duration', weight: weights.weightDuration, fn: scoreDuration },
+    { name: 'formatConsistency', weight: weights.weightFormatConsistency, fn: scoreFormatConsistency },
+    { name: 'trackCount', weight: weights.weightTrackCount, fn: scoreTrackCount },
+    { name: 'peerDelivery', weight: weights.weightPeerDelivery, fn: scorePeerDelivery },
+    { name: 'uploaderReputation', weight: weights.weightUploaderReputation, fn: scoreUploaderReputation },
+  ];
+}
+
+export function resolveScoringSettings(settings) {
+  const scoring = settings?.scoring && typeof settings.scoring === 'object'
+    ? settings.scoring
+    : {};
+
+  function resolveWeight(key) {
+    const value = scoring[key];
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? value
+      : DEFAULT_SCORING_WEIGHTS[key];
+  }
+
+  return buildScorersFromWeights({
+    weightFormatTier: resolveWeight('weightFormatTier'),
+    weightCandidateTrackMatch: resolveWeight('weightCandidateTrackMatch'),
+    weightAudioDepth: resolveWeight('weightAudioDepth'),
+    weightDuration: resolveWeight('weightDuration'),
+    weightFormatConsistency: resolveWeight('weightFormatConsistency'),
+    weightTrackCount: resolveWeight('weightTrackCount'),
+    weightPeerDelivery: resolveWeight('weightPeerDelivery'),
+    weightUploaderReputation: resolveWeight('weightUploaderReputation'),
+  });
+}
+
+const DEFAULT_SCORERS = buildScorersFromWeights(DEFAULT_SCORING_WEIGHTS);
 
 export function scoreDownloadResult({
   candidate,

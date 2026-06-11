@@ -346,3 +346,134 @@ test('normalizeSettingsPatch accepts library settings at exact range boundaries'
     { namespace: 'library', settingKey: 'maxSearchAttempts', value: 10 },
   ]);
 });
+
+test('normalizeSettingsPatch accepts scoring weight settings', () => {
+  const updates = normalizeSettingsPatch({
+    scoring: {
+      weightFormatTier: 0.30,
+      weightCandidateTrackMatch: 0.15,
+      weightAudioDepth: 0.10,
+      weightDuration: 0.10,
+      weightFormatConsistency: 0.12,
+      weightTrackCount: 0.08,
+      weightPeerDelivery: 0.10,
+      weightUploaderReputation: 0.05,
+    },
+  });
+
+  assert.equal(updates.length, 8);
+  assert.equal(updates[0].namespace, 'scoring');
+  assert.equal(updates[0].settingKey, 'weightFormatTier');
+  assert.equal(updates[0].value, 0.30);
+});
+
+test('normalizeSettingsPatch rejects scoring weight below minimum', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ scoring: { weightFormatTier: 0.005 } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'scoring.weightFormatTier must be between 0.01 and 1',
+  );
+});
+
+test('normalizeSettingsPatch rejects scoring weight above maximum', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ scoring: { weightFormatTier: 1.5 } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'scoring.weightFormatTier must be between 0.01 and 1',
+  );
+});
+
+test('normalizeSettingsPatch rejects non-number scoring weight', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ scoring: { weightFormatTier: 'high' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'scoring.weightFormatTier must be a number',
+  );
+});
+
+test('normalizeSettingsPatch accepts scoring weights at exact boundaries', () => {
+  const updates = normalizeSettingsPatch({
+    scoring: {
+      weightFormatTier: 0.01,
+      weightCandidateTrackMatch: 0.01,
+      weightAudioDepth: 0.01,
+      weightDuration: 0.01,
+      weightFormatConsistency: 0.01,
+      weightTrackCount: 0.01,
+      weightPeerDelivery: 0.01,
+      weightUploaderReputation: 0.93,
+    },
+  });
+
+  assert.equal(updates.length, 8);
+  assert.equal(updates[0].value, 0.01);
+  assert.equal(updates[7].value, 0.93);
+});
+
+test('normalizeSettingsPatch rejects scoring weights that do not sum to 1.0', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({
+      scoring: {
+        weightFormatTier: 0.40,
+        weightCandidateTrackMatch: 0.20,
+        weightAudioDepth: 0.15,
+        weightDuration: 0.15,
+        weightFormatConsistency: 0.10,
+        weightTrackCount: 0.05,
+        weightPeerDelivery: 0.03,
+        weightUploaderReputation: 0.02,
+      },
+    }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'scoring weights must sum to 1.0',
+  );
+});
+
+test('normalizeSettingsPatch accepts scoring weights that sum to 1.0', () => {
+  const updates = normalizeSettingsPatch({
+    scoring: {
+      weightFormatTier: 0.25,
+      weightCandidateTrackMatch: 0.20,
+      weightAudioDepth: 0.12,
+      weightDuration: 0.12,
+      weightFormatConsistency: 0.10,
+      weightTrackCount: 0.08,
+      weightPeerDelivery: 0.08,
+      weightUploaderReputation: 0.05,
+    },
+  });
+
+  assert.equal(updates.length, 8);
+  const sum = updates.reduce((s, u) => s + u.value, 0);
+  assert.ok(Math.abs(sum - 1.0) < 0.0001);
+});
+
+test('normalizeSettingsPatch accepts partial scoring patch without sum check', () => {
+  const updates = normalizeSettingsPatch({
+    scoring: {
+      weightFormatTier: 0.30,
+      weightDuration: 0.10,
+    },
+  });
+
+  assert.equal(updates.length, 2);
+  assert.equal(updates[0].settingKey, 'weightFormatTier');
+  assert.equal(updates[0].value, 0.30);
+});
+
+test('getDefaultSettings includes scoring namespace with all eight defaults', () => {
+  const defaults = getDefaultSettings();
+  assert.ok(defaults.scoring);
+  assert.equal(defaults.scoring.weightFormatTier, 0.25);
+  assert.equal(defaults.scoring.weightCandidateTrackMatch, 0.20);
+  assert.equal(defaults.scoring.weightAudioDepth, 0.12);
+  assert.equal(defaults.scoring.weightDuration, 0.12);
+  assert.equal(defaults.scoring.weightFormatConsistency, 0.10);
+  assert.equal(defaults.scoring.weightTrackCount, 0.08);
+  assert.equal(defaults.scoring.weightPeerDelivery, 0.08);
+  assert.equal(defaults.scoring.weightUploaderReputation, 0.05);
+});

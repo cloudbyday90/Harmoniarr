@@ -16,8 +16,19 @@
   along with this program. If not, see <https://www.gnu.org/licenses/>.
 -->
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
+
+const SCORING_WEIGHT_DEFAULTS = {
+  weightFormatTier: 0.25,
+  weightCandidateTrackMatch: 0.20,
+  weightAudioDepth: 0.12,
+  weightDuration: 0.12,
+  weightFormatConsistency: 0.10,
+  weightTrackCount: 0.08,
+  weightPeerDelivery: 0.08,
+  weightUploaderReputation: 0.05,
+};
 
 const {
   errorMessage,
@@ -28,6 +39,14 @@ const {
   saveSettings,
   successMessage,
 } = useSettingsForm();
+
+const scoringSum = computed(() =>
+  Object.values(form.scoring).reduce((sum, w) => sum + (typeof w === 'number' ? w : 0), 0),
+);
+
+function resetScoringDefaults() {
+  Object.assign(form.scoring, { ...SCORING_WEIGHT_DEFAULTS });
+}
 
 onMounted(() => { void loadSettings(); });
 </script>
@@ -86,6 +105,91 @@ onMounted(() => { void loadSettings(); });
                 <label class="hx-field-label">Max search attempts</label>
                 <input class="hx-input" v-model.number="form.library.maxSearchAttempts" type="number" min="1" max="10" step="1" />
                 <p class="cfg-field-hint">After this many empty searches, the release is marked as exhausted and Harmoniarr stops retrying. Default is 3.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Download scoring weights <span class="hx-pill" data-tone="info" style="font-size: var(--hx-text-xs); vertical-align: middle; margin-left: 6px">advanced</span></h3>
+            <p class="hx-card-subtitle">Control how much each quality factor contributes to a candidate's overall score. Weights determine which downloads Harmoniarr prioritizes.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <p class="cfg-group-title">Format and match quality</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Format tier</label>
+                <input class="hx-input" v-model.number="form.scoring.weightFormatTier" type="number" min="0.01" max="1" step="0.01" />
+                <p class="cfg-field-hint">How much the file format (FLAC vs MP3) matters. Default is 0.25.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Track match</label>
+                <input class="hx-input" v-model.number="form.scoring.weightCandidateTrackMatch" type="number" min="0.01" max="1" step="0.01" />
+                <p class="cfg-field-hint">How much matching expected track titles matters. Default is 0.20.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <p class="cfg-group-title">Audio fidelity</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Audio depth</label>
+                <input class="hx-input" v-model.number="form.scoring.weightAudioDepth" type="number" min="0.01" max="1" step="0.01" />
+                <p class="cfg-field-hint">How much audio bit depth and sample rate matters. Default is 0.12.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Duration</label>
+                <input class="hx-input" v-model.number="form.scoring.weightDuration" type="number" min="0.01" max="1" step="0.01" />
+                <p class="cfg-field-hint">How much matching expected album duration matters. Default is 0.12.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <p class="cfg-group-title">Consistency and completeness</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Format consistency</label>
+                <input class="hx-input" v-model.number="form.scoring.weightFormatConsistency" type="number" min="0.01" max="1" step="0.01" />
+                <p class="cfg-field-hint">How much uniform file formats across the candidate matters. Default is 0.10.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Track count</label>
+                <input class="hx-input" v-model.number="form.scoring.weightTrackCount" type="number" min="0.01" max="1" step="0.01" />
+                <p class="cfg-field-hint">How much matching expected track count matters. Default is 0.08.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <p class="cfg-group-title">Source reliability</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Peer delivery</label>
+                <input class="hx-input" v-model.number="form.scoring.weightPeerDelivery" type="number" min="0.01" max="1" step="0.01" />
+                <p class="cfg-field-hint">How much the uploader's connection quality matters. Default is 0.08.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Uploader reputation</label>
+                <input class="hx-input" v-model.number="form.scoring.weightUploaderReputation" type="number" min="0.01" max="1" step="0.01" />
+                <p class="cfg-field-hint">How much the uploader's historical reliability matters. Default is 0.05.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <div class="hx-form-row" style="align-items: center">
+              <div class="hx-field">
+                <p class="cfg-group-title">Weight total</p>
+                <p class="cfg-field-hint">
+                  Weights must sum to 1.00. Current sum:
+                  <strong :style="{ color: Math.abs(scoringSum - 1) < 0.0001 ? 'var(--hx-success)' : 'var(--hx-danger)' }">{{ scoringSum.toFixed(2) }}</strong>
+                </p>
+              </div>
+              <div class="hx-field" style="text-align: right">
+                <button type="button" class="hx-btn" data-variant="ghost" @click="resetScoringDefaults">Reset to defaults</button>
               </div>
             </div>
           </div>

@@ -415,6 +415,208 @@ No additional tests needed.
 
 ---
 
+## Download Scoring Implementation Plan
+
+> Phase 2 of the Settings Library track. Surfaces the eight scoring weights from
+> `download-result-scoring.js` as a `scoring` settings namespace, wires the import
+> candidate service to read those weights at runtime, adds the frontend collapsed
+> section to SettingsLibraryView, and covers all changes with tests.
+
+### Architecture Context
+
+The scoring system ranks download candidates across 8 dimensions using weighted
+averaging. Each dimension produces a 0–100 score; weights sum to 1.0 to produce
+a composite. Currently the 8 weights are hardcoded in `DEFAULT_SCORERS` inside
+`download-result-scoring.js`.
+
+**Key injection point:** `scoreDownloadResult` accepts a `scorers` parameter
+(array of `{name, weight, fn}`) defaulting to `DEFAULT_SCORERS`. The import
+candidate service calls `scoreDownloadResultFn({...})` at
+`import-candidate-service.js:801` without passing `scorers`.
+
+**Wiring chain:**
+
+```
+import-candidate-module.js:113
+  → createImportCandidateService({...})
+    → import-candidate-service.js:801
+      → scoreDownloadResultFn({candidate, ...})
+        → download-result-scoring.js scoreDownloadResult({..., scorers = DEFAULT_SCORERS})
+```
+
+**Difference from Phase 1:** The scoring function is a pure function (not a
+long-lived service). The injection happens in `import-candidate-service.js`,
+not `library-discovery-dispatch-service.js`. The wiring point is
+`import-candidate-module.js:113`, not `library-module.js`.
+
+**New validator challenge:** The `scoring` namespace has a **cross-field sum
+constraint** — all 8 weights must sum to 1.0 (±0.02 tolerance). No existing
+namespace has a constraint that spans multiple fields. This requires a custom
+namespace-level normalize function instead of per-field normalizers.
+
+### A) Refactors
+
+These changes restructure existing code without altering behaviour, so the
+import candidate service can accept scoring weights dynamically instead of using
+hardcoded defaults.
+
+#### A1. Extract scoring weight defaults to a named constant map
+
+`SCORING_WEIGHT_DEFAULTS_EXTRACTION_DESIGN.md` completes the extraction. The
+8 weight values are extracted from `DEFAULT_SCORERS` into a separate exported,
+frozen `DEFAULT_SCORING_WEIGHTS` map. A `buildScorersFromWeights(weights)`
+helper pairs weights with scorer functions. `DEFAULT_SCORERS` is rebuilt from
+the new constant. No behavioural change.
+
+#### A2. Accept `loadSettingsFn` as a constructor dependency in import-candidate-service
+
+`SCORING_SETTINGS_INJECTION_DESIGN.md` completes the injection. The
+`createImportCandidateService` factory now accepts `loadSettingsFn = loadSettings`
+as a constructor parameter, and `import-candidate-module.js` passes the real
+`loadSettings` through. No behavioural change — the parameter is accepted but
+not yet consumed.
+
+#### A3. Add `resolveScoringSettings` resolver
+
+`SCORING_SETTINGS_RESOLVER_DESIGN.md` completes the resolver. A pure, exported
+`resolveScoringSettings` function projects the `scoring` settings namespace into
+a `scorers` array via `buildScorersFromWeights`, falling back to
+`DEFAULT_SCORING_WEIGHTS` for missing or invalid individual weights. No sum
+constraint in the resolver — the validator (B3) enforces that at persistence.
+
+### B) Code Changes
+
+These changes alter existing files to consume the new scoring settings at
+runtime.
+
+#### B1. Read scoring settings per ingestion call
+
+`SCORING_SETTINGS_CONSUMPTION_DESIGN.md` details the design. The scoring loop
+in `ingestSlskdSearchResponses` reads scoring settings once per call via the
+injected `loadSettingsFn`, resolves through `resolveScoringSettings` (A3), and
+passes the `scorers` array to `scoreDownloadResultFn`. Four changes:
+
+1. Import `resolveScoringSettings` from `download-result-scoring.js`.
+2. Rename `_loadSettingsFn` → `loadSettingsFn` in factory params (A2 underscore
+   no longer accurate — parameter is now consumed).
+3. Add settings resolution before scoring loop with try/catch fallback to
+   `resolveScoringSettings(undefined)` (produces fully-defaulted scorers).
+4. Pass `scorers: effectiveScorers` to `scoreDownloadResultFn`.
+
+Zero behavioural change when settings are absent — the resolver produces
+identical scorers to the current hardcoded `DEFAULT_SCORERS`.
+
+#### B2. Wire `loadSettingsFn` through `import-candidate-module.js`
+
+`SCORING_SETTINGS_MODULE_WIRING_DESIGN.md` confirms this step is satisfied.
+A2 implemented both the factory parameter and the module wiring together. The
+wiring at `import-candidate-module.js:117` (`loadSettingsFn: loadSettings`) with
+the corresponding import at line 65 was verified during B1 implementation.
+No additional code changes needed.
+
+#### B3. Add `scoring` namespace to the settings validator
+
+`SCORING_NAMESPACE_VALIDATOR_DESIGN.md` details the design. Four decisions:
+
+1. **Per-field validation**: 8 weight fields, each using `normalizeRateSetting`
+   with `{min: 0.01, max: 1.0}`. Defaults imported from
+   `DEFAULT_SCORING_WEIGHTS` (single source of truth).
+2. **Cross-field constraint**: New `namespaceValidators` map (separate from
+   `settingDefinitions`). The `scoring` validator checks
+   `Math.abs(sum - 1.0) < 0.0001` when all 8 fields are present in the patch.
+   Partial patches skip the sum check (per-field validation is the security
+   boundary; the scoring algorithm normalizes by `totalWeight`).
+3. **Extension point**: `namespaceValidators` is the first cross-field
+   validation mechanism in the settings system. Future namespaces can add
+   entries without touching `settingDefinitions` or `getDefaultSettings`.
+4. **`normalizeSettingsPatch` change**: After per-field processing, group
+   updates by namespace and call `namespaceValidators[ns]?.(updates)`.
+
+#### B4. Add `scoring` namespace to `settings-form.js` payload builder
+
+`SCORING_SETTINGS_PAYLOAD_BUILDER_DESIGN.md` details the design. Three changes:
+
+1. `settings-form.js`: Add `scoring: { ...form.scoring }` after `library`.
+2. `useSettingsForm.js`: Add `scoring` form defaults (8 weight fields matching
+   `DEFAULT_SCORING_WEIGHTS` values — duplicated to avoid client→server import).
+3. `useSettingsForm.js`: Add `Object.assign(form.scoring,
+   payload.settings.scoring)` in `applySettings`.
+
+Pattern matches `library` exactly. B5 is collapsed into B4 (payload builder and
+composable are inseparable — the form can't send what the composable doesn't
+initialize).
+
+### C) New Code
+
+#### C1. Scoring settings resolver (part of download-result-scoring.js)
+
+Covered in A3 — the `resolveScoringSettings` helper is new logic within the
+existing scoring file.
+
+#### C2. SettingsLibraryView "Download scoring weights" section
+
+`SCORING_SETTINGS_FRONTEND_DESIGN.md` details the design. A separate `hx-card`
+after the Discovery card with:
+
+1. **Header**: "Download scoring weights" title with "(advanced)" subtitle.
+2. **8 weight inputs** in 4 `hx-form-row` pairs, each with `v-model.number`,
+   `type="number"`, `min="0.01"`, `max="1"`, `step="0.01"`.
+3. **Live sum indicator**: Computed `scoringSum` with green/danger coloring.
+4. **Reset to defaults button**: Restores all 8 weights to `DEFAULT_SCORING_WEIGHTS` values.
+
+### D) New Files
+
+#### D1. `test/server/scoring-settings.test.js`
+
+`SCORING_SETTINGS_TEST_DESIGN.md` details the design. Dedicated test file
+covering frozen defaults, resolver unit tests, builder verification, injection
+integration tests, and graceful fallback. ~16 tests following the Phase 1
+`library-discovery-dispatch-settings.test.js` pattern.
+
+#### D2. Extend `test/client/settings-library-view-contract.test.js`
+
+Add contract tests for the scoring section:
+
+- The "Download scoring weights" section is present in the form branch
+- All 8 fields are wired to `form.scoring.*`
+- The sum indicator element is present
+- The "Reset to defaults" button is present
+- The section renders in a collapsed state (if applicable)
+
+### E) Test Enhancements
+
+#### E1. Extend `test/server/settings-validator.test.js`
+
+Add test cases for the `scoring` namespace:
+
+- `normalizeSettingsPatch` accepts all 8 scoring weights in range
+- `normalizeSettingsPatch` rejects a weight below 0.01
+- `normalizeSettingsPatch` rejects a weight above 1.0
+- `normalizeSettingsPatch` rejects non-numeric weight value
+- `normalizeSettingsPatch` accepts weights that sum to 1.0
+- `normalizeSettingsPatch` rejects weights that do not sum to 1.0 (above tolerance)
+- `normalizeSettingsPatch` accepts weights that sum within 0.02 tolerance
+- `getDefaultSettings` includes `scoring` with all 8 defaults
+
+#### E2. Extend `test/client/settings-form.test.js`
+
+Add test cases for the `scoring` namespace in `buildSettingsUpdatePayload`:
+
+- Payload includes `scoring` spread when `form.scoring` is present
+- `scoring.weightFormatTier` is passed through as-is
+- All 8 scoring fields are included in the payload
+
+#### E3. Extend existing import candidate service tests
+
+`SCORING_SETTINGS_INJECTION_TEST_DESIGN.md` details the design. Three tests
+added to `test/server/import-candidate-service.test.js`:
+
+1. Custom `loadSettingsFn` returns scoring weights → `scorers` arg has those weights.
+2. `loadSettingsFn` returns no scoring namespace → `scorers` arg has default weights.
+3. `loadSettingsFn` throws → `scorers` arg has default weights.
+
+---
+
 ## Files
 
 | File | Role |

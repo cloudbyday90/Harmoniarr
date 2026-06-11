@@ -4,6 +4,7 @@ import {
   createImportCandidateService,
   normalizeSlskdResponsesToImportCandidates,
 } from '../../src/server/import-candidates/import-candidate-service.js';
+import { scoreDownloadResult } from '../../src/server/library/download-result-scoring.js';
 
 function createPool(t) {
   const client = {
@@ -943,4 +944,139 @@ test('createImportCandidateService uses injectable scoreDownloadResultFn', async
   assert.equal(mockScoreFn.mock.callCount(), 1);
   const storedCandidate = upsertImportCandidateFn.mock.calls[0].arguments[0];
   assert.equal(storedCandidate.normalizedPayload.compositeScore, 42);
+});
+
+test('createImportCandidateService passes custom scoring weights from loadSettingsFn', async (t) => {
+  const { pool } = createPool(t);
+  const capturedScorers = [];
+  const wrapScoreFn = t.mock.fn((args) => {
+    capturedScorers.push(args.scorers);
+    return scoreDownloadResult(args);
+  });
+  const slskdService = {
+    getSearchResponses: t.mock.fn(async () => ({
+      searchId: 'search-1',
+      responses: [{
+        username: 'source-user',
+        files: [{ filename: 'Artist\\Album\\01 Track.flac', size: 100, bitDepth: 16, sampleRate: 44100 }],
+      }],
+    })),
+  };
+  const upsertImportCandidateFn = t.mock.fn(async (candidate) => ({
+    id: 'candidate-1',
+    ...candidate,
+  }));
+  const replaceImportCandidateFilesFn = t.mock.fn(async (_, files) => files);
+  const recordAuditEventFn = t.mock.fn();
+  const service = createImportCandidateService({
+    loadSettingsFn: async () => ({
+      scoring: {
+        weightFormatTier: 0.50,
+        weightCandidateTrackMatch: 0.10,
+        weightAudioDepth: 0.10,
+        weightDuration: 0.10,
+        weightFormatConsistency: 0.08,
+        weightTrackCount: 0.04,
+        weightPeerDelivery: 0.04,
+        weightUploaderReputation: 0.04,
+      },
+    }),
+    pool,
+    recordAuditEventFn,
+    replaceImportCandidateFilesFn,
+    scoreDownloadResultFn: wrapScoreFn,
+    slskdService,
+    upsertImportCandidateFn,
+  });
+
+  await service.ingestSlskdSearchResponses({ searchId: 'search-1' });
+
+  assert.equal(capturedScorers.length, 1);
+  const scorers = capturedScorers[0];
+  const formatTierScorer = scorers.find((s) => s.name === 'formatTier');
+  assert.equal(formatTierScorer.weight, 0.50);
+  const trackMatchScorer = scorers.find((s) => s.name === 'candidateTrackMatch');
+  assert.equal(trackMatchScorer.weight, 0.10);
+});
+
+test('createImportCandidateService uses default scorers when loadSettingsFn returns no scoring namespace', async (t) => {
+  const { pool } = createPool(t);
+  const capturedScorers = [];
+  const wrapScoreFn = t.mock.fn((args) => {
+    capturedScorers.push(args.scorers);
+    return scoreDownloadResult(args);
+  });
+  const slskdService = {
+    getSearchResponses: t.mock.fn(async () => ({
+      searchId: 'search-1',
+      responses: [{
+        username: 'source-user',
+        files: [{ filename: 'Artist\\Album\\01 Track.flac', size: 100 }],
+      }],
+    })),
+  };
+  const upsertImportCandidateFn = t.mock.fn(async (candidate) => ({
+    id: 'candidate-1',
+    ...candidate,
+  }));
+  const replaceImportCandidateFilesFn = t.mock.fn(async (_, files) => files);
+  const recordAuditEventFn = t.mock.fn();
+  const service = createImportCandidateService({
+    loadSettingsFn: async () => ({ library: { discoveryBatchSize: 5 } }),
+    pool,
+    recordAuditEventFn,
+    replaceImportCandidateFilesFn,
+    scoreDownloadResultFn: wrapScoreFn,
+    slskdService,
+    upsertImportCandidateFn,
+  });
+
+  await service.ingestSlskdSearchResponses({ searchId: 'search-1' });
+
+  assert.equal(capturedScorers.length, 1);
+  const scorers = capturedScorers[0];
+  const formatTierScorer = scorers.find((s) => s.name === 'formatTier');
+  assert.equal(formatTierScorer.weight, 0.25);
+});
+
+test('createImportCandidateService falls back to default scorers when loadSettingsFn throws', async (t) => {
+  const { pool } = createPool(t);
+  const capturedScorers = [];
+  const wrapScoreFn = t.mock.fn((args) => {
+    capturedScorers.push(args.scorers);
+    return scoreDownloadResult(args);
+  });
+  const slskdService = {
+    getSearchResponses: t.mock.fn(async () => ({
+      searchId: 'search-1',
+      responses: [{
+        username: 'source-user',
+        files: [{ filename: 'Artist\\Album\\01 Track.flac', size: 100 }],
+      }],
+    })),
+  };
+  const upsertImportCandidateFn = t.mock.fn(async (candidate) => ({
+    id: 'candidate-1',
+    ...candidate,
+  }));
+  const replaceImportCandidateFilesFn = t.mock.fn(async (_, files) => files);
+  const recordAuditEventFn = t.mock.fn();
+  const service = createImportCandidateService({
+    loadSettingsFn: async () => { throw new Error('DB unavailable'); },
+    pool,
+    recordAuditEventFn,
+    replaceImportCandidateFilesFn,
+    scoreDownloadResultFn: wrapScoreFn,
+    slskdService,
+    upsertImportCandidateFn,
+  });
+
+  await service.ingestSlskdSearchResponses({ searchId: 'search-1' });
+
+  assert.equal(capturedScorers.length, 1);
+  const scorers = capturedScorers[0];
+  const formatTierScorer = scorers.find((s) => s.name === 'formatTier');
+  assert.equal(formatTierScorer.weight, 0.25);
+  const uploaderRepScorer = scorers.find((s) => s.name === 'uploaderReputation');
+  assert.equal(uploaderRepScorer.weight, 0.05);
 });

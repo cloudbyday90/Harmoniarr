@@ -104,6 +104,7 @@ export function buildSettingsUpdatePayload(form) {
       userMusicRoots: normalizeUserMusicRoots(form.paths.userMusicRoots),
     },
     library: { ...form.library },
+    scoring: { ...form.scoring },
     slskd: {
       baseUrl: form.slskd.baseUrl,
       requestTimeoutMs: form.slskd.requestTimeoutMs,

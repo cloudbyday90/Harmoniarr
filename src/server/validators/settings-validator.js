@@ -17,6 +17,7 @@
  */
 
 import { createApiError } from '../auth.js';
+import { DEFAULT_SCORING_WEIGHTS } from '../library/download-result-scoring.js';
 import {
   resolveCsrfProtectionMode,
   resolveHttpsEnforcementEnabled,
@@ -457,6 +458,56 @@ const settingDefinitions = {
       },
     },
   },
+  scoring: {
+    weightFormatTier: {
+      defaultValue: DEFAULT_SCORING_WEIGHTS.weightFormatTier,
+      normalize(value) {
+        return normalizeRateSetting('scoring.weightFormatTier', value, { min: 0.01, max: 1.0 });
+      },
+    },
+    weightCandidateTrackMatch: {
+      defaultValue: DEFAULT_SCORING_WEIGHTS.weightCandidateTrackMatch,
+      normalize(value) {
+        return normalizeRateSetting('scoring.weightCandidateTrackMatch', value, { min: 0.01, max: 1.0 });
+      },
+    },
+    weightAudioDepth: {
+      defaultValue: DEFAULT_SCORING_WEIGHTS.weightAudioDepth,
+      normalize(value) {
+        return normalizeRateSetting('scoring.weightAudioDepth', value, { min: 0.01, max: 1.0 });
+      },
+    },
+    weightDuration: {
+      defaultValue: DEFAULT_SCORING_WEIGHTS.weightDuration,
+      normalize(value) {
+        return normalizeRateSetting('scoring.weightDuration', value, { min: 0.01, max: 1.0 });
+      },
+    },
+    weightFormatConsistency: {
+      defaultValue: DEFAULT_SCORING_WEIGHTS.weightFormatConsistency,
+      normalize(value) {
+        return normalizeRateSetting('scoring.weightFormatConsistency', value, { min: 0.01, max: 1.0 });
+      },
+    },
+    weightTrackCount: {
+      defaultValue: DEFAULT_SCORING_WEIGHTS.weightTrackCount,
+      normalize(value) {
+        return normalizeRateSetting('scoring.weightTrackCount', value, { min: 0.01, max: 1.0 });
+      },
+    },
+    weightPeerDelivery: {
+      defaultValue: DEFAULT_SCORING_WEIGHTS.weightPeerDelivery,
+      normalize(value) {
+        return normalizeRateSetting('scoring.weightPeerDelivery', value, { min: 0.01, max: 1.0 });
+      },
+    },
+    weightUploaderReputation: {
+      defaultValue: DEFAULT_SCORING_WEIGHTS.weightUploaderReputation,
+      normalize(value) {
+        return normalizeRateSetting('scoring.weightUploaderReputation', value, { min: 0.01, max: 1.0 });
+      },
+    },
+  },
 };
 
 function normalizeStringAllowEmpty(settingName) {
@@ -531,6 +582,30 @@ export function getDefaultSettings() {
   );
 }
 
+const SCORING_WEIGHT_KEYS = [
+  'weightFormatTier',
+  'weightCandidateTrackMatch',
+  'weightAudioDepth',
+  'weightDuration',
+  'weightFormatConsistency',
+  'weightTrackCount',
+  'weightPeerDelivery',
+  'weightUploaderReputation',
+];
+
+const namespaceValidators = {
+  scoring(namespaceUpdates) {
+    const keys = namespaceUpdates.map((u) => u.settingKey);
+    if (keys.length === SCORING_WEIGHT_KEYS.length
+        && SCORING_WEIGHT_KEYS.every((k) => keys.includes(k))) {
+      const sum = namespaceUpdates.reduce((s, u) => s + u.value, 0);
+      if (Math.abs(sum - 1.0) >= 0.0001) {
+        throw createSettingsValidationError('scoring weights must sum to 1.0');
+      }
+    }
+  },
+};
+
 export function normalizeSettingsPatch(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw createSettingsValidationError('Settings payload must be an object');
@@ -558,6 +633,16 @@ export function normalizeSettingsPatch(input) {
         value: definition.normalize(rawValue),
       });
     }
+  }
+
+  const updatesByNamespace = new Map();
+  for (const update of updates) {
+    const existing = updatesByNamespace.get(update.namespace) ?? [];
+    existing.push(update);
+    updatesByNamespace.set(update.namespace, existing);
+  }
+  for (const [ns, nsUpdates] of updatesByNamespace) {
+    namespaceValidators[ns]?.(nsUpdates);
   }
 
   return updates;

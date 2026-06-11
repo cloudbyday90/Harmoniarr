@@ -62,6 +62,7 @@ import { createOperationRunInterruptionGate } from '../operation-run-cancellatio
 import { createMaintenanceLockService } from '../recovery/maintenance-lock-service.js';
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
+import { loadSettings } from '../settings.js';
 
 export function createImportCandidateModule({
   getMediaToolingStatus = async () => ({
@@ -113,6 +114,7 @@ export function createImportCandidateModule({
   importCandidateService = createImportCandidateService({
     listIgnoredUsernamesFn,
     listSourceUserReputationIndexFn,
+    loadSettingsFn: loadSettings,
     recordSourceUserOutcomeEvidenceFn,
     slskdService,
     browseEnrichmentService,
