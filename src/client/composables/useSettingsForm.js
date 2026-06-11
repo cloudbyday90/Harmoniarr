@@ -87,6 +87,17 @@ export function useSettingsForm({
       operationRunRetainCountPerType: 50,
       outcomeEventMaxAgeDays: 180,
     },
+    fidelity: {
+      spectralAuthenticMinCutoffHz: 20000,
+      spectralSuspiciousMinCutoffHz: 19000,
+      spectralTranscodeMidCutoffHz: 16000,
+      spectralMinSampleRateHz: 44100,
+      trustWatchFailureCount: 3,
+      trustWatchMaxSuccessRate: 0.5,
+      trustWatchEvidenceCount: 3,
+      trustHealthyEvidenceCount: 5,
+      trustHealthyMinSuccessRate: 0.8,
+    },
     paths: {
       downloadMappings: [],
       downloads: '',
@@ -140,6 +151,7 @@ export function useSettingsForm({
     Object.assign(form.scoring, payload.settings.scoring);
     Object.assign(form.acquisition, payload.settings.acquisition);
     Object.assign(form.retention, payload.settings.retention);
+    Object.assign(form.fidelity, payload.settings.fidelity);
     Object.assign(form.paths, {
       ...payload.settings.paths,
       downloadMappings: form.paths.downloadMappings,

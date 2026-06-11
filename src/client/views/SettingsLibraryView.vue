@@ -30,6 +30,18 @@ const SCORING_WEIGHT_DEFAULTS = {
   weightUploaderReputation: 0.05,
 };
 
+const FIDELITY_DEFAULTS = {
+  spectralAuthenticMinCutoffHz: 20000,
+  spectralSuspiciousMinCutoffHz: 19000,
+  spectralTranscodeMidCutoffHz: 16000,
+  spectralMinSampleRateHz: 44100,
+  trustWatchFailureCount: 3,
+  trustWatchMaxSuccessRate: 0.5,
+  trustWatchEvidenceCount: 3,
+  trustHealthyEvidenceCount: 5,
+  trustHealthyMinSuccessRate: 0.8,
+};
+
 const {
   errorMessage,
   form,
@@ -46,6 +58,10 @@ const scoringSum = computed(() =>
 
 function resetScoringDefaults() {
   Object.assign(form.scoring, { ...SCORING_WEIGHT_DEFAULTS });
+}
+
+function resetFidelityDefaults() {
+  Object.assign(form.fidelity, { ...FIDELITY_DEFAULTS });
 }
 
 onMounted(() => { void loadSettings(); });
@@ -247,6 +263,89 @@ onMounted(() => { void loadSettings(); });
               </div>
               <div class="hx-field" style="text-align: right">
                 <button type="button" class="hx-btn" data-variant="ghost" @click="resetScoringDefaults">Reset to defaults</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Fidelity thresholds <span class="hx-pill" data-tone="info" style="font-size: var(--hx-text-xs); vertical-align: middle; margin-left: 6px">advanced</span></h3>
+            <p class="hx-card-subtitle">Control how Harmoniarr evaluates audio quality and source reliability. Spectral analysis detects transcoded or degraded files. Source trust tracks peer reputation over time.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <p class="cfg-group-title">Spectral analysis</p>
+            <p class="hx-text-muted">Frequency cutoffs determine how spectral fingerprints classify audio quality. Higher cutoffs are stricter — fewer files pass as authentic. The minimum sample rate filters out low-resolution sources entirely.</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Authentic cutoff (Hz)</label>
+                <input class="hx-input" v-model.number="form.fidelity.spectralAuthenticMinCutoffHz" type="number" min="10000" max="24000" step="100" />
+                <p class="cfg-field-hint">Files with spectral content above this cutoff are classified as authentic. Default is 20000 Hz. Range: 10000–24000.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Suspicious cutoff (Hz)</label>
+                <input class="hx-input" v-model.number="form.fidelity.spectralSuspiciousMinCutoffHz" type="number" min="8000" max="24000" step="100" />
+                <p class="cfg-field-hint">Files below this cutoff are flagged as suspicious. Default is 19000 Hz. Range: 8000–24000.</p>
+              </div>
+            </div>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Transcode cutoff (Hz)</label>
+                <input class="hx-input" v-model.number="form.fidelity.spectralTranscodeMidCutoffHz" type="number" min="4000" max="24000" step="100" />
+                <p class="cfg-field-hint">Mid-range cutoff for detecting transcoded files. Default is 16000 Hz. Range: 4000–24000.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Min sample rate (Hz)</label>
+                <input class="hx-input" v-model.number="form.fidelity.spectralMinSampleRateHz" type="number" min="8000" max="192000" step="100" />
+                <p class="cfg-field-hint">Files below this sample rate are rejected outright. Default is 44100 Hz (CD quality). Range: 8000–192000.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <p class="cfg-group-title">Source trust</p>
+            <p class="hx-text-muted">Trust thresholds control when a source user is promoted to healthy status or demoted to watch status based on delivery history.</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Watch failure count</label>
+                <input class="hx-input" v-model.number="form.fidelity.trustWatchFailureCount" type="number" min="1" max="100" step="1" />
+                <p class="cfg-field-hint">Number of failed deliveries before a source is placed on watch. Default is 3. Range: 1–100.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Watch max success rate</label>
+                <input class="hx-input" v-model.number="form.fidelity.trustWatchMaxSuccessRate" type="number" min="0" max="1" step="0.01" />
+                <p class="cfg-field-hint">Sources with a success rate at or below this value are watched. Default is 0.50. Range: 0–1.</p>
+              </div>
+            </div>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Watch evidence count</label>
+                <input class="hx-input" v-model.number="form.fidelity.trustWatchEvidenceCount" type="number" min="1" max="1000" step="1" />
+                <p class="cfg-field-hint">Minimum delivery outcomes needed before evaluating watch status. Default is 3. Range: 1–1000.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Healthy evidence count</label>
+                <input class="hx-input" v-model.number="form.fidelity.trustHealthyEvidenceCount" type="number" min="1" max="1000" step="1" />
+                <p class="cfg-field-hint">Minimum delivery outcomes needed before promoting a source to healthy. Default is 5. Range: 1–1000.</p>
+              </div>
+            </div>
+            <div class="hx-field">
+              <label class="hx-field-label">Healthy min success rate</label>
+              <input class="hx-input" v-model.number="form.fidelity.trustHealthyMinSuccessRate" type="number" min="0" max="1" step="0.01" />
+              <p class="cfg-field-hint">Sources must meet or exceed this success rate to be classified as healthy. Default is 0.80. Range: 0–1.</p>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <div class="hx-form-row" style="align-items: center">
+              <div class="hx-field">
+                <p class="cfg-group-title">Defaults</p>
+                <p class="cfg-field-hint">Restore all fidelity thresholds to their recommended values.</p>
+              </div>
+              <div class="hx-field" style="text-align: right">
+                <button type="button" class="hx-btn" data-variant="ghost" @click="resetFidelityDefaults">Reset to defaults</button>
               </div>
             </div>
           </div>

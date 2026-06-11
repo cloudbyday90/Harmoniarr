@@ -107,6 +107,7 @@ export function buildSettingsUpdatePayload(form) {
     scoring: { ...form.scoring },
     acquisition: { ...form.acquisition },
     retention: { ...form.retention },
+    fidelity: { ...form.fidelity },
     slskd: {
       baseUrl: form.slskd.baseUrl,
       requestTimeoutMs: form.slskd.requestTimeoutMs,

@@ -64,6 +64,20 @@ function createRetentionForm() {
   };
 }
 
+function createFidelityForm() {
+  return {
+    spectralAuthenticMinCutoffHz: 20000,
+    spectralSuspiciousMinCutoffHz: 19000,
+    spectralTranscodeMidCutoffHz: 16000,
+    spectralMinSampleRateHz: 44100,
+    trustWatchFailureCount: 3,
+    trustWatchMaxSuccessRate: 0.5,
+    trustWatchEvidenceCount: 3,
+    trustHealthyEvidenceCount: 5,
+    trustHealthyMinSuccessRate: 0.8,
+  };
+}
+
 test('buildSettingsUpdatePayload preserves the existing slskd api key when the field is left blank', () => {
   const payload = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
@@ -71,6 +85,7 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
     scoring: createScoringForm(),
     acquisition: createAcquisitionForm(),
     retention: createRetentionForm(),
+    fidelity: createFidelityForm(),
     security: {
       csrfProtectionMode: 'disabled',
       enforceHttps: false,
@@ -152,6 +167,17 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
       operationRunMaxAgeDays: 90,
       operationRunRetainCountPerType: 50,
       outcomeEventMaxAgeDays: 180,
+    },
+    fidelity: {
+      spectralAuthenticMinCutoffHz: 20000,
+      spectralSuspiciousMinCutoffHz: 19000,
+      spectralTranscodeMidCutoffHz: 16000,
+      spectralMinSampleRateHz: 44100,
+      trustWatchFailureCount: 3,
+      trustWatchMaxSuccessRate: 0.5,
+      trustWatchEvidenceCount: 3,
+      trustHealthyEvidenceCount: 5,
+      trustHealthyMinSuccessRate: 0.8,
     },
     slskd: {
       baseUrl: 'http://slskd.internal:5030',
@@ -536,5 +562,103 @@ test('buildSettingsUpdatePayload includes retention defaults from createRetentio
     operationRunMaxAgeDays: 90,
     operationRunRetainCountPerType: 50,
     outcomeEventMaxAgeDays: 180,
+  });
+});
+
+test('buildSettingsUpdatePayload includes fidelity fields', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    library: createLibraryForm(),
+    scoring: createScoringForm(),
+    acquisition: createAcquisitionForm(),
+    retention: createRetentionForm(),
+    fidelity: {
+      spectralAuthenticMinCutoffHz: 22000,
+      spectralSuspiciousMinCutoffHz: 20000,
+      spectralTranscodeMidCutoffHz: 18000,
+      spectralMinSampleRateHz: 96000,
+      trustWatchFailureCount: 5,
+      trustWatchMaxSuccessRate: 0.3,
+      trustWatchEvidenceCount: 10,
+      trustHealthyEvidenceCount: 20,
+      trustHealthyMinSuccessRate: 0.9,
+    },
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.fidelity, {
+    spectralAuthenticMinCutoffHz: 22000,
+    spectralSuspiciousMinCutoffHz: 20000,
+    spectralTranscodeMidCutoffHz: 18000,
+    spectralMinSampleRateHz: 96000,
+    trustWatchFailureCount: 5,
+    trustWatchMaxSuccessRate: 0.3,
+    trustWatchEvidenceCount: 10,
+    trustHealthyEvidenceCount: 20,
+    trustHealthyMinSuccessRate: 0.9,
+  });
+});
+
+test('buildSettingsUpdatePayload includes fidelity defaults from createFidelityForm', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    library: createLibraryForm(),
+    scoring: createScoringForm(),
+    acquisition: createAcquisitionForm(),
+    retention: createRetentionForm(),
+    fidelity: createFidelityForm(),
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.fidelity, {
+    spectralAuthenticMinCutoffHz: 20000,
+    spectralSuspiciousMinCutoffHz: 19000,
+    spectralTranscodeMidCutoffHz: 16000,
+    spectralMinSampleRateHz: 44100,
+    trustWatchFailureCount: 3,
+    trustWatchMaxSuccessRate: 0.5,
+    trustWatchEvidenceCount: 3,
+    trustHealthyEvidenceCount: 5,
+    trustHealthyMinSuccessRate: 0.8,
   });
 });

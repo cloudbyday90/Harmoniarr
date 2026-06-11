@@ -209,3 +209,59 @@ test('SettingsLibraryView labels all eight scoring fields with hx-field-label', 
   assert.match(source, /<label class="hx-field-label">Peer delivery<\/label>/);
   assert.match(source, /<label class="hx-field-label">Uploader reputation<\/label>/);
 });
+
+test('SettingsLibraryView renders the Fidelity thresholds card', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<h3 class="hx-card-title">Fidelity thresholds/);
+  assert.match(source, /Control how Harmoniarr evaluates audio quality and source reliability/);
+});
+
+test('SettingsLibraryView wires all nine fidelity fields to form.fidelity.*', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /v-model\.number="form\.fidelity\.spectralAuthenticMinCutoffHz"/);
+  assert.match(source, /v-model\.number="form\.fidelity\.spectralSuspiciousMinCutoffHz"/);
+  assert.match(source, /v-model\.number="form\.fidelity\.spectralTranscodeMidCutoffHz"/);
+  assert.match(source, /v-model\.number="form\.fidelity\.spectralMinSampleRateHz"/);
+  assert.match(source, /v-model\.number="form\.fidelity\.trustWatchFailureCount"/);
+  assert.match(source, /v-model\.number="form\.fidelity\.trustWatchMaxSuccessRate"/);
+  assert.match(source, /v-model\.number="form\.fidelity\.trustWatchEvidenceCount"/);
+  assert.match(source, /v-model\.number="form\.fidelity\.trustHealthyEvidenceCount"/);
+  assert.match(source, /v-model\.number="form\.fidelity\.trustHealthyMinSuccessRate"/);
+});
+
+test('SettingsLibraryView constrains fidelity inputs to validator ranges', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /spectralAuthenticMinCutoffHz[^]*min="10000" max="24000" step="100"/);
+  assert.match(source, /spectralSuspiciousMinCutoffHz[^]*min="8000" max="24000" step="100"/);
+  assert.match(source, /spectralTranscodeMidCutoffHz[^]*min="4000" max="24000" step="100"/);
+  assert.match(source, /spectralMinSampleRateHz[^]*min="8000" max="192000" step="100"/);
+  assert.match(source, /trustWatchFailureCount[^]*min="1" max="100" step="1"/);
+  assert.match(source, /trustWatchMaxSuccessRate[^]*min="0" max="1" step="0\.01"/);
+  assert.match(source, /trustWatchEvidenceCount[^]*min="1" max="1000" step="1"/);
+  assert.match(source, /trustHealthyEvidenceCount[^]*min="1" max="1000" step="1"/);
+  assert.match(source, /trustHealthyMinSuccessRate[^]*min="0" max="1" step="0\.01"/);
+});
+
+test('SettingsLibraryView labels all nine fidelity fields with hx-field-label', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<label class="hx-field-label">Authentic cutoff \(Hz\)<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Suspicious cutoff \(Hz\)<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Transcode cutoff \(Hz\)<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Min sample rate \(Hz\)<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Watch failure count<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Watch max success rate<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Watch evidence count<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Healthy evidence count<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Healthy min success rate<\/label>/);
+});
+
+test('SettingsLibraryView includes a reset to defaults button for fidelity', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /resetFidelityDefaults/);
+  assert.match(source, /FIDELITY_DEFAULTS/);
+});

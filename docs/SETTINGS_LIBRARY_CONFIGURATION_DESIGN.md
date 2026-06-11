@@ -796,6 +796,87 @@ between the Acquisition and Scoring cards with:
 
 ---
 
+## Fidelity Thresholds Implementation Plan
+
+> Phase 5 of the Settings Library track. Surfaces the existing `fidelity` settings
+> namespace (9 fields: 4 spectral analysis integers + 3 source trust integers + 2
+> source trust rates) as a card in `SettingsLibraryView.vue`. No backend changes
+> needed — the validator, resolver, and consumption path are all complete.
+
+### Architecture Context
+
+The `fidelity` namespace already exists with full backend support:
+
+1. **Validator** (`settings-validator.js:379-434`): 9 fields — 4 spectral integers
+   (range-bounded `normalizeIntegerSetting`) + 3 trust integers + 2 trust rates
+   (`normalizeRateSetting` with default 0–1 range).
+2. **Resolver**: Existing resolver in the fidelity consumption path reads settings
+   with fallbacks.
+3. **Consumption**: Spectral analysis and source trust evaluation use resolved
+   settings at runtime.
+4. **Existing UI** (`SourceUserIntegrityToolsPanel.vue`): Already surfaces fidelity
+   fields for simulation/diagnostics but not in centralized settings.
+
+**No backend work needed.** Phase 5 is purely frontend surfacing, following the
+exact same pattern as Phases 3 (acquisition) and 4 (retention).
+
+### A) Payload Builder + Composable
+
+#### A1. Add `fidelity` spread to `buildSettingsUpdatePayload`
+
+`FIDELITY_SETTINGS_FRONTEND_DESIGN.md` completes the payload builder addition.
+The `fidelity` namespace is added as a shallow spread `{ ...form.fidelity }`
+after `retention` in the payload object, matching the established pattern.
+
+#### A2. Add `fidelity` form defaults to `useSettingsForm.js` composable
+
+`FIDELITY_SETTINGS_FRONTEND_DESIGN.md` completes the composable wiring. Two
+changes:
+
+1. Added `fidelity` defaults (9 fields) to the `form` reactive after `retention`.
+2. Added `Object.assign(form.fidelity, payload.settings.fidelity)` in
+   `applySettings` after the `retention` spread.
+
+Defaults duplicated (not imported from server) to maintain the client/server
+module boundary.
+
+### B) View
+
+#### B1. SettingsLibraryView "Fidelity thresholds" card
+
+`FIDELITY_SETTINGS_FRONTEND_DESIGN.md` completes the frontend view. A new
+`hx-card` after the Scoring card with:
+
+1. **Header**: "Fidelity thresholds" title with "(advanced)" `hx-pill` badge.
+2. **Spectral analysis sub-group**: 4 integer fields in 2 `hx-form-row` pairs
+   (authentic+suspicious cutoffs, transcode cutoff+sample rate).
+3. **Source trust sub-group**: 5 fields (3 integers + 2 rates) in 2 pairs + 1
+   single (watch criteria first, then healthy criteria).
+4. **Helper text**: Descriptive hint for each field with default value and range.
+
+### C) Tests
+
+#### C1. Extend `test/client/settings-library-view-contract.test.js`
+
+`FIDELITY_SETTINGS_TEST_DESIGN.md` completes the contract tests. 4 new tests
+added after the Scoring section:
+
+1. Card presence (title + subtitle).
+2. Field wiring (9 fields to `form.fidelity.*`).
+3. Input constraints (`min`/`max`/`step` for all 9 fields).
+4. Field labels (9 `hx-field-label` elements).
+
+#### C2. Extend `test/client/settings-form.test.js`
+
+`FIDELITY_SETTINGS_TEST_DESIGN.md` completes the payload tests. 2 new tests
+plus 1 existing fixture update:
+
+1. Existing first test fixture updated to include `fidelity` in input and output.
+2. Custom fidelity values pass through correctly.
+3. Default fidelity values from `createFidelityForm()` pass through correctly.
+
+---
+
 ## Files
 
 | File | Role |
