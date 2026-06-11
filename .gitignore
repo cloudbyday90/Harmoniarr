@@ -9,6 +9,7 @@ coverage/
 .env
 .env.*
 !.env.example
+opencode.jsonc
 postgres-language-server.jsonc
 *.log
 
