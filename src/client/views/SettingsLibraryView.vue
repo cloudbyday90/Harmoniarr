@@ -137,6 +137,40 @@ onMounted(() => { void loadSettings(); });
       <article class="hx-card">
         <header class="hx-card-header">
           <div>
+            <h3 class="hx-card-title">Retention</h3>
+            <p class="hx-card-subtitle">Control how long Harmoniarr retains historical operation data. Reducing these values will permanently delete older records on the next cleanup cycle.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <p class="cfg-group-title">Operation runs</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Max age (days)</label>
+                <input class="hx-input" v-model.number="form.retention.operationRunMaxAgeDays" type="number" min="7" max="3650" step="1" />
+                <p class="cfg-field-hint">Operation runs older than this are eligible for cleanup. Default is 90 days. Range: 7–3650.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Retain count per type</label>
+                <input class="hx-input" v-model.number="form.retention.operationRunRetainCountPerType" type="number" min="10" max="1000" step="1" />
+                <p class="cfg-field-hint">Maximum operation runs to keep per type, regardless of age. Default is 50. Range: 10–1000.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <p class="cfg-group-title">Outcome events</p>
+            <div class="hx-field">
+              <label class="hx-field-label">Max age (days)</label>
+              <input class="hx-input" v-model.number="form.retention.outcomeEventMaxAgeDays" type="number" min="30" max="3650" step="1" />
+              <p class="cfg-field-hint">Delivery outcome events older than this are eligible for cleanup. Default is 180 days. Range: 30–3650.</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
             <h3 class="hx-card-title">Download scoring weights <span class="hx-pill" data-tone="info" style="font-size: var(--hx-text-xs); vertical-align: middle; margin-left: 6px">advanced</span></h3>
             <p class="hx-card-subtitle">Control how much each quality factor contributes to a candidate's overall score. Weights determine which downloads Harmoniarr prioritizes.</p>
           </div>

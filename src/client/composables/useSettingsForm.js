@@ -82,6 +82,11 @@ export function useSettingsForm({
       autoIgnoreEnabled: false,
       autoIgnoreCooldownHours: 24,
     },
+    retention: {
+      operationRunMaxAgeDays: 90,
+      operationRunRetainCountPerType: 50,
+      outcomeEventMaxAgeDays: 180,
+    },
     paths: {
       downloadMappings: [],
       downloads: '',
@@ -134,6 +139,7 @@ export function useSettingsForm({
     Object.assign(form.library, payload.settings.library);
     Object.assign(form.scoring, payload.settings.scoring);
     Object.assign(form.acquisition, payload.settings.acquisition);
+    Object.assign(form.retention, payload.settings.retention);
     Object.assign(form.paths, {
       ...payload.settings.paths,
       downloadMappings: form.paths.downloadMappings,

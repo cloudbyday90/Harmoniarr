@@ -56,12 +56,21 @@ function createAcquisitionForm() {
   };
 }
 
+function createRetentionForm() {
+  return {
+    operationRunMaxAgeDays: 90,
+    operationRunRetainCountPerType: 50,
+    outcomeEventMaxAgeDays: 180,
+  };
+}
+
 test('buildSettingsUpdatePayload preserves the existing slskd api key when the field is left blank', () => {
   const payload = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
     library: createLibraryForm(),
     scoring: createScoringForm(),
     acquisition: createAcquisitionForm(),
+    retention: createRetentionForm(),
     security: {
       csrfProtectionMode: 'disabled',
       enforceHttps: false,
@@ -138,6 +147,11 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
     acquisition: {
       autoIgnoreEnabled: false,
       autoIgnoreCooldownHours: 24,
+    },
+    retention: {
+      operationRunMaxAgeDays: 90,
+      operationRunRetainCountPerType: 50,
+      outcomeEventMaxAgeDays: 180,
     },
     slskd: {
       baseUrl: 'http://slskd.internal:5030',
@@ -444,5 +458,83 @@ test('buildSettingsUpdatePayload includes acquisition defaults from createAcquis
   assert.deepEqual(payload.acquisition, {
     autoIgnoreEnabled: false,
     autoIgnoreCooldownHours: 24,
+  });
+});
+
+test('buildSettingsUpdatePayload includes retention fields', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    library: createLibraryForm(),
+    scoring: createScoringForm(),
+    acquisition: createAcquisitionForm(),
+    retention: {
+      operationRunMaxAgeDays: 180,
+      operationRunRetainCountPerType: 100,
+      outcomeEventMaxAgeDays: 365,
+    },
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.retention, {
+    operationRunMaxAgeDays: 180,
+    operationRunRetainCountPerType: 100,
+    outcomeEventMaxAgeDays: 365,
+  });
+});
+
+test('buildSettingsUpdatePayload includes retention defaults from createRetentionForm', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    library: createLibraryForm(),
+    scoring: createScoringForm(),
+    acquisition: createAcquisitionForm(),
+    retention: createRetentionForm(),
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.retention, {
+    operationRunMaxAgeDays: 90,
+    operationRunRetainCountPerType: 50,
+    outcomeEventMaxAgeDays: 180,
   });
 });

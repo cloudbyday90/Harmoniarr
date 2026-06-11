@@ -121,6 +121,42 @@ test('SettingsLibraryView labels the acquisition cooldown field with hx-field-la
   assert.match(source, /<label class="hx-field-label">Cooldown \(hours\)<\/label>/);
 });
 
+test('SettingsLibraryView renders the Retention card in the default branch', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<h3 class="hx-card-title">Retention<\/h3>/);
+  assert.match(source, /Reducing these values will permanently delete older records/);
+});
+
+test('SettingsLibraryView wires all three retention fields to form.retention.*', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /v-model\.number="form\.retention\.operationRunMaxAgeDays"/);
+  assert.match(source, /v-model\.number="form\.retention\.operationRunRetainCountPerType"/);
+  assert.match(source, /v-model\.number="form\.retention\.outcomeEventMaxAgeDays"/);
+});
+
+test('SettingsLibraryView constrains retention inputs to validator ranges', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /operationRunMaxAgeDays.*min="7" max="3650" step="1"/);
+  assert.match(source, /operationRunRetainCountPerType.*min="10" max="1000" step="1"/);
+  assert.match(source, /outcomeEventMaxAgeDays.*min="30" max="3650" step="1"/);
+});
+
+test('SettingsLibraryView includes a data deletion warning in the Retention card', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /permanently delete older records on the next cleanup cycle/);
+});
+
+test('SettingsLibraryView labels retention fields with hx-field-label', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<label class="hx-field-label">Max age \(days\)<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Retain count per type<\/label>/);
+});
+
 test('SettingsLibraryView renders the Download scoring weights card', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 

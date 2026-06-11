@@ -719,6 +719,83 @@ Both use `assert.deepEqual(payload.acquisition, {...})` namespace-slice pattern.
 
 ---
 
+## Retention Implementation Plan
+
+> Phase 4 of the Settings Library track. Surfaces the existing `retention` settings
+> namespace (3 fields: operation run max age, retain count per type, outcome event
+> max age) as a card in `SettingsLibraryView.vue`. No backend changes needed.
+
+### Architecture Context
+
+The `retention` namespace already exists with full backend support:
+
+1. **Validator** (`settings-validator.js:294-313`): Three integer fields with ranges
+   (7–3650, 10–1000, 30–3650) and defaults (90, 50, 180).
+2. **Resolver** (`ledger-retention-policy.js:53-70`): `resolveLedgerRetentionPolicy`
+   with `clampInteger` fallbacks and `ledgerRetentionBounds`.
+3. **Consumption** (`ledger-retention-service.js`): Scheduled background cleanup
+   that resolves retention policy from settings, computes ISO cutoffs, and deletes
+   expired records.
+4. **Security posture**: Minimum retention floors enforced by the resolver
+   (defense-in-depth). Even if validation is bypassed, values are clamped.
+
+**No backend work needed.** Phase 4 is purely frontend surfacing, following the
+exact same pattern as Phase 3 (acquisition).
+
+### A) Payload Builder + Composable
+
+#### A1. Add `retention` spread to `buildSettingsUpdatePayload`
+
+`RETENTION_SETTINGS_FRONTEND_DESIGN.md` details the design. Add
+`retention: { ...form.retention }` to the payload object in `settings-form.js`
+after `acquisition`.
+
+#### A2. Add `retention` form defaults to `useSettingsForm.js` composable
+
+`RETENTION_SETTINGS_FRONTEND_DESIGN.md` details the design. Two changes:
+
+1. Add `retention` defaults to the `form` reactive: `{ operationRunMaxAgeDays: 90,
+   operationRunRetainCountPerType: 50, outcomeEventMaxAgeDays: 180 }`.
+2. Add `Object.assign(form.retention, payload.settings.retention)` to
+   `applySettings`.
+
+Defaults duplicated (not imported from server) to maintain the client/server module
+boundary.
+
+### B) View
+
+#### B1. SettingsLibraryView "Retention" card
+
+`RETENTION_SETTINGS_FRONTEND_DESIGN.md` details the design. A new `hx-card`
+between the Acquisition and Scoring cards with:
+
+1. **Header**: "Retention" title, warning subtitle about data deletion.
+2. **Operation runs pair**: `hx-form-row` with `operationRunMaxAgeDays` and
+   `operationRunRetainCountPerType`.
+3. **Outcome events single**: `outcomeEventMaxAgeDays` field.
+4. **Warning**: Explicit text about permanent data deletion on next cleanup cycle.
+
+### C) Tests
+
+#### C1. Extend `test/client/settings-library-view-contract.test.js`
+
+`RETENTION_SETTINGS_TEST_DESIGN.md` details the design. 5 contract tests:
+
+1. Card presence (title + warning subtitle).
+2. Field wiring (3 fields).
+3. Input constraints (min/max/step for each field).
+4. Warning text present.
+5. Field labels (3 labels).
+
+#### C2. Extend `test/client/settings-form.test.js`
+
+`RETENTION_SETTINGS_TEST_DESIGN.md` details the design. 2 payload tests:
+
+1. Custom retention values pass through.
+2. Default retention values pass through.
+
+---
+
 ## Files
 
 | File | Role |
