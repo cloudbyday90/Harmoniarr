@@ -42,6 +42,13 @@ const FIDELITY_DEFAULTS = {
   trustHealthyMinSuccessRate: 0.8,
 };
 
+const NAMING_DEFAULTS = {
+  artistFolderFormat: '{ArtistName}',
+  albumFolderFormat: '{AlbumTitle} ({ReleaseYear})',
+  trackFilenameFormat: '{TrackNumber} - {SongTitle}',
+  multiDiscTrackFilenameFormat: '{DiscNumber}-{TrackNumber} - {SongTitle}',
+};
+
 const {
   errorMessage,
   form,
@@ -62,6 +69,10 @@ function resetScoringDefaults() {
 
 function resetFidelityDefaults() {
   Object.assign(form.fidelity, { ...FIDELITY_DEFAULTS });
+}
+
+function resetNamingDefaults() {
+  Object.assign(form.naming, { ...NAMING_DEFAULTS });
 }
 
 onMounted(() => { void loadSettings(); });
@@ -346,6 +357,65 @@ onMounted(() => { void loadSettings(); });
               </div>
               <div class="hx-field" style="text-align: right">
                 <button type="button" class="hx-btn" data-variant="ghost" @click="resetFidelityDefaults">Reset to defaults</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Naming templates <span class="hx-pill" data-tone="info" style="font-size: var(--hx-text-xs); vertical-align: middle; margin-left: 6px">advanced</span></h3>
+            <p class="hx-card-subtitle">Customize how Harmoniarr names artist folders, album folders, and track files when organizing your library. Changing these after files have been organized will trigger renames on the next organize cycle.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <p class="cfg-group-title">Folder naming</p>
+            <p class="hx-text-muted">Templates for artist and album folder names. These produce a single path segment each — path separators are not allowed.</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Artist folder format</label>
+                <input class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.artistFolderFormat" />
+                <p class="cfg-field-hint">Default is {ArtistName}.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Album folder format</label>
+                <input class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.albumFolderFormat" />
+                <p class="cfg-field-hint">Default is {AlbumTitle} ({ReleaseYear}).</p>
+              </div>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <p class="cfg-group-title">Track naming</p>
+            <p class="hx-text-muted">Templates for track filenames. The file extension is appended automatically — do not include it in the template. The multi-disc template is used when a release has more than one disc.</p>
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label">Track filename format</label>
+                <input class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.trackFilenameFormat" />
+                <p class="cfg-field-hint">Default is {TrackNumber} - {SongTitle}.</p>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label">Multi-disc track format</label>
+                <input class="hx-input" style="font-family: var(--hx-font-mono)" v-model="form.naming.multiDiscTrackFilenameFormat" />
+                <p class="cfg-field-hint">Default is {DiscNumber}-{TrackNumber} - {SongTitle}.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cfg-group">
+            <p class="cfg-group-title">Available tokens</p>
+            <p class="cfg-field-hint">{ArtistName} {AlbumTitle} {ReleaseYear} {SongTitle} {TrackNumber} {DiscNumber} {DiscCount}</p>
+            <p class="cfg-field-hint">Use {TokenName:50} to truncate a value to 50 characters. Tokens wrapped in curly braces are replaced with the corresponding metadata value.</p>
+          </div>
+          <div class="cfg-group">
+            <div class="hx-form-row" style="align-items: center">
+              <div class="hx-field">
+                <p class="cfg-group-title">Defaults</p>
+                <p class="cfg-field-hint">Restore all naming templates to their default values.</p>
+              </div>
+              <div class="hx-field" style="text-align: right">
+                <button type="button" class="hx-btn" data-variant="ghost" @click="resetNamingDefaults">Reset to defaults</button>
               </div>
             </div>
           </div>

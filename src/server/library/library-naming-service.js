@@ -17,6 +17,8 @@
  */
 
 import { normalizeFileExtension } from './library-file-type-policy.js';
+import { DEFAULT_NAMING_TEMPLATES, resolveTemplate } from './library-naming-template-engine.js';
+import { loadSettings } from '../settings.js';
 
 const windowsReservedNames = new Set([
   'CON',
@@ -111,7 +113,35 @@ function formatTrackNumber(trackNumber) {
   return Number.isInteger(parsed) && parsed > 0 ? String(parsed).padStart(2, '0') : '00';
 }
 
-export function createLibraryNamingService() {
+function resolveNamingSettings(settings) {
+  const naming = settings?.naming;
+  if (!naming || typeof naming !== 'object') {
+    return DEFAULT_NAMING_TEMPLATES;
+  }
+
+  return {
+    artistFolderFormat: naming.artistFolderFormat ?? DEFAULT_NAMING_TEMPLATES.artistFolderFormat,
+    albumFolderFormat: naming.albumFolderFormat ?? DEFAULT_NAMING_TEMPLATES.albumFolderFormat,
+    trackFilenameFormat: naming.trackFilenameFormat ?? DEFAULT_NAMING_TEMPLATES.trackFilenameFormat,
+    multiDiscTrackFilenameFormat: naming.multiDiscTrackFilenameFormat ?? DEFAULT_NAMING_TEMPLATES.multiDiscTrackFilenameFormat,
+  };
+}
+
+function buildTemplateContext({ artistName, albumTitle, releaseDate, trackNumber, trackTitle, discNumber, discCount }) {
+  return {
+    ArtistName: artistName ?? '',
+    AlbumTitle: albumTitle ?? '',
+    ReleaseYear: resolveReleaseYear(releaseDate) ?? '',
+    SongTitle: trackTitle ?? '',
+    TrackNumber: formatTrackNumber(trackNumber),
+    DiscNumber: discNumber != null ? String(discNumber) : '',
+    DiscCount: discCount != null ? String(discCount) : '',
+  };
+}
+
+export function createLibraryNamingService({
+  loadSettingsFn = loadSettings,
+} = {}) {
   function sanitizeLibraryPathSegment(value, options = {}) {
     return sanitizeStem(value, options);
   }
@@ -127,32 +157,41 @@ export function createLibraryNamingService() {
     return `${safeStem}${resolvedExtension}`;
   }
 
-  function buildArtistFolderName({ artistName }) {
-    return sanitizeLibraryPathSegment(artistName, { fallback: 'Unknown Artist' });
+  async function loadNamingTemplates() {
+    try {
+      const settings = await loadSettingsFn();
+      return resolveNamingSettings(settings);
+    } catch {
+      return DEFAULT_NAMING_TEMPLATES;
+    }
   }
 
-  function buildAlbumFolderName({ albumTitle, releaseDate = null }) {
-    const safeAlbumTitle = sanitizeLibraryPathSegment(albumTitle, { fallback: 'Unknown Album' });
-    const releaseYear = resolveReleaseYear(releaseDate);
-
-    return releaseYear ? `${safeAlbumTitle} (${releaseYear})` : safeAlbumTitle;
+  async function buildArtistFolderName({ artistName }) {
+    const templates = await loadNamingTemplates();
+    const context = buildTemplateContext({ artistName });
+    const resolved = resolveTemplate(templates.artistFolderFormat, context);
+    return sanitizeLibraryPathSegment(resolved, { fallback: 'Unknown Artist' });
   }
 
-  function buildTrackFilename({
+  async function buildAlbumFolderName({ albumTitle, releaseDate = null }) {
+    const templates = await loadNamingTemplates();
+    const context = buildTemplateContext({ albumTitle, releaseDate });
+    const resolved = resolveTemplate(templates.albumFolderFormat, context);
+    return sanitizeLibraryPathSegment(resolved, { fallback: 'Unknown Album' });
+  }
+
+  async function buildTrackFilename({
     discNumber = null,
     extension = '',
     isMultiDisc = false,
     trackNumber,
     trackTitle,
   }) {
-    const trackLabel = formatTrackNumber(trackNumber);
-    const discLabel = Number.isInteger(Number.parseInt(String(discNumber ?? ''), 10))
-      ? `${Number.parseInt(String(discNumber), 10)}-`
-      : '';
-    const prefix = isMultiDisc ? `${discLabel}${trackLabel}` : trackLabel;
-    const safeTrackTitle = sanitizeLibraryPathSegment(trackTitle, { fallback: 'Unknown Track' });
-
-    return `${prefix} - ${safeTrackTitle}${normalizeFileExtension(extension)}`;
+    const templates = await loadNamingTemplates();
+    const templateKey = isMultiDisc ? 'multiDiscTrackFilenameFormat' : 'trackFilenameFormat';
+    const context = buildTemplateContext({ discNumber, trackNumber, trackTitle });
+    const resolved = resolveTemplate(templates[templateKey], context);
+    return `${sanitizeLibraryPathSegment(resolved, { fallback: 'Unknown Track' })}${normalizeFileExtension(extension)}`;
   }
 
   return {

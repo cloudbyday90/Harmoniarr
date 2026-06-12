@@ -931,7 +931,18 @@ plus 1 existing fixture update:
    "complete" at 90% or 95% coverage instead of requiring 100%.
 2. **Organize naming template as settings.** The `Artist/Album (Year)/NN -
    Title.ext` template is hardcoded in `libraryNamingService`. Exposing template
-   variables would let operators customize folder structure.
+   variables would let operators customize folder structure. **Design complete:**
+   `SETTINGS_NAMING_TEMPLATE_DESIGN.md` covers template engine, token set,
+   security analysis, and 4-phase implementation plan. **R1 complete:**
+   `NAMING_TEMPLATE_ENGINE_DESIGN.md` — template engine implemented with 35 tests.
+   **R2 complete:** `NAMING_SETTINGS_NAMESPACE_DESIGN.md` — `naming` settings
+   namespace added to validator, form builder, and composable with full test coverage.
+   **R3 complete:** `NAMING_SERVICE_CONSUMPTION_DESIGN.md` — naming service consumes
+   template engine via `loadSettingsFn` injection with graceful fallback, builder
+   functions are async, organize preview service updated.
+   **R4 complete:** `NAMING_TEMPLATES_FRONTEND_DESIGN.md` — naming templates card
+   in SettingsLibraryView.vue with 4 monospace inputs, token reference, reset button,
+   and 6 contract tests.
 3. **Discovery schedule calendar.** Rather than just cooldown timers, a
    day-of-week / time-of-day schedule would let operators run discovery during
    off-peak hours.

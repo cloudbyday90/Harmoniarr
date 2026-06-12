@@ -108,6 +108,7 @@ export function buildSettingsUpdatePayload(form) {
     acquisition: { ...form.acquisition },
     retention: { ...form.retention },
     fidelity: { ...form.fidelity },
+    naming: { ...form.naming },
     slskd: {
       baseUrl: form.slskd.baseUrl,
       requestTimeoutMs: form.slskd.requestTimeoutMs,

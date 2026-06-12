@@ -78,6 +78,15 @@ function createFidelityForm() {
   };
 }
 
+function createNamingForm() {
+  return {
+    artistFolderFormat: '{ArtistName}',
+    albumFolderFormat: '{AlbumTitle} ({ReleaseYear})',
+    trackFilenameFormat: '{TrackNumber} - {SongTitle}',
+    multiDiscTrackFilenameFormat: '{DiscNumber}-{TrackNumber} - {SongTitle}',
+  };
+}
+
 test('buildSettingsUpdatePayload preserves the existing slskd api key when the field is left blank', () => {
   const payload = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
@@ -86,6 +95,7 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
     acquisition: createAcquisitionForm(),
     retention: createRetentionForm(),
     fidelity: createFidelityForm(),
+    naming: createNamingForm(),
     security: {
       csrfProtectionMode: 'disabled',
       enforceHttps: false,
@@ -178,6 +188,12 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
       trustWatchEvidenceCount: 3,
       trustHealthyEvidenceCount: 5,
       trustHealthyMinSuccessRate: 0.8,
+    },
+    naming: {
+      artistFolderFormat: '{ArtistName}',
+      albumFolderFormat: '{AlbumTitle} ({ReleaseYear})',
+      trackFilenameFormat: '{TrackNumber} - {SongTitle}',
+      multiDiscTrackFilenameFormat: '{DiscNumber}-{TrackNumber} - {SongTitle}',
     },
     slskd: {
       baseUrl: 'http://slskd.internal:5030',
@@ -660,5 +676,90 @@ test('buildSettingsUpdatePayload includes fidelity defaults from createFidelityF
     trustWatchEvidenceCount: 3,
     trustHealthyEvidenceCount: 5,
     trustHealthyMinSuccessRate: 0.8,
+  });
+});
+
+test('buildSettingsUpdatePayload includes naming template fields', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    library: createLibraryForm(),
+    scoring: createScoringForm(),
+    acquisition: createAcquisitionForm(),
+    retention: createRetentionForm(),
+    fidelity: createFidelityForm(),
+    naming: {
+      artistFolderFormat: '{ArtistName} ({ReleaseYear})',
+      albumFolderFormat: '{AlbumTitle}',
+      trackFilenameFormat: '{TrackNumber} - {SongTitle}',
+      multiDiscTrackFilenameFormat: 'D{DiscNumber}T{TrackNumber} - {SongTitle}',
+    },
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.naming, {
+    artistFolderFormat: '{ArtistName} ({ReleaseYear})',
+    albumFolderFormat: '{AlbumTitle}',
+    trackFilenameFormat: '{TrackNumber} - {SongTitle}',
+    multiDiscTrackFilenameFormat: 'D{DiscNumber}T{TrackNumber} - {SongTitle}',
+  });
+});
+
+test('buildSettingsUpdatePayload includes naming defaults from createNamingForm', () => {
+  const payload = buildSettingsUpdatePayload({
+    artwork: createArtworkForm(),
+    library: createLibraryForm(),
+    scoring: createScoringForm(),
+    acquisition: createAcquisitionForm(),
+    retention: createRetentionForm(),
+    fidelity: createFidelityForm(),
+    naming: createNamingForm(),
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+    slskd: {
+      apiKey: '',
+      baseUrl: 'http://slskd.internal:5030',
+      clearApiKey: false,
+      requestTimeoutMs: 15000,
+    },
+  });
+
+  assert.deepEqual(payload.naming, {
+    artistFolderFormat: '{ArtistName}',
+    albumFolderFormat: '{AlbumTitle} ({ReleaseYear})',
+    trackFilenameFormat: '{TrackNumber} - {SongTitle}',
+    multiDiscTrackFilenameFormat: '{DiscNumber}-{TrackNumber} - {SongTitle}',
   });
 });

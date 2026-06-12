@@ -18,6 +18,7 @@
 
 import { createApiError } from '../auth.js';
 import { DEFAULT_SCORING_WEIGHTS } from '../library/download-result-scoring.js';
+import { DEFAULT_NAMING_TEMPLATES, validateTemplate } from '../library/library-naming-template-engine.js';
 import {
   resolveCsrfProtectionMode,
   resolveHttpsEnforcementEnabled,
@@ -508,6 +509,32 @@ const settingDefinitions = {
       },
     },
   },
+  naming: {
+    artistFolderFormat: {
+      defaultValue: DEFAULT_NAMING_TEMPLATES.artistFolderFormat,
+      normalize(value) {
+        return normalizeTemplateSetting('naming.artistFolderFormat', value);
+      },
+    },
+    albumFolderFormat: {
+      defaultValue: DEFAULT_NAMING_TEMPLATES.albumFolderFormat,
+      normalize(value) {
+        return normalizeTemplateSetting('naming.albumFolderFormat', value);
+      },
+    },
+    trackFilenameFormat: {
+      defaultValue: DEFAULT_NAMING_TEMPLATES.trackFilenameFormat,
+      normalize(value) {
+        return normalizeTemplateSetting('naming.trackFilenameFormat', value);
+      },
+    },
+    multiDiscTrackFilenameFormat: {
+      defaultValue: DEFAULT_NAMING_TEMPLATES.multiDiscTrackFilenameFormat,
+      normalize(value) {
+        return normalizeTemplateSetting('naming.multiDiscTrackFilenameFormat', value);
+      },
+    },
+  },
 };
 
 function normalizeStringAllowEmpty(settingName) {
@@ -569,6 +596,15 @@ function normalizeRateSetting(settingName, value, { min = 0, max = 1 } = {}) {
   }
 
   return value;
+}
+
+function normalizeTemplateSetting(settingName, value) {
+  const result = validateTemplate(value);
+  if (!result.valid) {
+    throw createSettingsValidationError(`${settingName}: ${result.reason}`);
+  }
+
+  return typeof value === 'string' ? value.trim() : value;
 }
 
 export function getDefaultSettings() {

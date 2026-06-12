@@ -98,6 +98,12 @@ export function useSettingsForm({
       trustHealthyEvidenceCount: 5,
       trustHealthyMinSuccessRate: 0.8,
     },
+    naming: {
+      artistFolderFormat: '{ArtistName}',
+      albumFolderFormat: '{AlbumTitle} ({ReleaseYear})',
+      trackFilenameFormat: '{TrackNumber} - {SongTitle}',
+      multiDiscTrackFilenameFormat: '{DiscNumber}-{TrackNumber} - {SongTitle}',
+    },
     paths: {
       downloadMappings: [],
       downloads: '',
@@ -152,6 +158,7 @@ export function useSettingsForm({
     Object.assign(form.acquisition, payload.settings.acquisition);
     Object.assign(form.retention, payload.settings.retention);
     Object.assign(form.fidelity, payload.settings.fidelity);
+    Object.assign(form.naming, payload.settings.naming);
     Object.assign(form.paths, {
       ...payload.settings.paths,
       downloadMappings: form.paths.downloadMappings,

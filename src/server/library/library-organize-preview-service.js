@@ -79,7 +79,7 @@ function buildSummary(counts) {
   };
 }
 
-function buildProposedNaming(row, libraryNamingService) {
+async function buildProposedNaming(row, libraryNamingService) {
   if (!isAudioFileExtension(row.extension)) {
     return {
       status: buildStatus(
@@ -110,14 +110,16 @@ function buildProposedNaming(row, libraryNamingService) {
     };
   }
 
+  const artistFolderName = await libraryNamingService.buildArtistFolderName({ artistName: row.artistName });
+  const albumFolderName = await libraryNamingService.buildAlbumFolderName({
+    albumTitle,
+    releaseDate: row.releaseDate,
+  });
   const relativeFolderPath = posixPath.join(
-    libraryNamingService.buildArtistFolderName({ artistName: row.artistName }),
-    libraryNamingService.buildAlbumFolderName({
-      albumTitle,
-      releaseDate: row.releaseDate,
-    }),
+    artistFolderName,
+    albumFolderName,
   );
-  const filename = libraryNamingService.buildTrackFilename({
+  const filename = await libraryNamingService.buildTrackFilename({
     discNumber: row.mediumPosition,
     extension: row.extension,
     isMultiDisc: row.mediumCount > 1,
@@ -262,8 +264,8 @@ export function createLibraryOrganizePreviewService({
 } = {}) {
   async function buildLibraryOrganizePreview() {
     const rows = await libraryOrganizePreviewStore.listLibraryFilesForOrganizePreview();
-    const initialFiles = rows.map((row) => {
-      const previewPlan = buildProposedNaming(row, libraryNamingService);
+    const initialFiles = await Promise.all(rows.map(async (row) => {
+      const previewPlan = await buildProposedNaming(row, libraryNamingService);
       const proposedRelativePath = normalizeRelativePath(previewPlan.proposedRelativePath ?? '');
 
       return finalizeStatus({
@@ -289,7 +291,7 @@ export function createLibraryOrganizePreviewService({
         proposedRelativePath: proposedRelativePath || null,
         status: previewPlan.status,
       });
-    });
+    }));
     const files = applyDuplicateTargetBlocking(initialFiles);
     const counts = buildCounts(files);
 

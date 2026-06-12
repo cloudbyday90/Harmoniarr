@@ -477,3 +477,94 @@ test('getDefaultSettings includes scoring namespace with all eight defaults', ()
   assert.equal(defaults.scoring.weightPeerDelivery, 0.08);
   assert.equal(defaults.scoring.weightUploaderReputation, 0.05);
 });
+
+test('normalizeSettingsPatch accepts naming template settings', () => {
+  const updates = normalizeSettingsPatch({
+    naming: {
+      artistFolderFormat: '{ArtistName}',
+      albumFolderFormat: '{ReleaseYear} - {AlbumTitle}',
+      trackFilenameFormat: '{TrackNumber} - {SongTitle}',
+      multiDiscTrackFilenameFormat: '{DiscNumber}-{TrackNumber} - {SongTitle}',
+    },
+  });
+
+  assert.deepEqual(updates, [
+    { namespace: 'naming', settingKey: 'artistFolderFormat', value: '{ArtistName}' },
+    { namespace: 'naming', settingKey: 'albumFolderFormat', value: '{ReleaseYear} - {AlbumTitle}' },
+    { namespace: 'naming', settingKey: 'trackFilenameFormat', value: '{TrackNumber} - {SongTitle}' },
+    { namespace: 'naming', settingKey: 'multiDiscTrackFilenameFormat', value: '{DiscNumber}-{TrackNumber} - {SongTitle}' },
+  ]);
+});
+
+test('normalizeSettingsPatch rejects naming template with forward slash', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ naming: { artistFolderFormat: '{ArtistName}/{AlbumTitle}' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message.includes('path separator'),
+  );
+});
+
+test('normalizeSettingsPatch rejects naming template with backslash', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ naming: { albumFolderFormat: '{AlbumTitle}\\{ReleaseYear}' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message.includes('path separator'),
+  );
+});
+
+test('normalizeSettingsPatch rejects naming template with parent directory reference', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ naming: { trackFilenameFormat: '..' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message.includes('parent directory'),
+  );
+});
+
+test('normalizeSettingsPatch rejects empty naming template', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ naming: { artistFolderFormat: '' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message.includes('empty'),
+  );
+});
+
+test('normalizeSettingsPatch rejects whitespace-only naming template', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ naming: { albumFolderFormat: '   ' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message.includes('empty'),
+  );
+});
+
+test('normalizeSettingsPatch rejects non-string naming template', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ naming: { trackFilenameFormat: 42 } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message.includes('string'),
+  );
+});
+
+test('getDefaultSettings includes naming namespace with all four defaults', () => {
+  const defaults = getDefaultSettings();
+  assert.ok(defaults.naming);
+  assert.equal(defaults.naming.artistFolderFormat, '{ArtistName}');
+  assert.equal(defaults.naming.albumFolderFormat, '{AlbumTitle} ({ReleaseYear})');
+  assert.equal(defaults.naming.trackFilenameFormat, '{TrackNumber} - {SongTitle}');
+  assert.equal(defaults.naming.multiDiscTrackFilenameFormat, '{DiscNumber}-{TrackNumber} - {SongTitle}');
+});
+
+test('normalizeSettingsPatch trims whitespace from naming templates', () => {
+  const updates = normalizeSettingsPatch({
+    naming: {
+      artistFolderFormat: '  {ArtistName}  ',
+    },
+  });
+
+  assert.equal(updates[0].value, '{ArtistName}');
+});

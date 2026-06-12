@@ -55,6 +55,7 @@ import { createLibraryMediaRequestStore } from './library-media-request-store.js
 import { createLibraryOrganizeApplyRunStore } from './library-organize-apply-run-store.js';
 import { createLibraryOrganizeApplyService } from './library-organize-apply-service.js';
 import { createLibraryOrganizeApplyWorker } from './library-organize-apply-worker.js';
+import { createLibraryNamingService } from './library-naming-service.js';
 import { createLibraryOrganizePreviewService } from './library-organize-preview-service.js';
 import { createLibraryOrganizePreviewStore } from './library-organize-preview-store.js';
 import { createLibraryReleaseAvailabilityStore } from './library-release-availability-store.js';
@@ -205,6 +206,7 @@ export function createLibraryModule({
   mediaFilesystemService = createMediaFilesystemService(),
   libraryOrganizePreviewStore = createLibraryOrganizePreviewStore(),
   libraryOrganizePreviewService = createLibraryOrganizePreviewService({
+    libraryNamingService: createLibraryNamingService({ loadSettingsFn: loadSettings }),
     libraryOrganizePreviewStore,
   }),
   libraryOrganizeApplyRunStore = createLibraryOrganizeApplyRunStore(),

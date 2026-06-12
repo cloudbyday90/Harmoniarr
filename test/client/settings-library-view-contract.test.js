@@ -265,3 +265,54 @@ test('SettingsLibraryView includes a reset to defaults button for fidelity', asy
   assert.match(source, /resetFidelityDefaults/);
   assert.match(source, /FIDELITY_DEFAULTS/);
 });
+
+test('SettingsLibraryView renders the Naming templates card', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<h3 class="hx-card-title">Naming templates/);
+  assert.match(source, /Customize how Harmoniarr names artist folders/);
+});
+
+test('SettingsLibraryView wires all four naming template fields to form.naming.*', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /v-model="form\.naming\.artistFolderFormat"/);
+  assert.match(source, /v-model="form\.naming\.albumFolderFormat"/);
+  assert.match(source, /v-model="form\.naming\.trackFilenameFormat"/);
+  assert.match(source, /v-model="form\.naming\.multiDiscTrackFilenameFormat"/);
+});
+
+test('SettingsLibraryView uses monospace font for naming template inputs', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /font-family: var\(--hx-font-mono\)/);
+});
+
+test('SettingsLibraryView labels all four naming fields with hx-field-label', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /<label class="hx-field-label">Artist folder format<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Album folder format<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Track filename format<\/label>/);
+  assert.match(source, /<label class="hx-field-label">Multi-disc track format<\/label>/);
+});
+
+test('SettingsLibraryView includes a token reference section', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /Available tokens/);
+  assert.match(source, /\{ArtistName\}/);
+  assert.match(source, /\{AlbumTitle\}/);
+  assert.match(source, /\{ReleaseYear\}/);
+  assert.match(source, /\{SongTitle\}/);
+  assert.match(source, /\{TrackNumber\}/);
+  assert.match(source, /\{DiscNumber\}/);
+  assert.match(source, /\{DiscCount\}/);
+});
+
+test('SettingsLibraryView includes a reset to defaults button for naming', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /resetNamingDefaults/);
+  assert.match(source, /NAMING_DEFAULTS/);
+});
