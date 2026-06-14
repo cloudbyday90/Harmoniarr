@@ -55,7 +55,7 @@ defineProps({
 
 defineEmits(['add']);
 
-// Map of artist id -> seed-chip element, so the container can return focus to a
+// Map of artist id -> monitored-chip element, so the container can return focus to a
 // freshly added artist's chip after the add dialog closes (APG dialog pattern:
 // when the invoking control is gone/disabled, focus a logical follow-on element).
 const chipRefs = new Map();
@@ -68,7 +68,7 @@ function setChipRef(id, el) {
   }
 }
 
-function focusArtistChip(artistId) {
+function focusMonitoredArtistChip(artistId) {
   const el = chipRefs.get(artistId);
   if (el && typeof el.focus === 'function') {
     el.focus();
@@ -77,7 +77,7 @@ function focusArtistChip(artistId) {
   return false;
 }
 
-defineExpose({ focusArtistChip });
+defineExpose({ focusMonitoredArtistChip });
 </script>
 
 <template>
@@ -91,19 +91,19 @@ defineExpose({ focusArtistChip });
     </header>
 
     <div class="hx-card-body discover-graph-card__body">
-      <section class="discover-seed-band">
-        <div class="discover-seed-band__header">
+      <section class="discover-monitored-band">
+        <div class="discover-monitored-band__header">
           <span class="discover-summary-card__label">Your monitored artists</span>
-          <p class="discover-seed-band__copy">{{ buildDiscoverMonitoredBandCopy() }}</p>
+          <p class="discover-monitored-band__copy">{{ buildDiscoverMonitoredBandCopy() }}</p>
         </div>
 
-        <div class="discover-seeds" role="list" :aria-label="monitoredAriaLabel">
+        <div class="discover-monitored-list" role="list" :aria-label="monitoredAriaLabel">
           <RouterLink
             v-for="chip in chips"
             :key="chip.id"
             :ref="(el) => setChipRef(chip.id, el)"
             :to="chip.to"
-            class="discover-seed-chip"
+            class="discover-monitored-chip"
             role="listitem"
             :aria-label="chip.ariaLabel"
           >
@@ -111,11 +111,11 @@ defineExpose({ focusArtistChip });
               v-if="chip.artworkUrl"
               :src="chip.artworkUrl"
               :alt="chip.name"
-              class="discover-seed-chip__avatar"
+              class="discover-monitored-chip__avatar"
               loading="lazy"
             />
-            <span v-else class="discover-seed-chip__initial" aria-hidden="true">{{ chip.initial }}</span>
-            <span class="discover-seed-chip__name">{{ chip.name }}</span>
+            <span v-else class="discover-monitored-chip__initial" aria-hidden="true">{{ chip.initial }}</span>
+            <span class="discover-monitored-chip__name">{{ chip.name }}</span>
           </RouterLink>
         </div>
       </section>
@@ -182,7 +182,7 @@ defineExpose({ focusArtistChip });
   gap: var(--hx-space-4);
 }
 
-.discover-seed-band {
+.discover-monitored-band {
   display: grid;
   gap: var(--hx-space-3);
   padding: var(--hx-space-3);
@@ -191,12 +191,12 @@ defineExpose({ focusArtistChip });
   border: 1px solid var(--hx-border-subtle);
 }
 
-.discover-seed-band__header {
+.discover-monitored-band__header {
   display: grid;
   gap: var(--hx-space-1);
 }
 
-.discover-seed-band__copy,
+.discover-monitored-band__copy,
 .discover-suggestions__copy {
   margin: 0;
   font-size: var(--hx-text-sm);
@@ -204,13 +204,13 @@ defineExpose({ focusArtistChip });
   line-height: 1.55;
 }
 
-.discover-seeds {
+.discover-monitored-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--hx-space-2);
 }
 
-.discover-seed-chip {
+.discover-monitored-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--hx-space-2);
@@ -225,30 +225,30 @@ defineExpose({ focusArtistChip });
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
-.discover-seed-chip:hover {
+.discover-monitored-chip:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--hx-accent) 40%, var(--hx-border));
   background: color-mix(in srgb, var(--hx-accent-soft) 18%, var(--hx-bg-surface));
 }
 
-.discover-seed-chip:focus-visible {
+.discover-monitored-chip:focus-visible {
   outline: 2px solid var(--hx-accent);
   outline-offset: 2px;
 }
 
-.discover-seed-chip__avatar,
-.discover-seed-chip__initial {
+.discover-monitored-chip__avatar,
+.discover-monitored-chip__initial {
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.discover-seed-chip__avatar {
+.discover-monitored-chip__avatar {
   object-fit: cover;
 }
 
-.discover-seed-chip__initial {
+.discover-monitored-chip__initial {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -258,7 +258,7 @@ defineExpose({ focusArtistChip });
   font-weight: 700;
 }
 
-.discover-seed-chip__name {
+.discover-monitored-chip__name {
   font-size: var(--hx-text-sm);
   font-weight: 600;
 }

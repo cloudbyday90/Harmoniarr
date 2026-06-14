@@ -19,6 +19,8 @@ import { withServer } from '../server/http-test-helpers.js';
 
 const packageJsonPath = resolve(import.meta.dirname, '../../package.json');
 const SCENARIO_SHUTDOWN_DRAIN_MS = 150;
+const TEST_VAPID_PUBLIC_KEY = 'BN9CEVhAa-agHfE816dgSQUoOhYCng4hD86REpzvPg3wzlT8fr9LmvK60sb70uhX-vk0UFixyFak3dhk6SPyKRA';
+const TEST_VAPID_PRIVATE_KEY = 'tt5cAktvbcZtFB5tTbQr7eOaNWFH_-OvsAWx-yE9E00';
 
 async function withEnvironmentVariables(overrides, run) {
   const previous = new Map();
@@ -135,6 +137,9 @@ export async function createIntegrationAppRuntime({
           PGPASSWORD: databaseConfig.password ?? null,
           PGPORT: String(databaseConfig.port),
           PGUSER: databaseConfig.user,
+          VAPID_CONTACT: 'mailto:integration-tests@example.invalid',
+          VAPID_PRIVATE_KEY: TEST_VAPID_PRIVATE_KEY,
+          VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
         }, async () => {
           await closePool().catch(() => {});
           await prepareDatabaseFn();
@@ -205,6 +210,9 @@ export async function withIntegrationApp({
           PGPASSWORD: databaseConfig.password ?? null,
           PGPORT: String(databaseConfig.port),
           PGUSER: databaseConfig.user,
+          VAPID_CONTACT: 'mailto:integration-tests@example.invalid',
+          VAPID_PRIVATE_KEY: TEST_VAPID_PRIVATE_KEY,
+          VAPID_PUBLIC_KEY: TEST_VAPID_PUBLIC_KEY,
         }, async () => {
           await closePool().catch(() => {});
           await prepareDatabaseFn();

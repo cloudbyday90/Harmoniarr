@@ -21,7 +21,10 @@ services:
       HARMONIARR_CONTACT_EMAIL: ${HARMONIARR_CONTACT_EMAIL:-}
       HARMONIARR_LOG_LEVEL: ${HARMONIARR_LOG_LEVEL:-info}
       HARMONIARR_CSRF_PROTECTION: disabled
+      HARMONIARR_ALLOW_EPHEMERAL_VAPID_KEYS: "true"
       LASTFM_API_KEY: ${LASTFM_API_KEY:-}
+      NODE_ENV: development
+      VAPID_CONTACT: mailto:walkthrough@example.invalid
     ports:
       - name: web
         target: 3000

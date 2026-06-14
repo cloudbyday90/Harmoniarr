@@ -29,6 +29,9 @@ services:
       HARMONIARR_CONTACT_URL: ${HARMONIARR_CONTACT_URL:-https://github.com/cloudbyday90/harmoniarr}
       HARMONIARR_CONTACT_EMAIL: ${HARMONIARR_CONTACT_EMAIL:-}
       HARMONIARR_LOG_LEVEL: ${HARMONIARR_LOG_LEVEL:-info}
+      VAPID_CONTACT: "${VAPID_CONTACT:?Set VAPID_CONTACT before starting Harmoniarr}"
+      VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:?Set VAPID_PRIVATE_KEY by running npm run generate:vapid-keys}"
+      VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:?Set VAPID_PUBLIC_KEY by running npm run generate:vapid-keys}"
     ports:
       - "${HARMONIARR_PORT:-47956}:${APP_PORT:-3000}"
     volumes:

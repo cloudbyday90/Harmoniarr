@@ -87,7 +87,7 @@ async function addBoardsOfCanadaFromDiscover(page) {
   const addArtistDialog = page.getByRole('dialog', { name: 'Boards of Canada' });
   await addArtistDialog.waitFor();
   await addArtistDialog.getByRole('button', { name: 'Add artist', exact: true }).click();
-  await page.getByRole('heading', { name: 'Artists you might like' }).waitFor();
+  await page.getByRole('heading', { name: 'Recommended artists' }).waitFor();
 }
 
 async function loginRequesterThroughUi(page, {

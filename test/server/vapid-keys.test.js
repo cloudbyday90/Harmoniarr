@@ -19,9 +19,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  ALLOW_EPHEMERAL_VAPID_KEYS_ENV,
+  DEFAULT_VAPID_CONTACT,
+  VAPID_CONTACT_ENV,
   VAPID_PRIVATE_KEY_ENV,
   VAPID_PUBLIC_KEY_ENV,
   generateVapidKeyPair,
+  resolveVapidContactFromEnv,
   resolveOrGenerateVapidKeys,
   resolveVapidKeysFromEnv,
 } from '../../src/server/push/vapid-keys.js';
@@ -123,33 +127,113 @@ test('resolveOrGenerateVapidKeys: generates keys and writes warning when env var
   const generateFn = t.mock.fn(() => generated);
   const stderr = { write: t.mock.fn() };
 
-  const result = resolveOrGenerateVapidKeys({ env: {}, generateFn, stderr });
+  const result = resolveOrGenerateVapidKeys({ env: { NODE_ENV: 'test' }, generateFn, stderr });
 
   assert.deepEqual(result, generated);
   assert.equal(generateFn.mock.callCount(), 1);
   assert.ok(stderr.write.mock.callCount() > 0, 'should write warning to stderr');
 });
 
-test('resolveOrGenerateVapidKeys: warning includes the generated public key', (t) => {
+test('resolveOrGenerateVapidKeys: warning does not leak generated key material', (t) => {
   const generated = { publicKey: 'THE-PUB-KEY', privateKey: 'THE-PRIV-KEY' };
   const lines = [];
   const stderr = { write: (msg) => lines.push(msg) };
 
-  resolveOrGenerateVapidKeys({ env: {}, generateFn: () => generated, stderr });
+  resolveOrGenerateVapidKeys({ env: { NODE_ENV: 'test' }, generateFn: () => generated, stderr });
 
   const combined = lines.join('');
-  assert.ok(combined.includes('THE-PUB-KEY'), 'warning should include public key');
-  assert.ok(combined.includes(VAPID_PUBLIC_KEY_ENV), 'warning should name the env var');
+  assert.ok(!combined.includes('THE-PUB-KEY'), 'warning must not include generated public key');
+  assert.ok(!combined.includes('THE-PRIV-KEY'), 'warning must not include generated private key');
+  assert.ok(combined.includes('npm run generate:vapid-keys'), 'warning should point to the generator');
 });
 
-test('resolveOrGenerateVapidKeys: warning includes the generated private key', (t) => {
-  const generated = { publicKey: 'PUB', privateKey: 'THE-PRIV-KEY' };
-  const lines = [];
-  const stderr = { write: (msg) => lines.push(msg) };
+test('resolveOrGenerateVapidKeys: throws in production when keys are missing', (t) => {
+  const generateFn = t.mock.fn(() => ({ publicKey: 'gen-pub', privateKey: 'gen-priv' }));
+  const stderr = { write: t.mock.fn() };
 
-  resolveOrGenerateVapidKeys({ env: {}, generateFn: () => generated, stderr });
+  assert.throws(
+    () => resolveOrGenerateVapidKeys({ env: { NODE_ENV: 'production' }, generateFn, stderr }),
+    /VAPID keys are required/,
+  );
+  assert.equal(generateFn.mock.callCount(), 0);
+  assert.equal(stderr.write.mock.callCount(), 0);
+});
 
-  const combined = lines.join('');
-  assert.ok(combined.includes('THE-PRIV-KEY'), 'warning should include private key');
-  assert.ok(combined.includes(VAPID_PRIVATE_KEY_ENV), 'warning should name the env var');
+test('resolveOrGenerateVapidKeys: honours explicit non-production ephemeral-key opt-out', (t) => {
+  const generateFn = t.mock.fn(() => ({ publicKey: 'gen-pub', privateKey: 'gen-priv' }));
+  const stderr = { write: t.mock.fn() };
+
+  assert.throws(
+    () => resolveOrGenerateVapidKeys({
+      env: {
+        [ALLOW_EPHEMERAL_VAPID_KEYS_ENV]: 'false',
+        NODE_ENV: 'test',
+      },
+      generateFn,
+      stderr,
+    }),
+    /VAPID keys are required/,
+  );
+  assert.equal(generateFn.mock.callCount(), 0);
+});
+
+test('resolveOrGenerateVapidKeys: rejects invalid ephemeral-key opt-out value', () => {
+  assert.throws(
+    () => resolveOrGenerateVapidKeys({
+      env: {
+        [ALLOW_EPHEMERAL_VAPID_KEYS_ENV]: 'sometimes',
+        NODE_ENV: 'test',
+      },
+      generateFn: () => ({ publicKey: 'gen-pub', privateKey: 'gen-priv' }),
+      stderr: { write: () => {} },
+    }),
+    /HARMONIARR_ALLOW_EPHEMERAL_VAPID_KEYS/,
+  );
+});
+
+// ── resolveVapidContactFromEnv ────────────────────────────────────────────────
+
+test('resolveVapidContactFromEnv: returns configured mailto contact', () => {
+  assert.equal(
+    resolveVapidContactFromEnv({
+      env: { [VAPID_CONTACT_ENV]: 'mailto:ops@example.com' },
+    }),
+    'mailto:ops@example.com',
+  );
+});
+
+test('resolveVapidContactFromEnv: returns configured https contact', () => {
+  assert.equal(
+    resolveVapidContactFromEnv({
+      env: { [VAPID_CONTACT_ENV]: 'https://example.com/security' },
+    }),
+    'https://example.com/security',
+  );
+});
+
+test('resolveVapidContactFromEnv: trims configured contact', () => {
+  assert.equal(
+    resolveVapidContactFromEnv({
+      env: { [VAPID_CONTACT_ENV]: '  mailto:ops@example.com  ' },
+    }),
+    'mailto:ops@example.com',
+  );
+});
+
+test('resolveVapidContactFromEnv: uses default contact outside production', () => {
+  assert.equal(resolveVapidContactFromEnv({ env: { NODE_ENV: 'test' } }), DEFAULT_VAPID_CONTACT);
+});
+
+test('resolveVapidContactFromEnv: rejects default contact in production', () => {
+  assert.throws(
+    () => resolveVapidContactFromEnv({ env: { NODE_ENV: 'production' } }),
+    /VAPID_CONTACT must be configured/,
+  );
+});
+
+test('resolveVapidContactFromEnv: rejects unsupported contact schemes', () => {
+  assert.throws(
+    () => resolveVapidContactFromEnv({ env: { [VAPID_CONTACT_ENV]: 'ftp://example.com' } }),
+    /mailto: or https:/,
+  );
 });

@@ -232,6 +232,7 @@ Focused tests:
 - `test/client/release-radar-normalization.test.js`
 - `test/client/useReleaseRadar.test.js`
 - `test/server/library-release-radar-service.test.js`
+- `test/server/library-release-radar-store.test.js`
 
 Browser scenarios:
 - `test/browser/operator-ui-smoke.test.js`
@@ -571,7 +572,10 @@ Focused tests:
 - `test/client/release-radar-normalization.test.js`
 - `test/client/useReleaseRadar.test.js`
 - `test/server/library-release-radar-service.test.js`
+- `test/server/library-release-radar-store.test.js`
 - `test/server/library-routes.test.js`
+- `test/server/library-wanted-release-service.test.js`
+- `test/server/library-wanted-summary-store.test.js`
 
 Browser scenarios:
 - `test/browser/operator-ui-smoke.test.js`

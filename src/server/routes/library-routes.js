@@ -201,11 +201,12 @@ export function registerLibraryRoutes(app, {
   }));
 
   app.get('/api/v1/library/release-radar', asyncRoute(async (request, response) => {
-    await requireSession(request);
+    const session = await requireSession(request);
     const { recentDays = '30', upcomingDays = '90', limit = '100' } = request.query;
     response.json({
       ok: true,
       ...(await buildReleaseRadar({
+        appUserId: session.appUserId,
         limit: sanitizePageLimit(limit, { default: 100, max: 200 }),
         recentDays: Number.parseInt(String(recentDays), 10) || 30,
         upcomingDays: Number.parseInt(String(upcomingDays), 10) || 90,

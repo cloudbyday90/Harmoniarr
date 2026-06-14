@@ -16,62 +16,71 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  buildRecommendationScoreBreakdown,
+} from './discover-recommendation-scoring.js';
+
 /**
- * Pure functions for the Discover taste-graph traversal.
+ * Pure functions for the Discover recommendation traversal.
  *
  * These are extracted from the composable so they can be unit-tested with
  * the native Node test runner without requiring a Vue runtime.
  */
 
 /**
- * Merge per-seed similarity results into a single ranked suggestion list.
+ * Merge per-input similarity results into a single ranked suggestion list.
  *
- * When the same artist appears in the results for multiple seeds, their scores
- * are summed and a `seedCount` tracks how many seeds recommended them. This
- * produces a natural intersection-boost: artists recommended by several of
- * your seeded artists rank higher than those recommended by only one.
+ * When the same artist appears in the results for multiple recommendation
+ * inputs, their scores are summed and an `inputCount` tracks how many inputs
+ * recommended them. This produces a natural intersection boost: artists
+ * recommended by several monitored artists rank higher than those recommended
+ * by only one.
  *
- * @param {Map<string, Array<{id:string, name:string, score:number}>>} seedResults
- *   Per-seed arrays of similar-artist objects. Keys are seed MBIDs, values are
- *   the arrays returned by the similarity API for that seed.
+ * @param {Map<string, Array<{id:string, name:string, score:number}>>} inputResults
+ *   Per-input arrays of similar-artist objects. Keys are input MBIDs, values
+ *   are the arrays returned by the similarity API for that input.
  * @param {Set<string>} excludeIds
- *   Set of artist MBIDs to exclude from the output. Typically the seed MBIDs
- *   themselves so that seeds do not appear as their own suggestions.
+ *   Set of artist MBIDs to exclude from the output. Typically the monitored
+ *   input MBIDs themselves so they do not appear as their own suggestions.
  * @param {number} [limit=20]
  *   Maximum number of suggestions to return, applied after sorting.
- * @returns {Array<{id:string, name:string, score:number, seedCount:number, sources:string[], rankScore:number}>}
+ * @returns {Array<{id:string, name:string, score:number, inputCount:number, inputBoost:number, sources:string[], rankScore:number}>}
  *   Suggestions sorted descending by ranked overlap score, capped to `limit`.
  *   `sources` is the de-duplicated, sorted set of engine sources (e.g.
  *   `'musicbrainz'`, `'listenbrainz'`, `'lastfm'`, `'both'`) that contributed
  *   the artist, preserved so the UI can show recommendation provenance.
  */
-export function computeSuggestions(seedResults, excludeIds, limit = 20) {
+export function computeSuggestions(inputResults, excludeIds, limit = 20) {
   const tally = new Map();
 
-  for (const [, results] of seedResults) {
+  for (const [, results] of inputResults) {
     for (const { id, name, score, source } of results) {
       if (excludeIds.has(id)) continue;
 
       const existing = tally.get(id);
       if (existing) {
         existing.score += score;
-        existing.seedCount += 1;
+        existing.inputCount += 1;
         if (source) existing.sources.add(source);
       } else {
-        tally.set(id, { id, name, score, seedCount: 1, sources: new Set(source ? [source] : []) });
+        tally.set(id, { id, name, score, inputCount: 1, sources: new Set(source ? [source] : []) });
       }
     }
   }
 
   return [...tally.values()]
-    .map((artist) => ({
-      ...artist,
-      sources: [...artist.sources].sort(),
-      rankScore: artist.score + Math.min(0.45, Math.max(0, artist.seedCount - 1) * 0.18),
-    }))
+    .map((artist) => {
+      const scoreBreakdown = buildRecommendationScoreBreakdown(artist);
+      return {
+        ...artist,
+        inputBoost: scoreBreakdown.inputBoost,
+        sources: [...artist.sources].sort(),
+        rankScore: scoreBreakdown.rankScore,
+      };
+    })
     .sort((a, b) => (
       b.rankScore - a.rankScore
-      || b.seedCount - a.seedCount
+      || b.inputCount - a.inputCount
       || b.score - a.score
       || a.name.localeCompare(b.name)
     ))

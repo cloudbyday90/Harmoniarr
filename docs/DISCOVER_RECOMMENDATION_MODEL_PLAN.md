@@ -2471,15 +2471,24 @@ Use this section for incremental updates during implementation.
 - 2026-05-25: High-level design choices locked. Discover is the add surface, Home is the canonical monitored surface, artist detail is the deep curation surface, `Save` triggers background reevaluation, and Home cards should summarize catalog progress and coverage.
 - 2026-05-30: Plan aligned with implementation. Operator-scoped policy, release selection, track override, reconciliation snapshot tables, and save-triggered reconciliation services now exist; remaining work is centered on Discover/Home/artist-detail client surfaces and legacy monitoring read-path migration.
 - 2026-05-31: Artist detail moved onto the operator projection route for local artists. The page now exposes the policy draft editor, save/cancel boundary, release-level selection controls, and explicit override status while preserving raw MusicBrainz browse fallback for artists that are not imported locally.
+- 2026-06-12: Phase 1 terminology guard completed. `DISCOVER_SEED_TERMINOLOGY_GUARD_DESIGN.md` documents the official accessibility/testing baseline and the focused regression strategy. `test/client/discover-presentation.test.js` now guards fixed Discover copy and accessible labels against user-facing `seed` / `followed` terminology while leaving internal graph naming for the later cleanup phase.
+- 2026-06-12: Discover artist-card state contract completed. `DISCOVER_ARTIST_CARD_STATE_DESIGN.md` documents the accessibility baseline and final state model. `DiscoverArtistCard.vue` now derives visible action label, accessible name, disabled state, icon-only mode, and busy state from `resolveDiscoverArtistCardActionState()`, with focused helper and SFC contract tests.
+- 2026-06-12: Discover refresh browser regression completed. `DISCOVER_REFRESH_BROWSER_REGRESSION_DESIGN.md` documents the official Playwright, Node test runner, and OWASP testing baseline plus the selected focused-browser strategy. `test/browser/discover-refresh-regression.test.js` now adds Boards of Canada, adds Autechre from recommendations, reloads Discover, and verifies the monitored count, monitored chips, and shared recommendation copy still hydrate from the persisted operator monitored profile.
+- 2026-06-13: Internal naming cleanup evaluated. `DISCOVER_INTERNAL_NAMING_EVALUATION.md` recommends a scoped client-only rename from `seed` to `recommendationInput` across `useDiscoverGraph`, `DiscoverView`, Discover recommendation-panel classes/comments, and graph tests, while leaving server similarity-service `seedArtist` terminology alone because it is algorithm-local and not part of the Discover product contract.
+- 2026-06-13: Internal naming cleanup implemented. `DISCOVER_INTERNAL_NAMING_RENAME_DESIGN.md` records the official Vue, Node ESM, Playwright, Node test runner, OWASP, and WAI-ARIA source review, the rejected alternatives, and the selected client-only rename stack. Discover graph, presentation, view, panel, artwork, and modal-contract tests now use `recommendationInput` / `inputCount` terminology for the client Discover recommendation basis.
+- 2026-06-13: Scoring and explainability design implemented. `DISCOVER_SCORING_EXPLAINABILITY_DESIGN.md` records the official NIST AI RMF, European Commission DSA, WAI-ARIA, OWASP, Vue, JavaScript module, and Node test-runner source review. Discover recommendation scoring now lives in a pure ES module with a bounded monitored-artist support boost, and recommendation card explanations now come from a fixed, markup-free explanation contract.
+- 2026-06-13: Legacy monitoring read-path cleanup started. `LEGACY_MONITORING_READ_PATH_CLEANUP_DESIGN.md` documents the official PostgreSQL, OWASP, node-postgres, Express, and Node test-runner source review plus the selected direct-migration stack. Release Radar now reads from `operator_artist_monitoring` scoped by the authenticated `appUserId` instead of the legacy global `metadata_artist_monitoring` table.
+- 2026-06-13: Wanted release reconciliation read-path cleanup implemented. The wanted reconciliation service and wanted summary monitored-artist count now use an operator-monitoring compatibility scope derived from `operator_artist_monitoring`, removing their direct dependency on `metadata_artist_monitoring` while preserving the existing global `library_wanted_releases` projection until a separate per-operator wanted-state migration is designed.
 
 ## Checklist
 
-- [ ] Phase 1 terminology pass complete
+- [x] Phase 1 terminology pass complete
 - [x] Discover recommendation-basis copy updated
 - [x] Home monitored-profile copy updated
-- [ ] No user-facing seed language remains
-- [ ] Discover recommendation cards show monitored vs recommended correctly
-- [ ] Browser regression test covers refresh after monitoring multiple artists
+- [x] No user-facing seed language remains
+- [x] Discover recommendation cards show monitored vs recommended correctly
+- [x] Browser regression test covers refresh after monitoring multiple artists
+- [x] Internal Discover graph naming uses recommendation-input terminology
 - [x] Discover `Add artist` action is implemented as promotion into Home's monitored profile
 - [x] Monitoring vs request vs desired-track intent is reflected in product language
 - [x] Add-artist modal field set is finalized for first implementation pass
@@ -2490,5 +2499,5 @@ Use this section for incremental updates during implementation.
 - [x] Desired-state changes vs delete behavior is finalized
 - [x] Home artist card v1 content and layout is implemented from the operator projection
 - [x] Save-triggered background orchestration contract is finalized
-- [ ] Internal naming cleanup evaluated
-- [ ] Follow-up scoring/explainability work planned
+- [x] Internal naming cleanup evaluated
+- [x] Follow-up scoring/explainability work planned

@@ -124,7 +124,7 @@ suite('browser operator workflow smoke coverage', () => {
       await addArtistDialog.waitFor();
       await addArtistDialog.getByRole('button', { name: 'Add artist', exact: true }).click();
 
-      await page.getByRole('heading', { name: 'Artists you might like' }).waitFor();
+      await page.getByRole('heading', { name: 'Recommended artists' }).waitFor();
       await page.getByText('Autechre').waitFor();
 
       await navigateWithinApp(page, {

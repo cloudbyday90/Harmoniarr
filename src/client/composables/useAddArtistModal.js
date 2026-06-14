@@ -30,9 +30,9 @@ import {
  * `AddArtistModal` flow through one auditable mutation path
  * (`useArtistMonitoring().addArtistWithPolicy`).
  *
- * Surface-specific follow-up (seeding the taste graph, refreshing a list, focus
- * management) is supplied per call via the `onAdded` hook so the composable stays
- * presentation-agnostic.
+ * Surface-specific follow-up (refreshing recommendation inputs, refreshing a
+ * list, focus management) is supplied per call via the `onAdded` hook so the
+ * composable stays presentation-agnostic.
  *
  * @param {object} [options]
  * @param {ReturnType<typeof useArtistMonitoring>} [options.monitoring]
@@ -56,8 +56,8 @@ export function useAddArtistModal(options = {}) {
   /**
    * Open the policy dialog for an artist. No-ops when the artist is missing an id
    * or already added. The added check defaults to `isMonitored` but accepts a
-   * surface-specific predicate (e.g. Discover also treats taste-graph seeds as
-   * added).
+   * surface-specific predicate (e.g. Discover also treats recommendation inputs
+   * as added).
    */
   function openAddArtistModal(artist, isAlreadyAdded) {
     if (!artist?.id) {

@@ -56,6 +56,14 @@ function todayString(now) {
   return now.toISOString().slice(0, 10);
 }
 
+function requireAppUserId(appUserId) {
+  if (typeof appUserId !== 'string' || appUserId.trim().length === 0) {
+    throw new TypeError('buildReleaseRadar requires an appUserId');
+  }
+
+  return appUserId;
+}
+
 export function createLibraryReleaseRadarService({
   libraryReleaseRadarStore = createLibraryReleaseRadarStore(),
   nowFn = () => new Date(),
@@ -69,14 +77,16 @@ export function createLibraryReleaseRadarService({
    * applies to the combined raw result before splitting — each array can have
    * at most `limit` items.
    *
-   * @param {{ recentDays?: number, upcomingDays?: number, limit?: number }} options
+   * @param {{ appUserId: string, recentDays?: number, upcomingDays?: number, limit?: number }} options
    * @returns {Promise<{ checkedAt: string, windows: object, recent: object[], upcoming: object[] }>}
    */
   async function buildReleaseRadar({
+    appUserId,
     recentDays = defaultRecentDays,
     upcomingDays = defaultUpcomingDays,
     limit = defaultLimit,
   } = {}) {
+    const resolvedAppUserId = requireAppUserId(appUserId);
     const resolvedRecentDays = resolveDays(recentDays, defaultRecentDays);
     const resolvedUpcomingDays = resolveDays(upcomingDays, defaultUpcomingDays);
     const resolvedLimit = resolveLimit(limit);
@@ -92,6 +102,7 @@ export function createLibraryReleaseRadarService({
     until.setDate(until.getDate() + resolvedUpcomingDays);
 
     const all = await libraryReleaseRadarStore.listRadarReleaseGroups({
+      appUserId: resolvedAppUserId,
       limit: resolvedLimit * 2,
       since,
       until,

@@ -36,10 +36,7 @@ import {
   buildDiscoverPageSubtitle,
   buildDiscoverPreSearchBody,
   buildDiscoverSearchErrorBody,
-  buildRecommendationMeta,
-  buildRecommendationProvenance,
-  buildRecommendationStrength,
-  buildRecommendationSupport,
+  buildRecommendationExplanation,
   buildSearchResultBadgeLabel,
   buildSearchResultBadgeTone,
   buildSearchResultMeta,
@@ -78,26 +75,26 @@ const {
 } = useAddArtistModal({ monitoring });
 
 const {
-  seeds,
+  recommendationInputs,
   suggestions,
-  isAnySeedLoading,
-  hasSeeds,
+  isAnyRecommendationInputLoading,
+  hasRecommendationInputs,
   lastError: graphError,
-  isSeed,
-  addSeed,
-  hydrateSeeds,
+  isRecommendationInput,
+  addRecommendationInput,
+  hydrateRecommendationInputs,
 } = useDiscoverGraph();
 
 const {
   getArtistArtwork,
   isResolvingArtistArtwork,
 } = useDiscoverArtistArtwork({
-  artistSources: [seeds, suggestions, results],
+  artistSources: [recommendationInputs, suggestions, results],
 });
 
 // Ref to the recommendations panel so focus can return to a newly added artist's
-// seed chip once the add dialog closes (the invoking "Add" button is disabled by
-// then). See `handleFocusReturnUnavailable`.
+// monitored artist chip once the add dialog closes. See
+// `handleFocusReturnUnavailable`.
 const recommendationsPanelRef = ref(null);
 
 // ── View models ──────────────────────────────────────────────────────────────
@@ -105,31 +102,30 @@ const recommendationsPanelRef = ref(null);
 // stay free of business logic and the template stays declarative.
 
 const monitoredChips = computed(() =>
-  seeds.value.map((seed) => ({
-    id: seed.id,
-    name: seed.name,
-    initial: seed.name?.trim()?.charAt(0)?.toUpperCase() ?? '?',
-    artworkUrl: getArtistArtwork(seed.id)?.url ?? null,
-    to: buildArtistLocation(seed),
-    ariaLabel: buildDiscoverMonitoredArtistNavAriaLabel(seed.name),
+  recommendationInputs.value.map((input) => ({
+    id: input.id,
+    name: input.name,
+    initial: input.name?.trim()?.charAt(0)?.toUpperCase() ?? '?',
+    artworkUrl: getArtistArtwork(input.id)?.url ?? null,
+    to: buildArtistLocation(input),
+    ariaLabel: buildDiscoverMonitoredArtistNavAriaLabel(input.name),
   })),
 );
 
 const recommendationCards = computed(() =>
   suggestions.value.map((suggestion) => {
-    const provenance = buildRecommendationProvenance(suggestion);
-    const strength = buildRecommendationStrength(suggestion);
+    const explanation = buildRecommendationExplanation(suggestion);
     const added = isAddedArtist(suggestion.id);
     return {
       id: suggestion.id,
       artist: { id: suggestion.id, name: suggestion.name },
       artwork: getArtistArtwork(suggestion.id),
-      badge: provenance.label,
-      badgeTone: provenance.tone,
-      strengthLabel: strength.label,
-      strengthTier: strength.tier,
-      metaText: buildRecommendationMeta(suggestion),
-      supportingText: buildRecommendationSupport(suggestion),
+      badge: explanation.provenance.label,
+      badgeTone: explanation.provenance.tone,
+      strengthLabel: explanation.strength.label,
+      strengthTier: explanation.strength.tier,
+      metaText: explanation.metaText,
+      supportingText: explanation.supportingText,
       monitored: added,
       monitoring: isMonitoring(suggestion.id),
       disabled: added,
@@ -163,7 +159,7 @@ const searchPanelMode = computed(() =>
     hasSearched: hasSearched.value,
     isSearching: isSearching.value,
     resultCount: results.value.length,
-    hasSeeds: hasSeeds.value,
+    hasRecommendationInputs: hasRecommendationInputs.value,
   }),
 );
 
@@ -177,7 +173,7 @@ async function handleAddArtistSubmit(policyForm) {
       // The artist is already persisted. Refresh recommendations and the
       // monitored list in the background — a slow or unavailable similar-artists
       // fetch must not keep the modal open.
-      void addSeed(artist);
+      void addRecommendationInput(artist);
       void loadMonitoredArtists();
     },
   });
@@ -185,7 +181,7 @@ async function handleAddArtistSubmit(policyForm) {
 
 // When the add dialog closes and its invoking "Add" button is no longer
 // focusable (it became disabled after the add), move focus to the newly added
-// artist's seed chip — the logical follow-on element per the W3C APG dialog
+// artist's monitored chip — the logical follow-on element per the W3C APG dialog
 // pattern. Falls back to no-op if the chip is not yet rendered.
 async function handleFocusReturnUnavailable() {
   const artistId = lastAddedArtistId.value;
@@ -194,12 +190,12 @@ async function handleFocusReturnUnavailable() {
     return;
   }
   await nextTick();
-  recommendationsPanelRef.value?.focusArtistChip?.(artistId);
+  recommendationsPanelRef.value?.focusMonitoredArtistChip?.(artistId);
 }
 
 onMounted(async () => {
   await loadMonitoredArtists();
-  await hydrateSeeds(monitoredArtists.value);
+  await hydrateRecommendationInputs(monitoredArtists.value);
 });
 
 onBeforeUnmount(() => {
@@ -207,7 +203,7 @@ onBeforeUnmount(() => {
 });
 
 function isAddedArtist(artistId) {
-  return isSeed(artistId) || isMonitored(artistId);
+  return isRecommendationInput(artistId) || isMonitored(artistId);
 }
 
 function buildArtistLocation(artist) {
@@ -242,19 +238,19 @@ function buildArtistLocation(artist) {
       />
 
       <div class="discover-counts" role="list" aria-label="Discover summary">
-        <span class="hx-pill" data-tone="success" role="listitem">{{ seeds.length }} monitored</span>
+        <span class="hx-pill" data-tone="success" role="listitem">{{ recommendationInputs.length }} monitored</span>
         <span class="hx-pill" data-tone="info" role="listitem">{{ suggestions.length }} recommended</span>
         <span class="hx-pill" role="listitem">{{ results.length }} results</span>
-        <span v-if="isAnySeedLoading || isResolvingArtistArtwork" class="hx-pill" data-tone="warning" role="listitem">Refreshing</span>
+        <span v-if="isAnyRecommendationInputLoading || isResolvingArtistArtwork" class="hx-pill" data-tone="warning" role="listitem">Refreshing</span>
       </div>
     </header>
 
     <DiscoverRecommendationsPanel
-      v-if="hasSeeds"
+      v-if="hasRecommendationInputs"
       ref="recommendationsPanelRef"
       :chips="monitoredChips"
       :cards="recommendationCards"
-      :is-loading="isAnySeedLoading"
+      :is-loading="isAnyRecommendationInputLoading"
       :error-message="graphError"
       :monitored-aria-label="buildDiscoverMonitoredArtistsAriaLabel()"
       @add="openAddArtist"

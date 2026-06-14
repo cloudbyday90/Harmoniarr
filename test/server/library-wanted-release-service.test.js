@@ -4,34 +4,35 @@ import { createLibraryWantedReleaseService } from '../../src/server/library/libr
 
 test('reconcileWantedReleases records missing and partial monitored releases from current coverage gaps', async (t) => {
   const replaceLibraryWantedReleases = t.mock.fn(async () => {});
+  const query = t.mock.fn(async () => ({
+    rows: [
+      {
+        expected_track_count: 10,
+        matched_track_count: 0,
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'release-group-1',
+        metadata_release_id: 'release-1',
+        monitored_release_group_types: ['album', 'ep'],
+        reconciliation_status: null,
+        release_date: '2024-04-01',
+        release_status: 'Official',
+      },
+      {
+        expected_track_count: 8,
+        matched_track_count: 6,
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'release-group-2',
+        metadata_release_id: 'release-2',
+        monitored_release_group_types: ['album', 'ep'],
+        reconciliation_status: 'partial',
+        release_date: '2025-05-01',
+        release_status: 'Official',
+      },
+    ],
+  }));
   const service = createLibraryWantedReleaseService({
     getPoolFn: () => ({
-      query: async () => ({
-        rows: [
-          {
-            expected_track_count: 10,
-            matched_track_count: 0,
-            metadata_artist_id: 'artist-1',
-            metadata_release_group_id: 'release-group-1',
-            metadata_release_id: 'release-1',
-            monitored_release_group_types: ['album', 'ep'],
-            reconciliation_status: null,
-            release_date: '2024-04-01',
-            release_status: 'Official',
-          },
-          {
-            expected_track_count: 8,
-            matched_track_count: 6,
-            metadata_artist_id: 'artist-1',
-            metadata_release_group_id: 'release-group-2',
-            metadata_release_id: 'release-2',
-            monitored_release_group_types: ['album', 'ep'],
-            reconciliation_status: 'partial',
-            release_date: '2025-05-01',
-            release_status: 'Official',
-          },
-        ],
-      }),
+      query,
     }),
     libraryWantedReleaseStore: {
       replaceLibraryWantedReleases,
@@ -76,6 +77,11 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
       },
     ],
   });
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /operator_monitored_artist_scope/);
+  assert.match(sql, /operator_artist_monitoring/);
+  assert.doesNotMatch(sql, /metadata_artist_monitoring/);
 });
 
 test('reconcileWantedReleases clears stale wanted releases when no monitored gaps remain', async (t) => {
@@ -94,4 +100,24 @@ test('reconcileWantedReleases clears stale wanted releases when no monitored gap
   assert.deepEqual(replaceLibraryWantedReleases.mock.calls[0].arguments[0], {
     wantedReleases: [],
   });
+});
+
+test('reconcileWantedReleases folds all operator monitored release types into the compatibility scope', async (t) => {
+  const replaceLibraryWantedReleases = t.mock.fn(async () => {});
+  const query = t.mock.fn(async () => ({ rows: [] }));
+  const service = createLibraryWantedReleaseService({
+    getPoolFn: () => ({
+      query,
+    }),
+    libraryWantedReleaseStore: {
+      replaceLibraryWantedReleases,
+    },
+  });
+
+  await service.reconcileWantedReleases();
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /ARRAY_AGG\(DISTINCT monitored_type ORDER BY monitored_type\)/);
+  assert.match(sql, /CROSS JOIN LATERAL unnest\(operator_artist_monitoring\.monitored_release_group_types\)/);
+  assert.match(sql, /GROUP BY operator_artist_monitoring\.metadata_artist_id/);
 });

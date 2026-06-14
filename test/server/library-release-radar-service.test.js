@@ -55,7 +55,7 @@ test('buildReleaseRadar returns checkedAt, windows, and empty arrays when the st
     nowFn: () => now,
   });
 
-  const result = await service.buildReleaseRadar();
+  const result = await service.buildReleaseRadar({ appUserId: 'user-1' });
 
   assert.equal(result.checkedAt, now.toISOString());
   assert.deepEqual(result.recent, []);
@@ -75,7 +75,7 @@ test('buildReleaseRadar splits rows at today: past dates go to recent, future da
     nowFn: () => now,
   });
 
-  const result = await service.buildReleaseRadar();
+  const result = await service.buildReleaseRadar({ appUserId: 'user-1' });
 
   assert.equal(result.recent.length, 1);
   assert.equal(result.recent[0].releaseGroupTitle, 'NTS Sessions');
@@ -95,7 +95,7 @@ test('buildReleaseRadar orders recent releases newest-first', async () => {
     nowFn: () => now,
   });
 
-  const { recent } = await service.buildReleaseRadar();
+  const { recent } = await service.buildReleaseRadar({ appUserId: 'user-1' });
 
   assert.equal(recent[0].releaseGroupTitle, 'Newer');
   assert.equal(recent[1].releaseGroupTitle, 'Older');
@@ -113,7 +113,7 @@ test('buildReleaseRadar orders upcoming releases soonest-first', async () => {
     nowFn: () => now,
   });
 
-  const { upcoming } = await service.buildReleaseRadar();
+  const { upcoming } = await service.buildReleaseRadar({ appUserId: 'user-1' });
 
   assert.equal(upcoming[0].releaseGroupTitle, 'Sooner');
   assert.equal(upcoming[1].releaseGroupTitle, 'Later');
@@ -124,7 +124,7 @@ test('buildReleaseRadar returns default window values in result', async () => {
     libraryReleaseRadarStore: createMockStore([]),
   });
 
-  const { windows } = await service.buildReleaseRadar();
+  const { windows } = await service.buildReleaseRadar({ appUserId: 'user-1' });
 
   assert.equal(windows.recentDays, 30);
   assert.equal(windows.upcomingDays, 90);
@@ -135,7 +135,11 @@ test('buildReleaseRadar reflects custom window parameters in result', async () =
     libraryReleaseRadarStore: createMockStore([]),
   });
 
-  const { windows } = await service.buildReleaseRadar({ recentDays: 7, upcomingDays: 14 });
+  const { windows } = await service.buildReleaseRadar({
+    appUserId: 'user-1',
+    recentDays: 7,
+    upcomingDays: 14,
+  });
 
   assert.equal(windows.recentDays, 7);
   assert.equal(windows.upcomingDays, 14);
@@ -150,10 +154,10 @@ test('buildReleaseRadar passes the correct since/until date range to the store',
     nowFn: () => now,
   });
 
-  await service.buildReleaseRadar({ recentDays: 30, upcomingDays: 90 });
+  await service.buildReleaseRadar({ appUserId: 'user-1', recentDays: 30, upcomingDays: 90 });
 
   const [callArgs] = listRadarReleaseGroups.mock.calls;
-  const { since, until } = callArgs.arguments[0];
+  const { appUserId, since, until } = callArgs.arguments[0];
 
   const expectedSince = new Date(now);
   expectedSince.setDate(expectedSince.getDate() - 30);
@@ -161,8 +165,20 @@ test('buildReleaseRadar passes the correct since/until date range to the store',
   const expectedUntil = new Date(now);
   expectedUntil.setDate(expectedUntil.getDate() + 90);
 
+  assert.equal(appUserId, 'user-1');
   assert.equal(since.toISOString(), expectedSince.toISOString());
   assert.equal(until.toISOString(), expectedUntil.toISOString());
+});
+
+test('buildReleaseRadar requires an app user id', async () => {
+  const service = createLibraryReleaseRadarService({
+    libraryReleaseRadarStore: createMockStore([]),
+  });
+
+  await assert.rejects(
+    () => service.buildReleaseRadar(),
+    /requires an appUserId/,
+  );
 });
 
 test('buildReleaseRadar treats a release with firstReleaseDate equal to today as recent, not upcoming', async () => {
@@ -174,7 +190,7 @@ test('buildReleaseRadar treats a release with firstReleaseDate equal to today as
     nowFn: () => now,
   });
 
-  const { recent, upcoming } = await service.buildReleaseRadar();
+  const { recent, upcoming } = await service.buildReleaseRadar({ appUserId: 'user-1' });
 
   assert.equal(recent.length, 1);
   assert.equal(recent[0].releaseGroupTitle, 'Released Today');
@@ -195,7 +211,7 @@ test('buildReleaseRadar respects the limit cap per section', async () => {
     nowFn: () => now,
   });
 
-  const { recent } = await service.buildReleaseRadar({ limit: 5 });
+  const { recent } = await service.buildReleaseRadar({ appUserId: 'user-1', limit: 5 });
 
   assert.equal(recent.length, 5);
 });

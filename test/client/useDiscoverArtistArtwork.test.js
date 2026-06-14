@@ -38,7 +38,7 @@ test('useDiscoverArtistArtwork batches artwork across discover sources', async (
   const getResolved = (ownerType, ownerId, artworkRole) =>
     resolvedMap[`${ownerType}:${ownerId}:${artworkRole}`] ?? null;
 
-  const seeds = ref([{ id: 'artist-1', name: 'Boards of Canada' }]);
+  const recommendationInputs = ref([{ id: 'artist-1', name: 'Boards of Canada' }]);
   const suggestions = ref([
     { id: 'artist-2', name: 'Autechre' },
     { id: 'artist-1', name: 'Boards of Canada' },
@@ -46,7 +46,7 @@ test('useDiscoverArtistArtwork batches artwork across discover sources', async (
   const results = ref([{ id: 'artist-3', name: 'Tycho' }]);
 
   const workflow = useDiscoverArtistArtwork({
-    artistSources: [seeds, suggestions, results],
+    artistSources: [recommendationInputs, suggestions, results],
     createArtworkBatchResolve: () => ({
       getResolved,
       isResolving: ref(false),

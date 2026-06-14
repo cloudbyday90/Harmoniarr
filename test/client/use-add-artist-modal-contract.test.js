@@ -57,9 +57,9 @@ test('useAddArtistModal opens for a fresh artist and no-ops for an added one', (
 test('useAddArtistModal honours a custom isAlreadyAdded predicate', () => {
   const monitoring = buildMonitoringStub();
   const modal = useAddArtistModal({ monitoring });
-  const seeds = new Set(['seed']);
+  const addedIds = new Set(['candidate']);
 
-  modal.openAddArtistModal({ id: 'seed', name: 'Seed' }, (id) => seeds.has(id));
+  modal.openAddArtistModal({ id: 'candidate', name: 'Candidate' }, (id) => addedIds.has(id));
   assert.equal(modal.addArtistModalOpen.value, false);
 });
 

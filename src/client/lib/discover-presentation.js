@@ -27,6 +27,7 @@
  */
 
 import { buildAvatarInitial, buildAvatarStyle } from './artist-avatar.js';
+import { buildRecommendationExplanation } from './discover-recommendation-explainability.js';
 
 // ── Page-level copy ──────────────────────────────────────────────────────────
 
@@ -100,7 +101,7 @@ export function buildDiscoverSearchErrorBody() {
  * @param {boolean} flags.hasSearched
  * @param {boolean} flags.isSearching
  * @param {number} flags.resultCount
- * @param {boolean} flags.hasSeeds
+ * @param {boolean} flags.hasRecommendationInputs
  * @returns {'error'|'pre-search'|'searching'|'empty'|'results'|'idle'}
  */
 export function resolveDiscoverSearchPanelMode({
@@ -108,12 +109,12 @@ export function resolveDiscoverSearchPanelMode({
   hasSearched,
   isSearching,
   resultCount,
-  hasSeeds,
+  hasRecommendationInputs,
 }) {
   if (searchError) {
     return 'error';
   }
-  if (!hasSearched && !hasSeeds) {
+  if (!hasSearched && !hasRecommendationInputs) {
     return 'pre-search';
   }
   if (isSearching) {
@@ -176,7 +177,7 @@ export function buildDiscoverMonitoredBandCopy() {
  * @returns {string}
  */
 export function buildDiscoverSuggestionsCopy() {
-  return 'Ranked by how many of your monitored artists point to them.';
+  return 'Ranked by similarity strength first, then by shared support from your monitored artists.';
 }
 
 /**
@@ -191,31 +192,6 @@ export function buildDiscoverNoSimilarArtistsMessage() {
 // ── Recommendation cards ─────────────────────────────────────────────────────
 
 /**
- * Map a raw engine source string to a normalized provenance category.
- *
- * The recommendation engine tags each candidate with a `source`
- * (`'musicbrainz'`, `'listenbrainz'`, `'lastfm'`, or `'both'`). MusicBrainz is
- * editorial/relationship data ("related"); ListenBrainz and Last.fm are
- * listening-history data ("listeners"); `'both'` contributes both categories.
- *
- * @param {string} source
- * @returns {Array<'related'|'listeners'>}
- */
-function provenanceCategoriesForSource(source) {
-  switch (source) {
-    case 'musicbrainz':
-      return ['related'];
-    case 'listenbrainz':
-    case 'lastfm':
-      return ['listeners'];
-    case 'both':
-      return ['related', 'listeners'];
-    default:
-      return [];
-  }
-}
-
-/**
  * Provenance badge (label + tone) for a recommended artist card.
  *
  * Aggregates the engine sources that contributed an artist into a single,
@@ -227,27 +203,8 @@ function provenanceCategoriesForSource(source) {
  * @returns {{ label: string, tone: string }}
  */
 export function buildRecommendationProvenance(suggestion) {
-  const sources = Array.isArray(suggestion?.sources) ? suggestion.sources : [];
-  const categories = new Set();
-  for (const source of sources) {
-    for (const category of provenanceCategoriesForSource(source)) {
-      categories.add(category);
-    }
-  }
-
-  const hasRelated = categories.has('related');
-  const hasListeners = categories.has('listeners');
-
-  if (hasRelated && hasListeners) {
-    return { label: 'Related + listeners', tone: 'success' };
-  }
-  if (hasRelated) {
-    return { label: 'Related artist', tone: 'info' };
-  }
-  if (hasListeners) {
-    return { label: 'Listener overlap', tone: 'info' };
-  }
-  return { label: 'Recommended', tone: 'info' };
+  const { provenance } = buildRecommendationExplanation(suggestion);
+  return { label: provenance.label, tone: provenance.tone };
 }
 
 /**
@@ -259,7 +216,7 @@ export function buildRecommendationProvenance(suggestion) {
  * tiers rather than rendered directly, so internal scoring semantics stay
  * private and the label can never carry engine- or user-supplied markup.
  *
- * Tiers (by ranked overlap score, which already folds in the multi-seed boost):
+ * Tiers (by ranked overlap score, which already folds in the multi-input boost):
  *   - `>= 1.5` → `strong`   ("Strong overlap")
  *   - `>= 0.8` → `moderate` ("Moderate overlap")
  *   - else     → `emerging` ("Emerging overlap")
@@ -268,32 +225,20 @@ export function buildRecommendationProvenance(suggestion) {
  * @returns {{ tier: 'strong'|'moderate'|'emerging', label: string }}
  */
 export function buildRecommendationStrength(suggestion) {
-  const rankScore = Number(suggestion?.rankScore ?? suggestion?.score ?? 0);
-  const value = Number.isFinite(rankScore) ? rankScore : 0;
-
-  if (value >= 1.5) {
-    return { tier: 'strong', label: 'Strong overlap' };
-  }
-  if (value >= 0.8) {
-    return { tier: 'moderate', label: 'Moderate overlap' };
-  }
-  return { tier: 'emerging', label: 'Emerging overlap' };
+  return buildRecommendationExplanation(suggestion).strength;
 }
 
 /**
  * Meta line for a recommended artist card.
  *
- * @param {{ seedCount?: number }|null|undefined} suggestion
+ * @param {{ inputCount?: number }|null|undefined} suggestion
  * @returns {string}
  */
 export function buildRecommendationMeta(suggestion) {
   if (!suggestion) {
     return '';
   }
-  if (suggestion.seedCount > 1) {
-    return `Shared by ${suggestion.seedCount} of your monitored artists`;
-  }
-  return 'From your monitored artists';
+  return buildRecommendationExplanation(suggestion).metaText;
 }
 
 /**
@@ -306,11 +251,10 @@ export function buildRecommendationSupport(suggestion) {
   if (!suggestion) {
     return '';
   }
-  if (suggestion.score >= 1.5) {
-    return 'Strong overlap with the artists you already monitor.';
-  }
-  return 'Add to bring similar release activity into your library.';
+  return buildRecommendationExplanation(suggestion).supportingText;
 }
+
+export { buildRecommendationExplanation };
 
 // ── Search result cards ──────────────────────────────────────────────────────
 

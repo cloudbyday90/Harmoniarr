@@ -22,12 +22,13 @@ import { fetchSimilarArtists } from '../lib/metadata-api.js';
 import { computeSuggestions } from '../lib/discover-graph.js';
 
 /**
- * Composable for the Discover taste-graph traversal.
+ * Composable for Discover recommendation traversal.
  *
- * Maintains a list of "seeds" — artists the user has picked — and
- * automatically fetches similar artists for each seed. Suggestions are derived
- * by merging all per-seed results: artists recommended by multiple seeds score
- * higher, and seed artists themselves are excluded from the output.
+ * Maintains the monitored artists currently contributing to recommendations
+ * and automatically fetches similar artists for each recommendation input.
+ * Suggestions are derived by merging all per-input results: artists
+ * recommended by multiple monitored artists score higher, and recommendation
+ * inputs themselves are excluded from the output.
  *
  * The core scoring/merging logic lives in `src/client/lib/discover-graph.js`
  * as a pure function so it can be unit-tested without a Vue runtime.
@@ -43,132 +44,133 @@ export function useDiscoverGraph({
   fetchSimilar = fetchSimilarArtists,
   suggestionLimit = 20,
 } = {}) {
-  let nextSeedRequestVersion = 0;
-  const seedRequestVersions = new Map();
+  let nextInputRequestVersion = 0;
+  const inputRequestVersions = new Map();
 
   /**
-   * Ordered list of seed artists the user has picked.
+   * Ordered list of monitored artists contributing to recommendations.
    * Each entry: { id: string (MBID), name: string }.
    */
-  const seeds = ref([]);
+  const recommendationInputs = ref([]);
 
   /**
    * Map<mbid, Array<{id, name, score, source}>> holding the fetched similar-
-   * artist list for each seed MBID. Reassigned on each update for reactivity.
+   * artist list for each recommendation input MBID. Reassigned on each update
+   * for reactivity.
    */
-  const seedResults = ref(new Map());
+  const inputResults = ref(new Map());
 
   /**
-   * Set<string> of seed MBIDs for which a fetch is currently in flight.
-   * Reassigned on each update for reactivity.
+   * Set<string> of recommendation input MBIDs for which a fetch is currently
+   * in flight. Reassigned on each update for reactivity.
    */
-  const loadingSeeds = ref(new Set());
+  const loadingRecommendationInputs = ref(new Set());
 
   /** Most recent error message from a failed similar-artist fetch, or null. */
   const lastError = ref(null);
 
-  /** Derived Set of seed MBIDs — used to exclude seeds from suggestions. */
-  const seedIds = computed(() => new Set(seeds.value.map(a => a.id)));
+  /** Derived Set of input MBIDs, used to exclude inputs from suggestions. */
+  const recommendationInputIds = computed(() => new Set(recommendationInputs.value.map(a => a.id)));
 
   /**
-   * Ranked list of suggested artists derived from all seed results.
-   * Seeds themselves are excluded. Artists that appear across multiple seeds
-   * receive a summed score so they rank higher.
+   * Ranked list of suggested artists derived from all input results. Inputs
+   * themselves are excluded. Artists that appear across multiple inputs receive
+   * a summed score so they rank higher.
    */
   const suggestions = computed(() =>
-    computeSuggestions(seedResults.value, seedIds.value, suggestionLimit),
+    computeSuggestions(inputResults.value, recommendationInputIds.value, suggestionLimit),
   );
 
-  const isAnySeedLoading = computed(() => loadingSeeds.value.size > 0);
+  const isAnyRecommendationInputLoading = computed(() => loadingRecommendationInputs.value.size > 0);
   const hasSuggestions = computed(() => suggestions.value.length > 0);
-  const hasSeeds = computed(() => seeds.value.length > 0);
+  const hasRecommendationInputs = computed(() => recommendationInputs.value.length > 0);
 
   /**
-   * Returns true if the given MBID is already a seed.
+   * Returns true if the given MBID is already a recommendation input.
    * @param {string} artistId
    */
-  function isSeed(artistId) {
-    return seedIds.value.has(artistId);
+  function isRecommendationInput(artistId) {
+    return recommendationInputIds.value.has(artistId);
   }
 
   /**
    * Returns true if similar artists are currently being fetched for the given
-   * seed MBID.
+   * recommendation input MBID.
    * @param {string} artistId
    */
-  function isSeedLoading(artistId) {
-    return loadingSeeds.value.has(artistId);
+  function isRecommendationInputLoading(artistId) {
+    return loadingRecommendationInputs.value.has(artistId);
   }
 
-  function hasSeed(artistId) {
-    return seeds.value.some((artist) => artist.id === artistId);
+  function hasRecommendationInput(artistId) {
+    return recommendationInputs.value.some((artist) => artist.id === artistId);
   }
 
-  function ensureSeedPresent({ id, name }) {
-    if (seedIds.value.has(id)) {
+  function ensureRecommendationInputPresent({ id, name }) {
+    if (recommendationInputIds.value.has(id)) {
       return false;
     }
 
-    seeds.value = [...seeds.value, { id, name }];
+    recommendationInputs.value = [...recommendationInputs.value, { id, name }];
     return true;
   }
 
-  async function loadSeedSimilarArtists(artistId) {
-    const requestVersion = ++nextSeedRequestVersion;
-    seedRequestVersions.set(artistId, requestVersion);
+  async function loadInputSimilarArtists(artistId) {
+    const requestVersion = ++nextInputRequestVersion;
+    inputRequestVersions.set(artistId, requestVersion);
 
-    loadingSeeds.value = new Set([...loadingSeeds.value, artistId]);
+    loadingRecommendationInputs.value = new Set([...loadingRecommendationInputs.value, artistId]);
 
     try {
       const result = await fetchSimilar(artistId, { limit: 50 });
       const similar = result?.similar ?? [];
 
-      if (!hasSeed(artistId) || seedRequestVersions.get(artistId) !== requestVersion) {
+      if (!hasRecommendationInput(artistId) || inputRequestVersions.get(artistId) !== requestVersion) {
         return;
       }
 
-      const next = new Map(seedResults.value);
+      const next = new Map(inputResults.value);
       next.set(artistId, similar);
-      seedResults.value = next;
+      inputResults.value = next;
       lastError.value = null;
     } catch (error) {
-      if (!hasSeed(artistId) || seedRequestVersions.get(artistId) !== requestVersion) {
+      if (!hasRecommendationInput(artistId) || inputRequestVersions.get(artistId) !== requestVersion) {
         return;
       }
 
       lastError.value = getErrorMessage(error, 'Failed to fetch similar artists.');
 
-      // Store an empty result so the seed is still tracked.
-      const next = new Map(seedResults.value);
+      // Store an empty result so the input is still tracked.
+      const next = new Map(inputResults.value);
       next.set(artistId, []);
-      seedResults.value = next;
+      inputResults.value = next;
     } finally {
-      if (seedRequestVersions.get(artistId) === requestVersion) {
-        const next = new Set(loadingSeeds.value);
+      if (inputRequestVersions.get(artistId) === requestVersion) {
+        const next = new Set(loadingRecommendationInputs.value);
         next.delete(artistId);
-        loadingSeeds.value = next;
+        loadingRecommendationInputs.value = next;
       }
     }
   }
 
   /**
-   * Add an artist as a seed and fetch similar artists for them.
-   * Idempotent: calling with an already-seeded artist is a no-op.
+   * Add an artist as a recommendation input and fetch similar artists for them.
+   * Idempotent: calling with an already-added input is a no-op.
    *
    * @param {{ id: string, name: string }} artist
    */
-  async function addSeed(artist) {
+  async function addRecommendationInput(artist) {
     const { id, name } = artist;
 
-    const wasAdded = ensureSeedPresent({ id, name });
-    if (!wasAdded && (seedResults.value.has(id) || loadingSeeds.value.has(id))) {
+    const wasAdded = ensureRecommendationInputPresent({ id, name });
+    if (!wasAdded && (inputResults.value.has(id) || loadingRecommendationInputs.value.has(id))) {
       return;
     }
 
-    await loadSeedSimilarArtists(id);
+    await loadInputSimilarArtists(id);
   }
 
-  async function hydrateSeeds(artists) {
+  async function hydrateRecommendationInputs(artists) {
     const artistsToLoad = [];
 
     for (const artist of artists) {
@@ -178,55 +180,55 @@ export function useDiscoverGraph({
         continue;
       }
 
-      ensureSeedPresent({ id, name });
+      ensureRecommendationInputPresent({ id, name });
 
-      if (!seedResults.value.has(id) && !loadingSeeds.value.has(id)) {
+      if (!inputResults.value.has(id) && !loadingRecommendationInputs.value.has(id)) {
         artistsToLoad.push(id);
       }
     }
 
-    await Promise.all(artistsToLoad.map((artistId) => loadSeedSimilarArtists(artistId)));
+    await Promise.all(artistsToLoad.map((artistId) => loadInputSimilarArtists(artistId)));
   }
 
   /**
-   * Remove a seed and its associated results.
-   * @param {string} artistId - MBID of the seed to remove.
+   * Remove a recommendation input and its associated results.
+   * @param {string} artistId - MBID of the recommendation input to remove.
    */
-  function removeSeed(artistId) {
-    seeds.value = seeds.value.filter(a => a.id !== artistId);
+  function removeRecommendationInput(artistId) {
+    recommendationInputs.value = recommendationInputs.value.filter(a => a.id !== artistId);
 
-    const next = new Map(seedResults.value);
+    const next = new Map(inputResults.value);
     next.delete(artistId);
-    seedResults.value = next;
+    inputResults.value = next;
 
-    const nextLoading = new Set(loadingSeeds.value);
+    const nextLoading = new Set(loadingRecommendationInputs.value);
     nextLoading.delete(artistId);
-    loadingSeeds.value = nextLoading;
+    loadingRecommendationInputs.value = nextLoading;
 
-    seedRequestVersions.delete(artistId);
+    inputRequestVersions.delete(artistId);
   }
 
   /** Reset all graph state. */
-  function clearSeeds() {
-    seeds.value = [];
-    seedResults.value = new Map();
-    loadingSeeds.value = new Set();
+  function clearRecommendationInputs() {
+    recommendationInputs.value = [];
+    inputResults.value = new Map();
+    loadingRecommendationInputs.value = new Set();
     lastError.value = null;
-    seedRequestVersions.clear();
+    inputRequestVersions.clear();
   }
 
   return {
-    seeds: readonly(seeds),
+    recommendationInputs: readonly(recommendationInputs),
     suggestions,
-    isAnySeedLoading,
+    isAnyRecommendationInputLoading,
     hasSuggestions,
-    hasSeeds,
+    hasRecommendationInputs,
     lastError: readonly(lastError),
-    isSeed,
-    isSeedLoading,
-    addSeed,
-    hydrateSeeds,
-    removeSeed,
-    clearSeeds,
+    isRecommendationInput,
+    isRecommendationInputLoading,
+    addRecommendationInput,
+    hydrateRecommendationInputs,
+    removeRecommendationInput,
+    clearRecommendationInputs,
   };
 }

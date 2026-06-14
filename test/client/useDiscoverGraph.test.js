@@ -30,7 +30,7 @@ function createDeferred() {
   return { promise, resolve, reject };
 }
 
-test('hydrateSeeds adds all monitored artists immediately before similarity fetches resolve', async () => {
+test('hydrateRecommendationInputs adds all monitored artists immediately before similarity fetches resolve', async () => {
   const laurenDeferred = createDeferred();
   const beboDeferred = createDeferred();
   const fetchSimilar = async (artistId) => {
@@ -46,21 +46,21 @@ test('hydrateSeeds adds all monitored artists immediately before similarity fetc
   };
 
   const {
-    hasSeeds,
-    hydrateSeeds,
-    isAnySeedLoading,
-    seeds,
+    hasRecommendationInputs,
+    hydrateRecommendationInputs,
+    isAnyRecommendationInputLoading,
+    recommendationInputs,
   } = useDiscoverGraph({ fetchSimilar });
 
-  const hydration = hydrateSeeds([
+  const hydration = hydrateRecommendationInputs([
     { id: 'lauren', name: 'Lauren Daigle' },
     { id: 'bebo', name: 'Bebo Norman' },
   ]);
 
-  assert.equal(hasSeeds.value, true);
-  assert.equal(isAnySeedLoading.value, true);
+  assert.equal(hasRecommendationInputs.value, true);
+  assert.equal(isAnyRecommendationInputLoading.value, true);
   assert.deepEqual(
-    seeds.value.map((artist) => artist.name),
+    recommendationInputs.value.map((artist) => artist.name),
     ['Lauren Daigle', 'Bebo Norman'],
   );
 
@@ -68,26 +68,26 @@ test('hydrateSeeds adds all monitored artists immediately before similarity fetc
   beboDeferred.resolve({ similar: [] });
   await hydration;
 
-  assert.equal(isAnySeedLoading.value, false);
+  assert.equal(isAnyRecommendationInputLoading.value, false);
 });
 
-test('removeSeed ignores stale in-flight similarity results', async () => {
+test('removeRecommendationInput ignores stale in-flight similarity results', async () => {
   const deferred = createDeferred();
   const {
-    addSeed,
+    addRecommendationInput,
     hasSuggestions,
-    removeSeed,
-    seeds,
+    removeRecommendationInput,
+    recommendationInputs,
     suggestions,
   } = useDiscoverGraph({
     fetchSimilar: async () => deferred.promise,
   });
 
-  const load = addSeed({ id: 'seed-artist', name: 'Seed Artist' });
-  assert.deepEqual(seeds.value.map((artist) => artist.id), ['seed-artist']);
+  const load = addRecommendationInput({ id: 'input-artist', name: 'Input Artist' });
+  assert.deepEqual(recommendationInputs.value.map((artist) => artist.id), ['input-artist']);
 
-  removeSeed('seed-artist');
-  assert.deepEqual(seeds.value, []);
+  removeRecommendationInput('input-artist');
+  assert.deepEqual(recommendationInputs.value, []);
 
   deferred.resolve({
     similar: [{ id: 'similar-artist', name: 'Similar Artist', score: 0.91 }],
@@ -97,4 +97,3 @@ test('removeSeed ignores stale in-flight similarity results', async () => {
   assert.equal(hasSuggestions.value, false);
   assert.deepEqual(suggestions.value, []);
 });
-

@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
+import { OPERATOR_MONITORED_ARTIST_SCOPE_CTE } from './operator-monitored-artist-scope-sql.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -54,19 +55,20 @@ export function createLibraryWantedReleaseService({
     const pool = getPoolFn();
     const result = await pool.query(
       `
+        WITH ${OPERATOR_MONITORED_ARTIST_SCOPE_CTE}
         SELECT
           metadata_release_groups.metadata_artist_id,
           metadata_release_groups.id AS metadata_release_group_id,
           metadata_releases.id AS metadata_release_id,
           metadata_releases.release_date,
           metadata_releases.status AS release_status,
-          metadata_artist_monitoring.monitored_release_group_types,
+          operator_monitored_artist_scope.monitored_release_group_types,
           COUNT(metadata_tracks.id)::integer AS expected_track_count,
           COALESCE(library_release_reconciliations.matched_track_count, 0)::integer AS matched_track_count,
           library_release_reconciliations.reconciliation_status
-        FROM metadata_artist_monitoring
+        FROM operator_monitored_artist_scope
         JOIN metadata_release_groups
-          ON metadata_release_groups.metadata_artist_id = metadata_artist_monitoring.metadata_artist_id
+          ON metadata_release_groups.metadata_artist_id = operator_monitored_artist_scope.metadata_artist_id
         JOIN metadata_releases
           ON metadata_releases.metadata_release_group_id = metadata_release_groups.id
         JOIN metadata_media
@@ -75,11 +77,10 @@ export function createLibraryWantedReleaseService({
           ON metadata_tracks.metadata_medium_id = metadata_media.id
         LEFT JOIN library_release_reconciliations
           ON library_release_reconciliations.metadata_release_id = metadata_releases.id
-        WHERE metadata_artist_monitoring.is_monitored = TRUE
-          AND LOWER(TRIM(COALESCE(metadata_release_groups.primary_type, ''))) = ANY (
+        WHERE LOWER(TRIM(COALESCE(metadata_release_groups.primary_type, ''))) = ANY (
             ARRAY(
               SELECT LOWER(type_entry)
-              FROM unnest(metadata_artist_monitoring.monitored_release_group_types) AS type_entry
+              FROM unnest(operator_monitored_artist_scope.monitored_release_group_types) AS type_entry
             )
           )
           AND COALESCE(metadata_releases.status, 'Official') = 'Official'
@@ -91,7 +92,7 @@ export function createLibraryWantedReleaseService({
           metadata_releases.id,
           metadata_releases.release_date,
           metadata_releases.status,
-          metadata_artist_monitoring.monitored_release_group_types,
+          operator_monitored_artist_scope.monitored_release_group_types,
           library_release_reconciliations.matched_track_count,
           library_release_reconciliations.reconciliation_status
         ORDER BY metadata_releases.release_date NULLS LAST, metadata_releases.id ASC

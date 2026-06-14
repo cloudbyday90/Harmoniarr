@@ -130,20 +130,20 @@ export function createImportCandidateCanonicalNamingService({
       };
     }
 
-    const folderSegments = [
+    const folderSegments = await Promise.all([
       libraryNamingService.buildArtistFolderName({ artistName: artist.name }),
       libraryNamingService.buildAlbumFolderName({
         albumTitle: releaseGroup.title ?? release.title,
         releaseDate: release.release_date ?? releaseGroup.first_release_date ?? null,
       }),
-    ];
+    ]);
     const fileNamesById = new Map();
     const plannedFileNames = new Set();
     const isMultiDisc = mediaRows.length > 1;
 
     for (const [index, audioFile] of audioFiles.entries()) {
       const track = orderedTracks[index];
-      const filename = libraryNamingService.buildTrackFilename({
+      const filename = await libraryNamingService.buildTrackFilename({
         discNumber: track.discNumber,
         extension: normalizeFileExtension(audioFile.extension),
         isMultiDisc,

@@ -18,7 +18,7 @@
 
 import webPush from 'web-push';
 import { createPushSubscriptionStore } from './push-subscription-store.js';
-import { resolveOrGenerateVapidKeys } from './vapid-keys.js';
+import { resolveOrGenerateVapidKeys, resolveVapidContactFromEnv } from './vapid-keys.js';
 
 /**
  * Default TTL for push messages in seconds (24 hours).
@@ -104,7 +104,7 @@ function serialisePayload(payload) {
 export function createPushNotificationService({
   pushSubscriptionStore = createPushSubscriptionStore(),
   vapidKeys = resolveOrGenerateVapidKeys(),
-  vapidContact = process.env.VAPID_CONTACT ?? 'mailto:admin@harmoniarr.local',
+  vapidContact = resolveVapidContactFromEnv(),
   webPushLib = webPush,
   stderr = process.stderr,
 } = {}) {

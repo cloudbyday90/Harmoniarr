@@ -38,6 +38,7 @@
     "db:check-schema": "node scripts/check-database-schema.js",
     "db:dump-schema": "node scripts/update-schema-snapshot.js",
     "diagnose:migrations": "node scripts/diagnose-migrations.js",
+    "generate:vapid-keys": "node scripts/generate-vapid-keys.js",
     "lint": "npm run lint:server && npm run lint:shared && npm run lint:client && npm run lint:test && npm run lint:scripts",
     "lint:client": "eslint --cache --max-warnings 0 --report-unused-disable-directives \"src/client/**/*.js\" \"src/client/**/*.vue\"",
     "lint:scripts": "eslint --cache --max-warnings 0 --report-unused-disable-directives \"scripts/**/*.js\" \"eslint.config.js\" \"vite.config.js\"",

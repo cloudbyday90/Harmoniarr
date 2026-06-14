@@ -42,6 +42,23 @@ import {
   resolveDiscoverSearchPanelMode,
 } from '../../src/client/lib/discover-presentation.js';
 
+const legacyDiscoverProductTerms = [
+  /\bseed\b/i,
+  /\bseeds\b/i,
+  /\bseed artist\b/i,
+  /\badd as seed\b/i,
+  /\bseed match\b/i,
+  /\bfollowed artist\b/i,
+  /\bfollowing\b/i,
+];
+
+function assertNoLegacyDiscoverProductTerms(label, value) {
+  assert.equal(typeof value, 'string', `${label} should be a string`);
+  for (const term of legacyDiscoverProductTerms) {
+    assert.doesNotMatch(value, term, `${label} must not expose legacy Discover terminology`);
+  }
+}
+
 // ── buildDiscoverPageSubtitle ─────────────────────────────────────────────────
 
 test('buildDiscoverPageSubtitle returns a non-empty string', () => {
@@ -322,13 +339,13 @@ test('buildRecommendationProvenance label is always from the fixed enumeration (
 // ── buildRecommendationMeta ───────────────────────────────────────────────────
 
 test('buildRecommendationMeta references monitored artists for multiple matches', () => {
-  const meta = buildRecommendationMeta({ seedCount: 4 });
+  const meta = buildRecommendationMeta({ inputCount: 4 });
   assert.ok(meta.includes('4'));
   assert.ok(meta.toLowerCase().includes('monitored artists'));
 });
 
 test('buildRecommendationMeta returns single-source copy for one match', () => {
-  assert.equal(buildRecommendationMeta({ seedCount: 1 }), 'From your monitored artists');
+  assert.equal(buildRecommendationMeta({ inputCount: 1 }), 'From your monitored artists');
 });
 
 test('buildRecommendationMeta returns empty string for null', () => {
@@ -342,7 +359,7 @@ test('buildRecommendationSupport returns strong-overlap copy for high score', ()
 });
 
 test('buildRecommendationSupport returns add-prompt copy for low score', () => {
-  assert.ok(buildRecommendationSupport({ score: 0.5 }).toLowerCase().includes('add'));
+  assert.ok(buildRecommendationSupport({ score: 0.5 }).toLowerCase().includes('recommended'));
 });
 
 test('buildRecommendationSupport does not use graph or taste-profile jargon', () => {
@@ -412,11 +429,15 @@ const baseModeFlags = {
   hasSearched: false,
   isSearching: false,
   resultCount: 0,
-  hasSeeds: false,
+  hasRecommendationInputs: false,
 };
 
 test('resolveDiscoverSearchPanelMode returns "error" when a search error is present', () => {
-  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, searchError: 'boom', hasSeeds: true });
+  const mode = resolveDiscoverSearchPanelMode({
+    ...baseModeFlags,
+    searchError: 'boom',
+    hasRecommendationInputs: true,
+  });
   assert.equal(mode, 'error');
 });
 
@@ -426,12 +447,12 @@ test('resolveDiscoverSearchPanelMode error takes precedence over every other fla
     hasSearched: true,
     isSearching: true,
     resultCount: 5,
-    hasSeeds: true,
+    hasRecommendationInputs: true,
   });
   assert.equal(mode, 'error');
 });
 
-test('resolveDiscoverSearchPanelMode returns "pre-search" before any search with no seeds', () => {
+test('resolveDiscoverSearchPanelMode returns "pre-search" with no recommendation inputs', () => {
   assert.equal(resolveDiscoverSearchPanelMode(baseModeFlags), 'pre-search');
 });
 
@@ -450,13 +471,19 @@ test('resolveDiscoverSearchPanelMode returns "results" when a completed search h
   assert.equal(mode, 'results');
 });
 
-test('resolveDiscoverSearchPanelMode returns "idle" with seeds present but no search run', () => {
-  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, hasSeeds: true });
+test('resolveDiscoverSearchPanelMode returns "idle" with recommendation inputs present', () => {
+  const mode = resolveDiscoverSearchPanelMode({
+    ...baseModeFlags,
+    hasRecommendationInputs: true,
+  });
   assert.equal(mode, 'idle');
 });
 
-test('resolveDiscoverSearchPanelMode does not show pre-search once seeds exist', () => {
-  const mode = resolveDiscoverSearchPanelMode({ ...baseModeFlags, hasSeeds: true });
+test('resolveDiscoverSearchPanelMode does not show pre-search once recommendation inputs exist', () => {
+  const mode = resolveDiscoverSearchPanelMode({
+    ...baseModeFlags,
+    hasRecommendationInputs: true,
+  });
   assert.notEqual(mode, 'pre-search');
 });
 
@@ -564,5 +591,43 @@ test('buildRecommendationStrength labels are a fixed, markup-free enumeration', 
   ];
   for (const label of labels) {
     assert.ok(!/[<>]/.test(label), `label must not contain markup: ${label}`);
+  }
+});
+
+test('Discover presentation copy does not expose legacy seed terminology', () => {
+  const samples = [
+    ['page subtitle', buildDiscoverPageSubtitle()],
+    ['pre-search body', buildDiscoverPreSearchBody()],
+    ['search error title', formatDiscoverSearchError('MusicBrainz is temporarily unavailable')],
+    ['search error body', buildDiscoverSearchErrorBody()],
+    ['recommendations subtitle', buildDiscoverRecommendationsSubtitle()],
+    ['monitored artists aria label', buildDiscoverMonitoredArtistsAriaLabel()],
+    ['monitored artist nav aria label', buildDiscoverMonitoredArtistNavAriaLabel('Radiohead')],
+    ['monitored artist fallback aria label', buildDiscoverMonitoredArtistNavAriaLabel(null)],
+    ['monitored band copy', buildDiscoverMonitoredBandCopy()],
+    ['suggestions copy', buildDiscoverSuggestionsCopy()],
+    ['no similar artists message', buildDiscoverNoSimilarArtistsMessage()],
+    ['recommendation provenance related', buildRecommendationProvenance({ sources: ['musicbrainz'] }).label],
+    ['recommendation provenance listeners', buildRecommendationProvenance({ sources: ['listenbrainz'] }).label],
+    ['recommendation provenance combined', buildRecommendationProvenance({ sources: ['both'] }).label],
+    ['recommendation provenance fallback', buildRecommendationProvenance({ sources: [] }).label],
+    ['recommendation strength strong', buildRecommendationStrength({ rankScore: 2 }).label],
+    ['recommendation strength moderate', buildRecommendationStrength({ rankScore: 1 }).label],
+    ['recommendation strength emerging', buildRecommendationStrength({ rankScore: 0 }).label],
+    ['recommendation meta multiple', buildRecommendationMeta({ inputCount: 3 })],
+    ['recommendation meta single', buildRecommendationMeta({ inputCount: 1 })],
+    ['recommendation support strong', buildRecommendationSupport({ score: 2 })],
+    ['recommendation support default', buildRecommendationSupport({ score: 0.5 })],
+    ['search result badge monitored', buildSearchResultBadgeLabel(true)],
+    ['search result badge unmonitored', buildSearchResultBadgeLabel(false)],
+    ['search result meta', buildSearchResultMeta({ type: 'Group', country: 'GB' })],
+    ['search result support monitored', buildSearchResultSupport({}, true)],
+    ['search result support disambiguation', buildSearchResultSupport({ disambiguation: 'British band' }, false)],
+    ['search result support detailed fallback', buildSearchResultSupport({ country: 'GB', type: 'Group' }, false)],
+    ['search result support default fallback', buildSearchResultSupport({}, false)],
+  ];
+
+  for (const [label, value] of samples) {
+    assertNoLegacyDiscoverProductTerms(label, value);
   }
 });

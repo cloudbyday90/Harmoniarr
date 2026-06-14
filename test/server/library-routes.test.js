@@ -1366,6 +1366,7 @@ test('release radar route requires a session and returns the radar payload', asy
     assert.deepEqual(payload.windows, { recentDays: 30, upcomingDays: 90 });
     assert.equal(requireSession.mock.callCount(), 1);
     assert.equal(buildReleaseRadar.mock.callCount(), 1);
+    assert.equal(buildReleaseRadar.mock.calls[0].arguments[0].appUserId, 'user-1');
   });
 });
 
@@ -1399,6 +1400,7 @@ test('release radar route forwards recentDays, upcomingDays, and limit query par
     assert.equal(response.status, 200);
     assert.equal(buildReleaseRadar.mock.callCount(), 1);
     const [callArgs] = buildReleaseRadar.mock.calls;
+    assert.equal(callArgs.arguments[0].appUserId, 'user-1');
     assert.equal(callArgs.arguments[0].recentDays, 7);
     assert.equal(callArgs.arguments[0].upcomingDays, 14);
     assert.equal(callArgs.arguments[0].limit, 20);

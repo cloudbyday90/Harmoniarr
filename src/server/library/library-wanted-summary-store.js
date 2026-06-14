@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { OPERATOR_MONITORED_ARTIST_SCOPE_CTE } from './operator-monitored-artist-scope-sql.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -38,9 +39,9 @@ export function createLibraryWantedSummaryStore({
     const [monitoredArtistResult, releaseCountsResult] = await Promise.all([
       pool.query(
         `
+          WITH ${OPERATOR_MONITORED_ARTIST_SCOPE_CTE}
           SELECT COUNT(*)::integer AS monitored_artist_count
-          FROM metadata_artist_monitoring
-          WHERE is_monitored = TRUE
+          FROM operator_monitored_artist_scope
         `,
       ),
       pool.query(

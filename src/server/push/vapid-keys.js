@@ -25,6 +25,54 @@ import webPush from 'web-push';
  */
 export const VAPID_PUBLIC_KEY_ENV = 'VAPID_PUBLIC_KEY';
 export const VAPID_PRIVATE_KEY_ENV = 'VAPID_PRIVATE_KEY';
+export const VAPID_CONTACT_ENV = 'VAPID_CONTACT';
+export const ALLOW_EPHEMERAL_VAPID_KEYS_ENV = 'HARMONIARR_ALLOW_EPHEMERAL_VAPID_KEYS';
+export const DEFAULT_VAPID_CONTACT = 'mailto:admin@harmoniarr.local';
+
+function normalizeRuntimeMode(env) {
+  return typeof env.NODE_ENV === 'string' ? env.NODE_ENV.trim().toLowerCase() : '';
+}
+
+function isProductionRuntime(env) {
+  return normalizeRuntimeMode(env) === 'production';
+}
+
+function parseBooleanEnv(value, name) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'false') {
+    return false;
+  }
+
+  throw new Error(`${name} must be "true" or "false" when configured`);
+}
+
+function shouldAllowEphemeralVapidKeys(env) {
+  if (isProductionRuntime(env)) {
+    return false;
+  }
+
+  const configured = parseBooleanEnv(
+    env[ALLOW_EPHEMERAL_VAPID_KEYS_ENV],
+    ALLOW_EPHEMERAL_VAPID_KEYS_ENV,
+  );
+
+  return configured ?? true;
+}
+
+function parseContactUri(value) {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Generates a new VAPID key pair and returns it as
@@ -68,6 +116,35 @@ export function resolveVapidKeysFromEnv({ env = process.env } = {}) {
 }
 
 /**
+ * Resolves the VAPID contact URI used as the VAPID JWT subject.
+ *
+ * The subject identifies the application-server operator to push services.
+ * It is not secret, but it should be a real operational `mailto:` or `https:`
+ * URI in production so push providers can contact the deployment owner.
+ *
+ * @param {object} [options]
+ * @param {object} [options.env]
+ * @returns {string}
+ */
+export function resolveVapidContactFromEnv({ env = process.env } = {}) {
+  const rawContact = typeof env[VAPID_CONTACT_ENV] === 'string'
+    ? env[VAPID_CONTACT_ENV].trim()
+    : '';
+  const contact = rawContact || DEFAULT_VAPID_CONTACT;
+  const uri = parseContactUri(contact);
+
+  if (!uri || !['mailto:', 'https:'].includes(uri.protocol)) {
+    throw new Error(`${VAPID_CONTACT_ENV} must be a valid mailto: or https: URI`);
+  }
+
+  if (isProductionRuntime(env) && contact === DEFAULT_VAPID_CONTACT) {
+    throw new Error(`${VAPID_CONTACT_ENV} must be configured to a real operator contact in production`);
+  }
+
+  return contact;
+}
+
+/**
  * Resolves VAPID keys for use at runtime.
  *
  * - If both env vars are set, uses them directly.
@@ -94,13 +171,17 @@ export function resolveOrGenerateVapidKeys({
     return resolved;
   }
 
+  if (!shouldAllowEphemeralVapidKeys(env)) {
+    throw new Error(
+      `VAPID keys are required for this runtime. Set ${VAPID_PUBLIC_KEY_ENV} and ${VAPID_PRIVATE_KEY_ENV} before startup.`,
+    );
+  }
+
   const generated = generateVapidKeyPair({ generateFn });
 
   stderr.write(
-    `[harmoniarr-push] VAPID keys not set in environment. Generated an ephemeral pair for this run.\n` +
-    `[harmoniarr-push] Push subscriptions will break on restart. Set these in your environment:\n` +
-    `[harmoniarr-push]   ${VAPID_PUBLIC_KEY_ENV}=${generated.publicKey}\n` +
-    `[harmoniarr-push]   ${VAPID_PRIVATE_KEY_ENV}=${generated.privateKey}\n`,
+    `[harmoniarr-push] VAPID keys not set in environment. Generated ephemeral keys for this non-production run.\n` +
+    `[harmoniarr-push] Push subscriptions will break on restart. Generate and persist stable keys with: npm run generate:vapid-keys\n`,
   );
 
   return generated;

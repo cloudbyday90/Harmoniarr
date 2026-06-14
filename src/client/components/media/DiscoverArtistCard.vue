@@ -17,11 +17,13 @@
 -->
 
 <script setup>
+import { computed } from 'vue';
 import ArtistCard from './ArtistCard.vue';
 import {
   buildDiscoverArtistInitial,
   buildDiscoverAvatarStyle,
 } from '../../lib/discover-presentation.js';
+import { resolveDiscoverArtistCardActionState } from '../../lib/discover-artist-card-presentation.js';
 
 const props = defineProps({
   artist: {
@@ -75,6 +77,15 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['add']);
+
+const actionState = computed(() =>
+  resolveDiscoverArtistCardActionState({
+    artistName: props.artist?.name,
+    monitored: props.monitored,
+    monitoring: props.monitoring,
+    disabled: props.disabled,
+  }),
+);
 
 function handleAdd() {
   emit('add', props.artist);
@@ -133,18 +144,18 @@ function handleAdd() {
       <button
         type="button"
         class="hx-btn discover-artist-card__add-button"
-        :class="{ 'discover-artist-card__add-button--icon': !monitored }"
-        :data-variant="monitored ? 'ghost' : 'primary'"
-        :disabled="disabled || monitoring || monitored"
-        :aria-busy="monitoring || undefined"
-        :aria-label="monitored ? `${artist.name} is already monitored` : `Add ${artist.name}`"
+        :class="{ 'discover-artist-card__add-button--icon': actionState.iconOnly }"
+        :data-state="actionState.state"
+        :data-variant="actionState.buttonVariant"
+        :disabled="actionState.buttonDisabled"
+        :aria-busy="actionState.ariaBusy"
+        :aria-label="actionState.ariaLabel"
         @click="handleAdd"
       >
-        <template v-if="monitoring">Adding...</template>
-        <template v-else-if="monitored">Already monitored</template>
-        <template v-else>
+        <template v-if="actionState.iconOnly">
           <span aria-hidden="true">+</span>
         </template>
+        <template v-else>{{ actionState.visibleLabel }}</template>
       </button>
     </template>
   </ArtistCard>

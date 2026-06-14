@@ -52,14 +52,14 @@ export function createLibraryReleaseRadarStore({
   getPoolFn = getPool,
 } = {}) {
   /**
-   * Returns all monitored-artist release groups whose `first_release_date` falls
-   * within [since, until] (inclusive). Ordered by date ascending so the caller
-   * can split at `now` to obtain recent vs. upcoming arrays.
+   * Returns all operator-monitored release groups whose `first_release_date`
+   * falls within [since, until] (inclusive). Ordered by date ascending so the
+   * caller can split at `now` to obtain recent vs. upcoming arrays.
    *
-   * @param {{ since: Date, until: Date, limit: number }} options
+   * @param {{ appUserId: string, since: Date, until: Date, limit: number }} options
    * @returns {Promise<object[]>}
    */
-  async function listRadarReleaseGroups({ since, until, limit }) {
+  async function listRadarReleaseGroups({ appUserId, since, until, limit }) {
     const result = await getPoolFn().query(
       `
         SELECT
@@ -72,18 +72,19 @@ export function createLibraryReleaseRadarStore({
           ma.name AS artist_name,
           ma.musicbrainz_artist_id
         FROM metadata_release_groups mrg
-        JOIN metadata_artist_monitoring mam
-          ON mam.metadata_artist_id = mrg.metadata_artist_id
+        JOIN operator_artist_monitoring oam
+          ON oam.metadata_artist_id = mrg.metadata_artist_id
         JOIN metadata_artists ma
           ON ma.id = mrg.metadata_artist_id
-        WHERE mam.is_monitored = TRUE
+        WHERE oam.app_user_id = $1
+          AND oam.is_monitored = TRUE
           AND mrg.first_release_date IS NOT NULL
-          AND mrg.first_release_date >= $1
-          AND mrg.first_release_date <= $2
+          AND mrg.first_release_date >= $2
+          AND mrg.first_release_date <= $3
         ORDER BY mrg.first_release_date ASC
-        LIMIT $3
+        LIMIT $4
       `,
-      [since, until, limit],
+      [appUserId, since, until, limit],
     );
 
     return result.rows.map(mapRadarRow);

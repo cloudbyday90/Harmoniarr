@@ -93,6 +93,9 @@ Supported deployment variables:
 - `HARMONIARR_CONTACT_URL`
 - `HARMONIARR_CONTACT_EMAIL`
 - `HARMONIARR_LOG_LEVEL`
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_CONTACT`
 - `HARMONIARR_CSRF_PROTECTION`
 - `HARMONIARR_ENFORCE_HTTPS`
 - `HARMONIARR_ENABLE_STRICT_TRANSPORT_SECURITY`
@@ -121,6 +124,9 @@ HARMONIARR_BASE_URL=
 HARMONIARR_CONTACT_URL=https://github.com/cloudbyday90/harmoniarr
 HARMONIARR_CONTACT_EMAIL=
 HARMONIARR_LOG_LEVEL=info
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_CONTACT=mailto:admin@example.com
 HARMONIARR_CSRF_PROTECTION=disabled
 HARMONIARR_ENFORCE_HTTPS=false
 HARMONIARR_ENABLE_STRICT_TRANSPORT_SECURITY=false
@@ -142,6 +148,7 @@ Rationale:
 - `APP_PORT=3000` is the fixed internal HTTP port.
 - `HARMONIARR_PORT=47956` is the chosen high, uncommon host port to avoid the common media-app defaults.
 - `HARMONIARR_CONTACT_URL` defaults to the project URL so MusicBrainz-backed startup does not fail before operators customize their deployment metadata.
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_CONTACT` are required for production Web Push startup. Generate the key pair once with `npm run generate:vapid-keys`, keep the private key in the host `.env` or secret store, and do not rotate it casually because existing browser push subscriptions are tied to the public key.
 - Deployment security is now settings-driven and opt-in by default for local HTTP installs. These environment variables remain available as bootstrap fallbacks before an operator saves settings in the UI.
 - `HARMONIARR_CSRF_PROTECTION=disabled` keeps local-only installs friction-free by default; set it to `required` when browser writes should carry CSRF tokens.
 - `HARMONIARR_SECURE_COOKIES=true`, `HARMONIARR_ENFORCE_HTTPS=true`, and `HARMONIARR_ENABLE_STRICT_TRANSPORT_SECURITY=true` should only be enabled when Harmoniarr is actually served behind HTTPS, typically through a reverse proxy or TLS terminator.
