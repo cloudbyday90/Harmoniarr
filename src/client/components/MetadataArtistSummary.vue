@@ -19,7 +19,6 @@
 <script setup>
 import { RouterLink } from 'vue-router';
 import {
-  buildNextMonitoringPatch,
   describeMonitoringDecision,
   describeWantedState,
   detectionEventLinkTarget,
@@ -42,10 +41,6 @@ defineProps({
     type: Boolean,
     default: false,
   },
-  isUpdatingMonitoring: {
-    type: Boolean,
-    default: false,
-  },
   localArtist: {
     type: Object,
     required: true,
@@ -56,7 +51,7 @@ defineProps({
   },
 });
 
-const emit = defineEmits(['load-more-detection-events', 'refresh-metadata', 'update-monitoring']);
+const emit = defineEmits(['load-more-detection-events', 'refresh-metadata']);
 </script>
 
 <template>
@@ -64,13 +59,13 @@ const emit = defineEmits(['load-more-detection-events', 'refresh-metadata', 'upd
     <article class="panel-light">
       <p class="eyebrow">Local artist</p>
       <h3>{{ localArtist.artist.name }}</h3>
-      <button
-        type="button"
-        :disabled="isUpdatingMonitoring"
-        @click="emit('update-monitoring', buildNextMonitoringPatch(localArtist))"
+      <RouterLink
+        v-if="localArtist.artist?.source?.musicbrainzArtistId"
+        class="secondary-button"
+        :to="{ name: 'artist-detail', params: { mbid: localArtist.artist.source.musicbrainzArtistId } }"
       >
-        {{ isUpdatingMonitoring ? 'Updating...' : (localArtist.monitoring?.isMonitored ? 'Unmonitor artist' : 'Monitor artist') }}
-      </button>
+        Manage monitoring
+      </RouterLink>
       <button
         type="button"
         class="secondary-button"

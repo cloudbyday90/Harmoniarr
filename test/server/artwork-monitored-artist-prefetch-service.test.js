@@ -23,14 +23,13 @@ test('prefetchMonitoredArtistArtwork reuses the shared artwork fetch service for
     artworkFetchService: { resolveArtwork },
     defaultLimit: 10,
     getPoolFn: () => 'pool-token',
-    listMonitoredArtistsQuery: t.mock.fn(async ({ limit }, pool) => {
+    listMonitoredArtistsQuery: t.mock.fn(async ({ limit }) => {
       assert.equal(limit, 10);
-      assert.equal(pool, 'pool-token');
 
       return [
-        { id: 1, musicbrainz_artist_id: 'mbid-cached' },
-        { id: 2, musicbrainz_artist_id: 'mbid-fetched' },
-        { id: 3, musicbrainz_artist_id: null },
+        { metadataArtistId: 1, musicbrainzArtistId: 'mbid-cached' },
+        { metadataArtistId: 2, musicbrainzArtistId: 'mbid-fetched' },
+        { metadataArtistId: 3, musicbrainzArtistId: null },
       ];
     }),
   });
@@ -69,7 +68,7 @@ test('prefetchMonitoredArtistArtwork counts per-role failures without aborting t
     defaultLimit: 5,
     getPoolFn: () => 'pool-token',
     listMonitoredArtistsQuery: async () => [
-      { id: 9, musicbrainz_artist_id: 'mbid-1' },
+      { metadataArtistId: 9, musicbrainzArtistId: 'mbid-1' },
     ],
   });
 

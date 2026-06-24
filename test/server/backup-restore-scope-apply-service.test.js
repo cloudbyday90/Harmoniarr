@@ -6,7 +6,6 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   const updateSettingsFn = t.mock.fn(async () => {});
   const replaceOverridesSnapshot = t.mock.fn(async () => {});
   const replaceLibraryWantedReleases = t.mock.fn(async () => {});
-  const replaceMetadataArtistMonitoring = t.mock.fn(async () => {});
   const replaceOperatorArtistMonitoring = t.mock.fn(async () => {});
   const replaceOperatorReleaseGroupSelections = t.mock.fn(async () => {});
   const replaceOperatorTrackOverrides = t.mock.fn(async () => {});
@@ -14,7 +13,6 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   const service = createBackupRestoreScopeApplyService({
     replaceOverridesSnapshot,
     replaceLibraryWantedReleases,
-    replaceMetadataArtistMonitoring,
     replaceOperatorArtistMonitoring,
     replaceOperatorReleaseGroupSelections,
     replaceOperatorTrackOverrides,
@@ -33,13 +31,6 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
             },
           },
           monitoring: {
-            artistMonitoring: [
-              {
-                metadataArtistId: 'artist-1',
-                isMonitored: true,
-                monitoredReleaseGroupTypes: ['album'],
-              },
-            ],
             operatorArtistMonitoring: [
               {
                 acquisitionProfileKey: 'balanced_library',
@@ -83,6 +74,7 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
           wanted: {
             wantedReleases: [
               {
+                appUserId: 'user-1',
                 metadataArtistId: 'artist-1',
                 metadataReleaseGroupId: 'rg-1',
                 metadataReleaseId: 'release-1',
@@ -128,7 +120,10 @@ test('applyRestoreScopes applies settings-backed scopes, wanted, and monitoring 
   assert.equal(updateSettingsFn.mock.callCount(), 1);
   assert.equal(replaceOverridesSnapshot.mock.callCount(), 1);
   assert.equal(replaceLibraryWantedReleases.mock.callCount(), 1);
-  assert.equal(replaceMetadataArtistMonitoring.mock.callCount(), 1);
+  assert.equal(
+    replaceLibraryWantedReleases.mock.calls[0].arguments[0].wantedReleases[0].appUserId,
+    'user-1',
+  );
   assert.equal(replaceOperatorArtistMonitoring.mock.callCount(), 1);
   assert.equal(replaceOperatorReleaseGroupSelections.mock.callCount(), 1);
   assert.equal(replaceOperatorTrackOverrides.mock.callCount(), 1);
@@ -172,6 +167,44 @@ test('applyRestoreScopes skips unsupported and missing scope payloads', async ()
     requestedScopes: ['overrides', 'trust', 'monitoring'],
     settingsUpdated: false,
     skippedScopes: ['overrides', 'trust', 'monitoring'],
+    trustUpdated: false,
+    wantedUpdated: false,
+  });
+});
+
+test('applyRestoreScopes skips ownerless wanted rows', async (t) => {
+  const replaceLibraryWantedReleases = t.mock.fn(async () => {});
+  const service = createBackupRestoreScopeApplyService({
+    replaceLibraryWantedReleases,
+    updateSettingsFn: async () => {},
+  });
+
+  const result = await service.applyRestoreScopes({
+    artifactScope: ['wanted'],
+    parsedPayload: {
+      data: {
+        scopeSettings: {
+          wanted: {
+            wantedReleases: [{
+              metadataArtistId: 'artist-1',
+              metadataReleaseGroupId: 'rg-1',
+              metadataReleaseId: 'release-1',
+              wantedStatus: 'missing',
+            }],
+          },
+        },
+      },
+    },
+  });
+
+  assert.equal(replaceLibraryWantedReleases.mock.callCount(), 0);
+  assert.deepEqual(result, {
+    appliedScopes: [],
+    monitoringUpdated: false,
+    overridesUpdated: false,
+    requestedScopes: ['wanted'],
+    settingsUpdated: false,
+    skippedScopes: ['wanted'],
     trustUpdated: false,
     wantedUpdated: false,
   });

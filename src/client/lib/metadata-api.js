@@ -111,14 +111,6 @@ export function importMusicBrainzArtist(artistId) {
   });
 }
 
-export function updateMetadataArtistMonitoring(artistId, patch) {
-  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/monitoring`, {
-    method: 'PUT',
-    includeCsrf: true,
-    body: patch,
-  });
-}
-
 export function saveOperatorArtistDraft(artistId, draft) {
   return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator`, {
     method: 'PUT',

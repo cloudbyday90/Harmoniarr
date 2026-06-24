@@ -18,13 +18,12 @@
 
 import { getPool } from '../database.js';
 import {
-  listAdminMonitoredMetadataArtists,
-  listMonitoredMetadataArtists,
   searchMetadataArtists,
   searchMetadataReleaseGroups,
   searchMetadataReleases,
   searchMetadataReleasesByArtistAndTitle,
 } from './metadata-repository.js';
+import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
 import {
   normalizeSearchLimit,
   normalizeSearchText,
@@ -97,10 +96,10 @@ function mapRelease(row) {
 export function createMetadataSearchService({
   pool = getPool(),
   searchArtistsQuery = searchMetadataArtists,
-  listMonitoredArtistsQuery = listMonitoredMetadataArtists,
   searchReleaseGroupsQuery = searchMetadataReleaseGroups,
   searchReleasesByArtistAndTitleQuery = searchMetadataReleasesByArtistAndTitle,
   searchReleasesQuery = searchMetadataReleases,
+  listAdminMonitoredArtists = createMetadataMonitoredArtistStore().listAdminMonitoredArtists,
 } = {}) {
   async function searchArtists({ query, limit }) {
     const normalizedQuery = normalizeSearchText(query, 'query');
@@ -156,25 +155,6 @@ export function createMetadataSearchService({
     };
   }
 
-  async function listMonitoredArtists({ limit } = {}) {
-    const normalizedLimit = normalizeSearchLimit(limit, 25);
-    const results = await listMonitoredArtistsQuery({ limit: normalizedLimit }, pool);
-
-    return {
-      limit: normalizedLimit,
-      results: results.map((row) => ({
-        id: row.musicbrainz_artist_id ?? String(row.id),
-        localId: row.id,
-        name: row.name,
-        sortName: row.sort_name,
-        disambiguation: row.disambiguation,
-        country: row.country,
-        type: row.artist_type,
-        monitored: true,
-      })),
-    };
-  }
-
   async function searchAll({ query, artistLimit = 5, releaseGroupLimit = 5, releaseLimit = 5 } = {}) {
     const normalizedQuery = normalizeSearchText(query, 'query');
 
@@ -193,12 +173,11 @@ export function createMetadataSearchService({
   }
 
   async function listAllMonitoredArtists({ search, sort, limit, offset } = {}) {
-    return listAdminMonitoredMetadataArtists({ search, sort, limit, offset }, pool);
+    return listAdminMonitoredArtists({ search, sort, limit, offset });
   }
 
   return {
     listAllMonitoredArtists,
-    listMonitoredArtists,
     searchAll,
     searchArtists,
     searchReleaseGroups,

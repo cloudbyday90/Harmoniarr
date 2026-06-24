@@ -1,6 +1,6 @@
 # Legacy Monitoring Read-Path Cleanup Design
 
-Status: Implemented Release Radar and wanted compatibility migrations
+Status: Implemented Release Radar, wanted compatibility, and metadata refresh migrations
 Date: 2026-06-13
 Owner: Backend architecture + product architecture
 
@@ -163,7 +163,7 @@ The first migration uses this stack:
    - `metadata_artist_monitoring` stays available for legacy metadata refresh paths.
    - Future migrations should move one bounded caller at a time unless a shared compatibility projection becomes clearly necessary.
 
-The wanted reconciliation migration uses this stack:
+The 2026-06-13 wanted reconciliation compatibility migration used this temporary stack:
 
 1. Shared SQL projection
    - `operator-monitored-artist-scope-sql.js` exports a constant CTE, keeping SQL reuse explicit and ESM-only.
@@ -181,6 +181,8 @@ The wanted reconciliation migration uses this stack:
 4. Deferred schema posture
    - No migration is introduced in this pass.
    - Per-operator wanted releases should be handled as a separate schema-backed project, not hidden inside a read-path cleanup.
+
+Superseding follow-up: the 2026-06-14 per-operator wanted-state work removes this wanted compatibility posture for current wanted reads and reconciliation. The old compatibility CTE remains only as a historical transition artifact and should not be used for new wanted-state work.
 
 ## Security Notes
 
@@ -222,7 +224,6 @@ Validation performed:
 
 Implemented files:
 
-- `src/server/library/operator-monitored-artist-scope-sql.js`
 - `src/server/library/library-wanted-release-service.js`
 - `src/server/library/library-wanted-summary-store.js`
 - `test/server/library-wanted-release-service.test.js`
@@ -232,8 +233,8 @@ Behavioral outcome:
 
 - Wanted release reconciliation no longer reads from `metadata_artist_monitoring`.
 - The wanted summary monitored-artist count no longer reads from `metadata_artist_monitoring`.
-- Both paths derive a global compatibility scope from canonical operator monitoring rows.
-- `library_wanted_releases` remains global until a dedicated per-operator wanted-state migration is designed and validated.
+- Both paths initially derived a global compatibility scope from canonical operator monitoring rows.
+- Follow-up completed on 2026-06-14: `PER_OPERATOR_WANTED_STATE_DESIGN.md` moved `library_wanted_releases` to per-operator state with `app_user_id`, scoped route reads, backup/restore ownership, and operator release-scope / wanted-automation policy gates. The temporary `operator-monitored-artist-scope-sql.js` CTE module was removed after current code stopped importing it.
 
 Validation performed:
 
@@ -247,10 +248,77 @@ Validation performed:
 
 ## Remaining Cleanup
 
-Continue auditing legacy reads in smaller passes. Likely follow-up areas:
+None. The `metadata_artist_monitoring` table itself is now dropped (see the
+DROP implementation outcome below), completing the retirement arc. The
+operator-scoped model (`operator_artist_monitoring` +
+`metadata_artist_refresh_state`) is the sole monitoring source of truth,
+end to end.
 
-- metadata refresh scheduling and refresh heartbeat paths
-- wanted release reconciliation paths
-- metadata search or compatibility projections that still expose global monitoring state
+## Implementation Outcome: Metadata Artist Monitoring DROP TABLE
 
-Each follow-up should decide whether the caller truly needs current-user operator scope or a temporary global compatibility projection.
+Implemented on 2026-06-23 and documented in `METADATA_ARTIST_MONITORING_DROP_DESIGN.md`.
+
+Behavioral outcome:
+
+- `metadata_artist_monitoring` is dropped via `20260630_020000_metadata_artist_monitoring_drop.sql` (`DROP TABLE IF EXISTS`, transactional, no CASCADE — a pre-flight audit confirmed zero foreign-key/view dependents).
+- The schema snapshot is regenerated from the migration manifest; the DROP is the final state of the lineage (historical CREATE/ALTER sections remain as committed history).
+- No schema anchors referenced the table, so the anchor inventory is unchanged.
+- This completes the retirement: the table, its store, its service, its route, and all reads/writes/backup-restore are gone.
+
+## Implementation Outcome: Metadata Monitoring Backup/Restore Migration
+
+Implemented on 2026-06-23 and documented in `METADATA_MONITORING_BACKUP_RESTORE_MIGRATION_DESIGN.md`.
+
+Behavioral outcome:
+
+- New backups no longer include `monitoring.artistMonitoring`; the monitoring scope carries only canonical operator-scoped state (`operatorArtistMonitoring`, `operatorReleaseGroupSelections`, `operatorTrackOverrides`).
+- Restore applies only canonical operator-scoped monitoring state; the retired `artistMonitoring` field in old backups is ignored (forward/backward compatible).
+- `metadata_artist_refresh_state` is treated as rebuildable operational state (not exported/restored); the heartbeat rebuilds refresh schedules for monitored artists after restore.
+- The legacy `metadata-monitoring-store.js` and its entire wiring chain (metadata-module, system-module, app.js, and the refresh-scheduler legacy fallback shim) are removed. `metadata_artist_monitoring` is now an orphaned table with zero code references.
+
+## Implementation Outcome: Metadata Monitoring Write-Path Consolidation
+
+Implemented on 2026-06-23 and documented in `METADATA_MONITORING_WRITE_PATH_CONSOLIDATION_DESIGN.md`.
+
+Behavioral outcome:
+
+- The library browser's standalone monitor toggle is retired (`MetadataArtistSummary.vue` now links to the artist detail page); monitoring is consolidated onto the canonical operator-scoped save surface (`saveOperatorArtist`), the sole product-facing monitoring mutation.
+- `PUT /api/v1/metadata/artists/:id/monitoring` returns 410 Gone with a successor pointer to `PUT /api/v1/metadata/artists/:id/operator`.
+- `metadata-monitoring-service.js` is removed entirely; `metadata-monitoring-store.upsertArtistMonitoring` is removed (the store retains only snapshot/read methods for backup/restore).
+- The dead legacy `monitorArtist` client path is removed; `useArtistMonitoring.addArtistWithPolicy` is the single monitor entry point.
+- Monitor side effects (`artist_monitored` activity event + household notification) now fire on the canonical save path's unmonitored→monitored transition, fixing the prior inconsistency where only the legacy path notified.
+
+
+## Implementation Outcome: Metadata Artist-Payload Monitoring Read-Path Cleanup
+
+Implemented on 2026-06-23 and documented in `METADATA_ARTIST_PAYLOAD_MONITORING_CLEANUP_DESIGN.md`.
+
+Behavioral outcome:
+
+- The artist-detail payload `monitoring` field (served by `GET /api/v1/metadata/artists/:artistId`) no longer references `metadata_artist_monitoring`.
+- `metadata-monitored-artist-store.js` gains `getArtistMonitoringStatus(metadataArtistId)`, which assembles the canonical status in one query: `isMonitored` and `monitoredReleaseGroupTypes` aggregated from `operator_artist_monitoring`, and `lastRefreshedAt` / `nextRefreshAt` from `metadata_artist_refresh_state`.
+- `metadata-read-service.js` now depends on the monitored-artist store instead of the legacy monitoring store.
+- The response shape is unchanged, so the library browser and artist-detail composable need no client changes.
+- The legacy `metadataMonitoringStore` remains for the legacy mutation path and backup/restore.
+
+## Implementation Outcome: Metadata Monitored-Artist Read-Path Cleanup
+
+Implemented on 2026-06-23 and documented in `METADATA_MONITORED_ARTIST_READ_PATH_CLEANUP_DESIGN.md`.
+
+Behavioral outcome:
+
+- The monitored-artist *list* read paths (the admin oversight route and the background artwork prefetch) no longer reference `metadata_artist_monitoring`.
+- A new dedicated `metadata-monitored-artist-store.js` (factory `createMetadataMonitoredArtistStore`) owns a global de-duplicated monitored-artist read for artwork prefetch and an aggregated, paginated admin oversight read from `operator_artist_monitoring`, with `lastRefreshedAt` sourced from `metadata_artist_refresh_state`.
+- The legacy `listMonitoredMetadataArtists` / `listAdminMonitoredMetadataArtists` repository functions and the dead, un-routed `metadata-search-service.listMonitoredArtists` method are removed.
+- The admin list now exposes an additive `monitoringOperatorCount` and correctly renders the representative operator's username (the prior mapper read a misnamed column and always returned `null`).
+
+## Implementation Outcome: Metadata Refresh Read-Path Cleanup
+
+Implemented on 2026-06-14 and documented in `METADATA_REFRESH_READ_PATH_CLEANUP_DESIGN.md`.
+
+Behavioral outcome:
+
+- Metadata refresh scheduling no longer selects due artists from `metadata_artist_monitoring`.
+- `metadata_artist_refresh_state` stores one global provider-refresh cadence row per metadata artist.
+- `metadata-artist-refresh-state-store.js` derives due refresh candidates and monitored release-group types from `operator_artist_monitoring`.
+- Release detection during refresh prefers operator-derived monitoring policy instead of the legacy artist payload monitoring field.

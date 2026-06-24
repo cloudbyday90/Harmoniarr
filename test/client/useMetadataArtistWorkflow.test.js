@@ -184,47 +184,6 @@ test('useMetadataArtistWorkflow surfaces local artist open failures', async (t) 
   assert.equal(workflow.isLoadingArtist.value, false);
 });
 
-test('useMetadataArtistWorkflow updates local artist monitoring state through the shared metadata api', async (t) => {
-  const releaseWorkflow = createReleaseWorkflowDouble(t);
-  const updateArtistMonitoringRequest = t.mock.fn(async (_artistId, patch) => ({
-    artistId: 'local-artist-1',
-    monitoring: patch,
-  }));
-  const workflow = useMetadataArtistWorkflow({
-    updateArtistMonitoringRequest,
-    createLocalSearchWorkflow: () => createLocalSearchWorkflowDouble(),
-    createReleaseWorkflow: () => releaseWorkflow,
-  });
-
-  workflow.localArtist.value = {
-    artist: { id: 'local-artist-1', name: 'Autechre', source: { musicbrainzArtistId: 'mb-artist-1' } },
-    aliases: [],
-    detectionEvents: [],
-    monitoring: { isMonitored: false, monitoredReleaseGroupTypes: ['album', 'ep'] },
-    releaseGroups: [],
-    releases: [],
-  };
-
-  await workflow.updateArtistMonitoring({
-    isMonitored: true,
-    monitoredReleaseGroupTypes: ['album'],
-  });
-
-  assert.deepEqual(updateArtistMonitoringRequest.mock.calls[0].arguments, [
-    'local-artist-1',
-    {
-      isMonitored: true,
-      monitoredReleaseGroupTypes: ['album'],
-    },
-  ]);
-  assert.deepEqual(workflow.localArtist.value.monitoring, {
-    isMonitored: true,
-    monitoredReleaseGroupTypes: ['album'],
-  });
-  assert.equal(workflow.artistActionError.value, '');
-  assert.equal(workflow.isUpdatingArtistMonitoring.value, false);
-});
-
 test('useMetadataArtistWorkflow queues a metadata artist refresh through the shared metadata api', async (t) => {
   const releaseWorkflow = createReleaseWorkflowDouble(t);
   const startMetadataArtistRefreshRequest = t.mock.fn(async (artistId) => ({

@@ -17,7 +17,7 @@
  */
 
 import { getPool } from '../database.js';
-import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
+import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
 import { createMetadataReleaseDetectionService } from './metadata-release-detection-service.js';
 import {
   getMetadataArtistById,
@@ -165,7 +165,7 @@ function mapTrack(row) {
 export function createMetadataReadService({
   pool = getPool(),
   metadataReleaseDetectionService = createMetadataReleaseDetectionService(),
-  metadataMonitoringStore = createMetadataMonitoringStore({ getPoolFn: () => pool }),
+  metadataMonitoredArtistStore = createMetadataMonitoredArtistStore({ getPoolFn: () => pool }),
 } = {}) {
   async function buildArtistPayload(artist) {
     if (!artist) {
@@ -175,7 +175,7 @@ export function createMetadataReadService({
     const [aliases, detectionEventsPage, monitoring, releaseGroups, releases] = await Promise.all([
       listMetadataArtistAliases(artist.id, pool),
       metadataReleaseDetectionService.listDetectionEventsPageForArtist({ metadataArtistId: artist.id }),
-      metadataMonitoringStore.getArtistMonitoring(artist.id),
+      metadataMonitoredArtistStore.getArtistMonitoringStatus(artist.id),
       listMetadataReleaseGroupsByArtistId(artist.id, pool),
       listMetadataReleasesByArtistId(artist.id, pool),
     ]);

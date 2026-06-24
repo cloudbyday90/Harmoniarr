@@ -74,6 +74,7 @@ async function browseAllArtistReleaseGroups({
 }
 
 export function createMetadataRefreshService({
+  getArtistRefreshMonitoring = null,
   getMetadataArtistByMusicBrainzId = async () => null,
   metadataService = createMetadataService(),
   metadataReleaseDetectionService = createMetadataReleaseDetectionService(),
@@ -140,11 +141,20 @@ export function createMetadataRefreshService({
       await reconcileWantedReleases();
       wantedReconciliationCompleted = true;
     }
+    let detectionMonitoring = existingArtist?.monitoring ?? null;
+    if (resolvedMetadataArtistId && typeof getArtistRefreshMonitoring === 'function') {
+      try {
+        detectionMonitoring = await getArtistRefreshMonitoring(resolvedMetadataArtistId);
+      } catch {
+        // Detection can still record with the cached artist monitoring fallback.
+      }
+    }
+
     const detectionEvents = existingArtist
       ? await metadataReleaseDetectionService.recordDetectedReleaseGroups({
         artistName: storedArtist.name ?? artistPayload.name,
         metadataArtistId: resolvedMetadataArtistId,
-        monitoring: existingArtist.monitoring,
+        monitoring: detectionMonitoring,
         operationRunId: runId,
         refreshedAt: fetchedAt,
         releaseGroups: detectedReleaseGroups,

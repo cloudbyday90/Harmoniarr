@@ -53,7 +53,6 @@ suite('createApp', () => {
     youtubeOAuthService: { resolveAccessToken: async () => null },
   };
   const metadataModule = {
-    metadataMonitoringStore: { replaceArtistMonitoringSnapshot: async () => {}, listArtistMonitoringSnapshot: async () => [] },
     musicBrainzSearchService: { checkProviderHealth: t.mock.fn(async () => ({ provider: 'musicbrainz', status: 'healthy', message: 'MusicBrainz lookups are reachable.' })) },
     routeDependencies: { metadata: 'deps' },
   };
@@ -275,7 +274,6 @@ suite('createApp', () => {
   assert.equal(typeof systemModuleArgs.dependencyHealthService.getDependencyHealth, 'function');
   assert.equal(systemModuleArgs.libraryScanSummaryService, libraryModule.libraryScanSummaryService);
   assert.equal(systemModuleArgs.libraryWantedReleaseStore, libraryModule.libraryWantedReleaseStore);
-  assert.equal(systemModuleArgs.metadataMonitoringStore, metadataModule.metadataMonitoringStore);
   assert.equal(systemModuleArgs.operationHistoryService, operationsModule.operationHistoryService);
   assert.equal(systemModuleArgs.settingsService, settingsService);
   assert.equal(systemModuleArgs.slskdService, slskdModule.slskdService);
@@ -361,7 +359,6 @@ suite('createApp', () => {
     libraryWantedReleaseStore: libraryModule.libraryWantedReleaseStore,
     metadataRefreshHeartbeatConfig: undefined,
     metadataRefreshHeartbeatState: undefined,
-    metadataMonitoringStore: metadataModule.metadataMonitoringStore,
     musicBrainzSearchService: metadataModule.musicBrainzSearchService,
     operatorArtistMonitoringStore: metadataModule.operatorArtistMonitoringStore,
     operatorReleaseGroupSelectionStore: metadataModule.operatorReleaseGroupSelectionStore,

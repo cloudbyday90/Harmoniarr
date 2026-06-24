@@ -19,7 +19,9 @@ test('startBackupRestoreApply acquires and releases restore lock, persists run s
   const releaseMaintenanceLock = t.mock.fn(async () => ({ id: 'lock-1', lockType: 'restore', status: 'released' }));
   const replaceOverridesSnapshot = t.mock.fn(async () => {});
   const replaceLibraryWantedReleases = t.mock.fn(async () => {});
-  const replaceMetadataArtistMonitoring = t.mock.fn(async () => {});
+  const replaceOperatorArtistMonitoring = t.mock.fn(async () => {});
+  const replaceOperatorReleaseGroupSelections = t.mock.fn(async () => {});
+  const replaceOperatorTrackOverrides = t.mock.fn(async () => {});
   const replaceTrustSnapshot = t.mock.fn(async () => {});
   const recordAuditEventFn = t.mock.fn(async () => {});
   const updateSettingsFn = t.mock.fn(async () => ({}));
@@ -69,17 +71,37 @@ test('startBackupRestoreApply acquires and releases restore lock, persists run s
             },
           },
           monitoring: {
-            artistMonitoring: [
+            operatorArtistMonitoring: [
               {
+                appUserId: 'user-1',
                 metadataArtistId: 'artist-1',
                 isMonitored: true,
-                monitoredReleaseGroupTypes: ['album', 'ep'],
+                monitoredReleaseGroupTypes: ['album'],
+              },
+            ],
+            operatorReleaseGroupSelections: [
+              {
+                appUserId: 'user-1',
+                metadataArtistId: 'artist-1',
+                metadataReleaseGroupId: 'rg-1',
+                selectionState: 'selected',
+              },
+            ],
+            operatorTrackOverrides: [
+              {
+                appUserId: 'user-1',
+                isDesired: true,
+                metadataArtistId: 'artist-1',
+                metadataReleaseGroupId: 'rg-1',
+                metadataReleaseId: 'release-1',
+                trackMbid: '22222222-2222-4222-8222-222222222222',
               },
             ],
           },
           wanted: {
             wantedReleases: [
               {
+                appUserId: 'user-1',
                 metadataArtistId: 'artist-1',
                 metadataReleaseGroupId: 'rg-1',
                 metadataReleaseId: 'release-1',
@@ -123,7 +145,9 @@ test('startBackupRestoreApply acquires and releases restore lock, persists run s
     replaceOverridesSnapshot,
     recordAuditEventFn,
     replaceLibraryWantedReleases,
-    replaceMetadataArtistMonitoring,
+    replaceOperatorArtistMonitoring,
+    replaceOperatorReleaseGroupSelections,
+    replaceOperatorTrackOverrides,
     replaceTrustSnapshot,
     releaseMaintenanceLock,
     updateSettingsFn,
@@ -148,7 +172,9 @@ test('startBackupRestoreApply acquires and releases restore lock, persists run s
   assert.equal(updateSettingsFn.mock.callCount(), 1);
   assert.equal(replaceOverridesSnapshot.mock.callCount(), 1);
   assert.equal(replaceLibraryWantedReleases.mock.callCount(), 1);
-  assert.equal(replaceMetadataArtistMonitoring.mock.callCount(), 1);
+  assert.equal(replaceOperatorArtistMonitoring.mock.callCount(), 1);
+  assert.equal(replaceOperatorReleaseGroupSelections.mock.callCount(), 1);
+  assert.equal(replaceOperatorTrackOverrides.mock.callCount(), 1);
   assert.equal(replaceTrustSnapshot.mock.callCount(), 1);
   assert.equal(recordAuditEventFn.mock.callCount(), 2);
   assert.equal(result.accepted, true);

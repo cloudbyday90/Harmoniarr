@@ -17,7 +17,7 @@
  */
 
 import { getPool } from '../database.js';
-import { listMonitoredMetadataArtists } from '../metadata/metadata-repository.js';
+import { createMetadataMonitoredArtistStore } from '../metadata/metadata-monitored-artist-store.js';
 import { createArtworkFetchService } from './artwork-fetch-service.js';
 
 const defaultArtworkRoles = ['artist_thumbnail', 'artist_background'];
@@ -49,23 +49,26 @@ export function createArtworkMonitoredArtistPrefetchService({
   artworkRoles = defaultArtworkRoles,
   defaultLimit = 250,
   getPoolFn = getPool,
-  listMonitoredArtistsQuery = listMonitoredMetadataArtists,
+  listMonitoredArtistsQuery,
 } = {}) {
+  const monitoredArtistStore = createMetadataMonitoredArtistStore({ getPoolFn });
+  const readMonitoredArtists = listMonitoredArtistsQuery
+    ?? monitoredArtistStore.listMonitoredArtistsForArtwork;
+
   async function prefetchMonitoredArtistArtwork({ limit = defaultLimit } = {}) {
     const normalizedLimit = normalizePositiveInteger(limit, defaultLimit);
     const summary = buildEmptySummary({
       artworkRoles: [...artworkRoles],
       limit: normalizedLimit,
     });
-    const monitoredArtists = await listMonitoredArtistsQuery(
-      { limit: normalizedLimit },
-      getPoolFn(),
-    );
+    const monitoredArtists = await readMonitoredArtists({
+      limit: normalizedLimit,
+    });
 
     summary.totalMonitoredCount = monitoredArtists.length;
 
     for (const artist of monitoredArtists) {
-      const musicBrainzArtistId = artist.musicbrainz_artist_id ?? null;
+      const musicBrainzArtistId = artist.musicbrainzArtistId ?? null;
       if (!musicBrainzArtistId) {
         summary.skippedArtistCount += 1;
         continue;

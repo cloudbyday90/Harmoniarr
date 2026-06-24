@@ -7,6 +7,7 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
   const query = t.mock.fn(async () => ({
     rows: [
       {
+        app_user_id: 'user-1',
         expected_track_count: 10,
         matched_track_count: 0,
         metadata_artist_id: 'artist-1',
@@ -14,10 +15,13 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
         metadata_release_id: 'release-1',
         monitored_release_group_types: ['album', 'ep'],
         reconciliation_status: null,
+        release_scope: 'future_only',
         release_date: '2024-04-01',
         release_status: 'Official',
+        wanted_automation_mode: 'future_matching',
       },
       {
+        app_user_id: 'user-1',
         expected_track_count: 8,
         matched_track_count: 6,
         metadata_artist_id: 'artist-1',
@@ -25,8 +29,10 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
         metadata_release_id: 'release-2',
         monitored_release_group_types: ['album', 'ep'],
         reconciliation_status: 'partial',
+        release_scope: 'current_and_future',
         release_date: '2025-05-01',
         release_status: 'Official',
+        wanted_automation_mode: 'current_and_future_matching',
       },
     ],
   }));
@@ -44,10 +50,13 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
   assert.deepEqual(replaceLibraryWantedReleases.mock.calls[0].arguments[0], {
     wantedReleases: [
       {
+        appUserId: 'user-1',
         evidence: {
           monitoredReleaseGroupTypes: ['album', 'ep'],
+          releaseScope: 'future_only',
           reconciliationStatus: 'missing',
           strategy: 'monitored_release_absent',
+          wantedAutomationMode: 'future_matching',
         },
         expectedTrackCount: 10,
         matchedTrackCount: 0,
@@ -60,10 +69,13 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
         wantedStatus: 'missing',
       },
       {
+        appUserId: 'user-1',
         evidence: {
           monitoredReleaseGroupTypes: ['album', 'ep'],
+          releaseScope: 'current_and_future',
           reconciliationStatus: 'partial',
           strategy: 'monitored_release_gap',
+          wantedAutomationMode: 'current_and_future_matching',
         },
         expectedTrackCount: 8,
         matchedTrackCount: 6,
@@ -79,8 +91,12 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
   });
 
   const sql = query.mock.calls[0].arguments[0];
-  assert.match(sql, /operator_monitored_artist_scope/);
   assert.match(sql, /operator_artist_monitoring/);
+  assert.match(sql, /operator_artist_monitoring\.app_user_id/);
+  assert.match(sql, /operator_artist_monitoring\.release_scope <> 'track_only'/);
+  assert.match(sql, /operator_artist_monitoring\.wanted_automation_mode <> 'manual_only'/);
+  assert.match(sql, /operator_artist_monitoring\.release_scope = 'current_and_future'/);
+  assert.match(sql, /metadata_releases\.release_date >= operator_artist_monitoring\.created_at::date/);
   assert.doesNotMatch(sql, /metadata_artist_monitoring/);
 });
 
@@ -102,7 +118,7 @@ test('reconcileWantedReleases clears stale wanted releases when no monitored gap
   });
 });
 
-test('reconcileWantedReleases folds all operator monitored release types into the compatibility scope', async (t) => {
+test('reconcileWantedReleases reads per-operator monitoring policy directly', async (t) => {
   const replaceLibraryWantedReleases = t.mock.fn(async () => {});
   const query = t.mock.fn(async () => ({ rows: [] }));
   const service = createLibraryWantedReleaseService({
@@ -117,7 +133,8 @@ test('reconcileWantedReleases folds all operator monitored release types into th
   await service.reconcileWantedReleases();
 
   const sql = query.mock.calls[0].arguments[0];
-  assert.match(sql, /ARRAY_AGG\(DISTINCT monitored_type ORDER BY monitored_type\)/);
-  assert.match(sql, /CROSS JOIN LATERAL unnest\(operator_artist_monitoring\.monitored_release_group_types\)/);
-  assert.match(sql, /GROUP BY operator_artist_monitoring\.metadata_artist_id/);
+  assert.match(sql, /FROM operator_artist_monitoring/);
+  assert.match(sql, /unnest\(operator_artist_monitoring\.monitored_release_group_types\)/);
+  assert.match(sql, /GROUP BY\s+operator_artist_monitoring\.app_user_id/);
+  assert.doesNotMatch(sql, /operator_monitored_artist_scope/);
 });

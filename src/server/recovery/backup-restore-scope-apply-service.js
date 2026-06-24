@@ -52,25 +52,6 @@ const settingsBackedScopes = new Set([
   'qualityProfiles',
 ]);
 
-function normalizeMonitoringRows(artistMonitoring) {
-  if (!Array.isArray(artistMonitoring)) {
-    return null;
-  }
-
-  return artistMonitoring
-    .filter((row) => row && typeof row === 'object')
-    .map((row) => ({
-      isMonitored: row.isMonitored === true,
-      lastRefreshedAt: row.lastRefreshedAt ?? null,
-      metadataArtistId: row.metadataArtistId,
-      monitoredReleaseGroupTypes: Array.isArray(row.monitoredReleaseGroupTypes)
-        ? row.monitoredReleaseGroupTypes
-        : ['album', 'ep'],
-      nextRefreshAt: row.nextRefreshAt ?? null,
-    }))
-    .filter((row) => typeof row.metadataArtistId === 'string' && row.metadataArtistId.trim().length > 0);
-}
-
 function normalizeOperatorMonitoringRows(operatorArtistMonitoring) {
   if (!Array.isArray(operatorArtistMonitoring)) {
     return null;
@@ -165,6 +146,7 @@ function normalizeWantedRows(wantedReleases) {
   return wantedReleases
     .filter((row) => row && typeof row === 'object')
     .map((row) => ({
+      appUserId: row.appUserId,
       evidence: row.evidence ?? {},
       expectedTrackCount: Number.parseInt(row.expectedTrackCount, 10) || 0,
       matchedTrackCount: Number.parseInt(row.matchedTrackCount, 10) || 0,
@@ -177,7 +159,9 @@ function normalizeWantedRows(wantedReleases) {
       wantedStatus: row.wantedStatus,
     }))
     .filter((row) => (
-      typeof row.metadataArtistId === 'string'
+      typeof row.appUserId === 'string'
+      && row.appUserId.trim().length > 0
+      && typeof row.metadataArtistId === 'string'
       && row.metadataArtistId.trim().length > 0
       && typeof row.metadataReleaseGroupId === 'string'
       && row.metadataReleaseGroupId.trim().length > 0
@@ -201,7 +185,6 @@ function normalizeSnapshotRows(rows) {
 export function createBackupRestoreScopeApplyService({
   replaceOverridesSnapshot = async () => {},
   replaceLibraryWantedReleases = async () => {},
-  replaceMetadataArtistMonitoring = async () => {},
   replaceOperatorArtistMonitoring = async () => {},
   replaceOperatorReleaseGroupSelections = async () => {},
   replaceOperatorTrackOverrides = async () => {},
@@ -257,7 +240,7 @@ export function createBackupRestoreScopeApplyService({
 
       if (scope === 'wanted') {
         const wantedReleases = normalizeWantedRows(scopeSettings?.wanted?.wantedReleases);
-        if (!wantedReleases) {
+        if (!wantedReleases || wantedReleases.length < 1) {
           skippedScopes.push(scope);
           continue;
         }
@@ -269,7 +252,6 @@ export function createBackupRestoreScopeApplyService({
       }
 
       if (scope === 'monitoring') {
-        const artistMonitoring = normalizeMonitoringRows(scopeSettings?.monitoring?.artistMonitoring);
         const operatorArtistMonitoring = normalizeOperatorMonitoringRows(
           scopeSettings?.monitoring?.operatorArtistMonitoring,
         );
@@ -280,8 +262,7 @@ export function createBackupRestoreScopeApplyService({
           scopeSettings?.monitoring?.operatorTrackOverrides,
         );
         if (
-          !artistMonitoring
-          && !operatorArtistMonitoring
+          !operatorArtistMonitoring
           && !operatorReleaseGroupSelections
           && !operatorTrackOverrides
         ) {
@@ -289,9 +270,6 @@ export function createBackupRestoreScopeApplyService({
           continue;
         }
 
-        if (artistMonitoring) {
-          await replaceMetadataArtistMonitoring({ artistMonitoring });
-        }
         if (operatorArtistMonitoring) {
           await replaceOperatorArtistMonitoring({ operatorArtistMonitoring });
         }

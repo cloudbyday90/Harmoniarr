@@ -54,6 +54,7 @@ The remaining product/design gap is primarily in deeper track-level editing, bro
 - Discover now has the `+` add affordance and compact `Add artist` policy modal wired to operator policy save
 - Home now uses the operator monitored projection for artist cards and shows compact policy, coverage, progress, and reconciliation state
 - artist detail now loads the operator artist projection, exposes draft policy editing with `Save` / `Cancel`, and shows release-level selection override visibility
+- metadata refresh scheduling now derives due artists and release-type policy from operator monitoring while storing provider cadence in `metadata_artist_refresh_state`
 
 ## Locked Design Choices
 
@@ -2114,7 +2115,7 @@ Implemented canonical tables:
 
 Still needed:
 
-- move remaining legacy read paths off `metadata_artist_monitoring` or place a compatibility projection in front of them
+- move remaining compatibility payload/search reads off `metadata_artist_monitoring` or place a compatibility projection in front of them
 - decide where saved add-artist defaults live, likely per-operator preference storage
 - add `operator_library_item_access` or an equivalent access-link table before destructive delete semantics are exposed
 
@@ -2479,6 +2480,8 @@ Use this section for incremental updates during implementation.
 - 2026-06-13: Scoring and explainability design implemented. `DISCOVER_SCORING_EXPLAINABILITY_DESIGN.md` records the official NIST AI RMF, European Commission DSA, WAI-ARIA, OWASP, Vue, JavaScript module, and Node test-runner source review. Discover recommendation scoring now lives in a pure ES module with a bounded monitored-artist support boost, and recommendation card explanations now come from a fixed, markup-free explanation contract.
 - 2026-06-13: Legacy monitoring read-path cleanup started. `LEGACY_MONITORING_READ_PATH_CLEANUP_DESIGN.md` documents the official PostgreSQL, OWASP, node-postgres, Express, and Node test-runner source review plus the selected direct-migration stack. Release Radar now reads from `operator_artist_monitoring` scoped by the authenticated `appUserId` instead of the legacy global `metadata_artist_monitoring` table.
 - 2026-06-13: Wanted release reconciliation read-path cleanup implemented. The wanted reconciliation service and wanted summary monitored-artist count now use an operator-monitoring compatibility scope derived from `operator_artist_monitoring`, removing their direct dependency on `metadata_artist_monitoring` while preserving the existing global `library_wanted_releases` projection until a separate per-operator wanted-state migration is designed.
+- 2026-06-14: Per-operator wanted state implemented. `PER_OPERATOR_WANTED_STATE_DESIGN.md` records the official PostgreSQL, node-postgres, OWASP, and Express source review plus the selected schema stack. `library_wanted_releases` now has `app_user_id`, a per-user release uniqueness constraint, scoped wanted-summary and wanted-release read paths, operator policy gates for release scope and wanted automation, discovery source-user evidence, and backup/restore ownership preservation.
+- 2026-06-14: Metadata refresh read-path cleanup implemented. `METADATA_REFRESH_READ_PATH_CLEANUP_DESIGN.md` records the official PostgreSQL, node-postgres, OWASP, Express, Node test-runner, and MusicBrainz source review. The refresh heartbeat now reads due artist eligibility from `operator_artist_monitoring`, stores global provider cadence in `metadata_artist_refresh_state`, and uses operator-derived monitored release-group types for refresh release-detection decisions.
 
 ## Checklist
 

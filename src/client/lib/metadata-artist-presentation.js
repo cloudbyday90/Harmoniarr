@@ -56,20 +56,6 @@ export function describeWantedState(status) {
 }
 
 /**
- * Builds the monitoring patch payload that toggles the monitored flag and
- * preserves existing release group type preferences.
- *
- * @param {{ monitoring?: { isMonitored?: boolean, monitoredReleaseGroupTypes?: string[] } }} localArtist
- * @returns {{ isMonitored: boolean, monitoredReleaseGroupTypes: string[] }}
- */
-export function buildNextMonitoringPatch(localArtist) {
-  return {
-    isMonitored: !(localArtist.monitoring?.isMonitored ?? false),
-    monitoredReleaseGroupTypes: localArtist.monitoring?.monitoredReleaseGroupTypes ?? ['album', 'ep'],
-  };
-}
-
-/**
  * Returns a link target for a detection event that points to the matching
  * release group workspace, or null if no link can be resolved.
  *

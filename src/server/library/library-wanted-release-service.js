@@ -18,7 +18,6 @@
 
 import { getPool } from '../database.js';
 import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
-import { OPERATOR_MONITORED_ARTIST_SCOPE_CTE } from './operator-monitored-artist-scope-sql.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -30,10 +29,13 @@ function mapWantedRow(row) {
   const missingTrackCount = Math.max(expectedTrackCount - matchedTrackCount, 0);
 
   return {
+    appUserId: row.app_user_id,
     evidence: {
       monitoredReleaseGroupTypes: row.monitored_release_group_types ?? ['album', 'ep'],
+      releaseScope: row.release_scope ?? 'future_only',
       reconciliationStatus: row.reconciliation_status ?? 'missing',
       strategy: row.reconciliation_status ? 'monitored_release_gap' : 'monitored_release_absent',
+      wantedAutomationMode: row.wanted_automation_mode ?? 'future_matching',
     },
     expectedTrackCount,
     matchedTrackCount,
@@ -55,20 +57,22 @@ export function createLibraryWantedReleaseService({
     const pool = getPoolFn();
     const result = await pool.query(
       `
-        WITH ${OPERATOR_MONITORED_ARTIST_SCOPE_CTE}
         SELECT
+          operator_artist_monitoring.app_user_id,
           metadata_release_groups.metadata_artist_id,
           metadata_release_groups.id AS metadata_release_group_id,
           metadata_releases.id AS metadata_release_id,
           metadata_releases.release_date,
           metadata_releases.status AS release_status,
-          operator_monitored_artist_scope.monitored_release_group_types,
+          operator_artist_monitoring.monitored_release_group_types,
+          operator_artist_monitoring.release_scope,
+          operator_artist_monitoring.wanted_automation_mode,
           COUNT(metadata_tracks.id)::integer AS expected_track_count,
           COALESCE(library_release_reconciliations.matched_track_count, 0)::integer AS matched_track_count,
           library_release_reconciliations.reconciliation_status
-        FROM operator_monitored_artist_scope
+        FROM operator_artist_monitoring
         JOIN metadata_release_groups
-          ON metadata_release_groups.metadata_artist_id = operator_monitored_artist_scope.metadata_artist_id
+          ON metadata_release_groups.metadata_artist_id = operator_artist_monitoring.metadata_artist_id
         JOIN metadata_releases
           ON metadata_releases.metadata_release_group_id = metadata_release_groups.id
         JOIN metadata_media
@@ -77,22 +81,38 @@ export function createLibraryWantedReleaseService({
           ON metadata_tracks.metadata_medium_id = metadata_media.id
         LEFT JOIN library_release_reconciliations
           ON library_release_reconciliations.metadata_release_id = metadata_releases.id
-        WHERE LOWER(TRIM(COALESCE(metadata_release_groups.primary_type, ''))) = ANY (
+        WHERE operator_artist_monitoring.is_monitored = TRUE
+          AND operator_artist_monitoring.release_scope <> 'track_only'
+          AND operator_artist_monitoring.wanted_automation_mode <> 'manual_only'
+          AND LOWER(TRIM(COALESCE(metadata_release_groups.primary_type, ''))) = ANY (
             ARRAY(
               SELECT LOWER(type_entry)
-              FROM unnest(operator_monitored_artist_scope.monitored_release_group_types) AS type_entry
+              FROM unnest(operator_artist_monitoring.monitored_release_group_types) AS type_entry
             )
           )
           AND COALESCE(metadata_releases.status, 'Official') = 'Official'
           AND COALESCE(library_release_reconciliations.reconciliation_status, 'missing') <> 'complete'
           AND COALESCE(library_release_reconciliations.reconciliation_status, 'missing') <> 'duplicate'
+          AND (
+            operator_artist_monitoring.release_scope = 'current_and_future'
+            OR metadata_releases.release_date IS NULL
+            OR metadata_releases.release_date >= operator_artist_monitoring.created_at::date
+          )
+          AND (
+            operator_artist_monitoring.wanted_automation_mode = 'current_and_future_matching'
+            OR metadata_releases.release_date IS NULL
+            OR metadata_releases.release_date >= operator_artist_monitoring.created_at::date
+          )
         GROUP BY
+          operator_artist_monitoring.app_user_id,
           metadata_release_groups.metadata_artist_id,
           metadata_release_groups.id,
           metadata_releases.id,
           metadata_releases.release_date,
           metadata_releases.status,
-          operator_monitored_artist_scope.monitored_release_group_types,
+          operator_artist_monitoring.monitored_release_group_types,
+          operator_artist_monitoring.release_scope,
+          operator_artist_monitoring.wanted_automation_mode,
           library_release_reconciliations.matched_track_count,
           library_release_reconciliations.reconciliation_status
         ORDER BY metadata_releases.release_date NULLS LAST, metadata_releases.id ASC

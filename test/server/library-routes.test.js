@@ -1116,6 +1116,7 @@ test('library wanted summary route requires a session and returns the shared wan
     assert.equal(response.status, 200);
     assert.equal(requireSession.mock.callCount(), 1);
     assert.equal(buildLibraryWantedSummary.mock.callCount(), 1);
+    assert.deepEqual(buildLibraryWantedSummary.mock.calls[0].arguments[0], { appUserId: 'user-21' });
     assert.deepEqual(payload, {
       lastReconciledAt: '2026-04-30T13:20:00.000Z',
       monitoredArtistCount: 2,
@@ -1318,6 +1319,7 @@ test('library wanted-releases route includes discovery details for admin session
     assert.equal(response.status, 200);
     assert.equal(buildLibraryWantedReleases.mock.callCount(), 1);
     assert.deepEqual(buildLibraryWantedReleases.mock.calls[0].arguments[0], {
+      appUserId: 'admin-1',
       includeDiscoveryRequestDetails: true,
       limit: 25,
       wantedStatus: 'missing',
@@ -1338,6 +1340,7 @@ test('library wanted-releases route omits discovery details for requester sessio
 
     assert.equal(response.status, 200);
     assert.equal(buildLibraryWantedReleases.mock.callCount(), 1);
+    assert.equal(buildLibraryWantedReleases.mock.calls[0].arguments[0].appUserId, 'user-1');
     assert.equal(buildLibraryWantedReleases.mock.calls[0].arguments[0].includeDiscoveryRequestDetails, false);
   });
 });

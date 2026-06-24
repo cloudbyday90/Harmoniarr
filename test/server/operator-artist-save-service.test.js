@@ -505,3 +505,101 @@ test('saveOperatorArtist still resolves when a queued discography refresh is alr
   assert.equal(startMetadataArtistRefresh.mock.callCount(), 1);
   assert.equal(result.artistId, 'artist-1');
 });
+
+function buildTransitionTestPool({ existingIsMonitored }) {
+  const query = async (sql) => {
+    if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+      return { rows: [] };
+    }
+    if (sql.includes('FROM app_users')) {
+      return { rows: [{ id: 'user-1' }] };
+    }
+    if (sql.includes('FROM metadata_artists')) {
+      return { rows: [{ id: 'artist-1', name: 'Autechre' }] };
+    }
+    if (sql.includes('FROM operator_artist_monitoring')) {
+      return {
+        rows: [{
+          is_monitored: existingIsMonitored,
+          last_reconciled_at: null,
+          last_saved_snapshot_at: null,
+        }],
+      };
+    }
+    return { rows: [] };
+  };
+  return { connect: async () => ({ query, release: () => {} }) };
+}
+
+test('saveOperatorArtist fires monitor side effects only on the unmonitored -> monitored transition', async (t) => {
+  const notifications = [];
+  const activityEvents = [];
+  const service = createOperatorArtistSaveService({
+    getPoolFn: () => buildTransitionTestPool({ existingIsMonitored: false }),
+    getOperatorArtistProjection: async () => ({ operator: { monitoring: { isMonitored: true } } }),
+    onArtistMonitoredFn: async (payload) => { notifications.push(payload); },
+    recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
+    operatorArtistMonitoringStore: { upsertOperatorArtistMonitoring: async () => {} },
+    operatorArtistReconciliationRunStore: {
+      queueLatestSnapshotRun: async () => ({ action: 'created', run: { id: 'run-1', status: 'pending' }, runningRun: null }),
+    },
+    operatorArtistReconciliationSnapshotStore: {
+      createOperatorArtistReconciliationSnapshot: async () => ({ id: 'snap-1', snapshotRevision: 1, createdAt: 't', updatedAt: 't' }),
+    },
+    operatorReleaseGroupSelectionStore: { replaceOperatorArtistReleaseGroupSelections: async () => {} },
+    operatorTrackOverrideStore: { replaceOperatorArtistTrackOverrides: async () => {} },
+    startMetadataArtistRefresh: async () => {},
+  });
+
+  await service.saveOperatorArtist({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+    triggeredByUserId: 'user-1',
+    draft: { monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album'] } },
+  });
+
+  await new Promise((resolve) => { setImmediate(resolve); });
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+  assert.equal(notifications.length, 1, 'household notification fires once on transition');
+  assert.equal(notifications[0].artistName, 'Autechre');
+  assert.equal(notifications[0].metadataArtistId, 'artist-1');
+  assert.equal(activityEvents.length, 1, 'artist_monitored activity event fires once on transition');
+  assert.equal(activityEvents[0].eventType, 'artist_monitored');
+  assert.equal(activityEvents[0].entityId, 'artist-1');
+  assert.equal(activityEvents[0].actorUserId, 'user-1');
+});
+
+test('saveOperatorArtist does not fire monitor side effects when the artist was already monitored', async () => {
+  const notifications = [];
+  const activityEvents = [];
+  const service = createOperatorArtistSaveService({
+    getPoolFn: () => buildTransitionTestPool({ existingIsMonitored: true }),
+    getOperatorArtistProjection: async () => ({ operator: { monitoring: { isMonitored: true } } }),
+    onArtistMonitoredFn: async (payload) => { notifications.push(payload); },
+    recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
+    operatorArtistMonitoringStore: { upsertOperatorArtistMonitoring: async () => {} },
+    operatorArtistReconciliationRunStore: {
+      queueLatestSnapshotRun: async () => ({ action: 'created', run: { id: 'run-1', status: 'pending' }, runningRun: null }),
+    },
+    operatorArtistReconciliationSnapshotStore: {
+      createOperatorArtistReconciliationSnapshot: async () => ({ id: 'snap-1', snapshotRevision: 1, createdAt: 't', updatedAt: 't' }),
+    },
+    operatorReleaseGroupSelectionStore: { replaceOperatorArtistReleaseGroupSelections: async () => {} },
+    operatorTrackOverrideStore: { replaceOperatorArtistTrackOverrides: async () => {} },
+    startMetadataArtistRefresh: async () => {},
+  });
+
+  await service.saveOperatorArtist({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+    triggeredByUserId: 'user-1',
+    draft: { monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album'] } },
+  });
+
+  await new Promise((resolve) => { setImmediate(resolve); });
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+  assert.equal(notifications.length, 0);
+  assert.equal(activityEvents.length, 0);
+});

@@ -242,8 +242,9 @@ This supports explainability without making every screen recompute from raw even
 
 Current implementation note:
 
-- Canonical metadata monitoring now starts with `metadata_artist_monitoring`, a current-state table keyed to `metadata_artists`.
-- The implemented baseline stores `is_monitored` plus conservative `monitored_release_group_types` defaults of `album` and `ep`.
+- Canonical operator monitoring now starts with `operator_artist_monitoring`, a per-user policy table keyed to `metadata_artists`.
+- The legacy `metadata_artist_monitoring` table remains for compatibility routes and backup payloads during transition; new product-facing and scheduler reads should prefer operator-scoped state or a dedicated projection.
+- Metadata provider refresh cadence now lives in `metadata_artist_refresh_state`, keyed one row per metadata artist, while due-refresh eligibility is derived from `operator_artist_monitoring`.
 - `wanted_items`, `missing_items`, and the older `managed_*` monitoring references in this document remain planning-only until wanted reconciliation is implemented against the canonical metadata model.
 - Discovery intent now also starts with `library_discovery_requests`, a current-state projection keyed to canonical metadata releases and rebuilt from `library_wanted_releases`.
 
@@ -2304,13 +2305,33 @@ Rules:
 
 ## Missing And Wanted Tables
 
+### `metadata_artist_refresh_state`
+
+Current implemented metadata provider refresh cadence, one row per metadata artist.
+
+Columns:
+
+- `metadata_artist_id uuid primary key references metadata_artists(id) on delete cascade`
+- `last_refreshed_at timestamptz null`
+- `next_refresh_at timestamptz null`
+- `created_at timestamptz not null`
+- `updated_at timestamptz not null`
+
+Rules:
+
+- This table stores refresh schedule state only. It is not the source of monitoring policy.
+- Metadata refresh eligibility is derived from `operator_artist_monitoring` rows where `is_monitored = true`.
+- The refresh heartbeat groups operator monitoring rows by `metadata_artist_id` so multiple operators monitoring the same artist produce one MusicBrainz refresh candidate.
+- New release detection during refresh uses operator-derived monitored release-group types when available.
+
 ### `library_wanted_releases`
 
-Current implemented release-level wanted projection derived from canonical monitoring and library coverage.
+Current implemented per-operator release-level wanted projection derived from operator monitoring policy and library coverage.
 
 Columns:
 
 - `id uuid primary key`
+- `app_user_id uuid not null references app_users(id) on delete cascade`
 - `metadata_artist_id uuid not null references metadata_artists(id)`
 - `metadata_release_group_id uuid not null references metadata_release_groups(id)`
 - `metadata_release_id uuid not null references metadata_releases(id)`
@@ -2327,10 +2348,12 @@ Columns:
 
 Rules:
 
-- This table is currently keyed to canonical metadata releases, not the older planning-only `managed_*` model.
-- The initial implementation only projects monitored album and EP releases whose current library coverage is `missing` or `partial`.
+- This table is keyed to canonical metadata releases and the operator user that produced the wanted state, not the older planning-only `managed_*` model.
+- The implementation projects monitored release types from `operator_artist_monitoring` whose current library coverage is `missing` or `partial`.
 - `complete` and `duplicate` library reconciliation states do not produce wanted rows in this first slice.
-- The projection is rebuilt from canonical metadata monitoring plus `library_release_reconciliations` and should be treated as current-state output, not durable event history.
+- `release_scope = 'track_only'` and `wanted_automation_mode = 'manual_only'` do not produce automatic wanted rows.
+- `future_only` release scope and `future_matching` automation only produce rows for releases dated on or after the operator monitoring row's creation date, or rows without a release date.
+- The projection is rebuilt from operator monitoring plus `library_release_reconciliations` and should be treated as current-state output, not durable event history.
 
 ### `library_discovery_requests`
 

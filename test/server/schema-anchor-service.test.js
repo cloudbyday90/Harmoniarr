@@ -72,6 +72,26 @@ test('critical schema anchors include operation run lookup index', () => {
   );
 });
 
+test('critical schema anchors include per-operator wanted state anchors', () => {
+  assert.deepEqual(
+    criticalSchemaAnchors.tables.find((anchor) => anchor.table === 'library_wanted_releases'),
+    { table: 'library_wanted_releases' },
+  );
+  assert.deepEqual(
+    criticalSchemaAnchors.columns.find((anchor) => (
+      anchor.table === 'library_wanted_releases' && anchor.column === 'app_user_id'
+    )),
+    { table: 'library_wanted_releases', column: 'app_user_id' },
+  );
+  assert.deepEqual(
+    criticalSchemaAnchors.constraints.find((anchor) => (
+      anchor.table === 'library_wanted_releases'
+      && anchor.constraint === 'library_wanted_releases_user_release_unique'
+    )),
+    { table: 'library_wanted_releases', constraint: 'library_wanted_releases_user_release_unique' },
+  );
+});
+
 test('compareSchemaAnchorSnapshots reports clean matching anchors', () => {
   const source = {
     columns: {

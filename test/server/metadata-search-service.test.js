@@ -177,92 +177,30 @@ test('createMetadataSearchService rejects invalid empty search queries', async (
   );
 });
 
-test('createMetadataSearchService listMonitoredArtists normalizes and maps monitored artist rows', async (t) => {
-  const listMonitoredArtistsQuery = t.mock.fn(async ({ limit }, pool) => {
-    assert.equal(limit, 5);
-    assert.equal(pool, 'pool-token');
-
-    return [{
-      id: 42,
-      name: 'Autechre',
-      sort_name: 'Autechre',
-      disambiguation: null,
-      country: 'GB',
-      artist_type: 'Group',
-      musicbrainz_artist_id: 'mb-artist-1',
-    }];
-  });
+test('createMetadataSearchService listAllMonitoredArtists delegates to the monitored-artist store', async (t) => {
+  const listAdminMonitoredArtists = t.mock.fn(async (input) => ({
+    delegated: true,
+    input,
+  }));
 
   const service = createMetadataSearchService({
     pool: 'pool-token',
     searchArtistsQuery: async () => [],
-    listMonitoredArtistsQuery,
     searchReleaseGroupsQuery: async () => [],
     searchReleasesQuery: async () => [],
+    listAdminMonitoredArtists,
   });
 
-  const result = await service.listMonitoredArtists({ limit: '5' });
+  const result = await service.listAllMonitoredArtists({
+    search: 'Autechre',
+    sort: 'last_refreshed',
+    limit: 20,
+    offset: 40,
+  });
 
-  assert.equal(listMonitoredArtistsQuery.mock.callCount(), 1);
+  assert.equal(listAdminMonitoredArtists.mock.callCount(), 1);
   assert.deepEqual(result, {
-    limit: 5,
-    results: [{
-      id: 'mb-artist-1',
-      localId: 42,
-      name: 'Autechre',
-      sortName: 'Autechre',
-      disambiguation: null,
-      country: 'GB',
-      type: 'Group',
-      monitored: true,
-    }],
+    delegated: true,
+    input: { search: 'Autechre', sort: 'last_refreshed', limit: 20, offset: 40 },
   });
-});
-
-test('createMetadataSearchService listMonitoredArtists defaults limit to 25', async (t) => {
-  const listMonitoredArtistsQuery = t.mock.fn(async ({ limit }) => {
-    assert.equal(limit, 25);
-    return [];
-  });
-
-  const service = createMetadataSearchService({
-    pool: 'pool-token',
-    searchArtistsQuery: async () => [],
-    listMonitoredArtistsQuery,
-    searchReleaseGroupsQuery: async () => [],
-    searchReleasesQuery: async () => [],
-  });
-
-  const result = await service.listMonitoredArtists({});
-
-  assert.equal(result.limit, 25);
-  assert.deepEqual(result.results, []);
-});
-
-test('createMetadataSearchService listMonitoredArtists falls back to string local id as id when musicbrainz_artist_id is null', async (t) => {
-  const listMonitoredArtistsQuery = t.mock.fn(async () => [
-    {
-      id: 7,
-      name: 'Local Only Artist',
-      sort_name: 'Local Only Artist',
-      disambiguation: null,
-      country: null,
-      artist_type: null,
-      musicbrainz_artist_id: null,
-    },
-  ]);
-
-  const service = createMetadataSearchService({
-    pool: 'pool-token',
-    searchArtistsQuery: async () => [],
-    listMonitoredArtistsQuery,
-    searchReleaseGroupsQuery: async () => [],
-    searchReleasesQuery: async () => [],
-  });
-
-  const result = await service.listMonitoredArtists({ limit: 10 });
-
-  assert.equal(result.results[0].id, '7');
-  assert.equal(result.results[0].localId, 7);
-  assert.equal(result.results[0].monitored, true);
 });

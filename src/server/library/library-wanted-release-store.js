@@ -21,10 +21,21 @@ import { getPool } from '../database.js';
 export function createLibraryWantedReleaseStore({
   getPoolFn = getPool,
 } = {}) {
-  async function listLibraryWantedReleases() {
+  async function listLibraryWantedReleases({ appUserId = null } = {}) {
+    const params = [];
+    const conditions = [];
+
+    if (typeof appUserId === 'string' && appUserId.trim().length > 0) {
+      params.push(appUserId.trim());
+      conditions.push(`app_user_id = $${params.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const result = await getPoolFn().query(
       `
         SELECT
+          app_user_id,
           metadata_artist_id,
           metadata_release_group_id,
           metadata_release_id,
@@ -36,11 +47,14 @@ export function createLibraryWantedReleaseStore({
           release_status,
           evidence
         FROM library_wanted_releases
-        ORDER BY metadata_artist_id ASC, metadata_release_group_id ASC, metadata_release_id ASC
+        ${whereClause}
+        ORDER BY app_user_id ASC, metadata_artist_id ASC, metadata_release_group_id ASC, metadata_release_id ASC
       `,
+      params,
     );
 
     return result.rows.map((row) => ({
+      appUserId: row.app_user_id,
       evidence: row.evidence ?? {},
       expectedTrackCount: row.expected_track_count,
       matchedTrackCount: row.matched_track_count,
@@ -54,9 +68,17 @@ export function createLibraryWantedReleaseStore({
     }));
   }
 
-  async function listWantedStatusesForReleaseGroups({ metadataReleaseGroupIds } = {}) {
+  async function listWantedStatusesForReleaseGroups({ appUserId = null, metadataReleaseGroupIds } = {}) {
     if (!Array.isArray(metadataReleaseGroupIds) || metadataReleaseGroupIds.length < 1) {
       return [];
+    }
+
+    const params = [metadataReleaseGroupIds];
+    const conditions = ['metadata_release_group_id::text = ANY($1::text[])'];
+
+    if (typeof appUserId === 'string' && appUserId.trim().length > 0) {
+      params.push(appUserId.trim());
+      conditions.push(`app_user_id = $${params.length}`);
     }
 
     const result = await getPoolFn().query(
@@ -69,10 +91,10 @@ export function createLibraryWantedReleaseStore({
             ELSE MIN(wanted_status)
           END AS wanted_status
         FROM library_wanted_releases
-        WHERE metadata_release_group_id::text = ANY($1::text[])
+        WHERE ${conditions.join(' AND ')}
         GROUP BY metadata_release_group_id
       `,
-      [metadataReleaseGroupIds],
+      params,
     );
 
     return result.rows.map((row) => ({
@@ -93,6 +115,7 @@ export function createLibraryWantedReleaseStore({
         await client.query(
           `
             INSERT INTO library_wanted_releases (
+              app_user_id,
               metadata_artist_id,
               metadata_release_group_id,
               metadata_release_id,
@@ -116,12 +139,14 @@ export function createLibraryWantedReleaseStore({
               $7,
               $8,
               $9,
-              $10::jsonb,
+              $10,
+              $11::jsonb,
               NOW(),
               NOW()
             )
           `,
           [
+            wantedRelease.appUserId,
             wantedRelease.metadataArtistId,
             wantedRelease.metadataReleaseGroupId,
             wantedRelease.metadataReleaseId,
@@ -145,9 +170,14 @@ export function createLibraryWantedReleaseStore({
     }
   }
 
-  async function listWantedReleasesWithMetadata({ wantedStatus = null, limit = 500 } = {}) {
+  async function listWantedReleasesWithMetadata({ appUserId = null, wantedStatus = null, limit = 500 } = {}) {
     const params = [];
     const conditions = [];
+
+    if (typeof appUserId === 'string' && appUserId.trim().length > 0) {
+      params.push(appUserId.trim());
+      conditions.push(`lwr.app_user_id = $${params.length}`);
+    }
 
     if (wantedStatus === 'missing' || wantedStatus === 'partial') {
       params.push(wantedStatus);
@@ -170,6 +200,7 @@ export function createLibraryWantedReleaseStore({
           lwr.release_date,
           lwr.release_status,
           lwr.last_reconciled_at,
+          lwr.app_user_id,
           lwr.metadata_artist_id,
           lwr.metadata_release_group_id,
           lwr.metadata_release_id,
@@ -203,6 +234,7 @@ export function createLibraryWantedReleaseStore({
 
     return result.rows.map((row) => ({
       id: row.id,
+      appUserId: row.app_user_id,
       artistName: row.artist_name,
       artistSortName: row.artist_sort_name ?? row.artist_name,
       discoveryRequest: row.discovery_request_status

@@ -58,7 +58,6 @@ const {
   isRefreshingArtist,
   isSearchingLocal,
   isSearching,
-  isUpdatingArtistMonitoring,
   localArtist,
   localArtistResults,
   localRelease,
@@ -84,7 +83,6 @@ const {
   searchQuery,
   searchResults,
   selectedArtist,
-  updateArtistMonitoring,
   hasSearchedLocal,
 } = useMetadataArtistWorkflow();
 
@@ -254,12 +252,10 @@ watch(
         :detection-events-page-info="detectionEventsPageInfo"
         :is-loading-detection-events="isLoadingMoreDetectionEvents"
         :is-refreshing-metadata="isRefreshingArtist"
-        :is-updating-monitoring="isUpdatingArtistMonitoring"
         :local-artist="localArtist"
         :queued-refresh-run="queuedRefreshRun"
         @load-more-detection-events="loadMoreDetectionEvents"
         @refresh-metadata="refreshArtistMetadata"
-        @update-monitoring="updateArtistMonitoring"
       />
 
       <MetadataReleaseGroupBrowser

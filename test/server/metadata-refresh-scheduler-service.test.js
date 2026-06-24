@@ -5,7 +5,7 @@ import { createMetadataRefreshSchedulerService } from '../../src/server/metadata
 test('ensureArtistRefreshScheduled stores an immediate schedule for monitored artists', async (t) => {
   const scheduleArtistRefresh = t.mock.fn(async () => {});
   const service = createMetadataRefreshSchedulerService({
-    metadataMonitoringStore: {
+    metadataArtistRefreshStateStore: {
       scheduleArtistRefresh,
     },
     metadataRefreshSchedulingPolicyService: {
@@ -34,9 +34,9 @@ test('recordArtistRefreshCompleted persists the next schedule only for monitored
   const recordArtistRefresh = t.mock.fn(async () => {});
   const service = createMetadataRefreshSchedulerService({
     getMetadataArtist,
-    metadataMonitoringStore: {
+    metadataArtistRefreshStateStore: {
       clearArtistRefreshSchedule: t.mock.fn(async () => {}),
-      getArtistMonitoring: t.mock.fn(async () => ({
+      getArtistRefreshMonitoring: t.mock.fn(async () => ({
         isMonitored: true,
         monitoredReleaseGroupTypes: ['album', 'ep'],
       })),
@@ -83,9 +83,9 @@ test('recordArtistRefreshCompleted persists the next schedule only for monitored
 test('recordArtistRefreshCompleted clears the schedule for unmonitored artists', async (t) => {
   const clearArtistRefreshSchedule = t.mock.fn(async () => {});
   const service = createMetadataRefreshSchedulerService({
-    metadataMonitoringStore: {
+    metadataArtistRefreshStateStore: {
       clearArtistRefreshSchedule,
-      getArtistMonitoring: t.mock.fn(async () => ({ isMonitored: false })),
+      getArtistRefreshMonitoring: t.mock.fn(async () => ({ isMonitored: false })),
       listArtistsDueForRefresh: t.mock.fn(async () => []),
       recordArtistRefresh: t.mock.fn(async () => {}),
       scheduleArtistRefresh: t.mock.fn(async () => {}),

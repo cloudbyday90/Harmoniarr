@@ -25,7 +25,6 @@ import {
   searchMusicBrainzReleases,
   saveOperatorArtistDraft,
   startMetadataArtistRefresh,
-  updateMetadataArtistMonitoring,
 } from '../../src/client/lib/metadata-api.js';
 
 function createJsonResponse({ ok = true, payload = { ok: true }, status = 200 } = {}) {
@@ -183,19 +182,6 @@ test('metadata-api import endpoints send POST with CSRF', async (t) => {
     assert.equal(globalThis.fetch.mock.calls[i].arguments[1].method, 'POST');
     assert.equal(globalThis.fetch.mock.calls[i].arguments[1].headers.get('X-CSRF-Token'), 'csrf-meta');
   }
-});
-
-test('metadata-api updateMetadataArtistMonitoring sends PUT with body', async (t) => {
-  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-meta' };
-  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
-
-  await updateMetadataArtistMonitoring('a-1', { isMonitored: true });
-
-  assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/metadata/artists/a-1/monitoring');
-  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'PUT');
-
-  const body = JSON.parse(globalThis.fetch.mock.calls[0].arguments[1].body);
-  assert.equal(body.isMonitored, true);
 });
 
 test('metadata-api saveOperatorArtistDraft sends PUT with CSRF and body', async (t) => {

@@ -4,12 +4,15 @@ import { createLibraryWantedReleaseStore } from '../../src/server/library/librar
 
 test('listWantedReleasesWithMetadata maps discovery request recovery evidence', async () => {
   let observedSql = '';
+  let observedParams = [];
   const store = createLibraryWantedReleaseStore({
     getPoolFn: () => ({
-      query: async (sql) => {
+      query: async (sql, params) => {
         observedSql = sql;
+        observedParams = params;
         return {
           rows: [{
+            app_user_id: 'user-1',
             artist_name: 'Radiohead',
             artist_sort_name: 'Radiohead',
             discovery_blocked_reason: 'download_recovery_exhausted',
@@ -50,9 +53,12 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
     }),
   });
 
-  const releases = await store.listWantedReleasesWithMetadata();
+  const releases = await store.listWantedReleasesWithMetadata({ appUserId: 'user-1', limit: 25 });
 
   assert.match(observedSql, /LEFT JOIN library_discovery_requests ldr/);
+  assert.match(observedSql, /lwr\.app_user_id = \$1/);
+  assert.deepEqual(observedParams, ['user-1', 25]);
+  assert.equal(releases[0].appUserId, 'user-1');
   assert.deepEqual(releases[0].discoveryRequest, {
     blockedReason: 'download_recovery_exhausted',
     evidence: {
@@ -76,6 +82,7 @@ test('listWantedReleasesWithMetadata returns null discoveryRequest when none exi
     getPoolFn: () => ({
       query: async () => ({
         rows: [{
+          app_user_id: 'user-2',
           artist_name: 'Bjork',
           artist_sort_name: 'Bjork',
           discovery_request_status: null,
@@ -105,4 +112,79 @@ test('listWantedReleasesWithMetadata returns null discoveryRequest when none exi
   const releases = await store.listWantedReleasesWithMetadata();
 
   assert.equal(releases[0].discoveryRequest, null);
+});
+
+test('replaceLibraryWantedReleases writes operator-scoped wanted rows', async (t) => {
+  const queries = [];
+  const client = {
+    query: t.mock.fn(async (sql, params) => {
+      queries.push({ params, sql });
+      return { rows: [] };
+    }),
+    release: t.mock.fn(),
+  };
+  const store = createLibraryWantedReleaseStore({
+    getPoolFn: () => ({
+      connect: async () => client,
+    }),
+  });
+
+  await store.replaceLibraryWantedReleases({
+    wantedReleases: [{
+      appUserId: 'user-1',
+      evidence: { strategy: 'monitored_release_absent' },
+      expectedTrackCount: 12,
+      matchedTrackCount: 0,
+      metadataArtistId: 'artist-1',
+      metadataReleaseGroupId: 'rg-1',
+      metadataReleaseId: 'release-1',
+      missingTrackCount: 12,
+      releaseDate: '2026-06-01',
+      releaseStatus: 'Official',
+      wantedStatus: 'missing',
+    }],
+  });
+
+  const insertQuery = queries.find((entry) => entry.sql.includes('INSERT INTO library_wanted_releases'));
+  assert.match(insertQuery.sql, /app_user_id/);
+  assert.deepEqual(insertQuery.params, [
+    'user-1',
+    'artist-1',
+    'rg-1',
+    'release-1',
+    'missing',
+    12,
+    0,
+    12,
+    '2026-06-01',
+    'Official',
+    '{"strategy":"monitored_release_absent"}',
+  ]);
+  assert.equal(client.release.mock.callCount(), 1);
+});
+
+test('listLibraryWantedReleases maps appUserId for backup export', async () => {
+  const store = createLibraryWantedReleaseStore({
+    getPoolFn: () => ({
+      query: async () => ({
+        rows: [{
+          app_user_id: 'user-1',
+          evidence: {},
+          expected_track_count: 10,
+          matched_track_count: 0,
+          metadata_artist_id: 'artist-1',
+          metadata_release_group_id: 'rg-1',
+          metadata_release_id: 'release-1',
+          missing_track_count: 10,
+          release_date: null,
+          release_status: 'Official',
+          wanted_status: 'missing',
+        }],
+      }),
+    }),
+  });
+
+  const rows = await store.listLibraryWantedReleases();
+
+  assert.equal(rows[0].appUserId, 'user-1');
 });

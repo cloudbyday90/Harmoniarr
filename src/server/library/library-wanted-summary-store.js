@@ -17,7 +17,6 @@
  */
 
 import { getPool } from '../database.js';
-import { OPERATOR_MONITORED_ARTIST_SCOPE_CTE } from './operator-monitored-artist-scope-sql.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -34,15 +33,19 @@ function mapReleaseCounts(row) {
 export function createLibraryWantedSummaryStore({
   getPoolFn = getPool,
 } = {}) {
-  async function getLibraryWantedSnapshot() {
+  async function getLibraryWantedSnapshot({ appUserId } = {}) {
     const pool = getPoolFn();
     const [monitoredArtistResult, releaseCountsResult] = await Promise.all([
       pool.query(
         `
-          WITH ${OPERATOR_MONITORED_ARTIST_SCOPE_CTE}
-          SELECT COUNT(*)::integer AS monitored_artist_count
-          FROM operator_monitored_artist_scope
+          SELECT COUNT(DISTINCT metadata_artist_id)::integer AS monitored_artist_count
+          FROM operator_artist_monitoring
+          WHERE app_user_id = $1
+            AND is_monitored = TRUE
+            AND release_scope <> 'track_only'
+            AND wanted_automation_mode <> 'manual_only'
         `,
+        [appUserId],
       ),
       pool.query(
         `
@@ -52,7 +55,9 @@ export function createLibraryWantedSummaryStore({
             COUNT(*)::integer AS total_wanted_release_count,
             MAX(last_reconciled_at) AS last_reconciled_at
           FROM library_wanted_releases
+          WHERE app_user_id = $1
         `,
+        [appUserId],
       ),
     ]);
 

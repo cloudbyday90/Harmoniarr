@@ -67,7 +67,9 @@ export function createBackupRestoreApplyService({
   readBackupPayloadFn = (storagePath) => readFile(storagePath, 'utf8'),
   replaceOverridesSnapshot = async () => {},
   replaceLibraryWantedReleases = async () => {},
-  replaceMetadataArtistMonitoring = async () => {},
+  replaceOperatorArtistMonitoring = async () => {},
+  replaceOperatorReleaseGroupSelections = async () => {},
+  replaceOperatorTrackOverrides = async () => {},
   replaceTrustSnapshot = async () => {},
   recordAuditEventFn = recordAuditEvent,
   releaseMaintenanceLock = async () => null,
@@ -94,7 +96,9 @@ export function createBackupRestoreApplyService({
   const backupRestoreScopeApplyService = createBackupRestoreScopeApplyService({
     replaceOverridesSnapshot,
     replaceLibraryWantedReleases,
-    replaceMetadataArtistMonitoring,
+    replaceOperatorArtistMonitoring,
+    replaceOperatorReleaseGroupSelections,
+    replaceOperatorTrackOverrides,
     replaceTrustSnapshot,
     updateSettingsFn,
   });

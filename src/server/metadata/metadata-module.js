@@ -23,8 +23,8 @@ import { createMetadataArtistRefreshService } from './metadata-artist-refresh-se
 import { createMetadataArtistRefreshWorker } from './metadata-artist-refresh-worker.js';
 import { createMetadataRefreshHeartbeatState } from './metadata-refresh-heartbeat-state.js';
 import { resolveMetadataRefreshHeartbeatConfig } from './metadata-refresh-heartbeat-config.js';
-import { createMetadataMonitoringService } from './metadata-monitoring-service.js';
-import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
+import { createMetadataMonitoredArtistStore } from './metadata-monitored-artist-store.js';
+import { createMetadataArtistRefreshStateStore } from './metadata-artist-refresh-state-store.js';
 import { createOperatorArtistMonitoringService } from './operator-artist-monitoring-service.js';
 import { createOperatorMonitoredArtistProjectionService } from './operator-monitored-artist-projection-service.js';
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
@@ -69,8 +69,8 @@ export function createMetadataModule({
   metadataRefreshHeartbeatState = null,
   metadataRefreshSchedulerService = null,
   metadataRefreshSchedulingPolicyService = null,
-  metadataMonitoringStore = null,
-  metadataMonitoringService = null,
+  metadataArtistRefreshStateStore = null,
+  metadataMonitoredArtistStore = null,
   operatorArtistMonitoringStore = null,
   operatorArtistMonitoringService = null,
   operatorMonitoredArtistProjectionService = null,
@@ -99,23 +99,20 @@ export function createMetadataModule({
   similarArtistsService = null,
   releaseGroupTracklistService = null,
 } = {}) {
-  const resolvedMetadataMonitoringStore = metadataMonitoringStore ?? createMetadataMonitoringStore();
+  const resolvedMetadataMonitoredArtistStore = metadataMonitoredArtistStore
+    ?? createMetadataMonitoredArtistStore();
+  const resolvedMetadataArtistRefreshStateStore = metadataArtistRefreshStateStore
+    ?? createMetadataArtistRefreshStateStore();
   const resolvedMetadataReleaseDetectionService = metadataReleaseDetectionService ?? createMetadataReleaseDetectionService();
   const resolvedMetadataReadService = metadataReadService ?? createMetadataReadService({
-    metadataMonitoringStore: resolvedMetadataMonitoringStore,
+    metadataMonitoredArtistStore: resolvedMetadataMonitoredArtistStore,
     metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
   });
   const resolvedMetadataRefreshSchedulingPolicyService = metadataRefreshSchedulingPolicyService ?? createMetadataRefreshSchedulingPolicyService();
   const resolvedMetadataRefreshSchedulerService = metadataRefreshSchedulerService ?? createMetadataRefreshSchedulerService({
     getMetadataArtist: resolvedMetadataReadService.getArtist,
-    metadataMonitoringStore: resolvedMetadataMonitoringStore,
+    metadataArtistRefreshStateStore: resolvedMetadataArtistRefreshStateStore,
     metadataRefreshSchedulingPolicyService: resolvedMetadataRefreshSchedulingPolicyService,
-  });
-  const resolvedMetadataMonitoringService = metadataMonitoringService ?? createMetadataMonitoringService({
-    metadataMonitoringStore: resolvedMetadataMonitoringStore,
-    metadataRefreshSchedulerService: resolvedMetadataRefreshSchedulerService,
-    recordActivityEventFn,
-    onArtistMonitoredFn,
   });
   const resolvedOperatorArtistMonitoringStore = operatorArtistMonitoringStore ?? createOperatorArtistMonitoringStore();
   const resolvedOperatorArtistMonitoringService = operatorArtistMonitoringService ?? createOperatorArtistMonitoringService({
@@ -160,11 +157,13 @@ export function createMetadataModule({
   const resolvedOperatorArtistSaveService = operatorArtistSaveService
     ?? createOperatorArtistSaveService({
       getOperatorArtistProjection: resolvedOperatorArtistProjectionService.getOperatorArtistProjection,
+      onArtistMonitoredFn,
       operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
       operatorArtistReconciliationRunStore: resolvedOperatorArtistReconciliationRunStore,
       operatorArtistReconciliationSnapshotStore: resolvedOperatorArtistReconciliationSnapshotStore,
       operatorReleaseGroupSelectionStore: resolvedOperatorReleaseGroupSelectionStore,
       operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
+      recordActivityEventFn,
       // Late-bound: the metadata artist refresh service is resolved further
       // below. Adding/monitoring an artist queues a per-artist discography
       // refresh so their releases populate without waiting on the heartbeat.
@@ -211,6 +210,7 @@ export function createMetadataModule({
       renewLease: resolvedOperatorArtistReconciliationRunStore.renewLease,
     });
   const resolvedMetadataRefreshService = metadataRefreshService ?? createMetadataRefreshService({
+    getArtistRefreshMonitoring: resolvedMetadataArtistRefreshStateStore.getArtistRefreshMonitoring,
     getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,
     providerHealthRecorder,
     metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
@@ -265,8 +265,7 @@ export function createMetadataModule({
     metadataRefreshSchedulerService: resolvedMetadataRefreshSchedulerService,
     metadataRefreshSchedulingPolicyService: resolvedMetadataRefreshSchedulingPolicyService,
     metadataReadService: resolvedMetadataReadService,
-    metadataMonitoringService: resolvedMetadataMonitoringService,
-    metadataMonitoringStore: resolvedMetadataMonitoringStore,
+    metadataMonitoredArtistStore: resolvedMetadataMonitoredArtistStore,
     operatorArtistMonitoringService: resolvedOperatorArtistMonitoringService,
     operatorArtistMonitoringStore: resolvedOperatorArtistMonitoringStore,
     operatorMonitoredArtistProjectionService: resolvedOperatorMonitoredArtistProjectionService,
@@ -284,6 +283,7 @@ export function createMetadataModule({
     operatorTrackOverrideService: resolvedOperatorTrackOverrideService,
     operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
     metadataRefreshService: resolvedMetadataRefreshService,
+    metadataArtistRefreshStateStore: resolvedMetadataArtistRefreshStateStore,
     metadataSearchService: resolvedMetadataSearchService,
     providerHealthRecorder,
     musicBrainzCatalogService: resolvedMusicBrainzCatalogService,
@@ -304,7 +304,6 @@ export function createMetadataModule({
       getMetadataReleaseGroupByMusicBrainzId: resolvedMetadataReadService.getReleaseGroupByMusicBrainzId,
       saveOperatorArtist: resolvedOperatorArtistSaveService.saveOperatorArtist,
       startMetadataArtistRefresh: resolvedMetadataArtistRefreshService.startMetadataArtistRefresh,
-      updateMetadataArtistMonitoring: resolvedMetadataMonitoringService.updateArtistMonitoring,
       importMusicBrainzArtist: resolvedMusicBrainzImportService.importArtistById,
       importMusicBrainzReleaseGroup: resolvedMusicBrainzImportService.importReleaseGroupById,
       importMusicBrainzRelease: resolvedMusicBrainzImportService.importReleaseById,

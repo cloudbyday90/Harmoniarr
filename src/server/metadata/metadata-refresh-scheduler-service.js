@@ -16,17 +16,20 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createMetadataMonitoringStore } from './metadata-monitoring-store.js';
+import { createMetadataArtistRefreshStateStore } from './metadata-artist-refresh-state-store.js';
 import { createMetadataRefreshSchedulingPolicyService } from './metadata-refresh-scheduling-policy-service.js';
 
 export function createMetadataRefreshSchedulerService({
   getMetadataArtist = async () => null,
-  metadataMonitoringStore = createMetadataMonitoringStore(),
+  metadataArtistRefreshStateStore = null,
   metadataRefreshSchedulingPolicyService = createMetadataRefreshSchedulingPolicyService(),
 } = {}) {
+  const refreshStateStore = metadataArtistRefreshStateStore
+    ?? createMetadataArtistRefreshStateStore();
+
   async function ensureArtistRefreshScheduled({ metadataArtistId, now } = {}) {
     const schedule = metadataRefreshSchedulingPolicyService.buildInitialSchedule({ now });
-    await metadataMonitoringStore.scheduleArtistRefresh({
+    await refreshStateStore.scheduleArtistRefresh({
       metadataArtistId,
       nextRefreshAt: schedule.nextRefreshAt,
     });
@@ -35,18 +38,18 @@ export function createMetadataRefreshSchedulerService({
   }
 
   async function clearArtistRefreshSchedule({ metadataArtistId } = {}) {
-    await metadataMonitoringStore.clearArtistRefreshSchedule({ metadataArtistId });
+    await refreshStateStore.clearArtistRefreshSchedule({ metadataArtistId });
   }
 
   async function getNextDueArtist({ limit = 1, now } = {}) {
-    const artists = await metadataMonitoringStore.listArtistsDueForRefresh({ limit, now });
+    const artists = await refreshStateStore.listArtistsDueForRefresh({ limit, now });
     return artists[0] ?? null;
   }
 
   async function recordArtistRefreshCompleted({ metadataArtistId, refreshedAt } = {}) {
-    const monitoring = await metadataMonitoringStore.getArtistMonitoring(metadataArtistId);
+    const monitoring = await refreshStateStore.getArtistRefreshMonitoring(metadataArtistId);
     if (!monitoring?.isMonitored) {
-      await metadataMonitoringStore.clearArtistRefreshSchedule({ metadataArtistId });
+      await refreshStateStore.clearArtistRefreshSchedule({ metadataArtistId });
       return null;
     }
 
@@ -57,7 +60,7 @@ export function createMetadataRefreshSchedulerService({
       refreshedAt,
       releaseGroups: artist?.releaseGroups ?? [],
     });
-    await metadataMonitoringStore.recordArtistRefresh({
+    await refreshStateStore.recordArtistRefresh({
       lastRefreshedAt: schedule.lastRefreshedAt,
       metadataArtistId,
       nextRefreshAt: schedule.nextRefreshAt,

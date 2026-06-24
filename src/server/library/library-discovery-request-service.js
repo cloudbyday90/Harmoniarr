@@ -116,14 +116,20 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   const priorEvidence = row.prior_evidence && typeof row.prior_evidence === 'object'
     ? row.prior_evidence
     : {};
-  const requestSourceEvidence = row.source_media_request_id
-    ? {
-        sourceMediaRequestId: row.source_media_request_id,
-        sourceRequestKind: row.source_request_kind ?? null,
-        sourceRequestedByUserId: row.source_requested_by_user_id ?? null,
-        sourceRequestedForUserId: row.source_requested_for_user_id ?? row.source_requested_by_user_id ?? null,
-      }
-    : {};
+  const requestSourceEvidence = {};
+  if (row.source_media_request_id) {
+    requestSourceEvidence.sourceMediaRequestId = row.source_media_request_id;
+  }
+  if (row.source_request_kind) {
+    requestSourceEvidence.sourceRequestKind = row.source_request_kind;
+  }
+  if (row.source_requested_by_user_id) {
+    requestSourceEvidence.sourceRequestedByUserId = row.source_requested_by_user_id;
+  }
+  const sourceRequestedForUserId = row.source_requested_for_user_id ?? row.source_requested_by_user_id ?? null;
+  if (sourceRequestedForUserId) {
+    requestSourceEvidence.sourceRequestedForUserId = sourceRequestedForUserId;
+  }
   const releaseDateDeadline = buildReleaseDateInstant(row.release_date);
   const cooldownDeadline = buildCooldownDeadline(row.last_search_at, automaticCooldownMs);
 
@@ -302,7 +308,7 @@ export function createLibraryDiscoveryRequestService({
             NULL::uuid AS source_media_request_id,
             NULL::text AS source_request_kind,
             NULL::uuid AS source_requested_by_user_id,
-            NULL::uuid AS source_requested_for_user_id,
+            library_wanted_releases.app_user_id AS source_requested_for_user_id,
             current_discovery.search_mode,
             current_discovery.blocked_reason,
             current_discovery.evidence AS prior_evidence,
@@ -378,7 +384,11 @@ export function createLibraryDiscoveryRequestService({
             UNION ALL
             SELECT * FROM monitored_sources
           ) AS source_rows
-          ORDER BY source_rows.metadata_release_id ASC, source_rows.source_priority ASC, source_rows.release_date ASC NULLS LAST
+          ORDER BY
+            source_rows.metadata_release_id ASC,
+            source_rows.source_priority ASC,
+            source_rows.source_requested_for_user_id ASC NULLS LAST,
+            source_rows.release_date ASC NULLS LAST
         )
         SELECT
           deduped_sources.metadata_artist_id,

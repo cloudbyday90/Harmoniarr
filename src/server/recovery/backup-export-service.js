@@ -76,7 +76,6 @@ function resolveArtifactStoragePath({ artifact, backupsDirectory }) {
 }
 
 function buildScopeSettings({
-  artistMonitoring,
   manualOverrides,
   operatorArtistMonitoring,
   operatorReleaseGroupSelections,
@@ -91,7 +90,6 @@ function buildScopeSettings({
       qualityProfiles: settingsSnapshot.quality,
     },
     monitoring: {
-      artistMonitoring,
       operatorArtistMonitoring,
       operatorReleaseGroupSelections,
       operatorTrackOverrides,
@@ -124,7 +122,6 @@ export function createBackupExportService({
   deleteBackupArtifactById = async () => null,
   getBackupArtifactById = async () => null,
   getMigrationStatusFn = getMigrationStatus,
-  listArtistMonitoringForBackup = async () => [],
   listBackupArtifacts = async () => [],
   listOverridesSnapshotForBackup = async () => [],
   listOperatorArtistMonitoringForBackup = async () => [],
@@ -150,7 +147,6 @@ export function createBackupExportService({
     const settingsSnapshot = await loadSettingsFn();
     const migrationStatus = await getMigrationStatusFn();
     const [
-      artistMonitoring,
       manualOverrides,
       operatorArtistMonitoring,
       operatorReleaseGroupSelections,
@@ -158,7 +154,6 @@ export function createBackupExportService({
       sourceUsers,
       wantedReleases,
     ] = await Promise.all([
-      listArtistMonitoringForBackup(),
       listOverridesSnapshotForBackup(),
       listOperatorArtistMonitoringForBackup(),
       listOperatorReleaseGroupSelectionsForBackup(),
@@ -183,7 +178,6 @@ export function createBackupExportService({
       ...manifest,
       data: {
         scopeSettings: buildScopeSettings({
-          artistMonitoring,
           manualOverrides,
           operatorArtistMonitoring,
           operatorReleaseGroupSelections,

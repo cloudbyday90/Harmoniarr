@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createLibraryMediaRequestService } from '../../src/server/library/library-media-request-service.js';
-import { createMetadataMonitoringService } from '../../src/server/metadata/metadata-monitoring-service.js';
 import { createImportCandidateExecutionReconciliationService } from '../../src/server/import-candidates/import-candidate-execution-reconciliation-service.js';
 import { createImportCandidateApplyWorker } from '../../src/server/import-candidates/import-candidate-apply-worker.js';
 
@@ -85,100 +84,6 @@ test('library-media-request-service swallows onRequestCreatedFn errors', async (
   });
 
   assert.equal(result.id, 'req-1');
-});
-
-test('metadata-monitoring-service calls onArtistMonitoredFn when artist is monitored', async () => {
-  const notifications = [];
-  const pool = {
-    query: async () => ({ rows: [{ id: 'artist-1', name: 'Radiohead' }] }),
-  };
-  const monitoringStore = {
-    upsertArtistMonitoring: async () => {},
-    getArtistMonitoring: async () => null,
-  };
-  const refreshScheduler = {
-    ensureArtistRefreshScheduled: async () => {},
-    clearArtistRefreshSchedule: async () => {},
-  };
-
-  const service = createMetadataMonitoringService({
-    getPoolFn: () => pool,
-    metadataMonitoringStore: monitoringStore,
-    metadataRefreshSchedulerService: refreshScheduler,
-    recordActivityEventFn: async () => {},
-    onArtistMonitoredFn: async (payload) => { notifications.push(payload); },
-  });
-
-  await service.updateArtistMonitoring({
-    metadataArtistId: 'artist-1',
-    patch: { isMonitored: true },
-    actorUserId: 'user-1',
-  });
-
-  assert.equal(notifications.length, 1);
-  assert.equal(notifications[0].artistName, 'Radiohead');
-  assert.equal(notifications[0].metadataArtistId, 'artist-1');
-});
-
-test('metadata-monitoring-service does not call onArtistMonitoredFn when artist is unmonitored', async () => {
-  const notifications = [];
-  const pool = {
-    query: async () => ({ rows: [{ id: 'artist-1', name: 'Radiohead' }] }),
-  };
-  const monitoringStore = {
-    upsertArtistMonitoring: async () => {},
-    getArtistMonitoring: async () => null,
-  };
-  const refreshScheduler = {
-    ensureArtistRefreshScheduled: async () => {},
-    clearArtistRefreshSchedule: async () => {},
-  };
-
-  const service = createMetadataMonitoringService({
-    getPoolFn: () => pool,
-    metadataMonitoringStore: monitoringStore,
-    metadataRefreshSchedulerService: refreshScheduler,
-    recordActivityEventFn: async () => {},
-    onArtistMonitoredFn: async (payload) => { notifications.push(payload); },
-  });
-
-  await service.updateArtistMonitoring({
-    metadataArtistId: 'artist-1',
-    patch: { isMonitored: false },
-    actorUserId: 'user-1',
-  });
-
-  assert.equal(notifications.length, 0);
-});
-
-test('metadata-monitoring-service swallows onArtistMonitoredFn errors', async () => {
-  const pool = {
-    query: async () => ({ rows: [{ id: 'artist-1', name: 'Radiohead' }] }),
-  };
-  const monitoringStore = {
-    upsertArtistMonitoring: async () => {},
-    getArtistMonitoring: async () => null,
-  };
-  const refreshScheduler = {
-    ensureArtistRefreshScheduled: async () => {},
-    clearArtistRefreshSchedule: async () => {},
-  };
-
-  const service = createMetadataMonitoringService({
-    getPoolFn: () => pool,
-    metadataMonitoringStore: monitoringStore,
-    metadataRefreshSchedulerService: refreshScheduler,
-    recordActivityEventFn: async () => {},
-    onArtistMonitoredFn: async () => { throw new Error('notification failed'); },
-  });
-
-  const result = await service.updateArtistMonitoring({
-    metadataArtistId: 'artist-1',
-    patch: { isMonitored: true },
-    actorUserId: 'user-1',
-  });
-
-  assert.equal(result.artistId, 'artist-1');
 });
 
 test('reconciliation service calls onDownloadCompletedFn when transitioning to import_pending', async () => {

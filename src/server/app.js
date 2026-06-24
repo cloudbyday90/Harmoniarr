@@ -586,7 +586,6 @@ export function createApp({
     libraryScanSummaryService: libraryModule.libraryScanSummaryService,
     metadataRefreshHeartbeatConfig: metadataModule.metadataRefreshHeartbeatConfig,
     metadataRefreshHeartbeatState: metadataModule.metadataRefreshHeartbeatState,
-    metadataMonitoringStore: metadataModule.metadataMonitoringStore,
     operatorArtistMonitoringStore: metadataModule.operatorArtistMonitoringStore,
     operatorReleaseGroupSelectionStore: metadataModule.operatorReleaseGroupSelectionStore,
     operatorTrackOverrideStore: metadataModule.operatorTrackOverrideStore,

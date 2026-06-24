@@ -26,7 +26,6 @@ import {
 import {
   importMusicBrainzArtist,
   saveOperatorArtistDraft,
-  updateMetadataArtistMonitoring,
 } from '../lib/metadata-api.js';
 import { useToast } from './useToast.js';
 
@@ -38,15 +37,18 @@ import { useToast } from './useToast.js';
  * multiple screens can share the same monitoring pattern without duplicating
  * the import/monitor API sequence or toast feedback.
  *
+ * Monitoring is consolidated onto the canonical operator-scoped save surface
+ * (`addArtistWithPolicy`): import the MusicBrainz artist, then save an
+ * operator draft with the chosen policy.
+ *
  * @param {object} [options]
  * @param {string[]} [options.initialMonitoredIds] - MusicBrainz artist IDs to
  *   treat as already monitored at construction time. Must be MusicBrainz IDs
- *   (not local metadata artist IDs), matching the IDs used by `monitorArtist`.
+ *   (not local metadata artist IDs), matching the IDs used by `addArtistWithPolicy`.
  * @param {boolean} [options.showToasts] - When true (default), success/error
  *   toasts are shown automatically.
  * @param {function} [options.importArtist] - Override for testing.
  * @param {function} [options.saveOperatorArtist] - Override for testing.
- * @param {function} [options.updateMonitoring] - Override for testing.
  * @param {object} [options.toast] - Override for testing.
  */
 export function useArtistMonitoring({
@@ -54,7 +56,6 @@ export function useArtistMonitoring({
   showToasts = true,
   importArtist = importMusicBrainzArtist,
   saveOperatorArtist = saveOperatorArtistDraft,
-  updateMonitoring = updateMetadataArtistMonitoring,
   toast = useToast(),
 } = {}) {
 
@@ -91,64 +92,22 @@ export function useArtistMonitoring({
   }
 
   /**
-   * Import then monitor a MusicBrainz artist.
+   * Import a MusicBrainz artist then save an operator-scoped monitoring draft
+   * with the chosen policy.
    *
    * 1. Adds the artist ID to `monitoringIds`.
    * 2. Calls `importArtist(mbid)` to upsert the artist locally.
-   * 3. Calls `updateMonitoring(localId, { isMonitored: true })`.
+   * 3. Builds an operator draft from the normalized policy and calls
+   *    `saveOperatorArtist(localId, draft)`.
    * 4. Moves the ID from `monitoringIds` to `monitoredIds`.
    * 5. Optionally shows a success/error toast.
    *
-   * Returns `{ success: true }` or `{ success: false, error }`.
+   * Returns `{ success: true, ... }` or `{ success: false, error }`.
    *
    * @param {{ id: string, name: string }} artist
+   * @param {object} [policyForm]
+   * @returns {Promise<object>}
    */
-  async function monitorArtist(artist) {
-    const { id, name } = artist;
-
-    // Prevent duplicate or redundant calls.
-    if (monitoringIds.value.has(id) || monitoredIds.value.has(id)) {
-      return { success: false, error: new Error('Already monitoring or monitored.') };
-    }
-
-    // Mark as in-progress (reassign to trigger reactivity).
-    monitoringIds.value = new Set([...monitoringIds.value, id]);
-
-    try {
-      const importResult = await importArtist(id);
-      const localArtistId = importResult?.imported?.artistId ?? null;
-
-      if (!localArtistId) {
-        throw new Error(`Could not resolve local ID for ${name} after import.`);
-      }
-
-      await updateMonitoring(localArtistId, { isMonitored: true });
-
-      // Move from in-progress to complete (reassign both for reactivity).
-      const nextMonitoring = new Set(monitoringIds.value);
-      nextMonitoring.delete(id);
-      monitoringIds.value = nextMonitoring;
-
-      monitoredIds.value = new Set([...monitoredIds.value, id]);
-
-      if (showToasts) {
-        toast.success(`Monitoring ${name}.`);
-      }
-
-      return { success: true };
-    } catch (error) {
-      const nextMonitoring = new Set(monitoringIds.value);
-      nextMonitoring.delete(id);
-      monitoringIds.value = nextMonitoring;
-
-      if (showToasts) {
-        toast.error(getErrorMessage(error, `Could not monitor ${name}. Please try again.`));
-      }
-
-      return { success: false, error };
-    }
-  }
-
   async function addArtistWithPolicy(artist, policyForm = defaultAddArtistPolicyForm) {
     const { id, name } = artist;
 
@@ -207,6 +166,5 @@ export function useArtistMonitoring({
     hasMonitored,
     isMonitored,
     isMonitoring,
-    monitorArtist,
   };
 }

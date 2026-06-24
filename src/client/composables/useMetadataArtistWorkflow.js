@@ -28,7 +28,6 @@ import {
   resolveMusicBrainzArtistLocal,
   searchMusicBrainzArtists,
   startMetadataArtistRefresh as defaultStartMetadataArtistRefresh,
-  updateMetadataArtistMonitoring as defaultUpdateMetadataArtistMonitoring,
 } from '../lib/metadata-api.js';
 import { useMetadataLocalSearchWorkflow } from './useMetadataLocalSearchWorkflow.js';
 import { useMetadataReleaseWorkflow } from './useMetadataReleaseWorkflow.js';
@@ -41,7 +40,6 @@ export function useMetadataArtistWorkflow({
   resolveArtistLocal = resolveMusicBrainzArtistLocal,
   searchArtists = searchMusicBrainzArtists,
   startMetadataArtistRefreshRequest = defaultStartMetadataArtistRefresh,
-  updateArtistMonitoringRequest = defaultUpdateMetadataArtistMonitoring,
   createLocalSearchWorkflow = useMetadataLocalSearchWorkflow,
   createReleaseWorkflow = useMetadataReleaseWorkflow,
 } = {}) {
@@ -60,7 +58,6 @@ export function useMetadataArtistWorkflow({
   const isLoadingArtist = ref(false);
   const isLoadingMoreDetectionEvents = ref(false);
   const isRefreshingArtist = ref(false);
-  const isUpdatingArtistMonitoring = ref(false);
   const artistWorkspaceRequestGate = createLatestRequestGate();
 
   const localSearchWorkflow = createLocalSearchWorkflow();
@@ -250,27 +247,6 @@ export function useMetadataArtistWorkflow({
     }
   }
 
-  async function updateArtistMonitoring(patch) {
-    if (!localArtist.value?.artist?.id) {
-      return;
-    }
-
-    artistActionError.value = '';
-    isUpdatingArtistMonitoring.value = true;
-
-    try {
-      const updated = await updateArtistMonitoringRequest(localArtist.value.artist.id, patch);
-      localArtist.value = {
-        ...localArtist.value,
-        monitoring: updated.monitoring,
-      };
-    } catch (error) {
-      artistActionError.value = getErrorMessage(error, 'Updating artist monitoring failed');
-    } finally {
-      isUpdatingArtistMonitoring.value = false;
-    }
-  }
-
   async function refreshArtistMetadata() {
     if (!localArtist.value?.artist?.id) {
       return null;
@@ -301,7 +277,6 @@ export function useMetadataArtistWorkflow({
     isLoadingMoreDetectionEvents,
     isRefreshingArtist,
     isSearching,
-    isUpdatingArtistMonitoring,
     localArtist,
     loadMoreDetectionEvents,
     openLocalArtist,
@@ -313,7 +288,6 @@ export function useMetadataArtistWorkflow({
     searchQuery,
     searchResults,
     selectedArtist,
-    updateArtistMonitoring,
     ...localSearchWorkflow,
     ...releaseWorkflow,
   };

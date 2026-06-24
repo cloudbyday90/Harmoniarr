@@ -133,13 +133,7 @@ function createMetadataRouteTestApp(overrides = {}) {
         release: { id: `local-${releaseId}` },
         source: { actorUserId, requestMetadata },
       }),
-      updateMetadataArtistMonitoring: async ({ metadataArtistId, patch }) => ({
-        artistId: metadataArtistId,
-        monitoring: {
-          isMonitored: patch.isMonitored,
-          monitoredReleaseGroupTypes: patch.monitoredReleaseGroupTypes,
-        },
-      }),
+      updateMetadataArtistMonitoring: async () => {},
       requireCsrf: () => {},
       requireFreshAdminSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed', user: { role: 'admin' } }),
       requireFreshSession: async () => ({ appUserId: 'user-1', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' }),
@@ -603,27 +597,13 @@ test('metadata artist detection-events route returns the shared paginated histor
   });
 });
 
-test('metadata artist monitoring route updates the shared monitoring payload', async (t) => {
-  const updateMetadataArtistMonitoring = t.mock.fn(async ({ metadataArtistId, patch }) => ({
-    artistId: metadataArtistId,
-    monitoring: {
-      isMonitored: patch.isMonitored,
-      monitoredReleaseGroupTypes: patch.monitoredReleaseGroupTypes,
-    },
-  }));
-  const requireCsrf = t.mock.fn();
-  const app = createMetadataRouteTestApp({
-    requireCsrf,
-    updateMetadataArtistMonitoring,
-  });
+test('metadata artist monitoring route is retired and points to the operator save endpoint', async (t) => {
+  const app = createMetadataRouteTestApp({});
 
   await withServer(app, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/monitoring`, {
       method: 'PUT',
-      headers: {
-        'content-type': 'application/json',
-        'x-csrf-token': 'csrf-token',
-      },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         isMonitored: true,
         monitoredReleaseGroupTypes: ['album'],
@@ -631,24 +611,13 @@ test('metadata artist monitoring route updates the shared monitoring payload', a
     });
     const payload = await response.json();
 
-    assert.equal(response.status, 200);
-    assert.equal(requireCsrf.mock.callCount(), 1);
-    assert.deepEqual(updateMetadataArtistMonitoring.mock.calls[0].arguments[0], {
-      actorUserId: 'user-1',
-      metadataArtistId: 'local-artist-1',
-      patch: {
-        isMonitored: true,
-        monitoredReleaseGroupTypes: ['album'],
-      },
-    });
-    assert.deepEqual(payload, {
-      ok: true,
-      artistId: 'local-artist-1',
-      monitoring: {
-        isMonitored: true,
-        monitoredReleaseGroupTypes: ['album'],
-      },
-    });
+    assert.equal(response.status, 410);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.code, 'endpoint_retired');
+    assert.equal(
+      payload.error.replacementPath,
+      '/api/v1/metadata/artists/:artistId/operator',
+    );
   });
 });
 
@@ -871,37 +840,6 @@ test('metadata release import route returns the shared imported release payload'
   });
 });
 
-test('metadata artist monitoring route preserves forced re-auth failures from the injected session guard', async () => {
-  const app = createMetadataRouteTestApp({
-    requireFreshSession: async () => {
-      throw Object.assign(new Error('Re-authentication is required before continuing'), {
-        status: 403,
-        code: 'reauth_required',
-      });
-    },
-  });
-
-  await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/monitoring`, {
-      method: 'PUT',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ isMonitored: true }),
-    });
-    const payload = await response.json();
-
-    assert.equal(response.status, 403);
-    assert.deepEqual(payload, {
-      ok: false,
-      error: {
-        code: 'reauth_required',
-        message: 'Re-authentication is required before continuing',
-      },
-    });
-  });
-});
-
 test('metadata routes normalize shared metadata not found errors to 404 responses', async () => {
   const app = createMetadataRouteTestApp({
     getMetadataArtist: async () => {
@@ -1026,8 +964,8 @@ test('metadata import route preserves auth-guard failures from the injected sess
 });
 
 test('metadata artist monitoring route does not invoke the admin session guard', async (t) => {
-  // Regression guard: if the route regresses back to requireFreshAdminSession,
-  // this mock would throw and the test would fail.
+  // Regression guard: the retired route must not regress to requireFreshAdminSession.
+  // It returns 410 (retired) after a normal session check.
   const requireFreshAdminSession = t.mock.fn(async () => {
     throw Object.assign(new Error('Administrator access is required'), {
       status: 403,
@@ -1046,7 +984,7 @@ test('metadata artist monitoring route does not invoke the admin session guard',
       body: JSON.stringify({ isMonitored: true }),
     });
 
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 410);
     assert.equal(requireFreshAdminSession.mock.callCount(), 0);
   });
 });

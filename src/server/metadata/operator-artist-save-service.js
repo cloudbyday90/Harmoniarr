@@ -224,7 +224,7 @@ async function ensureUserExists({ appUserId, client }) {
 async function fetchExistingMonitoringTimestamps({ appUserId, client, metadataArtistId }) {
   const result = await client.query(
     `
-      SELECT last_reconciled_at, last_saved_snapshot_at
+      SELECT is_monitored, last_reconciled_at, last_saved_snapshot_at
       FROM operator_artist_monitoring
       WHERE app_user_id = $1
         AND metadata_artist_id = $2
@@ -236,6 +236,7 @@ async function fetchExistingMonitoringTimestamps({ appUserId, client, metadataAr
   return {
     lastReconciledAt: result.rows[0]?.last_reconciled_at?.toISOString?.() ?? null,
     lastSavedSnapshotAt: result.rows[0]?.last_saved_snapshot_at?.toISOString?.() ?? null,
+    wasMonitored: result.rows[0]?.is_monitored === true,
   };
 }
 
@@ -306,12 +307,14 @@ export function createOperatorArtistSaveService({
   getPoolFn = getPool,
   maxSaveRetries = 3,
   getOperatorArtistProjection = null,
+  onArtistMonitoredFn = null,
   operatorArtistMonitoringStore = createOperatorArtistMonitoringStore(),
   operatorArtistProjectionService = null,
   operatorArtistReconciliationRunStore = createOperatorArtistReconciliationRunStore(),
   operatorArtistReconciliationSnapshotStore = createOperatorArtistReconciliationSnapshotStore(),
   operatorReleaseGroupSelectionStore = createOperatorReleaseGroupSelectionStore(),
   operatorTrackOverrideStore = createOperatorTrackOverrideStore(),
+  recordActivityEventFn = null,
   startMetadataArtistRefresh = null,
 } = {}) {
   const resolvedOperatorArtistProjectionService = operatorArtistProjectionService
@@ -472,6 +475,37 @@ export function createOperatorArtistSaveService({
               // Swallow remaining errors: the scheduled heartbeat refresh
               // remains the durable fallback, so add must not fail on this.
             });
+        }
+
+        // Fire "artist newly monitored" side effects exactly once, only on the
+        // genuine unmonitored -> monitored transition, after the commit. Fired
+        // out-of-band so a notification/activity failure cannot roll back the
+        // save. Idempotent across the retry loop: this only runs on the
+        // successful attempt that returns.
+        const becameMonitored = !existingMonitoring.wasMonitored
+          && normalizedMonitoringPatch.isMonitored === true;
+        if (becameMonitored) {
+          const actorUserId = triggeredByUserId ?? appUserId;
+          if (typeof recordActivityEventFn === 'function') {
+            void Promise.resolve()
+              .then(() => recordActivityEventFn({
+                actorUserId,
+                entityId: metadataArtistId,
+                entityTitle: artist.name ?? null,
+                entityType: 'artist',
+                eventType: 'artist_monitored',
+              }))
+              .catch(() => {});
+          }
+          if (typeof onArtistMonitoredFn === 'function') {
+            void Promise.resolve()
+              .then(() => onArtistMonitoredFn({
+                actorUserId,
+                artistName: artist.name ?? null,
+                metadataArtistId,
+              }))
+              .catch(() => {});
+          }
         }
 
         let projection = null;

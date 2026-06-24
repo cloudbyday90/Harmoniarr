@@ -19,7 +19,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  buildNextMonitoringPatch,
   describeMonitoringDecision,
   describeWantedState,
   detectionEventLinkTarget,
@@ -80,38 +79,6 @@ test('describeWantedState returns None for unknown or absent status', () => {
   assert.equal(describeWantedState(null), 'None');
   assert.equal(describeWantedState(undefined), 'None');
   assert.equal(describeWantedState('satisfied'), 'None');
-});
-
-// ---------------------------------------------------------------------------
-// buildNextMonitoringPatch
-// ---------------------------------------------------------------------------
-
-test('buildNextMonitoringPatch toggles isMonitored from true to false', () => {
-  const patch = buildNextMonitoringPatch({
-    monitoring: { isMonitored: true, monitoredReleaseGroupTypes: ['album', 'ep'] },
-  });
-  assert.equal(patch.isMonitored, false);
-  assert.deepEqual(patch.monitoredReleaseGroupTypes, ['album', 'ep']);
-});
-
-test('buildNextMonitoringPatch toggles isMonitored from false to true', () => {
-  const patch = buildNextMonitoringPatch({
-    monitoring: { isMonitored: false, monitoredReleaseGroupTypes: ['album'] },
-  });
-  assert.equal(patch.isMonitored, true);
-});
-
-test('buildNextMonitoringPatch defaults to album+ep when monitoring is absent', () => {
-  const patch = buildNextMonitoringPatch({});
-  assert.equal(patch.isMonitored, true);
-  assert.deepEqual(patch.monitoredReleaseGroupTypes, ['album', 'ep']);
-});
-
-test('buildNextMonitoringPatch preserves custom release group types', () => {
-  const patch = buildNextMonitoringPatch({
-    monitoring: { isMonitored: false, monitoredReleaseGroupTypes: ['single', 'live'] },
-  });
-  assert.deepEqual(patch.monitoredReleaseGroupTypes, ['single', 'live']);
 });
 
 // ---------------------------------------------------------------------------

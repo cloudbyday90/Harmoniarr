@@ -168,3 +168,74 @@ test('refreshArtistCatalogById records detection history for newly discovered re
   });
   assert.equal(result.detectedReleaseGroupCount, 1);
 });
+
+test('refreshArtistCatalogById prefers operator-derived monitoring for detection decisions', async (t) => {
+  const recordDetectedReleaseGroups = t.mock.fn(async () => [{ id: 'event-1' }]);
+  const getArtistRefreshMonitoring = t.mock.fn(async () => ({
+    isMonitored: true,
+    monitoredReleaseGroupTypes: ['album', 'single'],
+  }));
+
+  const service = createMetadataRefreshService({
+    getArtistRefreshMonitoring,
+    getMetadataArtistByMusicBrainzId: t.mock.fn(async () => ({
+      artist: { id: 'local-artist-1', name: 'Autechre' },
+      monitoring: { isMonitored: false, monitoredReleaseGroupTypes: ['ep'] },
+      releaseGroups: [{
+        id: 'local-rg-1',
+        source: { musicbrainzReleaseGroupId: 'mb-rg-1' },
+      }],
+    })),
+    metadataReleaseDetectionService: {
+      recordDetectedReleaseGroups,
+    },
+    metadataService: {
+      storeArtist: t.mock.fn(async ({ artist }) => ({ id: 'local-artist-1', name: artist.name })),
+      storeReleaseGroup: t.mock.fn(async ({ releaseGroup }) => ({
+        artist: { id: 'local-artist-1' },
+        releaseGroup: {
+          id: `local-${releaseGroup.musicbrainzReleaseGroupId}`,
+          primaryType: releaseGroup.primaryType,
+          source: { musicbrainzReleaseGroupId: releaseGroup.musicbrainzReleaseGroupId },
+          title: releaseGroup.title,
+        },
+      })),
+    },
+    musicBrainzClient: {
+      browseArtistReleaseGroups: t.mock.fn(async () => ({
+        'release-group-count': 2,
+        'release-groups': [
+          {
+            id: 'mb-rg-1',
+            title: 'Tri Repetae',
+            'artist-credit': [{ artist: { id: 'mb-artist-1', name: 'Autechre' }, name: 'Autechre' }],
+            'primary-type': 'Album',
+          },
+          {
+            id: 'mb-rg-2',
+            title: 'New Single',
+            'artist-credit': [{ artist: { id: 'mb-artist-1', name: 'Autechre' }, name: 'Autechre' }],
+            'primary-type': 'Single',
+          },
+        ],
+      })),
+      lookupArtist: t.mock.fn(async () => ({
+        aliases: [],
+        id: 'mb-artist-1',
+        name: 'Autechre',
+      })),
+    },
+    nowFn: () => new Date('2026-06-15T12:00:00.000Z'),
+  });
+
+  await service.refreshArtistCatalogById({
+    metadataArtistId: 'local-artist-1',
+    musicBrainzArtistId: 'mb-artist-1',
+  });
+
+  assert.deepEqual(getArtistRefreshMonitoring.mock.calls[0].arguments[0], 'local-artist-1');
+  assert.deepEqual(recordDetectedReleaseGroups.mock.calls[0].arguments[0].monitoring, {
+    isMonitored: true,
+    monitoredReleaseGroupTypes: ['album', 'single'],
+  });
+});

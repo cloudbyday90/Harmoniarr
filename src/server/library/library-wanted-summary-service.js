@@ -19,6 +19,14 @@
 import { createLibraryWantedSummaryStore } from './library-wanted-summary-store.js';
 import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
 
+function normalizeRequiredAppUserId(appUserId, context) {
+  if (typeof appUserId !== 'string' || appUserId.trim().length < 1) {
+    throw new Error(`${context} requires an appUserId`);
+  }
+
+  return appUserId.trim();
+}
+
 function buildSummary({ monitoredArtistCount, releaseCounts }) {
   if (monitoredArtistCount === 0) {
     return {
@@ -59,29 +67,37 @@ export function createLibraryWantedSummaryService({
   libraryWantedSummaryStore = createLibraryWantedSummaryStore(),
 } = {}) {
   async function buildLibraryWantedReleases({
+    appUserId,
     includeDiscoveryRequestDetails = false,
     limit = 500,
     wantedStatus = null,
   } = {}) {
+    const scopedAppUserId = normalizeRequiredAppUserId(appUserId, 'buildLibraryWantedReleases');
     const checkedAt = new Date().toISOString();
-    const releases = await libraryWantedReleaseStore.listWantedReleasesWithMetadata({ limit, wantedStatus });
+    const releases = await libraryWantedReleaseStore.listWantedReleasesWithMetadata({
+      appUserId: scopedAppUserId,
+      limit,
+      wantedStatus,
+    });
 
     return {
       checkedAt,
       total: releases.length,
-      wantedReleases: includeDiscoveryRequestDetails
-        ? releases
-        : releases.map((release) => {
-            const publicRelease = { ...release };
-            delete publicRelease.discoveryRequest;
-            return publicRelease;
-          }),
+      wantedReleases: releases.map((release) => {
+        const publicRelease = { ...release };
+        delete publicRelease.appUserId;
+        if (!includeDiscoveryRequestDetails) {
+          delete publicRelease.discoveryRequest;
+        }
+        return publicRelease;
+      }),
     };
   }
 
-  async function buildLibraryWantedSummary() {
+  async function buildLibraryWantedSummary({ appUserId } = {}) {
+    const scopedAppUserId = normalizeRequiredAppUserId(appUserId, 'buildLibraryWantedSummary');
     const checkedAt = new Date().toISOString();
-    const snapshot = await libraryWantedSummaryStore.getLibraryWantedSnapshot();
+    const snapshot = await libraryWantedSummaryStore.getLibraryWantedSnapshot({ appUserId: scopedAppUserId });
 
     return {
       checkedAt,

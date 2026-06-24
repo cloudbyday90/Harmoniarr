@@ -79,7 +79,6 @@ export function registerMetadataRoutes(app, {
   limitMetadataImport = skipRateLimitMiddleware,
   limitMetadataMutation = skipRateLimitMiddleware,
   startMetadataArtistRefresh,
-  updateMetadataArtistMonitoring,
   requireCsrf: requireCsrfFn = defaultRequestAuthDependencies.requireCsrf,
   requireFreshAdminSession: requireFreshAdminSessionFn = defaultRequestAuthDependencies.requireFreshAdminSession,
   requireFreshSession: requireFreshSessionFn = defaultRequestAuthDependencies.requireFreshSession,
@@ -314,19 +313,10 @@ export function registerMetadataRoutes(app, {
   });
 
   app.put('/api/v1/metadata/artists/:artistId/monitoring', limitMetadataMutation, metadataRoute(async (request, response) => {
-    const session = await requireFreshSessionFn(request);
-    requireCsrfFn(request, session);
-
-    const updated = await updateMetadataArtistMonitoring({
-      actorUserId: session.appUserId,
-      metadataArtistId: request.params.artistId,
-      patch: request.body,
-    });
-
-    response.json({
-      ok: true,
-      artistId: updated.artistId,
-      monitoring: updated.monitoring,
+    await requireSessionFn(request);
+    sendRetiredRouteResponse(response, {
+      message: 'The legacy artist monitoring endpoint has been retired. Use the operator-scoped artist save endpoint to manage monitoring.',
+      replacementPath: '/api/v1/metadata/artists/:artistId/operator',
     });
   }));
 

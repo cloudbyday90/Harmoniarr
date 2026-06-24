@@ -12,10 +12,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const metadataRefreshDispatchPolicyService = {
     resolveDispatchReadiness: () => ({ allowed: true }),
   };
-  const metadataMonitoringService = {
-    updateArtistMonitoring: () => {},
-  };
-  const metadataMonitoringStore = {};
+  const metadataArtistRefreshStateStore = {};
   const operatorArtistProjectionService = {
     getOperatorArtistProjection: () => {},
   };
@@ -72,8 +69,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     metadataArtistRefreshService,
     metadataArtistRefreshWorker,
     metadataRefreshDispatchPolicyService,
-    metadataMonitoringService,
-    metadataMonitoringStore,
+    metadataArtistRefreshStateStore,
     operatorArtistProjectionService,
     operatorMonitoredArtistProjectionService,
     operatorArtistSaveService,
@@ -93,8 +89,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.metadataArtistRefreshWorker, metadataArtistRefreshWorker);
   assert.equal(metadataModule.metadataRefreshDispatchPolicyService, metadataRefreshDispatchPolicyService);
   assert.equal(metadataModule.metadataReadService, metadataReadService);
-  assert.equal(metadataModule.metadataMonitoringService, metadataMonitoringService);
-  assert.equal(metadataModule.metadataMonitoringStore, metadataMonitoringStore);
+  assert.equal(metadataModule.metadataArtistRefreshStateStore, metadataArtistRefreshStateStore);
   assert.equal(metadataModule.operatorMonitoredArtistProjectionService, operatorMonitoredArtistProjectionService);
   assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
   assert.equal(metadataModule.operatorArtistSaveService, operatorArtistSaveService);
@@ -119,7 +114,6 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getMetadataReleaseGroupByMusicBrainzId: metadataReadService.getReleaseGroupByMusicBrainzId,
     saveOperatorArtist: operatorArtistSaveService.saveOperatorArtist,
     startMetadataArtistRefresh: metadataArtistRefreshService.startMetadataArtistRefresh,
-    updateMetadataArtistMonitoring: metadataMonitoringService.updateArtistMonitoring,
     importMusicBrainzArtist: musicBrainzImportService.importArtistById,
     importMusicBrainzReleaseGroup: musicBrainzImportService.importReleaseGroupById,
     importMusicBrainzRelease: musicBrainzImportService.importReleaseById,

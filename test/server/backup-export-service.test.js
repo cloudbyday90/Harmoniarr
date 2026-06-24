@@ -66,7 +66,6 @@ test('createBackupExport writes backup artifact and persists metadata', async (t
   assert.equal(payload.data.settings.system.baseUrl, 'https://harmoniarr.local');
   assert.equal(payload.data.scopeSettings.settings.system.baseUrl, 'https://harmoniarr.local');
   assert.equal(payload.data.scopeSettings.pathMappings.paths.downloadMappings.length, 1);
-  assert.deepEqual(payload.data.scopeSettings.monitoring.artistMonitoring, []);
   assert.deepEqual(payload.data.scopeSettings.monitoring.operatorArtistMonitoring, []);
   assert.deepEqual(payload.data.scopeSettings.monitoring.operatorReleaseGroupSelections, []);
   assert.deepEqual(payload.data.scopeSettings.monitoring.operatorTrackOverrides, []);
@@ -100,13 +99,6 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
         baseUrl: 'https://harmoniarr.local',
       },
     }),
-    listArtistMonitoringForBackup: async () => ([
-      {
-        metadataArtistId: 'artist-1',
-        isMonitored: true,
-        monitoredReleaseGroupTypes: ['album'],
-      },
-    ]),
     listOperatorArtistMonitoringForBackup: async () => ([
       {
         acquisitionProfileKey: 'balanced_library',
@@ -161,6 +153,7 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
     ]),
     listWantedReleasesForBackup: async () => ([
       {
+        appUserId: 'user-1',
         metadataArtistId: 'artist-1',
         metadataReleaseGroupId: 'rg-1',
         metadataReleaseId: 'release-1',
@@ -183,8 +176,6 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
   const serialized = await readFile(capturedArtifact.storagePath, 'utf8');
   const payload = JSON.parse(serialized);
 
-  assert.equal(payload.data.scopeSettings.monitoring.artistMonitoring.length, 1);
-  assert.equal(payload.data.scopeSettings.monitoring.artistMonitoring[0].metadataArtistId, 'artist-1');
   assert.equal(payload.data.scopeSettings.monitoring.operatorArtistMonitoring.length, 1);
   assert.equal(payload.data.scopeSettings.monitoring.operatorArtistMonitoring[0].appUserId, 'user-1');
   assert.equal(payload.data.scopeSettings.monitoring.operatorReleaseGroupSelections.length, 1);
@@ -202,6 +193,7 @@ test('createBackupExport includes monitoring and wanted snapshots when provided'
   assert.equal(payload.data.scopeSettings.trust.sourceUsers.length, 1);
   assert.equal(payload.data.scopeSettings.trust.sourceUsers[0].username, 'trusted-uploader');
   assert.equal(payload.data.scopeSettings.wanted.wantedReleases.length, 1);
+  assert.equal(payload.data.scopeSettings.wanted.wantedReleases[0].appUserId, 'user-1');
   assert.equal(payload.data.scopeSettings.wanted.wantedReleases[0].metadataReleaseId, 'release-1');
 });
 

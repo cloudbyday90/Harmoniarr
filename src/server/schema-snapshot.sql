@@ -5465,3 +5465,271 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260630_000000_per_operator_wanted_state.sql
+-- Checksum: 39f74f73dfac95ebc005fbaa8547bc481debec445ddf78b3eaadf617272204de
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+ALTER TABLE library_wanted_releases
+  ADD COLUMN IF NOT EXISTS app_user_id UUID NULL REFERENCES app_users(id) ON DELETE CASCADE;
+
+ALTER TABLE library_wanted_releases
+  DROP CONSTRAINT IF EXISTS library_wanted_releases_metadata_release_id_key;
+
+WITH existing_global_wanted_rows AS (
+  DELETE FROM library_wanted_releases
+  WHERE app_user_id IS NULL
+  RETURNING
+    metadata_artist_id,
+    metadata_release_group_id,
+    metadata_release_id,
+    wanted_status,
+    expected_track_count,
+    matched_track_count,
+    missing_track_count,
+    release_date,
+    release_status,
+    evidence,
+    last_reconciled_at,
+    created_at,
+    updated_at
+)
+INSERT INTO library_wanted_releases (
+  app_user_id,
+  metadata_artist_id,
+  metadata_release_group_id,
+  metadata_release_id,
+  wanted_status,
+  expected_track_count,
+  matched_track_count,
+  missing_track_count,
+  release_date,
+  release_status,
+  evidence,
+  last_reconciled_at,
+  created_at,
+  updated_at
+)
+SELECT
+  operator_artist_monitoring.app_user_id,
+  existing_global_wanted_rows.metadata_artist_id,
+  existing_global_wanted_rows.metadata_release_group_id,
+  existing_global_wanted_rows.metadata_release_id,
+  existing_global_wanted_rows.wanted_status,
+  existing_global_wanted_rows.expected_track_count,
+  existing_global_wanted_rows.matched_track_count,
+  existing_global_wanted_rows.missing_track_count,
+  existing_global_wanted_rows.release_date,
+  existing_global_wanted_rows.release_status,
+  COALESCE(existing_global_wanted_rows.evidence, '{}'::jsonb)
+    || jsonb_build_object(
+      'scopeMigration', 'per_operator_wanted_state',
+      'scopeMigratedAt', NOW(),
+      'sourceAppUserId', operator_artist_monitoring.app_user_id::text
+    ),
+  existing_global_wanted_rows.last_reconciled_at,
+  existing_global_wanted_rows.created_at,
+  NOW()
+FROM existing_global_wanted_rows
+JOIN operator_artist_monitoring
+  ON operator_artist_monitoring.metadata_artist_id = existing_global_wanted_rows.metadata_artist_id
+WHERE operator_artist_monitoring.is_monitored = TRUE;
+
+ALTER TABLE library_wanted_releases
+  ALTER COLUMN app_user_id SET NOT NULL;
+
+ALTER TABLE library_wanted_releases
+  ADD CONSTRAINT library_wanted_releases_user_release_unique
+  UNIQUE (app_user_id, metadata_release_id);
+
+CREATE INDEX IF NOT EXISTS library_wanted_releases_user_status_idx
+  ON library_wanted_releases (app_user_id, wanted_status, last_reconciled_at DESC);
+
+CREATE INDEX IF NOT EXISTS library_wanted_releases_user_artist_idx
+  ON library_wanted_releases (app_user_id, metadata_artist_id, last_reconciled_at DESC);
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260630_000000',
+  '20260630_000000_per_operator_wanted_state.sql',
+  'per_operator_wanted_state',
+  '39f74f73dfac95ebc005fbaa8547bc481debec445ddf78b3eaadf617272204de',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260630_010000_metadata_artist_refresh_state.sql
+-- Checksum: c82017c9285584b7d50eeddeac0e250e1d37f87e3f61037582d61fd8d7e0c17f
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-- forward-only migration
+-- Splits metadata refresh cadence from legacy shared monitoring state. The
+-- refresh heartbeat now derives monitored eligibility from operator monitoring
+-- while this table stores one provider-refresh schedule per metadata artist.
+
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS metadata_artist_refresh_state (
+  metadata_artist_id UUID PRIMARY KEY REFERENCES metadata_artists(id) ON DELETE CASCADE,
+  last_refreshed_at TIMESTAMPTZ NULL,
+  next_refresh_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO metadata_artist_refresh_state (
+  metadata_artist_id,
+  last_refreshed_at,
+  next_refresh_at,
+  created_at,
+  updated_at
+)
+SELECT
+  metadata_artist_id,
+  last_refreshed_at,
+  next_refresh_at,
+  NOW(),
+  NOW()
+FROM metadata_artist_monitoring
+WHERE is_monitored = TRUE
+   OR last_refreshed_at IS NOT NULL
+   OR next_refresh_at IS NOT NULL
+ON CONFLICT (metadata_artist_id) DO UPDATE
+SET last_refreshed_at = EXCLUDED.last_refreshed_at,
+    next_refresh_at = EXCLUDED.next_refresh_at,
+    updated_at = NOW();
+
+CREATE INDEX IF NOT EXISTS metadata_artist_refresh_state_due_idx
+  ON metadata_artist_refresh_state (next_refresh_at ASC, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS operator_artist_monitoring_refresh_eligibility_idx
+  ON operator_artist_monitoring (metadata_artist_id, updated_at DESC)
+  WHERE is_monitored = TRUE;
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260630_010000',
+  '20260630_010000_metadata_artist_refresh_state.sql',
+  'metadata_artist_refresh_state',
+  'c82017c9285584b7d50eeddeac0e250e1d37f87e3f61037582d61fd8d7e0c17f',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260630_020000_metadata_artist_monitoring_drop.sql
+-- Checksum: 1cf00ff804c011b5461362b195e82035e6c5d301f6cd0728e6cbab287132f563
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-- forward-only migration
+-- Drops the legacy metadata_artist_monitoring table. The operator-scoped
+-- monitoring model (operator_artist_monitoring + metadata_artist_refresh_state)
+-- is the sole source of truth; this table has zero code references after the
+-- read, write, and backup/restore migrations. It has no foreign-key dependents.
+
+BEGIN;
+
+DROP TABLE IF EXISTS metadata_artist_monitoring;
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260630_020000',
+  '20260630_020000_metadata_artist_monitoring_drop.sql',
+  'metadata_artist_monitoring_drop',
+  '1cf00ff804c011b5461362b195e82035e6c5d301f6cd0728e6cbab287132f563',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
