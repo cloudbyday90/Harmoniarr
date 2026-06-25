@@ -17,12 +17,13 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 import { RouterLink } from 'vue-router';
 import EmptyState from '../EmptyState.vue';
 import GridControls from '../GridControls.vue';
 import OperatorArtistCard from './OperatorArtistCard.vue';
 import { useDiscoverArtistArtwork } from '../../composables/useDiscoverArtistArtwork.js';
+import { useArtworkGridRoving } from '../../composables/useArtworkGridRoving.js';
 import { useGridState } from '../../composables/useGridState.js';
 import { useOperatorMonitoredArtists } from '../../composables/useOperatorMonitoredArtists.js';
 import {
@@ -114,6 +115,14 @@ const sortedArtists = computed(() => {
     if (leftValue > rightValue) return direction;
     return (left.artist?.name ?? '').localeCompare(right.artist?.name ?? '');
   });
+});
+
+// Roving tabindex over the monitored-artists grid + the trailing "discover
+// more" card (one tab stop; arrows move focus across both).
+const artistsGridEl = useTemplateRef('artistsGrid');
+useArtworkGridRoving(() => artistsGridEl.value, {
+  cellSelector: '.hx-media-card__link-area, .operator-home__discover-card',
+  count: () => sortedArtists.value.length,
 });
 
 function refreshAll() {
@@ -215,45 +224,49 @@ onBeforeUnmount(() => {
           class="hx-card-body hx-card-body--flush"
           :class="{ 'operator-home__grid--stale': isRevalidating }"
         >
-          <section
+          <ul
+            ref="artistsGrid"
             class="hx-artwork-grid operator-home__grid"
+            role="list"
             aria-label="Monitored artists"
           >
-            <OperatorArtistCard
-              v-for="projection in sortedArtists"
-              :key="projection.artist?.id"
-              :projection="projection"
-              :artwork="getArtistArtwork(projection.artist?.musicBrainzArtistId)"
-            />
+            <li v-for="projection in sortedArtists" :key="projection.artist?.id">
+              <OperatorArtistCard
+                :projection="projection"
+                :artwork="getArtistArtwork(projection.artist?.musicBrainzArtistId)"
+              />
+            </li>
 
-            <RouterLink
-              :to="{ name: 'discover' }"
-              class="hx-media-card operator-home__discover-card"
-              aria-label="Add more artists from Discover"
-            >
-              <div
-                class="hx-artwork hx-artwork--dashed operator-home__discover-art"
-                aria-hidden="true"
+            <li>
+              <RouterLink
+                :to="{ name: 'discover' }"
+                class="hx-media-card operator-home__discover-card"
+                aria-label="Add more artists from Discover"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+                <div
+                  class="hx-artwork hx-artwork--dashed operator-home__discover-art"
+                  aria-hidden="true"
                 >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </div>
-              <div class="hx-media-card__body">
-                <p class="hx-media-card__title">Add more artists</p>
-                <p class="hx-media-card__meta">Search Discover</p>
-              </div>
-            </RouterLink>
-          </section>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </div>
+                <div class="hx-media-card__body">
+                  <p class="hx-media-card__title">Add more artists</p>
+                  <p class="hx-media-card__meta">Search Discover</p>
+                </div>
+              </RouterLink>
+            </li>
+          </ul>
         </div>
       </article>
     </template>
@@ -302,6 +315,14 @@ onBeforeUnmount(() => {
 .operator-home__discover-card:focus-visible .operator-home__discover-art {
   color: var(--hx-accent);
   border-color: var(--hx-accent);
+}
+
+/* Clear perimeter focus ring on the roving cell (WCAG 2.2 §2.4.11); the
+   art-color change above remains as an enhancement. */
+.operator-home__discover-card:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+  border-radius: var(--hx-radius-lg);
 }
 
 .operator-home__discover-art {

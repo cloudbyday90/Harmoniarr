@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import ArtistCard from '../components/media/ArtistCard.vue';
 import AddArtistModal from '../components/media/AddArtistModal.vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
@@ -25,6 +25,7 @@ import EmptyState from '../components/EmptyState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import { useArtistMonitoring } from '../composables/useArtistMonitoring.js';
+import { useArtworkGridRoving } from '../composables/useArtworkGridRoving.js';
 import { useAddArtistModal } from '../composables/useAddArtistModal.js';
 import { useArtworkBatchResolve } from '../composables/useArtworkBatchResolve.js';
 import { useNetworkSearchWorkflow } from '../composables/useNetworkSearchWorkflow.js';
@@ -196,6 +197,18 @@ const networkStateLabel = computed(() => buildNetworkSearchStateLabel(searchMeta
 const topPeer = computed(() => sortedResponses.value[0] ?? null);
 const musicArtistCount = computed(() => musicArtistResults.value.length);
 const musicReleaseCount = computed(() => musicReleaseResults.value.length);
+
+// Roving tabindex over each card grid (one tab stop; arrows move focus).
+const artistGridEl = useTemplateRef('artistGrid');
+useArtworkGridRoving(() => artistGridEl.value, {
+  cellSelector: '.hx-media-card__link-area',
+  count: musicArtistCount,
+});
+const releaseGridEl = useTemplateRef('releaseGrid');
+useArtworkGridRoving(() => releaseGridEl.value, {
+  cellSelector: '.hx-media-card__link-area',
+  count: musicReleaseCount,
+});
 const networkPeerCount = computed(() => sortedResponses.value.length);
 
 const modeCards = computed(() => ([
@@ -486,20 +499,20 @@ onBeforeUnmount(() => destroyNetworkWorkflow());
             </div>
           </header>
           <div class="hx-card-body">
-            <div class="hx-artwork-grid search-grid" aria-label="Artist search results">
-              <ArtistCard
-                v-for="artist in musicArtistResults"
-                :key="artist.id"
-                :artist="artist"
-                :monitored="isMonitored(artist.id)"
-                :monitoring="isMonitoring(artist.id)"
-                :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
-                :local-src="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.url ?? null : null"
-                :dominant-color="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.dominantColor ?? null : null"
-                :artwork-asset-id="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.assetId ?? null : null"
-                @monitor="handleAddArtist"
-              />
-            </div>
+            <ul ref="artistGrid" class="hx-artwork-grid search-grid" role="list" aria-label="Artist search results">
+              <li v-for="artist in musicArtistResults" :key="artist.id">
+                <ArtistCard
+                  :artist="artist"
+                  :monitored="isMonitored(artist.id)"
+                  :monitoring="isMonitoring(artist.id)"
+                  :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
+                  :local-src="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.url ?? null : null"
+                  :dominant-color="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.dominantColor ?? null : null"
+                  :artwork-asset-id="artist.id ? getResolvedArtwork('musicbrainz_artist', artist.id, 'artist_thumbnail')?.assetId ?? null : null"
+                  @monitor="handleAddArtist"
+                />
+              </li>
+            </ul>
           </div>
         </article>
 
@@ -511,20 +524,20 @@ onBeforeUnmount(() => destroyNetworkWorkflow());
             </div>
           </header>
           <div class="hx-card-body">
-            <div class="hx-artwork-grid search-grid" aria-label="Release search results">
-              <ReleaseCard
-                v-for="release in musicReleaseResults"
-                :key="release.id"
-                :release="release"
-                :requested="isRequested(release)"
-                :requesting="isRequesting(release)"
-                :local-src="getReleaseArtwork(release)?.url ?? null"
-                :dominant-color="getReleaseArtwork(release)?.dominantColor ?? null"
-                :artwork-asset-id="getReleaseArtwork(release)?.assetId ?? null"
-                @request="openConfirmModal"
-                @detail="openDetailModal"
-              />
-            </div>
+            <ul ref="releaseGrid" class="hx-artwork-grid search-grid" role="list" aria-label="Release search results">
+              <li v-for="release in musicReleaseResults" :key="release.id">
+                <ReleaseCard
+                  :release="release"
+                  :requested="isRequested(release)"
+                  :requesting="isRequesting(release)"
+                  :local-src="getReleaseArtwork(release)?.url ?? null"
+                  :dominant-color="getReleaseArtwork(release)?.dominantColor ?? null"
+                  :artwork-asset-id="getReleaseArtwork(release)?.assetId ?? null"
+                  @request="openConfirmModal"
+                  @detail="openDetailModal"
+                />
+              </li>
+            </ul>
           </div>
         </article>
       </template>

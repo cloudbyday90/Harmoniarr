@@ -44,105 +44,256 @@ See
    `role="list"`) with pure paging math (`paginated-list.js`) reveals items
    incrementally and is shared by both Discover panels.
 
+### Batch D — Roving-tabindex keyboard navigation for the artwork grid
+See [DISCOVER_ROVING_TABINDEX_DESIGN.md](DISCOVER_ROVING_TABINDEX_DESIGN.md).
+
+Opt-in W3C-APG roving tabindex over the Batch C grid: one card link is the single
+tab stop, arrow/Home/End/Ctrl+Home/Ctrl+End keys move focus, and the rest are
+removed from the tab order. Pure index/intent math in `roving-index.js`
+(`resolveRovingIntent` + `resolveRovingIndex`) + DOM-scoped controller in
+`useRovingTabindex.js`. The container stays `role="list"` (navigable cards, not
+tabular data), columns are resolved at runtime from computed grid tracks, and
+horizontal movement is linear while vertical uses the column stride.
+
+### Batch E — Artwork loading skeletons & stable card geometry
+See [DISCOVER_ARTWORK_SKELETONS_DESIGN.md](DISCOVER_ARTWORK_SKELETONS_DESIGN.md).
+
+Pure `resolveArtworkDisplayState({ url, isResolving })` → `image | loading |
+initial` drives a three-branch artwork slot in `DiscoverArtistCard`: a neutral
+`aria-hidden` skeleton during resolution (instead of a misleading avatar),
+reusing the global `hx-skeleton-pulse` keyframes. The container's existing
+`aspect-ratio` already held geometry (no CLS); this batch adds the explicit
+loading affordance and brings reduced-motion compliance (`prefers-reduced-motion`)
+to the new skeleton plus the pre-existing `.hx-skeleton` primitive and
+`ArtworkImage` shimmer client-wide.
+
+### Batch F — Roving tabindex for the monitored-artist chip band
+See [DISCOVER_MONITORED_CHIP_ROVING_DESIGN.md](DISCOVER_MONITORED_CHIP_ROVING_DESIGN.md).
+
+Reuses the Batch D `useRovingTabindex` composable on the monitored-artist chip
+band in horizontal mode (APG toolbar model): one chip is the single tab stop,
+Left/Right + Home/End move focus, the rest leave the tab order. Added an `axis`
+(`grid`/`horizontal`/`vertical`) to the pure `resolveRovingIntent` so a 1-D band
+ignores Up/Down; coexists with the Batch C focus-return via the composable's
+`focusin` listener. Completes the keyboard story across both Discover list
+surfaces.
+
+### Batch G — Monitored-chip ARIA role semantics
+See [DISCOVER_CHIP_ROLE_SEMANTICS_DESIGN.md](DISCOVER_CHIP_ROLE_SEMANTICS_DESIGN.md).
+
+Refactored the chip band to native `<ul>`/`<li>`/`<a>` and removed the
+`role="listitem"` override from each `RouterLink`. The override was suppressing
+the `<a>`'s implicit `link` role (W3C ARIA-in-HTML §3.1 anti-pattern); native
+markup restores correct "link" announcements and provides list/listitem
+semantics for free. A standard `<ul>` reset preserves the flex layout; Batch C/D/F
+keyboard/focus behavior is unchanged.
+
+### Batch H — Card-grid list semantics
+See [DISCOVER_CARD_GRID_LIST_SEMANTICS_DESIGN.md](DISCOVER_CARD_GRID_LIST_SEMANTICS_DESIGN.md).
+
+Migrated the shared `PaginatedArtworkGrid` to `<ul role="list">` + `<li>` per
+card, using `display: contents` on the `<li>` so the slotted `<article>` cards
+remain the CSS-grid items (zero layout change — MDN Grid-Accessibility guidance).
+A scoped `<ul>` reset avoids touching the 10 other `.hx-artwork-grid` consumers.
+Also restored `role="list"` on `list-style: none` lists (the chip band too),
+fixing a Batch G Safari regression where `list-style: none` suppressed list
+semantics. Completes list-semantics correctness across both Discover surfaces.
+
+### Batch I — Platform-wide `.hx-artwork-grid` list semantics
+See [ARTWORK_GRID_LIST_SEMANTICS_DESIGN.md](ARTWORK_GRID_LIST_SEMANTICS_DESIGN.md).
+
+Extended the Batch H pattern to all 10 remaining `.hx-artwork-grid` consumers
+(ActivityReleases ×2, ArtistDetail, Library, Missing, MyRequests,
+Operator/Requester Home, Search ×2) and **centralized** it: the shared
+`.hx-artwork-grid` rule now carries the `<ul>` reset and `> li { display: contents }`,
+so every card grid is a `<ul role="list">` of `<li>`-wrapped cards with identical
+layout. Added `aria-label` to the four unlabeled grids. The Batch H scoped
+duplicate in `PaginatedArtworkGrid` was removed. List semantics are now correct
+and consistent platform-wide, and future grids inherit the pattern automatically.
+
+### Batch J — Card-grid roving tabindex (platform-wide) + ReleaseCard keyboard a11y
+See [CARD_GRID_ROVING_DESIGN.md](CARD_GRID_ROVING_DESIGN.md).
+
+Extended Batch D's roving tabindex to the shared card grids. Prerequisite fix:
+`ReleaseCard`'s "open detail" action was mouse-only (`<article @click>`) — refactored
+to a keyboard-accessible `<div role="button" class="hx-media-card__link-area">`
+(sibling actions slot, no nested interactives), giving it the same roving target
+as `ArtistCard`. Centralized the focus ring; added `useArtworkGridRoving` (roving +
+refresh-on-count). Wired 8 grids (Search ×2, Home ×2, MyRequests, Library, Missing,
+Activity ×2) with per-card `cellSelector`s (union selectors for the Home panels'
+trailing discover card). ArtistDetail's per-section grids deferred.
+
+### Batch K — ArtistDetail per-section roving
+See [ARTIST_DETAIL_SECTION_ROVING_DESIGN.md](ARTIST_DETAIL_SECTION_ROVING_DESIGN.md).
+
+Completed the platform-wide roving story. Added `ArtistReleaseSectionGrid.vue` —
+a wrapper whose each instance owns a `useArtworkGridRoving` (called synchronously
+in setup, per Vue's composable rules), so every discography section is an
+independent roving composite (one tab stop per section; arrows stay within it).
+A scoped slot keeps the `ReleaseCard` and its operator-policy actions in
+`ArtistDetailView`'s scope. `artist-detail-grid` is passed as a class so the
+scoped `--hx-artwork-grid-min` overrides still apply. All card grids in the
+client are now roving-tabindex surfaces.
+
+### Batch L — Keyboard sweep + focus-ring audit
+See [KEYBOARD_FOCUS_AUDIT_DESIGN.md](KEYBOARD_FOCUS_AUDIT_DESIGN.md).
+
+Consolidated static audit of focus indicators across every roving surface
+(Batches D–K) against WCAG 2.2 §2.4.11/2.4.12/2.4.13. Found and fixed three gaps:
+`.hx-btn` had no focus ring (platform-wide — added `:focus-visible` outline);
+`.requester-home-discover-card` (a roving cell) had no ring (added); and
+`.operator-home__discover-card` used only a weak art-color change (added a clear
+perimeter outline, kept the enhancement). Every roving cell and every button now
+carries a consistent, WCAG-compliant `:focus-visible` ring. Runtime Playwright/axe
+confirmation remains as the final step in a seeded environment.
+
+### Batch M — Artwork skeleton→image fade-in
+See [ARTWORK_FADE_IN_DESIGN.md](ARTWORK_FADE_IN_DESIGN.md).
+
+Completes the Batch E loading-state story. The skeleton now persists over the
+fetch gap and the resolved `<img>` cross-fades in (`opacity 0→1`, 200ms) only on
+`@load`, gated by `imageLoaded`/`imageFailed` refs (reset on URL change; `@error`
+falls back to the avatar). The image overlays the skeleton (absolute, `inset:0`),
+the artwork container became a positioning context (`position: relative`), and the
+transition is scoped to `prefers-reduced-motion: no-preference` (CLS/LCP-safe —
+geometry is reserved by the container's aspect-ratio). Includes an avatar fill fix.
+
+### Batch N — Search debounce & typeahead
+See [SEARCH_DEBOUNCE_TYPEAHEAD_DESIGN.md](SEARCH_DEBOUNCE_TYPEAHEAD_DESIGN.md).
+
+Discover search now responds as the operator types. A pure `resolveSearchDispatch`
+helper (min-length, de-dupe, rate-limit gates; 13 tests) drives a
+`useDebouncedSearch` composable that debounces (350ms quiet), caps at MusicBrainz's
+~1 req/s (`minIntervalMs`), and cancels in-flight searches via AbortController
+(`searchMusicBrainzArtists` + `runSearch` became signal-aware; abort = cancellation,
+not error). `runSearch`'s clear-results/panel-state behavior is preserved, and the
+press-enter `submit()` fallback bypasses the rate cap. The search input stays
+enabled while searching so typing continues.
+
+### Batch O — Generalize artwork fade-in to `ArtworkImage`
+See [ARTWORK_IMAGE_FADE_IN_DESIGN.md](ARTWORK_IMAGE_FADE_IN_DESIGN.md).
+
+A CSS-only change attaches the Batch M `@load`-gated fade-in to `ArtworkImage`'s
+existing `data-state` machine: `<img>` is `opacity: 0` until
+`.hx-artwork[data-state='loaded']`, then fades to 1 over 200ms under
+`prefers-reduced-motion: no-preference`. No JS/template/helper change (the state
+machine + `@load` already exist). Now every card artwork — `ReleaseCard`,
+`RequestCard`, `ArtistCard` default — fades in deliberately platform-wide, with
+no double-application (`DiscoverArtistCard` keeps its own Batch M slot).
+
+### Batch P — Typeahead result announcement (live region)
+See [TYPEAHEAD_LIVE_REGION_DESIGN.md](TYPEAHEAD_LIVE_REGION_DESIGN.md).
+
+Makes the Batch N typeahead screen-reader-accessible. A pure `buildSearchStatusMessage`
+helper (11 tests) drives a visually-hidden `role="status" aria-live="polite"
+aria-atomic="true"` region that announces only completed searches ("N artists
+found" / "No artists found" / the formatted error) and stays quiet mid-flight to
+avoid per-keystroke spam. Added a global `.sr-only` utility (replacing per-component
+duplicates) and demoted the Batch B "searching" card to a plain visual article so
+the live region is the single announcement source (the input's dynamic
+`aria-label` + button `aria-busy` still convey the in-flight state).
+
+### Batch Q — Prominent shared skeleton for `ArtworkImage`
+See [ARTWORK_IMAGE_SKELETON_DESIGN.md](ARTWORK_IMAGE_SKELETON_DESIGN.md).
+
+Replaced `ArtworkImage`'s faint 6%-white loading sheen with a solid skeleton
+gradient + the global `hx-skeleton-pulse` keyframes (Batch E parity), so every
+card artwork has consistent, visible loading feedback (WCAG 1.4.11 — faint
+shimmers are missed by low-vision users). Deleted the now-unused local
+`hx-artwork-shimmer` keyframes; the Batch O fade-in and reduced-motion guard are
+unchanged. CSS-only.
+
+### Batch R — Consolidate `sr-only` variants onto the global utility
+See [SR_ONLY_CONSOLIDATION_DESIGN.md](SR_ONLY_CONSOLIDATION_DESIGN.md).
+
+Replaced four component-scoped `sr-only` duplicates (`library-sr-only`,
+`rdm-sr-only`, `rjt-sr-only`, RequestCard's scoped `.sr-only`) with the single
+global `.sr-only` (Batch P). Deleted the four scoped definitions; the global
+carries the canonical clip pattern incl. `clip-path: inset(50%)` (which three
+variants lacked). One source of truth; no behavior change (all were the same
+visually-hidden clip technique). CSS-only.
+
+### Batch S — Cross-fade skeleton→image handoff
+See [CROSSFADE_HANDOFF_DESIGN.md](CROSSFADE_HANDOFF_DESIGN.md).
+
+Eliminated the brief container-bg flash during the artwork fade-in by keeping the
+skeleton **persistent under** the fading image (not a literal cross-fade, which
+causes a mid-transition "dip"). `ArtworkImage`: img gets `z-index: 1` (above the
+`::after`); the skeleton `::after` persists during `[data-state='loaded']` with
+`animation: none`. `DiscoverArtistCard`: `showSkeleton` persists during the image
+state; `is-covered` class stops the pulse once loaded. No flash, no dip; reduced-
+motion users get an instant swap.
+
+### Batch T — Render performance: `content-visibility: auto` for card grids
+See [CONTENT_VISIBILITY_DESIGN.md](CONTENT_VISIBILITY_DESIGN.md).
+
+Added `content-visibility: auto` + `contain-intrinsic-size: auto 320px` to the
+global `.hx-media-card` primitive. The browser skips layout/paint of off-screen
+cards (estimated 50%+ rendering cost reduction on large grids) while rendering
+on-screen and focused cards normally. Progressive enhancement (Baseline 2024);
+roving-safe (focused cards are always "relevant to the user"); a11y-safe (content
+stays in the DOM + accessibility tree). One CSS rule; no component changes.
+
+### Batch U — `decoding="async"` on artwork images
+See [DECODING_ASYNC_DESIGN.md](DECODING_ASYNC_DESIGN.md).
+
+Added `decoding="async"` to all 5 artwork `<img>` elements (ArtworkImage,
+DiscoverArtistCard, DiscoverRecommendationsPanel chip avatar, OperatorArtistCard,
+ArtistDetailRelatedArtistCard). A progressive-enhancement hint (Baseline Jan 2020)
+that lets the browser avoid blocking other content during image decode — most
+impactful when many card images decode at once during scroll-fill. Pairs with
+`loading="lazy"` (fetch deferral) and `content-visibility: auto` (render
+deferral) to complete the three-stage artwork pipeline.
+
+### Batch V — Consolidate `--hx-artwork-grid-min` overrides
+See [GRID_MIN_CONSOLIDATION_DESIGN.md](GRID_MIN_CONSOLIDATION_DESIGN.md).
+
+Removed dead code (the global mobile `--hx-artwork-grid-min: 140px` was
+ineffective — every grid's scoped class wins on specificity) and added a
+documentation registry (a table comment in `.hx-artwork-grid` listing every
+per-view desktop/mobile value + scoped class). The per-view scoped overrides
+stay (correct pattern for differing values + required specificity).
+
+### Batch W — Route rogue card images through `ArtworkImage`
+See [ROGUE_CARDS_ARTWORKIMAGE_DESIGN.md](ROGUE_CARDS_ARTWORKIMAGE_DESIGN.md).
+
+Added a `#fallback` named slot to `ArtworkImage` (default: the music-note SVG) so
+cards can provide a custom error placeholder. Routed `OperatorArtistCard`'s
+artwork through `ArtworkImage` (gets the full skeleton/fade/cross-fade lifecycle
+from Batches E/O/Q/S); the `#fallback` preserves its colored artist-initial
+avatar. `ArtistDetailRelatedArtistCard` deferred (60px round avatar — layout
+mismatch with ArtworkImage's square artwork box; low value at that size).
+
 ---
 
-## Proposed (next three)
+## Proposed (follow-up)
 
-Status: Proposed (not yet implemented). Each is scoped to be picked up
-independently.
+Status: Proposed (not yet implemented).
 
-### 1. Roving-tabindex keyboard navigation for the artwork grid
+### Runtime keyboard verification (Playwright) in a seeded environment
 
-**Problem.** `PaginatedArtworkGrid` now exposes a `role="list"`, but every card's
-interactive controls remain in the natural tab order. As lists grow (and paging
-reveals more), keyboard users must Tab through dozens of controls to cross the
-grid. The W3C APG grid/listbox guidance favors a single tab stop with arrow-key
-roving focus.
+**Problem.** Batch L performed the static focus-ring audit and fixed the gaps in
+source, but the runtime behavior — actual arrow-key movement, Tab order across
+composites, and per-surface 3:1 contrast of the rendered ring — can only be
+proven in a running app. That needs the full stack (Express + PostgreSQL +
+seeded data), which is not available in-env.
 
-**Proposal.** Add an opt-in roving-tabindex behaviour to the grid primitive: one
-tab stop enters the grid, arrow keys move a `tabindex="0"` "active" cell while the
-rest are `tabindex="-1"`, and Enter/Space activates the card's primary action.
-Encapsulate the index math as a pure, tested helper (`resolveRovingIndex(current,
-key, columns, total)`) so the DOM wiring in the component stays thin.
+**Proposal.** Add a focused Playwright (test/browser) suite that, against a
+seeded dev server, asserts: one tab stop enters each grid/section; Arrow /
+Home / End / Ctrl+Home / Ctrl+End move focus as expected; Tab crosses between
+composites; and the focused cell's computed outline meets the 2px/3:1 standard.
+This converts the Batches D–L "recommended confirmation" notes into automated
+evidence and guards against regressions.
 
-**Why it is high value.** Turns a long, tab-heavy grid into a fast,
-spec-compliant keyboard surface — directly building on the Batch C primitive.
+**Why it is high value.** Locks in the platform-wide roving + focus work with
+real, repeatable evidence; catches any runtime-only regression.
 
 | Pros | Cons |
 | --- | --- |
-| Pure index math is fully unit-testable | Column count is layout-dependent (needs a resolved/observed value) |
-| One tab stop instead of N×controls | Must coexist with paging reveal and `role="list"` semantics |
+| Automated, repeatable proof of the a11y work | Requires a seeded full-stack environment to run |
+| Guards Batches D–L against future regressions | Playwright suite is heavier than unit tests |
 
-**Touch points.** New `roving-index.js` (+ tests), opt-in props on
-`PaginatedArtworkGrid`, key handling in the grid.
+**Touch points.** `test/browser/` (new spec); seeded dev-server fixture; small
+fixes if runtime gaps surface.
 
-**Verify against:** `w3c/aria-practices` — grid / listbox keyboard interaction
-(roving tabindex).
-
----
-
-### 2. Artwork loading skeletons & stable card geometry
-
-**Problem.** Artwork resolves asynchronously per visible artist. Cards currently
-pop from a blank/initial state to an image, causing layout shift and a flicker as
-the grid (and paging reveal) fills in. There is no explicit loading affordance,
-so a slow source looks like a broken card.
-
-**Proposal.** Give `DiscoverArtistCard` an explicit `loading` state (driven by the
-container's `isResolvingArtistArtwork`) that renders a fixed-aspect skeleton
-placeholder, reserving the artwork box geometry so nothing reflows when the image
-arrives. Derive the display state with a pure helper
-(`resolveArtworkDisplayState({ url, isResolving })` → `image | loading | initial`).
-
-**Why it is high value.** Removes the most visible jank on the primary browse
-surface and makes slow sources legible instead of looking broken.
-
-| Pros | Cons |
-| --- | --- |
-| Eliminates cumulative layout shift in the grid | Needs a reserved aspect-ratio box in card CSS |
-| Pure state resolver is testable; honors text/image embedding separation | Skeleton shimmer must respect `prefers-reduced-motion` |
-
-**Touch points.** New `resolveArtworkDisplayState` helper (+ tests),
-`DiscoverArtistCard` artwork slot + skeleton CSS, container passes a `loading`
-flag.
-
-**Verify against:** `w3c/aria-practices` busy/`aria-busy` guidance;
-`prefers-reduced-motion` media query for the shimmer.
-
----
-
-### 3. Search debounce & typeahead affordance
-
-**Problem.** Discover search is submit-only: the operator types a full query and
-presses enter. There is no incremental feedback, and rapid resubmissions can fire
-overlapping MusicBrainz requests. For exploratory discovery, a debounced
-typeahead is the expected interaction.
-
-**Proposal.** Add a pure, tested debounce/coalescing helper
-(`shouldDispatchQuery(prev, next, { minLength, sinceMs })`) and a small
-`useDebouncedSearch` composable that wraps `useDiscoverSearch`, dispatching after
-a quiet interval once a minimum length is met and cancelling in-flight requests
-on a newer query. Keep the explicit submit as a fallback.
-
-**Why it is high value.** Makes search feel live, cuts wasted upstream requests,
-and reduces error noise from half-typed queries.
-
-| Pros | Cons |
-| --- | --- |
-| Pure dispatch-decision logic is unit-testable | Must respect MusicBrainz rate limits — debounce + cancel are required |
-| Fewer wasted requests; snappier UX | Needs request cancellation/stale-result guarding |
-
-**Touch points.** New `shouldDispatchQuery` helper (+ tests),
-`useDebouncedSearch` composable, `DiscoverSearchBar` wiring, stale-response guard
-in `useDiscoverSearch`.
-
-**Verify against:** MusicBrainz rate-limit guidance (one request/second); AbortController
-request cancellation.
-
----
-
-## Suggested sequencing
-
-1. **Roving-tabindex navigation** — completes the keyboard story on the Batch C grid.
-2. **Artwork skeletons** — small, additive visual-stability win.
-3. **Search debounce/typeahead** — largest surface; touches upstream request flow.
+**Verify against:** W3C APG roving tabindex; WCAG 2.2 §2.4.11; axe-core.

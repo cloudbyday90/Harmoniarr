@@ -73,8 +73,8 @@ export function resolveMusicBrainzReleaseLocal(releaseId, { signal } = {}) {
   return apiRequest(`/api/v1/metadata/musicbrainz/releases/${encodeURIComponent(releaseId)}/local`, { signal });
 }
 
-export function searchMusicBrainzArtists({ query, limit } = {}) {
-  return apiRequest(`/api/v1/metadata/musicbrainz/artists/search${buildQueryString({ q: query, limit })}`);
+export function searchMusicBrainzArtists({ query, limit, signal } = {}) {
+  return apiRequest(`/api/v1/metadata/musicbrainz/artists/search${buildQueryString({ q: query, limit })}`, { signal });
 }
 
 export function searchMusicBrainzReleases({ artist, release, limit } = {}) {

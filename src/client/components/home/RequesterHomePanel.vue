@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import { RouterLink } from 'vue-router';
 import ArtistCard from '../media/ArtistCard.vue';
 import ConfirmRequestModal from '../media/ConfirmRequestModal.vue';
@@ -25,6 +25,7 @@ import EmptyState from '../EmptyState.vue';
 import GridControls from '../GridControls.vue';
 import ReleaseCard from '../media/ReleaseCard.vue';
 import RequestButton from '../media/RequestButton.vue';
+import { useArtworkGridRoving } from '../../composables/useArtworkGridRoving.js';
 import { useGridState } from '../../composables/useGridState.js';
 import { useActivityFeed } from '../../composables/useActivityFeed.js';
 import { useMonitoredArtistSummaries } from '../../composables/useMonitoredArtistSummaries.js';
@@ -157,6 +158,14 @@ const sortedArtists = computed(() => {
   });
 });
 
+// Roving tabindex over the monitored-artists grid + the trailing "find more"
+// card (one tab stop; arrows move focus across both).
+const artistsGridEl = useTemplateRef('artistsGrid');
+useArtworkGridRoving(() => artistsGridEl.value, {
+  cellSelector: '.hx-media-card__link-area, .requester-home-discover-card',
+  count: () => sortedArtists.value.length,
+});
+
 onMounted(() => {
   void loadMonitoredArtists();
   void radar.load();
@@ -257,44 +266,48 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <section
+      <ul
+        ref="artistsGrid"
         class="hx-artwork-grid requester-home-grid"
+        role="list"
         aria-label="Monitored artists"
       >
-        <ArtistCard
-          v-for="artist in sortedArtists"
-        :key="artist.id"
-        :artist="artist"
-        :monitored="true"
-        :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
-      />
+        <li v-for="artist in sortedArtists" :key="artist.id">
+          <ArtistCard
+            :artist="artist"
+            :monitored="true"
+            :to="artist.id ? buildArtistDetailLocation(artist.id, artist.name) : undefined"
+          />
+        </li>
 
-      <!-- "Find more artists" tail card — always visible when artists exist -->
-      <RouterLink
-        :to="{ name: 'discover' }"
-        class="hx-media-card requester-home-discover-card"
-        aria-label="Find more artists"
-      >
-        <div class="hx-artwork hx-artwork--dashed requester-home-discover-art">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+        <!-- "Find more artists" tail card — always visible when artists exist -->
+        <li>
+          <RouterLink
+            :to="{ name: 'discover' }"
+            class="hx-media-card requester-home-discover-card"
+            aria-label="Find more artists"
           >
-            <circle cx="12" cy="12" r="10"/>
-            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
-          </svg>
-        </div>
-        <div class="hx-media-card-body">
-          <p class="hx-media-card-title">Find more artists</p>
-        </div>
-      </RouterLink>
-    </section>
+            <div class="hx-artwork hx-artwork--dashed requester-home-discover-art">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10"/>
+                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+              </svg>
+            </div>
+            <div class="hx-media-card-body">
+              <p class="hx-media-card-title">Find more artists</p>
+            </div>
+          </RouterLink>
+        </li>
+      </ul>
 
       <!-- Recent Household Activity (compact, last 10 events) -->
       <section
@@ -429,6 +442,15 @@ onBeforeUnmount(() => {
   cursor: pointer;
   text-decoration: none;
   color: inherit;
+}
+
+/* Roving-tabindex focus target (WCAG 2.2 §2.4.11). This card is a roving cell
+   in the monitored-artists grid; without an explicit ring its focus was
+   invisible. Scoped specificity overrides .hx-media-card:focus-visible. */
+.requester-home-discover-card:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+  border-radius: var(--hx-radius-lg);
 }
 
 .requester-home-discover-art {

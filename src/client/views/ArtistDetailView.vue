@@ -22,6 +22,7 @@ import { useRoute } from 'vue-router';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import ArtistDetailRelatedArtistCard from '../components/media/ArtistDetailRelatedArtistCard.vue';
+import ArtistReleaseSectionGrid from '../components/media/ArtistReleaseSectionGrid.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistDetail } from '../composables/useArtistDetail.js';
@@ -570,10 +571,13 @@ watch(projection, () => {
                 </div>
               </div>
 
-              <div class="hx-artwork-grid artist-detail-grid" :aria-label="`${section.type}s`">
+              <ArtistReleaseSectionGrid
+                class="artist-detail-grid"
+                :releases="section.releases"
+                :aria-label="`${section.type}s`"
+              >
+                <template #default="{ release }">
                 <ReleaseCard
-                  v-for="release in section.releases"
-                  :key="release.musicbrainzReleaseGroupId"
                   :release="release"
                   :requested="isRequested(release)"
                   :requesting="isRequesting(release)"
@@ -602,7 +606,8 @@ watch(projection, () => {
                     </div>
                   </template>
                 </ReleaseCard>
-              </div>
+                </template>
+              </ArtistReleaseSectionGrid>
             </section>
           </div>
         </div>

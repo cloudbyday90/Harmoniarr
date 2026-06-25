@@ -17,12 +17,13 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import RequestButton from '../components/media/RequestButton.vue';
+import { useArtworkGridRoving } from '../composables/useArtworkGridRoving.js';
 import { useGridState } from '../composables/useGridState.js';
 import { useDownloadRecoveryRetry } from '../composables/useDownloadRecoveryRetry.js';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
@@ -112,6 +113,13 @@ const normalizedReleases = computed(() =>
     downloadRecoveryNotice: buildDownloadRecoveryNotice(release),
   })),
 );
+
+// Roving tabindex over the missing-releases grid (one tab stop; arrows move focus).
+const missingGridEl = useTemplateRef('missingGrid');
+useArtworkGridRoving(() => missingGridEl.value, {
+  cellSelector: '.hx-media-card__link-area',
+  count: () => normalizedReleases.value.length,
+});
 
 const confirmModalOpen = ref(false);
 const confirmRelease = ref(null);
@@ -307,10 +315,9 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else class="hx-card-body hx-card-body--flush">
-        <div class="hx-artwork-grid">
+        <ul ref="missingGrid" class="hx-artwork-grid" role="list" aria-label="Missing releases">
+          <li v-for="(release, index) in normalizedReleases" :key="filteredReleases[index]?.id ?? index">
           <ReleaseCard
-            v-for="(release, index) in normalizedReleases"
-            :key="filteredReleases[index]?.id ?? index"
             :release="release"
             :requested="isRequested(release)"
             :requesting="isRequesting(release)"
@@ -367,7 +374,8 @@ onBeforeUnmount(() => {
               </div>
             </template>
           </ReleaseCard>
-        </div>
+          </li>
+        </ul>
       </div>
     </article>
 

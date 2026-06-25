@@ -25,7 +25,7 @@ const COMPONENT_PATH = new URL('../../src/client/components/media/DiscoverArtist
 test('DiscoverArtistCard resolves add-action state through the presentation helper', async () => {
   const source = await readFile(COMPONENT_PATH, 'utf8');
 
-  assert.match(source, /import \{ computed \} from 'vue'/);
+  assert.match(source, /import \{ computed, ref, watch \} from 'vue'/);
   assert.match(
     source,
     /import \{ resolveDiscoverArtistCardActionState \} from '\.\.\/\.\.\/lib\/discover-artist-card-presentation\.js'/,

@@ -897,6 +897,14 @@ body,
 .hx-btn:hover { background: var(--hx-bg-surface-muted); }
 .hx-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
+/* Visible keyboard focus (WCAG 2.2 §2.4.11 Focus Appearance: ≥2px thickness +
+   3:1 contrast). The 2px offset seats the outline on the surrounding surface so
+   it also reads against filled variants (e.g. primary) without accent-on-accent. */
+.hx-btn:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
 .hx-btn[data-variant='primary'] {
   background: var(--hx-accent-strong);
   border-color: var(--hx-accent-strong);
@@ -1197,12 +1205,16 @@ body,
   /* ── Card grids ──────────────────────────────────────────────────────── */
 
   /*
-   * Force the minimum column width down so cards auto-fill at 2-per-row on
-   * a typical 360px phone.  The custom property can still be overridden per
-   * view (e.g. search sets --hx-artwork-grid-min: 160px).
+   * Tighter gap + a smaller column floor on mobile. NOTE: the --hx-artwork-grid-min
+   * here is only effective for grids WITHOUT a scoped override. Every grid view
+   * sets its own scoped --hx-artwork-grid-min (see the registry below) which has
+   * higher specificity and wins regardless of this media query. Each scoped view
+   * also carries its own @media (max-width: 640px) mobile override to 140px —
+   * that is structurally required (only a scoped rule can override another scoped
+   * rule's variable on the same element). The gap override below IS effective
+   * (no scoped view overrides gap).
    */
   .hx-artwork-grid {
-    --hx-artwork-grid-min: 140px;
     gap: var(--hx-space-3);
   }
 
@@ -1839,6 +1851,23 @@ body {
 }
 
 .hx-form-row > .hx-field { flex: 1 1 200px; }
+
+/* ---------- Screen-reader-only utility ---------- */
+/* Hides content visually but keeps it in the accessibility tree for screen
+   readers (live-region announcements, labels for AT). Standard clip pattern. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- Skeleton loaders ---------- */
 .hx-skeleton {
   display: block;
@@ -1861,6 +1890,15 @@ body {
 @keyframes hx-skeleton-pulse {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* Honor the user's reduced-motion preference (WCAG 2.2.2 / technique C39).
+   Skeletons are purely decorative state affordances, so the shimmer stops while
+   the underlying element remains visible. */
+@media (prefers-reduced-motion: reduce) {
+  .hx-skeleton {
+    animation: none;
+  }
 }
 
 /* ---------- Sticky settings save bar ---------- */
@@ -2520,11 +2558,39 @@ body {
 /*
  * .hx-artwork-grid — responsive auto-fill grid for artwork cards.
  * Minimum cell width is configurable via --hx-artwork-grid-min (default 160px).
+ *
+ * Per-view desktop values (scoped; each view owns its own + a 640px mobile
+ * override to 140px — see the comment in the @media block above for why):
+ *
+ *   View                     Scoped class              Desktop   Mobile
+ *   ───────────────────────  ────────────────────────  ────────  ──────
+ *   PaginatedArtworkGrid     .discover-grid             180px     140px
+ *   SearchView               .search-grid               168px     140px
+ *   ArtistDetailView         .artist-detail-grid        168px     140px
+ *   MyRequestsView           .my-requests-grid          160px     140px
+ *   RequesterHomePanel       .requester-home-grid       160px     140px
+ *   OperatorHomePanel        .operator-home__grid       196px     140px
+ *   (default / unset)        —                          160px     140px
+ *
+ * The container is a native <ul role="list"> and each card is wrapped in <li>.
+ * The <ul> reset below is a no-op on <div>/<section>, but required when the
+ * container is a <ul>: list-style:none would otherwise drop list semantics in
+ * Safari, so consumers also carry role="list". The > li rule dissolves the
+ * wrapper's box via display:contents so the card stays the CSS-grid item
+ * (MDN Grid Accessibility: avoid "markup flattening") while <li> keeps its
+ * listitem role.
  */
 .hx-artwork-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--hx-artwork-grid-min, 160px), 1fr));
   gap: var(--hx-space-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hx-artwork-grid > li {
+  display: contents;
 }
 
 /*
@@ -2549,6 +2615,15 @@ body {
   text-decoration: none;
   color: inherit;
   transition: box-shadow 150ms ease, border-color 150ms ease;
+  /* Skip rendering off-screen cards until they near the viewport (Baseline 2024).
+     The browser renders on-screen/focused cards normally; off-screen ones get
+     layout+paint+size containment (rendering skipped). `contain-intrinsic-size`
+     provides a height estimate so the scrollbar is accurate before render; the
+     `auto` keyword remembers the actual size after first render. Roving-safe:
+     focused cards are always "relevant to the user" (MDN) and rendered on demand.
+     Progressive enhancement — ignored by browsers that don't support it. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
 }
 
 .hx-media-card:hover,
@@ -2558,7 +2633,18 @@ body {
   outline: none;
 }
 
+/* Roving-tabindex focus target (ArtistCard RouterLink + ReleaseCard
+   div[role=button]). The card's own :focus-visible never fires because focus
+   lands on this inner element, so the ring belongs here. Outlines are not
+   clipped by ancestor overflow. */
+.hx-media-card__link-area:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+  border-radius: var(--hx-radius-lg);
+}
+
 .hx-media-card__artwork {
+  position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   background: var(--hx-bg-surface-sunken);

@@ -21,6 +21,7 @@
 // (monitored chips and recommendation cards) from the container and stays free
 // of business logic. Static copy is sourced from the presentation library so
 // the wording lives in one tested place.
+import { nextTick, useTemplateRef, watch } from 'vue';
 import DiscoverArtistCard from './DiscoverArtistCard.vue';
 import PaginatedArtworkGrid from './PaginatedArtworkGrid.vue';
 import {
@@ -29,8 +30,9 @@ import {
   buildDiscoverRecommendationsSubtitle,
   buildDiscoverSuggestionsCopy,
 } from '../../lib/discover-presentation.js';
+import { useRovingTabindex } from '../../composables/useRovingTabindex.js';
 
-defineProps({
+const props = defineProps({
   chips: {
     type: Array,
     default: () => [],
@@ -51,9 +53,39 @@ defineProps({
     type: String,
     default: '',
   },
+  // Global artwork-resolution flag; forwarded to each card so it can show a
+  // loading skeleton instead of a misleading avatar while images stream in.
+  artworkLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 defineEmits(['add']);
+
+// Roving tabindex over the monitored-artist chip band: one chip is the single
+// tab stop, Left/Right (and Home/End) move focus, the rest leave the tab order.
+// Reuses the Batch D composable in horizontal mode (APG toolbar model). The
+// `focusin` listener inside the composable also anchors roving to whichever chip
+// `focusMonitoredArtistChip` (below) focuses after an add, so the two mechanisms
+// stay in sync.
+const monitoredListEl = useTemplateRef('monitoredList');
+const { refresh: refreshMonitoredRoving } = useRovingTabindex(
+  () => monitoredListEl.value,
+  {
+    cellSelector: '.discover-monitored-chip',
+    axis: 'horizontal',
+  },
+);
+
+// Re-apply the managed tabindex when the chip set changes (add/remove) — the new
+// chip nodes render without a tabindex until the next sync.
+watch(
+  () => props.chips.length,
+  () => {
+    nextTick(refreshMonitoredRoving);
+  },
+);
 
 // Map of artist id -> monitored-chip element, so the container can return focus to a
 // freshly added artist's chip after the add dialog closes (APG dialog pattern:
@@ -97,27 +129,27 @@ defineExpose({ focusMonitoredArtistChip });
           <p class="discover-monitored-band__copy">{{ buildDiscoverMonitoredBandCopy() }}</p>
         </div>
 
-        <div class="discover-monitored-list" role="list" :aria-label="monitoredAriaLabel">
-          <RouterLink
-            v-for="chip in chips"
-            :key="chip.id"
-            :ref="(el) => setChipRef(chip.id, el)"
-            :to="chip.to"
-            class="discover-monitored-chip"
-            role="listitem"
-            :aria-label="chip.ariaLabel"
-          >
-            <img
-              v-if="chip.artworkUrl"
-              :src="chip.artworkUrl"
-              :alt="chip.name"
-              class="discover-monitored-chip__avatar"
-              loading="lazy"
-            />
-            <span v-else class="discover-monitored-chip__initial" aria-hidden="true">{{ chip.initial }}</span>
-            <span class="discover-monitored-chip__name">{{ chip.name }}</span>
-          </RouterLink>
-        </div>
+        <ul ref="monitoredList" class="discover-monitored-list" role="list" :aria-label="monitoredAriaLabel">
+          <li v-for="chip in chips" :key="chip.id">
+            <RouterLink
+              :ref="(el) => setChipRef(chip.id, el)"
+              :to="chip.to"
+              class="discover-monitored-chip"
+              :aria-label="chip.ariaLabel"
+            >
+              <img
+                v-if="chip.artworkUrl"
+                :src="chip.artworkUrl"
+                :alt="chip.name"
+                class="discover-monitored-chip__avatar"
+                loading="lazy"
+                decoding="async"
+              />
+              <span v-else class="discover-monitored-chip__initial" aria-hidden="true">{{ chip.initial }}</span>
+              <span class="discover-monitored-chip__name">{{ chip.name }}</span>
+            </RouterLink>
+          </li>
+        </ul>
       </section>
 
       <p v-if="errorMessage" class="discover-graph-card__error" role="alert">
@@ -134,6 +166,7 @@ defineExpose({ focusMonitoredArtistChip });
           :items="cards"
           :initial-visible="8"
           :step="8"
+          roving
           aria-label="Recommended artists"
         >
           <template #default="{ item: card }">
@@ -149,6 +182,7 @@ defineExpose({ focusMonitoredArtistChip });
               :monitored="card.monitored"
               :monitoring="card.monitoring"
               :disabled="card.disabled"
+              :loading="artworkLoading"
               :to="card.to"
               @add="$emit('add', $event)"
             />
@@ -205,6 +239,12 @@ defineExpose({ focusMonitoredArtistChip });
 }
 
 .discover-monitored-list {
+  /* Native <ul> reset — the list/listitem semantics come from <ul>/<li>, so the
+     chips (<a>) keep their native link role. Layout is flex; the <li> becomes
+     the flex item and the chip styles live on the link. */
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-wrap: wrap;
   gap: var(--hx-space-2);

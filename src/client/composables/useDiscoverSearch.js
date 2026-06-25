@@ -17,6 +17,7 @@
  */
 
 import { ref } from 'vue';
+import { isAbortError } from '../lib/abort-error.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { searchMusicBrainzArtists } from '../lib/metadata-api.js';
 
@@ -51,9 +52,12 @@ export function useDiscoverSearch({
 
   /**
    * Run an artist search against MusicBrainz.
-   * Clears previous results and error on each call.
+   * Clears previous results and error on each call. Pass an AbortSignal so a
+   * newer search can supersede an in-flight one: an aborted call is treated as
+   * an intentional cancellation (no error, no loading-flag reset) and its
+   * stale result is discarded.
    */
-  async function runSearch() {
+  async function runSearch({ signal } = {}) {
     const trimmed = query.value.trim();
     if (!trimmed) return;
 
@@ -63,12 +67,17 @@ export function useDiscoverSearch({
     hasSearched.value = true;
 
     try {
-      const payload = await searchArtists({ query: trimmed, limit: 20 });
+      const payload = await searchArtists({ query: trimmed, limit: 20, signal });
+      // A newer search may have aborted this one mid-flight; discard its result.
+      if (signal?.aborted) return;
       results.value = payload.search?.results ?? [];
     } catch (error) {
+      // An abort is an intentional cancellation, not a failure.
+      if (signal?.aborted || isAbortError(error)) return;
       searchError.value = getErrorMessage(error, 'Artist search failed. Please try again.');
     } finally {
-      isSearching.value = false;
+      // Only the still-current (non-aborted) search owns the loading flag.
+      if (!signal?.aborted) isSearching.value = false;
     }
   }
 

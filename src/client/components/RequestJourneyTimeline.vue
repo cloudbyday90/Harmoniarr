@@ -45,7 +45,7 @@ const announcement = computed(() => {
 
 <template>
   <div class="rjt">
-    <p class="rjt-sr-only" role="status" aria-live="polite">{{ announcement }}</p>
+    <p class="sr-only" role="status" aria-live="polite">{{ announcement }}</p>
     <ol class="rjt-list">
       <li
         v-for="stage in stages"
@@ -75,18 +75,6 @@ const announcement = computed(() => {
 </template>
 
 <style scoped>
-.rjt-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .rjt-list {
   list-style: none;
   margin: 0;

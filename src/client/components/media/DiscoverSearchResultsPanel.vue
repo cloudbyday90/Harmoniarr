@@ -27,6 +27,12 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  // Global artwork-resolution flag; forwarded to each card so it can show a
+  // loading skeleton instead of a misleading avatar while images stream in.
+  artworkLoading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 defineEmits(['add']);
@@ -48,6 +54,7 @@ defineEmits(['add']);
         :items="cards"
         :initial-visible="12"
         :step="12"
+        roving
         aria-label="Artist search results"
       >
         <template #default="{ item: card }">
@@ -61,6 +68,7 @@ defineEmits(['add']);
             :monitored="card.monitored"
             :monitoring="card.monitoring"
             :disabled="card.disabled"
+            :loading="artworkLoading"
             :to="card.to"
             @add="$emit('add', $event)"
           />

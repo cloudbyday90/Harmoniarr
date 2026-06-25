@@ -55,6 +55,7 @@ defineProps({
       :alt="artist.name"
       class="artist-detail-related-card__image"
       loading="lazy"
+      decoding="async"
     />
     <div
       v-else

@@ -26,7 +26,7 @@ test('useDiscoverSearch runSearch sends trimmed query and populates results', as
   await runSearch();
 
   assert.equal(searchArtists.mock.callCount(), 1);
-  assert.deepEqual(searchArtists.mock.calls[0].arguments[0], { query: 'Radiohead', limit: 20 });
+  assert.deepEqual(searchArtists.mock.calls[0].arguments[0], { query: 'Radiohead', limit: 20, signal: undefined });
   assert.deepEqual(results.value, [{ id: 'mb-1', name: 'Radiohead' }]);
   assert.equal(hasSearched.value, true);
   assert.equal(isSearching.value, false);

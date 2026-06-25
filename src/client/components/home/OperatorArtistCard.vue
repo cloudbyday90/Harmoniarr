@@ -20,6 +20,7 @@
 import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import ArtistCard from '../media/ArtistCard.vue';
+import ArtworkImage from '../ArtworkImage.vue';
 import {
   buildDiscoverArtistInitial,
   buildDiscoverAvatarStyle,
@@ -74,23 +75,19 @@ const detailLocation = computed(() => (musicBrainzArtistId.value
     variant="operator-home"
   >
     <template #artwork>
-      <img
-        v-if="artwork?.url"
-        :src="artwork.url"
-        :alt="cardArtist.name"
-        class="operator-artist-card__image"
-        loading="lazy"
-      />
-      <div
-        v-else
-        class="hx-artwork operator-artist-card__avatar"
-        :style="buildDiscoverAvatarStyle(cardArtist.id, cardArtist.name)"
-        aria-hidden="true"
-      >
-        <span class="operator-artist-card__initial">
-          {{ buildDiscoverArtistInitial(cardArtist.id, cardArtist.name) }}
-        </span>
-      </div>
+      <ArtworkImage :local-src="artwork?.url" :alt="cardArtist.name">
+        <template #fallback>
+          <div
+            class="operator-artist-card__avatar"
+            :style="buildDiscoverAvatarStyle(cardArtist.id, cardArtist.name)"
+            aria-hidden="true"
+          >
+            <span class="operator-artist-card__initial">
+              {{ buildDiscoverArtistInitial(cardArtist.id, cardArtist.name) }}
+            </span>
+          </div>
+        </template>
+      </ArtworkImage>
     </template>
 
     <template #eyebrow>
@@ -131,17 +128,12 @@ const detailLocation = computed(() => (musicBrainzArtistId.value
 </template>
 
 <style scoped>
-.operator-artist-card__image {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-}
-
 .operator-artist-card__avatar {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .operator-artist-card__initial {

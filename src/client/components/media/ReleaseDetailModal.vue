@@ -327,7 +327,7 @@ function handleTrackOverrideChange(medium, track, event) {
     <div class="rdm-shell">
       <!-- ── Header ──────────────────────────────────────────────────────── -->
       <header class="rdm-header">
-        <h2 id="rdm-heading" class="rdm-sr-only">Release detail</h2>
+        <h2 id="rdm-heading" class="sr-only">Release detail</h2>
         <button
           type="button"
           class="rdm-close hx-btn"
@@ -550,15 +550,6 @@ function handleTrackOverrideChange(medium, track, event) {
   padding: var(--hx-space-3) var(--hx-space-4);
   border-bottom: 1px solid var(--hx-border-subtle);
   flex-shrink: 0;
-}
-
-.rdm-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
 }
 
 .rdm-body {

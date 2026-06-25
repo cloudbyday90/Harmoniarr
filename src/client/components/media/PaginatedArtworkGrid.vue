@@ -24,12 +24,19 @@
 // DOM. Each visible item is exposed back to the parent through a scoped slot, so
 // callers keep full control over what a card looks like while sharing one tested
 // list/paging implementation.
-import { computed, ref, watch } from 'vue';
+//
+// Opt-in `roving` enables W3C-APG roving tabindex over the rendered cells: one
+// cell is the single tab stop into the grid, arrow/Home/End keys move focus, and
+// the rest are removed from the tab order. The index/intent math lives in
+// roving-index.js; this component only wires the composable and re-syncs the
+// managed tabindex after every reveal or list change.
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import {
   clampVisibleCount,
   resolveNextVisibleCount,
   resolveRemainingCount,
 } from '../../lib/paginated-list.js';
+import { useRovingTabindex } from '../../composables/useRovingTabindex.js';
 
 const props = defineProps({
   items: {
@@ -52,18 +59,37 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  // When true, the grid manages roving tabindex over its cells (one tab stop,
+  // arrow-key navigation). Off by default for backward compatibility.
+  roving: {
+    type: Boolean,
+    default: false,
+  },
+  // Selector for the focusable cell within each slotted item. Defaults to the
+  // media card's navigable link area.
+  cellSelector: {
+    type: String,
+    default: '.hx-media-card__link-area',
+  },
 });
 
 const visibleCount = ref(clampVisibleCount(props.initialVisible, props.items.length, props.step));
 
+const gridEl = useTemplateRef('grid');
+const { refresh: refreshRoving } = useRovingTabindex(() => gridEl.value, {
+  cellSelector: props.cellSelector,
+  enabled: () => props.roving,
+});
+
 // When the source list changes (re-ranked recommendations, new search), keep the
-// reveal window valid and avoid showing a stale "Show more" affordance.
-watch(
-  () => props.items.length,
-  (total) => {
-    visibleCount.value = clampVisibleCount(visibleCount.value, total, props.step);
-  },
-);
+// reveal window valid and avoid showing a stale "Show more" affordance. After
+// the DOM re-renders, re-apply the managed tabindex to the new cell nodes.
+watch(() => props.items.length, (total) => {
+  visibleCount.value = clampVisibleCount(visibleCount.value, total, props.step);
+  if (props.roving) {
+    nextTick(refreshRoving);
+  }
+});
 
 const visibleItems = computed(() => props.items.slice(0, visibleCount.value));
 const remainingCount = computed(() => resolveRemainingCount(visibleCount.value, props.items.length));
@@ -75,19 +101,28 @@ function keyFor(item, index) {
 
 function showMore() {
   visibleCount.value = resolveNextVisibleCount(visibleCount.value, props.items.length, props.step);
+  // Newly revealed cards render without a managed tabindex until the next sync.
+  if (props.roving) {
+    nextTick(refreshRoving);
+  }
 }
 </script>
 
 <template>
   <div class="discover-paginated">
-    <div class="hx-artwork-grid discover-grid" role="list" :aria-label="ariaLabel || undefined">
-      <slot
+    <ul
+      ref="grid"
+      class="hx-artwork-grid discover-grid"
+      role="list"
+      :aria-label="ariaLabel || undefined"
+    >
+      <li
         v-for="(item, index) in visibleItems"
         :key="keyFor(item, index)"
-        :item="item"
-        :index="index"
-      />
-    </div>
+      >
+        <slot :item="item" :index="index" />
+      </li>
+    </ul>
 
     <div v-if="hasMore" class="discover-paginated__more">
       <button
@@ -110,6 +145,8 @@ function showMore() {
 }
 
 .discover-grid {
+  /* The native <ul> reset and > li{display:contents} live on the shared
+     .hx-artwork-grid primitive now; this override only sets the cell floor. */
   --hx-artwork-grid-min: 180px;
 }
 

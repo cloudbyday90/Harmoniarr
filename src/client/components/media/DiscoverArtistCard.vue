@@ -17,13 +17,14 @@
 -->
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import ArtistCard from './ArtistCard.vue';
 import {
   buildDiscoverArtistInitial,
   buildDiscoverAvatarStyle,
 } from '../../lib/discover-presentation.js';
 import { resolveDiscoverArtistCardActionState } from '../../lib/discover-artist-card-presentation.js';
+import { resolveArtworkDisplayState } from '../../lib/artwork-display-state.js';
 
 const props = defineProps({
   artist: {
@@ -33,6 +34,14 @@ const props = defineProps({
   artwork: {
     type: Object,
     default: null,
+  },
+  // Whether artwork resolution is in flight for this card (the container's
+  // global `isResolvingArtistArtwork` flag). Drives the loading skeleton via the
+  // pure `resolveArtworkDisplayState` helper so the card never shows a misleading
+  // "no artwork" avatar while an image is still being fetched.
+  loading: {
+    type: Boolean,
+    default: false,
   },
   badge: {
     type: String,
@@ -78,6 +87,43 @@ const props = defineProps({
 
 const emit = defineEmits(['add']);
 
+const artworkState = computed(() =>
+  resolveArtworkDisplayState({
+    url: props.artwork?.url ?? null,
+    isResolving: props.loading,
+  }),
+);
+
+// Tracks the resolved <img> paint lifecycle so the skeleton can cover the fetch
+// gap and the image can fade in only once it has actually painted (not merely
+// when its URL resolves). Reset whenever the URL changes so a new image re-fades.
+const imageLoaded = ref(false);
+const imageFailed = ref(false);
+watch(
+  () => props.artwork?.url,
+  () => {
+    imageLoaded.value = false;
+    imageFailed.value = false;
+  },
+);
+
+function handleImageLoad() {
+  imageLoaded.value = true;
+}
+
+function handleImageError() {
+  // Fall back to the avatar rather than a perpetual skeleton / broken image.
+  imageFailed.value = true;
+}
+
+const showSkeleton = computed(
+  () =>
+    artworkState.value === 'loading' ||
+    (artworkState.value === 'image' && !imageFailed.value),
+);
+const showImage = computed(() => artworkState.value === 'image' && !imageFailed.value);
+const showAvatar = computed(() => artworkState.value === 'initial' || imageFailed.value);
+
 const actionState = computed(() =>
   resolveDiscoverArtistCardActionState({
     artistName: props.artist?.name,
@@ -104,15 +150,25 @@ function handleAdd() {
     variant="discover"
   >
     <template #artwork>
+      <div
+        v-if="showSkeleton"
+        class="discover-artist-card__skeleton"
+        :class="{ 'is-covered': imageLoaded }"
+        aria-hidden="true"
+      ></div>
       <img
-        v-if="artwork?.url"
+        v-if="showImage"
         :src="artwork.url"
         :alt="artist.name"
         class="discover-artist-card__image"
+        :class="{ 'is-loaded': imageLoaded }"
         loading="lazy"
+        decoding="async"
+        @load="handleImageLoad"
+        @error="handleImageError"
       />
       <div
-        v-else
+        v-if="showAvatar"
         class="hx-artwork discover-artist-card__avatar"
         :style="buildDiscoverAvatarStyle(artist.id, artist.name)"
         aria-hidden="true"
@@ -162,14 +218,64 @@ function handleAdd() {
 </template>
 
 <style scoped>
+/* The image overlays the skeleton (absolute, inset:0) so it can cross-fade in
+   on @load. Opacity 0 until .is-loaded; the transition is CLS-safe (geometry is
+   reserved by the container's aspect-ratio) and only applied when the user has
+   not set prefers-reduced-motion (WCAG 2.2.2 / technique C39). */
 .discover-artist-card__image {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  aspect-ratio: 1;
+  height: 100%;
   object-fit: cover;
+  opacity: 0;
+}
+
+.discover-artist-card__image.is-loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .discover-artist-card__image {
+    transition: opacity 200ms ease;
+  }
+}
+
+/* Loading skeleton — fills the reserved artwork box (the container's
+   aspect-ratio already holds the geometry, so no reflow when the image lands).
+   Purely visual: aria-hidden in the template because the panel-level
+   "Refreshing" status conveys loading to assistive tech (avoids N simultaneous
+   "loading" announcements across the grid). */
+.discover-artist-card__skeleton {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--hx-bg-surface-muted) 0%,
+    var(--hx-bg-surface-sunken) 50%,
+    var(--hx-bg-surface-muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: hx-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* Once the image has loaded and starts fading in over the skeleton, stop the
+   pulse so it's not animating invisibly underneath the opaque image. */
+.discover-artist-card__skeleton.is-covered {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-artist-card__skeleton {
+    animation: none;
+  }
 }
 
 .discover-artist-card__avatar {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;

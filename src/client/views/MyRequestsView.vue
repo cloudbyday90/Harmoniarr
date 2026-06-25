@@ -17,12 +17,13 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import RequestCard from '../components/media/RequestCard.vue';
 import RequestNotificationsPanel from '../components/RequestNotificationsPanel.vue';
 import { useGridState } from '../composables/useGridState.js';
+import { useArtworkGridRoving } from '../composables/useArtworkGridRoving.js';
 import { useMyRequestNotifications } from '../composables/useMyRequestNotifications.js';
 import { useMyRequests } from '../composables/useMyRequests.js';
 import { sortMyRequests } from '../lib/my-requests-presentation.js';
@@ -87,6 +88,13 @@ const displayRequests = computed(() => {
   const field = filterState.value?.sort?.field ?? 'requested_at';
   const order = filterState.value?.sort?.order ?? 'desc';
   return sortMyRequests(filtered, { field, order });
+});
+
+// Roving tabindex over the request grid (one tab stop; arrows move focus).
+const requestsGridEl = useTemplateRef('requestsGrid');
+useArtworkGridRoving(() => requestsGridEl.value, {
+  cellSelector: '.request-card',
+  count: () => displayRequests.value.length,
 });
 
 onMounted(() => {
@@ -167,18 +175,20 @@ onBeforeUnmount(() => {
         variant="default"
       />
 
-      <section
+      <ul
         v-else
+        ref="requestsGrid"
         class="hx-artwork-grid my-requests-grid"
+        role="list"
         aria-label="Your requests"
       >
-        <RequestCard
-          v-for="request in displayRequests"
-          :key="request.id"
-          :request="request"
-          :viewer-user-id="viewerUserId"
-        />
-      </section>
+        <li v-for="request in displayRequests" :key="request.id">
+          <RequestCard
+            :request="request"
+            :viewer-user-id="viewerUserId"
+          />
+        </li>
+      </ul>
     </template>
 
   </section>

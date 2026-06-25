@@ -28,6 +28,7 @@ import { useAddArtistModal } from '../composables/useAddArtistModal.js';
 import { useDiscoverArtistArtwork } from '../composables/useDiscoverArtistArtwork.js';
 import { useDiscoverGraph } from '../composables/useDiscoverGraph.js';
 import { useDiscoverSearch } from '../composables/useDiscoverSearch.js';
+import { useDebouncedSearch } from '../composables/useDebouncedSearch.js';
 import { useMonitoredArtistSummaries } from '../composables/useMonitoredArtistSummaries.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import {
@@ -44,15 +45,21 @@ import {
   formatDiscoverSearchError,
   resolveDiscoverSearchPanelMode,
 } from '../lib/discover-presentation.js';
+import { buildSearchStatusMessage } from '../lib/search-status-message.js';
 
+const discoverSearch = useDiscoverSearch();
 const {
   hasSearched,
   isSearching,
   query,
   results,
-  runSearch,
   searchError,
-} = useDiscoverSearch();
+} = discoverSearch;
+
+// Debounced typeahead over `query` (one request per ~quiet period, MusicBrainz
+// rate-capped, with AbortController cancellation). `submit` is the press-enter
+// fallback; typeahead dispatches automatically as the operator types.
+const { submit: submitSearch } = useDebouncedSearch(discoverSearch);
 
 const {
   artists: monitoredArtists,
@@ -163,6 +170,18 @@ const searchPanelMode = computed(() =>
   }),
 );
 
+// Screen-reader announcement of completed typeahead searches (role="status" live
+// region in the template). Quiet while a search is in flight / before any search
+// so the region speaks once per completed search instead of on every keystroke.
+const searchStatusMessage = computed(() =>
+  buildSearchStatusMessage({
+    count: results.value.length,
+    isSearching: isSearching.value,
+    hasSearched: hasSearched.value,
+    searchError: searchError.value ? formatDiscoverSearchError(searchError.value) : '',
+  }),
+);
+
 function openAddArtist(artist) {
   openAddArtistModal(artist, isAddedArtist);
 }
@@ -234,8 +253,12 @@ function buildArtistLocation(artist) {
       <DiscoverSearchBar
         v-model="query"
         :is-searching="isSearching"
-        @submit="runSearch"
+        @submit="submitSearch"
       />
+
+      <!-- Screen-reader live region: announces completed typeahead searches
+           (empty/quiet mid-flight to avoid per-keystroke spam). -->
+      <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ searchStatusMessage }}</p>
 
       <div class="discover-counts" role="list" aria-label="Discover summary">
         <span class="hx-pill" data-tone="success" role="listitem">{{ recommendationInputs.length }} monitored</span>
@@ -253,6 +276,7 @@ function buildArtistLocation(artist) {
       :is-loading="isAnyRecommendationInputLoading"
       :error-message="graphError"
       :monitored-aria-label="buildDiscoverMonitoredArtistsAriaLabel()"
+      :artwork-loading="isResolvingArtistArtwork"
       @add="openAddArtist"
     />
 
@@ -285,7 +309,7 @@ function buildArtistLocation(artist) {
       </template>
     </EmptyState>
 
-    <article v-else-if="searchPanelMode === 'searching'" class="hx-card discover-loading-card" role="status" aria-live="polite" aria-busy="true">
+    <article v-else-if="searchPanelMode === 'searching'" class="hx-card discover-loading-card">
       <div class="hx-card-body">
         <p class="discover-loading-card__title">Searching artist catalog...</p>
         <p class="discover-loading-card__body">Matching artists and artwork coverage are being prepared for add actions.</p>
@@ -310,6 +334,7 @@ function buildArtistLocation(artist) {
     <DiscoverSearchResultsPanel
       v-else-if="searchPanelMode === 'results'"
       :cards="searchResultCards"
+      :artwork-loading="isResolvingArtistArtwork"
       @add="openAddArtist"
     />
   </section>

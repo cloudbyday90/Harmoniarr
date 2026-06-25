@@ -158,21 +158,35 @@ const accentStyle = computed(() => {
 </script>
 
 <template>
-  <article class="hx-media-card" :data-variant="variant || undefined" :style="accentStyle" @click="handleDetail">
-    <div class="hx-media-card__artwork">
-      <ArtworkImage
-        ref="artworkImageComp"
-        :mbid="releaseMbid || releaseGroupMbid || undefined"
-        :mbid-type="releaseMbid ? 'release' : 'release-group'"
-        :alt="releaseTitle || 'Release artwork'"
-        :local-src="localSrc"
-      />
+  <article class="hx-media-card" :data-variant="variant || undefined" :style="accentStyle">
+    <!-- Keyboard-accessible primary action (open detail). A native <button>
+         cannot hold the block artwork/body markup (invalid HTML), so this uses
+         a div[role=button] — the W3C/Livefront-sanctioned fallback — with explicit
+         Enter/Space activation. The actions slot is a sibling, never nested. -->
+    <div
+      class="hx-media-card__link-area"
+      role="button"
+      tabindex="0"
+      :aria-label="`View details for ${releaseTitle || 'this release'}`"
+      @click="handleDetail"
+      @keydown.enter="handleDetail"
+      @keydown.space.prevent="handleDetail"
+    >
+      <div class="hx-media-card__artwork">
+        <ArtworkImage
+          ref="artworkImageComp"
+          :mbid="releaseMbid || releaseGroupMbid || undefined"
+          :mbid-type="releaseMbid ? 'release' : 'release-group'"
+          :alt="releaseTitle || 'Release artwork'"
+          :local-src="localSrc"
+        />
+      </div>
+      <div class="hx-media-card__body">
+        <p class="hx-media-card__title">{{ releaseTitle || '—' }}</p>
+        <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
+      </div>
     </div>
-    <div class="hx-media-card__body">
-      <p class="hx-media-card__title">{{ releaseTitle || '—' }}</p>
-      <p v-if="meta" class="hx-media-card__meta">{{ meta }}</p>
-    </div>
-    <div class="hx-media-card__actions" @click.stop>
+    <div class="hx-media-card__actions">
       <slot name="actions">
         <RequestButton
           :requested="requested"
@@ -191,13 +205,20 @@ const accentStyle = computed(() => {
 
 <style scoped>
 .hx-media-card {
-  cursor: pointer;
   border: 1px solid color-mix(
     in oklch,
     oklch(0.72 var(--card-accent-c, 0) var(--card-accent-h, 0)) 40%,
     transparent
   );
   transition: border-color 0.2s ease;
+}
+
+.hx-media-card__link-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  width: 100%;
+  cursor: pointer;
 }
 
 :global([data-theme="light"]) .hx-media-card {

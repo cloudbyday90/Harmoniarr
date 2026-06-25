@@ -46,14 +46,13 @@ function handleSubmit() {
         type="search"
         placeholder="Search for an artist by name"
         autocomplete="off"
-        :disabled="isSearching"
-        aria-label="Search for an artist"
+        :aria-label="isSearching ? 'Searching for an artist' : 'Search for an artist'"
       />
       <button
         type="submit"
         class="hx-btn"
         data-variant="primary"
-        :disabled="isSearching || !query.trim()"
+        :disabled="!query.trim()"
         :aria-busy="isSearching || undefined"
       >
         {{ isSearching ? 'Searching...' : 'Search' }}

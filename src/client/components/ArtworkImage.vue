@@ -101,17 +101,20 @@ defineExpose({ imgRef, activeSrc });
       :src="activeSrc"
       :alt="alt"
       loading="lazy"
+      decoding="async"
       class="hx-artwork__img"
       :ref="(el) => { imgRef = el; }"
       @load="onLoad"
       @error="onError"
     />
     <span v-else class="hx-artwork-placeholder" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M9 18V5l12-2v13"/>
-        <circle cx="6" cy="18" r="3"/>
-        <circle cx="18" cy="16" r="3"/>
-      </svg>
+      <slot name="fallback">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 18V5l12-2v13"/>
+          <circle cx="6" cy="18" r="3"/>
+          <circle cx="18" cy="16" r="3"/>
+        </svg>
+      </slot>
     </span>
   </div>
 </template>
@@ -129,10 +132,21 @@ defineExpose({ imgRef, activeSrc });
 }
 
 .hx-artwork__img {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Hidden until loaded so the image fades in deliberately (Batch M pattern)
+     over the persistent skeleton below, instead of progressively painting
+     under the loading sheen. The container's aspect-ratio reserves the
+     geometry, so the opacity change is CLS-free. */
+  opacity: 0;
+}
+
+.hx-artwork[data-state='loaded'] .hx-artwork__img {
+  opacity: 1;
 }
 
 .hx-artwork-placeholder {
@@ -150,23 +164,42 @@ defineExpose({ imgRef, activeSrc });
   opacity: 0.5;
 }
 
-/* Loading shimmer */
-.hx-artwork[data-state='loading']::after {
+/* Skeleton — persists during loaded (under the z-index:1 image) so the image
+   fades in over it without flashing the container background. Stops pulsing
+   once loaded (the image covers it). */
+.hx-artwork[data-state='loading']::after,
+.hx-artwork[data-state='loaded']::after {
   content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.06) 50%,
-    transparent 100%
+    var(--hx-bg-surface-muted) 0%,
+    var(--hx-bg-surface-sunken) 50%,
+    var(--hx-bg-surface-muted) 100%
   );
   background-size: 200% 100%;
-  animation: hx-artwork-shimmer 1.4s ease-in-out infinite;
 }
 
-@keyframes hx-artwork-shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
+.hx-artwork[data-state='loading']::after {
+  animation: hx-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.hx-artwork[data-state='loaded']::after {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-artwork[data-state='loading']::after {
+    animation: none;
+  }
+}
+
+/* Fade the image in only when the user has not requested reduced motion
+   (WCAG 2.2.2 / technique C39). Reduced-motion users get an instant appearance. */
+@media (prefers-reduced-motion: no-preference) {
+  .hx-artwork__img {
+    transition: opacity 200ms ease;
+  }
 }
 </style>

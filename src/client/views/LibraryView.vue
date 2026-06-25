@@ -17,13 +17,14 @@
 -->
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import ArtworkImage from '../components/ArtworkImage.vue';
 import EmptyState from '../components/EmptyState.vue';
 import GridControls from '../components/GridControls.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import { useArtworkBatchResolve } from '../composables/useArtworkBatchResolve.js';
+import { useArtworkGridRoving } from '../composables/useArtworkGridRoving.js';
 import { useGridState } from '../composables/useGridState.js';
 import { useLibraryFilterOptions } from '../composables/useLibraryFilterOptions.js';
 import { useLibraryReleases } from '../composables/useLibraryReleases.js';
@@ -117,6 +118,13 @@ const displayReleases = computed(() =>
     : library.data.value
   ).map(normalizeLibraryReleaseForCard),
 );
+
+// Roving tabindex over the library grid (one tab stop; arrows move focus).
+const libraryGridEl = useTemplateRef('libraryGrid');
+useArtworkGridRoving(() => libraryGridEl.value, {
+  cellSelector: '.hx-media-card__link-area',
+  count: () => displayReleases.value.length,
+});
 
 const { getResolved: getResolvedArtwork, resolve: resolveArtworkBatch } = useArtworkBatchResolve();
 
@@ -338,7 +346,7 @@ function refreshAll() {
                   </button>
                 </div>
               </template>
-            </ReleaseCard>
+          </ReleaseCard>
           </div>
         </div>
       </article>
@@ -420,7 +428,7 @@ function refreshAll() {
           />
 
           <fieldset class="library-display-mode-toggle">
-            <legend class="library-sr-only">Display mode</legend>
+            <legend class="sr-only">Display mode</legend>
             <label
               v-for="option in displayModeOptions"
               :key="option.value"
@@ -484,10 +492,9 @@ function refreshAll() {
         class="hx-card-body hx-card-body--flush"
         :class="{ 'library-grid--stale': library.isLoading.value && !library.isFirstLoad.value }"
       >
-        <div v-if="displayMode === 'grid'" class="hx-artwork-grid">
+        <ul ref="libraryGrid" v-if="displayMode === 'grid'" class="hx-artwork-grid" role="list" aria-label="Library releases">
+          <li v-for="(release, index) in displayReleases" :key="library.data.value[index]?.id ?? library.staleData.value[index]?.id ?? index">
           <ReleaseCard
-            v-for="(release, index) in displayReleases"
-            :key="library.data.value[index]?.id ?? library.staleData.value[index]?.id ?? index"
             :release="release"
             :requestable="false"
             :local-src="getReleaseArtwork(release)?.url ?? null"
@@ -513,7 +520,8 @@ function refreshAll() {
               </div>
             </template>
           </ReleaseCard>
-        </div>
+          </li>
+        </ul>
 
         <div v-else class="library-release-list" role="list" aria-label="Library releases">
           <article
@@ -854,18 +862,6 @@ function refreshAll() {
 .hx-text-muted {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
-}
-
-.library-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 @media (max-width: 640px) {
