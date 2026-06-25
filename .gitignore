@@ -5,6 +5,7 @@ coverage/
 .ops/
 .tmp/
 .data/
+.vscode/
 .eslintcache
 .env
 .env.*
