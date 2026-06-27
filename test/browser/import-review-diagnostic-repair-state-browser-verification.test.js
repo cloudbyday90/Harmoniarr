@@ -22,16 +22,14 @@ import {
   seedMetadataImportReviewWorkspace,
 } from '../../testing/browser/metadata-browser-fixtures.js';
 import {
-  buildImportReviewCandidate,
-  buildImportReviewMediaInspectionRun,
-  buildImportReviewPreview,
-  buildImportReviewRunSummary,
-} from '../../testing/browser/import-review-browser-helpers.js';
+  buildDiagnosticRunPanelRouteSuffix,
+  buildImportReviewDiagnosticFixturePack,
+  IMPORT_REVIEW_DIAGNOSTIC_FIXTURE,
+} from '../../testing/browser/import-review-diagnostic-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
-const IMPORT_REVIEW_SELECTION_STAGE_ID = 'import-review-selection-stage';
 
 let browserRuntime;
 let runtimeUnavailableReason = null;
@@ -77,111 +75,6 @@ async function openImportReviewForAdmin({
   await page.getByText('Operator runway', { exact: true }).waitFor();
 }
 
-function buildDiagnosticCandidate() {
-  const folderPath = '/private/staging/Boards of Canada/Geogaddi';
-  return buildImportReviewCandidate({
-    fileCount: 2,
-    files: [
-      {
-        bitRateKbps: 921,
-        extension: 'flac',
-        filename: 'alpha.flac',
-        folderPath,
-        id: 'candidate-diagnostics-file-1',
-        isLocked: false,
-        lengthSeconds: 301,
-        sizeBytes: 52428800,
-      },
-      {
-        bitRateKbps: 844,
-        extension: 'flac',
-        filename: 'beta.flac',
-        folderPath,
-        id: 'candidate-diagnostics-file-2',
-        isLocked: false,
-        lengthSeconds: 284,
-        sizeBytes: 49283072,
-      },
-    ],
-    folderPath,
-    id: 'candidate-diagnostics',
-    lockedFileCount: 0,
-    normalizedPayload: {
-      extensions: ['flac'],
-    },
-    sourceSearchId: 'search-diagnostics',
-    status: 'selected',
-    totalSizeBytes: 101711872,
-    username: 'diagnostic-peer',
-  });
-}
-
-function buildNormalCandidate() {
-  const folderPath = '/private/staging/Aphex Twin/Selected Ambient Works';
-  return buildImportReviewCandidate({
-    fileCount: 1,
-    files: [{
-      bitRateKbps: 894,
-      extension: 'flac',
-      filename: 'xtal.flac',
-      folderPath,
-      id: 'candidate-normal-file-1',
-      isLocked: false,
-      lengthSeconds: 293,
-      sizeBytes: 41779200,
-    }],
-    folderPath,
-    id: 'candidate-normal',
-    sourceSearchId: 'search-normal',
-    status: 'pending',
-    username: 'normal-peer',
-  });
-}
-
-function buildDiagnosticRepairWorkspace() {
-  const diagnosticCandidate = buildDiagnosticCandidate();
-  const normalCandidate = buildNormalCandidate();
-  const currentRun = buildImportReviewMediaInspectionRun({
-    id: 'media-inspection-run-current',
-  });
-  const diagnosticRun = buildImportReviewMediaInspectionRun({
-    currentStep: 'Media inspection completed with file diagnostics.',
-    id: 'media-inspection-run-diagnostics',
-    inspectedCandidateCount: 1,
-    inspectedFileCount: 2,
-    inspectionDiagnostics: [{
-      candidateId: diagnosticCandidate.id,
-      code: 'media_inspection_probe_failed',
-      fileId: 'candidate-diagnostics-file-1',
-      filename: 'alpha.flac',
-      folderPath: diagnosticCandidate.folderPath,
-      message: 'ffprobe could not read alpha.flac.',
-      username: diagnosticCandidate.username,
-    }],
-    inspectionUnavailableCount: 1,
-    status: 'completed',
-    warningCount: 1,
-  });
-
-  return {
-    candidates: [diagnosticCandidate, normalCandidate],
-    mediaInspectionSummary: buildImportReviewRunSummary({
-      currentRun,
-      recentRuns: [diagnosticRun, currentRun],
-      summary: {
-        message: 'Media inspection diagnostics are ready.',
-      },
-    }),
-    previewById: {
-      [diagnosticCandidate.id]: buildImportReviewPreview(diagnosticCandidate),
-      [normalCandidate.id]: buildImportReviewPreview(normalCandidate),
-    },
-    run: diagnosticRun,
-    diagnosticCandidate,
-    normalCandidate,
-  };
-}
-
 suite('Import Review diagnostic-driven repair-state browser verification', () => {
   before(async () => {
     try {
@@ -220,13 +113,15 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
         pageErrors.push(error.message);
       });
 
-      const workspace = buildDiagnosticRepairWorkspace();
+      const workspace = buildImportReviewDiagnosticFixturePack({
+        includeComparisonCandidate: true,
+      });
       await openImportReviewForAdmin({
         baseUrl,
         browserContext,
         page,
         workspace,
-        urlSuffix: `?mediaInspectionRunId=${workspace.run.id}#import-media-inspection-run-panel`,
+        urlSuffix: buildDiagnosticRunPanelRouteSuffix(workspace),
       });
 
       const mediaPanel = getRunwayPanel(page, 'Inspect selected candidate media');
@@ -240,12 +135,14 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
         .getByRole('button', { name: 'Open alpha.flac in candidate detail' })
         .click();
 
-      await waitForHash(page, `#${IMPORT_REVIEW_SELECTION_STAGE_ID}`);
+      await waitForHash(page, IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageHash);
       await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);
-      await waitForSearchParam(page, 'candidateFile', 'candidate-diagnostics-file-1');
+      await waitForSearchParam(page, 'candidateFile', IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId);
       await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
 
-      const focusedFile = page.locator('[data-import-candidate-file-id="candidate-diagnostics-file-1"]');
+      const focusedFile = page.locator(
+        `[data-import-candidate-file-id="${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId}"]`,
+      );
       await focusedFile.waitFor();
       await assertLocatorFocused(focusedFile, 'Diagnostic file should receive focus before repair');
 
@@ -264,7 +161,7 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
       await page.getByRole('button', { exact: true, name: 'Select' }).waitFor();
       assert.equal(await focusedFile.getAttribute('data-focused'), 'true');
       await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);
-      await waitForSearchParam(page, 'candidateFile', 'candidate-diagnostics-file-1');
+      await waitForSearchParam(page, 'candidateFile', IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId);
       await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
 
       const selectedRunRow = mediaPanel.locator('tbody tr').filter({ hasText: workspace.run.id });
@@ -273,14 +170,14 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
 
       await page
         .locator('.review-list-item')
-        .filter({ hasText: workspace.normalCandidate.folderPath })
+        .filter({ hasText: workspace.comparisonCandidate.folderPath })
         .click();
-      await waitForSearchParam(page, 'candidate', workspace.normalCandidate.id);
+      await waitForSearchParam(page, 'candidate', workspace.comparisonCandidate.id);
       await waitForMissingSearchParam(page, 'candidateFile');
       await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
       await page
-        .locator(`#${IMPORT_REVIEW_SELECTION_STAGE_ID}`)
-        .getByRole('heading', { exact: true, name: workspace.normalCandidate.folderPath })
+        .locator(`#${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageId}`)
+        .getByRole('heading', { exact: true, name: workspace.comparisonCandidate.folderPath })
         .waitFor();
       assert.equal(await page.locator('[data-focused="true"]').count(), 0);
 

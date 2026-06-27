@@ -18,9 +18,10 @@ import {
   seedMetadataImportReviewWorkspace,
 } from '../../testing/browser/metadata-browser-fixtures.js';
 import {
-  buildImportReviewMediaInspectionRun,
-  buildImportReviewRunSummary,
-} from '../../testing/browser/import-review-browser-helpers.js';
+  buildDiagnosticRunPanelRouteSuffix,
+  buildImportReviewDiagnosticFixturePack,
+  IMPORT_REVIEW_DIAGNOSTIC_FIXTURE,
+} from '../../testing/browser/import-review-diagnostic-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
@@ -54,49 +55,6 @@ async function openImportReviewForAdmin({
   });
   await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
   await page.getByText('Operator runway', { exact: true }).waitFor();
-}
-
-function buildMediaInspectionDiagnosticsWorkspace() {
-  const currentRun = buildImportReviewMediaInspectionRun({
-    id: 'media-inspection-run-current',
-  });
-  const diagnosticRun = buildImportReviewMediaInspectionRun({
-    currentStep: 'Media inspection completed with file diagnostics.',
-    id: 'media-inspection-run-diagnostics',
-    inspectedCandidateCount: 1,
-    inspectedFileCount: 2,
-    inspectionDiagnostics: [{
-      candidateId: 'candidate-diagnostics',
-      code: 'media_inspection_probe_failed',
-      fileId: 'candidate-diagnostics-file-1',
-      filename: 'alpha.flac',
-      folderPath: '/private/staging/Boards of Canada/Geogaddi',
-      message: 'ffprobe could not read alpha.flac.',
-      username: 'diagnostic-peer',
-    }, {
-      candidateId: 'candidate-diagnostics',
-      code: 'media_inspection_no_audio_stream',
-      fileId: 'candidate-diagnostics-file-2',
-      filename: 'beta.flac',
-      folderPath: '/private/staging/Boards of Canada/Geogaddi',
-      message: 'No audio stream was detected in beta.flac.',
-      username: 'diagnostic-peer',
-    }],
-    inspectionUnavailableCount: 1,
-    status: 'completed',
-    warningCount: 2,
-  });
-
-  return {
-    mediaInspectionSummary: buildImportReviewRunSummary({
-      currentRun,
-      recentRuns: [diagnosticRun, currentRun],
-      summary: {
-        message: 'Media inspection diagnostics are ready.',
-      },
-    }),
-    run: diagnosticRun,
-  };
 }
 
 suite('Import Review media-inspection per-file diagnostics browser verification', () => {
@@ -137,13 +95,13 @@ suite('Import Review media-inspection per-file diagnostics browser verification'
         pageErrors.push(error.message);
       });
 
-      const workspace = buildMediaInspectionDiagnosticsWorkspace();
+      const workspace = buildImportReviewDiagnosticFixturePack();
       await openImportReviewForAdmin({
         baseUrl,
         browserContext,
         page,
         workspace,
-        urlSuffix: `?mediaInspectionRunId=${workspace.run.id}#import-media-inspection-run-panel`,
+        urlSuffix: buildDiagnosticRunPanelRouteSuffix(workspace),
       });
 
       await waitForHash(page, '#import-media-inspection-run-panel');
@@ -155,15 +113,15 @@ suite('Import Review media-inspection per-file diagnostics browser verification'
         name: 'Media inspection file diagnostics',
       });
       await diagnosticsTable.waitFor();
-      await diagnosticsTable.getByText('alpha.flac', { exact: true }).waitFor();
+      await diagnosticsTable.getByText(IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFilename, { exact: true }).waitFor();
       await diagnosticsTable.getByText('Media Inspection Probe Failed', { exact: true }).waitFor();
       await diagnosticsTable.getByText('ffprobe could not read alpha.flac.', { exact: true }).waitFor();
-      await diagnosticsTable.getByText('beta.flac', { exact: true }).waitFor();
+      await diagnosticsTable.getByText(IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.secondaryDiagnosticFilename, { exact: true }).waitFor();
       await diagnosticsTable.getByText('Media Inspection No Audio Stream', { exact: true }).waitFor();
       await diagnosticsTable.getByText('No audio stream was detected in beta.flac.', { exact: true }).waitFor();
       assert.equal(await diagnosticsTable.getByText('diagnostic-peer', { exact: true }).count(), 2);
       assert.equal(
-        await diagnosticsTable.getByText('/private/staging/Boards of Canada/Geogaddi', { exact: true }).count(),
+        await diagnosticsTable.getByText(IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.diagnosticFolderPath, { exact: true }).count(),
         2,
       );
 

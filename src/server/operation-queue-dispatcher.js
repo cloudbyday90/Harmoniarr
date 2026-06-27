@@ -60,11 +60,6 @@ export function createOperationQueueDispatcher({
   const runner = createIntervalHeartbeatRunnerFn({
     intervalMs: resolvedDispatchIntervalMs,
     onTick: async () => {
-      const recoveryResult = operationStrandedRunRecoveryService?.recoverStrandedRuns
-        ? await operationStrandedRunRecoveryService.recoverStrandedRuns({
-          operationTypes: supportedOperationTypes,
-        })
-        : null;
       const dispatchReadiness = dispatchPauseService?.resolveDispatchReadiness
         ? await dispatchPauseService.resolveDispatchReadiness({
           operationTypes: supportedOperationTypes,
@@ -74,18 +69,24 @@ export function createOperationQueueDispatcher({
       if (dispatchReadiness && dispatchReadiness.allowed === false) {
         return {
           claimedCount: 0,
-          failedCount: recoveryResult?.failedCount ?? 0,
+          failedCount: 0,
           nextRetryAt: dispatchReadiness.nextRetryAt ?? null,
           pauseCode: dispatchReadiness.pauseCode ?? null,
           pauseMessage: dispatchReadiness.pauseMessage ?? null,
           pauseProvider: dispatchReadiness.pauseProvider ?? null,
           pausedOperationTypes: dispatchReadiness.pausedOperationTypes ?? supportedOperationTypes,
           reason: 'paused',
-          retriedCount: recoveryResult?.retriedCount ?? 0,
-          scannedCount: recoveryResult?.scannedCount ?? 0,
+          retriedCount: 0,
+          scannedCount: 0,
           skipped: true,
         };
       }
+
+      const recoveryResult = operationStrandedRunRecoveryService?.recoverStrandedRuns
+        ? await operationStrandedRunRecoveryService.recoverStrandedRuns({
+          operationTypes: supportedOperationTypes,
+        })
+        : null;
 
       let claimedCount = 0;
 

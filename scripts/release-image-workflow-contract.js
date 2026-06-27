@@ -50,6 +50,7 @@ export const releaseImageBrowserSmokeRuntimeStep = Object.freeze({
   command: 'npm run validate:docker-browser-smoke',
   name: 'Validate published image browser smoke workflow',
   path: 'supply-chain/harmoniarr-docker-smoke-browser-operator.json',
+  screenshotPath: 'supply-chain/browser-smoke-screenshots',
 });
 
 export const releaseImageBrowserSmokeEvidenceVerificationStep = Object.freeze({
@@ -63,6 +64,13 @@ export const releaseImageBrowserSmokeEvidenceStep = Object.freeze({
   artifactName: 'harmoniarr-docker-smoke-browser-operator.json',
   name: 'Upload published-image browser smoke evidence artifact',
   path: 'supply-chain/harmoniarr-docker-smoke-browser-operator.json',
+});
+
+export const releaseImageBrowserSmokeScreenshotEvidenceStep = Object.freeze({
+  action: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  artifactName: 'harmoniarr-docker-smoke-browser-screenshots',
+  name: 'Upload published-image browser smoke screenshots artifact',
+  path: 'supply-chain/browser-smoke-screenshots',
 });
 
 export const releaseImageEvidenceVerificationStep = Object.freeze({
@@ -337,6 +345,10 @@ export function validateReleaseImageWorkflowContract(source) {
     if (!block.includes(`HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH: ${releaseImageBrowserSmokeRuntimeStep.path}`)) {
       issues.push(`${releaseImageBrowserSmokeRuntimeStep.name} must write ${releaseImageBrowserSmokeRuntimeStep.path}`);
     }
+
+    if (!block.includes(`HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR: ${releaseImageBrowserSmokeRuntimeStep.screenshotPath}`)) {
+      issues.push(`${releaseImageBrowserSmokeRuntimeStep.name} must capture screenshots at ${releaseImageBrowserSmokeRuntimeStep.screenshotPath}`);
+    }
   } catch (error) {
     issues.push(error.message);
   }
@@ -373,8 +385,30 @@ export function validateReleaseImageWorkflowContract(source) {
     issues.push(error.message);
   }
 
+  try {
+    const block = getWorkflowStepBlock(normalizedSource, releaseImageBrowserSmokeScreenshotEvidenceStep.name);
+
+    if (!block.includes(`uses: ${releaseImageBrowserSmokeScreenshotEvidenceStep.action}`)) {
+      issues.push(`${releaseImageBrowserSmokeScreenshotEvidenceStep.name} must use ${releaseImageBrowserSmokeScreenshotEvidenceStep.action}`);
+    }
+
+    if (!block.includes(`name: ${releaseImageBrowserSmokeScreenshotEvidenceStep.artifactName}`)) {
+      issues.push(`${releaseImageBrowserSmokeScreenshotEvidenceStep.name} must publish ${releaseImageBrowserSmokeScreenshotEvidenceStep.artifactName}`);
+    }
+
+    if (!block.includes(`path: ${releaseImageBrowserSmokeScreenshotEvidenceStep.path}`)) {
+      issues.push(`${releaseImageBrowserSmokeScreenshotEvidenceStep.name} must upload ${releaseImageBrowserSmokeScreenshotEvidenceStep.path}`);
+    }
+  } catch (error) {
+    issues.push(error.message);
+  }
+
   if (!normalizedSource.includes('HARMONIARR_SUMMARY_BROWSER_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-browser-operator.json')) {
     issues.push('verify-published-image summary must report the browser smoke evidence artifact name');
+  }
+
+  if (!normalizedSource.includes('HARMONIARR_SUMMARY_BROWSER_SMOKE_SCREENSHOTS_ARTIFACT_NAME: harmoniarr-docker-smoke-browser-screenshots')) {
+    issues.push('verify-published-image summary must report the browser smoke screenshots artifact name');
   }
 
   if (!normalizedSource.includes('HARMONIARR_SUMMARY_SMOKE_CONTRACT_STATUS: passed')) {

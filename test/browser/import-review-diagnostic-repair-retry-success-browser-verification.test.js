@@ -22,14 +22,15 @@ import {
   queueMetadataImportReviewTransitionFailure,
   seedMetadataImportReviewWorkspace,
 } from '../../testing/browser/metadata-browser-fixtures.js';
-import { buildImportReviewDiagnosticRunWorkspace } from '../../testing/browser/import-review-browser-helpers.js';
+import {
+  buildDiagnosticRunPanelRouteSuffix,
+  buildImportReviewDiagnosticFixturePack,
+  IMPORT_REVIEW_DIAGNOSTIC_FIXTURE,
+} from '../../testing/browser/import-review-diagnostic-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
-const IMPORT_REVIEW_SELECTION_STAGE_ID = 'import-review-selection-stage';
-const DIAGNOSTIC_FILE_ID = 'candidate-diagnostics-file-1';
-const REPAIR_FAILURE_MESSAGE = 'Diagnostic repair is temporarily locked. Try again after the current import run finishes.';
 
 let browserRuntime;
 let runtimeUnavailableReason = null;
@@ -106,13 +107,13 @@ suite('Import Review diagnostic repair retry-success browser verification', () =
         pageErrors.push(error.message);
       });
 
-      const workspace = buildImportReviewDiagnosticRunWorkspace();
+      const workspace = buildImportReviewDiagnosticFixturePack();
       await openImportReviewForAdmin({
         baseUrl,
         browserContext,
         page,
         workspace,
-        urlSuffix: `?mediaInspectionRunId=${workspace.run.id}#import-media-inspection-run-panel`,
+        urlSuffix: buildDiagnosticRunPanelRouteSuffix(workspace),
       });
 
       const mediaPanel = getRunwayPanel(page, 'Inspect selected candidate media');
@@ -124,20 +125,22 @@ suite('Import Review diagnostic repair retry-success browser verification', () =
         .getByRole('button', { name: 'Open alpha.flac in candidate detail' })
         .click();
 
-      await waitForHash(page, `#${IMPORT_REVIEW_SELECTION_STAGE_ID}`);
+      await waitForHash(page, IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageHash);
       await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);
-      await waitForSearchParam(page, 'candidateFile', DIAGNOSTIC_FILE_ID);
+      await waitForSearchParam(page, 'candidateFile', IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId);
       await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
 
-      const selectionStage = page.locator(`#${IMPORT_REVIEW_SELECTION_STAGE_ID}`);
-      const focusedFile = selectionStage.locator(`[data-import-candidate-file-id="${DIAGNOSTIC_FILE_ID}"]`);
+      const selectionStage = page.locator(`#${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageId}`);
+      const focusedFile = selectionStage.locator(
+        `[data-import-candidate-file-id="${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId}"]`,
+      );
       await focusedFile.waitFor();
       await assertLocatorFocused(focusedFile, 'Diagnostic file should receive focus before repair retry');
 
       await queueMetadataImportReviewTransitionFailure(page, {
         action: 'reopen',
         importCandidateId: workspace.diagnosticCandidate.id,
-        message: REPAIR_FAILURE_MESSAGE,
+        message: IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.repairFailureMessage,
         status: 409,
       });
 
@@ -146,7 +149,7 @@ suite('Import Review diagnostic repair retry-success browser verification', () =
       await reopenButton.press('Enter');
 
       const alert = selectionStage.getByRole('alert').filter({
-        hasText: REPAIR_FAILURE_MESSAGE,
+        hasText: IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.repairFailureMessage,
       });
       await alert.waitFor();
       await assertLocatorFocused(reopenButton, 'Failed diagnostic repair should leave retry action focused');
@@ -165,7 +168,7 @@ suite('Import Review diagnostic repair retry-success browser verification', () =
       assert.equal(await alert.count(), 0);
       assert.equal(await focusedFile.getAttribute('data-focused'), 'true');
       await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);
-      await waitForSearchParam(page, 'candidateFile', DIAGNOSTIC_FILE_ID);
+      await waitForSearchParam(page, 'candidateFile', IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId);
       await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
 
       const selectedRunRow = mediaPanel.locator('tbody tr').filter({ hasText: workspace.run.id });

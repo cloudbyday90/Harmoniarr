@@ -15,14 +15,14 @@ import {
 } from '../../testing/browser/playwright-smoke-runtime.js';
 import {
   assertLocatorFocused,
+  assertVisibleFocusOutline,
 } from '../../testing/browser/keyboard-accessibility-helpers.js';
 import {
   installMetadataBrowserFixtures,
-  queueMetadataImportReviewTransitionFailure,
   seedMetadataImportReviewWorkspace,
 } from '../../testing/browser/metadata-browser-fixtures.js';
 import {
-  buildDiagnosticRunPanelRouteSuffix,
+  buildDirectDiagnosticRouteSuffix,
   buildImportReviewDiagnosticFixturePack,
   IMPORT_REVIEW_DIAGNOSTIC_FIXTURE,
 } from '../../testing/browser/import-review-diagnostic-fixtures.js';
@@ -68,7 +68,38 @@ async function openImportReviewForAdmin({
   await page.getByText('Operator runway', { exact: true }).waitFor();
 }
 
-suite('Import Review diagnostic repair failure-state browser verification', () => {
+async function assertDirectDiagnosticRouteHydrated({
+  page,
+  workspace,
+}) {
+  await waitForHash(page, IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageHash);
+  await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);
+  await waitForSearchParam(page, 'candidateFile', IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId);
+  await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
+
+  const selectionStage = page.locator(`#${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageId}`);
+  await selectionStage.getByRole('heading', { exact: true, name: 'Files and actions' }).waitFor();
+  await selectionStage.getByRole('heading', { exact: true, name: workspace.diagnosticCandidate.folderPath }).waitFor();
+  await selectionStage.getByText(workspace.diagnosticCandidate.username, { exact: true }).waitFor();
+  await selectionStage.getByText(IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFilename, { exact: true }).waitFor();
+  await selectionStage.getByRole('button', { exact: true, name: 'Reopen' }).waitFor();
+
+  const focusedFile = selectionStage.locator(
+    `[data-import-candidate-file-id="${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId}"]`,
+  );
+  await focusedFile.waitFor();
+  assert.equal(await focusedFile.getAttribute('data-focused'), 'true');
+  await assertLocatorFocused(focusedFile, 'Direct diagnostic route should focus the affected file row');
+  await assertVisibleFocusOutline(focusedFile, 'Direct diagnostic route should expose a visible file focus ring');
+
+  const mediaPanel = getRunwayPanel(page, 'Inspect selected candidate media');
+  await mediaPanel.getByText(`Run ${workspace.run.id}`, { exact: true }).waitFor();
+  const selectedRunRow = mediaPanel.locator('tbody tr').filter({ hasText: workspace.run.id });
+  await selectedRunRow.getByRole('button', { name: 'Selected' }).waitFor();
+  assert.equal(await selectedRunRow.getAttribute('aria-selected'), 'true');
+}
+
+suite('Import Review direct diagnostic route reload browser verification', () => {
   before(async () => {
     try {
       browserRuntime = await createBrowserSmokeRuntime({
@@ -92,7 +123,7 @@ suite('Import Review diagnostic repair failure-state browser verification', () =
     timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs,
   });
 
-  test('admins keep diagnostic context and retry focus when a diagnostic repair fails', {
+  test('admins can reload a direct diagnostic candidate route without losing file or run context', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -107,73 +138,26 @@ suite('Import Review diagnostic repair failure-state browser verification', () =
       });
 
       const workspace = buildImportReviewDiagnosticFixturePack();
+      const urlSuffix = buildDirectDiagnosticRouteSuffix(workspace);
+
       await openImportReviewForAdmin({
         baseUrl,
         browserContext,
         page,
         workspace,
-        urlSuffix: buildDiagnosticRunPanelRouteSuffix(workspace),
+        urlSuffix,
       });
 
-      const mediaPanel = getRunwayPanel(page, 'Inspect selected candidate media');
-      await mediaPanel.getByText(`Run ${workspace.run.id}`, { exact: true }).waitFor();
-      const diagnosticsTable = mediaPanel.getByRole('table', {
-        name: 'Media inspection file diagnostics',
-      });
-      await diagnosticsTable
-        .locator('tbody tr')
-        .filter({ hasText: 'alpha.flac' })
-        .getByRole('button', { name: 'Open alpha.flac in candidate detail' })
-        .click();
+      await assertDirectDiagnosticRouteHydrated({ page, workspace });
 
-      await waitForHash(page, IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageHash);
-      await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);
-      await waitForSearchParam(page, 'candidateFile', IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId);
-      await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
-
-      const selectionStage = page.locator(`#${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageId}`);
-      const focusedFile = selectionStage.locator(
-        `[data-import-candidate-file-id="${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId}"]`,
-      );
-      await focusedFile.waitFor();
-      await assertLocatorFocused(focusedFile, 'Diagnostic file should receive focus before failed repair');
-      assert.equal(await focusedFile.getAttribute('data-focused'), 'true');
-
-      await queueMetadataImportReviewTransitionFailure(page, {
-        action: 'reopen',
-        importCandidateId: workspace.diagnosticCandidate.id,
-        message: IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.repairFailureMessage,
-        status: 409,
-      });
-
-      const reopenButton = selectionStage.getByRole('button', { exact: true, name: 'Reopen' });
-      await reopenButton.focus();
-      await assertLocatorFocused(reopenButton, 'Diagnostic repair action should be keyboard focusable');
-      await reopenButton.press('Enter');
-
-      const alert = selectionStage.getByRole('alert').filter({
-        hasText: IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.repairFailureMessage,
-      });
-      await alert.waitFor();
-      await selectionStage.getByText('Selected', { exact: true }).first().waitFor();
-      await reopenButton.waitFor();
-      await assertLocatorFocused(reopenButton, 'Failed diagnostic repair should return focus to the retry action');
-      assert.equal(await focusedFile.getAttribute('data-focused'), 'true');
-      await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);
-      await waitForSearchParam(page, 'candidateFile', IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId);
-      await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
-      assert.equal(await page.getByRole('status').filter({
-        hasText: 'Candidate reopened for review.',
-      }).count(), 0);
-
-      const selectedRunRow = mediaPanel.locator('tbody tr').filter({ hasText: workspace.run.id });
-      await selectedRunRow.getByRole('button', { name: 'Selected' }).waitFor();
-      assert.equal(await selectedRunRow.getAttribute('aria-selected'), 'true');
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await assertDirectDiagnosticRouteHydrated({ page, workspace });
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {
-      scenarioName: 'import_review_diagnostic_repair_failure_state',
+      scenarioName: 'import_review_direct_diagnostic_route_reload',
     });
   });
 });

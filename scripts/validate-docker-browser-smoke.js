@@ -22,6 +22,7 @@ export const validateDockerBrowserSmokeCliOptions = Object.freeze({
   'evidence-path': { type: 'string' },
   headless: { type: 'boolean' },
   password: { type: 'string' },
+  'screenshot-dir': { type: 'string' },
   'timeout-ms': { type: 'string' },
   username: { type: 'string' },
 });
@@ -57,6 +58,7 @@ export function resolveDockerBrowserSmokeInputs({
     evidencePath,
     headless: getBooleanInput(values, 'headless', 'HARMONIARR_DOCKER_BROWSER_SMOKE_HEADLESS', env, true),
     password: getRequiredStringInput(values, 'password', 'HARMONIARR_WALKTHROUGH_PASSWORD', env),
+    screenshotDir: getOptionalStringInput(values, 'screenshot-dir', 'HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR', env),
     timeoutMs,
     username: getRequiredStringInput(values, 'username', 'HARMONIARR_WALKTHROUGH_USERNAME', env),
   };

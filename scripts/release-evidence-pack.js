@@ -35,6 +35,7 @@ export const releaseEvidencePackCliOptions = Object.freeze({
   'browser-evidence-path': { type: 'string' },
   'browser-headless': { type: 'boolean' },
   'browser-password': { type: 'string' },
+  'browser-screenshot-dir': { type: 'string' },
   'browser-timeout-ms': { type: 'string' },
   'browser-username': { type: 'string' },
   'evidence-dir': { type: 'string' },
@@ -102,6 +103,8 @@ export function resolveReleaseEvidencePackInputs({
     ?? defaultDockerBrowserSmokeBaseUrl;
   const browserEvidencePath = getOptionalStringInput(values, 'browser-evidence-path', 'HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH', env)
     ?? resolve(normalizedEvidenceDir, defaultBrowserSmokeEvidenceFileName);
+  const browserScreenshotDir = getOptionalStringInput(values, 'browser-screenshot-dir', 'HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR', env)
+    ?? resolve(normalizedEvidenceDir, 'browser-smoke-screenshots');
   const browserHeadless = getBooleanInput(values, 'browser-headless', 'HARMONIARR_DOCKER_BROWSER_SMOKE_HEADLESS', env, true);
   const browserTimeoutMs = parsePositiveInteger(
     values['browser-timeout-ms'] ?? env.HARMONIARR_DOCKER_BROWSER_SMOKE_TIMEOUT_MS,
@@ -117,6 +120,7 @@ export function resolveReleaseEvidencePackInputs({
     browserPassword: includeBrowserSmoke
       ? getRequiredStringInput(values, 'browser-password', 'HARMONIARR_WALKTHROUGH_PASSWORD', env)
       : getOptionalStringInput(values, 'browser-password', 'HARMONIARR_WALKTHROUGH_PASSWORD', env),
+    browserScreenshotDir,
     browserTimeoutMs,
     browserUsername: includeBrowserSmoke
       ? getRequiredStringInput(values, 'browser-username', 'HARMONIARR_WALKTHROUGH_USERNAME', env)
@@ -149,6 +153,7 @@ export async function runReleaseEvidencePackValidation({
   browserEvidencePath,
   browserHeadless = true,
   browserPassword,
+  browserScreenshotDir = null,
   browserTimeoutMs = 15_000,
   browserUsername,
   evidenceDir,
@@ -178,6 +183,7 @@ export async function runReleaseEvidencePackValidation({
         evidencePath: browserEvidencePath,
         headless: browserHeadless,
         password: browserPassword,
+        screenshotDir: browserScreenshotDir,
         timeoutMs: browserTimeoutMs,
         username: browserUsername,
       }),

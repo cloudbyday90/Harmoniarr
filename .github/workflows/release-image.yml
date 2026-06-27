@@ -275,6 +275,7 @@ jobs:
       - name: Validate published image browser smoke workflow
         env:
           HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH: supply-chain/harmoniarr-docker-smoke-browser-operator.json
+          HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR: supply-chain/browser-smoke-screenshots
           HARMONIARR_WALKTHROUGH_PASSWORD: HarmoniarrLocal123!
           HARMONIARR_WALKTHROUGH_USERNAME: walkthrough-admin
         run: docker tag "${{ needs.publish-image.outputs.image_ref }}" harmoniarr:walkthrough-local && docker compose -f compose.walkthrough.yaml up -d --no-build harmoniarr && docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm walkthrough-bootstrap && npm run validate:docker-browser-smoke
@@ -291,6 +292,13 @@ jobs:
           path: supply-chain/harmoniarr-docker-smoke-browser-operator.json
           if-no-files-found: error
 
+      - name: Upload published-image browser smoke screenshots artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harmoniarr-docker-smoke-browser-screenshots
+          path: supply-chain/browser-smoke-screenshots
+          if-no-files-found: error
+
       - name: Stop walkthrough compose stack
         if: ${{ always() }}
         run: docker compose -f compose.walkthrough.yaml down --remove-orphans
@@ -298,6 +306,7 @@ jobs:
       - name: Publish verification summary
         env:
           HARMONIARR_SUMMARY_BROWSER_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-browser-operator.json
+          HARMONIARR_SUMMARY_BROWSER_SMOKE_SCREENSHOTS_ARTIFACT_NAME: harmoniarr-docker-smoke-browser-screenshots
           HARMONIARR_SUMMARY_IMAGE_REF: ${{ needs.publish-image.outputs.image_ref }}
           HARMONIARR_SUMMARY_SMOKE_CONTRACT_STATUS: passed
           HARMONIARR_SUMMARY_SMOKE_EVIDENCE_ARTIFACT_NAME: harmoniarr-docker-smoke-released-image.json

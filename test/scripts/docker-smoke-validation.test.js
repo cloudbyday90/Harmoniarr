@@ -674,6 +674,53 @@ test('validateDockerFreshInstall verifies ffmpeg and ffprobe in the running imag
   assert.ok(calls.some(({ args }) => args.includes('{{json .State}}')));
 });
 
+test('validateDockerFreshInstall does not inherit HARMONIARR_IMAGE unless imageRef is explicit', async () => {
+  const inheritedImageRef = 'ghcr.io/cloudbyday90/harmoniarr@sha256:inherited';
+  const explicitImageRef = 'ghcr.io/cloudbyday90/harmoniarr@sha256:explicit';
+  const inheritedRun = createRunCommandStub();
+  const explicitRun = createRunCommandStub();
+  const commonOptions = {
+    fetchFn: async () => createFetchResponse({
+      ok: true,
+      pendingMigrations: 0,
+      service: 'ok',
+    }),
+    getAvailablePortFn: async () => 4300,
+    makeDirectoryLayoutFn: async () => ({
+      appData: '/tmp/appdata',
+      downloads: '/tmp/downloads',
+      music: '/tmp/music',
+      staging: '/tmp/staging',
+      transcodeTemp: '/tmp/transcode-temp',
+    }),
+    mkdtempFn: async () => '/tmp/harmoniarr-smoke',
+    processEnv: {
+      HARMONIARR_IMAGE: inheritedImageRef,
+    },
+    removeFn: async () => {},
+    startupValidationFailureScenario: null,
+    tempRootDir: '/tmp',
+  };
+
+  await validateDockerFreshInstall({
+    ...commonOptions,
+    projectName: 'harmoniarrsmoke-inherited',
+    runCommandFn: inheritedRun.runCommandFn,
+  });
+  await validateDockerFreshInstall({
+    ...commonOptions,
+    imageRef: explicitImageRef,
+    projectName: 'harmoniarrsmoke-explicit',
+    runCommandFn: explicitRun.runCommandFn,
+  });
+
+  const inheritedUpCall = inheritedRun.calls.find(({ args }) => args.includes('up'));
+  const explicitUpCall = explicitRun.calls.find(({ args }) => args.includes('up'));
+
+  assert.equal(inheritedUpCall.env.HARMONIARR_IMAGE, undefined);
+  assert.equal(explicitUpCall.env.HARMONIARR_IMAGE, explicitImageRef);
+});
+
 test('validateDockerFreshInstall fails when a tooling version probe returns no version line', async () => {
   const { runCommandFn } = createRunCommandStub({
     ffprobeVersion: '',

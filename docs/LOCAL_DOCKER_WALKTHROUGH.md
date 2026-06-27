@@ -69,6 +69,52 @@ docker compose -f compose.walkthrough.yaml down --remove-orphans
 Remove-Item -Recurse -Force .\.data\walkthrough
 ```
 
+## Deployment Validation Replay
+
+For release-path evidence, use the canonical `compose.yaml` validator instead
+of the walkthrough stack:
+
+```powershell
+$env:HARMONIARR_DOCKER_VALIDATION_EVIDENCE_DIR = ".tmp\docker-deployment-evidence"
+$env:HARMONIARR_DOCKER_VALIDATION_SUMMARY_PATH = ".tmp\docker-deployment-evidence\harmoniarr-docker-deployment-summary.json"
+npm run generate:vapid-keys
+# Set the generated VAPID_* values in this shell or a secret store.
+npm run validate:docker-deployment-path
+```
+
+To capture packaged-runtime browser evidence from the walkthrough stack:
+
+```powershell
+$env:HARMONIARR_DOCKER_BROWSER_SMOKE_EVIDENCE_PATH = ".tmp\docker-browser-smoke-evidence\harmoniarr-docker-smoke-browser-operator.json"
+$env:HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR = ".tmp\docker-browser-smoke-evidence\screenshots"
+$env:HARMONIARR_WALKTHROUGH_USERNAME = "walkthrough-admin"
+$env:HARMONIARR_WALKTHROUGH_PASSWORD = "HarmoniarrLocal123!"
+npm run validate:docker-browser-smoke
+$env:HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH = ".tmp\docker-browser-smoke-evidence\harmoniarr-docker-smoke-browser-operator.json"
+npm run validate:docker-smoke-evidence
+```
+
+The deployment-path validator creates an isolated Compose project, writes JSON
+evidence, and cleans up containers, volumes, and temporary bind-mount data when
+the run completes. Set `HARMONIARR_IMAGE` to validate an immutable released
+image, and set `HARMONIARR_BASELINE_IMAGE` to include baseline-to-candidate
+upgrade evidence.
+
+For local release rehearsals, a locally available image tag can be used:
+
+```powershell
+$env:HARMONIARR_DOCKER_VALIDATION_EVIDENCE_DIR = ".tmp\docker-release-upgrade-evidence"
+$env:HARMONIARR_DOCKER_VALIDATION_SUMMARY_PATH = ".tmp\docker-release-upgrade-evidence\harmoniarr-docker-deployment-summary.json"
+$env:HARMONIARR_IMAGE = "ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta"
+$env:HARMONIARR_BASELINE_IMAGE = "harmoniarr-walkthrough:latest"
+npm run validate:docker-deployment-path
+```
+
+Use registry-authenticated immutable digest refs for final release evidence.
+The validator intentionally keeps the fresh-install build path isolated from
+`HARMONIARR_IMAGE`, so a released-image ref does not leak into the local image
+build tag.
+
 ## Why This Exists
 
 This walkthrough is for local exploration only.

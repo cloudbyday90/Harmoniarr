@@ -763,34 +763,153 @@ to `Pending`.
 
 See `docs/IMPORT_REVIEW_DIAGNOSTIC_REPAIR_RETRY_SUCCESS_DESIGN.md`.
 
+## Batch BC - Import Review direct diagnostic route reload verification
+
+Status: Implemented.
+
+Direct diagnostic Import Review URLs now have reload browser proof. The suite
+loads `/app/activity/candidates` with `candidate`, `candidateFile`, and
+`mediaInspectionRunId` query state plus `#import-review-selection-stage`,
+verifies the candidate detail hydrates, the affected file receives focus and
+highlighting, and the historical media-inspection run stays selected.
+
+The same assertions run again after browser reload, proving the diagnostic
+context does not depend on the original diagnostic-row click event.
+
+See `docs/IMPORT_REVIEW_DIRECT_DIAGNOSTIC_ROUTE_RELOAD_DESIGN.md`.
+
+## Batch BD - Import Review diagnostic fixture-pack consolidation
+
+Status: Implemented.
+
+Import Review diagnostic browser suites now share a named fixture-pack module
+instead of duplicating the same selected diagnostic candidate, comparison
+candidate, media-inspection run, diagnostic file IDs, route suffixes, and repair
+failure message.
+
+The older media-inspection diagnostics, diagnostic-row handoff, and repair-state
+suites now consume the same fixture pack as the newer failure, retry-success,
+and direct-route reload suites. The consolidation is test-support only; product
+behavior and production Import Review code did not change.
+
+See `docs/IMPORT_REVIEW_DIAGNOSTIC_FIXTURE_PACK_CONSOLIDATION_DESIGN.md`.
+
+## Batch BE - Queued-worker maintenance-lock pause proof
+
+Status: Implemented.
+
+Queued-worker dispatch now has database-backed proof for maintenance-lock
+pausing. The integration suite seeds a pending library scan run, acquires a
+restore maintenance lock, ticks the real operation queue dispatcher through the
+real pause service and PostgreSQL-backed queue store, and verifies no
+stranded-run recovery runs, no run is claimed, and no handler starts.
+
+After releasing the lock, the same dispatcher tick claims the same pending run,
+increments attempt count, records the dispatcher owner, and launches the
+matching handler. This complements the existing claimed-worker pause proof and
+confirms both sides of the boundary: queue-side recovery and new queued work
+pause during a lock, and queued work resumes after release.
+
+See `docs/QUEUED_WORKER_MAINTENANCE_LOCK_PAUSE_PROOF_DESIGN.md`.
+
+## Batch BF - Docker-backed deployment-path validation execution
+
+Status: Implemented.
+
+The shared Docker deployment-path validator was executed in a live
+Docker-capable environment with evidence output enabled. The run passed the
+local workspace image fresh-install path, including embedded PostgreSQL
+readiness and persistence, zero pending migrations, FFmpeg/FFprobe availability,
+backup export and restore preview/apply behavior, delegated Request Music smoke,
+existing-data restart, startup-refusal behavior, and cleanup verification.
+
+The first attempt correctly failed before container creation because Compose
+required VAPID variables. After generating validation-only VAPID keys in the
+current shell, the validation passed and produced the deployment summary plus
+fresh-install evidence JSON under `.tmp/docker-deployment-evidence`.
+
+Released-image and upgrade-path validations were explicitly skipped because
+`HARMONIARR_IMAGE` and `HARMONIARR_BASELINE_IMAGE` were not configured.
+
+See `docs/DOCKER_BACKED_DEPLOYMENT_PATH_VALIDATION_EXECUTION.md`.
+
+## Batch BG - Released-image and baseline-upgrade evidence execution
+
+### Released-image and baseline-upgrade evidence execution
+
+Status: Implemented.
+
+The deployment-path wrapper now has live local execution evidence for all three
+API-level packaged-runtime paths: fresh install, released image, and
+baseline-to-candidate upgrade. The run used
+`HARMONIARR_IMAGE=ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta` and
+`HARMONIARR_BASELINE_IMAGE=harmoniarr-walkthrough:latest`, wrote JSON evidence
+under `.tmp/docker-release-upgrade-evidence`, verified each smoke evidence file
+with `npm run validate:docker-smoke-evidence`, and confirmed no
+`harmoniarrsmoke` or `harmoniarrupgrade` containers or volumes remained.
+
+The local environment could not prove GHCR digest pull availability because
+registry access returned `denied`, so the evidence is executable local-tag
+proof rather than registry-authenticated immutable digest proof. Final release
+closure should repeat the same command with registry access and immutable
+digest refs.
+
+| Pros | Cons |
+| --- | --- |
+| Proves released-image and upgrade behavior through the standard Compose path | Local tag proof does not replace registry digest proof |
+| Captures release-archive-ready JSON for fresh install, released image, upgrade path, and summary | Takes longer than single-path smoke |
+| Exposed and fixed environment leakage between fresh-install builds and released-image refs | Still needs browser-smoke evidence for UI-facing release confidence |
+
+See `docs/RELEASED_IMAGE_BASELINE_UPGRADE_EVIDENCE_EXECUTION.md`.
+
+## Batch BH - Packaged-runtime browser-smoke execution
+
+Status: Implemented.
+
+The packaged Docker walkthrough runtime now has browser-smoke execution
+evidence. `npm run validate:docker-browser-smoke` passed against
+`http://127.0.0.1:47956` with the walkthrough admin, wrote
+`.tmp/docker-browser-smoke-evidence/harmoniarr-docker-smoke-browser-operator.json`,
+and captured seven checkpoint screenshots under
+`.tmp/docker-browser-smoke-evidence/screenshots`.
+
+The smoke runner now uses user-facing selectors for the visible account menu,
+Activity page, Background Jobs section, and Download candidates page instead of
+stale implementation classes or tab labels. It also supports optional
+checkpoint screenshots through
+`HARMONIARR_DOCKER_BROWSER_SMOKE_SCREENSHOT_DIR`.
+
+| Pros | Cons |
+| --- | --- |
+| Proves browser-critical flows against the shipped runtime | Does not replace the full browser suite |
+| Complements the fresh-install, released-image, and upgrade JSON evidence | Requires screenshot artifact hygiene |
+| Produces release-archive-ready UI screenshots and JSON | Still needs final registry-authenticated digest replay |
+
+See `docs/PACKAGED_RUNTIME_BROWSER_SMOKE_EXECUTION.md`.
+
 ## Proposed (follow-up)
 
 Status: Proposed (not yet implemented).
 
-### Import Review direct diagnostic route reload verification
+### Registry-authenticated immutable release replay
 
-**Problem.** Diagnostic route state is covered when reached by clicking a
-diagnostic row, but a browser reload or shared URL can enter the same state
-directly. That path can regress selected-run hydration or file focus without
-breaking the click-driven tests.
+**Problem.** Local Docker evidence now covers API-level deployment paths and
+packaged browser smoke, but the local environment could not prove GHCR digest
+pull availability because registry access returned `denied`.
 
-**Proposal.** Load Import Review directly with `candidate`,
-`candidateFile`, and `mediaInspectionRunId` query state plus the selection hash,
-then verify the candidate detail opens, the affected file row receives focus and
-highlighting, and the historical media-inspection run detail is selected.
+**Proposal.** Repeat the deployment-path and browser-smoke evidence run with
+registry-authenticated immutable digest refs, then archive the deployment
+summary, smoke JSON, and screenshot artifacts as the final release evidence
+pack.
 
-**Why it is high value.** Direct URLs and reloads are the durability contract
-for this route state. Proving hydration closes the remaining diagnostic file
-focus path after click, success, failure, and retry coverage.
+**Why it is high value.** This converts local executable proof into final
+supply-chain proof for the exact registry-published artifact.
 
 | Pros | Cons |
 | --- | --- |
-| Proves route-state durability without user-click setup | Adds one route-hydration browser scenario |
-| Guards reload/shared-link behavior for diagnostics | Does not add new UI controls |
-| Complements existing handoff and repair tests | Requires seeded selected-run detail data |
+| Proves the exact immutable registry artifact | Requires registry credentials/access |
+| Closes the remaining release-evidence caveat | Longer than local tag replay |
+| Produces a complete release archive | Depends on registry availability |
 
-**Touch points.** `src/client/components/ImportCandidateDetailPanel.vue`,
-`src/client/views/ImportReviewView.vue`,
-`src/client/composables/useImportReviewWorkspace.js`,
-`testing/browser/import-review-browser-helpers.js`,
-`testing/browser/metadata-browser-fixtures.js`, and `test/browser/`.
+**Touch points.** Docker release evidence, release workflow artifacts, GHCR
+access, and release validation sign-off.

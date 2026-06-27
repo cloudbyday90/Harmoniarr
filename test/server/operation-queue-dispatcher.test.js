@@ -126,6 +126,7 @@ test('operation queue dispatcher skips claims while maintenance dispatch readine
   assert.deepEqual(resolveDispatchReadiness.mock.calls[0].arguments, [{
     operationTypes: ['library_scan'],
   }]);
+  assert.equal(recoverStrandedRuns.mock.callCount(), 0);
   assert.equal(claimNextRunnableRun.mock.callCount(), 0);
   assert.deepEqual(result, {
     claimedCount: 0,

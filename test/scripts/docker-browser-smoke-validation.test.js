@@ -22,6 +22,7 @@ test('resolveDockerBrowserSmokeInputs reads defaults and required walkthrough cr
   assert.equal(inputs.timeoutMs, 15_000);
   assert.equal(inputs.headless, true);
   assert.equal(inputs.evidencePath, null);
+  assert.equal(inputs.screenshotDir, null);
 });
 
 test('resolveDockerBrowserSmokeInputs accepts CLI overrides and dedicated evidence path env', () => {
@@ -30,6 +31,7 @@ test('resolveDockerBrowserSmokeInputs accepts CLI overrides and dedicated eviden
       '--base-url', 'http://127.0.0.1:49100',
       '--username', 'admin',
       '--password', 'BrowserPass123!',
+      '--screenshot-dir', 'artifacts/docker/screenshots',
       '--timeout-ms', '25000',
     ],
     env: {
@@ -45,6 +47,7 @@ test('resolveDockerBrowserSmokeInputs accepts CLI overrides and dedicated eviden
     evidencePath: 'artifacts/docker/browser-smoke.json',
     headless: false,
     password: 'BrowserPass123!',
+    screenshotDir: 'artifacts/docker/screenshots',
     timeoutMs: 25_000,
     username: 'admin',
   });
@@ -55,11 +58,15 @@ test('runDockerOperatorBrowserSmoke runs scenario and writes evidence', async ()
     closeBrowser: 0,
     closeContext: 0,
     launch: 0,
+    screenshot: [],
     setDefaultTimeout: [],
     writeEvidence: [],
   };
 
   const page = {
+    screenshot: async (options) => {
+      calls.screenshot.push(options);
+    },
     setDefaultTimeout: (value) => {
       calls.setDefaultTimeout.push(value);
     },
@@ -84,13 +91,17 @@ test('runDockerOperatorBrowserSmoke runs scenario and writes evidence', async ()
       calls.launch += 1;
       return browser;
     },
+    mkdirFn: async () => {},
     password: 'BrowserPass123!',
-    runOperatorBrowserScenarioFn: async ({ baseUrl, password, username }) => {
+    runOperatorBrowserScenarioFn: async ({ baseUrl, password, recordCheckpoint, username }) => {
       assert.equal(baseUrl, 'http://127.0.0.1:49100');
       assert.equal(username, 'admin');
       assert.equal(password, 'BrowserPass123!');
+      await recordCheckpoint('login_page_loaded');
+      await recordCheckpoint('recovery_loaded');
       return ['login_page_loaded', 'recovery_loaded'];
     },
+    screenshotDir: 'artifacts/docker/browser-screenshots',
     username: 'admin',
     writeDockerSmokeEvidenceFn: async (options) => {
       calls.writeEvidence.push(options);
@@ -102,9 +113,17 @@ test('runDockerOperatorBrowserSmoke runs scenario and writes evidence', async ()
   assert.deepEqual(calls.setDefaultTimeout, [15_000]);
   assert.equal(calls.closeContext, 1);
   assert.equal(calls.closeBrowser, 1);
+  assert.equal(calls.screenshot.length, 2);
+  assert.match(calls.screenshot[0].path, /01-login-page-loaded\.png$/);
+  assert.match(calls.screenshot[1].path, /02-recovery-loaded\.png$/);
   assert.equal(calls.writeEvidence.length, 1);
   assert.equal(calls.writeEvidence[0].validationKind, 'browser-operator-smoke');
+  assert.deepEqual(calls.writeEvidence[0].validationResult.screenshots.map((screenshot) => screenshot.checkpoint), [
+    'login_page_loaded',
+    'recovery_loaded',
+  ]);
   assert.deepEqual(result.checkpoints, ['login_page_loaded', 'recovery_loaded']);
+  assert.equal(result.screenshots.length, 2);
   assert.equal(result.evidencePath, 'C:/repo/artifacts/docker/browser-smoke.json');
 });
 
@@ -115,6 +134,7 @@ test('runDockerOperatorBrowserSmoke closes browser resources when scenario fails
   };
 
   const page = {
+    screenshot: async () => {},
     setDefaultTimeout: () => {},
   };
   const browserContext = {

@@ -1270,8 +1270,11 @@ function buildValidationEnvironment({
   port,
   processEnv = process.env,
 } = {}) {
+  const baseProcessEnv = { ...processEnv };
+  delete baseProcessEnv.HARMONIARR_IMAGE;
+
   return {
-    ...processEnv,
+    ...baseProcessEnv,
     APP_PORT: '3000',
     HARMONIARR_APPDATA: directories.appData,
     HARMONIARR_CONTACT_EMAIL: processEnv.HARMONIARR_CONTACT_EMAIL ?? '',

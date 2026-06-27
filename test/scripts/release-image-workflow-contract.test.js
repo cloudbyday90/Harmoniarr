@@ -10,6 +10,7 @@ import {
   releaseImageBrowserSmokeEvidenceStep,
   releaseImageBrowserSmokeEvidenceVerificationStep,
   releaseImageBrowserSmokeRuntimeStep,
+  releaseImageBrowserSmokeScreenshotEvidenceStep,
   releaseImageDeploymentSummaryArtifactStep,
   releaseImageDeploymentSummaryStep,
   releaseImageEvidenceDownloadStep,
@@ -73,14 +74,19 @@ test('release-image workflow runs browser smoke verification and uploads browser
   const runtimeBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeRuntimeStep.name);
   const verifyBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeEvidenceVerificationStep.name);
   const uploadBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeEvidenceStep.name);
+  const screenshotUploadBlock = getWorkflowStepBlock(workflowSource, releaseImageBrowserSmokeScreenshotEvidenceStep.name);
 
   assert.match(runtimeBlock, new RegExp(releaseImageBrowserSmokeRuntimeStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(runtimeBlock, new RegExp(releaseImageBrowserSmokeRuntimeStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(runtimeBlock, new RegExp(releaseImageBrowserSmokeRuntimeStep.screenshotPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(verifyBlock, new RegExp(releaseImageBrowserSmokeEvidenceVerificationStep.command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(verifyBlock, new RegExp(releaseImageBrowserSmokeEvidenceVerificationStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(uploadBlock, new RegExp(releaseImageBrowserSmokeEvidenceStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(uploadBlock, new RegExp(releaseImageBrowserSmokeEvidenceStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(uploadBlock, new RegExp(releaseImageBrowserSmokeEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(screenshotUploadBlock, new RegExp(releaseImageBrowserSmokeScreenshotEvidenceStep.action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(screenshotUploadBlock, new RegExp(releaseImageBrowserSmokeScreenshotEvidenceStep.artifactName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(screenshotUploadBlock, new RegExp(releaseImageBrowserSmokeScreenshotEvidenceStep.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
 test('release-image workflow downloads and re-verifies archived published-image smoke evidence during release-contract verification', async () => {

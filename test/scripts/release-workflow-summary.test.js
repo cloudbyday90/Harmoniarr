@@ -40,6 +40,7 @@ test('renderReleaseImageSummaryLines formats release assets and tags', () => {
 test('renderPublishedImageVerificationSummaryLines formats the smoke summary', () => {
   assert.deepEqual(renderPublishedImageVerificationSummaryLines({
     browserSmokeEvidenceArtifactName: 'harmoniarr-docker-smoke-browser-operator.json',
+    browserSmokeScreenshotsArtifactName: 'harmoniarr-docker-smoke-browser-screenshots',
     imageRef: 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
     smokeContractStatus: 'passed',
     smokeEvidenceArtifactName: 'harmoniarr-docker-smoke-released-image.json',
@@ -51,6 +52,7 @@ test('renderPublishedImageVerificationSummaryLines formats the smoke summary', (
     '- Smoke evidence contract: passed',
     '- Smoke evidence artifact: harmoniarr-docker-smoke-released-image.json',
     '- Browser smoke evidence artifact: harmoniarr-docker-smoke-browser-operator.json',
+    '- Browser smoke screenshots artifact: harmoniarr-docker-smoke-browser-screenshots',
     '',
   ]);
 });
@@ -159,6 +161,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for published-image veri
         '--summary-path', summaryPath,
         '--image-ref', 'ghcr.io/cloudbyday90/harmoniarr@sha256:abc',
         '--browser-smoke-evidence-artifact-name', 'harmoniarr-docker-smoke-browser-operator.json',
+        '--browser-smoke-screenshots-artifact-name', 'harmoniarr-docker-smoke-browser-screenshots',
         '--smoke-contract-status', 'passed',
         '--smoke-evidence-artifact-name', 'harmoniarr-docker-smoke-released-image.json',
       ],
@@ -170,6 +173,7 @@ test('writeReleaseWorkflowSummary accepts CLI overrides for published-image veri
     assert.match(summary, /Smoke evidence contract: passed/);
     assert.match(summary, /Smoke evidence artifact: harmoniarr-docker-smoke-released-image.json/);
     assert.match(summary, /Browser smoke evidence artifact: harmoniarr-docker-smoke-browser-operator.json/);
+    assert.match(summary, /Browser smoke screenshots artifact: harmoniarr-docker-smoke-browser-screenshots/);
   } finally {
     await rm(tempDirectory, { force: true, recursive: true });
   }

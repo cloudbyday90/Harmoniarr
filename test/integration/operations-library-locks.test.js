@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import { createLibraryScanRunStore } from '../../src/server/library/library-scan-run-store.js';
 import { createLibraryScanWorker } from '../../src/server/library/library-scan-worker.js';
+import { createOperationQueueDispatcher } from '../../src/server/operation-queue-dispatcher.js';
 import {
   createOperationRunInterruptionGate,
 } from '../../src/server/operation-run-cancellation.js';
@@ -15,7 +16,10 @@ import { operationRunRegistry } from '../../src/shared/operation-run-descriptors
 import { createIntegrationAppRuntime } from '../../testing/integration/app-runtime.js';
 import { bootstrapAdminSession } from '../../testing/integration/auth-helpers.js';
 import { seedOperationRunFixture } from '../../testing/integration/operation-run-fixtures.js';
-import { acquireIntegrationLock } from '../../testing/integration/recovery-helpers.js';
+import {
+  acquireIntegrationLock,
+  releaseIntegrationLock,
+} from '../../testing/integration/recovery-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 import {
   isSkippableIntegrationRuntimeError,
@@ -61,6 +65,25 @@ async function waitForPersistedOperationRun(getPoolFn, runId, {
   }
 
   throw new Error(`Timed out waiting for operation run ${runId} to return to pending`);
+}
+
+async function readOperationRunQueueState(getPoolFn, runId) {
+  const result = await getPoolFn().query(
+    `
+      SELECT
+        attempt_count,
+        claimed_at,
+        claimed_by_instance_id,
+        next_attempt_at,
+        status,
+        summary
+      FROM operation_runs
+      WHERE id = $1
+    `,
+    [runId],
+  );
+
+  return result.rows[0] ?? null;
 }
 
 suite('integration operations lifecycle and library lock routes', () => {
@@ -361,6 +384,107 @@ suite('integration operations lifecycle and library lock routes', () => {
       assert.match(persistedRun.summary.pauseMessage, /library scan is paused while the restore maintenance lock is active/i);
     }, {
       scenarioName: 'maintenance_lock_library_scan_worker_pause',
+    });
+  });
+
+  test('operation queue dispatcher leaves queued runs unclaimed while a maintenance lock is active and resumes after release', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await integrationRuntime.runScenario(async ({ client, getPoolFn }) => {
+      await bootstrapAdminSession(client);
+
+      const runStore = createLibraryScanRunStore({ getPoolFn });
+      const queueStore = createOperationQueueStore({
+        claimOwnerInstanceId: 'integration-dispatcher-worker',
+        getPoolFn,
+      });
+      const maintenanceLockService = createMaintenanceLockService({ getPoolFn });
+      const operationPauseService = createMaintenanceLockOperationPauseService({
+        listActiveMaintenanceLocks: maintenanceLockService.listActiveMaintenanceLocks,
+      });
+      const handledRunIds = [];
+      const recoverStrandedRuns = t.mock.fn(async () => ({
+        activeLeaseCount: 0,
+        failedCount: 0,
+        retriedCount: 0,
+        scannedCount: 0,
+        skipped: true,
+      }));
+      const dispatcher = createOperationQueueDispatcher({
+        dispatchPauseService: operationPauseService,
+        handlers: {
+          [operationRunRegistry.libraryScan.operationType]: async ({ run }) => {
+            handledRunIds.push(run.id);
+          },
+        },
+        operationQueueStore: queueStore,
+        operationStrandedRunRecoveryService: {
+          recoverStrandedRuns,
+        },
+      });
+
+      const seededRun = await runStore.createOperationRun({
+        libraryRoot: '/library/music',
+        status: 'pending',
+        triggeredByUserId: null,
+      });
+      const lock = await acquireIntegrationLock(getPoolFn(), {
+        lockType: 'restore',
+        reason: 'Pause queued worker dispatch',
+      });
+
+      const pausedResult = await dispatcher.tick();
+      const pausedRun = await readOperationRunQueueState(getPoolFn, seededRun.id);
+
+      assert.deepEqual(pausedResult, {
+        claimedCount: 0,
+        failedCount: 0,
+        nextRetryAt: null,
+        pauseCode: maintenanceLockPauseCode,
+        pauseMessage: 'Operation queue dispatch is paused while the restore maintenance lock is active.',
+        pauseProvider: 'restore',
+        pausedOperationTypes: [operationRunRegistry.libraryScan.operationType],
+        reason: 'paused',
+        retriedCount: 0,
+        scannedCount: 0,
+        skipped: true,
+      });
+      assert.equal(recoverStrandedRuns.mock.callCount(), 0);
+      assert.deepEqual(handledRunIds, []);
+      assert.equal(pausedRun.status, 'pending');
+      assert.equal(pausedRun.attempt_count, 0);
+      assert.equal(pausedRun.claimed_at, null);
+      assert.equal(pausedRun.claimed_by_instance_id, null);
+      assert.equal(pausedRun.summary.libraryRoot, '/library/music');
+
+      await releaseIntegrationLock(getPoolFn(), lock.id);
+
+      const resumedResult = await dispatcher.tick();
+      const claimedRun = await readOperationRunQueueState(getPoolFn, seededRun.id);
+
+      assert.deepEqual(resumedResult, {
+        claimedCount: 1,
+        failedCount: 0,
+        retriedCount: 0,
+        scannedCount: 0,
+        skipped: false,
+      });
+      assert.deepEqual(recoverStrandedRuns.mock.calls[0].arguments, [{
+        operationTypes: [operationRunRegistry.libraryScan.operationType],
+      }]);
+      assert.deepEqual(handledRunIds, [seededRun.id]);
+      assert.equal(claimedRun.status, 'pending');
+      assert.equal(claimedRun.attempt_count, 1);
+      assert.ok(claimedRun.claimed_at);
+      assert.equal(claimedRun.claimed_by_instance_id, 'integration-dispatcher-worker');
+      assert.equal(claimedRun.summary.libraryRoot, '/library/music');
+    }, {
+      scenarioName: 'maintenance_lock_queued_worker_dispatch_pause',
     });
   });
 });

@@ -45,6 +45,7 @@ export function renderReleaseImageSummaryLines({
 
 export function renderPublishedImageVerificationSummaryLines({
   browserSmokeEvidenceArtifactName = null,
+  browserSmokeScreenshotsArtifactName = null,
   imageRef,
   smokeContractStatus = null,
   smokeEvidenceArtifactName = null,
@@ -57,6 +58,7 @@ export function renderPublishedImageVerificationSummaryLines({
     ...(smokeContractStatus ? [`- Smoke evidence contract: ${smokeContractStatus}`] : []),
     ...(smokeEvidenceArtifactName ? [`- Smoke evidence artifact: ${smokeEvidenceArtifactName}`] : []),
     ...(browserSmokeEvidenceArtifactName ? [`- Browser smoke evidence artifact: ${browserSmokeEvidenceArtifactName}`] : []),
+    ...(browserSmokeScreenshotsArtifactName ? [`- Browser smoke screenshots artifact: ${browserSmokeScreenshotsArtifactName}`] : []),
     '',
   ];
 }
