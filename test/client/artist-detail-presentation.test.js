@@ -19,6 +19,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildArtistDetailBulkActionAriaLabel,
+  buildArtistDetailBulkActionLabel,
+  buildArtistDetailBulkAppliedStatus,
+  buildArtistDetailBulkConfirmationBody,
+  buildArtistDetailBulkConfirmationCancelLabel,
+  buildArtistDetailBulkConfirmationConfirmLabel,
+  buildArtistDetailBulkConfirmationTitle,
   buildArtistDetailErrorBody,
   buildArtistHeroBackgroundStyle,
   buildArtistMetaLine,
@@ -27,6 +34,7 @@ import {
   buildNoDiscographyBody,
   buildRelatedArtistAvatarStyle,
   buildRelatedArtistInitial,
+  formatArtistDetailBulkAffectedCount,
   formatArtistDetailError,
   formatDiscographyError,
   formatRelatedArtistScore,
@@ -289,6 +297,55 @@ test('buildNoDiscographyBody does not mention MusicBrainz', () => {
 
 test('buildNoDiscographyBody is stable across calls', () => {
   assert.equal(buildNoDiscographyBody(), buildNoDiscographyBody());
+});
+
+// ── Artist Detail bulk selection copy ────────────────────────────────────────
+
+test('buildArtistDetailBulkActionLabel maps selected and unselected actions', () => {
+  assert.equal(buildArtistDetailBulkActionLabel('selected'), 'Select all');
+  assert.equal(buildArtistDetailBulkActionLabel('unselected'), 'Clear all');
+});
+
+test('buildArtistDetailBulkActionAriaLabel includes the section label', () => {
+  assert.equal(buildArtistDetailBulkActionAriaLabel('EP', 'selected'), 'Select all EPs');
+});
+
+test('formatArtistDetailBulkAffectedCount handles release-only operations', () => {
+  assert.equal(formatArtistDetailBulkAffectedCount({ releaseCount: 2, trackCount: 0 }), '2 releases');
+});
+
+test('formatArtistDetailBulkAffectedCount includes track counts when known', () => {
+  assert.equal(
+    formatArtistDetailBulkAffectedCount({ releaseCount: 1, trackCount: 12 }),
+    '1 release, 12 tracks',
+  );
+});
+
+test('buildArtistDetailBulkConfirmationBody explains clear operations as draft changes', () => {
+  const body = buildArtistDetailBulkConfirmationBody({
+    releaseCount: 26,
+    sectionType: 'Album',
+    selectionState: 'unselected',
+    trackCount: 0,
+  });
+
+  assert.equal(
+    body,
+    'This will clear 26 releases in albums. The change stays in draft until you save policy.',
+  );
+});
+
+test('Artist Detail bulk confirmation labels are stable', () => {
+  assert.equal(buildArtistDetailBulkConfirmationTitle(), 'Confirm large bulk change');
+  assert.equal(buildArtistDetailBulkConfirmationConfirmLabel(), 'Apply draft change');
+  assert.equal(buildArtistDetailBulkConfirmationCancelLabel(), 'Review first');
+});
+
+test('buildArtistDetailBulkAppliedStatus reports selected draft operation', () => {
+  assert.equal(
+    buildArtistDetailBulkAppliedStatus({ releaseCount: 3, selectionState: 'selected', trackCount: 0 }),
+    'Draft selected 3 releases.',
+  );
 });
 
 // ── buildRelatedArtistAvatarStyle ─────────────────────────────────────────────

@@ -119,8 +119,9 @@ recommendations by monitored artist without changing durable operator state.
 The implementation preserves the core model: all monitored artists are the
 default recommendation basis, and focus is only a view-level analysis tool.
 
-## Next High-Value Item
+## Follow-Up Status
 
-The next high-value item is Artist Detail bulk-change confirmation thresholds.
-The focus-filter work improves recommendation analysis; the next likely risk is
-operator safety when large draft operations affect many releases or tracks.
+Artist Detail bulk-change confirmation thresholds were implemented in
+`ARTIST_DETAIL_BULK_CHANGE_CONFIRMATION_DESIGN.md`. The next high-value Artist
+Detail follow-up is large-catalog section filtering and sorting if real catalog
+pressure shows the current section grouping is insufficient.

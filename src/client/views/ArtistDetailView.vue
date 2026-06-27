@@ -19,6 +19,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import ArtistDetailRelatedArtistCard from '../components/media/ArtistDetailRelatedArtistCard.vue';
@@ -41,6 +42,21 @@ import {
   normalizeReleaseGroupForCard,
 } from '../lib/artist-detail-route.js';
 import {
+  applyArtistDetailBulkSelection,
+  buildArtistDetailBulkSelectionOperation,
+} from '../lib/artist-detail-bulk-selection.js';
+import {
+  CONFIRM_LEVEL,
+  CONFIRM_TONE,
+} from '../lib/confirm-intent.js';
+import {
+  buildArtistDetailBulkActionAriaLabel,
+  buildArtistDetailBulkActionLabel,
+  buildArtistDetailBulkAppliedStatus,
+  buildArtistDetailBulkConfirmationBody,
+  buildArtistDetailBulkConfirmationCancelLabel,
+  buildArtistDetailBulkConfirmationConfirmLabel,
+  buildArtistDetailBulkConfirmationTitle,
   buildArtistDetailErrorBody,
   buildArtistHeroBackgroundStyle,
   buildArtistMetaLine,
@@ -149,6 +165,8 @@ const policyDraft = ref(createOperatorArtistDetailDraft());
 const savedDraftFingerprint = ref(fingerprintOperatorArtistDraft(policyDraft.value));
 const isSavingPolicy = ref(false);
 const policySaveError = ref('');
+const pendingBulkSelectionOperation = ref(null);
+const bulkSelectionStatusMessage = ref('');
 
 function openDetailModal(release) {
   detailRelease.value = release;
@@ -177,6 +195,7 @@ const operatorCoverage = computed(() => operator.value?.coverage ?? {});
 const operatorOverview = computed(() => operator.value?.overview ?? {});
 const operatorReconciliation = computed(() => operator.value?.reconciliation ?? {});
 const coveragePercent = computed(() => calculateOperatorArtistCoveragePercent(operatorCoverage.value));
+const bulkSelectionConfirmationOpen = computed(() => pendingBulkSelectionOperation.value !== null);
 
 const discographySections = computed(() =>
   groupReleaseGroupsByType(releaseGroups.value).map((section) => ({
@@ -257,6 +276,55 @@ function updateDraftReleaseGroupSelection(release, selectionState) {
     release.sourceReleaseGroup,
     selectionState,
   );
+}
+
+function canApplyBulkSelectionChanges() {
+  return canEditOperatorPolicy.value
+    && !isSavingPolicy.value
+    && policyDraft.value.monitoring.isMonitored;
+}
+
+function commitBulkSelectionOperation(operation) {
+  if (!operation) return;
+  applyArtistDetailBulkSelection(
+    policyDraft.value,
+    operation.releases,
+    operation.selectionState,
+  );
+  bulkSelectionStatusMessage.value = buildArtistDetailBulkAppliedStatus(operation);
+}
+
+function requestSectionBulkSelection(section, selectionState) {
+  if (!canApplyBulkSelectionChanges()) {
+    return;
+  }
+
+  const operation = buildArtistDetailBulkSelectionOperation({
+    releases: section.releases,
+    sectionType: section.type,
+    selectionState,
+  });
+
+  if (!operation) {
+    return;
+  }
+
+  if (operation.requiresConfirmation) {
+    pendingBulkSelectionOperation.value = operation;
+    return;
+  }
+
+  commitBulkSelectionOperation(operation);
+}
+
+function closeBulkSelectionConfirmation() {
+  pendingBulkSelectionOperation.value = null;
+}
+
+function confirmBulkSelectionOperation() {
+  const operation = pendingBulkSelectionOperation.value;
+  pendingBulkSelectionOperation.value = null;
+  commitBulkSelectionOperation(operation);
 }
 
 function updateDraftTrackOverride({ medium, overrideState, release, releaseGroup, track }) {
@@ -551,6 +619,10 @@ watch(projection, () => {
         </header>
 
         <div class="hx-card-body artist-detail-section-card__body">
+          <p class="artist-detail-visually-hidden" role="status" aria-live="polite">
+            {{ bulkSelectionStatusMessage }}
+          </p>
+
           <p v-if="discographyError" class="artist-detail-soft-error" role="alert">
             {{ formatDiscographyError(discographyError) }}
           </p>
@@ -571,6 +643,32 @@ watch(projection, () => {
                 <div>
                   <h3 class="artist-detail-discography__title">{{ pluralizeReleaseType(section.type) }}</h3>
                   <p class="artist-detail-discography__meta">{{ section.releaseCount }} release{{ section.releaseCount === 1 ? '' : 's' }}</p>
+                </div>
+                <div
+                  v-if="canEditOperatorPolicy"
+                  class="artist-detail-discography__actions"
+                  :aria-label="`${pluralizeReleaseType(section.type)} bulk selection actions`"
+                >
+                  <button
+                    type="button"
+                    class="hx-btn"
+                    data-variant="ghost"
+                    :disabled="!canApplyBulkSelectionChanges()"
+                    :aria-label="buildArtistDetailBulkActionAriaLabel(section.type, 'selected')"
+                    @click="requestSectionBulkSelection(section, 'selected')"
+                  >
+                    {{ buildArtistDetailBulkActionLabel('selected') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="hx-btn"
+                    data-variant="ghost"
+                    :disabled="!canApplyBulkSelectionChanges()"
+                    :aria-label="buildArtistDetailBulkActionAriaLabel(section.type, 'unselected')"
+                    @click="requestSectionBulkSelection(section, 'unselected')"
+                  >
+                    {{ buildArtistDetailBulkActionLabel('unselected') }}
+                  </button>
                 </div>
               </div>
 
@@ -676,6 +774,21 @@ watch(projection, () => {
       @close="closeDetailModal"
       @requested="closeDetailModal"
       @track-override-change="updateDraftTrackOverride"
+    />
+
+    <ConfirmDialog
+      :is-open="bulkSelectionConfirmationOpen"
+      :is-confirming="bulkSelectionConfirmationOpen"
+      :button-enabled="bulkSelectionConfirmationOpen"
+      :can-confirm="bulkSelectionConfirmationOpen"
+      :confirm-level="CONFIRM_LEVEL.NONE"
+      :tone="CONFIRM_TONE.PRIMARY"
+      :title="buildArtistDetailBulkConfirmationTitle()"
+      :message="pendingBulkSelectionOperation ? buildArtistDetailBulkConfirmationBody(pendingBulkSelectionOperation) : ''"
+      :cancel-label="buildArtistDetailBulkConfirmationCancelLabel()"
+      :confirm-label="buildArtistDetailBulkConfirmationConfirmLabel()"
+      @close="closeBulkSelectionConfirmation"
+      @execute="confirmBulkSelectionOperation"
     />
   </section>
 </template>
@@ -822,6 +935,18 @@ watch(projection, () => {
   font-size: var(--hx-text-sm);
 }
 
+.artist-detail-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .artist-policy-card__actions {
   align-items: center;
 }
@@ -920,6 +1045,19 @@ watch(projection, () => {
   gap: var(--hx-space-3);
 }
 
+.artist-detail-discography__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--hx-space-2);
+}
+
+.artist-detail-discography__actions .hx-btn {
+  min-height: 32px;
+  padding-inline: var(--hx-space-3);
+  font-size: var(--hx-text-xs);
+}
+
 .artist-detail-discography__title {
   margin: 0;
   font-size: var(--hx-text-base);
@@ -989,6 +1127,14 @@ watch(projection, () => {
   }
 
   .artist-stage__media {
+    justify-content: flex-start;
+  }
+
+  .artist-detail-discography__header {
+    flex-direction: column;
+  }
+
+  .artist-detail-discography__actions {
     justify-content: flex-start;
   }
 

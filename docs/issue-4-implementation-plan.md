@@ -46,20 +46,18 @@ Confirmed complete:
 - artwork-first grids, responsive/mobile behavior, PWA/push notification support, and visual/browser evidence
 - Discover recommendation model core, including monitored-artist basis, product-language cleanup, add-to-monitored flow, scoring/explainability, operator-scoped wanted state, and monitoring read-path cleanup
 - Discover temporary recommendation-basis filtering, including URL-query focus state, monitored-artist validation, reload persistence, and browser verification
+- Artist Detail bulk-change confirmation thresholds, including section-level draft bulk selection, threshold confirmation, and browser verification
 
 Follow-up issues to create:
 
-1. **Artist Detail bulk-change confirmation thresholds** — add confirmation for
-   unusually large draft bulk operations once the >25 releases / >250 tracks
-   threshold from the Discover model plan is ready for implementation.
-2. **Artist Detail large-catalog filtering and sorting** — revisit section-level
+1. **Artist Detail large-catalog filtering and sorting** — revisit section-level
    filters/sorting after real catalog pressure proves the default grouping is
    insufficient.
-3. **Operator library removal semantics** — design and implement non-destructive
+2. **Operator library removal semantics** — design and implement non-destructive
    "remove from my view/library" behavior separately from deleting shared media.
-4. **Track-override remap review UX** — surface `review_needed` / `orphaned`
+3. **Track-override remap review UX** — surface `review_needed` / `orphaned`
    track override states when metadata changes make saved track intent ambiguous.
-5. **Plan-governance closure** — create/link GitHub sub-issues for the items
+4. **Plan-governance closure** — create/link GitHub sub-issues for the items
    above, then close Issue #4 as completed.
 
 ---

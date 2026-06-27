@@ -172,6 +172,56 @@ export function buildNoDiscographyBody() {
   return 'No releases are listed for this artist yet.';
 }
 
+export function buildArtistDetailBulkActionLabel(selectionState) {
+  return selectionState === 'unselected' ? 'Clear all' : 'Select all';
+}
+
+export function buildArtistDetailBulkActionAriaLabel(sectionType, selectionState) {
+  return `${buildArtistDetailBulkActionLabel(selectionState)} ${pluralizeReleaseType(sectionType)}`;
+}
+
+export function formatArtistDetailBulkAffectedCount(operation = {}) {
+  const releaseCount = Number.isFinite(Number(operation.releaseCount))
+    ? Number(operation.releaseCount)
+    : 0;
+  const trackCount = Number.isFinite(Number(operation.trackCount))
+    ? Number(operation.trackCount)
+    : 0;
+  const releaseLabel = `${releaseCount} release${releaseCount === 1 ? '' : 's'}`;
+
+  if (trackCount <= 0) {
+    return releaseLabel;
+  }
+
+  return `${releaseLabel}, ${trackCount} track${trackCount === 1 ? '' : 's'}`;
+}
+
+export function buildArtistDetailBulkConfirmationTitle() {
+  return 'Confirm large bulk change';
+}
+
+export function buildArtistDetailBulkConfirmationBody(operation = {}) {
+  const action = operation.selectionState === 'unselected' ? 'clear' : 'select';
+  const sectionLabel = pluralizeReleaseType(operation.sectionType).toLowerCase();
+  const affectedCount = formatArtistDetailBulkAffectedCount(operation);
+
+  return `This will ${action} ${affectedCount} in ${sectionLabel}. The change stays in draft until you save policy.`;
+}
+
+export function buildArtistDetailBulkConfirmationConfirmLabel() {
+  return 'Apply draft change';
+}
+
+export function buildArtistDetailBulkConfirmationCancelLabel() {
+  return 'Review first';
+}
+
+export function buildArtistDetailBulkAppliedStatus(operation = {}) {
+  const action = operation.selectionState === 'unselected' ? 'cleared' : 'selected';
+  const affectedCount = formatArtistDetailBulkAffectedCount(operation);
+  return `Draft ${action} ${affectedCount}.`;
+}
+
 // ── Related artists ───────────────────────────────────────────────────────────
 
 /**
