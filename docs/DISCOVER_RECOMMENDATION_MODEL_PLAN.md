@@ -1,7 +1,7 @@
 # Discover Recommendation Model Plan
 
-Status: Accepted platform direction, implementation in progress
-Last updated: 2026-05-31
+Status: Core model implemented; follow-up enhancements split
+Last updated: 2026-06-27
 Owner: Product + app architecture
 
 ## Purpose
@@ -42,19 +42,27 @@ In plain terms:
 
 ## Current Implementation State
 
-As of 2026-05-31, the backend and primary operator client surfaces have moved past the original draft architecture in several important areas:
+As of 2026-06-27, the backend and primary operator client surfaces have moved past the original draft architecture in several important areas:
 
 - operator-scoped policy tables now exist for artist monitoring, release-group selection, track overrides, and reconciliation snapshots
 - artist-detail save orchestration persists policy and selection state through modular ESM services
 - save-triggered reconciliation is queued through the existing operation-run system and coalesces repeated saves for the same operator and artist
-- the older `metadata_artist_monitoring` table still exists for legacy read paths and compatibility during transition
-
-The remaining product/design gap is primarily in deeper track-level editing, browser regression coverage, and legacy monitoring read-path cleanup:
+- the older `metadata_artist_monitoring` table has been retired from product-facing read/write paths and removed by migration
+- per-operator wanted state now scopes wanted-release projections by authenticated operator
+- metadata refresh scheduling derives due artists and release-type policy from `operator_artist_monitoring` while storing provider cadence in `metadata_artist_refresh_state`
 
 - Discover now has the `+` add affordance and compact `Add artist` policy modal wired to operator policy save
 - Home now uses the operator monitored projection for artist cards and shows compact policy, coverage, progress, and reconciliation state
 - artist detail now loads the operator artist projection, exposes draft policy editing with `Save` / `Cancel`, and shows release-level selection override visibility
-- metadata refresh scheduling now derives due artists and release-type policy from operator monitoring while storing provider cadence in `metadata_artist_refresh_state`
+- Discover recommendation scoring/explainability is implemented through a bounded monitored-artist support boost and fixed-card explanation contract
+
+The remaining work is no longer core implementation. It is a follow-up backlog
+for usability depth and edge-case workflow coverage:
+
+- large bulk-change confirmation thresholds in Artist Detail
+- large-catalog section filters and sorting in Artist Detail, if real catalog pressure proves they are needed
+- non-destructive operator library removal semantics
+- track-override remap review UX when metadata changes make saved intent ambiguous
 
 ## Locked Design Choices
 
@@ -1366,13 +1374,17 @@ This preserves a clear separation between:
 - user demand
 - track-level specificity
 
-## Proposed Implementation Phases
+## Implementation Phase Reconciliation
 
 ### Phase 1: Product Language Alignment
 
 Goal:
 
 - remove user-facing seed terminology
+
+Status:
+
+- complete
 
 Work:
 
@@ -1388,6 +1400,10 @@ Goal:
 
 - make Discover clearly recommendation-first
 
+Status:
+
+- complete
+
 Work:
 
 - ensure Discover always hydrates from monitored artists
@@ -1402,6 +1418,11 @@ Goal:
 
 - reduce architectural confusion in code
 
+Status:
+
+- complete for the client Discover recommendation basis; legacy algorithm-local
+  naming remains only where changing it would add churn without product benefit
+
 Work:
 
 - rename composable state and helper names where safe
@@ -1413,6 +1434,11 @@ Work:
 Goal:
 
 - improve trust in Discover results
+
+Status:
+
+- complete for the v1 card contract; deeper rationale remains a later detail
+  surface if operators need it
 
 Work:
 
@@ -1426,12 +1452,31 @@ Goal:
 
 - make Home artist detail the clear deep-management surface
 
+Status:
+
+- complete for draft editing, save/cancel, release-level selection visibility,
+  and save-triggered reconciliation
+
 Work:
 
 - define draft editing behavior
 - define `Save` / `Cancel` interaction
 - define desired-state vs delete-state behavior
 - define how saved changes trigger downstream automation
+
+### Follow-Up Phase: Usability Depth And Edge Cases
+
+Goal:
+
+- split non-blocking enhancements into explicit follow-up issues
+
+Work:
+
+- temporary recommendation-basis filtering by selected monitored artists
+- confirmation for unusually large Artist Detail bulk draft operations
+- section-level filtering/sorting for large artist catalogs if evidence warrants it
+- non-destructive operator library removal semantics
+- track-override remap review states when metadata changes invalidate exact saved intent
 
 ## Expected File Areas
 
@@ -1481,6 +1526,20 @@ The redesign should be considered complete when all of the following are true:
 17. The Home progress bar measures desired releases acquired rather than total known catalog size.
 18. Broad section policy and local manual overrides can coexist without hiding exceptions.
 19. `Save` creates one artist-level reconciliation job and avoids duplicate queueing against known queue or history state.
+
+### Acceptance Status
+
+| Criterion | Status | Evidence |
+| --- | --- | --- |
+| 1-4. Discover terminology and recommendation-basis language | Complete | `DISCOVER_SEED_TERMINOLOGY_GUARD_DESIGN.md`, `DISCOVER_INTERNAL_NAMING_RENAME_DESIGN.md`, Discover presentation/client tests |
+| 5-6. Monitoring updates Home and Discover consistently, including refresh | Complete | `DISCOVER_REFRESH_BROWSER_REGRESSION_DESIGN.md` and browser regression coverage |
+| 7. Recommendation cards explain relationship to monitored profile | Complete | `DISCOVER_SCORING_EXPLAINABILITY_DESIGN.md` and fixed explanation contract |
+| 8-11. Add artist is compact, operational, and policy-aware | Complete | `DISCOVER_ARTIST_CARD_STATE_DESIGN.md`, `DISCOVER_REDESIGN_DESIGN.md`, operator policy save flow |
+| 12-13. Artist detail Save/Cancel draft boundary | Complete | Operator projection-backed artist detail editing and save orchestration |
+| 14-15. Desired-state changes remain separate from deletion | Complete as a product contract; removal UX remains a follow-up | Desired-state policy and selection model are implemented; non-destructive library removal gets its own issue |
+| 16-17. Home artist cards communicate policy, coverage, progress, and activity | Complete | Operator monitored projection card model and Home browser/card verification work |
+| 18. Broad policy and manual overrides coexist visibly | Complete | Release-level selection state and override visibility in Artist Detail |
+| 19. Save creates one artist-level reconciliation job without duplicate queueing | Complete | Reconciliation snapshot/orchestration design and operation-run coalescing |
 
 ## Resolved Decisions And Remaining Open Items
 
@@ -2019,9 +2078,51 @@ Implementation principle:
 - compatibility view second
 - summary/materialized projection only by measured need
 
-## Implementation Impact
+## Reconciled Remaining Follow-Up Items
 
-The redesign is not only a presentation change. It will require new persisted artist-policy and selection state so the UI, reconciliation logic, and background jobs all operate from the same saved model.
+These items are intentionally not blockers for the core Discover recommendation
+model. They should be split into separate implementation issues so Issue #4 and
+the core model can close cleanly.
+
+1. **Temporary recommendation-basis filtering**
+
+   Add an optional Discover filter that narrows recommendations to a subset of
+   monitored artists for the current session or URL state. This must not create
+   a second persistent recommendation profile.
+
+2. **Large bulk-change confirmation in Artist Detail**
+
+   Implement the accepted threshold guard for unusually broad draft operations:
+   confirmation when a single action affects more than `25` releases or more
+   than `250` tracks.
+
+3. **Large-catalog section filtering and sorting**
+
+   Defer until real artist catalogs show default grouping is insufficient. If
+   implemented, keep it local to Artist Detail sections and preserve the
+   Save/Cancel draft boundary.
+
+4. **Non-destructive operator library removal semantics**
+
+   Design and implement "remove from my view/library" separately from deleting
+   shared media. This likely needs `operator_library_item_access` or an
+   equivalent access projection before UI work.
+
+5. **Track-override remap review UX**
+
+   Surface `review_needed` and `orphaned` states for saved track overrides when
+   metadata or canonical-release changes make exact remapping ambiguous.
+
+6. **GitHub follow-up split**
+
+   Create linked GitHub sub-issues for the items above and link them from
+   `docs/issue-4-implementation-plan.md`.
+
+## Implementation Impact (Historical Planning Reference)
+
+The redesign was not only a presentation change. This section is retained as
+historical planning context for the persisted artist-policy and selection state
+that now backs the implemented model.
 
 ### Client-Side Impact
 
@@ -2482,6 +2583,8 @@ Use this section for incremental updates during implementation.
 - 2026-06-13: Wanted release reconciliation read-path cleanup implemented. The wanted reconciliation service and wanted summary monitored-artist count now use an operator-monitoring compatibility scope derived from `operator_artist_monitoring`, removing their direct dependency on `metadata_artist_monitoring` while preserving the existing global `library_wanted_releases` projection until a separate per-operator wanted-state migration is designed.
 - 2026-06-14: Per-operator wanted state implemented. `PER_OPERATOR_WANTED_STATE_DESIGN.md` records the official PostgreSQL, node-postgres, OWASP, and Express source review plus the selected schema stack. `library_wanted_releases` now has `app_user_id`, a per-user release uniqueness constraint, scoped wanted-summary and wanted-release read paths, operator policy gates for release scope and wanted automation, discovery source-user evidence, and backup/restore ownership preservation.
 - 2026-06-14: Metadata refresh read-path cleanup implemented. `METADATA_REFRESH_READ_PATH_CLEANUP_DESIGN.md` records the official PostgreSQL, node-postgres, OWASP, Express, Node test-runner, and MusicBrainz source review. The refresh heartbeat now reads due artist eligibility from `operator_artist_monitoring`, stores global provider cadence in `metadata_artist_refresh_state`, and uses operator-derived monitored release-group types for refresh release-detection decisions.
+- 2026-06-27: Plan reconciliation completed. The core Discover recommendation model is implemented; remaining items are explicitly split into follow-up issues for temporary recommendation-basis filtering, large bulk-change confirmation, large-catalog section controls, non-destructive operator library removal, track-override remap review UX, and GitHub issue linking.
+- 2026-06-27: Temporary recommendation-basis filtering implemented. `DISCOVER_RECOMMENDATION_FOCUS_FILTER_DESIGN.md` records the official Vue Router, Vue reactivity, Playwright, WAI-ARIA, MDN, and OWASP source review plus the selected URL-query state stack. Discover now exposes `?focusArtist=` as a view-only filter over monitored recommendation inputs, validates ids against the hydrated monitored profile, recomputes recommendations from the focused input result map, preserves focus across reload, and clears back to all monitored artists without changing durable monitoring state.
 
 ## Checklist
 
@@ -2503,4 +2606,10 @@ Use this section for incremental updates during implementation.
 - [x] Home artist card v1 content and layout is implemented from the operator projection
 - [x] Save-triggered background orchestration contract is finalized
 - [x] Internal naming cleanup evaluated
-- [x] Follow-up scoring/explainability work planned
+- [x] Scoring/explainability work implemented
+- [x] Legacy monitoring read-path cleanup implemented
+- [x] Per-operator wanted state implemented
+- [x] Metadata refresh read-path cleanup implemented
+- [x] Core model acceptance criteria reconciled
+- [x] Temporary recommendation-basis filtering implemented
+- [ ] Create linked GitHub follow-up issues for the remaining non-blocking enhancements

@@ -27,6 +27,10 @@ import {
   buildDiscoverNoSimilarArtistsMessage,
   buildDiscoverPageSubtitle,
   buildDiscoverPreSearchBody,
+  buildDiscoverRecommendationFocusCopy,
+  buildDiscoverRecommendationFocusLegend,
+  buildDiscoverRecommendationFocusOptionLabel,
+  buildDiscoverRecommendationFocusSummary,
   buildDiscoverRecommendationsSubtitle,
   buildDiscoverSearchErrorBody,
   buildDiscoverSuggestionsCopy,
@@ -256,6 +260,48 @@ test('buildDiscoverNoSimilarArtistsMessage does not use "picks"', () => {
 
 test('buildDiscoverNoSimilarArtistsMessage is stable across calls', () => {
   assert.equal(buildDiscoverNoSimilarArtistsMessage(), buildDiscoverNoSimilarArtistsMessage());
+});
+
+// ── Recommendation focus controls ────────────────────────────────────────────
+
+test('buildDiscoverRecommendationFocusLegend returns stable non-empty copy', () => {
+  assert.equal(buildDiscoverRecommendationFocusLegend(), buildDiscoverRecommendationFocusLegend());
+  assert.ok(buildDiscoverRecommendationFocusLegend().length > 0);
+});
+
+test('buildDiscoverRecommendationFocusCopy describes a temporary view-only filter', () => {
+  const copy = buildDiscoverRecommendationFocusCopy().toLowerCase();
+  assert.ok(copy.includes('view only'));
+  assert.ok(copy.includes('monitored artist'));
+});
+
+test('buildDiscoverRecommendationFocusOptionLabel includes the artist name', () => {
+  assert.equal(
+    buildDiscoverRecommendationFocusOptionLabel('Boards of Canada'),
+    'Focus recommendations on Boards of Canada',
+  );
+});
+
+test('buildDiscoverRecommendationFocusOptionLabel returns fallback without a name', () => {
+  assert.equal(
+    buildDiscoverRecommendationFocusOptionLabel(null),
+    'Focus recommendations on this monitored artist',
+  );
+});
+
+test('buildDiscoverRecommendationFocusSummary reports all and focused states', () => {
+  assert.equal(
+    buildDiscoverRecommendationFocusSummary({ activeCount: 0, totalCount: 2 }),
+    'Using all 2 monitored artists.',
+  );
+  assert.equal(
+    buildDiscoverRecommendationFocusSummary({ activeCount: 1, totalCount: 2 }),
+    'Focused on 1 monitored artist.',
+  );
+  assert.equal(
+    buildDiscoverRecommendationFocusSummary({ activeCount: 2, totalCount: 2 }),
+    'Focused on 2 monitored artists.',
+  );
 });
 
 // ── buildDiscoverAvatarStyle ──────────────────────────────────────────────────
@@ -607,6 +653,12 @@ test('Discover presentation copy does not expose legacy seed terminology', () =>
     ['monitored band copy', buildDiscoverMonitoredBandCopy()],
     ['suggestions copy', buildDiscoverSuggestionsCopy()],
     ['no similar artists message', buildDiscoverNoSimilarArtistsMessage()],
+    ['recommendation focus legend', buildDiscoverRecommendationFocusLegend()],
+    ['recommendation focus copy', buildDiscoverRecommendationFocusCopy()],
+    ['recommendation focus option', buildDiscoverRecommendationFocusOptionLabel('Radiohead')],
+    ['recommendation focus fallback option', buildDiscoverRecommendationFocusOptionLabel(null)],
+    ['recommendation focus summary all', buildDiscoverRecommendationFocusSummary({ activeCount: 0, totalCount: 2 })],
+    ['recommendation focus summary active', buildDiscoverRecommendationFocusSummary({ activeCount: 1, totalCount: 2 })],
     ['recommendation provenance related', buildRecommendationProvenance({ sources: ['musicbrainz'] }).label],
     ['recommendation provenance listeners', buildRecommendationProvenance({ sources: ['listenbrainz'] }).label],
     ['recommendation provenance combined', buildRecommendationProvenance({ sources: ['both'] }).label],

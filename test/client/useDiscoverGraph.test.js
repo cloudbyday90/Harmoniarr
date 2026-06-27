@@ -97,3 +97,76 @@ test('removeRecommendationInput ignores stale in-flight similarity results', asy
   assert.equal(hasSuggestions.value, false);
   assert.deepEqual(suggestions.value, []);
 });
+
+test('setRecommendationFocusIds narrows suggestions without removing monitored artists', async () => {
+  const {
+    focusedRecommendationInputs,
+    isRecommendationFocusFiltered,
+    recommendationFocusIds,
+    recommendationInputs,
+    setRecommendationFocusIds,
+    suggestions,
+    hydrateRecommendationInputs,
+  } = useDiscoverGraph({
+    fetchSimilar: async (artistId) => {
+      if (artistId === 'boards') {
+        return {
+          similar: [
+            { id: 'aphex', name: 'Aphex Twin', score: 0.7 },
+            { id: 'tycho', name: 'Tycho', score: 0.5 },
+          ],
+        };
+      }
+
+      if (artistId === 'autechre') {
+        return {
+          similar: [
+            { id: 'aphex', name: 'Aphex Twin', score: 0.9 },
+          ],
+        };
+      }
+
+      throw new Error(`Unexpected artist id ${artistId}`);
+    },
+  });
+
+  await hydrateRecommendationInputs([
+    { id: 'boards', name: 'Boards of Canada' },
+    { id: 'autechre', name: 'Autechre' },
+  ]);
+
+  assert.deepEqual(recommendationInputs.value.map((artist) => artist.id), ['boards', 'autechre']);
+  assert.equal(suggestions.value.find((suggestion) => suggestion.id === 'aphex')?.inputCount, 2);
+
+  setRecommendationFocusIds(['boards']);
+
+  assert.equal(isRecommendationFocusFiltered.value, true);
+  assert.deepEqual(recommendationFocusIds.value, ['boards']);
+  assert.deepEqual(focusedRecommendationInputs.value.map((artist) => artist.id), ['boards']);
+  assert.equal(suggestions.value.find((suggestion) => suggestion.id === 'aphex')?.inputCount, 1);
+  assert.deepEqual(
+    suggestions.value.map((suggestion) => suggestion.id),
+    ['aphex', 'tycho'],
+  );
+});
+
+test('removeRecommendationInput prunes stale recommendation focus ids', async () => {
+  const {
+    hydrateRecommendationInputs,
+    recommendationFocusIds,
+    removeRecommendationInput,
+    setRecommendationFocusIds,
+  } = useDiscoverGraph({
+    fetchSimilar: async () => ({ similar: [] }),
+  });
+
+  await hydrateRecommendationInputs([
+    { id: 'boards', name: 'Boards of Canada' },
+    { id: 'autechre', name: 'Autechre' },
+  ]);
+  setRecommendationFocusIds(['boards', 'autechre']);
+
+  removeRecommendationInput('boards');
+
+  assert.deepEqual(recommendationFocusIds.value, ['autechre']);
+});

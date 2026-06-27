@@ -1,8 +1,8 @@
 # Issue #4 — Full App Re-scope: Harmoniarr as a Media Consumption App
 
-## Status: Core Implementation Complete; Plan Reconciliation Active
+## Status: Core Implementation Complete; Follow-Up Split Pending
 
-Last reconciled: 2026-06-02.
+Last reconciled: 2026-06-27.
 
 This document is now the active implementation ledger for Issue #4. The **Implementation Progress** section is the source of truth for shipped work. Historical first-pass language such as "Gaps", "Required", and speculative route/API sketches has moved to the linked archive.
 
@@ -29,7 +29,38 @@ Use this order when reading the plan:
 
 - [x] Add a release-validation evidence map that links each shipped Issue #4 step to its focused tests, browser scenarios, schema checks, and release evidence tasks. See [ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md](ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md).
 - [x] Add browser visual evidence for the highest-risk media surfaces: Library grid/list display modes, Needs Attention actions, Discover recommendations, requester Home, and mobile navigation. Covered by `test/browser/issue-4-visual-evidence.test.js`, which writes screenshots and `manifest.json` under `artifacts/browser-visual-evidence/issue-4-media-surfaces/`.
-- [ ] Create GitHub sub-issues for the remaining follow-up backlog and link them from this plan.
+- [ ] Create GitHub sub-issues for the reconciled follow-up backlog and link them from this plan.
+
+### Reconciliation Summary
+
+As of 2026-06-27, Issue #4's core feature scope is complete. The remaining work
+is not blocking the media-consumption re-scope; it should be tracked as
+follow-up issues rather than kept inside Issue #4 as ambiguous in-progress work.
+
+Confirmed complete:
+
+- requester/operator navigation split
+- requester Home, Discover, Search, My Requests, Missing, Library, Activity, and artist/release detail surfaces
+- release requests, delegated request visibility, request notifications, and cross-user deduplication
+- Release Radar, Coming Soon, wanted state, per-user preferences, and download-result scoring
+- artwork-first grids, responsive/mobile behavior, PWA/push notification support, and visual/browser evidence
+- Discover recommendation model core, including monitored-artist basis, product-language cleanup, add-to-monitored flow, scoring/explainability, operator-scoped wanted state, and monitoring read-path cleanup
+- Discover temporary recommendation-basis filtering, including URL-query focus state, monitored-artist validation, reload persistence, and browser verification
+
+Follow-up issues to create:
+
+1. **Artist Detail bulk-change confirmation thresholds** — add confirmation for
+   unusually large draft bulk operations once the >25 releases / >250 tracks
+   threshold from the Discover model plan is ready for implementation.
+2. **Artist Detail large-catalog filtering and sorting** — revisit section-level
+   filters/sorting after real catalog pressure proves the default grouping is
+   insufficient.
+3. **Operator library removal semantics** — design and implement non-destructive
+   "remove from my view/library" behavior separately from deleting shared media.
+4. **Track-override remap review UX** — surface `review_needed` / `orphaned`
+   track override states when metadata changes make saved track intent ambiguous.
+5. **Plan-governance closure** — create/link GitHub sub-issues for the items
+   above, then close Issue #4 as completed.
 
 ---
 

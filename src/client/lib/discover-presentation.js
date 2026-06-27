@@ -189,6 +189,61 @@ export function buildDiscoverNoSimilarArtistsMessage() {
   return 'No recommendations yet. Add more monitored artists to widen the field.';
 }
 
+/**
+ * Label for the temporary recommendation focus controls.
+ *
+ * @returns {string}
+ */
+export function buildDiscoverRecommendationFocusLegend() {
+  return 'Narrow recommendations';
+}
+
+/**
+ * Helper copy for recommendation focus controls.
+ *
+ * @returns {string}
+ */
+export function buildDiscoverRecommendationFocusCopy() {
+  return 'Choose monitored artists for this view only. Leave all unchecked to use every monitored artist.';
+}
+
+/**
+ * Accessible label for an individual recommendation focus checkbox.
+ *
+ * @param {string|null|undefined} name - Artist name.
+ * @returns {string}
+ */
+export function buildDiscoverRecommendationFocusOptionLabel(name) {
+  if (!name) {
+    return 'Focus recommendations on this monitored artist';
+  }
+  return `Focus recommendations on ${name}`;
+}
+
+/**
+ * Short status text for the active recommendation focus.
+ *
+ * @param {object} counts
+ * @param {number} [counts.activeCount]
+ * @param {number} [counts.totalCount]
+ * @returns {string}
+ */
+export function buildDiscoverRecommendationFocusSummary({
+  activeCount = 0,
+  totalCount = 0,
+} = {}) {
+  if (activeCount === 1) {
+    return 'Focused on 1 monitored artist.';
+  }
+  if (activeCount > 1) {
+    return `Focused on ${activeCount} monitored artists.`;
+  }
+  if (totalCount === 1) {
+    return 'Using 1 monitored artist.';
+  }
+  return `Using all ${totalCount} monitored artists.`;
+}
+
 // ── Recommendation cards ─────────────────────────────────────────────────────
 
 /**

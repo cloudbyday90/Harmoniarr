@@ -20,6 +20,12 @@ import { computed, readonly, ref } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchSimilarArtists } from '../lib/metadata-api.js';
 import { computeSuggestions } from '../lib/discover-graph.js';
+import {
+  filterInputResultsByFocus,
+  filterRecommendationInputsByFocus,
+  isRecommendationFocusActive,
+  normalizeRecommendationFocusIds,
+} from '../lib/discover-recommendation-focus.js';
 
 /**
  * Composable for Discover recommendation traversal.
@@ -52,6 +58,7 @@ export function useDiscoverGraph({
    * Each entry: { id: string (MBID), name: string }.
    */
   const recommendationInputs = ref([]);
+  const recommendationFocusIds = ref([]);
 
   /**
    * Map<mbid, Array<{id, name, score, source}>> holding the fetched similar-
@@ -71,6 +78,22 @@ export function useDiscoverGraph({
 
   /** Derived Set of input MBIDs, used to exclude inputs from suggestions. */
   const recommendationInputIds = computed(() => new Set(recommendationInputs.value.map(a => a.id)));
+  const normalizedRecommendationFocusIds = computed(() =>
+    normalizeRecommendationFocusIds(recommendationFocusIds.value, recommendationInputs.value),
+  );
+  const focusedRecommendationInputs = computed(() =>
+    filterRecommendationInputsByFocus(recommendationInputs.value, normalizedRecommendationFocusIds.value),
+  );
+  const isRecommendationFocusFiltered = computed(() =>
+    isRecommendationFocusActive(normalizedRecommendationFocusIds.value, recommendationInputs.value),
+  );
+  const focusedInputResults = computed(() =>
+    filterInputResultsByFocus(
+      inputResults.value,
+      normalizedRecommendationFocusIds.value,
+      recommendationInputs.value,
+    ),
+  );
 
   /**
    * Ranked list of suggested artists derived from all input results. Inputs
@@ -78,7 +101,7 @@ export function useDiscoverGraph({
    * a summed score so they rank higher.
    */
   const suggestions = computed(() =>
-    computeSuggestions(inputResults.value, recommendationInputIds.value, suggestionLimit),
+    computeSuggestions(focusedInputResults.value, recommendationInputIds.value, suggestionLimit),
   );
 
   const isAnyRecommendationInputLoading = computed(() => loadingRecommendationInputs.value.size > 0);
@@ -100,6 +123,14 @@ export function useDiscoverGraph({
    */
   function isRecommendationInputLoading(artistId) {
     return loadingRecommendationInputs.value.has(artistId);
+  }
+
+  function isRecommendationFocused(artistId) {
+    return normalizedRecommendationFocusIds.value.includes(artistId);
+  }
+
+  function setRecommendationFocusIds(artistIds) {
+    recommendationFocusIds.value = normalizeRecommendationFocusIds(artistIds, recommendationInputs.value);
   }
 
   function hasRecommendationInput(artistId) {
@@ -196,6 +227,7 @@ export function useDiscoverGraph({
    */
   function removeRecommendationInput(artistId) {
     recommendationInputs.value = recommendationInputs.value.filter(a => a.id !== artistId);
+    recommendationFocusIds.value = recommendationFocusIds.value.filter((id) => id !== artistId);
 
     const next = new Map(inputResults.value);
     next.delete(artistId);
@@ -211,6 +243,7 @@ export function useDiscoverGraph({
   /** Reset all graph state. */
   function clearRecommendationInputs() {
     recommendationInputs.value = [];
+    recommendationFocusIds.value = [];
     inputResults.value = new Map();
     loadingRecommendationInputs.value = new Set();
     lastError.value = null;
@@ -219,6 +252,9 @@ export function useDiscoverGraph({
 
   return {
     recommendationInputs: readonly(recommendationInputs),
+    recommendationFocusIds: normalizedRecommendationFocusIds,
+    focusedRecommendationInputs,
+    isRecommendationFocusFiltered,
     suggestions,
     isAnyRecommendationInputLoading,
     hasSuggestions,
@@ -226,6 +262,8 @@ export function useDiscoverGraph({
     lastError: readonly(lastError),
     isRecommendationInput,
     isRecommendationInputLoading,
+    isRecommendationFocused,
+    setRecommendationFocusIds,
     addRecommendationInput,
     hydrateRecommendationInputs,
     removeRecommendationInput,

@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AddArtistModal from '../components/media/AddArtistModal.vue';
 import DiscoverRecommendationsPanel from '../components/media/DiscoverRecommendationsPanel.vue';
 import DiscoverSearchBar from '../components/media/DiscoverSearchBar.vue';
@@ -32,10 +33,17 @@ import { useDebouncedSearch } from '../composables/useDebouncedSearch.js';
 import { useMonitoredArtistSummaries } from '../composables/useMonitoredArtistSummaries.js';
 import { buildArtistDetailLocation } from '../lib/artist-detail-route.js';
 import {
+  buildDiscoverRecommendationFocusQuery,
+  DISCOVER_RECOMMENDATION_FOCUS_QUERY_KEY,
+  normalizeRecommendationFocusIds,
+} from '../lib/discover-recommendation-focus.js';
+import {
   buildDiscoverMonitoredArtistNavAriaLabel,
   buildDiscoverMonitoredArtistsAriaLabel,
   buildDiscoverPageSubtitle,
   buildDiscoverPreSearchBody,
+  buildDiscoverRecommendationFocusOptionLabel,
+  buildDiscoverRecommendationFocusSummary,
   buildDiscoverSearchErrorBody,
   buildRecommendationExplanation,
   buildSearchResultBadgeLabel,
@@ -47,6 +55,8 @@ import {
 } from '../lib/discover-presentation.js';
 import { buildSearchStatusMessage } from '../lib/search-status-message.js';
 
+const route = useRoute();
+const router = useRouter();
 const discoverSearch = useDiscoverSearch();
 const {
   hasSearched,
@@ -83,11 +93,16 @@ const {
 
 const {
   recommendationInputs,
+  recommendationFocusIds,
+  focusedRecommendationInputs,
+  isRecommendationFocusFiltered,
   suggestions,
   isAnyRecommendationInputLoading,
   hasRecommendationInputs,
   lastError: graphError,
   isRecommendationInput,
+  isRecommendationFocused,
+  setRecommendationFocusIds,
   addRecommendationInput,
   hydrateRecommendationInputs,
 } = useDiscoverGraph();
@@ -117,6 +132,22 @@ const monitoredChips = computed(() =>
     to: buildArtistLocation(input),
     ariaLabel: buildDiscoverMonitoredArtistNavAriaLabel(input.name),
   })),
+);
+
+const recommendationFocusControls = computed(() =>
+  recommendationInputs.value.map((input) => ({
+    id: input.id,
+    name: input.name,
+    checked: isRecommendationFocused(input.id),
+    ariaLabel: buildDiscoverRecommendationFocusOptionLabel(input.name),
+  })),
+);
+
+const recommendationFocusSummary = computed(() =>
+  buildDiscoverRecommendationFocusSummary({
+    activeCount: recommendationFocusIds.value.length,
+    totalCount: recommendationInputs.value.length,
+  }),
 );
 
 const recommendationCards = computed(() =>
@@ -182,6 +213,17 @@ const searchStatusMessage = computed(() =>
   }),
 );
 
+watch(
+  () => [
+    route.query[DISCOVER_RECOMMENDATION_FOCUS_QUERY_KEY],
+    recommendationInputs.value.map((input) => input.id).join('|'),
+  ],
+  () => {
+    syncRecommendationFocusFromRoute({ replaceInvalid: true });
+  },
+  { immediate: true },
+);
+
 function openAddArtist(artist) {
   openAddArtistModal(artist, isAddedArtist);
 }
@@ -212,9 +254,52 @@ async function handleFocusReturnUnavailable() {
   recommendationsPanelRef.value?.focusMonitoredArtistChip?.(artistId);
 }
 
+function syncRecommendationFocusFromRoute({ replaceInvalid = false } = {}) {
+  const requestedIds = normalizeRecommendationFocusIds(
+    route.query[DISCOVER_RECOMMENDATION_FOCUS_QUERY_KEY],
+  );
+  const validIds = normalizeRecommendationFocusIds(requestedIds, recommendationInputs.value);
+  setRecommendationFocusIds(validIds);
+
+  if (
+    replaceInvalid
+    && recommendationInputs.value.length > 0
+    && requestedIds.length !== validIds.length
+  ) {
+    void router.replace({
+      query: buildDiscoverRecommendationFocusQuery(route.query, validIds),
+    });
+  }
+}
+
+async function replaceRecommendationFocusQuery(artistIds) {
+  await router.replace({
+    query: buildDiscoverRecommendationFocusQuery(route.query, artistIds),
+  });
+}
+
+function toggleRecommendationFocus({ artistId, checked }) {
+  const nextIds = new Set(recommendationFocusIds.value);
+  if (checked) {
+    nextIds.add(artistId);
+  } else {
+    nextIds.delete(artistId);
+  }
+
+  const normalizedIds = normalizeRecommendationFocusIds([...nextIds], recommendationInputs.value);
+  setRecommendationFocusIds(normalizedIds);
+  void replaceRecommendationFocusQuery(normalizedIds);
+}
+
+function clearRecommendationFocus() {
+  setRecommendationFocusIds([]);
+  void replaceRecommendationFocusQuery([]);
+}
+
 onMounted(async () => {
   await loadMonitoredArtists();
   await hydrateRecommendationInputs(monitoredArtists.value);
+  syncRecommendationFocusFromRoute({ replaceInvalid: true });
 });
 
 onBeforeUnmount(() => {
@@ -262,6 +347,7 @@ function buildArtistLocation(artist) {
 
       <div class="discover-counts" role="list" aria-label="Discover summary">
         <span class="hx-pill" data-tone="success" role="listitem">{{ recommendationInputs.length }} monitored</span>
+        <span v-if="isRecommendationFocusFiltered" class="hx-pill" data-tone="info" role="listitem">{{ focusedRecommendationInputs.length }} focused</span>
         <span class="hx-pill" data-tone="info" role="listitem">{{ suggestions.length }} recommended</span>
         <span class="hx-pill" role="listitem">{{ results.length }} results</span>
         <span v-if="isAnyRecommendationInputLoading || isResolvingArtistArtwork" class="hx-pill" data-tone="warning" role="listitem">Refreshing</span>
@@ -277,7 +363,12 @@ function buildArtistLocation(artist) {
       :error-message="graphError"
       :monitored-aria-label="buildDiscoverMonitoredArtistsAriaLabel()"
       :artwork-loading="isResolvingArtistArtwork"
+      :focus-controls="recommendationFocusControls"
+      :focus-active="isRecommendationFocusFiltered"
+      :focus-summary="recommendationFocusSummary"
       @add="openAddArtist"
+      @toggle-focus="toggleRecommendationFocus"
+      @clear-focus="clearRecommendationFocus"
     />
 
     <EmptyState

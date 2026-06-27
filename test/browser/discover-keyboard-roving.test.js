@@ -156,10 +156,26 @@ suite('Discover browser keyboard roving coverage', () => {
       const refreshedRecommendationCells = recommendationList.locator(cardCellSelector);
       const activeRecommendationIndex = await getRovingActiveIndex(recommendationList, cardCellSelector);
       assert.ok(activeRecommendationIndex >= 0, 'expected one active recommendation card');
+      const boardsFocusCheckbox = page.getByRole('checkbox', {
+        name: 'Focus recommendations on Boards of Canada',
+      });
+      const autechreFocusCheckbox = page.getByRole('checkbox', {
+        name: 'Focus recommendations on Autechre',
+      });
 
       await page.getByRole('button', { name: 'Search' }).focus();
       await page.keyboard.press('Tab');
       await assertLocatorFocused(monitoredChips.nth(0), 'Tab should enter the monitored-artist band at one chip');
+      await page.keyboard.press('Tab');
+      await assertLocatorFocused(
+        boardsFocusCheckbox,
+        'Tab should move from the monitored-artist band to recommendation focus controls',
+      );
+      await page.keyboard.press('Tab');
+      await assertLocatorFocused(
+        autechreFocusCheckbox,
+        'Tab should traverse each recommendation focus checkbox before the grid',
+      );
       await page.keyboard.press('Tab');
       await assertLocatorFocused(
         refreshedRecommendationCells.nth(activeRecommendationIndex),

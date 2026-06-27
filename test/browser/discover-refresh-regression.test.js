@@ -36,8 +36,8 @@ async function assertDiscoverHydratedFromTwoMonitoredArtists(page) {
   await page.getByRole('list', { name: 'Discover summary' }).getByText('2 monitored').waitFor();
 
   const monitoredArtistsList = page.getByRole('list', { name: 'Your monitored artists' });
-  await monitoredArtistsList.getByRole('listitem', { name: 'View Boards of Canada' }).waitFor();
-  await monitoredArtistsList.getByRole('listitem', { name: 'View Autechre' }).waitFor();
+  await monitoredArtistsList.getByRole('link', { name: 'View Boards of Canada' }).waitFor();
+  await monitoredArtistsList.getByRole('link', { name: 'View Autechre' }).waitFor();
 
   const sharedRecommendationCard = page.getByRole('link', { name: /Aphex Twin/ });
   await sharedRecommendationCard.waitFor();

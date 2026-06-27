@@ -27,6 +27,8 @@ import PaginatedArtworkGrid from './PaginatedArtworkGrid.vue';
 import {
   buildDiscoverMonitoredBandCopy,
   buildDiscoverNoSimilarArtistsMessage,
+  buildDiscoverRecommendationFocusCopy,
+  buildDiscoverRecommendationFocusLegend,
   buildDiscoverRecommendationsSubtitle,
   buildDiscoverSuggestionsCopy,
 } from '../../lib/discover-presentation.js';
@@ -59,9 +61,21 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  focusControls: {
+    type: Array,
+    default: () => [],
+  },
+  focusActive: {
+    type: Boolean,
+    default: false,
+  },
+  focusSummary: {
+    type: String,
+    default: '',
+  },
 });
 
-defineEmits(['add']);
+defineEmits(['add', 'clear-focus', 'toggle-focus']);
 
 // Roving tabindex over the monitored-artist chip band: one chip is the single
 // tab stop, Left/Right (and Home/End) move focus, the rest leave the tab order.
@@ -150,6 +164,42 @@ defineExpose({ focusMonitoredArtistChip });
             </RouterLink>
           </li>
         </ul>
+
+        <div v-if="focusControls.length > 1" class="discover-focus-filter">
+          <div class="discover-focus-filter__header">
+            <div class="discover-focus-filter__intro">
+              <span class="discover-summary-card__label">{{ buildDiscoverRecommendationFocusLegend() }}</span>
+              <p class="discover-focus-filter__copy">{{ buildDiscoverRecommendationFocusCopy() }}</p>
+            </div>
+            <button
+              v-if="focusActive"
+              type="button"
+              class="hx-btn"
+              data-variant="ghost"
+              @click="$emit('clear-focus')"
+            >
+              Use all monitored artists
+            </button>
+          </div>
+
+          <p class="discover-focus-filter__summary">{{ focusSummary }}</p>
+
+          <div class="discover-focus-filter__options" role="group" aria-label="Temporary recommendation focus">
+            <label
+              v-for="control in focusControls"
+              :key="control.id"
+              class="discover-focus-filter__option"
+            >
+              <input
+                type="checkbox"
+                :checked="control.checked"
+                :aria-label="control.ariaLabel"
+                @change="$emit('toggle-focus', { artistId: control.id, checked: $event.target.checked })"
+              />
+              <span>{{ control.name }}</span>
+            </label>
+          </div>
+        </div>
       </section>
 
       <p v-if="errorMessage" class="discover-graph-card__error" role="alert">
@@ -231,11 +281,62 @@ defineExpose({ focusMonitoredArtistChip });
 }
 
 .discover-monitored-band__copy,
-.discover-suggestions__copy {
+.discover-suggestions__copy,
+.discover-focus-filter__copy,
+.discover-focus-filter__summary {
   margin: 0;
   font-size: var(--hx-text-sm);
   color: var(--hx-text-muted);
   line-height: 1.55;
+}
+
+.discover-focus-filter {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding-top: var(--hx-space-3);
+  border-top: 1px solid var(--hx-border-subtle);
+}
+
+.discover-focus-filter__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+}
+
+.discover-focus-filter__intro {
+  display: grid;
+  gap: var(--hx-space-1);
+}
+
+.discover-focus-filter__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+
+.discover-focus-filter__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: 36px;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--hx-radius-pill);
+  border: 1px solid var(--hx-border);
+  background: var(--hx-bg-surface);
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+}
+
+.discover-focus-filter__option input {
+  margin: 0;
+  accent-color: var(--hx-accent);
+}
+
+.discover-focus-filter__option:has(input:focus-visible) {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
 }
 
 .discover-monitored-list {
