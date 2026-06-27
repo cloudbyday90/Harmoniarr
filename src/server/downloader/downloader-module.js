@@ -22,10 +22,12 @@ import { createDownloaderActionService } from './downloader-action-service.js';
 export function createDownloaderModule({
   downloaderActionService = null,
   downloaderQueueReadModelService = null,
+  slskdConfigService = null,
   slskdService,
 } = {}) {
   const resolvedDownloaderQueueReadModelService = downloaderQueueReadModelService
     ?? createDownloaderQueueReadModelService({
+      getDownloaderProviderStatus: slskdConfigService?.buildSecretStatus,
       getDownloads: slskdService?.getDownloads,
     });
   const resolvedDownloaderActionService = downloaderActionService

@@ -135,6 +135,20 @@ function resolveBinaryName(value, fallback) {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
+async function getSlskdDependencyStatus({ slskdConfigService, slskdService }) {
+  const providerStatus = await slskdConfigService.buildSecretStatus();
+  if (providerStatus.apiKeyConfigured !== true) {
+    return {
+      provider: 'slskd',
+      status: 'disabled',
+      code: 'slskd_not_configured',
+      message: 'Configure Soulseek (slskd) in Settings to enable downloads.',
+    };
+  }
+
+  return slskdService.getConnectionStatus();
+}
+
 export function createApp({
   appPort = parsePort(process.env.APP_PORT, 3000),
   clientDistDir,
@@ -249,6 +263,7 @@ export function createApp({
   const operationsModule = buildOperationsModule();
   const slskdModule = buildSlskdModule({ providerHealthRecorder, slskdConfigService });
   const downloaderModule = buildDownloaderModule({
+    slskdConfigService,
     slskdService: slskdModule.slskdService,
   });
   const restoreScopeRuntimeSnapshotStore = createRestoreScopeRuntimeSnapshotStore();
@@ -568,7 +583,10 @@ export function createApp({
       },
       {
         provider: 'slskd',
-        check: slskdModule.slskdService.getConnectionStatus,
+        check: () => getSlskdDependencyStatus({
+          slskdConfigService,
+          slskdService: slskdModule.slskdService,
+        }),
       },
     ],
   });

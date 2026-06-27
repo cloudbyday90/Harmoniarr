@@ -104,6 +104,7 @@ export function formatDependencyProviderLabel(provider) {
 
 const STATUS_LABELS = {
   degraded: 'Degraded',
+  disabled: 'Disabled',
   healthy: 'Healthy',
   misconfigured: 'Misconfigured',
   rate_limited: 'Rate limited',
@@ -120,6 +121,7 @@ export function getDependencyStatusClass(status) {
     case 'healthy':
       return 'review-status-selected';
     case 'degraded':
+    case 'disabled':
     case 'rate_limited':
       return 'review-status-held';
     case 'unavailable':

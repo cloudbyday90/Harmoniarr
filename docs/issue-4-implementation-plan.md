@@ -51,6 +51,9 @@ Confirmed complete:
 - Track-override remap review UX, including section filtering, card-level review indicators, Release Detail review notes, row-level matched-track status, and browser verification
 - Track-override remap repair workflow, including matched-track resolution and stale override clearing through the existing Artist Policy draft/save boundary
 - Operator audit visibility for saved Artist Policy changes, including bounded `artist_policy_saved` Activity events, repaired/cleared track-review counts, snapshot/reconciliation context, and Artist Detail feed links
+- Artist Policy Activity trail browser verification, including reviewed track
+  override repair, Artist Policy save, `artist_policy_saved` Activity-row proof,
+  and Activity link-back to Artist Detail
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See

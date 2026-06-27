@@ -56,7 +56,14 @@ suite('createApp', () => {
     musicBrainzSearchService: { checkProviderHealth: t.mock.fn(async () => ({ provider: 'musicbrainz', status: 'healthy', message: 'MusicBrainz lookups are reachable.' })) },
     routeDependencies: { metadata: 'deps' },
   };
-  const slskdConfigService = { buildRuntimeConfig: t.mock.fn(async () => ({ })) };
+  let slskdApiKeyConfigured = true;
+  const slskdConfigService = {
+    buildRuntimeConfig: t.mock.fn(async () => ({ })),
+    buildSecretStatus: t.mock.fn(async () => ({
+      apiKeyConfigured: slskdApiKeyConfigured,
+      apiKeySource: slskdApiKeyConfigured ? 'stored' : 'unset',
+    })),
+  };
   const settingsService = { buildSettingsPayload: () => {}, updateSettings: () => {} };
   const slskdTransferSnapshotService = {
     buildTransferSnapshot: () => {},
@@ -216,6 +223,7 @@ suite('createApp', () => {
   assert.equal(typeof metadataModuleArgs.providerHealthRecorder.recordSuccess, 'function');
   assert.equal(slskdModuleArgs.providerHealthRecorder, metadataModuleArgs.providerHealthRecorder);
   assert.equal(slskdModuleArgs.slskdConfigService, slskdConfigService);
+  assert.equal(downloaderModuleArgs.slskdConfigService, slskdConfigService);
   assert.equal(downloaderModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(importCandidateModuleArgs.slskdService, slskdModule.slskdService);
   assert.equal(importCandidateModuleArgs.slskdTransferSnapshotService, slskdTransferSnapshotService);
@@ -326,6 +334,24 @@ suite('createApp', () => {
         isLoggedIn: true,
         isTransitioning: false,
       },
+      observedAt: '<observed-at>',
+    },
+  );
+  slskdApiKeyConfigured = false;
+  const disabledSlskdHealth = await systemModuleArgs.dependencyHealthService.getDependencyHealth({
+    providers: ['slskd'],
+  });
+  assert.equal(slskdModule.slskdService.getConnectionStatus.mock.callCount(), 1);
+  assert.deepEqual(
+    {
+      ...disabledSlskdHealth[0],
+      observedAt: '<observed-at>',
+    },
+    {
+      provider: 'slskd',
+      status: 'disabled',
+      code: 'slskd_not_configured',
+      message: 'Configure Soulseek (slskd) in Settings to enable downloads.',
       observedAt: '<observed-at>',
     },
   );

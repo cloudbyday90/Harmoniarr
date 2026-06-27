@@ -2590,6 +2590,7 @@ Use this section for incremental updates during implementation.
 - 2026-06-27: Track-override remap repair workflow implemented. `TRACK_OVERRIDE_REMAP_REPAIR_WORKFLOW_DESIGN.md` records the official WAI/WCAG, Vue, Playwright, and OWASP source review plus the selected existing-save-boundary stack. Release Detail now lets operators keep a matched reviewed track or clear stale reviewed overrides from the Artist Policy draft; persistence still occurs through Save Policy.
 - 2026-06-27: Artist Policy audit visibility implemented. `ARTIST_POLICY_AUDIT_VISIBILITY_DESIGN.md` records the official OWASP, Express, PostgreSQL, Vue, and Playwright source review plus the selected append-only Activity event stack. Saved Artist Policy changes now emit `artist_policy_saved` events with bounded change summaries, repaired/cleared track-review counts, snapshot/reconciliation context, and Activity feed links back to Artist Detail.
 - 2026-06-27: Docker-backed schema generation implemented. `DOCKER_SCHEMA_GENERATION_DESIGN.md` records the official Testcontainers, Docker, and PostgreSQL source review plus the selected disposable PostgreSQL stack. Database-backed schema commands now replay migrations and validate the committed snapshot against fresh Docker PostgreSQL instances instead of ambient local database credentials.
+- 2026-06-27: Artist Policy Activity trail browser verification implemented. `ARTIST_POLICY_ACTIVITY_TRAIL_BROWSER_VERIFICATION_DESIGN.md` records the official Playwright, Vue, WAI-ARIA, and OWASP source review plus the selected focused-browser stack. Browser coverage now repairs a reviewed track override, saves Artist Policy, verifies the `artist_policy_saved` Activity row, and follows `Open artist policy` back to Artist Detail.
 
 ## Checklist
 
@@ -2619,4 +2620,5 @@ Use this section for incremental updates during implementation.
 - [x] Temporary recommendation-basis filtering implemented
 - [x] Artist Detail bulk-change confirmation thresholds implemented
 - [x] Artist Detail large-catalog filtering and sorting implemented
+- [x] Artist Policy Activity trail browser verification implemented
 - [ ] Create linked GitHub follow-up issues for the remaining non-blocking enhancements

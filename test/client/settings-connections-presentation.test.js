@@ -258,6 +258,10 @@ describe('formatDependencyStatusLabel', () => {
     assert.equal(formatDependencyStatusLabel('degraded'), 'Degraded');
   });
 
+  it('returns "Disabled" for disabled', () => {
+    assert.equal(formatDependencyStatusLabel('disabled'), 'Disabled');
+  });
+
   it('returns "Unavailable" for unavailable', () => {
     assert.equal(formatDependencyStatusLabel('unavailable'), 'Unavailable');
   });
@@ -288,6 +292,10 @@ describe('getDependencyStatusClass', () => {
 
   it('returns held class for degraded', () => {
     assert.equal(getDependencyStatusClass('degraded'), 'review-status-held');
+  });
+
+  it('returns held class for disabled', () => {
+    assert.equal(getDependencyStatusClass('disabled'), 'review-status-held');
   });
 
   it('returns held class for rate_limited', () => {

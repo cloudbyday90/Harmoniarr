@@ -61,6 +61,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   track-review counts, snapshot revision, reconciliation run id, and a link back
   to Artist Detail without storing the full draft body. See
   `ARTIST_POLICY_AUDIT_VISIBILITY_DESIGN.md`.
+- Artist Policy Activity trail browser verification: added focused browser
+  coverage for the saved-policy trail. The suite repairs a reviewed track
+  override from Release Detail, saves Artist Policy, verifies the
+  `artist_policy_saved` Activity row and bounded repair summary, then follows
+  `Open artist policy` back to Artist Detail. See
+  `ARTIST_POLICY_ACTIVITY_TRAIL_BROWSER_VERIFICATION_DESIGN.md`.
 - Activity releases/wanted browser verification: added focused Playwright
   coverage for Activity Releases recent/upcoming card grids using a deterministic
   release-radar fixture, proving roving movement, visible focus, active-card

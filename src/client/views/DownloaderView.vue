@@ -29,6 +29,11 @@ import {
   fetchDownloaderQueue,
   requestDownloaderTransferAction,
 } from '../lib/downloader-api.js';
+import {
+  buildDownloaderActivitySummary,
+  buildDownloaderEmptyState,
+  isDownloaderProviderDisabled,
+} from '../lib/downloader-presentation.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const POLL_INTERVAL_MS = 5000;
@@ -57,6 +62,7 @@ const {
   project: (payload) => (payload && typeof payload === 'object' ? payload : null),
   initialData: null,
   pollIntervalMs: POLL_INTERVAL_MS,
+  pollWhile: (queue) => !isDownloaderProviderDisabled(queue),
   fallbackErrorMessage: 'Failed to load downloads',
 });
 
@@ -76,9 +82,9 @@ const allFiles = computed(() => (
 ));
 const counts = computed(() => downloaderQueue.value?.queueHealth?.counts ?? emptyCounts);
 
-const activitySummary = computed(() =>
-  downloaderQueue.value?.queueHealth?.message ?? 'No transfers are currently visible.',
-);
+const providerDisabled = computed(() => isDownloaderProviderDisabled(downloaderQueue.value));
+const activitySummary = computed(() => buildDownloaderActivitySummary(downloaderQueue.value));
+const emptyState = computed(() => buildDownloaderEmptyState(downloaderQueue.value));
 
 const statusCards = computed(() => [
   { key: 'active', label: 'Active', value: counts.value.active, tone: counts.value.active > 0 ? 'warning' : 'info' },
@@ -139,7 +145,7 @@ function closeTransferDetail() {
 }
 
 async function performTransferAction(action) {
-  if (!selectedTransfer.value || pendingAction.value) return;
+  if (!selectedTransfer.value || pendingAction.value || providerDisabled.value) return;
   actionErrorMessage.value = '';
   pendingAction.value = action;
   try {
@@ -158,7 +164,7 @@ async function performTransferAction(action) {
 }
 
 async function clearCompletedTransfers() {
-  if (pendingAction.value) return;
+  if (pendingAction.value || providerDisabled.value) return;
   actionErrorMessage.value = '';
   pendingAction.value = 'clear_completed';
   try {
@@ -189,12 +195,12 @@ async function clearCompletedTransfers() {
           type="button"
           class="hx-btn"
           data-variant="ghost"
-          :disabled="pendingAction === 'clear_completed' || clearableTransferCount < 1"
+          :disabled="providerDisabled || pendingAction === 'clear_completed' || clearableTransferCount < 1"
           @click="clearCompletedTransfers"
         >
           {{ pendingAction === 'clear_completed' ? 'Clearing...' : 'Clear Completed' }}
         </button>
-        <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
+        <button type="button" class="hx-btn" @click="load" :disabled="isLoading || providerDisabled">
           {{ isLoading ? 'Loading…' : 'Refresh' }}
         </button>
       </div>
@@ -256,8 +262,13 @@ async function clearCompletedTransfers() {
           </div>
         </div>
         <div v-else-if="!allFiles.length" class="hx-empty">
-          <p class="hx-empty-title">No downloads in flight</p>
-          <p class="hx-empty-copy">Files queued from Search or import review will appear here.</p>
+          <p class="hx-empty-title">{{ emptyState.title }}</p>
+          <p class="hx-empty-copy">{{ emptyState.body }}</p>
+          <div v-if="emptyState.actionRouteName && emptyState.actionLabel" class="hx-empty-actions">
+            <RouterLink class="hx-btn" :to="{ name: emptyState.actionRouteName }">
+              {{ emptyState.actionLabel }}
+            </RouterLink>
+          </div>
         </div>
         <div v-else-if="!visibleFiles.length" class="hx-empty">
           <p class="hx-empty-title">No transfers match this filter</p>
@@ -378,6 +389,12 @@ async function clearCompletedTransfers() {
   width: 150px;
   height: 8px;
   accent-color: var(--hx-accent);
+}
+
+.downloader-page .hx-empty-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--hx-space-4);
 }
 
 .downloader-detail-button {

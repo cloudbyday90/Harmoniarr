@@ -18,6 +18,7 @@
 
 const dependencyStatusLabels = {
   degraded: 'Degraded',
+  disabled: 'Disabled',
   healthy: 'Healthy',
   misconfigured: 'Misconfigured',
   unavailable: 'Unavailable',

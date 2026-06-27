@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildDownloaderQueueReadModelFromDownloads,
+  buildDisabledDownloaderQueueReadModel,
   createDownloaderQueueReadModelService,
 } from '../../src/server/downloader/downloader-queue-read-model-service.js';
 
@@ -55,6 +56,15 @@ test('buildDownloaderQueueReadModelFromDownloads normalizes transfers, counts, p
   });
 
   assert.equal(result.provider, 'slskd');
+  assert.deepEqual(result.providerState, {
+    enabled: true,
+    configured: true,
+    message: 'Download provider is configured.',
+    reason: null,
+    status: 'enabled',
+    apiKeySource: null,
+    apiKeyUpdatedAt: null,
+  });
   assert.equal(result.observedAt, observedAt);
   assert.equal(result.includeRemoved, true);
   assert.equal(result.truncated, false);
@@ -152,7 +162,7 @@ test('buildDownloaderQueueReadModelFromDownloads reports idle empty queues', () 
   });
 
   assert.equal(result.queueHealth.status, 'idle');
-  assert.equal(result.queueHealth.message, 'No transfers are currently visible.');
+  assert.equal(result.queueHealth.message, 'No active downloads right now.');
   assert.deepEqual(result.queueHealth.progress, {
     bytesTransferred: null,
     percentComplete: null,
@@ -173,21 +183,97 @@ test('buildDownloaderQueueReadModelFromDownloads caps rows and reports truncatio
   assert.equal(result.queueHealth.counts.total, 2);
 });
 
+test('buildDisabledDownloaderQueueReadModel reports static setup state', () => {
+  const result = buildDisabledDownloaderQueueReadModel({
+    includeRemoved: true,
+    now: () => observedAt,
+    providerStatus: {
+      apiKeyConfigured: false,
+      apiKeySource: 'unset',
+    },
+  });
+
+  assert.equal(result.provider, 'slskd');
+  assert.equal(result.observedAt, observedAt);
+  assert.equal(result.includeRemoved, true);
+  assert.deepEqual(result.providerState, {
+    enabled: false,
+    configured: false,
+    message: 'Configure Soulseek (slskd) in Settings to enable downloads.',
+    reason: 'missing_api_key',
+    status: 'disabled',
+    apiKeySource: 'unset',
+    apiKeyUpdatedAt: null,
+  });
+  assert.equal(result.queueHealth.status, 'disabled');
+  assert.equal(result.queueHealth.message, 'Downloads are disabled until Soulseek (slskd) is configured.');
+  assert.deepEqual(result.queueHealth.counts, {
+    active: 0,
+    completed: 0,
+    failed: 0,
+    other: 0,
+    queued: 0,
+    total: 0,
+  });
+  assert.deepEqual(result.transfers, []);
+  assert.deepEqual(result.sourceGroups, []);
+  assert.equal(result.truncated, false);
+});
+
 test('createDownloaderQueueReadModelService delegates to getDownloads and normalizes includeRemoved', async (t) => {
   const getDownloads = t.mock.fn(async ({ includeRemoved }) => {
     assert.equal(includeRemoved, true);
     return sampleDownloads();
   });
+  const getDownloaderProviderStatus = t.mock.fn(async () => ({
+    apiKeyConfigured: true,
+    apiKeySource: 'stored',
+    apiKeyUpdatedAt: '2026-06-01T12:00:00.000Z',
+  }));
   const service = createDownloaderQueueReadModelService({
+    getDownloaderProviderStatus,
     getDownloads,
     now: () => observedAt,
   });
 
   const result = await service.buildDownloaderQueue({ includeRemoved: '1' });
 
+  assert.equal(getDownloaderProviderStatus.mock.callCount(), 1);
   assert.equal(getDownloads.mock.callCount(), 1);
   assert.equal(result.includeRemoved, true);
+  assert.deepEqual(result.providerState, {
+    enabled: true,
+    configured: true,
+    message: 'Download provider is configured.',
+    reason: null,
+    status: 'enabled',
+    apiKeySource: 'stored',
+    apiKeyUpdatedAt: '2026-06-01T12:00:00.000Z',
+  });
   assert.equal(result.transfers.length, 3);
+});
+
+test('createDownloaderQueueReadModelService does not call slskd when provider is unconfigured', async (t) => {
+  const getDownloads = t.mock.fn(async () => {
+    throw new Error('slskd should not be called');
+  });
+  const getDownloaderProviderStatus = t.mock.fn(async () => ({
+    apiKeyConfigured: false,
+    apiKeySource: 'unset',
+  }));
+  const service = createDownloaderQueueReadModelService({
+    getDownloaderProviderStatus,
+    getDownloads,
+    now: () => observedAt,
+  });
+
+  const result = await service.buildDownloaderQueue();
+
+  assert.equal(getDownloaderProviderStatus.mock.callCount(), 1);
+  assert.equal(getDownloads.mock.callCount(), 0);
+  assert.equal(result.providerState.enabled, false);
+  assert.equal(result.queueHealth.status, 'disabled');
+  assert.deepEqual(result.transfers, []);
 });
 
 test('createDownloaderQueueReadModelService requires a getDownloads dependency', () => {

@@ -56,5 +56,7 @@ Reviewed URLs:
 
 ## Follow-Up
 
-The next high-value follow-up is browser verification for the saved policy activity trail: repair a track override, save policy, open Activity, confirm the `artist_policy_saved` entry, and use the feed link to return to Artist Detail.
-
+The saved policy Activity trail browser verification is complete. Operators can
+repair a reviewed track override, save policy, open Activity, confirm the
+`artist_policy_saved` entry, and use the feed link to return to Artist Detail.
+See `ARTIST_POLICY_ACTIVITY_TRAIL_BROWSER_VERIFICATION_DESIGN.md`.

@@ -904,6 +904,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
 
       return {
         addedArtistIds: [],
+        activityEvents: [],
         autechreIsAdded: false,
         boardsIsAdded: false,
         boardsOperatorProjection: operatorProjectionsByMusicBrainzId['mb-artist-boards'],
@@ -1035,6 +1036,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
     function persistFixtureState() {
       globalThis.sessionStorage.setItem(fixtureStateStorageKey, JSON.stringify({
         addedArtistIds: getAddedArtistIds(),
+        activityEvents: Array.isArray(state.activityEvents) ? state.activityEvents : [],
         autechreIsAdded: state.autechreIsAdded,
         boardsIsAdded: state.boardsIsAdded,
         boardsOperatorProjection: state.boardsOperatorProjection,
@@ -2108,6 +2110,84 @@ export async function installMetadataBrowserFixtures(browserContext) {
       };
     }
 
+    function buildTrackOverrideActivityCounts(previousTrackOverrides = [], nextTrackOverrides = []) {
+      const nextByRecordingMbid = new Map(
+        nextTrackOverrides
+          .filter((override) => override.recordingMbid)
+          .map((override) => [override.recordingMbid, override]),
+      );
+      let resolvedReviewCount = 0;
+      let clearedReviewCount = 0;
+
+      for (const previousOverride of previousTrackOverrides) {
+        if (previousOverride.remapStatus !== 'review_needed') {
+          continue;
+        }
+
+        const nextOverride = previousOverride.recordingMbid
+          ? nextByRecordingMbid.get(previousOverride.recordingMbid)
+          : null;
+        if (!nextOverride) {
+          clearedReviewCount += 1;
+        } else if (nextOverride.remapStatus === 'resolved') {
+          resolvedReviewCount += 1;
+        }
+      }
+
+      return {
+        added: Math.max(0, nextTrackOverrides.length - previousTrackOverrides.length),
+        changed: resolvedReviewCount,
+        clearedReviewCount,
+        removed: Math.max(0, previousTrackOverrides.length - nextTrackOverrides.length),
+        resolvedReviewCount,
+      };
+    }
+
+    function recordArtistPolicyActivityEvent({
+      artistFixture,
+      nextProjection,
+      previousProjection,
+    }) {
+      const previousTrackOverrides = previousProjection?.operator?.trackOverrides ?? [];
+      const nextTrackOverrides = nextProjection?.operator?.trackOverrides ?? [];
+      const eventIndex = state.operatorSaveCount ?? 1;
+      const pendingRun = nextProjection?.operator?.reconciliation?.pendingRun ?? null;
+      const event = {
+        actorUserId: 'fixture-admin-user',
+        entityArtist: null,
+        entityId: artistFixture.localPayload.artist.id,
+        entityTitle: artistFixture.localPayload.artist.name,
+        entityType: 'metadata_artist',
+        eventType: 'artist_policy_saved',
+        extraPayload: {
+          artistId: artistFixture.localPayload.artist.id,
+          artistMusicBrainzId: artistFixture.musicBrainzArtistId,
+          changes: {
+            monitoring: { changedFieldCount: 0 },
+            releaseGroups: { added: 0, changed: 0, removed: 0 },
+            trackOverrides: buildTrackOverrideActivityCounts(previousTrackOverrides, nextTrackOverrides),
+          },
+          reconciliation: pendingRun
+            ? {
+              queuedBehindRun: false,
+              runId: pendingRun.id,
+            }
+            : null,
+          schemaVersion: 1,
+          snapshot: {
+            snapshotRevision: state.operatorSaveCount ?? 0,
+          },
+        },
+        id: `fixture-artist-policy-event-${eventIndex}`,
+        occurredAt: `2026-06-27T12:${String(eventIndex).padStart(2, '0')}:00.000Z`,
+      };
+
+      state.activityEvents = [
+        event,
+        ...(Array.isArray(state.activityEvents) ? state.activityEvents : []),
+      ];
+    }
+
     function updateOperatorProjectionFromDraft(localArtistId, draft) {
       const artistFixture = getArtistFixtureByLocalId(localArtistId);
       if (!artistFixture) {
@@ -2137,7 +2217,13 @@ export async function installMetadataBrowserFixtures(browserContext) {
       markArtistAsAdded(artistFixture.musicBrainzArtistId);
       if (artistFixture.musicBrainzArtistId === 'mb-artist-boards') {
         state.boardsOperatorProjection = nextProjection;
+        state.boardsTrackOverrideReviewNeeded = (nextProjection.operator?.overview?.reviewNeededTrackOverrideCount ?? 0) > 0;
       }
+      recordArtistPolicyActivityEvent({
+        artistFixture,
+        nextProjection,
+        previousProjection,
+      });
       persistFixtureState();
       return nextProjection;
     }
@@ -2155,6 +2241,25 @@ export async function installMetadataBrowserFixtures(browserContext) {
           ?? 'GET',
       ).toUpperCase();
       const path = url.pathname;
+
+      if (method === 'GET' && path === '/api/v1/activity/feed') {
+        Object.assign(state, loadFixtureState());
+        const eventType = url.searchParams.get('eventType');
+        const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '50', 10);
+        const limit = Number.isInteger(requestedLimit)
+          ? Math.max(1, Math.min(requestedLimit, 200))
+          : 50;
+        const events = (Array.isArray(state.activityEvents) ? state.activityEvents : [])
+          .filter((event) => !eventType || event.eventType === eventType)
+          .slice(0, limit);
+
+        return buildJsonResponse({
+          checkedAt: '2026-06-27T12:30:00.000Z',
+          events: clone(events),
+          ok: true,
+          total: events.length,
+        });
+      }
 
       if (method === 'GET' && path === '/api/v1/users') {
         Object.assign(state, loadFixtureState());
@@ -2584,6 +2689,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
       }
 
       if (method === 'PUT' && path.startsWith('/api/v1/metadata/artists/') && path.endsWith('/operator')) {
+        Object.assign(state, loadFixtureState());
         const localArtistId = decodeURIComponent(
           path.slice('/api/v1/metadata/artists/'.length, -'/operator'.length),
         );

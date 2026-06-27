@@ -168,7 +168,7 @@ function buildQueueHealthMessage(counts) {
   }
 
   if (counts.total === 0) {
-    return 'No transfers are currently visible.';
+    return 'No active downloads right now.';
   }
 
   return `${counts.total} transfer${counts.total === 1 ? '' : 's'} have an unrecognized state.`;
@@ -223,10 +223,65 @@ function normalizeMaxTransferRows(value) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : defaultMaxTransferRows;
 }
 
+function buildEnabledProviderState(providerStatus = {}) {
+  return {
+    enabled: true,
+    configured: true,
+    message: 'Download provider is configured.',
+    reason: null,
+    status: 'enabled',
+    apiKeySource: normalizeString(providerStatus.apiKeySource),
+    apiKeyUpdatedAt: normalizeTimestamp(providerStatus.apiKeyUpdatedAt),
+  };
+}
+
+function buildDisabledProviderState(providerStatus = {}) {
+  return {
+    enabled: false,
+    configured: false,
+    message: 'Configure Soulseek (slskd) in Settings to enable downloads.',
+    reason: providerStatus.apiKeyConfigured === false ? 'missing_api_key' : 'not_configured',
+    status: 'disabled',
+    apiKeySource: normalizeString(providerStatus.apiKeySource),
+    apiKeyUpdatedAt: normalizeTimestamp(providerStatus.apiKeyUpdatedAt),
+  };
+}
+
+export function buildDisabledDownloaderQueueReadModel({
+  includeRemoved = false,
+  now = () => new Date(),
+  providerStatus = {},
+} = {}) {
+  const observedAt = normalizeObservedAt(now);
+  const counts = createEmptyCounts();
+
+  return {
+    includeRemoved: normalizeBoolean(includeRemoved, false),
+    observedAt,
+    provider: 'slskd',
+    providerState: buildDisabledProviderState(providerStatus),
+    queueHealth: {
+      averageSpeed: 0,
+      counts,
+      message: 'Downloads are disabled until Soulseek (slskd) is configured.',
+      progress: {
+        bytesTransferred: null,
+        percentComplete: null,
+        size: null,
+      },
+      status: 'disabled',
+    },
+    sourceGroups: [],
+    transfers: [],
+    truncated: false,
+  };
+}
+
 export function buildDownloaderQueueReadModelFromDownloads(downloadGroups, {
   includeRemoved = false,
   maxTransferRows = defaultMaxTransferRows,
   now = () => new Date(),
+  providerStatus = {},
 } = {}) {
   const observedAt = normalizeObservedAt(now);
   const allTransfers = flattenDownloadGroups(downloadGroups);
@@ -240,6 +295,7 @@ export function buildDownloaderQueueReadModelFromDownloads(downloadGroups, {
     includeRemoved: normalizeBoolean(includeRemoved, false),
     observedAt,
     provider: 'slskd',
+    providerState: buildEnabledProviderState(providerStatus),
     queueHealth: buildQueueHealth(counts, transfers),
     sourceGroups: buildSourceGroups(transfers),
     transfers,
@@ -248,6 +304,7 @@ export function buildDownloaderQueueReadModelFromDownloads(downloadGroups, {
 }
 
 export function createDownloaderQueueReadModelService({
+  getDownloaderProviderStatus = null,
   getDownloads,
   maxTransferRows = defaultMaxTransferRows,
   now = () => new Date(),
@@ -258,12 +315,25 @@ export function createDownloaderQueueReadModelService({
 
   async function buildDownloaderQueue({ includeRemoved = false } = {}) {
     const normalizedIncludeRemoved = normalizeBoolean(includeRemoved, false);
+    const providerStatus = typeof getDownloaderProviderStatus === 'function'
+      ? await getDownloaderProviderStatus()
+      : null;
+
+    if (providerStatus && providerStatus.apiKeyConfigured !== true) {
+      return buildDisabledDownloaderQueueReadModel({
+        includeRemoved: normalizedIncludeRemoved,
+        now,
+        providerStatus,
+      });
+    }
+
     const downloads = await getDownloads({ includeRemoved: normalizedIncludeRemoved });
 
     return buildDownloaderQueueReadModelFromDownloads(downloads, {
       includeRemoved: normalizedIncludeRemoved,
       maxTransferRows,
       now,
+      providerStatus: providerStatus ?? {},
     });
   }
 

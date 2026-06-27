@@ -47,6 +47,10 @@ describe('formatDependencyStatus', () => {
     assert.equal(formatDependencyStatus('degraded'), 'Degraded');
   });
 
+  it('returns Disabled for disabled', () => {
+    assert.equal(formatDependencyStatus('disabled'), 'Disabled');
+  });
+
   it('returns Healthy for healthy', () => {
     assert.equal(formatDependencyStatus('healthy'), 'Healthy');
   });
