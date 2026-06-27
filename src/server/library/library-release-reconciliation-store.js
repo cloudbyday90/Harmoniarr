@@ -136,7 +136,12 @@ export function createLibraryReleaseReconciliationStore({
     }
   }
 
-  async function listLibraryReleasesWithMetadata({ reconciliationStatus = null, limit = 500 } = {}) {
+  async function listLibraryReleasesWithMetadata({
+    appUserId = null,
+    reconciliationStatus = null,
+    limit = 500,
+    visibilityState = 'visible',
+  } = {}) {
     const params = [];
     const conditions = [];
 
@@ -144,6 +149,22 @@ export function createLibraryReleaseReconciliationStore({
     if (validStatuses.includes(reconciliationStatus)) {
       params.push(reconciliationStatus);
       conditions.push(`lrr.reconciliation_status = $${params.length}`);
+    }
+
+    let visibilityJoin = 'LEFT JOIN operator_library_release_visibility olrv ON FALSE';
+    if (appUserId) {
+      params.push(appUserId);
+      visibilityJoin = `
+        LEFT JOIN operator_library_release_visibility olrv
+          ON olrv.metadata_release_id = lrr.metadata_release_id
+          AND olrv.app_user_id = $${params.length}
+      `;
+
+      if (visibilityState === 'removed') {
+        conditions.push("olrv.visibility_state = 'removed'");
+      } else if (visibilityState !== 'all') {
+        conditions.push("COALESCE(olrv.visibility_state, 'visible') = 'visible'");
+      }
     }
 
     params.push(Math.min(Math.max(1, Number.parseInt(String(limit ?? 500), 10) || 500), 2000));
@@ -175,11 +196,16 @@ export function createLibraryReleaseReconciliationStore({
           mr.country AS release_country,
           mr.status AS release_status,
           mr.release_date AS release_date,
-          mr.musicbrainz_release_id AS musicbrainz_release_id
+          mr.musicbrainz_release_id AS musicbrainz_release_id,
+          COALESCE(olrv.visibility_state, 'visible') AS operator_visibility_state,
+          olrv.removed_at AS operator_removed_at,
+          olrv.restored_at AS operator_restored_at,
+          olrv.reason AS operator_visibility_reason
         FROM library_release_reconciliations lrr
         JOIN metadata_artists ma ON ma.id = lrr.metadata_artist_id
         JOIN metadata_release_groups mrg ON mrg.id = lrr.metadata_release_group_id
         JOIN metadata_releases mr ON mr.id = lrr.metadata_release_id
+        ${visibilityJoin}
         ${whereClause}
         ORDER BY ma.sort_name ASC NULLS LAST, ma.name ASC, mrg.first_release_date ASC NULLS LAST, mr.release_date ASC NULLS LAST
         ${limitClause}
@@ -202,6 +228,12 @@ export function createLibraryReleaseReconciliationStore({
       missingTrackCount: Number.parseInt(String(row.missing_track_count ?? 0), 10) || 0,
       musicbrainzReleaseGroupId: row.musicbrainz_release_group_id ?? null,
       musicbrainzReleaseId: row.musicbrainz_release_id ?? null,
+      operatorVisibility: {
+        reason: row.operator_visibility_reason ?? null,
+        removedAt: row.operator_removed_at ?? null,
+        restoredAt: row.operator_restored_at ?? null,
+        state: row.operator_visibility_state ?? 'visible',
+      },
       reconciliationStatus: row.reconciliation_status,
       releaseCountry: row.release_country ?? null,
       releaseDate: row.release_date ?? null,

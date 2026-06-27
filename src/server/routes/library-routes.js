@@ -58,6 +58,9 @@ export function registerLibraryRoutes(app, {
   retryDownloadRecoveryDiscoveryRequest = async () => {
     throw new Error('retryDownloadRecoveryDiscoveryRequest dependency is required');
   },
+  setLibraryReleaseVisibility = async () => {
+    throw new Error('setLibraryReleaseVisibility dependency is required');
+  },
   startLibraryOrganizeApplyRun,
   startLibraryDiscoveryRun,
   startLibraryScan,
@@ -215,13 +218,40 @@ export function registerLibraryRoutes(app, {
   }));
 
   app.get('/api/v1/library/releases', asyncRoute(async (request, response) => {
-    await requireSession(request);
-    const { status: reconciliationStatus = null, limit = '500' } = request.query;
+    const session = await requireSession(request);
+    const {
+      status: reconciliationStatus = null,
+      limit = '500',
+      visibility: requestedVisibility = 'visible',
+    } = request.query;
     const validStatuses = ['complete', 'partial', 'duplicate'];
+    const validVisibilityStates = ['visible', 'removed', 'all'];
     response.json(await buildLibraryReleases({
+      appUserId: session.appUserId,
       limit: sanitizePageLimit(limit, { default: 500, max: 2000 }),
       reconciliationStatus: validStatuses.includes(reconciliationStatus) ? reconciliationStatus : null,
+      visibilityState: validVisibilityStates.includes(requestedVisibility) ? requestedVisibility : 'visible',
     }));
+  }));
+
+  app.post('/api/v1/library/releases/:metadataReleaseId/visibility', asyncRoute(async (request, response) => {
+    const session = await requireSession(request);
+    requireCsrf(request, session);
+
+    const result = await setLibraryReleaseVisibility({
+      actorUserId: session.appUserId,
+      actorUserRole: session.user?.role ?? null,
+      metadataReleaseId: request.params.metadataReleaseId,
+      reason: request.body?.reason ?? null,
+      requestMetadata: getRequestMetadata(request),
+      visibilityState: request.body?.visibilityState,
+    });
+
+    response.json({
+      ok: true,
+      target: result.target,
+      visibility: result.visibility,
+    });
   }));
 
   app.get('/api/v1/library/filter-options', asyncRoute(async (request, response) => {

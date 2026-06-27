@@ -65,6 +65,8 @@ import { createLibraryReleaseRadarService } from './library-release-radar-servic
 import { createLibraryReleaseRadarStore } from './library-release-radar-store.js';
 import { createLibraryReleaseReconciliationService } from './library-release-reconciliation-service.js';
 import { createLibraryReleaseReconciliationStore } from './library-release-reconciliation-store.js';
+import { createLibraryReleaseVisibilityService } from './library-release-visibility-service.js';
+import { createLibraryReleaseVisibilityStore } from './library-release-visibility-store.js';
 import { createLibraryReleasesService } from './library-releases-service.js';
 import { createLibraryScanRunStore } from './library-scan-run-store.js';
 import { createLibraryScanService } from './library-scan-service.js';
@@ -253,6 +255,10 @@ export function createLibraryModule({
   libraryReleaseReconciliationService = createLibraryReleaseReconciliationService({
     libraryReleaseReconciliationStore,
   }),
+  libraryReleaseVisibilityStore = createLibraryReleaseVisibilityStore(),
+  libraryReleaseVisibilityService = createLibraryReleaseVisibilityService({
+    libraryReleaseVisibilityStore,
+  }),
   libraryReleasesService = createLibraryReleasesService({
     libraryReleaseReconciliationStore,
   }),
@@ -413,6 +419,8 @@ export function createLibraryModule({
     libraryReconciliationSummaryStore,
     libraryReleaseReconciliationService,
     libraryReleaseReconciliationStore,
+    libraryReleaseVisibilityService,
+    libraryReleaseVisibilityStore,
     libraryReleasesService,
     libraryScanRunStore,
     libraryScanService,
@@ -446,6 +454,7 @@ export function createLibraryModule({
       listMediaRequests: libraryMediaRequestService.listMediaRequests,
       reassignMediaRequest: libraryMediaRequestService.reassignMediaRequest,
       retryDownloadRecoveryDiscoveryRequest: libraryDiscoveryRecoveryRetryService.retryDownloadRecoveryDiscoveryRequest,
+      setLibraryReleaseVisibility: libraryReleaseVisibilityService.setLibraryReleaseVisibility,
       startLibraryOrganizeApplyRun: libraryOrganizeApplyService.startLibraryOrganizeApplyRun,
       startLibraryDiscoveryRun: libraryDiscoveryRunService.startLibraryDiscoveryRun,
       startLibraryScan: libraryScanService.startLibraryScan,

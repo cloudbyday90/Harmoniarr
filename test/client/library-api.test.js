@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createMediaRequest,
+  fetchLibraryReleases,
   fetchLibraryDiscoverySummary,
   fetchLibraryOrganizePreview,
   fetchMediaRequestDetail,
@@ -11,6 +12,7 @@ import {
   fetchMediaRequestSummary,
   reassignMediaRequest,
   retryDownloadRecoveryDiscoveryRequest,
+  setLibraryReleaseVisibility,
 } from '../../src/client/lib/library-api.js';
 
 function createJsonResponse({ ok = true, payload = { ok: true }, status = 200 } = {}) {
@@ -101,6 +103,44 @@ test('library-api retryDownloadRecoveryDiscoveryRequest sends encoded POST with 
   );
   assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'POST');
   assert.equal(globalThis.fetch.mock.calls[0].arguments[1].headers.get('X-CSRF-Token'), 'csrf-retry');
+});
+
+test('library-api fetchLibraryReleases includes visibility query params', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchLibraryReleases({
+    limit: 100,
+    reconciliationStatus: 'partial',
+    visibility: 'removed',
+  });
+
+  const url = globalThis.fetch.mock.calls[0].arguments[0];
+  assert.equal(url, '/api/v1/library/releases?status=partial&visibility=removed&limit=100');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'GET');
+});
+
+test('library-api setLibraryReleaseVisibility sends encoded POST with CSRF', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-visibility' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await setLibraryReleaseVisibility({
+    metadataReleaseId: 'release/slash',
+    reason: 'Wrong edition',
+    visibilityState: 'removed',
+  });
+
+  assert.equal(globalThis.fetch.mock.callCount(), 1);
+  assert.equal(
+    globalThis.fetch.mock.calls[0].arguments[0],
+    '/api/v1/library/releases/release%2Fslash/visibility',
+  );
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'POST');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].headers.get('X-CSRF-Token'), 'csrf-visibility');
+  assert.deepEqual(JSON.parse(globalThis.fetch.mock.calls[0].arguments[1].body), {
+    reason: 'Wrong edition',
+    visibilityState: 'removed',
+  });
 });
 
 test('library-api fetchMediaRequestDetail sends GET with encoded id', async (t) => {

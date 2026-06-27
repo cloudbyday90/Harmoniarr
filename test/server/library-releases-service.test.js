@@ -69,6 +69,23 @@ test('buildLibraryReleases passes reconciliationStatus to store', async (t) => {
   assert.equal(callArgs.reconciliationStatus, 'complete');
 });
 
+test('buildLibraryReleases passes appUserId and visibilityState to store', async (t) => {
+  const listLibraryReleasesWithMetadata = t.mock.fn(async () => []);
+
+  const service = createLibraryReleasesService({
+    libraryReleaseReconciliationStore: { listLibraryReleasesWithMetadata },
+  });
+
+  await service.buildLibraryReleases({
+    appUserId: 'operator-1',
+    visibilityState: 'removed',
+  });
+
+  const callArgs = listLibraryReleasesWithMetadata.mock.calls[0].arguments[0];
+  assert.equal(callArgs.appUserId, 'operator-1');
+  assert.equal(callArgs.visibilityState, 'removed');
+});
+
 test('buildLibraryReleases passes partial reconciliationStatus to store', async (t) => {
   const listLibraryReleasesWithMetadata = t.mock.fn(async () => []);
 

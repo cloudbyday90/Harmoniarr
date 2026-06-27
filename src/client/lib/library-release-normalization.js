@@ -76,6 +76,7 @@ export function normalizeLibraryReleaseForCard(release) {
     matchedFileCount: release.matchedFileCount ?? 0,
     duplicateTrackCount: release.duplicateTrackCount ?? 0,
     duplicateFileCount: release.duplicateFileCount ?? release.duplicateTrackCount ?? 0,
+    operatorVisibility: release.operatorVisibility ?? { state: 'visible' },
 
     // Forwarded for local metadata navigation and artist-detail navigation.
     metadataArtistId: release.metadataArtistId ?? null,

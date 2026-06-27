@@ -161,6 +161,28 @@ describe('useLibraryReleases', () => {
     c.destroy();
   });
 
+  test('passes visibility filter through filter state', async () => {
+    let captured = null;
+    const fetchLibraryReleases = async (params) => {
+      captured = params;
+      return { total: 0, releases: [] };
+    };
+
+    const c = useLibraryReleases({
+      fetchLibraryReleases,
+      filterState: ref({
+        filters: { visibility: 'removed' },
+        sort: { field: 'artist', order: 'asc' },
+      }),
+    });
+
+    c.retry();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    assert.equal(captured.visibility, 'removed');
+    c.destroy();
+  });
+
   test('passes null reconciliationStatus when omitted', async () => {
     let captured = null;
     const fetchLibraryReleases = async (params) => {

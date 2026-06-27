@@ -59,7 +59,8 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:
 
-- non-destructive operator library removal semantics
+- non-destructive operator library removal semantics (implemented 2026-06-27;
+  see [NON_DESTRUCTIVE_OPERATOR_LIBRARY_REMOVAL_DESIGN.md](NON_DESTRUCTIVE_OPERATOR_LIBRARY_REMOVAL_DESIGN.md))
 - track-override remap review UX when metadata changes make saved intent ambiguous
 
 ## Locked Design Choices

@@ -67,6 +67,9 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const libraryReconciliationSummaryStore = {};
   const libraryReleaseReconciliationService = { reconcileLibraryReleases };
   const libraryReleaseReconciliationStore = {};
+  const setLibraryReleaseVisibility = async () => {};
+  const libraryReleaseVisibilityService = { setLibraryReleaseVisibility };
+  const libraryReleaseVisibilityStore = {};
   const buildReleaseRadar = async () => {};
   const libraryReleaseRadarService = { buildReleaseRadar };
   const libraryReleaseRadarStore = {};
@@ -118,6 +121,8 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryReconciliationSummaryStore,
     libraryReleaseReconciliationService,
     libraryReleaseReconciliationStore,
+    libraryReleaseVisibilityService,
+    libraryReleaseVisibilityStore,
     libraryReleaseRadarService,
     libraryReleaseRadarStore,
     libraryReleasesService,
@@ -168,6 +173,8 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.libraryReconciliationSummaryStore, libraryReconciliationSummaryStore);
   assert.equal(libraryModule.libraryReleaseReconciliationService, libraryReleaseReconciliationService);
   assert.equal(libraryModule.libraryReleaseReconciliationStore, libraryReleaseReconciliationStore);
+  assert.equal(libraryModule.libraryReleaseVisibilityService, libraryReleaseVisibilityService);
+  assert.equal(libraryModule.libraryReleaseVisibilityStore, libraryReleaseVisibilityStore);
   assert.equal(libraryModule.libraryReleasesService, libraryReleasesService);
   assert.equal(libraryModule.libraryScanRunStore, libraryScanRunStore);
   assert.equal(libraryModule.libraryScanService, libraryScanService);
@@ -203,6 +210,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     listMediaRequests,
     reassignMediaRequest,
     retryDownloadRecoveryDiscoveryRequest,
+    setLibraryReleaseVisibility,
     startLibraryOrganizeApplyRun,
     startLibraryDiscoveryRun,
     startLibraryScan,

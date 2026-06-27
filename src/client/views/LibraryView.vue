@@ -25,13 +25,17 @@ import ReleaseCard from '../components/media/ReleaseCard.vue';
 import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import { useArtworkBatchResolve } from '../composables/useArtworkBatchResolve.js';
 import { useArtworkGridRoving } from '../composables/useArtworkGridRoving.js';
+import { useConfirm } from '../composables/useConfirm.js';
 import { useGridState } from '../composables/useGridState.js';
 import { useLibraryFilterOptions } from '../composables/useLibraryFilterOptions.js';
 import { useLibraryReleases } from '../composables/useLibraryReleases.js';
+import { sessionStore } from '../state/session.js';
 import {
   buildReleaseArtworkRequests,
   getPreferredReleaseArtwork,
 } from '../lib/release-artwork-resolve.js';
+import { getErrorMessage } from '../lib/error-utils.js';
+import { setLibraryReleaseVisibility } from '../lib/library-api.js';
 import {
   LIBRARY_DISPLAY_MODE_OPTIONS,
   readLibraryDisplayModePreference,
@@ -66,7 +70,13 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'duplicate', label: 'Duplicate' },
 ];
 
-const FILTER_GROUP_KEYS = ['status', 'format'];
+const VISIBILITY_FILTER_OPTIONS = [
+  { value: 'visible', label: 'Visible' },
+  { value: 'removed', label: 'Removed from view' },
+  { value: 'all', label: 'All' },
+];
+
+const FILTER_GROUP_KEYS = ['status', 'visibility', 'format'];
 
 const LIBRARY_DEFAULTS = {
   sort: { field: 'artist', order: 'asc' },
@@ -81,7 +91,10 @@ const { options: dynamicFilterOptions, load: loadFilterOptions, attachVisibility
 
 // Merge static status filter group with any dynamic format/genre groups from the server
 const filterGroups = computed(() => {
-  const groups = [{ key: 'status', label: 'Status', options: STATUS_FILTER_OPTIONS }];
+  const groups = [
+    { key: 'status', label: 'Status', options: STATUS_FILTER_OPTIONS },
+    { key: 'visibility', label: 'Library view', options: VISIBILITY_FILTER_OPTIONS },
+  ];
   if (dynamicFilterOptions.value?.formats?.length > 0) {
     groups.push({
       key: 'format',
@@ -141,9 +154,15 @@ const duplicateReviewExpanded = ref(readDuplicateReviewExpandedPreference());
 const displayMode = ref(readLibraryDisplayModePreference());
 const detailModalOpen = ref(false);
 const detailRelease = ref(null);
+const visibilityMutationError = ref('');
+const visibilityMutationReleaseId = ref(null);
 
 const displayModeOptions = LIBRARY_DISPLAY_MODE_OPTIONS;
 const needsAttention = computed(() => buildLibraryNeedsAttention(displayReleases.value));
+const canChangeLibraryVisibility = computed(() =>
+  sessionStore.state.user?.role === 'admin' || sessionStore.state.user?.role === 'operator',
+);
+const confirm = useConfirm();
 
 function getReleaseArtwork(release) {
   return getPreferredReleaseArtwork(getResolvedArtwork, release);
@@ -169,6 +188,54 @@ function openPartialReleaseDetail(release) {
 function closeDetailModal() {
   detailModalOpen.value = false;
   detailRelease.value = null;
+}
+
+function isVisibilityMutationPending(release) {
+  return visibilityMutationReleaseId.value === release?.metadataReleaseId;
+}
+
+function isRemovedFromLibraryView(release) {
+  return release?.operatorVisibility?.state === 'removed';
+}
+
+function getVisibilityActionLabel(release) {
+  return isRemovedFromLibraryView(release) ? 'Restore to library view' : 'Remove from library view';
+}
+
+async function changeReleaseVisibility(release) {
+  const metadataReleaseId = release?.metadataReleaseId;
+  if (!metadataReleaseId || visibilityMutationReleaseId.value) {
+    return;
+  }
+
+  visibilityMutationError.value = '';
+  const visibilityState = isRemovedFromLibraryView(release) ? 'visible' : 'removed';
+  if (visibilityState === 'removed') {
+    const confirmed = await confirm({
+      title: 'Remove from library view?',
+      message: `${release.title ?? 'This release'} will be hidden for your operator account only. No files, requests, or shared catalog metadata will be deleted.`,
+      confirmLabel: 'Remove from view',
+      cancelLabel: 'Keep visible',
+      gateLabel: 'I understand this only hides the release from my view.',
+      level: 'checkbox',
+      tone: 'primary',
+    });
+    if (!confirmed) return;
+  }
+
+  visibilityMutationReleaseId.value = metadataReleaseId;
+  try {
+    await setLibraryReleaseVisibility({
+      metadataReleaseId,
+      reason: visibilityState === 'removed' ? 'Operator removed release from library view' : null,
+      visibilityState,
+    });
+    await library.revalidate();
+  } catch (error) {
+    visibilityMutationError.value = getErrorMessage(error, 'Could not update library visibility.');
+  } finally {
+    visibilityMutationReleaseId.value = null;
+  }
 }
 
 async function showPartialGrid() {
@@ -448,11 +515,13 @@ function refreshAll() {
 
         <!-- Non-first-load error callout above stale data -->
         <div
-          v-if="library.error.value && !library.isFirstLoad.value"
+          v-if="(library.error.value && !library.isFirstLoad.value) || visibilityMutationError"
           class="library-error-callout"
           role="alert"
         >
-          <span class="hx-pill" data-tone="danger">{{ library.error.value.message }}</span>
+          <span class="hx-pill" data-tone="danger">
+            {{ visibilityMutationError || library.error.value.message }}
+          </span>
           <button type="button" class="hx-btn hx-btn--sm" @click="refreshAll">Retry</button>
         </div>
       </div>
@@ -517,6 +586,16 @@ function refreshAll() {
                     {{ formatLibraryTrackCounts(release) }}
                   </span>
                 </div>
+                <button
+                  v-if="canChangeLibraryVisibility"
+                  type="button"
+                  class="hx-btn hx-btn--sm"
+                  data-variant="ghost"
+                  :disabled="isVisibilityMutationPending(release)"
+                  @click="changeReleaseVisibility(release)"
+                >
+                  {{ isVisibilityMutationPending(release) ? 'Updating...' : getVisibilityActionLabel(release) }}
+                </button>
               </div>
             </template>
           </ReleaseCard>
@@ -576,6 +655,18 @@ function refreshAll() {
                 <dd>{{ formatLibraryDuplicateFileCount(release) }}</dd>
               </div>
             </dl>
+
+            <div v-if="canChangeLibraryVisibility" class="library-release-row__actions">
+              <button
+                type="button"
+                class="hx-btn hx-btn--sm"
+                data-variant="ghost"
+                :disabled="isVisibilityMutationPending(release)"
+                @click="changeReleaseVisibility(release)"
+              >
+                {{ isVisibilityMutationPending(release) ? 'Updating...' : getVisibilityActionLabel(release) }}
+              </button>
+            </div>
           </article>
         </div>
       </div>
@@ -682,7 +773,7 @@ function refreshAll() {
 
 .library-release-row {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) minmax(220px, auto);
+  grid-template-columns: 64px minmax(0, 1fr) minmax(220px, auto) minmax(120px, auto);
   align-items: center;
   gap: var(--hx-space-3);
   min-height: 88px;
@@ -756,6 +847,11 @@ function refreshAll() {
   font-size: var(--hx-text-sm);
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.library-release-row__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .library-needs-attention {
@@ -888,6 +984,11 @@ function refreshAll() {
     grid-column: 1 / -1;
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .library-release-row__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 
   .library-release-row__fact {

@@ -51,8 +51,10 @@ Confirmed complete:
 
 Follow-up issues to create:
 
-1. **Operator library removal semantics** — design and implement non-destructive
-   "remove from my view/library" behavior separately from deleting shared media.
+1. **Operator library removal semantics** — complete. Non-destructive,
+   operator-scoped Library visibility now hides/restores reconciled releases
+   without deleting shared media. See
+   [NON_DESTRUCTIVE_OPERATOR_LIBRARY_REMOVAL_DESIGN.md](NON_DESTRUCTIVE_OPERATOR_LIBRARY_REMOVAL_DESIGN.md).
 2. **Track-override remap review UX** — surface `review_needed` / `orphaned`
    track override states when metadata changes make saved track intent ambiguous.
 3. **Plan-governance closure** — create/link GitHub sub-issues for the items

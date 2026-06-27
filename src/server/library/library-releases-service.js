@@ -21,11 +21,18 @@ import { createLibraryReleaseReconciliationStore } from './library-release-recon
 export function createLibraryReleasesService({
   libraryReleaseReconciliationStore = createLibraryReleaseReconciliationStore(),
 } = {}) {
-  async function buildLibraryReleases({ reconciliationStatus = null, limit = 500 } = {}) {
+  async function buildLibraryReleases({
+    appUserId = null,
+    reconciliationStatus = null,
+    limit = 500,
+    visibilityState = 'visible',
+  } = {}) {
     const checkedAt = new Date().toISOString();
     const releases = await libraryReleaseReconciliationStore.listLibraryReleasesWithMetadata({
+      appUserId,
       reconciliationStatus,
       limit,
+      visibilityState,
     });
 
     return {

@@ -104,6 +104,7 @@ export function fetchLibraryReleases({
   format = null,
   sort = null,
   order = null,
+  visibility = null,
   limit = 500,
   signal = null,
 } = {}) {
@@ -114,6 +115,9 @@ export function fetchLibraryReleases({
   if (format) params.set('format', String(format));
   if (sort) params.set('sort', String(sort));
   if (order === 'asc' || order === 'desc') params.set('order', order);
+  if (['visible', 'removed', 'all'].includes(visibility)) {
+    params.set('visibility', visibility);
+  }
   if (limit && limit !== 500) {
     params.set('limit', String(limit));
   }
@@ -122,6 +126,14 @@ export function fetchLibraryReleases({
     query ? `/api/v1/library/releases?${query}` : '/api/v1/library/releases',
     signal ? { signal } : {},
   );
+}
+
+export function setLibraryReleaseVisibility({ metadataReleaseId, reason = null, visibilityState }) {
+  return apiRequest(`/api/v1/library/releases/${encodeURIComponent(metadataReleaseId)}/visibility`, {
+    body: { reason, visibilityState },
+    includeCsrf: true,
+    method: 'POST',
+  });
 }
 
 export function fetchLibraryFilterOptions() {

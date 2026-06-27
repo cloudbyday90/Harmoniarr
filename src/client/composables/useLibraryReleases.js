@@ -147,6 +147,7 @@ export function useLibraryReleases({
       sort: state.sort?.field ?? null,
       order: state.sort?.order ?? null,
       format: state.filters?.format ?? null,
+      visibility: state.filters?.visibility ?? null,
     };
   }
 

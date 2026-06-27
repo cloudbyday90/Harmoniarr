@@ -115,3 +115,68 @@ test('listReconciliationsByMetadataReleaseIds returns compact reconciliation row
     reconciliationStatus: 'partial',
   }]);
 });
+
+test('listLibraryReleasesWithMetadata filters removed releases for the operator view', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /LEFT JOIN operator_library_release_visibility olrv/);
+    assert.match(sql, /COALESCE\(olrv\.visibility_state, 'visible'\) = 'visible'/);
+    assert.deepEqual(params, ['operator-1', 25]);
+    return {
+      rows: [{
+        artist_name: 'Radiohead',
+        artist_sort_name: 'Radiohead',
+        duplicate_track_count: 0,
+        expected_track_count: 12,
+        id: 'recon-1',
+        last_reconciled_at: '2026-06-30T10:00:00.000Z',
+        matched_file_count: 12,
+        matched_track_count: 12,
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'rg-1',
+        metadata_release_id: 'release-1',
+        missing_track_count: 0,
+        musicbrainz_release_group_id: 'rg-mbid-1',
+        musicbrainz_release_id: 'release-mbid-1',
+        operator_removed_at: null,
+        operator_restored_at: null,
+        operator_visibility_reason: null,
+        operator_visibility_state: 'visible',
+        reconciliation_status: 'complete',
+        release_country: 'GB',
+        release_date: '1997-05-21',
+        release_disambiguation: null,
+        release_group_title: 'OK Computer',
+        release_group_type: 'Album',
+        release_status: 'Official',
+        release_title: 'OK Computer',
+      }],
+    };
+  });
+  const store = createLibraryReleaseReconciliationStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const releases = await store.listLibraryReleasesWithMetadata({
+    appUserId: 'operator-1',
+    limit: 25,
+    visibilityState: 'visible',
+  });
+
+  assert.equal(releases[0].operatorVisibility.state, 'visible');
+});
+
+test('listLibraryReleasesWithMetadata can list removed releases', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /olrv\.visibility_state = 'removed'/);
+    assert.deepEqual(params, ['operator-1', 500]);
+    return { rows: [] };
+  });
+  const store = createLibraryReleaseReconciliationStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  await store.listLibraryReleasesWithMetadata({
+    appUserId: 'operator-1',
+    visibilityState: 'removed',
+  });
+});

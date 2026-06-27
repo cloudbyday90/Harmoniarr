@@ -1291,6 +1291,68 @@ test('library filter-options route requires a session and returns the filter opt
   });
 });
 
+test('library releases route scopes visibility to the signed-in user', async (t) => {
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'operator-1', csrfToken: 'csrf-1', user: { role: 'operator' } }));
+  const buildLibraryReleases = t.mock.fn(async () => ({ releases: [], total: 0 }));
+  const app = createLibraryRouteTestApp({ buildLibraryReleases, requireSession });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/releases?visibility=removed&status=partial&limit=25`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload, { releases: [], total: 0 });
+    assert.deepEqual(buildLibraryReleases.mock.calls[0].arguments[0], {
+      appUserId: 'operator-1',
+      limit: 25,
+      reconciliationStatus: 'partial',
+      visibilityState: 'removed',
+    });
+  });
+});
+
+test('library release visibility route requires csrf and forwards operator identity', async (t) => {
+  const requireCsrf = t.mock.fn(() => {});
+  const requireSession = t.mock.fn(async () => ({ appUserId: 'operator-1', csrfToken: 'csrf-1', user: { role: 'operator' } }));
+  const setLibraryReleaseVisibility = t.mock.fn(async () => ({
+    target: { metadataReleaseId: 'release-1' },
+    visibility: {
+      appUserId: 'operator-1',
+      metadataReleaseId: 'release-1',
+      visibilityState: 'removed',
+    },
+  }));
+  const app = createLibraryRouteTestApp({
+    requireCsrf,
+    requireSession,
+    setLibraryReleaseVisibility,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/library/releases/release-1/visibility`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': 'csrf-1',
+      },
+      body: JSON.stringify({ reason: 'Wrong edition', visibilityState: 'removed' }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.visibility.visibilityState, 'removed');
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.equal(setLibraryReleaseVisibility.mock.callCount(), 1);
+    assert.equal(setLibraryReleaseVisibility.mock.calls[0].arguments[0].actorUserId, 'operator-1');
+    assert.equal(setLibraryReleaseVisibility.mock.calls[0].arguments[0].actorUserRole, 'operator');
+    assert.equal(setLibraryReleaseVisibility.mock.calls[0].arguments[0].metadataReleaseId, 'release-1');
+    assert.equal(setLibraryReleaseVisibility.mock.calls[0].arguments[0].reason, 'Wrong edition');
+    assert.equal(setLibraryReleaseVisibility.mock.calls[0].arguments[0].visibilityState, 'removed');
+    assert.equal(setLibraryReleaseVisibility.mock.calls[0].arguments[0].requestMetadata.ipAddress, '127.0.0.1');
+  });
+});
+
 test('library filter-options route rejects unauthenticated requests', async (t) => {
   const requireSession = t.mock.fn(async () => {
     throw createApiError(401, 'session_required', 'Authentication required');

@@ -124,6 +124,28 @@ test('normalizeLibraryReleaseForCard forwards all track counts', () => {
   assert.equal(result.duplicateFileCount, 2);
 });
 
+test('normalizeLibraryReleaseForCard forwards operator visibility state', () => {
+  const result = normalizeLibraryReleaseForCard({
+    operatorVisibility: {
+      reason: 'Wrong edition',
+      removedAt: '2026-06-30T10:00:00.000Z',
+      state: 'removed',
+    },
+  });
+
+  assert.deepEqual(result.operatorVisibility, {
+    reason: 'Wrong edition',
+    removedAt: '2026-06-30T10:00:00.000Z',
+    state: 'removed',
+  });
+});
+
+test('normalizeLibraryReleaseForCard defaults operator visibility to visible', () => {
+  assert.deepEqual(normalizeLibraryReleaseForCard({ releaseTitle: 'Album' }).operatorVisibility, {
+    state: 'visible',
+  });
+});
+
 test('normalizeLibraryReleaseForCard defaults track counts to 0 when absent', () => {
   const result = normalizeLibraryReleaseForCard({ releaseTitle: 'Album' });
   assert.equal(result.expectedTrackCount, 0);
