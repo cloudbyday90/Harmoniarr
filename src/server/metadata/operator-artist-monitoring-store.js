@@ -69,9 +69,9 @@ export function createOperatorArtistMonitoringStore({
     }));
   }
 
-  async function getOperatorArtistMonitoring({ appUserId, metadataArtistId }) {
-    const pool = getPoolFn();
-    const result = await pool.query(
+  async function getOperatorArtistMonitoring({ appUserId, metadataArtistId, queryable = null }) {
+    const queryTarget = queryable ?? getPoolFn();
+    const result = await queryTarget.query(
       `
         SELECT *
         FROM operator_artist_monitoring

@@ -506,6 +506,133 @@ test('saveOperatorArtist still resolves when a queued discography refresh is alr
   assert.equal(result.artistId, 'artist-1');
 });
 
+test('saveOperatorArtist records an artist_policy_saved activity event with bounded change summary', async (t) => {
+  const query = t.mock.fn(async (sql) => {
+    if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+      return { rows: [] };
+    }
+    if (sql.includes('FROM app_users')) {
+      return { rows: [{ id: 'user-1' }] };
+    }
+    if (sql.includes('FROM metadata_artists')) {
+      return {
+        rows: [{
+          id: 'artist-1',
+          musicbrainz_artist_id: 'mb-artist-1',
+          name: 'Autechre',
+        }],
+      };
+    }
+    if (sql.includes('FROM operator_artist_monitoring')) {
+      return {
+        rows: [{
+          is_monitored: true,
+          last_reconciled_at: null,
+          last_saved_snapshot_at: null,
+        }],
+      };
+    }
+    if (sql.includes('FROM metadata_release_groups')) {
+      return { rows: [{ id: 'release-group-1', metadata_artist_id: 'artist-1' }] };
+    }
+    if (sql.includes('FROM metadata_releases')) {
+      return { rows: [] };
+    }
+    return { rows: [] };
+  });
+  const client = { query, release: t.mock.fn(() => {}) };
+  const activityEvents = [];
+  const service = createOperatorArtistSaveService({
+    getOperatorArtistProjection: async () => ({ artist: { id: 'artist-1' }, operator: { monitoring: { isMonitored: true } } }),
+    getPoolFn: () => ({ connect: async () => client }),
+    operatorArtistMonitoringStore: {
+      getOperatorArtistMonitoring: async () => ({
+        acquisitionProfileKey: 'balanced_library',
+        isMonitored: true,
+        monitoredReleaseGroupTypes: ['album'],
+        releaseScope: 'future_only',
+        searchOnAddMode: 'none',
+        selectionSourceMode: 'policy_plus_overrides',
+        wantedAutomationMode: 'future_matching',
+      }),
+      upsertOperatorArtistMonitoring: async () => {},
+    },
+    operatorArtistReconciliationRunStore: {
+      queueLatestSnapshotRun: async () => ({ action: 'created', run: { id: 'run-1', status: 'pending' }, runningRun: null }),
+    },
+    operatorArtistReconciliationSnapshotStore: {
+      createOperatorArtistReconciliationSnapshot: async () => ({
+        createdAt: '2026-06-27T14:00:00.000Z',
+        id: 'snapshot-1',
+        snapshotRevision: 7,
+        updatedAt: '2026-06-27T14:00:00.000Z',
+      }),
+    },
+    operatorReleaseGroupSelectionStore: {
+      listOperatorReleaseGroupSelections: async () => [{
+        metadataReleaseGroupId: 'release-group-1',
+        resolvedMetadataReleaseId: null,
+        selectionSource: 'manual',
+        selectionState: 'partial',
+      }],
+      replaceOperatorArtistReleaseGroupSelections: async () => {},
+    },
+    operatorTrackOverrideStore: {
+      listOperatorTrackOverrides: async () => [{
+        isDesired: false,
+        metadataReleaseGroupId: 'release-group-1',
+        remapStatus: 'review_needed',
+        trackMbid: 'track-1',
+      }],
+      replaceOperatorArtistTrackOverrides: async () => {},
+    },
+    recordActivityEventFn: async (payload) => { activityEvents.push(payload); },
+  });
+
+  await service.saveOperatorArtist({
+    appUserId: 'user-1',
+    draft: {
+      monitoring: {
+        acquisitionProfileKey: 'balanced_library',
+        isMonitored: true,
+        monitoredReleaseGroupTypes: ['album', 'ep'],
+        releaseScope: 'future_only',
+        searchOnAddMode: 'none',
+        selectionSourceMode: 'policy_plus_overrides',
+        wantedAutomationMode: 'future_matching',
+      },
+      releaseGroupSelections: [{
+        metadataReleaseGroupId: 'release-group-1',
+        resolvedMetadataReleaseId: null,
+        selectionSource: 'manual',
+        selectionState: 'selected',
+      }],
+      trackOverrides: [{
+        isDesired: false,
+        metadataReleaseGroupId: 'release-group-1',
+        remapStatus: 'resolved',
+        trackMbid: 'track-1',
+      }],
+    },
+    metadataArtistId: 'artist-1',
+    triggeredByUserId: 'operator-1',
+  });
+
+  await new Promise((resolve) => { setImmediate(resolve); });
+
+  assert.equal(activityEvents.length, 1);
+  assert.equal(activityEvents[0].eventType, 'artist_policy_saved');
+  assert.equal(activityEvents[0].actorUserId, 'operator-1');
+  assert.equal(activityEvents[0].entityId, 'artist-1');
+  assert.equal(activityEvents[0].entityTitle, 'Autechre');
+  assert.equal(activityEvents[0].extraPayload.artistMusicBrainzId, 'mb-artist-1');
+  assert.equal(activityEvents[0].extraPayload.changes.monitoring.changedFieldCount, 1);
+  assert.equal(activityEvents[0].extraPayload.changes.releaseGroups.changed, 1);
+  assert.equal(activityEvents[0].extraPayload.changes.trackOverrides.resolvedReviewCount, 1);
+  assert.equal(activityEvents[0].extraPayload.snapshot.snapshotRevision, 7);
+  assert.equal(activityEvents[0].extraPayload.reconciliation.runId, 'run-1');
+});
+
 function buildTransitionTestPool({ existingIsMonitored }) {
   const query = async (sql) => {
     if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
@@ -564,10 +691,10 @@ test('saveOperatorArtist fires monitor side effects only on the unmonitored -> m
   assert.equal(notifications.length, 1, 'household notification fires once on transition');
   assert.equal(notifications[0].artistName, 'Autechre');
   assert.equal(notifications[0].metadataArtistId, 'artist-1');
-  assert.equal(activityEvents.length, 1, 'artist_monitored activity event fires once on transition');
-  assert.equal(activityEvents[0].eventType, 'artist_monitored');
-  assert.equal(activityEvents[0].entityId, 'artist-1');
-  assert.equal(activityEvents[0].actorUserId, 'user-1');
+  const monitoredEvents = activityEvents.filter((event) => event.eventType === 'artist_monitored');
+  assert.equal(monitoredEvents.length, 1, 'artist_monitored activity event fires once on transition');
+  assert.equal(monitoredEvents[0].entityId, 'artist-1');
+  assert.equal(monitoredEvents[0].actorUserId, 'user-1');
 });
 
 test('saveOperatorArtist does not fire monitor side effects when the artist was already monitored', async () => {
@@ -601,5 +728,5 @@ test('saveOperatorArtist does not fire monitor side effects when the artist was 
   await new Promise((resolve) => { setTimeout(resolve, 0); });
 
   assert.equal(notifications.length, 0);
-  assert.equal(activityEvents.length, 0);
+  assert.equal(activityEvents.some((event) => event.eventType === 'artist_monitored'), false);
 });

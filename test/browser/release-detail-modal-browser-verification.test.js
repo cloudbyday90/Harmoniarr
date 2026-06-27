@@ -16,6 +16,7 @@ import {
 import {
   installMetadataBrowserFixtures,
   markBoardsOfCanadaAddedInMetadataBrowserFixture,
+  markBoardsTrackOverrideReviewNeededInMetadataBrowserFixture,
 } from '../../testing/browser/metadata-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import {
@@ -97,6 +98,13 @@ suite('Release Detail modal browser verification', () => {
       await installMetadataBrowserFixtures(browserContext);
       await bootstrapAdminThroughUi(page, { baseUrl });
       await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
+      await markBoardsTrackOverrideReviewNeededInMetadataBrowserFixture(page);
+
+      await page.goto(`${baseUrl}/app/artists/mb-artist-boards`, { waitUntil: 'domcontentloaded' });
+      await page.getByLabel('Albums selection filter').selectOption('track_review');
+      const reviewCard = page.locator('.artist-detail-selection__review');
+      await reviewCard.getByText('Track review', { exact: true }).waitFor();
+      await reviewCard.getByText('1 track override needs review').waitFor();
 
       let { dialog, releaseCard } = await openMusicHasTheRightToChildrenDialog({ baseUrl, page, pageErrors });
       const closeButton = dialog.getByRole('button', { name: 'Close' });
@@ -108,11 +116,22 @@ suite('Release Detail modal browser verification', () => {
 
       ({ dialog, releaseCard } = await openMusicHasTheRightToChildrenDialog({ baseUrl, page, pageErrors }));
       await dialog.getByText('Roygbiv').waitFor();
+      await dialog.getByText('1 track override needs review before saving Artist Policy.').waitFor();
+      await dialog.getByText('Needs review', { exact: true }).waitFor();
+      await dialog.getByText('Saved override may need remapping after metadata changed.').waitFor();
       await dialog.getByRole('button', { name: 'Request', exact: true }).waitFor();
-
       await assertFocusWithin(dialog, 'Focus should start inside the modal dialog');
       await assertTabFocusContained(page, dialog, { steps: 8 });
       await assertTabFocusContained(page, dialog, { backwards: true, steps: 4 });
+
+      const roygbivOverrideSelect = dialog.getByLabel('Desired state for Roygbiv');
+      assert.equal(await roygbivOverrideSelect.inputValue(), 'suppressed');
+      await dialog.getByRole('button', { name: 'Keep this track for Roygbiv' }).click();
+      await dialog.getByText('Needs review', { exact: true }).waitFor({ state: 'hidden' });
+      await dialog.getByText('1 track override needs review before saving Artist Policy.').waitFor({ state: 'hidden' });
+      assert.equal(await roygbivOverrideSelect.inputValue(), 'suppressed');
+      await page.keyboard.press('Tab');
+      await assertFocusWithin(dialog, 'Tab after repair should re-enter the modal dialog');
 
       const gbEdition = dialog.getByRole('button', {
         name: 'Switch to edition, GB, 1998, 3 tracks',

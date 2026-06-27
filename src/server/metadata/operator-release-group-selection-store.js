@@ -25,8 +25,9 @@ export function createOperatorReleaseGroupSelectionStore({
   async function listOperatorReleaseGroupSelections({
     appUserId = null,
     metadataArtistId = null,
+    queryable = null,
   } = {}) {
-    const pool = getPoolFn();
+    const queryTarget = queryable ?? getPoolFn();
     const clauses = [];
     const params = [];
 
@@ -40,7 +41,7 @@ export function createOperatorReleaseGroupSelectionStore({
     }
 
     const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-    const result = await pool.query(
+    const result = await queryTarget.query(
       `
         SELECT *
         FROM operator_release_group_selection

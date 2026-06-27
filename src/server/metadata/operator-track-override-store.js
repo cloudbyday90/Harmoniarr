@@ -73,8 +73,9 @@ export function createOperatorTrackOverrideStore({
     appUserId = null,
     metadataArtistId = null,
     metadataReleaseGroupId = null,
+    queryable = null,
   } = {}) {
-    const pool = getPoolFn();
+    const queryTarget = queryable ?? getPoolFn();
     const clauses = [];
     const params = [];
 
@@ -92,7 +93,7 @@ export function createOperatorTrackOverrideStore({
     }
 
     const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-    const result = await pool.query(
+    const result = await queryTarget.query(
       `
         SELECT *
         FROM operator_track_override

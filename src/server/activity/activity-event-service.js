@@ -25,6 +25,7 @@ const allowedEventTypes = new Set([
   'download_completed',
   'release_added',
   'artist_monitored',
+  'artist_policy_saved',
   'request_fulfilled',
 ]);
 

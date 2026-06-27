@@ -12,18 +12,20 @@ import {
   defaultSchemaSnapshotPath,
 } from '../src/server/schema-bootstrap.js';
 import { getAppliedMigrationFilenames } from '../src/server/schema-migration-store.js';
-import { withTemporaryPostgresDatabase } from '../testing/postgres-temporary-database.js';
+import { withDockerizedPostgresDatabase } from '../testing/postgres-docker-database.js';
 
 export async function validateSchemaBootstrap({
   bootstrapSchemaFn = bootstrapDatabaseSchemaFromSnapshot,
   getAppliedMigrationFilenamesFn = getAppliedMigrationFilenames,
   loadMigrationManifestFn = loadMigrationManifest,
   schemaSnapshotPath = defaultSchemaSnapshotPath,
-  withTemporaryPostgresDatabaseFn = withTemporaryPostgresDatabase,
+  withDockerizedPostgresDatabaseFn = withDockerizedPostgresDatabase,
+  withTemporaryPostgresDatabaseFn = null,
 } = {}) {
   const migrations = await loadMigrationManifestFn();
+  const withDatabaseFn = withTemporaryPostgresDatabaseFn ?? withDockerizedPostgresDatabaseFn;
 
-  return withTemporaryPostgresDatabaseFn({
+  return withDatabaseFn({
     run: async ({ databaseName, getPoolFn }) => {
       const bootstrapResult = await bootstrapSchemaFn({
         getPoolFn,

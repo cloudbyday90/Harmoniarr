@@ -188,6 +188,36 @@ test('getActivityEventLabel formats artist_monitored', () => {
   assert.equal(getActivityEventLabel(event), 'Now monitoring Boards of Canada');
 });
 
+test('getActivityEventLabel and detail format artist_policy_saved', () => {
+  const event = {
+    eventType: 'artist_policy_saved',
+    entityTitle: 'Boards of Canada',
+    extraPayload: {
+      changes: {
+        monitoring: { changedFieldCount: 1 },
+        releaseGroups: { added: 1, changed: 1, removed: 0 },
+        trackOverrides: {
+          added: 0,
+          changed: 1,
+          clearedReviewCount: 1,
+          removed: 1,
+          resolvedReviewCount: 2,
+        },
+      },
+      reconciliation: {
+        queuedBehindRun: false,
+        runId: 'run-1',
+      },
+    },
+  };
+
+  assert.equal(getActivityEventLabel(event), 'Artist policy saved for Boards of Canada');
+  assert.equal(
+    getActivityEventDetail(event),
+    '1 monitoring field; 2 release selections; 2 track overrides; 2 track reviews repaired; 1 stale track review cleared; reconciliation queued',
+  );
+});
+
 test('getActivityEventLabel formats request_fulfilled for the requester', () => {
   const event = {
     eventType: 'request_fulfilled',
@@ -258,6 +288,7 @@ test('getActivityEventDetail returns empty for non-release events', () => {
 test('getActivityEventIcon returns correct icon keys for each event type', () => {
   assert.equal(getActivityEventIcon('request_created'), 'music-request');
   assert.equal(getActivityEventIcon('artist_monitored'), 'artist-monitored');
+  assert.equal(getActivityEventIcon('artist_policy_saved'), 'artist-policy');
   assert.equal(getActivityEventIcon('release_added'), 'release-added');
   assert.equal(getActivityEventIcon('request_fulfilled'), 'checkmark');
   assert.equal(getActivityEventIcon('download_completed'), 'download');

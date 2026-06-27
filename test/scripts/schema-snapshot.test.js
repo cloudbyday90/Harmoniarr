@@ -53,48 +53,69 @@ test('updateSchemaSnapshot verifies source database migration state before writi
   const calls = [];
 
   const result = await updateSchemaSnapshot({
-    assertDatabaseMigrationStateCurrentFn: async () => {
-      calls.push('database');
-      return { current: true };
+    prepareSchemaSourceFn: async () => {
+      calls.push('docker-source');
+      return {
+        appliedMigrations: ['001.sql'],
+        databaseName: 'docker_db',
+        databaseState: { current: true },
+        image: 'postgres:test',
+      };
     },
     writeFileFn: async (path, content, encoding) => {
       calls.push({ content, encoding, path });
     },
   });
 
-  assert.equal(calls[0], 'database');
+  assert.equal(calls[0], 'docker-source');
   assert.equal(calls[1].path, schemaSnapshotPath);
   assert.equal(calls[1].encoding, 'utf8');
   assert.match(calls[1].content, /-- Harmoniarr schema snapshot/);
   assert.equal(result.databaseState.current, true);
+  assert.deepEqual(result.appliedMigrations, ['001.sql']);
+  assert.equal(result.databaseName, 'docker_db');
+  assert.equal(result.dockerImage, 'postgres:test');
   assert.ok(result.migrationCount > 0);
   assert.equal(result.snapshotPath, schemaSnapshotPath);
 });
 
 test('checkDatabaseBackedSchema verifies source database, committed snapshot, and fresh bootstrap', async () => {
   const calls = [];
+  const sourcePool = {};
+  const temporaryDatabaseRunner = async ({ run }) => run({
+    databaseName: 'snapshot_db',
+    getPoolFn: () => ({}),
+  });
 
   const result = await checkDatabaseBackedSchema({
-    assertDatabaseMigrationStateCurrentFn: async () => {
-      calls.push('database');
-      return { current: true };
-    },
     checkSchemaSnapshotFn: async () => {
       calls.push('snapshot');
       return { migrationCount: 2, snapshotPath: 'schema.sql' };
+    },
+    prepareSchemaSourceFn: async ({ run }) => {
+      calls.push('docker-source');
+      return run({
+        databaseName: 'docker_db',
+        databaseState: { current: true },
+        getPoolFn: () => sourcePool,
+        image: 'postgres:test',
+        temporaryDatabaseRunner,
+      });
     },
     validateSchemaBootstrapFn: async () => {
       calls.push('bootstrap');
       return { appliedCount: 2, migrationCount: 2 };
     },
-    validateSchemaAnchorsAgainstSnapshotFn: async () => {
-      calls.push('anchors');
+    validateSchemaAnchorsAgainstSnapshotFn: async ({ getPoolFn }) => {
+      calls.push(getPoolFn() === sourcePool ? 'anchors:source' : 'anchors:wrong-source');
       return { anchorCount: 3 };
     },
   });
 
-  assert.deepEqual(calls, ['database', 'snapshot', 'bootstrap', 'anchors']);
+  assert.deepEqual(calls, ['docker-source', 'snapshot', 'bootstrap', 'anchors:source']);
   assert.equal(result.databaseState.current, true);
+  assert.equal(result.databaseName, 'docker_db');
+  assert.equal(result.dockerImage, 'postgres:test');
   assert.equal(result.snapshot.migrationCount, 2);
   assert.equal(result.bootstrap.appliedCount, 2);
   assert.equal(result.anchors.anchorCount, 3);

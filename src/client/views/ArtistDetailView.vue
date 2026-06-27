@@ -87,10 +87,18 @@ import {
   createOperatorArtistDetailDraft,
   describeReleaseGroupOverride,
   fingerprintOperatorArtistDraft,
+  getDraftReleaseGroupTrackOverrideReviewSummary,
   getDraftReleaseGroupSelectionState,
+  hasDraftReleaseGroupTrackOverrideReview,
+  removeDraftTrackOverride,
+  resolveDraftTrackOverrideRemapReview,
   setDraftReleaseGroupSelectionState,
   setDraftTrackOverrideState,
 } from '../lib/operator-artist-detail-draft.js';
+import {
+  buildTrackOverrideRemapReviewSummaryText,
+  getTrackOverrideRemapReviewSummaryTone,
+} from '../lib/operator-track-override-remap-review.js';
 import {
   calculateOperatorArtistCoveragePercent,
   formatOperatorArtistActivityLine,
@@ -230,6 +238,8 @@ const controlledDiscographySections = computed(() =>
         getDraftReleaseGroupSelectionState(policyDraft.value, release.sourceReleaseGroup),
       hasManualOverride: (release) =>
         describeReleaseGroupOverride(policyDraft.value, release.sourceReleaseGroup) !== 'Policy default',
+      hasTrackOverrideReview: (release) =>
+        hasDraftReleaseGroupTrackOverrideReview(policyDraft.value, release.sourceReleaseGroup),
       releases: section.releases,
     });
 
@@ -343,6 +353,22 @@ function resetSectionControls(sectionType) {
   updateSectionControls(sectionType, defaultArtistDetailSectionControls);
 }
 
+function getReleaseGroupTrackOverrideReviewSummary(releaseGroup) {
+  return getDraftReleaseGroupTrackOverrideReviewSummary(policyDraft.value, releaseGroup);
+}
+
+function buildReleaseGroupTrackOverrideReviewText(releaseGroup) {
+  return buildTrackOverrideRemapReviewSummaryText(
+    getReleaseGroupTrackOverrideReviewSummary(releaseGroup),
+  );
+}
+
+function getReleaseGroupTrackOverrideReviewTone(releaseGroup) {
+  return getTrackOverrideRemapReviewSummaryTone(
+    getReleaseGroupTrackOverrideReviewSummary(releaseGroup),
+  );
+}
+
 function canApplyBulkSelectionChanges() {
   return canEditOperatorPolicy.value
     && !isSavingPolicy.value
@@ -403,6 +429,18 @@ function updateDraftTrackOverride({ medium, overrideState, release, releaseGroup
       metadataReleaseId: release?.id ?? null,
     },
   );
+}
+
+function repairDraftTrackOverride({ action, trackOverride }) {
+  if (!canEditOperatorPolicy.value || !trackOverride || isSavingPolicy.value) {
+    return;
+  }
+
+  if (action === 'resolve') {
+    resolveDraftTrackOverrideRemapReview(policyDraft.value, trackOverride);
+  } else if (action === 'clear') {
+    removeDraftTrackOverride(policyDraft.value, trackOverride);
+  }
 }
 
 async function savePolicyDraft() {
@@ -841,6 +879,20 @@ watch(projection, () => {
                       <span class="artist-detail-selection__note">
                         {{ describeReleaseGroupOverride(policyDraft, release.sourceReleaseGroup) }}
                       </span>
+                      <span
+                        v-if="hasDraftReleaseGroupTrackOverrideReview(policyDraft, release.sourceReleaseGroup)"
+                        class="artist-detail-selection__review"
+                      >
+                        <span
+                          class="hx-pill"
+                          :data-tone="getReleaseGroupTrackOverrideReviewTone(release.sourceReleaseGroup)"
+                        >
+                          Track review
+                        </span>
+                        <span class="artist-detail-selection__review-copy">
+                          {{ buildReleaseGroupTrackOverrideReviewText(release.sourceReleaseGroup) }}
+                        </span>
+                      </span>
                     </div>
                   </template>
                 </ReleaseCard>
@@ -911,6 +963,7 @@ watch(projection, () => {
       @close="closeDetailModal"
       @requested="closeDetailModal"
       @track-override-change="updateDraftTrackOverride"
+      @track-override-repair="repairDraftTrackOverride"
     />
 
     <ConfirmDialog
@@ -1268,6 +1321,21 @@ watch(projection, () => {
 }
 
 .artist-detail-selection__note {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  line-height: 1.35;
+}
+
+.artist-detail-selection__review {
+  display: grid;
+  gap: var(--hx-space-1);
+}
+
+.artist-detail-selection__review .hx-pill {
+  justify-self: start;
+}
+
+.artist-detail-selection__review-copy {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-xs);
   line-height: 1.35;

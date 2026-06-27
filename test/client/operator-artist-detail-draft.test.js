@@ -23,8 +23,13 @@ import {
   createOperatorArtistDetailDraft,
   describeReleaseGroupOverride,
   fingerprintOperatorArtistDraft,
+  getDraftReleaseGroupTrackOverrideReviewSummary,
+  getDraftTrackOverride,
   getDraftTrackOverrideState,
   getDraftReleaseGroupSelectionState,
+  hasDraftReleaseGroupTrackOverrideReview,
+  removeDraftTrackOverride,
+  resolveDraftTrackOverrideRemapReview,
   setDraftReleaseGroupSelectionState,
   setDraftTrackOverrideState,
 } from '../../src/client/lib/operator-artist-detail-draft.js';
@@ -183,4 +188,115 @@ test('setDraftTrackOverrideState records and clears track override intent', () =
   setDraftTrackOverrideState(draft, releaseGroup, track, 'policy', context);
   assert.equal(getDraftTrackOverrideState(draft, releaseGroup, track, context), 'policy');
   assert.deepEqual(draft.trackOverrides, []);
+});
+
+test('draft helpers expose track override remap review state for a release group and row', () => {
+  const draft = createOperatorArtistDetailDraft({
+    operator: {
+      monitoring: { monitoredReleaseGroupTypes: ['album'] },
+      trackOverrides: [
+        {
+          isDesired: true,
+          mediumPosition: 1,
+          metadataReleaseGroupId: 'local-rg-1',
+          metadataReleaseId: 'local-release-1',
+          recordingMbid: 'mb-recording-roygbiv',
+          remapStatus: 'review_needed',
+          trackPosition: 3,
+          trackTitleSnapshot: 'Roygbiv',
+        },
+        {
+          isDesired: false,
+          mediumPosition: 1,
+          metadataReleaseGroupId: 'local-rg-1',
+          metadataReleaseId: 'local-release-1',
+          recordingMbid: 'mb-recording-missing',
+          remapStatus: 'orphaned',
+          trackPosition: 9,
+          trackTitleSnapshot: 'Missing Track',
+        },
+      ],
+    },
+  });
+  const releaseGroup = makeReleaseGroup();
+  const track = {
+    position: 3,
+    recordingMbid: 'mb-recording-roygbiv',
+    title: 'Roygbiv',
+  };
+
+  assert.equal(hasDraftReleaseGroupTrackOverrideReview(draft, releaseGroup), true);
+  assert.deepEqual(getDraftReleaseGroupTrackOverrideReviewSummary(draft, releaseGroup), {
+    hasReview: true,
+    orphanedCount: 1,
+    reviewNeededCount: 1,
+    totalReviewCount: 2,
+  });
+  assert.equal(
+    getDraftTrackOverride(draft, releaseGroup, track, {
+      mediumPosition: 1,
+      metadataReleaseId: 'local-release-1',
+    }).remapStatus,
+    'review_needed',
+  );
+});
+
+test('resolveDraftTrackOverrideRemapReview preserves override intent and clears review state', () => {
+  const draft = createOperatorArtistDetailDraft({
+    operator: {
+      monitoring: { monitoredReleaseGroupTypes: ['album'] },
+      trackOverrides: [{
+        isDesired: false,
+        mediumPosition: 1,
+        metadataReleaseGroupId: 'local-rg-1',
+        metadataReleaseId: 'local-release-1',
+        recordingMbid: 'mb-recording-roygbiv',
+        remapStatus: 'review_needed',
+        trackPosition: 3,
+        trackTitleSnapshot: 'Roygbiv',
+      }],
+    },
+  });
+
+  resolveDraftTrackOverrideRemapReview(draft, draft.trackOverrides[0]);
+
+  assert.equal(draft.trackOverrides.length, 1);
+  assert.equal(draft.trackOverrides[0].isDesired, false);
+  assert.equal(draft.trackOverrides[0].remapStatus, 'resolved');
+  assert.equal(hasDraftReleaseGroupTrackOverrideReview(draft, makeReleaseGroup()), false);
+});
+
+test('removeDraftTrackOverride clears the selected override by saved identity', () => {
+  const draft = createOperatorArtistDetailDraft({
+    operator: {
+      monitoring: { monitoredReleaseGroupTypes: ['album'] },
+      trackOverrides: [
+        {
+          isDesired: false,
+          mediumPosition: 1,
+          metadataReleaseGroupId: 'local-rg-1',
+          metadataReleaseId: 'local-release-1',
+          recordingMbid: 'mb-recording-roygbiv',
+          remapStatus: 'review_needed',
+          trackPosition: 3,
+          trackTitleSnapshot: 'Roygbiv',
+        },
+        {
+          isDesired: true,
+          mediumPosition: 1,
+          metadataReleaseGroupId: 'local-rg-1',
+          metadataReleaseId: 'local-release-1',
+          recordingMbid: 'mb-recording-other',
+          remapStatus: 'resolved',
+          trackPosition: 4,
+          trackTitleSnapshot: 'Other Track',
+        },
+      ],
+    },
+  });
+
+  removeDraftTrackOverride(draft, draft.trackOverrides[0]);
+
+  assert.equal(draft.trackOverrides.length, 1);
+  assert.equal(draft.trackOverrides[0].recordingMbid, 'mb-recording-other');
 });

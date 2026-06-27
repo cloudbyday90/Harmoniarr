@@ -48,6 +48,39 @@ test('validateSchemaBootstrap bootstraps an empty temporary database and finds n
   assert.equal(calls[2].kind, 'release');
 });
 
+test('validateSchemaBootstrap uses the Docker database runner by default', async () => {
+  const calls = [];
+
+  const result = await validateSchemaBootstrap({
+    bootstrapSchemaFn: async () => {
+      calls.push('bootstrap');
+      return { bootstrapped: true };
+    },
+    getAppliedMigrationFilenamesFn: async () => new Set(['20260427_000001_bootstrap.sql']),
+    loadMigrationManifestFn: async () => ([
+      { filename: '20260427_000001_bootstrap.sql' },
+    ]),
+    withDockerizedPostgresDatabaseFn: async ({ run }) => {
+      calls.push('docker');
+      return run({
+        databaseName: 'docker_schema_db',
+        getPoolFn: () => ({
+          async connect() {
+            return {
+              release() {
+                calls.push('release');
+              },
+            };
+          },
+        }),
+      });
+    },
+  });
+
+  assert.equal(result.databaseName, 'docker_schema_db');
+  assert.deepEqual(calls, ['docker', 'bootstrap', 'release']);
+});
+
 test('validateSchemaBootstrap fails when the snapshot leaves pending migrations', async () => {
   await assert.rejects(
     () => validateSchemaBootstrap({

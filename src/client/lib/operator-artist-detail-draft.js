@@ -17,6 +17,9 @@
  */
 
 import { defaultAddArtistPolicyForm, normalizeAddArtistPolicyForm } from './add-artist-policy.js';
+import {
+  summarizeTrackOverrideRemapReview,
+} from './operator-track-override-remap-review.js';
 
 const defaultMonitoring = Object.freeze({
   acquisitionProfileKey: defaultAddArtistPolicyForm.acquisitionProfileKey,
@@ -90,7 +93,7 @@ function normalizeTrackOverride(override = {}) {
   };
 }
 
-function buildDraftTrackOverrideIdentity(releaseGroup, track, context = {}) {
+export function buildDraftTrackOverrideIdentity(releaseGroup, track, context = {}) {
   const metadataReleaseGroupId = normalizeNullableString(releaseGroup?.id ?? context.metadataReleaseGroupId);
   const trackMbid = normalizeNullableString(
     track?.trackMbid ?? track?.musicbrainzTrackId ?? track?.musicbrainzTrackMbid,
@@ -133,12 +136,95 @@ function isSameTrackOverrideIdentity(override, identity) {
     && (override.metadataReleaseId ?? null) === (identity.metadataReleaseId ?? null);
 }
 
+function buildDraftTrackOverrideIdentityFromOverride(override) {
+  if (!override?.metadataReleaseGroupId) {
+    return null;
+  }
+
+  if (override.trackMbid) {
+    return {
+      mediumPosition: null,
+      metadataReleaseGroupId: override.metadataReleaseGroupId,
+      metadataReleaseId: null,
+      recordingMbid: null,
+      trackMbid: override.trackMbid,
+      trackPosition: null,
+    };
+  }
+
+  if (!override.recordingMbid || override.mediumPosition == null || override.trackPosition == null) {
+    return null;
+  }
+
+  return {
+    mediumPosition: override.mediumPosition,
+    metadataReleaseGroupId: override.metadataReleaseGroupId,
+    metadataReleaseId: override.metadataReleaseId ?? null,
+    recordingMbid: override.recordingMbid,
+    trackMbid: null,
+    trackPosition: override.trackPosition,
+  };
+}
+
 function findDraftTrackOverrideIndex(draft, releaseGroup, track, context = {}) {
   const identity = buildDraftTrackOverrideIdentity(releaseGroup, track, context);
   if (!identity) return -1;
 
   return (draft?.trackOverrides ?? [])
     .findIndex((override) => isSameTrackOverrideIdentity(override, identity));
+}
+
+export function getDraftTrackOverride(draft, releaseGroup, track, context = {}) {
+  const overrideIndex = findDraftTrackOverrideIndex(draft, releaseGroup, track, context);
+  if (overrideIndex < 0) return null;
+  return draft.trackOverrides[overrideIndex] ?? null;
+}
+
+export function getDraftReleaseGroupTrackOverrides(draft, releaseGroup) {
+  return (draft?.trackOverrides ?? [])
+    .filter((trackOverride) => trackOverride.metadataReleaseGroupId === releaseGroup?.id);
+}
+
+export function getDraftReleaseGroupTrackOverrideReviewSummary(draft, releaseGroup) {
+  return summarizeTrackOverrideRemapReview(
+    getDraftReleaseGroupTrackOverrides(draft, releaseGroup),
+  );
+}
+
+export function hasDraftReleaseGroupTrackOverrideReview(draft, releaseGroup) {
+  return getDraftReleaseGroupTrackOverrideReviewSummary(draft, releaseGroup).hasReview;
+}
+
+export function removeDraftTrackOverride(draft, trackOverride) {
+  if (!draft || !trackOverride) {
+    return draft;
+  }
+
+  const identity = buildDraftTrackOverrideIdentityFromOverride(trackOverride);
+  if (!identity) {
+    return draft;
+  }
+
+  draft.trackOverrides = (draft.trackOverrides ?? [])
+    .filter((override) => !isSameTrackOverrideIdentity(override, identity));
+  return draft;
+}
+
+export function resolveDraftTrackOverrideRemapReview(draft, trackOverride) {
+  if (!draft || !trackOverride) {
+    return draft;
+  }
+
+  const identity = buildDraftTrackOverrideIdentityFromOverride(trackOverride);
+  if (!identity) {
+    return draft;
+  }
+
+  draft.trackOverrides = (draft.trackOverrides ?? [])
+    .map((override) => isSameTrackOverrideIdentity(override, identity)
+      ? normalizeTrackOverride({ ...override, remapStatus: 'resolved' })
+      : override);
+  return draft;
 }
 
 export function createOperatorArtistDetailDraft(projection = {}) {
@@ -200,9 +286,9 @@ export function canBuildDraftTrackOverride(releaseGroup, track, context = {}) {
 }
 
 export function getDraftTrackOverrideState(draft, releaseGroup, track, context = {}) {
-  const overrideIndex = findDraftTrackOverrideIndex(draft, releaseGroup, track, context);
-  if (overrideIndex < 0) return 'policy';
-  return draft.trackOverrides[overrideIndex].isDesired ? 'desired' : 'suppressed';
+  const override = getDraftTrackOverride(draft, releaseGroup, track, context);
+  if (!override) return 'policy';
+  return override.isDesired ? 'desired' : 'suppressed';
 }
 
 export function setDraftTrackOverrideState(draft, releaseGroup, track, overrideState, context = {}) {
@@ -271,13 +357,18 @@ export function fingerprintOperatorArtistDraft(draft = {}) {
 export function describeReleaseGroupOverride(draft, releaseGroup) {
   const state = getDraftReleaseGroupSelectionState(draft, releaseGroup);
   const policyState = isReleaseGroupSelectedByPolicy(draft, releaseGroup) ? 'selected' : 'unselected';
-  const draftTrackOverrideCount = (draft?.trackOverrides ?? [])
-    .filter((trackOverride) => trackOverride.metadataReleaseGroupId === releaseGroup?.id)
-    .length;
+  const draftReleaseGroupTrackOverrides = getDraftReleaseGroupTrackOverrides(draft, releaseGroup);
+  const draftTrackOverrideCount = draftReleaseGroupTrackOverrides.length;
   const trackOverrideCount = draftTrackOverrideCount
     || releaseGroup?.operatorState?.trackOverrideSummary?.totalCount
     || 0;
-  const reviewNeededCount = releaseGroup?.operatorState?.trackOverrideSummary?.reviewNeededCount ?? 0;
+  const savedTrackOverrideSummary = releaseGroup?.operatorState?.trackOverrideSummary ?? {};
+  const reviewSummary = draftTrackOverrideCount > 0
+    ? summarizeTrackOverrideRemapReview(draftReleaseGroupTrackOverrides)
+    : {
+      hasReview: Number(savedTrackOverrideSummary.reviewNeededCount ?? 0)
+        + Number(savedTrackOverrideSummary.orphanedCount ?? 0) > 0,
+    };
 
   if (state !== policyState) {
     if (state === 'partial') return 'Manual partial selection';
@@ -286,8 +377,8 @@ export function describeReleaseGroupOverride(draft, releaseGroup) {
   }
 
   if (trackOverrideCount > 0) {
-    return reviewNeededCount > 0
-      ? `${trackOverrideCount} track override${trackOverrideCount === 1 ? '' : 's'} need review`
+    return reviewSummary.hasReview
+      ? `${trackOverrideCount} track override${trackOverrideCount === 1 ? ' needs' : 's need'} review`
       : `${trackOverrideCount} track override${trackOverrideCount === 1 ? '' : 's'}`;
   }
 

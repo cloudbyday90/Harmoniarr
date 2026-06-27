@@ -21,6 +21,7 @@ import {
   formatReleaseActivitySubject,
   normalizeReleaseActivityPresentation,
 } from '../../shared/release-activity-presentation.js';
+import { formatArtistPolicyActivityDetail } from './artist-policy-activity-presentation.js';
 
 /**
  * Activity event normalization helpers.
@@ -98,6 +99,10 @@ export function getActivityEventLabel(event, currentUserId = null) {
       const artistName = title ?? 'an artist';
       return `Now monitoring ${artistName}`;
     }
+    case 'artist_policy_saved': {
+      const artistName = title ?? 'an artist';
+      return `Artist policy saved for ${artistName}`;
+    }
     case 'release_added': {
       const releaseDesc = formatReleaseActivitySubject(
         event.releasePresentation,
@@ -130,6 +135,10 @@ export function getActivityEventDetail(event) {
     return '';
   }
 
+  if (event.eventType === 'artist_policy_saved') {
+    return formatArtistPolicyActivityDetail(event.extraPayload ?? {});
+  }
+
   if (event.eventType !== 'release_added') {
     return '';
   }
@@ -157,6 +166,8 @@ export function getActivityEventIcon(eventType) {
       return 'music-request';
     case 'artist_monitored':
       return 'artist-monitored';
+    case 'artist_policy_saved':
+      return 'artist-policy';
     case 'release_added':
       return 'release-added';
     case 'request_fulfilled':

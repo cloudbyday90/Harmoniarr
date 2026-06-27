@@ -8,10 +8,13 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { applyPendingMigrations } from '../src/server/migrations.js';
 import { loadMigrationManifest } from '../src/server/migration-manifest.js';
 import { assertDatabaseMigrationStateCurrent } from '../src/server/schema-migration-state-service.js';
 import { schemaIdFunctionSql, schemaIdPgcryptoSql } from '../src/server/schema-id-function.js';
 import { schemaMigrationsTableSql } from '../src/server/schema-migration-store.js';
+import { withDockerizedPostgresDatabase } from '../testing/postgres-docker-database.js';
+import { withTemporaryPostgresDatabase } from '../testing/postgres-temporary-database.js';
 import { validateSchemaAnchorsAgainstSnapshot } from './schema-anchor-validation.js';
 import { validateSchemaBootstrap } from './schema-bootstrap-validation.js';
 
@@ -137,34 +140,88 @@ export async function checkSchemaSnapshot() {
   return expected;
 }
 
-export async function updateSchemaSnapshot({
+function createTemporaryDatabaseRunner(env) {
+  return (options = {}) => withTemporaryPostgresDatabase({
+    ...options,
+    env,
+  });
+}
+
+export async function prepareDockerSchemaSource({
+  applyPendingMigrationsFn = applyPendingMigrations,
   assertDatabaseMigrationStateCurrentFn = assertDatabaseMigrationStateCurrent,
+  run = null,
+  withDockerizedPostgresDatabaseFn = withDockerizedPostgresDatabase,
+} = {}) {
+  return withDockerizedPostgresDatabaseFn({
+    run: async ({ databaseName, env, getPoolFn, image }) => {
+      const appliedMigrations = await applyPendingMigrationsFn({ getPoolFn });
+      const databaseState = await assertDatabaseMigrationStateCurrentFn({ getPoolFn });
+      const source = {
+        appliedMigrations,
+        databaseName,
+        databaseState,
+        getPoolFn,
+        image,
+        temporaryDatabaseRunner: createTemporaryDatabaseRunner(env),
+      };
+
+      if (typeof run === 'function') {
+        return run(source);
+      }
+
+      return {
+        appliedMigrations: source.appliedMigrations,
+        databaseName: source.databaseName,
+        databaseState: source.databaseState,
+        image: source.image,
+      };
+    },
+  });
+}
+
+export async function updateSchemaSnapshot({
+  prepareSchemaSourceFn = prepareDockerSchemaSource,
   writeFileFn = writeFile,
 } = {}) {
-  const databaseState = await assertDatabaseMigrationStateCurrentFn();
+  const source = await prepareSchemaSourceFn();
   const expected = await buildExpectedSchemaSnapshot();
   await writeFileFn(schemaSnapshotPath, expected.content, 'utf8');
   return {
     ...expected,
-    databaseState,
+    appliedMigrations: source.appliedMigrations ?? [],
+    databaseName: source.databaseName ?? null,
+    databaseState: source.databaseState ?? null,
+    dockerImage: source.image ?? null,
   };
 }
 
 export async function checkDatabaseBackedSchema({
-  assertDatabaseMigrationStateCurrentFn = assertDatabaseMigrationStateCurrent,
   checkSchemaSnapshotFn = checkSchemaSnapshot,
+  prepareSchemaSourceFn = prepareDockerSchemaSource,
   validateSchemaAnchorsAgainstSnapshotFn = validateSchemaAnchorsAgainstSnapshot,
   validateSchemaBootstrapFn = validateSchemaBootstrap,
 } = {}) {
-  const databaseState = await assertDatabaseMigrationStateCurrentFn();
-  const snapshot = await checkSchemaSnapshotFn();
-  const bootstrap = await validateSchemaBootstrapFn();
-  const anchors = await validateSchemaAnchorsAgainstSnapshotFn();
+  return prepareSchemaSourceFn({
+    run: async (source) => {
+      const snapshot = await checkSchemaSnapshotFn();
+      const temporaryDatabaseRunner = source.temporaryDatabaseRunner ?? withTemporaryPostgresDatabase;
+      const bootstrap = await validateSchemaBootstrapFn({
+        withDockerizedPostgresDatabaseFn: temporaryDatabaseRunner,
+      });
+      const anchors = await validateSchemaAnchorsAgainstSnapshotFn({
+        getPoolFn: source.getPoolFn,
+        withDockerizedPostgresDatabaseFn: temporaryDatabaseRunner,
+      });
 
-  return {
-    anchors,
-    bootstrap,
-    databaseState,
-    snapshot,
-  };
+      return {
+        anchors,
+        bootstrap,
+        databaseName: source.databaseName ?? null,
+        databaseState: source.databaseState ?? null,
+        dockerImage: source.image ?? null,
+        snapshot,
+      };
+    },
+  });
 }

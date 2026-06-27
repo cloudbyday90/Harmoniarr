@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { buildOperatorArtistPolicyChangeSummary } from './operator-artist-policy-change-summary.js';
 import { normalizeOperatorArtistMonitoringPatch } from './operator-artist-monitoring-service.js';
 import { createOperatorArtistMonitoringStore } from './operator-artist-monitoring-store.js';
 import { createOperatorArtistProjectionService } from './operator-artist-projection-service.js';
@@ -192,7 +193,7 @@ function buildSnapshotPayload({
 async function fetchArtistRow({ client, metadataArtistId }) {
   const result = await client.query(
     `
-      SELECT id, name
+      SELECT id, musicbrainz_artist_id, name
       FROM metadata_artists
       WHERE id = $1
       LIMIT 1
@@ -206,6 +207,7 @@ async function fetchArtistRow({ client, metadataArtistId }) {
 
   return {
     id: result.rows[0].id,
+    musicBrainzArtistId: result.rows[0].musicbrainz_artist_id ?? null,
     name: result.rows[0].name,
   };
 }
@@ -238,6 +240,62 @@ async function fetchExistingMonitoringTimestamps({ appUserId, client, metadataAr
     lastSavedSnapshotAt: result.rows[0]?.last_saved_snapshot_at?.toISOString?.() ?? null,
     wasMonitored: result.rows[0]?.is_monitored === true,
   };
+}
+
+async function getPreviousMonitoringPolicy({
+  appUserId,
+  client,
+  existingMonitoring,
+  metadataArtistId,
+  operatorArtistMonitoringStore,
+}) {
+  if (typeof operatorArtistMonitoringStore.getOperatorArtistMonitoring !== 'function') {
+    return {
+      isMonitored: existingMonitoring.wasMonitored,
+      lastReconciledAt: existingMonitoring.lastReconciledAt,
+      lastSavedSnapshotAt: existingMonitoring.lastSavedSnapshotAt,
+    };
+  }
+
+  return operatorArtistMonitoringStore.getOperatorArtistMonitoring({
+    appUserId,
+    metadataArtistId,
+    queryable: client,
+  });
+}
+
+async function listPreviousReleaseGroupSelections({
+  appUserId,
+  client,
+  metadataArtistId,
+  operatorReleaseGroupSelectionStore,
+}) {
+  if (typeof operatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections !== 'function') {
+    return [];
+  }
+
+  return operatorReleaseGroupSelectionStore.listOperatorReleaseGroupSelections({
+    appUserId,
+    metadataArtistId,
+    queryable: client,
+  });
+}
+
+async function listPreviousTrackOverrides({
+  appUserId,
+  client,
+  metadataArtistId,
+  operatorTrackOverrideStore,
+}) {
+  if (typeof operatorTrackOverrideStore.listOperatorTrackOverrides !== 'function') {
+    return [];
+  }
+
+  return operatorTrackOverrideStore.listOperatorTrackOverrides({
+    appUserId,
+    metadataArtistId,
+    queryable: client,
+  });
 }
 
 async function fetchReleaseGroupOwnership({ client, metadataArtistId, referencedReleaseGroupIds }) {
@@ -389,6 +447,31 @@ export function createOperatorArtistSaveService({
           client,
           metadataArtistId,
         });
+        const [
+          previousMonitoring,
+          previousReleaseGroupSelections,
+          previousTrackOverrides,
+        ] = await Promise.all([
+          getPreviousMonitoringPolicy({
+            appUserId,
+            client,
+            existingMonitoring,
+            metadataArtistId,
+            operatorArtistMonitoringStore,
+          }),
+          listPreviousReleaseGroupSelections({
+            appUserId,
+            client,
+            metadataArtistId,
+            operatorReleaseGroupSelectionStore,
+          }),
+          listPreviousTrackOverrides({
+            appUserId,
+            client,
+            metadataArtistId,
+            operatorTrackOverrideStore,
+          }),
+        ]);
 
         await fetchReleaseGroupOwnership({
           client,
@@ -454,8 +537,38 @@ export function createOperatorArtistSaveService({
           triggerSource,
           triggeredByUserId,
         });
+        const reconciliationSummary = summarizeQueueResult(queueResult);
+        const policyChangeSummary = buildOperatorArtistPolicyChangeSummary({
+          metadataArtistId,
+          nextMonitoring: persistedMonitoring,
+          nextReleaseGroupSelections: normalizedReleaseGroupSelections,
+          nextTrackOverrides: normalizedTrackOverrides,
+          previousMonitoring,
+          previousReleaseGroupSelections,
+          previousTrackOverrides,
+          reconciliation: reconciliationSummary,
+          snapshot,
+        });
 
         await client.query('COMMIT');
+
+        if (policyChangeSummary.hasChanges && typeof recordActivityEventFn === 'function') {
+          const actorUserId = triggeredByUserId ?? appUserId;
+          void Promise.resolve()
+            .then(() => recordActivityEventFn({
+              actorUserId,
+              entityId: metadataArtistId,
+              entityTitle: artist.name ?? null,
+              entityType: 'artist',
+              eventType: 'artist_policy_saved',
+              extraPayload: {
+                ...policyChangeSummary,
+                artistMusicBrainzId: artist.musicBrainzArtistId,
+                triggerSource,
+              },
+            }))
+            .catch(() => {});
+        }
 
         if (normalizedMonitoringPatch.isMonitored === true && typeof startMetadataArtistRefresh === 'function') {
           // Kick off a metadata catalog refresh so the artist's discography is
@@ -519,7 +632,7 @@ export function createOperatorArtistSaveService({
           artistId: metadataArtistId,
           operator: projection?.operator ?? null,
           projection,
-          reconciliation: summarizeQueueResult(queueResult),
+          reconciliation: reconciliationSummary,
           snapshot: summarizeSnapshot(snapshot),
         };
       } catch (error) {

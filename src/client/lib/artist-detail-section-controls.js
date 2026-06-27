@@ -22,6 +22,7 @@ export const ARTIST_DETAIL_SECTION_SELECTION_FILTERS = Object.freeze([
   { label: 'Partial', value: 'partial' },
   { label: 'Unselected', value: 'unselected' },
   { label: 'Manual overrides', value: 'manual_overrides' },
+  { label: 'Track review needed', value: 'track_review' },
 ]);
 
 export const ARTIST_DETAIL_SECTION_SORT_OPTIONS = Object.freeze([
@@ -146,6 +147,7 @@ export function applyArtistDetailSectionControls({
   controls = {},
   getSelectionState = () => 'selected',
   hasManualOverride = () => false,
+  hasTrackOverrideReview = () => false,
   releases = [],
 } = {}) {
   const normalizedControls = normalizeControls(controls);
@@ -158,6 +160,10 @@ export function applyArtistDetailSectionControls({
 
     if (normalizedControls.selectionFilter === 'manual_overrides') {
       return hasManualOverride(release);
+    }
+
+    if (normalizedControls.selectionFilter === 'track_review') {
+      return hasTrackOverrideReview(release);
     }
 
     if (normalizedControls.selectionFilter !== 'all') {

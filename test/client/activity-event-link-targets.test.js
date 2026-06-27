@@ -168,6 +168,30 @@ test('buildActivityEventLinkTarget returns null for release_added with source bu
   assert.equal(buildActivityEventLinkTarget(event), null);
 });
 
+test('buildActivityEventLinkTarget resolves artist policy activity back to Artist Detail', () => {
+  const target = buildActivityEventLinkTarget({
+    eventType: 'artist_policy_saved',
+    extraPayload: {
+      artistMusicBrainzId: 'mb-artist-boards',
+    },
+  });
+
+  assert.deepEqual(target, {
+    label: 'Open artist policy',
+    to: {
+      name: 'artist-detail',
+      params: { mbid: 'mb-artist-boards' },
+    },
+  });
+});
+
+test('buildActivityEventLinkTarget returns null for artist policy activity without MusicBrainz artist id', () => {
+  assert.equal(buildActivityEventLinkTarget({
+    eventType: 'artist_policy_saved',
+    extraPayload: {},
+  }), null);
+});
+
 test('buildActivityEventLinkTarget falls back to legacy normalization when releasePresentation is missing', () => {
   const event = {
     id: 'evt-legacy',

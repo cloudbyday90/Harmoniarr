@@ -9,6 +9,13 @@ Database model source: `docs/DATABASE_MODEL.md`
 ## Current Status (2026-05-23)
 
 - Current validation baseline: 1534 server / 3087 client tests pass.
+- Docker-backed schema generation and validation: database-backed schema
+  commands now use disposable Testcontainers PostgreSQL instances instead of an
+  ambient local database. `update:schema-snapshot`, `db:dump-schema`,
+  `validate:schema-bootstrap`, and `db:check-schema` now replay or bootstrap
+  against fresh Docker PostgreSQL state, while `check:schema-snapshot` remains a
+  fast no-Docker deterministic text check. See
+  `DOCKER_SCHEMA_GENERATION_DESIGN.md`.
 - Discover browser keyboard verification: added a seeded Playwright suite for
   the Discover recommendation grid and monitored-artist chip band. The suite
   proves roving `tabindex` state, Arrow/Home/Control+Home/Control+End movement,
@@ -35,6 +42,25 @@ Database model source: `docs/DATABASE_MODEL.md`
   and Request controls. A narrow wanted browser fixture now seeds wanted
   summary, wanted releases, and reconciliation summary responses for this and
   later Activity Wanted coverage.
+- Track-override remap review UX: Artist Detail now exposes a `Track review
+  needed` section filter, affected release cards show text plus warning/danger
+  review indicators, and Release Detail surfaces release-level review notes plus
+  row-level matched-track status for saved `review_needed` / `orphaned` track
+  overrides. The implementation uses the existing operator projection and
+  Artist Policy save boundary; no new mutation route or migration was needed.
+  See `TRACK_OVERRIDE_REMAP_REVIEW_UX_DESIGN.md`.
+- Track-override remap repair workflow: Release Detail now provides explicit
+  draft repair actions for ambiguous saved track overrides. `Keep this track`
+  resolves a matched reviewed override without changing desired/suppressed
+  intent, while `Clear override` removes stale reviewed overrides from the draft.
+  Operators persist these repairs through the existing Save Policy action. See
+  `TRACK_OVERRIDE_REMAP_REPAIR_WORKFLOW_DESIGN.md`.
+- Artist Policy audit visibility: saved Artist Policy changes now emit bounded
+  `artist_policy_saved` Activity events after the save transaction commits. The
+  payload records monitoring/release/track change counts, repaired and cleared
+  track-review counts, snapshot revision, reconciliation run id, and a link back
+  to Artist Detail without storing the full draft body. See
+  `ARTIST_POLICY_AUDIT_VISIBILITY_DESIGN.md`.
 - Activity releases/wanted browser verification: added focused Playwright
   coverage for Activity Releases recent/upcoming card grids using a deterministic
   release-radar fixture, proving roving movement, visible focus, active-card

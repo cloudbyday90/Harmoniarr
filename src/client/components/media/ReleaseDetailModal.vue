@@ -32,8 +32,17 @@ import {
 } from '../../lib/track-duration.js';
 import {
   canBuildDraftTrackOverride,
+  getDraftReleaseGroupTrackOverrides,
+  getDraftReleaseGroupTrackOverrideReviewSummary,
+  getDraftTrackOverride,
   getDraftTrackOverrideState,
 } from '../../lib/operator-artist-detail-draft.js';
+import {
+  buildTrackOverrideRemapReviewSummaryText,
+  getTrackOverrideRemapReviewPresentation,
+  getTrackOverrideRemapReviewSummaryTone,
+  isTrackOverrideRemapReviewStatus,
+} from '../../lib/operator-track-override-remap-review.js';
 
 /**
  * ReleaseDetailModal — full release detail modal with tracklist, edition
@@ -105,7 +114,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['close', 'requested', 'track-override-change']);
+const emit = defineEmits(['close', 'requested', 'track-override-change', 'track-override-repair']);
 
 const dialogRef = ref(null);
 const closeButtonRef = ref(null);
@@ -209,6 +218,61 @@ const showTrackOverrideControls = computed(() =>
     (medium.tracks ?? []).some((track) => canBuildTrackOverride(medium, track)),
   ),
 );
+
+const trackOverrideReviewSummary = computed(() =>
+  getDraftReleaseGroupTrackOverrideReviewSummary(
+    props.operatorDraft,
+    props.operatorReleaseGroup,
+  ),
+);
+
+const showTrackOverrideReviewNote = computed(() =>
+  canEditTrackOverrides.value && trackOverrideReviewSummary.value.hasReview,
+);
+
+const trackOverrideReviewSummaryText = computed(() =>
+  buildTrackOverrideRemapReviewSummaryText(trackOverrideReviewSummary.value),
+);
+
+const trackOverrideReviewSummaryTone = computed(() =>
+  getTrackOverrideRemapReviewSummaryTone(trackOverrideReviewSummary.value),
+);
+
+const visibleReviewTrackOverrides = computed(() => {
+  const overrides = [];
+
+  for (const medium of media.value) {
+    for (const track of medium.tracks ?? []) {
+      const override = getTrackOverrideForTrack(medium, track);
+      if (override && isTrackOverrideRemapReviewStatus(override.remapStatus) && !overrides.includes(override)) {
+        overrides.push(override);
+      }
+    }
+  }
+
+  return overrides;
+});
+
+const unresolvedReviewTrackOverrides = computed(() =>
+  getDraftReleaseGroupTrackOverrides(props.operatorDraft, props.operatorReleaseGroup)
+    .filter((override) => isTrackOverrideRemapReviewStatus(override.remapStatus)),
+);
+
+const unmatchedReviewTrackOverrides = computed(() =>
+  unresolvedReviewTrackOverrides.value
+    .filter((override) => !visibleReviewTrackOverrides.value.includes(override)),
+);
+
+watch(showTrackOverrideReviewNote, async (hasReview, hadReview) => {
+  if (!hadReview || hasReview || !dialogRef.value?.open) {
+    return;
+  }
+
+  await nextTick();
+  globalThis.setTimeout(() => {
+    closeButtonRef.value?.focus({ preventScroll: true });
+  }, 0);
+});
 
 // ── Modal lifecycle ───────────────────────────────────────────────────────────
 
@@ -333,6 +397,29 @@ function getTrackOverrideState(medium, track) {
   );
 }
 
+function getTrackOverrideForTrack(medium, track) {
+  return getDraftTrackOverride(
+    props.operatorDraft,
+    props.operatorReleaseGroup,
+    track,
+    buildTrackOverrideContext(medium),
+  );
+}
+
+function getTrackOverrideReviewPresentationForTrack(medium, track) {
+  const override = getTrackOverrideForTrack(medium, track);
+
+  return getTrackOverrideRemapReviewPresentation(override?.remapStatus);
+}
+
+function getTrackOverrideReviewPresentationForOverride(trackOverride) {
+  return getTrackOverrideRemapReviewPresentation(trackOverride?.remapStatus);
+}
+
+function getTrackOverrideRepairTitle(trackOverride) {
+  return trackOverride?.trackTitleSnapshot ?? 'Saved track override';
+}
+
 function getTrackOverrideLabel(track) {
   return `Desired state for ${track?.title ?? 'track'}`;
 }
@@ -354,6 +441,18 @@ function handleTrackOverrideChange(medium, track, event) {
     track,
   });
 }
+
+function handleTrackOverrideRepair(action, trackOverride) {
+  if (!trackOverride || props.operatorEditingDisabled) {
+    return;
+  }
+
+  emit('track-override-repair', {
+    action,
+    releaseGroup: props.operatorReleaseGroup,
+    trackOverride,
+  });
+}
 </script>
 
 <template>
@@ -363,6 +462,7 @@ function handleTrackOverrideChange(medium, track, event) {
     role="dialog"
     aria-modal="true"
     aria-labelledby="rdm-heading"
+    tabindex="-1"
     @cancel="handleCancel"
     @click="handleBackdropClick"
     @keydown="handleKeydown"
@@ -504,6 +604,56 @@ function handleTrackOverrideChange(medium, track, event) {
             Track overrides are saved with Artist Policy.
           </div>
 
+          <div
+            v-if="showTrackOverrideReviewNote"
+            class="rdm-operator-note rdm-operator-note--review"
+            role="note"
+          >
+            <span class="hx-pill" :data-tone="trackOverrideReviewSummaryTone">
+              Track review
+            </span>
+            <span>{{ trackOverrideReviewSummaryText }} before saving Artist Policy.</span>
+          </div>
+
+          <div
+            v-if="unmatchedReviewTrackOverrides.length > 0"
+            class="rdm-remap-repair"
+            aria-label="Saved track override repair"
+          >
+            <h3 class="rdm-remap-repair__title">Saved overrides not in this edition</h3>
+            <p class="rdm-remap-repair__copy">
+              Clear stale overrides here, then save Artist Policy to persist the change.
+            </p>
+            <ul class="rdm-remap-repair__list">
+              <li
+                v-for="trackOverride in unmatchedReviewTrackOverrides"
+                :key="`${trackOverride.metadataReleaseGroupId}:${trackOverride.trackMbid ?? trackOverride.recordingMbid}:${trackOverride.trackPosition}`"
+                class="rdm-remap-repair__item"
+              >
+                <span class="rdm-remap-repair__item-main">
+                  <strong>{{ getTrackOverrideRepairTitle(trackOverride) }}</strong>
+                  <span
+                    class="hx-pill"
+                    :data-tone="getTrackOverrideReviewPresentationForOverride(trackOverride)?.tone"
+                  >
+                    {{ getTrackOverrideReviewPresentationForOverride(trackOverride)?.label }}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  class="hx-btn"
+                  data-variant="ghost"
+                  :disabled="operatorEditingDisabled"
+                  :aria-label="`Clear override for ${getTrackOverrideRepairTitle(trackOverride)}`"
+                  @mousedown.prevent
+                  @click="handleTrackOverrideRepair('clear', trackOverride)"
+                >
+                  Clear override
+                </button>
+              </li>
+            </ul>
+          </div>
+
           <!-- ── Tracklist ───────────────────────────────────────────── -->
           <div v-if="media.length > 0" class="rdm-tracklist">
             <div
@@ -540,6 +690,44 @@ function handleTrackOverrideChange(medium, track, event) {
                     <option value="desired">Desired</option>
                     <option value="suppressed">Suppressed</option>
                   </select>
+                  <span
+                    v-if="getTrackOverrideReviewPresentationForTrack(medium, track)"
+                    class="rdm-track-review"
+                  >
+                    <span
+                      class="hx-pill"
+                      :data-tone="getTrackOverrideReviewPresentationForTrack(medium, track).tone"
+                    >
+                      {{ getTrackOverrideReviewPresentationForTrack(medium, track).label }}
+                    </span>
+                    <span class="rdm-track-review__copy">
+                      {{ getTrackOverrideReviewPresentationForTrack(medium, track).description }}
+                    </span>
+                    <span class="rdm-track-review__actions">
+                      <button
+                        type="button"
+                        class="hx-btn"
+                        data-variant="ghost"
+                        :disabled="operatorEditingDisabled"
+                        :aria-label="`Keep this track for ${track.title ?? 'track override'}`"
+                        @mousedown.prevent
+                        @click="handleTrackOverrideRepair('resolve', getTrackOverrideForTrack(medium, track))"
+                      >
+                        Keep this track
+                      </button>
+                      <button
+                        type="button"
+                        class="hx-btn"
+                        data-variant="ghost"
+                        :disabled="operatorEditingDisabled"
+                        :aria-label="`Clear override for ${track.title ?? 'track'}`"
+                        @mousedown.prevent
+                        @click="handleTrackOverrideRepair('clear', getTrackOverrideForTrack(medium, track))"
+                      >
+                        Clear override
+                      </button>
+                    </span>
+                  </span>
                 </li>
               </ol>
             </div>
@@ -678,6 +866,58 @@ function handleTrackOverrideChange(medium, track, event) {
   border-radius: var(--hx-radius-sm);
   background: var(--hx-bg-surface-muted);
   color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+}
+
+.rdm-operator-note--review {
+  border-color: color-mix(in srgb, var(--hx-warning) 32%, var(--hx-border-subtle));
+}
+
+.rdm-remap-repair {
+  display: grid;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface-muted);
+}
+
+.rdm-remap-repair__title {
+  margin: 0;
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-sm);
+  font-weight: 700;
+}
+
+.rdm-remap-repair__copy {
+  margin: 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+}
+
+.rdm-remap-repair__list {
+  display: grid;
+  gap: var(--hx-space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.rdm-remap-repair__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+}
+
+.rdm-remap-repair__item-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  color: var(--hx-text);
   font-size: var(--hx-text-sm);
 }
 
@@ -828,7 +1068,7 @@ function handleTrackOverrideChange(medium, track, event) {
 }
 
 .rdm-track.has-track-override-controls {
-  grid-template-columns: 1.2rem 2rem minmax(0, 1fr) auto auto;
+  grid-template-columns: 1.2rem 2rem minmax(0, 1fr) auto auto minmax(9rem, 0.85fr);
 }
 
 .rdm-track.is-owned {
@@ -866,6 +1106,35 @@ function handleTrackOverrideChange(medium, track, event) {
 
 .rdm-track-override-select {
   min-width: 8.5rem;
+  font-size: var(--hx-text-xs);
+}
+
+.rdm-track-review {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rdm-track-review .hx-pill {
+  justify-self: start;
+}
+
+.rdm-track-review__copy {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  line-height: 1.3;
+}
+
+.rdm-track-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-1);
+}
+
+.rdm-track-review__actions .hx-btn,
+.rdm-remap-repair__item .hx-btn {
+  min-height: 28px;
+  padding: 0 var(--hx-space-2);
   font-size: var(--hx-text-xs);
 }
 
@@ -926,6 +1195,15 @@ function handleTrackOverrideChange(medium, track, event) {
   .rdm-track-override-select {
     grid-column: 3 / -1;
     width: 100%;
+  }
+
+  .rdm-track-review {
+    grid-column: 3 / -1;
+  }
+
+  .rdm-remap-repair__item {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

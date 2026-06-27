@@ -48,6 +48,13 @@ Confirmed complete:
 - Discover temporary recommendation-basis filtering, including URL-query focus state, monitored-artist validation, reload persistence, and browser verification
 - Artist Detail bulk-change confirmation thresholds, including section-level draft bulk selection, threshold confirmation, and browser verification
 - Artist Detail large-catalog filtering and sorting, including section-local search, selection filters, sort controls, reset, visible-subset bulk draft actions, and browser verification
+- Track-override remap review UX, including section filtering, card-level review indicators, Release Detail review notes, row-level matched-track status, and browser verification
+- Track-override remap repair workflow, including matched-track resolution and stale override clearing through the existing Artist Policy draft/save boundary
+- Operator audit visibility for saved Artist Policy changes, including bounded `artist_policy_saved` Activity events, repaired/cleared track-review counts, snapshot/reconciliation context, and Artist Detail feed links
+- Docker-backed schema generation and validation, including fresh
+  Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
+  validation, database schema checks, and anchor comparison. See
+  [DOCKER_SCHEMA_GENERATION_DESIGN.md](DOCKER_SCHEMA_GENERATION_DESIGN.md).
 
 Follow-up issues to create:
 
@@ -55,9 +62,17 @@ Follow-up issues to create:
    operator-scoped Library visibility now hides/restores reconciled releases
    without deleting shared media. See
    [NON_DESTRUCTIVE_OPERATOR_LIBRARY_REMOVAL_DESIGN.md](NON_DESTRUCTIVE_OPERATOR_LIBRARY_REMOVAL_DESIGN.md).
-2. **Track-override remap review UX** — surface `review_needed` / `orphaned`
-   track override states when metadata changes make saved track intent ambiguous.
-3. **Plan-governance closure** — create/link GitHub sub-issues for the items
+2. **Track-override remap review UX** — complete. Artist Detail and Release
+   Detail now surface saved `review_needed` / `orphaned` track override states
+   when metadata changes make saved track intent ambiguous. See
+   [TRACK_OVERRIDE_REMAP_REVIEW_UX_DESIGN.md](TRACK_OVERRIDE_REMAP_REVIEW_UX_DESIGN.md)
+   and
+   [TRACK_OVERRIDE_REMAP_REPAIR_WORKFLOW_DESIGN.md](TRACK_OVERRIDE_REMAP_REPAIR_WORKFLOW_DESIGN.md).
+3. **Artist Policy audit visibility** — complete. Saved Artist Policy changes
+   now emit structured Activity events with bounded change summaries and
+   Artist Detail deep links. See
+   [ARTIST_POLICY_AUDIT_VISIBILITY_DESIGN.md](ARTIST_POLICY_AUDIT_VISIBILITY_DESIGN.md).
+4. **Plan-governance closure** — create/link GitHub sub-issues for the items
    above, then close Issue #4 as completed.
 
 ---

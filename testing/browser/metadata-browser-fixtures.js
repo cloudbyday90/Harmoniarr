@@ -626,6 +626,18 @@ export async function markBoardsOfCanadaAddedInMetadataBrowserFixture(page) {
   });
 }
 
+export async function markBoardsTrackOverrideReviewNeededInMetadataBrowserFixture(page) {
+  await page.evaluate(() => {
+    const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
+    const rawState = globalThis.sessionStorage.getItem(fixtureStateStorageKey);
+    const state = rawState ? JSON.parse(rawState) : {};
+    globalThis.sessionStorage.setItem(fixtureStateStorageKey, JSON.stringify({
+      ...state,
+      boardsTrackOverrideReviewNeeded: true,
+    }));
+  });
+}
+
 export async function readMetadataBrowserFixtureState(page) {
   return page.evaluate(() => {
     const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
@@ -895,6 +907,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
         autechreIsAdded: false,
         boardsIsAdded: false,
         boardsOperatorProjection: operatorProjectionsByMusicBrainzId['mb-artist-boards'],
+        boardsTrackOverrideReviewNeeded: false,
         importReviewApplyPreviewById: {},
         importReviewApplySummary: null,
         importReviewCandidates: [],
@@ -916,20 +929,107 @@ export async function installMetadataBrowserFixtures(browserContext) {
       };
     }
 
+    function applyBoardsTrackOverrideReviewState(sourceState = {}) {
+      if (!sourceState.boardsTrackOverrideReviewNeeded) {
+        return sourceState;
+      }
+
+      const projection = sourceState.operatorProjectionsByMusicBrainzId?.['mb-artist-boards'];
+      if (!projection) {
+        return sourceState;
+      }
+
+      const trackOverride = {
+        isDesired: false,
+        mediumPosition: 1,
+        metadataReleaseGroupId: 'metadata-rg-mhtrtc',
+        metadataReleaseId: 'metadata-release-mhtrtc',
+        recordingMbid: 'mb-recording-roygbiv',
+        remapStatus: 'review_needed',
+        trackLengthMsSnapshot: 153000,
+        trackMbid: null,
+        trackPosition: 3,
+        trackTitleSnapshot: 'Roygbiv',
+      };
+      const trackOverrides = [
+        ...(projection.operator?.trackOverrides ?? [])
+          .filter((override) => override.recordingMbid !== trackOverride.recordingMbid),
+        trackOverride,
+      ];
+      const releaseGroups = (projection.releaseGroups ?? []).map((releaseGroup) => {
+        if (releaseGroup.id !== trackOverride.metadataReleaseGroupId) {
+          return releaseGroup;
+        }
+
+        const releaseGroupTrackOverrides = trackOverrides
+          .filter((override) => override.metadataReleaseGroupId === releaseGroup.id);
+
+        return {
+          ...releaseGroup,
+          operatorState: {
+            ...releaseGroup.operatorState,
+            trackOverrideSummary: {
+              desiredCount: releaseGroupTrackOverrides
+                .filter((override) => override.isDesired === true)
+                .length,
+              orphanedCount: releaseGroupTrackOverrides
+                .filter((override) => override.remapStatus === 'orphaned')
+                .length,
+              reviewNeededCount: releaseGroupTrackOverrides
+                .filter((override) => override.remapStatus === 'review_needed')
+                .length,
+              suppressedCount: releaseGroupTrackOverrides
+                .filter((override) => override.isDesired === false)
+                .length,
+              totalCount: releaseGroupTrackOverrides.length,
+            },
+          },
+        };
+      });
+      const nextProjection = {
+        ...projection,
+        operator: {
+          ...projection.operator,
+          overview: {
+            ...projection.operator.overview,
+            hasManualOverrides: true,
+            reviewNeededTrackOverrideCount: trackOverrides
+              .filter((override) => override.remapStatus === 'review_needed')
+              .length,
+            suppressedTrackOverrideCount: trackOverrides
+              .filter((override) => override.isDesired === false)
+              .length,
+            trackOverrideCount: trackOverrides.length,
+          },
+          trackOverrides,
+        },
+        releaseGroups,
+      };
+
+      return {
+        ...sourceState,
+        boardsOperatorProjection: nextProjection,
+        operatorProjectionsByMusicBrainzId: {
+          ...sourceState.operatorProjectionsByMusicBrainzId,
+          'mb-artist-boards': nextProjection,
+        },
+      };
+    }
+
     function loadFixtureState() {
       try {
         const rawState = globalThis.sessionStorage.getItem(fixtureStateStorageKey);
         if (rawState) {
-          return {
+          return applyBoardsTrackOverrideReviewState({
             ...createInitialFixtureState(),
             ...JSON.parse(rawState),
-          };
+          });
         }
       } catch {
         // Fall through to a clean state when storage is unavailable or stale.
       }
 
-      return createInitialFixtureState();
+      return applyBoardsTrackOverrideReviewState(createInitialFixtureState());
     }
 
     function persistFixtureState() {
@@ -938,6 +1038,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
         autechreIsAdded: state.autechreIsAdded,
         boardsIsAdded: state.boardsIsAdded,
         boardsOperatorProjection: state.boardsOperatorProjection,
+        boardsTrackOverrideReviewNeeded: state.boardsTrackOverrideReviewNeeded,
         importReviewApplyPreviewById: state.importReviewApplyPreviewById,
         importReviewApplySummary: state.importReviewApplySummary,
         importReviewCandidates: state.importReviewCandidates,
@@ -1894,8 +1995,12 @@ export async function installMetadataBrowserFixtures(browserContext) {
               desiredCount: releaseGroupTrackOverrides
                 .filter((override) => override.isDesired === true)
                 .length,
-              orphanedCount: 0,
-              reviewNeededCount: 0,
+              orphanedCount: releaseGroupTrackOverrides
+                .filter((override) => override.remapStatus === 'orphaned')
+                .length,
+              reviewNeededCount: releaseGroupTrackOverrides
+                .filter((override) => override.remapStatus === 'review_needed')
+                .length,
               suppressedCount: releaseGroupTrackOverrides
                 .filter((override) => override.isDesired === false)
                 .length,
@@ -1940,11 +2045,15 @@ export async function installMetadataBrowserFixtures(browserContext) {
         hasManualOverrides: releaseGroupSelections.length > 0 || trackOverrides.length > 0,
         manualSelectionCount: releaseGroupSelections.length,
         orphanedReleaseGroupSelectionCount: 0,
-        orphanedTrackOverrideCount: 0,
+        orphanedTrackOverrideCount: trackOverrides
+          .filter((override) => override.remapStatus === 'orphaned')
+          .length,
         partialReleaseGroupCount,
         policySelectionCount: releaseGroups.length - releaseGroupSelections.length,
         releaseGroupCount: releaseGroups.length,
-        reviewNeededTrackOverrideCount: 0,
+        reviewNeededTrackOverrideCount: trackOverrides
+          .filter((override) => override.remapStatus === 'review_needed')
+          .length,
         selectedReleaseGroupCount,
         suppressedTrackOverrideCount: trackOverrides.filter((override) => override.isDesired === false).length,
         trackOverrideCount: trackOverrides.length,

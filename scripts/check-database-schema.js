@@ -14,7 +14,7 @@ await runMigrationCli({
   prefix: 'harmoniarr-check-database-schema',
   renderSuccessMessage: ({ anchors, bootstrap, databaseState, snapshot }) => {
     return [
-      `source database current (${formatDatabaseMigrationStateSummary(databaseState)})`,
+      `Docker source database current (${formatDatabaseMigrationStateSummary(databaseState)})`,
       `committed snapshot current at ${snapshot.snapshotPath} (${snapshot.migrationCount} migration(s))`,
       `fresh snapshot bootstrap valid (${bootstrap.appliedCount}/${bootstrap.migrationCount} migrations applied)`,
       `critical anchors match (${anchors.anchorCount} anchor(s))`,

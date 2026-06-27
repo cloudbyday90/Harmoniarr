@@ -98,6 +98,7 @@ test('recordActivityEvent: handles each allowed event type without throwing', as
     'download_completed',
     'release_added',
     'artist_monitored',
+    'artist_policy_saved',
     'request_fulfilled',
   ];
 

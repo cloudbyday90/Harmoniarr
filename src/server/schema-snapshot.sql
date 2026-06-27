@@ -5122,6 +5122,52 @@ SET migration_key = EXCLUDED.migration_key,
     application_version = NULL,
     updated_at = NOW();
 
+-- Migration: 20260627_135354_add_artist_policy_activity_event.sql
+-- Checksum: d66a8b2f4a41d39fcf057af21861710049d4ea0925ca75f88814ccb93494247d
+BEGIN;
+
+ALTER TABLE activity_events
+  DROP CONSTRAINT IF EXISTS activity_events_event_type_check;
+
+ALTER TABLE activity_events
+  ADD CONSTRAINT activity_events_event_type_check
+  CHECK (event_type IN (
+    'request_created',
+    'download_completed',
+    'release_added',
+    'artist_monitored',
+    'artist_policy_saved',
+    'request_fulfilled'
+  ));
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260627_135354',
+  '20260627_135354_add_artist_policy_activity_event.sql',
+  'add_artist_policy_activity_event',
+  'd66a8b2f4a41d39fcf057af21861710049d4ea0925ca75f88814ccb93494247d',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
 -- Migration: 20260628_000000_source_user_outcome_quality.sql
 -- Checksum: 05feb927ee1b14f3eb17063bdc4db8e0395127a6ec5a7436e2ec36c763d0b9e2
 -- Harmoniarr - Soulseek-native music library management

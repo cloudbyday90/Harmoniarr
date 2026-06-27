@@ -20,8 +20,8 @@ import { getPool } from './database.js';
 import { listMigrationFiles, readMigrationFile } from './migration-manifest.js';
 import { ensureSchemaTable, getAppliedMigrationChecksums, getAppliedMigrationFilenames } from './schema-migration-store.js';
 
-export async function getMigrationStatus() {
-  const pool = getPool();
+export async function getMigrationStatus({ getPoolFn = getPool } = {}) {
+  const pool = getPoolFn();
   const client = await pool.connect();
 
   try {
@@ -40,8 +40,8 @@ export async function getMigrationStatus() {
   }
 }
 
-export async function applyPendingMigrations() {
-  const pool = getPool();
+export async function applyPendingMigrations({ getPoolFn = getPool } = {}) {
+  const pool = getPoolFn();
   const client = await pool.connect();
 
   try {
@@ -156,8 +156,8 @@ export async function applyPendingMigrations() {
   }
 }
 
-export async function assertNoPendingMigrations() {
-  const status = await getMigrationStatus();
+export async function assertNoPendingMigrations(options = {}) {
+  const status = await getMigrationStatus(options);
   if (status.pending.length > 0) {
     throw new Error(`Pending migrations detected: ${status.pending.join(', ')}`);
   }

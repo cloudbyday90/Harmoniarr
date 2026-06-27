@@ -17,9 +17,14 @@
  */
 
 import { normalizeReleaseActivityPresentation } from '../../shared/release-activity-presentation.js';
+import { getArtistPolicyActivityRouteTarget } from './artist-policy-activity-presentation.js';
 import { buildOperationRunLinkTargetFromReleasePresentation } from './operation-run-link-targets.js';
 
 export function buildActivityEventLinkTarget(event = {}) {
+  if (event.eventType === 'artist_policy_saved') {
+    return getArtistPolicyActivityRouteTarget(event.extraPayload ?? {});
+  }
+
   if (event.eventType !== 'release_added') {
     return null;
   }

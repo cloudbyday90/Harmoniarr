@@ -41,7 +41,7 @@ function makeRelease(overrides = {}) {
 test('Artist Detail section controls expose stable option sets', () => {
   assert.deepEqual(
     ARTIST_DETAIL_SECTION_SELECTION_FILTERS.map((option) => option.value),
-    ['all', 'selected', 'partial', 'unselected', 'manual_overrides'],
+    ['all', 'selected', 'partial', 'unselected', 'manual_overrides', 'track_review'],
   );
   assert.deepEqual(
     ARTIST_DETAIL_SECTION_SORT_OPTIONS.map((option) => option.value),
@@ -99,6 +99,20 @@ test('applyArtistDetailSectionControls filters manual overrides via injected pre
 
   assert.equal(result.visibleCount, 1);
   assert.equal(result.releases[0].title, 'Manual Exclusion');
+});
+
+test('applyArtistDetailSectionControls filters track override review via injected predicate', () => {
+  const result = applyArtistDetailSectionControls({
+    controls: { selectionFilter: 'track_review' },
+    hasTrackOverrideReview: (release) => release.hasTrackOverrideReview === true,
+    releases: [
+      makeRelease({ hasTrackOverrideReview: false, title: 'Clean Override' }),
+      makeRelease({ hasTrackOverrideReview: true, title: 'Needs Review' }),
+    ],
+  });
+
+  assert.equal(result.visibleCount, 1);
+  assert.equal(result.releases[0].title, 'Needs Review');
 });
 
 test('applyArtistDetailSectionControls sorts newest and oldest by date', () => {

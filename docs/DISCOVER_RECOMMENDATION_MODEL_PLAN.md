@@ -2097,10 +2097,22 @@ the core model can close cleanly.
 
 3. **Track-override remap review UX**
 
-   Surface `review_needed` and `orphaned` states for saved track overrides when
-   metadata or canonical-release changes make exact remapping ambiguous.
+   Implemented 2026-06-27. Artist Detail section controls now expose a
+   `Track review needed` filter, affected release cards show compact review
+   indicators, and Release Detail surfaces release-level and matched-row review
+   state for saved track overrides. See
+   [TRACK_OVERRIDE_REMAP_REVIEW_UX_DESIGN.md](TRACK_OVERRIDE_REMAP_REVIEW_UX_DESIGN.md).
 
-4. **GitHub follow-up split**
+4. **Operator audit visibility for saved Artist Policy changes**
+
+   Implemented 2026-06-27. Artist Policy saves now emit a bounded
+   `artist_policy_saved` Activity event when the persisted policy changes,
+   including release-selection counts, track-override counts, repaired/cleared
+   remap review counts, snapshot revision, reconciliation run id, and an Artist
+   Detail deep link. See
+   [ARTIST_POLICY_AUDIT_VISIBILITY_DESIGN.md](ARTIST_POLICY_AUDIT_VISIBILITY_DESIGN.md).
+
+5. **GitHub follow-up split**
 
    Create linked GitHub sub-issues for the items above and link them from
    `docs/issue-4-implementation-plan.md`.
@@ -2574,6 +2586,10 @@ Use this section for incremental updates during implementation.
 - 2026-06-27: Temporary recommendation-basis filtering implemented. `DISCOVER_RECOMMENDATION_FOCUS_FILTER_DESIGN.md` records the official Vue Router, Vue reactivity, Playwright, WAI-ARIA, MDN, and OWASP source review plus the selected URL-query state stack. Discover now exposes `?focusArtist=` as a view-only filter over monitored recommendation inputs, validates ids against the hydrated monitored profile, recomputes recommendations from the focused input result map, preserves focus across reload, and clears back to all monitored artists without changing durable monitoring state.
 - 2026-06-27: Artist Detail bulk-change confirmation thresholds implemented. `ARTIST_DETAIL_BULK_CHANGE_CONFIRMATION_DESIGN.md` records the official WAI-ARIA, MDN, Vue, OWASP, and Playwright source review plus the selected pure-threshold service stack. Artist Detail now exposes section-level `Select all` / `Clear all` release-group actions, applies small changes immediately to draft state, and requires confirmation when a single operation affects more than `25` releases or more than `250` known tracks.
 - 2026-06-27: Artist Detail large-catalog controls implemented. `ARTIST_DETAIL_LARGE_CATALOG_CONTROLS_DESIGN.md` records the official MDN, WAI, Vue, OWASP, and Playwright source review plus the selected section-local control stack. Artist Detail now supports per-section search, selection-state filtering, manual-override filtering, date/title/selection sorting, reset controls, and visible-subset bulk draft actions.
+- 2026-06-27: Track-override remap review UX implemented. `TRACK_OVERRIDE_REMAP_REVIEW_UX_DESIGN.md` records the official WAI/WCAG, Vue, Playwright, and OWASP source review plus the selected client-visibility stack. Artist Detail now filters to release groups with ambiguous saved track overrides, cards display review indicators, Release Detail shows review notes and row-level matched-track status, and fixture-backed browser verification covers the flow.
+- 2026-06-27: Track-override remap repair workflow implemented. `TRACK_OVERRIDE_REMAP_REPAIR_WORKFLOW_DESIGN.md` records the official WAI/WCAG, Vue, Playwright, and OWASP source review plus the selected existing-save-boundary stack. Release Detail now lets operators keep a matched reviewed track or clear stale reviewed overrides from the Artist Policy draft; persistence still occurs through Save Policy.
+- 2026-06-27: Artist Policy audit visibility implemented. `ARTIST_POLICY_AUDIT_VISIBILITY_DESIGN.md` records the official OWASP, Express, PostgreSQL, Vue, and Playwright source review plus the selected append-only Activity event stack. Saved Artist Policy changes now emit `artist_policy_saved` events with bounded change summaries, repaired/cleared track-review counts, snapshot/reconciliation context, and Activity feed links back to Artist Detail.
+- 2026-06-27: Docker-backed schema generation implemented. `DOCKER_SCHEMA_GENERATION_DESIGN.md` records the official Testcontainers, Docker, and PostgreSQL source review plus the selected disposable PostgreSQL stack. Database-backed schema commands now replay migrations and validate the committed snapshot against fresh Docker PostgreSQL instances instead of ambient local database credentials.
 
 ## Checklist
 
