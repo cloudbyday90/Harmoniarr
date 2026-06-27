@@ -94,8 +94,9 @@ test('useImportReviewQueue loads queue state and selected candidate detail from 
   assert.equal(workflow.lastLoadedAt.value, '2026-04-30T15:00:00.000Z');
 });
 
-test('useImportReviewQueue refreshes the queue after a review action and advances selection when filters exclude the transitioned candidate', async (t) => {
+test('useImportReviewQueue refreshes the queue after a review action and preserves transitioned candidate detail', async (t) => {
   const firstCandidate = createCandidate('candidate-1');
+  const heldCandidate = createCandidate('candidate-1', { status: 'held' });
   const secondCandidate = createCandidate('candidate-2', { folderPath: 'Folder candidate-2' });
   let queueRefreshCount = 0;
   const listCandidates = t.mock.fn(async () => {
@@ -112,9 +113,17 @@ test('useImportReviewQueue refreshes the queue after a review action and advance
       { ...secondCandidate, files: undefined },
     ], 1);
   });
-  const fetchCandidate = t.mock.fn(async (importCandidateId) => ({
-    importCandidate: importCandidateId === 'candidate-1' ? firstCandidate : secondCandidate,
-  }));
+  const fetchCandidate = t.mock.fn(async (importCandidateId) => {
+    if (importCandidateId === 'candidate-1') {
+      return {
+        importCandidate: queueRefreshCount > 1 ? heldCandidate : firstCandidate,
+      };
+    }
+
+    return {
+      importCandidate: secondCandidate,
+    };
+  });
   const holdCandidate = t.mock.fn(async (importCandidateId, reason) => ({
     review: {
       candidate: {
@@ -143,11 +152,14 @@ test('useImportReviewQueue refreshes the queue after a review action and advance
   assert.deepEqual(holdCandidate.mock.calls[0].arguments, ['candidate-1', 'Needs path mapping']);
   assert.equal(listCandidates.mock.callCount(), 2);
   assert.equal(fetchCandidate.mock.callCount(), 2);
-  assert.deepEqual(fetchCandidate.mock.calls[1].arguments, ['candidate-2']);
-  assert.equal(workflow.selectedCandidateId.value, 'candidate-2');
-  assert.equal(workflow.selectedCandidate.value.id, 'candidate-2');
+  assert.deepEqual(fetchCandidate.mock.calls[1].arguments, ['candidate-1']);
+  assert.equal(workflow.selectedCandidateId.value, 'candidate-1');
+  assert.equal(workflow.selectedCandidate.value.id, 'candidate-1');
+  assert.equal(workflow.selectedCandidate.value.status, 'held');
+  assert.deepEqual(workflow.candidates.value.map((candidate) => candidate.id), ['candidate-2']);
   assert.equal(workflow.actionReason.value, '');
   assert.equal(workflow.actionError.value, '');
+  assert.equal(workflow.actionStatus.value, 'Candidate held for review.');
 });
 
 test('useImportReviewQueue selects a candidate for download planning through the injected shared transition service', async (t) => {
@@ -196,6 +208,7 @@ test('useImportReviewQueue selects a candidate for download planning through the
   assert.deepEqual(selectCandidateForDownload.mock.calls[0].arguments, ['candidate-1', 'Queue this candidate']);
   assert.equal(workflow.selectedCandidate.value.status, 'selected');
   assert.equal(workflow.actionError.value, '');
+  assert.equal(workflow.actionStatus.value, 'Candidate selected for download.');
 });
 
 test('useImportReviewQueue trims filter input through the shared setter', async (t) => {
@@ -238,6 +251,7 @@ test('useImportReviewQueue surfaces queue and action failures through shared err
 
   assert.equal(workflow.listError.value, 'queue offline');
   assert.equal(workflow.actionError.value, 'transition conflict');
+  assert.equal(workflow.actionStatus.value, '');
   assert.equal(workflow.isLoadingQueue.value, false);
   assert.equal(workflow.isTransitionPending.value, false);
 });

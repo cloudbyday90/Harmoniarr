@@ -66,6 +66,7 @@ export function useImportReviewAdminWorkflow({
     const query = { ...resolvedRoute.query };
     delete query.applyRunId;
     delete query.candidate;
+    delete query.candidateFile;
     delete query.executionRunId;
     delete query.mediaInspectionRunId;
     delete query.folderPath;
@@ -107,16 +108,43 @@ export function useImportReviewAdminWorkflow({
     await callMaybeAsync(onPanelNavigate, panelId);
   }
 
-  async function handleStartExecutionRun() {
-    await replaceImportReviewRouteState({ executionRunId: '' }, { hash: `#${IMPORT_REVIEW_EXECUTION_PANEL_ID}` });
-    await executionSummaryWorkflow.startExecutionRun();
+  async function refreshQueueAndPreservePanel(panelId) {
+    const hash = `#${panelId}`;
     await refreshQueue({ preserveSelection: true });
+    await replaceImportReviewRouteState({}, { hash });
+    await navigateToPanel(panelId);
+  }
+
+  async function refreshExecutionSummary() {
+    await executionSummaryWorkflow.loadImportCandidateExecutionSummary({
+      preferredRunId: currentRouteState().executionRunId || null,
+    });
+  }
+
+  async function refreshMediaInspectionSummary() {
+    await mediaInspectionSummaryWorkflow.loadImportCandidateMediaInspectionSummary({
+      preferredRunId: currentRouteState().mediaInspectionRunId || null,
+    });
+  }
+
+  async function refreshApplySummary() {
+    await applySummaryWorkflow.loadImportCandidateApplySummary({
+      preferredRunId: currentRouteState().applyRunId || null,
+    });
+  }
+
+  async function handleStartExecutionRun() {
+    const panelId = IMPORT_REVIEW_EXECUTION_PANEL_ID;
+    await replaceImportReviewRouteState({ executionRunId: '' }, { hash: `#${panelId}` });
+    await executionSummaryWorkflow.startExecutionRun();
+    await refreshQueueAndPreservePanel(panelId);
   }
 
   async function handleReconcileExecutionState() {
-    await replaceImportReviewRouteState({ executionRunId: '' }, { hash: `#${IMPORT_REVIEW_EXECUTION_PANEL_ID}` });
+    const panelId = IMPORT_REVIEW_EXECUTION_PANEL_ID;
+    await replaceImportReviewRouteState({ executionRunId: '' }, { hash: `#${panelId}` });
     await executionSummaryWorkflow.reconcileExecutionState();
-    await refreshQueue({ preserveSelection: true });
+    await refreshQueueAndPreservePanel(panelId);
   }
 
   async function handleSelectExecutionRun(runId) {
@@ -124,12 +152,13 @@ export function useImportReviewAdminWorkflow({
   }
 
   async function handleStartMediaInspectionRun() {
+    const panelId = IMPORT_REVIEW_MEDIA_INSPECTION_PANEL_ID;
     await replaceImportReviewRouteState(
       { mediaInspectionRunId: '' },
-      { hash: `#${IMPORT_REVIEW_MEDIA_INSPECTION_PANEL_ID}` },
+      { hash: `#${panelId}` },
     );
     await mediaInspectionSummaryWorkflow.startMediaInspectionRun();
-    await refreshQueue({ preserveSelection: true });
+    await refreshQueueAndPreservePanel(panelId);
   }
 
   async function handleSelectMediaInspectionRun(runId) {
@@ -140,9 +169,10 @@ export function useImportReviewAdminWorkflow({
   }
 
   async function handleStartApplyRun() {
-    await replaceImportReviewRouteState({ applyRunId: '' }, { hash: `#${IMPORT_REVIEW_APPLY_PANEL_ID}` });
+    const panelId = IMPORT_REVIEW_APPLY_PANEL_ID;
+    await replaceImportReviewRouteState({ applyRunId: '' }, { hash: `#${panelId}` });
     await applySummaryWorkflow.startApplyRun();
-    await refreshQueue({ preserveSelection: true });
+    await refreshQueueAndPreservePanel(panelId);
   }
 
   async function handleSelectApplyRun(runId) {
@@ -156,8 +186,8 @@ export function useImportReviewAdminWorkflow({
         return;
       }
 
-      void executionSummaryWorkflow.loadImportCandidateExecutionSummary();
-      void mediaInspectionSummaryWorkflow.loadImportCandidateMediaInspectionSummary();
+      void refreshExecutionSummary();
+      void refreshMediaInspectionSummary();
     },
     { immediate: true },
   );
@@ -169,7 +199,7 @@ export function useImportReviewAdminWorkflow({
         return;
       }
 
-      void applySummaryWorkflow.loadImportCandidateApplySummary();
+      void refreshApplySummary();
     },
     { immediate: true },
   );
@@ -258,6 +288,7 @@ export function useImportReviewAdminWorkflow({
   return {
     apply: {
       ...applySummaryWorkflow,
+      handleRefresh: refreshApplySummary,
       handleSelectRun: handleSelectApplyRun,
       handleStartRun: handleStartApplyRun,
       panelId: IMPORT_REVIEW_APPLY_PANEL_ID,
@@ -266,6 +297,7 @@ export function useImportReviewAdminWorkflow({
     destroy,
     execution: {
       ...executionSummaryWorkflow,
+      handleRefresh: refreshExecutionSummary,
       handleReconcile: handleReconcileExecutionState,
       handleSelectRun: handleSelectExecutionRun,
       handleStartRun: handleStartExecutionRun,
@@ -273,6 +305,7 @@ export function useImportReviewAdminWorkflow({
     },
     mediaInspection: {
       ...mediaInspectionSummaryWorkflow,
+      handleRefresh: refreshMediaInspectionSummary,
       handleSelectRun: handleSelectMediaInspectionRun,
       handleStartRun: handleStartMediaInspectionRun,
       panelId: IMPORT_REVIEW_MEDIA_INSPECTION_PANEL_ID,

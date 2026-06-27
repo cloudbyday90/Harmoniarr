@@ -126,7 +126,7 @@ onBeforeUnmount(() => {
         </div>
       </header>
       <div class="hx-card-body hx-card-body--flush">
-        <table class="hx-table">
+        <table class="hx-table" aria-label="Wanted releases">
           <thead>
             <tr>
               <th>Artist</th>

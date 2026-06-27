@@ -133,6 +133,14 @@ function handleDetail() {
   emit('detail', props.release);
 }
 
+function handlePrimaryKeydown(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') {
+    return;
+  }
+  event.preventDefault();
+  handleDetail();
+}
+
 const artworkImageComp = useTemplateRef('artworkImageComp');
 const imgElRef = computed(() => artworkImageComp.value?.imgRef ?? null);
 const isSameOriginFn = () => {
@@ -169,8 +177,7 @@ const accentStyle = computed(() => {
       tabindex="0"
       :aria-label="`View details for ${releaseTitle || 'this release'}`"
       @click="handleDetail"
-      @keydown.enter="handleDetail"
-      @keydown.space.prevent="handleDetail"
+      @keydown="handlePrimaryKeydown"
     >
       <div class="hx-media-card__artwork">
         <ArtworkImage

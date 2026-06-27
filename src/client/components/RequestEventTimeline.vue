@@ -19,9 +19,9 @@
 <script setup>
 import { computed } from 'vue';
 import {
-  formatReassignmentEventDescription,
-  getReassignmentEventLabel,
-  getReassignmentEventTone,
+  formatRequestEventDescription,
+  getRequestEventLabel,
+  getRequestEventTone,
 } from '../lib/request-music-form.js';
 
 const props = defineProps({
@@ -54,17 +54,17 @@ function formatTimestamp(isoString) {
 <template>
   <div v-if="events.length > 0" class="ret-wrap">
     <h4 class="ret-heading">Event history</h4>
-    <ol class="ret-timeline">
+    <ol class="ret-timeline" aria-label="Request event history">
       <li v-for="event in events" :key="event.id" class="ret-item">
         <div class="ret-dot"></div>
         <div class="ret-content">
           <div class="ret-header">
-            <span class="hx-pill" :data-tone="getReassignmentEventTone(event.eventType)">
-              {{ getReassignmentEventLabel(event.eventType) }}
+            <span class="hx-pill" :data-tone="getRequestEventTone(event.eventType)">
+              {{ getRequestEventLabel(event.eventType) }}
             </span>
             <span class="ret-timestamp">{{ formatTimestamp(event.occurredAt) }}</span>
           </div>
-          <p class="ret-desc">{{ formatReassignmentEventDescription(event, usersById) }}</p>
+          <p class="ret-desc">{{ formatRequestEventDescription(event, usersById) }}</p>
         </div>
       </li>
     </ol>

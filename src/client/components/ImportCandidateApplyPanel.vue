@@ -37,6 +37,7 @@ import {
   formatOperationTimestampShort,
 } from '../lib/operation-run-presentation.js';
 import ConfirmDialog from './ConfirmDialog.vue';
+import ImportCandidateRunFailureNotice from './ImportCandidateRunFailureNotice.vue';
 
 defineProps({
   actionErrorMessage: {
@@ -128,13 +129,13 @@ function onApplyConfirm() {
     <p class="review-summary-copy">Moves downloaded files into your library. Files are staged first and only committed once all moves succeed safely.</p>
     <p class="review-summary-copy" v-if="summary">{{ summary.message }}</p>
 
-    <article class="panel-light error-panel" v-if="errorMessage">
+    <article class="panel-light error-panel" v-if="errorMessage" role="alert">
       <h3>Import run unavailable</h3>
       <p>{{ errorMessage }}</p>
     </article>
 
-    <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
-    <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
+    <p class="error-copy" role="alert" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
+    <p class="error-copy" role="alert" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !currentRun">
       <h3>Loading import run</h3>
@@ -157,6 +158,7 @@ function onApplyConfirm() {
         <table class="hx-table apply-runs-subtable">
           <thead>
             <tr>
+              <th>Run</th>
               <th>Status</th>
               <th>Started</th>
               <th>Duration</th>
@@ -175,6 +177,7 @@ function onApplyConfirm() {
               :aria-selected="run.id === (selectedRunId || currentRun?.id) ? 'true' : 'false'"
               :class="{ 'is-selected': run.id === (selectedRunId || currentRun?.id) }"
             >
+              <td><span class="apply-run-id">{{ run.id }}</span></td>
               <td>
                 <span class="review-status-pill" :class="getRunStatusClass(run.status)">
                   {{ formatRunStatus(run.status) }}
@@ -211,6 +214,8 @@ function onApplyConfirm() {
           {{ formatRunStatus(currentRun.status) }}
         </span>
       </div>
+
+      <ImportCandidateRunFailureNotice :message="currentRun.errorMessage" />
 
       <dl class="review-meta-grid review-meta-grid-wide">
         <div>
@@ -398,6 +403,13 @@ function onApplyConfirm() {
 
 .apply-runs-subtable-row {
   cursor: default;
+}
+
+.apply-run-id {
+  font-family: var(--hx-font-mono, ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace);
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+  white-space: nowrap;
 }
 
 .apply-runs-subtable tbody tr.is-selected > td {

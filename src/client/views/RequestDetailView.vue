@@ -41,8 +41,13 @@ import { cancelMediaRequest } from '../lib/library-api.js';
 import {
   candidateStatusLabel,
   candidateStatusTone,
+  formatCandidateFolderPath,
   formatCandidateSourceLabel,
   formatBytes,
+  formatImportCandidateId,
+  formatRunId,
+  formatRunStatusMessage,
+  hasRunDiagnostics,
   runItemStatusLabel,
   runItemStatusTone,
   buildPipelineSteps,
@@ -150,6 +155,9 @@ async function handleCancel() {
     void load({ mediaRequestId: route.params.id });
   } catch (error) {
     toast.error(error instanceof Error ? error.message : 'Failed to cancel request.');
+    if (error?.status === 409) {
+      await load({ mediaRequestId: route.params.id });
+    }
   } finally {
     isCancelling.value = false;
   }
@@ -308,52 +316,77 @@ function formatTimestamp(ts) {
         </header>
         <div class="hx-card-body hx-card-body--flush">
           <p v-if="isLoadingPipeline" class="hx-text-muted rdl-pipeline-loading">Loading pipeline data.</p>
-          <div v-else class="rdl-pipeline-list">
-            <details
+          <ol v-else class="rdl-pipeline-list" aria-label="Linked import candidates">
+            <li
               v-for="(candidate, index) in pipelineCandidates"
               :key="candidate.sourceKey ?? candidate.id ?? index"
               class="rdl-candidate"
             >
-              <summary class="rdl-candidate-summary">
-                <span class="hx-pill" :data-tone="candidateStatusTone(candidate.status)">{{ candidateStatusLabel(candidate.status) }}</span>
-                <span class="rdl-candidate-source">{{ formatCandidateSourceLabel(candidate, index) }}</span>
-                <span class="rdl-candidate-meta">{{ candidate.fileCount ?? 0 }} files{{ candidate.totalSizeBytes ? `, ${formatBytes(candidate.totalSizeBytes)}` : '' }}</span>
-              </summary>
-              <div class="rdl-candidate-body">
-                <div class="rdl-pipeline-steps">
-                  <div v-for="(step, index) in buildPipelineSteps(candidate)" :key="step.key" class="rdl-step" :data-status="step.status">
-                    <div class="rdl-step-dot"></div>
-                    <span v-if="index < buildPipelineSteps(candidate).length - 1" class="rdl-step-line"></span>
-                    <span class="rdl-step-label">{{ step.label }}</span>
+              <details>
+                <summary class="rdl-candidate-summary">
+                  <span class="hx-pill" :data-tone="candidateStatusTone(candidate.status)">{{ candidateStatusLabel(candidate.status) }}</span>
+                  <span class="rdl-candidate-source">{{ formatCandidateSourceLabel(candidate, index, { preferOperatorContext: canOpenImportReview }) }}</span>
+                  <span class="rdl-candidate-meta">{{ candidate.fileCount ?? 0 }} files{{ candidate.totalSizeBytes ? `, ${formatBytes(candidate.totalSizeBytes)}` : '' }}</span>
+                </summary>
+                <div class="rdl-candidate-body">
+                  <div class="rdl-pipeline-steps">
+                    <div v-for="(step, index) in buildPipelineSteps(candidate)" :key="step.key" class="rdl-step" :data-status="step.status">
+                      <div class="rdl-step-dot"></div>
+                      <span v-if="index < buildPipelineSteps(candidate).length - 1" class="rdl-step-line"></span>
+                      <span class="rdl-step-label">{{ step.label }}</span>
+                    </div>
                   </div>
+                  <dl
+                    class="rdl-fields rdl-candidate-details"
+                    v-if="candidate.execution || candidate.apply || (canOpenImportReview && formatCandidateFolderPath(candidate))"
+                  >
+                    <div class="rdl-field" v-if="canOpenImportReview && formatCandidateFolderPath(candidate)">
+                      <dt>Source folder</dt>
+                      <dd class="rdl-diagnostic-value">{{ formatCandidateFolderPath(candidate) }}</dd>
+                    </div>
+                    <div class="rdl-field" v-if="candidate.execution">
+                      <dt>Download</dt>
+                      <dd>
+                        <span v-if="runItemStatusLabel(candidate.execution)" class="hx-pill" :data-tone="runItemStatusTone(candidate.execution)">{{ runItemStatusLabel(candidate.execution) }}</span>
+                        <span class="rdl-timestamp" v-if="candidate.execution.startedAt">{{ formatTimestamp(candidate.execution.startedAt) }}</span>
+                      </dd>
+                    </div>
+                    <div class="rdl-field" v-if="hasRunDiagnostics(candidate.execution)">
+                      <dt>Download diagnostics</dt>
+                      <dd class="rdl-diagnostics">
+                        <span v-if="formatRunStatusMessage(candidate.execution)" class="rdl-run-msg">{{ formatRunStatusMessage(candidate.execution) }}</span>
+                        <span v-if="formatRunId(candidate.execution)" class="rdl-run-id">Run {{ formatRunId(candidate.execution) }}</span>
+                        <span v-if="formatImportCandidateId(candidate.execution)" class="rdl-run-id">Candidate {{ formatImportCandidateId(candidate.execution) }}</span>
+                        <span class="rdl-errmsg" v-if="candidate.execution.runErrorMessage">{{ candidate.execution.runErrorMessage }}</span>
+                      </dd>
+                    </div>
+                    <div class="rdl-field" v-if="candidate.apply">
+                      <dt>Import</dt>
+                      <dd>
+                        <span v-if="runItemStatusLabel(candidate.apply)" class="hx-pill" :data-tone="runItemStatusTone(candidate.apply)">{{ runItemStatusLabel(candidate.apply) }}</span>
+                        <span class="rdl-timestamp" v-if="candidate.apply.startedAt">{{ formatTimestamp(candidate.apply.startedAt) }}</span>
+                      </dd>
+                    </div>
+                    <div class="rdl-field" v-if="hasRunDiagnostics(candidate.apply)">
+                      <dt>Import diagnostics</dt>
+                      <dd class="rdl-diagnostics">
+                        <span v-if="formatRunStatusMessage(candidate.apply)" class="rdl-run-msg">{{ formatRunStatusMessage(candidate.apply) }}</span>
+                        <span v-if="formatRunId(candidate.apply)" class="rdl-run-id">Run {{ formatRunId(candidate.apply) }}</span>
+                        <span v-if="formatImportCandidateId(candidate.apply)" class="rdl-run-id">Candidate {{ formatImportCandidateId(candidate.apply) }}</span>
+                        <span class="rdl-errmsg" v-if="candidate.apply.runErrorMessage">{{ candidate.apply.runErrorMessage }}</span>
+                      </dd>
+                    </div>
+                  </dl>
+                  <router-link
+                    v-if="canOpenImportReview && candidate.id"
+                    :to="{ name: 'activity-candidates', query: { candidate: candidate.id } }"
+                    class="hx-btn rdl-candidate-link"
+                    data-variant="ghost"
+                  >Open in import review</router-link>
                 </div>
-                <dl class="rdl-fields rdl-candidate-details" v-if="candidate.execution || candidate.apply">
-                  <div class="rdl-field" v-if="candidate.execution">
-                    <dt>Download</dt>
-                    <dd>
-                      <span v-if="runItemStatusLabel(candidate.execution)" class="hx-pill" :data-tone="runItemStatusTone(candidate.execution)">{{ runItemStatusLabel(candidate.execution) }}</span>
-                      <span class="rdl-timestamp" v-if="candidate.execution.startedAt">{{ formatTimestamp(candidate.execution.startedAt) }}</span>
-                      <span class="rdl-errmsg" v-if="candidate.execution.runErrorMessage">{{ candidate.execution.runErrorMessage }}</span>
-                    </dd>
-                  </div>
-                  <div class="rdl-field" v-if="candidate.apply">
-                    <dt>Import</dt>
-                    <dd>
-                      <span v-if="runItemStatusLabel(candidate.apply)" class="hx-pill" :data-tone="runItemStatusTone(candidate.apply)">{{ runItemStatusLabel(candidate.apply) }}</span>
-                      <span class="rdl-timestamp" v-if="candidate.apply.startedAt">{{ formatTimestamp(candidate.apply.startedAt) }}</span>
-                      <span class="rdl-errmsg" v-if="candidate.apply.runErrorMessage">{{ candidate.apply.runErrorMessage }}</span>
-                    </dd>
-                  </div>
-                </dl>
-                <router-link
-                  v-if="canOpenImportReview && candidate.id"
-                  :to="{ name: 'activity-candidates', query: { candidate: candidate.id } }"
-                  class="hx-btn rdl-candidate-link"
-                  data-variant="ghost"
-                >Open in import review</router-link>
-              </div>
-            </details>
-          </div>
+              </details>
+            </li>
+          </ol>
         </div>
       </article>
 
@@ -378,6 +411,20 @@ function formatTimestamp(ts) {
               data-variant="ghost"
             >Open in import review</router-link>
           </div>
+        </div>
+      </article>
+
+      <article v-else class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">Fulfillment pipeline</h2>
+            <p class="hx-card-subtitle">No import candidates are linked to this request yet.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <p class="hx-text-muted rdl-empty-pipeline">
+            Harmoniarr will show download and import progress here after discovery finds a usable source.
+          </p>
         </div>
       </article>
 
@@ -470,6 +517,10 @@ function formatTimestamp(ts) {
   gap: var(--hx-space-3);
 }
 
+.rdl-empty-pipeline {
+  margin: 0;
+}
+
 .rdl-pipeline-status {
   display: flex;
   align-items: center;
@@ -488,6 +539,9 @@ function formatTimestamp(ts) {
 
 .rdl-pipeline-list {
   display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .rdl-candidate {
@@ -538,6 +592,27 @@ function formatTimestamp(ts) {
 
 .rdl-candidate-link {
   justify-self: start;
+}
+
+.rdl-diagnostic-value,
+.rdl-diagnostics {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rdl-diagnostics {
+  align-items: flex-start;
+}
+
+.rdl-run-msg {
+  color: var(--hx-text);
+}
+
+.rdl-run-id,
+.rdl-diagnostic-value {
+  color: var(--hx-text-muted);
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
 }
 
 .rdl-timestamp {

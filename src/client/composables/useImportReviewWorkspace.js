@@ -116,6 +116,7 @@ export function useImportReviewWorkspace({
   const {
     actionError,
     actionReason,
+    actionStatus,
     activeFilterCount,
     attachVisibilityListener,
     candidates,
@@ -152,8 +153,14 @@ export function useImportReviewWorkspace({
   ]).filter((pill) => pill.value));
 
   function currentRouteState(overrides = {}) {
+    const routeState = normalizeImportReviewRouteState(resolvedRoute.query);
+
     return {
+      applyRunId: routeState.applyRunId,
+      candidateFileId: routeState.candidateFileId,
       candidateId: selectedCandidateId.value ?? '',
+      executionRunId: routeState.executionRunId,
+      mediaInspectionRunId: routeState.mediaInspectionRunId,
       folderPath: folderPathFilter.value,
       sourceSearchId: sourceSearchIdFilter.value,
       status: statusFilter.value,
@@ -172,6 +179,7 @@ export function useImportReviewWorkspace({
     }
 
     await replaceResolvedRoute({
+      ...(resolvedRoute.hash ? { hash: resolvedRoute.hash } : {}),
       name: 'review-queue',
       query: nextQuery,
     });
@@ -210,7 +218,7 @@ export function useImportReviewWorkspace({
     }
 
     if (candidateId !== routeState.candidateId) {
-      await replaceRouteState({ candidateId });
+      await replaceRouteState({ candidateFileId: '', candidateId });
     }
   }
 
@@ -219,7 +227,7 @@ export function useImportReviewWorkspace({
   }
 
   async function applyFilters() {
-    await replaceRouteState({ candidateId: '' });
+    await replaceRouteState({ candidateFileId: '', candidateId: '' });
   }
 
   async function resetQueueFilters() {
@@ -229,6 +237,7 @@ export function useImportReviewWorkspace({
     clearPreview();
     await replaceRouteState({
       candidateId: '',
+      candidateFileId: '',
       folderPath: '',
       sourceSearchId: '',
       status: 'pending',
@@ -237,11 +246,18 @@ export function useImportReviewWorkspace({
   }
 
   async function openCandidate(importCandidateId) {
-    await replaceRouteState({ candidateId: importCandidateId });
+    await replaceRouteState({
+      candidateFileId: '',
+      candidateId: importCandidateId,
+    });
   }
 
   async function runTransition(action) {
-    await action();
+    const result = await action();
+    if (!result) {
+      return null;
+    }
+
     await replaceRouteState();
     await Promise.all([
       refreshApplyPreviewForSelection({ clearApplyPreview, loadApplyPreview, selectedCandidate }),
@@ -249,6 +265,7 @@ export function useImportReviewWorkspace({
       loadImportPendingSummary(),
       loadSelectedSummary(),
     ]);
+    return result;
   }
 
   async function runFileDecision(action, importCandidateFileId) {
@@ -270,19 +287,19 @@ export function useImportReviewWorkspace({
   }
 
   async function runSelectCandidate() {
-    await runTransition(selectSelectedCandidate);
+    return runTransition(selectSelectedCandidate);
   }
 
   async function runHoldCandidate() {
-    await runTransition(holdSelectedCandidate);
+    return runTransition(holdSelectedCandidate);
   }
 
   async function runRejectCandidate() {
-    await runTransition(rejectSelectedCandidate);
+    return runTransition(rejectSelectedCandidate);
   }
 
   async function runReopenCandidate() {
-    await runTransition(reopenSelectedCandidate);
+    return runTransition(reopenSelectedCandidate);
   }
 
   async function runSkipCandidateFile(importCandidateFileId) {
@@ -314,6 +331,7 @@ export function useImportReviewWorkspace({
   return {
     actionError,
     actionReason,
+    actionStatus,
     activeFilterCount,
     applyPreview,
     applyPreviewError,

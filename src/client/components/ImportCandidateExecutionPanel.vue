@@ -39,6 +39,7 @@ import {
   formatElapsedDuration,
   formatOperationTimestampShort,
 } from '../lib/operation-run-presentation.js';
+import ImportCandidateRunFailureNotice from './ImportCandidateRunFailureNotice.vue';
 
 defineProps({
   actionErrorMessage: {
@@ -158,13 +159,13 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
       </div>
     </dl>
 
-    <article class="panel-light error-panel" v-if="errorMessage">
+    <article class="panel-light error-panel" v-if="errorMessage" role="alert">
       <h3>Download run unavailable</h3>
       <p>{{ errorMessage }}</p>
     </article>
 
-    <p class="error-copy" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
-    <p class="error-copy" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
+    <p class="error-copy" role="alert" v-if="runDetailErrorMessage">{{ runDetailErrorMessage }}</p>
+    <p class="error-copy" role="alert" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !currentRun">
       <h3>Loading download run</h3>
@@ -187,6 +188,7 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
         <table class="hx-table execution-runs-subtable">
           <thead>
             <tr>
+              <th>Run</th>
               <th>Status</th>
               <th>Started</th>
               <th>Duration</th>
@@ -205,6 +207,7 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
               :aria-selected="run.id === (selectedRunId || currentRun?.id) ? 'true' : 'false'"
               :class="{ 'is-selected': run.id === (selectedRunId || currentRun?.id) }"
             >
+              <td><span class="execution-run-id">{{ run.id }}</span></td>
               <td>
                 <span class="review-status-pill" :class="getRunStatusClass(run.status)">
                   {{ formatRunStatus(run.status) }}
@@ -241,6 +244,8 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
           {{ formatRunStatus(currentRun.status) }}
         </span>
       </div>
+
+      <ImportCandidateRunFailureNotice :message="currentRun.errorMessage" />
 
       <div class="execution-degraded-notice" v-if="isTransferSnapshotDegraded(currentRun)" role="status">
         <span class="status-chip" data-status="degraded">Degraded</span>
@@ -445,6 +450,13 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
 
 .execution-runs-subtable-row {
   cursor: default;
+}
+
+.execution-run-id {
+  font-family: var(--hx-font-mono, ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace);
+  font-size: var(--hx-text-xs);
+  color: var(--hx-text-muted);
+  white-space: nowrap;
 }
 
 .execution-runs-subtable tbody tr.is-selected > td {

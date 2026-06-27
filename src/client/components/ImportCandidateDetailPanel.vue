@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import {
   candidateStatusLabel,
   formatBytes,
@@ -40,6 +40,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  actionStatus: {
+    type: String,
+    default: '',
+  },
   applyPreview: {
     type: Object,
     default: null,
@@ -53,6 +57,10 @@ const props = defineProps({
     default: true,
   },
   fileDecisionError: {
+    type: String,
+    default: '',
+  },
+  focusedFileId: {
     type: String,
     default: '',
   },
@@ -114,6 +122,12 @@ function updateActionReason(event) {
 
 const rejectConfirmOpen = ref(false);
 const rejectAcknowledged = ref(false);
+const actionStatusRef = ref(null);
+const holdButtonRef = ref(null);
+const rejectButtonRef = ref(null);
+const reopenButtonRef = ref(null);
+const selectButtonRef = ref(null);
+const fileItemRefs = new Map();
 
 function openRejectConfirm() {
   rejectAcknowledged.value = false;
@@ -186,6 +200,98 @@ function fileDecisionButtonLabel(filePreview) {
 
   return canClearApplyFileDecision(filePreview) ? 'Clear skip' : 'Skip file';
 }
+
+function normalizeId(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function setFileItemRef(fileId, element) {
+  const normalizedFileId = normalizeId(fileId);
+  if (!normalizedFileId) {
+    return;
+  }
+
+  if (element) {
+    fileItemRefs.set(normalizedFileId, element);
+  } else {
+    fileItemRefs.delete(normalizedFileId);
+  }
+}
+
+function isFocusedCandidateFile(file) {
+  return normalizeId(file?.id) !== '' && normalizeId(file?.id) === normalizeId(props.focusedFileId);
+}
+
+async function focusCandidateFile(fileId) {
+  const normalizedFileId = normalizeId(fileId);
+  if (
+    !normalizedFileId
+    || props.isLoadingCandidate
+    || !props.candidate?.files?.some((file) => file.id === normalizedFileId)
+  ) {
+    return;
+  }
+
+  await nextTick();
+  const fileItem = fileItemRefs.get(normalizedFileId);
+  fileItem?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  });
+  fileItem?.focus({ preventScroll: true });
+}
+
+function focusPreferredActionButton() {
+  const candidate = props.candidate;
+  const preferredButton = canReopen(candidate)
+    ? reopenButtonRef.value
+    : canSelect(candidate)
+      ? selectButtonRef.value
+      : canHold(candidate)
+        ? holdButtonRef.value
+        : canReject(candidate)
+          ? rejectButtonRef.value
+          : null;
+
+  preferredButton?.focus();
+}
+
+watch(
+  () => props.actionStatus,
+  async (nextStatus) => {
+    if (!nextStatus) {
+      return;
+    }
+
+    await nextTick();
+    actionStatusRef.value?.focus();
+  },
+);
+
+watch(
+  () => props.actionError,
+  async (nextError) => {
+    if (!nextError) {
+      return;
+    }
+
+    await nextTick();
+    focusPreferredActionButton();
+  },
+);
+
+watch(
+  () => [
+    props.focusedFileId,
+    props.candidate?.id,
+    props.candidate?.files?.length ?? 0,
+    props.isLoadingCandidate,
+  ],
+  () => {
+    void focusCandidateFile(props.focusedFileId);
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -271,6 +377,7 @@ function fileDecisionButtonLabel(filePreview) {
         <div class="review-action-row">
           <button
             v-if="canSelect(candidate)"
+            ref="selectButtonRef"
             type="button"
             :disabled="isTransitionPending"
             @click="$emit('select')"
@@ -279,6 +386,7 @@ function fileDecisionButtonLabel(filePreview) {
           </button>
           <button
             v-if="canHold(candidate)"
+            ref="holdButtonRef"
             type="button"
             class="secondary-button"
             :disabled="isTransitionPending"
@@ -288,6 +396,7 @@ function fileDecisionButtonLabel(filePreview) {
           </button>
           <button
             v-if="canReject(candidate)"
+            ref="rejectButtonRef"
             type="button"
             class="danger-button"
             :disabled="isTransitionPending"
@@ -297,6 +406,7 @@ function fileDecisionButtonLabel(filePreview) {
           </button>
           <button
             v-if="canReopen(candidate)"
+            ref="reopenButtonRef"
             type="button"
             :disabled="isTransitionPending"
             @click="$emit('reopen')"
@@ -305,7 +415,15 @@ function fileDecisionButtonLabel(filePreview) {
           </button>
         </div>
 
-        <p class="error-copy" v-if="actionError">{{ actionError }}</p>
+        <p
+          v-if="actionStatus"
+          ref="actionStatusRef"
+          class="review-summary-copy review-action-status"
+          role="status"
+          aria-live="polite"
+          tabindex="-1"
+        >{{ actionStatus }}</p>
+        <p class="error-copy" role="alert" v-if="actionError">{{ actionError }}</p>
       </article>
 
       <article class="panel-light review-preview-panel">
@@ -512,7 +630,16 @@ function fileDecisionButtonLabel(filePreview) {
       </article>
 
       <div class="review-file-list" v-if="candidate.files?.length">
-        <article class="review-file-item" v-for="file in candidate.files" :key="file.id">
+        <article
+          class="review-file-item"
+          v-for="file in candidate.files"
+          :key="file.id"
+          :ref="(element) => setFileItemRef(file.id, element)"
+          :aria-label="`Candidate file ${file.filename}`"
+          :data-focused="isFocusedCandidateFile(file) ? 'true' : null"
+          :data-import-candidate-file-id="file.id"
+          :tabindex="isFocusedCandidateFile(file) ? -1 : null"
+        >
           <div class="review-file-header">
             <div>
               <strong>{{ file.filename }}</strong>
@@ -569,3 +696,29 @@ function fileDecisionButtonLabel(filePreview) {
     @update:acknowledged="rejectAcknowledged = $event"
   />
 </template>
+
+<style scoped>
+.review-action-status:focus-visible {
+  border-radius: var(--hx-radius-sm);
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
+.review-action-row button:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
+.review-file-item[data-focused='true'] {
+  border-color: rgba(94, 173, 255, 0.5);
+  background:
+    linear-gradient(180deg, rgba(94, 173, 255, 0.08), transparent 60%),
+    var(--hx-bg-surface);
+  box-shadow: 0 0 0 1px rgba(94, 173, 255, 0.22);
+}
+
+.review-file-item:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 3px;
+}
+</style>

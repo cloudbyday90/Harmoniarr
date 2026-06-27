@@ -17,12 +17,13 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
 import { useReleaseDetail } from '../../composables/useReleaseDetail.js';
 import { useReleaseRequest } from '../../composables/useReleaseRequest.js';
 import { useActiveUsers } from '../../composables/useActiveUsers.js';
 import { sessionStore } from '../../state/session.js';
+import { containDialogTabFocus } from '../../lib/dialog-focus-trap.js';
 import { getErrorMessage } from '../../lib/error-utils.js';
 import {
   computeMediaTotalMs,
@@ -107,12 +108,15 @@ const props = defineProps({
 const emit = defineEmits(['close', 'requested', 'track-override-change']);
 
 const dialogRef = ref(null);
+const closeButtonRef = ref(null);
+const requestButtonRef = ref(null);
 const editionMenuOpen = ref(false);
 const requestError = ref(null);
 const selectedForUserId = ref(null);
+let previouslyFocusedElement = null;
 
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
-const { users: activeUsers } = useActiveUsers();
+const { users: activeUsers } = useActiveUsers({ enabled: isAdmin.value });
 
 const {
   release,
@@ -210,11 +214,25 @@ const showTrackOverrideControls = computed(() =>
 
 function openDialogSession() {
   if (!dialogRef.value) return;
+  previouslyFocusedElement = globalThis.document?.activeElement instanceof HTMLElement
+    ? globalThis.document.activeElement
+    : null;
   if (!dialogRef.value.open) dialogRef.value.showModal();
+  closeButtonRef.value?.focus({ preventScroll: true });
   selectedForUserId.value = null;
   requestError.value = null;
   editionMenuOpen.value = false;
   load(props.releaseGroupMbid, { preferReleaseMbid: props.preferReleaseMbid });
+}
+
+function closeDialogSession() {
+  if (dialogRef.value?.open) {
+    dialogRef.value.close();
+  }
+  if (previouslyFocusedElement?.isConnected) {
+    previouslyFocusedElement.focus({ preventScroll: true });
+  }
+  previouslyFocusedElement = null;
 }
 
 onMounted(() => {
@@ -230,7 +248,7 @@ watch(
     if (isOpen) {
       openDialogSession();
     } else {
-      if (dialogRef.value.open) dialogRef.value.close();
+      closeDialogSession();
     }
   },
 );
@@ -239,16 +257,29 @@ watch(
 
 function handleCancel(event) {
   event.preventDefault();
-  if (!isCurrentlyRequesting.value) emit('close');
+  if (!isCurrentlyRequesting.value) {
+    closeDialogSession();
+    emit('close');
+  }
 }
 
 function handleBackdropClick(event) {
   if (isCurrentlyRequesting.value) return;
-  if (event.target === dialogRef.value) emit('close');
+  if (event.target === dialogRef.value) {
+    closeDialogSession();
+    emit('close');
+  }
 }
 
 function handleClose() {
-  if (!isCurrentlyRequesting.value) emit('close');
+  if (!isCurrentlyRequesting.value) {
+    closeDialogSession();
+    emit('close');
+  }
+}
+
+function handleKeydown(event) {
+  containDialogTabFocus(event, dialogRef.value);
 }
 
 async function handleRequest() {
@@ -258,9 +289,12 @@ async function handleRequest() {
     requestedForUserId: selectedForUserId.value ?? null,
   });
   if (result.ok) {
+    closeDialogSession();
     emit('requested', { releaseGroupMbid: props.releaseGroupMbid });
   } else if (!result.skipped) {
     requestError.value = getErrorMessage(result.error, 'Request failed. Please try again.');
+    await nextTick();
+    requestButtonRef.value?.focus({ preventScroll: true });
   }
 }
 
@@ -303,6 +337,14 @@ function getTrackOverrideLabel(track) {
   return `Desired state for ${track?.title ?? 'track'}`;
 }
 
+function buildEditionButtonLabel(edition) {
+  const parts = ['Switch to edition'];
+  if (edition?.country) parts.push(edition.country);
+  if (edition?.releaseDate) parts.push(edition.releaseDate.slice(0, 4));
+  if (edition?.trackCount) parts.push(`${edition.trackCount} tracks`);
+  return parts.join(', ');
+}
+
 function handleTrackOverrideChange(medium, track, event) {
   emit('track-override-change', {
     medium,
@@ -323,12 +365,14 @@ function handleTrackOverrideChange(medium, track, event) {
     aria-labelledby="rdm-heading"
     @cancel="handleCancel"
     @click="handleBackdropClick"
+    @keydown="handleKeydown"
   >
     <div class="rdm-shell">
       <!-- ── Header ──────────────────────────────────────────────────────── -->
       <header class="rdm-header">
         <h2 id="rdm-heading" class="sr-only">Release detail</h2>
         <button
+          ref="closeButtonRef"
           type="button"
           class="rdm-close hx-btn"
           data-variant="ghost"
@@ -381,6 +425,7 @@ function handleTrackOverrideChange(medium, track, event) {
           <div class="rdm-action-row">
             <button
               v-if="!isCurrentlyRequested"
+              ref="requestButtonRef"
               type="button"
               class="hx-btn"
               data-variant="primary"
@@ -417,6 +462,8 @@ function handleTrackOverrideChange(medium, track, event) {
                 type="button"
                 class="rdm-edition-pill"
                 :class="{ 'is-active': ed.id === currentRelease?.id }"
+                :aria-label="buildEditionButtonLabel(ed)"
+                :aria-pressed="ed.id === currentRelease?.id"
                 @click="handleSwitchEdition(ed)"
               >
                 {{ ed.country ?? '??' }}
@@ -431,11 +478,12 @@ function handleTrackOverrideChange(medium, track, event) {
                 type="button"
                 class="hx-btn"
                 data-variant="ghost"
+                aria-label="Edition actions"
                 :aria-expanded="editionMenuOpen"
                 @click="editionMenuOpen = !editionMenuOpen"
               >···</button>
-              <ul v-if="editionMenuOpen" class="rdm-edition-menu" role="menu">
-                <li role="menuitem">
+              <ul v-if="editionMenuOpen" class="rdm-edition-menu">
+                <li>
                   <button
                     type="button"
                     class="rdm-edition-menu__item"
@@ -688,6 +736,12 @@ function handleTrackOverrideChange(medium, track, event) {
 .rdm-edition-pill:hover {
   background: var(--hx-bg-muted);
   color: var(--hx-text);
+}
+
+.rdm-edition-pill:focus-visible,
+.rdm-edition-menu__item:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
 }
 
 .rdm-edition-pill.is-active {

@@ -101,7 +101,7 @@ watch(() => props.isOpen, async (open) => {
 <template>
   <dialog
     v-if="isOpen"
-    ref="setDialogRef"
+    :ref="setDialogRef"
     class="hx-confirm-dialog"
     role="alertdialog"
     aria-modal="true"

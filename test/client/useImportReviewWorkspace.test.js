@@ -169,8 +169,9 @@ test('useImportReviewWorkspace syncs route filters, candidate detail, preview, a
   }]);
 });
 
-test('useImportReviewWorkspace refreshes queue state after transitions and updates route plus preview to the new selection', async (t) => {
+test('useImportReviewWorkspace refreshes queue state after transitions while preserving the transitioned detail', async (t) => {
   const firstCandidate = createCandidate('candidate-1');
+  const heldCandidate = createCandidate('candidate-1', { status: 'held' });
   const secondCandidate = createCandidate('candidate-2', { folderPath: 'Folder candidate-2' });
   let queueRefreshCount = 0;
   const route = reactive({
@@ -194,9 +195,17 @@ test('useImportReviewWorkspace refreshes queue state after transitions and updat
       { ...secondCandidate, files: undefined },
     ], 1);
   });
-  const fetchCandidate = t.mock.fn(async (importCandidateId) => ({
-    importCandidate: importCandidateId === 'candidate-1' ? firstCandidate : secondCandidate,
-  }));
+  const fetchCandidate = t.mock.fn(async (importCandidateId) => {
+    if (importCandidateId === 'candidate-1') {
+      return {
+        importCandidate: queueRefreshCount > 1 ? heldCandidate : firstCandidate,
+      };
+    }
+
+    return {
+      importCandidate: secondCandidate,
+    };
+  });
   const holdCandidate = t.mock.fn(async (importCandidateId, reason) => ({
     review: {
       candidate: {
@@ -230,14 +239,14 @@ test('useImportReviewWorkspace refreshes queue state after transitions and updat
     selectedImportCandidates: {
       counts: {
         blocked: 0,
-        ready: queueRefreshCount > 1 ? 1 : 0,
+        ready: 0,
         readyWithWarnings: 0,
-        totalSelected: queueRefreshCount > 1 ? 1 : 0,
+        totalSelected: 0,
       },
-      selectedCandidates: queueRefreshCount > 1 ? [{ id: 'candidate-2' }] : [],
+      selectedCandidates: [],
       summary: {
-        status: queueRefreshCount > 1 ? 'ready' : 'empty',
-        message: queueRefreshCount > 1 ? '1 selected candidate is ready.' : 'No candidates are selected.',
+        status: 'empty',
+        message: 'No candidates are selected.',
       },
     },
   }));
@@ -245,14 +254,14 @@ test('useImportReviewWorkspace refreshes queue state after transitions and updat
     importPendingCandidates: {
       counts: {
         blocked: 0,
-        ready: queueRefreshCount > 1 ? 1 : 0,
+        ready: 0,
         readyWithWarnings: 0,
-        totalImportPending: queueRefreshCount > 1 ? 1 : 0,
+        totalImportPending: 0,
       },
-      importPendingCandidates: queueRefreshCount > 1 ? [{ id: 'candidate-2' }] : [],
+      importPendingCandidates: [],
       summary: {
-        status: queueRefreshCount > 1 ? 'ready' : 'empty',
-        message: queueRefreshCount > 1 ? '1 completed download candidate is ready for import review.' : 'No completed downloads are waiting for import review yet.',
+        status: 'empty',
+        message: 'No completed downloads are waiting for import review yet.',
       },
     },
   }));
@@ -280,16 +289,151 @@ test('useImportReviewWorkspace refreshes queue state after transitions and updat
   assert.deepEqual(holdCandidate.mock.calls[0].arguments, ['candidate-1', 'Needs path mapping']);
   assert.ok(fetchImportPendingSummary.mock.callCount() >= 2);
   assert.ok(fetchSelectedSummary.mock.callCount() >= 2);
-  assert.equal(workspace.selectedCandidateId.value, 'candidate-2');
-  assert.equal(workspace.preview.value.candidate.id, 'candidate-2');
-  assert.equal(workspace.selectedSummaryCounts.value.totalSelected, 1);
-  assert.equal(workspace.importPendingSummaryCounts.value.totalImportPending, 1);
-  assert.deepEqual(replaceRoute.mock.calls.at(-1).arguments, [{
+  assert.equal(workspace.selectedCandidateId.value, 'candidate-1');
+  assert.equal(workspace.selectedCandidate.value.status, 'held');
+  assert.equal(workspace.preview.value.candidate.id, 'candidate-1');
+  assert.equal(workspace.selectedSummaryCounts.value.totalSelected, 0);
+  assert.equal(workspace.importPendingSummaryCounts.value.totalImportPending, 0);
+  assert.equal(replaceRoute.mock.callCount(), 0);
+  assert.equal(route.query.candidate, 'candidate-1');
+});
+
+test('useImportReviewWorkspace clears diagnostic file focus when selecting a different queue candidate', async (t) => {
+  const candidate = createCandidate('candidate-1');
+  const route = reactive({
+    hash: '#import-review-selection-stage',
+    query: {
+      candidate: 'candidate-1',
+      candidateFile: 'file-candidate-1',
+      mediaInspectionRunId: 'media-run-1',
+      status: 'pending',
+    },
+  });
+  const replaceRoute = t.mock.fn(async (location) => {
+    route.query = { ...location.query };
+  });
+
+  const workspace = useImportReviewWorkspace({
+    previewWorkflow: useImportCandidatePreview({
+      fetchPreview: async (importCandidateId) => ({
+        importCandidatePreview: {
+          candidate: { id: importCandidateId },
+          validation: {
+            blockers: [],
+            canPreview: true,
+            warnings: [],
+          },
+        },
+      }),
+    }),
+    queueWorkflow: useImportReviewQueue({
+      fetchCandidate: async (importCandidateId) => ({ importCandidate: createCandidate(importCandidateId) }),
+      listCandidates: async () => createQueuePayload([
+        { ...candidate, files: undefined },
+        { ...createCandidate('candidate-2'), files: undefined },
+      ], 2),
+    }),
+    replaceRoute,
+    route,
+  });
+
+  await workspace.syncFromRoute({ preserveSelection: false });
+  await workspace.openCandidate('candidate-2');
+
+  assert.deepEqual(replaceRoute.mock.calls.at(-1).arguments[0], {
+    hash: '#import-review-selection-stage',
     name: 'review-queue',
     query: {
       candidate: 'candidate-2',
+      mediaInspectionRunId: 'media-run-1',
     },
-  }]);
+  });
+});
+
+test('useImportReviewWorkspace leaves selection and summaries stable when a transition fails', async (t) => {
+  const candidate = createCandidate('candidate-1', { status: 'failed' });
+  const route = reactive({
+    query: {
+      candidate: 'candidate-1',
+      status: 'failed',
+    },
+  });
+  const replaceRoute = t.mock.fn(async () => {});
+  const listCandidates = t.mock.fn(async () => createQueuePayload([
+    { ...candidate, files: undefined },
+  ], 1));
+  const fetchCandidate = t.mock.fn(async () => ({ importCandidate: candidate }));
+  const reopenCandidate = t.mock.fn(async () => {
+    throw new Error('Recovery is temporarily locked.');
+  });
+  const fetchPreview = t.mock.fn(async (importCandidateId) => ({
+    importCandidatePreview: {
+      candidate: { id: importCandidateId },
+      validation: {
+        blockers: [],
+        canPreview: true,
+        warnings: [],
+      },
+    },
+  }));
+  const fetchSelectedSummary = t.mock.fn(async () => ({
+    selectedImportCandidates: {
+      counts: {
+        blocked: 0,
+        ready: 0,
+        readyWithWarnings: 0,
+        totalSelected: 0,
+      },
+      selectedCandidates: [],
+      summary: {
+        status: 'empty',
+        message: 'No candidates are selected.',
+      },
+    },
+  }));
+  const fetchImportPendingSummary = t.mock.fn(async () => ({
+    importPendingCandidates: {
+      counts: {
+        blocked: 0,
+        ready: 0,
+        readyWithWarnings: 0,
+        totalImportPending: 0,
+      },
+      importPendingCandidates: [],
+      summary: {
+        status: 'empty',
+        message: 'No completed downloads are waiting for import review yet.',
+      },
+    },
+  }));
+
+  const workspace = useImportReviewWorkspace({
+    importPendingSummaryWorkflow: useImportPendingCandidateSummary({ fetchSummary: fetchImportPendingSummary }),
+    previewWorkflow: useImportCandidatePreview({ fetchPreview }),
+    queueWorkflow: useImportReviewQueue({ fetchCandidate, listCandidates, reopenCandidate }),
+    replaceRoute,
+    route,
+    selectedSummaryWorkflow: useSelectedImportCandidateSummary({ fetchSummary: fetchSelectedSummary }),
+  });
+
+  await workspace.syncFromRoute({ preserveSelection: false });
+  const previewLoadCount = fetchPreview.mock.callCount();
+  const selectedSummaryLoadCount = fetchSelectedSummary.mock.callCount();
+  const importPendingSummaryLoadCount = fetchImportPendingSummary.mock.callCount();
+  const routeReplaceCount = replaceRoute.mock.callCount();
+
+  const result = await workspace.runReopenCandidate();
+
+  assert.equal(result, null);
+  assert.equal(reopenCandidate.mock.callCount(), 1);
+  assert.equal(workspace.selectedCandidateId.value, 'candidate-1');
+  assert.equal(workspace.selectedCandidate.value.status, 'failed');
+  assert.equal(workspace.actionError.value, 'Recovery is temporarily locked.');
+  assert.equal(workspace.actionStatus.value, '');
+  assert.equal(fetchPreview.mock.callCount(), previewLoadCount);
+  assert.equal(fetchSelectedSummary.mock.callCount(), selectedSummaryLoadCount);
+  assert.equal(fetchImportPendingSummary.mock.callCount(), importPendingSummaryLoadCount);
+  assert.equal(replaceRoute.mock.callCount(), routeReplaceCount);
 });
 
 test('useImportReviewWorkspace loads apply preview for import-pending candidates', async () => {

@@ -24,6 +24,7 @@ import {
   candidateStatusTone,
   canStartApplyRun,
   canStartExecutionRun,
+  canStartMediaInspectionRun,
   describeApplyOperation,
   formatApplyFallbackReason,
   formatApplyMutationMode,
@@ -632,8 +633,12 @@ describe('getApplyItemOperationHistory', () => {
 // ---------------------------------------------------------------------------
 
 describe('canStartApplyRun', () => {
-  it('returns true when there is no current run', () => {
+  it('returns true when there is no current run and candidates are waiting', () => {
     assert.equal(canStartApplyRun(null, 5), true);
+  });
+
+  it('returns false when there is no current run but no candidates are waiting', () => {
+    assert.equal(canStartApplyRun(null, 0), false);
   });
 
   it('returns true when run is completed and candidates are waiting', () => {
@@ -1026,8 +1031,12 @@ describe('getHeartbeatSkipReasonLabel', () => {
 // ---------------------------------------------------------------------------
 
 describe('canStartExecutionRun', () => {
-  it('returns true when there is no current run', () => {
-    assert.equal(canStartExecutionRun(null, 0), true);
+  it('returns true when there is no current run and candidates are selected', () => {
+    assert.equal(canStartExecutionRun(null, 2), true);
+  });
+
+  it('returns false when there is no current run but no candidates are selected', () => {
+    assert.equal(canStartExecutionRun(null, 0), false);
   });
 
   it('returns false when run is pending', () => {
@@ -1048,6 +1057,40 @@ describe('canStartExecutionRun', () => {
 
   it('returns true when run is failed and count > 0', () => {
     assert.equal(canStartExecutionRun({ status: 'failed' }, 1), true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// canStartMediaInspectionRun
+// ---------------------------------------------------------------------------
+
+describe('canStartMediaInspectionRun', () => {
+  it('returns true when there is no current run and candidates are selected', () => {
+    assert.equal(canStartMediaInspectionRun(null, 2), true);
+  });
+
+  it('returns false when there is no current run but no candidates are selected', () => {
+    assert.equal(canStartMediaInspectionRun(null, 0), false);
+  });
+
+  it('returns false when run is pending', () => {
+    assert.equal(canStartMediaInspectionRun({ status: 'pending' }, 5), false);
+  });
+
+  it('returns false when run is running', () => {
+    assert.equal(canStartMediaInspectionRun({ status: 'running' }, 5), false);
+  });
+
+  it('returns true when run is completed and count > 0', () => {
+    assert.equal(canStartMediaInspectionRun({ status: 'completed' }, 3), true);
+  });
+
+  it('returns false when run is completed but count is 0', () => {
+    assert.equal(canStartMediaInspectionRun({ status: 'completed' }, 0), false);
+  });
+
+  it('returns true when run is failed and count > 0', () => {
+    assert.equal(canStartMediaInspectionRun({ status: 'failed' }, 1), true);
   });
 });
 

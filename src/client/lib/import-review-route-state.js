@@ -48,7 +48,8 @@ function normalizeRunId(value) {
 export function normalizeImportReviewRouteState(query = {}) {
   return {
     applyRunId: normalizeRunId(query.applyRunId),
-    candidateId: normalizeRouteValue(query.candidate),
+    candidateFileId: normalizeRouteValue(query.candidateFile ?? query.candidateFileId),
+    candidateId: normalizeRouteValue(query.candidate ?? query.candidateId),
     executionRunId: normalizeRunId(query.executionRunId),
     mediaInspectionRunId: normalizeRunId(query.mediaInspectionRunId),
     folderPath: normalizeRouteValue(query.folderPath),
@@ -60,6 +61,7 @@ export function normalizeImportReviewRouteState(query = {}) {
 
 export function buildImportReviewRouteQuery(state = {}) {
   const applyRunId = normalizeRunId(state.applyRunId);
+  const candidateFileId = normalizeRouteValue(state.candidateFileId);
   const candidateId = normalizeRouteValue(state.candidateId);
   const executionRunId = normalizeRunId(state.executionRunId);
   const mediaInspectionRunId = normalizeRunId(state.mediaInspectionRunId);
@@ -77,6 +79,10 @@ export function buildImportReviewRouteQuery(state = {}) {
 
   if (candidateId) {
     query.candidate = candidateId;
+  }
+
+  if (candidateFileId) {
+    query.candidateFile = candidateFileId;
   }
 
   if (executionRunId) {
@@ -111,6 +117,7 @@ export function buildImportReviewRouteQuery(state = {}) {
 export function getImportReviewRouteStateKey(state) {
   const normalized = normalizeImportReviewRouteState({
     applyRunId: state?.applyRunId,
+    candidateFile: state?.candidateFileId,
     candidate: state?.candidateId,
     executionRunId: state?.executionRunId,
     mediaInspectionRunId: state?.mediaInspectionRunId,
@@ -122,6 +129,7 @@ export function getImportReviewRouteStateKey(state) {
 
   return JSON.stringify([
     normalized.applyRunId,
+    normalized.candidateFileId,
     normalized.candidateId,
     normalized.executionRunId,
     normalized.mediaInspectionRunId,

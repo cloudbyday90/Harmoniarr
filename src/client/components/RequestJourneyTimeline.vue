@@ -46,7 +46,7 @@ const announcement = computed(() => {
 <template>
   <div class="rjt">
     <p class="sr-only" role="status" aria-live="polite">{{ announcement }}</p>
-    <ol class="rjt-list">
+    <ol class="rjt-list" aria-label="Request journey">
       <li
         v-for="stage in stages"
         :key="stage.key"

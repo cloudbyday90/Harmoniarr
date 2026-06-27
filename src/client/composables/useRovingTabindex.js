@@ -69,6 +69,12 @@ function resolveGridColumns(container) {
  * @param {string} [options.cellSelector='.hx-media-card__link-area']
  *   Selector for the focusable cell within each item. Defaults to the card's
  *   navigable link area.
+ * @param {string} [options.managedControlSelector='']
+ *   Optional selector for secondary controls that live in the same item as a
+ *   roving cell. When provided, controls in inactive items are removed from the
+ *   Tab sequence (`tabindex="-1"`), while controls in the active item keep their
+ *   native focusability. This preserves access to the active card's actions
+ *   without letting inactive card buttons pre-empt the active roving target.
  * @param {() => boolean} [options.enabled]
  *   Predicate controlling whether roving is active. When it returns `false`,
  *   no listeners are attached and any managed `tabindex` attributes are
@@ -89,6 +95,7 @@ function resolveGridColumns(container) {
  */
 export function useRovingTabindex(containerRefFn, options = {}) {
   const cellSelector = options.cellSelector || '.hx-media-card__link-area';
+  const managedControlSelector = options.managedControlSelector || '';
   const isEnabled = typeof options.enabled === 'function' ? options.enabled : () => true;
   // Navigation axis: 'grid' (all four arrows), 'horizontal' (Left/Right only),
   // or 'vertical' (Up/Down only). See resolveRovingIntent for the mapping.
@@ -110,9 +117,24 @@ export function useRovingTabindex(containerRefFn, options = {}) {
     return Array.from(el.querySelectorAll(cellSelector));
   }
 
+  function getManagedControlsForCell(cell) {
+    if (!managedControlSelector || !cell || typeof cell.closest !== 'function') {
+      return [];
+    }
+    const item = cell.closest('li') ?? cell.parentElement;
+    if (!item || typeof item.querySelectorAll !== 'function') {
+      return [];
+    }
+    return Array.from(item.querySelectorAll(managedControlSelector))
+      .filter((control) => control !== cell);
+  }
+
   function clearManagedTabindex() {
     for (const cell of getCells()) {
       cell.removeAttribute('tabindex');
+      for (const control of getManagedControlsForCell(cell)) {
+        control.removeAttribute('tabindex');
+      }
     }
   }
 
@@ -130,6 +152,13 @@ export function useRovingTabindex(containerRefFn, options = {}) {
     }
     for (let i = 0; i < total; i++) {
       cells[i].setAttribute('tabindex', i === activeIndex ? '0' : '-1');
+      for (const control of getManagedControlsForCell(cells[i])) {
+        if (i === activeIndex) {
+          control.removeAttribute('tabindex');
+        } else {
+          control.setAttribute('tabindex', '-1');
+        }
+      }
     }
   }
 
@@ -185,7 +214,7 @@ export function useRovingTabindex(containerRefFn, options = {}) {
   }
 
   function refresh() {
-    if (isEnabled()) {
+    if (isEnabled() && attach()) {
       syncTabindex();
     }
   }
@@ -193,12 +222,18 @@ export function useRovingTabindex(containerRefFn, options = {}) {
   function attach() {
     const el = containerRefFn();
     if (!el) {
-      return;
+      return false;
+    }
+    if (attached === el) {
+      return true;
+    }
+    if (attached) {
+      detach();
     }
     el.addEventListener('keydown', onKeydown);
     el.addEventListener('focusin', onFocusin);
     attached = el;
-    syncTabindex();
+    return true;
   }
 
   function detach() {
@@ -210,9 +245,7 @@ export function useRovingTabindex(containerRefFn, options = {}) {
   }
 
   onMounted(() => {
-    if (isEnabled()) {
-      attach();
-    }
+    refresh();
   });
 
   // Self-manage attach/detach when the enabled predicate flips.
@@ -220,7 +253,7 @@ export function useRovingTabindex(containerRefFn, options = {}) {
     () => isEnabled(),
     (enabled) => {
       if (enabled) {
-        attach();
+        refresh();
       } else {
         detach();
         clearManagedTabindex();

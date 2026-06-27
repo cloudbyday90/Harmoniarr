@@ -80,11 +80,14 @@ test('useImportReviewAdminWorkflow refreshes stage summaries for admins and sync
   await Promise.resolve();
   await Promise.resolve();
 
-  assert.deepEqual(executionLoads[0], null);
-  assert.deepEqual(mediaLoads[0], null);
-  assert.deepEqual(applyLoads[0], null);
+  assert.deepEqual(executionLoads[0], { preferredRunId: 'run-44' });
+  assert.deepEqual(mediaLoads[0], { preferredRunId: null });
+  assert.deepEqual(applyLoads[0], { preferredRunId: null });
   assert.deepEqual(executionLoads.at(-1), { preferredRunId: 'run-44' });
   assert.equal(focusedPanels.at(-1), 'import-execution-run-panel');
+
+  await workflow.execution.handleRefresh();
+  assert.deepEqual(executionLoads.at(-1), { preferredRunId: 'run-44' });
 
   await workflow.execution.handleSelectRun('run-45');
   assert.deepEqual(replace.mock.calls.at(-1).arguments[0], {
@@ -107,7 +110,9 @@ test('useImportReviewAdminWorkflow start handlers update route state and refresh
     route.hash = location.hash ?? '';
     route.query = { ...location.query };
   });
-  const refreshQueue = t.mock.fn(async () => {});
+  const refreshQueue = t.mock.fn(async () => {
+    route.hash = '';
+  });
   const executionStart = t.mock.fn(async () => {});
   const applyStart = t.mock.fn(async () => {});
   const inspectionStart = t.mock.fn(async () => {});
@@ -131,12 +136,57 @@ test('useImportReviewAdminWorkflow start handlers update route state and refresh
   });
 
   await workflow.execution.handleStartRun();
+  assert.equal(route.hash, '#import-execution-run-panel');
   await workflow.mediaInspection.handleStartRun();
+  assert.equal(route.hash, '#import-media-inspection-run-panel');
   await workflow.apply.handleStartRun();
+  assert.equal(route.hash, '#import-apply-run-panel');
 
   assert.equal(executionStart.mock.callCount(), 1);
   assert.equal(inspectionStart.mock.callCount(), 1);
   assert.equal(applyStart.mock.callCount(), 1);
   assert.equal(refreshQueue.mock.callCount(), 3);
   assert.deepEqual(refreshQueue.mock.calls[0].arguments[0], { preserveSelection: true });
+});
+
+test('useImportReviewAdminWorkflow route replacement preserves selected run while selecting a candidate', async (t) => {
+  const route = reactive({
+    hash: '#import-media-inspection-run-panel',
+    query: {
+      candidateFile: 'stale-file',
+      mediaInspectionRunId: 'media-run-12',
+      status: 'selected',
+    },
+  });
+  const replace = t.mock.fn(async (location) => {
+    route.hash = location.hash ?? '';
+    route.query = { ...location.query };
+  });
+
+  const workflow = useImportReviewAdminWorkflow({
+    applySummaryWorkflow: createSummaryWorkflow(),
+    executionSummaryWorkflow: createSummaryWorkflow(),
+    isAdmin: ref(false),
+    mediaInspectionSummaryWorkflow: createSummaryWorkflow(),
+    route,
+    router: { replace },
+  });
+
+  await workflow.replaceImportReviewRouteState(
+    {
+      candidateFileId: 'candidate-diagnostics-file-1',
+      candidateId: 'candidate-diagnostics',
+    },
+    { hash: '#import-review-selection-stage' },
+  );
+
+  assert.deepEqual(replace.mock.calls.at(-1).arguments[0], {
+    hash: '#import-review-selection-stage',
+    query: {
+      candidateFile: 'candidate-diagnostics-file-1',
+      candidate: 'candidate-diagnostics',
+      mediaInspectionRunId: 'media-run-12',
+      status: 'selected',
+    },
+  });
 });

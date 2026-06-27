@@ -85,6 +85,8 @@ test('createImportCandidateMediaInspectionWorker inspects selected candidates an
   const previewImportCandidateApply = t.mock.fn(async ({ importCandidateId }) => ({
     files: importCandidateId === 'candidate-1'
       ? [{
+        fileId: 'candidate-1-file-1',
+        filename: 'alpha.flac',
         inspection: {
           warnings: [{
             code: 'media_inspection_no_audio_stream',
@@ -92,6 +94,8 @@ test('createImportCandidateMediaInspectionWorker inspects selected candidates an
           }],
         },
       }, {
+        fileId: 'candidate-1-file-2',
+        filename: 'beta.flac',
         inspection: {
           warnings: [{
             code: 'media_inspection_probe_failed',
@@ -113,7 +117,9 @@ test('createImportCandidateMediaInspectionWorker inspects selected candidates an
         executionStatus: {
           code: 'ready',
         },
+        folderPath: '/private/staging/Boards of Canada/Geogaddi',
         id: 'candidate-1',
+        username: 'remote-peer',
       }, {
         executionStatus: {
           code: 'blocked',
@@ -171,6 +177,23 @@ test('createImportCandidateMediaInspectionWorker inspects selected candidates an
   assert.equal(completionArgs.summary.inspectedFileCount, 3);
   assert.equal(completionArgs.summary.warningCount, 2);
   assert.equal(completionArgs.summary.inspectionUnavailableCount, 1);
+  assert.deepEqual(completionArgs.summary.inspectionDiagnostics, [{
+    candidateId: 'candidate-1',
+    code: 'media_inspection_no_audio_stream',
+    fileId: 'candidate-1-file-1',
+    filename: 'alpha.flac',
+    folderPath: '/private/staging/Boards of Canada/Geogaddi',
+    message: 'No audio stream',
+    username: 'remote-peer',
+  }, {
+    candidateId: 'candidate-1',
+    code: 'media_inspection_probe_failed',
+    fileId: 'candidate-1-file-2',
+    filename: 'beta.flac',
+    folderPath: '/private/staging/Boards of Canada/Geogaddi',
+    message: 'Probe failed',
+    username: 'remote-peer',
+  }]);
   assert.deepEqual(releasedLeaseArgs, {
     runId: 'inspection-run-1',
     status: 'completed',

@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { nextTick, watch } from 'vue';
+import { isRef, nextTick, watch } from 'vue';
 import { useRovingTabindex } from './useRovingTabindex.js';
 
 /**
@@ -33,23 +33,32 @@ import { useRovingTabindex } from './useRovingTabindex.js';
  * trailing non-card link (e.g. a "discover more" `RouterLink`), pass a union
  * `cellSelector`.
  *
+ * Inactive card action controls are removed from the Tab sequence while the
+ * active card's controls keep native focusability. This keeps the grid's active
+ * card as the Tab entry point without making per-card actions unreachable.
+ *
  * @param {() => HTMLElement|null} containerRefFn - Accessor for the `<ul>` grid.
  * @param {object} options
  * @param {string} options.cellSelector - Selector for the focusable cell(s).
- * @param {() => number} [options.count] - Getter for the live card count; when
- *   it changes, the managed `tabindex` is re-applied on `nextTick`.
+ * @param {string} [options.managedControlSelector] - Optional selector for
+ *   secondary controls scoped to the same `<li>` item as each roving cell.
+ * @param {import('vue').Ref<number>|(() => number)} [options.count]
+ *   Ref/computed ref or getter for the live card count; when it changes, the
+ *   managed `tabindex` is re-applied on `nextTick`.
  * @returns {{ refresh: () => void }}
  */
 export function useArtworkGridRoving(containerRefFn, options = {}) {
   const { refresh } = useRovingTabindex(containerRefFn, {
     cellSelector: options.cellSelector,
+    managedControlSelector: options.managedControlSelector
+      ?? '.hx-media-card__actions :is(a[href], button, input, select, textarea, [tabindex])',
     axis: 'grid',
   });
 
-  if (typeof options.count === 'function') {
+  if (typeof options.count === 'function' || isRef(options.count)) {
     watch(options.count, () => {
       nextTick(refresh);
-    });
+    }, { immediate: true });
   }
 
   return { refresh };

@@ -71,6 +71,13 @@ const props = defineProps({
     type: String,
     default: '.hx-media-card__link-area',
   },
+  // Secondary controls in inactive cards should not appear before the active
+  // roving card when tabbing into the grid. The active card's controls keep
+  // native focusability so keyboard users can still reach actions like Add.
+  managedControlSelector: {
+    type: String,
+    default: '.hx-media-card__actions :is(a[href], button, input, select, textarea, [tabindex])',
+  },
 });
 
 const visibleCount = ref(clampVisibleCount(props.initialVisible, props.items.length, props.step));
@@ -78,6 +85,7 @@ const visibleCount = ref(clampVisibleCount(props.initialVisible, props.items.len
 const gridEl = useTemplateRef('grid');
 const { refresh: refreshRoving } = useRovingTabindex(() => gridEl.value, {
   cellSelector: props.cellSelector,
+  managedControlSelector: props.managedControlSelector,
   enabled: () => props.roving,
 });
 

@@ -26,7 +26,7 @@ import { useGridState } from '../composables/useGridState.js';
 import { useArtworkGridRoving } from '../composables/useArtworkGridRoving.js';
 import { useMyRequestNotifications } from '../composables/useMyRequestNotifications.js';
 import { useMyRequests } from '../composables/useMyRequests.js';
-import { sortMyRequests } from '../lib/my-requests-presentation.js';
+import { getMyRequestFilterStatus, sortMyRequests } from '../lib/my-requests-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const viewerUserId = computed(() => sessionStore.state.user?.id ?? null);
@@ -83,7 +83,7 @@ const displayRequests = computed(() => {
   const all = requests.value ?? [];
   const statusFilter = filterState.value?.filters?.status;
   const filtered = statusFilter
-    ? all.filter((r) => r.status === statusFilter)
+    ? all.filter((r) => getMyRequestFilterStatus(r) === statusFilter)
     : all;
   const field = filterState.value?.sort?.field ?? 'requested_at';
   const order = filterState.value?.sort?.order ?? 'desc';

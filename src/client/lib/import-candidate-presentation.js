@@ -398,10 +398,10 @@ export function getApplyItemOperationHistory(item) {
  * @returns {boolean}
  */
 export function canStartApplyRun(currentRun, importPendingCandidateCount) {
+  if (importPendingCandidateCount <= 0) return false;
   return !currentRun || (
     currentRun.status !== 'pending' &&
-    currentRun.status !== 'running' &&
-    importPendingCandidateCount > 0
+    currentRun.status !== 'running'
   );
 }
 
@@ -583,10 +583,10 @@ export function getHeartbeatSkipReasonLabel(reason) {
  * @returns {boolean}
  */
 export function canStartExecutionRun(currentRun, selectedCandidateCount) {
+  if (selectedCandidateCount <= 0) return false;
   return !currentRun || (
     currentRun.status !== 'pending' &&
-    currentRun.status !== 'running' &&
-    selectedCandidateCount > 0
+    currentRun.status !== 'running'
   );
 }
 
@@ -602,10 +602,10 @@ export function canStartExecutionRun(currentRun, selectedCandidateCount) {
  * @returns {boolean}
  */
 export function canStartMediaInspectionRun(currentRun, selectedCandidateCount) {
+  if (selectedCandidateCount <= 0) return false;
   return !currentRun || (
     currentRun.status !== 'pending' &&
-    currentRun.status !== 'running' &&
-    selectedCandidateCount > 0
+    currentRun.status !== 'running'
   );
 }
 

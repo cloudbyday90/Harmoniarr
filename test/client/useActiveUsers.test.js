@@ -65,6 +65,46 @@ test('useActiveUsers filters out disabled users', async () => {
   assert.equal(users.value[0].username, 'alice');
 });
 
+test('useActiveUsers skips fetch and cached users when disabled', async () => {
+  clearActiveUsersCache();
+  let callCount = 0;
+  const fetchUsersFn = async () => {
+    callCount++;
+    return { users: [{ id: 'u1', username: 'alice', isDisabled: false }] };
+  };
+
+  const enabled = useActiveUsers({ fetchUsersFn });
+  await settle();
+  assert.equal(enabled.users.value.length, 1);
+
+  const disabled = useActiveUsers({ enabled: false, fetchUsersFn });
+  await settle();
+
+  assert.equal(callCount, 1);
+  assert.equal(disabled.isLoading.value, false);
+  assert.equal(disabled.error.value, null);
+  assert.deepEqual(disabled.users.value, []);
+});
+
+test('useActiveUsers does not fetch when disabled before cache exists', async () => {
+  clearActiveUsersCache();
+  let callCount = 0;
+  const { users, isLoading, error } = useActiveUsers({
+    enabled: false,
+    fetchUsersFn: async () => {
+      callCount++;
+      return { users: [{ id: 'u1', username: 'alice', isDisabled: false }] };
+    },
+  });
+
+  await settle();
+
+  assert.equal(callCount, 0);
+  assert.equal(isLoading.value, false);
+  assert.equal(error.value, null);
+  assert.deepEqual(users.value, []);
+});
+
 test('useActiveUsers deduplicates concurrent fetch calls', async () => {
   clearActiveUsersCache();
   let callCount = 0;

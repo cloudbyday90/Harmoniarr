@@ -217,44 +217,143 @@ export function buildMediaRequestSuccessMessage(mediaRequest, currentUserId) {
     : 'Music request submitted and added to your request profile.';
 }
 
-export function getReassignmentEventLabel(eventType) {
+function titleCaseEventType(eventType) {
+  return String(eventType ?? 'event')
+    .split(/[_\s-]+/u)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ') || 'Event';
+}
+
+function getActorLabel(event, fallback) {
+  return event?.actorUsername ?? fallback;
+}
+
+function getRequestedForLabel({ event, userId, usersById, nameField, fallback }) {
+  const user = userId ? usersById?.[userId] : null;
+  return user?.username ?? event?.[nameField] ?? fallback;
+}
+
+function appendReason(parts, event) {
+  if (event?.reason) {
+    parts.push(`Reason: ${event.reason}`);
+  }
+  return parts;
+}
+
+export function getRequestEventLabel(eventType) {
   switch (eventType) {
     case 'reassigned':
       return 'Reassigned';
     case 'cancelled':
       return 'Cancelled';
+    case 'created':
+    case 'request_created':
+      return 'Created';
+    case 'download_completed':
+      return 'Download Completed';
+    case 'fulfillment_failed':
+      return 'Fulfillment Failed';
+    case 'fulfillment_started':
+      return 'Fulfillment Started';
+    case 'import_completed':
+      return 'Imported';
+    case 'import_pending':
+      return 'Import Pending';
     default:
-      return eventType;
+      return titleCaseEventType(eventType);
   }
 }
 
-export function getReassignmentEventTone(eventType) {
+export function getRequestEventTone(eventType) {
   switch (eventType) {
-    case 'reassigned':
-      return 'info';
     case 'cancelled':
+    case 'fulfillment_failed':
       return 'danger';
+    case 'created':
+    case 'request_created':
+    case 'download_completed':
+    case 'import_completed':
+      return 'success';
+    case 'fulfillment_started':
+    case 'import_pending':
+    case 'reassigned':
     default:
       return 'info';
   }
+}
+
+export function formatRequestEventDescription(event, usersById = {}) {
+  if (!event) return '';
+
+  if (event.eventType === 'cancelled') {
+    return appendReason([
+      event.actorUsername
+        ? `${event.actorUsername} cancelled this request`
+        : 'Request was cancelled',
+    ], event).join('. ');
+  }
+
+  if (event.eventType === 'created' || event.eventType === 'request_created') {
+    return event.actorUsername
+      ? `${event.actorUsername} created this request`
+      : 'Request was created';
+  }
+
+  if (event.eventType === 'fulfillment_started') {
+    return 'Fulfillment started for this request';
+  }
+
+  if (event.eventType === 'download_completed') {
+    return 'Download completed for this request';
+  }
+
+  if (event.eventType === 'import_pending') {
+    return 'Download complete; waiting to import files';
+  }
+
+  if (event.eventType === 'import_completed') {
+    return 'Files were imported into the library';
+  }
+
+  if (event.eventType === 'fulfillment_failed') {
+    return appendReason(['Fulfillment failed for this request'], event).join('. ');
+  }
+
+  if (event.eventType === 'reassigned') {
+    const actorLabel = getActorLabel(event, 'An admin');
+    const previousLabel = getRequestedForLabel({
+      event,
+      fallback: 'previous requester',
+      nameField: 'previousRequestedForUsername',
+      userId: event.previousRequestedForUserId,
+      usersById,
+    });
+    const newLabel = getRequestedForLabel({
+      event,
+      fallback: 'new requester',
+      nameField: 'newRequestedForUsername',
+      userId: event.newRequestedForUserId,
+      usersById,
+    });
+
+    return appendReason([
+      `${actorLabel} reassigned from ${previousLabel} to ${newLabel}`,
+    ], event).join('. ');
+  }
+
+  return event.summary ?? `${getRequestEventLabel(event.eventType)} event`;
+}
+
+export function getReassignmentEventLabel(eventType) {
+  return getRequestEventLabel(eventType);
+}
+
+export function getReassignmentEventTone(eventType) {
+  return getRequestEventTone(eventType);
 }
 
 export function formatReassignmentEventDescription(event, usersById) {
   if (!event) return '';
-
-  const actorLabel = event.actorUsername ?? 'Unknown admin';
-  const previousUser = usersById[event.previousRequestedForUserId];
-  const newUser = usersById[event.newRequestedForUserId];
-  const previousLabel = previousUser?.username ?? event.previousRequestedForUserId ?? 'unknown';
-  const newLabel = newUser?.username ?? event.newRequestedForUserId ?? 'unknown';
-
-  const parts = [
-    `${actorLabel} reassigned from ${previousLabel} to ${newLabel}`,
-  ];
-
-  if (event.reason) {
-    parts.push(`Reason: ${event.reason}`);
-  }
-
-  return parts.join('. ');
+  return formatRequestEventDescription({ ...event, eventType: event?.eventType ?? 'reassigned' }, usersById);
 }

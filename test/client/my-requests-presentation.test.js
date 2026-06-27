@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   formatRequestDate,
+  getMyRequestFilterStatus,
   getRequestAttributionLine,
   getRequestKindLabel,
   sortMyRequests,
@@ -151,6 +152,57 @@ describe('sortMyRequests', () => {
     ];
     const result = sortMyRequests(requests, { field: 'requested_at', order: 'desc' });
     assert.equal(result.length, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getMyRequestFilterStatus
+// ---------------------------------------------------------------------------
+
+describe('getMyRequestFilterStatus', () => {
+  it('maps needs_fetch requests to pending', () => {
+    assert.equal(getMyRequestFilterStatus({ requestState: 'needs_fetch' }), 'pending');
+  });
+
+  it('maps needs_review requests to pending', () => {
+    assert.equal(getMyRequestFilterStatus({ requestState: 'needs_review' }), 'pending');
+  });
+
+  it('maps downloading fulfillment to downloading', () => {
+    assert.equal(
+      getMyRequestFilterStatus({ requestState: 'needs_fetch', fulfillmentStatus: { code: 'downloading' } }),
+      'downloading',
+    );
+  });
+
+  it('maps import_pending fulfillment to downloading', () => {
+    assert.equal(
+      getMyRequestFilterStatus({ requestState: 'needs_fetch', fulfillmentStatus: { code: 'import_pending' } }),
+      'downloading',
+    );
+  });
+
+  it('maps already_exists requests to complete', () => {
+    assert.equal(getMyRequestFilterStatus({ requestState: 'already_exists' }), 'complete');
+  });
+
+  it('maps fulfilled fulfillment to complete', () => {
+    assert.equal(
+      getMyRequestFilterStatus({ requestState: 'needs_fetch', fulfillmentStatus: { code: 'fulfilled' } }),
+      'complete',
+    );
+  });
+
+  it('maps failed and cancelled states to failed', () => {
+    assert.equal(getMyRequestFilterStatus({ requestState: 'failed' }), 'failed');
+    assert.equal(getMyRequestFilterStatus({ requestState: 'cancelled' }), 'failed');
+  });
+
+  it('maps failed fulfillment to failed', () => {
+    assert.equal(
+      getMyRequestFilterStatus({ requestState: 'needs_fetch', fulfillmentStatus: { code: 'failed' } }),
+      'failed',
+    );
   });
 });
 

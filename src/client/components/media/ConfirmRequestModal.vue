@@ -17,8 +17,9 @@
 -->
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import ArtworkImage from '../ArtworkImage.vue';
+import { containDialogTabFocus } from '../../lib/dialog-focus-trap.js';
 import { getReleaseArtistName, getReleaseTitle, getReleaseYear } from '../../lib/release-normalization.js';
 
 /**
@@ -79,6 +80,9 @@ const props = defineProps({
 const emit = defineEmits(['confirm', 'close']);
 
 const dialogRef = ref(null);
+const closeButtonRef = ref(null);
+const confirmButtonRef = ref(null);
+let previouslyFocusedElement = null;
 
 /**
  * The selected beneficiary user ID for the "Request for" selector.
@@ -86,17 +90,31 @@ const dialogRef = ref(null);
  */
 const selectedForUserId = ref(null);
 
-// Reset the "Request for" selector each time the modal opens with a new release.
-watch(() => props.open, (isOpen) => {
-  if (isOpen) selectedForUserId.value = null;
-});
-
-// Sync the native dialog open state with the `open` prop.
-// onMounted handles the case where `open` is already true before the ref is
-// ready (the watcher's immediate run exits early when dialogRef is null).
-onMounted(() => {
-  if (props.open && dialogRef.value && !dialogRef.value.open) {
+function openDialogSession() {
+  if (!dialogRef.value) return;
+  previouslyFocusedElement = globalThis.document?.activeElement instanceof HTMLElement
+    ? globalThis.document.activeElement
+    : null;
+  if (!dialogRef.value.open) {
     dialogRef.value.showModal();
+  }
+  selectedForUserId.value = null;
+  closeButtonRef.value?.focus({ preventScroll: true });
+}
+
+function closeDialogSession() {
+  if (dialogRef.value?.open) {
+    dialogRef.value.close();
+  }
+  if (previouslyFocusedElement?.isConnected) {
+    previouslyFocusedElement.focus({ preventScroll: true });
+  }
+  previouslyFocusedElement = null;
+}
+
+onMounted(() => {
+  if (props.open) {
+    openDialogSession();
   }
 });
 
@@ -105,16 +123,23 @@ watch(
   (isOpen) => {
     if (!dialogRef.value) return;
     if (isOpen) {
-      if (!dialogRef.value.open) {
-        dialogRef.value.showModal();
-      }
+      openDialogSession();
     } else {
-      if (dialogRef.value.open) {
-        dialogRef.value.close();
-      }
+      closeDialogSession();
     }
   },
-  { immediate: true },
+);
+
+watch(
+  () => [props.errorMessage, props.loading, props.open],
+  async ([errorMessage, loading, isOpen]) => {
+    if (!errorMessage || loading || !isOpen) {
+      return;
+    }
+
+    await nextTick();
+    confirmButtonRef.value?.focus({ preventScroll: true });
+  },
 );
 
 const artistName = computed(() => getReleaseArtistName(props.release));
@@ -145,6 +170,7 @@ const metaLine = computed(() => {
 function handleCancel(event) {
   event.preventDefault();
   if (!props.loading) {
+    closeDialogSession();
     emit('close');
   }
 }
@@ -153,14 +179,20 @@ function handleCancel(event) {
 function handleBackdropClick(event) {
   if (props.loading) return;
   if (event.target === dialogRef.value) {
+    closeDialogSession();
     emit('close');
   }
 }
 
 function handleClose() {
   if (!props.loading) {
+    closeDialogSession();
     emit('close');
   }
+}
+
+function handleKeydown(event) {
+  containDialogTabFocus(event, dialogRef.value);
 }
 
 function handleConfirm() {
@@ -177,11 +209,13 @@ function handleConfirm() {
     aria-labelledby="crm-heading"
     @cancel="handleCancel"
     @click="handleBackdropClick"
+    @keydown="handleKeydown"
   >
     <div class="crm-shell">
       <header class="crm-header">
         <h2 id="crm-heading" class="crm-title">Request this release?</h2>
         <button
+          ref="closeButtonRef"
           type="button"
           class="crm-close hx-btn"
           data-variant="ghost"
@@ -229,6 +263,7 @@ function handleConfirm() {
 
       <footer class="crm-footer">
         <button
+          ref="confirmButtonRef"
           type="button"
           class="hx-btn"
           data-variant="ghost"
@@ -387,6 +422,11 @@ function handleConfirm() {
 .crm-for-user__select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.crm-for-user__select:focus-visible {
+  outline: 2px solid var(--hx-focus-ring, var(--hx-accent));
+  outline-offset: 2px;
 }
 
 .crm-error {

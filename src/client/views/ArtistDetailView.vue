@@ -163,7 +163,10 @@ function closeDetailModal() {
 const artistName = computed(() => (artist.value?.name ?? nameHint.value) || 'Artist');
 const artistMeta = computed(() => buildArtistMetaLine(artist.value));
 const musicBrainzUrl = computed(() => buildArtistMusicBrainzUrl(mbid.value));
-const canEditOperatorPolicy = computed(() => Boolean(projection.value?.artist?.id && operator.value));
+const canEditOperatorPolicy = computed(() =>
+  sessionStore.state.user?.role !== 'requester'
+  && Boolean(projection.value?.artist?.id && operator.value),
+);
 const isPolicyDirty = computed(() =>
   fingerprintOperatorArtistDraft(policyDraft.value) !== savedDraftFingerprint.value,
 );
@@ -574,7 +577,7 @@ watch(projection, () => {
               <ArtistReleaseSectionGrid
                 class="artist-detail-grid"
                 :releases="section.releases"
-                :aria-label="`${section.type}s`"
+                :aria-label="pluralizeReleaseType(section.type)"
               >
                 <template #default="{ release }">
                 <ReleaseCard

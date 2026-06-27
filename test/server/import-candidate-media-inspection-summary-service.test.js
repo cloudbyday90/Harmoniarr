@@ -71,6 +71,15 @@ test('buildImportCandidateMediaInspectionRunDetail returns a specific historical
         finishedAt: '2026-05-01T01:30:00.000Z',
         id: runId,
         inspectedCandidateCount: 3,
+        inspectionDiagnostics: [{
+          candidateId: 'candidate-1',
+          code: 'media_inspection_probe_failed',
+          fileId: 'file-1',
+          filename: 'alpha.flac',
+          folderPath: '/private/staging/Boards of Canada/Geogaddi',
+          message: 'Probe failed',
+          username: 'remote-peer',
+        }],
         inspectedFileCount: 9,
         inspectionUnavailableCount: 0,
         requestedCandidateCount: 4,
@@ -87,6 +96,15 @@ test('buildImportCandidateMediaInspectionRunDetail returns a specific historical
 
   assert.equal(detail.run.id, 'inspection-run-7');
   assert.equal(detail.run.blockedCandidateCount, 1);
+  assert.deepEqual(detail.run.inspectionDiagnostics, [{
+    candidateId: 'candidate-1',
+    code: 'media_inspection_probe_failed',
+    fileId: 'file-1',
+    filename: 'alpha.flac',
+    folderPath: '/private/staging/Boards of Canada/Geogaddi',
+    message: 'Probe failed',
+    username: 'remote-peer',
+  }]);
 });
 
 test('buildImportCandidateMediaInspectionRunDetail preserves not-found semantics', async () => {

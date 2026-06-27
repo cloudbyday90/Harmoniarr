@@ -54,6 +54,43 @@ export function sortMyRequests(requests, { field = 'requested_at', order = 'desc
 }
 
 /**
+ * Resolve the coarse My Requests status bucket used by the view filters.
+ *
+ * The API exposes durable `requestState` plus a fulfillment read model, not a
+ * legacy `status` field. This helper keeps the filter UI stable while mapping
+ * current request payloads to the four requester-facing buckets.
+ *
+ * @param {object|null|undefined} request
+ * @returns {'pending'|'downloading'|'complete'|'failed'}
+ */
+export function getMyRequestFilterStatus(request) {
+  const requestState = request?.requestState ?? null;
+  const fulfillmentCode = request?.fulfillmentStatus?.code ?? null;
+
+  if (
+    requestState === 'already_exists'
+    || fulfillmentCode === 'already_available'
+    || fulfillmentCode === 'fulfilled'
+  ) {
+    return 'complete';
+  }
+
+  if (
+    requestState === 'failed'
+    || requestState === 'cancelled'
+    || fulfillmentCode === 'failed'
+  ) {
+    return 'failed';
+  }
+
+  if (fulfillmentCode === 'downloading' || fulfillmentCode === 'import_pending') {
+    return 'downloading';
+  }
+
+  return 'pending';
+}
+
+/**
  * Format an ISO date string into a locale-appropriate short date (year, month,
  * day). Returns `null` for missing or unparseable values.
  *

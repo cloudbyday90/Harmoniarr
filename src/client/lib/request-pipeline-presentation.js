@@ -58,18 +58,34 @@ export function formatBytes(bytes) {
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-export function formatCandidateSourceLabel(candidate, index = 0) {
-  if (typeof candidate?.sourceLabel === 'string' && candidate.sourceLabel.trim()) {
-    return candidate.sourceLabel.trim();
+function normalizeString(value) {
+  return typeof value === 'string' && value.trim()
+    ? value.trim()
+    : null;
+}
+
+function folderNameFromPath(folderPath) {
+  return folderPath?.split(/[/\\]/u).filter(Boolean).pop() ?? null;
+}
+
+export function formatCandidateSourceLabel(candidate, index = 0, { preferOperatorContext = false } = {}) {
+  const username = normalizeString(candidate?.username);
+  const folderPath = normalizeString(candidate?.folderPath);
+  const folderName = folderNameFromPath(folderPath);
+
+  if (preferOperatorContext && username && folderName) {
+    return `${username} - ${folderName}`;
+  }
+  if (preferOperatorContext && username) {
+    return username;
+  }
+  if (preferOperatorContext && folderName) {
+    return folderName;
   }
 
-  const username = typeof candidate?.username === 'string' && candidate.username.trim()
-    ? candidate.username.trim()
-    : null;
-  const folderPath = typeof candidate?.folderPath === 'string' && candidate.folderPath.trim()
-    ? candidate.folderPath.trim()
-    : null;
-  const folderName = folderPath?.split(/[/\\]/).filter(Boolean).pop() ?? null;
+  if (normalizeString(candidate?.sourceLabel)) {
+    return candidate.sourceLabel.trim();
+  }
 
   if (username && folderName) {
     return `${username} - ${folderName}`;
@@ -82,6 +98,31 @@ export function formatCandidateSourceLabel(candidate, index = 0) {
   }
 
   return `Source ${index + 1}`;
+}
+
+export function formatCandidateFolderPath(candidate) {
+  return normalizeString(candidate?.folderPath);
+}
+
+export function hasRunDiagnostics(runItem) {
+  return Boolean(
+    normalizeString(runItem?.operationRunId)
+    || normalizeString(runItem?.importCandidateId)
+    || normalizeString(runItem?.statusMessage)
+    || normalizeString(runItem?.runErrorMessage),
+  );
+}
+
+export function formatRunId(runItem) {
+  return normalizeString(runItem?.operationRunId);
+}
+
+export function formatImportCandidateId(runItem) {
+  return normalizeString(runItem?.importCandidateId);
+}
+
+export function formatRunStatusMessage(runItem) {
+  return normalizeString(runItem?.statusMessage);
 }
 
 export function runItemStatusLabel(runItem) {

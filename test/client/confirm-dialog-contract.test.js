@@ -40,6 +40,7 @@ test('ConfirmDialog follows the WAI-ARIA alertdialog pattern', async () => {
   assert.match(source, /role="alertdialog"/);
   assert.match(source, /aria-modal="true"/);
   assert.match(source, /aria-labelledby/);
+  assert.match(source, /:ref="setDialogRef"/);
   // Message is exposed via aria-describedby per the APG alertdialog pattern.
   assert.match(source, /aria-describedby="isConfirming && message \? 'confirm-message' : undefined"/);
   assert.match(source, /id="confirm-message"/);

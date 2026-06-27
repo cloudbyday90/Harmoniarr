@@ -11,6 +11,7 @@ import {
 
 test('normalizeImportReviewRouteState trims route query values and defaults invalid status to pending', () => {
   assert.deepEqual(normalizeImportReviewRouteState({
+    candidateFile: ' file-1 ',
     candidate: ' candidate-1 ',
     folderPath: '  Amber ',
     sourceSearchId: ' search-1 ',
@@ -18,6 +19,7 @@ test('normalizeImportReviewRouteState trims route query values and defaults inva
     username: ' source-user ',
   }), {
     applyRunId: '',
+    candidateFileId: 'file-1',
     candidateId: 'candidate-1',
     executionRunId: '',
     mediaInspectionRunId: '',
@@ -31,6 +33,7 @@ test('normalizeImportReviewRouteState trims route query values and defaults inva
 test('normalizeImportReviewRouteState maps all-status route tokens to an empty status filter', () => {
   assert.deepEqual(normalizeImportReviewRouteState({ status: 'all' }), {
     applyRunId: '',
+    candidateFileId: '',
     candidateId: '',
     executionRunId: '',
     mediaInspectionRunId: '',
@@ -41,9 +44,27 @@ test('normalizeImportReviewRouteState maps all-status route tokens to an empty s
   });
 });
 
+test('normalizeImportReviewRouteState accepts internal candidateId state keys', () => {
+  assert.deepEqual(normalizeImportReviewRouteState({
+    candidateFileId: ' file-99 ',
+    candidateId: ' candidate-99 ',
+  }), {
+    applyRunId: '',
+    candidateFileId: 'file-99',
+    candidateId: 'candidate-99',
+    executionRunId: '',
+    mediaInspectionRunId: '',
+    folderPath: '',
+    sourceSearchId: '',
+    status: 'pending',
+    username: '',
+  });
+});
+
 test('buildImportReviewRouteQuery omits default pending status and preserves explicit all-status queries', () => {
   assert.deepEqual(buildImportReviewRouteQuery({
     applyRunId: 'apply-run-2',
+    candidateFileId: 'file-3',
     candidateId: 'candidate-1',
     executionRunId: 'execution-run-1',
     mediaInspectionRunId: 'inspection-run-1',
@@ -53,6 +74,7 @@ test('buildImportReviewRouteQuery omits default pending status and preserves exp
     username: 'source-user',
   }), {
     applyRunId: 'apply-run-2',
+    candidateFile: 'file-3',
     candidate: 'candidate-1',
     executionRunId: 'execution-run-1',
     mediaInspectionRunId: 'inspection-run-1',
@@ -71,6 +93,7 @@ test('buildImportReviewRouteQuery omits default pending status and preserves exp
 test('getImportReviewRouteStateKey matches equivalent route states after normalization', () => {
   assert.equal(
     getImportReviewRouteStateKey({
+      candidateFileId: ' file-1 ',
       candidateId: ' candidate-1 ',
       folderPath: ' Amber ',
       sourceSearchId: ' search-1 ',
@@ -78,6 +101,7 @@ test('getImportReviewRouteStateKey matches equivalent route states after normali
       username: ' source-user ',
     }),
     getImportReviewRouteStateKey({
+      candidateFileId: 'file-1',
       candidateId: 'candidate-1',
       folderPath: 'Amber',
       sourceSearchId: 'search-1',

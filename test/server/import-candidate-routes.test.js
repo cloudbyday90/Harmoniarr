@@ -1033,6 +1033,15 @@ test('import candidate media inspection run detail route returns a historical ru
       finishedAt: '2026-04-30T20:39:00.000Z',
       id: runId,
       inspectedCandidateCount: 1,
+      inspectionDiagnostics: [{
+        candidateId: 'candidate-1',
+        code: 'media_inspection_probe_failed',
+        fileId: 'file-1',
+        filename: 'alpha.flac',
+        folderPath: '/private/staging/Boards of Canada/Geogaddi',
+        message: 'Probe failed',
+        username: 'remote-peer',
+      }],
       inspectedFileCount: 3,
       inspectionUnavailableCount: 0,
       requestedCandidateCount: 2,
@@ -1052,6 +1061,15 @@ test('import candidate media inspection run detail route returns a historical ru
       runId: 'inspection-run-4',
     }]);
     assert.equal(payload.importCandidateMediaInspectionRun.run.id, 'inspection-run-4');
+    assert.deepEqual(payload.importCandidateMediaInspectionRun.run.inspectionDiagnostics, [{
+      candidateId: 'candidate-1',
+      code: 'media_inspection_probe_failed',
+      fileId: 'file-1',
+      filename: 'alpha.flac',
+      folderPath: '/private/staging/Boards of Canada/Geogaddi',
+      message: 'Probe failed',
+      username: 'remote-peer',
+    }]);
   });
 });
 

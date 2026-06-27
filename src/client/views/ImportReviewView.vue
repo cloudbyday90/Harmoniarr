@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import ImportCandidateApplyPanel from '../components/ImportCandidateApplyPanel.vue';
 import ImportCandidateExecutionPanel from '../components/ImportCandidateExecutionPanel.vue';
@@ -41,14 +41,17 @@ import {
   buildImportReviewOverviewCards,
   buildImportReviewWorkflowStages,
 } from '../lib/import-review-workspace-presentation.js';
+import { normalizeImportReviewRouteState } from '../lib/import-review-route-state.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
+const IMPORT_REVIEW_SELECTION_STAGE_ID = 'import-review-selection-stage';
 
 const {
   actionError,
   actionReason,
+  actionStatus,
   activeFilterCount,
   applyPreview,
   applyPreviewError,
@@ -99,15 +102,19 @@ const {
   isLoadingSelectedSummary,
 } = useImportReviewWorkspace({ pollIntervalMs: 15000, revalidateOnFocus: true });
 
-function scrollPanelIntoView(panelId) {
+function scrollPanelIntoView(panelId, { focus = false } = {}) {
   if (typeof document === 'undefined') {
     return;
   }
 
-  document.getElementById(panelId)?.scrollIntoView({
+  const panel = document.getElementById(panelId);
+  panel?.scrollIntoView({
     behavior: 'smooth',
     block: 'start',
   });
+  if (focus) {
+    panel?.focus({ preventScroll: true });
+  }
 }
 
 const applySummaryWorkflow = useImportCandidateApplySummary({ pollIntervalMs: 15000, revalidateOnFocus: true });
@@ -142,6 +149,10 @@ const isAnyRunRevalidating = computed(() =>
   || adminWorkflow.mediaInspection.isRevalidating?.value,
 );
 
+const focusedCandidateFileId = computed(() =>
+  normalizeImportReviewRouteState(route.query).candidateFileId,
+);
+
 const workflowStages = computed(() => buildImportReviewWorkflowStages({
   applyCurrentRun: adminWorkflow.apply.currentRun?.value,
   applySummary: adminWorkflow.apply.summary?.value,
@@ -152,6 +163,34 @@ const workflowStages = computed(() => buildImportReviewWorkflowStages({
   mediaInspectionSummary: adminWorkflow.mediaInspection.summary?.value,
   selectedCounts: selectedSummaryCounts.value,
 }));
+
+function normalizeDiagnosticCandidateTarget(target) {
+  if (typeof target === 'string') {
+    return {
+      candidateId: target.trim(),
+      fileId: '',
+    };
+  }
+
+  return {
+    candidateId: typeof target?.candidateId === 'string' ? target.candidateId.trim() : '',
+    fileId: typeof target?.fileId === 'string' ? target.fileId.trim() : '',
+  };
+}
+
+async function openDiagnosticCandidate(target) {
+  const { candidateId, fileId } = normalizeDiagnosticCandidateTarget(target);
+  if (!candidateId) {
+    return;
+  }
+
+  await adminWorkflow.replaceImportReviewRouteState(
+    { candidateFileId: fileId, candidateId },
+    { hash: `#${IMPORT_REVIEW_SELECTION_STAGE_ID}` },
+  );
+  await nextTick();
+  scrollPanelIntoView(IMPORT_REVIEW_SELECTION_STAGE_ID, { focus: true });
+}
 
 onMounted(() => {
   if (!isAdmin.value && !route.query.status) {
@@ -262,7 +301,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="import-review-layout__workspace">
-        <section id="import-review-selection-stage" class="import-review-workspace-card">
+        <section :id="IMPORT_REVIEW_SELECTION_STAGE_ID" class="import-review-workspace-card" tabindex="-1">
           <div class="import-review-workspace-card__header">
             <div>
               <p class="import-review-workspace-card__eyebrow">Selection workspace</p>
@@ -276,12 +315,14 @@ onBeforeUnmount(() => {
           <ImportCandidateDetailPanel
             :action-error="actionError"
             :action-reason="actionReason"
+            :action-status="actionStatus"
             :apply-preview="applyPreview"
             :apply-preview-error="applyPreviewError"
             :candidate="selectedCandidate"
             :can-manage-candidates="isAdmin"
             :detail-error="detailError"
             :file-decision-error="decisionError"
+            :focused-file-id="focusedCandidateFileId"
             :is-loading-apply-preview="isLoadingApplyPreview"
             :is-loading-candidate="isLoadingCandidate"
             :is-loading-preview="isLoadingPreview"
@@ -344,7 +385,8 @@ onBeforeUnmount(() => {
           :selected-candidate-count="selectedSummaryCounts.totalSelected"
           :selected-run-id="adminWorkflow.mediaInspection.selectedRunId?.value"
           :summary="adminWorkflow.mediaInspection.summary?.value"
-          @refresh="adminWorkflow.mediaInspection.loadImportCandidateMediaInspectionSummary"
+          @refresh="adminWorkflow.mediaInspection.handleRefresh"
+          @open-candidate="openDiagnosticCandidate"
           @select-run="adminWorkflow.mediaInspection.handleSelectRun"
           @start="adminWorkflow.mediaInspection.handleStartRun"
         />
@@ -363,7 +405,7 @@ onBeforeUnmount(() => {
           :selected-run-id="adminWorkflow.execution.selectedRunId?.value"
           :summary="adminWorkflow.execution.summary?.value"
           @reconcile="adminWorkflow.execution.handleReconcile"
-          @refresh="adminWorkflow.execution.loadImportCandidateExecutionSummary"
+          @refresh="adminWorkflow.execution.handleRefresh"
           @select-run="adminWorkflow.execution.handleSelectRun"
           @start="adminWorkflow.execution.handleStartRun"
         />
@@ -380,7 +422,7 @@ onBeforeUnmount(() => {
           :run-detail-error-message="adminWorkflow.apply.runDetailErrorMessage?.value"
           :selected-run-id="adminWorkflow.apply.selectedRunId?.value"
           :summary="adminWorkflow.apply.summary?.value"
-          @refresh="adminWorkflow.apply.loadImportCandidateApplySummary"
+          @refresh="adminWorkflow.apply.handleRefresh"
           @select-run="adminWorkflow.apply.handleSelectRun"
           @start="adminWorkflow.apply.handleStartRun"
         />
@@ -668,6 +710,12 @@ onBeforeUnmount(() => {
 .import-review-runway {
   display: grid;
   gap: var(--hx-space-4);
+}
+
+.import-review-workspace-card:focus-visible {
+  border-radius: var(--hx-radius-md);
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 3px;
 }
 
 .import-review-workspace-card__header,

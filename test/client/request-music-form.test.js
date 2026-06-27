@@ -21,10 +21,13 @@ import test from 'node:test';
 import {
   buildMediaRequestPayload,
   buildMediaRequestSuccessMessage,
+  formatRequestEventDescription,
   formatReassignmentEventDescription,
   getCancelToastMessage,
   getFulfillmentStatusLabel,
   getFulfillmentStatusTone,
+  getRequestEventLabel,
+  getRequestEventTone,
   getReassignmentEventLabel,
   getReassignmentEventTone,
   getRequestHeadline,
@@ -388,7 +391,7 @@ test('getReassignmentEventLabel returns "Reassigned" for reassigned event type',
 });
 
 test('getReassignmentEventLabel returns raw event type for unknown types', () => {
-  assert.equal(getReassignmentEventLabel('something_else'), 'something_else');
+  assert.equal(getReassignmentEventLabel('something_else'), 'Something Else');
 });
 
 test('getReassignmentEventTone returns "info" for reassigned', () => {
@@ -441,9 +444,83 @@ test('formatReassignmentEventDescription handles missing usersById entries', () 
     reason: null,
   };
   const result = formatReassignmentEventDescription(event, {});
-  assert.ok(result.includes('Unknown admin'));
-  assert.ok(result.includes('u-1'));
-  assert.ok(result.includes('u-2'));
+  assert.ok(result.includes('An admin'));
+  assert.ok(result.includes('previous requester'));
+  assert.ok(result.includes('new requester'));
+  assert.equal(result.includes('u-1'), false);
+  assert.equal(result.includes('u-2'), false);
+});
+
+test('getRequestEventLabel returns requester-friendly labels for durable request events', () => {
+  assert.equal(getRequestEventLabel('created'), 'Created');
+  assert.equal(getRequestEventLabel('request_created'), 'Created');
+  assert.equal(getRequestEventLabel('cancelled'), 'Cancelled');
+  assert.equal(getRequestEventLabel('download_completed'), 'Download Completed');
+  assert.equal(getRequestEventLabel('fulfillment_started'), 'Fulfillment Started');
+  assert.equal(getRequestEventLabel('import_completed'), 'Imported');
+  assert.equal(getRequestEventLabel('import_pending'), 'Import Pending');
+});
+
+test('getRequestEventTone returns danger for cancellation and success for creation', () => {
+  assert.equal(getRequestEventTone('cancelled'), 'danger');
+  assert.equal(getRequestEventTone('created'), 'success');
+  assert.equal(getRequestEventTone('download_completed'), 'success');
+  assert.equal(getRequestEventTone('fulfillment_failed'), 'danger');
+  assert.equal(getRequestEventTone('import_pending'), 'info');
+  assert.equal(getRequestEventTone('reassigned'), 'info');
+});
+
+test('formatRequestEventDescription formats cancelled events without admin reassignment copy', () => {
+  const result = formatRequestEventDescription({
+    actorUsername: 'listener',
+    eventType: 'cancelled',
+    reason: 'Found another source',
+  }, {});
+  assert.equal(result, 'listener cancelled this request. Reason: Found another source');
+});
+
+test('formatRequestEventDescription formats created events', () => {
+  const result = formatRequestEventDescription({
+    actorUsername: 'listener',
+    eventType: 'created',
+  }, {});
+  assert.equal(result, 'listener created this request');
+});
+
+test('formatRequestEventDescription formats fulfillment pipeline events', () => {
+  assert.equal(
+    formatRequestEventDescription({ eventType: 'fulfillment_started' }, {}),
+    'Fulfillment started for this request',
+  );
+  assert.equal(
+    formatRequestEventDescription({ eventType: 'download_completed' }, {}),
+    'Download completed for this request',
+  );
+  assert.equal(
+    formatRequestEventDescription({ eventType: 'import_pending' }, {}),
+    'Download complete; waiting to import files',
+  );
+  assert.equal(
+    formatRequestEventDescription({ eventType: 'import_completed' }, {}),
+    'Files were imported into the library',
+  );
+  assert.equal(
+    formatRequestEventDescription({ eventType: 'fulfillment_failed', reason: 'No usable source' }, {}),
+    'Fulfillment failed for this request. Reason: No usable source',
+  );
+});
+
+test('formatRequestEventDescription avoids exposing raw user ids for requester-visible reassignment events', () => {
+  const result = formatRequestEventDescription({
+    actorUsername: 'admin',
+    eventType: 'reassigned',
+    newRequestedForUserId: 'user-new',
+    previousRequestedForUserId: 'user-old',
+    reason: 'Request owner corrected',
+  }, {});
+  assert.equal(result, 'admin reassigned from previous requester to new requester. Reason: Request owner corrected');
+  assert.equal(result.includes('user-old'), false);
+  assert.equal(result.includes('user-new'), false);
 });
 
 // ---------------------------------------------------------------------------

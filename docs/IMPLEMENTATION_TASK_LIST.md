@@ -9,6 +9,106 @@ Database model source: `docs/DATABASE_MODEL.md`
 ## Current Status (2026-05-23)
 
 - Current validation baseline: 1534 server / 3087 client tests pass.
+- Discover browser keyboard verification: added a seeded Playwright suite for
+  the Discover recommendation grid and monitored-artist chip band. The suite
+  proves roving `tabindex` state, Arrow/Home/Control+Home/Control+End movement,
+  visible focus outlines, and Tab entry points using shared browser keyboard
+  helpers. The same helper pattern is now the standard for subsequent platform
+  card-grid browser verification.
+- Library/Search card-grid browser verification: extended the seeded Playwright
+  keyboard proof to Library release cards and Search artist/release grids. The
+  shared artwork-grid roving wrapper now removes inactive card actions from the
+  Tab sequence while preserving the active card's action, and the metadata
+  browser fixtures include a multi-result catalog query for deterministic Search
+  coverage. Remaining browser follow-up is Home's mixed grid selector, then
+  Missing/Activity/My Requests, then Artist Detail sections.
+- Home mixed card-grid browser verification: added focused Playwright coverage
+  for operator and requester Home monitored-artist grids, proving the mixed
+  selector path (`.hx-media-card__link-area` plus each Discover tail card)
+  participates in one roving tabindex composite with visible focus and inactive
+  action management. Remaining browser follow-up is Missing, Activity, My
+  Requests, then Artist Detail sections.
+- Missing release-card grid browser verification: added focused Playwright
+  coverage for the Missing wanted-release grid, including roving movement,
+  visible focus, Tab from the active card into its Request action, inactive
+  action suppression, and an active recovery card exposing both Retry discovery
+  and Request controls. A narrow wanted browser fixture now seeds wanted
+  summary, wanted releases, and reconciliation summary responses for this and
+  later Activity Wanted coverage.
+- Activity releases/wanted browser verification: added focused Playwright
+  coverage for Activity Releases recent/upcoming card grids using a deterministic
+  release-radar fixture, proving roving movement, visible focus, active-card
+  Request actions, and inactive-card action suppression. Activity Wanted remains
+  a native table; it now has an accessible table name and browser coverage for
+  wanted rows, the download-recovery notice, and keyboard-triggered Retry
+  discovery through the client API path. Remaining browser follow-up is My
+  Requests, then Artist Detail sections.
+- My Requests card-grid browser verification: added focused Playwright coverage
+  for the request-card grid using a deterministic media-request fixture, proving
+  roving movement, visible focus, status filtering, full-grid restoration, and
+  keyboard activation into request detail. Fixed the view's filter bug by
+  replacing the nonexistent `request.status` read with
+  `getMyRequestFilterStatus(request)`, a pure presentation helper that maps
+  `requestState` plus `fulfillmentStatus.code` into the existing pending /
+  downloading / complete / failed filter buckets.
+- Artist Detail per-section card-grid browser verification: added focused
+  Playwright coverage for the discography section grids using the seeded
+  metadata fixture with two Albums and two EPs. The suite proves each section is
+  an independent roving composite, arrow/home movement stays in-section, focus
+  remains visible, and operator selection controls are tabbable only for the
+  active release card in their own section. The section list `aria-label` now
+  uses the same `pluralizeReleaseType(section.type)` helper as the visible
+  heading.
+- Release Detail modal browser verification: added focused Playwright coverage
+  for the modal opened from Artist Detail. The suite keyboard-opens a release
+  card, proves initial focus, Escape/Close focus restoration, Tab containment,
+  edition switching against a distinct fixture payload, and operator track
+  override select reachability. Runtime hardening included explicit modal
+  opener focus restoration, semantic pressed-state edition buttons, removal of
+  unsupported ARIA menu roles from the edition overflow, visible edition focus
+  rings, and explicit Enter/Space activation for `ReleaseCard`'s custom
+  `role="button"` body.
+- Request action browser verification: added focused Playwright coverage for
+  Search release-card request actions and Release Detail direct requests. The
+  suite proves keyboard reachability into the active card's Request button,
+  confirmation-dialog initial focus and Tab containment, admin requester-for
+  payload submission, requested disabled-state feedback, and successful Release
+  Detail request focus restoration. The metadata browser fixture now records
+  media-request payloads and seeds eligible admin/requester users. Remaining
+  high-value follow-up is post-request My Requests refresh verification.
+- Request failure and retry-state browser verification: extended the request
+  browser fixtures with queued media-request failures and linked duplicate
+  response state, plus shared Search/Release Detail request browser helpers.
+  The suite proves failed card-confirm and Release Detail requests keep dialogs
+  open, expose `role="alert"` errors, preserve requester-for selections, do not
+  record media requests, and remain retryable; successful retries transition to
+  requested feedback and Release Detail restores focus to the opener. Runtime
+  hardening now focuses the retry button after request failure so disabled
+  loading buttons do not drop keyboard focus out of the dialog.
+- Requester-role request browser verification: added focused requester-session
+  Playwright coverage using real requester creation/login and forced password
+  change. The suite proves requester Search and Release Detail request flows
+  have no requester-for controls, submit payloads without `requestedForUserId`,
+  avoid admin `/api/v1/users` reads, and keep Artist Detail operator policy
+  controls hidden. Runtime hardening added an explicit disabled mode to
+  `useActiveUsers`, uses it for non-admin Release Detail sessions, and gates
+  Artist Detail operator-policy editing to non-requester users.
+- Post-request My Requests refresh verification: added focused requester-session
+  Playwright coverage for the post-submit handoff. The suite verifies My
+  Requests starts empty for a new requester, submits a release request from
+  Search, then returns to My Requests and sees the submitted request card with
+  release title, request kind, and `Searching` state. The metadata browser
+  fixture now converts recorded request mutations into the scoped My Requests
+  read model and summary/detail stubs. Next high-value follow-up is submitted
+  request-detail handoff browser verification.
+- Submitted-request detail handoff browser verification: added focused
+  requester-session Playwright coverage for opening a newly submitted My
+  Requests card into Request Detail by keyboard. The suite verifies the detail
+  page renders the submitted request headline, request kind, journey, artist /
+  release fields, requester attribution, empty pipeline state, and no admin-only
+  controls. `RequestDetailView` now renders an explicit empty `Fulfillment
+  pipeline` card when no import candidates are linked yet. Next high-value
+  follow-up is requester Request Detail cancellation browser verification.
 - Metadata artist monitoring DROP TABLE: dropped the legacy `metadata_artist_monitoring` table via `20260630_020000_metadata_artist_monitoring_drop.sql` (`DROP TABLE IF EXISTS`, transactional, no CASCADE — pre-flight audit confirmed zero FK/view dependents). Schema snapshot regenerated from the migration manifest (78 migrations); no anchors referenced the table. This completes the `metadata_artist_monitoring` retirement arc — the table, its store, its service, its route, and all reads/writes/backup-restore are gone; `operator_artist_monitoring` + `metadata_artist_refresh_state` are the sole monitoring source of truth.
 - Metadata monitoring backup/restore migration: backup export no longer includes the redundant legacy `monitoring.artistMonitoring` snapshot (the canonical `operatorArtistMonitoring`/selections/overrides are already backed up); restore applies only canonical operator-scoped monitoring state and ignores the retired `artistMonitoring` field in old backups (forward/backward compatible). `metadata_artist_refresh_state` is treated as rebuildable operational state (not exported/restored). The legacy `metadata-monitoring-store.js` and its entire wiring chain (metadata-module, system-module, app.js, refresh-scheduler fallback shim) are removed — `metadata_artist_monitoring` is now an orphaned table with zero code references, ready for a DROP migration.
 - Metadata monitoring write-path consolidation: the library browser's standalone monitor toggle is retired (links to the artist detail page), consolidating monitoring onto the canonical operator-scoped save surface (`saveOperatorArtist`) — the sole product-facing monitoring mutation. `PUT /api/v1/metadata/artists/:id/monitoring` returns 410 Gone pointing to `PUT /…/operator`; `metadata-monitoring-service.js` is removed entirely and `metadata-monitoring-store.upsertArtistMonitoring` is removed (store retains only backup/restore snapshot methods). The dead legacy `monitorArtist` client path is removed; `useArtistMonitoring.addArtistWithPolicy` is the single monitor entry point. Monitor side effects (`artist_monitored` activity event + household notification) now fire on the canonical save path's unmonitored→monitored transition (read-before-write detection, post-commit, idempotent across retries), fixing the prior inconsistency. The only remaining legacy `metadata_artist_monitoring` surface is backup/restore.
@@ -652,6 +752,24 @@ Status note:
 - [x] Add migration replay and schema snapshot validation.
   - Applied-migration checksum drift is now detected at startup via `assertNoMigrationChecksumDrift`, which compares the stored checksums for previously-applied migrations against the current file checksums and aborts startup if any mismatch is found, preventing silent schema divergence from in-place migration edits.
 - [ ] Add end-to-end UI coverage for bootstrap, login, settings, review queue, job feedback, and recovery-sensitive flows where practical.
+  - Added requester Request Detail cancellation browser verification. The suite drives Search -> release request -> Request Detail -> shared cancellation `alertdialog` -> cancel mutation -> toast/status feedback -> cancelled journey state -> My Requests refresh. The metadata browser fixture now persists `cancelled` media-request read models and returns production-shaped `409` responses for stale/non-cancellable cancel attempts. See `docs/REQUEST_DETAIL_CANCELLATION_BROWSER_VERIFICATION_DESIGN.md`.
+  - Added requester Request Detail cancellation failure/conflict browser verification. The suite proves transient cancellation failures show `role="alert"` feedback while leaving the request retryable, and stale `409 Conflict` responses refresh Request Detail/My Requests to the durable `cancelled` state. `RequestDetailView` now revalidates on cancellation conflicts, and the metadata browser fixture has cancellation-specific failure/state helpers. See `docs/REQUEST_DETAIL_CANCELLATION_FAILURE_BROWSER_VERIFICATION_DESIGN.md`.
+  - Added requester Request Detail event timeline browser verification. The suite seeds first-page and cursor-paginated request events, verifies requester-safe cancellation/creation/reassignment copy, asserts raw fixture user IDs are not exposed, and proves the `Load more events` path through the production-shaped event endpoint. `RequestEventTimeline` now uses generic request-event helpers and exposes an accessible `Request event history` list. See `docs/REQUEST_DETAIL_EVENT_TIMELINE_BROWSER_VERIFICATION_DESIGN.md`.
+  - Added Request Detail fulfillment pipeline event/status parity browser verification. The suite seeds an import-pending request, raw operator-shaped pipeline candidate data, and matching fulfillment events, then verifies the requester fulfillment stat, journey, pipeline candidate, and event history agree while source-user names, private paths, candidate IDs, run IDs, diagnostics, and import-review links remain hidden. Request Detail now exposes named `Request journey` and `Linked import candidates` lists. See `docs/REQUEST_DETAIL_PIPELINE_PARITY_BROWSER_VERIFICATION_DESIGN.md`.
+  - Added Operator Request Detail pipeline diagnostics browser verification. The suite creates an admin request, seeds a raw failed pipeline candidate, verifies source-user/folder context, download/import status messages, operation run IDs, import-candidate IDs, and run errors are visible, then keyboard-activates the import-review drill-through. Request Detail now has small presentation helpers for operator source labels and projected run diagnostics. See `docs/REQUEST_DETAIL_OPERATOR_PIPELINE_DIAGNOSTICS_BROWSER_VERIFICATION_DESIGN.md`.
+  - Added Request Detail failed-import recovery handoff browser verification. The suite creates an admin request, seeds a failed linked import candidate plus matching Import Review detail/preview data, keyboard-activates `Open in import review`, and verifies `/app/activity/candidates?candidate=...` selects the failed candidate, shows failure context, and exposes a focusable `Reopen` recovery action even while the queue remains filtered to pending candidates. The metadata browser fixture now also serves Import Review queue/detail/preview/summary endpoints for future recovery-action tests. See `docs/REQUEST_DETAIL_FAILED_IMPORT_RECOVERY_HANDOFF_DESIGN.md`.
+  - Added Import Review failed-candidate recovery action browser verification. The suite executes `Reopen` from a seeded failed candidate, verifies the candidate transitions to `Pending`, the pending queue refreshes, pending action buttons appear, and focus moves to a visible status message. A paired queued-failure scenario verifies assertive alert feedback, stable failed state, and retryable focus on `Reopen`. `useImportReviewWorkspace` now skips route/summary/preview refreshes after failed transitions, and `ImportCandidateDetailPanel` exposes success/error action feedback through status/alert roles. See `docs/IMPORT_REVIEW_FAILED_CANDIDATE_RECOVERY_ACTION_DESIGN.md`.
+  - Added Import Review review-state transition matrix browser verification. The suite verifies `Pending -> Held -> Selected` plus `Selected -> Rejected -> Pending` through the real Import Review client API paths, including reject confirmation gating, focused success status messages, visible focus rings, queue count refreshes, selected-summary refreshes, route stability, and persisted fixture state. `useImportReviewQueue` now preserves the transitioned candidate detail after successful actions even when the active queue filter excludes it. See `docs/IMPORT_REVIEW_TRANSITION_MATRIX_DESIGN.md`.
+  - Added Import Review requester/non-admin read-only access browser verification. The suite proves requester deep links to Import Review redirect to Home before any import-candidate API request, and operator sessions can inspect candidate queue/detail context without filters, review notes, management buttons, operator runway panels, or transition endpoint calls. Browser user helpers now support generic role creation/login while preserving existing requester helper exports. See `docs/IMPORT_REVIEW_READ_ONLY_ACCESS_DESIGN.md`.
+  - Added Import Review operator runway start/reconcile controls browser verification. The suite proves empty queues disable media inspection, download execution, and import apply starts; selected/import-pending candidates enable the right controls; execution reconciliation refreshes heartbeat state; import apply stays behind the destructive type-to-confirm dialog; and failed execution starts expose retryable `role="alert"` feedback. Shared start predicates now require eligible candidate counts before enabling starts, post-mutation queue refreshes preserve the owning runway panel hash, and the metadata browser fixture now supports Import Review run start/reconcile POST endpoints plus durable run summary state. See `docs/IMPORT_REVIEW_OPERATOR_RUNWAY_CONTROLS_DESIGN.md`.
+  - Added Import Review selected-run deep-link and historical run-detail browser verification. The suite proves direct `mediaInspectionRunId`, `executionRunId`, and `applyRunId` URLs load the selected historical run, recent-run `View` actions update query/hash state, and panel refresh preserves the selected historical detail. Runway refreshes now go through `useImportReviewAdminWorkflow` selected-run handlers, recent-run tables expose a visible `Run` column, and browser fixtures include reusable run/summary builders for the next diagnostics slices. See `docs/IMPORT_REVIEW_SELECTED_RUN_DEEP_LINKS_DESIGN.md`.
+  - Added Import Review run-detail failure diagnostics browser verification. The suite proves failed historical media inspection, download execution, and import apply run URLs render operator-visible diagnostics. A shared `ImportCandidateRunFailureNotice` now exposes durable run errors as polite `role="status"` content across runway panels; execution coverage verifies degraded transfer state, transfer exceptions, and persisted transfer observations; apply coverage verifies failed and not-attempted file operations. Media inspection remains aggregate-only until per-file diagnostics are persisted. See `docs/IMPORT_REVIEW_RUN_DETAIL_FAILURE_DIAGNOSTICS_DESIGN.md`.
+  - Added media-inspection per-file diagnostic persistence and browser verification. Media inspection workers now persist bounded `inspectionDiagnostics` rows in the operation-run JSONB summary, the run store normalizes them on read, and the media inspection panel renders a named file diagnostics table for selected runs. The payload excludes raw probe output and stores only candidate/user/folder/file/warning context. Focused server, route, and browser tests cover the write, read, API, and UI paths. See `docs/MEDIA_INSPECTION_PER_FILE_DIAGNOSTICS_DESIGN.md`.
+  - Added Import Review diagnostic row handoff browser verification. Media inspection diagnostic rows now expose keyboard-accessible `Open candidate` actions that update route state to the affected candidate, preserve the selected `mediaInspectionRunId`, focus the selection workspace, and leave the historical run selected. The route-state normalizer now accepts internal `candidateId` state keys so composables can merge candidate and run state safely. See `docs/IMPORT_REVIEW_DIAGNOSTIC_ROW_HANDOFF_DESIGN.md`.
+  - Added Import Review diagnostic file focus handoff. Diagnostic row actions now carry the affected file as `candidateFile` route state, preserve the selected media-inspection run, and focus/highlight the matching file row after candidate detail renders. Browser coverage proves `candidate`, `candidateFile`, and `mediaInspectionRunId` remain synchronized from selected-run diagnostics into the file-level candidate context. See `docs/IMPORT_REVIEW_DIAGNOSTIC_FILE_FOCUS_HANDOFF_DESIGN.md`.
+  - Added Import Review diagnostic-driven repair-state verification. Browser coverage now opens a diagnostic file from selected-run media-inspection detail, executes `Reopen`, verifies success status focus, preserves `candidate`/`candidateFile`/`mediaInspectionRunId`, and proves normal queue candidate selection clears stale file focus while keeping selected-run state. Workspace route replacements now preserve current run IDs, diagnostic file state during repair, and the current hash when replacing query state. See `docs/IMPORT_REVIEW_DIAGNOSTIC_REPAIR_STATE_DESIGN.md`.
+  - Added Import Review diagnostic repair failure-state verification. Browser coverage now queues a failed `Reopen` from the focused diagnostic-file context, verifies assertive alert feedback, retry focus on `Reopen`, preserved `candidate`/`candidateFile`/`mediaInspectionRunId`, selected-run continuity, and no false success status. Shared diagnostic Import Review browser workspace builders now live in `testing/browser/import-review-browser-helpers.js`. See `docs/IMPORT_REVIEW_DIAGNOSTIC_REPAIR_FAILURE_STATE_DESIGN.md`.
+  - Added Import Review diagnostic repair retry-success verification. Browser coverage now drives a failed diagnostic `Reopen`, retries the same action successfully, verifies the stale alert clears, success status receives focus, the candidate moves to `Pending`, and `candidate`/`candidateFile`/`mediaInspectionRunId` plus the selected historical run remain intact. See `docs/IMPORT_REVIEW_DIAGNOSTIC_REPAIR_RETRY_SUCCESS_DESIGN.md`.
 - [ ] Add fixture packs for canonical music identity, import review states, file-operation edge cases, auth failures, and restore/recovery scenarios.
 - [ ] Validate fresh install, upgrade, restore preview/apply, and rollback-aware deployment behavior.
   - The shared Docker smoke validator now covers fresh-install schema bootstrap, fail-closed startup refusal, FFmpeg/FFprobe availability, embedded PostgreSQL readiness plus persistence, backup export plus restore preview/apply validation, existing-data restart behavior, and optional machine-readable evidence output through `HARMONIARR_DOCKER_SMOKE_EVIDENCE_PATH`.

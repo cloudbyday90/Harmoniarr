@@ -22,6 +22,10 @@ import {
   isOperationRunPauseError,
   throwIfOperationRunCancellationRequested,
 } from '../operation-run-cancellation.js';
+import {
+  buildMediaInspectionDiagnostics,
+  MAX_MEDIA_INSPECTION_DIAGNOSTICS,
+} from './import-candidate-media-inspection-diagnostics.js';
 
 function summarizeInspection(files = []) {
   const inspectionWarnings = files.flatMap((file) => file?.inspection?.warnings ?? []);
@@ -82,6 +86,7 @@ export function createImportCandidateMediaInspectionWorker({
         inspectionUnavailableCount: 0,
         warningCount: 0,
       };
+      const inspectionDiagnostics = [];
 
       for (const candidate of selectedSummary.selectedCandidates ?? []) {
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
@@ -95,11 +100,17 @@ export function createImportCandidateMediaInspectionWorker({
           importCandidateId: candidate.id,
         });
         const inspectionSummary = summarizeInspection(applyPreview.files ?? []);
+        const candidateDiagnostics = buildMediaInspectionDiagnostics({
+          applyPreview,
+          candidate,
+          maxDiagnostics: MAX_MEDIA_INSPECTION_DIAGNOSTICS - inspectionDiagnostics.length,
+        });
 
         counters.inspectedCandidateCount += 1;
         counters.inspectedFileCount += inspectionSummary.fileCount;
         counters.inspectionUnavailableCount += inspectionSummary.inspectionUnavailableCount;
         counters.warningCount += inspectionSummary.warningCount;
+        inspectionDiagnostics.push(...candidateDiagnostics);
       }
 
       await markRunCompleted({
@@ -109,6 +120,7 @@ export function createImportCandidateMediaInspectionWorker({
           currentStep: 'Media inspection complete',
           inspectedCandidateCount: counters.inspectedCandidateCount,
           inspectedFileCount: counters.inspectedFileCount,
+          inspectionDiagnostics,
           inspectionUnavailableCount: counters.inspectionUnavailableCount,
           requestedCandidateCount,
           warningCount: counters.warningCount,

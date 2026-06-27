@@ -3,11 +3,16 @@ import { describe, test } from 'node:test';
 import {
   candidateStatusLabel,
   candidateStatusTone,
+  buildPipelineSteps,
+  formatCandidateFolderPath,
   formatCandidateSourceLabel,
   formatBytes,
+  formatImportCandidateId,
+  formatRunId,
+  formatRunStatusMessage,
+  hasRunDiagnostics,
   runItemStatusLabel,
   runItemStatusTone,
-  buildPipelineSteps,
 } from '../../src/client/lib/request-pipeline-presentation.js';
 
 describe('candidateStatusLabel', () => {
@@ -77,6 +82,14 @@ describe('formatCandidateSourceLabel', () => {
     }, 1), 'Source 2');
   });
 
+  test('can prefer operator peer and folder context over safe source labels', () => {
+    assert.equal(formatCandidateSourceLabel({
+      sourceLabel: 'Source 2',
+      username: 'remote-peer',
+      folderPath: 'Artist\\Album',
+    }, 1, { preferOperatorContext: true }), 'remote-peer - Album');
+  });
+
   test('falls back to operator peer and folder context when no safe label exists', () => {
     assert.equal(formatCandidateSourceLabel({
       username: 'remote-peer',
@@ -86,6 +99,33 @@ describe('formatCandidateSourceLabel', () => {
 
   test('falls back to a generic source label when no source fields exist', () => {
     assert.equal(formatCandidateSourceLabel({}, 2), 'Source 3');
+  });
+});
+
+describe('operator diagnostics helpers', () => {
+  test('formatCandidateFolderPath returns normalized paths only', () => {
+    assert.equal(formatCandidateFolderPath({ folderPath: '  Artist\\Album  ' }), 'Artist\\Album');
+    assert.equal(formatCandidateFolderPath({ folderPath: '   ' }), null);
+  });
+
+  test('hasRunDiagnostics detects operator-only run fields', () => {
+    assert.equal(hasRunDiagnostics({ operationRunId: 'run-1' }), true);
+    assert.equal(hasRunDiagnostics({ importCandidateId: 'candidate-1' }), true);
+    assert.equal(hasRunDiagnostics({ statusMessage: 'Downloading' }), true);
+    assert.equal(hasRunDiagnostics({ runErrorMessage: 'Failed' }), true);
+    assert.equal(hasRunDiagnostics({ itemStatus: 'completed' }), false);
+  });
+
+  test('run diagnostic formatters normalize blank fields', () => {
+    const runItem = {
+      importCandidateId: ' candidate-1 ',
+      operationRunId: ' run-1 ',
+      statusMessage: ' Downloading from source ',
+    };
+    assert.equal(formatRunId(runItem), 'run-1');
+    assert.equal(formatImportCandidateId(runItem), 'candidate-1');
+    assert.equal(formatRunStatusMessage(runItem), 'Downloading from source');
+    assert.equal(formatRunId({ operationRunId: ' ' }), null);
   });
 });
 

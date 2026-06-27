@@ -19,6 +19,7 @@
 import { createOperationRunStore } from '../operation-run-store.js';
 import { getPool } from '../database.js';
 import { operationRunRegistry } from '../../shared/operation-run-descriptors.js';
+import { normalizeMediaInspectionDiagnostics } from './import-candidate-media-inspection-diagnostics.js';
 
 function toNumberOrNull(value) {
   return Number.isFinite(value) ? value : null;
@@ -36,6 +37,7 @@ function normalizeRun(run) {
     id: run.id,
     inspectedCandidateCount: toNumberOrNull(run.summary.inspectedCandidateCount),
     inspectedFileCount: toNumberOrNull(run.summary.inspectedFileCount),
+    inspectionDiagnostics: normalizeMediaInspectionDiagnostics(run.summary.inspectionDiagnostics),
     inspectionUnavailableCount: toNumberOrNull(run.summary.inspectionUnavailableCount),
     requestedCandidateCount: toNumberOrNull(run.summary.requestedCandidateCount),
     startedAt: run.startedAt,

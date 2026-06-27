@@ -76,6 +76,7 @@ export function useImportReviewQueue({
   const listError = ref('');
   const detailError = ref('');
   const actionError = ref('');
+  const actionStatus = ref('');
   const isLoadingQueue = ref(false);
   const isRevalidating = ref(false);
   const isLoadingCandidate = ref(false);
@@ -125,6 +126,7 @@ export function useImportReviewQueue({
     selectedCandidate.value = null;
     detailError.value = '';
     actionError.value = '';
+    actionStatus.value = '';
     actionReason.value = '';
   }
 
@@ -238,6 +240,7 @@ export function useImportReviewQueue({
     selectedCandidateId.value = importCandidateId;
     detailError.value = '';
     actionError.value = '';
+    actionStatus.value = '';
 
     if (!forceReload && selectedCandidate.value?.id === importCandidateId) {
       syncSelectedCandidateFromQueue();
@@ -278,12 +281,13 @@ export function useImportReviewQueue({
     return null;
   }
 
-  async function transitionSelectedCandidate(transitionFn, fallbackMessage) {
+  async function transitionSelectedCandidate(transitionFn, fallbackMessage, successMessage) {
     if (!selectedCandidateId.value) {
       return null;
     }
 
     actionError.value = '';
+    actionStatus.value = '';
     isTransitionPending.value = true;
 
     try {
@@ -292,13 +296,14 @@ export function useImportReviewQueue({
 
       await loadQueue();
 
-      if (candidates.value.some((candidate) => candidate.id === transitionedCandidateId)) {
+      if (transitionedCandidateId) {
         await selectCandidate(transitionedCandidateId, { forceReload: true });
       } else {
         await reconcileSelection({ fallbackToFirstCandidate: true, forceReload: true });
       }
 
       actionReason.value = '';
+      actionStatus.value = successMessage;
       return review;
     } catch (error) {
       actionError.value = getErrorMessage(error, fallbackMessage);
@@ -309,19 +314,35 @@ export function useImportReviewQueue({
   }
 
   function holdSelectedCandidate() {
-    return transitionSelectedCandidate(holdCandidate, 'Holding the import candidate failed');
+    return transitionSelectedCandidate(
+      holdCandidate,
+      'Holding the import candidate failed',
+      'Candidate held for review.',
+    );
   }
 
   function selectSelectedCandidate() {
-    return transitionSelectedCandidate(selectCandidateForDownload, 'Selecting the import candidate failed');
+    return transitionSelectedCandidate(
+      selectCandidateForDownload,
+      'Selecting the import candidate failed',
+      'Candidate selected for download.',
+    );
   }
 
   function rejectSelectedCandidate() {
-    return transitionSelectedCandidate(rejectCandidate, 'Rejecting the import candidate failed');
+    return transitionSelectedCandidate(
+      rejectCandidate,
+      'Rejecting the import candidate failed',
+      'Candidate rejected.',
+    );
   }
 
   function reopenSelectedCandidate() {
-    return transitionSelectedCandidate(reopenCandidate, 'Reopening the import candidate failed');
+    return transitionSelectedCandidate(
+      reopenCandidate,
+      'Reopening the import candidate failed',
+      'Candidate reopened for review.',
+    );
   }
 
   return {
@@ -334,6 +355,7 @@ export function useImportReviewQueue({
     destroy,
     detailError,
     folderPathFilter,
+    actionStatus,
     holdSelectedCandidate,
     isLoadingCandidate,
     isLoadingQueue,

@@ -23,10 +23,14 @@ import { fetchUsers } from '../lib/users-api.js';
 let cachedUsers = null;
 let fetchPromise = null;
 
-export function useActiveUsers({ fetchUsersFn = fetchUsers } = {}) {
-  const users = ref(cachedUsers ?? []);
-  const isLoading = ref(!cachedUsers);
+export function useActiveUsers({ enabled = true, fetchUsersFn = fetchUsers } = {}) {
+  const users = ref(enabled ? cachedUsers ?? [] : []);
+  const isLoading = ref(Boolean(enabled && !cachedUsers));
   const error = ref(null);
+
+  if (!enabled) {
+    return { users, isLoading, error };
+  }
 
   if (!cachedUsers) {
     if (!fetchPromise) {

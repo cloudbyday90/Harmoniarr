@@ -264,36 +264,533 @@ from Batches E/O/Q/S); the `#fallback` preserves its colored artist-initial
 avatar. `ArtistDetailRelatedArtistCard` deferred (60px round avatar — layout
 mismatch with ArtworkImage's square artwork box; low value at that size).
 
+### Batch X — Discover browser keyboard verification
+See [DISCOVER_BROWSER_KEYBOARD_VERIFICATION_DESIGN.md](DISCOVER_BROWSER_KEYBOARD_VERIFICATION_DESIGN.md).
+
+Added a focused Playwright suite for Discover's runtime roving-tabindex behavior
+using the existing seeded metadata browser fixtures. The suite proves the
+recommended-artist card grid and monitored-artist chip band keep a single managed
+`tabindex="0"` target, move focus with Arrow/Home/Control+Home/Control+End keys,
+render visible focus outlines, and accept Tab entry at the expected roving
+targets. The first runtime pass exposed inactive card Add buttons pre-empting the
+active roving card; `useRovingTabindex` now optionally removes secondary
+controls in inactive items from the Tab sequence while preserving active-card
+actions. Shared DOM assertions live in
+`testing/browser/keyboard-accessibility-helpers.js` so later browser specs can
+reuse the same focus and `tabindex` checks.
+
+### Batch Y — Library/Search card-grid browser keyboard verification
+See [PLATFORM_CARD_GRID_BROWSER_KEYBOARD_VERIFICATION_DESIGN.md](PLATFORM_CARD_GRID_BROWSER_KEYBOARD_VERIFICATION_DESIGN.md).
+
+Extended the Batch X browser proof to the first platform card-grid families:
+Library release cards plus Search artist and release cards. The shared
+`useArtworkGridRoving` wrapper now forwards the inactive-secondary-control
+Tab-order hardening to every artwork grid that uses it, so inactive card actions
+do not pre-empt the active roving card while the active card's action remains
+keyboard-reachable. Added reusable helper assertions for grid movement and
+per-item action `tabindex` state, plus a deterministic multi-result Search
+fixture query. Runtime validation also hardened the shared roving lifecycle for
+async/`v-if` grids and Vue computed-ref `count` sources.
+
+### Batch Z — Home mixed card-grid browser keyboard verification
+See [HOME_MIXED_CARD_GRID_BROWSER_VERIFICATION_DESIGN.md](HOME_MIXED_CARD_GRID_BROWSER_VERIFICATION_DESIGN.md).
+
+Added a focused browser suite for the operator and requester Home monitored-
+artist grids, the highest-risk remaining card-grid shape because each grid
+mixes normal media-card link areas with a trailing Discover `RouterLink` tail
+card. The suite proves Arrow/Home/Control+Home/Control+End movement across both
+cell classes, visible focus on the tail card, and inactive first-card action
+management. A small reusable requester browser helper now creates/logs in a
+requester through real authenticated UI/API flows with CSRF.
+
+### Batch AA — Missing release-card grid browser keyboard verification
+See [MISSING_RELEASE_CARD_GRID_BROWSER_VERIFICATION_DESIGN.md](MISSING_RELEASE_CARD_GRID_BROWSER_VERIFICATION_DESIGN.md).
+
+Added a focused browser suite for the Missing release-card grid, the next
+highest-risk surface because release cards contain active secondary controls:
+normal `Request` buttons and optional `Retry discovery` recovery actions. A new
+wanted-release browser fixture seeds wanted summary, wanted releases, and
+reconciliation summary responses. The suite proves roving Arrow/Home/
+Control+Home/Control+End movement, Tab from the active card into its request
+action, inactive-card action suppression, and active recovery-card controls
+remaining reachable.
+
+### Batch AB — Activity releases/wanted browser verification
+See [ACTIVITY_RELEASES_WANTED_BROWSER_VERIFICATION_DESIGN.md](ACTIVITY_RELEASES_WANTED_BROWSER_VERIFICATION_DESIGN.md).
+
+Added focused browser coverage for Activity's release surfaces. Activity
+Releases now has deterministic release-radar fixture coverage proving both the
+Recent releases and Upcoming releases card grids expose roving Arrow/Home/
+Control+Home/Control+End movement, visible focus, active-card Request actions,
+and inactive-card action suppression. Activity Wanted remains a native table
+because its status/count/date data is tabular; the table now has an accessible
+name and browser coverage proves the wanted rows, recovery notice, and keyboard
+`Retry discovery` action against the real client API path.
+
+### Batch AC — My Requests card-grid browser verification
+See [MY_REQUESTS_CARD_GRID_BROWSER_VERIFICATION_DESIGN.md](MY_REQUESTS_CARD_GRID_BROWSER_VERIFICATION_DESIGN.md).
+
+Added focused browser coverage for the My Requests request-card grid. The suite
+uses a deterministic media-request fixture and proves request cards keep one
+roving Tab stop, move with Arrow/Home/Control+Home/Control+End keys, retain a
+visible focus ring, filter correctly to a downloading request, restore the full
+grid, and open request detail with Enter. The slice also fixed a latent filter
+bug: My Requests was checking a nonexistent `request.status` field. Filtering
+now goes through `getMyRequestFilterStatus(request)`, a pure helper mapping the
+current `requestState` + `fulfillmentStatus.code` payload to the UI buckets.
+
+### Batch AD — Artist Detail per-section card-grid browser verification
+See [ARTIST_DETAIL_SECTION_GRID_BROWSER_VERIFICATION_DESIGN.md](ARTIST_DETAIL_SECTION_GRID_BROWSER_VERIFICATION_DESIGN.md).
+
+Added focused browser coverage for Artist Detail's per-section discography
+grids, the final unverified Batch K card-grid surface. The suite uses the seeded
+metadata fixture to render Albums and EPs for Boards of Canada, then proves each
+section has independent roving focus, Arrow/Home/Control+Home/Control+End
+movement, visible focus via the shared helper, and operator selection controls
+that remain tabbable only for the active card in their own section. The slice
+also aligned discography list `aria-label`s with the visible
+`pluralizeReleaseType(section.type)` heading helper so accessible names cannot
+drift from section copy.
+
+### Batch AE — Release Detail modal browser verification
+See [RELEASE_DETAIL_MODAL_BROWSER_VERIFICATION_DESIGN.md](RELEASE_DETAIL_MODAL_BROWSER_VERIFICATION_DESIGN.md).
+
+Added focused browser coverage for the Release Detail modal opened from Artist
+Detail. The suite keyboard-opens the modal from a release card, proves initial
+focus moves to the close button, Escape and explicit Close restore focus to the
+opener, Tab and Shift+Tab stay inside the native dialog, edition switching loads
+a distinct fixture tracklist, and operator track override selects remain
+reachable. Runtime work also hardened the modal: explicit opener focus
+restoration, semantic `aria-pressed` edition buttons, no ARIA menu role without
+menu keyboard behavior, visible edition focus rings, and a more robust
+Enter/Space handler for `ReleaseCard`'s custom `role="button"` body.
+
+### Batch AF — Request action browser verification
+See [REQUEST_ACTION_BROWSER_VERIFICATION_DESIGN.md](REQUEST_ACTION_BROWSER_VERIFICATION_DESIGN.md).
+
+Added focused browser coverage for the request mutation itself after the card
+grid and Release Detail keyboard work. The suite verifies Search release-card
+keyboard reachability into the Request action, confirmation-dialog initial
+focus/Tab containment, admin requester-for selection, requested disabled-state
+feedback, and Release Detail direct request payloads plus focus restoration
+after success. Runtime work hardened `ConfirmRequestModal` with explicit opener
+focus capture/restoration and a requester-for select focus ring; `ReleaseDetailModal`
+now restores opener focus before emitting a successful `requested` close. The
+metadata browser fixture now records media-request payloads and seeds eligible
+admin/requester users for exact requester-for assertions.
+
+### Batch AG — Request failure and retry-state browser verification
+See [REQUEST_FAILURE_RETRY_BROWSER_VERIFICATION_DESIGN.md](REQUEST_FAILURE_RETRY_BROWSER_VERIFICATION_DESIGN.md).
+
+Extended the request browser coverage from success paths into failure and retry
+states. The metadata browser fixture now supports queued media-request failures
+and pre-marked linked request keys, with shared request browser helpers for
+Search release-card and Release Detail setup. The suite proves failed
+confirmation-dialog and Release Detail submissions stay open, expose
+`role="alert"` text, preserve requester-for selections, do not record media
+requests, and remain retryable; successful retries transition to requested
+feedback and Release Detail restores focus to its opener. Runtime hardening
+returns focus to the retry button after failed submissions because disabled
+loading buttons can otherwise drop focus.
+
+### Batch AH — Requester-role request browser verification
+See [REQUESTER_ROLE_REQUEST_BROWSER_VERIFICATION_DESIGN.md](REQUESTER_ROLE_REQUEST_BROWSER_VERIFICATION_DESIGN.md).
+
+Added focused requester-session browser coverage for the request workflow. The
+suite creates a real requester through the admin API, logs in through the forced
+password-change path, and verifies Search release-card and Release Detail
+requests submit without `requestedForUserId`, show no requester-for selectors,
+and do not read the admin `/api/v1/users` endpoint. Runtime hardening added an
+`enabled` option to `useActiveUsers`, uses it to prevent requester Release Detail
+from fetching active users, and gates Artist Detail operator-policy controls to
+non-requester sessions so requester UI remains least-privilege.
+
 ---
+
+### Batch AI — Post-request My Requests refresh verification
+
+Status: Implemented. See
+`docs/POST_REQUEST_MY_REQUESTS_REFRESH_DESIGN.md`.
+
+Added focused browser coverage for the requester post-submit handoff. The suite
+creates a real requester through the admin API, completes forced password change
+through the UI, verifies My Requests starts empty, submits `Music Has the Right
+to Children` from Search, then returns to My Requests and verifies the submitted
+request card appears with the expected release title, request kind, and
+`Searching` state.
+
+The metadata browser fixture now converts recorded media-request mutations into
+the scoped My Requests read model and summary payload, plus detail/pipeline/event
+stubs for continuity. This keeps the browser test on the existing production
+contract (`scope=mine`) instead of adding client-only refresh hooks.
+
+### Batch AJ — Submitted-request detail handoff browser verification
+
+Status: Implemented. See
+`docs/SUBMITTED_REQUEST_DETAIL_HANDOFF_DESIGN.md`.
+
+Added focused browser coverage for the submitted-request list-to-detail handoff.
+The suite creates and logs in a real requester, submits `Music Has the Right to
+Children`, opens the resulting My Requests card by keyboard, and verifies
+Request Detail renders the submitted request headline, request kind, journey,
+request fields, requester attribution, and no admin-only controls.
+
+Runtime work added an explicit empty `Fulfillment pipeline` state to
+`RequestDetailView` so newly submitted requests explain that download/import
+progress will appear after discovery links a usable source. This removes the
+previously silent no-candidates state.
+
+### Batch AK — Requester Request Detail cancellation browser verification
+
+Status: Implemented. See
+`docs/REQUEST_DETAIL_CANCELLATION_BROWSER_VERIFICATION_DESIGN.md`.
+
+Added focused requester browser coverage for cancelling a submitted request from
+Request Detail. The suite creates and logs in a requester, submits `Music Has
+the Right to Children`, opens the detail page, activates `Cancel request`,
+confirms through the shared `alertdialog`, and verifies the success toast,
+cancelled journey copy, removal of further cancellation/admin controls, fixture
+state persistence, and My Requests refresh to `Cancelled`.
+
+The metadata browser fixture now handles the production-shaped
+`POST /api/v1/library/media-requests/:id/cancel` contract with persisted
+`cancelled` read models and `409` responses for non-cancellable states.
+
+### Batch AL — Request Detail cancellation failure and conflict-state browser verification
+
+Status: Implemented. See
+`docs/REQUEST_DETAIL_CANCELLATION_FAILURE_BROWSER_VERIFICATION_DESIGN.md`.
+
+Added focused requester browser coverage for cancellation failure handling. The
+suite verifies a queued `503` cancellation failure shows assertive error
+feedback, keeps the request in `needs_fetch`, leaves `Cancel request` available,
+and succeeds on retry. It also verifies a stale `409 Conflict` shows error
+feedback, refreshes Request Detail to `cancelled`, removes stale cancellation
+controls, and shows `Cancelled` after navigating back to My Requests.
+
+Runtime work keeps transient errors retryable and refreshes the detail read
+model only for `409` cancellation conflicts. The metadata browser fixture now
+supports cancellation-specific failure queues and a helper for marking an
+existing request cancelled before the UI submits.
+
+## Batch AM - Requester Request Detail event timeline browser verification
+
+Status: Implemented.
+
+Requester Request Detail event history now has a focused browser contract. The
+metadata browser fixture can seed first-page and cursor-paginated
+`media_request_events` per media request, and the new browser test verifies
+requester-safe cancellation, creation, and older reassignment events through the
+production-shaped detail and load-more endpoints.
+
+The UI hardening also moved `RequestEventTimeline.vue` from reassignment-only
+presentation helpers to generic request-event helpers. Unknown reassignment
+users now fall back to `previous requester` and `new requester` instead of raw
+internal user IDs, and the timeline exposes an accessible `Request event
+history` list for role-first browser verification.
+
+See `docs/REQUEST_DETAIL_EVENT_TIMELINE_BROWSER_VERIFICATION_DESIGN.md`.
+
+## Batch AN - Request Detail fulfillment pipeline event/status parity browser verification
+
+Status: Implemented.
+
+Requester Request Detail now has browser proof that fulfillment status, journey
+stages, linked pipeline candidates, and durable event history agree for an
+import-pending request. The browser fixture can seed raw operator-shaped
+pipeline candidates and projects requester-safe candidates based on the active
+session, matching the production requester/operator disclosure split.
+
+The UI now exposes named semantic lists for both `Request journey` and
+`Linked import candidates`, and fulfillment event copy covers fulfillment
+started, download completed, import pending, imported, and fulfillment failed
+events without falling back to raw enum text.
+
+See `docs/REQUEST_DETAIL_PIPELINE_PARITY_BROWSER_VERIFICATION_DESIGN.md`.
+
+## Batch AO - Operator Request Detail pipeline diagnostics browser verification
+
+Status: Implemented.
+
+Operator/admin Request Detail now has browser proof for the diagnostic side of
+the pipeline projection. The suite creates an admin request, seeds a raw failed
+candidate, verifies source-user/folder context, download/import status messages,
+operation run IDs, import-candidate IDs, and run errors are visible, then
+activates the `Open in import review` link by keyboard and confirms the target
+candidate query.
+
+Request Detail now uses small presentation helpers for operator source labels
+and run diagnostics, while requester-safe tests continue to prove those same raw
+fixture fields stay hidden from requester sessions.
+
+See `docs/REQUEST_DETAIL_OPERATOR_PIPELINE_DIAGNOSTICS_BROWSER_VERIFICATION_DESIGN.md`.
+
+## Batch AP - Failed-import recovery handoff from Request Detail to Import Review
+
+Status: Implemented.
+
+Operator/admin Request Detail now has browser proof that a failed import
+candidate handoff lands in Import Review with the target candidate selected.
+The suite creates an admin request, seeds a failed linked candidate plus matching
+Import Review candidate detail/preview data, activates `Open in import review`
+by keyboard, and verifies `/app/activity/candidates?candidate=...` preserves the
+candidate selection even when the default pending queue filter shows zero
+matching rows.
+
+The Import Review browser fixture now covers queue list/detail, planning
+preview, stage summaries, run summaries, and simple review transitions. The
+handoff test verifies failed status, source folder, validation blocker,
+candidate file context, and a keyboard-focusable `Reopen` recovery action.
+
+See `docs/REQUEST_DETAIL_FAILED_IMPORT_RECOVERY_HANDOFF_DESIGN.md`.
+
+## Batch AQ - Import Review failed-candidate recovery action states
+
+Status: Implemented.
+
+Import Review now has browser proof for the failed-candidate recovery mutation
+itself. The suite opens a seeded failed candidate directly in Import Review,
+executes `Reopen`, and verifies the candidate moves to `Pending`, the queue count
+refreshes from zero to one under the default pending filter, the pending action
+buttons appear, and focus moves to a visible `role="status"` message after the
+removed `Reopen` button disappears.
+
+The paired failure scenario queues a one-shot transition failure through the
+browser fixture, verifies assertive `role="alert"` feedback, keeps the candidate
+failed, leaves `Reopen` retryable and focused, and does not show a false success
+status. `useImportReviewWorkspace` now short-circuits dependent refresh work when
+the transition returns `null`.
+
+See `docs/IMPORT_REVIEW_FAILED_CANDIDATE_RECOVERY_ACTION_DESIGN.md`.
+
+## Batch AR - Import Review review-state transition matrix
+
+Status: Implemented.
+
+Import Review now has browser proof for the normal review-state transitions
+adjacent to failed-candidate recovery. The suite opens seeded candidates directly
+in Import Review and verifies `Pending -> Held -> Selected` plus
+`Selected -> Rejected -> Pending`, including reject confirmation gating, success
+status focus, visible focus rings, queue count changes, selected-summary
+refreshes, stable route state, and persisted fixture state.
+
+The runtime hardening keeps the transitioned candidate selected after successful
+actions even when the active pending filter excludes it. This prevents `Hold` or
+`Reject` from silently clearing or jumping the detail panel while the operator is
+reviewing the result of their action.
+
+See `docs/IMPORT_REVIEW_TRANSITION_MATRIX_DESIGN.md`.
+
+## Batch AS - Import Review requester/non-admin read-only access verification
+
+Status: Implemented.
+
+Import Review now has browser proof for the least-privilege side of the review
+workflow. The suite verifies requester deep links to
+`/app/activity/candidates?...` are redirected back to Home before any
+`/api/v1/import-candidates` request loads. It also verifies an operator session
+can inspect candidate queue/detail context while review notes, filters,
+`Select`/`Hold`/`Reject`/`Reopen`, and the admin-only operator runway remain
+absent.
+
+The browser user helper now has generic `createUserThroughApi` and
+`loginUserThroughUi` helpers; existing requester helpers wrap those functions.
+The read-only suite also captures network requests and proves no Import Review
+transition endpoint is called outside admin management flows.
+
+See `docs/IMPORT_REVIEW_READ_ONLY_ACCESS_DESIGN.md`.
+
+## Batch AT - Import Review operator runway start/reconcile controls
+
+Status: Implemented.
+
+Import Review now has browser proof for the admin-only runway controls that
+start or sync background work. The suite verifies empty queues disable media
+inspection, download execution, and import apply starts; selected candidates
+enable media inspection and download starts; execution reconciliation updates
+heartbeat summary state; and import apply remains gated by the destructive
+type-to-confirm dialog.
+
+Runtime hardening tightened the shared start predicates so zero eligible
+candidates always disables a start, even when no current run exists. Runway
+panel errors now expose `role="alert"` feedback. The metadata browser fixture
+now supports production-shaped POST start/reconcile endpoints, one-shot run
+failures, durable run action logging, and run-summary read-after-write state.
+Post-mutation queue refreshes now preserve the owning runway panel hash so the
+operator stays anchored to the control they just used.
+
+See `docs/IMPORT_REVIEW_OPERATOR_RUNWAY_CONTROLS_DESIGN.md`.
+
+## Batch AU - Import Review selected-run deep links and historical run detail
+
+Status: Implemented.
+
+Import Review runway panels now have browser proof for selected-run deep links
+and historical run detail loading. The suite verifies direct URLs for media
+inspection, download execution, and import apply historical runs, plus selecting
+older rows from recent history and preserving selected historical detail after a
+panel refresh.
+
+Runtime hardening routes panel refreshes through `useImportReviewAdminWorkflow`
+so refresh calls preserve the selected run ID from query state. The recent-run
+tables now expose a visible `Run` column, which makes historical rows operator-
+clear and gives browser tests a user-visible identifier instead of relying on
+row position.
+
+See `docs/IMPORT_REVIEW_SELECTED_RUN_DEEP_LINKS_DESIGN.md`.
+
+## Batch AV - Import Review run-detail failure diagnostics browser verification
+
+Status: Implemented.
+
+Import Review selected-run URLs now have browser proof for failed historical
+run diagnostics. The suite deep-links directly into failed media inspection,
+download execution, and import apply runs, then verifies the operator-visible
+failure cause and diagnostic evidence in each panel.
+
+Runtime hardening added `ImportCandidateRunFailureNotice.vue`, a shared durable
+failure notice rendered as polite `role="status"` content across all three
+runway panels. Execution diagnostics prove degraded transfer state, missing
+transfer recovery context, failed transfer exceptions, and persisted transfer
+observations. Apply diagnostics prove failed file-operation messages and
+not-attempted follow-up operations. Media inspection remains aggregate-only
+because per-file inspection warnings are not persisted yet.
+
+See `docs/IMPORT_REVIEW_RUN_DETAIL_FAILURE_DIAGNOSTICS_DESIGN.md`.
+
+## Batch AW - Media-inspection per-file diagnostic persistence
+
+Status: Implemented.
+
+Media inspection run detail now persists and renders bounded per-file warning
+diagnostics. The worker records diagnostic rows from apply-preview media
+inspection warnings into `operation_runs.summary.inspectionDiagnostics`; the run
+store normalizes those rows on read; and the media inspection panel renders a
+named `Media inspection file diagnostics` table for selected runs.
+
+The implementation intentionally uses the existing operation-run JSONB summary
+instead of adding a table because the data is run-scoped, bounded, and not yet
+queried independently. The payload excludes raw probe output and stores only
+operator-useful fields: candidate, source user, source folder, file, formatted
+warning code, and message.
+
+See `docs/MEDIA_INSPECTION_PER_FILE_DIAGNOSTICS_DESIGN.md`.
+
+## Batch AX - Import Review diagnostic row handoff to candidate detail
+
+Status: Implemented.
+
+Media inspection diagnostic rows now have keyboard-accessible `Open candidate`
+actions. Activating a row updates Import Review route state to the diagnostic
+candidate, preserves the selected `mediaInspectionRunId`, moves the hash to the
+selection workspace, and focuses that workspace so operators land back on the
+authorized candidate action surface.
+
+The route-state normalizer now also accepts internal `candidateId` keys so
+composables can merge public query state and internal state without dropping the
+candidate selection. Browser coverage starts from a selected historical
+media-inspection run URL and proves the handoff keeps the selected run, opens
+the candidate detail, and exposes the recovery action.
+
+See `docs/IMPORT_REVIEW_DIAGNOSTIC_ROW_HANDOFF_DESIGN.md`.
+
+## Batch AY - Import Review diagnostic file focus handoff
+
+Status: Implemented.
+
+Diagnostic row handoff now carries the affected file as durable route state
+using `candidateFile=<fileId>`. Import Review preserves the selected
+`mediaInspectionRunId`, opens the candidate, and `ImportCandidateDetailPanel`
+scrolls and focuses the matching candidate file row after it renders.
+
+The focused file row has a visible accent treatment and focus outline, while
+browser coverage proves the URL keeps `candidate`, `candidateFile`, and
+`mediaInspectionRunId` together and that the active element is the affected file
+row.
+
+See `docs/IMPORT_REVIEW_DIAGNOSTIC_FILE_FOCUS_HANDOFF_DESIGN.md`.
+
+## Batch AZ - Import Review diagnostic-driven repair-state verification
+
+Status: Implemented.
+
+Diagnostic file handoff now has browser proof through the adjacent repair path.
+The suite starts from a selected media-inspection run, opens the affected file,
+executes `Reopen`, verifies success-status focus, preserves `candidate`,
+`candidateFile`, and `mediaInspectionRunId`, and confirms the selected historical
+run remains selected.
+
+Runtime hardening also keeps workspace query replacements from dropping the
+current hash and preserves selected run IDs plus diagnostic file state during
+repair transitions. Normal queue candidate selection, filter apply, reset, and
+route backfill now clear stale `candidateFile` state so file focus cannot point
+at the wrong candidate.
+
+See `docs/IMPORT_REVIEW_DIAGNOSTIC_REPAIR_STATE_DESIGN.md`.
+
+## Batch BA - Import Review diagnostic repair failure-state verification
+
+Status: Implemented.
+
+Diagnostic repair now has negative-path browser proof from the same file-level
+handoff context as Batch AZ. The suite starts from a selected media-inspection
+run, opens the affected diagnostic file, queues a one-shot `Reopen` failure,
+and verifies assertive alert feedback, retry focus on `Reopen`, preserved
+`candidate`/`candidateFile`/`mediaInspectionRunId` route state, preserved file
+highlighting, selected historical run continuity, and no false success status.
+
+A reusable diagnostic Import Review browser workspace builder now lives in
+`testing/browser/import-review-browser-helpers.js`, keeping future diagnostic
+repair tests from copying local candidate/run fixture payloads.
+
+See `docs/IMPORT_REVIEW_DIAGNOSTIC_REPAIR_FAILURE_STATE_DESIGN.md`.
+
+## Batch BB - Import Review diagnostic repair retry-success verification
+
+Status: Implemented.
+
+Diagnostic repair now has browser proof for the failure-to-success retry loop.
+The suite starts from a selected media-inspection run, opens the affected
+diagnostic file, queues a one-shot `Reopen` failure, verifies retry focus on
+`Reopen`, retries the same action successfully, and verifies the prior alert
+clears while success status receives focus.
+
+The route and diagnostic context remain stable across both attempts:
+`candidate`, `candidateFile`, and `mediaInspectionRunId` stay in the URL, the
+affected file row remains highlighted, and the selected historical
+media-inspection run stays selected after the retry transitions the candidate
+to `Pending`.
+
+See `docs/IMPORT_REVIEW_DIAGNOSTIC_REPAIR_RETRY_SUCCESS_DESIGN.md`.
 
 ## Proposed (follow-up)
 
 Status: Proposed (not yet implemented).
 
-### Runtime keyboard verification (Playwright) in a seeded environment
+### Import Review direct diagnostic route reload verification
 
-**Problem.** Batch L performed the static focus-ring audit and fixed the gaps in
-source, but the runtime behavior — actual arrow-key movement, Tab order across
-composites, and per-surface 3:1 contrast of the rendered ring — can only be
-proven in a running app. That needs the full stack (Express + PostgreSQL +
-seeded data), which is not available in-env.
+**Problem.** Diagnostic route state is covered when reached by clicking a
+diagnostic row, but a browser reload or shared URL can enter the same state
+directly. That path can regress selected-run hydration or file focus without
+breaking the click-driven tests.
 
-**Proposal.** Add a focused Playwright (test/browser) suite that, against a
-seeded dev server, asserts: one tab stop enters each grid/section; Arrow /
-Home / End / Ctrl+Home / Ctrl+End move focus as expected; Tab crosses between
-composites; and the focused cell's computed outline meets the 2px/3:1 standard.
-This converts the Batches D–L "recommended confirmation" notes into automated
-evidence and guards against regressions.
+**Proposal.** Load Import Review directly with `candidate`,
+`candidateFile`, and `mediaInspectionRunId` query state plus the selection hash,
+then verify the candidate detail opens, the affected file row receives focus and
+highlighting, and the historical media-inspection run detail is selected.
 
-**Why it is high value.** Locks in the platform-wide roving + focus work with
-real, repeatable evidence; catches any runtime-only regression.
+**Why it is high value.** Direct URLs and reloads are the durability contract
+for this route state. Proving hydration closes the remaining diagnostic file
+focus path after click, success, failure, and retry coverage.
 
 | Pros | Cons |
 | --- | --- |
-| Automated, repeatable proof of the a11y work | Requires a seeded full-stack environment to run |
-| Guards Batches D–L against future regressions | Playwright suite is heavier than unit tests |
+| Proves route-state durability without user-click setup | Adds one route-hydration browser scenario |
+| Guards reload/shared-link behavior for diagnostics | Does not add new UI controls |
+| Complements existing handoff and repair tests | Requires seeded selected-run detail data |
 
-**Touch points.** `test/browser/` (new spec); seeded dev-server fixture; small
-fixes if runtime gaps surface.
-
-**Verify against:** W3C APG roving tabindex; WCAG 2.2 §2.4.11; axe-core.
+**Touch points.** `src/client/components/ImportCandidateDetailPanel.vue`,
+`src/client/views/ImportReviewView.vue`,
+`src/client/composables/useImportReviewWorkspace.js`,
+`testing/browser/import-review-browser-helpers.js`,
+`testing/browser/metadata-browser-fixtures.js`, and `test/browser/`.
