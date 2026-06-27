@@ -31,6 +31,12 @@ import {
   buildArtistMetaLine,
   buildArtistMusicBrainzLabel,
   buildArtistMusicBrainzUrl,
+  buildArtistDetailSectionControlSummary,
+  buildArtistDetailSectionNoMatchesBody,
+  buildArtistDetailSectionResetLabel,
+  buildArtistDetailSectionSearchLabel,
+  buildArtistDetailSectionSelectionFilterLabel,
+  buildArtistDetailSectionSortLabel,
   buildNoDiscographyBody,
   buildRelatedArtistAvatarStyle,
   buildRelatedArtistInitial,
@@ -304,10 +310,16 @@ test('buildNoDiscographyBody is stable across calls', () => {
 test('buildArtistDetailBulkActionLabel maps selected and unselected actions', () => {
   assert.equal(buildArtistDetailBulkActionLabel('selected'), 'Select all');
   assert.equal(buildArtistDetailBulkActionLabel('unselected'), 'Clear all');
+  assert.equal(buildArtistDetailBulkActionLabel('selected', { isFiltered: true }), 'Select visible');
+  assert.equal(buildArtistDetailBulkActionLabel('unselected', { isFiltered: true }), 'Clear visible');
 });
 
 test('buildArtistDetailBulkActionAriaLabel includes the section label', () => {
   assert.equal(buildArtistDetailBulkActionAriaLabel('EP', 'selected'), 'Select all EPs');
+  assert.equal(
+    buildArtistDetailBulkActionAriaLabel('EP', 'unselected', { isFiltered: true }),
+    'Clear visible EPs',
+  );
 });
 
 test('formatArtistDetailBulkAffectedCount handles release-only operations', () => {
@@ -345,6 +357,28 @@ test('buildArtistDetailBulkAppliedStatus reports selected draft operation', () =
   assert.equal(
     buildArtistDetailBulkAppliedStatus({ releaseCount: 3, selectionState: 'selected', trackCount: 0 }),
     'Draft selected 3 releases.',
+  );
+});
+
+test('Artist Detail section control copy summarizes visible and total counts', () => {
+  assert.equal(
+    buildArtistDetailSectionControlSummary({ totalCount: 4, visibleCount: 4 }),
+    '4 releases',
+  );
+  assert.equal(
+    buildArtistDetailSectionControlSummary({ totalCount: 4, visibleCount: 1 }),
+    'Showing 1 of 4 releases',
+  );
+});
+
+test('Artist Detail section control labels include section type', () => {
+  assert.equal(buildArtistDetailSectionSearchLabel('Album'), 'Search Albums');
+  assert.equal(buildArtistDetailSectionSelectionFilterLabel('Album'), 'Albums selection filter');
+  assert.equal(buildArtistDetailSectionSortLabel('Album'), 'Sort Albums');
+  assert.equal(buildArtistDetailSectionResetLabel('Album'), 'Reset Albums controls');
+  assert.equal(
+    buildArtistDetailSectionNoMatchesBody('Album'),
+    'No albums match these section controls.',
   );
 });
 

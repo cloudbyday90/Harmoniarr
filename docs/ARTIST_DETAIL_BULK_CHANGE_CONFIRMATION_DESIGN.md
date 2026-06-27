@@ -111,9 +111,8 @@ large-change confirmation threshold. Normal small changes stay fast, while
 large catalog changes require an explicit confirmation before mutating the
 draft state.
 
-## Next High-Value Item
+## Follow-Up Status
 
-Artist Detail large-catalog filtering and sorting is the next logical follow-up.
-The new bulk actions make large sections easier to modify, but catalogs with
-many release groups still need scan controls if real usage shows section
-grouping alone is not enough.
+Artist Detail large-catalog filtering and sorting was implemented in
+`ARTIST_DETAIL_LARGE_CATALOG_CONTROLS_DESIGN.md`. The next high-value follow-up
+is non-destructive operator library removal semantics.

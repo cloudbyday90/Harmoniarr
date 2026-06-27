@@ -172,12 +172,13 @@ export function buildNoDiscographyBody() {
   return 'No releases are listed for this artist yet.';
 }
 
-export function buildArtistDetailBulkActionLabel(selectionState) {
-  return selectionState === 'unselected' ? 'Clear all' : 'Select all';
+export function buildArtistDetailBulkActionLabel(selectionState, { isFiltered = false } = {}) {
+  const scope = isFiltered ? 'visible' : 'all';
+  return selectionState === 'unselected' ? `Clear ${scope}` : `Select ${scope}`;
 }
 
-export function buildArtistDetailBulkActionAriaLabel(sectionType, selectionState) {
-  return `${buildArtistDetailBulkActionLabel(selectionState)} ${pluralizeReleaseType(sectionType)}`;
+export function buildArtistDetailBulkActionAriaLabel(sectionType, selectionState, { isFiltered = false } = {}) {
+  return `${buildArtistDetailBulkActionLabel(selectionState, { isFiltered })} ${pluralizeReleaseType(sectionType)}`;
 }
 
 export function formatArtistDetailBulkAffectedCount(operation = {}) {
@@ -220,6 +221,37 @@ export function buildArtistDetailBulkAppliedStatus(operation = {}) {
   const action = operation.selectionState === 'unselected' ? 'cleared' : 'selected';
   const affectedCount = formatArtistDetailBulkAffectedCount(operation);
   return `Draft ${action} ${affectedCount}.`;
+}
+
+export function buildArtistDetailSectionControlSummary({ totalCount = 0, visibleCount = 0 } = {}) {
+  const total = Number.isFinite(Number(totalCount)) ? Number(totalCount) : 0;
+  const visible = Number.isFinite(Number(visibleCount)) ? Number(visibleCount) : total;
+
+  if (visible === total) {
+    return `${total} release${total === 1 ? '' : 's'}`;
+  }
+
+  return `Showing ${visible} of ${total} releases`;
+}
+
+export function buildArtistDetailSectionSearchLabel(sectionType) {
+  return `Search ${pluralizeReleaseType(sectionType)}`;
+}
+
+export function buildArtistDetailSectionSelectionFilterLabel(sectionType) {
+  return `${pluralizeReleaseType(sectionType)} selection filter`;
+}
+
+export function buildArtistDetailSectionSortLabel(sectionType) {
+  return `Sort ${pluralizeReleaseType(sectionType)}`;
+}
+
+export function buildArtistDetailSectionResetLabel(sectionType) {
+  return `Reset ${pluralizeReleaseType(sectionType)} controls`;
+}
+
+export function buildArtistDetailSectionNoMatchesBody(sectionType) {
+  return `No ${pluralizeReleaseType(sectionType).toLowerCase()} match these section controls.`;
 }
 
 // ── Related artists ───────────────────────────────────────────────────────────

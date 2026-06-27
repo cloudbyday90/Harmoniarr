@@ -46,6 +46,12 @@ import {
   buildArtistDetailBulkSelectionOperation,
 } from '../lib/artist-detail-bulk-selection.js';
 import {
+  ARTIST_DETAIL_SECTION_SELECTION_FILTERS,
+  ARTIST_DETAIL_SECTION_SORT_OPTIONS,
+  applyArtistDetailSectionControls,
+  defaultArtistDetailSectionControls,
+} from '../lib/artist-detail-section-controls.js';
+import {
   CONFIRM_LEVEL,
   CONFIRM_TONE,
 } from '../lib/confirm-intent.js';
@@ -62,6 +68,12 @@ import {
   buildArtistMetaLine,
   buildArtistMusicBrainzLabel,
   buildArtistMusicBrainzUrl,
+  buildArtistDetailSectionControlSummary,
+  buildArtistDetailSectionNoMatchesBody,
+  buildArtistDetailSectionResetLabel,
+  buildArtistDetailSectionSearchLabel,
+  buildArtistDetailSectionSelectionFilterLabel,
+  buildArtistDetailSectionSortLabel,
   buildNoDiscographyBody,
   formatArtistDetailError,
   formatDiscographyError,
@@ -167,6 +179,7 @@ const isSavingPolicy = ref(false);
 const policySaveError = ref('');
 const pendingBulkSelectionOperation = ref(null);
 const bulkSelectionStatusMessage = ref('');
+const sectionControls = ref({});
 
 function openDetailModal(release) {
   detailRelease.value = release;
@@ -206,6 +219,32 @@ const discographySections = computed(() =>
       sourceReleaseGroup: releaseGroup,
     })),
   })),
+);
+
+const controlledDiscographySections = computed(() =>
+  discographySections.value.map((section) => {
+    const controls = sectionControls.value[section.type] ?? defaultArtistDetailSectionControls;
+    const result = applyArtistDetailSectionControls({
+      controls,
+      getSelectionState: (release) =>
+        getDraftReleaseGroupSelectionState(policyDraft.value, release.sourceReleaseGroup),
+      hasManualOverride: (release) =>
+        describeReleaseGroupOverride(policyDraft.value, release.sourceReleaseGroup) !== 'Policy default',
+      releases: section.releases,
+    });
+
+    return {
+      ...section,
+      controls: result.controls,
+      isFiltered: result.isFiltered,
+      isSectionControlsActive: result.isActive,
+      isSorted: result.isSorted,
+      releaseCount: result.visibleCount,
+      releases: result.releases,
+      totalReleaseCount: result.totalCount,
+      visibleReleaseCount: result.visibleCount,
+    };
+  }),
 );
 
 const hasDiscography = computed(() => releaseGroups.value.length > 0);
@@ -276,6 +315,32 @@ function updateDraftReleaseGroupSelection(release, selectionState) {
     release.sourceReleaseGroup,
     selectionState,
   );
+}
+
+function updateSectionControls(sectionType, patch) {
+  sectionControls.value = {
+    ...sectionControls.value,
+    [sectionType]: {
+      ...(sectionControls.value[sectionType] ?? defaultArtistDetailSectionControls),
+      ...patch,
+    },
+  };
+}
+
+function updateSectionSearch(sectionType, event) {
+  updateSectionControls(sectionType, { query: event.target.value });
+}
+
+function updateSectionSelectionFilter(sectionType, event) {
+  updateSectionControls(sectionType, { selectionFilter: event.target.value });
+}
+
+function updateSectionSort(sectionType, event) {
+  updateSectionControls(sectionType, { sortMode: event.target.value });
+}
+
+function resetSectionControls(sectionType) {
+  updateSectionControls(sectionType, defaultArtistDetailSectionControls);
 }
 
 function canApplyBulkSelectionChanges() {
@@ -635,14 +700,16 @@ watch(projection, () => {
 
           <div v-else class="artist-detail-discography">
             <section
-              v-for="section in discographySections"
+              v-for="section in controlledDiscographySections"
               :key="section.type"
               class="artist-detail-discography__section"
             >
               <div class="artist-detail-discography__header">
                 <div>
                   <h3 class="artist-detail-discography__title">{{ pluralizeReleaseType(section.type) }}</h3>
-                  <p class="artist-detail-discography__meta">{{ section.releaseCount }} release{{ section.releaseCount === 1 ? '' : 's' }}</p>
+                  <p class="artist-detail-discography__meta">
+                    {{ buildArtistDetailSectionControlSummary({ totalCount: section.totalReleaseCount, visibleCount: section.visibleReleaseCount }) }}
+                  </p>
                 </div>
                 <div
                   v-if="canEditOperatorPolicy"
@@ -653,26 +720,96 @@ watch(projection, () => {
                     type="button"
                     class="hx-btn"
                     data-variant="ghost"
-                    :disabled="!canApplyBulkSelectionChanges()"
-                    :aria-label="buildArtistDetailBulkActionAriaLabel(section.type, 'selected')"
+                    :disabled="!canApplyBulkSelectionChanges() || section.releases.length === 0"
+                    :aria-label="buildArtistDetailBulkActionAriaLabel(section.type, 'selected', { isFiltered: section.isFiltered })"
                     @click="requestSectionBulkSelection(section, 'selected')"
                   >
-                    {{ buildArtistDetailBulkActionLabel('selected') }}
+                    {{ buildArtistDetailBulkActionLabel('selected', { isFiltered: section.isFiltered }) }}
                   </button>
                   <button
                     type="button"
                     class="hx-btn"
                     data-variant="ghost"
-                    :disabled="!canApplyBulkSelectionChanges()"
-                    :aria-label="buildArtistDetailBulkActionAriaLabel(section.type, 'unselected')"
+                    :disabled="!canApplyBulkSelectionChanges() || section.releases.length === 0"
+                    :aria-label="buildArtistDetailBulkActionAriaLabel(section.type, 'unselected', { isFiltered: section.isFiltered })"
                     @click="requestSectionBulkSelection(section, 'unselected')"
                   >
-                    {{ buildArtistDetailBulkActionLabel('unselected') }}
+                    {{ buildArtistDetailBulkActionLabel('unselected', { isFiltered: section.isFiltered }) }}
                   </button>
                 </div>
               </div>
 
+              <div
+                class="artist-detail-discography__controls"
+                :aria-label="`${pluralizeReleaseType(section.type)} section controls`"
+              >
+                <label class="artist-detail-discography__field">
+                  <span>{{ buildArtistDetailSectionSearchLabel(section.type) }}</span>
+                  <input
+                    class="hx-input artist-detail-discography__search"
+                    type="search"
+                    :value="section.controls.query"
+                    :placeholder="`Filter ${pluralizeReleaseType(section.type).toLowerCase()}`"
+                    @input="updateSectionSearch(section.type, $event)"
+                  />
+                </label>
+
+                <label v-if="canEditOperatorPolicy" class="artist-detail-discography__field">
+                  <span>{{ buildArtistDetailSectionSelectionFilterLabel(section.type) }}</span>
+                  <select
+                    class="hx-select"
+                    :value="section.controls.selectionFilter"
+                    @change="updateSectionSelectionFilter(section.type, $event)"
+                  >
+                    <option
+                      v-for="option in ARTIST_DETAIL_SECTION_SELECTION_FILTERS"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+
+                <label class="artist-detail-discography__field">
+                  <span>{{ buildArtistDetailSectionSortLabel(section.type) }}</span>
+                  <select
+                    class="hx-select"
+                    :value="section.controls.sortMode"
+                    @change="updateSectionSort(section.type, $event)"
+                  >
+                    <option
+                      v-for="option in ARTIST_DETAIL_SECTION_SORT_OPTIONS"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+
+                <button
+                  type="button"
+                  class="hx-btn artist-detail-discography__reset"
+                  data-variant="ghost"
+                  :disabled="!section.isSectionControlsActive"
+                  :aria-label="buildArtistDetailSectionResetLabel(section.type)"
+                  @click="resetSectionControls(section.type)"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <p
+                v-if="section.releases.length === 0"
+                class="artist-detail-discography__empty"
+                role="status"
+              >
+                {{ buildArtistDetailSectionNoMatchesBody(section.type) }}
+              </p>
+
               <ArtistReleaseSectionGrid
+                v-else
                 class="artist-detail-grid"
                 :releases="section.releases"
                 :aria-label="pluralizeReleaseType(section.type)"
@@ -1058,6 +1195,49 @@ watch(projection, () => {
   font-size: var(--hx-text-xs);
 }
 
+.artist-detail-discography__controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.3fr) minmax(160px, 0.75fr) minmax(150px, 0.7fr) auto;
+  gap: var(--hx-space-3);
+  align-items: end;
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface-muted);
+}
+
+.artist-detail-discography__field {
+  display: grid;
+  gap: var(--hx-space-1);
+  min-width: 0;
+}
+
+.artist-detail-discography__field span {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  font-weight: 700;
+}
+
+.artist-detail-discography__field .hx-input,
+.artist-detail-discography__field .hx-select {
+  width: 100%;
+}
+
+.artist-detail-discography__reset {
+  min-height: 36px;
+  padding-inline: var(--hx-space-3);
+}
+
+.artist-detail-discography__empty {
+  margin: 0;
+  padding: var(--hx-space-4);
+  border: 1px dashed var(--hx-border);
+  border-radius: var(--hx-radius-sm);
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  background: var(--hx-bg-surface-muted);
+}
+
 .artist-detail-discography__title {
   margin: 0;
   font-size: var(--hx-text-base);
@@ -1136,6 +1316,10 @@ watch(projection, () => {
 
   .artist-detail-discography__actions {
     justify-content: flex-start;
+  }
+
+  .artist-detail-discography__controls {
+    grid-template-columns: 1fr;
   }
 
   .artist-detail-grid {

@@ -47,17 +47,15 @@ Confirmed complete:
 - Discover recommendation model core, including monitored-artist basis, product-language cleanup, add-to-monitored flow, scoring/explainability, operator-scoped wanted state, and monitoring read-path cleanup
 - Discover temporary recommendation-basis filtering, including URL-query focus state, monitored-artist validation, reload persistence, and browser verification
 - Artist Detail bulk-change confirmation thresholds, including section-level draft bulk selection, threshold confirmation, and browser verification
+- Artist Detail large-catalog filtering and sorting, including section-local search, selection filters, sort controls, reset, visible-subset bulk draft actions, and browser verification
 
 Follow-up issues to create:
 
-1. **Artist Detail large-catalog filtering and sorting** — revisit section-level
-   filters/sorting after real catalog pressure proves the default grouping is
-   insufficient.
-2. **Operator library removal semantics** — design and implement non-destructive
+1. **Operator library removal semantics** — design and implement non-destructive
    "remove from my view/library" behavior separately from deleting shared media.
-3. **Track-override remap review UX** — surface `review_needed` / `orphaned`
+2. **Track-override remap review UX** — surface `review_needed` / `orphaned`
    track override states when metadata changes make saved track intent ambiguous.
-4. **Plan-governance closure** — create/link GitHub sub-issues for the items
+3. **Plan-governance closure** — create/link GitHub sub-issues for the items
    above, then close Issue #4 as completed.
 
 ---

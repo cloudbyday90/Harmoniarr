@@ -59,7 +59,6 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:
 
-- large-catalog section filters and sorting in Artist Detail, if real catalog pressure proves they are needed
 - non-destructive operator library removal semantics
 - track-override remap review UX when metadata changes make saved intent ambiguous
 
@@ -2089,24 +2088,18 @@ the core model can close cleanly.
    monitored artists for the current session or URL state. This must not create
    a second persistent recommendation profile.
 
-2. **Large-catalog section filtering and sorting**
-
-   Defer until real artist catalogs show default grouping is insufficient. If
-   implemented, keep it local to Artist Detail sections and preserve the
-   Save/Cancel draft boundary.
-
-3. **Non-destructive operator library removal semantics**
+2. **Non-destructive operator library removal semantics**
 
    Design and implement "remove from my view/library" separately from deleting
    shared media. This likely needs `operator_library_item_access` or an
    equivalent access projection before UI work.
 
-4. **Track-override remap review UX**
+3. **Track-override remap review UX**
 
    Surface `review_needed` and `orphaned` states for saved track overrides when
    metadata or canonical-release changes make exact remapping ambiguous.
 
-5. **GitHub follow-up split**
+4. **GitHub follow-up split**
 
    Create linked GitHub sub-issues for the items above and link them from
    `docs/issue-4-implementation-plan.md`.
@@ -2576,9 +2569,10 @@ Use this section for incremental updates during implementation.
 - 2026-06-13: Wanted release reconciliation read-path cleanup implemented. The wanted reconciliation service and wanted summary monitored-artist count now use an operator-monitoring compatibility scope derived from `operator_artist_monitoring`, removing their direct dependency on `metadata_artist_monitoring` while preserving the existing global `library_wanted_releases` projection until a separate per-operator wanted-state migration is designed.
 - 2026-06-14: Per-operator wanted state implemented. `PER_OPERATOR_WANTED_STATE_DESIGN.md` records the official PostgreSQL, node-postgres, OWASP, and Express source review plus the selected schema stack. `library_wanted_releases` now has `app_user_id`, a per-user release uniqueness constraint, scoped wanted-summary and wanted-release read paths, operator policy gates for release scope and wanted automation, discovery source-user evidence, and backup/restore ownership preservation.
 - 2026-06-14: Metadata refresh read-path cleanup implemented. `METADATA_REFRESH_READ_PATH_CLEANUP_DESIGN.md` records the official PostgreSQL, node-postgres, OWASP, Express, Node test-runner, and MusicBrainz source review. The refresh heartbeat now reads due artist eligibility from `operator_artist_monitoring`, stores global provider cadence in `metadata_artist_refresh_state`, and uses operator-derived monitored release-group types for refresh release-detection decisions.
-- 2026-06-27: Plan reconciliation completed. The core Discover recommendation model is implemented; remaining items are explicitly split into follow-up issues for temporary recommendation-basis filtering, large bulk-change confirmation, large-catalog section controls, non-destructive operator library removal, track-override remap review UX, and GitHub issue linking.
+- 2026-06-27: Plan reconciliation completed. The core Discover recommendation model is implemented; follow-up items were explicitly split for temporary recommendation-basis filtering, large bulk-change confirmation, large-catalog section controls, non-destructive operator library removal, track-override remap review UX, and GitHub issue linking.
 - 2026-06-27: Temporary recommendation-basis filtering implemented. `DISCOVER_RECOMMENDATION_FOCUS_FILTER_DESIGN.md` records the official Vue Router, Vue reactivity, Playwright, WAI-ARIA, MDN, and OWASP source review plus the selected URL-query state stack. Discover now exposes `?focusArtist=` as a view-only filter over monitored recommendation inputs, validates ids against the hydrated monitored profile, recomputes recommendations from the focused input result map, preserves focus across reload, and clears back to all monitored artists without changing durable monitoring state.
 - 2026-06-27: Artist Detail bulk-change confirmation thresholds implemented. `ARTIST_DETAIL_BULK_CHANGE_CONFIRMATION_DESIGN.md` records the official WAI-ARIA, MDN, Vue, OWASP, and Playwright source review plus the selected pure-threshold service stack. Artist Detail now exposes section-level `Select all` / `Clear all` release-group actions, applies small changes immediately to draft state, and requires confirmation when a single operation affects more than `25` releases or more than `250` known tracks.
+- 2026-06-27: Artist Detail large-catalog controls implemented. `ARTIST_DETAIL_LARGE_CATALOG_CONTROLS_DESIGN.md` records the official MDN, WAI, Vue, OWASP, and Playwright source review plus the selected section-local control stack. Artist Detail now supports per-section search, selection-state filtering, manual-override filtering, date/title/selection sorting, reset controls, and visible-subset bulk draft actions.
 
 ## Checklist
 
@@ -2607,4 +2601,5 @@ Use this section for incremental updates during implementation.
 - [x] Core model acceptance criteria reconciled
 - [x] Temporary recommendation-basis filtering implemented
 - [x] Artist Detail bulk-change confirmation thresholds implemented
+- [x] Artist Detail large-catalog filtering and sorting implemented
 - [ ] Create linked GitHub follow-up issues for the remaining non-blocking enhancements
