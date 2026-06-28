@@ -1,16 +1,27 @@
-# Issue #4 — Full App Re-scope: Harmoniarr as a Media Consumption App
+# Issue #4 - Full App Re-scope: Harmoniarr as a Media Consumption App
 
-## Status: Core Implementation Complete; Follow-Up Split Pending
+## Status: Closed / Archived
 
-Last reconciled: 2026-06-27.
+Last reconciled: 2026-06-28.
 
-This document is now the active implementation ledger for Issue #4. The **Implementation Progress** section is the source of truth for shipped work. Historical first-pass language such as "Gaps", "Required", and speculative route/API sketches has moved to the linked archive.
+Issue #4's core media-consumption re-scope is complete and should no longer be
+used as an active implementation ledger. The **Implementation Progress** section
+remains as shipped-history evidence only. New work should be tracked in focused
+design documents instead of continuing to grow this issue plan.
+
+Current active Music Queue and download/import workflow work has moved to
+[ACQUISITION_PIPELINE_REDESIGN_PLAN.md](ACQUISITION_PIPELINE_REDESIGN_PLAN.md).
+That plan owns the next product direction for release progress, quality-aware
+match selection, automated download execution, safe library add, and
+walkthrough proof.
+
+The Phase 0 design/research/evaluation outcome is captured in
+[MUSIC_QUEUE_PHASE_0_DESIGN.md](MUSIC_QUEUE_PHASE_0_DESIGN.md).
 
 Use this order when reading the plan:
 
-1. **Implementation Progress** — what has shipped.
-2. **Open Follow-Up Backlog** — current actionable work that remains after the core re-scope.
-3. **Historical Design Archive** — original problem framing, gaps, decisions, and specs moved to [issue-4-design-archive.md](issue-4-design-archive.md).
+1. **Implementation Progress** - what has shipped.
+2. **Historical Design Archive** - original problem framing, gaps, decisions, and specs moved to [issue-4-design-archive.md](issue-4-design-archive.md).
 
 ### Core Design Shifts
 
@@ -25,11 +36,11 @@ Use this order when reading the plan:
 
 ---
 
-### Open Follow-Up Backlog
+### Closed Follow-Up Backlog
 
 - [x] Add a release-validation evidence map that links each shipped Issue #4 step to its focused tests, browser scenarios, schema checks, and release evidence tasks. See [ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md](ISSUE_4_RELEASE_VALIDATION_EVIDENCE.md).
 - [x] Add browser visual evidence for the highest-risk media surfaces: Library grid/list display modes, Needs Attention actions, Discover recommendations, requester Home, and mobile navigation. Covered by `test/browser/issue-4-visual-evidence.test.js`, which writes screenshots and `manifest.json` under `artifacts/browser-visual-evidence/issue-4-media-surfaces/`.
-- [ ] Create GitHub sub-issues for the reconciled follow-up backlog and link them from this plan.
+- [x] Retired the remaining generic "create follow-up sub-issues" task. Follow-up work is now tracked through focused design plans, starting with [ACQUISITION_PIPELINE_REDESIGN_PLAN.md](ACQUISITION_PIPELINE_REDESIGN_PLAN.md).
 
 ### Reconciliation Summary
 

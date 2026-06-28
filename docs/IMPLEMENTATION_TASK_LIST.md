@@ -9,6 +9,10 @@ Database model source: `docs/DATABASE_MODEL.md`
 ## Current Status (2026-05-23)
 
 - Current validation baseline: 1534 server / 3087 client tests pass.
+- Issue #4 is closed as a historical media-consumption re-scope ledger. New
+  Music Queue and download/import workflow work is tracked in focused design
+  documents, led by
+  `ACQUISITION_PIPELINE_REDESIGN_PLAN.md`.
 - Activity Imports and artist reconciliation recovery: fixed the blank
   `Activity > Imports` view by importing its shared formatter helpers, added a
   bounded one-shot self-healing path for failed operator artist reconciliation
@@ -24,6 +28,16 @@ Database model source: `docs/DATABASE_MODEL.md`
   import-readiness handoff, and shared blocked-candidate runway copy now uses
   correct singular/plural wording. See
   `REQUEST_PIPELINE_IMPORT_READINESS_DESIGN.md`.
+- Music Queue pipeline redesign planning: the former `Download candidates`
+  experience is being redesigned around release progress instead of raw
+  import-candidate review. The new plan defines release-centered statuses,
+  button language, read-model phases, match drilldowns, setup blockers,
+  candidate-scoped execution, safe library add, and walkthrough proof.
+  Phase 0 now has a completed design/research/evaluation outcome covering the
+  status/action contract, Activity boundary, quality profiles, candidate hiding
+  rule, event payloads, match-attempt lifecycle, and walkthrough payload
+  examples. See `ACQUISITION_PIPELINE_REDESIGN_PLAN.md` and
+  `MUSIC_QUEUE_PHASE_0_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release
