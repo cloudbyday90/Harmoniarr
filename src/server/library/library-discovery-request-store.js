@@ -224,6 +224,7 @@ export function createLibraryDiscoveryRequestStore({
   }
 
   async function recordDiscoverySearchSuccess({
+    autoSelection = null,
     candidateCount,
     fileCount,
     ingestionDiagnostics = null,
@@ -245,6 +246,7 @@ export function createLibraryDiscoveryRequestStore({
             'lastSearchQuery', $2::text,
             'lastSearchResult', jsonb_strip_nulls(jsonb_build_object(
               'candidateCount', $3::integer,
+              'autoSelection', $9::jsonb,
               'fileCount', $4::integer,
               'ingestionDiagnostics', $8::jsonb,
               'sourceProvider', 'slskd'
@@ -265,6 +267,7 @@ export function createLibraryDiscoveryRequestStore({
         searchAttemptCount,
         nextSearchAfter,
         ingestionDiagnostics ? JSON.stringify(ingestionDiagnostics) : null,
+        autoSelection ? JSON.stringify(autoSelection) : null,
       ],
     );
   }

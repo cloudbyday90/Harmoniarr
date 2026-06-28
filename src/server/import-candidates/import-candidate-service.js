@@ -40,6 +40,8 @@ import {
 } from './import-candidate-repository.js';
 
 const candidateStatuses = new Set(['pending', 'held', 'rejected', 'selected', 'downloading', 'import_pending', 'applied', 'failed']);
+const DEFAULT_SLSKD_RESPONSE_POLL_ATTEMPTS = 15;
+const DEFAULT_SLSKD_RESPONSE_POLL_INTERVAL_MS = 1000;
 
 function normalizeOptionalString(value, {
   fieldName,
@@ -188,6 +190,25 @@ function deriveTrustedUsernames(reputationIndex) {
     }
   }
   return trusted;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function hasProviderResponses(searchResponses) {
+  return Array.isArray(searchResponses?.responses) && searchResponses.responses.length > 0;
+}
+
+function toSearchResponsesFromState(searchState, fallbackSearchId) {
+  return {
+    searchId: typeof searchState?.id === 'string' && searchState.id.trim()
+      ? searchState.id.trim()
+      : fallbackSearchId,
+    responses: Array.isArray(searchState?.responses) ? searchState.responses : [],
+  };
 }
 
 function normalizeResponseFile(file, {
@@ -390,6 +411,9 @@ export function createImportCandidateService({
   loadSettingsFn = loadSettings,
   slskdService,
   browseEnrichmentService = null,
+  slskdSearchResponsePollAttempts = DEFAULT_SLSKD_RESPONSE_POLL_ATTEMPTS,
+  slskdSearchResponsePollIntervalMs = DEFAULT_SLSKD_RESPONSE_POLL_INTERVAL_MS,
+  sleepFn = sleep,
   transitionImportCandidateStatusFn = transitionImportCandidateStatus,
   upsertImportCandidateFn = upsertImportCandidate,
 } = {}) {
@@ -406,6 +430,54 @@ export function createImportCandidateService({
     } finally {
       client.release();
     }
+  }
+
+  async function waitForSlskdSearchResponses({ searchId }) {
+    let searchResponses = await slskdService.getSearchResponses({ searchId });
+    if (hasProviderResponses(searchResponses) || typeof slskdService.getSearchState !== 'function') {
+      return searchResponses;
+    }
+
+    const maxAttempts = Number.isInteger(slskdSearchResponsePollAttempts) && slskdSearchResponsePollAttempts > 0
+      ? slskdSearchResponsePollAttempts
+      : 0;
+    const pollIntervalMs = Number.isInteger(slskdSearchResponsePollIntervalMs) && slskdSearchResponsePollIntervalMs > 0
+      ? slskdSearchResponsePollIntervalMs
+      : 0;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      if (pollIntervalMs > 0) {
+        await sleepFn(pollIntervalMs);
+      }
+
+      let searchState;
+      try {
+        searchState = await slskdService.getSearchState({
+          searchId,
+          includeResponses: true,
+        });
+      } catch {
+        searchState = undefined;
+      }
+
+      const stateResponses = toSearchResponsesFromState(searchState, searchId);
+      if (hasProviderResponses(stateResponses)) {
+        return stateResponses;
+      }
+
+      if (Number.parseInt(String(searchState?.responseCount ?? 0), 10) > 0) {
+        searchResponses = await slskdService.getSearchResponses({ searchId });
+        if (hasProviderResponses(searchResponses)) {
+          return searchResponses;
+        }
+      }
+
+      if (searchState?.isComplete) {
+        return await slskdService.getSearchResponses({ searchId });
+      }
+    }
+
+    return await slskdService.getSearchResponses({ searchId });
   }
 
   async function listImportCandidates({
@@ -790,7 +862,7 @@ export function createImportCandidateService({
     requestMetadata = null,
     searchId,
   }) {
-    const searchResponses = await slskdService.getSearchResponses({ searchId });
+    const searchResponses = await waitForSlskdSearchResponses({ searchId });
     // Feed the G6 candidate source filter from the operator-controlled ignore
     // list (the "act" side of the learn->act loop). An explicit ignoredUsernames
     // argument still wins; otherwise the current ignore list is resolved here so

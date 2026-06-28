@@ -93,85 +93,95 @@ export function useArtistDetail({
     discographyError.value = null;
     relatedError.value = null;
 
-    const [localResult, similarResult] = await Promise.allSettled([
-      resolveLocal(mbid, { signal }),
-      fetchSimilar(mbid, { limit: similarLimit, signal }),
-    ]);
+    try {
+      const [localResult, similarResult] = await Promise.allSettled([
+        resolveLocal(mbid, { signal }),
+        fetchSimilar(mbid, { limit: similarLimit, signal }),
+      ]);
 
-    let shouldBrowseDiscography = true;
+      let shouldBrowseDiscography = true;
 
-    // Local artist — 404 is not an error (artist not yet imported).
-    if (localResult.status === 'fulfilled') {
-      artist.value = localResult.value?.artist ?? null;
-      monitoring.value = localResult.value?.monitoring ?? null;
-      const localArtistId = localResult.value?.artist?.id ?? null;
+      // Local artist — 404 is not an error (artist not yet imported).
+      if (localResult.status === 'fulfilled') {
+        artist.value = localResult.value?.artist ?? null;
+        monitoring.value = localResult.value?.monitoring ?? null;
+        const localArtistId = localResult.value?.artist?.id ?? null;
 
-      if (localArtistId) {
-        try {
-          const operatorPayload = await fetchOperatorProjection(localArtistId, { signal });
-          projection.value = operatorPayload;
-          operator.value = operatorPayload?.operator ?? null;
-          artist.value = operatorPayload?.artist ?? artist.value;
-          monitoring.value = operatorPayload?.operator?.monitoring ?? monitoring.value;
-          releaseGroups.value = Array.isArray(operatorPayload?.releaseGroups)
-            ? operatorPayload.releaseGroups
-            : [];
-          shouldBrowseDiscography = false;
-        } catch (error) {
-          if (error?.status !== 404) {
-            artistError.value = getErrorMessage(
-              error,
-              'Could not load operator artist policy.',
-            );
+        if (localArtistId) {
+          try {
+            const operatorPayload = await fetchOperatorProjection(localArtistId, { signal });
+            projection.value = operatorPayload;
+            operator.value = operatorPayload?.operator ?? null;
+            artist.value = operatorPayload?.artist ?? artist.value;
+            monitoring.value = operatorPayload?.operator?.monitoring ?? monitoring.value;
+            releaseGroups.value = Array.isArray(operatorPayload?.releaseGroups)
+              ? operatorPayload.releaseGroups
+              : [];
+            shouldBrowseDiscography = false;
+          } catch (error) {
+            if (error?.status !== 404) {
+              artistError.value = getErrorMessage(
+                error,
+                'Could not load operator artist policy.',
+              );
+            }
+            projection.value = null;
+            operator.value = null;
           }
-          projection.value = null;
-          operator.value = null;
+        }
+      } else {
+        if (localResult.reason?.status !== 404) {
+          artistError.value = getErrorMessage(
+            localResult.reason,
+            'Could not load artist data.',
+          );
+        }
+        artist.value = null;
+        monitoring.value = null;
+      }
+
+      if (shouldBrowseDiscography) {
+        try {
+          const discographyResult = await browseReleaseGroups({
+            artistId: mbid,
+            limit: releaseGroupLimit,
+            signal,
+          });
+          releaseGroups.value = Array.isArray(discographyResult?.results)
+            ? discographyResult.results
+            : [];
+        } catch (error) {
+          discographyError.value = getErrorMessage(
+            error,
+            'Could not load discography.',
+          );
+          releaseGroups.value = [];
         }
       }
-    } else {
-      if (localResult.reason?.status !== 404) {
-        artistError.value = getErrorMessage(
-          localResult.reason,
-          'Could not load artist data.',
-        );
-      }
-      artist.value = null;
-      monitoring.value = null;
-    }
 
-    if (shouldBrowseDiscography) {
-      try {
-        const discographyResult = await browseReleaseGroups({
-          artistId: mbid,
-          limit: releaseGroupLimit,
-          signal,
-        });
-        releaseGroups.value = Array.isArray(discographyResult?.results)
-          ? discographyResult.results
+      // Related artists.
+      if (similarResult.status === 'fulfilled') {
+        relatedArtists.value = Array.isArray(similarResult.value?.similar)
+          ? similarResult.value.similar.slice(0, similarLimit)
           : [];
-      } catch (error) {
-        discographyError.value = getErrorMessage(
-          error,
-          'Could not load discography.',
+      } else {
+        relatedError.value = getErrorMessage(
+          similarResult.reason,
+          'Could not load related artists.',
         );
-        releaseGroups.value = [];
+        relatedArtists.value = [];
       }
-    }
-
-    // Related artists.
-    if (similarResult.status === 'fulfilled') {
-      relatedArtists.value = Array.isArray(similarResult.value?.similar)
-        ? similarResult.value.similar.slice(0, similarLimit)
-        : [];
-    } else {
+    } catch (error) {
+      artistError.value = getErrorMessage(error, 'Could not load artist detail.');
+      releaseGroups.value = [];
       relatedError.value = getErrorMessage(
-        similarResult.reason,
+        error,
         'Could not load related artists.',
       );
       relatedArtists.value = [];
+    } finally {
+      isLoading.value = false;
     }
-
-    isLoading.value = false;
   }
 
   /**

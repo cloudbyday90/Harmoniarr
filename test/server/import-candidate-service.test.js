@@ -329,6 +329,62 @@ test('createImportCandidateService ingests slskd responses in one transaction an
   assert.equal(result.candidates[0].files[0].filename, '01 Wildlife Analysis.flac');
 });
 
+test('createImportCandidateService waits for asynchronous slskd search responses before ingesting', async (t) => {
+  const { pool } = createPool(t);
+  const getSearchResponses = t.mock.fn(async () => ({
+    searchId: 'search-delayed',
+    responses: [],
+  }));
+  const getSearchState = t.mock.fn(async () => ({
+    id: 'search-delayed',
+    isComplete: false,
+    responseCount: 1,
+    responses: [{
+      username: 'source-user',
+      files: [{
+        filename: 'Lauren Daigle\\How Can It Be\\01 First.flac',
+        size: 321,
+      }],
+    }],
+  }));
+  const upsertImportCandidateFn = t.mock.fn(async (candidate) => ({
+    id: 'candidate-delayed',
+    ...candidate,
+  }));
+  const replaceImportCandidateFilesFn = t.mock.fn(async (importCandidateId, files) => files.map((file) => ({
+    id: `file-${file.sourceFileIndex}`,
+    importCandidateId,
+    ...file,
+  })));
+
+  const service = createImportCandidateService({
+    pool,
+    recordAuditEventFn: t.mock.fn(),
+    replaceImportCandidateFilesFn,
+    sleepFn: t.mock.fn(async () => {}),
+    slskdSearchResponsePollAttempts: 2,
+    slskdSearchResponsePollIntervalMs: 1,
+    slskdService: {
+      getSearchResponses,
+      getSearchState,
+    },
+    upsertImportCandidateFn,
+  });
+
+  const result = await service.ingestSlskdSearchResponses({ searchId: 'search-delayed' });
+
+  assert.equal(getSearchResponses.mock.callCount(), 1);
+  assert.equal(getSearchState.mock.callCount(), 1);
+  assert.deepEqual(getSearchState.mock.calls[0].arguments[0], {
+    searchId: 'search-delayed',
+    includeResponses: true,
+  });
+  assert.equal(result.candidateCount, 1);
+  assert.equal(result.sourceSearchId, 'search-delayed');
+  assert.equal(result.candidates[0].id, 'candidate-delayed');
+  assert.equal(result.candidates[0].files[0].filename, '01 First.flac');
+});
+
 test('createImportCandidateService returns zero-candidate ingestion diagnostics without raw provider details', async (t) => {
   const { pool } = createPool(t);
   const service = createImportCandidateService({

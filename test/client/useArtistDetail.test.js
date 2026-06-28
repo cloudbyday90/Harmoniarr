@@ -271,6 +271,23 @@ test('useArtistDetail loadArtistDetail sets isLoading false after resolution', a
   assert.equal(isLoading.value, false);
 });
 
+test('useArtistDetail loadArtistDetail clears isLoading after unexpected loader errors', async () => {
+  const { artistError, isLoading, loadArtistDetail, releaseGroups, relatedArtists } = useArtistDetail({
+    resolveLocal: () => {
+      throw new Error('unexpected local resolver failure');
+    },
+    browseReleaseGroups: createBrowseDouble({ results: [makeReleaseGroup()] }),
+    fetchSimilar: createSimilarDouble({ similar: [makeSimilar()] }),
+  });
+
+  await loadArtistDetail('mb-1');
+
+  assert.equal(isLoading.value, false);
+  assert.ok(artistError.value);
+  assert.deepEqual(releaseGroups.value, []);
+  assert.deepEqual(relatedArtists.value, []);
+});
+
 test('useArtistDetail loadArtistDetail passes the mbid to resolveLocal', async (t) => {
   const resolveLocal = t.mock.fn(createLocalDouble());
   const { loadArtistDetail } = useArtistDetail({

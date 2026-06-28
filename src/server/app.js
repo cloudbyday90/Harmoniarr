@@ -460,6 +460,7 @@ export function createApp({
     artworkIngestionService: artworkModule.artworkIngestionService,
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getUserPreferencesFn: appUserModule.appUserService.getUserPreferences,
+    importCandidateAutoSelectionService: importCandidateModule.importCandidateAutoSelectionService,
     importCandidateService: importCandidateModule.importCandidateService,
     maintenanceLockOperationPauseService,
     maintenanceLockService,

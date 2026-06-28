@@ -118,6 +118,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   cooldown only when the request is new, newer than the previous search, or a
   prior claim never recorded a search outcome. See
   `REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md`.
+- slskd discovery response ingestion hardening: Import Review candidate
+  ingestion now waits for asynchronous slskd search responses before recording a
+  no-provider-response result, closing the local walkthrough gap where slskd
+  logged responses but Wanted rows cooled down with `0` candidates. Artist
+  Detail loading also clears safely after unexpected loader failures. See
+  `SLSKD_DISCOVERY_RESPONSE_INGESTION_HARDENING_DESIGN.md`.
 - Discovery response ingestion diagnostics: zero-candidate Soulseek searches now
   persist bounded aggregate diagnostics under discovery search evidence and
   Wanted rows explain why responses did not become Import Review candidates
@@ -129,6 +135,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   selected/download handoff state. This explains why successful searches may
   still show no Downloader activity until a candidate is selected in Import
   Review. See `IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md`.
+- Confidence-gated Import Review auto-selection: Library discovery dispatch now
+  attempts automatic selection after successful slskd candidate ingestion when
+  the existing selection-readiness model reports an unambiguous high-confidence
+  candidate. The service reuses the existing Import Review `select` transition,
+  audit/event writes, and JSONB discovery evidence, while leaving automatic
+  download-run start as the next gated component. See
+  `CONFIDENCE_GATED_AUTO_SELECTION_DESIGN.md`.
 - Wanted Import Review selection handoff browser verification: added a
   deterministic browser scenario proving a high-confidence Wanted row opens the
   matching Import Review candidate queue, allows the operator to select the

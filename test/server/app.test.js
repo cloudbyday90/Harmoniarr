@@ -20,7 +20,10 @@ suite('createApp', () => {
   };
   const authModule = { routeDependencies: { auth: 'deps' } };
   const downloaderModule = { routeDependencies: { downloader: 'deps' } };
-  const importCandidateModule = { routeDependencies: { importCandidates: 'deps' } };
+  const importCandidateModule = {
+    importCandidateAutoSelectionService: { selectHighConfidenceCandidate: () => {} },
+    routeDependencies: { importCandidates: 'deps' },
+  };
   const libraryModule = {
     libraryDiscoveryRequestService: {
       reconcileDiscoveryRequests: t.mock.fn(async () => {}),
@@ -273,6 +276,10 @@ suite('createApp', () => {
   assert.equal(libraryModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
   assert.equal(libraryModuleArgs.artworkAssignmentService, artworkModule.artworkAssignmentService);
   assert.equal(libraryModuleArgs.artworkIngestionService, artworkModule.artworkIngestionService);
+  assert.equal(
+    libraryModuleArgs.importCandidateAutoSelectionService,
+    importCandidateModule.importCandidateAutoSelectionService,
+  );
   assert.equal(libraryModuleArgs.importCandidateService, importCandidateModule.importCandidateService);
   assert.equal(libraryModuleArgs.prefetchMonitoredArtistArtwork, artworkModule.artworkMonitoredArtistPrefetchService.prefetchMonitoredArtistArtwork);
   assert.equal(typeof libraryModuleArgs.providerClientResolverService.resolveProviderClients, 'function');

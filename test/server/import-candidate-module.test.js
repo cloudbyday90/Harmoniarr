@@ -60,6 +60,9 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   const importCandidateApplyPreviewService = {
     previewImportCandidateApply: () => {},
   };
+  const importCandidateAutoSelectionService = {
+    selectHighConfidenceCandidate: () => {},
+  };
   const importCandidateImportPendingSummaryService = {
     buildImportPendingCandidateSummary: () => {},
   };
@@ -104,6 +107,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     importCandidateExecutionSummaryService,
     importCandidateExecutionWorker,
     importCandidateApplyPreviewService,
+    importCandidateAutoSelectionService,
     importCandidateImportPendingSummaryService,
     importCandidatePreviewService,
     importCandidateSelectionSummaryService,
@@ -132,6 +136,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   assert.equal(importCandidateModule.importCandidateExecutionSummaryService, importCandidateExecutionSummaryService);
   assert.equal(importCandidateModule.importCandidateExecutionWorker, importCandidateExecutionWorker);
   assert.equal(importCandidateModule.importCandidateApplyPreviewService, importCandidateApplyPreviewService);
+  assert.equal(importCandidateModule.importCandidateAutoSelectionService, importCandidateAutoSelectionService);
   assert.equal(importCandidateModule.importCandidateImportPendingSummaryService, importCandidateImportPendingSummaryService);
   assert.equal(importCandidateModule.importCandidateService, importCandidateService);
   assert.equal(importCandidateModule.importCandidatePreviewService, importCandidatePreviewService);

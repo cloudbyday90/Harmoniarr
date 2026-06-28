@@ -64,6 +64,7 @@ export function createLibraryDiscoveryDispatchService({
   getNow = () => new Date(),
   getReleaseTracklistExpectationsFn = null,
   getUserPreferencesFn = null,
+  importCandidateAutoSelectionService = null,
   importCandidateService = null,
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
   loadSettingsFn = loadSettings,
@@ -126,6 +127,32 @@ export function createLibraryDiscoveryDispatchService({
     void onDiscoveryRequestExhaustedFn(payload).catch(() => {});
   }
 
+  async function selectHighConfidenceCandidateAfterIngestion({
+    actorUserId,
+    requestMetadata,
+    sourceSearchId,
+  }) {
+    if (typeof importCandidateAutoSelectionService?.selectHighConfidenceCandidate !== 'function') {
+      return null;
+    }
+
+    try {
+      return await importCandidateAutoSelectionService.selectHighConfidenceCandidate({
+        actorUserId,
+        requestMetadata,
+        sourceSearchId,
+      });
+    } catch (error) {
+      return {
+        attempted: true,
+        errorCode: error?.code ?? 'auto_selection_failed',
+        selected: false,
+        skippedReason: 'auto_selection_failed',
+        sourceSearchId,
+      };
+    }
+  }
+
   async function dispatchTrackFallbackSearches({
     actorUserId,
     claimedRequest,
@@ -174,10 +201,17 @@ export function createLibraryDiscoveryDispatchService({
           requestMetadata,
           searchId: search.id,
         });
+        const autoSelectionResult = ingestionResult.candidateCount > 0
+          ? await selectHighConfidenceCandidateAfterIngestion({
+            actorUserId,
+            requestMetadata,
+            sourceSearchId: search.id,
+          })
+          : null;
 
         summary.candidateCount += ingestionResult.candidateCount;
         summary.fileCount += ingestionResult.fileCount;
-        summary.dispatchedSearches.push({
+        const dispatchedSearch = {
           candidateCount: ingestionResult.candidateCount,
           fileCount: ingestionResult.fileCount,
           metadataReleaseId: claimedRequest.metadataReleaseId,
@@ -185,7 +219,11 @@ export function createLibraryDiscoveryDispatchService({
           query,
           searchId: search.id,
           trackTitle,
-        });
+        };
+        if (autoSelectionResult) {
+          dispatchedSearch.autoSelection = autoSelectionResult;
+        }
+        summary.dispatchedSearches.push(dispatchedSearch);
       } catch {
         // A single failing per-track search must not abort the remaining tracks
         // or the surrounding album-exhaustion handling.
@@ -321,6 +359,13 @@ export function createLibraryDiscoveryDispatchService({
           requestMetadata,
           searchId: search.id,
         });
+        const autoSelectionResult = ingestionResult.candidateCount > 0
+          ? await selectHighConfidenceCandidateAfterIngestion({
+            actorUserId,
+            requestMetadata,
+            sourceSearchId: search.id,
+          })
+          : null;
         candidateCount += ingestionResult.candidateCount;
         fileCount += ingestionResult.fileCount;
         const zeroCandidateSchedule = ingestionResult.candidateCount === 0
@@ -332,13 +377,17 @@ export function createLibraryDiscoveryDispatchService({
             searchAttemptCount: claimedRequest.searchAttemptCount ?? 0,
           })
           : null;
-        dispatchedSearches.push({
+        const dispatchedSearch = {
           candidateCount: ingestionResult.candidateCount,
           fileCount: ingestionResult.fileCount,
           metadataReleaseId: claimedRequest.metadataReleaseId,
           query: searchQuery,
           searchId: search.id,
-        });
+        };
+        if (autoSelectionResult) {
+          dispatchedSearch.autoSelection = autoSelectionResult;
+        }
+        dispatchedSearches.push(dispatchedSearch);
 
         const successPayload = {
           candidateCount: ingestionResult.candidateCount,
@@ -349,6 +398,9 @@ export function createLibraryDiscoveryDispatchService({
         };
         if (ingestionResult.ingestionDiagnostics) {
           successPayload.ingestionDiagnostics = ingestionResult.ingestionDiagnostics;
+        }
+        if (autoSelectionResult) {
+          successPayload.autoSelection = autoSelectionResult;
         }
         if (zeroCandidateSchedule) {
           successPayload.nextSearchAfter = zeroCandidateSchedule.nextSearchAfter;

@@ -156,6 +156,73 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
   });
 });
 
+test('dispatchReadyDiscoveryRequests auto-selects high-confidence ingested candidates', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {},
+    metadataReleaseId: 'release-1',
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+  }];
+  const autoSelectionResult = {
+    attempted: true,
+    candidateCount: 2,
+    selected: true,
+    selectedCandidateId: 'candidate-1',
+    sourceSearchId: 'search-1',
+  };
+  const selectHighConfidenceCandidate = t.mock.fn(async () => autoSelectionResult);
+  const recordDiscoverySearchSuccess = t.mock.fn(async () => {});
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    importCandidateAutoSelectionService: {
+      selectHighConfidenceCandidate,
+    },
+    importCandidateService: {
+      ingestSlskdSearchResponses: t.mock.fn(async () => ({
+        candidateCount: 2,
+        fileCount: 5,
+      })),
+    },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess,
+    },
+    slskdService: {
+      startSearch: t.mock.fn(async () => ({ id: 'search-1' })),
+    },
+  });
+
+  const result = await service.dispatchReadyDiscoveryRequests({
+    actorUserId: 'operator-1',
+    requestMetadata: {
+      ipAddress: '198.51.100.24',
+      userAgent: 'DispatchAutoSelectionTest/1.0',
+    },
+  });
+
+  assert.deepEqual(selectHighConfidenceCandidate.mock.calls[0].arguments[0], {
+    actorUserId: 'operator-1',
+    requestMetadata: {
+      ipAddress: '198.51.100.24',
+      userAgent: 'DispatchAutoSelectionTest/1.0',
+    },
+    sourceSearchId: 'search-1',
+  });
+  assert.deepEqual(recordDiscoverySearchSuccess.mock.calls[0].arguments[0], {
+    autoSelection: autoSelectionResult,
+    candidateCount: 2,
+    fileCount: 5,
+    metadataReleaseId: 'release-1',
+    searchId: 'search-1',
+    searchQuery: 'Autechre Confield 2001',
+  });
+  assert.equal(result.dispatchedSearches[0].autoSelection.selectedCandidateId, 'candidate-1');
+});
+
 test('dispatchReadyDiscoveryRequests threads release tracklist expectations into ingestion', async (t) => {
   const claimedRequests = [{
     metadataReleaseId: 'release-9',

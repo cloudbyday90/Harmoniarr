@@ -81,6 +81,7 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
     assert.match(sql, /'lastSearchId', \$1::text/);
     assert.match(sql, /'lastSearchQuery', \$2::text/);
     assert.match(sql, /'candidateCount', \$3::integer/);
+    assert.match(sql, /'autoSelection', \$9::jsonb/);
     assert.match(sql, /'fileCount', \$4::integer/);
     assert.match(sql, /'ingestionDiagnostics', \$8::jsonb/);
     assert.deepEqual(params, [
@@ -96,6 +97,11 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
         reasonCodes: ['no_provider_responses'],
         responseCount: 0,
       }),
+      JSON.stringify({
+        attempted: true,
+        selected: false,
+        skippedReason: 'no_candidates',
+      }),
     ]);
     return { rows: [] };
   });
@@ -104,6 +110,11 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
   });
 
   await store.recordDiscoverySearchSuccess({
+    autoSelection: {
+      attempted: true,
+      selected: false,
+      skippedReason: 'no_candidates',
+    },
     candidateCount: 0,
     fileCount: 0,
     ingestionDiagnostics: {
