@@ -86,8 +86,10 @@ Cons:
 
 ## Follow-Up
 
-The next high-value item is **Import Review selected-run progress refresh
-visibility**: after `Start download run`, prove and improve how the Import
-Review execution panel refreshes from pending run state into accepted, blocked,
-failed, or completed transfer evidence without making the operator leave the
-page.
+Import Review selected-run progress refresh visibility is complete; see
+[IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md](IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md).
+
+The next high-value item is **Import Review blocked/failed execution retry
+guidance**: make blocked and queue-failed execution items provide an explicit
+retry/reselect path from the diagnostic panel, with browser verification for the
+failure-state recovery loop.

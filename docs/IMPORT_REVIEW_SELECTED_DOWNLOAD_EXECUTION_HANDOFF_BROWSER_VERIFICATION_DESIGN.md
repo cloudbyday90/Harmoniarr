@@ -16,6 +16,9 @@ into the Import Review download execution runway:
    `execution-start` fixture action.
 7. Activity > Wanted shows a selected-candidate `Start the download run`
    guidance block before Downloader activity is expected.
+8. The Import Review execution panel shows `Waiting for execution worker`, so
+   the operator knows to refresh worker pickup or sync transfer state before
+   expecting Downloader progress.
 
 This proves the next visible step after selection: Downloader can remain empty
 until the operator starts the download execution run, and Import Review now shows
@@ -84,6 +87,8 @@ the Wanted-origin flow; see
 Selected-candidate readiness guidance is complete; see
 [IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md](IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md).
 
-The next high-value follow-up is Import Review selected-run progress refresh
-visibility, so operators can stay on the execution panel and see accepted,
-blocked, failed, or completed transfer evidence without manual navigation.
+Import Review selected-run progress refresh visibility is complete; see
+[IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md](IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md).
+
+The next high-value follow-up is Import Review blocked/failed execution retry
+guidance.

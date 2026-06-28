@@ -17,8 +17,10 @@
 -->
 
 <script setup>
+import { computed } from 'vue';
 import {
   canStartExecutionRun,
+  buildImportExecutionRefreshNotice,
   formatLiveTransferStatus,
   formatPath,
   formatPercent,
@@ -43,7 +45,7 @@ import {
 import { buildDownloaderTransferLocation } from '../lib/downloader-transfer-route.js';
 import ImportCandidateRunFailureNotice from './ImportCandidateRunFailureNotice.vue';
 
-defineProps({
+const props = defineProps({
   actionErrorMessage: {
     type: String,
     default: '',
@@ -91,6 +93,13 @@ defineProps({
 });
 
 defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
+
+const refreshNotice = computed(() => buildImportExecutionRefreshNotice({
+  currentRun: props.currentRun,
+  isLoading: props.isLoading,
+  isReconciling: props.isReconciling,
+  summary: props.summary,
+}));
 
 function downloaderTransferLocation(transfer) {
   return buildDownloaderTransferLocation(transfer);
@@ -258,6 +267,22 @@ function getDownloadAcceptanceDiagnostic(item) {
       </div>
 
       <ImportCandidateRunFailureNotice :message="currentRun.errorMessage" />
+
+      <div
+        v-if="refreshNotice"
+        class="execution-refresh-notice"
+        :data-tone="refreshNotice.tone"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="hx-pill" :data-tone="refreshNotice.tone">
+          Progress
+        </span>
+        <div>
+          <strong>{{ refreshNotice.title }}</strong>
+          <p>{{ refreshNotice.message }}</p>
+        </div>
+      </div>
 
       <div class="execution-degraded-notice" v-if="isTransferSnapshotDegraded(currentRun)" role="status">
         <span class="status-chip" data-status="degraded">Degraded</span>
@@ -576,6 +601,44 @@ function getDownloadAcceptanceDiagnostic(item) {
   margin: 0;
   font-size: var(--hx-text-sm);
   color: var(--hx-text);
+}
+
+.execution-refresh-notice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--hx-space-3);
+  align-items: start;
+  padding: var(--hx-space-3) var(--hx-space-4);
+  background: var(--hx-bg-surface-sunken);
+  border: 1px solid var(--hx-border-muted);
+  border-radius: var(--hx-radius-md);
+}
+
+.execution-refresh-notice[data-tone='success'] {
+  background: var(--hx-success-soft);
+  border-color: rgba(18, 134, 88, 0.32);
+}
+
+.execution-refresh-notice[data-tone='warning'] {
+  background: var(--hx-warning-soft);
+  border-color: rgba(192, 138, 22, 0.32);
+}
+
+.execution-refresh-notice[data-tone='danger'] {
+  background: var(--hx-danger-soft);
+  border-color: rgba(218, 68, 83, 0.32);
+}
+
+.execution-refresh-notice strong {
+  display: block;
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+}
+
+.execution-refresh-notice p {
+  margin: var(--hx-space-1) 0 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
 }
 
 .execution-diagnostic-panel {

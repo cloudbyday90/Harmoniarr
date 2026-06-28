@@ -146,6 +146,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   makes the explicit Import Review `Start download run` boundary visible before
   Downloader activity is expected. See
   `IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md`.
+- Import Review selected-run progress refresh visibility: the execution panel
+  now renders a bounded progress notice for pending worker pickup, refreshing,
+  transfer sync, current Downloader progress, diagnostic failure, and completed
+  states so operators can stay in Import Review while transfer evidence changes.
+  See `IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md`.
 - Wanted-started download transfer handoff browser verification: extended the
   same operator journey through execution transfer sync and direct Downloader
   detail drill-through for the accepted transfer. See

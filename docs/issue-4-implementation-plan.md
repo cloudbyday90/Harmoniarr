@@ -146,6 +146,10 @@ Confirmed complete:
   Wanted-row next steps for candidate selection, selected-but-not-run state,
   queued transfers, blocked handoffs, and failed diagnostics. See
   [IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md](IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md).
+- Import Review selected-run progress refresh visibility, including execution
+  panel notices for pending worker pickup, manual transfer sync, current
+  Downloader progress, completed runs, and diagnostic failure states. See
+  [IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md](IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md).
 - Wanted-started download transfer handoff browser verification, including the
   continuation from selected candidate to synced live Downloader transfer detail.
   See

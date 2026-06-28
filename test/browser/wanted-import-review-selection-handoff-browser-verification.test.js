@@ -207,6 +207,11 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
         { exact: true },
       ).waitFor();
       await executionPanel.locator('.review-detail-header').getByText('Pending', { exact: true }).waitFor();
+      await executionPanel.getByText('Waiting for execution worker', { exact: true }).waitFor();
+      await executionPanel.getByText(
+        'The download run is queued. Use Refresh to check whether the worker has started, then sync transfer state once Downloader acceptance is recorded.',
+        { exact: true },
+      ).waitFor();
       assert.equal(await startDownloadRun.isDisabled(), true);
 
       const fixtureState = await readMetadataBrowserFixtureState(page);
@@ -263,6 +268,11 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
       );
       await executionPanel.getByText('Run execution-run-1', { exact: true }).waitFor();
       await executionPanel.locator('.review-detail-header').getByText('Running', { exact: true }).waitFor();
+      await executionPanel.getByText('Transfer progress current', { exact: true }).waitFor();
+      await executionPanel.getByText(
+        'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Import Review.',
+        { exact: true },
+      ).waitFor();
       await executionPanel.getByText('Queued in Downloader and actively progressing.', { exact: true }).waitFor();
       await executionPanel.getByText('Provider accepted transfer', { exact: true }).waitFor();
       await executionPanel.getByText(

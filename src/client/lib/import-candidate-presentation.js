@@ -676,6 +676,104 @@ export function buildLiveTransferSyncNotice(item) {
   };
 }
 
+function hasExecutionItems(currentRun) {
+  return Array.isArray(currentRun?.items) && currentRun.items.length > 0;
+}
+
+function getExecutionAcceptedTransferCount(currentRun) {
+  return coerceCount(currentRun?.queuedCount)
+    + coerceCount(currentRun?.queuedWithWarningsCount)
+    + coerceCount(currentRun?.readyCount)
+    + coerceCount(currentRun?.readyWithWarningsCount);
+}
+
+function getExecutionFailureCount(currentRun) {
+  return coerceCount(currentRun?.queueFailedCount) + coerceCount(currentRun?.blockedCount);
+}
+
+/**
+ * Build a compact operator-facing notice for the Import Review execution panel
+ * explaining whether the selected run needs refresh/sync action or already has
+ * current transfer evidence.
+ *
+ * @param {object} options
+ * @param {object|null|undefined} options.currentRun
+ * @param {boolean} options.isLoading
+ * @param {boolean} options.isReconciling
+ * @param {object|null|undefined} options.summary
+ * @returns {{tone: string, title: string, message: string}|null}
+ */
+export function buildImportExecutionRefreshNotice({
+  currentRun = null,
+  isLoading = false,
+  isReconciling = false,
+  summary = null,
+} = {}) {
+  if (!currentRun) {
+    return null;
+  }
+
+  if (isReconciling) {
+    return {
+      message: 'Checking Downloader for the latest accepted, active, completed, failed, or missing transfer evidence.',
+      title: 'Syncing transfer state',
+      tone: 'info',
+    };
+  }
+
+  if (isLoading) {
+    return {
+      message: 'Refreshing the selected run detail from the server while preserving the current panel.',
+      title: 'Refreshing run detail',
+      tone: 'info',
+    };
+  }
+
+  if (currentRun.status === 'pending') {
+    return {
+      message: 'The download run is queued. Use Refresh to check whether the worker has started, then sync transfer state once Downloader acceptance is recorded.',
+      title: 'Waiting for execution worker',
+      tone: 'info',
+    };
+  }
+
+  const acceptedTransferCount = getExecutionAcceptedTransferCount(currentRun);
+  if (currentRun.status === 'running' && acceptedTransferCount > 0) {
+    return {
+      message: 'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Import Review.',
+      title: 'Transfer progress current',
+      tone: 'success',
+    };
+  }
+
+  const failureCount = getExecutionFailureCount(currentRun);
+  if ((currentRun.status === 'failed' || failureCount > 0) && hasExecutionItems(currentRun)) {
+    return {
+      message: 'Review the item diagnostics below before retrying or choosing another candidate.',
+      title: 'Review execution diagnostics',
+      tone: 'danger',
+    };
+  }
+
+  if (currentRun.status === 'running') {
+    return {
+      message: 'This run is active but no transfer observations are recorded yet. Use Sync transfer state or wait for the heartbeat to refresh provider progress.',
+      title: 'Sync transfer state',
+      tone: 'warning',
+    };
+  }
+
+  if (currentRun.status === 'completed') {
+    return {
+      message: summary?.message ?? 'The selected download run has completed. Continue with import apply when completed downloads are available.',
+      title: 'Download run complete',
+      tone: 'success',
+    };
+  }
+
+  return null;
+}
+
 /**
  * Return a human-readable label for the last outcome of an import execution
  * heartbeat.

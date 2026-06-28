@@ -145,6 +145,11 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   Review download run before expecting Downloader activity, while queued or
   blocked states point to Downloader or diagnostics respectively; see
   [IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md](IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md)
+- Import Review now shows selected-run progress refresh guidance for queued
+  worker pickup, manual transfer sync, current Downloader progress, diagnostic
+  failures, and completed runs, keeping the operator in the execution panel
+  while evidence refreshes; see
+  [IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md](IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md)
 - the Wanted-origin flow now continues through execution transfer sync into a
   live Downloader transfer detail route, proving the accepted transfer is visible
   after reconciliation; see

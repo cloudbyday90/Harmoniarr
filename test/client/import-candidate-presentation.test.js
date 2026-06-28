@@ -24,6 +24,7 @@ import {
   candidateStatusTone,
   buildImportApplyLibraryHandoffNotice,
   buildImportApplyReadinessNotice,
+  buildImportExecutionRefreshNotice,
   buildLiveTransferSyncNotice,
   canStartApplyRun,
   canStartExecutionRun,
@@ -1170,6 +1171,89 @@ describe('buildLiveTransferSyncNotice', () => {
         },
       })?.title,
       'Transfer completed in Downloader',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildImportExecutionRefreshNotice
+// ---------------------------------------------------------------------------
+
+describe('buildImportExecutionRefreshNotice', () => {
+  it('returns null without a selected execution run', () => {
+    assert.equal(buildImportExecutionRefreshNotice({ currentRun: null }), null);
+  });
+
+  it('reports reconciliation in progress before run status messages', () => {
+    assert.deepEqual(
+      buildImportExecutionRefreshNotice({
+        currentRun: { status: 'running' },
+        isReconciling: true,
+      }),
+      {
+        message: 'Checking Downloader for the latest accepted, active, completed, failed, or missing transfer evidence.',
+        title: 'Syncing transfer state',
+        tone: 'info',
+      },
+    );
+  });
+
+  it('explains pending execution runs as waiting for the worker', () => {
+    assert.deepEqual(
+      buildImportExecutionRefreshNotice({
+        currentRun: { status: 'pending' },
+      }),
+      {
+        message: 'The download run is queued. Use Refresh to check whether the worker has started, then sync transfer state once Downloader acceptance is recorded.',
+        title: 'Waiting for execution worker',
+        tone: 'info',
+      },
+    );
+  });
+
+  it('reports accepted transfer evidence as current progress', () => {
+    assert.deepEqual(
+      buildImportExecutionRefreshNotice({
+        currentRun: {
+          queuedCount: 1,
+          status: 'running',
+        },
+      }),
+      {
+        message: 'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Import Review.',
+        title: 'Transfer progress current',
+        tone: 'success',
+      },
+    );
+  });
+
+  it('prompts manual sync for running runs without transfer observations', () => {
+    assert.deepEqual(
+      buildImportExecutionRefreshNotice({
+        currentRun: { status: 'running' },
+      }),
+      {
+        message: 'This run is active but no transfer observations are recorded yet. Use Sync transfer state or wait for the heartbeat to refresh provider progress.',
+        title: 'Sync transfer state',
+        tone: 'warning',
+      },
+    );
+  });
+
+  it('points failed runs with items to diagnostics', () => {
+    assert.deepEqual(
+      buildImportExecutionRefreshNotice({
+        currentRun: {
+          items: [{ id: 'item-1' }],
+          queueFailedCount: 1,
+          status: 'failed',
+        },
+      }),
+      {
+        message: 'Review the item diagnostics below before retrying or choosing another candidate.',
+        title: 'Review execution diagnostics',
+        tone: 'danger',
+      },
     );
   });
 });

@@ -14,7 +14,10 @@ Added browser verification for the full Wanted-origin download handoff:
    transfer.
 6. The execution runway shows an active transfer and exposes `Open in
    Downloader`.
-7. Downloader opens directly to the linked transfer detail drawer with Import
+7. The execution runway shows `Transfer progress current`, confirming the
+   selected-run progress notice has moved from pending worker pickup to current
+   Downloader evidence.
+8. Downloader opens directly to the linked transfer detail drawer with Import
    Review linkage evidence.
 
 This closes the browser-level gap between candidate selection and live Downloader
@@ -89,6 +92,9 @@ Provider-backed download acceptance diagnostics are now implemented; see
 Docker walkthrough provider acceptance evidence is also implemented; see
 [DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md](DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md).
 
-The next follow-up is Import execution selected-candidate readiness guidance:
-when a wanted request produces candidates but no download run is ready, show the
-operator the exact missing step from Wanted, Import Review, and Downloader.
+Import execution selected-candidate readiness guidance is complete; see
+[IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md](IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md).
+Import Review selected-run progress refresh visibility is complete; see
+[IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md](IMPORT_REVIEW_SELECTED_RUN_PROGRESS_REFRESH_VISIBILITY_DESIGN.md).
+
+The next follow-up is Import Review blocked/failed execution retry guidance.
