@@ -255,8 +255,9 @@ function buildDisplayRunSummary(run) {
   }
 
   if ((run.blockedCount ?? 0) > 0) {
+    const verb = run.blockedCount === 1 ? 'needs' : 'need';
     return {
-      message: `${run.blockedCount} planned import candidate${run.blockedCount === 1 ? '' : 's'} are blocked and need operator attention.`,
+      message: `${run.blockedCount} planned import candidate${run.blockedCount === 1 ? ' is' : 's are'} blocked and ${verb} operator attention.`,
       status: 'blocked',
     };
   }

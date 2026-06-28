@@ -77,8 +77,9 @@ function buildSummary(counts) {
   }
 
   if (counts.blocked > 0) {
+    const verb = counts.blocked === 1 ? 'needs' : 'need';
     return {
-      message: `${counts.blocked} selected candidate${counts.blocked === 1 ? '' : 's'} are blocked and need operator attention before download enqueue can proceed.`,
+      message: `${counts.blocked} selected candidate${counts.blocked === 1 ? ' is' : 's are'} blocked and ${verb} operator attention before download enqueue can proceed.`,
       status: 'blocked',
     };
   }

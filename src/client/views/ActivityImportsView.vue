@@ -22,11 +22,17 @@ import {
   candidateStatusLabel,
   candidateStatusTone,
   formatCandidateCountLabel,
+  formatPath,
   formatSourceProvider,
+  formatTimestamp,
+  formatTokenLabel,
 } from '../lib/import-candidate-presentation.js';
 import { formatOperationTimestamp } from '../lib/operation-run-presentation.js';
 import { formatBytes } from '../lib/search-presentation.js';
-import { fetchImportCandidates } from '../lib/import-candidate-api.js';
+import {
+  fetchImportCandidates,
+  fetchImportPendingCandidateSummary,
+} from '../lib/import-candidate-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const props = defineProps({
@@ -37,19 +43,100 @@ const props = defineProps({
   emptyCopy: { type: String, default: 'Imports awaiting ingestion will appear here once downloads complete.' },
 });
 
+const isImportPendingRoute = computed(() => props.status === 'import_pending');
+
+function createEmptyImportPendingPayload() {
+  return {
+    counts: {
+      blocked: 0,
+      ready: 0,
+      readyWithWarnings: 0,
+      totalImportPending: 0,
+    },
+    candidates: [],
+    mode: 'import_pending',
+    summary: {
+      message: props.emptyCopy,
+      status: 'empty',
+    },
+  };
+}
+
+function projectImportPendingPayload(payload) {
+  const summaryPayload = payload?.importPendingCandidates;
+
+  return {
+    counts: summaryPayload?.counts ?? createEmptyImportPendingPayload().counts,
+    candidates: Array.isArray(summaryPayload?.importPendingCandidates)
+      ? summaryPayload.importPendingCandidates
+      : [],
+    mode: 'import_pending',
+    summary: summaryPayload?.summary ?? createEmptyImportPendingPayload().summary,
+  };
+}
+
+function projectCandidatePayload(payload) {
+  return {
+    candidates: Array.isArray(payload?.importCandidates) ? payload.importCandidates : [],
+    counts: null,
+    mode: 'candidate_list',
+    summary: null,
+  };
+}
+
 const {
-  data: candidates,
+  data: importsPayload,
   errorMessage,
   isLoading,
   load,
 } = useAsyncResource({
-  fetcher: () => fetchImportCandidates({ status: props.status, limit: 100 }),
-  project: (payload) => (Array.isArray(payload?.importCandidates) ? payload.importCandidates : []),
-  initialData: [],
+  fetcher: () => (isImportPendingRoute.value
+    ? fetchImportPendingCandidateSummary({ limit: 100 })
+    : fetchImportCandidates({ status: props.status, limit: 100 })),
+  project: (payload) => (isImportPendingRoute.value
+    ? projectImportPendingPayload(payload)
+    : projectCandidatePayload(payload)),
+  initialData: createEmptyImportPendingPayload(),
   fallbackErrorMessage: 'Failed to load import candidates',
 });
 
+const candidates = computed(() => importsPayload.value?.candidates ?? []);
 const candidateCount = computed(() => candidates.value?.length ?? 0);
+const importPendingCounts = computed(() => importsPayload.value?.counts ?? createEmptyImportPendingPayload().counts);
+const importPendingSummary = computed(() => importsPayload.value?.summary ?? null);
+
+function importStatusTone(code) {
+  switch (code) {
+    case 'blocked':
+      return 'danger';
+    case 'ready_with_warnings':
+      return 'warning';
+    default:
+      return 'info';
+  }
+}
+
+function importStatusLabel(code) {
+  switch (code) {
+    case 'blocked':
+      return 'Blocked';
+    case 'ready_with_warnings':
+      return 'Ready with warnings';
+    default:
+      return 'Ready';
+  }
+}
+
+function buildImportReviewLocation(candidate) {
+  return {
+    hash: '#import-review-selection-stage',
+    name: 'activity-candidates',
+    query: {
+      candidate: candidate.id,
+      status: 'import_pending',
+    },
+  };
+}
 </script>
 
 <template>
@@ -65,6 +152,43 @@ const candidateCount = computed(() => candidates.value?.length ?? 0);
         </button>
       </div>
     </header>
+
+    <article v-if="isImportPendingRoute && importPendingSummary" class="hx-card">
+      <div class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Import readiness</h3>
+          <p class="hx-card-subtitle">{{ importPendingSummary.message }}</p>
+        </div>
+        <div class="hx-card-actions">
+          <RouterLink class="hx-btn" :to="{ name: 'settings-media-storage' }">
+            Check path mappings
+          </RouterLink>
+          <RouterLink class="hx-btn" data-variant="primary" :to="{ name: 'activity-candidates', query: { status: 'import_pending' } }">
+            Open Import Review
+          </RouterLink>
+        </div>
+      </div>
+      <div class="hx-card-body">
+        <div class="hx-stat-grid">
+          <div class="hx-stat">
+            <span class="hx-stat-label">Import pending</span>
+            <span class="hx-stat-value">{{ importPendingCounts.totalImportPending }}</span>
+          </div>
+          <div class="hx-stat">
+            <span class="hx-stat-label">Ready</span>
+            <span class="hx-stat-value">{{ importPendingCounts.ready }}</span>
+          </div>
+          <div class="hx-stat">
+            <span class="hx-stat-label">Warnings</span>
+            <span class="hx-stat-value">{{ importPendingCounts.readyWithWarnings }}</span>
+          </div>
+          <div class="hx-stat">
+            <span class="hx-stat-label">Blocked</span>
+            <span class="hx-stat-value">{{ importPendingCounts.blocked }}</span>
+          </div>
+        </div>
+      </div>
+    </article>
 
     <article v-if="errorMessage" class="hx-card">
       <div class="hx-card-body">
@@ -85,6 +209,49 @@ const candidateCount = computed(() => candidates.value?.length ?? 0);
         <div v-else-if="!candidateCount" class="hx-empty">
           <p class="hx-empty-title">{{ emptyTitle }}</p>
           <p class="hx-empty-copy">{{ emptyCopy }}</p>
+        </div>
+        <div v-else-if="isImportPendingRoute" class="hx-table-scroll">
+          <table class="hx-table">
+            <thead>
+              <tr>
+                <th>Folder</th>
+                <th>User</th>
+                <th>Status</th>
+                <th>Source path</th>
+                <th>Library target</th>
+                <th>Updated</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="candidate in candidates" :key="candidate.id">
+                <td>
+                  <strong>{{ candidate.folderPath || 'Root-level files' }}</strong>
+                  <p class="hx-text-muted">{{ candidate.fileCount }} file{{ candidate.fileCount === 1 ? '' : 's' }} from {{ formatSourceProvider(candidate.sourceProvider) }}</p>
+                </td>
+                <td>{{ candidate.username ?? '—' }}</td>
+                <td>
+                  <span class="hx-pill" :data-tone="importStatusTone(candidate.importStatus?.code)">
+                    {{ importStatusLabel(candidate.importStatus?.code) }}
+                  </span>
+                  <p class="hx-text-muted">{{ candidate.importStatus?.message }}</p>
+                  <p class="hx-text-muted" v-if="candidate.planning?.primaryBlocker">Blocker: {{ candidate.planning.primaryBlocker }}</p>
+                  <p class="hx-text-muted" v-else-if="candidate.planning?.primaryWarning">Warning: {{ candidate.planning.primaryWarning }}</p>
+                </td>
+                <td>
+                  <span>{{ formatPath(candidate.planning?.sourceFolderPath) }}</span>
+                  <p class="hx-text-muted">{{ formatTokenLabel(candidate.planning?.resolutionStrategy) }}</p>
+                </td>
+                <td>{{ formatPath(candidate.planning?.libraryFolderPath) }}</td>
+                <td>{{ formatTimestamp(candidate.importPendingAt) }}</td>
+                <td>
+                  <RouterLink class="hx-btn" :to="buildImportReviewLocation(candidate)">
+                    Review import
+                  </RouterLink>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <div v-else class="hx-table-scroll">
           <table class="hx-table">

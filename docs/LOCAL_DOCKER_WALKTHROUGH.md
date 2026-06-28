@@ -105,6 +105,35 @@ If Downloader stays empty, this diagnostic is the first place to check before
 reading container logs. It intentionally shows bounded counts and operator
 actions, not API keys, raw provider payloads, or stack traces.
 
+## Verifying Import Readiness
+
+Provider acceptance is not the same as import readiness. slskd can accept and
+complete transfers while Harmoniarr still cannot import them if the completed
+download folder is not mounted into the Harmoniarr container or if the path
+mapping is missing.
+
+After a download run records accepted or completed transfers:
+
+1. Open `Activity > Imports`.
+2. Check the `Import readiness` summary.
+3. If candidates are blocked, use `Review import` to open the candidate in
+   Import Review.
+4. If the source path is missing, open `Settings > Media & storage` and add a
+   download mapping from the slskd completed-download path to the Harmoniarr
+   container path.
+
+For example, if slskd reports completed files under
+`/downloads/complete/Music`, and the same host folder is mounted into
+Harmoniarr at `/data/downloads/complete`, configure:
+
+```text
+Provider path: /downloads/complete/Music
+Harmoniarr path: /data/downloads/complete
+```
+
+The Activity Imports page should then move from blocked import readiness to a
+ready or warning state after refresh.
+
 To capture replayable local evidence from a configured walkthrough:
 
 ```powershell

@@ -91,6 +91,10 @@ test('buildSelectedImportCandidateSummary resolves planning readiness over persi
   assert.equal(summary.counts.ready, 1);
   assert.equal(summary.counts.blocked, 1);
   assert.equal(summary.summary.status, 'blocked');
+  assert.equal(
+    summary.summary.message,
+    '1 selected candidate is blocked and needs operator attention before download enqueue can proceed.',
+  );
   assert.equal(summary.selectedCandidates[0].executionStatus.code, 'ready');
   assert.equal(summary.selectedCandidates[1].executionStatus.code, 'blocked');
   assert.deepEqual(summary.selectedCandidates[0].requestOwnership, {

@@ -70,6 +70,7 @@ test('buildImportCandidateExecutionSummary returns the current run with persiste
   assert.equal(summary.recentRuns.length, 1);
   assert.equal(summary.recentRuns[0].id, 'run-1');
   assert.equal(summary.summary.status, 'blocked');
+  assert.equal(summary.summary.message, '1 planned import candidate is blocked and needs operator attention.');
 });
 
 test('buildImportCandidateExecutionSummary reports no run when none exist', async () => {

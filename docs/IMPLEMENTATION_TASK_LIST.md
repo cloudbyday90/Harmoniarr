@@ -14,6 +14,16 @@ Database model source: `docs/DATABASE_MODEL.md`
   bounded one-shot self-healing path for failed operator artist reconciliation
   runs, and exposed a CSRF-backed Artist Detail `Retry reconciliation` action.
   See `ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md`.
+- Request pipeline import-readiness surfacing: live walkthrough diagnosis
+  showed wanted generation, discovery, candidate ingestion, provider enqueue,
+  and transfer completion evidence were present, but completed files were not
+  visible to Harmoniarr because download path mappings were empty. Activity >
+  Imports now uses the import-pending summary, shows blocked/ready/warning
+  counts, links path blockers to Media & storage, and deep-links candidates into
+  Import Review for repair and apply. Browser coverage proves the blocked
+  import-readiness handoff, and shared blocked-candidate runway copy now uses
+  correct singular/plural wording. See
+  `REQUEST_PIPELINE_IMPORT_READINESS_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

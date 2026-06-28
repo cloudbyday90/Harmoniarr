@@ -2713,6 +2713,7 @@ Use this section for incremental updates during implementation.
 - 2026-06-28: Docker provider acceptance evidence implemented. `DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md` records the official Docker, Playwright, and OWASP source review plus the selected walkthrough evidence stack. `npm run validate:docker-provider-acceptance` now verifies configured provider state, download path mapping evidence, durable Import Review download acceptance diagnostics, and the browser-visible diagnostic panel without serializing slskd API keys.
 - 2026-06-28: Confidence-gated download execution start implemented. `CONFIDENCE_GATED_DOWNLOAD_EXECUTION_START_DESIGN.md` records the official slskd, OWASP, Playwright, and Vue source review plus the selected operation-run reuse stack. High-confidence auto-selection now starts the existing Import Review download-enqueue run when Library automation is enabled and slskd is healthy.
 - 2026-06-28: Activity Imports and artist reconciliation recovery implemented. `ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md` records the official Playwright, Vue, and OWASP source review plus the selected bounded-recovery stack. Activity Imports now renders through imported shared formatters, failed operator artist reconciliation can queue one `failure_recovery` run from the latest snapshot, and Artist Detail exposes a protected manual retry action.
+- 2026-06-28: Request pipeline import-readiness surfacing implemented. `REQUEST_PIPELINE_IMPORT_READINESS_DESIGN.md` records the live walkthrough finding that provider acceptance can succeed while import apply remains blocked by missing container-visible download paths. Activity Imports now uses the import-pending summary, shows readiness counts and path blockers, links to Media & storage, and deep-links candidates into Import Review.
 
 ## Checklist
 
@@ -2746,4 +2747,5 @@ Use this section for incremental updates during implementation.
 - [x] Docker provider acceptance evidence implemented
 - [x] Confidence-gated download execution start implemented
 - [x] Activity Imports and artist reconciliation recovery implemented
+- [x] Request pipeline import-readiness surfacing implemented
 - [ ] Create linked GitHub follow-up issues for the remaining non-blocking enhancements

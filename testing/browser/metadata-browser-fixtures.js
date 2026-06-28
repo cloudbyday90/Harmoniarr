@@ -1973,13 +1973,25 @@ export async function installMetadataBrowserFixtures(browserContext) {
     function buildImportPendingCandidateSummary() {
       const candidates = getImportReviewWorkspaceState().candidates
         .filter((candidate) => candidate.status === 'import_pending');
+      const counts = candidates.reduce((summary, candidate) => {
+        const code = candidate.importStatus?.code;
+        summary.totalImportPending += 1;
+        if (code === 'blocked') {
+          summary.blocked += 1;
+        } else if (code === 'ready_with_warnings') {
+          summary.readyWithWarnings += 1;
+        } else {
+          summary.ready += 1;
+        }
+        return summary;
+      }, {
+        blocked: 0,
+        ready: 0,
+        readyWithWarnings: 0,
+        totalImportPending: 0,
+      });
       return {
-        counts: {
-          blocked: 0,
-          ready: candidates.length,
-          readyWithWarnings: 0,
-          totalImportPending: candidates.length,
-        },
+        counts,
         importPendingCandidates: candidates.map((candidate) => clone({
           ...candidate,
           importPendingAt: candidate.importPendingAt ?? candidate.updatedAt ?? candidate.discoveredAt ?? null,
@@ -1990,9 +2002,11 @@ export async function installMetadataBrowserFixtures(browserContext) {
           planning: candidate.planning ?? {},
         })),
         summary: {
-          message: candidates.length
-            ? `${candidates.length} candidate${candidates.length === 1 ? '' : 's'} waiting for import.`
-            : 'No downloads ready to import.',
+          message: counts.blocked > 0
+            ? `${counts.blocked} completed download candidate${counts.blocked === 1 ? ' is' : 's are'} blocked and ${counts.blocked === 1 ? 'needs' : 'need'} operator attention before import apply can proceed.`
+            : candidates.length
+              ? `${candidates.length} candidate${candidates.length === 1 ? '' : 's'} waiting for import.`
+              : 'No downloads ready to import.',
         },
       };
     }

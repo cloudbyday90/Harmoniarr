@@ -144,3 +144,66 @@ test('buildImportPendingCandidateSummary returns an empty summary when nothing i
   assert.equal(summary.summary.status, 'empty');
   assert.deepEqual(summary.importPendingCandidates, []);
 });
+
+test('buildImportPendingCandidateSummary uses singular blocked copy for one blocked completed download', async () => {
+  const service = createImportCandidateImportPendingSummaryService({
+    listImportCandidates: async () => ({
+      candidates: [{
+        fileCount: 1,
+        folderPath: 'Missing Folder',
+        id: 'candidate-blocked',
+        lockedFileCount: 0,
+        sourceProvider: 'slskd',
+        sourceSearchId: 'search-blocked',
+        totalSizeBytes: 1024,
+        updatedAt: '2026-04-30T20:00:00.000Z',
+        username: 'blocked-user',
+      }],
+      pagination: {
+        limit: 25,
+        offset: 0,
+        total: 1,
+      },
+    }),
+    previewImportCandidateApply: async () => ({
+      counts: {
+        collisionCount: 0,
+        missingSourceCount: 1,
+        readyCount: 0,
+        stagingPresentCount: 0,
+        totalFiles: 1,
+      },
+      files: [],
+      preview: {
+        library: {
+          previewFolderPath: '/data/music/Missing Folder',
+        },
+        source: {
+          resolutionStrategy: 'downloads_root_relative',
+          resolvedFolderPath: '/data/downloads/Missing Folder',
+        },
+        staging: {
+          previewFolderPath: '/data/staging/import-candidates/candidate-blocked/Missing Folder',
+        },
+        validation: {
+          blockers: [],
+          canPreview: true,
+          warnings: [],
+        },
+      },
+      summary: {
+        message: '1 file is missing from the resolved source path and block import apply.',
+        status: 'blocked',
+      },
+    }),
+  });
+
+  const summary = await service.buildImportPendingCandidateSummary();
+
+  assert.equal(summary.counts.blocked, 1);
+  assert.equal(summary.summary.status, 'blocked');
+  assert.equal(
+    summary.summary.message,
+    '1 completed download candidate is blocked and needs operator attention before import apply can proceed.',
+  );
+});
