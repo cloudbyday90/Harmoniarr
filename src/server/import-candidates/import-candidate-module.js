@@ -42,6 +42,7 @@ import { createImportCandidateRecoveryService } from './import-candidate-recover
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
 import { createImportCandidateExecutionWorker } from './import-candidate-execution-worker.js';
+import { createImportCandidateAutoDownloadRunService } from './import-candidate-auto-download-run-service.js';
 import { createImportCandidateAutoSelectionService } from './import-candidate-auto-selection-service.js';
 import { createImportCandidateImportPendingSummaryService } from './import-candidate-import-pending-summary-service.js';
 import { listImportCandidateFileDecisions } from './import-candidate-file-decision-repository.js';
@@ -305,6 +306,10 @@ export function createImportCandidateModule({
     listImportCandidates: importCandidateService.listImportCandidates,
     selectImportCandidate: importCandidateService.selectImportCandidate,
   }),
+  importCandidateAutoDownloadRunService = createImportCandidateAutoDownloadRunService({
+    getProviderStatus: slskdService.getConnectionStatus,
+    startImportCandidateExecutionRun: importCandidateExecutionService.startImportCandidateExecutionRun,
+  }),
   importCandidateMediaInspectionSummaryService = createImportCandidateMediaInspectionSummaryService({
     importCandidateMediaInspectionRunStore,
   }),
@@ -354,6 +359,7 @@ export function createImportCandidateModule({
     importCandidateExecutionSummaryService,
     importCandidateExecutionWorker,
     importCandidateRecoveryService,
+    importCandidateAutoDownloadRunService,
     importCandidateAutoSelectionService,
     importCandidateImportPendingSummaryService,
     importCandidateApplyPreviewService,

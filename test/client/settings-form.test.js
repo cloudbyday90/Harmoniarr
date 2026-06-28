@@ -29,6 +29,7 @@ function createArtworkForm() {
 
 function createLibraryForm() {
   return {
+    autoStartDownloadsAfterSelection: true,
     discoveryCooldownHours: 6,
     discoveryFallbackCooldownHours: 2,
     discoveryBatchSize: 5,
@@ -154,6 +155,7 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
       userMusicRoots: [{ userId: 'user-1', relativeRoot: 'family/alice' }],
     },
     library: {
+      autoStartDownloadsAfterSelection: true,
       discoveryCooldownHours: 6,
       discoveryFallbackCooldownHours: 2,
       discoveryBatchSize: 5,
@@ -345,6 +347,7 @@ test('buildSettingsUpdatePayload includes library discovery scheduling fields', 
   const payload = buildSettingsUpdatePayload({
     artwork: createArtworkForm(),
     library: {
+      autoStartDownloadsAfterSelection: false,
       discoveryCooldownHours: 12,
       discoveryFallbackCooldownHours: 4,
       discoveryBatchSize: 10,
@@ -374,6 +377,7 @@ test('buildSettingsUpdatePayload includes library discovery scheduling fields', 
   });
 
   assert.deepEqual(payload.library, {
+    autoStartDownloadsAfterSelection: false,
     discoveryCooldownHours: 12,
     discoveryFallbackCooldownHours: 4,
     discoveryBatchSize: 10,

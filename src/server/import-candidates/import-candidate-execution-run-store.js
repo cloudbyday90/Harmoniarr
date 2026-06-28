@@ -43,9 +43,12 @@ function normalizeRun(run) {
     readyCount: toNumberOrNull(run.summary.readyCount),
     readyWithWarningsCount: toNumberOrNull(run.summary.readyWithWarningsCount),
     requestedCandidateCount: toNumberOrNull(run.summary.requestedCandidateCount),
+    selectedCandidateId: run.summary.selectedCandidateId ?? null,
+    sourceSearchId: run.summary.sourceSearchId ?? null,
     startedAt: run.startedAt,
     status: run.status,
     totalSelected: toNumberOrNull(run.summary.totalSelected),
+    triggerSource: run.summary.triggerSource ?? 'manual',
   };
 }
 

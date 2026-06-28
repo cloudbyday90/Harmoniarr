@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import { createLibraryMediaRequestStore } from '../library/library-media-request-store.js';
+import { normalizeMetadataReleaseDateForDateColumn } from './metadata-release-date-normalization.js';
 
 function normalizeQuery(value) {
   if (typeof value !== 'string') {
@@ -180,7 +181,7 @@ export function createOperatorArtistReconciliationRequestService({
               snapshotId,
               snapshotRevision,
             }),
-            expectedReleaseDate: desiredRelease.releaseDate ?? null,
+            expectedReleaseDate: normalizeMetadataReleaseDateForDateColumn(desiredRelease.releaseDate),
             matchedMetadataReleaseGroupId: desiredRelease.metadataReleaseGroupId,
             matchedMetadataReleaseId: desiredRelease.metadataReleaseId,
             musicbrainzReleaseId: desiredRelease.musicbrainzReleaseId ?? null,

@@ -1210,6 +1210,44 @@ test('createLibraryMediaRequestService stores expectedReleaseDate for pre-reques
   assert.equal(createMediaRequest.mock.calls[0].arguments[0].expectedReleaseDate, '2099-12-01');
 });
 
+test('createLibraryMediaRequestService normalizes partial expectedReleaseDate values', async (t) => {
+  const createMediaRequest = t.mock.fn(async (payload) => ({
+    id: 'request-prerequest',
+    expectedReleaseDate: payload.expectedReleaseDate,
+    requestKind: payload.requestKind,
+    requestState: payload.requestState,
+    requestedByUser: { id: payload.requestedByUserId, username: 'listener', role: 'requester' },
+    requestedForUser: { id: payload.requestedForUserId, username: 'listener', role: 'requester' },
+  }));
+  const service = createLibraryMediaRequestService({
+    mediaRequestStore: {
+      createMediaRequest,
+      findActiveDuplicateRequest: t.mock.fn(async () => null),
+      getMediaRequestCounts: async () => ({ alreadyExists: 0, needsFetch: 1, needsReview: 0, totalRequests: 1 }),
+      listMediaRequests: async () => ({ mediaRequests: [] }),
+    },
+    metadataSearchService: {
+      searchReleases: async () => ({ results: [] }),
+    },
+    releaseAvailabilityStore: {
+      getReleaseAvailability: async () => null,
+    },
+    recordAuditEventFn: async () => {},
+  });
+
+  await service.createMediaRequest({
+    actorUserId: 'user-1',
+    payload: {
+      artistName: 'Radiohead',
+      expectedReleaseDate: '2000',
+      releaseTitle: 'Kid A',
+      requestKind: 'release',
+    },
+  });
+
+  assert.equal(createMediaRequest.mock.calls[0].arguments[0].expectedReleaseDate, '2000-01-01');
+});
+
 test('createLibraryMediaRequestService passes null expectedReleaseDate when not provided', async (t) => {
   const createMediaRequest = t.mock.fn(async (payload) => ({
     id: 'request-no-date',

@@ -17,31 +17,11 @@
  */
 
 import { getPool } from '../database.js';
+import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 import { createLibraryWantedReleaseStore } from './library-wanted-release-store.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
-}
-
-function normalizeReleaseDateForProjection(value) {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return trimmed;
-  }
-
-  if (/^\d{4}-\d{2}$/.test(trimmed)) {
-    return `${trimmed}-01`;
-  }
-
-  if (/^\d{4}$/.test(trimmed)) {
-    return `${trimmed}-01-01`;
-  }
-
-  return null;
 }
 
 function mapWantedRow(row) {
@@ -64,7 +44,7 @@ function mapWantedRow(row) {
     metadataReleaseGroupId: row.metadata_release_group_id,
     metadataReleaseId: row.metadata_release_id,
     missingTrackCount,
-    releaseDate: normalizeReleaseDateForProjection(row.release_date),
+    releaseDate: normalizeMetadataReleaseDateForDateColumn(row.release_date),
     releaseStatus: row.release_status ?? null,
     wantedStatus: matchedTrackCount > 0 ? 'partial' : 'missing',
   };

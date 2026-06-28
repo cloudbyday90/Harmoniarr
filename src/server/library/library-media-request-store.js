@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 
 function mapMediaRequestRow(row) {
   if (!row) {
@@ -292,7 +293,7 @@ export function createLibraryMediaRequestStore({
         JSON.stringify(evidence ?? {}),
         musicbrainzReleaseId,
         linkedRequestId,
-        expectedReleaseDate ?? null,
+        normalizeMetadataReleaseDateForDateColumn(expectedReleaseDate),
         fanOutParentId,
         fanOutChildCount,
       ],

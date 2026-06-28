@@ -17,6 +17,7 @@
 -->
 
 <script setup>
+import { onMounted } from 'vue';
 import {
   formatActivityEntryCountLabel,
   formatActivityEntryStatusLabel,
@@ -37,6 +38,10 @@ const {
   limit: 100,
   pollIntervalMs: 30000,
   revalidateOnFocus: true,
+});
+
+onMounted(() => {
+  void load();
 });
 </script>
 

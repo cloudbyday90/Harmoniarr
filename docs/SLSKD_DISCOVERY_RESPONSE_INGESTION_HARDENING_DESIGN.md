@@ -62,6 +62,8 @@ Cons:
 ## Automation Boundary
 
 After this fix, successful discovery searches should create Import Review
-candidates. The current product workflow still requires an operator to select a
-candidate and start the download/import runway. Fully automatic
-search-download-import remains a separate policy-controlled enhancement.
+candidates. Later follow-up implemented confidence-gated automatic selection and
+download-enqueue start for high-confidence candidates; see
+[CONFIDENCE_GATED_DOWNLOAD_EXECUTION_START_DESIGN.md](CONFIDENCE_GATED_DOWNLOAD_EXECUTION_START_DESIGN.md).
+Ambiguous or low-confidence candidates still require operator review before
+download/import runway execution.

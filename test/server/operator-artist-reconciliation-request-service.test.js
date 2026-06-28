@@ -10,8 +10,9 @@ test('materializeDesiredReleaseRequests creates requests for eligible releases a
     release: t.mock.fn(() => {}),
   };
   const connect = t.mock.fn(async () => client);
-  const createMediaRequest = t.mock.fn(async ({ matchedMetadataReleaseId, queryable }) => {
+  const createMediaRequest = t.mock.fn(async ({ expectedReleaseDate, matchedMetadataReleaseId, queryable }) => {
     assert.equal(queryable, client);
+    assert.equal(expectedReleaseDate, '2000-01-01');
     return {
       id: `request-for-${matchedMetadataReleaseId}`,
     };
@@ -40,7 +41,7 @@ test('materializeDesiredReleaseRequests creates requests for eligible releases a
       metadataReleaseGroupId: 'group-1',
       metadataReleaseId: 'release-1',
       musicbrainzReleaseId: 'mb-release-1',
-      releaseDate: '2026-06-01',
+      releaseDate: '2000',
       releaseGroupTitle: 'Amber',
       releaseTitle: 'Amber',
       selectionState: 'selected',
@@ -51,7 +52,7 @@ test('materializeDesiredReleaseRequests creates requests for eligible releases a
       metadataReleaseGroupId: 'group-1',
       metadataReleaseId: 'release-1',
       musicbrainzReleaseId: 'mb-release-1',
-      releaseDate: '2026-06-01',
+      releaseDate: '2000',
       releaseGroupTitle: 'Amber',
       releaseTitle: 'Amber',
       selectionState: 'partial',

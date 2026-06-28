@@ -63,6 +63,7 @@ export function useSettingsForm({
       logLevel: 'info',
     },
     library: {
+      autoStartDownloadsAfterSelection: true,
       discoveryCooldownHours: 6,
       discoveryFallbackCooldownHours: 2,
       discoveryBatchSize: 5,

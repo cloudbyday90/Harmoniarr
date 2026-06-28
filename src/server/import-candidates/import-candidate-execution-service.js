@@ -33,7 +33,13 @@ export function createImportCandidateExecutionService({
 } = {}) {
   const operationDescriptor = operationRunRegistry.importCandidateExecutionPlanning;
 
-  async function startImportCandidateExecutionRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+  async function startImportCandidateExecutionRun({
+    requestMetadata = null,
+    selectedCandidateId = null,
+    sourceSearchId = null,
+    triggeredByUserId = null,
+    triggerSource = 'manual',
+  } = {}) {
     await assertMaintenanceWriteAllowed();
 
     const activeRun = await getActiveRun();
@@ -56,6 +62,14 @@ export function createImportCandidateExecutionService({
       executionMode: 'download_enqueue',
       requestedCandidateCount,
       status: 'pending',
+      summary: {
+        currentStep: 'queued',
+        executionMode: 'download_enqueue',
+        requestedCandidateCount,
+        selectedCandidateId,
+        sourceSearchId,
+        triggerSource,
+      },
       triggeredByUserId,
     });
 
@@ -65,6 +79,9 @@ export function createImportCandidateExecutionService({
       details: {
         requestedCandidateCount,
         runId: run.id,
+        selectedCandidateId,
+        sourceSearchId,
+        triggerSource,
       },
       entityId: run.id,
       entityType: 'operation_run',

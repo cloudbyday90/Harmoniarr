@@ -59,6 +59,9 @@ export function createOperationQueueHandlers({
     handlers[operationRunRegistry.importCandidateExecutionPlanning.operationType] = async ({ run }) => importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
       requestedCandidateCount: toNumberOrNull(run.summary.requestedCandidateCount),
       runId: run.id,
+      selectedCandidateId: run.summary.selectedCandidateId ?? null,
+      sourceSearchId: run.summary.sourceSearchId ?? null,
+      triggerSource: run.summary.triggerSource ?? 'manual',
     });
   }
 

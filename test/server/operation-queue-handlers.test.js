@@ -93,6 +93,9 @@ test('operation queue handlers register shared operation types and map run summa
       id: 'run-2',
       summary: {
         requestedCandidateCount: 7,
+        selectedCandidateId: 'candidate-1',
+        sourceSearchId: 'search-1',
+        triggerSource: 'auto_selection',
       },
     },
   });
@@ -206,6 +209,9 @@ test('operation queue handlers register shared operation types and map run summa
   assert.deepEqual(importCandidateExecutionStartWorkerRun.mock.calls[0].arguments[0], {
     requestedCandidateCount: 7,
     runId: 'run-2',
+    selectedCandidateId: 'candidate-1',
+    sourceSearchId: 'search-1',
+    triggerSource: 'auto_selection',
   });
   assert.deepEqual(importCandidateApplyStartWorkerRun.mock.calls[0].arguments[0], {
     executableCandidateCount: 4,

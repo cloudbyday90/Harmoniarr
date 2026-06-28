@@ -89,6 +89,7 @@ export function createLibraryModule({
   enableTrackFallback = process.env.HARMONIARR_ENABLE_TRACK_FALLBACK === 'true',
   getAppUserById = null,
   getUserPreferencesFn = null,
+  importCandidateAutoDownloadRunService = null,
   importCandidateAutoSelectionService = null,
   importCandidateService = null,
   onOrganizeReleaseAddedFn = null,
@@ -111,6 +112,7 @@ export function createLibraryModule({
       return buildReleaseTracklistExpectations(trackRows);
     },
     getUserPreferencesFn,
+    importCandidateAutoDownloadRunService,
     importCandidateAutoSelectionService,
     importCandidateService,
     libraryDiscoveryRequestStore,

@@ -220,7 +220,7 @@ test('replaceLibraryWantedReleases writes operator-scoped wanted rows', async (t
       metadataReleaseGroupId: 'rg-1',
       metadataReleaseId: 'release-1',
       missingTrackCount: 12,
-      releaseDate: '2026-06-01',
+      releaseDate: '2026',
       releaseStatus: 'Official',
       wantedStatus: 'missing',
     }],
@@ -237,7 +237,7 @@ test('replaceLibraryWantedReleases writes operator-scoped wanted rows', async (t
     12,
     0,
     12,
-    '2026-06-01',
+    '2026-01-01',
     'Official',
     '{"strategy":"monitored_release_absent"}',
   ]);

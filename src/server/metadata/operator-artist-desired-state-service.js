@@ -17,21 +17,10 @@
  */
 
 import { defaultOperatorArtistMonitoringPolicy } from './operator-artist-monitoring-policy.js';
-
-function parseReleaseDateInstant(releaseDate) {
-  if (typeof releaseDate !== 'string' || releaseDate.trim().length === 0) {
-    return null;
-  }
-
-  const candidate = releaseDate.includes('T')
-    ? new Date(releaseDate)
-    : new Date(`${releaseDate}T00:00:00.000Z`);
-
-  return Number.isNaN(candidate.getTime()) ? null : candidate;
-}
+import { parseMetadataReleaseDateInstant } from './metadata-release-date-normalization.js';
 
 function isReleaseInFuture(releaseDate, now) {
-  const releaseInstant = parseReleaseDateInstant(releaseDate);
+  const releaseInstant = parseMetadataReleaseDateInstant(releaseDate);
   if (!releaseInstant) {
     return false;
   }

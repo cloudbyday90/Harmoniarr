@@ -139,9 +139,15 @@ Database model source: `docs/DATABASE_MODEL.md`
   attempts automatic selection after successful slskd candidate ingestion when
   the existing selection-readiness model reports an unambiguous high-confidence
   candidate. The service reuses the existing Import Review `select` transition,
-  audit/event writes, and JSONB discovery evidence, while leaving automatic
-  download-run start as the next gated component. See
+  audit/event writes, and JSONB discovery evidence. See
   `CONFIDENCE_GATED_AUTO_SELECTION_DESIGN.md`.
+- Confidence-gated download execution start: high-confidence auto-selection now
+  triggers the existing Import Review download-enqueue operation when Library
+  automation is enabled and slskd is healthy. Operation summaries and discovery
+  evidence preserve bounded trigger context (`auto_selection`, source search id,
+  selected candidate id, and run id) without storing provider secrets or raw
+  slskd payloads. Operators can disable this behavior in Settings > Library.
+  See `CONFIDENCE_GATED_DOWNLOAD_EXECUTION_START_DESIGN.md`.
 - Wanted Import Review selection handoff browser verification: added a
   deterministic browser scenario proving a high-confidence Wanted row opens the
   matching Import Review candidate queue, allows the operator to select the

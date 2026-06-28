@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 
 function mapDiscoveryDispatchRow(row) {
   if (!row) {
@@ -617,7 +618,7 @@ export function createLibraryDiscoveryRequestStore({
             discoveryRequest.searchMode,
             discoveryRequest.requestStatus,
             discoveryRequest.blockedReason,
-            discoveryRequest.releaseDate,
+            normalizeMetadataReleaseDateForDateColumn(discoveryRequest.releaseDate),
             discoveryRequest.lastSearchAt,
             discoveryRequest.nextSearchAfter,
             discoveryRequest.manualRequestedAt,

@@ -434,6 +434,10 @@ const settingDefinitions = {
     },
   },
   library: {
+    autoStartDownloadsAfterSelection: {
+      defaultValue: true,
+      normalize: normalizeBooleanSetting('library.autoStartDownloadsAfterSelection'),
+    },
     discoveryCooldownHours: {
       defaultValue: 6,
       normalize(value) {

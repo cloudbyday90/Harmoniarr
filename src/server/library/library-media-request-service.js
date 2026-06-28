@@ -20,6 +20,7 @@ import { createApiError } from '../auth.js';
 import { recordAuditEvent } from '../audit.js';
 import { buildMediaRequestTargetEligibility } from '../media-request-target-eligibility.js';
 import { createMetadataSearchService } from '../metadata/metadata-search-service.js';
+import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 import { normalizeExternalMediaSource } from './external-media-source-parser.js';
 import { createLibraryMediaRequestFulfillmentService } from './library-media-request-fulfillment-service.js';
 import { createLibraryMediaRequestNotificationService } from './library-media-request-notification-service.js';
@@ -192,7 +193,12 @@ function normalizeOptionalDate(value, fieldName) {
     throw createApiError(400, 'validation_error', `${fieldName} must be a date in YYYY, YYYY-MM, or YYYY-MM-DD format`);
   }
 
-  return normalized;
+  const normalizedDate = normalizeMetadataReleaseDateForDateColumn(normalized);
+  if (!normalizedDate) {
+    throw createApiError(400, 'validation_error', `${fieldName} must be a valid calendar date`);
+  }
+
+  return normalizedDate;
 }
 
 function validateDraft(payload) {

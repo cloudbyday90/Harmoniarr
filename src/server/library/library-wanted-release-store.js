@@ -18,6 +18,7 @@
 
 import { getPool } from '../database.js';
 import { buildImportCandidateSelectionReadiness } from '../import-candidates/import-candidate-selection-readiness.js';
+import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -210,7 +211,7 @@ export function createLibraryWantedReleaseStore({
             wantedRelease.expectedTrackCount,
             wantedRelease.matchedTrackCount,
             wantedRelease.missingTrackCount,
-            wantedRelease.releaseDate,
+            normalizeMetadataReleaseDateForDateColumn(wantedRelease.releaseDate),
             wantedRelease.releaseStatus,
             JSON.stringify(wantedRelease.evidence ?? {}),
           ],

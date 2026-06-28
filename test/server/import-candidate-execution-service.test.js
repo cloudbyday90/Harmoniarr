@@ -25,7 +25,10 @@ test('startImportCandidateExecutionRun queues a planning run for selected candid
       ipAddress: '127.0.0.1',
       userAgent: 'test-agent',
     },
+    selectedCandidateId: 'candidate-1',
+    sourceSearchId: 'search-1',
     triggeredByUserId: 'user-1',
+    triggerSource: 'auto_selection',
   });
 
   assert.equal(result.accepted, true);
@@ -38,9 +41,18 @@ test('startImportCandidateExecutionRun queues a planning run for selected candid
     executionMode: 'download_enqueue',
     requestedCandidateCount: 2,
     status: 'pending',
+    summary: {
+      currentStep: 'queued',
+      executionMode: 'download_enqueue',
+      requestedCandidateCount: 2,
+      selectedCandidateId: 'candidate-1',
+      sourceSearchId: 'search-1',
+      triggerSource: 'auto_selection',
+    },
     triggeredByUserId: 'user-1',
   }]);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.triggerSource, 'auto_selection');
 });
 
 test('startImportCandidateExecutionRun rejects empty selected state', async () => {

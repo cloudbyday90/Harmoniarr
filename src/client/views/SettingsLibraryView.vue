@@ -135,6 +135,14 @@ onMounted(() => { void loadSettings(); });
               </div>
             </div>
           </div>
+          <div class="cfg-group">
+            <p class="cfg-group-title">Automation</p>
+            <label class="cfg-check">
+              <input type="checkbox" v-model="form.library.autoStartDownloadsAfterSelection" />
+              <span>Automatically start download runs for high-confidence selections</span>
+            </label>
+            <p class="cfg-field-hint">When discovery finds one unambiguous high-confidence candidate, Harmoniarr selects it and starts the existing Import Review download run. Ambiguous or low-confidence candidates still require review.</p>
+          </div>
         </div>
       </article>
 

@@ -383,3 +383,41 @@ test('resetDownloadRecoveryExhaustion clears exhausted state and records manual 
   assert.equal(result.searchAttemptCount, 0);
   assert.equal(result.evidence.manualDownloadRecoveryRetry.resetByUserId, 'admin-1');
 });
+
+test('replaceLibraryDiscoveryRequests normalizes partial release dates before insert', async (t) => {
+  const queries = [];
+  const client = {
+    query: t.mock.fn(async (sql, params) => {
+      queries.push({ params, sql });
+      return { rows: [] };
+    }),
+    release: t.mock.fn(),
+  };
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({
+      connect: async () => client,
+    }),
+  });
+
+  await store.replaceLibraryDiscoveryRequests({
+    discoveryRequests: [{
+      blockedReason: null,
+      evidence: { strategy: 'eligible_now' },
+      lastSearchAt: null,
+      manualRequestedAt: null,
+      metadataArtistId: 'artist-1',
+      metadataReleaseGroupId: 'group-1',
+      metadataReleaseId: 'release-1',
+      nextSearchAfter: '2026-06-01T00:00:00.000Z',
+      releaseDate: '2000',
+      requestStatus: 'ready',
+      searchAttemptCount: 0,
+      searchMode: 'automatic',
+      wantedStatus: 'missing',
+    }],
+  });
+
+  const insertQuery = queries.find((entry) => entry.sql.includes('INSERT INTO library_discovery_requests'));
+  assert.equal(insertQuery.params[7], '2000-01-01');
+  assert.equal(client.release.mock.callCount(), 1);
+});

@@ -17,6 +17,10 @@
  */
 
 import { getPool } from '../database.js';
+import {
+  normalizeMetadataReleaseDateForDateColumn,
+  parseMetadataReleaseDateInstant,
+} from '../metadata/metadata-release-date-normalization.js';
 import { createLibraryDiscoveryRequestStore } from './library-discovery-request-store.js';
 
 const defaultAutomaticCooldownMs = 6 * 60 * 60 * 1000;
@@ -36,15 +40,6 @@ function toIsoStringOrNull(value) {
 
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function buildReleaseDateInstant(value) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function buildCooldownDeadline(lastSearchAt, cooldownMs) {
@@ -154,7 +149,8 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   if (sourceRequestedAt) {
     requestSourceEvidence.sourceRequestedAt = sourceRequestedAt;
   }
-  const releaseDateDeadline = buildReleaseDateInstant(row.release_date);
+  const releaseDate = normalizeMetadataReleaseDateForDateColumn(row.release_date);
+  const releaseDateDeadline = parseMetadataReleaseDateInstant(row.release_date);
   const cooldownDeadline = buildCooldownDeadline(row.last_search_at, automaticCooldownMs);
 
   if (searchMode === 'manual') {
@@ -173,7 +169,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       metadataReleaseGroupId: row.metadata_release_group_id,
       metadataReleaseId: row.metadata_release_id,
       nextSearchAfter: now.toISOString(),
-      releaseDate: row.release_date ?? null,
+      releaseDate,
       requestStatus: 'ready',
       researchAttemptCount,
       searchAttemptCount: 0,
@@ -202,7 +198,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       metadataReleaseGroupId: row.metadata_release_group_id,
       metadataReleaseId: row.metadata_release_id,
       nextSearchAfter: null,
-      releaseDate: row.release_date ?? null,
+      releaseDate,
       requestStatus: 'blocked',
       researchAttemptCount,
       searchAttemptCount: Math.max(searchAttemptCount, exhaustedSearchAttemptCount),
@@ -227,7 +223,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       metadataReleaseGroupId: row.metadata_release_group_id,
       metadataReleaseId: row.metadata_release_id,
       nextSearchAfter: null,
-      releaseDate: row.release_date ?? null,
+      releaseDate,
       requestStatus: 'blocked',
       researchAttemptCount,
       searchAttemptCount,
@@ -256,7 +252,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       metadataReleaseGroupId: row.metadata_release_group_id,
       metadataReleaseId: row.metadata_release_id,
       nextSearchAfter: pendingDownloadRecoveryRediscovery.nextSearchAfter,
-      releaseDate: row.release_date ?? null,
+      releaseDate,
       requestStatus: 'ready',
       researchAttemptCount,
       searchAttemptCount,
@@ -284,7 +280,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
       metadataReleaseGroupId: row.metadata_release_group_id,
       metadataReleaseId: row.metadata_release_id,
       nextSearchAfter: now.toISOString(),
-      releaseDate: row.release_date ?? null,
+      releaseDate,
       requestStatus: 'ready',
       researchAttemptCount,
       searchAttemptCount: 0,
@@ -316,7 +312,7 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
     metadataReleaseGroupId: row.metadata_release_group_id,
     metadataReleaseId: row.metadata_release_id,
     nextSearchAfter: automaticState.nextSearchAfter,
-    releaseDate: row.release_date ?? null,
+    releaseDate,
     requestStatus: automaticState.requestStatus,
     researchAttemptCount,
     searchAttemptCount,

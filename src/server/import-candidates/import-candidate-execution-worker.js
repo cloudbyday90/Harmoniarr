@@ -61,6 +61,18 @@ function buildEnqueueRequests(files) {
   });
 }
 
+function buildRunTriggerSummary({
+  selectedCandidateId = null,
+  sourceSearchId = null,
+  triggerSource = null,
+} = {}) {
+  return Object.fromEntries(Object.entries({
+    selectedCandidateId,
+    sourceSearchId,
+    triggerSource,
+  }).filter(([, value]) => value !== null && value !== undefined));
+}
+
 export function createImportCandidateExecutionWorker({
   acquireLease,
   buildSelectedImportCandidateSummary = async () => ({
@@ -120,9 +132,20 @@ export function createImportCandidateExecutionWorker({
     }));
   }
 
-  async function runExecution({ requestedCandidateCount, runId }) {
+  async function runExecution({
+    requestedCandidateCount,
+    runId,
+    selectedCandidateId = null,
+    sourceSearchId = null,
+    triggerSource = null,
+  }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
+    const triggerSummary = buildRunTriggerSummary({
+      selectedCandidateId,
+      sourceSearchId,
+      triggerSource,
+    });
 
     try {
       await acquireLease({ runId });
@@ -137,6 +160,7 @@ export function createImportCandidateExecutionWorker({
           currentStep: 'Resolving selected candidate download requests',
           executionMode: 'download_enqueue',
           requestedCandidateCount,
+          ...triggerSummary,
         },
       });
 
@@ -382,6 +406,7 @@ export function createImportCandidateExecutionWorker({
           readyWithWarningsCount: selectedSummary.counts?.readyWithWarnings ?? 0,
           recoveredCandidateCount: counts.recovered,
           requestedCandidateCount,
+          ...triggerSummary,
           totalSelected: (selectedSummary.counts?.totalSelected ?? runItems.length) + counts.recovered,
         },
       });
@@ -398,6 +423,7 @@ export function createImportCandidateExecutionWorker({
             pauseMessage: error.message,
             pauseProvider: error.pauseProvider ?? null,
             requestedCandidateCount,
+            ...triggerSummary,
           },
         });
         return;
@@ -411,6 +437,7 @@ export function createImportCandidateExecutionWorker({
             currentStep: 'Download enqueue cancelled',
             executionMode: 'download_enqueue',
             requestedCandidateCount,
+            ...triggerSummary,
           },
         });
         return;
@@ -424,6 +451,7 @@ export function createImportCandidateExecutionWorker({
           currentStep: 'Download enqueue failed',
           executionMode: 'download_enqueue',
           requestedCandidateCount,
+          ...triggerSummary,
         },
       });
     } finally {
@@ -433,14 +461,26 @@ export function createImportCandidateExecutionWorker({
     }
   }
 
-  async function startWorkerRun({ requestedCandidateCount, runId }) {
+  async function startWorkerRun({
+    requestedCandidateCount,
+    runId,
+    selectedCandidateId = null,
+    sourceSearchId = null,
+    triggerSource = null,
+  }) {
     if (activeRunIds.has(runId)) {
       return;
     }
 
     activeRunIds.add(runId);
     queueMicrotask(() => {
-      void runExecution({ requestedCandidateCount, runId });
+      void runExecution({
+        requestedCandidateCount,
+        runId,
+        selectedCandidateId,
+        sourceSearchId,
+        triggerSource,
+      });
     });
   }
 

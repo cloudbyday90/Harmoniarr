@@ -21,6 +21,7 @@ suite('createApp', () => {
   const authModule = { routeDependencies: { auth: 'deps' } };
   const downloaderModule = { routeDependencies: { downloader: 'deps' } };
   const importCandidateModule = {
+    importCandidateAutoDownloadRunService: { startDownloadRunAfterAutoSelection: () => {} },
     importCandidateAutoSelectionService: { selectHighConfidenceCandidate: () => {} },
     routeDependencies: { importCandidates: 'deps' },
   };
@@ -276,6 +277,10 @@ suite('createApp', () => {
   assert.equal(libraryModuleArgs.maintenanceLockService, importCandidateModuleArgs.maintenanceLockService);
   assert.equal(libraryModuleArgs.artworkAssignmentService, artworkModule.artworkAssignmentService);
   assert.equal(libraryModuleArgs.artworkIngestionService, artworkModule.artworkIngestionService);
+  assert.equal(
+    libraryModuleArgs.importCandidateAutoDownloadRunService,
+    importCandidateModule.importCandidateAutoDownloadRunService,
+  );
   assert.equal(
     libraryModuleArgs.importCandidateAutoSelectionService,
     importCandidateModule.importCandidateAutoSelectionService,

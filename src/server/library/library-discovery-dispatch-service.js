@@ -64,6 +64,7 @@ export function createLibraryDiscoveryDispatchService({
   getNow = () => new Date(),
   getReleaseTracklistExpectationsFn = null,
   getUserPreferencesFn = null,
+  importCandidateAutoDownloadRunService = null,
   importCandidateAutoSelectionService = null,
   importCandidateService = null,
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
@@ -153,6 +154,36 @@ export function createLibraryDiscoveryDispatchService({
     }
   }
 
+  async function startDownloadRunAfterAutoSelection({
+    actorUserId,
+    autoSelectionResult,
+    requestMetadata,
+    sourceSearchId,
+  }) {
+    if (typeof importCandidateAutoDownloadRunService?.startDownloadRunAfterAutoSelection !== 'function') {
+      return null;
+    }
+
+    try {
+      return await importCandidateAutoDownloadRunService.startDownloadRunAfterAutoSelection({
+        actorUserId,
+        autoSelectionResult,
+        requestMetadata,
+        sourceSearchId,
+      });
+    } catch (error) {
+      return {
+        attempted: true,
+        errorCode: error?.code ?? 'auto_download_start_failed',
+        message: error?.message ?? 'Automatic download start failed',
+        selectedCandidateId: autoSelectionResult?.selectedCandidateId ?? null,
+        skippedReason: 'auto_download_start_failed',
+        sourceSearchId,
+        started: false,
+      };
+    }
+  }
+
   async function dispatchTrackFallbackSearches({
     actorUserId,
     claimedRequest,
@@ -208,6 +239,14 @@ export function createLibraryDiscoveryDispatchService({
             sourceSearchId: search.id,
           })
           : null;
+        const autoDownloadStartResult = autoSelectionResult?.selected
+          ? await startDownloadRunAfterAutoSelection({
+            actorUserId,
+            autoSelectionResult,
+            requestMetadata,
+            sourceSearchId: search.id,
+          })
+          : null;
 
         summary.candidateCount += ingestionResult.candidateCount;
         summary.fileCount += ingestionResult.fileCount;
@@ -222,6 +261,9 @@ export function createLibraryDiscoveryDispatchService({
         };
         if (autoSelectionResult) {
           dispatchedSearch.autoSelection = autoSelectionResult;
+        }
+        if (autoDownloadStartResult) {
+          dispatchedSearch.autoDownloadStart = autoDownloadStartResult;
         }
         summary.dispatchedSearches.push(dispatchedSearch);
       } catch {
@@ -366,6 +408,14 @@ export function createLibraryDiscoveryDispatchService({
             sourceSearchId: search.id,
           })
           : null;
+        const autoDownloadStartResult = autoSelectionResult?.selected
+          ? await startDownloadRunAfterAutoSelection({
+            actorUserId,
+            autoSelectionResult,
+            requestMetadata,
+            sourceSearchId: search.id,
+          })
+          : null;
         candidateCount += ingestionResult.candidateCount;
         fileCount += ingestionResult.fileCount;
         const zeroCandidateSchedule = ingestionResult.candidateCount === 0
@@ -387,6 +437,9 @@ export function createLibraryDiscoveryDispatchService({
         if (autoSelectionResult) {
           dispatchedSearch.autoSelection = autoSelectionResult;
         }
+        if (autoDownloadStartResult) {
+          dispatchedSearch.autoDownloadStart = autoDownloadStartResult;
+        }
         dispatchedSearches.push(dispatchedSearch);
 
         const successPayload = {
@@ -401,6 +454,9 @@ export function createLibraryDiscoveryDispatchService({
         }
         if (autoSelectionResult) {
           successPayload.autoSelection = autoSelectionResult;
+        }
+        if (autoDownloadStartResult) {
+          successPayload.autoDownloadStart = autoDownloadStartResult;
         }
         if (zeroCandidateSchedule) {
           successPayload.nextSearchAfter = zeroCandidateSchedule.nextSearchAfter;

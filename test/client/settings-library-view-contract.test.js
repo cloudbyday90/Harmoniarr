@@ -45,13 +45,16 @@ test('SettingsLibraryView hides the form when in error state', async () => {
   assert.match(source, /<h3 class="hx-card-title">Settings unavailable<\/h3>/);
 });
 
-test('SettingsLibraryView wires all four fields to form.library.*', async () => {
+test('SettingsLibraryView wires discovery fields and automation toggle to form.library.*', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
+  assert.match(source, /v-model="form\.library\.autoStartDownloadsAfterSelection"/);
   assert.match(source, /v-model\.number="form\.library\.discoveryCooldownHours"/);
   assert.match(source, /v-model\.number="form\.library\.discoveryFallbackCooldownHours"/);
   assert.match(source, /v-model\.number="form\.library\.discoveryBatchSize"/);
   assert.match(source, /v-model\.number="form\.library\.maxSearchAttempts"/);
+  assert.match(source, /Automatically start download runs for high-confidence selections/);
+  assert.match(source, /Ambiguous or low-confidence candidates still require review/);
 });
 
 test('SettingsLibraryView constrains inputs to validator ranges', async () => {

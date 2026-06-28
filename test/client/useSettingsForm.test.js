@@ -33,6 +33,13 @@ function createSettingsPayload(overrides = {}) {
         baseUrl: 'https://example.com',
         logLevel: 'debug',
       },
+      library: {
+        autoStartDownloadsAfterSelection: false,
+        discoveryBatchSize: 10,
+        discoveryCooldownHours: 12,
+        discoveryFallbackCooldownHours: 4,
+        maxSearchAttempts: 5,
+      },
       paths: {
         downloadMappings: [],
         downloads: '/downloads',
@@ -81,6 +88,8 @@ test('useSettingsForm loadSettings fetches and applies settings', async () => {
   assert.equal(form.artwork.fetchEnabled, false);
   assert.equal(form.artwork.derivativeSizesText, '128, 256');
   assert.equal(form.artwork.providerOrderText, 'coverArtArchive, fanartTv');
+  assert.equal(form.library.autoStartDownloadsAfterSelection, false);
+  assert.equal(form.library.discoveryBatchSize, 10);
   assert.equal(form.slskd.baseUrl, 'http://slskd:5030');
   assert.equal(form.slskd.apiKey, '');
   assert.equal(form.providers.spotifyEnabled, true);
@@ -206,6 +215,7 @@ test('useSettingsForm initial state has correct defaults', () => {
   assert.equal(successMessage.value, '');
   assert.equal(form.security.csrfProtectionMode, 'disabled');
   assert.equal(form.system.logLevel, 'info');
+  assert.equal(form.library.autoStartDownloadsAfterSelection, true);
   assert.equal(form.slskd.baseUrl, 'http://slskd:5030');
   assert.equal(form.artwork.derivativeFormat, 'webp');
   assert.equal(form.providers.playlistExpansionPolicy, 'bounded');

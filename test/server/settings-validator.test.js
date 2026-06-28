@@ -268,6 +268,7 @@ test('normalizeSettingsPatch rejects an out-of-range fidelity success rate', () 
 test('normalizeSettingsPatch accepts library discovery scheduling settings', () => {
   const updates = normalizeSettingsPatch({
     library: {
+      autoStartDownloadsAfterSelection: false,
       discoveryCooldownHours: 12,
       discoveryFallbackCooldownHours: 4,
       discoveryBatchSize: 10,
@@ -276,6 +277,7 @@ test('normalizeSettingsPatch accepts library discovery scheduling settings', () 
   });
 
   assert.deepEqual(updates, [
+    { namespace: 'library', settingKey: 'autoStartDownloadsAfterSelection', value: false },
     { namespace: 'library', settingKey: 'discoveryCooldownHours', value: 12 },
     { namespace: 'library', settingKey: 'discoveryFallbackCooldownHours', value: 4 },
     { namespace: 'library', settingKey: 'discoveryBatchSize', value: 10 },
@@ -319,10 +321,20 @@ test('normalizeSettingsPatch rejects float library maxSearchAttempts', () => {
   );
 });
 
-test('getDefaultSettings includes library namespace with all four defaults', () => {
+test('normalizeSettingsPatch rejects non-boolean library autoStartDownloadsAfterSelection', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ library: { autoStartDownloadsAfterSelection: 'yes' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'library.autoStartDownloadsAfterSelection must be a boolean',
+  );
+});
+
+test('getDefaultSettings includes library namespace with discovery and automation defaults', () => {
   const defaults = getDefaultSettings();
 
   assert.ok(defaults.library);
+  assert.equal(defaults.library.autoStartDownloadsAfterSelection, true);
   assert.equal(defaults.library.discoveryCooldownHours, 6);
   assert.equal(defaults.library.discoveryFallbackCooldownHours, 2);
   assert.equal(defaults.library.discoveryBatchSize, 5);
@@ -332,6 +344,7 @@ test('getDefaultSettings includes library namespace with all four defaults', () 
 test('normalizeSettingsPatch accepts library settings at exact range boundaries', () => {
   const updates = normalizeSettingsPatch({
     library: {
+      autoStartDownloadsAfterSelection: true,
       discoveryCooldownHours: 168,
       discoveryFallbackCooldownHours: 168,
       discoveryBatchSize: 50,
@@ -340,6 +353,7 @@ test('normalizeSettingsPatch accepts library settings at exact range boundaries'
   });
 
   assert.deepEqual(updates, [
+    { namespace: 'library', settingKey: 'autoStartDownloadsAfterSelection', value: true },
     { namespace: 'library', settingKey: 'discoveryCooldownHours', value: 168 },
     { namespace: 'library', settingKey: 'discoveryFallbackCooldownHours', value: 168 },
     { namespace: 'library', settingKey: 'discoveryBatchSize', value: 50 },
