@@ -148,6 +148,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   persist and render bounded diagnostics for planning blockers, no unlocked
   files, provider acceptance, partial provider rejection, and full provider
   rejection. See `PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md`.
+- Docker provider acceptance evidence: the local walkthrough now has
+  `npm run validate:docker-provider-acceptance`, which logs into the running
+  Docker walkthrough, verifies configured provider state, path mapping
+  evidence, durable Import Review download acceptance diagnostics, and the
+  browser-visible diagnostic panel without serializing provider secrets. See
+  `DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,

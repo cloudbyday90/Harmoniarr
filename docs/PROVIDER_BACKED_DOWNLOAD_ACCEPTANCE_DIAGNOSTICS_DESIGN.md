@@ -93,8 +93,11 @@ Cons:
 
 ## Follow-Up
 
-The next high-value item is **Docker walkthrough provider acceptance evidence**:
-add a local validation script or documented checklist that captures a real
-configured slskd run from selected candidate to either accepted transfer or
-bounded diagnostic, including path mapping evidence for the completed downloads
-folder.
+Docker walkthrough provider acceptance evidence is now implemented in
+`docs/DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md` through
+`npm run validate:docker-provider-acceptance`.
+
+The next high-value item is **Import execution selected-candidate readiness
+guidance**: when a wanted request produces candidates but no download run is
+ready, show the operator the exact missing step from Wanted, Import Review, and
+Downloader instead of requiring them to infer it from separate screens.

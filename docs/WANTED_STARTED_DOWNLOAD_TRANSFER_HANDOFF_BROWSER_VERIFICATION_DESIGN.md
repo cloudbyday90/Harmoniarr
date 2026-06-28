@@ -86,6 +86,9 @@ Cons:
 
 Provider-backed download acceptance diagnostics are now implemented; see
 [PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md](PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md).
+Docker walkthrough provider acceptance evidence is also implemented; see
+[DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md](DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md).
 
-The remaining follow-up is Docker walkthrough provider acceptance evidence for a
-real configured slskd run and completed-download path mapping.
+The next follow-up is Import execution selected-candidate readiness guidance:
+when a wanted request produces candidates but no download run is ready, show the
+operator the exact missing step from Wanted, Import Review, and Downloader.

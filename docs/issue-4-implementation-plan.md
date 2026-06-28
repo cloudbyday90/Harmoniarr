@@ -150,6 +150,11 @@ Confirmed complete:
   visibility for planning blockers, no unlocked files, provider acceptance, and
   provider rejection outcomes. See
   [PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md](PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md).
+- Docker provider acceptance evidence, including a walkthrough validator that
+  proves configured provider status, path mapping evidence, durable Import
+  Review download acceptance diagnostics, and the browser-visible diagnostic
+  panel without serializing provider secrets. See
+  [DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md](DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md).
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See

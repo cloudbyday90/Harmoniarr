@@ -124,6 +124,55 @@ test('assertDockerSmokeEvidenceContract validates released-image evidence payloa
   assert.equal(evidence.validationResult.requestMusicFlow.delegatedRequestId, 'request-1');
 });
 
+test('assertDockerSmokeEvidenceContract validates docker provider acceptance evidence payloads', () => {
+  const evidence = assertDockerSmokeEvidenceContract({
+    generatedAt: '2026-06-28T00:00:00.000Z',
+    schemaVersion: 1,
+    validationKind: 'docker-provider-acceptance',
+    validationResult: {
+      baseUrl: 'http://127.0.0.1:47956',
+      checkedAt: '2026-06-28T00:00:00.000Z',
+      importReview: {
+        currentRun: {
+          id: 'execution-run-1',
+          status: 'running',
+        },
+        diagnosticCount: 1,
+        diagnostics: [{
+          code: 'provider_accepted',
+          title: 'Provider accepted transfer',
+        }],
+      },
+      paths: {
+        downloadMappingCount: 1,
+      },
+      provider: {
+        enabled: true,
+        queueHealthStatus: 'busy',
+      },
+      username: 'walkthrough-admin',
+    },
+  });
+
+  assert.equal(evidence.validationKind, 'docker-provider-acceptance');
+  assert.equal(evidence.validationResult.importReview.diagnostics[0].code, 'provider_accepted');
+});
+
+test('assertDockerSmokeEvidenceContract rejects provider acceptance evidence without diagnostics', () => {
+  assert.throws(() => assertDockerSmokeEvidenceContract({
+    generatedAt: '2026-06-28T00:00:00.000Z',
+    schemaVersion: 1,
+    validationKind: 'docker-provider-acceptance',
+    validationResult: {
+      importReview: {
+        diagnostics: [],
+      },
+      paths: {},
+      provider: {},
+    },
+  }), /docker-provider-acceptance\.importReview\.diagnostics must include at least one diagnostic/u);
+});
+
 test('verifyDockerSmokeEvidenceFile reads and validates a smoke evidence artifact', async () => {
   const evidence = await verifyDockerSmokeEvidenceFile('artifacts/docker-smoke.json', {
     readFileFn: async (filePath, encoding) => {

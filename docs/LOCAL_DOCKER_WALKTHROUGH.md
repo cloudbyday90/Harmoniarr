@@ -105,6 +105,25 @@ If Downloader stays empty, this diagnostic is the first place to check before
 reading container logs. It intentionally shows bounded counts and operator
 actions, not API keys, raw provider payloads, or stack traces.
 
+To capture replayable local evidence from a configured walkthrough:
+
+```powershell
+$env:HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_PATH = ".tmp\docker-provider-acceptance\provider-acceptance.json"
+$env:HARMONIARR_DOCKER_PROVIDER_ACCEPTANCE_SCREENSHOT_DIR = ".tmp\docker-provider-acceptance\screenshots"
+$env:HARMONIARR_WALKTHROUGH_USERNAME = "walkthrough-admin"
+$env:HARMONIARR_WALKTHROUGH_PASSWORD = "HarmoniarrLocal123!"
+npm run validate:docker-provider-acceptance
+```
+
+The evidence command verifies configured provider status, path mapping
+presence, durable Import Review download acceptance diagnostics, and the
+browser-visible diagnostic panel. To require that slskd accepted at least one
+transfer, run:
+
+```powershell
+npm run validate:docker-provider-acceptance -- --require-accepted-transfer true
+```
+
 If you need a fully clean rebuild while testing Docker changes, use:
 
 ```powershell

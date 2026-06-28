@@ -64,6 +64,7 @@
     "validate": "npm run check-copyright && npm run migration:check && npm run check:schema-snapshot && npm run check:esm && npm run check:image-tags && npm test && npm run build",
     "validate:docker-fresh-install": "node scripts/validate-docker-fresh-install.js",
     "validate:docker-deployment-path": "node scripts/validate-docker-deployment-path.js",
+    "validate:docker-provider-acceptance": "node scripts/validate-docker-provider-acceptance.js",
     "validate:docker-upgrade": "node scripts/validate-docker-upgrade.js",
     "validate:docker-released-image": "node scripts/validate-docker-released-image.js",
     "validate:docker-browser-smoke": "node scripts/validate-docker-browser-smoke.js",

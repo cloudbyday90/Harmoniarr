@@ -51,6 +51,20 @@ function assertUpgradeValidationResult(validationResult, validationKind) {
   assertObjectSection(validationResult.upgradedRuntime, `${validationKind}.upgradedRuntime`);
 }
 
+function assertDockerProviderAcceptanceValidationResult(validationResult, validationKind) {
+  assertObjectSection(validationResult.provider, `${validationKind}.provider`);
+  assertObjectSection(validationResult.paths, `${validationKind}.paths`);
+  assertObjectSection(validationResult.importReview, `${validationKind}.importReview`);
+
+  if (!Array.isArray(validationResult.importReview.diagnostics)) {
+    throw new Error(`${validationKind}.importReview.diagnostics must be an array`);
+  }
+
+  if (validationResult.importReview.diagnostics.length === 0) {
+    throw new Error(`${validationKind}.importReview.diagnostics must include at least one diagnostic`);
+  }
+}
+
 export function assertDockerSmokeValidationResultContract({
   validationKind,
   validationResult,
@@ -64,6 +78,9 @@ export function assertDockerSmokeValidationResultContract({
       break;
     case 'upgrade':
       assertUpgradeValidationResult(normalizedValidationResult, validationKind);
+      break;
+    case 'docker-provider-acceptance':
+      assertDockerProviderAcceptanceValidationResult(normalizedValidationResult, validationKind);
       break;
     default:
       break;
