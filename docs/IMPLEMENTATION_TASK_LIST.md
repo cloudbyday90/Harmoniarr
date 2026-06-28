@@ -49,6 +49,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   focused tests. Phase 2 should now replace the visible candidate-first workflow
   with Music Queue match drilldowns while keeping Import Review as advanced
   diagnostics. See `MUSIC_QUEUE_PHASE_1_READ_MODEL_DESIGN.md`.
+- Music Queue Phase 2 UX slice: Music Queue now has six user-facing summary
+  buckets, search/state/type filters, release rows with reason, last activity,
+  quality, progress chips, and next actions, plus a release details panel for
+  match/quality review. Activity and Import Review copy now frame raw
+  candidate tools as diagnostics instead of the primary download workflow. See
+  `MUSIC_QUEUE_PHASE_2_UX_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

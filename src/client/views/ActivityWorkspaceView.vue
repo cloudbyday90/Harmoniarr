@@ -22,7 +22,7 @@ import { useTabbarOverflow } from '../composables/useTabbarOverflow.js';
 
 const tabs = [
   { name: 'activity-operations', label: 'Operations', implemented: true },
-  { name: 'activity-candidates', label: 'Candidates', implemented: true },
+  { name: 'activity-candidates', label: 'Diagnostics', implemented: true },
   { name: 'activity-requests', label: 'Requests', implemented: true },
   { name: 'activity-wanted', label: 'Wanted', implemented: true },
   { name: 'activity-imports', label: 'Imports', implemented: true },
@@ -46,7 +46,7 @@ onUnmounted(cleanup);
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Activity</h1>
-        <p class="hx-page-subtitle">Operational workbench: queues, history, imports, requests, and source users.</p>
+        <p class="hx-page-subtitle">Timeline, history, failures, and advanced diagnostics. Use Music Queue for release progress.</p>
       </div>
     </header>
 

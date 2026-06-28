@@ -44,3 +44,20 @@ test('deriveMusicQueueStatus treats completed downloads as ready to add', () => 
   assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.READY_TO_ADD);
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.ADD_TO_LIBRARY);
 });
+
+test('deriveMusicQueueStatus asks users to pick a match for ambiguous evidence', () => {
+  const status = deriveMusicQueueStatus({
+    match: {
+      readiness: {
+        code: 'ambiguous',
+        message: 'Multiple matches are too close to choose automatically.',
+      },
+      totalCount: 3,
+    },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.PICK_MATCH);
+  assert.equal(status.detail, 'Multiple matches are too close to choose automatically.');
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_MATCHES);
+});

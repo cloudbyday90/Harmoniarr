@@ -820,30 +820,39 @@ Acceptance:
 
 ### Phase 2 - New User-Facing Design And Core Logic
 
+Status: **In progress.** First UX/read-model slice complete; see
+`MUSIC_QUEUE_PHASE_2_UX_DESIGN.md`.
+
 Goal: flesh out the Music Queue experience and the user-facing logic. This phase
 makes the new surface understandable and useful before enabling deeper
 automation changes.
 
-- [ ] Replace the old `Download candidates` primary experience with Music Queue
+- [x] Replace the old `Download candidates` primary experience with Music Queue
   routing and page copy.
-- [ ] Decide whether Music Queue is top-level nav, a Home panel with `See all`,
+- [x] Decide whether Music Queue is top-level nav, a Home panel with `See all`,
   or both.
-- [ ] Add summary cards: `Waiting`, `Searching`, `Downloading`, `Ready to add`,
+- [x] Add summary cards: `Waiting`, `Searching`, `Downloading`, `Ready to add`,
   `Needs help`, `Needs setup`.
-- [ ] Add release-centered rows/cards with artist, release, year/type, state,
+- [x] Add release-centered rows/cards with artist, release, year/type, state,
   why, next action, last activity, progress chips, quality profile, and match
   attempt summary.
-- [ ] Add filters for artist, state, reason, release type, and last activity.
-- [ ] Add the match review drawer/panel behind `Review matches`.
+- [x] Add filters for artist/search text, state, and release type. Reason and
+  last-activity filters remain follow-up work once release-scoped match events
+  are present.
+- [x] Add the match review drawer/panel behind `Review matches`.
 - [ ] Reuse existing candidate detail/preview data as simplified match evidence.
 - [ ] Replace candidate-level actions with `Use this match`, `Reject match`,
   `Review quality choice`, and `Try again`.
-- [ ] Show why automation did or did not choose a match.
+- [x] Show why automation did or did not choose a match at aggregate release
+  level. Per-match explanation remains follow-up work.
+- [x] Show quality profile fit for each release: profile, decision, format
+  evidence, and verification state. Per-match preferred/minimum/cutoff detail
+  remains follow-up work.
 - [ ] Show quality profile fit for each match: preferred, minimum, cutoff,
   fallback, verified/unverified, suspicious/transcoded.
-- [ ] Add setup handoffs: `Set up folders`, `Test Soulseek`, `Set up media
+- [x] Add setup handoffs: `Set up folders`, `Test Soulseek`, `Set up media
   tools`.
-- [ ] Keep advanced diagnostics accessible but visually secondary.
+- [x] Keep advanced diagnostics accessible but visually secondary.
 
 Acceptance:
 

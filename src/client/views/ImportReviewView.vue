@@ -213,13 +213,13 @@ onBeforeUnmount(() => {
       <div class="import-review-stage__body">
         <div class="import-review-stage__intro">
           <div>
-            <p class="import-review-stage__eyebrow">Import candidates</p>
-            <h1 class="import-review-stage__title">Download candidates <span v-if="isRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h1>
+            <p class="import-review-stage__eyebrow">Advanced diagnostics</p>
+            <h1 class="import-review-stage__title">Match diagnostics <span v-if="isRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h1>
             <p class="import-review-stage__copy" v-if="isAdmin">
               Review each match, pressure-test the files, queue the download run, and only then apply completed downloads into the library.
             </p>
             <p class="import-review-stage__copy" v-else>
-              Track the candidates assigned to your account and follow their progress through review, download, and import.
+              Inspect raw match evidence, exception details, and download/import handoffs when Music Queue needs help.
             </p>
           </div>
 
@@ -248,7 +248,7 @@ onBeforeUnmount(() => {
 
     <article class="hx-card import-review-access-card" v-if="!isAdmin">
       <p>
-        You can inspect candidates assigned to your account. Admin-only controls remain available for review state changes and background runs.
+        Music Queue handles the normal workflow. This diagnostics page exposes raw match details and admin-only recovery controls when a release needs deeper inspection.
       </p>
     </article>
 
@@ -305,9 +305,9 @@ onBeforeUnmount(() => {
           <div class="import-review-workspace-card__header">
             <div>
               <p class="import-review-workspace-card__eyebrow">Selection workspace</p>
-              <h2 class="import-review-workspace-card__title">Review details and exceptions</h2>
+              <h2 class="import-review-workspace-card__title">Match details and exceptions</h2>
               <p class="import-review-workspace-card__copy">
-                Keep the candidate queue on the left and use this workspace to inspect file paths, collision risks, and operator notes before a candidate moves forward.
+                Use this workspace to inspect file paths, collision risks, and operator notes when Music Queue cannot safely continue.
               </p>
             </div>
           </div>
