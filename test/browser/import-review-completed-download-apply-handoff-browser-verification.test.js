@@ -18,7 +18,9 @@ import {
   readMetadataBrowserFixtureState,
   seedMetadataImportReviewWorkspace,
 } from '../../testing/browser/metadata-browser-fixtures.js';
+import { installLibraryBrowserFixtures } from '../../testing/browser/library-browser-fixtures.js';
 import {
+  buildImportReviewApplyRun,
   buildImportReviewCandidate,
   buildImportReviewExecutionRun,
   buildImportReviewPreview,
@@ -125,6 +127,92 @@ function buildCompletedDownloadApplyWorkspace() {
   };
 }
 
+function buildCompletedImportApplyWorkspace() {
+  const candidate = buildImportReviewCandidate({
+    folderPath: '/private/staging/Boards of Canada/Tomorrow\'s Harvest',
+    id: 'candidate-applied-tomorrows-harvest',
+    importPendingAt: '2026-06-27T21:36:00.000Z',
+    importStatus: {
+      code: 'applied',
+      message: 'Imported release is available in Library.',
+    },
+    planning: {
+      libraryFolderPath: 'Music/Boards of Canada/Tomorrow\'s Harvest',
+      resolutionStrategy: 'mapped',
+      sourceFolderPath: '/private/staging/Boards of Canada/Tomorrow\'s Harvest',
+      stagingFolderPath: '/data/staging/candidate-applied-tomorrows-harvest',
+    },
+    status: 'applied',
+    username: 'healthy-slskd-peer',
+  });
+  const applyRun = buildImportReviewApplyRun({
+    currentStep: 'Import apply completed.',
+    finishedAt: '2026-06-27T22:05:00.000Z',
+    id: 'apply-run-tomorrows-harvest-completed',
+    items: [{
+      applySnapshot: {
+        apply: {
+          result: {
+            appliedFileCount: 17,
+            failedFileCount: 0,
+            notAttemptedCount: 0,
+            stagedFromSourceCount: 17,
+          },
+        },
+        candidate: {
+          folderPath: candidate.folderPath,
+          id: candidate.id,
+          username: candidate.username,
+        },
+        fileOperations: [{
+          appliedMode: 'move',
+          filename: '01 - Gemini.flac',
+          finishedAt: '2026-06-27T22:05:00.000Z',
+          id: 'apply-operation-gemini-finalize',
+          libraryPath: 'Music/Boards of Canada/Tomorrow\'s Harvest/01 - Gemini.flac',
+          position: 1,
+          sourcePath: '/private/staging/Boards of Canada/Tomorrow\'s Harvest/01 - Gemini.flac',
+          stagingPath: '/data/staging/candidate-applied-tomorrows-harvest/01 - Gemini.flac',
+          startedAt: '2026-06-27T22:04:00.000Z',
+          status: 'applied',
+          stepType: 'finalize',
+          transport: 'filesystem',
+        }],
+        planning: {
+          libraryFolderPath: 'Music/Boards of Canada/Tomorrow\'s Harvest',
+          sourceFolderPath: '/private/staging/Boards of Canada/Tomorrow\'s Harvest',
+          stagingFolderPath: '/data/staging/candidate-applied-tomorrows-harvest',
+        },
+      },
+      id: 'apply-item-tomorrows-harvest',
+      itemStatus: 'applied',
+      statusMessage: 'Import apply completed and the release is available in Library.',
+      updatedAt: '2026-06-27T22:05:00.000Z',
+    }],
+    processedCandidateCount: 1,
+    requestedCandidateCount: 1,
+    status: 'completed',
+  });
+
+  return {
+    applyRun,
+    candidate,
+    workspace: {
+      applySummary: buildImportReviewRunSummary({
+        currentRun: applyRun,
+        summary: {
+          message: 'Import apply completed.',
+          status: 'completed',
+        },
+      }),
+      candidates: [candidate],
+      previewById: {
+        [candidate.id]: buildImportReviewPreview(candidate),
+      },
+    },
+  };
+}
+
 suite('Import Review completed-download apply handoff browser verification', () => {
   before(async () => {
     try {
@@ -216,6 +304,66 @@ suite('Import Review completed-download apply handoff browser verification', () 
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {
       scenarioName: 'import_review_completed_download_apply_handoff',
+    });
+  });
+
+  test('admins can open Library from a completed import apply run', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      page.on('pageerror', (error) => {
+        pageErrors.push(error.message);
+      });
+
+      const { applyRun, candidate, workspace } = buildCompletedImportApplyWorkspace();
+      await installMetadataBrowserFixtures(browserContext);
+      await installLibraryBrowserFixtures(browserContext);
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await seedMetadataImportReviewWorkspace(page, workspace);
+
+      await page.goto(
+        `${baseUrl}/app/activity/candidates?candidate=${candidate.id}&status=applied&applyRunId=${applyRun.id}#import-apply-run-panel`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+
+      const applyPanel = getRunwayPanel(page, 'Move downloads to library');
+      await applyPanel.getByText('Run apply-run-tomorrows-harvest-completed', { exact: true }).waitFor();
+      await applyPanel.getByText('1 release is in the library', { exact: true }).waitFor();
+      await applyPanel.getByText(
+        'Open Library to confirm the newly imported release in the complete library view.',
+        { exact: true },
+      ).waitFor();
+
+      const libraryResponse = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/v1/library/releases'
+          && url.searchParams.get('status') === 'complete';
+      });
+      await applyPanel.getByRole('link', { name: 'Open Library' }).click();
+      await libraryResponse;
+      await page.waitForURL((url) =>
+        url.pathname === '/app/library'
+        && url.searchParams.get('focus') === 'library'
+        && url.searchParams.get('status') === 'complete',
+      );
+
+      await page.getByRole('heading', { name: 'Library' }).waitFor();
+      await page.getByRole('button', { name: 'Remove filter: Status In Library' }).waitFor();
+      const libraryList = page.getByRole('list', { name: 'Library releases' });
+      await libraryList.getByText('Tomorrow\'s Harvest').waitFor();
+      await libraryList.getByText('Boards of Canada').first().waitFor();
+
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+      await page.goto('about:blank', { waitUntil: 'load' });
+    }, {
+      scenarioName: 'import_review_apply_library_handoff',
     });
   });
 });

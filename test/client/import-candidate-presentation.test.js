@@ -22,6 +22,7 @@ import assert from 'node:assert/strict';
 import {
   candidateStatusLabel,
   candidateStatusTone,
+  buildImportApplyLibraryHandoffNotice,
   buildImportApplyReadinessNotice,
   buildLiveTransferSyncNotice,
   canStartApplyRun,
@@ -710,6 +711,73 @@ describe('buildImportApplyReadinessNotice', () => {
         tone: 'warning',
         title: '3 downloads are ready to import',
         message: 'Start import apply to stage and commit these completed downloads into the library.',
+      },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildImportApplyLibraryHandoffNotice
+// ---------------------------------------------------------------------------
+
+describe('buildImportApplyLibraryHandoffNotice', () => {
+  it('returns null when there is no completed apply run', () => {
+    assert.equal(buildImportApplyLibraryHandoffNotice(null), null);
+    assert.equal(buildImportApplyLibraryHandoffNotice({ status: 'running', appliedCount: 1 }), null);
+    assert.equal(buildImportApplyLibraryHandoffNotice({ status: 'failed', appliedCount: 1 }), null);
+  });
+
+  it('returns null when a completed apply run did not apply releases', () => {
+    assert.equal(
+      buildImportApplyLibraryHandoffNotice({
+        appliedCount: 0,
+        appliedWithWarningsCount: 0,
+        status: 'completed',
+      }),
+      null,
+    );
+  });
+
+  it('builds a complete Library handoff for applied releases', () => {
+    assert.deepEqual(
+      buildImportApplyLibraryHandoffNotice({
+        appliedCount: 1,
+        appliedWithWarningsCount: 0,
+        status: 'completed',
+      }),
+      {
+        tone: 'success',
+        title: '1 release is in the library',
+        message: 'Open Library to confirm the newly imported release in the complete library view.',
+        location: {
+          name: 'library',
+          query: {
+            focus: 'library',
+            status: 'complete',
+          },
+        },
+      },
+    );
+  });
+
+  it('uses a warning tone when completed apply includes warning outcomes', () => {
+    assert.deepEqual(
+      buildImportApplyLibraryHandoffNotice({
+        appliedCount: 2,
+        appliedWithWarningsCount: 1,
+        status: 'completed',
+      }),
+      {
+        tone: 'warning',
+        title: '3 releases are in the library',
+        message: 'Open Library to confirm the imported release and review any warning state after the next scan.',
+        location: {
+          name: 'library',
+          query: {
+            focus: 'library',
+            status: 'complete',
+          },
+        },
       },
     );
   });

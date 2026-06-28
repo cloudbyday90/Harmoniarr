@@ -105,6 +105,10 @@ Database model source: `docs/DATABASE_MODEL.md`
   when completed downloads are ready to import, and browser coverage proves the
   path from completed transfer evidence to a queued import apply run. See
   `IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md`.
+- Import Review apply-to-Library handoff: completed apply runs now show a
+  bounded `Open Library` action that lands on the complete-release Library view,
+  and browser coverage proves the applied release renders through the Library
+  read model. See `IMPORT_REVIEW_APPLY_LIBRARY_HANDOFF_DESIGN.md`.
 - Library discovery JSONB parameter casting: Library discovery evidence writes
   now cast placeholders passed into PostgreSQL `jsonb_build_object`, fixing the
   `could not determine data type of parameter $1` failures seen in Background

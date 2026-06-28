@@ -110,6 +110,10 @@ Confirmed complete:
   verification that completed transfer evidence leads to visible import-ready
   state and a queued import apply run. See
   [IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md](IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md).
+- Import Review apply-to-Library handoff, including browser verification that a
+  completed apply run exposes `Open Library`, preserves bounded route state, and
+  lands on the complete-release Library view. See
+  [IMPORT_REVIEW_APPLY_LIBRARY_HANDOFF_DESIGN.md](IMPORT_REVIEW_APPLY_LIBRARY_HANDOFF_DESIGN.md).
 - Library discovery JSONB parameter casting, including a fix for Background Jobs
   failures that reported `could not determine data type of parameter $1` while
   persisting discovery evidence. See

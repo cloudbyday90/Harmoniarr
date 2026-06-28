@@ -438,6 +438,45 @@ export function buildImportApplyReadinessNotice({
 }
 
 /**
+ * Build a short operator-facing handoff from a completed import apply run to
+ * the Library complete-release view.
+ *
+ * @param {object|null|undefined} currentRun
+ * @returns {{tone: string, title: string, message: string, location: object}|null}
+ */
+export function buildImportApplyLibraryHandoffNotice(currentRun) {
+  if (currentRun?.status !== 'completed') {
+    return null;
+  }
+
+  const appliedCount = coerceCount(currentRun.appliedCount);
+  const appliedWithWarningsCount = coerceCount(currentRun.appliedWithWarningsCount);
+  const totalAppliedCount = appliedCount + appliedWithWarningsCount;
+  if (totalAppliedCount <= 0) {
+    return null;
+  }
+
+  const releaseLabel = totalAppliedCount === 1 ? 'release' : 'releases';
+  const verbLabel = totalAppliedCount === 1 ? 'is' : 'are';
+  const hasWarnings = appliedWithWarningsCount > 0;
+
+  return {
+    tone: hasWarnings ? 'warning' : 'success',
+    title: `${totalAppliedCount} ${releaseLabel} ${verbLabel} in the library`,
+    message: hasWarnings
+      ? 'Open Library to confirm the imported release and review any warning state after the next scan.'
+      : 'Open Library to confirm the newly imported release in the complete library view.',
+    location: {
+      name: 'library',
+      query: {
+        focus: 'library',
+        status: 'complete',
+      },
+    },
+  };
+}
+
+/**
  * Return a CSS class suffix for an execution-run item queue status pill.
  *
  * @param {string|null|undefined} status

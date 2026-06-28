@@ -17,8 +17,9 @@
 -->
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import {
+  buildImportApplyLibraryHandoffNotice,
   buildImportApplyReadinessNotice,
   canStartApplyRun,
   describeApplyOperation,
@@ -40,7 +41,7 @@ import {
 import ConfirmDialog from './ConfirmDialog.vue';
 import ImportCandidateRunFailureNotice from './ImportCandidateRunFailureNotice.vue';
 
-defineProps({
+const props = defineProps({
   actionErrorMessage: {
     type: String,
     default: '',
@@ -88,6 +89,13 @@ const emit = defineEmits(['refresh', 'select-run', 'start']);
 const confirmOpen = ref(false);
 const applyTyped = ref('');
 const applyAcknowledged = ref(false);
+const applyReadinessNotice = computed(() => buildImportApplyReadinessNotice({
+  currentRun: props.currentRun,
+  importPendingCandidateCount: props.importPendingCandidateCount,
+}));
+const applyLibraryHandoffNotice = computed(() =>
+  buildImportApplyLibraryHandoffNotice(props.currentRun),
+);
 
 function openConfirm() {
   applyTyped.value = '';
@@ -131,14 +139,30 @@ function onApplyConfirm() {
     <p class="review-summary-copy" v-if="summary">{{ summary.message }}</p>
 
     <article
-      v-if="buildImportApplyReadinessNotice({ currentRun, importPendingCandidateCount })"
+      v-if="applyReadinessNotice"
       class="apply-readiness-notice"
-      :data-tone="buildImportApplyReadinessNotice({ currentRun, importPendingCandidateCount }).tone"
+      :data-tone="applyReadinessNotice.tone"
       role="status"
       aria-live="polite"
     >
-      <strong>{{ buildImportApplyReadinessNotice({ currentRun, importPendingCandidateCount }).title }}</strong>
-      <p>{{ buildImportApplyReadinessNotice({ currentRun, importPendingCandidateCount }).message }}</p>
+      <strong>{{ applyReadinessNotice.title }}</strong>
+      <p>{{ applyReadinessNotice.message }}</p>
+    </article>
+
+    <article
+      v-if="applyLibraryHandoffNotice"
+      class="apply-library-handoff-notice"
+      :data-tone="applyLibraryHandoffNotice.tone"
+      role="status"
+      aria-live="polite"
+    >
+      <div>
+        <strong>{{ applyLibraryHandoffNotice.title }}</strong>
+        <p>{{ applyLibraryHandoffNotice.message }}</p>
+      </div>
+      <RouterLink class="hx-btn hx-btn--sm" :to="applyLibraryHandoffNotice.location">
+        Open Library
+      </RouterLink>
     </article>
 
     <article class="panel-light error-panel" v-if="errorMessage" role="alert">
@@ -452,7 +476,8 @@ function onApplyConfirm() {
   color: var(--hx-accent-strong);
 }
 
-.apply-readiness-notice {
+.apply-readiness-notice,
+.apply-library-handoff-notice {
   display: grid;
   gap: var(--hx-space-1);
   padding: var(--hx-space-3) var(--hx-space-4);
@@ -461,24 +486,43 @@ function onApplyConfirm() {
   border-radius: var(--hx-radius-md);
 }
 
-.apply-readiness-notice[data-tone='success'] {
+.apply-library-handoff-notice {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.apply-readiness-notice[data-tone='success'],
+.apply-library-handoff-notice[data-tone='success'] {
   background: var(--hx-success-soft);
   border-color: rgba(47, 158, 107, 0.32);
 }
 
-.apply-readiness-notice[data-tone='warning'] {
+.apply-readiness-notice[data-tone='warning'],
+.apply-library-handoff-notice[data-tone='warning'] {
   background: var(--hx-warning-soft);
   border-color: rgba(192, 138, 22, 0.32);
 }
 
-.apply-readiness-notice strong {
+.apply-readiness-notice strong,
+.apply-library-handoff-notice strong {
   color: var(--hx-text);
   font-size: var(--hx-text-sm);
 }
 
-.apply-readiness-notice p {
+.apply-readiness-notice p,
+.apply-library-handoff-notice p {
   margin: 0;
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
+}
+
+@media (max-width: 640px) {
+  .apply-library-handoff-notice {
+    grid-template-columns: 1fr;
+  }
+
+  .apply-library-handoff-notice .hx-btn {
+    justify-self: start;
+  }
 }
 </style>

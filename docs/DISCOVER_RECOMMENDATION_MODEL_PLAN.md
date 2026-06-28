@@ -111,6 +111,10 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   ready to import, with browser verification from completed transfer evidence
   to a queued import apply run; see
   [IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md](IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md)
+- completed Import Review apply runs now expose an `Open Library` handoff into
+  the complete-release Library view, proving applied releases are visible from
+  the Library read model after import apply; see
+  [IMPORT_REVIEW_APPLY_LIBRARY_HANDOFF_DESIGN.md](IMPORT_REVIEW_APPLY_LIBRARY_HANDOFF_DESIGN.md)
 - Library discovery evidence writes now cast PostgreSQL JSONB placeholders,
   fixing `could not determine data type of parameter $1` dispatch failures
   before search/import handoff evidence can persist; see
