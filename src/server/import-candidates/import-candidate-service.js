@@ -25,6 +25,10 @@ import { loadSettings } from '../settings.js';
 import { scoreCandidateFormatMatch } from '../library/format-preference-scoring.js';
 import { getPool } from '../database.js';
 import {
+  createSlskdIngestionDiagnostics,
+  finalizeSlskdIngestionDiagnostics,
+} from './import-candidate-ingest-diagnostics.js';
+import {
   getImportCandidateById,
   insertImportCandidateEvent,
   listImportCandidateFiles,
@@ -210,7 +214,7 @@ function normalizeResponseFile(file, {
   };
 }
 
-export function normalizeSlskdResponsesToImportCandidates({
+export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
   blacklistedTitleTerms = null,
   formatPreferences = null,
   discoveredAt = new Date(),
@@ -222,15 +226,21 @@ export function normalizeSlskdResponsesToImportCandidates({
   const groups = new Map();
   let sourceFileIndex = 0;
 
-  const { responses: filteredResponses } = filterSlskdResponsesForCandidates({
+  const { responses: filteredResponses, summary: filterSummary } = filterSlskdResponsesForCandidates({
     responses,
     ignoredUsernames,
     blacklistedTitleTerms,
+  });
+  const ingestionDiagnostics = createSlskdIngestionDiagnostics({
+    filteredResponses,
+    filterSummary,
+    responses,
   });
 
   for (const response of filteredResponses) {
     const username = typeof response?.username === 'string' ? response.username.trim() : '';
     if (!username) {
+      ingestionDiagnostics.missingUsernameResponseCount += 1;
       continue;
     }
 
@@ -255,6 +265,7 @@ export function normalizeSlskdResponsesToImportCandidates({
       sourceFileIndex += 1;
 
       if (!normalizedFile) {
+        ingestionDiagnostics.malformedFileCount += 1;
         continue;
       }
 
@@ -277,7 +288,7 @@ export function normalizeSlskdResponsesToImportCandidates({
     }
   }
 
-  return Array.from(groups.values()).map((group) => {
+  const candidates = Array.from(groups.values()).map((group) => {
     const totalSizeBytes = group.files.reduce((total, file) => total + (file.sizeBytes ?? 0), 0);
     const lockedFileCount = group.files.filter((file) => file.isLocked).length;
     const extensions = Array.from(new Set(group.files.map((file) => file.extension).filter(Boolean))).sort();
@@ -332,6 +343,34 @@ export function normalizeSlskdResponsesToImportCandidates({
       files: group.files,
     };
   });
+
+  return {
+    candidates,
+    ingestionDiagnostics: finalizeSlskdIngestionDiagnostics(ingestionDiagnostics, {
+      candidateCount: candidates.length,
+      fileCount: candidates.reduce((total, candidate) => total + candidate.fileCount, 0),
+    }),
+  };
+}
+
+export function normalizeSlskdResponsesToImportCandidates({
+  blacklistedTitleTerms = null,
+  formatPreferences = null,
+  discoveredAt = new Date(),
+  ignoredUsernames = null,
+  requestOwnership = null,
+  responses = [],
+  searchId,
+}) {
+  return normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
+    blacklistedTitleTerms,
+    formatPreferences,
+    discoveredAt,
+    ignoredUsernames,
+    requestOwnership,
+    responses,
+    searchId,
+  }).candidates;
 }
 
 export function createImportCandidateService({
@@ -342,7 +381,7 @@ export function createImportCandidateService({
   listImportCandidatesBySourceMediaRequestIdsFn = listImportCandidatesBySourceMediaRequestIdsFromRepository,
   listIgnoredUsernamesFn = async () => [],
   listSourceUserReputationIndexFn = async () => new Map(),
-  normalizeSlskdResponsesFn = normalizeSlskdResponsesToImportCandidates,
+  normalizeSlskdResponsesFn = normalizeSlskdResponsesToImportCandidatesWithDiagnostics,
   pool = getPool(),
   recordAuditEventFn = recordAuditEvent,
   recordSourceUserOutcomeEvidenceFn = async () => null,
@@ -765,7 +804,7 @@ export function createImportCandidateService({
         effectiveIgnoredUsernames = null;
       }
     }
-    const candidates = normalizeSlskdResponsesFn({
+    const normalizedResponses = normalizeSlskdResponsesFn({
       blacklistedTitleTerms,
       formatPreferences,
       ignoredUsernames: effectiveIgnoredUsernames,
@@ -773,6 +812,11 @@ export function createImportCandidateService({
       responses: searchResponses.responses,
       searchId: searchResponses.searchId,
     });
+    const candidates = Array.isArray(normalizedResponses)
+      ? normalizedResponses
+      : Array.isArray(normalizedResponses?.candidates)
+        ? normalizedResponses.candidates
+        : [];
     let reputationIndex;
     try {
       reputationIndex = await listSourceUserReputationIndexFn({
@@ -846,6 +890,14 @@ export function createImportCandidateService({
 
       return stored;
     });
+    const storedFileCount = storedCandidates.reduce((total, candidate) => total + candidate.fileCount, 0);
+    const ingestionDiagnostics = finalizeSlskdIngestionDiagnostics(
+      normalizedResponses?.ingestionDiagnostics,
+      {
+        candidateCount: storedCandidates.length,
+        fileCount: storedFileCount,
+      },
+    );
 
     await recordAuditEventFn({
       actorUserId,
@@ -858,7 +910,7 @@ export function createImportCandidateService({
         sourceProvider: 'slskd',
         sourceSearchId: searchResponses.searchId,
         candidateCount: storedCandidates.length,
-        fileCount: storedCandidates.reduce((total, candidate) => total + candidate.fileCount, 0),
+        fileCount: storedFileCount,
       },
       ipAddress: requestMetadata?.ipAddress ?? null,
       userAgent: requestMetadata?.userAgent ?? null,
@@ -868,7 +920,8 @@ export function createImportCandidateService({
       sourceProvider: 'slskd',
       sourceSearchId: searchResponses.searchId,
       candidateCount: storedCandidates.length,
-      fileCount: storedCandidates.reduce((total, candidate) => total + candidate.fileCount, 0),
+      fileCount: storedFileCount,
+      ingestionDiagnostics,
       candidates: storedCandidates,
     };
   }

@@ -664,6 +664,42 @@ test('buildDiscoveryDispatchResult reports zero-candidate cooldown', () => {
   assert.match(result.message, /retry after cooldown/);
 });
 
+test('buildDiscoveryDispatchResult explains zero-candidate ingestion diagnostics', () => {
+  const result = buildDiscoveryDispatchResult({
+    discoveryRequest: {
+      evidence: {
+        lastSearchResult: {
+          candidateCount: 0,
+          fileCount: 0,
+          ingestionDiagnostics: {
+            blacklistedFileCount: 3,
+            candidateCount: 0,
+            fileCount: 0,
+            filteredResponseCount: 0,
+            ignoredUserResponseCount: 0,
+            provider: 'slskd',
+            reasonCodes: ['all_responses_filtered', 'blacklisted_files'],
+            responseCount: 2,
+            responseFileCount: 3,
+          },
+          sourceProvider: 'slskd',
+        },
+      },
+      requestStatus: 'cooldown',
+      searchAttemptCount: 1,
+    },
+  });
+
+  assert.equal(result.label, 'No candidates');
+  assert.equal(result.tone, 'warning');
+  assert.equal(result.message, 'Soulseek responded, but every file matched a blocked title term.');
+  assert.ok(result.details.some((detail) => detail.label === 'Responses' && detail.value === '2'));
+  assert.ok(result.details.some((detail) => detail.label === 'Provider files' && detail.value === '3'));
+  assert.ok(result.details.some((detail) => detail.label === 'Filtered' && detail.value === '3'));
+  assert.ok(result.details.some((detail) => detail.label === 'Reason' && detail.value.includes('blacklisted_files')));
+  assert.equal(JSON.stringify(result).includes('apiKey'), false);
+});
+
 test('buildDiscoveryDispatchResult reports dispatch failure without leaking provider secrets', () => {
   const result = buildDiscoveryDispatchResult({
     discoveryRequest: {

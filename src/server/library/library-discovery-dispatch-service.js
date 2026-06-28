@@ -347,6 +347,9 @@ export function createLibraryDiscoveryDispatchService({
           searchId: search.id,
           searchQuery,
         };
+        if (ingestionResult.ingestionDiagnostics) {
+          successPayload.ingestionDiagnostics = ingestionResult.ingestionDiagnostics;
+        }
         if (zeroCandidateSchedule) {
           successPayload.nextSearchAfter = zeroCandidateSchedule.nextSearchAfter;
           successPayload.searchAttemptCount = zeroCandidateSchedule.searchAttemptCount;

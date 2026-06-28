@@ -123,6 +123,10 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   automatic-dispatchable while bypassing stale cooldown only for new request
   intent or interrupted claims with no recorded search outcome; see
   [REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md](REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md)
+- zero-candidate discovery searches now persist bounded ingestion diagnostics
+  and Wanted rows explain whether provider responses were absent, filtered, or
+  malformed without exposing raw slskd payloads; see
+  [DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md](DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:

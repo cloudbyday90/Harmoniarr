@@ -123,6 +123,11 @@ Confirmed complete:
   changing the row out of the automatic dispatcher path or creating continuous
   retry loops. See
   [REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md](REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md).
+- Discovery response ingestion diagnostics, including bounded zero-candidate
+  reason evidence from slskd response ingestion and Wanted row messages that
+  explain absent, filtered, or malformed provider responses without exposing raw
+  provider payloads. See
+  [DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md](DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md).
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See

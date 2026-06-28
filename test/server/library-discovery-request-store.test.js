@@ -82,6 +82,7 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
     assert.match(sql, /'lastSearchQuery', \$2::text/);
     assert.match(sql, /'candidateCount', \$3::integer/);
     assert.match(sql, /'fileCount', \$4::integer/);
+    assert.match(sql, /'ingestionDiagnostics', \$8::jsonb/);
     assert.deepEqual(params, [
       'search-1',
       'Bjork Vespertine Live',
@@ -90,6 +91,11 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
       'release-1',
       2,
       '2026-04-30T16:00:00.000Z',
+      JSON.stringify({
+        provider: 'slskd',
+        reasonCodes: ['no_provider_responses'],
+        responseCount: 0,
+      }),
     ]);
     return { rows: [] };
   });
@@ -100,6 +106,11 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
   await store.recordDiscoverySearchSuccess({
     candidateCount: 0,
     fileCount: 0,
+    ingestionDiagnostics: {
+      provider: 'slskd',
+      reasonCodes: ['no_provider_responses'],
+      responseCount: 0,
+    },
     metadataReleaseId: 'release-1',
     nextSearchAfter: '2026-04-30T16:00:00.000Z',
     searchAttemptCount: 2,

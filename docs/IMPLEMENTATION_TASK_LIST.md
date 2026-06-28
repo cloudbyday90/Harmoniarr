@@ -118,6 +118,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   cooldown only when the request is new, newer than the previous search, or a
   prior claim never recorded a search outcome. See
   `REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md`.
+- Discovery response ingestion diagnostics: zero-candidate Soulseek searches now
+  persist bounded aggregate diagnostics under discovery search evidence and
+  Wanted rows explain why responses did not become Import Review candidates
+  without exposing provider payloads, usernames, filenames, paths, or secrets.
+  See `DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,

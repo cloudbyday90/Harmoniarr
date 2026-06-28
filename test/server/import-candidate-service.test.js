@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   createImportCandidateService,
   normalizeSlskdResponsesToImportCandidates,
+  normalizeSlskdResponsesToImportCandidatesWithDiagnostics,
 } from '../../src/server/import-candidates/import-candidate-service.js';
 import { scoreDownloadResult } from '../../src/server/library/download-result-scoring.js';
 
@@ -189,6 +190,54 @@ test('normalizeSlskdResponsesToImportCandidates scores below quality floor as 0'
   assert.equal(candidates[0].normalizedPayload.formatMatchLabel, 'Below quality floor');
 });
 
+test('normalizeSlskdResponsesToImportCandidatesWithDiagnostics reports bounded zero-candidate reasons', () => {
+  const result = normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
+    blacklistedTitleTerms: ['karaoke'],
+    discoveredAt: new Date('2026-04-30T14:00:00.000Z'),
+    ignoredUsernames: ['ignored-peer'],
+    searchId: 'search-1',
+    responses: [{
+      username: 'ignored-peer',
+      files: [{ filename: 'Artist\\Album\\01 Track.flac', size: 100 }],
+    }, {
+      username: 'source-user',
+      files: [{ filename: 'Artist\\Album\\karaoke mix.flac', size: 100 }],
+    }, {
+      username: '',
+      files: [{ filename: 'Artist\\Album\\02 Track.flac', size: 100 }],
+    }, {
+      username: 'source-user-2',
+      files: [{ filename: '', size: 100 }],
+    }],
+  });
+
+  assert.equal(result.candidates.length, 0);
+  assert.deepEqual(result.ingestionDiagnostics, {
+    blacklistedFileCount: 1,
+    candidateCount: 0,
+    emptyResponseCount: 1,
+    fileCount: 0,
+    filteredFileCount: 2,
+    filteredLockedFileCount: 0,
+    filteredResponseCount: 2,
+    ignoredUserResponseCount: 1,
+    malformedFileCount: 1,
+    missingUsernameResponseCount: 1,
+    provider: 'slskd',
+    reasonCodes: [
+      'ignored_uploaders',
+      'blacklisted_files',
+      'missing_uploader_identity',
+      'malformed_file_payload',
+    ],
+    responseCount: 4,
+    responseFileCount: 4,
+    responseLockedFileCount: 0,
+  });
+  assert.equal(JSON.stringify(result.ingestionDiagnostics).includes('ignored-peer'), false);
+  assert.equal(JSON.stringify(result.ingestionDiagnostics).includes('karaoke mix'), false);
+});
+
 test('createImportCandidateService ingests slskd responses in one transaction and records audit', async (t) => {
   const { client, pool } = createPool(t);
   const slskdService = {
@@ -278,6 +327,39 @@ test('createImportCandidateService ingests slskd responses in one transaction an
   });
   assert.equal(result.candidates[0].id, 'candidate-1');
   assert.equal(result.candidates[0].files[0].filename, '01 Wildlife Analysis.flac');
+});
+
+test('createImportCandidateService returns zero-candidate ingestion diagnostics without raw provider details', async (t) => {
+  const { pool } = createPool(t);
+  const service = createImportCandidateService({
+    listIgnoredUsernamesFn: t.mock.fn(async () => ['ignored-peer']),
+    pool,
+    recordAuditEventFn: t.mock.fn(),
+    replaceImportCandidateFilesFn: t.mock.fn(),
+    slskdService: {
+      getSearchResponses: async () => ({
+        searchId: 'search-1',
+        responses: [{
+          username: 'ignored-peer',
+          files: [{ filename: 'Artist\\Album\\01 Track.flac', size: 100 }],
+        }],
+      }),
+    },
+    upsertImportCandidateFn: t.mock.fn(),
+  });
+
+  const result = await service.ingestSlskdSearchResponses({ searchId: 'search-1' });
+
+  assert.equal(result.candidateCount, 0);
+  assert.equal(result.fileCount, 0);
+  assert.deepEqual(result.ingestionDiagnostics.reasonCodes, [
+    'all_responses_filtered',
+    'ignored_uploaders',
+  ]);
+  assert.equal(result.ingestionDiagnostics.responseCount, 1);
+  assert.equal(result.ingestionDiagnostics.responseFileCount, 1);
+  assert.equal(JSON.stringify(result.ingestionDiagnostics).includes('ignored-peer'), false);
+  assert.equal(JSON.stringify(result.ingestionDiagnostics).includes('01 Track'), false);
 });
 
 test('createImportCandidateService includes stored uploader reputation in candidate scoring', async (t) => {

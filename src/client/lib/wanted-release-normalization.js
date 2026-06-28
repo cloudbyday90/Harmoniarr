@@ -399,6 +399,67 @@ function buildDiscoveryResultDetails(discoveryRequest, evidence) {
   return details;
 }
 
+function getIngestionDiagnosticMessage(diagnostics) {
+  const reasonCodes = Array.isArray(diagnostics?.reasonCodes) ? diagnostics.reasonCodes : [];
+
+  if (reasonCodes.includes('no_provider_responses')) {
+    return 'Soulseek returned no responses for the last search.';
+  }
+  if (reasonCodes.includes('ignored_uploaders') && reasonCodes.includes('all_responses_filtered')) {
+    return 'Soulseek responded, but matching uploaders are currently ignored.';
+  }
+  if (reasonCodes.includes('blacklisted_files') && reasonCodes.includes('all_responses_filtered')) {
+    return 'Soulseek responded, but every file matched a blocked title term.';
+  }
+  if (reasonCodes.includes('missing_uploader_identity')) {
+    return 'Soulseek responded, but responses were missing uploader identity.';
+  }
+  if (reasonCodes.includes('malformed_file_payload')) {
+    return 'Soulseek responded, but files could not be normalized into candidates.';
+  }
+  if (reasonCodes.includes('no_usable_files')) {
+    return 'Soulseek responded without usable files.';
+  }
+  if (reasonCodes.includes('no_candidate_folders')) {
+    return 'Soulseek responses did not contain candidate folders.';
+  }
+
+  return null;
+}
+
+function addIngestionDiagnosticDetails(details, diagnostics) {
+  if (!diagnostics || typeof diagnostics !== 'object') {
+    return details;
+  }
+
+  const responseCount = toCount(diagnostics.responseCount);
+  if (responseCount > 0) {
+    details.push({ label: 'Responses', value: String(responseCount) });
+  }
+
+  const responseFileCount = toCount(diagnostics.responseFileCount);
+  if (responseFileCount > 0) {
+    details.push({ label: 'Provider files', value: String(responseFileCount) });
+  }
+
+  const filteredOutCount = toCount(diagnostics.ignoredUserResponseCount)
+    + toCount(diagnostics.blacklistedFileCount)
+    + toCount(diagnostics.malformedFileCount)
+    + toCount(diagnostics.missingUsernameResponseCount);
+  if (filteredOutCount > 0) {
+    details.push({ label: 'Filtered', value: String(filteredOutCount) });
+  }
+
+  const reasonCodes = Array.isArray(diagnostics.reasonCodes)
+    ? diagnostics.reasonCodes.filter((reasonCode) => typeof reasonCode === 'string' && reasonCode)
+    : [];
+  if (reasonCodes.length > 0) {
+    details.push({ label: 'Reason', value: reasonCodes.join(', ') });
+  }
+
+  return details;
+}
+
 /**
  * Builds a compact operator-facing discovery dispatch result for a wanted row.
  *
@@ -458,12 +519,16 @@ export function buildDiscoveryDispatchResult(release) {
       };
     }
 
+    const diagnostics = lastSearchResult.ingestionDiagnostics ?? null;
+    addIngestionDiagnosticDetails(details, diagnostics);
+    const diagnosticMessage = getIngestionDiagnosticMessage(diagnostics);
+
     return {
       details,
       label: 'No candidates',
-      message: discoveryRequest.requestStatus === 'cooldown'
+      message: diagnosticMessage ?? (discoveryRequest.requestStatus === 'cooldown'
         ? 'Last search returned no candidates; Harmoniarr will retry after cooldown.'
-        : 'Last search returned no candidates.',
+        : 'Last search returned no candidates.'),
       tone: discoveryRequest.requestStatus === 'blocked' ? 'danger' : 'warning',
     };
   }

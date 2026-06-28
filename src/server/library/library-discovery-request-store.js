@@ -226,6 +226,7 @@ export function createLibraryDiscoveryRequestStore({
   async function recordDiscoverySearchSuccess({
     candidateCount,
     fileCount,
+    ingestionDiagnostics = null,
     metadataReleaseId,
     nextSearchAfter = undefined,
     searchId,
@@ -242,11 +243,12 @@ export function createLibraryDiscoveryRequestStore({
             'lastDispatchFailure', NULL,
             'lastSearchId', $1::text,
             'lastSearchQuery', $2::text,
-            'lastSearchResult', jsonb_build_object(
+            'lastSearchResult', jsonb_strip_nulls(jsonb_build_object(
               'candidateCount', $3::integer,
               'fileCount', $4::integer,
+              'ingestionDiagnostics', $8::jsonb,
               'sourceProvider', 'slskd'
-            ),
+            )),
             'lastSearchAttemptCount', COALESCE($6::integer, search_attempt_count)
           ),
           next_search_after = COALESCE($7::timestamptz, next_search_after),
@@ -254,7 +256,16 @@ export function createLibraryDiscoveryRequestStore({
           updated_at = NOW()
         WHERE metadata_release_id = $5
       `,
-      [searchId, searchQuery, candidateCount, fileCount, metadataReleaseId, searchAttemptCount, nextSearchAfter],
+      [
+        searchId,
+        searchQuery,
+        candidateCount,
+        fileCount,
+        metadataReleaseId,
+        searchAttemptCount,
+        nextSearchAfter,
+        ingestionDiagnostics ? JSON.stringify(ingestionDiagnostics) : null,
+      ],
     );
   }
 

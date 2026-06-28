@@ -343,6 +343,11 @@ test('dispatchReadyDiscoveryRequests continues when getUserPreferencesFn throws'
   const ingestSlskdSearchResponses = t.mock.fn(async () => ({
     candidateCount: 0,
     fileCount: 0,
+    ingestionDiagnostics: {
+      provider: 'slskd',
+      reasonCodes: ['no_provider_responses'],
+      responseCount: 0,
+    },
   }));
   const getUserPreferencesFn = t.mock.fn(async () => { throw new Error('DB unavailable'); });
 
@@ -367,6 +372,11 @@ test('dispatchReadyDiscoveryRequests continues when getUserPreferencesFn throws'
   assert.deepEqual(recordDiscoverySearchSuccess.mock.calls[0].arguments[0], {
     candidateCount: 0,
     fileCount: 0,
+    ingestionDiagnostics: {
+      provider: 'slskd',
+      reasonCodes: ['no_provider_responses'],
+      responseCount: 0,
+    },
     metadataReleaseId: 'release-1',
     nextSearchAfter: '2026-04-30T20:00:00.000Z',
     searchAttemptCount: 1,
