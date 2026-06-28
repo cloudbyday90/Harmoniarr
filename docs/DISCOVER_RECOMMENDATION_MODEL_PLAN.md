@@ -127,6 +127,10 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   and Wanted rows explain whether provider responses were absent, filtered, or
   malformed without exposing raw slskd payloads; see
   [DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md](DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md)
+- Wanted rows now expose Import Review selection readiness, distinguishing
+  high-confidence candidates ready for operator selection from ambiguous,
+  low-confidence, unscored, selected, or active handoff states; see
+  [IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md](IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:

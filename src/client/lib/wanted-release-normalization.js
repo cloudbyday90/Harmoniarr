@@ -189,9 +189,15 @@ function formatCandidateCount(count) {
   return `${count} ${pluralize(count, 'candidate')}`;
 }
 
+function formatScore(value) {
+  const parsed = Number.parseFloat(String(value ?? ''));
+  return Number.isFinite(parsed) ? parsed.toFixed(1).replace(/\.0$/, '') : null;
+}
+
 function buildImportReviewWorkflowDetails(summary) {
   const statusCounts = summary?.statusCounts ?? {};
   const downloadExecutionSummary = summary?.downloadExecutionSummary ?? null;
+  const selectionReadiness = summary?.selectionReadiness ?? null;
   const details = [{ label: 'Candidates', value: String(toCount(summary?.totalCount)) }];
   const orderedStatuses = [
     ['pending', 'Pending'],
@@ -221,7 +227,66 @@ function buildImportReviewWorkflowDetails(summary) {
     details.push({ label: 'Queue failures', value: String(failedFilenameCount) });
   }
 
+  const bestScore = formatScore(selectionReadiness?.bestCompositeScore);
+  if (bestScore) {
+    details.push({ label: 'Best score', value: bestScore });
+  }
+
+  const scoreGap = formatScore(selectionReadiness?.scoreGap);
+  if (scoreGap) {
+    details.push({ label: 'Score gap', value: scoreGap });
+  }
+
   return details;
+}
+
+function buildSelectionReadinessWorkflowResult({
+  details,
+  primaryStatus,
+  readiness,
+}) {
+  if (!readiness || !['pending', 'held'].includes(primaryStatus)) {
+    return null;
+  }
+
+  const bestScore = formatScore(readiness.bestCompositeScore);
+  const threshold = formatScore(readiness.thresholds?.minCompositeScore);
+  const scoreText = bestScore && threshold ? `Best score ${bestScore} meets the ${threshold} threshold.` : null;
+
+  switch (readiness.code) {
+    case 'auto_selectable':
+      return {
+        details,
+        label: 'Ready for selection',
+        message: `${scoreText ?? 'A high-confidence candidate is available.'} Select it in Import Review to start download handoff.`,
+        tone: 'info',
+      };
+    case 'ambiguous':
+      return {
+        details,
+        label: 'Review candidates',
+        message: 'Multiple candidates are close in score; choose one in Import Review before download handoff.',
+        tone: 'warning',
+      };
+    case 'low_confidence':
+      return {
+        details,
+        label: 'Needs review',
+        message: bestScore
+          ? `Best score ${bestScore} is below the selection threshold; review candidates before download handoff.`
+          : 'Candidates need review before download handoff.',
+        tone: 'warning',
+      };
+    case 'unscored':
+      return {
+        details,
+        label: 'Needs review',
+        message: 'Candidates have no composite score yet; review them before download handoff.',
+        tone: 'warning',
+      };
+    default:
+      return null;
+  }
 }
 
 function buildDownloadExecutionWorkflowResult(summary, details) {
@@ -308,6 +373,15 @@ export function buildImportReviewWorkflowResult(release) {
   const downloadExecutionResult = buildDownloadExecutionWorkflowResult(summary, details);
   if (downloadExecutionResult) {
     return downloadExecutionResult;
+  }
+
+  const selectionReadinessResult = buildSelectionReadinessWorkflowResult({
+    details,
+    primaryStatus,
+    readiness: summary.selectionReadiness,
+  });
+  if (selectionReadinessResult) {
+    return selectionReadinessResult;
   }
 
   switch (primaryStatus) {

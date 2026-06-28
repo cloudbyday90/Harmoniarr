@@ -128,6 +128,11 @@ Confirmed complete:
   explain absent, filtered, or malformed provider responses without exposing raw
   provider payloads. See
   [DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md](DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md).
+- Import candidate selection readiness, including bounded score/status
+  summaries on Wanted rows that explain when search candidates are ready for
+  operator selection, ambiguous, low-confidence, unscored, already selected, or
+  already in download/import handoff. See
+  [IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md](IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md).
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See

@@ -33,6 +33,9 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             id: 'wanted-1',
             import_candidate_latest_status: 'selected',
             import_candidate_latest_updated_at: '2026-06-27T21:10:00.000Z',
+            import_candidate_best_composite_score: 91,
+            import_candidate_scored_count: 3,
+            import_candidate_second_best_composite_score: 84,
             import_candidate_status_counts: {
               downloading: 2,
               pending: 1,
@@ -75,6 +78,8 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   assert.match(observedSql, /LEFT JOIN LATERAL/);
   assert.match(observedSql, /FROM import_candidates ic/);
   assert.match(observedSql, /ic\.source_search_id = NULLIF\(ldr\.evidence->>'lastSearchId', ''\)/);
+  assert.match(observedSql, /jsonb_typeof\(ic\.normalized_payload->'compositeScore'\)/);
+  assert.match(observedSql, /second_best_composite_score/);
   assert.match(observedSql, /FROM import_execution_run_items iei/);
   assert.match(observedSql, /jsonb_array_length\(latest_item\.planning_snapshot #> '\{execution,enqueuedTransfers\}'\)/);
   assert.match(observedSql, /lwr\.app_user_id = \$1/);
@@ -93,6 +98,22 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
     importReviewSummary: {
       latestStatus: 'selected',
       latestUpdatedAt: '2026-06-27T21:10:00.000Z',
+      selectionReadiness: {
+        bestCompositeScore: 91,
+        candidateCount: 3,
+        code: 'handoff_active',
+        label: 'Download handoff active',
+        message: 'A selected candidate is already moving through the download or import pipeline.',
+        reviewableCount: 1,
+        scoredCandidateCount: 3,
+        scoreGap: 7,
+        secondBestCompositeScore: 84,
+        thresholds: {
+          ambiguityMargin: 5,
+          minCompositeScore: 85,
+        },
+        tone: 'info',
+      },
       statusCounts: {
         downloading: 2,
         pending: 1,
@@ -137,6 +158,9 @@ test('listWantedReleasesWithMetadata returns null discoveryRequest when none exi
           id: 'wanted-2',
           import_candidate_latest_status: null,
           import_candidate_latest_updated_at: null,
+          import_candidate_best_composite_score: null,
+          import_candidate_scored_count: 0,
+          import_candidate_second_best_composite_score: null,
           import_candidate_status_counts: null,
           import_candidate_total_count: 0,
           import_execution_enqueued_transfer_count: 0,

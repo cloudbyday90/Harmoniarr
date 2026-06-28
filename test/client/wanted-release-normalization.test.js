@@ -789,6 +789,60 @@ test('buildImportReviewWorkflowResult reports selected candidates', () => {
   ]);
 });
 
+test('buildImportReviewWorkflowResult reports high-confidence candidates awaiting selection', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        latestStatus: 'pending',
+        selectionReadiness: {
+          bestCompositeScore: 91,
+          code: 'auto_selectable',
+          scoreGap: 11,
+          thresholds: {
+            minCompositeScore: 85,
+          },
+        },
+        statusCounts: {
+          pending: 2,
+        },
+        totalCount: 2,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Ready for selection');
+  assert.equal(result.tone, 'info');
+  assert.equal(result.message, 'Best score 91 meets the 85 threshold. Select it in Import Review to start download handoff.');
+  assert.ok(result.details.some((detail) => detail.label === 'Best score' && detail.value === '91'));
+  assert.ok(result.details.some((detail) => detail.label === 'Score gap' && detail.value === '11'));
+});
+
+test('buildImportReviewWorkflowResult reports ambiguous candidates before download handoff', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        latestStatus: 'pending',
+        selectionReadiness: {
+          bestCompositeScore: 88.5,
+          code: 'ambiguous',
+          scoreGap: 3.3,
+          thresholds: {
+            minCompositeScore: 85,
+          },
+        },
+        statusCounts: {
+          pending: 3,
+        },
+        totalCount: 3,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Review candidates');
+  assert.equal(result.tone, 'warning');
+  assert.equal(result.message, 'Multiple candidates are close in score; choose one in Import Review before download handoff.');
+});
+
 test('buildImportReviewWorkflowResult prioritizes active downloading state over stale latest status', () => {
   const result = buildImportReviewWorkflowResult({
     discoveryRequest: {

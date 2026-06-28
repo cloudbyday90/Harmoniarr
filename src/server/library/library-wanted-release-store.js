@@ -17,6 +17,7 @@
  */
 
 import { getPool } from '../database.js';
+import { buildImportCandidateSelectionReadiness } from '../import-candidates/import-candidate-selection-readiness.js';
 
 function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
@@ -46,6 +47,17 @@ function buildImportReviewSummary(row) {
     statusCounts: normalizeStatusCounts(row.import_candidate_status_counts),
     totalCount,
   };
+
+  const selectionReadiness = buildImportCandidateSelectionReadiness({
+    bestCompositeScore: row.import_candidate_best_composite_score,
+    scoredCandidateCount: row.import_candidate_scored_count,
+    secondBestCompositeScore: row.import_candidate_second_best_composite_score,
+    statusCounts: summary.statusCounts,
+    totalCount,
+  });
+  if (selectionReadiness) {
+    summary.selectionReadiness = selectionReadiness;
+  }
 
   const executionItemCount = toInteger(row.import_execution_item_total_count);
   if (executionItemCount > 0) {
@@ -268,6 +280,9 @@ export function createLibraryWantedReleaseStore({
           import_review_summary.status_counts AS import_candidate_status_counts,
           import_review_summary.latest_status AS import_candidate_latest_status,
           import_review_summary.latest_updated_at AS import_candidate_latest_updated_at,
+          import_review_summary.best_composite_score AS import_candidate_best_composite_score,
+          import_review_summary.second_best_composite_score AS import_candidate_second_best_composite_score,
+          import_review_summary.scored_candidate_count AS import_candidate_scored_count,
           import_execution_summary.total_item_count AS import_execution_item_total_count,
           import_execution_summary.item_status_counts AS import_execution_item_status_counts,
           import_execution_summary.latest_item_status AS import_execution_latest_item_status,
@@ -280,20 +295,62 @@ export function createLibraryWantedReleaseStore({
         JOIN metadata_releases mr ON mr.id = lwr.metadata_release_id
         LEFT JOIN library_discovery_requests ldr ON ldr.metadata_release_id = lwr.metadata_release_id
         LEFT JOIN LATERAL (
-          SELECT
-            COUNT(*)::integer AS total_count,
-            COALESCE(jsonb_object_agg(status_summary.status, status_summary.status_count), '{}'::jsonb) AS status_counts,
-            (ARRAY_AGG(status_summary.status ORDER BY status_summary.latest_updated_at DESC, status_summary.status ASC))[1] AS latest_status,
-            MAX(status_summary.latest_updated_at) AS latest_updated_at
-          FROM (
+          WITH candidate_rows AS (
             SELECT
               ic.status,
-              COUNT(*)::integer AS status_count,
-              MAX(ic.updated_at) AS latest_updated_at
+              ic.updated_at,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'compositeScore') = 'number'
+                  THEN (ic.normalized_payload->>'compositeScore')::numeric
+                WHEN jsonb_typeof(ic.normalized_payload->'compositeScore') = 'string'
+                  AND (ic.normalized_payload->>'compositeScore') ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                  THEN (ic.normalized_payload->>'compositeScore')::numeric
+                ELSE NULL
+              END AS composite_score
             FROM import_candidates ic
             WHERE ic.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')
-            GROUP BY ic.status
-          ) status_summary
+          )
+          SELECT
+            (SELECT COUNT(*)::integer FROM candidate_rows) AS total_count,
+            (
+              SELECT COALESCE(jsonb_object_agg(status_summary.status, status_summary.status_count), '{}'::jsonb)
+              FROM (
+                SELECT
+                  candidate_rows.status,
+                  COUNT(*)::integer AS status_count
+                FROM candidate_rows
+                GROUP BY candidate_rows.status
+              ) status_summary
+            ) AS status_counts,
+            (
+              SELECT candidate_rows.status
+              FROM candidate_rows
+              ORDER BY candidate_rows.updated_at DESC, candidate_rows.status ASC
+              LIMIT 1
+            ) AS latest_status,
+            (SELECT MAX(candidate_rows.updated_at) FROM candidate_rows) AS latest_updated_at,
+            (
+              SELECT candidate_rows.composite_score
+              FROM candidate_rows
+              WHERE candidate_rows.composite_score IS NOT NULL
+              ORDER BY candidate_rows.composite_score DESC NULLS LAST
+              LIMIT 1
+            ) AS best_composite_score,
+            (
+              SELECT ranked_scores.composite_score
+              FROM (
+                SELECT
+                  candidate_rows.composite_score,
+                  ROW_NUMBER() OVER (ORDER BY candidate_rows.composite_score DESC NULLS LAST) AS score_rank
+                FROM candidate_rows
+                WHERE candidate_rows.composite_score IS NOT NULL
+              ) ranked_scores
+              WHERE ranked_scores.score_rank = 2
+            ) AS second_best_composite_score,
+            (
+              SELECT COUNT(candidate_rows.composite_score)::integer
+              FROM candidate_rows
+            ) AS scored_candidate_count
         ) import_review_summary ON TRUE
         LEFT JOIN LATERAL (
           SELECT

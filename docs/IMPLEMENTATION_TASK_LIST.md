@@ -123,6 +123,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   Wanted rows explain why responses did not become Import Review candidates
   without exposing provider payloads, usernames, filenames, paths, or secrets.
   See `DISCOVERY_RESPONSE_INGESTION_DIAGNOSTICS_DESIGN.md`.
+- Import candidate selection readiness: Wanted rows now distinguish
+  high-confidence candidates ready for operator selection, ambiguous
+  close-scoring candidates, low-confidence or unscored candidates, and active
+  selected/download handoff state. This explains why successful searches may
+  still show no Downloader activity until a candidate is selected in Import
+  Review. See `IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,
