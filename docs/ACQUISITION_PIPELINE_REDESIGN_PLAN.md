@@ -1031,35 +1031,40 @@ user-facing workflow become automation-first.
 
 ---
 
-## 16. Open Design Questions
+## 16. Closed Design Decisions
 
-- Should Music Queue replace the current user-facing `Wanted` and `Candidates`
-  pages, or should Wanted remain as a ledger while Music Queue owns visible
-  progress?
-- Should Music Queue become a top-level nav item, a Home panel with a "See all"
-  route, or both?
-- Which current Activity tabs should survive as user-facing tabs versus move to
-  operator diagnostics?
-- Should Activity default to a single timeline with filters instead of many
-  tabs?
-- Should matches open as an inline row expansion, right-side panel, or
-  route-backed detail page?
-- What is the default safe auto-add policy for warnings?
-- What are the exact default quality profiles: Lossless archive, High
-  quality, Any available, or more?
-- Should fallback below preferred quality be per-user, per-artist, per-release,
-  or per-profile?
-- Should cutoff quality trigger a future upgrade search even after a lower
-  quality release imports successfully?
-- Should path mapping be required before any Soulseek search, or only before
-  download enqueue?
-- Should automatic library add be global, per-library, per-user, or per-artist?
-- What is the correct default for low-confidence results: keep visible, hide
-  under review, or auto-reject after a TTL?
-- How much of the old Import Review runway should remain visible to operators by
-  default?
-- Should the candidate diagnostics route be operator-only, or visible to
-  requesters only through simplified source history?
+The architecture-impacting open questions are closed in
+[MUSIC_QUEUE_OPEN_QUESTIONS_DECISIONS.md](MUSIC_QUEUE_OPEN_QUESTIONS_DECISIONS.md).
+
+Accepted decisions:
+
+- Music Queue is the primary release-progress surface.
+- Wanted remains the durable ledger; candidates move to diagnostics.
+- Music Queue should be a top-level route, with an optional Home summary panel.
+- Activity defaults to a timeline/history view with filters.
+- Operational Activity tabs move to Music Queue, Downloader, Settings, Artist
+  Detail, Library, or advanced diagnostics.
+- Default quality profiles are `lossless_archive`, `high_quality`, and
+  `any_available`.
+- Fallback below preferred quality is profile-level first, with per-release
+  override later.
+- Cutoff quality keeps upgrade search eligible when `upgradeAllowed` is true.
+- Provider health gates search; folder setup gates download handoff.
+- Automatic library add is globally allowed only for safe states, and remains
+  blocked by profile/library safety rules.
+- Low-confidence results stop as `pick_match`; they are not auto-rejected by
+  TTL in Phase 1.
+- Raw candidate diagnostics are operator-only. Requesters may see simplified
+  match history through request/release context.
+
+Deferred UI decisions:
+
+- match detail layout: route-backed page first, drawer or inline expansion can
+  be decided during Phase 2
+- exact Music Queue summary cards
+- how long legacy Import Review runway remains visible by default
+- whether Wanted survives as a visible secondary page after Music Queue proves
+  the workflow
 
 ---
 

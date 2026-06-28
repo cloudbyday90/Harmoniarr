@@ -12,6 +12,10 @@ Phase 0 does not add runtime code. Its job is to make the product contract,
 status contract, quality contract, Activity boundary, and payload shape explicit
 before Phase 1 creates modular read-model and presentation services.
 
+Architecture-impacting open questions were closed after this Phase 0 contract in
+[MUSIC_QUEUE_OPEN_QUESTIONS_DECISIONS.md](MUSIC_QUEUE_OPEN_QUESTIONS_DECISIONS.md).
+Those decisions are binding for Phase 1.
+
 ---
 
 ## 1. Official Sources Reviewed
@@ -569,4 +573,3 @@ should build a read-only projection and presentation layer:
    steps.
 5. Add a skeleton Music Queue route/view that consumes the read model without
    changing automation behavior yet.
-

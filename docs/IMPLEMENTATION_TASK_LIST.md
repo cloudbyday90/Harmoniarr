@@ -36,7 +36,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   Phase 0 now has a completed design/research/evaluation outcome covering the
   status/action contract, Activity boundary, quality profiles, candidate hiding
   rule, event payloads, match-attempt lifecycle, and walkthrough payload
-  examples. See `ACQUISITION_PIPELINE_REDESIGN_PLAN.md` and
+  examples. Follow-up open questions are closed in
+  `MUSIC_QUEUE_OPEN_QUESTIONS_DECISIONS.md`, locking Music Queue route
+  ownership, Activity boundaries, default quality profiles, fallback/cutoff
+  behavior, setup gates, auto-add policy, and diagnostics visibility before
+  Phase 1. See `ACQUISITION_PIPELINE_REDESIGN_PLAN.md` and
   `MUSIC_QUEUE_PHASE_0_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
