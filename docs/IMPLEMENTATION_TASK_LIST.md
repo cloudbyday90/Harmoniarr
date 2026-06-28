@@ -144,6 +144,10 @@ Database model source: `docs/DATABASE_MODEL.md`
   same operator journey through execution transfer sync and direct Downloader
   detail drill-through for the accepted transfer. See
   `WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
+- Provider-backed download acceptance diagnostics: import execution items now
+  persist and render bounded diagnostics for planning blockers, no unlocked
+  files, provider acceptance, partial provider rejection, and full provider
+  rejection. See `PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,

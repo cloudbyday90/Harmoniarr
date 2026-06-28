@@ -144,6 +144,11 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   live Downloader transfer detail route, proving the accepted transfer is visible
   after reconciliation; see
   [WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md)
+- Import Review execution items now persist and render provider-backed download
+  acceptance diagnostics, explaining whether Downloader stayed empty because of
+  planning blockers, no unlocked files, partial provider rejection, or full
+  provider rejection; see
+  [PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md](PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:

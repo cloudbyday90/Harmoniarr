@@ -186,6 +186,24 @@ export function buildSelectionReadyAcceptedExecutionRun(currentRun) {
           id: 'candidate-selection-ready',
           username: selectionReadyTransfer.username,
         },
+        execution: {
+          diagnostics: {
+            downloadAcceptance: {
+              code: 'provider_accepted',
+              counts: {
+                enqueuedTransfers: 1,
+                failedFiles: 0,
+                requestedFiles: 1,
+              },
+              enqueuedTransferIds: ['transfer-selection-ready-saw'],
+              message: 'The download provider accepted 1 transfer for this candidate.',
+              operatorAction: 'Monitor Downloader until the transfer completes, then continue import review.',
+              title: 'Provider accepted transfer',
+              tone: 'success',
+              warningMessage: null,
+            },
+          },
+        },
         planning: {
           libraryFolderPath: 'Music/Aphex Twin/Selected Ambient Works 85-92',
           sourceFolderPath: '/private/staging/Aphex Twin/Selected Ambient Works 85-92',

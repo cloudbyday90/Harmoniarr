@@ -146,6 +146,10 @@ Confirmed complete:
   continuation from selected candidate to synced live Downloader transfer detail.
   See
   [WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
+- Provider-backed download acceptance diagnostics, including bounded operator
+  visibility for planning blockers, no unlocked files, provider acceptance, and
+  provider rejection outcomes. See
+  [PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md](PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md).
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See

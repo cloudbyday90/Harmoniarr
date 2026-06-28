@@ -82,6 +82,29 @@ files, for example `/downloads/complete/Music`, mapped to
 `/data/downloads/complete`. Do not map to `Y:\` inside Harmoniarr; that is a
 host path, not a container path.
 
+## Verifying Provider Download Acceptance
+
+After Soulseek is configured and at least one Import Review candidate is
+selected, use Import Review's download runway:
+
+1. Click `Start download run`.
+2. Click `Sync transfer state`.
+3. Read the `Download acceptance diagnostic` on the selected run item.
+
+The diagnostic should say whether the provider accepted a transfer or why the
+candidate did not reach Downloader. Expected actionable outcomes include:
+
+- `Provider accepted transfer`: open Downloader and monitor the transfer.
+- `Provider accepted with warnings`: some files were rejected; review before
+  import apply.
+- `Provider rejected the candidate`: try another candidate or rerun discovery.
+- `No downloadable files`: review locked or filtered files on the candidate.
+- `Download planning blocked`: fix path mappings or validation blockers first.
+
+If Downloader stays empty, this diagnostic is the first place to check before
+reading container logs. It intentionally shows bounded counts and operator
+actions, not API keys, raw provider payloads, or stack traces.
+
 If you need a fully clean rebuild while testing Docker changes, use:
 
 ```powershell

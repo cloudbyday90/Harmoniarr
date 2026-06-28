@@ -22,6 +22,11 @@ import {
   isOperationRunPauseError,
   throwIfOperationRunCancellationRequested,
 } from '../operation-run-cancellation.js';
+import {
+  buildDownloadAcceptanceDiagnostic,
+  buildNoUnlockedFilesDiagnostic,
+  buildPlanningBlockedDiagnostic,
+} from './import-candidate-execution-diagnostics.js';
 
 function normalizeRemoteFilename(file) {
   const rawFilename = typeof file?.rawPayload?.filename === 'string'
@@ -209,6 +214,10 @@ export function createImportCandidateExecutionWorker({
         };
 
         if (summaryCandidate.executionStatus.code === 'blocked') {
+          const diagnostic = buildPlanningBlockedDiagnostic({
+            candidate: summaryCandidate,
+            message: summaryCandidate.executionStatus.message,
+          });
           counts.blocked += 1;
           await updateImportExecutionRunItem({
             importCandidateId: summaryCandidate.id,
@@ -218,6 +227,9 @@ export function createImportCandidateExecutionWorker({
               ...baseSnapshot,
               execution: {
                 ...baseSnapshot.execution,
+                diagnostics: {
+                  downloadAcceptance: diagnostic,
+                },
                 outcome: 'blocked',
               },
             },
@@ -230,6 +242,9 @@ export function createImportCandidateExecutionWorker({
         const requestedFiles = buildEnqueueRequests((candidate?.files ?? []).filter((file) => !file.isLocked));
 
         if (requestedFiles.length === 0) {
+          const diagnostic = buildNoUnlockedFilesDiagnostic({
+            candidate: summaryCandidate,
+          });
           counts.blocked += 1;
           await updateImportExecutionRunItem({
             importCandidateId: summaryCandidate.id,
@@ -239,11 +254,14 @@ export function createImportCandidateExecutionWorker({
               ...baseSnapshot,
               execution: {
                 ...baseSnapshot.execution,
+                diagnostics: {
+                  downloadAcceptance: diagnostic,
+                },
                 outcome: 'blocked',
                 requestedFiles: [],
               },
             },
-            statusMessage: 'No unlocked files are available to enqueue from this candidate.',
+            statusMessage: diagnostic.message,
           });
           continue;
         }
@@ -274,6 +292,11 @@ export function createImportCandidateExecutionWorker({
         const warningMessage = summaryCandidate.executionStatus.code === 'ready_with_warnings'
           ? summaryCandidate.executionStatus.message
           : null;
+        const diagnostic = buildDownloadAcceptanceDiagnostic({
+          enqueueResult,
+          requestedFiles,
+          warningMessage,
+        });
         const statusMessage = itemStatus === 'queue_failed'
           ? failedMessage ?? 'Download enqueue failed.'
           : [
@@ -290,6 +313,9 @@ export function createImportCandidateExecutionWorker({
             ...baseSnapshot,
             execution: {
               ...baseSnapshot.execution,
+              diagnostics: {
+                downloadAcceptance: diagnostic,
+              },
               enqueuedTransfers: enqueueResult.enqueued,
               failedFilenames: enqueueResult.failed,
               outcome: itemStatus,
@@ -320,6 +346,9 @@ export function createImportCandidateExecutionWorker({
                 ...baseSnapshot,
                 execution: {
                   ...baseSnapshot.execution,
+                  diagnostics: {
+                    downloadAcceptance: diagnostic,
+                  },
                   enqueuedTransfers: enqueueResult.enqueued,
                   failedFilenames: enqueueResult.failed,
                   outcome: itemStatus,

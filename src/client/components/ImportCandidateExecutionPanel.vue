@@ -95,6 +95,12 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
 function downloaderTransferLocation(transfer) {
   return buildDownloaderTransferLocation(transfer);
 }
+
+function getDownloadAcceptanceDiagnostic(item) {
+  return item?.planningSnapshot?.execution?.diagnostics?.downloadAcceptance
+    ?? item?.diagnostics?.downloadAcceptance
+    ?? null;
+}
 </script>
 
 <template>
@@ -321,6 +327,35 @@ function downloaderTransferLocation(transfer) {
             </article>
           </div>
 
+          <article
+            v-if="getDownloadAcceptanceDiagnostic(item)"
+            class="execution-diagnostic-panel"
+            :data-tone="getDownloadAcceptanceDiagnostic(item).tone"
+          >
+            <div class="review-file-header">
+              <div>
+                <p class="eyebrow">Download acceptance diagnostic</p>
+                <strong>{{ getDownloadAcceptanceDiagnostic(item).title }}</strong>
+                <p class="metadata-card-copy">{{ getDownloadAcceptanceDiagnostic(item).message }}</p>
+                <p class="metadata-card-copy">{{ getDownloadAcceptanceDiagnostic(item).operatorAction }}</p>
+              </div>
+            </div>
+            <dl class="review-meta-grid review-meta-grid-wide">
+              <div>
+                <dt>Requested files</dt>
+                <dd>{{ getDownloadAcceptanceDiagnostic(item).counts?.requestedFiles ?? 0 }}</dd>
+              </div>
+              <div>
+                <dt>Accepted transfers</dt>
+                <dd>{{ getDownloadAcceptanceDiagnostic(item).counts?.enqueuedTransfers ?? 0 }}</dd>
+              </div>
+              <div>
+                <dt>Rejected files</dt>
+                <dd>{{ getDownloadAcceptanceDiagnostic(item).counts?.failedFiles ?? 0 }}</dd>
+              </div>
+            </dl>
+          </article>
+
           <article class="panel-light" v-if="item.liveTransferSummary || item.liveTransfers?.length">
             <div class="review-file-header">
               <div>
@@ -541,6 +576,30 @@ function downloaderTransferLocation(transfer) {
   margin: 0;
   font-size: var(--hx-text-sm);
   color: var(--hx-text);
+}
+
+.execution-diagnostic-panel {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  border: 1px solid var(--hx-border-muted);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-surface-sunken);
+}
+
+.execution-diagnostic-panel[data-tone='success'] {
+  background: var(--hx-success-soft);
+  border-color: rgba(18, 134, 88, 0.32);
+}
+
+.execution-diagnostic-panel[data-tone='warning'] {
+  background: var(--hx-warning-soft);
+  border-color: rgba(192, 138, 22, 0.32);
+}
+
+.execution-diagnostic-panel[data-tone='danger'] {
+  background: var(--hx-danger-soft);
+  border-color: rgba(218, 68, 83, 0.32);
 }
 
 .execution-transfer-sync-notice {

@@ -84,8 +84,8 @@ Cons:
 
 ## Follow-Up
 
-The next high-value item is **provider-backed download acceptance diagnostics**:
-use the local Docker walkthrough with configured slskd and download path mapping
-to prove a real selected candidate either creates a transfer or reports a
-specific actionable block, such as no acceptable remote files, path mapping
-failure, provider rejection, or stale queue state.
+Provider-backed download acceptance diagnostics are now implemented; see
+[PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md](PROVIDER_BACKED_DOWNLOAD_ACCEPTANCE_DIAGNOSTICS_DESIGN.md).
+
+The remaining follow-up is Docker walkthrough provider acceptance evidence for a
+real configured slskd run and completed-download path mapping.

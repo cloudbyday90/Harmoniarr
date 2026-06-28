@@ -245,9 +245,20 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
         .locator('.review-detail-header')
         .getByText('Download transfer state synced from slskd.', { exact: true })
         .waitFor();
+      const syncedFixtureState = await readMetadataBrowserFixtureState(page);
+      assert.equal(
+        syncedFixtureState.importReviewExecutionSummary.currentRun.items[0]
+          .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
+        'provider_accepted',
+      );
       await executionPanel.getByText('Run execution-run-1', { exact: true }).waitFor();
       await executionPanel.locator('.review-detail-header').getByText('Running', { exact: true }).waitFor();
       await executionPanel.getByText('Queued in Downloader and actively progressing.', { exact: true }).waitFor();
+      await executionPanel.getByText('Provider accepted transfer', { exact: true }).waitFor();
+      await executionPanel.getByText(
+        'The download provider accepted 1 transfer for this candidate.',
+        { exact: true },
+      ).waitFor();
       await executionPanel.getByText('1 transfer is actively progressing.', { exact: true }).waitFor();
       await executionPanel.getByText(
         'Aphex Twin\\Selected Ambient Works 85-92\\01 Xtal.flac',

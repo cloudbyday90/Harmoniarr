@@ -103,6 +103,16 @@ test('import execution worker enqueues ready candidates and persists per-item ou
   assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
   assert.equal(markRunStarted.mock.callCount(), 1);
   assert.equal(markRunCompleted.mock.callCount(), 1);
+  assert.equal(
+    updateImportExecutionRunItem.mock.calls[0].arguments[0]
+      .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
+    'provider_accepted',
+  );
+  assert.equal(
+    updateImportExecutionRunItem.mock.calls[1].arguments[0]
+      .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
+    'planning_blocked',
+  );
   assert.deepEqual(markRunCompleted.mock.calls[0].arguments, [{
     runId: 'run-1',
     summary: {
@@ -327,8 +337,88 @@ test('import execution worker cascades all-failed enqueue results to the next re
   assert.equal(upsertImportExecutionRunItem.mock.callCount(), 1);
   assert.equal(upsertImportExecutionRunItem.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
   assert.equal(updateImportExecutionRunItem.mock.calls[1].arguments[0].planningSnapshot.execution.recovery.nextCandidateId, 'candidate-2');
+  assert.equal(
+    updateImportExecutionRunItem.mock.calls[0].arguments[0]
+      .planningSnapshot.execution.diagnostics.downloadAcceptance.code,
+    'provider_rejected_all_files',
+  );
   assert.equal(completedArgs.summary.queueFailedCount, 1);
   assert.equal(completedArgs.summary.queuedCount, 1);
   assert.equal(completedArgs.summary.recoveredCandidateCount, 1);
   assert.equal(completedArgs.summary.processedCandidateCount, 2);
+});
+
+test('import execution worker persists no-file diagnostics before provider enqueue', async (t) => {
+  const enqueueDownloads = t.mock.fn(async () => ({
+    enqueued: [],
+    failed: [],
+  }));
+  const updateImportExecutionRunItem = t.mock.fn(async () => null);
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const worker = createImportCandidateExecutionWorker({
+    acquireLease: async () => {},
+    buildSelectedImportCandidateSummary: async () => ({
+      counts: {
+        blocked: 0,
+        ready: 1,
+        readyWithWarnings: 0,
+        totalSelected: 1,
+      },
+      selectedCandidates: [{
+        executionStatus: {
+          code: 'ready',
+          message: 'Ready for download enqueue.',
+        },
+        fileCount: 2,
+        folderPath: 'Autechre/Amber',
+        id: 'candidate-no-files',
+        lockedFileCount: 2,
+        planning: {
+          libraryFolderPath: '/music/Autechre/Amber',
+          sourceFolderPath: '/downloads/Autechre/Amber',
+          stagingFolderPath: '/staging/import-candidates/candidate-no-files/Autechre/Amber',
+        },
+        selectedAt: '2026-04-30T12:00:00.000Z',
+        sourceProvider: 'slskd',
+        sourceSearchId: 'search-1',
+        totalSizeBytes: 123456,
+        username: 'source-user',
+      }],
+    }),
+    enqueueDownloads,
+    getImportCandidate: async ({ importCandidateId }) => ({
+      id: importCandidateId,
+      files: [{
+        filename: '01 Foil.flac',
+        folderPath: 'Autechre/Amber',
+        isLocked: true,
+        sizeBytes: 123456,
+      }],
+    }),
+    markRunCompleted: t.mock.fn(async (args) => {
+      resolveCompleted(args);
+    }),
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    releaseLease: async () => {},
+    replaceImportExecutionRunItems: async () => [],
+    updateImportExecutionRunItem,
+  });
+
+  await worker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: 'run-no-files',
+  });
+
+  const completedArgs = await completed;
+  const itemUpdate = updateImportExecutionRunItem.mock.calls[0].arguments[0];
+
+  assert.equal(enqueueDownloads.mock.callCount(), 0);
+  assert.equal(itemUpdate.itemStatus, 'blocked');
+  assert.equal(itemUpdate.statusMessage, 'No unlocked files are available to enqueue from this candidate.');
+  assert.equal(itemUpdate.planningSnapshot.execution.diagnostics.downloadAcceptance.code, 'no_unlocked_files');
+  assert.equal(completedArgs.summary.blockedCount, 1);
 });
