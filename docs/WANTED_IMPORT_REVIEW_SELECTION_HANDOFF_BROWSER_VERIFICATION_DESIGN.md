@@ -76,7 +76,10 @@ Cons:
 
 ## Follow-Up
 
-The next high-value item is **Import Review selected-candidate download
-execution handoff browser verification**: after selecting a candidate, start the
-download execution run from Import Review and verify the selected summary/runway
-state moves toward Downloader handoff.
+Import Review selected-candidate download execution handoff browser verification
+is complete; see
+[IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
+
+The remaining follow-up is live transfer acceptance proof: seed or simulate a
+running execution item with an accepted Downloader transfer and prove the
+operator can drill from the execution run to Downloader transfer details.

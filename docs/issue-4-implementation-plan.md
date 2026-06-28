@@ -138,6 +138,10 @@ Confirmed complete:
   Import Review queue, supports candidate selection, and returns to a selected
   Wanted workflow state without a full-page fixture reset. See
   [WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
+- Import Review selected download execution handoff browser verification,
+  including the continuation from a Wanted-origin selected candidate into a
+  queued pending download execution run. See
+  [IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See

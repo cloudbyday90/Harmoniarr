@@ -135,6 +135,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   candidate, and returns through in-app navigation to a `Selected for download`
   Wanted state. See
   `WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
+- Import Review selected download execution handoff browser verification:
+  extended the Wanted-to-Import Review proof through `Start download run`,
+  verifying the selected summary, pending execution run, and persisted
+  `execution-start` fixture action. See
+  `IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,
