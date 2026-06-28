@@ -831,6 +831,21 @@ export async function queueMetadataImportReviewRunFailure(page, failure = {}) {
   }, failure);
 }
 
+export async function queueMetadataImportReviewExecutionReconciliation(page, reconciliation = {}) {
+  await page.evaluate((queuedReconciliation) => {
+    const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
+    const rawState = globalThis.sessionStorage.getItem(fixtureStateStorageKey);
+    const state = rawState ? JSON.parse(rawState) : {};
+    const reconciliations = Array.isArray(state.importReviewExecutionReconciliations)
+      ? state.importReviewExecutionReconciliations
+      : [];
+    globalThis.sessionStorage.setItem(fixtureStateStorageKey, JSON.stringify({
+      ...state,
+      importReviewExecutionReconciliations: [...reconciliations, queuedReconciliation],
+    }));
+  }, reconciliation);
+}
+
 export async function markMetadataReleaseRequestLinked(page, requestKey) {
   await page.evaluate((key) => {
     const fixtureStateStorageKey = 'harmoniarr:metadata-browser-fixture-state:v1';
@@ -913,6 +928,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
         importReviewApplySummary: null,
         importReviewCandidates: [],
         importReviewExecutionSummary: null,
+        importReviewExecutionReconciliations: [],
         importReviewMediaInspectionSummary: null,
         importReviewPreviewById: {},
         importReviewRunActions: [],
@@ -1045,6 +1061,9 @@ export async function installMetadataBrowserFixtures(browserContext) {
         importReviewApplySummary: state.importReviewApplySummary,
         importReviewCandidates: state.importReviewCandidates,
         importReviewExecutionSummary: state.importReviewExecutionSummary,
+        importReviewExecutionReconciliations: Array.isArray(state.importReviewExecutionReconciliations)
+          ? state.importReviewExecutionReconciliations
+          : [],
         importReviewMediaInspectionSummary: state.importReviewMediaInspectionSummary,
         importReviewPreviewById: state.importReviewPreviewById,
         importReviewRunActions: state.importReviewRunActions,
@@ -1178,6 +1197,43 @@ export async function installMetadataBrowserFixtures(browserContext) {
       state.importReviewRunFailures = failures;
       persistFixtureState();
       return failure;
+    }
+
+    function consumeImportReviewExecutionReconciliation() {
+      const reconciliations = Array.isArray(state.importReviewExecutionReconciliations)
+        ? state.importReviewExecutionReconciliations
+        : [];
+      if (reconciliations.length < 1) {
+        return null;
+      }
+
+      const [reconciliation, ...remainingReconciliations] = reconciliations;
+      state.importReviewExecutionReconciliations = remainingReconciliations;
+      return reconciliation;
+    }
+
+    function updateImportReviewRecentRuns(recentRuns, run) {
+      const runs = Array.isArray(recentRuns) ? recentRuns : [];
+      const filteredRuns = runs.filter((recentRun) => recentRun?.id !== run?.id);
+      return run ? [run, ...filteredRuns] : filteredRuns;
+    }
+
+    function applyImportReviewExecutionCandidateStatuses(candidateStatuses) {
+      if (!candidateStatuses || typeof candidateStatuses !== 'object') {
+        return;
+      }
+
+      const workspace = getImportReviewWorkspaceState();
+      state.importReviewCandidates = workspace.candidates.map((candidate) => {
+        const nextStatus = candidateStatuses[candidate.id];
+        return nextStatus
+          ? {
+            ...candidate,
+            status: nextStatus,
+            updatedAt: new Date().toISOString(),
+          }
+          : candidate;
+      });
     }
 
     async function resolveCurrentSessionUser() {
@@ -1827,9 +1883,28 @@ export async function installMetadataBrowserFixtures(browserContext) {
 
       const nowIso = new Date().toISOString();
       const executionSummary = state.importReviewExecutionSummary ?? buildEmptyImportCandidateExecutionSummary();
+      const queuedReconciliation = consumeImportReviewExecutionReconciliation();
+      const currentRun = executionSummary.currentRun ?? null;
+      const reconciledRun = queuedReconciliation?.currentRun
+        ? {
+          ...currentRun,
+          ...queuedReconciliation.currentRun,
+        }
+        : currentRun;
+      const latestRun = reconciledRun ?? executionSummary.latestRun ?? null;
+      const recentRuns = updateImportReviewRecentRuns(executionSummary.recentRuns, reconciledRun);
+
+      applyImportReviewExecutionCandidateStatuses(queuedReconciliation?.candidateStatuses);
+
       state.importReviewExecutionSummary = {
         ...executionSummary,
+        activeRun: reconciledRun && (reconciledRun.status === 'pending' || reconciledRun.status === 'running')
+          ? reconciledRun
+          : null,
         checkedAt: nowIso,
+        currentRun: reconciledRun,
+        latestRun,
+        recentRuns,
         summary: {
           ...(executionSummary.summary ?? {}),
           heartbeat: {
@@ -1839,14 +1914,15 @@ export async function installMetadataBrowserFixtures(browserContext) {
               lastOutcome: 'started',
               lastSkipReason: null,
               lastTickAt: nowIso,
-              lastTransitionCount: 0,
+              lastTransitionCount: queuedReconciliation?.transitionCount ?? 0,
             },
           },
-          message: 'Download transfer state synced manually.',
+          message: queuedReconciliation?.summary?.message ?? 'Download transfer state synced manually.',
           missingTransferPolicy: executionSummary.summary?.missingTransferPolicy ?? {
             gracePeriodLabel: 'Manual fixture',
           },
-          status: 'ready',
+          status: queuedReconciliation?.summary?.status ?? 'ready',
+          ...(queuedReconciliation?.summary ?? {}),
         },
       };
       recordImportReviewRunAction({
@@ -1860,7 +1936,7 @@ export async function installMetadataBrowserFixtures(browserContext) {
         reconciliation: {
           currentRunId: executionSummary.currentRun?.id ?? null,
           summary: {
-            transitioned: 0,
+            transitioned: queuedReconciliation?.transitionCount ?? 0,
           },
           transitions: [],
         },

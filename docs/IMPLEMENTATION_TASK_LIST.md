@@ -140,6 +140,10 @@ Database model source: `docs/DATABASE_MODEL.md`
   verifying the selected summary, pending execution run, and persisted
   `execution-start` fixture action. See
   `IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
+- Wanted-started download transfer handoff browser verification: extended the
+  same operator journey through execution transfer sync and direct Downloader
+  detail drill-through for the accepted transfer. See
+  `WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,

@@ -18,6 +18,11 @@ import {
   readMetadataBrowserFixtureState,
 } from '../../testing/browser/metadata-browser-fixtures.js';
 import { installWantedBrowserFixtures } from '../../testing/browser/wanted-browser-fixtures.js';
+import { installDownloaderBrowserFixtures } from '../../testing/browser/downloader-browser-fixtures.js';
+import {
+  buildSelectionReadyDownloaderQueueFixture,
+  queueSelectionReadyTransferAcceptance,
+} from '../../testing/browser/wanted-download-transfer-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
@@ -70,6 +75,30 @@ async function selectHighConfidenceCandidate(page) {
   await selectButton.click();
   await page.getByRole('status').filter({ hasText: 'Candidate selected for download.' }).waitFor();
   await page.getByText('1 selected candidate ready for download.', { exact: true }).waitFor();
+}
+
+async function startSelectionReadyDownloadRun(page) {
+  const executionPanel = getRunwayPanel(page, 'Queue selected for download');
+  const startDownloadRun = executionPanel.getByRole('button', { name: 'Start download run' });
+  await startDownloadRun.click();
+  await page.waitForFunction(() => globalThis.location.hash === '#import-execution-run-panel');
+  await executionPanel.getByText('Run execution-run-1', { exact: true }).waitFor();
+  return { executionPanel, startDownloadRun };
+}
+
+async function assertSelectionReadyDownloaderDetailsOpen(page) {
+  await page.waitForFunction(() => {
+    const url = new URL(globalThis.location.href);
+    return url.pathname === '/app/downloader'
+      && url.searchParams.get('open') === 'details'
+      && url.searchParams.get('transferId') === 'transfer-selection-ready-saw'
+      && url.searchParams.get('username') === 'high-confidence-peer';
+  });
+
+  const dialog = page.getByRole('dialog', { name: /01 Xtal\.flac/u });
+  await dialog.waitFor();
+  await dialog.getByText('Linked to Import Review candidate.', { exact: true }).waitFor();
+  await dialog.getByText('The transfer is actively downloading at 53%.', { exact: true }).waitFor();
 }
 
 suite('Wanted to Import Review selection handoff browser verification', () => {
@@ -162,11 +191,7 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
       await openSelectionReadyWantedCandidates({ baseUrl, page });
       await selectHighConfidenceCandidate(page);
 
-      const executionPanel = getRunwayPanel(page, 'Queue selected for download');
-      const startDownloadRun = executionPanel.getByRole('button', { name: 'Start download run' });
-      await startDownloadRun.click();
-      await page.waitForFunction(() => globalThis.location.hash === '#import-execution-run-panel');
-      await executionPanel.getByText('Run execution-run-1', { exact: true }).waitFor();
+      const { executionPanel, startDownloadRun } = await startSelectionReadyDownloadRun(page);
       await executionPanel.getByText(
         'Download run execution-run-1 queued for 1 selected candidate.',
         { exact: true },
@@ -186,6 +211,68 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {
       scenarioName: 'wanted_import_review_selection_to_download_execution_handoff',
+    });
+  });
+
+  test('admins can sync a Wanted-started execution into a live Downloader transfer', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      page.on('pageerror', (error) => {
+        pageErrors.push(error.message);
+      });
+
+      await installMetadataBrowserFixtures(browserContext);
+      await installWantedBrowserFixtures(browserContext);
+      await installDownloaderBrowserFixtures(browserContext, {
+        queue: buildSelectionReadyDownloaderQueueFixture(),
+      });
+      await bootstrapAdminThroughUi(page, { baseUrl });
+
+      await openSelectionReadyWantedCandidates({ baseUrl, page });
+      await selectHighConfidenceCandidate(page);
+      const { executionPanel } = await startSelectionReadyDownloadRun(page);
+      await queueSelectionReadyTransferAcceptance(page);
+
+      await executionPanel.getByRole('button', { name: 'Sync transfer state' }).click();
+      await executionPanel
+        .locator('.review-detail-header')
+        .getByText('Download transfer state synced from slskd.', { exact: true })
+        .waitFor();
+      await executionPanel.getByText('Run execution-run-1', { exact: true }).waitFor();
+      await executionPanel.locator('.review-detail-header').getByText('Running', { exact: true }).waitFor();
+      await executionPanel.getByText('Queued in Downloader and actively progressing.', { exact: true }).waitFor();
+      await executionPanel.getByText('1 transfer is actively progressing.', { exact: true }).waitFor();
+      await executionPanel.getByText(
+        'Aphex Twin\\Selected Ambient Works 85-92\\01 Xtal.flac',
+        { exact: true },
+      ).waitFor();
+
+      await executionPanel.getByRole('link', { name: 'Open in Downloader' }).click();
+      await assertSelectionReadyDownloaderDetailsOpen(page);
+
+      const fixtureState = await readMetadataBrowserFixtureState(page);
+      assert.deepEqual(
+        fixtureState.importReviewRunActions.map((action) => action.action),
+        ['execution-start', 'execution-reconcile'],
+      );
+      assert.equal(fixtureState.importReviewExecutionSummary.currentRun.status, 'running');
+      assert.equal(fixtureState.importReviewExecutionSummary.currentRun.queuedCount, 1);
+      assert.equal(
+        fixtureState.importReviewCandidates.find((candidate) => candidate.id === 'candidate-selection-ready')?.status,
+        'downloading',
+      );
+
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+      await page.goto('about:blank', { waitUntil: 'load' });
+    }, {
+      scenarioName: 'wanted_started_execution_live_downloader_transfer_handoff',
     });
   });
 });

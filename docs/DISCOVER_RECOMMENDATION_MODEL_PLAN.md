@@ -140,6 +140,10 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   run`, verifying the selected-candidate summary, queued pending execution run,
   and persisted execution-start action; see
   [IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md)
+- the Wanted-origin flow now continues through execution transfer sync into a
+  live Downloader transfer detail route, proving the accepted transfer is visible
+  after reconciliation; see
+  [WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:

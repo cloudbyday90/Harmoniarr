@@ -75,8 +75,9 @@ Cons:
 
 ## Follow-Up
 
-The next high-value item is **download execution live transfer acceptance
-browser verification**: seed or simulate a running execution item with an
-accepted Downloader transfer and prove the operator can drill from the execution
-run to the Downloader transfer details, including the stale-transfer notice when
-the live queue no longer has the transfer.
+Download execution live transfer acceptance browser verification is complete for
+the Wanted-origin flow; see
+[WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
+
+The remaining high-value follow-up is provider-backed download acceptance
+diagnostics in the local Docker walkthrough.
