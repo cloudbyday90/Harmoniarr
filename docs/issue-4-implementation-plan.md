@@ -54,6 +54,66 @@ Confirmed complete:
 - Artist Policy Activity trail browser verification, including reviewed track
   override repair, Artist Policy save, `artist_policy_saved` Activity-row proof,
   and Activity link-back to Artist Detail
+- Metadata canonical release materialization, including bounded MusicBrainz
+  release import for policy-selected monitored release groups before operator
+  reconciliation so monitored artists can progress from release-group metadata
+  to concrete desired-state work. See
+  [METADATA_CANONICAL_RELEASE_MATERIALIZATION_DESIGN.md](METADATA_CANONICAL_RELEASE_MATERIALIZATION_DESIGN.md).
+- Library discovery dispatch handoff observability, including Wanted-surface
+  discovery queue counts, latest run context, and a protected manual dispatch
+  action that clarifies the path from wanted releases to Soulseek search,
+  Import Review candidates, and Downloader activity. See
+  [LIBRARY_DISCOVERY_DISPATCH_HANDOFF_OBSERVABILITY_DESIGN.md](LIBRARY_DISCOVERY_DISPATCH_HANDOFF_OBSERVABILITY_DESIGN.md).
+- Discovery dispatch execution handoff browser verification, including a
+  fixture-backed proof that the Wanted manual dispatch action sends CSRF,
+  refreshes latest-run context, and exposes the resulting Import Review
+  candidate. See
+  [DISCOVERY_DISPATCH_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](DISCOVERY_DISPATCH_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
+- Discovery dispatch result transparency, including per-wanted-release result
+  summaries for candidates produced, no-candidate cooldowns, failed dispatches,
+  exhausted searches, and queued states. See
+  [DISCOVERY_DISPATCH_RESULT_TRANSPARENCY_DESIGN.md](DISCOVERY_DISPATCH_RESULT_TRANSPARENCY_DESIGN.md).
+- Wanted discovery candidate deep links, including a route-safe `Open
+  candidates` handoff from candidate-producing Wanted rows into Import Review
+  filtered by dispatch `sourceSearchId`. See
+  [WANTED_DISCOVERY_CANDIDATE_DEEPLINK_DESIGN.md](WANTED_DISCOVERY_CANDIDATE_DEEPLINK_DESIGN.md).
+- Wanted Import Review workflow-state correlation, including bounded candidate
+  status counts surfaced on Wanted rows so operators can see pending review,
+  selected, downloading, import-pending, failed, and applied states without
+  exposing detailed provider payloads. See
+  [WANTED_IMPORT_REVIEW_WORKFLOW_STATE_DESIGN.md](WANTED_IMPORT_REVIEW_WORKFLOW_STATE_DESIGN.md).
+- Downloader correlation from Import Review execution, including bounded
+  persisted execution handoff counts on Wanted rows so operators can tell when
+  selected candidates were blocked, failed before enqueue, or accepted by
+  Downloader. See
+  [DOWNLOADER_CORRELATION_FROM_IMPORT_REVIEW_EXECUTION_DESIGN.md](DOWNLOADER_CORRELATION_FROM_IMPORT_REVIEW_EXECUTION_DESIGN.md).
+- Downloader import-candidate linkage, including row and diagnostics-drawer
+  handoffs from live Downloader transfers back to the Import Review candidate
+  whose execution item queued the transfer. See
+  [DOWNLOADER_IMPORT_CANDIDATE_LINKAGE_DESIGN.md](DOWNLOADER_IMPORT_CANDIDATE_LINKAGE_DESIGN.md).
+- Downloader linked-transfer browser verification, including a fixture-backed
+  proof that row and diagnostics-drawer handoffs route into the selected Import
+  Review candidate. See
+  [DOWNLOADER_LINKED_TRANSFER_BROWSER_VERIFICATION_DESIGN.md](DOWNLOADER_LINKED_TRANSFER_BROWSER_VERIFICATION_DESIGN.md).
+- Import Review Downloader transfer handoff, including reverse live-transfer
+  drill-through from execution detail into the matching Downloader details
+  drawer. See
+  [IMPORT_REVIEW_DOWNLOADER_TRANSFER_HANDOFF_DESIGN.md](IMPORT_REVIEW_DOWNLOADER_TRANSFER_HANDOFF_DESIGN.md).
+- Downloader stale-transfer handoff notice, including browser verification for
+  direct transfer links whose live queue row has disappeared before reload. See
+  [DOWNLOADER_STALE_TRANSFER_HANDOFF_NOTICE_DESIGN.md](DOWNLOADER_STALE_TRANSFER_HANDOFF_NOTICE_DESIGN.md).
+- Import Review transfer sync notice, including browser verification that a
+  completed transfer summary stays visible after the live Downloader row is no
+  longer available to open. See
+  [IMPORT_REVIEW_TRANSFER_SYNC_NOTICE_DESIGN.md](IMPORT_REVIEW_TRANSFER_SYNC_NOTICE_DESIGN.md).
+- Import Review completed-download apply handoff, including browser
+  verification that completed transfer evidence leads to visible import-ready
+  state and a queued import apply run. See
+  [IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md](IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md).
+- Library discovery JSONB parameter casting, including a fix for Background Jobs
+  failures that reported `could not determine data type of parameter $1` while
+  persisting discovery evidence. See
+  [LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md](LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md).
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See

@@ -239,3 +239,123 @@ test('refreshArtistCatalogById prefers operator-derived monitoring for detection
     monitoredReleaseGroupTypes: ['album', 'single'],
   });
 });
+
+test('refreshArtistCatalogById queues operator reconciliation after storing refreshed release groups', async (t) => {
+  const listOperatorArtistMonitoringByMetadataArtist = t.mock.fn(async () => [
+    {
+      appUserId: 'user-1',
+      isMonitored: true,
+      metadataArtistId: 'local-artist-1',
+    },
+    {
+      appUserId: 'user-2',
+      isMonitored: true,
+      metadataArtistId: 'local-artist-1',
+    },
+  ]);
+  const queueOperatorArtistReconciliation = t.mock.fn(async ({ appUserId }) => {
+    if (appUserId === 'user-2') {
+      const error = new Error('No saved artist reconciliation snapshot is available yet');
+      error.code = 'operator_artist_reconciliation_not_ready';
+      throw error;
+    }
+    return { accepted: true };
+  });
+  const storeReleaseGroup = t.mock.fn(async ({ releaseGroup }) => ({
+    artist: { id: 'local-artist-1' },
+    releaseGroup: {
+      id: `local-${releaseGroup.musicbrainzReleaseGroupId}`,
+      primaryType: releaseGroup.primaryType,
+      source: { musicbrainzReleaseGroupId: releaseGroup.musicbrainzReleaseGroupId },
+      title: releaseGroup.title,
+    },
+  }));
+  const materializeMonitoredReleaseGroups = t.mock.fn(async () => ({
+    eligibleReleaseGroupCount: 1,
+    importedReleaseCount: 1,
+    skippedExistingCanonicalCount: 0,
+    skippedExistingReleaseCount: 0,
+    skippedNoCandidateCount: 0,
+  }));
+
+  const service = createMetadataRefreshService({
+    getMetadataArtistByMusicBrainzId: t.mock.fn(async () => ({
+      artist: { id: 'local-artist-1', name: 'Lauren Daigle' },
+      releaseGroups: [],
+      releases: [],
+    })),
+    listOperatorArtistMonitoringByMetadataArtist,
+    materializeMonitoredReleaseGroups,
+    metadataReleaseDetectionService: {
+      recordDetectedReleaseGroups: t.mock.fn(async () => []),
+    },
+    metadataService: {
+      storeArtist: t.mock.fn(async ({ artist }) => ({ id: 'local-artist-1', name: artist.name })),
+      storeReleaseGroup,
+    },
+    musicBrainzClient: {
+      browseArtistReleaseGroups: t.mock.fn(async () => ({
+        'release-group-count': 1,
+        'release-groups': [{
+          id: 'mb-rg-1',
+          title: 'Look Up Child',
+          'artist-credit': [{ artist: { id: 'mb-artist-1', name: 'Lauren Daigle' }, name: 'Lauren Daigle' }],
+          'primary-type': 'Album',
+          'first-release-date': '2018-09-07',
+        }],
+      })),
+      lookupArtist: t.mock.fn(async () => ({
+        aliases: [],
+        id: 'mb-artist-1',
+        name: 'Lauren Daigle',
+      })),
+    },
+    nowFn: () => new Date('2026-06-27T20:26:37.000Z'),
+    queueOperatorArtistReconciliation,
+  });
+
+  const result = await service.refreshArtistCatalogById({
+    metadataArtistId: 'local-artist-1',
+    musicBrainzArtistId: 'mb-artist-1',
+    triggerSource: 'monitor_added',
+  });
+
+  assert.equal(storeReleaseGroup.mock.callCount(), 1);
+  assert.deepEqual(listOperatorArtistMonitoringByMetadataArtist.mock.calls[0].arguments[0], {
+    metadataArtistId: 'local-artist-1',
+  });
+  assert.deepEqual(materializeMonitoredReleaseGroups.mock.calls[0].arguments[0], {
+    metadataArtistId: 'local-artist-1',
+    monitoringRows: [
+      {
+        appUserId: 'user-1',
+        isMonitored: true,
+        metadataArtistId: 'local-artist-1',
+      },
+      {
+        appUserId: 'user-2',
+        isMonitored: true,
+        metadataArtistId: 'local-artist-1',
+      },
+    ],
+    throwIfCancelled: materializeMonitoredReleaseGroups.mock.calls[0].arguments[0].throwIfCancelled,
+  });
+  assert.equal(queueOperatorArtistReconciliation.mock.callCount(), 2);
+  assert.deepEqual(queueOperatorArtistReconciliation.mock.calls[0].arguments[0], {
+    appUserId: 'user-1',
+    metadataArtistId: 'local-artist-1',
+    triggerSource: 'metadata_refresh:monitor_added',
+  });
+  assert.deepEqual(queueOperatorArtistReconciliation.mock.calls[1].arguments[0], {
+    appUserId: 'user-2',
+    metadataArtistId: 'local-artist-1',
+    triggerSource: 'metadata_refresh:monitor_added',
+  });
+  assert.equal(result.materializedEligibleReleaseGroupCount, 1);
+  assert.equal(result.materializedImportedReleaseCount, 1);
+  assert.equal(result.materializedSkippedExistingCanonicalCount, 0);
+  assert.equal(result.materializedSkippedExistingReleaseCount, 0);
+  assert.equal(result.materializedSkippedNoCandidateCount, 0);
+  assert.equal(result.operatorReconciliationQueuedCount, 1);
+  assert.equal(result.operatorReconciliationSkippedNotReadyCount, 1);
+});

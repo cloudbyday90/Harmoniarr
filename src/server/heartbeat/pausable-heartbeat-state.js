@@ -28,7 +28,7 @@ function normalizePauseState(state) {
 }
 
 function resolvePauseStateForOutcome({ details, nextBaseState }) {
-  if (nextBaseState.lastSkipReason !== 'paused') {
+  if (nextBaseState.lastSkipReason !== 'paused' && nextBaseState.lastSkipReason !== 'setup_required') {
     return {
       lastPauseCode: null,
       lastPauseMessage: null,

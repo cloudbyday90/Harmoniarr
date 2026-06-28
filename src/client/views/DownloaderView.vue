@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import DownloaderTransferDetailDrawer from '../components/downloader/DownloaderTransferDetailDrawer.vue';
 import {
   formatTransferFilename,
@@ -34,9 +35,16 @@ import {
   buildDownloaderEmptyState,
   isDownloaderProviderDisabled,
 } from '../lib/downloader-presentation.js';
+import { buildDownloaderImportCandidateLocation } from '../lib/downloader-import-review-link.js';
+import {
+  normalizeDownloaderTransferRouteQuery,
+  omitDownloaderTransferRouteQuery,
+} from '../lib/downloader-transfer-route.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const POLL_INTERVAL_MS = 5000;
+const route = useRoute();
+const router = useRouter();
 
 const filterOptions = Object.freeze([
   { value: 'all', label: 'All' },
@@ -120,6 +128,40 @@ const selectedTransfer = computed(() => (
     ? allFiles.value.find((file) => file.transferKey === selectedTransferKey.value) ?? null
     : null
 ));
+const routeTransferTarget = computed(() => normalizeDownloaderTransferRouteQuery(route.query));
+const routeTransferLookupNotice = computed(() => {
+  const target = routeTransferTarget.value;
+  if (target.open !== 'details' || !target.transferKey) return null;
+  if (selectedTransfer.value?.transferKey === target.transferKey) return null;
+  if (allFiles.value.some((file) => file.transferKey === target.transferKey)) return null;
+  if (isLoading.value && !downloaderQueue.value) return null;
+  if (!downloaderQueue.value) return null;
+
+  return {
+    body: 'The linked transfer is not in the current Downloader queue. It may have completed, been removed, or aged out of the live Soulseek transfer list. Import Review keeps the persisted candidate history.',
+    title: 'Transfer is no longer visible in Downloader',
+  };
+});
+
+function selectRouteTransferIfAvailable() {
+  const transferKey = routeTransferTarget.value.transferKey;
+  if (!transferKey || routeTransferTarget.value.open !== 'details') return;
+
+  const routeTransfer = allFiles.value.find((file) => file.transferKey === transferKey);
+  if (!routeTransfer) return;
+
+  selectedTransferKey.value = routeTransfer.transferKey;
+}
+
+watch(
+  () => [
+    routeTransferTarget.value.open,
+    routeTransferTarget.value.transferKey,
+    allFiles.value.map((file) => file.transferKey).join('|'),
+  ],
+  selectRouteTransferIfAvailable,
+  { immediate: true },
+);
 
 function progressLabel(file) {
   if (file.progress?.percentComplete !== null && file.progress?.percentComplete !== undefined) {
@@ -133,15 +175,31 @@ function shouldShowIndeterminateProgress(file) {
   return file?.state?.code === 'active' || file?.state?.code === 'queued';
 }
 
+function importCandidateLocation(file) {
+  return buildDownloaderImportCandidateLocation(file);
+}
+
 function openTransferDetail(file) {
   if (!file?.transferKey) return;
   selectedTransferKey.value = file.transferKey;
 }
 
 function closeTransferDetail() {
+  const closedTransferKey = selectedTransferKey.value;
   selectedTransferKey.value = null;
   actionErrorMessage.value = '';
   pendingAction.value = '';
+
+  if (closedTransferKey && routeTransferTarget.value.transferKey === closedTransferKey) {
+    clearRouteTransferHandoff();
+  }
+}
+
+function clearRouteTransferHandoff() {
+  void router.replace({
+    name: 'downloader',
+    query: omitDownloaderTransferRouteQuery(route.query),
+  });
 }
 
 async function performTransferAction(action) {
@@ -223,6 +281,18 @@ async function clearCompletedTransfers() {
     <article v-if="actionErrorMessage && !selectedTransfer" class="hx-card" role="status" aria-live="polite">
       <div class="hx-card-body">
         <span class="hx-pill" data-tone="danger">{{ actionErrorMessage }}</span>
+      </div>
+    </article>
+
+    <article v-if="routeTransferLookupNotice" class="hx-card downloader-route-notice" role="status" aria-live="polite">
+      <div class="hx-card-body downloader-route-notice-body">
+        <div>
+          <h2 class="downloader-route-notice-title">{{ routeTransferLookupNotice.title }}</h2>
+          <p class="downloader-route-notice-copy">{{ routeTransferLookupNotice.body }}</p>
+        </div>
+        <button type="button" class="hx-btn" data-variant="ghost" @click="clearRouteTransferHandoff">
+          Clear link
+        </button>
       </div>
     </article>
 
@@ -323,13 +393,22 @@ async function clearCompletedTransfers() {
                   <span v-else>—</span>
                 </td>
                 <td class="hx-table-num">
-                  <button
-                    type="button"
-                    class="hx-btn downloader-detail-button"
-                    @click="openTransferDetail(file)"
-                  >
-                    Details
-                  </button>
+                  <div class="downloader-diagnostics-actions">
+                    <button
+                      type="button"
+                      class="hx-btn downloader-detail-button"
+                      @click="openTransferDetail(file)"
+                    >
+                      Details
+                    </button>
+                    <RouterLink
+                      v-if="importCandidateLocation(file)"
+                      class="downloader-import-review-link"
+                      :to="importCandidateLocation(file)"
+                    >
+                      Open candidate
+                    </RouterLink>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -397,8 +476,51 @@ async function clearCompletedTransfers() {
   margin-top: var(--hx-space-4);
 }
 
+.downloader-route-notice {
+  border-color: color-mix(in srgb, var(--hx-warning) 36%, var(--hx-border));
+}
+
+.downloader-route-notice-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+}
+
+.downloader-route-notice-title {
+  margin: 0;
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-base);
+}
+
+.downloader-route-notice-copy {
+  max-width: 760px;
+  margin: var(--hx-space-1) 0 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+
 .downloader-detail-button {
   min-height: 32px;
   padding: 0 var(--hx-space-3);
+}
+
+.downloader-diagnostics-actions {
+  display: inline-grid;
+  gap: var(--hx-space-1);
+  justify-items: end;
+}
+
+.downloader-import-review-link {
+  color: var(--hx-accent);
+  font-size: var(--hx-text-xs);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.downloader-import-review-link:hover,
+.downloader-import-review-link:focus-visible {
+  text-decoration: underline;
 }
 </style>

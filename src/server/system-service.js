@@ -126,6 +126,7 @@ export function createSystemService({
           inProgress: 'Discovery dispatch is already evaluating wanted releases.',
           notDue: 'No discovery requests are currently due for automatic dispatch.',
           started: 'Discovery dispatch most recently queued a library discovery run.',
+          setupRequired: 'Configure Soulseek (slskd) in Settings to enable automatic discovery searches.',
           waiting: 'Discovery dispatch has not recorded a heartbeat outcome yet.',
         },
       },

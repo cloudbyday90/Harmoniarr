@@ -47,6 +47,7 @@ test('createSlskdService normalizes connection status from application state', a
   assert.deepEqual(status, {
     provider: 'slskd',
     status: 'healthy',
+    message: 'Soulseek is connected and ready for searches and downloads.',
     details: {
       isConnected: true,
       isLoggedIn: true,

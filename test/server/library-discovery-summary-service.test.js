@@ -87,6 +87,32 @@ test('buildLibraryDiscoverySummary reports ready state when any request can sear
   assert.equal(summary.summary.message, '3 discovery requests are ready to search now.');
 });
 
+test('buildLibraryDiscoverySummary uses singular copy for one ready request', async () => {
+  const service = createLibraryDiscoverySummaryService({
+    libraryDiscoveryHeartbeatState: createLibraryDiscoveryHeartbeatState(),
+    libraryDiscoveryRunStore: {
+      getLatestRun: async () => null,
+    },
+    libraryDiscoverySummaryStore: {
+      getLibraryDiscoverySnapshot: async () => ({
+        lastEvaluatedAt: null,
+        nextEligibleAt: null,
+        requestCounts: {
+          blocked: 0,
+          cooldown: 0,
+          ready: 1,
+          totalRequests: 1,
+        },
+      }),
+    },
+  });
+
+  const summary = await service.buildLibraryDiscoverySummary();
+
+  assert.equal(summary.summary.status, 'ready');
+  assert.equal(summary.summary.message, '1 discovery request is ready to search now.');
+});
+
 test('buildLibraryDiscoverySummary reports cooldown state before date-blocked state', async () => {
   const libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState();
   const service = createLibraryDiscoverySummaryService({

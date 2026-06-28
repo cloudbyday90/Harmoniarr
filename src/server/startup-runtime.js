@@ -21,6 +21,7 @@ import { createApp } from './app.js';
 import { createImportCandidateExecutionHeartbeat } from './import-candidates/import-candidate-execution-heartbeat.js';
 import { createFulfillmentCorrelationHeartbeat } from './fulfillment/fulfillment-correlation-heartbeat.js';
 import { createLibraryDiscoveryHeartbeat } from './library/library-discovery-heartbeat.js';
+import { createLibraryDiscoveryDispatchPolicyService } from './library/library-discovery-dispatch-policy-service.js';
 import { resolveLibraryDiscoveryHeartbeatConfig } from './library/library-discovery-heartbeat-config.js';
 import { createLedgerRetentionHeartbeat } from './ledger-retention-heartbeat.js';
 import { createLedgerRetentionService } from './ledger-retention-service.js';
@@ -57,6 +58,7 @@ export async function startServerRuntime({
   createFulfillmentCorrelationHeartbeat: buildFulfillmentCorrelationHeartbeat = createFulfillmentCorrelationHeartbeat,
   createLedgerRetentionHeartbeat: buildLedgerRetentionHeartbeat = createLedgerRetentionHeartbeat,
   createLedgerRetentionService: buildLedgerRetentionService = createLedgerRetentionService,
+  createLibraryDiscoveryDispatchPolicyService: buildLibraryDiscoveryDispatchPolicyService = createLibraryDiscoveryDispatchPolicyService,
   createLibraryDiscoveryHeartbeat: buildLibraryDiscoveryHeartbeat = createLibraryDiscoveryHeartbeat,
   createMetadataRefreshHeartbeat: buildMetadataRefreshHeartbeat = createMetadataRefreshHeartbeat,
   createOperationQueueDispatcher: buildOperationQueueDispatcher = createOperationQueueDispatcher,
@@ -121,11 +123,14 @@ export async function startServerRuntime({
   const getDependencyHealth = systemModule?.dependencyHealthService?.getDependencyHealth
     ?? (async () => []);
   const libraryDiscoveryHeartbeatConfig = buildLibraryDiscoveryHeartbeatConfig();
+  const libraryDiscoveryDispatchPolicyService = buildLibraryDiscoveryDispatchPolicyService();
   const libraryDiscoveryHeartbeat = buildLibraryDiscoveryHeartbeat({
     getActiveRun: libraryModule.libraryDiscoveryRunStore.getActiveRun,
+    getDependencyHealth,
     getDiscoverySnapshot: libraryModule.libraryDiscoverySummaryStore.getLibraryDiscoverySnapshot,
     heartbeatPauseService: maintenanceLockHeartbeatPauseService,
     intervalMs: libraryDiscoveryHeartbeatConfig.intervalMs,
+    libraryDiscoveryDispatchPolicyService,
     libraryDiscoveryHeartbeatState: libraryModule.libraryDiscoveryHeartbeatState,
     onError: (error) => {
       runtimeReporter.writeError(error, { label: 'discovery heartbeat failed' });

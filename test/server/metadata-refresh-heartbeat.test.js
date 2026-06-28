@@ -73,7 +73,12 @@ test('createMetadataRefreshHeartbeat queues one due artist and configures an unr
 
 test('createMetadataRefreshHeartbeat skips when nothing is due and swallows in-progress conflicts', async () => {
   const metadataRefreshHeartbeatState = createMetadataRefreshHeartbeatState();
+  let dependencyHealthCallCount = 0;
   const heartbeat = createMetadataRefreshHeartbeat({
+    getDependencyHealth: async () => {
+      dependencyHealthCallCount += 1;
+      throw new Error('dependency health should not run when no artist is due');
+    },
     getNow: () => new Date('2026-05-01T14:00:00.000Z'),
     metadataRefreshHeartbeatState,
     metadataRefreshSchedulerService: {
@@ -90,6 +95,7 @@ test('createMetadataRefreshHeartbeat skips when nothing is due and swallows in-p
     reason: 'not_due',
     skipped: true,
   });
+  assert.equal(dependencyHealthCallCount, 0);
 
   const conflictState = createMetadataRefreshHeartbeatState();
   const conflictHeartbeat = createMetadataRefreshHeartbeat({
@@ -116,6 +122,7 @@ test('createMetadataRefreshHeartbeat skips when nothing is due and swallows in-p
 
 test('createMetadataRefreshHeartbeat pauses dispatch when provider health blocks MusicBrainz work', async () => {
   const metadataRefreshHeartbeatState = createMetadataRefreshHeartbeatState();
+  let schedulerCallCount = 0;
   const heartbeat = createMetadataRefreshHeartbeat({
     getDependencyHealth: async () => [{
       provider: 'musicbrainz',
@@ -132,8 +139,15 @@ test('createMetadataRefreshHeartbeat pauses dispatch when provider health blocks
     metadataRefreshHeartbeatState,
     metadataRefreshSchedulerService: {
       getNextDueArtist: async () => {
-        throw new Error('scheduler lookup should not run while paused');
+        schedulerCallCount += 1;
+        return {
+          artistName: 'Autechre',
+          metadataArtistId: 'artist-1',
+        };
       },
+    },
+    startMetadataArtistRefresh: async () => {
+      throw new Error('refresh should not start while paused');
     },
   });
 
@@ -145,6 +159,7 @@ test('createMetadataRefreshHeartbeat pauses dispatch when provider health blocks
     reason: 'paused',
     skipped: true,
   });
+  assert.equal(schedulerCallCount, 1);
   assert.deepEqual(metadataRefreshHeartbeatState.getHeartbeatState(), {
     lastErrorMessage: null,
     lastOutcome: 'skipped',

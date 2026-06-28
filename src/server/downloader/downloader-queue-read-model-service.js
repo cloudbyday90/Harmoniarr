@@ -22,6 +22,7 @@ import {
   calculateDownloaderTransferProgress,
   classifyDownloaderTransferState,
 } from './downloader-transfer-policy.js';
+import { createDownloaderImportCandidateLinkageService } from './downloader-import-candidate-linkage-service.js';
 
 const defaultMaxTransferRows = 1000;
 
@@ -78,7 +79,14 @@ function flattenDownloadGroups(groups) {
   return transfers;
 }
 
-function normalizeTransfer(transfer, index) {
+function buildTransferKey(transfer, index) {
+  return [
+    normalizeString(transfer?.username) ?? 'unknown-source',
+    normalizeString(transfer?.id) ?? `row-${index + 1}`,
+  ].join('::');
+}
+
+function normalizeTransfer(transfer, index, importCandidateLinkage = null) {
   const state = classifyDownloaderTransferState(transfer);
   const progress = calculateDownloaderTransferProgress(transfer);
   const timestamps = {
@@ -92,6 +100,7 @@ function normalizeTransfer(transfer, index) {
     actionEligibility: buildDownloaderActionEligibility(transfer),
     averageSpeed: normalizeNumber(transfer?.averageSpeed),
     diagnostics: buildDownloaderTransferDiagnostics(transfer, {
+      importCandidateLinkage,
       progress,
       state,
       timestamps,
@@ -104,10 +113,7 @@ function normalizeTransfer(transfer, index) {
     sourceUser: normalizeString(transfer?.username),
     state,
     timestamps,
-    transferKey: [
-      normalizeString(transfer?.username) ?? 'unknown-source',
-      normalizeString(transfer?.id) ?? `row-${index + 1}`,
-    ].join('::'),
+    transferKey: buildTransferKey(transfer, index),
   };
 }
 
@@ -279,6 +285,7 @@ export function buildDisabledDownloaderQueueReadModel({
 
 export function buildDownloaderQueueReadModelFromDownloads(downloadGroups, {
   includeRemoved = false,
+  importCandidateLinkageByTransferKey = new Map(),
   maxTransferRows = defaultMaxTransferRows,
   now = () => new Date(),
   providerStatus = {},
@@ -288,7 +295,11 @@ export function buildDownloaderQueueReadModelFromDownloads(downloadGroups, {
   const normalizedMaxTransferRows = normalizeMaxTransferRows(maxTransferRows);
   const transfers = allTransfers
     .slice(0, normalizedMaxTransferRows)
-    .map((transfer, index) => normalizeTransfer(transfer, index));
+    .map((transfer, index) => normalizeTransfer(
+      transfer,
+      index,
+      importCandidateLinkageByTransferKey.get(buildTransferKey(transfer, index)) ?? null,
+    ));
   const counts = buildCounts(transfers);
 
   return {
@@ -304,6 +315,7 @@ export function buildDownloaderQueueReadModelFromDownloads(downloadGroups, {
 }
 
 export function createDownloaderQueueReadModelService({
+  buildTransferImportCandidateLinkage = createDownloaderImportCandidateLinkageService().buildTransferImportCandidateLinkage,
   getDownloaderProviderStatus = null,
   getDownloads,
   maxTransferRows = defaultMaxTransferRows,
@@ -328,9 +340,20 @@ export function createDownloaderQueueReadModelService({
     }
 
     const downloads = await getDownloads({ includeRemoved: normalizedIncludeRemoved });
+    const allTransfers = flattenDownloadGroups(downloads).slice(0, normalizeMaxTransferRows(maxTransferRows));
+    const importCandidateLinkageByTransferKey = typeof buildTransferImportCandidateLinkage === 'function'
+      ? await buildTransferImportCandidateLinkage({
+          transfers: allTransfers.map((transfer, index) => ({
+            id: normalizeString(transfer?.id),
+            sourceUser: normalizeString(transfer?.username),
+            transferKey: buildTransferKey(transfer, index),
+          })),
+        })
+      : new Map();
 
     return buildDownloaderQueueReadModelFromDownloads(downloads, {
       includeRemoved: normalizedIncludeRemoved,
+      importCandidateLinkageByTransferKey,
       maxTransferRows,
       now,
       providerStatus: providerStatus ?? {},

@@ -22,6 +22,8 @@ import assert from 'node:assert/strict';
 import {
   candidateStatusLabel,
   candidateStatusTone,
+  buildImportApplyReadinessNotice,
+  buildLiveTransferSyncNotice,
   canStartApplyRun,
   canStartExecutionRun,
   canStartMediaInspectionRun,
@@ -663,6 +665,57 @@ describe('canStartApplyRun', () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildImportApplyReadinessNotice
+// ---------------------------------------------------------------------------
+
+describe('buildImportApplyReadinessNotice', () => {
+  it('returns null when no downloads are ready to import', () => {
+    assert.equal(
+      buildImportApplyReadinessNotice({ currentRun: null, importPendingCandidateCount: 0 }),
+      null,
+    );
+  });
+
+  it('returns null while an apply run is active', () => {
+    assert.equal(
+      buildImportApplyReadinessNotice({
+        currentRun: { status: 'running' },
+        importPendingCandidateCount: 2,
+      }),
+      null,
+    );
+  });
+
+  it('explains a single ready download', () => {
+    assert.deepEqual(
+      buildImportApplyReadinessNotice({
+        currentRun: null,
+        importPendingCandidateCount: 1,
+      }),
+      {
+        tone: 'success',
+        title: '1 download is ready to import',
+        message: 'Start import apply to stage and commit this completed download into the library.',
+      },
+    );
+  });
+
+  it('explains multiple ready downloads after a previous failed apply run', () => {
+    assert.deepEqual(
+      buildImportApplyReadinessNotice({
+        currentRun: { status: 'failed' },
+        importPendingCandidateCount: 3,
+      }),
+      {
+        tone: 'warning',
+        title: '3 downloads are ready to import',
+        message: 'Start import apply to stage and commit these completed downloads into the library.',
+      },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // formatSourceProvider
 // ---------------------------------------------------------------------------
 
@@ -967,6 +1020,89 @@ describe('getPersistedMissingTransfer', () => {
   it('returns the missing transfer when present', () => {
     const mt = { missingSince: '2026-01-01T00:00:00Z' };
     assert.deepEqual(getPersistedMissingTransfer({ persistedMissingTransfer: mt }), mt);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildLiveTransferSyncNotice
+// ---------------------------------------------------------------------------
+
+describe('buildLiveTransferSyncNotice', () => {
+  it('returns null when a live transfer row is available', () => {
+    assert.equal(
+      buildLiveTransferSyncNotice({
+        liveTransferSummary: { status: 'active', total: 1, active: 1 },
+        liveTransfers: [{ id: 'transfer-1', username: 'peer' }],
+      }),
+      null,
+    );
+  });
+
+  it('explains a completed summary without a live Downloader row', () => {
+    assert.deepEqual(
+      buildLiveTransferSyncNotice({
+        liveTransferSummary: {
+          completed: 1,
+          status: 'completed',
+          total: 1,
+        },
+        liveTransfers: [],
+      }),
+      {
+        tone: 'success',
+        title: 'Transfer completed in Downloader',
+        message: 'The live queue no longer has a row to open because the last sync recorded this transfer as complete.',
+      },
+    );
+  });
+
+  it('explains a failed summary without a live Downloader row', () => {
+    assert.deepEqual(
+      buildLiveTransferSyncNotice({
+        liveTransferSummary: {
+          failed: 1,
+          status: 'failed',
+          total: 1,
+        },
+      }),
+      {
+        tone: 'danger',
+        title: 'Transfer no longer has a live Downloader row',
+        message: 'The last sync recorded a failed or rejected transfer. Use the persisted execution detail here for recovery.',
+      },
+    );
+  });
+
+  it('explains stale active summary evidence when no live row is visible', () => {
+    assert.deepEqual(
+      buildLiveTransferSyncNotice({
+        liveTransferSummary: {
+          active: 1,
+          status: 'active',
+          total: 1,
+        },
+      }),
+      {
+        tone: 'warning',
+        title: 'Transfer state needs a fresh sync',
+        message: 'The last summary still showed work in progress, but no live Downloader row is visible in this read model.',
+      },
+    );
+  });
+
+  it('falls back to persisted transfer observation summary', () => {
+    assert.equal(
+      buildLiveTransferSyncNotice({
+        persistedTransferObservation: {
+          summary: {
+            completed: 1,
+            status: 'completed',
+            total: 1,
+          },
+        },
+      })?.title,
+      'Transfer completed in Downloader',
+    );
   });
 });
 

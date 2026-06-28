@@ -13,6 +13,7 @@ import {
   isSkippableBrowserRuntimeError,
   toBrowserRuntimeUnavailableReason,
 } from '../../testing/browser/playwright-smoke-runtime.js';
+import { installMetadataBrowserFixtures } from '../../testing/browser/metadata-browser-fixtures.js';
 import { installReleaseRadarBrowserFixtures } from '../../testing/browser/release-radar-browser-fixtures.js';
 import { installWantedBrowserFixtures } from '../../testing/browser/wanted-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
@@ -121,6 +122,7 @@ suite('Activity releases/wanted browser verification', () => {
     }
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      await installMetadataBrowserFixtures(browserContext);
       await installWantedBrowserFixtures(browserContext);
       await bootstrapAdminThroughUi(page, { baseUrl });
 
@@ -133,6 +135,15 @@ suite('Activity releases/wanted browser verification', () => {
       await wantedTable.getByRole('cell', { name: 'Autechre' }).waitFor();
       await wantedTable.getByText('Music Has the Right to Children').first().waitFor();
       await wantedTable.getByText('Kid A').first().waitFor();
+      await wantedTable.getByText('1 candidate', { exact: true }).waitFor();
+      await wantedTable.getByText('Last search produced Import Review candidates.', { exact: true }).waitFor();
+      await wantedTable.getByRole('link', { name: 'Open candidates' }).waitFor();
+      await wantedTable.getByText('Queued in Downloader', { exact: true }).waitFor();
+      await wantedTable.getByText('1 Downloader transfer accepted.', { exact: true }).waitFor();
+      await wantedTable.getByText('No candidates', { exact: true }).waitFor();
+      await wantedTable.getByText('Last search returned no candidates; Harmoniarr will retry after cooldown.', {
+        exact: true,
+      }).waitFor();
       await page.getByText('Download recovery needs review').waitFor();
 
       const retryButton = page.getByRole('button', {
@@ -145,6 +156,18 @@ suite('Activity releases/wanted browser verification', () => {
 
       const retryRequests = await page.evaluate(() => globalThis.__harmoniarrWantedRetryRequests);
       assert.deepEqual(retryRequests, ['metadata-release-mhtrtc']);
+
+      await wantedTable.getByRole('link', { name: 'Open candidates' }).click();
+      await page.waitForFunction(() => {
+        const url = new URL(globalThis.location.href);
+        return url.pathname === '/app/activity/candidates'
+          && url.searchParams.get('sourceSearchId') === 'search-discovery-dispatch-amber'
+          && url.searchParams.get('status') === 'all';
+      });
+      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByText('1 matching candidates', { exact: true }).waitFor();
+      await page.getByText('healthy-slskd-peer', { exact: true }).first().waitFor();
+      await page.getByText('/private/staging/Autechre/Amber', { exact: true }).first().waitFor();
 
       await page.goto('about:blank', { waitUntil: 'load' });
     }, {

@@ -94,6 +94,22 @@ export function createOperatorArtistMonitoringStore({
     return normalizeOperatorArtistMonitoringRow(result.rows[0]);
   }
 
+  async function listOperatorArtistMonitoringByMetadataArtist({ metadataArtistId }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        SELECT *
+        FROM operator_artist_monitoring
+        WHERE metadata_artist_id = $1
+          AND is_monitored = TRUE
+        ORDER BY updated_at DESC, app_user_id ASC
+      `,
+      [metadataArtistId],
+    );
+
+    return result.rows.map((row) => normalizeOperatorArtistMonitoringRow(row));
+  }
+
   async function upsertOperatorArtistMonitoring({
     acquisitionProfileKey,
     appUserId,
@@ -223,6 +239,7 @@ export function createOperatorArtistMonitoringStore({
 
   return {
     getOperatorArtistMonitoring,
+    listOperatorArtistMonitoringByMetadataArtist,
     listOperatorMonitoredArtists,
     listOperatorArtistMonitoringSnapshot,
     replaceOperatorArtistMonitoringSnapshot,

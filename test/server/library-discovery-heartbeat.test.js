@@ -196,6 +196,51 @@ test('createLibraryDiscoveryHeartbeat starts a due discovery run and configures 
   assert.equal(clearIntervalCalls[0], intervalHandler);
 });
 
+test('createLibraryDiscoveryHeartbeat records setup-required when slskd is not configured', async () => {
+  const libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState();
+  const heartbeat = createLibraryDiscoveryHeartbeat({
+    getActiveRun: async () => {
+      throw new Error('active run lookup should not run before provider setup');
+    },
+    getDependencyHealth: async ({ providers }) => {
+      assert.deepEqual(providers, ['slskd']);
+      return [{
+        provider: 'slskd',
+        status: 'disabled',
+        code: 'slskd_not_configured',
+        message: 'Configure Soulseek (slskd) in Settings to enable downloads and discovery searches.',
+      }];
+    },
+    getDiscoverySnapshot: async () => {
+      throw new Error('discovery snapshot should not be read before provider setup');
+    },
+    getNow: () => new Date('2026-04-30T14:00:00.000Z'),
+    libraryDiscoveryHeartbeatState,
+    startLibraryDiscoveryRun: async () => {
+      throw new Error('discovery run should not be queued before provider setup');
+    },
+  });
+
+  const result = await heartbeat.tick();
+
+  assert.deepEqual(result, {
+    provider: 'slskd',
+    reason: 'setup_required',
+    skipped: true,
+  });
+  assert.deepEqual(libraryDiscoveryHeartbeatState.getHeartbeatState(), {
+    lastErrorMessage: null,
+    lastOutcome: 'skipped',
+    lastPauseCode: 'slskd_not_configured',
+    lastPauseMessage: 'Configure Soulseek (slskd) in Settings to enable downloads and discovery searches.',
+    lastPauseProvider: 'slskd',
+    lastSkipReason: 'setup_required',
+    lastTickAt: '2026-04-30T14:00:00.000Z',
+    lastTriggeredAt: null,
+    nextRetryAt: null,
+  });
+});
+
 test('createLibraryDiscoveryHeartbeat swallows concurrent-run conflicts and surfaces other errors through onError', async () => {
   const errors = [];
   const conflictState = createLibraryDiscoveryHeartbeatState();

@@ -68,6 +68,16 @@ export function createMetadataRefreshHeartbeat({
         };
       }
 
+      const dueArtist = await metadataRefreshSchedulerService.getNextDueArtist({ now: occurredAt });
+      if (!dueArtist) {
+        metadataRefreshHeartbeatState.recordHeartbeatOutcome({
+          occurredAt,
+          outcome: 'skipped',
+          skipReason: 'not_due',
+        });
+        return { reason: 'not_due', skipped: true };
+      }
+
       const dependencyStatuses = await getDependencyHealth({ providers: ['musicbrainz'] });
       const dispatchReadiness = metadataRefreshDispatchPolicyService.resolveDispatchReadiness({
         dependencyStatuses,
@@ -89,16 +99,6 @@ export function createMetadataRefreshHeartbeat({
           reason: 'paused',
           skipped: true,
         };
-      }
-
-      const dueArtist = await metadataRefreshSchedulerService.getNextDueArtist({ now: occurredAt });
-      if (!dueArtist) {
-        metadataRefreshHeartbeatState.recordHeartbeatOutcome({
-          occurredAt,
-          outcome: 'skipped',
-          skipReason: 'not_due',
-        });
-        return { reason: 'not_due', skipped: true };
       }
 
       await startMetadataArtistRefresh({

@@ -49,8 +49,39 @@ test('listDiscoveryRequestsByMetadataReleaseIds returns current request state fo
   }]);
 });
 
+test('recordDiscoverySearchFailure casts JSON evidence parameters for PostgreSQL inference', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /'code', \$1::text/);
+    assert.match(sql, /'message', \$2::text/);
+    assert.match(sql, /'lastSearchQuery', \$3::text/);
+    assert.deepEqual(params, [
+      'discovery_dispatch_failed',
+      'Soulseek search failed',
+      'Autechre Amber',
+      'release-1',
+    ]);
+    return { rows: [] };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  await store.recordDiscoverySearchFailure({
+    errorCode: 'discovery_dispatch_failed',
+    errorMessage: 'Soulseek search failed',
+    metadataReleaseId: 'release-1',
+    searchQuery: 'Autechre Amber',
+  });
+
+  assert.equal(query.mock.callCount(), 1);
+});
+
 test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async (t) => {
-  const query = t.mock.fn(async (_sql, params) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /'lastSearchId', \$1::text/);
+    assert.match(sql, /'lastSearchQuery', \$2::text/);
+    assert.match(sql, /'candidateCount', \$3::integer/);
+    assert.match(sql, /'fileCount', \$4::integer/);
     assert.deepEqual(params, [
       'search-1',
       'Bjork Vespertine Live',
@@ -80,7 +111,9 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
 });
 
 test('markDiscoveryRequestExhausted blocks automatic discovery retries', async (t) => {
-  const query = t.mock.fn(async (_sql, params) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /'lastSearchQuery', \$2::text/);
+    assert.match(sql, /'reasonCode', \$4::text/);
     assert.deepEqual(params, [
       'release-1',
       'Selected Ambient Works Volume II',

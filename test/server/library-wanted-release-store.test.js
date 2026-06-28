@@ -31,6 +31,22 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             discovery_search_attempt_count: 2,
             expected_track_count: 10,
             id: 'wanted-1',
+            import_candidate_latest_status: 'selected',
+            import_candidate_latest_updated_at: '2026-06-27T21:10:00.000Z',
+            import_candidate_status_counts: {
+              downloading: 2,
+              pending: 1,
+            },
+            import_candidate_total_count: 3,
+            import_execution_enqueued_transfer_count: 4,
+            import_execution_failed_filename_count: 1,
+            import_execution_item_status_counts: {
+              queued: 1,
+              queued_with_warnings: 1,
+            },
+            import_execution_item_total_count: 2,
+            import_execution_latest_item_status: 'queued',
+            import_execution_latest_updated_at: '2026-06-27T21:12:00.000Z',
             last_reconciled_at: '2026-05-31T14:00:00.000Z',
             matched_track_count: 0,
             metadata_artist_id: 'artist-1',
@@ -56,6 +72,11 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   const releases = await store.listWantedReleasesWithMetadata({ appUserId: 'user-1', limit: 25 });
 
   assert.match(observedSql, /LEFT JOIN library_discovery_requests ldr/);
+  assert.match(observedSql, /LEFT JOIN LATERAL/);
+  assert.match(observedSql, /FROM import_candidates ic/);
+  assert.match(observedSql, /ic\.source_search_id = NULLIF\(ldr\.evidence->>'lastSearchId', ''\)/);
+  assert.match(observedSql, /FROM import_execution_run_items iei/);
+  assert.match(observedSql, /jsonb_array_length\(latest_item\.planning_snapshot #> '\{execution,enqueuedTransfers\}'\)/);
   assert.match(observedSql, /lwr\.app_user_id = \$1/);
   assert.deepEqual(observedParams, ['user-1', 25]);
   assert.equal(releases[0].appUserId, 'user-1');
@@ -67,6 +88,26 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
         sourceOperationRunId: 'operation-run-123456789',
         sourceSearchId: 'search-123456789',
         triggeredByFailedCandidateId: 'candidate-123456789',
+      },
+    },
+    importReviewSummary: {
+      latestStatus: 'selected',
+      latestUpdatedAt: '2026-06-27T21:10:00.000Z',
+      statusCounts: {
+        downloading: 2,
+        pending: 1,
+      },
+      totalCount: 3,
+      downloadExecutionSummary: {
+        enqueuedTransferCount: 4,
+        failedFilenameCount: 1,
+        itemStatusCounts: {
+          queued: 1,
+          queued_with_warnings: 1,
+        },
+        latestItemStatus: 'queued',
+        latestUpdatedAt: '2026-06-27T21:12:00.000Z',
+        totalItemCount: 2,
       },
     },
     lastSearchAt: '2026-05-31T14:30:00.000Z',
@@ -85,9 +126,25 @@ test('listWantedReleasesWithMetadata returns null discoveryRequest when none exi
           app_user_id: 'user-2',
           artist_name: 'Bjork',
           artist_sort_name: 'Bjork',
+          discovery_blocked_reason: null,
+          discovery_evidence: null,
+          discovery_last_search_at: null,
+          discovery_next_search_after: null,
           discovery_request_status: null,
+          discovery_research_attempt_count: null,
+          discovery_search_attempt_count: null,
           expected_track_count: 9,
           id: 'wanted-2',
+          import_candidate_latest_status: null,
+          import_candidate_latest_updated_at: null,
+          import_candidate_status_counts: null,
+          import_candidate_total_count: 0,
+          import_execution_enqueued_transfer_count: 0,
+          import_execution_failed_filename_count: 0,
+          import_execution_item_status_counts: null,
+          import_execution_item_total_count: 0,
+          import_execution_latest_item_status: null,
+          import_execution_latest_updated_at: null,
           last_reconciled_at: null,
           matched_track_count: 0,
           metadata_artist_id: 'artist-2',

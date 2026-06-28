@@ -97,6 +97,16 @@ export function createJobLeaseStore({
           NOW() + ($4 * INTERVAL '1 millisecond'),
           'active'
         )
+        ON CONFLICT (lease_key) DO UPDATE
+        SET owner_instance_id = EXCLUDED.owner_instance_id,
+            acquired_at = EXCLUDED.acquired_at,
+            heartbeat_at = EXCLUDED.heartbeat_at,
+            expires_at = EXCLUDED.expires_at,
+            released_at = NULL,
+            status = 'active'
+        WHERE job_leases.released_at IS NOT NULL
+           OR job_leases.expires_at <= NOW()
+           OR job_leases.owner_instance_id = EXCLUDED.owner_instance_id
         RETURNING id, job_type, lease_key, owner_instance_id, acquired_at, heartbeat_at, expires_at, released_at, status, created_at
       `,
       [jobType, leaseKey, ownerInstanceId, resolvedLeaseDurationMs],

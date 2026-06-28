@@ -55,6 +55,66 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
 - Home now uses the operator monitored projection for artist cards and shows compact policy, coverage, progress, and reconciliation state
 - artist detail now loads the operator artist projection, exposes draft policy editing with `Save` / `Cancel`, and shows release-level selection override visibility
 - Discover recommendation scoring/explainability is implemented through a bounded monitored-artist support boost and fixed-card explanation contract
+- metadata artist refresh now materializes bounded canonical releases for
+  policy-selected monitored release groups before queuing operator
+  reconciliation, allowing artist monitoring to create downstream desired-state
+  work instead of leaving selected release groups unresolved; see
+  [METADATA_CANONICAL_RELEASE_MATERIALIZATION_DESIGN.md](METADATA_CANONICAL_RELEASE_MATERIALIZATION_DESIGN.md)
+- Wanted now includes discovery-dispatch handoff observability, including queue
+  readiness counts, the latest dispatch-run outcome, and a protected manual
+  `Run discovery now` action for operators to move wanted releases into
+  Soulseek search and Import Review candidate creation; see
+  [LIBRARY_DISCOVERY_DISPATCH_HANDOFF_OBSERVABILITY_DESIGN.md](LIBRARY_DISCOVERY_DISPATCH_HANDOFF_OBSERVABILITY_DESIGN.md)
+- the dispatch handoff now has fixture-backed browser verification proving the
+  manual Wanted action sends a CSRF-backed dispatch request, refreshes run
+  context, and hands the operator to the resulting Import Review candidate; see
+  [DISCOVERY_DISPATCH_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](DISCOVERY_DISPATCH_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md)
+- Wanted rows now include per-release discovery result transparency, derived
+  from existing dispatch evidence, so operators can see whether a release
+  produced candidates, returned no candidates, failed, exhausted search
+  attempts, or is still queued; see
+  [DISCOVERY_DISPATCH_RESULT_TRANSPARENCY_DESIGN.md](DISCOVERY_DISPATCH_RESULT_TRANSPARENCY_DESIGN.md)
+- candidate-producing Wanted rows now include an Import Review deep link
+  filtered by the discovery dispatch `sourceSearchId`, giving operators a
+  direct handoff from per-release discovery evidence to the matching candidate
+  queue without exposing provider secrets; see
+  [WANTED_DISCOVERY_CANDIDATE_DEEPLINK_DESIGN.md](WANTED_DISCOVERY_CANDIDATE_DEEPLINK_DESIGN.md)
+- Wanted rows now correlate matching Import Review candidate workflow state,
+  showing when a discovery result is pending review, selected for download,
+  downloading, ready to import, failed, or applied through a bounded status
+  aggregate; see
+  [WANTED_IMPORT_REVIEW_WORKFLOW_STATE_DESIGN.md](WANTED_IMPORT_REVIEW_WORKFLOW_STATE_DESIGN.md)
+- Wanted rows now correlate persisted Import Review execution handoff state,
+  showing whether selected candidates were blocked, failed before enqueue, or
+  accepted by Downloader without polling slskd; see
+  [DOWNLOADER_CORRELATION_FROM_IMPORT_REVIEW_EXECUTION_DESIGN.md](DOWNLOADER_CORRELATION_FROM_IMPORT_REVIEW_EXECUTION_DESIGN.md)
+- Downloader rows now correlate live provider transfers back to the Import
+  Review candidate that queued them when persisted execution evidence contains
+  the matching transfer `username` and `id`, exposing row and drawer handoffs
+  without raw provider payloads; see
+  [DOWNLOADER_IMPORT_CANDIDATE_LINKAGE_DESIGN.md](DOWNLOADER_IMPORT_CANDIDATE_LINKAGE_DESIGN.md)
+- the linked Downloader transfer handoff now has browser verification proving
+  both the row link and diagnostics-drawer link navigate to the selected Import
+  Review candidate; see
+  [DOWNLOADER_LINKED_TRANSFER_BROWSER_VERIFICATION_DESIGN.md](DOWNLOADER_LINKED_TRANSFER_BROWSER_VERIFICATION_DESIGN.md)
+- Import Review execution live-transfer rows now hand back to the matching
+  Downloader details drawer through bounded route query state; see
+  [IMPORT_REVIEW_DOWNLOADER_TRANSFER_HANDOFF_DESIGN.md](IMPORT_REVIEW_DOWNLOADER_TRANSFER_HANDOFF_DESIGN.md)
+- direct Downloader transfer handoff URLs now show a polite stale-transfer
+  notice when the transfer has disappeared from the live queue; see
+  [DOWNLOADER_STALE_TRANSFER_HANDOFF_NOTICE_DESIGN.md](DOWNLOADER_STALE_TRANSFER_HANDOFF_NOTICE_DESIGN.md)
+- Import Review execution detail now explains durable completed, failed,
+  temporarily missing, and stale in-progress transfer summaries when Downloader
+  no longer has a live row to open; see
+  [IMPORT_REVIEW_TRANSFER_SYNC_NOTICE_DESIGN.md](IMPORT_REVIEW_TRANSFER_SYNC_NOTICE_DESIGN.md)
+- the Import Review apply runway now explains when completed downloads are
+  ready to import, with browser verification from completed transfer evidence
+  to a queued import apply run; see
+  [IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md](IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md)
+- Library discovery evidence writes now cast PostgreSQL JSONB placeholders,
+  fixing `could not determine data type of parameter $1` dispatch failures
+  before search/import handoff evidence can persist; see
+  [LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md](LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:

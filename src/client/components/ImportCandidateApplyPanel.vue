@@ -19,6 +19,7 @@
 <script setup>
 import { ref } from 'vue';
 import {
+  buildImportApplyReadinessNotice,
   canStartApplyRun,
   describeApplyOperation,
   formatPath,
@@ -128,6 +129,17 @@ function onApplyConfirm() {
 
     <p class="review-summary-copy">Moves downloaded files into your library. Files are staged first and only committed once all moves succeed safely.</p>
     <p class="review-summary-copy" v-if="summary">{{ summary.message }}</p>
+
+    <article
+      v-if="buildImportApplyReadinessNotice({ currentRun, importPendingCandidateCount })"
+      class="apply-readiness-notice"
+      :data-tone="buildImportApplyReadinessNotice({ currentRun, importPendingCandidateCount }).tone"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>{{ buildImportApplyReadinessNotice({ currentRun, importPendingCandidateCount }).title }}</strong>
+      <p>{{ buildImportApplyReadinessNotice({ currentRun, importPendingCandidateCount }).message }}</p>
+    </article>
 
     <article class="panel-light error-panel" v-if="errorMessage" role="alert">
       <h3>Import run unavailable</h3>
@@ -438,5 +450,35 @@ function onApplyConfirm() {
   background: var(--hx-accent-soft);
   border-color: rgba(94, 173, 255, 0.32);
   color: var(--hx-accent-strong);
+}
+
+.apply-readiness-notice {
+  display: grid;
+  gap: var(--hx-space-1);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  background: var(--hx-bg-surface-sunken);
+  border: 1px solid var(--hx-border-muted);
+  border-radius: var(--hx-radius-md);
+}
+
+.apply-readiness-notice[data-tone='success'] {
+  background: var(--hx-success-soft);
+  border-color: rgba(47, 158, 107, 0.32);
+}
+
+.apply-readiness-notice[data-tone='warning'] {
+  background: var(--hx-warning-soft);
+  border-color: rgba(192, 138, 22, 0.32);
+}
+
+.apply-readiness-notice strong {
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+}
+
+.apply-readiness-notice p {
+  margin: 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
 }
 </style>

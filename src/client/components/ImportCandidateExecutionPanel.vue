@@ -24,6 +24,7 @@ import {
   formatPercent,
   formatRunStatus,
   formatTimestamp,
+  buildLiveTransferSyncNotice,
   getExecutionItemStatusClass,
   getExecutionItemStatusLabel,
   getHeartbeatOutcomeLabel,
@@ -39,6 +40,7 @@ import {
   formatElapsedDuration,
   formatOperationTimestampShort,
 } from '../lib/operation-run-presentation.js';
+import { buildDownloaderTransferLocation } from '../lib/downloader-transfer-route.js';
 import ImportCandidateRunFailureNotice from './ImportCandidateRunFailureNotice.vue';
 
 defineProps({
@@ -89,6 +91,10 @@ defineProps({
 });
 
 defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
+
+function downloaderTransferLocation(transfer) {
+  return buildDownloaderTransferLocation(transfer);
+}
 </script>
 
 <template>
@@ -356,6 +362,13 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
                     <p class="eyebrow">{{ transfer.username || 'unknown user' }}</p>
                     <strong>{{ transfer.filename || 'Unknown transfer' }}</strong>
                     <p class="metadata-card-copy">{{ transfer.state || 'Unknown state' }}</p>
+                    <RouterLink
+                      v-if="downloaderTransferLocation(transfer)"
+                      class="execution-transfer-downloader-link"
+                      :to="downloaderTransferLocation(transfer)"
+                    >
+                      Open in Downloader
+                    </RouterLink>
                   </div>
                   <span class="review-status-pill" :class="getLiveTransferStatusClass({ status: transfer.exception ? 'failed' : (String(transfer.state || '').includes('Completed, Succeeded') ? 'completed' : (String(transfer.state || '').includes('Queued') ? 'queued' : 'active')) })">
                     {{ transfer.placeInQueue != null ? `Queue ${transfer.placeInQueue}` : formatPercent(Number(transfer.size) > 0 ? Math.round(((Number(transfer.bytesTransferred) || 0) / Number(transfer.size)) * 100) : null) }}
@@ -364,6 +377,17 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
                 <p class="metadata-card-copy" v-if="transfer.exception">{{ transfer.exception }}</p>
               </article>
             </div>
+
+            <article
+              v-if="buildLiveTransferSyncNotice(item)"
+              class="execution-transfer-sync-notice"
+              :data-tone="buildLiveTransferSyncNotice(item).tone"
+              role="status"
+              aria-live="polite"
+            >
+              <strong>{{ buildLiveTransferSyncNotice(item).title }}</strong>
+              <p>{{ buildLiveTransferSyncNotice(item).message }}</p>
+            </article>
 
             <article
               class="panel-light review-empty-state"
@@ -487,6 +511,21 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
   color: var(--hx-accent-strong);
 }
 
+.execution-transfer-downloader-link {
+  display: inline-block;
+  width: fit-content;
+  margin-top: var(--hx-space-1);
+  color: var(--hx-accent);
+  font-size: var(--hx-text-xs);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.execution-transfer-downloader-link:hover,
+.execution-transfer-downloader-link:focus-visible {
+  text-decoration: underline;
+}
+
 .execution-degraded-notice {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -502,5 +541,41 @@ defineEmits(['reconcile', 'refresh', 'select-run', 'start']);
   margin: 0;
   font-size: var(--hx-text-sm);
   color: var(--hx-text);
+}
+
+.execution-transfer-sync-notice {
+  display: grid;
+  gap: var(--hx-space-1);
+  margin-top: var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  background: var(--hx-bg-surface-sunken);
+  border: 1px solid var(--hx-border-muted);
+  border-radius: var(--hx-radius-md);
+}
+
+.execution-transfer-sync-notice[data-tone='success'] {
+  background: var(--hx-success-soft);
+  border-color: rgba(18, 134, 88, 0.32);
+}
+
+.execution-transfer-sync-notice[data-tone='warning'] {
+  background: var(--hx-warning-soft);
+  border-color: rgba(192, 138, 22, 0.32);
+}
+
+.execution-transfer-sync-notice[data-tone='danger'] {
+  background: var(--hx-danger-soft);
+  border-color: rgba(218, 68, 83, 0.32);
+}
+
+.execution-transfer-sync-notice strong {
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+}
+
+.execution-transfer-sync-notice p {
+  margin: 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
 }
 </style>

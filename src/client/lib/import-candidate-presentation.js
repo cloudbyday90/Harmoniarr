@@ -406,6 +406,38 @@ export function canStartApplyRun(currentRun, importPendingCandidateCount) {
 }
 
 /**
+ * Build a short notice for the apply runway when completed downloads are
+ * waiting to be committed into the library.
+ *
+ * @param {object} options
+ * @param {object|null|undefined} options.currentRun
+ * @param {number} options.importPendingCandidateCount
+ * @returns {{tone: string, title: string, message: string}|null}
+ */
+export function buildImportApplyReadinessNotice({
+  currentRun = null,
+  importPendingCandidateCount = 0,
+} = {}) {
+  const count = Number(importPendingCandidateCount);
+  if (!Number.isFinite(count) || count <= 0) {
+    return null;
+  }
+
+  if (currentRun?.status === 'pending' || currentRun?.status === 'running') {
+    return null;
+  }
+
+  const candidateLabel = count === 1 ? 'download is' : 'downloads are';
+  const startLabel = count === 1 ? 'this completed download' : 'these completed downloads';
+
+  return {
+    tone: currentRun?.status === 'failed' ? 'warning' : 'success',
+    title: `${count} ${candidateLabel} ready to import`,
+    message: `Start import apply to stage and commit ${startLabel} into the library.`,
+  };
+}
+
+/**
  * Return a CSS class suffix for an execution-run item queue status pill.
  *
  * @param {string|null|undefined} status
@@ -529,6 +561,80 @@ export function getLatestTransferSummary(item) {
  */
 export function getPersistedMissingTransfer(item) {
   return item?.persistedMissingTransfer ?? null;
+}
+
+function coerceCount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+/**
+ * Build a short operator-facing explanation when an execution item has durable
+ * transfer summary evidence but no live slskd transfer rows to open.
+ *
+ * @param {object|null|undefined} item
+ * @returns {{tone: string, title: string, message: string}|null}
+ */
+export function buildLiveTransferSyncNotice(item) {
+  const liveTransfers = Array.isArray(item?.liveTransfers) ? item.liveTransfers : [];
+  if (liveTransfers.length > 0) {
+    return null;
+  }
+
+  const summary = item?.liveTransferSummary ?? getLatestTransferSummary(item);
+  if (!summary) {
+    return null;
+  }
+
+  const total = coerceCount(summary.total);
+  if (total === 0) {
+    return null;
+  }
+
+  const completed = coerceCount(summary.completed);
+  const failed = coerceCount(summary.failed) + coerceCount(summary.rejected);
+  const active = coerceCount(summary.active);
+  const queued = coerceCount(summary.queued);
+
+  if (summary.status === 'completed' || completed >= total) {
+    return {
+      tone: 'success',
+      title: 'Transfer completed in Downloader',
+      message: 'The live queue no longer has a row to open because the last sync recorded this transfer as complete.',
+    };
+  }
+
+  if (summary.status === 'failed' || failed >= total) {
+    return {
+      tone: 'danger',
+      title: 'Transfer no longer has a live Downloader row',
+      message: 'The last sync recorded a failed or rejected transfer. Use the persisted execution detail here for recovery.',
+    };
+  }
+
+  if (summary.status === 'not_found') {
+    return {
+      tone: summary.missingTransfer?.isPastGracePeriod ? 'danger' : 'warning',
+      title: summary.missingTransfer?.isPastGracePeriod
+        ? 'Transfer is missing past the grace window'
+        : 'Transfer is temporarily missing from Downloader',
+      message: 'Harmoniarr will keep the persisted observation visible while reconciliation checks whether the transfer returns.',
+    };
+  }
+
+  if (active > 0 || queued > 0 || summary.status === 'active' || summary.status === 'queued') {
+    return {
+      tone: 'warning',
+      title: 'Transfer state needs a fresh sync',
+      message: 'The last summary still showed work in progress, but no live Downloader row is visible in this read model.',
+    };
+  }
+
+  return {
+    tone: 'info',
+    title: 'Transfer summary is persisted',
+    message: 'No live Downloader row is visible right now, so this panel is showing the latest durable transfer summary.',
+  };
 }
 
 /**

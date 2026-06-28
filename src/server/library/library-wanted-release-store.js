@@ -18,6 +18,50 @@
 
 import { getPool } from '../database.js';
 
+function toInteger(value) {
+  return Number.parseInt(String(value ?? 0), 10) || 0;
+}
+
+function normalizeStatusCounts(value) {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([status, count]) => [status, toInteger(count)])
+      .filter(([, count]) => count > 0),
+  );
+}
+
+function buildImportReviewSummary(row) {
+  const totalCount = toInteger(row.import_candidate_total_count);
+  if (totalCount < 1) {
+    return null;
+  }
+
+  const summary = {
+    latestStatus: row.import_candidate_latest_status ?? null,
+    latestUpdatedAt: row.import_candidate_latest_updated_at ?? null,
+    statusCounts: normalizeStatusCounts(row.import_candidate_status_counts),
+    totalCount,
+  };
+
+  const executionItemCount = toInteger(row.import_execution_item_total_count);
+  if (executionItemCount > 0) {
+    summary.downloadExecutionSummary = {
+      enqueuedTransferCount: toInteger(row.import_execution_enqueued_transfer_count),
+      failedFilenameCount: toInteger(row.import_execution_failed_filename_count),
+      itemStatusCounts: normalizeStatusCounts(row.import_execution_item_status_counts),
+      latestItemStatus: row.import_execution_latest_item_status ?? null,
+      latestUpdatedAt: row.import_execution_latest_updated_at ?? null,
+      totalItemCount: executionItemCount,
+    };
+  }
+
+  return summary;
+}
+
 export function createLibraryWantedReleaseStore({
   getPoolFn = getPool,
 } = {}) {
@@ -219,12 +263,80 @@ export function createLibraryWantedReleaseStore({
           ldr.next_search_after AS discovery_next_search_after,
           ldr.search_attempt_count AS discovery_search_attempt_count,
           ldr.research_attempt_count AS discovery_research_attempt_count,
-          ldr.evidence AS discovery_evidence
+          ldr.evidence AS discovery_evidence,
+          import_review_summary.total_count AS import_candidate_total_count,
+          import_review_summary.status_counts AS import_candidate_status_counts,
+          import_review_summary.latest_status AS import_candidate_latest_status,
+          import_review_summary.latest_updated_at AS import_candidate_latest_updated_at,
+          import_execution_summary.total_item_count AS import_execution_item_total_count,
+          import_execution_summary.item_status_counts AS import_execution_item_status_counts,
+          import_execution_summary.latest_item_status AS import_execution_latest_item_status,
+          import_execution_summary.latest_updated_at AS import_execution_latest_updated_at,
+          import_execution_summary.enqueued_transfer_count AS import_execution_enqueued_transfer_count,
+          import_execution_summary.failed_filename_count AS import_execution_failed_filename_count
         FROM library_wanted_releases lwr
         JOIN metadata_artists ma ON ma.id = lwr.metadata_artist_id
         JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
         JOIN metadata_releases mr ON mr.id = lwr.metadata_release_id
         LEFT JOIN library_discovery_requests ldr ON ldr.metadata_release_id = lwr.metadata_release_id
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*)::integer AS total_count,
+            COALESCE(jsonb_object_agg(status_summary.status, status_summary.status_count), '{}'::jsonb) AS status_counts,
+            (ARRAY_AGG(status_summary.status ORDER BY status_summary.latest_updated_at DESC, status_summary.status ASC))[1] AS latest_status,
+            MAX(status_summary.latest_updated_at) AS latest_updated_at
+          FROM (
+            SELECT
+              ic.status,
+              COUNT(*)::integer AS status_count,
+              MAX(ic.updated_at) AS latest_updated_at
+            FROM import_candidates ic
+            WHERE ic.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')
+            GROUP BY ic.status
+          ) status_summary
+        ) import_review_summary ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*)::integer AS total_item_count,
+            COALESCE(jsonb_object_agg(item_summary.item_status, item_summary.item_count), '{}'::jsonb) AS item_status_counts,
+            (ARRAY_AGG(item_summary.item_status ORDER BY item_summary.latest_updated_at DESC, item_summary.item_status ASC))[1] AS latest_item_status,
+            MAX(item_summary.latest_updated_at) AS latest_updated_at,
+            COALESCE(SUM(item_summary.enqueued_transfer_count), 0)::integer AS enqueued_transfer_count,
+            COALESCE(SUM(item_summary.failed_filename_count), 0)::integer AS failed_filename_count
+          FROM (
+            SELECT
+              latest_item.item_status,
+              COUNT(*)::integer AS item_count,
+              MAX(latest_item.updated_at) AS latest_updated_at,
+              COALESCE(SUM(
+                CASE
+                  WHEN jsonb_typeof(latest_item.planning_snapshot #> '{execution,enqueuedTransfers}') = 'array'
+                    THEN jsonb_array_length(latest_item.planning_snapshot #> '{execution,enqueuedTransfers}')
+                  ELSE 0
+                END
+              ), 0)::integer AS enqueued_transfer_count,
+              COALESCE(SUM(
+                CASE
+                  WHEN jsonb_typeof(latest_item.planning_snapshot #> '{execution,failedFilenames}') = 'array'
+                    THEN jsonb_array_length(latest_item.planning_snapshot #> '{execution,failedFilenames}')
+                  ELSE 0
+                END
+              ), 0)::integer AS failed_filename_count
+            FROM (
+              SELECT DISTINCT ON (iei.import_candidate_id)
+                iei.import_candidate_id,
+                iei.item_status,
+                iei.planning_snapshot,
+                iei.updated_at
+              FROM import_execution_run_items iei
+              JOIN import_candidates ic
+                ON ic.id = iei.import_candidate_id
+              WHERE ic.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')
+              ORDER BY iei.import_candidate_id, iei.updated_at DESC, iei.created_at DESC
+            ) latest_item
+            GROUP BY latest_item.item_status
+          ) item_summary
+        ) import_execution_summary ON TRUE
         ${whereClause}
         ORDER BY ma.sort_name ASC NULLS LAST, ma.name ASC, mrg.first_release_date ASC NULLS LAST, mr.release_date ASC NULLS LAST
         ${limitClause}
@@ -241,6 +353,7 @@ export function createLibraryWantedReleaseStore({
         ? {
             blockedReason: row.discovery_blocked_reason ?? null,
             evidence: row.discovery_evidence ?? {},
+            importReviewSummary: buildImportReviewSummary(row),
             lastSearchAt: row.discovery_last_search_at ?? null,
             nextSearchAfter: row.discovery_next_search_after ?? null,
             requestStatus: row.discovery_request_status,

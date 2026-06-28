@@ -9,6 +9,7 @@ It is intentionally separate from the canonical deployment baseline in `compose.
 - builds the local image from the current repository
 - binds the app only to `127.0.0.1:47956`
 - keeps all walkthrough data under `./.data/walkthrough/`
+- provides a disposable local-only secret encryption key so provider API keys can be saved from Settings
 - uses the shipped public bootstrap route to create one local admin through a one-shot helper after the app becomes healthy
 
 Local walkthrough credentials:
@@ -17,6 +18,13 @@ Local walkthrough credentials:
 - password: `HarmoniarrLocal123!`
 
 These credentials live in `docker/walkthrough.env` and are only meant for disposable local exploration.
+
+The walkthrough Compose file also sets a deterministic local fallback for
+`HARMONIARR_SECRET_ENCRYPTION_KEY`. That key exists only so Settings can store
+encrypted provider secrets during local exploration. Do not reuse it for
+production. For a real deployment, set your own 32-byte key as 64 hex
+characters or base64 and keep it stable for as long as encrypted settings need
+to be read.
 
 ## Optional: Last.fm API Key
 
@@ -45,6 +53,11 @@ http://127.0.0.1:47956
 ```
 
 The one-shot `walkthrough-bootstrap` helper exits successfully after creating the walkthrough admin. That is expected. Running it through `docker compose run --rm` keeps the normal walkthrough stack clean instead of leaving an exited helper container behind.
+
+After configuring Soulseek in Settings > Connections, use the Provider health
+`Test connection` button to refresh the saved connection status. The API key is
+write-only: the field intentionally stays blank after save, and leaving it blank
+keeps the stored key.
 
 If you need a fully clean rebuild while testing Docker changes, use:
 

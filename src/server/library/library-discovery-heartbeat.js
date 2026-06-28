@@ -18,6 +18,7 @@
 
 import { createLibraryDiscoveryHeartbeatState } from './library-discovery-heartbeat-state.js';
 import { createIntervalHeartbeatRunner } from '../heartbeat/interval-heartbeat-runner.js';
+import { createLibraryDiscoveryDispatchPolicyService } from './library-discovery-dispatch-policy-service.js';
 
 const defaultHeartbeatIntervalMs = 15 * 60 * 1000;
 
@@ -93,6 +94,7 @@ export function shouldStartLibraryDiscoveryHeartbeatRun({
 export function createLibraryDiscoveryHeartbeat({
   clearIntervalFn = clearInterval,
   getActiveRun = async () => null,
+  getDependencyHealth = async () => [],
   getDiscoverySnapshot = async () => ({
     lastEvaluatedAt: null,
     nextEligibleAt: null,
@@ -107,6 +109,7 @@ export function createLibraryDiscoveryHeartbeat({
   heartbeatPauseService = null,
   intervalMs = defaultHeartbeatIntervalMs,
   libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState(),
+  libraryDiscoveryDispatchPolicyService = createLibraryDiscoveryDispatchPolicyService(),
   onError = () => {},
   setIntervalFn = setInterval,
   startLibraryDiscoveryRun = async () => ({ accepted: true }),
@@ -132,6 +135,42 @@ export function createLibraryDiscoveryHeartbeat({
         return {
           nextRetryAt: heartbeatReadiness.nextRetryAt ?? null,
           provider: heartbeatReadiness.pauseProvider ?? null,
+          reason: 'paused',
+          skipped: true,
+        };
+      }
+
+      const dependencyStatuses = await getDependencyHealth({ providers: ['slskd'] });
+      const dispatchReadiness = libraryDiscoveryDispatchPolicyService.resolveDispatchReadiness({
+        dependencyStatuses,
+      });
+      if (!dispatchReadiness.allowed) {
+        if (dispatchReadiness.reason === 'setup_required') {
+          libraryDiscoveryHeartbeatState.recordHeartbeatOutcome({
+            occurredAt,
+            outcome: 'skipped',
+            pauseCode: dispatchReadiness.pauseCode,
+            pauseMessage: dispatchReadiness.message,
+            pauseProvider: dispatchReadiness.provider,
+            skipReason: 'setup_required',
+          });
+          return {
+            provider: dispatchReadiness.provider ?? null,
+            reason: 'setup_required',
+            skipped: true,
+          };
+        }
+
+        libraryDiscoveryHeartbeatState.recordHeartbeatOutcome({
+          occurredAt,
+          outcome: 'skipped',
+          pauseCode: dispatchReadiness.pauseCode,
+          pauseMessage: dispatchReadiness.pauseMessage,
+          pauseProvider: dispatchReadiness.provider,
+          skipReason: 'paused',
+        });
+        return {
+          provider: dispatchReadiness.provider ?? null,
           reason: 'paused',
           skipped: true,
         };

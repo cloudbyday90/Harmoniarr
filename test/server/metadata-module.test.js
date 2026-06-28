@@ -59,6 +59,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const metadataRefreshService = {
     refreshArtistCatalogById: () => {},
   };
+  const metadataReleaseMaterializationService = {
+    materializeMonitoredReleaseGroups: () => {},
+  };
   const providerHealthRecorder = {
     recordError: () => {},
     recordSuccess: () => {},
@@ -75,6 +78,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     operatorArtistSaveService,
     metadataReadService,
     metadataRefreshService,
+    metadataReleaseMaterializationService,
     metadataSearchService,
     providerHealthRecorder,
     musicBrainzCatalogService,
@@ -94,6 +98,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   assert.equal(metadataModule.operatorArtistProjectionService, operatorArtistProjectionService);
   assert.equal(metadataModule.operatorArtistSaveService, operatorArtistSaveService);
   assert.equal(metadataModule.metadataRefreshService, metadataRefreshService);
+  assert.equal(metadataModule.metadataReleaseMaterializationService, metadataReleaseMaterializationService);
   assert.equal(metadataModule.metadataSearchService, metadataSearchService);
   assert.equal(metadataModule.providerHealthRecorder, providerHealthRecorder);
   assert.equal(metadataModule.musicBrainzCatalogService, musicBrainzCatalogService);

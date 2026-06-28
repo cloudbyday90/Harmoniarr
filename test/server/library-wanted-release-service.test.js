@@ -34,6 +34,34 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
         release_status: 'Official',
         wanted_automation_mode: 'current_and_future_matching',
       },
+      {
+        app_user_id: 'user-1',
+        expected_track_count: 5,
+        matched_track_count: 0,
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'release-group-3',
+        metadata_release_id: 'release-3',
+        monitored_release_group_types: ['album', 'ep'],
+        reconciliation_status: null,
+        release_scope: 'current_and_future',
+        release_date: '2016',
+        release_status: 'Official',
+        wanted_automation_mode: 'current_and_future_matching',
+      },
+      {
+        app_user_id: 'user-1',
+        expected_track_count: 6,
+        matched_track_count: 0,
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'release-group-4',
+        metadata_release_id: 'release-4',
+        monitored_release_group_types: ['album', 'ep'],
+        reconciliation_status: null,
+        release_scope: 'current_and_future',
+        release_date: '2017-03',
+        release_status: 'Official',
+        wanted_automation_mode: 'current_and_future_matching',
+      },
     ],
   }));
   const service = createLibraryWantedReleaseService({
@@ -87,6 +115,44 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
         releaseStatus: 'Official',
         wantedStatus: 'partial',
       },
+      {
+        appUserId: 'user-1',
+        evidence: {
+          monitoredReleaseGroupTypes: ['album', 'ep'],
+          releaseScope: 'current_and_future',
+          reconciliationStatus: 'missing',
+          strategy: 'monitored_release_absent',
+          wantedAutomationMode: 'current_and_future_matching',
+        },
+        expectedTrackCount: 5,
+        matchedTrackCount: 0,
+        metadataArtistId: 'artist-1',
+        metadataReleaseGroupId: 'release-group-3',
+        metadataReleaseId: 'release-3',
+        missingTrackCount: 5,
+        releaseDate: '2016-01-01',
+        releaseStatus: 'Official',
+        wantedStatus: 'missing',
+      },
+      {
+        appUserId: 'user-1',
+        evidence: {
+          monitoredReleaseGroupTypes: ['album', 'ep'],
+          releaseScope: 'current_and_future',
+          reconciliationStatus: 'missing',
+          strategy: 'monitored_release_absent',
+          wantedAutomationMode: 'current_and_future_matching',
+        },
+        expectedTrackCount: 6,
+        matchedTrackCount: 0,
+        metadataArtistId: 'artist-1',
+        metadataReleaseGroupId: 'release-group-4',
+        metadataReleaseId: 'release-4',
+        missingTrackCount: 6,
+        releaseDate: '2017-03-01',
+        releaseStatus: 'Official',
+        wantedStatus: 'missing',
+      },
     ],
   });
 
@@ -96,7 +162,11 @@ test('reconcileWantedReleases records missing and partial monitored releases fro
   assert.match(sql, /operator_artist_monitoring\.release_scope <> 'track_only'/);
   assert.match(sql, /operator_artist_monitoring\.wanted_automation_mode <> 'manual_only'/);
   assert.match(sql, /operator_artist_monitoring\.release_scope = 'current_and_future'/);
-  assert.match(sql, /metadata_releases\.release_date >= operator_artist_monitoring\.created_at::date/);
+  assert.match(sql, /metadata_releases\.release_date ~ '\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$'/);
+  assert.match(sql, /\(metadata_releases\.release_date \|\| '-01'\)::date/);
+  assert.match(sql, /\(metadata_releases\.release_date \|\| '-01-01'\)::date/);
+  assert.match(sql, /operator_artist_monitoring\.created_at::date/);
+  assert.doesNotMatch(sql, /metadata_releases\.release_date >= operator_artist_monitoring\.created_at::date/);
   assert.doesNotMatch(sql, /metadata_artist_monitoring/);
 });
 

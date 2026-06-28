@@ -45,6 +45,7 @@ import { createMetadataRefreshSchedulerService } from './metadata-refresh-schedu
 import { createMetadataRefreshSchedulingPolicyService } from './metadata-refresh-scheduling-policy-service.js';
 import { createMetadataReadService } from './metadata-read-service.js';
 import { createMetadataRefreshService } from './metadata-refresh-service.js';
+import { createMetadataReleaseMaterializationService } from './metadata-release-materialization-service.js';
 import { createMetadataSearchService } from './metadata-search-service.js';
 import { createMusicBrainzCatalogService } from './musicbrainz-catalog-service.js';
 import { createMusicBrainzImportService } from './musicbrainz-import-service.js';
@@ -89,6 +90,7 @@ export function createMetadataModule({
   operatorTrackOverrideService = null,
   metadataReadService = null,
   metadataRefreshService = null,
+  metadataReleaseMaterializationService = null,
   metadataSearchService = null,
   providerHealthRecorder = null,
   recordActivityEventFn = null,
@@ -190,6 +192,14 @@ export function createMetadataModule({
       queueLatestSnapshotRun: resolvedOperatorArtistReconciliationRunStore.queueLatestSnapshotRun,
       recordAuditEventFn,
     });
+  const resolvedMusicBrainzCatalogService = musicBrainzCatalogService ?? createMusicBrainzCatalogService({ providerHealthRecorder });
+  const resolvedMusicBrainzImportService = musicBrainzImportService ?? createMusicBrainzImportService({ providerHealthRecorder });
+  const resolvedMetadataReleaseMaterializationService = metadataReleaseMaterializationService
+    ?? createMetadataReleaseMaterializationService({
+      getMetadataArtist: resolvedMetadataReadService.getArtist,
+      importMusicBrainzRelease: resolvedMusicBrainzImportService.importReleaseById,
+      musicBrainzCatalogService: resolvedMusicBrainzCatalogService,
+    });
   const resolvedOperatorArtistReconciliationWorker = operatorArtistReconciliationWorker
     ?? createOperatorArtistReconciliationWorker({
       acquireLease: resolvedOperatorArtistReconciliationRunStore.acquireLease,
@@ -212,8 +222,11 @@ export function createMetadataModule({
   const resolvedMetadataRefreshService = metadataRefreshService ?? createMetadataRefreshService({
     getArtistRefreshMonitoring: resolvedMetadataArtistRefreshStateStore.getArtistRefreshMonitoring,
     getMetadataArtistByMusicBrainzId: resolvedMetadataReadService.getArtistByMusicBrainzId,
+    listOperatorArtistMonitoringByMetadataArtist: resolvedOperatorArtistMonitoringStore.listOperatorArtistMonitoringByMetadataArtist,
+    materializeMonitoredReleaseGroups: resolvedMetadataReleaseMaterializationService.materializeMonitoredReleaseGroups,
     providerHealthRecorder,
     metadataReleaseDetectionService: resolvedMetadataReleaseDetectionService,
+    queueOperatorArtistReconciliation: resolvedOperatorArtistReconciliationService.queueOperatorArtistReconciliation,
     reconcileWantedReleases,
   });
   const resolvedMetadataArtistRefreshRunStore = metadataArtistRefreshRunStore ?? createMetadataArtistRefreshRunStore();
@@ -245,8 +258,6 @@ export function createMetadataModule({
   const resolvedMetadataRefreshHeartbeatConfig = metadataRefreshHeartbeatConfig ?? resolveMetadataRefreshHeartbeatConfig();
   const resolvedMetadataRefreshHeartbeatState = metadataRefreshHeartbeatState ?? createMetadataRefreshHeartbeatState();
   const resolvedMetadataSearchService = metadataSearchService ?? createMetadataSearchService();
-  const resolvedMusicBrainzCatalogService = musicBrainzCatalogService ?? createMusicBrainzCatalogService({ providerHealthRecorder });
-  const resolvedMusicBrainzImportService = musicBrainzImportService ?? createMusicBrainzImportService({ providerHealthRecorder });
   const resolvedMusicBrainzSearchService = musicBrainzSearchService ?? createMusicBrainzSearchService({ providerHealthRecorder });
   const resolvedSimilarArtistsService = similarArtistsService ?? createSimilarArtistsService();
   const resolvedReleaseGroupTracklistService = releaseGroupTracklistService ?? createReleaseGroupTracklistService({
@@ -283,6 +294,7 @@ export function createMetadataModule({
     operatorTrackOverrideService: resolvedOperatorTrackOverrideService,
     operatorTrackOverrideStore: resolvedOperatorTrackOverrideStore,
     metadataRefreshService: resolvedMetadataRefreshService,
+    metadataReleaseMaterializationService: resolvedMetadataReleaseMaterializationService,
     metadataArtistRefreshStateStore: resolvedMetadataArtistRefreshStateStore,
     metadataSearchService: resolvedMetadataSearchService,
     providerHealthRecorder,

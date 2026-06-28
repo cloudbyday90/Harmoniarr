@@ -335,6 +335,7 @@ export function buildDownloaderActionEligibility(transfer = null) {
 }
 
 export function buildDownloaderTransferDiagnostics(transfer, {
+  importCandidateLinkage = null,
   progress,
   state,
   timestamps,
@@ -345,12 +346,7 @@ export function buildDownloaderTransferDiagnostics(transfer, {
   const placeInQueue = normalizeQueuePosition(transfer?.placeInQueue);
 
   return {
-    importLinkage: {
-      candidateId: null,
-      requestId: null,
-      status: 'not_linked',
-      summary: 'No request or import-candidate linkage is exposed for this live provider row yet.',
-    },
+    importLinkage: buildImportLinkage(importCandidateLinkage),
     provider: {
       hasProviderError: hasException(transfer),
       name: 'slskd',
@@ -371,5 +367,28 @@ export function buildDownloaderTransferDiagnostics(transfer, {
     timing: {
       lastKnownEventAt: getLastKnownEventAt(normalizedTimestamps),
     },
+  };
+}
+
+function buildImportLinkage(importCandidateLinkage) {
+  if (importCandidateLinkage?.candidateId) {
+    return {
+      candidateId: importCandidateLinkage.candidateId,
+      candidateStatus: importCandidateLinkage.candidateStatus ?? null,
+      executionItemStatus: importCandidateLinkage.executionItemStatus ?? null,
+      linkedAt: importCandidateLinkage.linkedAt ?? null,
+      operationRunId: importCandidateLinkage.operationRunId ?? null,
+      requestId: null,
+      sourceSearchId: importCandidateLinkage.sourceSearchId ?? null,
+      status: 'linked',
+      summary: importCandidateLinkage.summary ?? 'Linked to Import Review candidate.',
+    };
+  }
+
+  return {
+    candidateId: null,
+    requestId: null,
+    status: 'not_linked',
+    summary: 'No request or import-candidate linkage is exposed for this live provider row yet.',
   };
 }

@@ -61,6 +61,7 @@ export function fetchLibraryDiscoveryRunDetail(runId) {
 
 export function startLibraryDiscoveryRun() {
   return apiRequest('/api/v1/library/discovery-runs', {
+    includeCsrf: true,
     method: 'POST',
   });
 }

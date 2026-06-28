@@ -211,10 +211,10 @@ export function createLibraryDiscoveryRequestStore({
           evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
             'dispatchStrategy', 'slskd_search_dispatch',
             'lastDispatchFailure', jsonb_build_object(
-              'code', $1,
-              'message', $2
+              'code', $1::text,
+              'message', $2::text
             ),
-            'lastSearchQuery', $3
+            'lastSearchQuery', $3::text
           ),
           updated_at = NOW()
         WHERE metadata_release_id = $4
@@ -240,11 +240,11 @@ export function createLibraryDiscoveryRequestStore({
           evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
             'dispatchStrategy', 'slskd_search_dispatch',
             'lastDispatchFailure', NULL,
-            'lastSearchId', $1,
-            'lastSearchQuery', $2,
+            'lastSearchId', $1::text,
+            'lastSearchQuery', $2::text,
             'lastSearchResult', jsonb_build_object(
-              'candidateCount', $3,
-              'fileCount', $4,
+              'candidateCount', $3::integer,
+              'fileCount', $4::integer,
               'sourceProvider', 'slskd'
             ),
             'lastSearchAttemptCount', COALESCE($6::integer, search_attempt_count)
@@ -534,9 +534,9 @@ export function createLibraryDiscoveryRequestStore({
           evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
             'dispatchStrategy', 'slskd_search_dispatch',
             'lastDispatchFailure', NULL,
-            'lastSearchQuery', $2,
+            'lastSearchQuery', $2::text,
             'searchExhausted', jsonb_build_object(
-              'reasonCode', $4,
+              'reasonCode', $4::text,
               'searchAttemptCount', GREATEST(search_attempt_count, COALESCE($3::integer, search_attempt_count))
             )
           ),

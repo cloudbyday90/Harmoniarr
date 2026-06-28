@@ -123,11 +123,11 @@ function normalizeServerState(payload) {
   return {
     provider: 'slskd',
     status,
-    ...(status === 'healthy' ? {} : {
-      message: isConnected
+    message: status === 'healthy'
+      ? 'Soulseek is connected and ready for searches and downloads.'
+      : isConnected
         ? 'slskd is connected but not logged in'
         : 'slskd is not connected to Soulseek',
-    }),
     details: {
       isConnected,
       isLoggedIn,

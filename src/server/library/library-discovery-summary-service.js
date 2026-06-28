@@ -32,7 +32,7 @@ function buildSummary({ requestCounts }) {
 
   if (requestCounts.ready > 0) {
     return {
-      message: `${requestCounts.ready} discovery request${requestCounts.ready === 1 ? '' : 's'} are ready to search now.`,
+      message: `${requestCounts.ready} discovery request${requestCounts.ready === 1 ? ' is' : 's are'} ready to search now.`,
       status: 'ready',
     };
   }

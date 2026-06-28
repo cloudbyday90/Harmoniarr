@@ -61,6 +61,48 @@ test('job lease store renews a lease by updating heartbeat and expiry timestamps
   assert.equal(lease.leaseKey, 'library_scan:run-2');
 });
 
+test('job lease store reuses released or expired lease keys with guarded conflict handling', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      acquired_at: new Date('2026-05-01T00:10:00.000Z'),
+      created_at: new Date('2026-05-01T00:00:00.000Z'),
+      expires_at: new Date('2026-05-01T00:40:00.000Z'),
+      heartbeat_at: new Date('2026-05-01T00:10:00.000Z'),
+      id: 'lease-2b',
+      job_type: 'metadata_artist_refresh',
+      lease_key: 'metadata_artist_refresh:run-retry',
+      owner_instance_id: 'instance-retry',
+      released_at: null,
+      status: 'active',
+    }],
+  }));
+  const jobLeaseStore = createJobLeaseStore({
+    getPoolFn: () => ({ query }),
+    leaseDurationMs: 120_000,
+    nowFn: () => new Date('2026-05-01T00:10:01.000Z'),
+    ownerInstanceId: 'instance-retry',
+  });
+
+  const lease = await jobLeaseStore.acquireLease({
+    jobType: 'metadata_artist_refresh',
+    leaseKey: 'metadata_artist_refresh:run-retry',
+  });
+
+  const sql = query.mock.calls[0].arguments[0];
+  assert.match(sql, /ON CONFLICT \(lease_key\) DO UPDATE/);
+  assert.match(sql, /job_leases\.released_at IS NOT NULL/);
+  assert.match(sql, /job_leases\.expires_at <= NOW\(\)/);
+  assert.match(sql, /job_leases\.owner_instance_id = EXCLUDED\.owner_instance_id/);
+  assert.deepEqual(query.mock.calls[0].arguments[1], [
+    'metadata_artist_refresh',
+    'metadata_artist_refresh:run-retry',
+    'instance-retry',
+    120_000,
+  ]);
+  assert.equal(lease.state, 'active');
+  assert.equal(lease.ownerInstanceId, 'instance-retry');
+});
+
 test('job lease store lists a batch of leases by key', async (t) => {
   const query = t.mock.fn(async () => ({
     rows: [{

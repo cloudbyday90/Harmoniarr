@@ -11,6 +11,8 @@ test('DownloaderTransferDetailDrawer follows the modal dialog accessibility cont
   assert.match(source, /role="dialog"/);
   assert.match(source, /aria-modal="true"/);
   assert.match(source, /aria-labelledby="downloader-detail-title"/);
+  assert.match(source, /:ref="setDialogRef"/);
+  assert.match(source, /props\.open && !dialogRef\.open/);
   assert.match(source, /@cancel="onCancel"/);
   assert.match(source, /dialogRef\.showModal\(\)/);
   assert.match(source, /aria-label="Close transfer diagnostics"/);
@@ -29,6 +31,14 @@ test('DownloaderTransferDetailDrawer exposes server-owned operator action eligib
   assert.match(source, /retry_provider_contract_not_available|action\.reason/);
 });
 
+test('DownloaderTransferDetailDrawer exposes import candidate drill-through when linked', async () => {
+  const source = await readFile(drawerPath, 'utf8');
+
+  assert.match(source, /buildDownloaderImportCandidateLocation/);
+  assert.match(source, /Open Import Review candidate/);
+  assert.match(source, /diagnostics\.importLinkage\?\.summary/);
+});
+
 test('DownloaderView opens diagnostics from an explicit Details action', async () => {
   const source = await readFile(viewPath, 'utf8');
 
@@ -36,6 +46,14 @@ test('DownloaderView opens diagnostics from an explicit Details action', async (
   assert.match(source, /selectedTransferKey/);
   assert.match(source, /@click="openTransferDetail\(file\)"/);
   assert.match(source, />\s*Details\s*<\/button>/);
+});
+
+test('DownloaderView exposes import candidate drill-through links for linked transfers', async () => {
+  const source = await readFile(viewPath, 'utf8');
+
+  assert.match(source, /buildDownloaderImportCandidateLocation/);
+  assert.match(source, /importCandidateLocation\(file\)/);
+  assert.match(source, /Open candidate/);
 });
 
 test('DownloaderView wires operator controls to downloader mutation APIs', async () => {

@@ -23,6 +23,27 @@ function toInteger(value) {
   return Number.parseInt(String(value ?? 0), 10) || 0;
 }
 
+function normalizeReleaseDateForProjection(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^\d{4}-\d{2}$/.test(trimmed)) {
+    return `${trimmed}-01`;
+  }
+
+  if (/^\d{4}$/.test(trimmed)) {
+    return `${trimmed}-01-01`;
+  }
+
+  return null;
+}
+
 function mapWantedRow(row) {
   const expectedTrackCount = toInteger(row.expected_track_count);
   const matchedTrackCount = toInteger(row.matched_track_count);
@@ -43,11 +64,23 @@ function mapWantedRow(row) {
     metadataReleaseGroupId: row.metadata_release_group_id,
     metadataReleaseId: row.metadata_release_id,
     missingTrackCount,
-    releaseDate: row.release_date ?? null,
+    releaseDate: normalizeReleaseDateForProjection(row.release_date),
     releaseStatus: row.release_status ?? null,
     wantedStatus: matchedTrackCount > 0 ? 'partial' : 'missing',
   };
 }
+
+const metadataReleaseComparableDateSql = `
+  CASE
+    WHEN metadata_releases.release_date ~ '^\\d{4}-\\d{2}-\\d{2}$'
+      THEN metadata_releases.release_date::date
+    WHEN metadata_releases.release_date ~ '^\\d{4}-\\d{2}$'
+      THEN (metadata_releases.release_date || '-01')::date
+    WHEN metadata_releases.release_date ~ '^\\d{4}$'
+      THEN (metadata_releases.release_date || '-01-01')::date
+    ELSE NULL
+  END
+`;
 
 export function createLibraryWantedReleaseService({
   getPoolFn = getPool,
@@ -96,12 +129,12 @@ export function createLibraryWantedReleaseService({
           AND (
             operator_artist_monitoring.release_scope = 'current_and_future'
             OR metadata_releases.release_date IS NULL
-            OR metadata_releases.release_date >= operator_artist_monitoring.created_at::date
+            OR (${metadataReleaseComparableDateSql}) >= operator_artist_monitoring.created_at::date
           )
           AND (
             operator_artist_monitoring.wanted_automation_mode = 'current_and_future_matching'
             OR metadata_releases.release_date IS NULL
-            OR metadata_releases.release_date >= operator_artist_monitoring.created_at::date
+            OR (${metadataReleaseComparableDateSql}) >= operator_artist_monitoring.created_at::date
           )
         GROUP BY
           operator_artist_monitoring.app_user_id,

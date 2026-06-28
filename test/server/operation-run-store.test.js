@@ -42,6 +42,28 @@ test('operation run store delegates lease operations through the shared job leas
   assert.equal(lease.leaseKey, 'library_scan:run-5');
 });
 
+test('operation run store rejects unavailable shared leases', async (t) => {
+  const acquireLease = t.mock.fn(async () => null);
+  const operationRunStore = createOperationRunStore({
+    createJobLeaseStoreFn: () => ({
+      acquireLease,
+      getLease: async () => null,
+      releaseLease: async () => null,
+      renewLease: async () => null,
+    }),
+    operationType: 'library_scan',
+  });
+
+  await assert.rejects(
+    () => operationRunStore.acquireLease({ runId: 'run-busy' }),
+    {
+      code: 'operation_run_lease_unavailable',
+      message: 'Operation run lease is currently held by another worker',
+      runId: 'run-busy',
+    },
+  );
+});
+
 test('operation run store can check and finalize shared cancellation state', async (t) => {
   const query = t.mock.fn(async (sql) => {
     if (sql.includes('SELECT cancel_requested_at')) {

@@ -202,6 +202,9 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
         resolveDispatchReadiness: () => ({ allowed: true }),
       },
       libraryModule: {
+        libraryDiscoveryDispatchPolicyService: {
+          resolveDispatchReadiness: () => ({ allowed: true }),
+        },
         libraryDiscoveryHeartbeatState: { kind: 'library-state' },
         libraryDiscoveryRunService: {
           startLibraryDiscoveryRun: async () => {},
@@ -258,8 +261,10 @@ test('startServerRuntime composes startup services, starts them, and shuts them 
       return importExecutionHeartbeat;
     },
     createLibraryDiscoveryHeartbeat: (options) => {
+      assert.equal(typeof options.getDependencyHealth, 'function');
       assert.equal(typeof options.heartbeatPauseService.resolveHeartbeatReadiness, 'function');
       assert.equal(options.intervalMs, 900000);
+      assert.equal(typeof options.libraryDiscoveryDispatchPolicyService.resolveDispatchReadiness, 'function');
       assert.equal(typeof options.onError, 'function');
       return libraryDiscoveryHeartbeat;
     },

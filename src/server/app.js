@@ -142,7 +142,7 @@ async function getSlskdDependencyStatus({ slskdConfigService, slskdService }) {
       provider: 'slskd',
       status: 'disabled',
       code: 'slskd_not_configured',
-      message: 'Configure Soulseek (slskd) in Settings to enable downloads.',
+      message: 'Configure Soulseek (slskd) in Settings to enable downloads and discovery searches.',
     };
   }
 

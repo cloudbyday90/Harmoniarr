@@ -9,6 +9,106 @@ Database model source: `docs/DATABASE_MODEL.md`
 ## Current Status (2026-05-23)
 
 - Current validation baseline: 1534 server / 3087 client tests pass.
+- Local Docker system alert hardening: repeated operator alerts on mostly
+  unconfigured walkthrough stacks now collapse by root cause, metadata refresh
+  operation retries can reacquire released job leases safely, and wanted-release
+  reconciliation compares MusicBrainz text release dates through an explicit
+  date-normalization expression instead of `text >= date`. See
+  `SYSTEM_ALERT_HARDENING_DESIGN.md`.
+- Provider prerequisite gating: automatic Library discovery dispatch now checks
+  slskd dependency readiness before reading discovery snapshots or queuing
+  operation runs. Missing slskd setup records a non-alerting `setup_required`
+  heartbeat hint, while unavailable/degraded slskd remains an operator-paused
+  condition. See `PROVIDER_PREREQUISITE_GATING_DESIGN.md`.
+- Docker provider setup-state browser verification: packaged-runtime browser
+  smoke now proves a clean unconfigured slskd walkthrough has no operator alert
+  noise, Discovery dispatch reports a setup-required heartbeat, Downloader
+  renders setup guidance, and the disabled Downloader page does not keep polling
+  the provider-backed queue. See
+  `DOCKER_PROVIDER_SETUP_STATE_BROWSER_VERIFICATION_DESIGN.md`.
+- Metadata refresh idle dependency gating: clean walkthrough verification found
+  MusicBrainz unavailability could still surface as a topbar alert even when no
+  monitored artists were due for refresh. Metadata refresh now checks due work
+  before probing MusicBrainz, while still pausing when a due artist exists and
+  MusicBrainz is unavailable. See
+  `METADATA_REFRESH_IDLE_DEPENDENCY_GATING_DESIGN.md`.
+- Walkthrough connection-settings readiness: the local walkthrough Compose stack
+  now provides a disposable `HARMONIARR_SECRET_ENCRYPTION_KEY` fallback so
+  Settings can store encrypted provider credentials without manual env setup.
+  Settings > Connections also exposes a saved-provider `Test connection` action
+  backed by the existing dependency-health read model, shows toast feedback for
+  the saved Soulseek connection result, and includes a healthy Soulseek
+  descriptor in the provider-health row. The walkthrough docs call out the
+  local-only key and write-only API-key behavior.
+- Metadata canonical release materialization: metadata artist refresh now
+  materializes one bounded canonical MusicBrainz release candidate for each
+  policy-selected monitored release group before queuing operator artist
+  reconciliation. This resolves the local Docker "artist is monitored but
+  Downloader stays idle" gap where release groups existed but no canonical
+  releases could feed desired-state planning. See
+  `METADATA_CANONICAL_RELEASE_MATERIALIZATION_DESIGN.md`.
+- Library discovery dispatch handoff observability: Wanted now shows discovery
+  queue readiness, latest dispatch-run outcome, and a CSRF-backed `Run
+  discovery now` control so operators can see and start the handoff from wanted
+  releases to Soulseek search, Import Review candidates, and Downloader
+  activity. See
+  `LIBRARY_DISCOVERY_DISPATCH_HANDOFF_OBSERVABILITY_DESIGN.md`.
+- Discovery dispatch execution handoff browser verification: added a
+  deterministic browser scenario proving the Wanted `Run discovery now` action
+  sends a CSRF-backed dispatch request, refreshes latest-run state, and exposes
+  the downstream Import Review candidate created by the dispatch. See
+  `DISCOVERY_DISPATCH_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
+- Discovery dispatch result transparency: Wanted rows now summarize per-release
+  discovery outcomes from existing dispatch evidence, including candidates
+  produced, no-candidate cooldowns, failures, exhausted searches, and queued
+  states without exposing provider secrets. See
+  `DISCOVERY_DISPATCH_RESULT_TRANSPARENCY_DESIGN.md`.
+- Wanted discovery candidate deep links: candidate-producing Wanted rows now
+  expose an `Open candidates` handoff into Import Review filtered by the
+  dispatch `sourceSearchId`, without routing provider secrets or adding a new
+  privileged read path. See
+  `WANTED_DISCOVERY_CANDIDATE_DEEPLINK_DESIGN.md`.
+- Wanted Import Review workflow-state correlation: candidate-producing Wanted
+  rows now include a bounded status aggregate from matching Import Review
+  candidates, showing states such as pending review, selected for download,
+  downloading, ready to import, failed, or applied without exposing raw provider
+  payloads. See `WANTED_IMPORT_REVIEW_WORKFLOW_STATE_DESIGN.md`.
+- Downloader correlation from Import Review execution: Wanted rows now derive a
+  bounded download-execution summary from persisted Import Review execution
+  items, showing whether selected candidates were blocked, failed before
+  enqueue, or accepted by Downloader without polling slskd or exposing raw
+  transfer payloads. See
+  `DOWNLOADER_CORRELATION_FROM_IMPORT_REVIEW_EXECUTION_DESIGN.md`.
+- Downloader import-candidate linkage: live Downloader rows now correlate
+  persisted Import Review execution enqueue evidence back to the candidate that
+  created the transfer. The row and diagnostics drawer expose `Open candidate`
+  handoffs without exposing raw provider payloads, paths, or execution
+  snapshots. See `DOWNLOADER_IMPORT_CANDIDATE_LINKAGE_DESIGN.md`.
+- Downloader linked-transfer browser verification: added a focused Chromium
+  scenario proving a linked Downloader row and its diagnostics drawer both hand
+  off to the selected Import Review candidate. The scenario also hardened the
+  native diagnostics drawer open path. See
+  `DOWNLOADER_LINKED_TRANSFER_BROWSER_VERIFICATION_DESIGN.md`.
+- Import Review Downloader transfer handoff: live execution transfer rows now
+  expose `Open in Downloader`, routing to the matching Downloader transfer
+  details drawer through bounded query state. See
+  `IMPORT_REVIEW_DOWNLOADER_TRANSFER_HANDOFF_DESIGN.md`.
+- Downloader stale-transfer handoff notice: direct Downloader transfer links
+  now explain when the linked transfer is no longer visible in the live queue
+  and let the operator clear only the handoff query state. See
+  `DOWNLOADER_STALE_TRANSFER_HANDOFF_NOTICE_DESIGN.md`.
+- Import Review transfer sync notice: execution detail now explains completed,
+  failed, temporarily missing, and stale in-progress transfer summaries when no
+  live Downloader row is available to open. See
+  `IMPORT_REVIEW_TRANSFER_SYNC_NOTICE_DESIGN.md`.
+- Import Review completed-download apply handoff: the apply runway now explains
+  when completed downloads are ready to import, and browser coverage proves the
+  path from completed transfer evidence to a queued import apply run. See
+  `IMPORT_REVIEW_COMPLETED_DOWNLOAD_APPLY_HANDOFF_DESIGN.md`.
+- Library discovery JSONB parameter casting: Library discovery evidence writes
+  now cast placeholders passed into PostgreSQL `jsonb_build_object`, fixing the
+  `could not determine data type of parameter $1` failures seen in Background
+  Jobs. See `LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,

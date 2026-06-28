@@ -81,6 +81,45 @@ test('createOperatorNotificationService deduplicates notifications and enforces 
   assert.equal(payload.counts.total, 1);
 });
 
+test('createOperatorNotificationService coalesces repeated operation failures by root cause', () => {
+  const service = createOperatorNotificationService({
+    nowFn: () => new Date('2026-05-02T16:00:00.000Z'),
+  });
+
+  const payload = service.buildOperatorNotifications({
+    operationRuns: [{
+      errorMessage: 'operator does not exist: text >= date',
+      finishedAt: '2026-05-02T15:58:00.000Z',
+      id: 'run-latest',
+      operationType: 'library_discovery_dispatch',
+      startedAt: '2026-05-02T15:57:00.000Z',
+      status: 'failed',
+    }, {
+      errorMessage: 'operator does not exist: text >= date',
+      finishedAt: '2026-05-02T15:40:00.000Z',
+      id: 'run-older',
+      operationType: 'library_discovery_dispatch',
+      startedAt: '2026-05-02T15:39:00.000Z',
+      status: 'failed',
+    }, {
+      errorMessage: 'duplicate key value violates unique constraint "job_leases_lease_key_key"',
+      finishedAt: '2026-05-02T15:55:00.000Z',
+      id: 'run-metadata',
+      operationType: 'metadata_artist_refresh',
+      startedAt: '2026-05-02T15:50:00.000Z',
+      status: 'failed',
+    }],
+  });
+
+  assert.equal(payload.counts.total, 2);
+  assert.equal(payload.counts.actionable, 2);
+  assert.equal(payload.counts.byCategory.failure, 2);
+  assert.equal(payload.notifications[0].occurrenceCount, 2);
+  assert.equal(payload.notifications[0].reference.runId, 'run-latest');
+  assert.equal(payload.notifications[0].message, 'operator does not exist: text >= date (2 recent occurrences.)');
+  assert.equal(payload.notifications[1].occurrenceCount, 1);
+});
+
 test('buildOperatorNotifications marks notifications as acknowledged when occurredAt <= acknowledgedBefore', () => {
   const service = createOperatorNotificationService({
     nowFn: () => new Date('2026-05-02T16:00:00.000Z'),
@@ -140,4 +179,21 @@ test('buildOperatorNotifications marks heartbeat notifications as acknowledged',
 
   assert.equal(payload.notifications[0].isAcknowledged, true);
   assert.equal(payload.counts.unacknowledged, 0);
+});
+
+test('buildOperatorNotifications does not alert on setup-required heartbeat hints', () => {
+  const service = createOperatorNotificationService();
+
+  const payload = service.buildOperatorNotifications({
+    heartbeats: [{
+      key: 'libraryDiscovery',
+      label: 'Discovery dispatch',
+      lastTickAt: '2026-05-02T15:50:00.000Z',
+      message: 'Configure Soulseek (slskd) in Settings to enable automatic discovery searches.',
+      status: 'setup_required',
+    }],
+  });
+
+  assert.equal(payload.counts.total, 0);
+  assert.deepEqual(payload.notifications, []);
 });

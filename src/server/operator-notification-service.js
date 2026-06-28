@@ -37,13 +37,38 @@ function buildOperationRunTitle(operationType) {
   return getOperationRunDescriptorDefinition(operationType)?.title ?? operationType;
 }
 
+function buildFailureDedupeKey(run) {
+  return [
+    'operation_terminal',
+    run.operationType ?? 'unknown',
+    run.status ?? 'unknown_status',
+    run.errorMessage ?? 'unknown_error',
+  ].join(':');
+}
+
+function isAfter(left, right) {
+  return toSortableTime(left) > toSortableTime(right);
+}
+
+function isBefore(left, right) {
+  return toSortableTime(left) < toSortableTime(right);
+}
+
+function buildRepeatedFailureMessage(message, occurrenceCount) {
+  if (occurrenceCount <= 1) {
+    return message;
+  }
+
+  return `${message} (${occurrenceCount} recent occurrences.)`;
+}
+
 function buildOperationRunNotification(run) {
   const title = buildOperationRunTitle(run.operationType);
 
   if (run.status === 'failed' || run.status === 'cancelled') {
     return {
       category: 'failure',
-      dedupeKey: `run:${run.id}:failure`,
+      dedupeKey: buildFailureDedupeKey(run),
       message: run.errorMessage ?? `${title} requires operator review.`,
       reference: {
         operationType: run.operationType,
@@ -117,6 +142,45 @@ function buildHeartbeatNotification(heartbeat) {
 export function createOperatorNotificationService({
   nowFn = () => new Date(),
 } = {}) {
+  function addNotification(notificationsByDedupeKey, notification, occurredAt, acknowledgedBefore) {
+    const existing = notificationsByDedupeKey.get(notification.dedupeKey);
+    if (existing) {
+      const occurrenceCount = existing.occurrenceCount + 1;
+      const latest = isAfter(occurredAt, existing.occurredAt)
+        ? {
+          ...existing,
+          ...notification,
+          occurredAt,
+          latestMessage: notification.message,
+        }
+        : existing;
+
+      notificationsByDedupeKey.set(notification.dedupeKey, {
+        ...latest,
+        firstOccurredAt: isBefore(occurredAt, existing.firstOccurredAt)
+          ? occurredAt
+          : existing.firstOccurredAt,
+        id: notification.dedupeKey,
+        isAcknowledged: acknowledgedBefore && latest.occurredAt
+          ? latest.occurredAt <= acknowledgedBefore
+          : false,
+        message: buildRepeatedFailureMessage(latest.latestMessage, occurrenceCount),
+        occurrenceCount,
+      });
+      return;
+    }
+
+    notificationsByDedupeKey.set(notification.dedupeKey, {
+      ...notification,
+      firstOccurredAt: occurredAt,
+      id: notification.dedupeKey,
+      isAcknowledged: acknowledgedBefore && occurredAt ? occurredAt <= acknowledgedBefore : false,
+      latestMessage: notification.message,
+      occurrenceCount: 1,
+      occurredAt,
+    });
+  }
+
   function buildOperatorNotifications({
     acknowledgedBefore = null,
     heartbeats = [],
@@ -124,42 +188,30 @@ export function createOperatorNotificationService({
     limit,
   } = {}) {
     const normalizedLimit = normalizeLimit(limit);
-    const notifications = [];
-    const dedupe = new Set();
+    const notificationsByDedupeKey = new Map();
 
     for (const run of operationRuns) {
       const notification = buildOperationRunNotification(run);
-      if (!notification || dedupe.has(notification.dedupeKey)) {
+      if (!notification) {
         continue;
       }
 
-      dedupe.add(notification.dedupeKey);
       const occurredAt = run.finishedAt ?? run.cancelledAt ?? run.startedAt ?? null;
-      notifications.push({
-        ...notification,
-        id: notification.dedupeKey,
-        isAcknowledged: acknowledgedBefore && occurredAt ? occurredAt <= acknowledgedBefore : false,
-        occurredAt,
-      });
+      addNotification(notificationsByDedupeKey, notification, occurredAt, acknowledgedBefore);
     }
 
     for (const heartbeat of heartbeats) {
       const notification = buildHeartbeatNotification(heartbeat);
-      if (!notification || dedupe.has(notification.dedupeKey)) {
+      if (!notification || notificationsByDedupeKey.has(notification.dedupeKey)) {
         continue;
       }
 
-      dedupe.add(notification.dedupeKey);
       const occurredAt = heartbeat.lastTickAt ?? null;
-      notifications.push({
-        ...notification,
-        id: notification.dedupeKey,
-        isAcknowledged: acknowledgedBefore && occurredAt ? occurredAt <= acknowledgedBefore : false,
-        occurredAt,
-      });
+      addNotification(notificationsByDedupeKey, notification, occurredAt, acknowledgedBefore);
     }
 
-    const sortedNotifications = notifications
+    const sortedNotifications = Array.from(notificationsByDedupeKey.values())
+      .map(({ latestMessage, ...notification }) => notification)
       .sort((left, right) => toSortableTime(right.occurredAt) - toSortableTime(left.occurredAt))
       .slice(0, normalizedLimit);
 

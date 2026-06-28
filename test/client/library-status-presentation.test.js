@@ -20,6 +20,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildDiscoveryDispatchHandoffMessage,
   canStartDiscoveryDispatch,
   canStartLibraryScan,
   getDiscoveryHeartbeatOutcomeLabel,
@@ -222,6 +223,45 @@ describe('canStartDiscoveryDispatch', () => {
         latestRun: { status: 'failed' },
       }),
       true,
+    );
+  });
+});
+
+describe('buildDiscoveryDispatchHandoffMessage', () => {
+  it('reports ready discovery requests before other states', () => {
+    assert.equal(
+      buildDiscoveryDispatchHandoffMessage({
+        requestCounts: { blocked: 2, cooldown: 1, ready: 3, totalRequests: 6 },
+        latestRun: null,
+      }),
+      '3 releases are ready for Soulseek search dispatch.',
+    );
+  });
+
+  it('reports an active dispatch run when no requests are ready', () => {
+    assert.equal(
+      buildDiscoveryDispatchHandoffMessage({
+        requestCounts: { blocked: 0, cooldown: 0, ready: 0, totalRequests: 2 },
+        latestRun: { status: 'running' },
+      }),
+      'Discovery dispatch is already running. Results will appear in Import Review or Downloader after searches return.',
+    );
+  });
+
+  it('reports cooldown requests', () => {
+    assert.equal(
+      buildDiscoveryDispatchHandoffMessage({
+        requestCounts: { blocked: 0, cooldown: 1, ready: 0, totalRequests: 1 },
+        latestRun: { status: 'completed' },
+      }),
+      '1 release is cooling down before the next automatic search.',
+    );
+  });
+
+  it('reports empty queue', () => {
+    assert.equal(
+      buildDiscoveryDispatchHandoffMessage(null),
+      'No discovery searches are waiting right now.',
     );
   });
 });

@@ -19,6 +19,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, watch } from 'vue';
 import { formatTransferFilename } from '../../lib/activity-downloads-presentation.js';
+import { buildDownloaderImportCandidateLocation } from '../../lib/downloader-import-review-link.js';
 import { formatOperationTimestampShort } from '../../lib/operation-run-presentation.js';
 import { formatBytes, formatSpeed } from '../../lib/search-presentation.js';
 
@@ -41,6 +42,7 @@ const title = computed(() => (
 ));
 
 const diagnostics = computed(() => props.transfer?.diagnostics ?? {});
+const importCandidateLocation = computed(() => buildDownloaderImportCandidateLocation(props.transfer));
 const recommendedAction = computed(() => diagnostics.value.recommendedNextAction ?? null);
 const timestamps = computed(() => props.transfer?.timestamps ?? {});
 const transferActions = computed(() => (
@@ -70,6 +72,11 @@ const detailRows = computed(() => [
 function setDialogRef(el) {
   if (el instanceof HTMLDialogElement) {
     dialogRef = el;
+    if (props.open && !dialogRef.open) {
+      dialogRef.showModal();
+    }
+  } else if (el === null) {
+    dialogRef = null;
   }
 }
 
@@ -111,7 +118,7 @@ onBeforeUnmount(() => {
 <template>
   <dialog
     v-if="open && transfer"
-    ref="setDialogRef"
+    :ref="setDialogRef"
     class="downloader-detail-drawer"
     role="dialog"
     aria-modal="true"
@@ -202,7 +209,17 @@ onBeforeUnmount(() => {
         <dl class="downloader-detail-grid">
           <div>
             <dt>Import linkage</dt>
-            <dd>{{ diagnostics.importLinkage?.summary ?? 'Not linked.' }}</dd>
+            <dd>
+              <span>{{ diagnostics.importLinkage?.summary ?? 'Not linked.' }}</span>
+              <RouterLink
+                v-if="importCandidateLocation"
+                class="downloader-detail-import-link"
+                :to="importCandidateLocation"
+                @click="closeDrawer"
+              >
+                Open Import Review candidate
+              </RouterLink>
+            </dd>
           </div>
           <div>
             <dt>Retry tracking</dt>
@@ -366,6 +383,20 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
   color: var(--hx-text-strong);
   font-size: var(--hx-text-sm);
+}
+
+.downloader-detail-import-link {
+  display: block;
+  width: fit-content;
+  margin-top: var(--hx-space-1);
+  color: var(--hx-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.downloader-detail-import-link:hover,
+.downloader-detail-import-link:focus-visible {
+  text-decoration: underline;
 }
 
 @media (max-width: 640px) {

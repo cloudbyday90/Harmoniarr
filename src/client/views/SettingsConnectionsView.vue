@@ -29,6 +29,16 @@ import {
 } from '../lib/settings-connections-presentation.js';
 import { useConnections } from '../composables/useConnections.js';
 import { useDependencyHealth } from '../composables/useDependencyHealth.js';
+import { useToast } from '../composables/useToast.js';
+
+const toast = useToast();
+
+const {
+  dependencies: providerHealth,
+  isLoading: isTestingProviderHealth,
+  loadDependencyHealth,
+  loadError: providerHealthError,
+} = useDependencyHealth();
 
 const {
   connectSpotifyOAuth,
@@ -47,12 +57,40 @@ const {
   saveSettings,
   secretStatus,
   successMessage,
-} = useConnections();
+} = useConnections({
+  onSaveSuccess: () => {
+    void loadDependencyHealth();
+  },
+});
 
-const {
-  dependencies: providerHealth,
-  loadDependencyHealth,
-} = useDependencyHealth();
+async function testProviderConnection() {
+  await loadDependencyHealth();
+
+  if (providerHealthError.value) {
+    toast.error(`Connection test failed: ${providerHealthError.value}`);
+    return;
+  }
+
+  const slskdStatus = providerHealth.value.find((dep) => dep.provider === 'slskd');
+  if (!slskdStatus) {
+    toast.info('Provider health refreshed.');
+    return;
+  }
+
+  if (slskdStatus.status === 'healthy') {
+    toast.success(slskdStatus.message ?? 'Soulseek connection is healthy.');
+    return;
+  }
+
+  const message = slskdStatus.message
+    ?? `Soulseek connection is ${formatDependencyStatusLabel(slskdStatus.status).toLowerCase()}.`;
+  if (slskdStatus.status === 'disabled') {
+    toast.warning(message);
+    return;
+  }
+
+  toast.error(message);
+}
 
 onMounted(() => {
   void loadSettings();
@@ -120,14 +158,18 @@ onMounted(() => {
         </article>
 
         <!-- Provider operational health -->
-        <article class="hx-card" v-if="providerHealth.length">
+        <article class="hx-card" v-if="providerHealth.length || providerHealthError">
           <header class="hx-card-header">
             <div>
               <h3 class="hx-card-title">Provider health</h3>
               <p class="hx-card-subtitle">Operational status of connected services, updated from the server heartbeat.</p>
             </div>
+            <button type="button" class="hx-btn" @click="testProviderConnection" :disabled="isTestingProviderHealth">
+              {{ isTestingProviderHealth ? 'Testing…' : 'Test connection' }}
+            </button>
           </header>
           <div class="hx-card-body">
+            <p class="cfg-save-msg is-error" v-if="providerHealthError">{{ providerHealthError }}</p>
             <div class="cfg-health-list">
               <div class="cfg-health-row" v-for="dep in providerHealth" :key="dep.provider">
                 <span class="cfg-health-provider">{{ formatDependencyProviderLabel(dep.provider) }}</span>

@@ -147,6 +147,31 @@ export function canStartDiscoveryDispatch(summaryPayload) {
   return !['pending', 'running'].includes(summaryPayload.latestRun?.status);
 }
 
+export function buildDiscoveryDispatchHandoffMessage(summaryPayload) {
+  const ready = summaryPayload?.requestCounts?.ready ?? 0;
+  const cooldown = summaryPayload?.requestCounts?.cooldown ?? 0;
+  const blocked = summaryPayload?.requestCounts?.blocked ?? 0;
+  const latestRun = summaryPayload?.latestRun ?? null;
+
+  if (ready > 0) {
+    return `${ready} ${ready === 1 ? 'release is' : 'releases are'} ready for Soulseek search dispatch.`;
+  }
+
+  if (['pending', 'running'].includes(latestRun?.status)) {
+    return 'Discovery dispatch is already running. Results will appear in Import Review or Downloader after searches return.';
+  }
+
+  if (cooldown > 0) {
+    return `${cooldown} ${cooldown === 1 ? 'release is' : 'releases are'} cooling down before the next automatic search.`;
+  }
+
+  if (blocked > 0) {
+    return `${blocked} ${blocked === 1 ? 'release is' : 'releases are'} blocked by release-date or recovery policy.`;
+  }
+
+  return 'No discovery searches are waiting right now.';
+}
+
 // ── Library scan ─────────────────────────────────────────────────────────────
 
 /**

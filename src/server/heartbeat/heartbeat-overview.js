@@ -50,6 +50,13 @@ function buildHeartbeatMessage(label, state, messages = {}) {
     };
   }
 
+  if (state.lastSkipReason === 'setup_required') {
+    return {
+      message: state.lastPauseMessage ?? messages.setupRequired ?? `${label} needs setup before it can run.`,
+      status: 'setup_required',
+    };
+  }
+
   if (state.lastOutcome === 'started') {
     return {
       message: messages.started ?? `${label} most recently triggered background work.`,

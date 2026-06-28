@@ -144,6 +144,13 @@ function normalizeOperationRun(row) {
   };
 }
 
+function createOperationRunLeaseUnavailableError({ runId }) {
+  const error = new Error('Operation run lease is currently held by another worker');
+  error.code = 'operation_run_lease_unavailable';
+  error.runId = runId;
+  return error;
+}
+
 export function createOperationRunStore({
   createJobLeaseStoreFn = createJobLeaseStore,
   getPoolFn = getPool,
@@ -424,10 +431,16 @@ export function createOperationRunStore({
   }
 
   async function acquireLease({ runId }) {
-    return jobLeaseStore.acquireLease({
+    const lease = await jobLeaseStore.acquireLease({
       jobType: resolvedLeaseJobType,
       leaseKey: buildLeaseKey(runId),
     });
+
+    if (!lease) {
+      throw createOperationRunLeaseUnavailableError({ runId });
+    }
+
+    return lease;
   }
 
   async function getLease({ runId }) {

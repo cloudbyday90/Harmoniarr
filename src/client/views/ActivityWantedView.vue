@@ -19,10 +19,19 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useDownloadRecoveryRetry } from '../composables/useDownloadRecoveryRetry.js';
+import { useLibraryDiscoverySummary } from '../composables/useLibraryDiscoverySummary.js';
 import { useLibraryWantedSummary } from '../composables/useLibraryWantedSummary.js';
 import { useLibraryWantedReleases } from '../composables/useLibraryWantedReleases.js';
+import { formatOperationTimestampShort } from '../lib/operation-run-presentation.js';
 import {
+  buildDiscoveryDispatchHandoffMessage,
+  getDiscoveryQueueStatusLabel,
+} from '../lib/library-status-presentation.js';
+import { buildWantedDiscoveryCandidateLocation } from '../lib/wanted-discovery-candidate-link.js';
+import {
+  buildDiscoveryDispatchResult,
   buildDownloadRecoveryNotice,
+  buildImportReviewWorkflowResult,
   buildWantedReleasesCardSubtitle,
   formatLastReconciledAt,
   getWantedStatusLabel,
@@ -31,20 +40,36 @@ import {
 
 const wanted = useLibraryWantedSummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
 const releases = useLibraryWantedReleases({ pollIntervalMs: 30000, revalidateOnFocus: true });
+const discovery = useLibraryDiscoverySummary({ pollIntervalMs: 30000, revalidateOnFocus: true });
 const recoveryRetry = useDownloadRecoveryRetry();
 
-const isRefreshing = computed(() => wanted.isRevalidating.value || releases.isRevalidating.value);
+const isRefreshing = computed(() => wanted.isRevalidating.value
+  || releases.isRevalidating.value
+  || discovery.isRevalidating.value);
+const discoveryHandoffMessage = computed(() => buildDiscoveryDispatchHandoffMessage(discovery.discoverySummary.value));
+const discoveryStatusLabel = computed(() => getDiscoveryQueueStatusLabel(discovery.summary.value?.status));
 
 const wantedReleasesWithNotices = computed(() =>
   releases.wantedReleases.value.map((release) => ({
+    candidateLocation: buildWantedDiscoveryCandidateLocation(release),
+    dispatchResult: buildDiscoveryDispatchResult(release),
     notice: buildDownloadRecoveryNotice(release),
     release,
+    workflowResult: buildImportReviewWorkflowResult(release),
   })),
 );
 
 function refresh() {
   wanted.loadLibraryWantedSummary();
   releases.loadWantedReleases();
+  discovery.loadLibraryDiscoverySummary();
+}
+
+async function startDiscoveryDispatch() {
+  const result = await discovery.startDiscoveryDispatch();
+  if (result) {
+    refresh();
+  }
 }
 
 async function retryDownloadRecovery(release) {
@@ -58,11 +83,13 @@ onMounted(() => {
   refresh();
   wanted.attachVisibilityListener();
   releases.attachVisibilityListener();
+  discovery.attachVisibilityListener();
 });
 
 onBeforeUnmount(() => {
   wanted.destroy();
   releases.destroy();
+  discovery.destroy();
 });
 </script>
 
@@ -118,6 +145,66 @@ onBeforeUnmount(() => {
       </div>
     </article>
 
+    <article class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h3 class="hx-card-title">Discovery dispatch</h3>
+          <p class="hx-card-subtitle">
+            Sends wanted releases to Soulseek search before Import Review and Downloader activity can appear.
+          </p>
+        </div>
+        <div class="hx-card-actions">
+          <span v-if="discovery.summary.value" class="hx-pill" :data-tone="discovery.summary.value.status === 'ready' ? 'info' : null">
+            {{ discoveryStatusLabel }}
+          </span>
+          <button
+            type="button"
+            class="hx-btn"
+            data-variant="primary"
+            :disabled="!discovery.canStartDiscovery.value || discovery.isStartingDiscovery.value"
+            @click="startDiscoveryDispatch"
+          >
+            {{ discovery.isStartingDiscovery.value ? 'Starting…' : 'Run discovery now' }}
+          </button>
+        </div>
+      </header>
+      <div class="hx-card-body discovery-dispatch-panel">
+        <span v-if="discovery.errorMessage.value" class="hx-pill" data-tone="danger">{{ discovery.errorMessage.value }}</span>
+        <span v-if="discovery.startErrorMessage.value" class="hx-pill" data-tone="danger">{{ discovery.startErrorMessage.value }}</span>
+
+        <p class="discovery-dispatch-message">{{ discoveryHandoffMessage }}</p>
+
+        <dl class="discovery-dispatch-counts" aria-label="Discovery dispatch queue counts">
+          <div>
+            <dt>Ready</dt>
+            <dd>{{ discovery.requestCounts.value.ready }}</dd>
+          </div>
+          <div>
+            <dt>Cooling down</dt>
+            <dd>{{ discovery.requestCounts.value.cooldown }}</dd>
+          </div>
+          <div>
+            <dt>Blocked</dt>
+            <dd>{{ discovery.requestCounts.value.blocked }}</dd>
+          </div>
+        </dl>
+
+        <p v-if="discovery.latestRun.value" class="hx-text-muted discovery-dispatch-latest">
+          Latest run:
+          {{ discovery.latestRun.value.status }}
+          <span v-if="discovery.latestRun.value.startedAt">
+            at {{ formatOperationTimestampShort(discovery.latestRun.value.startedAt) }}
+          </span>
+          <span v-if="discovery.latestRun.value.dispatchedCount != null">
+            · {{ discovery.latestRun.value.dispatchedCount }} dispatched
+          </span>
+          <span v-if="discovery.latestRun.value.candidateCount != null">
+            · {{ discovery.latestRun.value.candidateCount }} candidates
+          </span>
+        </p>
+      </div>
+    </article>
+
     <article class="hx-card" v-if="releases.wantedReleases.value.length > 0">
       <header class="hx-card-header">
         <div>
@@ -138,6 +225,7 @@ onBeforeUnmount(() => {
               <th class="hx-table-num">Matched</th>
               <th class="hx-table-num">Missing</th>
               <th>Release date</th>
+              <th>Discovery</th>
             </tr>
           </thead>
           <tbody>
@@ -159,9 +247,41 @@ onBeforeUnmount(() => {
                 <td class="hx-table-num">{{ item.release.matchedTrackCount }}</td>
                 <td class="hx-table-num">{{ item.release.missingTrackCount }}</td>
                 <td>{{ item.release.releaseDate ?? '—' }}</td>
+                <td>
+                  <div class="wanted-discovery-result">
+                    <span class="hx-pill" :data-tone="item.dispatchResult.tone">
+                      {{ item.dispatchResult.label }}
+                    </span>
+                    <span class="hx-text-muted">{{ item.dispatchResult.message }}</span>
+                    <RouterLink
+                      v-if="item.candidateLocation"
+                      class="hx-btn wanted-discovery-link"
+                      data-variant="ghost"
+                      :to="item.candidateLocation"
+                    >
+                      Open candidates
+                    </RouterLink>
+                    <div v-if="item.workflowResult" class="wanted-candidate-workflow">
+                      <span class="hx-pill" :data-tone="item.workflowResult.tone">
+                        {{ item.workflowResult.label }}
+                      </span>
+                      <span class="hx-text-muted">{{ item.workflowResult.message }}</span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="item.dispatchResult.details.length" :key="`${item.release.id}-dispatch-details`">
+                <td colspan="10">
+                  <dl class="wanted-discovery-details" aria-label="Discovery dispatch result details">
+                    <template v-for="detail in item.dispatchResult.details" :key="detail.label">
+                      <dt>{{ detail.label }}</dt>
+                      <dd>{{ detail.value }}</dd>
+                    </template>
+                  </dl>
+                </td>
               </tr>
               <tr v-if="item.notice" :key="`${item.release.id}-recovery`">
-                <td colspan="9">
+                <td colspan="10">
                   <div class="hx-recovery-notice" role="status">
                     <div>
                       <p class="hx-recovery-notice-title">{{ item.notice.title }}</p>
@@ -244,9 +364,100 @@ onBeforeUnmount(() => {
   align-items: flex-start;
 }
 
+.discovery-dispatch-panel {
+  display: grid;
+  gap: var(--hx-space-3);
+}
+
+.discovery-dispatch-message {
+  margin: 0;
+  color: var(--hx-text);
+}
+
+.discovery-dispatch-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--hx-space-3);
+  margin: 0;
+}
+
+.discovery-dispatch-counts > div {
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-surface-sunken);
+}
+
+.discovery-dispatch-counts dt {
+  margin: 0 0 var(--hx-space-1);
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.discovery-dispatch-counts dd {
+  margin: 0;
+  color: var(--hx-text);
+  font-size: var(--hx-text-xl);
+  font-weight: 700;
+}
+
+.discovery-dispatch-latest {
+  margin: 0;
+}
+
+.wanted-discovery-result {
+  display: grid;
+  gap: var(--hx-space-1);
+  min-width: 14rem;
+}
+
+.wanted-discovery-result .hx-text-muted {
+  font-size: var(--hx-text-sm);
+}
+
+.wanted-discovery-link {
+  justify-self: start;
+  width: max-content;
+  min-height: 0;
+  padding: var(--hx-space-1) var(--hx-space-2);
+  font-size: var(--hx-text-sm);
+}
+
+.wanted-candidate-workflow {
+  display: grid;
+  gap: var(--hx-space-1);
+  margin-top: var(--hx-space-1);
+}
+
+.wanted-discovery-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2) var(--hx-space-4);
+  margin: 0;
+  padding: var(--hx-space-2) var(--hx-space-3);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface-sunken);
+  font-size: var(--hx-text-sm);
+}
+
+.wanted-discovery-details dt {
+  color: var(--hx-text-muted);
+}
+
+.wanted-discovery-details dd {
+  margin: 0;
+  font-weight: 700;
+}
+
 @media (max-width: 720px) {
   .hx-recovery-notice {
     flex-direction: column;
+  }
+
+  .discovery-dispatch-counts {
+    grid-template-columns: 1fr;
   }
 }
 </style>

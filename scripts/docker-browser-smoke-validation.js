@@ -13,6 +13,8 @@ import { chromium } from 'playwright';
 import { writeDockerSmokeEvidence } from './docker-smoke-evidence.js';
 
 export const defaultDockerBrowserSmokeBaseUrl = 'http://127.0.0.1:47956';
+const downloaderProviderSetupObservationMs = 5_500;
+const providerSetupRetryIntervalMs = 250;
 
 async function waitForHeading(page, name) {
   await page.getByRole('heading', { name }).waitFor();
@@ -28,6 +30,127 @@ function sanitizeEvidenceFileSegment(value) {
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function assertCondition(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function getResponsePayloadValue(payload, key) {
+  return payload && typeof payload === 'object' ? payload[key] : null;
+}
+
+function normalizeDownloaderPayload(payload) {
+  return getResponsePayloadValue(payload, 'downloader') ?? payload;
+}
+
+function getDiscoveryHeartbeat(overview) {
+  const heartbeats = Array.isArray(overview?.heartbeats) ? overview.heartbeats : [];
+  return heartbeats.find((heartbeat) => heartbeat?.key === 'libraryDiscovery') ?? null;
+}
+
+async function fetchJsonFromApp(page, path) {
+  const result = await page.evaluate(async (requestPath) => {
+    const response = await fetch(requestPath, {
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+    const text = await response.text();
+    let payload;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = null;
+    }
+
+    return {
+      ok: response.ok,
+      payload,
+      status: response.status,
+      text,
+    };
+  }, path);
+
+  if (!result.ok) {
+    throw new Error(`GET ${path} failed with status ${result.status}: ${result.text}`);
+  }
+
+  return result.payload;
+}
+
+async function waitForDiscoverySetupRequired(page, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let latestOverview = null;
+
+  while (Date.now() <= deadline) {
+    latestOverview = await fetchJsonFromApp(page, '/api/v1/system/overview');
+    const heartbeat = getDiscoveryHeartbeat(latestOverview);
+    if (heartbeat?.status === 'setup_required') {
+      return latestOverview;
+    }
+    await page.waitForTimeout(providerSetupRetryIntervalMs);
+  }
+
+  const latestStatus = getDiscoveryHeartbeat(latestOverview)?.status ?? 'missing';
+  throw new Error(`Discovery dispatch heartbeat did not reach setup_required; latest status was ${latestStatus}`);
+}
+
+export function assertUnconfiguredProviderSetupPayloads({
+  downloaderQueue,
+  notifications,
+  overview,
+} = {}) {
+  const normalizedDownloaderQueue = normalizeDownloaderPayload(downloaderQueue);
+  const discoveryHeartbeat = getDiscoveryHeartbeat(overview);
+  const notificationList = Array.isArray(notifications?.notifications) ? notifications.notifications : [];
+  const noisyNotifications = notificationList.filter((notification) => {
+    const title = String(notification?.title ?? '');
+    const message = String(notification?.message ?? '');
+    return /Library discovery failed|Metadata artist refresh failed/u.test(`${title} ${message}`);
+  });
+
+  assertCondition(
+    notifications?.counts?.total === 0,
+    `Expected no operator notifications on unconfigured provider startup, received ${notifications?.counts?.total ?? 'unknown'}`,
+  );
+  assertCondition(
+    notifications?.counts?.unacknowledged === 0,
+    `Expected no unread operator notifications on unconfigured provider startup, received ${notifications?.counts?.unacknowledged ?? 'unknown'}`,
+  );
+  assertCondition(
+    noisyNotifications.length === 0,
+    `Expected no discovery or metadata refresh alert noise, received ${noisyNotifications.length}`,
+  );
+  assertCondition(
+    discoveryHeartbeat?.status === 'setup_required',
+    `Expected Discovery dispatch heartbeat to be setup_required, received ${discoveryHeartbeat?.status ?? 'missing'}`,
+  );
+  assertCondition(
+    /Configure Soulseek \(slskd\)/u.test(discoveryHeartbeat?.message ?? ''),
+    'Expected Discovery dispatch heartbeat to provide slskd setup guidance',
+  );
+  assertCondition(
+    normalizedDownloaderQueue?.providerState?.enabled === false,
+    'Expected downloader providerState.enabled to be false when slskd is unconfigured',
+  );
+  assertCondition(
+    normalizedDownloaderQueue?.queueHealth?.status === 'disabled',
+    `Expected downloader queueHealth.status disabled, received ${normalizedDownloaderQueue?.queueHealth?.status ?? 'missing'}`,
+  );
+  assertCondition(
+    Array.isArray(normalizedDownloaderQueue?.transfers) && normalizedDownloaderQueue.transfers.length === 0,
+    'Expected disabled downloader queue to expose an empty transfer list',
+  );
+
+  return {
+    discoveryHeartbeatStatus: discoveryHeartbeat.status,
+    downloaderStatus: normalizedDownloaderQueue.queueHealth.status,
+    notificationCount: notifications.counts.total,
+  };
 }
 
 function createNoopCheckpointRecorder() {
@@ -77,6 +200,7 @@ export async function runOperatorBrowserScenario({
   page,
   password,
   recordCheckpoint = async () => {},
+  timeoutMs = 15_000,
   username,
 } = {}) {
   const checkpoints = [];
@@ -96,6 +220,49 @@ export async function runOperatorBrowserScenario({
   await page.waitForURL(/\/app(?:\?.*)?$/);
   await page.getByRole('button', { name: new RegExp(escapeRegExp(username), 'u') }).waitFor();
   await record('login_completed');
+
+  const downloaderQueueResponses = [];
+  const recordDownloaderQueueResponse = (response) => {
+    if (response.url().includes('/api/v1/downloader/queue')) {
+      downloaderQueueResponses.push({
+        status: response.status(),
+        url: response.url(),
+      });
+    }
+  };
+
+  const overview = await waitForDiscoverySetupRequired(page, timeoutMs);
+  const notifications = await fetchJsonFromApp(page, '/api/v1/system/operator-notifications?limit=25');
+  const downloaderQueue = await fetchJsonFromApp(page, '/api/v1/downloader/queue');
+  assertUnconfiguredProviderSetupPayloads({
+    downloaderQueue,
+    notifications,
+    overview,
+  });
+  await record('provider_setup_state_verified');
+
+  page.on('response', recordDownloaderQueueResponse);
+  try {
+    await page.getByRole('link', { name: 'Downloader' }).click();
+    await page.waitForURL(/\/app\/downloader(?:\?.*)?(?:#.*)?$/);
+    await waitForHeading(page, 'Downloader');
+    await page.getByText('Set up Soulseek to enable downloads').waitFor();
+    await page.getByText('Add your Soulseek download client URL and slskd API key in Settings.').waitFor();
+    await page.getByRole('link', { name: 'Configure slskd' }).waitFor();
+    await page.waitForTimeout(downloaderProviderSetupObservationMs);
+  } finally {
+    page.off('response', recordDownloaderQueueResponse);
+  }
+
+  assertCondition(
+    downloaderQueueResponses.length === 1,
+    `Expected exactly one downloader queue read while provider is disabled, received ${downloaderQueueResponses.length}`,
+  );
+  assertCondition(
+    downloaderQueueResponses.every((response) => response.status >= 200 && response.status < 400),
+    'Expected disabled downloader queue read to complete without provider errors',
+  );
+  await record('downloader_setup_state_loaded');
 
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.waitForURL(/\/app\/settings(?:\?.*)?(?:#.*)?$/);
@@ -183,6 +350,7 @@ export async function runDockerOperatorBrowserSmoke({
       page,
       password,
       recordCheckpoint: checkpointRecorder.record,
+      timeoutMs,
       username,
     });
 

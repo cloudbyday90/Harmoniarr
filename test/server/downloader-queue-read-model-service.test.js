@@ -156,6 +156,38 @@ test('buildDownloaderQueueReadModelFromDownloads normalizes transfers, counts, p
   assert.equal(result.transfers[2].timestamps.requestedAt, null);
 });
 
+test('buildDownloaderQueueReadModelFromDownloads exposes import-candidate linkage when supplied', () => {
+  const result = buildDownloaderQueueReadModelFromDownloads(sampleDownloads(), {
+    importCandidateLinkageByTransferKey: new Map([[
+      'source-b::transfer-active',
+      {
+        candidateId: 'candidate-1',
+        candidateStatus: 'downloading',
+        executionItemStatus: 'queued',
+        linkedAt: '2026-06-20T12:00:00.000Z',
+        operationRunId: 'run-1',
+        sourceSearchId: 'search-1',
+        status: 'linked',
+        summary: 'Linked to Import Review candidate.',
+      },
+    ]]),
+    now: () => observedAt,
+  });
+
+  assert.deepEqual(result.transfers[0].diagnostics.importLinkage, {
+    candidateId: 'candidate-1',
+    candidateStatus: 'downloading',
+    executionItemStatus: 'queued',
+    linkedAt: '2026-06-20T12:00:00.000Z',
+    operationRunId: 'run-1',
+    requestId: null,
+    sourceSearchId: 'search-1',
+    status: 'linked',
+    summary: 'Linked to Import Review candidate.',
+  });
+  assert.equal(result.transfers[1].diagnostics.importLinkage.status, 'not_linked');
+});
+
 test('buildDownloaderQueueReadModelFromDownloads reports idle empty queues', () => {
   const result = buildDownloaderQueueReadModelFromDownloads([], {
     now: () => observedAt,
@@ -231,6 +263,7 @@ test('createDownloaderQueueReadModelService delegates to getDownloads and normal
     apiKeyUpdatedAt: '2026-06-01T12:00:00.000Z',
   }));
   const service = createDownloaderQueueReadModelService({
+    buildTransferImportCandidateLinkage: async () => new Map(),
     getDownloaderProviderStatus,
     getDownloads,
     now: () => observedAt,
@@ -253,15 +286,50 @@ test('createDownloaderQueueReadModelService delegates to getDownloads and normal
   assert.equal(result.transfers.length, 3);
 });
 
+test('createDownloaderQueueReadModelService enriches downloads with import-candidate linkage', async (t) => {
+  const buildTransferImportCandidateLinkage = t.mock.fn(async ({ transfers }) => {
+    assert.deepEqual(transfers, [
+      { id: 'transfer-active', sourceUser: 'source-b', transferKey: 'source-b::transfer-active' },
+      { id: 'transfer-failed', sourceUser: 'source-b', transferKey: 'source-b::transfer-failed' },
+      { id: 'transfer-queued', sourceUser: 'source-a', transferKey: 'source-a::transfer-queued' },
+    ]);
+    return new Map([[
+      'source-a::transfer-queued',
+      {
+        candidateId: 'candidate-queued',
+        candidateStatus: 'downloading',
+        executionItemStatus: 'queued',
+        status: 'linked',
+      },
+    ]]);
+  });
+  const service = createDownloaderQueueReadModelService({
+    buildTransferImportCandidateLinkage,
+    getDownloaderProviderStatus: async () => ({ apiKeyConfigured: true }),
+    getDownloads: async () => sampleDownloads(),
+    now: () => observedAt,
+  });
+
+  const result = await service.buildDownloaderQueue();
+
+  assert.equal(buildTransferImportCandidateLinkage.mock.callCount(), 1);
+  assert.equal(result.transfers[2].diagnostics.importLinkage.candidateId, 'candidate-queued');
+  assert.equal(result.transfers[2].diagnostics.importLinkage.status, 'linked');
+});
+
 test('createDownloaderQueueReadModelService does not call slskd when provider is unconfigured', async (t) => {
   const getDownloads = t.mock.fn(async () => {
     throw new Error('slskd should not be called');
+  });
+  const buildTransferImportCandidateLinkage = t.mock.fn(async () => {
+    throw new Error('linkage should not be called');
   });
   const getDownloaderProviderStatus = t.mock.fn(async () => ({
     apiKeyConfigured: false,
     apiKeySource: 'unset',
   }));
   const service = createDownloaderQueueReadModelService({
+    buildTransferImportCandidateLinkage,
     getDownloaderProviderStatus,
     getDownloads,
     now: () => observedAt,
@@ -271,6 +339,7 @@ test('createDownloaderQueueReadModelService does not call slskd when provider is
 
   assert.equal(getDownloaderProviderStatus.mock.callCount(), 1);
   assert.equal(getDownloads.mock.callCount(), 0);
+  assert.equal(buildTransferImportCandidateLinkage.mock.callCount(), 0);
   assert.equal(result.providerState.enabled, false);
   assert.equal(result.queueHealth.status, 'disabled');
   assert.deepEqual(result.transfers, []);

@@ -397,6 +397,54 @@ test('createSystemService returns an empty notification payload when no shared n
   assert.deepEqual(notifications.notifications, []);
 });
 
+test('createSystemService forwards discovery setup-required heartbeat state', async (t) => {
+  const operatorNotificationService = {
+    buildOperatorNotifications: t.mock.fn(({ heartbeats }) => ({
+      checkedAt: '2026-05-02T16:00:00.000Z',
+      counts: {
+        actionable: 0,
+        byCategory: {
+          failure: 0,
+          manual_intervention: 0,
+          queued_work: 0,
+          recovery: 0,
+        },
+        total: 0,
+        unacknowledged: 0,
+      },
+      heartbeats,
+      notifications: [],
+    })),
+  };
+  const systemService = createSystemService({
+    libraryDiscoveryHeartbeatState: {
+      getHeartbeatState: () => ({
+        lastOutcome: 'skipped',
+        lastPauseCode: 'slskd_not_configured',
+        lastPauseMessage: 'Configure Soulseek (slskd) in Settings to enable downloads and discovery searches.',
+        lastPauseProvider: 'slskd',
+        lastSkipReason: 'setup_required',
+        lastTickAt: '2026-05-02T15:55:00.000Z',
+      }),
+    },
+    operationHistoryService: {
+      listRecentOperationRuns: t.mock.fn(async () => []),
+    },
+    operatorNotificationService,
+  });
+
+  const notifications = await systemService.getOperatorNotifications({ limit: 10 });
+
+  assert.equal(operatorNotificationService.buildOperatorNotifications.mock.callCount(), 1);
+  assert.equal(notifications.notifications.length, 0);
+  assert.equal(notifications.heartbeats[0].key, 'libraryDiscovery');
+  assert.equal(notifications.heartbeats[0].status, 'setup_required');
+  assert.equal(
+    notifications.heartbeats[0].message,
+    'Configure Soulseek (slskd) in Settings to enable downloads and discovery searches.',
+  );
+});
+
 test('createSystemService includes runtime monitoring details in the overview payload when configured', async () => {
   const runtimeResourceService = {
     getRuntimeConfiguration() {

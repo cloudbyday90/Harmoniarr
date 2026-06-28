@@ -155,6 +155,356 @@ export function buildDownloadRecoveryNotice(release) {
   };
 }
 
+function pluralize(count, singular, plural = `${singular}s`) {
+  return count === 1 ? singular : plural;
+}
+
+function toCount(value) {
+  return Number.parseInt(String(value ?? 0), 10) || 0;
+}
+
+const importReviewWorkflowStatusPriority = [
+  'downloading',
+  'import_pending',
+  'selected',
+  'failed',
+  'held',
+  'pending',
+  'applied',
+  'rejected',
+];
+
+function getImportReviewStatusCount(statusCounts, status) {
+  return toCount(statusCounts?.[status]);
+}
+
+function getPrimaryImportReviewStatus(summary) {
+  const statusCounts = summary?.statusCounts ?? {};
+  return importReviewWorkflowStatusPriority.find((status) => getImportReviewStatusCount(statusCounts, status) > 0)
+    ?? summary?.latestStatus
+    ?? null;
+}
+
+function formatCandidateCount(count) {
+  return `${count} ${pluralize(count, 'candidate')}`;
+}
+
+function buildImportReviewWorkflowDetails(summary) {
+  const statusCounts = summary?.statusCounts ?? {};
+  const downloadExecutionSummary = summary?.downloadExecutionSummary ?? null;
+  const details = [{ label: 'Candidates', value: String(toCount(summary?.totalCount)) }];
+  const orderedStatuses = [
+    ['pending', 'Pending'],
+    ['held', 'Held'],
+    ['rejected', 'Rejected'],
+    ['selected', 'Selected'],
+    ['downloading', 'Downloading'],
+    ['import_pending', 'Import pending'],
+    ['applied', 'Applied'],
+    ['failed', 'Failed'],
+  ];
+
+  orderedStatuses.forEach(([status, label]) => {
+    const count = getImportReviewStatusCount(statusCounts, status);
+    if (count > 0) {
+      details.push({ label, value: String(count) });
+    }
+  });
+
+  const enqueuedTransferCount = toCount(downloadExecutionSummary?.enqueuedTransferCount);
+  if (enqueuedTransferCount > 0) {
+    details.push({ label: 'Downloader transfers', value: String(enqueuedTransferCount) });
+  }
+
+  const failedFilenameCount = toCount(downloadExecutionSummary?.failedFilenameCount);
+  if (failedFilenameCount > 0) {
+    details.push({ label: 'Queue failures', value: String(failedFilenameCount) });
+  }
+
+  return details;
+}
+
+function buildDownloadExecutionWorkflowResult(summary, details) {
+  const downloadExecutionSummary = summary?.downloadExecutionSummary ?? null;
+  if (!downloadExecutionSummary) {
+    return null;
+  }
+
+  const itemStatusCounts = downloadExecutionSummary.itemStatusCounts ?? {};
+  const queueFailedCount = getImportReviewStatusCount(itemStatusCounts, 'queue_failed');
+  const blockedCount = getImportReviewStatusCount(itemStatusCounts, 'blocked');
+  const queuedWithWarningsCount = getImportReviewStatusCount(itemStatusCounts, 'queued_with_warnings');
+  const queuedCount = getImportReviewStatusCount(itemStatusCounts, 'queued');
+  const enqueuedTransferCount = toCount(downloadExecutionSummary.enqueuedTransferCount);
+  const failedFilenameCount = toCount(downloadExecutionSummary.failedFilenameCount);
+
+  if (queueFailedCount > 0) {
+    return {
+      details,
+      label: 'Download queue failed',
+      message: `${formatCandidateCount(queueFailedCount)} failed before reaching Downloader.`,
+      tone: 'danger',
+    };
+  }
+
+  if (failedFilenameCount > 0 && enqueuedTransferCount < 1) {
+    return {
+      details,
+      label: 'Download queue failed',
+      message: `${failedFilenameCount} file ${failedFilenameCount === 1 ? 'was' : 'were'} rejected before reaching Downloader.`,
+      tone: 'danger',
+    };
+  }
+
+  if (blockedCount > 0 && enqueuedTransferCount < 1) {
+    return {
+      details,
+      label: 'Download blocked',
+      message: `${formatCandidateCount(blockedCount)} blocked before Downloader enqueue.`,
+      tone: 'warning',
+    };
+  }
+
+  if (queuedWithWarningsCount > 0) {
+    return {
+      details,
+      label: 'Queued with warnings',
+      message: `${enqueuedTransferCount} Downloader transfer${enqueuedTransferCount === 1 ? '' : 's'} accepted with warnings.`,
+      tone: 'warning',
+    };
+  }
+
+  if (queuedCount > 0 || enqueuedTransferCount > 0) {
+    return {
+      details,
+      label: 'Queued in Downloader',
+      message: `${enqueuedTransferCount} Downloader transfer${enqueuedTransferCount === 1 ? '' : 's'} accepted.`,
+      tone: 'warning',
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Builds a compact operator-facing Import Review workflow summary for a wanted
+ * release's latest discovery search.
+ *
+ * @param {object} release - Raw or normalized wanted release object.
+ * @returns {{label: string, message: string, tone: 'success'|'warning'|'danger'|'info', details: Array<{label: string, value: string}>}|null}
+ */
+export function buildImportReviewWorkflowResult(release) {
+  const summary = release?.discoveryRequest?.importReviewSummary ?? null;
+  const totalCount = toCount(summary?.totalCount);
+  if (totalCount < 1) {
+    return null;
+  }
+
+  const primaryStatus = getPrimaryImportReviewStatus(summary);
+  const primaryCount = getImportReviewStatusCount(summary.statusCounts, primaryStatus) || totalCount;
+  const candidateLabel = formatCandidateCount(primaryCount);
+  const needVerb = primaryCount === 1 ? 'needs' : 'need';
+  const details = buildImportReviewWorkflowDetails(summary);
+  const downloadExecutionResult = buildDownloadExecutionWorkflowResult(summary, details);
+  if (downloadExecutionResult) {
+    return downloadExecutionResult;
+  }
+
+  switch (primaryStatus) {
+    case 'downloading':
+      return {
+        details,
+        label: 'Downloading',
+        message: `${candidateLabel} in the download pipeline.`,
+        tone: 'warning',
+      };
+    case 'import_pending':
+      return {
+        details,
+        label: 'Ready to import',
+        message: `${candidateLabel} waiting for import apply.`,
+        tone: 'info',
+      };
+    case 'selected':
+      return {
+        details,
+        label: 'Selected for download',
+        message: `${candidateLabel} selected in Import Review.`,
+        tone: 'info',
+      };
+    case 'failed':
+      return {
+        details,
+        label: 'Candidate failed',
+        message: `${candidateLabel} ${needVerb} review before acquisition can continue.`,
+        tone: 'danger',
+      };
+    case 'held':
+      return {
+        details,
+        label: 'Held for review',
+        message: `${candidateLabel} intentionally held in Import Review.`,
+        tone: 'warning',
+      };
+    case 'pending':
+      return {
+        details,
+        label: 'Pending review',
+        message: `${candidateLabel} waiting for Import Review.`,
+        tone: 'info',
+      };
+    case 'applied':
+      return {
+        details,
+        label: 'Applied',
+        message: `${candidateLabel} applied; coverage will update after reconciliation.`,
+        tone: 'success',
+      };
+    case 'rejected':
+      return {
+        details,
+        label: 'Rejected',
+        message: `${candidateLabel} rejected in Import Review.`,
+        tone: 'danger',
+      };
+    default:
+      return {
+        details,
+        label: 'Import Review',
+        message: `${formatCandidateCount(totalCount)} ${totalCount === 1 ? 'has' : 'have'} Import Review workflow state.`,
+        tone: 'info',
+      };
+  }
+}
+
+function buildDiscoveryResultDetails(discoveryRequest, evidence) {
+  const details = [];
+  const lastSearchAt = formatEvidenceTimestamp(discoveryRequest?.lastSearchAt);
+  if (lastSearchAt) {
+    details.push({ label: 'Last search', value: lastSearchAt });
+  }
+
+  const lastSearchId = formatShortIdentifier(evidence?.lastSearchId);
+  if (lastSearchId) {
+    details.push({ label: 'Search', value: lastSearchId });
+  }
+
+  const searchAttemptCount = toCount(
+    evidence?.lastSearchAttemptCount ?? discoveryRequest?.searchAttemptCount,
+  );
+  if (searchAttemptCount > 0) {
+    details.push({ label: 'Attempts', value: String(searchAttemptCount) });
+  }
+
+  return details;
+}
+
+/**
+ * Builds a compact operator-facing discovery dispatch result for a wanted row.
+ *
+ * @param {object} release - Raw or normalized wanted release object.
+ * @returns {{label: string, message: string, tone: 'success'|'warning'|'danger'|'info', details: Array<{label: string, value: string}>}}
+ */
+export function buildDiscoveryDispatchResult(release) {
+  const discoveryRequest = release?.discoveryRequest ?? null;
+  if (!discoveryRequest) {
+    return {
+      details: [],
+      label: 'Not queued',
+      message: 'Discovery has not created a search request for this release yet.',
+      tone: 'info',
+    };
+  }
+
+  const evidence = discoveryRequest.evidence ?? {};
+  const lastDispatchFailure = evidence.lastDispatchFailure ?? null;
+  if (lastDispatchFailure) {
+    return {
+      details: buildDiscoveryResultDetails(discoveryRequest, evidence),
+      label: 'Search failed',
+      message: lastDispatchFailure.message ?? 'The latest Soulseek search dispatch failed.',
+      tone: 'danger',
+    };
+  }
+
+  const exhausted = evidence.searchExhausted ?? null;
+  if (exhausted) {
+    return {
+      details: [
+        ...buildDiscoveryResultDetails(discoveryRequest, evidence),
+        { label: 'Reason', value: exhausted.reasonCode ?? 'search_attempts_exhausted' },
+      ],
+      label: 'No results',
+      message: 'Automatic search attempts are exhausted for this release.',
+      tone: 'danger',
+    };
+  }
+
+  const lastSearchResult = evidence.lastSearchResult ?? null;
+  if (lastSearchResult) {
+    const candidateCount = toCount(lastSearchResult.candidateCount);
+    const fileCount = toCount(lastSearchResult.fileCount);
+    const details = buildDiscoveryResultDetails(discoveryRequest, evidence);
+    if (fileCount > 0) {
+      details.push({ label: 'Files', value: String(fileCount) });
+    }
+
+    if (candidateCount > 0) {
+      return {
+        details,
+        label: `${candidateCount} ${pluralize(candidateCount, 'candidate')}`,
+        message: 'Last search produced Import Review candidates.',
+        tone: 'success',
+      };
+    }
+
+    return {
+      details,
+      label: 'No candidates',
+      message: discoveryRequest.requestStatus === 'cooldown'
+        ? 'Last search returned no candidates; Harmoniarr will retry after cooldown.'
+        : 'Last search returned no candidates.',
+      tone: discoveryRequest.requestStatus === 'blocked' ? 'danger' : 'warning',
+    };
+  }
+
+  if (discoveryRequest.requestStatus === 'ready') {
+    return {
+      details: buildDiscoveryResultDetails(discoveryRequest, evidence),
+      label: 'Ready to search',
+      message: 'Queued for the next discovery dispatch run.',
+      tone: 'info',
+    };
+  }
+
+  if (discoveryRequest.requestStatus === 'cooldown') {
+    return {
+      details: buildDiscoveryResultDetails(discoveryRequest, evidence),
+      label: 'Cooling down',
+      message: 'Waiting before the next automatic search attempt.',
+      tone: 'warning',
+    };
+  }
+
+  if (discoveryRequest.requestStatus === 'blocked') {
+    return {
+      details: buildDiscoveryResultDetails(discoveryRequest, evidence),
+      label: 'Blocked',
+      message: discoveryRequest.blockedReason === 'release_date_pending'
+        ? 'Waiting for the release date before searching.'
+        : 'Discovery is blocked for this release.',
+      tone: 'warning',
+    };
+  }
+
+  return {
+    details: buildDiscoveryResultDetails(discoveryRequest, evidence),
+    label: 'Pending dispatch',
+    message: 'Discovery state is available but no search result is recorded yet.',
+    tone: 'info',
+  };
+}
+
 /**
  * Returns the display label for a wanted status value.
  *

@@ -19,7 +19,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildDiscoveryDispatchResult,
   buildDownloadRecoveryNotice,
+  buildImportReviewWorkflowResult,
   buildMissingPageSubtitle,
   buildMissingStatCards,
   buildWantedReleasesCardSubtitle,
@@ -605,4 +607,291 @@ test('buildDownloadRecoveryNotice summarizes exhausted recovery evidence', () =>
   assert.ok(notice.details.some((detail) => detail.label === 'Failed candidate' && detail.value === 'candidat...'));
   assert.ok(notice.details.some((detail) => detail.label === 'Operation run' && detail.value === 'operatio...'));
   assert.ok(notice.details.some((detail) => detail.label === 'Search' && detail.value === 'search-1...'));
+});
+
+// ── buildDiscoveryDispatchResult ────────────────────────────────────────────
+
+test('buildDiscoveryDispatchResult reports releases without discovery request as not queued', () => {
+  const result = buildDiscoveryDispatchResult({ releaseTitle: 'Amber' });
+
+  assert.equal(result.label, 'Not queued');
+  assert.equal(result.tone, 'info');
+  assert.match(result.message, /has not created a search request/);
+});
+
+test('buildDiscoveryDispatchResult reports successful candidate-producing search', () => {
+  const result = buildDiscoveryDispatchResult({
+    discoveryRequest: {
+      evidence: {
+        lastSearchAttemptCount: 1,
+        lastSearchId: 'search-123456789',
+        lastSearchResult: {
+          candidateCount: 2,
+          fileCount: 17,
+          sourceProvider: 'slskd',
+        },
+      },
+      lastSearchAt: '2026-06-27T21:02:00.000Z',
+      requestStatus: 'cooldown',
+      searchAttemptCount: 1,
+    },
+  });
+
+  assert.equal(result.label, '2 candidates');
+  assert.equal(result.tone, 'success');
+  assert.equal(result.message, 'Last search produced Import Review candidates.');
+  assert.ok(result.details.some((detail) => detail.label === 'Search' && detail.value === 'search-1...'));
+  assert.ok(result.details.some((detail) => detail.label === 'Files' && detail.value === '17'));
+});
+
+test('buildDiscoveryDispatchResult reports zero-candidate cooldown', () => {
+  const result = buildDiscoveryDispatchResult({
+    discoveryRequest: {
+      evidence: {
+        lastSearchResult: {
+          candidateCount: 0,
+          fileCount: 0,
+          sourceProvider: 'slskd',
+        },
+      },
+      requestStatus: 'cooldown',
+      searchAttemptCount: 2,
+    },
+  });
+
+  assert.equal(result.label, 'No candidates');
+  assert.equal(result.tone, 'warning');
+  assert.match(result.message, /retry after cooldown/);
+});
+
+test('buildDiscoveryDispatchResult reports dispatch failure without leaking provider secrets', () => {
+  const result = buildDiscoveryDispatchResult({
+    discoveryRequest: {
+      evidence: {
+        lastDispatchFailure: {
+          code: 'slskd_unavailable',
+          message: 'Soulseek search endpoint timed out.',
+        },
+      },
+      requestStatus: 'cooldown',
+    },
+  });
+
+  assert.equal(result.label, 'Search failed');
+  assert.equal(result.tone, 'danger');
+  assert.equal(result.message, 'Soulseek search endpoint timed out.');
+  assert.ok(!JSON.stringify(result).includes('apiKey'));
+});
+
+test('buildDiscoveryDispatchResult reports exhausted automatic search attempts', () => {
+  const result = buildDiscoveryDispatchResult({
+    discoveryRequest: {
+      evidence: {
+        searchExhausted: {
+          reasonCode: 'discovery_search_attempts_exhausted',
+          searchAttemptCount: 3,
+        },
+      },
+      requestStatus: 'blocked',
+      searchAttemptCount: 3,
+    },
+  });
+
+  assert.equal(result.label, 'No results');
+  assert.equal(result.tone, 'danger');
+  assert.match(result.message, /exhausted/);
+  assert.ok(result.details.some((detail) => detail.label === 'Reason'));
+});
+
+test('buildDiscoveryDispatchResult reports queued ready requests', () => {
+  const result = buildDiscoveryDispatchResult({
+    discoveryRequest: {
+      evidence: {},
+      requestStatus: 'ready',
+    },
+  });
+
+  assert.equal(result.label, 'Ready to search');
+  assert.equal(result.tone, 'info');
+});
+
+// ── buildImportReviewWorkflowResult ─────────────────────────────────────────
+
+test('buildImportReviewWorkflowResult returns null without candidate workflow state', () => {
+  assert.equal(buildImportReviewWorkflowResult({ discoveryRequest: null }), null);
+  assert.equal(buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        totalCount: 0,
+      },
+    },
+  }), null);
+});
+
+test('buildImportReviewWorkflowResult reports selected candidates', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        latestStatus: 'selected',
+        latestUpdatedAt: '2026-06-27T21:10:00.000Z',
+        statusCounts: {
+          pending: 1,
+          selected: 2,
+        },
+        totalCount: 3,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Selected for download');
+  assert.equal(result.tone, 'info');
+  assert.equal(result.message, '2 candidates selected in Import Review.');
+  assert.deepEqual(result.details.slice(0, 3), [
+    { label: 'Candidates', value: '3' },
+    { label: 'Pending', value: '1' },
+    { label: 'Selected', value: '2' },
+  ]);
+});
+
+test('buildImportReviewWorkflowResult prioritizes active downloading state over stale latest status', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        latestStatus: 'pending',
+        statusCounts: {
+          downloading: 1,
+          pending: 4,
+        },
+        totalCount: 5,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Downloading');
+  assert.equal(result.tone, 'warning');
+  assert.equal(result.message, '1 candidate in the download pipeline.');
+});
+
+test('buildImportReviewWorkflowResult reports candidates accepted by Downloader', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        downloadExecutionSummary: {
+          enqueuedTransferCount: 4,
+          failedFilenameCount: 0,
+          itemStatusCounts: {
+            queued: 1,
+          },
+          totalItemCount: 1,
+        },
+        latestStatus: 'downloading',
+        statusCounts: {
+          downloading: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Queued in Downloader');
+  assert.equal(result.tone, 'warning');
+  assert.equal(result.message, '4 Downloader transfers accepted.');
+  assert.ok(result.details.some((detail) => detail.label === 'Downloader transfers' && detail.value === '4'));
+});
+
+test('buildImportReviewWorkflowResult reports download enqueue warnings', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        downloadExecutionSummary: {
+          enqueuedTransferCount: 3,
+          failedFilenameCount: 1,
+          itemStatusCounts: {
+            queued_with_warnings: 1,
+          },
+          totalItemCount: 1,
+        },
+        latestStatus: 'downloading',
+        statusCounts: {
+          downloading: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Queued with warnings');
+  assert.equal(result.tone, 'warning');
+  assert.equal(result.message, '3 Downloader transfers accepted with warnings.');
+  assert.ok(result.details.some((detail) => detail.label === 'Queue failures' && detail.value === '1'));
+});
+
+test('buildImportReviewWorkflowResult reports candidates blocked before Downloader enqueue', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        downloadExecutionSummary: {
+          enqueuedTransferCount: 0,
+          failedFilenameCount: 0,
+          itemStatusCounts: {
+            blocked: 1,
+          },
+          totalItemCount: 1,
+        },
+        latestStatus: 'selected',
+        statusCounts: {
+          selected: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Download blocked');
+  assert.equal(result.tone, 'warning');
+  assert.equal(result.message, '1 candidate blocked before Downloader enqueue.');
+});
+
+test('buildImportReviewWorkflowResult reports candidates that failed before reaching Downloader', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        downloadExecutionSummary: {
+          enqueuedTransferCount: 0,
+          failedFilenameCount: 2,
+          itemStatusCounts: {
+            queue_failed: 1,
+          },
+          totalItemCount: 1,
+        },
+        latestStatus: 'failed',
+        statusCounts: {
+          failed: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Download queue failed');
+  assert.equal(result.tone, 'danger');
+  assert.equal(result.message, '1 candidate failed before reaching Downloader.');
+});
+
+test('buildImportReviewWorkflowResult reports failed candidates with singular grammar', () => {
+  const result = buildImportReviewWorkflowResult({
+    discoveryRequest: {
+      importReviewSummary: {
+        latestStatus: 'failed',
+        statusCounts: {
+          failed: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result.label, 'Candidate failed');
+  assert.equal(result.tone, 'danger');
+  assert.equal(result.message, '1 candidate needs review before acquisition can continue.');
 });

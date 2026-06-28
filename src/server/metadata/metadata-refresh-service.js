@@ -76,13 +76,61 @@ async function browseAllArtistReleaseGroups({
 export function createMetadataRefreshService({
   getArtistRefreshMonitoring = null,
   getMetadataArtistByMusicBrainzId = async () => null,
+  listOperatorArtistMonitoringByMetadataArtist = async () => [],
+  materializeMonitoredReleaseGroups = null,
   metadataService = createMetadataService(),
   metadataReleaseDetectionService = createMetadataReleaseDetectionService(),
   musicBrainzClient = createMusicBrainzClient(),
   nowFn = () => new Date(),
   providerHealthRecorder = null,
+  queueOperatorArtistReconciliation = null,
   reconcileWantedReleases = null,
 } = {}) {
+  async function queueOperatorReconciliationsAfterRefresh({
+    metadataArtistId,
+    monitoringRows = null,
+    triggerSource,
+  }) {
+    if (!metadataArtistId || typeof queueOperatorArtistReconciliation !== 'function') {
+      return {
+        queuedCount: 0,
+        skippedNotReadyCount: 0,
+      };
+    }
+
+    const monitoredRows = Array.isArray(monitoringRows)
+      ? monitoringRows
+      : await listOperatorArtistMonitoringByMetadataArtist({ metadataArtistId });
+    let queuedCount = 0;
+    let skippedNotReadyCount = 0;
+
+    for (const monitoring of monitoredRows) {
+      if (monitoring?.isMonitored !== true || !monitoring.appUserId) {
+        continue;
+      }
+
+      try {
+        await queueOperatorArtistReconciliation({
+          appUserId: monitoring.appUserId,
+          metadataArtistId,
+          triggerSource: `metadata_refresh:${triggerSource}`,
+        });
+        queuedCount += 1;
+      } catch (error) {
+        if (error?.code === 'operator_artist_reconciliation_not_ready') {
+          skippedNotReadyCount += 1;
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    return {
+      queuedCount,
+      skippedNotReadyCount,
+    };
+  }
+
   async function refreshArtistCatalogById({
     metadataArtistId = null,
     musicBrainzArtistId,
@@ -136,11 +184,35 @@ export function createMetadataRefreshService({
     }
 
     await throwIfCancelled();
+    const monitoredRows = resolvedMetadataArtistId
+      ? await listOperatorArtistMonitoringByMetadataArtist({ metadataArtistId: resolvedMetadataArtistId })
+      : [];
+    let releaseMaterialization = {
+      eligibleReleaseGroupCount: 0,
+      importedReleaseCount: 0,
+      skippedExistingCanonicalCount: 0,
+      skippedExistingReleaseCount: 0,
+      skippedNoCandidateCount: 0,
+    };
+    if (typeof materializeMonitoredReleaseGroups === 'function') {
+      releaseMaterialization = await materializeMonitoredReleaseGroups({
+        metadataArtistId: resolvedMetadataArtistId,
+        monitoringRows: monitoredRows,
+        throwIfCancelled,
+      });
+    }
+
+    await throwIfCancelled();
     let wantedReconciliationCompleted = false;
     if (reconcileWantedReleases) {
       await reconcileWantedReleases();
       wantedReconciliationCompleted = true;
     }
+    const operatorReconciliationQueue = await queueOperatorReconciliationsAfterRefresh({
+      metadataArtistId: resolvedMetadataArtistId,
+      monitoringRows: monitoredRows,
+      triggerSource,
+    });
     let detectionMonitoring = existingArtist?.monitoring ?? null;
     if (resolvedMetadataArtistId && typeof getArtistRefreshMonitoring === 'function') {
       try {
@@ -165,6 +237,13 @@ export function createMetadataRefreshService({
     return {
       artist: storedArtist,
       detectedReleaseGroupCount: detectionEvents.length,
+      materializedEligibleReleaseGroupCount: releaseMaterialization.eligibleReleaseGroupCount,
+      materializedImportedReleaseCount: releaseMaterialization.importedReleaseCount,
+      materializedSkippedExistingCanonicalCount: releaseMaterialization.skippedExistingCanonicalCount,
+      materializedSkippedExistingReleaseCount: releaseMaterialization.skippedExistingReleaseCount,
+      materializedSkippedNoCandidateCount: releaseMaterialization.skippedNoCandidateCount,
+      operatorReconciliationQueuedCount: operatorReconciliationQueue.queuedCount,
+      operatorReconciliationSkippedNotReadyCount: operatorReconciliationQueue.skippedNotReadyCount,
       refreshedAt: fetchedAt,
       releaseGroupCount: releaseGroups.length,
       wantedReconciliationCompleted,

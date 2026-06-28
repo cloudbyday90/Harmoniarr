@@ -103,6 +103,48 @@ test('listOperatorMonitoredArtists returns compact monitored artist rows ordered
   }]);
 });
 
+test('listOperatorArtistMonitoringByMetadataArtist returns monitored operators for a refreshed artist', async (t) => {
+  const query = t.mock.fn(async () => ({
+    rows: [{
+      acquisition_profile_key: 'lossless_archive',
+      app_user_id: 'user-1',
+      id: 'monitoring-1',
+      is_monitored: true,
+      last_reconciled_at: null,
+      last_saved_snapshot_at: new Date('2026-06-27T20:00:00.000Z'),
+      metadata_artist_id: 'artist-1',
+      monitored_release_group_types: ['album', 'ep'],
+      release_scope: 'current_and_future',
+      search_on_add_mode: 'missing_now',
+      selection_source_mode: 'policy_only',
+      wanted_automation_mode: 'current_and_future_matching',
+    }],
+  }));
+  const store = createOperatorArtistMonitoringStore({ getPoolFn: () => ({ query }) });
+
+  const result = await store.listOperatorArtistMonitoringByMetadataArtist({
+    metadataArtistId: 'artist-1',
+  });
+
+  assert.match(query.mock.calls[0].arguments[0], /WHERE metadata_artist_id = \$1/);
+  assert.match(query.mock.calls[0].arguments[0], /is_monitored = TRUE/);
+  assert.deepEqual(query.mock.calls[0].arguments[1], ['artist-1']);
+  assert.deepEqual(result, [{
+    acquisitionProfileKey: 'lossless_archive',
+    appUserId: 'user-1',
+    id: 'monitoring-1',
+    isMonitored: true,
+    lastReconciledAt: null,
+    lastSavedSnapshotAt: '2026-06-27T20:00:00.000Z',
+    metadataArtistId: 'artist-1',
+    monitoredReleaseGroupTypes: ['album', 'ep'],
+    releaseScope: 'current_and_future',
+    searchOnAddMode: 'missing_now',
+    selectionSourceMode: 'policy_only',
+    wantedAutomationMode: 'current_and_future_matching',
+  }]);
+});
+
 test('getOperatorArtistMonitoring returns defaults when no row exists', async () => {
   const store = createOperatorArtistMonitoringStore({
     getPoolFn: () => ({

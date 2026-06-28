@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { runDockerOperatorBrowserSmoke } from '../../scripts/docker-browser-smoke-validation.js';
+import {
+  assertUnconfiguredProviderSetupPayloads,
+  runDockerOperatorBrowserSmoke,
+} from '../../scripts/docker-browser-smoke-validation.js';
 import {
   resolveDockerBrowserSmokeInputs,
   dockerBrowserSmokeEvidencePathEnvVar,
@@ -93,10 +96,11 @@ test('runDockerOperatorBrowserSmoke runs scenario and writes evidence', async ()
     },
     mkdirFn: async () => {},
     password: 'BrowserPass123!',
-    runOperatorBrowserScenarioFn: async ({ baseUrl, password, recordCheckpoint, username }) => {
+    runOperatorBrowserScenarioFn: async ({ baseUrl, password, recordCheckpoint, timeoutMs, username }) => {
       assert.equal(baseUrl, 'http://127.0.0.1:49100');
       assert.equal(username, 'admin');
       assert.equal(password, 'BrowserPass123!');
+      assert.equal(timeoutMs, 15_000);
       await recordCheckpoint('login_page_loaded');
       await recordCheckpoint('recovery_loaded');
       return ['login_page_loaded', 'recovery_loaded'];
@@ -161,4 +165,71 @@ test('runDockerOperatorBrowserSmoke closes browser resources when scenario fails
 
   assert.equal(calls.closeContext, 1);
   assert.equal(calls.closeBrowser, 1);
+});
+
+test('assertUnconfiguredProviderSetupPayloads accepts calm setup state for unconfigured slskd', () => {
+  const result = assertUnconfiguredProviderSetupPayloads({
+    downloaderQueue: {
+      downloader: {
+        providerState: {
+          enabled: false,
+        },
+        queueHealth: {
+          status: 'disabled',
+        },
+        transfers: [],
+      },
+    },
+    notifications: {
+      counts: {
+        total: 0,
+        unacknowledged: 0,
+      },
+      notifications: [],
+    },
+    overview: {
+      heartbeats: [{
+        key: 'libraryDiscovery',
+        message: 'Configure Soulseek (slskd) in Settings to enable automatic discovery searches.',
+        status: 'setup_required',
+      }],
+    },
+  });
+
+  assert.deepEqual(result, {
+    discoveryHeartbeatStatus: 'setup_required',
+    downloaderStatus: 'disabled',
+    notificationCount: 0,
+  });
+});
+
+test('assertUnconfiguredProviderSetupPayloads rejects discovery or metadata alert noise', () => {
+  assert.throws(() => assertUnconfiguredProviderSetupPayloads({
+    downloaderQueue: {
+      providerState: {
+        enabled: false,
+      },
+      queueHealth: {
+        status: 'disabled',
+      },
+      transfers: [],
+    },
+    notifications: {
+      counts: {
+        total: 1,
+        unacknowledged: 1,
+      },
+      notifications: [{
+        message: 'operator does not exist: text >= date',
+        title: 'Library discovery failed',
+      }],
+    },
+    overview: {
+      heartbeats: [{
+        key: 'libraryDiscovery',
+        message: 'Configure Soulseek (slskd) in Settings to enable automatic discovery searches.',
+        status: 'setup_required',
+      }],
+    },
+  }), /Expected no operator notifications/u);
 });
