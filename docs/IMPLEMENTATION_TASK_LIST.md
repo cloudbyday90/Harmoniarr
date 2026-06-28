@@ -129,6 +129,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   selected/download handoff state. This explains why successful searches may
   still show no Downloader activity until a candidate is selected in Import
   Review. See `IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md`.
+- Wanted Import Review selection handoff browser verification: added a
+  deterministic browser scenario proving a high-confidence Wanted row opens the
+  matching Import Review candidate queue, allows the operator to select the
+  candidate, and returns through in-app navigation to a `Selected for download`
+  Wanted state. See
+  `WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,

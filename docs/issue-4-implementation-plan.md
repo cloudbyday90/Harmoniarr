@@ -133,6 +133,11 @@ Confirmed complete:
   operator selection, ambiguous, low-confidence, unscored, already selected, or
   already in download/import handoff. See
   [IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md](IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md).
+- Wanted Import Review selection handoff browser verification, including a
+  fixture-backed proof that a high-confidence Wanted row opens the matching
+  Import Review queue, supports candidate selection, and returns to a selected
+  Wanted workflow state without a full-page fixture reset. See
+  [WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See

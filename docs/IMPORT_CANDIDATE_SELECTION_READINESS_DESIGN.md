@@ -98,11 +98,10 @@ Readiness codes:
 
 ## Follow-Up
 
-Add browser verification for the Wanted-to-Import Review selection handoff:
+Browser verification for the Wanted-to-Import Review selection handoff is
+complete; see
+[WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
 
-1. Seed a wanted release with high-confidence Import Review candidates.
-2. Verify the wanted card says `Ready for selection`.
-3. Open candidates from the wanted card.
-4. Select the best candidate.
-5. Verify the wanted card changes to `Selected for download` or shows an active
-   download handoff once execution runs.
+The remaining follow-up is to prove the next stage: once a candidate is
+selected, the operator can start the download execution run and see the selected
+summary/runway state move toward Downloader handoff.

@@ -38,6 +38,50 @@ const dispatchCandidate = buildImportReviewCandidate({
   username: 'healthy-slskd-peer',
 });
 
+const selectionReadyCandidate = buildImportReviewCandidate({
+  fileCount: 13,
+  files: [
+    {
+      bitRateKbps: 921,
+      extension: 'flac',
+      filename: '01 Xtal.flac',
+      folderPath: '/private/staging/Aphex Twin/Selected Ambient Works 85-92',
+      id: 'candidate-selection-ready-file-1',
+      isLocked: false,
+      lengthSeconds: 293,
+      sizeBytes: 41779200,
+    },
+  ],
+  folderPath: '/private/staging/Aphex Twin/Selected Ambient Works 85-92',
+  id: 'candidate-selection-ready',
+  lockedFileCount: 0,
+  normalizedPayload: {
+    compositeScore: 91,
+    extensions: ['flac'],
+  },
+  sourceSearchId: 'search-selection-ready-saw',
+  selectionReason: 'operator_review',
+  status: 'pending',
+  totalSizeBytes: 41779200,
+  username: 'high-confidence-peer',
+});
+
+const selectionComparisonCandidate = buildImportReviewCandidate({
+  fileCount: 13,
+  folderPath: '/private/staging/Aphex Twin/Selected Ambient Works 85-92 alternate',
+  id: 'candidate-selection-comparison',
+  lockedFileCount: 0,
+  normalizedPayload: {
+    compositeScore: 80,
+    extensions: ['flac'],
+  },
+  sourceSearchId: 'search-selection-ready-saw',
+  selectionReason: 'operator_review',
+  status: 'pending',
+  totalSizeBytes: 40777216,
+  username: 'comparison-peer',
+});
+
 const wantedReleases = Object.freeze([
   Object.freeze({
     artistName: 'Autechre',
@@ -92,6 +136,67 @@ const wantedReleases = Object.freeze([
     releaseGroupType: 'Album',
     releaseStatus: 'Official',
     releaseTitle: 'Amber',
+    wantedStatus: 'missing',
+  }),
+  Object.freeze({
+    artistName: 'Aphex Twin',
+    artistSortName: 'aphex twin',
+    discoveryRequest: {
+      blockedReason: 'automatic_cooldown',
+      evidence: {
+        lastSearchAttemptCount: 1,
+        lastSearchId: 'search-selection-ready-saw',
+        lastSearchResult: {
+          candidateCount: 2,
+          fileCount: 13,
+          sourceProvider: 'slskd',
+        },
+      },
+      importReviewSummary: {
+        latestStatus: 'pending',
+        latestUpdatedAt: '2026-06-27T21:18:00.000Z',
+        selectionReadiness: {
+          bestCompositeScore: 91,
+          candidateCount: 2,
+          code: 'auto_selectable',
+          label: 'High-confidence candidate',
+          message: 'The best candidate meets selection thresholds. Review and select it to start download handoff.',
+          reviewableCount: 2,
+          scoredCandidateCount: 2,
+          scoreGap: 11,
+          secondBestCompositeScore: 80,
+          thresholds: {
+            ambiguityMargin: 5,
+            minCompositeScore: 85,
+          },
+          tone: 'info',
+        },
+        statusCounts: {
+          pending: 2,
+        },
+        totalCount: 2,
+      },
+      lastSearchAt: '2026-06-27T21:15:00.000Z',
+      nextSearchAfter: '2026-06-28T03:15:00.000Z',
+      requestStatus: 'cooldown',
+      researchAttemptCount: 0,
+      searchAttemptCount: 1,
+    },
+    expectedTrackCount: 13,
+    id: 'wanted-saw-85-92',
+    matchedTrackCount: 0,
+    metadataArtistId: 'metadata-artist-aphex',
+    metadataReleaseGroupId: 'metadata-rg-saw-85-92',
+    metadataReleaseId: 'metadata-release-saw-85-92',
+    missingTrackCount: 13,
+    musicbrainzReleaseGroupId: 'mb-rg-saw-85-92',
+    musicbrainzReleaseId: 'mb-release-saw-85-92',
+    releaseDate: '1992-02-12',
+    releaseDisambiguation: null,
+    releaseGroupTitle: 'Selected Ambient Works 85-92',
+    releaseGroupType: 'Album',
+    releaseStatus: 'Official',
+    releaseTitle: 'Selected Ambient Works 85-92',
     wantedStatus: 'missing',
   }),
   Object.freeze({
@@ -188,9 +293,15 @@ const fixture = Object.freeze({
     }),
   }),
   dispatchImportReviewWorkspace: Object.freeze({
-    candidates: Object.freeze([dispatchCandidate]),
+    candidates: Object.freeze([
+      dispatchCandidate,
+      selectionReadyCandidate,
+      selectionComparisonCandidate,
+    ]),
     previewById: Object.freeze({
       [dispatchCandidate.id]: buildImportReviewPreview(dispatchCandidate),
+      [selectionReadyCandidate.id]: buildImportReviewPreview(selectionReadyCandidate),
+      [selectionComparisonCandidate.id]: buildImportReviewPreview(selectionComparisonCandidate),
     }),
   }),
   discoverySummary: Object.freeze({
@@ -230,7 +341,7 @@ const fixture = Object.freeze({
     releaseCounts: Object.freeze({
       missing: 2,
       partial: 1,
-      totalWanted: 3,
+      totalWanted: 4,
     }),
     summary: Object.freeze({
       message: '3 monitored releases still need files.',
@@ -273,6 +384,106 @@ export async function installWantedBrowserFixtures(browserContext) {
           ? workspace.previewById
           : {},
       }));
+    }
+
+    function countStatuses(items) {
+      return items.reduce((counts, item) => ({
+        ...counts,
+        [item.status]: (counts[item.status] ?? 0) + 1,
+      }), {});
+    }
+
+    function toScore(value) {
+      const parsed = Number.parseFloat(String(value ?? ''));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function buildSelectionReadySummary(release) {
+      const rawState = globalThis.sessionStorage.getItem(fixtureStateStorageKey);
+      const state = rawState ? JSON.parse(rawState) : {};
+      const candidates = Array.isArray(state.importReviewCandidates)
+        ? state.importReviewCandidates.filter((candidate) =>
+          candidate.sourceSearchId === release.discoveryRequest.evidence.lastSearchId)
+        : [];
+
+      if (candidates.length < 1) {
+        return release.discoveryRequest.importReviewSummary;
+      }
+
+      const statusCounts = countStatuses(candidates);
+      const scoredCandidates = candidates
+        .map((candidate) => toScore(candidate.normalizedPayload?.compositeScore))
+        .filter((score) => score !== null)
+        .sort((left, right) => right - left);
+      const selectedCount = statusCounts.selected ?? 0;
+      const downloadingCount = statusCounts.downloading ?? 0;
+      const importPendingCount = statusCounts.import_pending ?? 0;
+      const reviewableCount = (statusCounts.pending ?? 0) + (statusCounts.held ?? 0);
+      const bestCompositeScore = scoredCandidates[0] ?? null;
+      const secondBestCompositeScore = scoredCandidates[1] ?? null;
+      const scoreGap = bestCompositeScore !== null && secondBestCompositeScore !== null
+        ? Number((bestCompositeScore - secondBestCompositeScore).toFixed(2))
+        : null;
+      const latestCandidate = [...candidates].sort((left, right) =>
+        String(right.updatedAt ?? right.discoveredAt ?? '').localeCompare(String(left.updatedAt ?? left.discoveredAt ?? '')),
+      )[0];
+      let readinessCode = 'auto_selectable';
+      let readinessLabel = 'High-confidence candidate';
+      let readinessTone = 'info';
+      let readinessMessage = 'The best candidate meets selection thresholds. Review and select it to start download handoff.';
+
+      if (downloadingCount + importPendingCount > 0) {
+        readinessCode = 'handoff_active';
+        readinessLabel = 'Download handoff active';
+        readinessMessage = 'A selected candidate is already moving through the download or import pipeline.';
+      } else if (selectedCount > 0) {
+        readinessCode = 'selected';
+        readinessLabel = 'Candidate selected';
+        readinessMessage = 'A candidate is selected; the download worker is responsible for enqueueing it next.';
+      } else if (reviewableCount < 1) {
+        readinessCode = 'not_reviewable';
+        readinessLabel = 'No reviewable candidates';
+        readinessTone = 'warning';
+        readinessMessage = 'Candidates exist, but none are pending or held for selection.';
+      }
+
+      return {
+        latestStatus: latestCandidate?.status ?? null,
+        latestUpdatedAt: latestCandidate?.updatedAt ?? latestCandidate?.discoveredAt ?? null,
+        selectionReadiness: {
+          bestCompositeScore,
+          candidateCount: candidates.length,
+          code: readinessCode,
+          label: readinessLabel,
+          message: readinessMessage,
+          reviewableCount,
+          scoredCandidateCount: scoredCandidates.length,
+          scoreGap,
+          secondBestCompositeScore,
+          thresholds: {
+            ambiguityMargin: 5,
+            minCompositeScore: 85,
+          },
+          tone: readinessTone,
+        },
+        statusCounts,
+        totalCount: candidates.length,
+      };
+    }
+
+    function buildWantedReleasePayload(release) {
+      const clonedRelease = clone(release);
+      if (clonedRelease.id !== 'wanted-saw-85-92') {
+        return clonedRelease;
+      }
+
+      return {
+        ...clonedRelease,
+        discoveryRequest: {
+          ...clonedRelease.discoveryRequest,
+          importReviewSummary: buildSelectionReadySummary(clonedRelease),
+        },
+      };
     }
 
     mergeImportReviewWorkspace(fixturePayload.dispatchImportReviewWorkspace);
@@ -343,7 +554,8 @@ export async function installWantedBrowserFixtures(browserContext) {
 
       if (method === 'GET' && path === '/api/v1/library/wanted-releases') {
         const statusFilter = url.searchParams.get('status');
-        const filteredWantedReleases = clone(fixturePayload.wantedReleases)
+        const filteredWantedReleases = fixturePayload.wantedReleases
+          .map(buildWantedReleasePayload)
           .filter((release) => (
             statusFilter === 'missing' || statusFilter === 'partial'
               ? release.wantedStatus === statusFilter

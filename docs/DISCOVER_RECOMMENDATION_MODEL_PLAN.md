@@ -131,6 +131,11 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   high-confidence candidates ready for operator selection from ambiguous,
   low-confidence, unscored, selected, or active handoff states; see
   [IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md](IMPORT_CANDIDATE_SELECTION_READINESS_DESIGN.md)
+- the readiness handoff now has browser verification proving a high-confidence
+  Wanted row opens the matching Import Review queue, allows candidate selection,
+  and returns to a `Selected for download` Wanted state through in-app
+  navigation; see
+  [WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_IMPORT_REVIEW_SELECTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:

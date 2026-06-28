@@ -133,13 +133,14 @@ suite('Activity releases/wanted browser verification', () => {
       const wantedTable = page.getByRole('table', { name: 'Wanted releases' });
       await wantedTable.getByRole('columnheader', { name: 'Artist' }).waitFor();
       await wantedTable.getByRole('cell', { name: 'Autechre' }).waitFor();
+      const amberRow = wantedTable.getByRole('row').filter({ hasText: 'Amber' }).first();
       await wantedTable.getByText('Music Has the Right to Children').first().waitFor();
       await wantedTable.getByText('Kid A').first().waitFor();
-      await wantedTable.getByText('1 candidate', { exact: true }).waitFor();
-      await wantedTable.getByText('Last search produced Import Review candidates.', { exact: true }).waitFor();
-      await wantedTable.getByRole('link', { name: 'Open candidates' }).waitFor();
-      await wantedTable.getByText('Queued in Downloader', { exact: true }).waitFor();
-      await wantedTable.getByText('1 Downloader transfer accepted.', { exact: true }).waitFor();
+      await amberRow.getByText('1 candidate', { exact: true }).waitFor();
+      await amberRow.getByText('Last search produced Import Review candidates.', { exact: true }).waitFor();
+      await amberRow.getByRole('link', { name: 'Open candidates' }).waitFor();
+      await amberRow.getByText('Queued in Downloader', { exact: true }).waitFor();
+      await amberRow.getByText('1 Downloader transfer accepted.', { exact: true }).waitFor();
       await wantedTable.getByText('No candidates', { exact: true }).waitFor();
       await wantedTable.getByText('Last search returned no candidates; Harmoniarr will retry after cooldown.', {
         exact: true,
@@ -157,7 +158,7 @@ suite('Activity releases/wanted browser verification', () => {
       const retryRequests = await page.evaluate(() => globalThis.__harmoniarrWantedRetryRequests);
       assert.deepEqual(retryRequests, ['metadata-release-mhtrtc']);
 
-      await wantedTable.getByRole('link', { name: 'Open candidates' }).click();
+      await amberRow.getByRole('link', { name: 'Open candidates' }).click();
       await page.waitForFunction(() => {
         const url = new URL(globalThis.location.href);
         return url.pathname === '/app/activity/candidates'
