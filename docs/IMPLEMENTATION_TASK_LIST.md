@@ -42,6 +42,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   behavior, setup gates, auto-add policy, and diagnostics visibility before
   Phase 1. See `ACQUISITION_PIPELINE_REDESIGN_PLAN.md` and
   `MUSIC_QUEUE_PHASE_0_DESIGN.md`.
+- Music Queue Phase 1 read model: added the read-only `src/server/acquisition/`
+  module, status and quality policy services, authenticated Music Queue API
+  routes, route inventory entries, client API/composable/presentation helpers,
+  top-level `/app/music-queue` route, primary navigation, skeleton view, and
+  focused tests. Phase 2 should now replace the visible candidate-first workflow
+  with Music Queue match drilldowns while keeping Import Review as advanced
+  diagnostics. See `MUSIC_QUEUE_PHASE_1_READ_MODEL_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

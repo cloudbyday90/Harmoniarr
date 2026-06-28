@@ -27,6 +27,7 @@
 
 const OPERATOR_NAV = Object.freeze([
   Object.freeze({ name: 'dashboard', label: 'Home', icon: 'library', exact: true }),
+  Object.freeze({ name: 'music-queue', label: 'Music Queue', icon: 'music' }),
   Object.freeze({ name: 'discover', label: 'Discover', icon: 'discover' }),
   Object.freeze({ name: 'missing', label: 'Missing', icon: 'missing' }),
   Object.freeze({ name: 'downloader', label: 'Downloader', icon: 'download' }),
@@ -36,6 +37,7 @@ const OPERATOR_NAV = Object.freeze([
 
 const REQUESTER_NAV = Object.freeze([
   Object.freeze({ name: 'dashboard', label: 'Home', icon: 'library', exact: true }),
+  Object.freeze({ name: 'music-queue', label: 'Music Queue', icon: 'music' }),
   Object.freeze({ name: 'discover', label: 'Discover', icon: 'discover' }),
   Object.freeze({ name: 'search', label: 'Search', icon: 'search' }),
   Object.freeze({ name: 'my-requests', label: 'My Requests', icon: 'requests' }),

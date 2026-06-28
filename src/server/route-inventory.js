@@ -17,6 +17,8 @@
  */
 
 export const serverRouteInventory = Object.freeze([
+  { method: 'GET', path: '/api/v1/acquisition/releases', access: 'authenticated', area: 'music-queue', kind: 'read' },
+  { method: 'GET', path: '/api/v1/acquisition/releases/:wantedReleaseId', access: 'authenticated', area: 'music-queue', kind: 'read' },
   { method: 'GET', path: '/api/v1/activity/feed', access: 'authenticated', area: 'activity', kind: 'read' },
   { method: 'GET', path: '/api/v1/activity/source-users', access: 'admin', area: 'activity', kind: 'read' },
   { method: 'GET', path: '/api/v1/activity/source-users/:username', access: 'admin', area: 'activity', kind: 'read' },

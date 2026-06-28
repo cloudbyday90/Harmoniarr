@@ -1,6 +1,6 @@
 # Music Queue Phase 0 Design
 
-Status: **Phase 0 complete / Phase 1 ready.**
+Status: **Phase 0 complete / Phase 1 implemented.**
 
 Date: 2026-06-28.
 

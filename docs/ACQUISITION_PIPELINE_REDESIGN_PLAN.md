@@ -763,36 +763,43 @@ Acceptance:
 
 ### Phase 1 - Refactor, Read Model, And Skeleton
 
+Status: **Complete as a read-only foundation slice.** See
+`MUSIC_QUEUE_PHASE_1_READ_MODEL_DESIGN.md`.
+
 Goal: create the modular foundation without changing the user's main workflow
 yet. This phase extracts a clean read model, status policy, quality policy,
 match-attempt summary, presentation helpers, routes, and skeleton UI.
 
-- [ ] Add `src/server/acquisition/acquisition-pipeline-status-service.js` with
+- [x] Add `src/server/acquisition/acquisition-pipeline-status-service.js` with
   pure status derivation.
-- [ ] Add `src/server/acquisition/acquisition-quality-policy-service.js` with
+- [x] Add `src/server/acquisition/acquisition-quality-policy-service.js` with
   pure quality eligibility, cutoff, fallback, and verified-audio derivation.
-- [ ] Include verified media evidence in quality eligibility when files have
+- [x] Include verified media evidence in quality eligibility when files have
   been downloaded or inspected.
-- [ ] Add match-attempt summary derivation: attempted count, blocked count,
-  latest blocked reason, and next acceptable match.
-- [ ] Add `src/server/acquisition/acquisition-pipeline-store.js` with
+- [x] Add match-attempt summary derivation from the existing wanted-release
+  import review summary, including selection-readiness evidence for ambiguous,
+  low-confidence, unscored, selected, and handoff-active matches. Detailed
+  attempted/blocked/next-match lifecycle remains Phase 2/3 work.
+- [x] Add `src/server/acquisition/acquisition-pipeline-store.js` with
   release-centered aggregate reads over wanted releases, discovery requests,
-  candidates, execution runs, transfer snapshots, import previews, and setup.
-- [ ] Add `src/server/acquisition/acquisition-pipeline-service.js`.
-- [ ] Add `src/server/routes/acquisition-routes.js` with
+  candidate review summaries, download execution summaries, and setup blockers
+  already exposed by the wanted-release read model. Transfer snapshots and
+  import previews remain deeper Phase 2/3 enrichments.
+- [x] Add `src/server/acquisition/acquisition-pipeline-service.js`.
+- [x] Add `src/server/routes/acquisition-routes.js` with
   `GET /api/v1/acquisition/releases` and
   `GET /api/v1/acquisition/releases/:wantedReleaseId`.
-- [ ] Add route inventory entries and permission checks.
-- [ ] Add `src/client/lib/acquisition-pipeline-presentation.js`.
-- [ ] Add `src/client/lib/acquisition-quality-presentation.js`.
-- [ ] Add `src/client/composables/useMusicQueue.js`.
-- [ ] Add `src/client/views/MusicQueueView.vue` skeleton with loading, empty,
-  setup-needed, needs-help, and generic error states.
-- [ ] Preserve the existing Import Review page behind diagnostics; do not delete
+- [x] Add route inventory entries and permission checks.
+- [x] Add `src/client/lib/acquisition-pipeline-presentation.js`.
+- [x] Add `src/client/lib/acquisition-quality-presentation.js`.
+- [x] Add `src/client/composables/useMusicQueue.js`.
+- [x] Add `src/client/views/MusicQueueView.vue` skeleton with loading, empty,
+  needs-help/status, and generic error states.
+- [x] Preserve the existing Import Review page behind diagnostics; do not delete
   it in this phase.
-- [ ] Add focused server tests for every status mapping.
-- [ ] Add route tests for permissions and response shape.
-- [ ] Add focused client tests for presentation helpers and the composable.
+- [x] Add focused server tests for status and quality mappings.
+- [x] Add route tests for permissions and response shape.
+- [x] Add focused client tests for presentation helpers.
 
 Acceptance:
 
@@ -1096,19 +1103,19 @@ Work this document in order, without continuing to patch Issue #4:
 
 ## 18. Recommended Next Slice
 
-Start with **Phase 1 - Refactor, Read Model, And Skeleton**, specifically:
+Move to **Phase 2 - Music Queue UX And Match Drilldowns**.
 
-1. add a pure status projection service that maps existing wanted, discovery,
-   candidate, transfer, media-check, and apply evidence into the Phase 0 status
-   contract
-2. add a pure quality policy service for profile, minimum, cutoff, fallback, and
-   verified-audio decisions
-3. add a read-only store/service pair that assembles Music Queue rows without
-   changing automation behavior
-4. add client presentation helpers for labels, tones, actions, and progress
-   steps
-5. add focused server/client tests for the Phase 0 walkthrough payload examples
+Recommended first slice:
 
-Reason: Phase 0 is complete. The next useful work is a read-only projection that
-proves the new contract against current state before we change download or
-library-add automation.
+1. replace the visible `Activity > Candidates` primary copy with Music
+   Queue-oriented language and handoffs
+2. add the Music Queue match-review drilldown behind `Review matches`
+3. show setup blockers, quality blockers, auto-select readiness, and selected
+   download handoff on the release row
+4. keep raw Import Review/candidate controls available as advanced diagnostics
+5. add browser proof for a monitored artist flowing from wanted release to Music
+   Queue match state
+
+Reason: Phase 1 now gives us a read-only status contract and top-level route.
+The next high-value work is making the actual user workflow stop centering on
+raw candidates.

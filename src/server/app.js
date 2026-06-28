@@ -18,6 +18,7 @@
 
 import express from 'express';
 import { resolve } from 'node:path';
+import { createAcquisitionModule } from './acquisition/acquisition-module.js';
 import { createAppUserModule } from './app-user-module.js';
 import { createActivityModule } from './activity/activity-module.js';
 import { createArtworkModule } from './artwork/artwork-module.js';
@@ -59,6 +60,7 @@ import { createMaintenanceLockOperationPauseService } from './recovery/maintenan
 import { createMaintenanceLockService } from './recovery/maintenance-lock-service.js';
 import { createControlPlaneIdempotencyService } from './recovery/control-plane-idempotency-service.js';
 import { registerArtworkRoutes } from './routes/artwork-routes.js';
+import { registerAcquisitionRoutes } from './routes/acquisition-routes.js';
 import { registerActivityRoutes } from './routes/activity-routes.js';
 import { registerAppUserRoutes } from './routes/app-user-routes.js';
 import { registerAuthRoutes } from './routes/auth-routes.js';
@@ -154,6 +156,7 @@ export function createApp({
   clientDistDir,
   packageJsonPath,
   startedAt = new Date(),
+  createAcquisitionModule: buildAcquisitionModule = createAcquisitionModule,
   createArtworkModule: buildArtworkModule = createArtworkModule,
   createActivityModule: buildActivityModule = createActivityModule,
   createAppUserModule: buildAppUserModule = createAppUserModule,
@@ -172,6 +175,7 @@ export function createApp({
   createSlskdConfigService: buildSlskdConfigService = createSlskdConfigService,
   createSlskdModule: buildSlskdModule = createSlskdModule,
   createSystemModule: buildSystemModule = createSystemModule,
+  registerAcquisitionRoutes: mountAcquisitionRoutes = registerAcquisitionRoutes,
   registerArtworkRoutes: mountArtworkRoutes = registerArtworkRoutes,
   registerActivityRoutes: mountActivityRoutes = registerActivityRoutes,
   registerAppUserRoutes: mountAppUserRoutes = registerAppUserRoutes,
@@ -549,6 +553,9 @@ export function createApp({
     settingsService,
     slskdService: slskdModule.slskdService,
   });
+  const acquisitionModule = buildAcquisitionModule({
+    buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
+  });
   const metadataModule = buildMetadataModule({
     libraryMediaRequestStore: libraryModule.libraryMediaRequestStore,
     maintenanceLockOperationPauseService,
@@ -843,6 +850,14 @@ export function createApp({
     }),
     limitDownloaderQueueRead: requestRateLimiterService.createMiddleware({
       bucketName: 'downloader-queue-read',
+      limit: 120,
+      windowMs: 60 * 1000,
+    }),
+  });
+  mountAcquisitionRoutes(app, {
+    ...acquisitionModule.routeDependencies,
+    limitMusicQueueRead: requestRateLimiterService.createMiddleware({
+      bucketName: 'music-queue-read',
       limit: 120,
       windowMs: 60 * 1000,
     }),

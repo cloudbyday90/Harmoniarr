@@ -41,6 +41,7 @@ const LibraryView = () => import('./views/LibraryView.vue');
 const LoginView = () => import('./views/LoginView.vue');
 const MetadataView = () => import('./views/MetadataView.vue');
 const MissingView = () => import('./views/MissingView.vue');
+const MusicQueueView = () => import('./views/MusicQueueView.vue');
 const OnboardingView = () => import('./views/OnboardingView.vue');
 const OperationsView = () => import('./views/OperationsView.vue');
 const RecoveryView = () => import('./views/RecoveryView.vue');
@@ -111,6 +112,8 @@ const router = createRouter({
         { path: 'onboarding', name: 'onboarding', component: OnboardingView },
         { path: 'discover', name: 'discover', component: DiscoverView },
         { path: 'library', name: 'library', component: LibraryView },
+        { path: 'music-queue', name: 'music-queue', component: MusicQueueView },
+        { path: 'music-queue/:wantedReleaseId', name: 'music-queue-release', component: MusicQueueView },
         { path: 'missing', name: 'missing', component: MissingView },
         { path: 'downloader', name: 'downloader', component: DownloaderView },
         { path: 'search', name: 'search', component: SearchView },
