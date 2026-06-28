@@ -109,6 +109,26 @@ function resolveAutomaticState({ cooldownDeadline, now, releaseDateDeadline }) {
   };
 }
 
+function isIsoAfter(left, right) {
+  if (!left || !right) return false;
+  const leftTime = new Date(left).getTime();
+  const rightTime = new Date(right).getTime();
+  return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime > rightTime;
+}
+
+function shouldPrioritizeRequestIntake({ priorEvidence, row, searchAttemptCount }) {
+  if (!row.source_media_request_id) return false;
+
+  const sourceRequestedAt = toIsoStringOrNull(row.source_requested_at);
+  const lastSearchAt = toIsoStringOrNull(row.last_search_at);
+  if (!lastSearchAt) return true;
+  if (isIsoAfter(sourceRequestedAt, lastSearchAt)) return true;
+
+  const hasRecordedSearchOutcome = Boolean(priorEvidence.lastSearchResult || priorEvidence.searchExhausted);
+  const hasRecordedFailure = Boolean(priorEvidence.lastDispatchFailure);
+  return searchAttemptCount === 0 && !hasRecordedSearchOutcome && !hasRecordedFailure;
+}
+
 function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   const searchMode = row.search_mode ?? 'automatic';
   const researchAttemptCount = toNonNegativeInteger(row.research_attempt_count);
@@ -129,6 +149,10 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
   const sourceRequestedForUserId = row.source_requested_for_user_id ?? row.source_requested_by_user_id ?? null;
   if (sourceRequestedForUserId) {
     requestSourceEvidence.sourceRequestedForUserId = sourceRequestedForUserId;
+  }
+  const sourceRequestedAt = toIsoStringOrNull(row.source_requested_at);
+  if (sourceRequestedAt) {
+    requestSourceEvidence.sourceRequestedAt = sourceRequestedAt;
   }
   const releaseDateDeadline = buildReleaseDateInstant(row.release_date);
   const cooldownDeadline = buildCooldownDeadline(row.last_search_at, automaticCooldownMs);
@@ -241,6 +265,34 @@ function mapDiscoveryRow(row, { automaticCooldownMs, now }) {
     };
   }
 
+  if (shouldPrioritizeRequestIntake({ priorEvidence, row, searchAttemptCount })) {
+    return {
+      blockedReason: null,
+      evidence: {
+        ...priorEvidence,
+        ...requestSourceEvidence,
+        automaticCooldownMs,
+        cooldownDeadline: cooldownDeadline?.toISOString() ?? null,
+        priorBlockedReason: row.blocked_reason ?? null,
+        releaseDateGate: releaseDateDeadline?.toISOString() ?? null,
+        strategy: 'media_request_intake_ready',
+        wantedStrategy: row.wanted_strategy ?? null,
+      },
+      lastSearchAt: toIsoStringOrNull(row.last_search_at),
+      manualRequestedAt: toIsoStringOrNull(row.manual_requested_at),
+      metadataArtistId: row.metadata_artist_id,
+      metadataReleaseGroupId: row.metadata_release_group_id,
+      metadataReleaseId: row.metadata_release_id,
+      nextSearchAfter: now.toISOString(),
+      releaseDate: row.release_date ?? null,
+      requestStatus: 'ready',
+      researchAttemptCount,
+      searchAttemptCount: 0,
+      searchMode,
+      wantedStatus: row.wanted_status,
+    };
+  }
+
   const automaticState = resolveAutomaticState({
     cooldownDeadline,
     now,
@@ -309,6 +361,7 @@ export function createLibraryDiscoveryRequestService({
             NULL::text AS source_request_kind,
             NULL::uuid AS source_requested_by_user_id,
             library_wanted_releases.app_user_id AS source_requested_for_user_id,
+            NULL::timestamptz AS source_requested_at,
             current_discovery.search_mode,
             current_discovery.blocked_reason,
             current_discovery.evidence AS prior_evidence,
@@ -336,6 +389,7 @@ export function createLibraryDiscoveryRequestService({
             media_requests.request_kind AS source_request_kind,
             media_requests.requested_by_user_id AS source_requested_by_user_id,
             media_requests.requested_for_user_id AS source_requested_for_user_id,
+            media_requests.created_at AS source_requested_at,
             current_discovery.search_mode,
             current_discovery.blocked_reason,
             current_discovery.evidence AS prior_evidence,
@@ -372,6 +426,7 @@ export function createLibraryDiscoveryRequestService({
             source_rows.source_request_kind,
             source_rows.source_requested_by_user_id,
             source_rows.source_requested_for_user_id,
+            source_rows.source_requested_at,
             source_rows.search_mode,
             source_rows.blocked_reason,
             source_rows.prior_evidence,
@@ -401,6 +456,7 @@ export function createLibraryDiscoveryRequestService({
           deduped_sources.source_request_kind,
           deduped_sources.source_requested_by_user_id,
           deduped_sources.source_requested_for_user_id,
+          deduped_sources.source_requested_at,
           deduped_sources.search_mode,
           deduped_sources.blocked_reason,
           deduped_sources.prior_evidence,

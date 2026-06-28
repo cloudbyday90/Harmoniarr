@@ -228,24 +228,29 @@ test('reconcileDiscoveryRequests includes request-driven release matches in disc
   const service = createLibraryDiscoveryRequestService({
     getNow: () => now,
     getPoolFn: () => ({
-      query: async () => ({
-        rows: [{
-          blocked_reason: null,
-          last_search_at: null,
-          manual_requested_at: null,
-          metadata_artist_id: 'artist-7',
-          metadata_release_group_id: 'release-group-7',
-          metadata_release_id: 'release-7',
-          release_date: '2026-05-01',
-          search_mode: 'automatic',
-          source_media_request_id: 'request-7',
-          source_request_kind: 'release',
-          source_requested_by_user_id: 'admin-7',
-          source_requested_for_user_id: 'user-7',
-          wanted_status: 'missing',
-          wanted_strategy: 'media_request_intake',
-        }],
-      }),
+      query: async (sql) => {
+        assert.match(sql, /media_requests\.created_at AS source_requested_at/);
+        assert.match(sql, /source_rows\.source_requested_at/);
+        return {
+          rows: [{
+            blocked_reason: null,
+            last_search_at: null,
+            manual_requested_at: null,
+            metadata_artist_id: 'artist-7',
+            metadata_release_group_id: 'release-group-7',
+            metadata_release_id: 'release-7',
+            release_date: '2026-05-01',
+            search_mode: 'automatic',
+            source_media_request_id: 'request-7',
+            source_request_kind: 'release',
+            source_requested_by_user_id: 'admin-7',
+            source_requested_at: '2026-05-02T13:45:00.000Z',
+            source_requested_for_user_id: 'user-7',
+            wanted_status: 'missing',
+            wanted_strategy: 'media_request_intake',
+          }],
+        };
+      },
     }),
     libraryDiscoveryRequestStore: {
       replaceLibraryDiscoveryRequests,
@@ -260,12 +265,14 @@ test('reconcileDiscoveryRequests includes request-driven release matches in disc
       evidence: {
         automaticCooldownMs: 21600000,
         cooldownDeadline: null,
+        priorBlockedReason: null,
         releaseDateGate: '2026-05-01T00:00:00.000Z',
         sourceMediaRequestId: 'request-7',
         sourceRequestKind: 'release',
         sourceRequestedByUserId: 'admin-7',
+        sourceRequestedAt: '2026-05-02T13:45:00.000Z',
         sourceRequestedForUserId: 'user-7',
-        strategy: 'eligible_now',
+        strategy: 'media_request_intake_ready',
         wantedStrategy: 'media_request_intake',
       },
       lastSearchAt: null,
@@ -282,6 +289,182 @@ test('reconcileDiscoveryRequests includes request-driven release matches in disc
       wantedStatus: 'missing',
     }],
   });
+});
+
+test('reconcileDiscoveryRequests lets newer media requests bypass existing automatic cooldown once', async (t) => {
+  const replaceLibraryDiscoveryRequests = t.mock.fn(async () => {});
+  const now = new Date('2026-05-02T15:00:00.000Z');
+  const service = createLibraryDiscoveryRequestService({
+    getNow: () => now,
+    getPoolFn: () => ({
+      query: async () => ({
+        rows: [{
+          blocked_reason: 'automatic_cooldown',
+          last_search_at: '2026-05-02T12:00:00.000Z',
+          manual_requested_at: null,
+          metadata_artist_id: 'artist-7',
+          metadata_release_group_id: 'release-group-7',
+          metadata_release_id: 'release-7',
+          prior_evidence: {
+            lastSearchResult: {
+              candidateCount: 0,
+              fileCount: 0,
+              sourceProvider: 'slskd',
+            },
+            strategy: 'cooldown_gate',
+          },
+          release_date: '2026-05-01',
+          search_attempt_count: 2,
+          search_mode: 'automatic',
+          source_media_request_id: 'request-7',
+          source_request_kind: 'release',
+          source_requested_at: '2026-05-02T13:45:00.000Z',
+          source_requested_by_user_id: 'admin-7',
+          source_requested_for_user_id: 'user-7',
+          wanted_status: 'missing',
+          wanted_strategy: 'media_request_intake',
+        }],
+      }),
+    }),
+    libraryDiscoveryRequestStore: {
+      replaceLibraryDiscoveryRequests,
+    },
+  });
+
+  await service.reconcileDiscoveryRequests();
+
+  assert.deepEqual(replaceLibraryDiscoveryRequests.mock.calls[0].arguments[0].discoveryRequests[0], {
+    blockedReason: null,
+    evidence: {
+      automaticCooldownMs: 21600000,
+      cooldownDeadline: '2026-05-02T18:00:00.000Z',
+      lastSearchResult: {
+        candidateCount: 0,
+        fileCount: 0,
+        sourceProvider: 'slskd',
+      },
+      priorBlockedReason: 'automatic_cooldown',
+      releaseDateGate: '2026-05-01T00:00:00.000Z',
+      sourceMediaRequestId: 'request-7',
+      sourceRequestKind: 'release',
+      sourceRequestedAt: '2026-05-02T13:45:00.000Z',
+      sourceRequestedByUserId: 'admin-7',
+      sourceRequestedForUserId: 'user-7',
+      strategy: 'media_request_intake_ready',
+      wantedStrategy: 'media_request_intake',
+    },
+    lastSearchAt: '2026-05-02T12:00:00.000Z',
+    manualRequestedAt: null,
+    metadataArtistId: 'artist-7',
+    metadataReleaseGroupId: 'release-group-7',
+    metadataReleaseId: 'release-7',
+    nextSearchAfter: '2026-05-02T15:00:00.000Z',
+    releaseDate: '2026-05-01',
+    requestStatus: 'ready',
+    researchAttemptCount: 0,
+    searchAttemptCount: 0,
+    searchMode: 'automatic',
+    wantedStatus: 'missing',
+  });
+});
+
+test('reconcileDiscoveryRequests retries interrupted request-driven claims without recorded search outcome', async (t) => {
+  const replaceLibraryDiscoveryRequests = t.mock.fn(async () => {});
+  const now = new Date('2026-05-02T15:00:00.000Z');
+  const service = createLibraryDiscoveryRequestService({
+    getNow: () => now,
+    getPoolFn: () => ({
+      query: async () => ({
+        rows: [{
+          blocked_reason: 'automatic_cooldown',
+          last_search_at: '2026-05-02T14:00:00.000Z',
+          manual_requested_at: null,
+          metadata_artist_id: 'artist-7',
+          metadata_release_group_id: 'release-group-7',
+          metadata_release_id: 'release-7',
+          prior_evidence: {
+            dispatchStrategy: 'slskd_search_dispatch',
+            lastDispatchAttemptedAt: '2026-05-02T14:00:00.000Z',
+          },
+          release_date: '2026-05-01',
+          search_attempt_count: 0,
+          search_mode: 'automatic',
+          source_media_request_id: 'request-7',
+          source_request_kind: 'release',
+          source_requested_at: '2026-05-02T13:45:00.000Z',
+          source_requested_by_user_id: 'admin-7',
+          source_requested_for_user_id: 'user-7',
+          wanted_status: 'missing',
+          wanted_strategy: 'media_request_intake',
+        }],
+      }),
+    }),
+    libraryDiscoveryRequestStore: {
+      replaceLibraryDiscoveryRequests,
+    },
+  });
+
+  await service.reconcileDiscoveryRequests();
+
+  const request = replaceLibraryDiscoveryRequests.mock.calls[0].arguments[0].discoveryRequests[0];
+  assert.equal(request.requestStatus, 'ready');
+  assert.equal(request.blockedReason, null);
+  assert.equal(request.nextSearchAfter, '2026-05-02T15:00:00.000Z');
+  assert.equal(request.searchAttemptCount, 0);
+  assert.equal(request.searchMode, 'automatic');
+  assert.equal(request.evidence.strategy, 'media_request_intake_ready');
+  assert.equal(request.evidence.priorBlockedReason, 'automatic_cooldown');
+});
+
+test('reconcileDiscoveryRequests keeps already-searched media requests behind automatic cooldown', async (t) => {
+  const replaceLibraryDiscoveryRequests = t.mock.fn(async () => {});
+  const now = new Date('2026-05-02T15:00:00.000Z');
+  const service = createLibraryDiscoveryRequestService({
+    getNow: () => now,
+    getPoolFn: () => ({
+      query: async () => ({
+        rows: [{
+          blocked_reason: 'automatic_cooldown',
+          last_search_at: '2026-05-02T14:00:00.000Z',
+          manual_requested_at: null,
+          metadata_artist_id: 'artist-7',
+          metadata_release_group_id: 'release-group-7',
+          metadata_release_id: 'release-7',
+          prior_evidence: {
+            lastSearchResult: {
+              candidateCount: 0,
+              fileCount: 0,
+              sourceProvider: 'slskd',
+            },
+          },
+          release_date: '2026-05-01',
+          search_attempt_count: 1,
+          search_mode: 'automatic',
+          source_media_request_id: 'request-7',
+          source_request_kind: 'release',
+          source_requested_at: '2026-05-02T13:45:00.000Z',
+          source_requested_by_user_id: 'admin-7',
+          source_requested_for_user_id: 'user-7',
+          wanted_status: 'missing',
+          wanted_strategy: 'media_request_intake',
+        }],
+      }),
+    }),
+    libraryDiscoveryRequestStore: {
+      replaceLibraryDiscoveryRequests,
+    },
+  });
+
+  await service.reconcileDiscoveryRequests();
+
+  const request = replaceLibraryDiscoveryRequests.mock.calls[0].arguments[0].discoveryRequests[0];
+  assert.equal(request.requestStatus, 'cooldown');
+  assert.equal(request.blockedReason, 'automatic_cooldown');
+  assert.equal(request.nextSearchAfter, '2026-05-02T20:00:00.000Z');
+  assert.equal(request.searchAttemptCount, 1);
+  assert.equal(request.searchMode, 'automatic');
+  assert.equal(request.evidence.strategy, 'cooldown_gate');
+  assert.equal(request.evidence.sourceRequestedAt, '2026-05-02T13:45:00.000Z');
 });
 
 test('reconcileDiscoveryRequests preserves exhausted automatic discovery requests', async (t) => {

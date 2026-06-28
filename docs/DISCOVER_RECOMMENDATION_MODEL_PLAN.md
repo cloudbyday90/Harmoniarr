@@ -119,6 +119,10 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   fixing `could not determine data type of parameter $1` dispatch failures
   before search/import handoff evidence can persist; see
   [LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md](LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md)
+- explicit Missing and Release Detail requests now keep matching discovery rows
+  automatic-dispatchable while bypassing stale cooldown only for new request
+  intent or interrupted claims with no recorded search outcome; see
+  [REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md](REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:

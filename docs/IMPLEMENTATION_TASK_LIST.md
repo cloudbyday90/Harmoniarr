@@ -113,6 +113,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   now cast placeholders passed into PostgreSQL `jsonb_build_object`, fixing the
   `could not determine data type of parameter $1` failures seen in Background
   Jobs. See `LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md`.
+- Request-driven discovery retry readiness: explicit Missing and Release Detail
+  requests now keep discovery rows automatic-dispatchable while bypassing stale
+  cooldown only when the request is new, newer than the previous search, or a
+  prior claim never recorded a search outcome. See
+  `REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,

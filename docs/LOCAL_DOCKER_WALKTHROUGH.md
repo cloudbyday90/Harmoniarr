@@ -59,6 +59,29 @@ After configuring Soulseek in Settings > Connections, use the Provider health
 write-only: the field intentionally stays blank after save, and leaving it blank
 keeps the stored key.
 
+If slskd is running outside the walkthrough Compose stack, Harmoniarr also needs
+container-visible access to the folder where slskd writes completed downloads.
+A Windows or Unraid host path such as `Y:\` is not visible inside the
+Harmoniarr container by itself. Bind-mount that folder, or the completed music
+subfolder, into Harmoniarr and then add a Settings > Media & storage path
+mapping from the slskd container path to the Harmoniarr container path.
+
+Example for a local Windows drive:
+
+```yaml
+services:
+  harmoniarr:
+    volumes:
+      - type: bind
+        source: Y:/Complete/Music
+        target: /data/downloads/complete
+```
+
+Then configure the path mapping using the path slskd reports for completed
+files, for example `/downloads/complete/Music`, mapped to
+`/data/downloads/complete`. Do not map to `Y:\` inside Harmoniarr; that is a
+host path, not a container path.
+
 If you need a fully clean rebuild while testing Docker changes, use:
 
 ```powershell

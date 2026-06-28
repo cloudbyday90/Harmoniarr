@@ -118,6 +118,11 @@ Confirmed complete:
   failures that reported `could not determine data type of parameter $1` while
   persisting discovery evidence. See
   [LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md](LIBRARY_DISCOVERY_JSONB_PARAMETER_CASTING_DESIGN.md).
+- Request-driven discovery retry readiness, including explicit Missing and
+  Release Detail request intake that can clear stale automatic cooldown without
+  changing the row out of the automatic dispatcher path or creating continuous
+  retry loops. See
+  [REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md](REQUEST_DRIVEN_DISCOVERY_RETRY_DESIGN.md).
 - Docker-backed schema generation and validation, including fresh
   Testcontainers PostgreSQL replay for schema snapshot updates, bootstrap
   validation, database schema checks, and anchor comparison. See
