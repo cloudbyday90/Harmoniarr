@@ -451,6 +451,140 @@ export function buildImportReviewWorkflowResult(release) {
   }
 }
 
+function getImportReviewWorkflowState(release) {
+  const summary = release?.discoveryRequest?.importReviewSummary ?? null;
+  const totalCount = toCount(summary?.totalCount);
+  if (totalCount < 1) {
+    return {
+      primaryStatus: null,
+      summary,
+      totalCount,
+    };
+  }
+
+  return {
+    primaryStatus: getPrimaryImportReviewStatus(summary),
+    summary,
+    totalCount,
+  };
+}
+
+function buildReadinessGuidance({
+  label = 'Next step',
+  message,
+  title,
+  tone = 'info',
+}) {
+  return {
+    label,
+    message,
+    title,
+    tone,
+  };
+}
+
+/**
+ * Builds the next operator step when a wanted release has discovery or Import
+ * Review state but Downloader has not obviously started useful work yet.
+ *
+ * @param {object} release - Raw or normalized wanted release object.
+ * @returns {{label: string, title: string, message: string, tone: 'success'|'warning'|'danger'|'info'}|null}
+ */
+export function buildImportExecutionReadinessGuidance(release) {
+  const discoveryRequest = release?.discoveryRequest ?? null;
+  if (!discoveryRequest) {
+    return buildReadinessGuidance({
+      message: 'Run discovery to search for candidates before Import Review or Downloader can start.',
+      title: 'Run discovery',
+    });
+  }
+
+  const lastSearchResult = discoveryRequest.evidence?.lastSearchResult ?? null;
+  const candidateCount = toCount(lastSearchResult?.candidateCount);
+  const {
+    primaryStatus,
+    summary,
+    totalCount,
+  } = getImportReviewWorkflowState(release);
+
+  if (candidateCount > 0 && totalCount < 1) {
+    return buildReadinessGuidance({
+      message: 'Open the candidate results and select one before starting a download run.',
+      title: 'Open Import Review candidates',
+    });
+  }
+
+  if (totalCount < 1) {
+    return null;
+  }
+
+  const downloadExecutionSummary = summary?.downloadExecutionSummary ?? null;
+  const itemStatusCounts = downloadExecutionSummary?.itemStatusCounts ?? {};
+  const enqueuedTransferCount = toCount(downloadExecutionSummary?.enqueuedTransferCount);
+  const queueFailedCount = getImportReviewStatusCount(itemStatusCounts, 'queue_failed');
+  const blockedCount = getImportReviewStatusCount(itemStatusCounts, 'blocked');
+
+  if (enqueuedTransferCount > 0) {
+    return buildReadinessGuidance({
+      message: 'Open Downloader or sync transfer state in Import Review to track provider progress.',
+      title: 'Watch Downloader',
+      tone: 'success',
+    });
+  }
+
+  if (queueFailedCount > 0 || blockedCount > 0) {
+    return buildReadinessGuidance({
+      message: 'Open Import Review and read the download acceptance diagnostic before retrying.',
+      title: 'Review the download diagnostic',
+      tone: queueFailedCount > 0 ? 'danger' : 'warning',
+    });
+  }
+
+  switch (primaryStatus) {
+    case 'selected':
+      return buildReadinessGuidance({
+        message: 'A candidate is selected. Open Import Review and click Start download run to send it to Downloader.',
+        title: 'Start the download run',
+      });
+    case 'pending':
+    case 'held':
+      return buildReadinessGuidance({
+        message: 'Open Import Review and select the candidate you want before starting a download run.',
+        title: 'Select a candidate',
+      });
+    case 'downloading':
+      return buildReadinessGuidance({
+        message: 'Open Downloader or sync transfer state in Import Review to track provider progress.',
+        title: 'Watch Downloader',
+        tone: 'success',
+      });
+    case 'import_pending':
+      return buildReadinessGuidance({
+        message: 'Open Import Review and start the import apply run for the completed download.',
+        title: 'Apply the completed download',
+      });
+    case 'failed':
+      return buildReadinessGuidance({
+        message: 'Open Import Review, inspect the failed candidate, and choose a retry or replacement.',
+        title: 'Review failed candidate',
+        tone: 'danger',
+      });
+    case 'rejected':
+      return buildReadinessGuidance({
+        message: 'Run discovery again or pick another candidate source before trying the download handoff.',
+        title: 'Find another candidate',
+        tone: 'warning',
+      });
+    case 'applied':
+      return null;
+    default:
+      return buildReadinessGuidance({
+        message: 'Open Import Review to inspect the current candidate workflow state.',
+        title: 'Check Import Review',
+      });
+  }
+}
+
 function buildDiscoveryResultDetails(discoveryRequest, evidence) {
   const details = [];
   const lastSearchAt = formatEvidenceTimestamp(discoveryRequest?.lastSearchAt);

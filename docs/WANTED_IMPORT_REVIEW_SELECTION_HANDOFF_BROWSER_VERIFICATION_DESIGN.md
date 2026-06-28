@@ -14,6 +14,8 @@ Added browser verification for the high-confidence candidate selection handoff:
 4. The operator selects the high-confidence candidate.
 5. Returning through in-app navigation to Activity > Wanted updates the row to
    `Selected for download`.
+6. The Wanted row shows `Select a candidate` before selection and `Start the
+   download run` after selection, making the next action explicit.
 
 This proves the gap seen in local walkthroughs: a successful search can produce
 candidates while Downloader remains idle until Import Review selection occurs.
@@ -79,6 +81,9 @@ Cons:
 Import Review selected-candidate download execution handoff browser verification
 is complete; see
 [IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
+
+The selected-candidate readiness guidance is complete; see
+[IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md](IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md).
 
 The live transfer acceptance proof is complete for the Wanted-origin flow; see
 [WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).

@@ -21,6 +21,7 @@ import test from 'node:test';
 import {
   buildDiscoveryDispatchResult,
   buildDownloadRecoveryNotice,
+  buildImportExecutionReadinessGuidance,
   buildImportReviewWorkflowResult,
   buildMissingPageSubtitle,
   buildMissingStatCards,
@@ -984,4 +985,132 @@ test('buildImportReviewWorkflowResult reports failed candidates with singular gr
   assert.equal(result.label, 'Candidate failed');
   assert.equal(result.tone, 'danger');
   assert.equal(result.message, '1 candidate needs review before acquisition can continue.');
+});
+
+// ── buildImportExecutionReadinessGuidance ───────────────────────────────────
+
+test('buildImportExecutionReadinessGuidance prompts discovery before candidates exist', () => {
+  const result = buildImportExecutionReadinessGuidance({
+    discoveryRequest: null,
+  });
+
+  assert.equal(result.title, 'Run discovery');
+  assert.equal(result.message, 'Run discovery to search for candidates before Import Review or Downloader can start.');
+  assert.equal(result.tone, 'info');
+});
+
+test('buildImportExecutionReadinessGuidance prompts candidate review after search results', () => {
+  const result = buildImportExecutionReadinessGuidance({
+    discoveryRequest: {
+      evidence: {
+        lastSearchResult: {
+          candidateCount: 4,
+        },
+      },
+      importReviewSummary: {
+        totalCount: 0,
+      },
+    },
+  });
+
+  assert.equal(result.title, 'Open Import Review candidates');
+  assert.equal(result.message, 'Open the candidate results and select one before starting a download run.');
+});
+
+test('buildImportExecutionReadinessGuidance prompts selection for pending candidates', () => {
+  const result = buildImportExecutionReadinessGuidance({
+    discoveryRequest: {
+      importReviewSummary: {
+        latestStatus: 'pending',
+        statusCounts: {
+          pending: 2,
+        },
+        totalCount: 2,
+      },
+    },
+  });
+
+  assert.equal(result.title, 'Select a candidate');
+  assert.equal(result.message, 'Open Import Review and select the candidate you want before starting a download run.');
+});
+
+test('buildImportExecutionReadinessGuidance prompts download run after candidate selection', () => {
+  const result = buildImportExecutionReadinessGuidance({
+    discoveryRequest: {
+      importReviewSummary: {
+        latestStatus: 'selected',
+        statusCounts: {
+          selected: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result.title, 'Start the download run');
+  assert.equal(result.message, 'A candidate is selected. Open Import Review and click Start download run to send it to Downloader.');
+});
+
+test('buildImportExecutionReadinessGuidance points accepted transfers to Downloader', () => {
+  const result = buildImportExecutionReadinessGuidance({
+    discoveryRequest: {
+      importReviewSummary: {
+        downloadExecutionSummary: {
+          enqueuedTransferCount: 2,
+          itemStatusCounts: {
+            queued: 1,
+          },
+          totalItemCount: 1,
+        },
+        latestStatus: 'downloading',
+        statusCounts: {
+          downloading: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result.title, 'Watch Downloader');
+  assert.equal(result.tone, 'success');
+});
+
+test('buildImportExecutionReadinessGuidance points queue failures to diagnostics', () => {
+  const result = buildImportExecutionReadinessGuidance({
+    discoveryRequest: {
+      importReviewSummary: {
+        downloadExecutionSummary: {
+          enqueuedTransferCount: 0,
+          itemStatusCounts: {
+            queue_failed: 1,
+          },
+          totalItemCount: 1,
+        },
+        latestStatus: 'selected',
+        statusCounts: {
+          selected: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result.title, 'Review the download diagnostic');
+  assert.equal(result.tone, 'danger');
+});
+
+test('buildImportExecutionReadinessGuidance suppresses completed applied candidates', () => {
+  const result = buildImportExecutionReadinessGuidance({
+    discoveryRequest: {
+      importReviewSummary: {
+        latestStatus: 'applied',
+        statusCounts: {
+          applied: 1,
+        },
+        totalCount: 1,
+      },
+    },
+  });
+
+  assert.equal(result, null);
 });

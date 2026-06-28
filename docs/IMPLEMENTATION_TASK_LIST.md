@@ -140,6 +140,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   verifying the selected summary, pending execution run, and persisted
   `execution-start` fixture action. See
   `IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
+- Import execution selected-candidate readiness guidance: Wanted rows now show
+  a separate next-step block for discovery, candidate review, selection,
+  selected-but-not-run, queued, blocked, failed, and completed states. This
+  makes the explicit Import Review `Start download run` boundary visible before
+  Downloader activity is expected. See
+  `IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md`.
 - Wanted-started download transfer handoff browser verification: extended the
   same operator journey through execution transfer sync and direct Downloader
   detail drill-through for the accepted transfer. See

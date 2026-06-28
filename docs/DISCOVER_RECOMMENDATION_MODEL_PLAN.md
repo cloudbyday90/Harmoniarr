@@ -140,6 +140,11 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   run`, verifying the selected-candidate summary, queued pending execution run,
   and persisted execution-start action; see
   [IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md)
+- Wanted rows now add explicit next-step readiness guidance on top of the
+  workflow status, so selected candidates tell operators to start the Import
+  Review download run before expecting Downloader activity, while queued or
+  blocked states point to Downloader or diagnostics respectively; see
+  [IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md](IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md)
 - the Wanted-origin flow now continues through execution transfer sync into a
   live Downloader transfer detail route, proving the accepted transfer is visible
   after reconciliation; see

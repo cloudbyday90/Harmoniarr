@@ -31,6 +31,7 @@ import { buildWantedDiscoveryCandidateLocation } from '../lib/wanted-discovery-c
 import {
   buildDiscoveryDispatchResult,
   buildDownloadRecoveryNotice,
+  buildImportExecutionReadinessGuidance,
   buildImportReviewWorkflowResult,
   buildWantedReleasesCardSubtitle,
   formatLastReconciledAt,
@@ -54,6 +55,7 @@ const wantedReleasesWithNotices = computed(() =>
     candidateLocation: buildWantedDiscoveryCandidateLocation(release),
     dispatchResult: buildDiscoveryDispatchResult(release),
     notice: buildDownloadRecoveryNotice(release),
+    readinessGuidance: buildImportExecutionReadinessGuidance(release),
     release,
     workflowResult: buildImportReviewWorkflowResult(release),
   })),
@@ -267,6 +269,18 @@ onBeforeUnmount(() => {
                       </span>
                       <span class="hx-text-muted">{{ item.workflowResult.message }}</span>
                     </div>
+                    <div
+                      v-if="item.readinessGuidance"
+                      class="wanted-readiness-guidance"
+                      :data-tone="item.readinessGuidance.tone"
+                      role="status"
+                    >
+                      <span class="hx-pill" :data-tone="item.readinessGuidance.tone">
+                        {{ item.readinessGuidance.label }}
+                      </span>
+                      <strong>{{ item.readinessGuidance.title }}</strong>
+                      <span class="hx-text-muted">{{ item.readinessGuidance.message }}</span>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -429,6 +443,24 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--hx-space-1);
   margin-top: var(--hx-space-1);
+}
+
+.wanted-readiness-guidance {
+  display: grid;
+  gap: var(--hx-space-1);
+  margin-top: var(--hx-space-2);
+  padding: var(--hx-space-2);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface-sunken);
+}
+
+.wanted-readiness-guidance .hx-pill {
+  width: max-content;
+}
+
+.wanted-readiness-guidance strong {
+  font-size: var(--hx-text-sm);
 }
 
 .wanted-discovery-details {

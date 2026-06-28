@@ -50,6 +50,11 @@ async function openSelectionReadyWantedCandidates({ baseUrl, page }) {
     'Best score 91 meets the 85 threshold. Select it in Import Review to start download handoff.',
     { exact: true },
   ).waitFor();
+  await selectionRow.getByText('Select a candidate', { exact: true }).waitFor();
+  await selectionRow.getByText(
+    'Open Import Review and select the candidate you want before starting a download run.',
+    { exact: true },
+  ).waitFor();
 
   await selectionRow.getByRole('link', { name: 'Open candidates' }).click();
   await page.waitForFunction(() => {
@@ -162,6 +167,11 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
       await refreshedSelectionRow.getByText('1 candidate selected in Import Review.', {
         exact: true,
       }).waitFor();
+      await refreshedSelectionRow.getByText('Start the download run', { exact: true }).waitFor();
+      await refreshedSelectionRow.getByText(
+        'A candidate is selected. Open Import Review and click Start download run to send it to Downloader.',
+        { exact: true },
+      ).waitFor();
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       await page.goto('about:blank', { waitUntil: 'load' });

@@ -14,6 +14,8 @@ into the Import Review download execution runway:
 5. `Start download run` queues `execution-run-1`.
 6. The execution runway shows the queued pending run and persists the
    `execution-start` fixture action.
+7. Activity > Wanted shows a selected-candidate `Start the download run`
+   guidance block before Downloader activity is expected.
 
 This proves the next visible step after selection: Downloader can remain empty
 until the operator starts the download execution run, and Import Review now shows
@@ -79,5 +81,9 @@ Download execution live transfer acceptance browser verification is complete for
 the Wanted-origin flow; see
 [WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](WANTED_STARTED_DOWNLOAD_TRANSFER_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
 
-The remaining high-value follow-up is provider-backed download acceptance
-diagnostics in the local Docker walkthrough.
+Selected-candidate readiness guidance is complete; see
+[IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md](IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md).
+
+The next high-value follow-up is Import Review selected-run progress refresh
+visibility, so operators can stay on the execution panel and see accepted,
+blocked, failed, or completed transfer evidence without manual navigation.

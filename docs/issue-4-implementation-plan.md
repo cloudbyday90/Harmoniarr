@@ -142,6 +142,10 @@ Confirmed complete:
   including the continuation from a Wanted-origin selected candidate into a
   queued pending download execution run. See
   [IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](IMPORT_REVIEW_SELECTED_DOWNLOAD_EXECUTION_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
+- Import execution selected-candidate readiness guidance, including explicit
+  Wanted-row next steps for candidate selection, selected-but-not-run state,
+  queued transfers, blocked handoffs, and failed diagnostics. See
+  [IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md](IMPORT_EXECUTION_SELECTED_CANDIDATE_READINESS_GUIDANCE_DESIGN.md).
 - Wanted-started download transfer handoff browser verification, including the
   continuation from selected candidate to synced live Downloader transfer detail.
   See
