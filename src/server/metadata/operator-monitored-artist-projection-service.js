@@ -88,6 +88,7 @@ function summarizeCardState({
         latestRun: reconciliation?.latestRun ?? null,
         latestSnapshot: reconciliation?.latestSnapshot ?? null,
         pendingRun: reconciliation?.pendingRun ?? null,
+        recovery: reconciliation?.recovery ?? null,
         runningRun: reconciliation?.runningRun ?? null,
         status: reconciliation?.status ?? 'idle',
       },

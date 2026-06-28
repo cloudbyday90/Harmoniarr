@@ -126,6 +126,13 @@ export function startMetadataArtistRefresh(artistId) {
   });
 }
 
+export function retryOperatorArtistReconciliation(artistId) {
+  return apiRequest(`/api/v1/metadata/artists/${encodeURIComponent(artistId)}/operator/reconciliation`, {
+    method: 'POST',
+    includeCsrf: true,
+  });
+}
+
 export function importMusicBrainzReleaseGroup(releaseGroupId) {
   return apiRequest(`/api/v1/metadata/musicbrainz/release-groups/${encodeURIComponent(releaseGroupId)}/import`, {
     method: 'POST',

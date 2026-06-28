@@ -123,6 +123,7 @@ test('getOperatorArtistProjection overlays explicit selections, track overrides,
           updatedAt: '2026-05-25T13:00:00.000Z',
         },
         pendingRun: { id: 'run-2', status: 'pending' },
+        recovery: null,
         runningRun: null,
         status: 'queued',
       },
@@ -171,6 +172,86 @@ test('getOperatorArtistProjection overlays explicit selections, track overrides,
       releaseGroupId: 'rg-1',
       title: 'Selected Ambient Works 85-92',
     }],
+  });
+});
+
+test('getOperatorArtistProjection self-heals a failed reconciliation by queueing one recovery run', async (t) => {
+  const recoverFailedOperatorArtistReconciliation = t.mock.fn(async () => ({
+    attempted: true,
+    errorMessage: null,
+    run: { id: 'run-recovery', status: 'pending', triggerSource: 'failure_recovery' },
+    status: 'queued',
+  }));
+  const service = createOperatorArtistProjectionService({
+    getMetadataArtist: async () => ({
+      aliases: [],
+      artist: { id: 'artist-1', name: 'Autechre' },
+      detectionEvents: [],
+      detectionEventsPageInfo: { hasMore: false, nextCursor: null },
+      releaseGroups: [],
+      releases: [],
+    }),
+    getOperatorArtistMonitoring: async () => ({ isMonitored: true }),
+    getLatestOperatorArtistReconciliationSnapshot: async () => ({
+      id: 'snapshot-7',
+      snapshotRevision: 7,
+    }),
+    getLatestRunByOperatorArtist: async () => ({
+      id: 'run-failed',
+      status: 'failed',
+      triggerSource: 'save',
+    }),
+    getPendingRunByOperatorArtist: async () => null,
+    getRunningRunByOperatorArtist: async () => null,
+    listLibraryReleaseReconciliationsByMetadataReleaseIds: async () => [],
+    listOperatorReleaseGroupSelections: async () => [],
+    listOperatorTrackOverrides: async () => [],
+    operatorArtistReconciliationRecoveryService: {
+      recoverFailedOperatorArtistReconciliation,
+    },
+  });
+
+  const result = await service.getOperatorArtistProjection({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+  });
+
+  assert.deepEqual(recoverFailedOperatorArtistReconciliation.mock.calls[0].arguments[0], {
+    appUserId: 'user-1',
+    latestRun: {
+      id: 'run-failed',
+      status: 'failed',
+      triggerSource: 'save',
+    },
+    latestSnapshot: {
+      id: 'snapshot-7',
+      snapshotRevision: 7,
+    },
+    metadataArtistId: 'artist-1',
+    pendingRun: null,
+    runningRun: null,
+  });
+  assert.deepEqual(result.operator.reconciliation, {
+    latestRun: {
+      id: 'run-failed',
+      status: 'failed',
+      triggerSource: 'save',
+    },
+    latestSnapshot: {
+      createdAt: null,
+      id: 'snapshot-7',
+      snapshotRevision: 7,
+      updatedAt: null,
+    },
+    pendingRun: { id: 'run-recovery', status: 'pending', triggerSource: 'failure_recovery' },
+    recovery: {
+      attempted: true,
+      errorMessage: null,
+      run: { id: 'run-recovery', status: 'pending', triggerSource: 'failure_recovery' },
+      status: 'queued',
+    },
+    runningRun: null,
+    status: 'queued',
   });
 });
 

@@ -18,6 +18,13 @@
 
 <script setup>
 import { computed } from 'vue';
+import {
+  candidateStatusLabel,
+  candidateStatusTone,
+  formatCandidateCountLabel,
+  formatSourceProvider,
+} from '../lib/import-candidate-presentation.js';
+import { formatOperationTimestamp } from '../lib/operation-run-presentation.js';
 import { formatBytes } from '../lib/search-presentation.js';
 import { fetchImportCandidates } from '../lib/import-candidate-api.js';
 import { useAsyncResource } from '../composables/useAsyncResource.js';

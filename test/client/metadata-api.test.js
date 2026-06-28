@@ -18,6 +18,7 @@ import {
   resolveMusicBrainzArtistLocal,
   resolveMusicBrainzReleaseGroupLocal,
   resolveMusicBrainzReleaseLocal,
+  retryOperatorArtistReconciliation,
   searchLocalMetadataArtists,
   searchLocalMetadataReleaseGroups,
   searchLocalMetadataReleases,
@@ -211,6 +212,17 @@ test('metadata-api startMetadataArtistRefresh sends POST', async (t) => {
 
   assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/metadata/artists/a-1/refresh');
   assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'POST');
+});
+
+test('metadata-api retryOperatorArtistReconciliation sends POST with CSRF', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-meta' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await retryOperatorArtistReconciliation('artist/operator');
+
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/metadata/artists/artist%2Foperator/operator/reconciliation');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].method, 'POST');
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[1].headers.get('X-CSRF-Token'), 'csrf-meta');
 });
 
 test('metadata-api fetchReleaseGroupTracklist sends preferReleaseMbid and preferReleaseId', async (t) => {

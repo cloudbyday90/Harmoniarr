@@ -81,7 +81,10 @@ import {
   pluralizeReleaseType,
 } from '../lib/artist-detail-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
-import { saveOperatorArtistDraft } from '../lib/metadata-api.js';
+import {
+  retryOperatorArtistReconciliation,
+  saveOperatorArtistDraft,
+} from '../lib/metadata-api.js';
 import {
   buildOperatorArtistSaveDraft,
   createOperatorArtistDetailDraft,
@@ -184,7 +187,9 @@ const detailRelease = ref(null);
 const policyDraft = ref(createOperatorArtistDetailDraft());
 const savedDraftFingerprint = ref(fingerprintOperatorArtistDraft(policyDraft.value));
 const isSavingPolicy = ref(false);
+const isRetryingReconciliation = ref(false);
 const policySaveError = ref('');
+const reconciliationActionError = ref('');
 const pendingBulkSelectionOperation = ref(null);
 const bulkSelectionStatusMessage = ref('');
 const sectionControls = ref({});
@@ -217,6 +222,14 @@ const operatorOverview = computed(() => operator.value?.overview ?? {});
 const operatorReconciliation = computed(() => operator.value?.reconciliation ?? {});
 const coveragePercent = computed(() => calculateOperatorArtistCoveragePercent(operatorCoverage.value));
 const bulkSelectionConfirmationOpen = computed(() => pendingBulkSelectionOperation.value !== null);
+const canRetryOperatorReconciliation = computed(() =>
+  canEditOperatorPolicy.value
+  && isArtistMonitored.value
+  && operatorReconciliation.value?.status === 'failed'
+  && !operatorReconciliation.value?.pendingRun
+  && !operatorReconciliation.value?.runningRun
+  && !isRetryingReconciliation.value,
+);
 
 const discographySections = computed(() =>
   groupReleaseGroupsByType(releaseGroups.value).map((section) => ({
@@ -470,6 +483,24 @@ async function savePolicyDraft() {
   }
 }
 
+async function retryReconciliation() {
+  if (!canRetryOperatorReconciliation.value) {
+    return;
+  }
+
+  isRetryingReconciliation.value = true;
+  reconciliationActionError.value = '';
+
+  try {
+    await retryOperatorArtistReconciliation(projection.value.artist.id);
+    await loadArtistDetail(mbid.value);
+  } catch (error) {
+    reconciliationActionError.value = getErrorMessage(error, 'Retrying artist reconciliation failed.');
+  } finally {
+    isRetryingReconciliation.value = false;
+  }
+}
+
 watch(mbid, (nextMbid) => {
   if (nextMbid) {
     void loadArtistDetail(nextMbid);
@@ -565,6 +596,16 @@ watch(projection, () => {
                   <polyline points="21 3 21 9 15 9" />
                 </svg>
               </button>
+              <button
+                v-if="canRetryOperatorReconciliation || isRetryingReconciliation"
+                type="button"
+                class="hx-btn"
+                data-variant="primary"
+                :disabled="isRetryingReconciliation"
+                @click="retryReconciliation"
+              >
+                {{ isRetryingReconciliation ? 'Retrying...' : 'Retry reconciliation' }}
+              </button>
             </div>
           </div>
 
@@ -580,6 +621,9 @@ watch(projection, () => {
 
       <p v-if="artistError" class="artist-detail-soft-error" role="alert">
         {{ formatArtistDetailError(artistError) }}
+      </p>
+      <p v-if="reconciliationActionError" class="artist-detail-soft-error" role="alert">
+        {{ reconciliationActionError }}
       </p>
 
       <article v-if="canEditOperatorPolicy" class="hx-card artist-policy-card" aria-label="Artist policy">

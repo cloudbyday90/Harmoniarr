@@ -168,6 +168,12 @@ As of 2026-06-27, the backend and primary operator client surfaces have moved pa
   state, path mapping evidence, durable Import Review diagnostics, and the
   browser-visible diagnostic panel without exposing provider secrets; see
   [DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md](DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md)
+- failed operator artist reconciliation now has a bounded recovery path:
+  monitored-artist projections queue one `failure_recovery` run when the latest
+  run failed and no active run exists, Artist Detail exposes a protected
+  `Retry reconciliation` action, and `Activity > Imports` no longer blanks due
+  missing formatter imports; see
+  [ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md](ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md)
 
 The remaining work is no longer core implementation. It is a follow-up backlog
 for usability depth and edge-case workflow coverage:
@@ -2706,6 +2712,7 @@ Use this section for incremental updates during implementation.
 - 2026-06-27: Artist Policy Activity trail browser verification implemented. `ARTIST_POLICY_ACTIVITY_TRAIL_BROWSER_VERIFICATION_DESIGN.md` records the official Playwright, Vue, WAI-ARIA, and OWASP source review plus the selected focused-browser stack. Browser coverage now repairs a reviewed track override, saves Artist Policy, verifies the `artist_policy_saved` Activity row, and follows `Open artist policy` back to Artist Detail.
 - 2026-06-28: Docker provider acceptance evidence implemented. `DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md` records the official Docker, Playwright, and OWASP source review plus the selected walkthrough evidence stack. `npm run validate:docker-provider-acceptance` now verifies configured provider state, download path mapping evidence, durable Import Review download acceptance diagnostics, and the browser-visible diagnostic panel without serializing slskd API keys.
 - 2026-06-28: Confidence-gated download execution start implemented. `CONFIDENCE_GATED_DOWNLOAD_EXECUTION_START_DESIGN.md` records the official slskd, OWASP, Playwright, and Vue source review plus the selected operation-run reuse stack. High-confidence auto-selection now starts the existing Import Review download-enqueue run when Library automation is enabled and slskd is healthy.
+- 2026-06-28: Activity Imports and artist reconciliation recovery implemented. `ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md` records the official Playwright, Vue, and OWASP source review plus the selected bounded-recovery stack. Activity Imports now renders through imported shared formatters, failed operator artist reconciliation can queue one `failure_recovery` run from the latest snapshot, and Artist Detail exposes a protected manual retry action.
 
 ## Checklist
 
@@ -2738,4 +2745,5 @@ Use this section for incremental updates during implementation.
 - [x] Artist Policy Activity trail browser verification implemented
 - [x] Docker provider acceptance evidence implemented
 - [x] Confidence-gated download execution start implemented
+- [x] Activity Imports and artist reconciliation recovery implemented
 - [ ] Create linked GitHub follow-up issues for the remaining non-blocking enhancements

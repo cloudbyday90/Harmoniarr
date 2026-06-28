@@ -22,6 +22,9 @@ test('createMetadataModule exposes shared route dependencies from injected servi
   const operatorArtistSaveService = {
     saveOperatorArtist: () => {},
   };
+  const operatorArtistReconciliationService = {
+    queueOperatorArtistReconciliation: async () => {},
+  };
   const metadataReadService = {
     getArtist: () => {},
     getArtistByMusicBrainzId: () => {},
@@ -76,6 +79,7 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     operatorArtistProjectionService,
     operatorMonitoredArtistProjectionService,
     operatorArtistSaveService,
+    operatorArtistReconciliationService,
     metadataReadService,
     metadataRefreshService,
     metadataReleaseMaterializationService,
@@ -132,5 +136,6 @@ test('createMetadataModule exposes shared route dependencies from injected servi
     getSimilarArtists: similarArtistsService.getSimilarArtists,
     getReleaseGroupTracklist: releaseGroupTracklistService.getReleaseGroupTracklist,
     markCanonicalRelease: forceCanonicalRelease,
+    queueOperatorArtistReconciliation: operatorArtistReconciliationService.queueOperatorArtistReconciliation,
   });
 });

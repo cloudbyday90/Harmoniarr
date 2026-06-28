@@ -94,6 +94,9 @@ export function registerMetadataRoutes(app, {
   getSimilarArtists,
   getReleaseGroupTracklist,
   markCanonicalRelease,
+  queueOperatorArtistReconciliation = async () => {
+    throw createApiError(503, 'operator_artist_reconciliation_unavailable', 'Artist reconciliation is temporarily unavailable');
+  },
 }) {
   function registerSessionGetJsonRoute(path, buildResponseBody) {
     app.get(path, metadataRoute(async (request, response) => {
@@ -264,6 +267,24 @@ export function registerMetadataRoutes(app, {
       releaseGroups: result.projection?.releaseGroups ?? [],
       releases: result.projection?.releases ?? [],
       snapshot: result.snapshot,
+    });
+  }));
+
+  app.post('/api/v1/metadata/artists/:artistId/operator/reconciliation', limitMetadataMutation, metadataRoute(async (request, response) => {
+    const session = await requireFreshSessionFn(request);
+    requireCsrfFn(request, session);
+
+    const result = await queueOperatorArtistReconciliation({
+      appUserId: session.appUserId,
+      metadataArtistId: request.params.artistId,
+      requestMetadata: getRequestMetadataFn(request),
+      triggeredByUserId: session.appUserId,
+      triggerSource: 'manual_retry',
+    });
+
+    response.status(202).json({
+      ok: true,
+      reconciliation: result,
     });
   }));
 

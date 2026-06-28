@@ -9,6 +9,11 @@ Database model source: `docs/DATABASE_MODEL.md`
 ## Current Status (2026-05-23)
 
 - Current validation baseline: 1534 server / 3087 client tests pass.
+- Activity Imports and artist reconciliation recovery: fixed the blank
+  `Activity > Imports` view by importing its shared formatter helpers, added a
+  bounded one-shot self-healing path for failed operator artist reconciliation
+  runs, and exposed a CSRF-backed Artist Detail `Retry reconciliation` action.
+  See `ACTIVITY_IMPORTS_AND_RECONCILIATION_RECOVERY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

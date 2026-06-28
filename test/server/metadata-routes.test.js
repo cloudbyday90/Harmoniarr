@@ -81,6 +81,22 @@ function createMetadataRouteTestApp(overrides = {}) {
           sessionUserId: appUserId,
         }],
       }),
+      queueOperatorArtistReconciliation: async ({ appUserId, metadataArtistId, requestMetadata, triggeredByUserId, triggerSource }) => ({
+        accepted: true,
+        coalesced: false,
+        queuedBehindRun: false,
+        replacedPending: false,
+        run: {
+          appUserId,
+          id: `run-${metadataArtistId}`,
+          metadataArtistId,
+          requestMetadata,
+          status: 'pending',
+          triggeredByUserId,
+          triggerSource,
+        },
+        runningRun: null,
+      }),
       saveOperatorArtist: async ({ appUserId, draft, metadataArtistId }) => ({
         artistId: metadataArtistId,
         operator: {
@@ -543,6 +559,71 @@ test('metadata operator artist save route persists the operator draft payload', 
       snapshot: {
         id: 'snapshot-1',
         snapshotRevision: 1,
+      },
+    });
+  });
+});
+
+test('metadata operator artist reconciliation route queues an operator-scoped retry', async (t) => {
+  const queueOperatorArtistReconciliation = t.mock.fn(async (input) => ({
+    accepted: true,
+    coalesced: false,
+    queuedBehindRun: false,
+    replacedPending: false,
+    run: { id: 'run-local-artist-1', status: 'pending' },
+    runningRun: null,
+    input,
+  }));
+  const requireCsrf = t.mock.fn();
+  const requireFreshSession = t.mock.fn(async () => ({ appUserId: 'user-7', csrfToken: 'csrf-token', csrfTokenHash: 'hashed' }));
+  const app = createMetadataRouteTestApp({
+    queueOperatorArtistReconciliation,
+    requireCsrf,
+    requireFreshSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/metadata/artists/local-artist-1/operator/reconciliation`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': 'csrf-token',
+        'x-forwarded-for': '203.0.113.88',
+        'user-agent': 'HarmoniarrRouteTest/1.0',
+      },
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(queueOperatorArtistReconciliation.mock.calls[0].arguments[0], {
+      appUserId: 'user-7',
+      metadataArtistId: 'local-artist-1',
+      requestMetadata: {
+        ipAddress: '203.0.113.88',
+        userAgent: 'HarmoniarrRouteTest/1.0',
+      },
+      triggeredByUserId: 'user-7',
+      triggerSource: 'manual_retry',
+    });
+    assert.deepEqual(payload, {
+      ok: true,
+      reconciliation: {
+        accepted: true,
+        coalesced: false,
+        queuedBehindRun: false,
+        replacedPending: false,
+        run: { id: 'run-local-artist-1', status: 'pending' },
+        runningRun: null,
+        input: {
+          appUserId: 'user-7',
+          metadataArtistId: 'local-artist-1',
+          requestMetadata: {
+            ipAddress: '203.0.113.88',
+            userAgent: 'HarmoniarrRouteTest/1.0',
+          },
+          triggeredByUserId: 'user-7',
+          triggerSource: 'manual_retry',
+        },
       },
     });
   });
