@@ -114,6 +114,10 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
     expectedTrackCount: null,
     expectedDurationSeconds: null,
     formatPreferences: null,
+    musicQueueContext: {
+      profileCode: 'lossless_archive',
+      qualityOverride: null,
+    },
     requestOwnership: {
       metadataArtistId: null,
       metadataReleaseGroupId: null,

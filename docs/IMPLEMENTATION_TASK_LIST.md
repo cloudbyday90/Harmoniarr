@@ -95,6 +95,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   the existing auto-download runner starts the candidate-scoped execution run
   only when quality is accepted. See
   `MUSIC_QUEUE_PHASE_3_AUTO_MATCH_DOWNLOAD_HANDOFF_DESIGN.md`.
+- Music Queue Phase 3 failed-match retry: provider-enqueue and transfer-failure
+  recovery now keeps the failed match terminal, carries bounded Music Queue
+  quality context through candidate ingestion and browse enrichment, skips
+  below-profile retry matches, promotes the next acceptable scoped match, and
+  persists bounded skipped-match evidence in the existing execution snapshot.
+  See `MUSIC_QUEUE_PHASE_3_FAILED_MATCH_RETRY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

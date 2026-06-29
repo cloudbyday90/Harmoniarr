@@ -254,6 +254,10 @@ export function createLibraryDiscoveryDispatchService({
       summary.queryCount += 1;
       try {
         const search = await slskdService.startSearch({ query });
+        const qualityContext = buildAutoSelectionQualityContext({
+          claimedRequest,
+          userPreferences,
+        });
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
           actorUserId,
           albumTitle,
@@ -261,13 +265,10 @@ export function createLibraryDiscoveryDispatchService({
           expectedTrackCount: 1,
           expectedDurationSeconds: null,
           formatPreferences,
+          musicQueueContext: qualityContext,
           requestOwnership,
           requestMetadata,
           searchId: search.id,
-        });
-        const qualityContext = buildAutoSelectionQualityContext({
-          claimedRequest,
-          userPreferences,
         });
         const autoSelectionResult = ingestionResult.candidateCount > 0
           ? await selectHighConfidenceCandidateAfterIngestion({
@@ -439,6 +440,7 @@ export function createLibraryDiscoveryDispatchService({
           expectedTrackCount: tracklistExpectations?.expectedTrackCount ?? null,
           expectedDurationSeconds: tracklistExpectations?.expectedDurationSeconds ?? null,
           formatPreferences,
+          musicQueueContext: qualityContext,
           requestOwnership,
           requestMetadata,
           searchId: search.id,

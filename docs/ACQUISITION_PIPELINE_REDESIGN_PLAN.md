@@ -886,9 +886,10 @@ Acceptance:
 
 ### Phase 3 - Automation, Match Attempts, And Fallback
 
-Status: **In progress.** The first automatic match/download handoff slice is
-implemented; see
-`MUSIC_QUEUE_PHASE_3_AUTO_MATCH_DOWNLOAD_HANDOFF_DESIGN.md`.
+Status: **In progress.** The automatic match/download handoff and failed-match
+retry slices are implemented; see
+`MUSIC_QUEUE_PHASE_3_AUTO_MATCH_DOWNLOAD_HANDOFF_DESIGN.md` and
+`MUSIC_QUEUE_PHASE_3_FAILED_MATCH_RETRY_DESIGN.md`.
 
 Goal: make the system proceed automatically through search, match choice,
 download, failed-match blocking, next-match fallback, transfer reconciliation,
@@ -905,12 +906,15 @@ and rediscovery.
 - [x] Auto-download high-confidence releases using the candidate-scoped path.
 - [x] Auto-download only matches that satisfy quality policy.
 - [ ] Block auto-download before provider enqueue when folder setup is missing.
-- [ ] Exclude matches blocked by failed download, timeout, disappeared source,
-  failed quality verification, import blocker, or operator rejection.
-- [ ] On failed execution or failed quality verification, block that match and
-  attempt the next acceptable match automatically.
-- [ ] Persist bounded trigger evidence for match selected, match failed, match
-  blocked, trying next, exhausted, and rediscovery queued.
+- [x] Exclude matches blocked by failed download or operator rejection from
+  automatic recovery.
+- [x] On failed download execution, keep the failed match terminal and attempt
+  the next acceptable match automatically.
+- [x] Persist bounded trigger evidence for match selected, match failed,
+  skipped-by-quality, trying next, exhausted, and rediscovery queued in existing
+  discovery/execution evidence.
+- [ ] Extend the same failed-match retry behavior to timeout, disappeared
+  source, failed quality verification, and import blocker outcomes.
 - [ ] Add automatic retry/rediscovery when no acceptable matches remain and
   retry policy allows another search.
 - [ ] Keep active-run conflicts clear and non-noisy.

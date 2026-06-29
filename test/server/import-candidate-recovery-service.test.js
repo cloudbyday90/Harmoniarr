@@ -74,6 +74,93 @@ test('import candidate recovery promotes the next scoped candidate and records a
   });
 });
 
+test('import candidate recovery skips below-profile matches before promoting next acceptable match', async (t) => {
+  const candidates = new Map([
+    ['candidate-mp3', {
+      id: 'candidate-mp3',
+      normalizedPayload: {
+        bitrateKbps: 320,
+        extensions: ['mp3'],
+      },
+    }],
+    ['candidate-flac', {
+      id: 'candidate-flac',
+      normalizedPayload: {
+        extensions: ['flac'],
+      },
+    }],
+  ]);
+  const findNextCandidateForRecoveryFn = t.mock.fn(async ({ excludeCandidateIds = [] }) => {
+    const excluded = new Set(excludeCandidateIds);
+    if (!excluded.has('candidate-mp3')) return candidates.get('candidate-mp3');
+    if (!excluded.has('candidate-flac')) return candidates.get('candidate-flac');
+    return null;
+  });
+  const promoteImportCandidateForRecoveryFn = t.mock.fn(async ({ importCandidateId }) => ({
+    id: importCandidateId,
+  }));
+  const service = createImportCandidateRecoveryService({
+    findNextCandidateForRecoveryFn,
+    getImportCandidate: async () => ({
+      id: 'failed-candidate',
+      normalizedPayload: {
+        musicQueue: {
+          profileCode: 'lossless_archive',
+        },
+        requestOwnership: {
+          metadataReleaseId: 'release-1',
+        },
+      },
+      sourceSearchId: 'search-1',
+    }),
+    incrementImportCandidateDownloadAttemptCountFn: async () => ({
+      id: 'failed-candidate',
+      downloadAttemptCount: 1,
+      normalizedPayload: {
+        musicQueue: {
+          profileCode: 'lossless_archive',
+        },
+        requestOwnership: {
+          metadataReleaseId: 'release-1',
+        },
+      },
+      sourceSearchId: 'search-1',
+    }),
+    promoteImportCandidateForRecoveryFn,
+    qualityPolicyService: {
+      evaluateQualityEvidence: ({ candidate }) => candidate.normalizedPayload.extensions.includes('flac')
+        ? { autoDownloadEligible: true, code: 'accepted', formats: ['flac'] }
+        : { autoDownloadEligible: false, code: 'below_minimum', formats: ['mp3'] },
+    },
+  });
+
+  const result = await service.handleImportCandidateDownloadFailure({
+    failedCandidateId: 'failed-candidate',
+    failureReason: 'Download enqueue failed.',
+  });
+
+  assert.equal(findNextCandidateForRecoveryFn.mock.callCount(), 2);
+  assert.deepEqual(findNextCandidateForRecoveryFn.mock.calls[1].arguments[0].excludeCandidateIds, [
+    'failed-candidate',
+    'candidate-mp3',
+  ]);
+  assert.deepEqual(promoteImportCandidateForRecoveryFn.mock.calls[0].arguments[0], {
+    importCandidateId: 'candidate-flac',
+    maxDownloadAttemptCount: 3,
+    reason: 'Download enqueue failed.',
+    triggeredByFailedCandidateId: 'failed-candidate',
+  });
+  assert.equal(result.recovered, true);
+  assert.equal(result.nextCandidateId, 'candidate-flac');
+  assert.equal(result.skippedCandidateCount, 1);
+  assert.deepEqual(result.skippedCandidates, [{
+    candidateId: 'candidate-mp3',
+    formats: ['mp3'],
+    qualityCode: 'below_minimum',
+    reason: 'quality_below_minimum',
+  }]);
+});
+
 test('import candidate recovery reports exhaustion when no scoped candidate remains', async (t) => {
   const createRecoveryExecutionRun = t.mock.fn(async () => ({
     id: 'unexpected-run',

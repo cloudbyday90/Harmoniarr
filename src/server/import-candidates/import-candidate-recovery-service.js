@@ -29,6 +29,49 @@ function normalizeOptionalString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function normalizeMusicQueueContext(candidate, {
+  profileCode = null,
+  qualityOverride = null,
+} = {}) {
+  const candidateContext = candidate?.normalizedPayload?.musicQueue ?? {};
+  const resolvedProfileCode = normalizeOptionalString(profileCode)
+    ?? normalizeOptionalString(candidateContext.profileCode)
+    ?? null;
+  const resolvedQualityOverride = qualityOverride
+    ?? (candidateContext.qualityOverride && typeof candidateContext.qualityOverride === 'object'
+      ? candidateContext.qualityOverride
+      : null);
+
+  return {
+    profileCode: resolvedProfileCode,
+    qualityOverride: resolvedQualityOverride,
+  };
+}
+
+function resolveQualitySkippedReason(quality) {
+  if (!quality) {
+    return null;
+  }
+
+  if (quality.autoDownloadEligible === true || quality.code === 'accepted') {
+    return null;
+  }
+
+  if (quality.code === 'below_minimum') return 'quality_below_minimum';
+  if (quality.code === 'needs_verification') return 'quality_needs_verification';
+  if (quality.code === 'no_evidence') return 'quality_no_evidence';
+  return 'quality_not_eligible';
+}
+
+function buildSkippedRecoveryCandidate(candidate, { quality, reason }) {
+  return {
+    candidateId: candidate?.id ?? null,
+    formats: Array.isArray(quality?.formats) ? quality.formats.slice(0, 8) : [],
+    qualityCode: quality?.code ?? null,
+    reason,
+  };
+}
+
 function resolveMetadataReleaseId(candidate) {
   return normalizeOptionalString(candidate?.metadataReleaseId)
     ?? normalizeOptionalString(candidate?.normalizedPayload?.requestOwnership?.metadataReleaseId);
@@ -41,6 +84,7 @@ function buildRecoveryResult({
   recoveryRun = null,
   recovered,
   rediscovery = null,
+  skippedCandidates = [],
 }) {
   const result = {
     attemptedCandidateId: attemptedCandidate?.id ?? null,
@@ -53,6 +97,11 @@ function buildRecoveryResult({
     recoveryRunId: recoveryRun?.id ?? null,
     sourceSearchId: failedCandidate?.sourceSearchId ?? null,
   };
+
+  if (skippedCandidates.length > 0) {
+    result.skippedCandidateCount = skippedCandidates.length;
+    result.skippedCandidates = skippedCandidates.slice(0, 5);
+  }
 
   if (rediscovery) {
     result.rediscovery = rediscovery;
@@ -70,6 +119,7 @@ export function createImportCandidateRecoveryService({
   markImportCandidateDownloadFailed = async () => null,
   maxCandidateDownloadAttempts = MAX_CANDIDATE_DOWNLOAD_ATTEMPTS,
   promoteImportCandidateForRecoveryFn = promoteImportCandidateForRecovery,
+  qualityPolicyService = null,
   retryImportCandidateDownload = async () => null,
   retryRejectedTransferDelayMs = RETRY_REJECTED_TRANSFER_DELAY_MS,
   scheduleDownloadRecoveryRediscovery = null,
@@ -113,10 +163,16 @@ export function createImportCandidateRecoveryService({
     failureReason = null,
     failedCandidateId,
     operationRunId = null,
+    profileCode = null,
+    qualityOverride = null,
     scheduleFollowUpRun = false,
   } = {}) {
     const sourceSearchId = normalizeOptionalString(failedCandidate.sourceSearchId);
     const metadataReleaseId = resolveMetadataReleaseId(failedCandidate);
+    const musicQueueContext = normalizeMusicQueueContext(failedCandidate, {
+      profileCode,
+      qualityOverride,
+    });
 
     if (!sourceSearchId && !metadataReleaseId) {
       return buildRecoveryResult({
@@ -126,12 +182,42 @@ export function createImportCandidateRecoveryService({
       });
     }
 
-    const nextCandidate = await findNextCandidateForRecoveryFn({
-      excludeCandidateId: failedCandidateId,
-      maxDownloadAttemptCount: maxCandidateDownloadAttempts,
-      metadataReleaseId,
-      sourceSearchId,
-    });
+    const excludedCandidateIds = [failedCandidateId];
+    const skippedCandidates = [];
+    let nextCandidate = null;
+
+    for (let attemptIndex = 0; attemptIndex < 25; attemptIndex += 1) {
+      const candidate = await findNextCandidateForRecoveryFn({
+        excludeCandidateId: failedCandidateId,
+        ...(excludedCandidateIds.length > 1 ? { excludeCandidateIds: excludedCandidateIds } : {}),
+        maxDownloadAttemptCount: maxCandidateDownloadAttempts,
+        metadataReleaseId,
+        sourceSearchId,
+      });
+
+      if (!candidate) {
+        break;
+      }
+
+      const quality = typeof qualityPolicyService?.evaluateQualityEvidence === 'function'
+        ? qualityPolicyService.evaluateQualityEvidence({
+          candidate,
+          profileCode: musicQueueContext.profileCode ?? undefined,
+          qualityOverride: musicQueueContext.qualityOverride,
+        })
+        : null;
+      const qualitySkippedReason = resolveQualitySkippedReason(quality);
+      if (!qualitySkippedReason) {
+        nextCandidate = candidate;
+        break;
+      }
+
+      skippedCandidates.push(buildSkippedRecoveryCandidate(candidate, {
+        quality,
+        reason: qualitySkippedReason,
+      }));
+      excludedCandidateIds.push(candidate.id);
+    }
 
     if (!nextCandidate) {
       const rediscovery = typeof scheduleDownloadRecoveryRediscovery === 'function'
@@ -150,14 +236,18 @@ export function createImportCandidateRecoveryService({
           reason: 'rediscovery_scheduled',
           recovered: false,
           rediscovery,
+          skippedCandidates,
         });
       }
 
       return buildRecoveryResult({
         failedCandidate,
-        reason: 'no_recovery_candidate_available',
+        reason: skippedCandidates.length > 0
+          ? 'no_quality_eligible_recovery_candidate_available'
+          : 'no_recovery_candidate_available',
         recovered: false,
         rediscovery,
+        skippedCandidates,
       });
     }
 
@@ -174,6 +264,7 @@ export function createImportCandidateRecoveryService({
         failedCandidate,
         reason: 'recovery_candidate_no_longer_selectable',
         recovered: false,
+        skippedCandidates,
       });
     }
 
@@ -190,6 +281,7 @@ export function createImportCandidateRecoveryService({
       reason: 'candidate_promoted',
       recoveryRun,
       recovered: true,
+      skippedCandidates,
     });
   }
 
@@ -197,6 +289,8 @@ export function createImportCandidateRecoveryService({
     failedCandidateId,
     failureReason = null,
     operationRunId = null,
+    profileCode = null,
+    qualityOverride = null,
     scheduleFollowUpRun = false,
   } = {}) {
     const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
@@ -217,6 +311,8 @@ export function createImportCandidateRecoveryService({
       failedCandidateId,
       failureReason,
       operationRunId,
+      profileCode,
+      qualityOverride,
       scheduleFollowUpRun,
     });
   }
@@ -225,6 +321,8 @@ export function createImportCandidateRecoveryService({
     failedCandidateId,
     failureReason = null,
     operationRunId = null,
+    profileCode = null,
+    qualityOverride = null,
     scheduleFollowUpRun = true,
   } = {}) {
     const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
@@ -278,6 +376,8 @@ export function createImportCandidateRecoveryService({
       failedCandidateId,
       failureReason,
       operationRunId,
+      profileCode,
+      qualityOverride,
       scheduleFollowUpRun,
     });
   }

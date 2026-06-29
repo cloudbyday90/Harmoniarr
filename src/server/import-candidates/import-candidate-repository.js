@@ -234,17 +234,22 @@ export async function incrementImportCandidateDownloadAttemptCount({
 }
 
 export async function findNextCandidateForRecovery({
+  excludeCandidateIds = null,
   excludeCandidateId,
   maxDownloadAttemptCount,
   metadataReleaseId = null,
   sourceSearchId = null,
 }, queryable) {
   const db = resolveQueryable(queryable);
+  const excludedIds = Array.isArray(excludeCandidateIds)
+    ? excludeCandidateIds.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim())
+    : [];
+  const hasExcludedIdArray = excludedIds.length > 0;
   const result = await db.query(
     `
       SELECT *
       FROM import_candidates
-      WHERE id <> $1
+      WHERE ${hasExcludedIdArray ? 'id <> ALL($5::text[])' : 'id <> $1'}
         AND status IN ('pending', 'held')
         AND download_attempt_count < $4
         AND (
@@ -267,6 +272,7 @@ export async function findNextCandidateForRecovery({
       sourceSearchId,
       metadataReleaseId,
       maxDownloadAttemptCount,
+      ...(hasExcludedIdArray ? [excludedIds] : []),
     ],
   );
 

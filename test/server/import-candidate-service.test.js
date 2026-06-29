@@ -149,6 +149,35 @@ test('normalizeSlskdResponsesToImportCandidates includes formatMatchScore when f
   assert.equal(candidates[0].normalizedPayload.formatMatchLabel, 'Format match');
 });
 
+test('normalizeSlskdResponsesToImportCandidates carries bounded Music Queue quality context', () => {
+  const qualityOverride = {
+    mode: 'allow_fallback_quality',
+    wantedReleaseId: 'wanted-1',
+  };
+  const candidates = normalizeSlskdResponsesToImportCandidates({
+    discoveredAt: new Date('2026-04-30T14:00:00.000Z'),
+    musicQueueContext: {
+      profileCode: 'lossless_archive',
+      qualityOverride,
+    },
+    searchId: 'search-1',
+    responses: [{
+      username: 'source-user',
+      files: [{
+        filename: 'Artist\\Album\\01 Track.flac',
+        size: 100,
+      }],
+    }],
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.deepEqual(candidates[0].normalizedPayload.musicQueue, {
+    profileCode: 'lossless_archive',
+    qualityOverride,
+  });
+  assert.equal(candidates[0].rawPayload.musicQueue, undefined);
+});
+
 test('normalizeSlskdResponsesToImportCandidates omits formatMatchScore when formatPreferences is null', () => {
   const candidates = normalizeSlskdResponsesToImportCandidates({
     formatPreferences: null,

@@ -126,6 +126,28 @@ function toNonNegativeInteger(value) {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
+function normalizeMusicQueueContext(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const profileCode = typeof value.profileCode === 'string' && value.profileCode.trim()
+    ? value.profileCode.trim()
+    : null;
+  const qualityOverride = value.qualityOverride && typeof value.qualityOverride === 'object'
+    ? value.qualityOverride
+    : null;
+
+  if (!profileCode && !qualityOverride) {
+    return null;
+  }
+
+  return {
+    profileCode,
+    qualityOverride,
+  };
+}
+
 function normalizeExtension(filename, extension) {
   if (typeof extension === 'string' && extension.trim()) {
     return extension.trim().replace(/^\./, '').toLowerCase();
@@ -240,12 +262,14 @@ export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
   formatPreferences = null,
   discoveredAt = new Date(),
   ignoredUsernames = null,
+  musicQueueContext = null,
   requestOwnership = null,
   responses = [],
   searchId,
 }) {
   const groups = new Map();
   let sourceFileIndex = 0;
+  const normalizedMusicQueueContext = normalizeMusicQueueContext(musicQueueContext);
 
   const { responses: filteredResponses, summary: filterSummary } = filterSlskdResponsesForCandidates({
     responses,
@@ -355,6 +379,9 @@ export function normalizeSlskdResponsesToImportCandidatesWithDiagnostics({
         lockedFileCount,
         totalSizeBytes,
         extensions,
+        ...(normalizedMusicQueueContext ? {
+          musicQueue: normalizedMusicQueueContext,
+        } : {}),
         ...(formatScore ? {
           formatMatchLabel: formatScore.label,
           formatMatchScore: formatScore.score,
@@ -379,6 +406,7 @@ export function normalizeSlskdResponsesToImportCandidates({
   formatPreferences = null,
   discoveredAt = new Date(),
   ignoredUsernames = null,
+  musicQueueContext = null,
   requestOwnership = null,
   responses = [],
   searchId,
@@ -388,6 +416,7 @@ export function normalizeSlskdResponsesToImportCandidates({
     formatPreferences,
     discoveredAt,
     ignoredUsernames,
+    musicQueueContext,
     requestOwnership,
     responses,
     searchId,
@@ -858,6 +887,7 @@ export function createImportCandidateService({
     expectedDurationSeconds = null,
     formatPreferences = null,
     ignoredUsernames = null,
+    musicQueueContext = null,
     requestOwnership = null,
     requestMetadata = null,
     searchId,
@@ -880,6 +910,7 @@ export function createImportCandidateService({
       blacklistedTitleTerms,
       formatPreferences,
       ignoredUsernames: effectiveIgnoredUsernames,
+      musicQueueContext,
       requestOwnership,
       responses: searchResponses.responses,
       searchId: searchResponses.searchId,
@@ -907,6 +938,7 @@ export function createImportCandidateService({
           expectedTrackCount,
           trustedUsernames: deriveTrustedUsernames(reputationIndex),
           formatPreferences,
+          musicQueueContext,
           requestOwnership,
           searchId: searchResponses.searchId,
         });

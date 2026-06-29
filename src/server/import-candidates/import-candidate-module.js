@@ -163,6 +163,7 @@ export function createImportCandidateModule({
     createRecoveryExecutionRun: importCandidateExecutionRunStore.createOperationRun,
     getImportCandidate: importCandidateService.getImportCandidate,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
+    qualityPolicyService: createAcquisitionQualityPolicyService(),
     retryImportCandidateDownload: importCandidateService.retryImportCandidateDownload,
     scheduleDownloadRecoveryRediscovery,
   }),
