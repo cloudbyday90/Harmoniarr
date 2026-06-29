@@ -34,6 +34,28 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             import_candidate_latest_status: 'selected',
             import_candidate_latest_updated_at: '2026-06-27T21:10:00.000Z',
             import_candidate_best_composite_score: 91,
+            import_candidate_matches: [{
+              discoveredAt: '2026-06-27T21:09:00.000Z',
+              fileCount: 10,
+              formatMatchLabel: 'Format match',
+              formatMatchScore: 30,
+              formats: ['flac'],
+              hasFreeUploadSlot: true,
+              lockedFileCount: 0,
+              matchId: 'candidate-1',
+              queueLength: 0,
+              score: 91,
+              scoreBreakdown: { title: 40 },
+              sourceProvider: 'slskd',
+              status: 'pending',
+              totalSizeBytes: 123456789,
+              trackMatchSummary: {
+                expectedTrackCount: 10,
+                matchedTrackCount: 10,
+              },
+              updatedAt: '2026-06-27T21:10:00.000Z',
+              uploadSpeed: 1000000,
+            }],
             import_candidate_scored_count: 3,
             import_candidate_second_best_composite_score: 84,
             import_candidate_status_counts: {
@@ -80,6 +102,8 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   assert.match(observedSql, /ic\.source_search_id = NULLIF\(ldr\.evidence->>'lastSearchId', ''\)/);
   assert.match(observedSql, /jsonb_typeof\(ic\.normalized_payload->'compositeScore'\)/);
   assert.match(observedSql, /second_best_composite_score/);
+  assert.match(observedSql, /import_match_drilldown\.matches AS import_candidate_matches/);
+  assert.match(observedSql, /LIMIT 5/);
   assert.match(observedSql, /FROM import_execution_run_items iei/);
   assert.match(observedSql, /jsonb_array_length\(latest_item\.planning_snapshot #> '\{execution,enqueuedTransfers\}'\)/);
   assert.match(observedSql, /lwr\.app_user_id = \$1/);
@@ -98,6 +122,28 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
     importReviewSummary: {
       latestStatus: 'selected',
       latestUpdatedAt: '2026-06-27T21:10:00.000Z',
+      matches: [{
+        discoveredAt: '2026-06-27T21:09:00.000Z',
+        fileCount: 10,
+        formatMatchLabel: 'Format match',
+        formatMatchScore: 30,
+        formats: ['flac'],
+        hasFreeUploadSlot: true,
+        lockedFileCount: 0,
+        matchId: 'candidate-1',
+        queueLength: 0,
+        score: 91,
+        scoreBreakdown: { title: 40 },
+        sourceProvider: 'slskd',
+        status: 'pending',
+        totalSizeBytes: 123456789,
+        trackMatchSummary: {
+          expectedTrackCount: 10,
+          matchedTrackCount: 10,
+        },
+        updatedAt: '2026-06-27T21:10:00.000Z',
+        uploadSpeed: 1000000,
+      }],
       selectionReadiness: {
         bestCompositeScore: 91,
         candidateCount: 3,

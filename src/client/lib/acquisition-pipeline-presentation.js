@@ -18,6 +18,7 @@
 
 import { formatOperationTimestampShort } from './operation-run-presentation.js';
 import { formatQualityDecisionLabel, formatQualityProfileLabel } from './acquisition-quality-presentation.js';
+import { formatBytes } from './import-candidate-presentation.js';
 
 const DEFAULT_STATUS = Object.freeze({
   code: 'queued_for_search',
@@ -75,6 +76,7 @@ function buildMatchSummary(release) {
     blockedCount: getCount(match.statusCounts?.failed) + getCount(match.statusCounts?.rejected),
     completedTransferCount: getCount(executionCounts.completed) + getCount(executionCounts.complete),
     label: totalCount === 1 ? '1 match found' : `${totalCount} matches found`,
+    matches: Array.isArray(match.matches) ? match.matches : [],
     message: readiness?.message ?? (totalCount > 0 ? 'Harmoniarr is evaluating the available matches.' : 'No matches have been found yet.'),
     pendingCount: match.pendingCount == null ? derivedPendingCount : getCount(match.pendingCount),
     readiness,
@@ -96,6 +98,155 @@ function buildQualitySummary(release) {
     tone: quality.tone ?? 'warning',
     verifiedLabel: quality.verifiedLossless ? 'Verified lossless' : 'Needs verification',
   };
+}
+
+function formatMatchStatusLabel(status) {
+  switch (status) {
+    case 'applied':
+      return 'In library';
+    case 'downloading':
+      return 'Downloading';
+    case 'failed':
+      return 'Blocked';
+    case 'held':
+      return 'Needs review';
+    case 'import_pending':
+      return 'Ready to add';
+    case 'rejected':
+      return 'Rejected';
+    case 'selected':
+      return 'Selected';
+    default:
+      return 'Available';
+  }
+}
+
+function formatMatchStatusTone(status) {
+  if (status === 'applied') return 'success';
+  if (status === 'failed' || status === 'rejected') return 'danger';
+  if (status === 'downloading' || status === 'import_pending' || status === 'selected') return 'info';
+  if (status === 'held') return 'warning';
+  return 'neutral';
+}
+
+function formatScore(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? String(Number(parsed.toFixed(2))) : 'Not scored';
+}
+
+function formatSpeed(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 'Speed unknown';
+
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  let speed = parsed;
+  let unitIndex = 0;
+  while (speed >= 1024 && unitIndex < units.length - 1) {
+    speed /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${speed.toFixed(speed >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function normalizeFormats(value) {
+  return Array.isArray(value)
+    ? [...new Set(value.map(normalizeToken).filter(Boolean))]
+    : [];
+}
+
+function formatFormatsLabel(formats) {
+  return formats.length > 0 ? formats.join(', ').toUpperCase() : 'No format evidence';
+}
+
+function buildMatchQualityFit(match, qualityProfile) {
+  const formats = normalizeFormats(match?.formats);
+  const preferredFormats = normalizeFormats(qualityProfile?.preferredFormats);
+  const minimumFormats = normalizeFormats(qualityProfile?.minimumFormats);
+  const preferredMet = formats.some((format) => preferredFormats.includes(format));
+  const minimumMet = formats.some((format) => minimumFormats.includes(format));
+
+  if (formats.length === 0) {
+    return { label: 'No format evidence', tone: 'warning' };
+  }
+
+  if (preferredMet) {
+    return { label: 'Preferred quality', tone: 'success' };
+  }
+
+  if (minimumMet) {
+    return { label: 'Meets minimum', tone: 'info' };
+  }
+
+  return { label: 'Below profile', tone: 'danger' };
+}
+
+function buildTrackCoverageLabel(trackMatchSummary, fileCount) {
+  const matched = getCount(trackMatchSummary?.matchedTrackCount);
+  const expected = getCount(trackMatchSummary?.expectedTrackCount);
+  if (expected > 0) {
+    return `${matched} of ${expected} tracks matched`;
+  }
+
+  const files = getCount(fileCount);
+  return `${files} file${files === 1 ? '' : 's'}`;
+}
+
+function buildMatchReason({ index, match, qualityFit, readiness }) {
+  if (match?.status === 'selected') return 'Harmoniarr selected this match for download handoff.';
+  if (match?.status === 'downloading') return 'This match is currently downloading.';
+  if (match?.status === 'import_pending') return 'This match downloaded and is waiting to be added to the library.';
+  if (match?.status === 'applied') return 'This match has already been added to the library.';
+  if (match?.status === 'failed') return 'This match failed and should not be retried before another option is considered.';
+  if (match?.status === 'rejected') return 'This match was rejected and will stay out of automatic selection.';
+  if (qualityFit.label === 'Below profile') return 'This match does not meet the selected quality profile.';
+  if (index === 0 && readiness?.code === 'auto_selectable') return 'This is the highest-ranked match and meets automatic selection thresholds.';
+  if (index === 0 && readiness?.code === 'ambiguous') return 'This is one of several close matches, so Harmoniarr needs a choice.';
+  if (index === 0 && readiness?.code === 'low_confidence') return 'This is the best match found, but its score is below the automatic threshold.';
+  if (match?.score == null) return 'This match needs review because no score is available yet.';
+  return 'This match is available as another option for the release.';
+}
+
+function buildMatchHealthLabel(match) {
+  if (match?.hasFreeUploadSlot) {
+    return `Free slot - ${formatSpeed(match.uploadSpeed)}`;
+  }
+
+  if (match?.queueLength != null) {
+    return `Queue ${match.queueLength} - ${formatSpeed(match.uploadSpeed)}`;
+  }
+
+  return formatSpeed(match?.uploadSpeed);
+}
+
+function buildMatchCards(release) {
+  const matches = Array.isArray(release?.matchSummary?.matches) ? release.matchSummary.matches : [];
+  const readiness = release?.matchSummary?.readiness ?? null;
+  const qualityProfile = release?.qualityProfile ?? {};
+
+  return matches.map((match, index) => {
+    const qualityFit = buildMatchQualityFit(match, qualityProfile);
+    const formats = normalizeFormats(match.formats);
+    const fileCount = getCount(match.fileCount);
+    const lockedFileCount = getCount(match.lockedFileCount);
+
+    return {
+      fileLabel: `${fileCount} file${fileCount === 1 ? '' : 's'}${lockedFileCount > 0 ? `, ${lockedFileCount} locked` : ''}`,
+      formatLabel: formatFormatsLabel(formats),
+      healthLabel: buildMatchHealthLabel(match),
+      id: match.matchId ?? `match-${index + 1}`,
+      isBest: index === 0,
+      label: `Match ${index + 1}`,
+      qualityFitLabel: qualityFit.label,
+      qualityFitTone: qualityFit.tone,
+      reason: buildMatchReason({ index, match, qualityFit, readiness }),
+      scoreLabel: formatScore(match.score),
+      sizeLabel: formatBytes(Number(match.totalSizeBytes)),
+      statusLabel: formatMatchStatusLabel(match.status),
+      statusTone: formatMatchStatusTone(match.status),
+      trackCoverageLabel: buildTrackCoverageLabel(match.trackMatchSummary, match.fileCount),
+    };
+  });
 }
 
 export function buildMusicQueueAction(status) {
@@ -166,6 +317,7 @@ export function normalizeMusicQueueRelease(release) {
       qualitySummary.profileLabel,
     ],
     qualityDecisionLabel: formatQualityDecisionLabel(quality.code),
+    qualityProfile,
     qualityProfileLabel: formatQualityProfileLabel(qualityProfile.code),
     qualitySummary,
     releaseGroupType: release?.releaseGroupType ?? null,
@@ -293,6 +445,7 @@ export function buildMusicQueueMatchReview(release) {
   return {
     action: release.action,
     heading: `${release.releaseTitle} by ${release.artistName}`,
+    matchCards: buildMatchCards(release),
     matchRows: [
       { label: 'Matches found', value: String(matchSummary.totalCount ?? 0) },
       { label: 'Ready to review', value: String(matchSummary.pendingCount ?? 0) },

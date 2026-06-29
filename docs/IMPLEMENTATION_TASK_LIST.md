@@ -55,6 +55,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   match/quality review. Activity and Import Review copy now frame raw
   candidate tools as diagnostics instead of the primary download workflow. See
   `MUSIC_QUEUE_PHASE_2_UX_DESIGN.md`.
+- Music Queue Phase 2 match drilldown: Music Queue now projects bounded
+  release-scoped match summaries from existing Import Review evidence and shows
+  simplified per-match cards with score, status, quality fit, track coverage,
+  file count, size, and source-health hints. Raw provider payloads, source
+  usernames, and folder paths stay in advanced diagnostics. See
+  `MUSIC_QUEUE_PHASE_2_MATCH_DRILLDOWN_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

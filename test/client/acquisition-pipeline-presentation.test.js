@@ -122,6 +122,28 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
     evidence: {
       match: {
         bestCompositeScore: 82,
+        matches: [{
+          fileCount: 12,
+          formats: ['flac'],
+          hasFreeUploadSlot: true,
+          lockedFileCount: 0,
+          matchId: 'candidate-1',
+          queueLength: 0,
+          score: 82,
+          status: 'pending',
+          totalSizeBytes: 123456789,
+          trackMatchSummary: {
+            expectedTrackCount: 12,
+            matchedTrackCount: 11,
+          },
+          uploadSpeed: 1048576,
+        }, {
+          fileCount: 12,
+          formats: ['mp3'],
+          matchId: 'candidate-2',
+          score: 80,
+          status: 'failed',
+        }],
         readiness: { message: 'The best match is below the high-confidence threshold.', scoreGap: 3 },
         statusCounts: { failed: 1, pending: 2 },
         totalCount: 3,
@@ -131,7 +153,11 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
       code: 'needs_verification',
       explanation: 'Lossless preference needs verified media evidence.',
       formats: ['flac'],
-      profile: { code: 'lossless_archive' },
+      profile: {
+        code: 'lossless_archive',
+        minimumFormats: ['flac', 'alac', 'wav'],
+        preferredFormats: ['flac'],
+      },
       verifiedLossless: false,
     },
     releaseTitle: 'Child of God',
@@ -148,6 +174,12 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
 
   assert.equal(review.heading, 'Child of God by Forest Frank');
   assert.equal(review.reason, 'The best match is below the high-confidence threshold.');
+  assert.equal(review.matchCards.length, 2);
+  assert.equal(review.matchCards[0].qualityFitLabel, 'Preferred quality');
+  assert.equal(review.matchCards[0].trackCoverageLabel, '11 of 12 tracks matched');
+  assert.equal(review.matchCards[0].healthLabel, 'Free slot - 1.0 MB/s');
+  assert.equal(review.matchCards[1].statusLabel, 'Blocked');
+  assert.equal(review.matchCards[1].qualityFitLabel, 'Below profile');
   assert.deepEqual(review.matchRows.slice(0, 2), [
     { label: 'Matches found', value: '3' },
     { label: 'Ready to review', value: '2' },

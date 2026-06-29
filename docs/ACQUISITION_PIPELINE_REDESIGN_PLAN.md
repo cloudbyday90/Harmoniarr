@@ -820,8 +820,9 @@ Acceptance:
 
 ### Phase 2 - New User-Facing Design And Core Logic
 
-Status: **In progress.** First UX/read-model slice complete; see
-`MUSIC_QUEUE_PHASE_2_UX_DESIGN.md`.
+Status: **In progress.** UX/read-model and match-drilldown slices complete; see
+`MUSIC_QUEUE_PHASE_2_UX_DESIGN.md` and
+`MUSIC_QUEUE_PHASE_2_MATCH_DRILLDOWN_DESIGN.md`.
 
 Goal: flesh out the Music Queue experience and the user-facing logic. This phase
 makes the new surface understandable and useful before enabling deeper
@@ -840,16 +841,18 @@ automation changes.
   last-activity filters remain follow-up work once release-scoped match events
   are present.
 - [x] Add the match review drawer/panel behind `Review matches`.
-- [ ] Reuse existing candidate detail/preview data as simplified match evidence.
+- [x] Reuse existing candidate detail/preview data as simplified match evidence.
 - [ ] Replace candidate-level actions with `Use this match`, `Reject match`,
   `Review quality choice`, and `Try again`.
 - [x] Show why automation did or did not choose a match at aggregate release
-  level. Per-match explanation remains follow-up work.
+  level and in simplified per-match cards.
 - [x] Show quality profile fit for each release: profile, decision, format
   evidence, and verification state. Per-match preferred/minimum/cutoff detail
   remains follow-up work.
-- [ ] Show quality profile fit for each match: preferred, minimum, cutoff,
-  fallback, verified/unverified, suspicious/transcoded.
+- [x] Show basic quality profile fit for each match: preferred, minimum, and
+  below-profile format evidence.
+- [ ] Show deep quality profile fit for each match: cutoff, fallback,
+  verified/unverified, suspicious/transcoded.
 - [x] Add setup handoffs: `Set up folders`, `Test Soulseek`, `Set up media
   tools`.
 - [x] Keep advanced diagnostics accessible but visually secondary.

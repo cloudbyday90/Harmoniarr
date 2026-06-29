@@ -209,7 +209,57 @@ function closeReview() {
           </section>
 
           <section class="music-queue-review-section">
-            <h3>Matches</h3>
+            <h3>Available matches</h3>
+            <div v-if="!matchReview.matchCards.length" class="music-queue-review-note">
+              No individual matches are available yet. Harmoniarr will show them here after the next search returns usable results.
+            </div>
+            <div v-else class="music-queue-match-list" role="list">
+              <article v-for="match in matchReview.matchCards" :key="match.id" class="music-queue-match-card" role="listitem">
+                <div class="music-queue-match-card-header">
+                  <div>
+                    <h4>{{ match.label }}<span v-if="match.isBest"> · Best ranked</span></h4>
+                    <p>{{ match.reason }}</p>
+                  </div>
+                  <span class="hx-pill" :data-tone="match.statusTone">{{ match.statusLabel }}</span>
+                </div>
+                <dl class="music-queue-match-grid">
+                  <div>
+                    <dt>Score</dt>
+                    <dd>{{ match.scoreLabel }}</dd>
+                  </div>
+                  <div>
+                    <dt>Quality</dt>
+                    <dd>
+                      <span class="hx-pill" :data-tone="match.qualityFitTone">{{ match.qualityFitLabel }}</span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Format</dt>
+                    <dd>{{ match.formatLabel }}</dd>
+                  </div>
+                  <div>
+                    <dt>Tracks</dt>
+                    <dd>{{ match.trackCoverageLabel }}</dd>
+                  </div>
+                  <div>
+                    <dt>Files</dt>
+                    <dd>{{ match.fileLabel }}</dd>
+                  </div>
+                  <div>
+                    <dt>Size</dt>
+                    <dd>{{ match.sizeLabel }}</dd>
+                  </div>
+                  <div>
+                    <dt>Source health</dt>
+                    <dd>{{ match.healthLabel }}</dd>
+                  </div>
+                </dl>
+              </article>
+            </div>
+          </section>
+
+          <section class="music-queue-review-section">
+            <h3>Match summary</h3>
             <dl class="music-queue-detail-grid">
               <template v-for="row in matchReview.matchRows" :key="row.label">
                 <dt>{{ row.label }}</dt>
@@ -443,6 +493,64 @@ function closeReview() {
 .music-queue-detail-grid dd {
   margin: 0;
   text-align: right;
+}
+
+.music-queue-review-note {
+  color: var(--hx-text-muted);
+}
+
+.music-queue-match-list {
+  display: grid;
+  gap: 12px;
+}
+
+.music-queue-match-card {
+  background: var(--hx-bg-surface-muted);
+  border: 1px solid var(--hx-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.music-queue-match-card-header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.music-queue-match-card h4,
+.music-queue-match-card p,
+.music-queue-match-grid {
+  margin: 0;
+}
+
+.music-queue-match-card p,
+.music-queue-match-grid dt {
+  color: var(--hx-text-muted);
+}
+
+.music-queue-match-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.music-queue-match-grid div {
+  display: grid;
+  gap: 4px;
+}
+
+.music-queue-match-grid dt {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.music-queue-match-grid dd {
+  margin: 0;
 }
 
 .music-queue-review-actions {

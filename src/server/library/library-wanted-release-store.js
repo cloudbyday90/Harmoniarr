@@ -36,6 +36,38 @@ function normalizeStatusCounts(value) {
   );
 }
 
+function normalizeMatchRows(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((match) => match && typeof match === 'object')
+    .map((match) => ({
+      discoveredAt: match.discoveredAt ?? null,
+      fileCount: toInteger(match.fileCount),
+      formatMatchLabel: match.formatMatchLabel ?? null,
+      formatMatchScore: match.formatMatchScore ?? null,
+      formats: Array.isArray(match.formats) ? match.formats : [],
+      hasFreeUploadSlot: match.hasFreeUploadSlot === true,
+      lockedFileCount: toInteger(match.lockedFileCount),
+      matchId: match.matchId ?? null,
+      queueLength: match.queueLength ?? null,
+      score: match.score ?? null,
+      scoreBreakdown: match.scoreBreakdown && typeof match.scoreBreakdown === 'object'
+        ? match.scoreBreakdown
+        : null,
+      sourceProvider: match.sourceProvider ?? null,
+      status: match.status ?? null,
+      totalSizeBytes: match.totalSizeBytes ?? null,
+      trackMatchSummary: match.trackMatchSummary && typeof match.trackMatchSummary === 'object'
+        ? match.trackMatchSummary
+        : null,
+      updatedAt: match.updatedAt ?? null,
+      uploadSpeed: match.uploadSpeed ?? null,
+    }));
+}
+
 function buildImportReviewSummary(row) {
   const totalCount = toInteger(row.import_candidate_total_count);
   if (totalCount < 1) {
@@ -45,6 +77,7 @@ function buildImportReviewSummary(row) {
   const summary = {
     latestStatus: row.import_candidate_latest_status ?? null,
     latestUpdatedAt: row.import_candidate_latest_updated_at ?? null,
+    matches: normalizeMatchRows(row.import_candidate_matches),
     statusCounts: normalizeStatusCounts(row.import_candidate_status_counts),
     totalCount,
   };
@@ -284,6 +317,7 @@ export function createLibraryWantedReleaseStore({
           import_review_summary.best_composite_score AS import_candidate_best_composite_score,
           import_review_summary.second_best_composite_score AS import_candidate_second_best_composite_score,
           import_review_summary.scored_candidate_count AS import_candidate_scored_count,
+          import_match_drilldown.matches AS import_candidate_matches,
           import_execution_summary.total_item_count AS import_execution_item_total_count,
           import_execution_summary.item_status_counts AS import_execution_item_status_counts,
           import_execution_summary.latest_item_status AS import_execution_latest_item_status,
@@ -353,6 +387,101 @@ export function createLibraryWantedReleaseStore({
               FROM candidate_rows
             ) AS scored_candidate_count
         ) import_review_summary ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'discoveredAt', match_rows.discovered_at,
+                'fileCount', match_rows.file_count,
+                'formatMatchLabel', match_rows.format_match_label,
+                'formatMatchScore', match_rows.format_match_score,
+                'formats', match_rows.formats,
+                'hasFreeUploadSlot', match_rows.has_free_upload_slot,
+                'lockedFileCount', match_rows.locked_file_count,
+                'matchId', match_rows.id,
+                'queueLength', match_rows.queue_length,
+                'score', match_rows.composite_score,
+                'scoreBreakdown', match_rows.score_breakdown,
+                'sourceProvider', match_rows.source_provider,
+                'status', match_rows.status,
+                'totalSizeBytes', match_rows.total_size_bytes,
+                'trackMatchSummary', match_rows.track_match_summary,
+                'updatedAt', match_rows.updated_at,
+                'uploadSpeed', match_rows.upload_speed
+              )
+              ORDER BY match_rows.composite_score DESC NULLS LAST, match_rows.updated_at DESC
+            ),
+            '[]'::jsonb
+          ) AS matches
+          FROM (
+            SELECT
+              ic.id,
+              ic.source_provider,
+              ic.status,
+              ic.file_count,
+              ic.locked_file_count,
+              ic.total_size_bytes,
+              ic.discovered_at,
+              ic.updated_at,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'compositeScore') = 'number'
+                  THEN (ic.normalized_payload->>'compositeScore')::numeric
+                WHEN jsonb_typeof(ic.normalized_payload->'compositeScore') = 'string'
+                  AND (ic.normalized_payload->>'compositeScore') ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                  THEN (ic.normalized_payload->>'compositeScore')::numeric
+                ELSE NULL
+              END AS composite_score,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'extensions') = 'array'
+                  THEN ic.normalized_payload->'extensions'
+                ELSE '[]'::jsonb
+              END AS formats,
+              ic.normalized_payload->>'formatMatchLabel' AS format_match_label,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'formatMatchScore') = 'number'
+                  THEN (ic.normalized_payload->>'formatMatchScore')::numeric
+                WHEN jsonb_typeof(ic.normalized_payload->'formatMatchScore') = 'string'
+                  AND (ic.normalized_payload->>'formatMatchScore') ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                  THEN (ic.normalized_payload->>'formatMatchScore')::numeric
+                ELSE NULL
+              END AS format_match_score,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'hasFreeUploadSlot') = 'boolean'
+                  THEN (ic.normalized_payload->>'hasFreeUploadSlot')::boolean
+                ELSE FALSE
+              END AS has_free_upload_slot,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'queueLength') = 'number'
+                  THEN (ic.normalized_payload->>'queueLength')::integer
+                WHEN jsonb_typeof(ic.normalized_payload->'queueLength') = 'string'
+                  AND (ic.normalized_payload->>'queueLength') ~ '^[0-9]+$'
+                  THEN (ic.normalized_payload->>'queueLength')::integer
+                ELSE NULL
+              END AS queue_length,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'uploadSpeed') = 'number'
+                  THEN (ic.normalized_payload->>'uploadSpeed')::bigint
+                WHEN jsonb_typeof(ic.normalized_payload->'uploadSpeed') = 'string'
+                  AND (ic.normalized_payload->>'uploadSpeed') ~ '^[0-9]+$'
+                  THEN (ic.normalized_payload->>'uploadSpeed')::bigint
+                ELSE NULL
+              END AS upload_speed,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'scoreBreakdown') = 'object'
+                  THEN ic.normalized_payload->'scoreBreakdown'
+                ELSE NULL
+              END AS score_breakdown,
+              CASE
+                WHEN jsonb_typeof(ic.normalized_payload->'trackMatchSummary') = 'object'
+                  THEN ic.normalized_payload->'trackMatchSummary'
+                ELSE NULL
+              END AS track_match_summary
+            FROM import_candidates ic
+            WHERE ic.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')
+            ORDER BY composite_score DESC NULLS LAST, ic.updated_at DESC, ic.id ASC
+            LIMIT 5
+          ) match_rows
+        ) import_match_drilldown ON TRUE
         LEFT JOIN LATERAL (
           SELECT
             COUNT(*)::integer AS total_item_count,
