@@ -21,6 +21,7 @@ import { useAsyncResource } from './useAsyncResource.js';
 import {
   fetchMusicQueueReleases as defaultFetchMusicQueueReleases,
   rejectMusicQueueMatch as defaultRejectMusicQueueMatch,
+  searchMusicQueueReleaseAgain as defaultSearchMusicQueueReleaseAgain,
   useMusicQueueMatch as defaultUseMusicQueueMatch,
 } from '../lib/acquisition-api.js';
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
@@ -31,11 +32,13 @@ export function useMusicQueue({
   limit = 100,
   pollIntervalMs = 30000,
   rejectMusicQueueMatch = defaultRejectMusicQueueMatch,
+  searchMusicQueueReleaseAgain = defaultSearchMusicQueueReleaseAgain,
   useMusicQueueMatch = defaultUseMusicQueueMatch,
 } = {}) {
   const actionErrorMessage = ref('');
   const actionMessage = ref('');
   const activeMatchActionKey = ref('');
+  const activeReleaseActionKey = ref('');
   const resource = useAsyncResource({
     fallbackErrorMessage: 'Music Queue failed to load',
     fetcher: () => fetchMusicQueueReleases({ limit }),
@@ -103,13 +106,40 @@ export function useMusicQueue({
     });
   }
 
+  async function searchAgain({ wantedReleaseId } = {}) {
+    if (!wantedReleaseId) {
+      actionErrorMessage.value = 'This release is missing the context needed to search again.';
+      return null;
+    }
+
+    activeReleaseActionKey.value = `${wantedReleaseId}:search-again`;
+    actionErrorMessage.value = '';
+    actionMessage.value = '';
+
+    try {
+      const payload = await searchMusicQueueReleaseAgain({ wantedReleaseId });
+      actionMessage.value = payload?.action?.dispatchAlreadyActive
+        ? 'Search queued. Discovery is already running and will pick this up.'
+        : 'Search queued. Harmoniarr will look for this release again.';
+      await resource.load();
+      return payload;
+    } catch (error) {
+      actionErrorMessage.value = getErrorMessage(error, 'Music Queue search retry failed.');
+      return null;
+    } finally {
+      activeReleaseActionKey.value = '';
+    }
+  }
+
   return {
     ...resource,
     actionErrorMessage: readonly(actionErrorMessage),
     actionMessage: readonly(actionMessage),
     activeMatchActionKey: readonly(activeMatchActionKey),
+    activeReleaseActionKey: readonly(activeReleaseActionKey),
     rejectMatch,
     releases,
+    searchAgain,
     summaryCards,
     totalCount,
     useMatch,

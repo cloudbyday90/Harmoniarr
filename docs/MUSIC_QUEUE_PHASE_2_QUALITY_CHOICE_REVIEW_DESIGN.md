@@ -24,6 +24,8 @@ Implemented outcome:
 
 This intentionally does **not** add `Allow fallback quality`, `Search again`, or
 `Try again` mutations. Those actions need their own audited server boundary.
+The first retry boundary later landed in
+`MUSIC_QUEUE_PHASE_2_SEARCH_AGAIN_ACTION_DESIGN.md`.
 
 ## Official Sources Reviewed
 
@@ -100,10 +102,11 @@ The user can now open a Music Queue release and answer:
 
 ## Next Slice
 
-Implement the release-scoped quality decision actions:
+Implement the release-scoped quality fallback override:
 
 1. `Allow fallback quality` for profiles where fallback is permitted or where an
    operator explicitly overrides a release
-2. `Search again` / `Try again` for quality-stopped releases
-3. audited Activity events for quality choice, fallback accepted, fallback
+2. audited Activity events for quality choice, fallback accepted, fallback
    rejected, and rediscovery queued
+3. re-evaluation of the release under the fallback policy before automatic
+   download continues

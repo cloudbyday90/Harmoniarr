@@ -4,6 +4,7 @@ import {
   fetchMusicQueueRelease,
   fetchMusicQueueReleases,
   rejectMusicQueueMatch,
+  searchMusicQueueReleaseAgain,
   useMusicQueueMatch,
 } from '../../src/client/lib/acquisition-api.js';
 
@@ -64,6 +65,21 @@ test('acquisition-api rejectMusicQueueMatch sends CSRF-backed scoped POST', asyn
 
   const [url, options] = globalThis.fetch.mock.calls[0].arguments;
   assert.equal(url, '/api/v1/acquisition/releases/wanted-1/matches/candidate-1/reject');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-mq');
+  assert.deepEqual(JSON.parse(options.body), {});
+});
+
+test('acquisition-api searchMusicQueueReleaseAgain sends CSRF-backed scoped POST', async (t) => {
+  globalThis.document = { cookie: 'harmoniarr_csrf=csrf-mq' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await searchMusicQueueReleaseAgain({
+    wantedReleaseId: 'wanted/1',
+  });
+
+  const [url, options] = globalThis.fetch.mock.calls[0].arguments;
+  assert.equal(url, '/api/v1/acquisition/releases/wanted%2F1/search-again');
   assert.equal(options.method, 'POST');
   assert.equal(options.headers.get('X-CSRF-Token'), 'csrf-mq');
   assert.deepEqual(JSON.parse(options.body), {});

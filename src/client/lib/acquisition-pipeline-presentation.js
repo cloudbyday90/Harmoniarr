@@ -666,9 +666,11 @@ export function buildMusicQueueMatchReview(release) {
   if (!release) return null;
   const matchSummary = release.matchSummary ?? {};
   const qualitySummary = release.qualitySummary ?? {};
+  const canSearchAgain = ['failed', 'no_matches_left', 'quality_choice_needed'].includes(release.statusCode);
 
   return {
     action: release.action,
+    canSearchAgain,
     heading: `${release.releaseTitle} by ${release.artistName}`,
     matchCards: buildMatchCards(release),
     matchRows: [
@@ -697,5 +699,6 @@ export function buildMusicQueueMatchReview(release) {
       { label: 'Library gate', value: qualitySummary.autoAddLabel },
     ],
     qualityGuidance: qualitySummary.reviewGuidance,
+    searchAgainLabel: release.statusCode === 'quality_choice_needed' ? 'Search again' : 'Try again',
   };
 }

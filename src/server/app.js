@@ -558,9 +558,11 @@ export function createApp({
     rejectImportCandidate: importCandidateModule.importCandidateService?.rejectImportCandidate
       ?? importCandidateModule.routeDependencies?.rejectImportCandidate
       ?? null,
+    requestMusicQueueRediscovery: libraryModule.libraryDiscoveryRequestStore?.requestMusicQueueRediscovery,
     selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate
       ?? importCandidateModule.routeDependencies?.selectImportCandidate
       ?? null,
+    startLibraryDiscoveryRun: libraryModule.routeDependencies.startLibraryDiscoveryRun,
   });
   const metadataModule = buildMetadataModule({
     libraryMediaRequestStore: libraryModule.libraryMediaRequestStore,

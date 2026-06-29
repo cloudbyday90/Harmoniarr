@@ -23,6 +23,10 @@ function createAcquisitionRouteTestApp(overrides = {}) {
         action: { code: 'reject_match', matchId },
         release: { id: wantedReleaseId },
       }),
+      requestMusicQueueReleaseRediscovery: async ({ wantedReleaseId }) => ({
+        action: { code: 'search_again', wantedReleaseId },
+        release: { id: wantedReleaseId },
+      }),
       requireCsrf: () => {},
       requireFreshSession: async () => ({ appUserId: 'user-1' }),
       requireSession: async () => ({ appUserId: 'user-1' }),
@@ -154,6 +158,41 @@ test('music queue reject-match route delegates scoped mutation', async (t) => {
       appUserId: 'user-1',
       matchId: 'candidate-1',
       reason: 'Not the album',
+      requestMetadata: { ipAddress: '127.0.0.1' },
+      wantedReleaseId: 'wanted-1',
+    }]);
+  });
+});
+
+test('music queue search-again route requires fresh session and CSRF before scoped retry', async (t) => {
+  const requireFreshSession = t.mock.fn(async () => ({ appUserId: 'user-1' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const requestMusicQueueReleaseRediscovery = t.mock.fn(async ({ wantedReleaseId }) => ({
+    action: { code: 'search_again', wantedReleaseId },
+    release: { id: wantedReleaseId },
+  }));
+  const app = createAcquisitionRouteTestApp({
+    getRequestMetadata: () => ({ ipAddress: '127.0.0.1' }),
+    requestMusicQueueReleaseRediscovery,
+    requireCsrf,
+    requireFreshSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/acquisition/releases/wanted-1/search-again`, {
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.action.code, 'search_again');
+    assert.equal(requireFreshSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(requestMusicQueueReleaseRediscovery.mock.calls[0].arguments, [{
+      actorUserId: 'user-1',
+      appUserId: 'user-1',
       requestMetadata: { ipAddress: '127.0.0.1' },
       wantedReleaseId: 'wanted-1',
     }]);

@@ -158,6 +158,63 @@ test('markDiscoveryRequestExhausted blocks automatic discovery retries', async (
   assert.equal(query.mock.callCount(), 1);
 });
 
+test('requestMusicQueueRediscovery resets one release into ready automatic search state', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /request_status = 'ready'/);
+    assert.match(sql, /next_search_after = \$2::timestamptz/);
+    assert.match(sql, /- 'downloadRecoveryExhausted'/);
+    assert.match(sql, /- 'downloadRecoveryRediscovery'/);
+    assert.match(sql, /- 'searchExhausted'/);
+    assert.match(sql, /'musicQueueRediscovery'/);
+    assert.deepEqual(params, [
+      'release-1',
+      '2026-06-29T12:00:00.000Z',
+      'quality_choice_search_again',
+      'user-1',
+      'wanted-1',
+    ]);
+    return {
+      rows: [{
+        blocked_reason: null,
+        evidence: {
+          musicQueueRediscovery: {
+            reasonCode: 'quality_choice_search_again',
+            requestedAt: '2026-06-29T12:00:00.000Z',
+          },
+        },
+        last_search_at: '2026-06-29T10:00:00.000Z',
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'group-1',
+        metadata_release_id: 'release-1',
+        next_search_after: '2026-06-29T12:00:00.000Z',
+        research_attempt_count: 0,
+        release_date: '2026-06-01',
+        release_group_title: 'Child of God',
+        release_title: 'Child of God',
+        request_status: 'ready',
+        search_attempt_count: 0,
+        search_mode: 'automatic',
+        wanted_status: 'missing',
+      }],
+    };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const result = await store.requestMusicQueueRediscovery({
+    metadataReleaseId: 'release-1',
+    reasonCode: 'quality_choice_search_again',
+    requestedAt: '2026-06-29T12:00:00.000Z',
+    requestedByUserId: 'user-1',
+    wantedReleaseId: 'wanted-1',
+  });
+
+  assert.equal(result.requestStatus, 'ready');
+  assert.equal(result.blockedReason, null);
+  assert.equal(result.nextSearchAfter, '2026-06-29T12:00:00.000Z');
+});
+
 test('scheduleDownloadRecoveryRediscovery records delayed automatic rediscovery state', async (t) => {
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /research_attempt_count = research_attempt_count \+ 1/);

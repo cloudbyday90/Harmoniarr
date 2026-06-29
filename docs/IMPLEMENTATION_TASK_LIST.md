@@ -73,6 +73,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   minimum, cutoff, fallback, audio-check, and spectral verdict context. This is
   read-only; fallback/try-again mutations remain the next Phase 2 slice. See
   `MUSIC_QUEUE_PHASE_2_QUALITY_CHOICE_REVIEW_DESIGN.md`.
+- Music Queue Phase 2 Search again action: stopped releases now expose a
+  release-scoped `Search again` / `Try again` action from the Music Queue
+  details panel. The route requires fresh session and CSRF, re-checks release
+  ownership before resetting discovery state, records bounded
+  `musicQueueRediscovery` evidence, and starts or reuses the existing Library
+  discovery dispatch operation. See
+  `MUSIC_QUEUE_PHASE_2_SEARCH_AGAIN_ACTION_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

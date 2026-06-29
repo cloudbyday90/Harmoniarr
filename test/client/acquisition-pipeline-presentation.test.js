@@ -177,6 +177,7 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
   const review = buildMusicQueueMatchReview(release);
 
   assert.equal(review.heading, 'Child of God by Forest Frank');
+  assert.equal(review.canSearchAgain, false);
   assert.equal(review.reason, 'The best match is below the high-confidence threshold.');
   assert.equal(review.matchCards.length, 2);
   assert.equal(review.matchCards[0].qualityFitLabel, 'Preferred quality');
@@ -208,6 +209,38 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
   assert.ok(review.qualityRows.some((row) => row.label === 'Fallback' && row.value === 'Fallback blocked'));
   assert.ok(review.qualityRows.some((row) => row.value === 'Needs verification'));
   assert.equal(review.qualityGuidance, 'Harmoniarr needs real audio evidence before treating this as lossless.');
+});
+
+test('buildMusicQueueMatchReview exposes search again for quality-stopped releases', () => {
+  const release = normalizeMusicQueueRelease({
+    artistName: 'Lauren Daigle',
+    quality: {
+      code: 'below_minimum',
+      explanation: 'Lossless archive requires flac, alac, wav.',
+      formats: ['mp3'],
+      profile: {
+        code: 'lossless_archive',
+        cutoffFormats: ['flac', 'alac', 'wav'],
+        fallbackAllowed: false,
+        minimumFormats: ['flac', 'alac', 'wav'],
+        preferredFormats: ['flac'],
+        requiresVerification: true,
+      },
+    },
+    releaseTitle: 'How Can It Be',
+    status: {
+      code: 'quality_choice_needed',
+      label: 'Quality choice needed',
+      message: 'Only lossy matches were found.',
+      nextAction: 'review_quality_choice',
+      tone: 'warning',
+    },
+  });
+
+  const review = buildMusicQueueMatchReview(release);
+
+  assert.equal(review.canSearchAgain, true);
+  assert.equal(review.searchAgainLabel, 'Search again');
 });
 
 test('buildMusicQueueReleaseTypeFilters derives stable type options', () => {

@@ -47,3 +47,14 @@ export function rejectMusicQueueMatch({ wantedReleaseId, matchId, reason } = {})
     },
   );
 }
+
+export function searchMusicQueueReleaseAgain({ wantedReleaseId } = {}) {
+  return apiRequest(
+    `/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}/search-again`,
+    {
+      body: {},
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}

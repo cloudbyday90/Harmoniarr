@@ -30,12 +30,14 @@ const {
   actionErrorMessage,
   actionMessage,
   activeMatchActionKey,
+  activeReleaseActionKey,
   errorMessage,
   isLoading,
   isRevalidating,
   load,
   rejectMatch,
   releases,
+  searchAgain,
   summaryCards,
   totalCount,
   useMatch,
@@ -75,6 +77,10 @@ function isMatchActionRunning(match, action) {
   return activeMatchActionKey.value === getMatchActionKey(match, action);
 }
 
+function isReleaseActionRunning(action) {
+  return activeReleaseActionKey.value === `${selectedRelease.value?.id}:${action}`;
+}
+
 async function handleUseMatch(match) {
   await useMatch({
     matchId: match.matchId,
@@ -85,6 +91,12 @@ async function handleUseMatch(match) {
 async function handleRejectMatch(match) {
   await rejectMatch({
     matchId: match.matchId,
+    wantedReleaseId: selectedRelease.value?.id,
+  });
+}
+
+async function handleSearchAgain() {
+  await searchAgain({
     wantedReleaseId: selectedRelease.value?.id,
   });
 }
@@ -347,6 +359,16 @@ async function handleRejectMatch(match) {
           </section>
 
           <div class="music-queue-review-actions">
+            <button
+              v-if="matchReview.canSearchAgain"
+              type="button"
+              class="hx-btn"
+              data-variant="primary"
+              :disabled="Boolean(activeReleaseActionKey)"
+              @click="handleSearchAgain"
+            >
+              {{ isReleaseActionRunning('search-again') ? 'Queuing...' : matchReview.searchAgainLabel }}
+            </button>
             <RouterLink
               v-if="matchReview.action?.type === 'route'"
               class="hx-btn"

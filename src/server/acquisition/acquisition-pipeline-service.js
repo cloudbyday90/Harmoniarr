@@ -165,11 +165,20 @@ function buildSummary(releases) {
   };
 }
 
+const REDISCOVERY_ALLOWED_STATUS_CODES = new Set([
+  'failed',
+  'no_matches_left',
+  'quality_choice_needed',
+]);
+
 export function createAcquisitionPipelineService({
   acquisitionPipelineStore,
+  getNow = () => new Date(),
   qualityPolicyService = createAcquisitionQualityPolicyService(),
   rejectImportCandidate = null,
+  requestMusicQueueRediscovery = null,
   selectImportCandidate = null,
+  startLibraryDiscoveryRun = null,
   statusService = createAcquisitionPipelineStatusService(),
 } = {}) {
   if (!acquisitionPipelineStore) {
@@ -200,6 +209,86 @@ export function createAcquisitionPipelineService({
       matchId: scopedMatchId,
       release,
       wantedReleaseId: scopedWantedReleaseId,
+    };
+  }
+
+  async function requestMusicQueueReleaseRediscovery({
+    appUserId,
+    actorUserId = null,
+    requestMetadata = null,
+    wantedReleaseId,
+  } = {}) {
+    if (typeof requestMusicQueueRediscovery !== 'function') {
+      throw createApiError(503, 'music_queue_retry_unavailable', 'Music Queue retry is not available');
+    }
+
+    const scopedAppUserId = normalizeRequiredAppUserId(appUserId, 'requestMusicQueueReleaseRediscovery');
+    const scopedWantedReleaseId = normalizeRequiredId(wantedReleaseId, 'wantedReleaseId');
+    const release = await acquisitionPipelineStore.getWantedReleaseEvidence({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    if (!release) {
+      throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
+    }
+
+    const projectedRelease = projectRelease(release, { qualityPolicyService, statusService });
+    if (!REDISCOVERY_ALLOWED_STATUS_CODES.has(projectedRelease.status?.code)) {
+      throw createApiError(409, 'music_queue_retry_not_available', 'This release is not stopped in a state that can be searched again');
+    }
+
+    const metadataReleaseId = normalizeString(release.metadataReleaseId);
+    if (!metadataReleaseId) {
+      throw createApiError(409, 'music_queue_retry_missing_release', 'This release is missing the metadata release needed to search again');
+    }
+
+    const requestedAt = getNow().toISOString();
+    const rediscovery = await requestMusicQueueRediscovery({
+      metadataReleaseId,
+      reasonCode: projectedRelease.status?.code === 'quality_choice_needed'
+        ? 'quality_choice_search_again'
+        : 'music_queue_try_again',
+      requestedAt,
+      requestedByUserId: actorUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    if (!rediscovery) {
+      throw createApiError(409, 'music_queue_retry_not_available', 'This release could not be queued for another search');
+    }
+
+    let dispatchAlreadyActive = false;
+    let run = null;
+    if (typeof startLibraryDiscoveryRun === 'function') {
+      try {
+        const started = await startLibraryDiscoveryRun({
+          requestMetadata,
+          triggerSource: 'music_queue_try_again',
+          triggeredByUserId: actorUserId,
+        });
+        run = started?.run ?? null;
+      } catch (error) {
+        if (error?.code !== 'library_discovery_in_progress') {
+          throw error;
+        }
+        dispatchAlreadyActive = true;
+      }
+    }
+
+    const refreshed = await getMusicQueueRelease({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+
+    return {
+      action: {
+        code: 'search_again',
+        dispatchAlreadyActive,
+        discoveryRunId: run?.id ?? null,
+        wantedReleaseId: scopedWantedReleaseId,
+      },
+      rediscovery,
+      release: refreshed.release,
+      run,
     };
   }
 
@@ -301,6 +390,7 @@ export function createAcquisitionPipelineService({
   return {
     getMusicQueueRelease,
     listMusicQueueReleases,
+    requestMusicQueueReleaseRediscovery,
     rejectMusicQueueMatch,
     useMusicQueueMatch,
   };
