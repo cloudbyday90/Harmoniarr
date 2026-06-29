@@ -140,7 +140,14 @@ function buildBlocker({ code, file, message }) {
   };
 }
 
-function evaluateStrictLosslessFile({ file, qualityPolicyService, qualityOverride, profileCode, summaryCandidate }) {
+async function evaluateStrictLosslessFile({
+  file,
+  preAddSpectralProofService,
+  qualityPolicyService,
+  qualityOverride,
+  profileCode,
+  summaryCandidate,
+}) {
   if (file?.status?.code && file.status.code !== 'ready') {
     return buildBlocker({
       code: 'safe_auto_file_not_ready',
@@ -200,13 +207,37 @@ function evaluateStrictLosslessFile({ file, qualityPolicyService, qualityOverrid
     });
   }
 
+  if (!preAddSpectralProofService || typeof preAddSpectralProofService.verifySpectralProof !== 'function') {
+    return buildBlocker({
+      code: 'safe_auto_spectral_proof_unavailable',
+      file,
+      message: 'No pre-add spectral proof service is available for this strict lossless file.',
+    });
+  }
+
+  const spectralProof = await preAddSpectralProofService.verifySpectralProof({
+    declaredCodec: metadata.primaryAudioCodec ?? null,
+    declaredExtension: extractExtension(file?.filename),
+    filePath: file?.sourceFile?.path ?? file?.sourcePath ?? null,
+    sampleRate: metadata.sampleRate ?? null,
+    sizeBytes: file?.sourceFile?.sizeBytes ?? null,
+  });
+  if (!spectralProof.accepted) {
+    return buildBlocker({
+      code: `safe_auto_${spectralProof.code}`,
+      file,
+      message: spectralProof.message,
+    });
+  }
+
   return null;
 }
 
 export function createImportCandidateSafeAutoAddQualityGateService({
+  preAddSpectralProofService = null,
   qualityPolicyService = createAcquisitionQualityPolicyService(),
 } = {}) {
-  function evaluateSafeAutoAddQuality({
+  async function evaluateSafeAutoAddQuality({
     applyPreview,
     summaryCandidate = {},
   } = {}) {
@@ -240,15 +271,20 @@ export function createImportCandidateSafeAutoAddQualityGateService({
       };
     }
 
-    const blockers = files
-      .map((file) => evaluateStrictLosslessFile({
+    const blockers = [];
+    for (const file of files) {
+      const blocker = await evaluateStrictLosslessFile({
         file,
+        preAddSpectralProofService,
         profileCode: profile.code,
         qualityOverride,
         qualityPolicyService,
         summaryCandidate,
-      }))
-      .filter(Boolean);
+      });
+      if (blocker) {
+        blockers.push(blocker);
+      }
+    }
 
     if (blockers.length > 0) {
       return {

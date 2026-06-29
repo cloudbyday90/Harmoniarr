@@ -408,6 +408,7 @@ export function createApp({
       getMediaToolingStatus: mediaToolingStatusService.getStatus,
       mediaCommandService,
     }),
+    analyzeSpectralCutoffFn: spectralAnalyzer.analyzeSpectralCutoff,
     maintenanceLockService,
     maintenanceLockOperationPauseService,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,

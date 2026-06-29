@@ -49,11 +49,21 @@ function createSummaryCandidate(overrides = {}) {
   };
 }
 
-test('safe auto add quality gate accepts verified lossless files for strict profiles', () => {
-  const service = createImportCandidateSafeAutoAddQualityGateService();
+test('safe auto add quality gate accepts verified lossless files for strict profiles', async () => {
+  const service = createImportCandidateSafeAutoAddQualityGateService({
+    preAddSpectralProofService: {
+      verifySpectralProof: async () => ({
+        accepted: true,
+        code: 'spectral_authentic',
+        message: 'Authentic.',
+      }),
+    },
+  });
 
-  const result = service.evaluateSafeAutoAddQuality({
-    applyPreview: createApplyPreview([createReadyFlacFile()]),
+  const result = await service.evaluateSafeAutoAddQuality({
+    applyPreview: createApplyPreview([createReadyFlacFile({
+      sourceFile: { exists: true, path: '/downloads/01 Track.flac' },
+    })]),
     summaryCandidate: createSummaryCandidate(),
   });
 
@@ -63,10 +73,10 @@ test('safe auto add quality gate accepts verified lossless files for strict prof
   assert.deepEqual(result.blockers, []);
 });
 
-test('safe auto add quality gate blocks strict profiles when ffprobe evidence is missing', () => {
+test('safe auto add quality gate blocks strict profiles when ffprobe evidence is missing', async () => {
   const service = createImportCandidateSafeAutoAddQualityGateService();
 
-  const result = service.evaluateSafeAutoAddQuality({
+  const result = await service.evaluateSafeAutoAddQuality({
     applyPreview: createApplyPreview([createReadyFlacFile({
       inspection: {
         metadata: null,
@@ -80,10 +90,10 @@ test('safe auto add quality gate blocks strict profiles when ffprobe evidence is
   assert.equal(result.blockers[0].code, 'safe_auto_media_inspection_failed');
 });
 
-test('safe auto add quality gate blocks a lossy codec inside a lossless-looking file', () => {
+test('safe auto add quality gate blocks a lossy codec inside a lossless-looking file', async () => {
   const service = createImportCandidateSafeAutoAddQualityGateService();
 
-  const result = service.evaluateSafeAutoAddQuality({
+  const result = await service.evaluateSafeAutoAddQuality({
     applyPreview: createApplyPreview([createReadyFlacFile({
       inspection: {
         metadata: {
@@ -109,10 +119,10 @@ test('safe auto add quality gate blocks a lossy codec inside a lossless-looking 
   assert.match(result.blockers[0].code, /below_minimum|codec_extension_mismatch/);
 });
 
-test('safe auto add quality gate blocks suspicious spectral evidence when present', () => {
+test('safe auto add quality gate blocks suspicious spectral evidence when present', async () => {
   const service = createImportCandidateSafeAutoAddQualityGateService();
 
-  const result = service.evaluateSafeAutoAddQuality({
+  const result = await service.evaluateSafeAutoAddQuality({
     applyPreview: createApplyPreview([createReadyFlacFile({
       inspection: {
         ...createReadyFlacFile().inspection,
@@ -126,10 +136,32 @@ test('safe auto add quality gate blocks suspicious spectral evidence when presen
   assert.equal(result.blockers[0].code, 'safe_auto_spectral_transcoded');
 });
 
-test('safe auto add quality gate does not enforce strict lossless checks for flexible profiles', () => {
+test('safe auto add quality gate blocks strict lossless when pre-add spectral proof is missing', async () => {
+  const service = createImportCandidateSafeAutoAddQualityGateService({
+    preAddSpectralProofService: {
+      verifySpectralProof: async () => ({
+        accepted: false,
+        code: 'spectral_no_cached_proof',
+        message: 'No cached spectral proof exists for this file yet.',
+      }),
+    },
+  });
+
+  const result = await service.evaluateSafeAutoAddQuality({
+    applyPreview: createApplyPreview([createReadyFlacFile({
+      sourceFile: { exists: true, path: '/downloads/01 Track.flac' },
+    })]),
+    summaryCandidate: createSummaryCandidate(),
+  });
+
+  assert.equal(result.eligible, false);
+  assert.equal(result.blockers[0].code, 'safe_auto_spectral_no_cached_proof');
+});
+
+test('safe auto add quality gate does not enforce strict lossless checks for flexible profiles', async () => {
   const service = createImportCandidateSafeAutoAddQualityGateService();
 
-  const result = service.evaluateSafeAutoAddQuality({
+  const result = await service.evaluateSafeAutoAddQuality({
     applyPreview: createApplyPreview([]),
     summaryCandidate: createSummaryCandidate({
       musicQueueContext: {
@@ -142,4 +174,3 @@ test('safe auto add quality gate does not enforce strict lossless checks for fle
   assert.equal(result.eligible, true);
   assert.equal(result.profileCode, 'high_quality');
 });
-

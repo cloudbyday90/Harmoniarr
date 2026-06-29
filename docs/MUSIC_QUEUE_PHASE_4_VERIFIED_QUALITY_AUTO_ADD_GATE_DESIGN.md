@@ -42,10 +42,10 @@ downloaded audio with media-tool evidence.
    If existing metadata carries a `suspicious` or `transcoded` verdict, safe
    automatic add stops before moving files.
 
-5. Keep expensive spectral proof off the synchronous apply path for this slice.
-   The current sidecar still handles spectral analysis after apply. The next
-   Phase 4 slice should persist and reuse cached spectral fingerprints before
-   automatic add for strict profiles.
+5. Keep expensive spectral proof cache-first and bounded.
+   The follow-up cached pre-add proof slice now reuses sampled fingerprints
+   before running bounded spectral analysis. See
+   `MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md`.
 
 ---
 
@@ -104,15 +104,11 @@ Behavior:
 
 ---
 
-## 6. Remaining Phase 4 Follow-Up
+## 6. Follow-Up Outcome
 
-The next high-value Phase 4 item is cached spectral proof before automatic add:
+Cached spectral proof before automatic add is implemented in
+`MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md`.
 
-1. persist sampled content fingerprints for downloaded files before library add
-2. reuse prior spectral verdicts by fingerprint
-3. queue bounded pre-add spectral analysis when no trusted cached verdict exists
-4. block strict lossless auto-add until spectral verdict is `authentic` or an
-   explicit policy accepts `inconclusive`
-5. surface `Quality choice needed` in Music Queue when the pre-add spectral gate
-   stops automation
-
+Remaining work is now user-facing surfacing: Music Queue and Activity should
+explain strict-quality stops in plain language and link back to the right review
+surface.

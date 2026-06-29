@@ -931,10 +931,11 @@ Acceptance:
 
 ### Phase 4 - Verified Audio Quality And Safe Library Add
 
-Status: **In progress.** The safe automatic add-to-library handoff and first
-verified-quality gate are implemented; see
+Status: **In progress.** The safe automatic add-to-library handoff, first
+verified-quality gate, and cached pre-add spectral proof are implemented; see
 `MUSIC_QUEUE_PHASE_4_SAFE_AUTO_ADD_HANDOFF_DESIGN.md` and
-`MUSIC_QUEUE_PHASE_4_VERIFIED_QUALITY_AUTO_ADD_GATE_DESIGN.md`.
+`MUSIC_QUEUE_PHASE_4_VERIFIED_QUALITY_AUTO_ADD_GATE_DESIGN.md`, and
+`MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md`.
 
 Goal: make `FLAC` and other quality choices truthful before Harmoniarr claims a
 release is complete.
@@ -946,9 +947,9 @@ release is complete.
   strict lossless profiles.
 - [x] Wire ffprobe evidence into the quality policy: codec, container, bitrate,
   sample rate, bit depth, channel count, duration, and tags.
-- [ ] Wire spectral verdicts into strict lossless decisions:
+- [x] Wire spectral verdicts into strict lossless decisions:
   authentic, suspicious, transcoded, inconclusive.
-- [ ] Use cached content fingerprints before repeating expensive spectral
+- [x] Use cached content fingerprints before repeating expensive spectral
   analysis.
 - [x] Stop strict lossless auto-add when any required file is lossy, suspicious,
   transcoded, probe-failed, or unverified beyond policy.

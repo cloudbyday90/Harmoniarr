@@ -293,7 +293,7 @@ export function createImportCandidateApplyWorker({
         try {
           const applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
           if (applySafetyMode === 'safe_auto') {
-            const qualityGate = safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
+            const qualityGate = await safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
               applyPreview,
               summaryCandidate,
             });

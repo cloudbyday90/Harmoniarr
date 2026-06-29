@@ -114,6 +114,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   existing suspicious/transcoded spectral verdicts block safe-auto add while
   leaving the candidate available for review. See
   `MUSIC_QUEUE_PHASE_4_VERIFIED_QUALITY_AUTO_ADD_GATE_DESIGN.md`.
+- Music Queue Phase 4 cached spectral pre-add proof: strict lossless safe-auto
+  add now derives sampled content fingerprints, reuses cached spectral
+  measurements, runs bounded ffmpeg spectral analysis on cache miss, stores raw
+  measurements for threshold reclassification, and blocks safe-auto add when
+  proof is suspicious, transcoded, inconclusive, unavailable, or failed. See
+  `MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

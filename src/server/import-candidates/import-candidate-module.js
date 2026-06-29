@@ -60,6 +60,9 @@ import { createMediaLosslessRetentionPolicyService } from '../media/media-lossle
 import { createMediaTranscodeExecutionService } from '../media/media-transcode-execution-service.js';
 import { createMediaTranscodePlanningService } from '../media/media-transcode-planning-service.js';
 import { createFfmpegSpectralAnalyzer } from '../media/ffmpeg-spectral-analyzer.js';
+import { createFileContentHasher } from '../media/file-content-hasher.js';
+import { createMediaSpectralProofService } from '../media/media-spectral-proof-service.js';
+import { createSourceUserSpectralCacheStore } from '../activity/source-user-spectral-cache-store.js';
 import { createSourceUserSpectralJobStore } from '../activity/source-user-spectral-job-store.js';
 import { createSourceUserSpectralSidecarService } from '../activity/source-user-spectral-sidecar-service.js';
 import { createOperationRunInterruptionGate } from '../operation-run-cancellation.js';
@@ -101,10 +104,15 @@ export function createImportCandidateModule({
   }),
   mediaLosslessRetentionPolicyService = createMediaLosslessRetentionPolicyService(),
   mediaTranscodePlanningService = createMediaTranscodePlanningService(),
+  analyzeSpectralCutoffFn = createFfmpegSpectralAnalyzer().analyzeSpectralCutoff,
+  spectralCacheStore = createSourceUserSpectralCacheStore(),
+  fileContentHasher = createFileContentHasher(),
   sourceUserSpectralSidecarService = createSourceUserSpectralSidecarService({
     spectralJobStore: createSourceUserSpectralJobStore(),
-    analyzeSpectralCutoffFn: createFfmpegSpectralAnalyzer().analyzeSpectralCutoff,
+    analyzeSpectralCutoffFn,
     recordSourceUserOutcomeEvidenceFn,
+    hashFileFn: fileContentHasher.hashFile,
+    spectralCacheStore,
   }),
   importCandidateReputationEnrichmentService = createImportCandidateReputationEnrichmentService({
     listSourceUserReputationIndexFn,
@@ -162,6 +170,11 @@ export function createImportCandidateModule({
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
   importCandidateSafeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService({
+    preAddSpectralProofService: createMediaSpectralProofService({
+      analyzeSpectralCutoffFn,
+      hashFileFn: fileContentHasher.hashFile,
+      spectralCacheStore,
+    }),
     qualityPolicyService: createAcquisitionQualityPolicyService(),
   }),
   importCandidateRecoveryService = createImportCandidateRecoveryService({
