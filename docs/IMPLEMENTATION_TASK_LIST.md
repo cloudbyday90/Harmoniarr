@@ -101,6 +101,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   below-profile retry matches, promotes the next acceptable scoped match, and
   persists bounded skipped-match evidence in the existing execution snapshot.
   See `MUSIC_QUEUE_PHASE_3_FAILED_MATCH_RETRY_DESIGN.md`.
+- Music Queue Phase 4 safe auto add handoff: completed download reconciliation
+  now queues a safe automatic add-to-library operation through the existing
+  import apply run service. Safe-auto runs process only clean `ready`
+  import-pending candidates, leaving warning and blocked candidates for review,
+  and reconciliation returns bounded start/skip evidence. See
+  `MUSIC_QUEUE_PHASE_4_SAFE_AUTO_ADD_HANDOFF_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

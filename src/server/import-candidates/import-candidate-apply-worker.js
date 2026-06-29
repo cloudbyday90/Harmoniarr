@@ -50,6 +50,38 @@ function buildRunItems(importPendingCandidates) {
   }));
 }
 
+function isSafeAutoCandidate(summaryCandidate) {
+  return summaryCandidate?.importStatus?.code === 'ready';
+}
+
+function resolveRunnableCandidates(importPendingCandidates, applySafetyMode) {
+  if (applySafetyMode !== 'safe_auto') {
+    return importPendingCandidates;
+  }
+
+  return importPendingCandidates.filter(isSafeAutoCandidate);
+}
+
+function buildApplyTriggerSummary({ applySafetyMode, triggerSource }) {
+  return {
+    ...(applySafetyMode !== 'manual' ? { applySafetyMode } : {}),
+    ...(triggerSource !== 'manual' ? { triggerSource } : {}),
+  };
+}
+
+function buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applySafetyMode) {
+  if (applySafetyMode !== 'safe_auto') {
+    return {};
+  }
+
+  return {
+    skippedUnsafeCandidateCount: Math.max(
+      (importPendingSummary.counts?.totalImportPending ?? 0) - runItems.length,
+      0,
+    ),
+  };
+}
+
 function createBaseSnapshot(summaryCandidate) {
   return {
     apply: {
@@ -187,7 +219,13 @@ export function createImportCandidateApplyWorker({
 } = {}) {
   const activeRunIds = new Set();
 
-  async function runApply({ executableCandidateCount, requestedCandidateCount, runId }) {
+  async function runApply({
+    applySafetyMode = 'manual',
+    executableCandidateCount,
+    requestedCandidateCount,
+    runId,
+    triggerSource = 'manual',
+  }) {
     let finalLeaseStatus = 'completed';
     let leaseHeartbeat = null;
 
@@ -205,11 +243,16 @@ export function createImportCandidateApplyWorker({
           executionMode: 'move',
           executableCandidateCount,
           requestedCandidateCount,
+          ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
         },
       });
 
       const importPendingSummary = await buildImportPendingCandidateSummary({ limit: 1000 });
-      const runItems = buildRunItems(importPendingSummary.importPendingCandidates ?? []);
+      const runnableCandidates = resolveRunnableCandidates(
+        importPendingSummary.importPendingCandidates ?? [],
+        applySafetyMode,
+      );
+      const runItems = buildRunItems(runnableCandidates);
       await replaceImportApplyRunItems(runId, runItems);
 
       const counts = {
@@ -220,7 +263,7 @@ export function createImportCandidateApplyWorker({
       };
       const postApplyReleaseHints = [];
 
-      for (const summaryCandidate of importPendingSummary.importPendingCandidates ?? []) {
+      for (const summaryCandidate of runnableCandidates) {
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
         const baseSnapshot = createBaseSnapshot(summaryCandidate);
 
@@ -407,6 +450,8 @@ export function createImportCandidateApplyWorker({
           readyCount: importPendingSummary.counts?.ready ?? 0,
           readyWithWarningsCount: importPendingSummary.counts?.readyWithWarnings ?? 0,
           requestedCandidateCount,
+          ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
+          ...buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applySafetyMode),
           totalImportPending: importPendingSummary.counts?.totalImportPending ?? runItems.length,
         },
       });
@@ -448,6 +493,7 @@ export function createImportCandidateApplyWorker({
             pauseMessage: error.message,
             pauseProvider: error.pauseProvider ?? null,
             requestedCandidateCount,
+            ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
           },
         });
         return;
@@ -462,6 +508,7 @@ export function createImportCandidateApplyWorker({
             executionMode: 'move',
             executableCandidateCount,
             requestedCandidateCount,
+            ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
           },
         });
         return;
@@ -476,6 +523,7 @@ export function createImportCandidateApplyWorker({
           executionMode: 'move',
           executableCandidateCount,
           requestedCandidateCount,
+          ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
         },
       });
     } finally {
@@ -485,14 +533,26 @@ export function createImportCandidateApplyWorker({
     }
   }
 
-  async function startWorkerRun({ executableCandidateCount, requestedCandidateCount, runId }) {
+  async function startWorkerRun({
+    applySafetyMode = 'manual',
+    executableCandidateCount,
+    requestedCandidateCount,
+    runId,
+    triggerSource = 'manual',
+  }) {
     if (activeRunIds.has(runId)) {
       return;
     }
 
     activeRunIds.add(runId);
     queueMicrotask(() => {
-      void runApply({ executableCandidateCount, requestedCandidateCount, runId });
+      void runApply({
+        applySafetyMode,
+        executableCandidateCount,
+        requestedCandidateCount,
+        runId,
+        triggerSource,
+      });
     });
   }
 

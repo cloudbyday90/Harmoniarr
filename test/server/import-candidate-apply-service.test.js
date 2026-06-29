@@ -34,13 +34,53 @@ test('startImportCandidateApplyRun queues a run for ready import-pending candida
   assert.equal(result.accepted, true);
   assert.deepEqual(buildImportPendingCandidateSummary.mock.calls[0].arguments, [{ limit: 1000 }]);
   assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
+    applySafetyMode: 'manual',
     executableCandidateCount: 2,
     executionMode: 'move',
     requestedCandidateCount: 3,
     status: 'pending',
     triggeredByUserId: 'user-1',
+    triggerSource: 'manual',
   }]);
   assert.equal(recordAuditEventFn.mock.callCount(), 1);
+});
+
+test('startImportCandidateApplyRun queues safe-auto runs for ready candidates only', async (t) => {
+  const createOperationRun = t.mock.fn(async () => ({
+    id: 'run-apply-auto-1',
+    status: 'pending',
+  }));
+  const recordAuditEventFn = t.mock.fn(async () => {});
+  const service = createImportCandidateApplyService({
+    buildImportPendingCandidateSummary: async () => ({
+      counts: {
+        blocked: 1,
+        ready: 1,
+        readyWithWarnings: 2,
+        totalImportPending: 4,
+      },
+    }),
+    createOperationRun,
+    recordAuditEventFn,
+  });
+
+  const result = await service.startImportCandidateApplyRun({
+    applySafetyMode: 'safe_auto',
+    triggerSource: 'download_completed',
+  });
+
+  assert.equal(result.accepted, true);
+  assert.deepEqual(createOperationRun.mock.calls[0].arguments, [{
+    applySafetyMode: 'safe_auto',
+    executableCandidateCount: 1,
+    executionMode: 'move',
+    requestedCandidateCount: 4,
+    status: 'pending',
+    triggeredByUserId: null,
+    triggerSource: 'download_completed',
+  }]);
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].actorType, 'system');
+  assert.equal(recordAuditEventFn.mock.calls[0].arguments[0].details.warningCandidateCount, 2);
 });
 
 test('startImportCandidateApplyRun rejects when nothing import-pending is executable', async () => {

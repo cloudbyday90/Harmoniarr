@@ -931,10 +931,16 @@ Acceptance:
 
 ### Phase 4 - Verified Audio Quality And Safe Library Add
 
+Status: **In progress.** The safe automatic add-to-library handoff is
+implemented; see
+`MUSIC_QUEUE_PHASE_4_SAFE_AUTO_ADD_HANDOFF_DESIGN.md`.
+
 Goal: make `FLAC` and other quality choices truthful before Harmoniarr claims a
 release is complete.
 
-- [ ] Define safe add-to-library policy.
+- [x] Define safe add-to-library policy for the first backend slice: automatic
+  add processes only clean `ready` candidates, while warning and blocked
+  candidates remain stopped for review.
 - [ ] Require verified audio-quality evidence before automatic library add for
   strict lossless profiles.
 - [ ] Wire ffprobe evidence into the quality policy: codec, container, bitrate,
@@ -945,7 +951,8 @@ release is complete.
   analysis.
 - [ ] Stop strict lossless auto-add when any required file is lossy, suspicious,
   transcoded, probe-failed, or unverified beyond policy.
-- [ ] Auto-start add-to-library/apply for ready matches that meet safe policy.
+- [x] Auto-start add-to-library/apply for ready matches that meet the first
+  safe policy slice.
 - [ ] Route collisions, lossy decisions, suspicious FLAC, probe failures, and
   unsafe import plans to `needs help`.
 - [ ] Add `Add to library` for manual safe adds.

@@ -114,6 +114,7 @@ export function createImportCandidateExecutionReconciliationService({
   handleImportCandidateRejectedTransfer = async () => ({ recovered: false }),
   onDownloadCompletedFn = null,
   recordActivityEventFn = null,
+  startSafeApplyRunAfterDownloadCompleted = null,
   updateImportExecutionRunItem = async () => null,
 } = {}) {
   async function reconcileImportCandidateExecutionSummary({
@@ -129,6 +130,7 @@ export function createImportCandidateExecutionReconciliationService({
     const transitions = [];
     const recoveries = [];
     const rediscoveries = [];
+    const autoApplyRuns = [];
 
     for (const item of items) {
       const importCandidateId = item?.planningSnapshot?.candidate?.id ?? item?.importCandidateId ?? null;
@@ -203,6 +205,13 @@ export function createImportCandidateExecutionReconciliationService({
             eventType: 'download_completed',
           }).catch(() => {});
         }
+
+        if (typeof startSafeApplyRunAfterDownloadCompleted === 'function' && result?.candidate) {
+          autoApplyRuns.push(await startSafeApplyRunAfterDownloadCompleted({
+            importCandidateId,
+            requestMetadata,
+          }));
+        }
       } else if (targetStatus === 'failed') {
         result = await markImportCandidateDownloadFailed({
           actorUserId,
@@ -244,6 +253,8 @@ export function createImportCandidateExecutionReconciliationService({
       checkedAt,
       currentRunId: run?.id ?? null,
       summary: {
+        autoApplySkipped: autoApplyRuns.filter((runResult) => runResult.started === false).length,
+        autoApplyStarted: autoApplyRuns.filter((runResult) => runResult.started === true).length,
         recovered: recoveries.length,
         rediscovered: rediscoveries.length,
         retried: retries.length,
@@ -254,6 +265,7 @@ export function createImportCandidateExecutionReconciliationService({
       recoveries,
       rediscoveries,
       retries,
+      autoApplyRuns,
     };
   }
 

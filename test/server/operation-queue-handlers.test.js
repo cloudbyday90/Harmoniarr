@@ -103,8 +103,10 @@ test('operation queue handlers register shared operation types and map run summa
     run: {
       id: 'run-3',
       summary: {
+        applySafetyMode: 'safe_auto',
         executableCandidateCount: 4,
         requestedCandidateCount: 6,
+        triggerSource: 'download_completed',
       },
     },
   });
@@ -214,9 +216,11 @@ test('operation queue handlers register shared operation types and map run summa
     triggerSource: 'auto_selection',
   });
   assert.deepEqual(importCandidateApplyStartWorkerRun.mock.calls[0].arguments[0], {
+    applySafetyMode: 'safe_auto',
     executableCandidateCount: 4,
     requestedCandidateCount: 6,
     runId: 'run-3',
+    triggerSource: 'download_completed',
   });
   assert.deepEqual(importCandidateMediaInspectionStartWorkerRun.mock.calls[0].arguments[0], {
     requestedCandidateCount: 5,

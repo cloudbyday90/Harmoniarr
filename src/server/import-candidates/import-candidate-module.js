@@ -42,6 +42,7 @@ import { createImportCandidateRecoveryService } from './import-candidate-recover
 import { createImportCandidateExecutionService } from './import-candidate-execution-service.js';
 import { createImportCandidateExecutionSummaryService } from './import-candidate-execution-summary-service.js';
 import { createImportCandidateExecutionWorker } from './import-candidate-execution-worker.js';
+import { createImportCandidateAutoApplyRunService } from './import-candidate-auto-apply-run-service.js';
 import { createImportCandidateAutoDownloadRunService } from './import-candidate-auto-download-run-service.js';
 import { createImportCandidateAutoSelectionService } from './import-candidate-auto-selection-service.js';
 import { createImportCandidateImportPendingSummaryService } from './import-candidate-import-pending-summary-service.js';
@@ -281,6 +282,9 @@ export function createImportCandidateModule({
     createOperationRun: importCandidateApplyRunStore.createOperationRun,
     getActiveRun: importCandidateApplyRunStore.getActiveRun,
   }),
+  importCandidateAutoApplyRunService = createImportCandidateAutoApplyRunService({
+    startImportCandidateApplyRun: importCandidateApplyService.startImportCandidateApplyRun,
+  }),
   importCandidateMediaInspectionService = createImportCandidateMediaInspectionService({
     assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'import candidate media inspection',
@@ -329,6 +333,7 @@ export function createImportCandidateModule({
     markImportCandidateImportPending: importCandidateService.markImportCandidateImportPending,
     onDownloadCompletedFn,
     recordActivityEventFn,
+    startSafeApplyRunAfterDownloadCompleted: importCandidateAutoApplyRunService.startSafeApplyRunAfterDownloadCompleted,
     updateImportExecutionRunItem,
   }),
   importCandidateBulkReviewService = createImportCandidateBulkReviewService({
@@ -349,6 +354,7 @@ export function createImportCandidateModule({
     importCandidateTranscodeWorker,
     importCandidateApplyRunStore,
     importCandidateApplyService,
+    importCandidateAutoApplyRunService,
     importCandidateApplySummaryService,
     importCandidateApplyWorker,
     importCandidateReleaseHintService,

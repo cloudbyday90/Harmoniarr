@@ -63,6 +63,9 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   const importCandidateAutoDownloadRunService = {
     startDownloadRunAfterAutoSelection: () => {},
   };
+  const importCandidateAutoApplyRunService = {
+    startSafeApplyRunAfterDownloadCompleted: () => {},
+  };
   const importCandidateAutoSelectionService = {
     selectHighConfidenceCandidate: () => {},
   };
@@ -110,6 +113,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     importCandidateExecutionSummaryService,
     importCandidateExecutionWorker,
     importCandidateApplyPreviewService,
+    importCandidateAutoApplyRunService,
     importCandidateAutoDownloadRunService,
     importCandidateAutoSelectionService,
     importCandidateImportPendingSummaryService,
@@ -140,6 +144,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   assert.equal(importCandidateModule.importCandidateExecutionSummaryService, importCandidateExecutionSummaryService);
   assert.equal(importCandidateModule.importCandidateExecutionWorker, importCandidateExecutionWorker);
   assert.equal(importCandidateModule.importCandidateApplyPreviewService, importCandidateApplyPreviewService);
+  assert.equal(importCandidateModule.importCandidateAutoApplyRunService, importCandidateAutoApplyRunService);
   assert.equal(importCandidateModule.importCandidateAutoDownloadRunService, importCandidateAutoDownloadRunService);
   assert.equal(importCandidateModule.importCandidateAutoSelectionService, importCandidateAutoSelectionService);
   assert.equal(importCandidateModule.importCandidateImportPendingSummaryService, importCandidateImportPendingSummaryService);

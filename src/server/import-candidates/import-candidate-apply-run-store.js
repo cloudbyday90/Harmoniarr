@@ -33,6 +33,7 @@ function normalizeRun(run) {
     appliedCount: toNumberOrNull(run.summary.appliedCount),
     appliedWithWarningsCount: toNumberOrNull(run.summary.appliedWithWarningsCount),
     applyFailedCount: toNumberOrNull(run.summary.applyFailedCount),
+    applySafetyMode: run.summary.applySafetyMode ?? 'manual',
     blockedCount: toNumberOrNull(run.summary.blockedCount),
     currentStep: run.summary.currentStep ?? null,
     errorMessage: run.errorMessage,
@@ -47,6 +48,7 @@ function normalizeRun(run) {
     startedAt: run.startedAt,
     status: run.status,
     totalImportPending: toNumberOrNull(run.summary.totalImportPending),
+    triggerSource: run.summary.triggerSource ?? 'manual',
   };
 }
 
@@ -60,14 +62,24 @@ export function createImportCandidateApplyRunStore({
     operationType: operationDescriptor.operationType,
   });
 
-  async function createOperationRun({ executableCandidateCount = null, executionMode = 'move', requestedCandidateCount, status = 'pending', triggeredByUserId = null }) {
+  async function createOperationRun({
+    applySafetyMode = 'manual',
+    executableCandidateCount = null,
+    executionMode = 'move',
+    requestedCandidateCount,
+    status = 'pending',
+    triggeredByUserId = null,
+    triggerSource = 'manual',
+  }) {
     const run = await operationRunStore.createOperationRun({
       status,
       summary: {
+        applySafetyMode,
         currentStep: 'queued',
         executableCandidateCount,
         executionMode,
         requestedCandidateCount,
+        triggerSource,
       },
       triggeredByUserId,
     });

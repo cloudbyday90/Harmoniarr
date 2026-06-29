@@ -158,6 +158,99 @@ test('import apply worker applies ready candidates and persists per-item outcome
   }]);
 });
 
+test('import apply worker safe-auto mode skips warning and blocked candidates', async (t) => {
+  const markImportCandidateApplied = t.mock.fn(async () => ({}));
+  const replaceImportApplyRunItems = t.mock.fn(async () => []);
+  const updateImportApplyRunItem = t.mock.fn(async () => null);
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const markRunCompleted = t.mock.fn(async () => {
+    resolveCompleted();
+  });
+  const readyCandidate = createReadyImportCandidate({ id: 'candidate-ready-auto' });
+  const warningCandidate = createReadyImportCandidate({
+    id: 'candidate-warning-auto',
+    importStatus: { code: 'ready_with_warnings', message: 'Review warnings before adding.' },
+  });
+  const blockedCandidate = createReadyImportCandidate({
+    id: 'candidate-blocked-auto',
+    importStatus: { code: 'blocked', message: 'Collision review is required.' },
+  });
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview: async () => ({
+      executionMode: 'move',
+      fileOperations: [{ status: 'applied' }],
+      summary: {
+        appliedFileCount: 1,
+        failedFileCount: 0,
+        notAttemptedCount: 0,
+        stagedFromSourceCount: 1,
+        totalFiles: 1,
+      },
+    }),
+    buildImportPendingCandidateSummary: async () => ({
+      counts: {
+        blocked: 1,
+        ready: 1,
+        readyWithWarnings: 1,
+        totalImportPending: 3,
+      },
+      importPendingCandidates: [readyCandidate, warningCandidate, blockedCandidate],
+    }),
+    markImportCandidateApplied,
+    markRunCompleted,
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => ({
+      counts: { totalFiles: 1 },
+      files: [],
+      summary: { status: 'ready' },
+    }),
+    releaseLease: async () => {},
+    replaceImportApplyRunItems,
+    updateImportApplyRunItem,
+  });
+
+  await worker.startWorkerRun({
+    applySafetyMode: 'safe_auto',
+    executableCandidateCount: 1,
+    requestedCandidateCount: 3,
+    runId: 'run-safe-auto-1',
+    triggerSource: 'download_completed',
+  });
+
+  await completed;
+
+  assert.equal(replaceImportApplyRunItems.mock.callCount(), 1);
+  assert.equal(replaceImportApplyRunItems.mock.calls[0].arguments[1].length, 1);
+  assert.equal(replaceImportApplyRunItems.mock.calls[0].arguments[1][0].importCandidateId, 'candidate-ready-auto');
+  assert.equal(updateImportApplyRunItem.mock.callCount(), 1);
+  assert.equal(updateImportApplyRunItem.mock.calls[0].arguments[0].importCandidateId, 'candidate-ready-auto');
+  assert.equal(markImportCandidateApplied.mock.callCount(), 1);
+  assert.deepEqual(markRunCompleted.mock.calls[0].arguments, [{
+    runId: 'run-safe-auto-1',
+    summary: {
+      appliedCount: 1,
+      appliedWithWarningsCount: 0,
+      applyFailedCount: 0,
+      applySafetyMode: 'safe_auto',
+      blockedCount: 0,
+      currentStep: 'Import apply complete',
+      executionMode: 'move',
+      processedCandidateCount: 1,
+      readyCount: 1,
+      readyWithWarningsCount: 1,
+      requestedCandidateCount: 3,
+      skippedUnsafeCandidateCount: 2,
+      totalImportPending: 3,
+      triggerSource: 'download_completed',
+    },
+  }]);
+});
+
 test('import apply worker schedules one library scan after a completed run with applied candidates', async (t) => {
   const callOrder = [];
   let resolveScheduled;

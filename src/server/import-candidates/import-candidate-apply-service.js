@@ -37,7 +37,12 @@ export function createImportCandidateApplyService({
 } = {}) {
   const operationDescriptor = operationRunRegistry.importCandidateApply;
 
-  async function startImportCandidateApplyRun({ requestMetadata = null, triggeredByUserId = null } = {}) {
+  async function startImportCandidateApplyRun({
+    applySafetyMode = 'manual',
+    requestMetadata = null,
+    triggeredByUserId = null,
+    triggerSource = 'manual',
+  } = {}) {
     await assertMaintenanceWriteAllowed();
 
     const activeRun = await getActiveRun();
@@ -47,8 +52,11 @@ export function createImportCandidateApplyService({
 
     const importPendingSummary = await buildImportPendingCandidateSummary({ limit: 1000 });
     const requestedCandidateCount = importPendingSummary.counts?.totalImportPending ?? 0;
-    const executableCandidateCount = (importPendingSummary.counts?.ready ?? 0)
-      + (importPendingSummary.counts?.readyWithWarnings ?? 0);
+    const readyCandidateCount = importPendingSummary.counts?.ready ?? 0;
+    const warningCandidateCount = importPendingSummary.counts?.readyWithWarnings ?? 0;
+    const executableCandidateCount = applySafetyMode === 'safe_auto'
+      ? readyCandidateCount
+      : readyCandidateCount + warningCandidateCount;
 
     if (requestedCandidateCount < 1) {
       throw createApiError(409, 'import_candidate_apply_not_ready', 'No import-pending candidates are available for import apply');
@@ -59,11 +67,13 @@ export function createImportCandidateApplyService({
     }
 
     const run = await createOperationRun({
+      applySafetyMode,
       executableCandidateCount,
       executionMode: 'move',
       requestedCandidateCount,
       status: 'pending',
       triggeredByUserId,
+      triggerSource,
     });
 
     await recordAuditEventFn({
@@ -71,9 +81,12 @@ export function createImportCandidateApplyService({
       actorUserId: triggeredByUserId,
       details: {
         blockedCandidateCount: importPendingSummary.counts?.blocked ?? 0,
+        applySafetyMode,
         executableCandidateCount,
         requestedCandidateCount,
         runId: run.id,
+        triggerSource,
+        warningCandidateCount,
       },
       entityId: run.id,
       entityType: 'operation_run',

@@ -106,6 +106,62 @@ test('reconcileImportCandidateExecutionState persists workflow transitions from 
   assert.equal(result.summary.transitioned, 3);
 });
 
+test('reconcileImportCandidateExecutionState starts safe auto apply after completed download', async (t) => {
+  const startSafeApplyRunAfterDownloadCompleted = t.mock.fn(async ({ importCandidateId }) => ({
+    attempted: true,
+    importCandidateId,
+    runId: 'apply-run-1',
+    started: true,
+    triggerSource: 'download_completed',
+  }));
+  const service = createImportCandidateExecutionReconciliationService({
+    buildImportCandidateExecutionSummary: async () => ({
+      currentRun: {
+        id: 'run-completed-auto-apply',
+        items: [{
+          itemStatus: 'queued',
+          liveTransferSummary: { status: 'completed', message: '1 transfer completed successfully.' },
+          planningSnapshot: { candidate: { id: 'candidate-complete-1' }, execution: {} },
+          statusMessage: 'Completed',
+        }],
+      },
+    }),
+    getImportCandidate: async () => ({
+      id: 'candidate-complete-1',
+      status: 'downloading',
+    }),
+    markImportCandidateImportPending: async ({ importCandidateId }) => ({
+      candidate: {
+        id: importCandidateId,
+        folderPath: 'Artist/Album',
+        status: 'import_pending',
+        username: 'source-user',
+      },
+    }),
+    startSafeApplyRunAfterDownloadCompleted,
+    updateImportExecutionRunItem: async () => null,
+  });
+
+  const result = await service.reconcileImportCandidateExecutionState({
+    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test-agent' },
+  });
+
+  assert.equal(startSafeApplyRunAfterDownloadCompleted.mock.callCount(), 1);
+  assert.deepEqual(startSafeApplyRunAfterDownloadCompleted.mock.calls[0].arguments, [{
+    importCandidateId: 'candidate-complete-1',
+    requestMetadata: { ipAddress: '127.0.0.1', userAgent: 'test-agent' },
+  }]);
+  assert.equal(result.summary.autoApplyStarted, 1);
+  assert.equal(result.summary.autoApplySkipped, 0);
+  assert.deepEqual(result.autoApplyRuns, [{
+    attempted: true,
+    importCandidateId: 'candidate-complete-1',
+    runId: 'apply-run-1',
+    started: true,
+    triggerSource: 'download_completed',
+  }]);
+});
+
 test('reconcileImportCandidateExecutionState only fails missing transfers after the grace window expires', async (t) => {
   const markImportCandidateDownloadFailed = t.mock.fn(async ({ importCandidateId }) => ({
     candidate: { id: importCandidateId, status: 'failed' },
