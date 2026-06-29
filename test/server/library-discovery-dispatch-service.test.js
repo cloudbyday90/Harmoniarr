@@ -206,6 +206,8 @@ test('dispatchReadyDiscoveryRequests auto-selects high-confidence ingested candi
 
   assert.deepEqual(selectHighConfidenceCandidate.mock.calls[0].arguments[0], {
     actorUserId: 'operator-1',
+    profileCode: 'lossless_archive',
+    qualityOverride: null,
     requestMetadata: {
       ipAddress: '198.51.100.24',
       userAgent: 'DispatchAutoSelectionTest/1.0',
@@ -221,6 +223,60 @@ test('dispatchReadyDiscoveryRequests auto-selects high-confidence ingested candi
     searchQuery: 'Autechre Confield 2001',
   });
   assert.equal(result.dispatchedSearches[0].autoSelection.selectedCandidateId, 'candidate-1');
+});
+
+test('dispatchReadyDiscoveryRequests passes release fallback quality override into auto-selection', async (t) => {
+  const fallbackOverride = {
+    mode: 'allow_fallback_quality',
+    wantedReleaseId: 'wanted-1',
+  };
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {
+      musicQueueQualityOverride: fallbackOverride,
+      qualityProfile: 'lossless_archive',
+    },
+    metadataReleaseId: 'release-1',
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+  }];
+  const selectHighConfidenceCandidate = t.mock.fn(async () => ({
+    attempted: true,
+    selected: false,
+    skippedReason: 'quality_below_minimum',
+    sourceSearchId: 'search-1',
+  }));
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    importCandidateAutoSelectionService: {
+      selectHighConfidenceCandidate,
+    },
+    importCandidateService: {
+      ingestSlskdSearchResponses: t.mock.fn(async () => ({
+        candidateCount: 1,
+        fileCount: 12,
+      })),
+    },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    slskdService: {
+      startSearch: t.mock.fn(async () => ({ id: 'search-1' })),
+    },
+  });
+
+  await service.dispatchReadyDiscoveryRequests({ actorUserId: 'operator-1' });
+
+  assert.deepEqual(selectHighConfidenceCandidate.mock.calls[0].arguments[0], {
+    actorUserId: 'operator-1',
+    profileCode: 'lossless_archive',
+    qualityOverride: fallbackOverride,
+    requestMetadata: null,
+    sourceSearchId: 'search-1',
+  });
 });
 
 test('dispatchReadyDiscoveryRequests starts download run after high-confidence auto-selection', async (t) => {

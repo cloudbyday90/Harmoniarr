@@ -886,17 +886,24 @@ Acceptance:
 
 ### Phase 3 - Automation, Match Attempts, And Fallback
 
+Status: **In progress.** The first automatic match/download handoff slice is
+implemented; see
+`MUSIC_QUEUE_PHASE_3_AUTO_MATCH_DOWNLOAD_HANDOFF_DESIGN.md`.
+
 Goal: make the system proceed automatically through search, match choice,
 download, failed-match blocking, next-match fallback, transfer reconciliation,
 and rediscovery.
 
-- [ ] Add automatic match selection using desired format, minimum quality,
+- [x] Add automatic match selection using desired format, minimum quality,
   release identity, track match, folder completeness, peer health, source-user
-  trust, prior failures, and import safety.
-- [ ] Extend execution service to start a run for one match/candidate.
-- [ ] Keep shared selected-queue execution for advanced/manual batch use.
-- [ ] Auto-download high-confidence releases using the candidate-scoped path.
-- [ ] Auto-download only matches that satisfy quality policy.
+  trust, prior failures, and import safety. This first slice uses existing
+  composite scoring and release quality policy; durable prior-failure/import
+  safety ranking remains follow-up work.
+- [x] Extend execution service to start a run for one match/candidate by passing
+  the selected candidate id through the existing execution run summary.
+- [x] Keep shared selected-queue execution for advanced/manual batch use.
+- [x] Auto-download high-confidence releases using the candidate-scoped path.
+- [x] Auto-download only matches that satisfy quality policy.
 - [ ] Block auto-download before provider enqueue when folder setup is missing.
 - [ ] Exclude matches blocked by failed download, timeout, disappeared source,
   failed quality verification, import blocker, or operator rejection.

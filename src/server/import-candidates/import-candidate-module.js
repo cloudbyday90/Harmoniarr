@@ -65,6 +65,7 @@ import { createMaintenanceLockService } from '../recovery/maintenance-lock-servi
 import { createMaintenanceLockWriteGuardService } from '../recovery/maintenance-lock-write-guard-service.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
 import { loadSettings } from '../settings.js';
+import { createAcquisitionQualityPolicyService } from '../acquisition/acquisition-quality-policy-service.js';
 
 export function createImportCandidateModule({
   getMediaToolingStatus = async () => ({
@@ -304,6 +305,7 @@ export function createImportCandidateModule({
   }),
   importCandidateAutoSelectionService = createImportCandidateAutoSelectionService({
     listImportCandidates: importCandidateService.listImportCandidates,
+    qualityPolicyService: createAcquisitionQualityPolicyService(),
     selectImportCandidate: importCandidateService.selectImportCandidate,
   }),
   importCandidateAutoDownloadRunService = createImportCandidateAutoDownloadRunService({

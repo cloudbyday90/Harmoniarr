@@ -23,6 +23,7 @@ import {
 
 export const DEFAULT_AUTO_SELECTION_REASON = 'High-confidence automatic selection';
 const REVIEWABLE_STATUSES = new Set(['pending', 'held']);
+const AUTO_DOWNLOAD_ELIGIBLE_QUALITY_CODES = new Set(['accepted']);
 
 function toNullableNumber(value) {
   if (value === null || value === undefined || value === '') {
@@ -67,37 +68,128 @@ function buildScoredCandidates(candidates) {
     });
 }
 
+function resolveSkippedReasonForQuality(quality) {
+  if (!quality) {
+    return 'quality_not_evaluated';
+  }
+
+  if (quality.autoDownloadEligible === true || AUTO_DOWNLOAD_ELIGIBLE_QUALITY_CODES.has(quality.code)) {
+    return null;
+  }
+
+  if (quality.code === 'below_minimum') return 'quality_below_minimum';
+  if (quality.code === 'needs_verification') return 'quality_needs_verification';
+  if (quality.code === 'no_evidence') return 'quality_no_evidence';
+  return 'quality_not_eligible';
+}
+
+function evaluateCandidateQuality({
+  candidate,
+  profileCode,
+  qualityOverride,
+  qualityPolicyService,
+}) {
+  if (typeof qualityPolicyService?.evaluateQualityEvidence !== 'function') {
+    return null;
+  }
+
+  return qualityPolicyService.evaluateQualityEvidence({
+    candidate,
+    profileCode,
+    qualityOverride,
+  });
+}
+
+function buildQualityEligibleCandidates({
+  profileCode,
+  qualityOverride,
+  qualityPolicyService,
+  scoredCandidates,
+}) {
+  if (typeof qualityPolicyService?.evaluateQualityEvidence !== 'function') {
+    return {
+      eligibleCandidates: scoredCandidates.map((entry) => ({
+        ...entry,
+        quality: null,
+      })),
+      latestQuality: null,
+      latestSkippedReason: null,
+      qualityGateApplied: false,
+    };
+  }
+
+  const evaluatedCandidates = scoredCandidates.map((entry) => {
+    const quality = evaluateCandidateQuality({
+      candidate: entry.candidate,
+      profileCode,
+      qualityOverride,
+      qualityPolicyService,
+    });
+    return {
+      ...entry,
+      quality,
+      skippedReason: resolveSkippedReasonForQuality(quality),
+    };
+  });
+
+  const eligibleCandidates = evaluatedCandidates
+    .filter((entry) => entry.skippedReason === null);
+
+  return {
+    eligibleCandidates,
+    latestQuality: evaluatedCandidates[0]?.quality ?? null,
+    latestSkippedReason: evaluatedCandidates[0]?.skippedReason ?? null,
+    qualityGateApplied: true,
+  };
+}
+
 export function buildImportCandidateAutoSelectionEvaluation({
   candidates = [],
   policy = DEFAULT_SELECTION_READINESS_POLICY,
+  profileCode = null,
+  qualityOverride = null,
+  qualityPolicyService = null,
 } = {}) {
   const candidateList = Array.isArray(candidates) ? candidates : [];
   const scoredCandidates = buildScoredCandidates(candidateList);
+  const qualityGate = buildQualityEligibleCandidates({
+    profileCode,
+    qualityOverride,
+    qualityPolicyService,
+    scoredCandidates,
+  });
+  const selectionCandidates = qualityGate.eligibleCandidates;
   const readiness = buildImportCandidateSelectionReadiness({
-    bestCompositeScore: scoredCandidates[0]?.score ?? null,
+    bestCompositeScore: selectionCandidates[0]?.score ?? null,
     policy,
-    scoredCandidateCount: scoredCandidates.length,
-    secondBestCompositeScore: scoredCandidates[1]?.score ?? null,
+    scoredCandidateCount: selectionCandidates.length,
+    secondBestCompositeScore: selectionCandidates[1]?.score ?? null,
     statusCounts: buildStatusCounts(candidateList),
     totalCount: candidateList.length,
   });
 
   return {
-    bestCandidate: scoredCandidates[0]?.candidate ?? null,
+    bestCandidate: selectionCandidates[0]?.candidate ?? null,
     candidateCount: candidateList.length,
+    quality: selectionCandidates[0]?.quality ?? qualityGate.latestQuality,
+    qualityGateApplied: qualityGate.qualityGateApplied,
     readiness,
-    scoredCandidateCount: scoredCandidates.length,
+    scoredCandidateCount: selectionCandidates.length,
+    skippedReason: selectionCandidates.length > 0 ? null : qualityGate.latestSkippedReason,
   };
 }
 
 export function createImportCandidateAutoSelectionService({
   listImportCandidates,
   policy = DEFAULT_SELECTION_READINESS_POLICY,
+  qualityPolicyService = null,
   selectImportCandidate,
   selectionReason = DEFAULT_AUTO_SELECTION_REASON,
 } = {}) {
   async function selectHighConfidenceCandidate({
     actorUserId = null,
+    profileCode = null,
+    qualityOverride = null,
     requestMetadata = null,
     sourceSearchId,
   } = {}) {
@@ -125,13 +217,33 @@ export function createImportCandidateAutoSelectionService({
       sourceSearchId: normalizedSourceSearchId,
     });
     const candidates = Array.isArray(listResult?.candidates) ? listResult.candidates : [];
-    const evaluation = buildImportCandidateAutoSelectionEvaluation({ candidates, policy });
+    const evaluation = buildImportCandidateAutoSelectionEvaluation({
+      candidates,
+      policy,
+      profileCode,
+      qualityOverride,
+      qualityPolicyService,
+    });
     const readiness = evaluation.readiness;
+
+    if (evaluation.qualityGateApplied && evaluation.skippedReason) {
+      return {
+        attempted: true,
+        candidateCount: evaluation.candidateCount,
+        quality: evaluation.quality,
+        readiness,
+        scoredCandidateCount: evaluation.scoredCandidateCount,
+        selected: false,
+        skippedReason: evaluation.skippedReason,
+        sourceSearchId: normalizedSourceSearchId,
+      };
+    }
 
     if (readiness?.code !== 'auto_selectable') {
       return {
         attempted: true,
         candidateCount: evaluation.candidateCount,
+        quality: evaluation.quality,
         readiness,
         scoredCandidateCount: evaluation.scoredCandidateCount,
         selected: false,
@@ -163,6 +275,7 @@ export function createImportCandidateAutoSelectionService({
     return {
       attempted: true,
       candidateCount: evaluation.candidateCount,
+      quality: evaluation.quality,
       readiness,
       scoredCandidateCount: evaluation.scoredCandidateCount,
       selected: true,

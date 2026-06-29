@@ -126,13 +126,19 @@ function withFallbackOverride(profile, qualityOverride) {
 
 function collectFormatTokens({ candidate = {}, mediaVerification = {} } = {}) {
   const normalizedPayload = candidate.normalizedPayload ?? candidate.normalized_payload ?? {};
+  const normalizedPayloadExtensions = Array.isArray(normalizedPayload.extensions)
+    ? normalizedPayload.extensions
+    : [];
   const rawFormats = [
     candidate.audioFormat,
     candidate.codec,
     candidate.extension,
+    ...(Array.isArray(candidate.formats) ? candidate.formats : []),
+    ...(Array.isArray(candidate.extensions) ? candidate.extensions : []),
     normalizedPayload.audioFormat,
     normalizedPayload.codec,
     normalizedPayload.extension,
+    ...normalizedPayloadExtensions,
     mediaVerification.audioFormat,
     mediaVerification.codec,
     mediaVerification.container,

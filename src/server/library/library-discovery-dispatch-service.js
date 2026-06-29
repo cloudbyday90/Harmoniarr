@@ -128,8 +128,39 @@ export function createLibraryDiscoveryDispatchService({
     void onDiscoveryRequestExhaustedFn(payload).catch(() => {});
   }
 
+  function resolveQualityProfileCode({ claimedRequest, userPreferences } = {}) {
+    const explicitProfile = claimedRequest?.evidence?.qualityProfile
+      ?? claimedRequest?.evidence?.acquisitionProfile;
+    if (typeof explicitProfile === 'string' && explicitProfile.trim().length > 0) {
+      return explicitProfile.trim();
+    }
+
+    if (userPreferences?.minimumQuality === 'any' && (!userPreferences?.preferredFormat || userPreferences.preferredFormat === 'any')) {
+      return 'any_available';
+    }
+
+    if (
+      userPreferences?.minimumQuality === 'high'
+      || userPreferences?.preferredFormat === 'mp3_320'
+      || userPreferences?.preferredFormat === 'mp3_v0'
+    ) {
+      return 'high_quality';
+    }
+
+    return 'lossless_archive';
+  }
+
+  function buildAutoSelectionQualityContext({ claimedRequest, userPreferences } = {}) {
+    return {
+      profileCode: resolveQualityProfileCode({ claimedRequest, userPreferences }),
+      qualityOverride: claimedRequest?.evidence?.musicQueueQualityOverride ?? null,
+    };
+  }
+
   async function selectHighConfidenceCandidateAfterIngestion({
     actorUserId,
+    profileCode,
+    qualityOverride,
     requestMetadata,
     sourceSearchId,
   }) {
@@ -140,6 +171,8 @@ export function createLibraryDiscoveryDispatchService({
     try {
       return await importCandidateAutoSelectionService.selectHighConfidenceCandidate({
         actorUserId,
+        profileCode,
+        qualityOverride,
         requestMetadata,
         sourceSearchId,
       });
@@ -232,9 +265,14 @@ export function createLibraryDiscoveryDispatchService({
           requestMetadata,
           searchId: search.id,
         });
+        const qualityContext = buildAutoSelectionQualityContext({
+          claimedRequest,
+          userPreferences,
+        });
         const autoSelectionResult = ingestionResult.candidateCount > 0
           ? await selectHighConfidenceCandidateAfterIngestion({
             actorUserId,
+            ...qualityContext,
             requestMetadata,
             sourceSearchId: search.id,
           })
@@ -389,6 +427,10 @@ export function createLibraryDiscoveryDispatchService({
           minimumQuality: userPreferences.minimumQuality,
           preferredFormat: userPreferences.preferredFormat,
         } : null;
+        const qualityContext = buildAutoSelectionQualityContext({
+          claimedRequest,
+          userPreferences,
+        });
 
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
           actorUserId,
@@ -404,6 +446,7 @@ export function createLibraryDiscoveryDispatchService({
         const autoSelectionResult = ingestionResult.candidateCount > 0
           ? await selectHighConfidenceCandidateAfterIngestion({
             actorUserId,
+            ...qualityContext,
             requestMetadata,
             sourceSearchId: search.id,
           })

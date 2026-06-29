@@ -88,6 +88,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   queues rediscovery, and keeps unverified lossless claims blocked for audio
   verification. See
   `MUSIC_QUEUE_PHASE_2_FALLBACK_QUALITY_ACTION_DESIGN.md`.
+- Music Queue Phase 3 automatic match/download handoff: discovery dispatch now
+  passes release quality profile and per-release fallback override evidence into
+  automatic match selection. Auto-selection filters matches through the Music
+  Queue quality policy before selecting exactly one high-confidence match, and
+  the existing auto-download runner starts the candidate-scoped execution run
+  only when quality is accepted. See
+  `MUSIC_QUEUE_PHASE_3_AUTO_MATCH_DOWNLOAD_HANDOFF_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

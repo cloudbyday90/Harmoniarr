@@ -49,6 +49,17 @@ test('lossless archive requires verification for claimed FLAC evidence', () => {
   assert.equal(decision.autoDownloadEligible, false);
 });
 
+test('quality evaluation reads normalized extension arrays from candidates', () => {
+  const decision = evaluateQualityEvidence({
+    candidate: { normalizedPayload: { extensions: ['mp3'], bitrateKbps: 320 } },
+    profileCode: QUALITY_PROFILE_CODES.HIGH_QUALITY,
+  });
+
+  assert.equal(decision.code, QUALITY_DECISION_CODES.ACCEPTED);
+  assert.deepEqual(decision.formats, ['mp3']);
+  assert.equal(decision.autoDownloadEligible, true);
+});
+
 test('lossless archive blocks lossy evidence before automatic handoff', () => {
   const decision = evaluateQualityEvidence({
     candidate: { normalizedPayload: { bitrateKbps: 320, codec: 'mp3' } },

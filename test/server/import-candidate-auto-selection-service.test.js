@@ -8,13 +8,17 @@ import {
 
 function buildCandidate({
   compositeScore,
+  extensions = ['flac'],
   id,
+  bitrateKbps = null,
   status = 'pending',
 }) {
   return {
     id,
     normalizedPayload: {
+      bitrateKbps,
       compositeScore,
+      extensions,
     },
     status,
   };
@@ -123,4 +127,88 @@ test('selectHighConfidenceCandidate skips low-confidence or already-selected res
   assert.equal(selectImportCandidate.mock.callCount(), 0);
   assert.equal(lowConfidence.skippedReason, 'low_confidence');
   assert.equal(alreadySelected.skippedReason, 'selected');
+});
+
+test('selectHighConfidenceCandidate skips strict lossless when only lossy matches are available', async (t) => {
+  const selectImportCandidate = t.mock.fn(async () => {
+    throw new Error('should not select below-profile candidates');
+  });
+  const service = createImportCandidateAutoSelectionService({
+    listImportCandidates: t.mock.fn(async () => ({
+      candidates: [
+        buildCandidate({
+          bitrateKbps: 320,
+          compositeScore: 97,
+          extensions: ['mp3'],
+          id: 'candidate-mp3',
+        }),
+      ],
+    })),
+    qualityPolicyService: {
+      evaluateQualityEvidence: ({ candidate, profileCode }) => ({
+        autoDownloadEligible: false,
+        code: profileCode === 'lossless_archive' && candidate.normalizedPayload.extensions.includes('mp3')
+          ? 'below_minimum'
+          : 'accepted',
+      }),
+    },
+    selectImportCandidate,
+  });
+
+  const result = await service.selectHighConfidenceCandidate({
+    profileCode: 'lossless_archive',
+    sourceSearchId: 'search-lossless',
+  });
+
+  assert.equal(selectImportCandidate.mock.callCount(), 0);
+  assert.equal(result.selected, false);
+  assert.equal(result.skippedReason, 'quality_below_minimum');
+  assert.equal(result.quality.code, 'below_minimum');
+});
+
+test('selectHighConfidenceCandidate selects the highest-scoring quality-eligible match', async (t) => {
+  const selectImportCandidate = t.mock.fn(async () => ({
+    candidate: { id: 'candidate-flac', status: 'selected' },
+  }));
+  const service = createImportCandidateAutoSelectionService({
+    listImportCandidates: t.mock.fn(async () => ({
+      candidates: [
+        buildCandidate({
+          bitrateKbps: 320,
+          compositeScore: 99,
+          extensions: ['mp3'],
+          id: 'candidate-mp3',
+        }),
+        buildCandidate({
+          compositeScore: 94,
+          extensions: ['flac'],
+          id: 'candidate-flac',
+        }),
+      ],
+    })),
+    qualityPolicyService: {
+      evaluateQualityEvidence: ({ candidate }) => {
+        if (candidate.normalizedPayload.extensions.includes('mp3')) {
+          return { autoDownloadEligible: false, code: 'below_minimum' };
+        }
+        return { autoDownloadEligible: true, code: 'accepted' };
+      },
+    },
+    selectImportCandidate,
+  });
+
+  const result = await service.selectHighConfidenceCandidate({
+    profileCode: 'lossless_archive',
+    sourceSearchId: 'search-flac',
+  });
+
+  assert.equal(result.selected, true);
+  assert.equal(result.selectedCandidateId, 'candidate-flac');
+  assert.equal(result.scoredCandidateCount, 1);
+  assert.deepEqual(selectImportCandidate.mock.calls[0].arguments[0], {
+    actorUserId: null,
+    importCandidateId: 'candidate-flac',
+    reason: DEFAULT_AUTO_SELECTION_REASON,
+    requestMetadata: null,
+  });
 });
