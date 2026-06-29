@@ -27,6 +27,22 @@ const qualityPolicyService = {
   }),
 };
 
+const fallbackBlockedQualityPolicyService = {
+  evaluateQualityEvidence: () => ({
+    code: 'below_minimum',
+    explanation: 'Only MP3 evidence is available.',
+    profile: { code: 'lossless_archive' },
+  }),
+};
+
+const needsVerificationQualityPolicyService = {
+  evaluateQualityEvidence: () => ({
+    code: 'needs_verification',
+    explanation: 'Lossless evidence needs verification.',
+    profile: { code: 'lossless_archive' },
+  }),
+};
+
 function createRelease({ matchId = 'candidate-1', status = 'pending' } = {}) {
   return {
     artistName: 'Forest Frank',
@@ -54,6 +70,9 @@ function createRelease({ matchId = 'candidate-1', status = 'pending' } = {}) {
 }
 
 function createService({
+  allowMusicQueueFallbackQuality = async () => ({ metadataReleaseId: 'release-1', requestStatus: 'ready' }),
+  qualityPolicyService: serviceQualityPolicyService = qualityPolicyService,
+  recordActivityEventFn = async () => {},
   requestMusicQueueRediscovery = async () => ({ metadataReleaseId: 'release-1', requestStatus: 'ready' }),
   release = createRelease(),
   rejectImportCandidate = async () => ({ toStatus: 'rejected' }),
@@ -74,8 +93,10 @@ function createService({
 
   return createAcquisitionPipelineService({
     acquisitionPipelineStore: store,
+    allowMusicQueueFallbackQuality,
     getNow: () => new Date('2026-06-29T12:00:00.000Z'),
-    qualityPolicyService,
+    qualityPolicyService: serviceQualityPolicyService,
+    recordActivityEventFn,
     requestMusicQueueRediscovery,
     rejectImportCandidate,
     selectImportCandidate,
@@ -240,4 +261,67 @@ test('requestMusicQueueReleaseRediscovery rejects unstopped releases before writ
     },
   );
   assert.equal(requestMusicQueueRediscovery.mock.callCount(), 0);
+});
+
+test('allowMusicQueueReleaseFallbackQuality verifies release scope and records a quality decision', async (t) => {
+  const allowMusicQueueFallbackQuality = t.mock.fn(async () => ({
+    metadataReleaseId: 'release-1',
+    requestStatus: 'ready',
+  }));
+  const recordActivityEventFn = t.mock.fn(async () => {});
+  const startLibraryDiscoveryRun = t.mock.fn(async () => ({ accepted: true, run: { id: 'run-1' } }));
+  const service = createService({
+    allowMusicQueueFallbackQuality,
+    qualityPolicyService: fallbackBlockedQualityPolicyService,
+    recordActivityEventFn,
+    startLibraryDiscoveryRun,
+    statusService: stoppedStatusService,
+  });
+
+  const result = await service.allowMusicQueueReleaseFallbackQuality({
+    actorUserId: 'user-1',
+    appUserId: 'user-1',
+    requestMetadata: { ipAddress: '127.0.0.1' },
+    wantedReleaseId: 'wanted-1',
+  });
+
+  assert.equal(result.action.code, 'allow_fallback_quality');
+  assert.equal(result.action.discoveryRunId, 'run-1');
+  assert.deepEqual(allowMusicQueueFallbackQuality.mock.calls[0].arguments, [{
+    allowedAt: '2026-06-29T12:00:00.000Z',
+    allowedByUserId: 'user-1',
+    metadataReleaseId: 'release-1',
+    priorQualityProfile: 'lossless_archive',
+    reasonCode: 'operator_allowed_fallback_quality',
+    wantedReleaseId: 'wanted-1',
+  }]);
+  assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].eventType, 'quality_fallback_allowed');
+  assert.deepEqual(startLibraryDiscoveryRun.mock.calls[0].arguments, [{
+    requestMetadata: { ipAddress: '127.0.0.1' },
+    triggerSource: 'music_queue_quality_fallback',
+    triggeredByUserId: 'user-1',
+  }]);
+});
+
+test('allowMusicQueueReleaseFallbackQuality rejects unverified lossless states before writing', async (t) => {
+  const allowMusicQueueFallbackQuality = t.mock.fn(async () => ({}));
+  const service = createService({
+    allowMusicQueueFallbackQuality,
+    qualityPolicyService: needsVerificationQualityPolicyService,
+    statusService: stoppedStatusService,
+  });
+
+  await assert.rejects(
+    () => service.allowMusicQueueReleaseFallbackQuality({
+      actorUserId: 'user-1',
+      appUserId: 'user-1',
+      wantedReleaseId: 'wanted-1',
+    }),
+    (error) => {
+      assert.equal(error.status, 409);
+      assert.equal(error.code, 'music_queue_fallback_not_available');
+      return true;
+    },
+  );
+  assert.equal(allowMusicQueueFallbackQuality.mock.callCount(), 0);
 });

@@ -108,10 +108,12 @@ function buildQualitySummary(release) {
     autoAddLabel: quality.autoAddEligible ? 'Automatic add allowed' : 'Automatic add blocked',
     autoDownloadLabel: quality.autoDownloadEligible ? 'Automatic download allowed' : 'Automatic download blocked',
     bitrateLabel: formatQualityBitrateLabel(quality.bitrateKbps),
+    canAllowFallbackQuality: quality.code === 'below_minimum' && quality.fallbackOverrideActive !== true,
     cutoffFormatsLabel: formatQualityFormatList(profile.cutoffFormats),
     decisionLabel,
     explanation: quality.explanation ?? 'Quality evidence has not been evaluated yet.',
-    fallbackLabel: formatQualityFallbackLabel(profile),
+    fallbackLabel: quality.fallbackOverrideActive ? 'Fallback allowed for this release' : formatQualityFallbackLabel(profile),
+    fallbackOverrideLabel: quality.fallbackOverrideActive ? 'Allowed for this release' : 'No release override',
     formatsLabel,
     minimumFormatsLabel: formatQualityFormatList(profile.minimumFormats),
     preferredFormatsLabel: formatQualityFormatList(profile.preferredFormats),
@@ -125,6 +127,10 @@ function buildQualitySummary(release) {
 }
 
 function buildQualityReviewGuidance(quality = {}) {
+  if (quality.fallbackOverrideActive) {
+    return 'Fallback quality is allowed for this release. Harmoniarr can use the best acceptable match and keep looking for a preferred upgrade when the profile allows it.';
+  }
+
   switch (quality.code) {
     case 'accepted':
       return 'This quality decision is acceptable for automation.';
@@ -666,11 +672,15 @@ export function buildMusicQueueMatchReview(release) {
   if (!release) return null;
   const matchSummary = release.matchSummary ?? {};
   const qualitySummary = release.qualitySummary ?? {};
+  const canAllowFallbackQuality = release.statusCode === 'quality_choice_needed'
+    && qualitySummary.canAllowFallbackQuality;
   const canSearchAgain = ['failed', 'no_matches_left', 'quality_choice_needed'].includes(release.statusCode);
 
   return {
     action: release.action,
+    canAllowFallbackQuality,
     canSearchAgain,
+    fallbackQualityLabel: 'Allow fallback quality',
     heading: `${release.releaseTitle} by ${release.artistName}`,
     matchCards: buildMatchCards(release),
     matchRows: [
@@ -690,6 +700,7 @@ export function buildMusicQueueMatchReview(release) {
       { label: 'Minimum', value: qualitySummary.minimumFormatsLabel },
       { label: 'Cutoff', value: qualitySummary.cutoffFormatsLabel },
       { label: 'Fallback', value: qualitySummary.fallbackLabel },
+      { label: 'Release choice', value: qualitySummary.fallbackOverrideLabel },
       { label: 'Upgrade search', value: qualitySummary.upgradeLabel },
       { label: 'Formats', value: qualitySummary.formatsLabel },
       { label: 'Bitrate', value: qualitySummary.bitrateLabel },

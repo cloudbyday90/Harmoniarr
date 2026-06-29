@@ -80,6 +80,14 @@ Database model source: `docs/DATABASE_MODEL.md`
   `musicQueueRediscovery` evidence, and starts or reuses the existing Library
   discovery dispatch operation. See
   `MUSIC_QUEUE_PHASE_2_SEARCH_AGAIN_ACTION_DESIGN.md`.
+- Music Queue Phase 2 fallback-quality action: releases stopped at
+  `Quality choice needed` for below-profile evidence now expose an audited
+  release-scoped `Allow fallback quality` action. The route requires fresh
+  session and CSRF, re-checks release ownership, persists a bounded
+  `musicQueueQualityOverride`, records `quality_fallback_allowed` Activity,
+  queues rediscovery, and keeps unverified lossless claims blocked for audio
+  verification. See
+  `MUSIC_QUEUE_PHASE_2_FALLBACK_QUALITY_ACTION_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

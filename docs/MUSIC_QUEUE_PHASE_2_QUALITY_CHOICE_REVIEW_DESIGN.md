@@ -102,11 +102,8 @@ The user can now open a Music Queue release and answer:
 
 ## Next Slice
 
-Implement the release-scoped quality fallback override:
+The release-scoped quality fallback override later landed in
+`MUSIC_QUEUE_PHASE_2_FALLBACK_QUALITY_ACTION_DESIGN.md`.
 
-1. `Allow fallback quality` for profiles where fallback is permitted or where an
-   operator explicitly overrides a release
-2. audited Activity events for quality choice, fallback accepted, fallback
-   rejected, and rediscovery queued
-3. re-evaluation of the release under the fallback policy before automatic
-   download continues
+Next move is Phase 3 automation: automatically choose and download the best
+acceptable match after the quality gate passes.

@@ -95,11 +95,8 @@ discovery run unless one is already active.
 
 ## Next Slice
 
-Implement `Allow fallback quality` as an audited release-scoped quality override:
+`Allow fallback quality` later landed in
+`MUSIC_QUEUE_PHASE_2_FALLBACK_QUALITY_ACTION_DESIGN.md`.
 
-1. define the persisted override shape
-2. expose the current quality contract in the release read model
-3. require fresh session + CSRF
-4. record Activity/audit events
-5. re-evaluate the release under the fallback policy
-6. queue rediscovery after the override is saved
+Next move is Phase 3 automation: automatically select and download the best
+acceptable match when Music Queue no longer needs help.

@@ -17,7 +17,10 @@
  */
 
 import { createApiError } from '../auth.js';
-import { createAcquisitionQualityPolicyService } from './acquisition-quality-policy-service.js';
+import {
+  createAcquisitionQualityPolicyService,
+  QUALITY_DECISION_CODES,
+} from './acquisition-quality-policy-service.js';
 import { createAcquisitionPipelineStatusService } from './acquisition-pipeline-status-service.js';
 
 function normalizeString(value) {
@@ -115,6 +118,7 @@ function buildQualityEvidence(release, qualityPolicyService) {
     candidate: release.discoveryRequest?.evidence?.bestCandidate ?? {},
     mediaVerification: release.discoveryRequest?.evidence?.mediaVerification ?? {},
     profileCode,
+    qualityOverride: release.discoveryRequest?.evidence?.musicQueueQualityOverride ?? null,
   });
 }
 
@@ -173,9 +177,11 @@ const REDISCOVERY_ALLOWED_STATUS_CODES = new Set([
 
 export function createAcquisitionPipelineService({
   acquisitionPipelineStore,
+  allowMusicQueueFallbackQuality = null,
   getNow = () => new Date(),
   qualityPolicyService = createAcquisitionQualityPolicyService(),
   rejectImportCandidate = null,
+  recordActivityEventFn = null,
   requestMusicQueueRediscovery = null,
   selectImportCandidate = null,
   startLibraryDiscoveryRun = null,
@@ -183,6 +189,32 @@ export function createAcquisitionPipelineService({
 } = {}) {
   if (!acquisitionPipelineStore) {
     throw new TypeError('createAcquisitionPipelineService requires acquisitionPipelineStore');
+  }
+
+  async function startDiscoveryRunIfAvailable({
+    actorUserId,
+    requestMetadata,
+    triggerSource,
+  }) {
+    let dispatchAlreadyActive = false;
+    let run = null;
+    if (typeof startLibraryDiscoveryRun === 'function') {
+      try {
+        const started = await startLibraryDiscoveryRun({
+          requestMetadata,
+          triggerSource,
+          triggeredByUserId: actorUserId,
+        });
+        run = started?.run ?? null;
+      } catch (error) {
+        if (error?.code !== 'library_discovery_in_progress') {
+          throw error;
+        }
+        dispatchAlreadyActive = true;
+      }
+    }
+
+    return { dispatchAlreadyActive, run };
   }
 
   async function getScopedReleaseMatch({ appUserId, matchId, wantedReleaseId }, context) {
@@ -256,23 +288,11 @@ export function createAcquisitionPipelineService({
       throw createApiError(409, 'music_queue_retry_not_available', 'This release could not be queued for another search');
     }
 
-    let dispatchAlreadyActive = false;
-    let run = null;
-    if (typeof startLibraryDiscoveryRun === 'function') {
-      try {
-        const started = await startLibraryDiscoveryRun({
-          requestMetadata,
-          triggerSource: 'music_queue_try_again',
-          triggeredByUserId: actorUserId,
-        });
-        run = started?.run ?? null;
-      } catch (error) {
-        if (error?.code !== 'library_discovery_in_progress') {
-          throw error;
-        }
-        dispatchAlreadyActive = true;
-      }
-    }
+    const { dispatchAlreadyActive, run } = await startDiscoveryRunIfAvailable({
+      actorUserId,
+      requestMetadata,
+      triggerSource: 'music_queue_try_again',
+    });
 
     const refreshed = await getMusicQueueRelease({
       appUserId: scopedAppUserId,
@@ -287,6 +307,98 @@ export function createAcquisitionPipelineService({
         wantedReleaseId: scopedWantedReleaseId,
       },
       rediscovery,
+      release: refreshed.release,
+      run,
+    };
+  }
+
+  async function allowMusicQueueReleaseFallbackQuality({
+    appUserId,
+    actorUserId = null,
+    requestMetadata = null,
+    wantedReleaseId,
+  } = {}) {
+    if (typeof allowMusicQueueFallbackQuality !== 'function') {
+      throw createApiError(503, 'music_queue_fallback_unavailable', 'Music Queue fallback quality is not available');
+    }
+
+    const scopedAppUserId = normalizeRequiredAppUserId(appUserId, 'allowMusicQueueReleaseFallbackQuality');
+    const scopedWantedReleaseId = normalizeRequiredId(wantedReleaseId, 'wantedReleaseId');
+    const release = await acquisitionPipelineStore.getWantedReleaseEvidence({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    if (!release) {
+      throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
+    }
+
+    const projectedRelease = projectRelease(release, { qualityPolicyService, statusService });
+    if (projectedRelease.status?.code !== 'quality_choice_needed') {
+      throw createApiError(409, 'music_queue_fallback_not_available', 'This release is not waiting for a quality choice');
+    }
+    if (projectedRelease.quality?.code !== QUALITY_DECISION_CODES.BELOW_MINIMUM) {
+      throw createApiError(409, 'music_queue_fallback_not_available', 'Fallback quality can only be allowed when matches are below the selected preference');
+    }
+
+    const metadataReleaseId = normalizeString(release.metadataReleaseId);
+    if (!metadataReleaseId) {
+      throw createApiError(409, 'music_queue_fallback_missing_release', 'This release is missing the metadata release needed to allow fallback quality');
+    }
+
+    const allowedAt = getNow().toISOString();
+    const profileCode = projectedRelease.quality?.profile?.code ?? 'lossless_archive';
+    const override = await allowMusicQueueFallbackQuality({
+      allowedAt,
+      allowedByUserId: actorUserId,
+      metadataReleaseId,
+      priorQualityProfile: profileCode,
+      reasonCode: 'operator_allowed_fallback_quality',
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    if (!override) {
+      throw createApiError(409, 'music_queue_fallback_not_available', 'Fallback quality could not be saved for this release');
+    }
+
+    if (typeof recordActivityEventFn === 'function') {
+      try {
+        Promise.resolve(recordActivityEventFn({
+          actorUserId,
+          entityArtist: release.artistName ?? null,
+          entityId: scopedWantedReleaseId,
+          entityTitle: release.releaseTitle ?? release.releaseGroupTitle ?? null,
+          entityType: 'wanted_release',
+          eventType: 'quality_fallback_allowed',
+          extraPayload: {
+            metadataReleaseId,
+            priorQualityProfile: profileCode,
+            queuedRediscovery: true,
+            reasonCode: 'operator_allowed_fallback_quality',
+          },
+        })).catch(() => {});
+      } catch {
+        // Activity is diagnostic; the user action already persisted successfully.
+      }
+    }
+
+    const { dispatchAlreadyActive, run } = await startDiscoveryRunIfAvailable({
+      actorUserId,
+      requestMetadata,
+      triggerSource: 'music_queue_quality_fallback',
+    });
+
+    const refreshed = await getMusicQueueRelease({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+
+    return {
+      action: {
+        code: 'allow_fallback_quality',
+        dispatchAlreadyActive,
+        discoveryRunId: run?.id ?? null,
+        wantedReleaseId: scopedWantedReleaseId,
+      },
+      override,
       release: refreshed.release,
       run,
     };
@@ -388,6 +500,7 @@ export function createAcquisitionPipelineService({
   }
 
   return {
+    allowMusicQueueReleaseFallbackQuality,
     getMusicQueueRelease,
     listMusicQueueReleases,
     requestMusicQueueReleaseRediscovery,

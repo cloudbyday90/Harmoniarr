@@ -68,3 +68,28 @@ test('high quality accepts 320 kbps MP3 fallback evidence', () => {
   assert.equal(decision.code, QUALITY_DECISION_CODES.ACCEPTED);
   assert.equal(decision.minimumMet, true);
 });
+
+test('release fallback override accepts high-quality lossy evidence without changing cutoff preference', () => {
+  const decision = evaluateQualityEvidence({
+    candidate: { normalizedPayload: { bitrateKbps: 320, codec: 'mp3' } },
+    profileCode: QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE,
+    qualityOverride: { mode: 'allow_fallback_quality' },
+  });
+
+  assert.equal(decision.code, QUALITY_DECISION_CODES.ACCEPTED);
+  assert.equal(decision.fallbackOverrideActive, true);
+  assert.equal(decision.profile.fallbackAllowed, true);
+  assert.equal(decision.profile.upgradeAllowed, true);
+  assert.deepEqual(decision.profile.cutoffFormats, ['flac', 'alac', 'wav']);
+});
+
+test('release fallback override still requires verification for lossless claims', () => {
+  const decision = evaluateQualityEvidence({
+    candidate: { normalizedPayload: { codec: 'flac' } },
+    profileCode: QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE,
+    qualityOverride: { mode: 'allow_fallback_quality' },
+  });
+
+  assert.equal(decision.code, QUALITY_DECISION_CODES.NEEDS_VERIFICATION);
+  assert.equal(decision.autoDownloadEligible, false);
+});

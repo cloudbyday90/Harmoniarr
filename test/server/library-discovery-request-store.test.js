@@ -215,6 +215,65 @@ test('requestMusicQueueRediscovery resets one release into ready automatic searc
   assert.equal(result.nextSearchAfter, '2026-06-29T12:00:00.000Z');
 });
 
+test('allowMusicQueueFallbackQuality records override and queues rediscovery', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /'musicQueueQualityOverride'/);
+    assert.match(sql, /'mode', 'allow_fallback_quality'/);
+    assert.match(sql, /'musicQueueRediscovery'/);
+    assert.match(sql, /'quality_fallback_search_again'/);
+    assert.deepEqual(params, [
+      'release-1',
+      '2026-06-29T13:00:00.000Z',
+      'user-1',
+      'wanted-1',
+      'lossless_archive',
+      'operator_allowed_fallback_quality',
+    ]);
+    return {
+      rows: [{
+        blocked_reason: null,
+        evidence: {
+          musicQueueQualityOverride: {
+            mode: 'allow_fallback_quality',
+          },
+          musicQueueRediscovery: {
+            reasonCode: 'quality_fallback_search_again',
+          },
+        },
+        last_search_at: '2026-06-29T10:00:00.000Z',
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'group-1',
+        metadata_release_id: 'release-1',
+        next_search_after: '2026-06-29T13:00:00.000Z',
+        research_attempt_count: 0,
+        release_date: '2026-06-01',
+        release_group_title: 'Child of God',
+        release_title: 'Child of God',
+        request_status: 'ready',
+        search_attempt_count: 0,
+        search_mode: 'automatic',
+        wanted_status: 'missing',
+      }],
+    };
+  });
+  const store = createLibraryDiscoveryRequestStore({
+    getPoolFn: () => ({ query }),
+  });
+
+  const result = await store.allowMusicQueueFallbackQuality({
+    allowedAt: '2026-06-29T13:00:00.000Z',
+    allowedByUserId: 'user-1',
+    metadataReleaseId: 'release-1',
+    priorQualityProfile: 'lossless_archive',
+    reasonCode: 'operator_allowed_fallback_quality',
+    wantedReleaseId: 'wanted-1',
+  });
+
+  assert.equal(result.requestStatus, 'ready');
+  assert.equal(result.blockedReason, null);
+  assert.equal(result.evidence.musicQueueQualityOverride.mode, 'allow_fallback_quality');
+});
+
 test('scheduleDownloadRecoveryRediscovery records delayed automatic rediscovery state', async (t) => {
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /research_attempt_count = research_attempt_count \+ 1/);

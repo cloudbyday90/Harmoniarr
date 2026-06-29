@@ -58,3 +58,14 @@ export function searchMusicQueueReleaseAgain({ wantedReleaseId } = {}) {
     },
   );
 }
+
+export function allowMusicQueueFallbackQuality({ wantedReleaseId } = {}) {
+  return apiRequest(
+    `/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}/allow-fallback-quality`,
+    {
+      body: {},
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}

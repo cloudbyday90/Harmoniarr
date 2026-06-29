@@ -821,7 +821,8 @@ Acceptance:
 ### Phase 2 - New User-Facing Design And Core Logic
 
 Status: **In progress.** UX/read-model, match-drilldown, release-scoped
-match-action, quality-choice review, and Search again slices complete; see
+match-action, quality-choice review, Search again, and fallback-quality slices
+complete; see
 `MUSIC_QUEUE_PHASE_2_UX_DESIGN.md` and
 `MUSIC_QUEUE_PHASE_2_MATCH_DRILLDOWN_DESIGN.md`.
 The match-action outcome is documented in
@@ -829,7 +830,9 @@ The match-action outcome is documented in
 outcome is documented in
 `MUSIC_QUEUE_PHASE_2_QUALITY_CHOICE_REVIEW_DESIGN.md`. The Search again action
 outcome is documented in
-`MUSIC_QUEUE_PHASE_2_SEARCH_AGAIN_ACTION_DESIGN.md`.
+`MUSIC_QUEUE_PHASE_2_SEARCH_AGAIN_ACTION_DESIGN.md`. The fallback-quality action
+outcome is documented in
+`MUSIC_QUEUE_PHASE_2_FALLBACK_QUALITY_ACTION_DESIGN.md`.
 
 Goal: flesh out the Music Queue experience and the user-facing logic. This phase
 makes the new surface understandable and useful before enabling deeper
@@ -854,7 +857,7 @@ automation changes.
 - [x] Add release-scoped `Review quality choice` details.
 - [x] Add release-scoped `Search again` / `Try again` action for stopped
   releases.
-- [ ] Add release-scoped quality fallback action.
+- [x] Add release-scoped quality fallback action.
 - [x] Show why automation did or did not choose a match at aggregate release
   level and in simplified per-match cards.
 - [x] Show quality profile fit for each release: profile, decision, format

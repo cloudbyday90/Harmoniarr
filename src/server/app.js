@@ -554,11 +554,13 @@ export function createApp({
     slskdService: slskdModule.slskdService,
   });
   const acquisitionModule = buildAcquisitionModule({
+    allowMusicQueueFallbackQuality: libraryModule.libraryDiscoveryRequestStore?.allowMusicQueueFallbackQuality,
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
     rejectImportCandidate: importCandidateModule.importCandidateService?.rejectImportCandidate
       ?? importCandidateModule.routeDependencies?.rejectImportCandidate
       ?? null,
     requestMusicQueueRediscovery: libraryModule.libraryDiscoveryRequestStore?.requestMusicQueueRediscovery,
+    recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate
       ?? importCandidateModule.routeDependencies?.selectImportCandidate
       ?? null,

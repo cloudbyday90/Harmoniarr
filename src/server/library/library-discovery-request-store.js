@@ -602,6 +602,92 @@ export function createLibraryDiscoveryRequestStore({
     return mapDiscoveryRequestStateRow(result.rows[0]);
   }
 
+  async function allowMusicQueueFallbackQuality({
+    allowedAt,
+    allowedByUserId = null,
+    metadataReleaseId,
+    priorQualityProfile = null,
+    reasonCode = 'operator_allowed_fallback_quality',
+    wantedReleaseId = null,
+  }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        WITH updated AS (
+          UPDATE library_discovery_requests
+          SET
+            search_mode = 'automatic',
+            request_status = 'ready',
+            blocked_reason = NULL,
+            next_search_after = $2::timestamptz,
+            search_attempt_count = 0,
+            evidence = (
+              COALESCE(evidence, '{}'::jsonb)
+                - 'searchExhausted'
+            ) || jsonb_build_object(
+              'musicQueueQualityOverride',
+              jsonb_build_object(
+                'allowedAt', $2::timestamptz,
+                'allowedByUserId', $3::text,
+                'mode', 'allow_fallback_quality',
+                'priorQualityProfile', $5::text,
+                'reasonCode', $6::text,
+                'wantedReleaseId', $4::text
+              ),
+              'musicQueueRediscovery',
+              jsonb_build_object(
+                'priorBlockedReason', blocked_reason,
+                'priorRequestStatus', request_status,
+                'priorSearchAttemptCount', search_attempt_count,
+                'reasonCode', 'quality_fallback_search_again',
+                'requestedAt', $2::timestamptz,
+                'requestedByUserId', $3::text,
+                'wantedReleaseId', $4::text
+              )
+            ),
+            updated_at = NOW()
+          WHERE metadata_release_id = $1
+            AND search_mode = 'automatic'
+          RETURNING *
+        )
+        SELECT
+          updated.metadata_artist_id,
+          updated.metadata_release_group_id,
+          updated.metadata_release_id,
+          updated.wanted_status,
+          updated.search_mode,
+          updated.request_status,
+          updated.blocked_reason,
+          updated.release_date,
+          updated.last_search_at,
+          updated.next_search_after,
+          updated.search_attempt_count,
+          updated.research_attempt_count,
+          updated.evidence,
+          metadata_artists.name AS artist_name,
+          metadata_release_groups.title AS release_group_title,
+          metadata_releases.title AS release_title
+        FROM updated
+        JOIN metadata_artists
+          ON metadata_artists.id = updated.metadata_artist_id
+        JOIN metadata_release_groups
+          ON metadata_release_groups.id = updated.metadata_release_group_id
+        JOIN metadata_releases
+          ON metadata_releases.id = updated.metadata_release_id
+      `,
+      [
+        metadataReleaseId,
+        allowedAt,
+        allowedByUserId,
+        wantedReleaseId,
+        priorQualityProfile,
+        reasonCode,
+      ],
+    );
+
+    return mapDiscoveryRequestStateRow(result.rows[0]);
+  }
+
   async function markDiscoveryRequestExhausted({
     metadataReleaseId,
     reasonCode = 'discovery_search_attempts_exhausted',
@@ -710,6 +796,7 @@ export function createLibraryDiscoveryRequestStore({
   }
 
   return {
+    allowMusicQueueFallbackQuality,
     claimNextReadyAutomaticDiscoveryRequest,
     getDownloadRecoveryRediscoveryState,
     listDiscoveryRequestsByMetadataReleaseIds,

@@ -30,6 +30,8 @@ export const QUALITY_DECISION_CODES = Object.freeze({
 });
 
 const LOSSLESS_FORMATS = new Set(['alac', 'ape', 'flac', 'wav', 'wave']);
+const FALLBACK_MINIMUM_FORMATS = Object.freeze(['mp3', 'aac', 'opus', 'ogg']);
+const FALLBACK_MINIMUM_BITRATE_KBPS = 256;
 
 const QUALITY_PROFILES = Object.freeze({
   [QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE]: Object.freeze({
@@ -82,6 +84,46 @@ function toNumberOrNull(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeFallbackOverride(value) {
+  if (!value || typeof value !== 'object') return null;
+  const mode = normalizeToken(value.mode);
+  if (mode !== 'allow_fallback_quality') return null;
+  return {
+    allowedAt: value.allowedAt ?? null,
+    allowedByUserId: value.allowedByUserId ?? null,
+    mode,
+    reasonCode: value.reasonCode ?? null,
+    wantedReleaseId: value.wantedReleaseId ?? null,
+  };
+}
+
+function withFallbackOverride(profile, qualityOverride) {
+  const fallbackOverride = normalizeFallbackOverride(qualityOverride);
+  if (!fallbackOverride) {
+    return { fallbackOverride: null, profile };
+  }
+
+  const minimumFormats = [
+    ...new Set([
+      ...profile.minimumFormats,
+      ...FALLBACK_MINIMUM_FORMATS,
+    ]),
+  ];
+
+  return {
+    fallbackOverride,
+    profile: {
+      ...profile,
+      fallbackAllowed: true,
+      fallbackOverrideActive: true,
+      fallbackTargetFormats: FALLBACK_MINIMUM_FORMATS,
+      minimumBitrateKbps: profile.minimumBitrateKbps ?? FALLBACK_MINIMUM_BITRATE_KBPS,
+      minimumFormats,
+      upgradeAllowed: true,
+    },
+  };
+}
+
 function collectFormatTokens({ candidate = {}, mediaVerification = {} } = {}) {
   const normalizedPayload = candidate.normalizedPayload ?? candidate.normalized_payload ?? {};
   const rawFormats = [
@@ -129,8 +171,9 @@ export function evaluateQualityEvidence({
   candidate = {},
   mediaVerification = {},
   profileCode = QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE,
+  qualityOverride = null,
 } = {}) {
-  const profile = resolveQualityProfile(profileCode);
+  const { fallbackOverride, profile } = withFallbackOverride(resolveQualityProfile(profileCode), qualityOverride);
   const formats = collectFormatTokens({ candidate, mediaVerification });
   const normalizedPayload = candidate.normalizedPayload ?? candidate.normalized_payload ?? {};
   const bitrateKbps = toNumberOrNull(
@@ -142,12 +185,16 @@ export function evaluateQualityEvidence({
       ?? normalizedPayload.bitRateKbps,
   );
   const verifiedLossless = resolveVerifiedLossless({ mediaVerification });
+  const hasLosslessFormat = formats.some((format) => LOSSLESS_FORMATS.has(format));
   const preferredMet = profile.preferredFormats.some((format) => formats.includes(format));
   const minimumFormatMet = profile.minimumFormats.some((format) => formats.includes(format));
   const minimumBitrateMet = profile.minimumBitrateKbps == null || (bitrateKbps != null && bitrateKbps >= profile.minimumBitrateKbps);
-  const minimumMet = profile.code === QUALITY_PROFILE_CODES.HIGH_QUALITY
-    ? (minimumFormatMet && (verifiedLossless || minimumBitrateMet))
+  const minimumMet = profile.minimumBitrateKbps != null
+    ? (minimumFormatMet && (hasLosslessFormat || minimumBitrateMet))
     : minimumFormatMet;
+  const needsLosslessVerification = profile.requiresVerification
+    && hasLosslessFormat
+    && !verifiedLossless;
 
   if (formats.length === 0 && bitrateKbps == null) {
     return {
@@ -157,6 +204,8 @@ export function evaluateQualityEvidence({
       code: QUALITY_DECISION_CODES.NO_EVIDENCE,
       explanation: 'No audio quality evidence has been collected yet.',
       formats,
+      fallbackOverride,
+      fallbackOverrideActive: Boolean(fallbackOverride),
       minimumMet: false,
       preferredMet: false,
       profile,
@@ -173,6 +222,8 @@ export function evaluateQualityEvidence({
       code: QUALITY_DECISION_CODES.BELOW_MINIMUM,
       explanation: `${profile.label} requires ${profile.minimumFormats.join(', ')}${profile.minimumBitrateKbps ? ` or ${profile.minimumBitrateKbps} kbps+ evidence` : ''}.`,
       formats,
+      fallbackOverride,
+      fallbackOverrideActive: Boolean(fallbackOverride),
       minimumMet: false,
       preferredMet,
       profile,
@@ -181,7 +232,7 @@ export function evaluateQualityEvidence({
     };
   }
 
-  if (profile.requiresVerification && !verifiedLossless) {
+  if (needsLosslessVerification) {
     return {
       autoAddEligible: false,
       autoDownloadEligible: false,
@@ -189,6 +240,8 @@ export function evaluateQualityEvidence({
       code: QUALITY_DECISION_CODES.NEEDS_VERIFICATION,
       explanation: 'Lossless preference needs verified media evidence before automatic download or import.',
       formats,
+      fallbackOverride,
+      fallbackOverrideActive: Boolean(fallbackOverride),
       minimumMet,
       preferredMet,
       profile,
@@ -204,8 +257,12 @@ export function evaluateQualityEvidence({
     code: QUALITY_DECISION_CODES.ACCEPTED,
     explanation: preferredMet
       ? `${profile.label} preference is satisfied.`
-      : `${profile.label} minimum is satisfied by fallback quality.`,
+      : (fallbackOverride
+          ? `${profile.label} fallback quality is allowed for this release.`
+          : `${profile.label} minimum is satisfied by fallback quality.`),
     formats,
+    fallbackOverride,
+    fallbackOverrideActive: Boolean(fallbackOverride),
     minimumMet,
     preferredMet,
     profile,

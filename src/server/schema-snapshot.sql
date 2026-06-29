@@ -5123,7 +5123,24 @@ SET migration_key = EXCLUDED.migration_key,
     updated_at = NOW();
 
 -- Migration: 20260627_135354_add_artist_policy_activity_event.sql
--- Checksum: d66a8b2f4a41d39fcf057af21861710049d4ea0925ca75f88814ccb93494247d
+-- Checksum: fb854a578961fb152c828b221843083090a394838ad9356938c41c946e3c9590
+--
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 BEGIN;
 
 ALTER TABLE activity_events
@@ -5153,7 +5170,7 @@ VALUES (
   '20260627_135354',
   '20260627_135354_add_artist_policy_activity_event.sql',
   'add_artist_policy_activity_event',
-  'd66a8b2f4a41d39fcf057af21861710049d4ea0925ca75f88814ccb93494247d',
+  'fb854a578961fb152c828b221843083090a394838ad9356938c41c946e3c9590',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE
@@ -5498,6 +5515,70 @@ VALUES (
   '20260629_000001_spectral_cache_and_retroactive.sql',
   'spectral_cache_and_retroactive',
   '9a10433bfe9271585ecfce3e01083574d40890856080a6c4a2bd0f48bd93cf3d',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();
+
+-- Migration: 20260629_164322_add_music_queue_quality_fallback_activity_event.sql
+-- Checksum: 5b6f70af5fb706a2de2c39f1af9b3d6c8ba5583983e7e73cdddfa7a5e5976570
+--
+-- Harmoniarr - Soulseek-native music library management
+-- Copyright (C) 2026 Harmoniarr Contributors
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+BEGIN;
+
+ALTER TABLE activity_events
+  DROP CONSTRAINT IF EXISTS activity_events_event_type_check;
+
+ALTER TABLE activity_events
+  ADD CONSTRAINT activity_events_event_type_check
+  CHECK (event_type IN (
+    'request_created',
+    'download_completed',
+    'release_added',
+    'artist_monitored',
+    'artist_policy_saved',
+    'quality_fallback_allowed',
+    'request_fulfilled'
+  ));
+
+COMMIT;
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260629_164322',
+  '20260629_164322_add_music_queue_quality_fallback_activity_event.sql',
+  'add_music_queue_quality_fallback_activity_event',
+  '5b6f70af5fb706a2de2c39f1af9b3d6c8ba5583983e7e73cdddfa7a5e5976570',
   'applied'
 )
 ON CONFLICT (filename) DO UPDATE

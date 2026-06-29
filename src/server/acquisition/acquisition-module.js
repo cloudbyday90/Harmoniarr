@@ -22,12 +22,14 @@ import { createAcquisitionPipelineStore } from './acquisition-pipeline-store.js'
 import { createAcquisitionQualityPolicyService } from './acquisition-quality-policy-service.js';
 
 export function createAcquisitionModule({
+  allowMusicQueueFallbackQuality = null,
   buildLibraryWantedReleases,
   createPipelineService = createAcquisitionPipelineService,
   createPipelineStatusService = createAcquisitionPipelineStatusService,
   createPipelineStore = createAcquisitionPipelineStore,
   createQualityPolicyService = createAcquisitionQualityPolicyService,
   rejectImportCandidate = null,
+  recordActivityEventFn = null,
   requestMusicQueueRediscovery = null,
   selectImportCandidate = null,
   startLibraryDiscoveryRun = null,
@@ -37,8 +39,10 @@ export function createAcquisitionModule({
   const acquisitionPipelineStore = createPipelineStore({ buildLibraryWantedReleases });
   const acquisitionPipelineService = createPipelineService({
     acquisitionPipelineStore,
+    allowMusicQueueFallbackQuality,
     qualityPolicyService,
     rejectImportCandidate,
+    recordActivityEventFn,
     requestMusicQueueRediscovery,
     selectImportCandidate,
     startLibraryDiscoveryRun,
@@ -51,6 +55,7 @@ export function createAcquisitionModule({
     qualityPolicyService,
     routeDependencies: {
       getMusicQueueRelease: acquisitionPipelineService.getMusicQueueRelease,
+      allowMusicQueueReleaseFallbackQuality: acquisitionPipelineService.allowMusicQueueReleaseFallbackQuality,
       listMusicQueueReleases: acquisitionPipelineService.listMusicQueueReleases,
       requestMusicQueueReleaseRediscovery: acquisitionPipelineService.requestMusicQueueReleaseRediscovery,
       rejectMusicQueueMatch: acquisitionPipelineService.rejectMusicQueueMatch,

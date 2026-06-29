@@ -243,6 +243,82 @@ test('buildMusicQueueMatchReview exposes search again for quality-stopped releas
   assert.equal(review.searchAgainLabel, 'Search again');
 });
 
+test('buildMusicQueueMatchReview exposes fallback quality action for below-profile quality stops', () => {
+  const release = normalizeMusicQueueRelease({
+    artistName: 'Forest Frank',
+    evidence: { match: { totalCount: 1 } },
+    id: 'wanted-1',
+    quality: {
+      autoAddEligible: false,
+      autoDownloadEligible: false,
+      bitrateKbps: 320,
+      code: 'below_minimum',
+      explanation: 'Lossless archive requires FLAC.',
+      fallbackOverrideActive: false,
+      formats: ['mp3'],
+      profile: {
+        code: 'lossless_archive',
+        cutoffFormats: ['flac'],
+        fallbackAllowed: false,
+        minimumFormats: ['flac'],
+        preferredFormats: ['flac'],
+      },
+      verifiedLossless: false,
+    },
+    releaseTitle: 'Child of God',
+    status: {
+      code: 'quality_choice_needed',
+      label: 'Quality choice needed',
+      message: 'Needs review',
+      nextAction: 'review_quality_choice',
+      tone: 'warning',
+    },
+  });
+
+  const review = buildMusicQueueMatchReview(release);
+
+  assert.equal(review.canAllowFallbackQuality, true);
+  assert.equal(review.fallbackQualityLabel, 'Allow fallback quality');
+  assert.ok(review.qualityRows.some((row) => row.label === 'Release choice' && row.value === 'No release override'));
+});
+
+test('buildMusicQueueMatchReview hides fallback action after release override is active', () => {
+  const release = normalizeMusicQueueRelease({
+    artistName: 'Forest Frank',
+    id: 'wanted-1',
+    quality: {
+      autoAddEligible: true,
+      autoDownloadEligible: true,
+      code: 'accepted',
+      explanation: 'Fallback quality is allowed for this release.',
+      fallbackOverrideActive: true,
+      formats: ['mp3'],
+      profile: {
+        code: 'lossless_archive',
+        cutoffFormats: ['flac'],
+        fallbackAllowed: true,
+        minimumFormats: ['flac', 'mp3'],
+        preferredFormats: ['flac'],
+        upgradeAllowed: true,
+      },
+    },
+    releaseTitle: 'Child of God',
+    status: {
+      code: 'pick_match',
+      label: 'Pick a match',
+      message: 'Review matches',
+      nextAction: 'review_matches',
+      tone: 'warning',
+    },
+  });
+
+  const review = buildMusicQueueMatchReview(release);
+
+  assert.equal(review.canAllowFallbackQuality, false);
+  assert.ok(review.qualityRows.some((row) => row.label === 'Release choice' && row.value === 'Allowed for this release'));
+  assert.match(review.qualityGuidance, /Fallback quality is allowed/);
+});
+
 test('buildMusicQueueReleaseTypeFilters derives stable type options', () => {
   const filters = buildMusicQueueReleaseTypeFilters([
     normalizeMusicQueueRelease({ releaseGroupType: 'Album' }),

@@ -7,6 +7,10 @@ import { createJsonTestApp, withServer } from '../../testing/server/http-test-he
 function createAcquisitionRouteTestApp(overrides = {}) {
   return createJsonTestApp((app) => {
     registerAcquisitionRoutes(app, {
+      allowMusicQueueReleaseFallbackQuality: async ({ wantedReleaseId }) => ({
+        action: { code: 'allow_fallback_quality', wantedReleaseId },
+        release: { id: wantedReleaseId },
+      }),
       getRequestMetadata: () => ({ ipAddress: '127.0.0.1' }),
       getMusicQueueRelease: async ({ wantedReleaseId }) => ({
         release: { id: wantedReleaseId, status: { code: 'queued_for_search' } },
@@ -191,6 +195,41 @@ test('music queue search-again route requires fresh session and CSRF before scop
     assert.equal(requireFreshSession.mock.callCount(), 1);
     assert.equal(requireCsrf.mock.callCount(), 1);
     assert.deepEqual(requestMusicQueueReleaseRediscovery.mock.calls[0].arguments, [{
+      actorUserId: 'user-1',
+      appUserId: 'user-1',
+      requestMetadata: { ipAddress: '127.0.0.1' },
+      wantedReleaseId: 'wanted-1',
+    }]);
+  });
+});
+
+test('music queue allow-fallback-quality route requires fresh session and CSRF before scoped override', async (t) => {
+  const allowMusicQueueReleaseFallbackQuality = t.mock.fn(async ({ wantedReleaseId }) => ({
+    action: { code: 'allow_fallback_quality', wantedReleaseId },
+    release: { id: wantedReleaseId },
+  }));
+  const requireFreshSession = t.mock.fn(async () => ({ appUserId: 'user-1' }));
+  const requireCsrf = t.mock.fn(() => {});
+  const app = createAcquisitionRouteTestApp({
+    allowMusicQueueReleaseFallbackQuality,
+    getRequestMetadata: () => ({ ipAddress: '127.0.0.1' }),
+    requireCsrf,
+    requireFreshSession,
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/acquisition/releases/wanted-1/allow-fallback-quality`, {
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.action.code, 'allow_fallback_quality');
+    assert.equal(requireFreshSession.mock.callCount(), 1);
+    assert.equal(requireCsrf.mock.callCount(), 1);
+    assert.deepEqual(allowMusicQueueReleaseFallbackQuality.mock.calls[0].arguments, [{
       actorUserId: 'user-1',
       appUserId: 'user-1',
       requestMetadata: { ipAddress: '127.0.0.1' },

@@ -19,6 +19,7 @@
 export const serverRouteInventory = Object.freeze([
   { method: 'GET', path: '/api/v1/acquisition/releases', access: 'authenticated', area: 'music-queue', kind: 'read' },
   { method: 'GET', path: '/api/v1/acquisition/releases/:wantedReleaseId', access: 'authenticated', area: 'music-queue', kind: 'read' },
+  { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/allow-fallback-quality', access: 'authenticated', area: 'music-queue', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/search-again', access: 'authenticated', area: 'music-queue', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/matches/:matchId/use', access: 'authenticated', area: 'music-queue', kind: 'mutation' },
   { method: 'POST', path: '/api/v1/acquisition/releases/:wantedReleaseId/matches/:matchId/reject', access: 'authenticated', area: 'music-queue', kind: 'mutation' },

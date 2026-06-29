@@ -31,6 +31,7 @@ const {
   actionMessage,
   activeMatchActionKey,
   activeReleaseActionKey,
+  allowFallbackQuality,
   errorMessage,
   isLoading,
   isRevalidating,
@@ -97,6 +98,12 @@ async function handleRejectMatch(match) {
 
 async function handleSearchAgain() {
   await searchAgain({
+    wantedReleaseId: selectedRelease.value?.id,
+  });
+}
+
+async function handleAllowFallbackQuality() {
+  await allowFallbackQuality({
     wantedReleaseId: selectedRelease.value?.id,
   });
 }
@@ -360,10 +367,20 @@ async function handleSearchAgain() {
 
           <div class="music-queue-review-actions">
             <button
-              v-if="matchReview.canSearchAgain"
+              v-if="matchReview.canAllowFallbackQuality"
               type="button"
               class="hx-btn"
               data-variant="primary"
+              :disabled="Boolean(activeReleaseActionKey)"
+              @click="handleAllowFallbackQuality"
+            >
+              {{ isReleaseActionRunning('allow-fallback-quality') ? 'Saving...' : matchReview.fallbackQualityLabel }}
+            </button>
+            <button
+              v-if="matchReview.canSearchAgain"
+              type="button"
+              class="hx-btn"
+              :data-variant="matchReview.canAllowFallbackQuality ? 'ghost' : 'primary'"
               :disabled="Boolean(activeReleaseActionKey)"
               @click="handleSearchAgain"
             >

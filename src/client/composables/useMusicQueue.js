@@ -19,6 +19,7 @@
 import { computed, readonly, ref } from 'vue';
 import { useAsyncResource } from './useAsyncResource.js';
 import {
+  allowMusicQueueFallbackQuality as defaultAllowMusicQueueFallbackQuality,
   fetchMusicQueueReleases as defaultFetchMusicQueueReleases,
   rejectMusicQueueMatch as defaultRejectMusicQueueMatch,
   searchMusicQueueReleaseAgain as defaultSearchMusicQueueReleaseAgain,
@@ -28,6 +29,7 @@ import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/
 import { getErrorMessage } from '../lib/error-utils.js';
 
 export function useMusicQueue({
+  allowMusicQueueFallbackQuality = defaultAllowMusicQueueFallbackQuality,
   fetchMusicQueueReleases = defaultFetchMusicQueueReleases,
   limit = 100,
   pollIntervalMs = 30000,
@@ -131,12 +133,38 @@ export function useMusicQueue({
     }
   }
 
+  async function allowFallbackQuality({ wantedReleaseId } = {}) {
+    if (!wantedReleaseId) {
+      actionErrorMessage.value = 'This release is missing the context needed to allow fallback quality.';
+      return null;
+    }
+
+    activeReleaseActionKey.value = `${wantedReleaseId}:allow-fallback-quality`;
+    actionErrorMessage.value = '';
+    actionMessage.value = '';
+
+    try {
+      const payload = await allowMusicQueueFallbackQuality({ wantedReleaseId });
+      actionMessage.value = payload?.action?.dispatchAlreadyActive
+        ? 'Fallback quality allowed. Discovery is already running and will pick this up.'
+        : 'Fallback quality allowed. Harmoniarr will look for an acceptable match.';
+      await resource.load();
+      return payload;
+    } catch (error) {
+      actionErrorMessage.value = getErrorMessage(error, 'Music Queue fallback quality update failed.');
+      return null;
+    } finally {
+      activeReleaseActionKey.value = '';
+    }
+  }
+
   return {
     ...resource,
     actionErrorMessage: readonly(actionErrorMessage),
     actionMessage: readonly(actionMessage),
     activeMatchActionKey: readonly(activeMatchActionKey),
     activeReleaseActionKey: readonly(activeReleaseActionKey),
+    allowFallbackQuality,
     rejectMatch,
     releases,
     searchAgain,
