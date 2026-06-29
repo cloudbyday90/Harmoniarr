@@ -45,6 +45,7 @@ import { createImportCandidateExecutionWorker } from './import-candidate-executi
 import { createImportCandidateAutoApplyRunService } from './import-candidate-auto-apply-run-service.js';
 import { createImportCandidateAutoDownloadRunService } from './import-candidate-auto-download-run-service.js';
 import { createImportCandidateAutoSelectionService } from './import-candidate-auto-selection-service.js';
+import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
 import { createImportCandidateImportPendingSummaryService } from './import-candidate-import-pending-summary-service.js';
 import { listImportCandidateFileDecisions } from './import-candidate-file-decision-repository.js';
 import { replaceImportExecutionRunItems, updateImportExecutionRunItem, upsertImportExecutionRunItem } from './import-candidate-execution-repository.js';
@@ -160,6 +161,9 @@ export function createImportCandidateModule({
   importCandidateTranscodeRunStore = createImportCandidateTranscodeRunStore(),
   importCandidateExecutionRunStore = createImportCandidateExecutionRunStore(),
   importCandidateApplyRunStore = createImportCandidateApplyRunStore(),
+  importCandidateSafeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService({
+    qualityPolicyService: createAcquisitionQualityPolicyService(),
+  }),
   importCandidateRecoveryService = createImportCandidateRecoveryService({
     createRecoveryExecutionRun: importCandidateExecutionRunStore.createOperationRun,
     getImportCandidate: importCandidateService.getImportCandidate,
@@ -216,6 +220,7 @@ export function createImportCandidateModule({
     markRunPaused: importCandidateApplyRunStore.markRunPaused,
     markRunStarted: importCandidateApplyRunStore.markRunStarted,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
+    safeAutoAddQualityGateService: importCandidateSafeAutoAddQualityGateService,
     releaseLease: importCandidateApplyRunStore.releaseLease,
     renewLease: importCandidateApplyRunStore.renewLease,
     replaceImportApplyRunItems,

@@ -107,6 +107,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   import-pending candidates, leaving warning and blocked candidates for review,
   and reconciliation returns bounded start/skip evidence. See
   `MUSIC_QUEUE_PHASE_4_SAFE_AUTO_ADD_HANDOFF_DESIGN.md`.
+- Music Queue Phase 4 verified quality auto-add gate: safe automatic
+  add-to-library now rechecks ffprobe-backed audio evidence before moving files
+  for strict `Lossless archive` releases. Missing probe evidence, lossy codecs,
+  codec/extension mismatch, suspicious low-bitrate lossless evidence, and
+  existing suspicious/transcoded spectral verdicts block safe-auto add while
+  leaving the candidate available for review. See
+  `MUSIC_QUEUE_PHASE_4_VERIFIED_QUALITY_AUTO_ADD_GATE_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

@@ -46,6 +46,29 @@ export function buildCandidatePlanningSummary(preview) {
   };
 }
 
+function buildMusicQueueContext(candidate) {
+  const context = candidate?.normalizedPayload?.musicQueue;
+  if (!context || typeof context !== 'object') {
+    return null;
+  }
+
+  const profileCode = typeof context.profileCode === 'string' && context.profileCode.trim()
+    ? context.profileCode.trim()
+    : null;
+  const qualityOverride = context.qualityOverride && typeof context.qualityOverride === 'object'
+    ? context.qualityOverride
+    : null;
+
+  if (!profileCode && !qualityOverride) {
+    return null;
+  }
+
+  return {
+    profileCode,
+    qualityOverride,
+  };
+}
+
 export function buildStageCandidateBase(candidate, preview) {
   return {
     fileCount: candidate.fileCount,
@@ -53,6 +76,7 @@ export function buildStageCandidateBase(candidate, preview) {
     id: candidate.id,
     downloadAttemptCount: candidate.downloadAttemptCount ?? 0,
     lockedFileCount: candidate.lockedFileCount,
+    musicQueueContext: buildMusicQueueContext(candidate),
     planning: buildCandidatePlanningSummary(preview),
     releaseIdentity: preview?.naming?.releaseIdentity ?? null,
     requestOwnership: candidate.normalizedPayload?.requestOwnership ?? null,

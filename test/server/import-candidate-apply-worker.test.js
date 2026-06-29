@@ -23,6 +23,34 @@ function createReadyImportCandidate(overrides = {}) {
   };
 }
 
+function createVerifiedApplyPreview() {
+  return {
+    counts: { totalFiles: 1 },
+    files: [{
+      fileId: 'file-ready-1',
+      filename: '01 Track.flac',
+      inspection: {
+        metadata: {
+          bitDepth: 16,
+          bitRate: 850000,
+          channelCount: 2,
+          containerFormatName: 'flac',
+          primaryAudioCodec: 'flac',
+          sampleRate: 44100,
+          tags: {
+            album: 'Album',
+            artist: 'Artist',
+            title: 'Track',
+          },
+        },
+        warnings: [],
+      },
+      status: { code: 'ready', message: 'Ready.' },
+    }],
+    summary: { status: 'ready' },
+  };
+}
+
 test('import apply worker applies ready candidates and persists per-item outcomes', async (t) => {
   const markImportCandidateApplied = t.mock.fn(async () => ({}));
   const replaceImportApplyRunItems = t.mock.fn(async () => []);
@@ -204,11 +232,7 @@ test('import apply worker safe-auto mode skips warning and blocked candidates', 
     markRunCompleted,
     markRunFailed: async () => {},
     markRunStarted: async () => {},
-    previewImportCandidateApply: async () => ({
-      counts: { totalFiles: 1 },
-      files: [],
-      summary: { status: 'ready' },
-    }),
+    previewImportCandidateApply: async () => createVerifiedApplyPreview(),
     releaseLease: async () => {},
     replaceImportApplyRunItems,
     updateImportApplyRunItem,
@@ -246,6 +270,111 @@ test('import apply worker safe-auto mode skips warning and blocked candidates', 
       requestedCandidateCount: 3,
       skippedUnsafeCandidateCount: 2,
       totalImportPending: 3,
+      triggerSource: 'download_completed',
+    },
+  }]);
+});
+
+test('import apply worker safe-auto mode blocks strict lossless candidates without verified quality evidence', async (t) => {
+  const applyImportCandidatePreview = t.mock.fn(async () => ({
+    executionMode: 'move',
+    fileOperations: [{ status: 'applied' }],
+    summary: {
+      appliedFileCount: 1,
+      failedFileCount: 0,
+      notAttemptedCount: 0,
+      stagedFromSourceCount: 1,
+      totalFiles: 1,
+    },
+  }));
+  const markImportCandidateApplied = t.mock.fn(async () => ({}));
+  const updateImportApplyRunItem = t.mock.fn(async () => null);
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const markRunCompleted = t.mock.fn(async () => {
+    resolveCompleted();
+  });
+
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview,
+    buildImportPendingCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
+      importPendingCandidates: [createReadyImportCandidate({
+        id: 'candidate-fake-flac',
+        musicQueueContext: {
+          profileCode: 'lossless_archive',
+          qualityOverride: null,
+        },
+      })],
+    }),
+    markImportCandidateApplied,
+    markRunCompleted,
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => ({
+      counts: { totalFiles: 1 },
+      files: [{
+        fileId: 'file-fake-flac',
+        filename: '01 Fake.flac',
+        inspection: {
+          metadata: {
+            bitRate: 192000,
+            channelCount: 2,
+            containerFormatName: 'mp3',
+            primaryAudioCodec: 'mp3',
+            sampleRate: 44100,
+            tags: {
+              album: 'Album',
+              artist: 'Artist',
+              title: 'Fake',
+            },
+          },
+          warnings: [],
+        },
+        status: { code: 'ready', message: 'Ready.' },
+      }],
+      summary: { status: 'ready' },
+    }),
+    releaseLease: async () => {},
+    replaceImportApplyRunItems: async () => [],
+    updateImportApplyRunItem,
+  });
+
+  await worker.startWorkerRun({
+    applySafetyMode: 'safe_auto',
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId: 'run-safe-auto-quality-block',
+    triggerSource: 'download_completed',
+  });
+
+  await completed;
+
+  assert.equal(applyImportCandidatePreview.mock.callCount(), 0);
+  assert.equal(markImportCandidateApplied.mock.callCount(), 0);
+  assert.equal(updateImportApplyRunItem.mock.callCount(), 1);
+  assert.equal(updateImportApplyRunItem.mock.calls[0].arguments[0].itemStatus, 'blocked');
+  assert.match(updateImportApplyRunItem.mock.calls[0].arguments[0].statusMessage, /verified lossless checks/);
+  assert.deepEqual(markRunCompleted.mock.calls[0].arguments, [{
+    runId: 'run-safe-auto-quality-block',
+    summary: {
+      appliedCount: 0,
+      appliedWithWarningsCount: 0,
+      applyFailedCount: 0,
+      applySafetyMode: 'safe_auto',
+      blockedCount: 1,
+      currentStep: 'Import apply complete',
+      executionMode: 'move',
+      processedCandidateCount: 1,
+      qualityBlockedCount: 1,
+      readyCount: 1,
+      readyWithWarningsCount: 0,
+      requestedCandidateCount: 1,
+      skippedUnsafeCandidateCount: 0,
+      totalImportPending: 1,
       triggerSource: 'download_completed',
     },
   }]);

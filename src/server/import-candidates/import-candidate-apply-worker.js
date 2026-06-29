@@ -20,6 +20,7 @@ import { buildReleaseAddedActivityEvent } from '../activity/release-added-activi
 import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-quality.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
+import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
 import {
   isOperationRunCancellationError,
   isOperationRunPauseError,
@@ -35,6 +36,7 @@ function buildRunItems(importPendingCandidates) {
         id: candidate.id,
         importPendingAt: candidate.importPendingAt,
         lockedFileCount: candidate.lockedFileCount,
+        musicQueueContext: candidate.musicQueueContext ?? null,
         sourceProvider: candidate.sourceProvider,
         sourceSearchId: candidate.sourceSearchId,
         totalSizeBytes: candidate.totalSizeBytes,
@@ -94,6 +96,7 @@ function createBaseSnapshot(summaryCandidate) {
       id: summaryCandidate.id,
       importPendingAt: summaryCandidate.importPendingAt,
       lockedFileCount: summaryCandidate.lockedFileCount,
+      musicQueueContext: summaryCandidate.musicQueueContext ?? null,
       sourceProvider: summaryCandidate.sourceProvider,
       sourceSearchId: summaryCandidate.sourceSearchId,
       totalSizeBytes: summaryCandidate.totalSizeBytes,
@@ -200,6 +203,7 @@ export function createImportCandidateApplyWorker({
   markRunCancelled,
   markRunFailed,
   markRunStarted,
+  safeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService(),
   previewImportCandidateApply = async () => ({
     files: [],
     preview: null,
@@ -260,6 +264,7 @@ export function createImportCandidateApplyWorker({
         appliedWithWarnings: 0,
         applyFailed: 0,
         blocked: 0,
+        qualityBlocked: 0,
       };
       const postApplyReleaseHints = [];
 
@@ -287,6 +292,35 @@ export function createImportCandidateApplyWorker({
 
         try {
           const applyPreview = await previewImportCandidateApply({ importCandidateId: summaryCandidate.id });
+          if (applySafetyMode === 'safe_auto') {
+            const qualityGate = safeAutoAddQualityGateService.evaluateSafeAutoAddQuality({
+              applyPreview,
+              summaryCandidate,
+            });
+            if (!qualityGate.eligible) {
+              counts.blocked += 1;
+              counts.qualityBlocked += 1;
+              await updateImportApplyRunItem({
+                applySnapshot: {
+                  ...baseSnapshot,
+                  apply: {
+                    ...baseSnapshot.apply,
+                    outcome: 'quality_blocked',
+                    qualityGate,
+                  },
+                  fullPreview: {
+                    counts: applyPreview.counts,
+                    summary: applyPreview.summary,
+                  },
+                },
+                importCandidateId: summaryCandidate.id,
+                itemStatus: 'blocked',
+                operationRunId: runId,
+                statusMessage: qualityGate.message,
+              });
+              continue;
+            }
+          }
           const applyResult = await applyImportCandidatePreview({
             applyPreview,
             executionMode: 'move',
@@ -450,6 +484,7 @@ export function createImportCandidateApplyWorker({
           readyCount: importPendingSummary.counts?.ready ?? 0,
           readyWithWarningsCount: importPendingSummary.counts?.readyWithWarnings ?? 0,
           requestedCandidateCount,
+          ...(counts.qualityBlocked > 0 ? { qualityBlockedCount: counts.qualityBlocked } : {}),
           ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
           ...buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applySafetyMode),
           totalImportPending: importPendingSummary.counts?.totalImportPending ?? runItems.length,
