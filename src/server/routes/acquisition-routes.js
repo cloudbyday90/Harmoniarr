@@ -23,10 +23,16 @@ import { skipRateLimitMiddleware } from '../request-rate-limiter.js';
 const defaultRequestAuthDependencies = createRequestAuthDependencies();
 
 export function registerAcquisitionRoutes(app, {
+  getRequestMetadata = defaultRequestAuthDependencies.getRequestMetadata,
   getMusicQueueRelease,
+  limitMusicQueueMutation = skipRateLimitMiddleware,
   limitMusicQueueRead = skipRateLimitMiddleware,
   listMusicQueueReleases,
+  rejectMusicQueueMatch,
+  requireCsrf = defaultRequestAuthDependencies.requireCsrf,
+  requireFreshSession = defaultRequestAuthDependencies.requireFreshSession,
   requireSession = defaultRequestAuthDependencies.requireSession,
+  useMusicQueueMatch,
 }) {
   app.get('/api/v1/acquisition/releases', limitMusicQueueRead, asyncRoute(async (request, response) => {
     const session = await requireSession(request);
@@ -45,5 +51,41 @@ export function registerAcquisitionRoutes(app, {
       wantedReleaseId: request.params.wantedReleaseId,
     });
     response.json(payload);
+  }));
+
+  app.post('/api/v1/acquisition/releases/:wantedReleaseId/matches/:matchId/use', limitMusicQueueMutation, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+    const payload = await useMusicQueueMatch({
+      actorUserId: session.user?.id ?? session.appUserId,
+      appUserId: session.user?.id ?? session.appUserId,
+      matchId: request.params.matchId,
+      reason: request.body?.reason,
+      requestMetadata: getRequestMetadata(request),
+      wantedReleaseId: request.params.wantedReleaseId,
+    });
+
+    response.json({
+      ok: true,
+      ...payload,
+    });
+  }));
+
+  app.post('/api/v1/acquisition/releases/:wantedReleaseId/matches/:matchId/reject', limitMusicQueueMutation, asyncRoute(async (request, response) => {
+    const session = await requireFreshSession(request);
+    requireCsrf(request, session);
+    const payload = await rejectMusicQueueMatch({
+      actorUserId: session.user?.id ?? session.appUserId,
+      appUserId: session.user?.id ?? session.appUserId,
+      matchId: request.params.matchId,
+      reason: request.body?.reason,
+      requestMetadata: getRequestMetadata(request),
+      wantedReleaseId: request.params.wantedReleaseId,
+    });
+
+    response.json({
+      ok: true,
+      ...payload,
+    });
   }));
 }

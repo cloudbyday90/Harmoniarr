@@ -176,9 +176,13 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
   assert.equal(review.reason, 'The best match is below the high-confidence threshold.');
   assert.equal(review.matchCards.length, 2);
   assert.equal(review.matchCards[0].qualityFitLabel, 'Preferred quality');
+  assert.equal(review.matchCards[0].canUseMatch, true);
+  assert.equal(review.matchCards[0].canRejectMatch, true);
   assert.equal(review.matchCards[0].trackCoverageLabel, '11 of 12 tracks matched');
   assert.equal(review.matchCards[0].healthLabel, 'Free slot - 1.0 MB/s');
   assert.equal(review.matchCards[1].statusLabel, 'Blocked');
+  assert.equal(review.matchCards[1].canUseMatch, false);
+  assert.equal(review.matchCards[1].canRejectMatch, false);
   assert.equal(review.matchCards[1].qualityFitLabel, 'Below profile');
   assert.deepEqual(review.matchRows.slice(0, 2), [
     { label: 'Matches found', value: '3' },

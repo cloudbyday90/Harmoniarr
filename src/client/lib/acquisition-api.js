@@ -25,3 +25,25 @@ export function fetchMusicQueueReleases({ limit = 100, offset = 0 } = {}) {
 export function fetchMusicQueueRelease(wantedReleaseId) {
   return apiRequest(`/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}`);
 }
+
+export function useMusicQueueMatch({ wantedReleaseId, matchId, reason } = {}) {
+  return apiRequest(
+    `/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}/matches/${encodeURIComponent(matchId)}/use`,
+    {
+      body: { reason },
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}
+
+export function rejectMusicQueueMatch({ wantedReleaseId, matchId, reason } = {}) {
+  return apiRequest(
+    `/api/v1/acquisition/releases/${encodeURIComponent(wantedReleaseId)}/matches/${encodeURIComponent(matchId)}/reject`,
+    {
+      body: { reason },
+      includeCsrf: true,
+      method: 'POST',
+    },
+  );
+}

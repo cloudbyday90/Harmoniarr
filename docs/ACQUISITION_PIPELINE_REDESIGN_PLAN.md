@@ -820,9 +820,12 @@ Acceptance:
 
 ### Phase 2 - New User-Facing Design And Core Logic
 
-Status: **In progress.** UX/read-model and match-drilldown slices complete; see
+Status: **In progress.** UX/read-model, match-drilldown, and release-scoped
+match-action slices complete; see
 `MUSIC_QUEUE_PHASE_2_UX_DESIGN.md` and
 `MUSIC_QUEUE_PHASE_2_MATCH_DRILLDOWN_DESIGN.md`.
+The match-action outcome is documented in
+`MUSIC_QUEUE_PHASE_2_MATCH_ACTIONS_DESIGN.md`.
 
 Goal: flesh out the Music Queue experience and the user-facing logic. This phase
 makes the new surface understandable and useful before enabling deeper
@@ -842,8 +845,9 @@ automation changes.
   are present.
 - [x] Add the match review drawer/panel behind `Review matches`.
 - [x] Reuse existing candidate detail/preview data as simplified match evidence.
-- [ ] Replace candidate-level actions with `Use this match`, `Reject match`,
-  `Review quality choice`, and `Try again`.
+- [x] Replace candidate-level `select` / `reject` actions with release-scoped
+  `Use this match` and `Reject match` actions in Music Queue.
+- [ ] Add release-scoped `Review quality choice` and `Try again` actions.
 - [x] Show why automation did or did not choose a match at aggregate release
   level and in simplified per-match cards.
 - [x] Show quality profile fit for each release: profile, decision, format

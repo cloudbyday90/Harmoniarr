@@ -555,6 +555,12 @@ export function createApp({
   });
   const acquisitionModule = buildAcquisitionModule({
     buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
+    rejectImportCandidate: importCandidateModule.importCandidateService?.rejectImportCandidate
+      ?? importCandidateModule.routeDependencies?.rejectImportCandidate
+      ?? null,
+    selectImportCandidate: importCandidateModule.importCandidateService?.selectImportCandidate
+      ?? importCandidateModule.routeDependencies?.selectImportCandidate
+      ?? null,
   });
   const metadataModule = buildMetadataModule({
     libraryMediaRequestStore: libraryModule.libraryMediaRequestStore,
@@ -856,6 +862,11 @@ export function createApp({
   });
   mountAcquisitionRoutes(app, {
     ...acquisitionModule.routeDependencies,
+    limitMusicQueueMutation: requestRateLimiterService.createMiddleware({
+      bucketName: 'music-queue-mutation',
+      limit: 40,
+      windowMs: 60 * 1000,
+    }),
     limitMusicQueueRead: requestRateLimiterService.createMiddleware({
       bucketName: 'music-queue-read',
       limit: 120,

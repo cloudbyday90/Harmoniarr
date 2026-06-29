@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { registerAcquisitionRoutes } from '../../src/server/routes/acquisition-routes.js';
 import { registerArtworkRoutes } from '../../src/server/routes/artwork-routes.js';
 import { registerActivityRoutes } from '../../src/server/routes/activity-routes.js';
 import { registerPushRoutes } from '../../src/server/routes/push-routes.js';
@@ -39,6 +40,16 @@ function asyncNoopResult(result = {}) {
 
 function collectRegisteredRoutes() {
   const { app, routes } = createRecordingApp();
+
+  registerAcquisitionRoutes(app, {
+    getMusicQueueRelease: asyncNoopResult({ release: {} }),
+    listMusicQueueReleases: asyncNoopResult({ releases: [] }),
+    rejectMusicQueueMatch: asyncNoopResult({}),
+    requireCsrf: () => {},
+    requireFreshSession: asyncNoopResult({ appUserId: 'user-1' }),
+    requireSession: asyncNoopResult({ appUserId: 'user-1' }),
+    useMusicQueueMatch: asyncNoopResult({}),
+  });
 
   registerActivityRoutes(app, {
     blockSourceUser: asyncNoopResult({ sourceUser: { username: 'peer-1' } }),

@@ -27,13 +27,18 @@ import {
 import { useMusicQueue } from '../composables/useMusicQueue.js';
 
 const {
+  actionErrorMessage,
+  actionMessage,
+  activeMatchActionKey,
   errorMessage,
   isLoading,
   isRevalidating,
   load,
+  rejectMatch,
   releases,
   summaryCards,
   totalCount,
+  useMatch,
 } = useMusicQueue();
 
 const query = ref('');
@@ -61,6 +66,28 @@ function openReview(release) {
 function closeReview() {
   selectedReleaseId.value = null;
 }
+
+function getMatchActionKey(match, action) {
+  return `${selectedRelease.value?.id}:${match.matchId}:${action}`;
+}
+
+function isMatchActionRunning(match, action) {
+  return activeMatchActionKey.value === getMatchActionKey(match, action);
+}
+
+async function handleUseMatch(match) {
+  await useMatch({
+    matchId: match.matchId,
+    wantedReleaseId: selectedRelease.value?.id,
+  });
+}
+
+async function handleRejectMatch(match) {
+  await rejectMatch({
+    matchId: match.matchId,
+    wantedReleaseId: selectedRelease.value?.id,
+  });
+}
 </script>
 
 <template>
@@ -87,6 +114,14 @@ function closeReview() {
 
     <div v-if="errorMessage" class="hx-alert" data-tone="danger">
       {{ errorMessage }}
+    </div>
+
+    <div v-if="actionMessage" class="hx-alert" data-tone="success" role="status">
+      {{ actionMessage }}
+    </div>
+
+    <div v-if="actionErrorMessage" class="hx-alert" data-tone="danger" role="alert">
+      {{ actionErrorMessage }}
     </div>
 
     <div v-if="isLoading" class="music-queue-panel">
@@ -254,6 +289,28 @@ function closeReview() {
                     <dd>{{ match.healthLabel }}</dd>
                   </div>
                 </dl>
+                <div v-if="match.canUseMatch || match.canRejectMatch" class="music-queue-match-actions">
+                  <button
+                    v-if="match.canUseMatch"
+                    type="button"
+                    class="hx-btn"
+                    data-variant="primary"
+                    :disabled="Boolean(activeMatchActionKey)"
+                    @click="handleUseMatch(match)"
+                  >
+                    {{ isMatchActionRunning(match, 'use') ? 'Selecting...' : 'Use this match' }}
+                  </button>
+                  <button
+                    v-if="match.canRejectMatch"
+                    type="button"
+                    class="hx-btn"
+                    data-variant="ghost"
+                    :disabled="Boolean(activeMatchActionKey)"
+                    @click="handleRejectMatch(match)"
+                  >
+                    {{ isMatchActionRunning(match, 'reject') ? 'Rejecting...' : 'Reject match' }}
+                  </button>
+                </div>
               </article>
             </div>
           </section>
@@ -429,6 +486,7 @@ function closeReview() {
 }
 
 .music-queue-chip-row,
+.music-queue-match-actions,
 .music-queue-row-actions,
 .music-queue-review-actions {
   display: flex;

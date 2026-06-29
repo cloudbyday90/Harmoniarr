@@ -27,6 +27,8 @@ export function createAcquisitionModule({
   createPipelineStatusService = createAcquisitionPipelineStatusService,
   createPipelineStore = createAcquisitionPipelineStore,
   createQualityPolicyService = createAcquisitionQualityPolicyService,
+  rejectImportCandidate = null,
+  selectImportCandidate = null,
 } = {}) {
   const qualityPolicyService = createQualityPolicyService();
   const statusService = createPipelineStatusService();
@@ -34,6 +36,8 @@ export function createAcquisitionModule({
   const acquisitionPipelineService = createPipelineService({
     acquisitionPipelineStore,
     qualityPolicyService,
+    rejectImportCandidate,
+    selectImportCandidate,
     statusService,
   });
 
@@ -44,6 +48,8 @@ export function createAcquisitionModule({
     routeDependencies: {
       getMusicQueueRelease: acquisitionPipelineService.getMusicQueueRelease,
       listMusicQueueReleases: acquisitionPipelineService.listMusicQueueReleases,
+      rejectMusicQueueMatch: acquisitionPipelineService.rejectMusicQueueMatch,
+      useMusicQueueMatch: acquisitionPipelineService.useMusicQueueMatch,
     },
     statusService,
   };

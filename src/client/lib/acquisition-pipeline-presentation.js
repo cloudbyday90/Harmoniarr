@@ -229,12 +229,16 @@ function buildMatchCards(release) {
     const formats = normalizeFormats(match.formats);
     const fileCount = getCount(match.fileCount);
     const lockedFileCount = getCount(match.lockedFileCount);
+    const matchId = match.matchId ?? null;
 
     return {
+      canRejectMatch: Boolean(matchId) && ['held', 'pending', 'selected'].includes(match.status ?? 'pending'),
+      canUseMatch: Boolean(matchId) && ['held', 'pending'].includes(match.status ?? 'pending'),
       fileLabel: `${fileCount} file${fileCount === 1 ? '' : 's'}${lockedFileCount > 0 ? `, ${lockedFileCount} locked` : ''}`,
       formatLabel: formatFormatsLabel(formats),
       healthLabel: buildMatchHealthLabel(match),
-      id: match.matchId ?? `match-${index + 1}`,
+      id: matchId ?? `match-${index + 1}`,
+      matchId,
       isBest: index === 0,
       label: `Match ${index + 1}`,
       qualityFitLabel: qualityFit.label,

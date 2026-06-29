@@ -16,16 +16,26 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed } from 'vue';
+import { computed, readonly, ref } from 'vue';
 import { useAsyncResource } from './useAsyncResource.js';
-import { fetchMusicQueueReleases as defaultFetchMusicQueueReleases } from '../lib/acquisition-api.js';
+import {
+  fetchMusicQueueReleases as defaultFetchMusicQueueReleases,
+  rejectMusicQueueMatch as defaultRejectMusicQueueMatch,
+  useMusicQueueMatch as defaultUseMusicQueueMatch,
+} from '../lib/acquisition-api.js';
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
+import { getErrorMessage } from '../lib/error-utils.js';
 
 export function useMusicQueue({
   fetchMusicQueueReleases = defaultFetchMusicQueueReleases,
   limit = 100,
   pollIntervalMs = 30000,
+  rejectMusicQueueMatch = defaultRejectMusicQueueMatch,
+  useMusicQueueMatch = defaultUseMusicQueueMatch,
 } = {}) {
+  const actionErrorMessage = ref('');
+  const actionMessage = ref('');
+  const activeMatchActionKey = ref('');
   const resource = useAsyncResource({
     fallbackErrorMessage: 'Music Queue failed to load',
     fetcher: () => fetchMusicQueueReleases({ limit }),
@@ -44,10 +54,64 @@ export function useMusicQueue({
   const summaryCards = computed(() => buildMusicQueueSummaryCards(resource.data.value.summary));
   const totalCount = computed(() => resource.data.value.pagination?.total ?? releases.value.length);
 
+  async function runMatchAction({
+    actionKey,
+    apiFn,
+    matchId,
+    successMessage,
+    wantedReleaseId,
+  }) {
+    if (!wantedReleaseId || !matchId) {
+      actionErrorMessage.value = 'This match is missing the release context needed to update it.';
+      return null;
+    }
+
+    activeMatchActionKey.value = actionKey;
+    actionErrorMessage.value = '';
+    actionMessage.value = '';
+
+    try {
+      const payload = await apiFn({ matchId, wantedReleaseId });
+      actionMessage.value = successMessage;
+      await resource.load();
+      return payload;
+    } catch (error) {
+      actionErrorMessage.value = getErrorMessage(error, 'Music Queue match action failed.');
+      return null;
+    } finally {
+      activeMatchActionKey.value = '';
+    }
+  }
+
+  function useMatch({ matchId, wantedReleaseId } = {}) {
+    return runMatchAction({
+      actionKey: `${wantedReleaseId}:${matchId}:use`,
+      apiFn: useMusicQueueMatch,
+      matchId,
+      successMessage: 'Match selected. Harmoniarr will use it for the next download step.',
+      wantedReleaseId,
+    });
+  }
+
+  function rejectMatch({ matchId, wantedReleaseId } = {}) {
+    return runMatchAction({
+      actionKey: `${wantedReleaseId}:${matchId}:reject`,
+      apiFn: rejectMusicQueueMatch,
+      matchId,
+      successMessage: 'Match rejected. Harmoniarr will not choose it for this release.',
+      wantedReleaseId,
+    });
+  }
+
   return {
     ...resource,
+    actionErrorMessage: readonly(actionErrorMessage),
+    actionMessage: readonly(actionMessage),
+    activeMatchActionKey: readonly(activeMatchActionKey),
+    rejectMatch,
     releases,
     summaryCards,
     totalCount,
+    useMatch,
   };
 }

@@ -33,6 +33,21 @@ function normalizeRequiredAppUserId(appUserId, context) {
   return normalized;
 }
 
+function normalizeRequiredId(value, fieldName) {
+  const normalized = normalizeString(value);
+  if (!normalized) {
+    throw createApiError(400, 'validation_error', `${fieldName} is required`);
+  }
+
+  return normalized;
+}
+
+function findReleaseMatch(release, matchId) {
+  const matches = release?.discoveryRequest?.importReviewSummary?.matches;
+  if (!Array.isArray(matches)) return null;
+  return matches.find((match) => normalizeString(match?.matchId) === matchId) ?? null;
+}
+
 function getCount(value) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
@@ -153,10 +168,80 @@ function buildSummary(releases) {
 export function createAcquisitionPipelineService({
   acquisitionPipelineStore,
   qualityPolicyService = createAcquisitionQualityPolicyService(),
+  rejectImportCandidate = null,
+  selectImportCandidate = null,
   statusService = createAcquisitionPipelineStatusService(),
 } = {}) {
   if (!acquisitionPipelineStore) {
     throw new TypeError('createAcquisitionPipelineService requires acquisitionPipelineStore');
+  }
+
+  async function getScopedReleaseMatch({ appUserId, matchId, wantedReleaseId }, context) {
+    const scopedAppUserId = normalizeRequiredAppUserId(appUserId, context);
+    const scopedWantedReleaseId = normalizeRequiredId(wantedReleaseId, 'wantedReleaseId');
+    const scopedMatchId = normalizeRequiredId(matchId, 'matchId');
+
+    const release = await acquisitionPipelineStore.getWantedReleaseEvidence({
+      appUserId: scopedAppUserId,
+      wantedReleaseId: scopedWantedReleaseId,
+    });
+    if (!release) {
+      throw createApiError(404, 'music_queue_release_not_found', 'Music Queue release was not found');
+    }
+
+    const match = findReleaseMatch(release, scopedMatchId);
+    if (!match) {
+      throw createApiError(404, 'music_queue_match_not_found', 'Music Queue match was not found for this release');
+    }
+
+    return {
+      appUserId: scopedAppUserId,
+      match,
+      matchId: scopedMatchId,
+      release,
+      wantedReleaseId: scopedWantedReleaseId,
+    };
+  }
+
+  async function runScopedMatchAction({
+    actionCode,
+    appUserId,
+    actorUserId = null,
+    matchId,
+    reason = null,
+    requestMetadata = null,
+    transition,
+    wantedReleaseId,
+  }) {
+    if (typeof transition !== 'function') {
+      throw createApiError(503, 'music_queue_match_action_unavailable', 'Music Queue match actions are not available');
+    }
+
+    const scoped = await getScopedReleaseMatch({
+      appUserId,
+      matchId,
+      wantedReleaseId,
+    }, actionCode);
+
+    const review = await transition({
+      actorUserId,
+      importCandidateId: scoped.matchId,
+      reason,
+      requestMetadata,
+    });
+    const refreshed = await getMusicQueueRelease({
+      appUserId: scoped.appUserId,
+      wantedReleaseId: scoped.wantedReleaseId,
+    });
+
+    return {
+      action: {
+        code: actionCode,
+        matchId: scoped.matchId,
+      },
+      release: refreshed.release,
+      review,
+    };
   }
 
   async function listMusicQueueReleases({ appUserId, limit, offset } = {}) {
@@ -195,8 +280,28 @@ export function createAcquisitionPipelineService({
     };
   }
 
+  function useMusicQueueMatch(options = {}) {
+    return runScopedMatchAction({
+      ...options,
+      actionCode: 'use_match',
+      reason: options.reason ?? 'Selected from Music Queue',
+      transition: selectImportCandidate,
+    });
+  }
+
+  function rejectMusicQueueMatch(options = {}) {
+    return runScopedMatchAction({
+      ...options,
+      actionCode: 'reject_match',
+      reason: options.reason ?? 'Rejected from Music Queue',
+      transition: rejectImportCandidate,
+    });
+  }
+
   return {
     getMusicQueueRelease,
     listMusicQueueReleases,
+    rejectMusicQueueMatch,
+    useMusicQueueMatch,
   };
 }

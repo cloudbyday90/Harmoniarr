@@ -38,7 +38,13 @@ suite('createApp', () => {
       startLibraryScan: t.mock.fn(async () => ({ accepted: true, run: { id: 'scan-run-1' } })),
     },
     libraryScanSummaryService: { buildLibraryScanSummary: () => ({}) },
-    routeDependencies: { library: 'deps' },
+    routeDependencies: {
+      buildLibraryWantedReleases: async () => ({
+        pagination: { limit: 100, offset: 0, total: 0 },
+        releases: [],
+      }),
+      library: 'deps',
+    },
   };
   const operationsModule = {
     operationHistoryService: { listRecentOperationRuns: t.mock.fn(async () => []) },
@@ -582,7 +588,12 @@ suite('createApp', () => {
         reconcileWantedReleases: async () => {},
       },
       libraryScanSummaryService: { buildLibraryScanSummary: () => ({}) },
-      routeDependencies: {},
+      routeDependencies: {
+        buildLibraryWantedReleases: async () => ({
+          pagination: { limit: 100, offset: 0, total: 0 },
+          releases: [],
+        }),
+      },
     }),
     createMetadataModule: () => ({
       musicBrainzSearchService: { checkProviderHealth: async () => ({ status: 'healthy' }) },

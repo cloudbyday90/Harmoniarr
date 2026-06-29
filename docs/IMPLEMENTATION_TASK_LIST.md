@@ -61,6 +61,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   file count, size, and source-health hints. Raw provider payloads, source
   usernames, and folder paths stay in advanced diagnostics. See
   `MUSIC_QUEUE_PHASE_2_MATCH_DRILLDOWN_DESIGN.md`.
+- Music Queue Phase 2 match actions: Music Queue now exposes release-scoped
+  `Use this match` and `Reject match` controls in the match review panel. The
+  routes require fresh session and CSRF, re-check the match belongs to the
+  caller's wanted release before delegating to Import Review transitions, and
+  refresh the release projection after success. See
+  `MUSIC_QUEUE_PHASE_2_MATCH_ACTIONS_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release
