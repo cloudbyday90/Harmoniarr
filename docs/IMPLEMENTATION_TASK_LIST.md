@@ -67,6 +67,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   caller's wanted release before delegating to Import Review transitions, and
   refresh the release projection after success. See
   `MUSIC_QUEUE_PHASE_2_MATCH_ACTIONS_DESIGN.md`.
+- Music Queue Phase 2 quality-choice review: quality profiles now expose
+  cutoff, fallback, upgrade, and verification policy fields, and Music Queue
+  details show release-level and per-match quality fit, including preferred,
+  minimum, cutoff, fallback, audio-check, and spectral verdict context. This is
+  read-only; fallback/try-again mutations remain the next Phase 2 slice. See
+  `MUSIC_QUEUE_PHASE_2_QUALITY_CHOICE_REVIEW_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

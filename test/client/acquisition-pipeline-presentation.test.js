@@ -155,8 +155,12 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
       formats: ['flac'],
       profile: {
         code: 'lossless_archive',
+        cutoffFormats: ['flac', 'alac', 'wav'],
+        fallbackAllowed: false,
         minimumFormats: ['flac', 'alac', 'wav'],
         preferredFormats: ['flac'],
+        requiresVerification: true,
+        upgradeAllowed: false,
       },
       verifiedLossless: false,
     },
@@ -180,6 +184,18 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
   assert.equal(review.matchCards[0].canRejectMatch, true);
   assert.equal(review.matchCards[0].trackCoverageLabel, '11 of 12 tracks matched');
   assert.equal(review.matchCards[0].healthLabel, 'Free slot - 1.0 MB/s');
+  assert.deepEqual(
+    review.matchCards[0].qualityRows.map((row) => [row.label, row.value]),
+    [
+      ['Observed', 'FLAC'],
+      ['Preferred', 'Matches FLAC'],
+      ['Minimum', 'Meets FLAC, ALAC, WAV'],
+      ['Cutoff', 'At cutoff FLAC, ALAC, WAV'],
+      ['Fallback', 'Not using fallback'],
+      ['Audio check', 'Required before automatic progress'],
+      ['Spectral check', 'No spectral evidence'],
+    ],
+  );
   assert.equal(review.matchCards[1].statusLabel, 'Blocked');
   assert.equal(review.matchCards[1].canUseMatch, false);
   assert.equal(review.matchCards[1].canRejectMatch, false);
@@ -188,7 +204,10 @@ test('buildMusicQueueMatchReview returns match and quality rows for the details 
     { label: 'Matches found', value: '3' },
     { label: 'Ready to review', value: '2' },
   ]);
+  assert.ok(review.qualityRows.some((row) => row.label === 'Cutoff' && row.value === 'FLAC, ALAC, WAV'));
+  assert.ok(review.qualityRows.some((row) => row.label === 'Fallback' && row.value === 'Fallback blocked'));
   assert.ok(review.qualityRows.some((row) => row.value === 'Needs verification'));
+  assert.equal(review.qualityGuidance, 'Harmoniarr needs real audio evidence before treating this as lossless.');
 });
 
 test('buildMusicQueueReleaseTypeFilters derives stable type options', () => {

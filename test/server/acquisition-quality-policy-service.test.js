@@ -11,6 +11,21 @@ test('resolveQualityProfile defaults to lossless archive', () => {
   assert.equal(resolveQualityProfile('unknown').code, QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE);
 });
 
+test('quality profiles expose cutoff, fallback, upgrade, and verification policy', () => {
+  const lossless = resolveQualityProfile(QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE);
+  const highQuality = resolveQualityProfile(QUALITY_PROFILE_CODES.HIGH_QUALITY);
+
+  assert.deepEqual(lossless.cutoffFormats, ['flac', 'alac', 'wav']);
+  assert.equal(lossless.fallbackAllowed, false);
+  assert.equal(lossless.manualReviewBelowPreferred, true);
+  assert.equal(lossless.requiresVerification, true);
+  assert.equal(lossless.upgradeAllowed, false);
+
+  assert.deepEqual(highQuality.cutoffFormats, ['flac', 'alac', 'wav']);
+  assert.equal(highQuality.fallbackAllowed, true);
+  assert.equal(highQuality.upgradeAllowed, true);
+});
+
 test('lossless archive accepts verified FLAC evidence', () => {
   const decision = evaluateQualityEvidence({
     candidate: { normalizedPayload: { codec: 'flac' } },

@@ -820,12 +820,14 @@ Acceptance:
 
 ### Phase 2 - New User-Facing Design And Core Logic
 
-Status: **In progress.** UX/read-model, match-drilldown, and release-scoped
-match-action slices complete; see
+Status: **In progress.** UX/read-model, match-drilldown, release-scoped
+match-action, and quality-choice review slices complete; see
 `MUSIC_QUEUE_PHASE_2_UX_DESIGN.md` and
 `MUSIC_QUEUE_PHASE_2_MATCH_DRILLDOWN_DESIGN.md`.
 The match-action outcome is documented in
-`MUSIC_QUEUE_PHASE_2_MATCH_ACTIONS_DESIGN.md`.
+`MUSIC_QUEUE_PHASE_2_MATCH_ACTIONS_DESIGN.md`. The quality-choice review
+outcome is documented in
+`MUSIC_QUEUE_PHASE_2_QUALITY_CHOICE_REVIEW_DESIGN.md`.
 
 Goal: flesh out the Music Queue experience and the user-facing logic. This phase
 makes the new surface understandable and useful before enabling deeper
@@ -847,7 +849,8 @@ automation changes.
 - [x] Reuse existing candidate detail/preview data as simplified match evidence.
 - [x] Replace candidate-level `select` / `reject` actions with release-scoped
   `Use this match` and `Reject match` actions in Music Queue.
-- [ ] Add release-scoped `Review quality choice` and `Try again` actions.
+- [x] Add release-scoped `Review quality choice` details.
+- [ ] Add release-scoped quality fallback and `Try again` actions.
 - [x] Show why automation did or did not choose a match at aggregate release
   level and in simplified per-match cards.
 - [x] Show quality profile fit for each release: profile, decision, format
@@ -855,7 +858,7 @@ automation changes.
   remains follow-up work.
 - [x] Show basic quality profile fit for each match: preferred, minimum, and
   below-profile format evidence.
-- [ ] Show deep quality profile fit for each match: cutoff, fallback,
+- [x] Show deep quality profile fit for each match: cutoff, fallback,
   verified/unverified, suspicious/transcoded.
 - [x] Add setup handoffs: `Set up folders`, `Test Soulseek`, `Set up media
   tools`.

@@ -17,7 +17,15 @@
  */
 
 import { formatOperationTimestampShort } from './operation-run-presentation.js';
-import { formatQualityDecisionLabel, formatQualityProfileLabel } from './acquisition-quality-presentation.js';
+import {
+  formatQualityBitrateLabel,
+  formatQualityDecisionLabel,
+  formatQualityFallbackLabel,
+  formatQualityFormatList,
+  formatQualityProfileLabel,
+  formatQualityUpgradeLabel,
+  formatQualityVerificationRequirement,
+} from './acquisition-quality-presentation.js';
 import { formatBytes } from './import-candidate-presentation.js';
 
 const DEFAULT_STATUS = Object.freeze({
@@ -88,16 +96,47 @@ function buildMatchSummary(release) {
 
 function buildQualitySummary(release) {
   const quality = release?.quality ?? {};
+  const profile = quality.profile ?? {};
+  const formatsLabel = Array.isArray(quality.formats) && quality.formats.length > 0
+    ? formatQualityFormatList(quality.formats)
+    : 'No format evidence';
+  const decisionLabel = formatQualityDecisionLabel(quality.code);
+  const profileLabel = formatQualityProfileLabel(profile.code);
+  const reviewGuidance = buildQualityReviewGuidance(quality);
+
   return {
-    decisionLabel: formatQualityDecisionLabel(quality.code),
+    autoAddLabel: quality.autoAddEligible ? 'Automatic add allowed' : 'Automatic add blocked',
+    autoDownloadLabel: quality.autoDownloadEligible ? 'Automatic download allowed' : 'Automatic download blocked',
+    bitrateLabel: formatQualityBitrateLabel(quality.bitrateKbps),
+    cutoffFormatsLabel: formatQualityFormatList(profile.cutoffFormats),
+    decisionLabel,
     explanation: quality.explanation ?? 'Quality evidence has not been evaluated yet.',
-    formatsLabel: Array.isArray(quality.formats) && quality.formats.length > 0
-      ? quality.formats.join(', ').toUpperCase()
-      : 'No format evidence',
-    profileLabel: formatQualityProfileLabel(quality.profile?.code),
+    fallbackLabel: formatQualityFallbackLabel(profile),
+    formatsLabel,
+    minimumFormatsLabel: formatQualityFormatList(profile.minimumFormats),
+    preferredFormatsLabel: formatQualityFormatList(profile.preferredFormats),
+    profileLabel,
+    reviewGuidance,
     tone: quality.tone ?? 'warning',
+    upgradeLabel: formatQualityUpgradeLabel(profile),
+    verificationRequirementLabel: formatQualityVerificationRequirement(profile),
     verifiedLabel: quality.verifiedLossless ? 'Verified lossless' : 'Needs verification',
   };
+}
+
+function buildQualityReviewGuidance(quality = {}) {
+  switch (quality.code) {
+    case 'accepted':
+      return 'This quality decision is acceptable for automation.';
+    case 'below_minimum':
+      return 'These matches are below the selected profile. Use a better match, search again, or change the profile before Harmoniarr downloads automatically.';
+    case 'needs_verification':
+      return 'Harmoniarr needs real audio evidence before treating this as lossless.';
+    case 'no_evidence':
+      return 'No usable quality evidence has been collected yet.';
+    default:
+      return 'Harmoniarr has not finished evaluating quality for this release.';
+  }
 }
 
 function formatMatchStatusLabel(status) {
@@ -161,24 +200,205 @@ function formatFormatsLabel(formats) {
 
 function buildMatchQualityFit(match, qualityProfile) {
   const formats = normalizeFormats(match?.formats);
+  const spectralVerdict = normalizeToken(
+    match?.spectralVerdict
+      ?? match?.mediaVerification?.spectralVerdict
+      ?? match?.mediaVerification?.transcodeVerdict
+      ?? match?.mediaVerification?.losslessVerdict,
+  );
   const preferredFormats = normalizeFormats(qualityProfile?.preferredFormats);
   const minimumFormats = normalizeFormats(qualityProfile?.minimumFormats);
+  const cutoffFormats = normalizeFormats(qualityProfile?.cutoffFormats);
+  const effectiveCutoffFormats = cutoffFormats.length > 0 ? cutoffFormats : preferredFormats;
   const preferredMet = formats.some((format) => preferredFormats.includes(format));
   const minimumMet = formats.some((format) => minimumFormats.includes(format));
+  const cutoffMet = formats.some((format) => effectiveCutoffFormats.includes(format));
+  const fallbackUsed = minimumMet && !preferredMet;
+  const verificationRequired = qualityProfile?.requiresVerification === true;
+  const verifiedLossless = match?.verifiedLossless === true || match?.mediaVerification?.verifiedLossless === true;
 
   if (formats.length === 0) {
-    return { label: 'No format evidence', tone: 'warning' };
+    return {
+      cutoffMet,
+      detailRows: buildMatchQualityRows({
+        cutoffFormats: effectiveCutoffFormats,
+        cutoffMet,
+        fallbackUsed,
+        formats,
+        minimumFormats,
+        minimumMet,
+        preferredFormats,
+        preferredMet,
+        qualityProfile,
+        spectralVerdict,
+        verificationRequired,
+        verifiedLossless,
+      }),
+      fallbackUsed,
+      label: 'No format evidence',
+      minimumMet,
+      preferredMet,
+      tone: 'warning',
+    };
   }
 
   if (preferredMet) {
-    return { label: 'Preferred quality', tone: 'success' };
+    return {
+      cutoffMet,
+      detailRows: buildMatchQualityRows({
+        cutoffFormats: effectiveCutoffFormats,
+        cutoffMet,
+        fallbackUsed,
+        formats,
+        minimumFormats,
+        minimumMet,
+        preferredFormats,
+        preferredMet,
+        qualityProfile,
+        spectralVerdict,
+        verificationRequired,
+        verifiedLossless,
+      }),
+      fallbackUsed,
+      label: 'Preferred quality',
+      minimumMet,
+      preferredMet,
+      tone: 'success',
+    };
   }
 
   if (minimumMet) {
-    return { label: 'Meets minimum', tone: 'info' };
+    return {
+      cutoffMet,
+      detailRows: buildMatchQualityRows({
+        cutoffFormats: effectiveCutoffFormats,
+        cutoffMet,
+        fallbackUsed,
+        formats,
+        minimumFormats,
+        minimumMet,
+        preferredFormats,
+        preferredMet,
+        qualityProfile,
+        spectralVerdict,
+        verificationRequired,
+        verifiedLossless,
+      }),
+      fallbackUsed,
+      label: qualityProfile?.fallbackAllowed ? 'Fallback quality' : 'Needs quality choice',
+      minimumMet,
+      preferredMet,
+      tone: qualityProfile?.fallbackAllowed ? 'info' : 'warning',
+    };
   }
 
-  return { label: 'Below profile', tone: 'danger' };
+  return {
+    cutoffMet,
+    detailRows: buildMatchQualityRows({
+      cutoffFormats: effectiveCutoffFormats,
+      cutoffMet,
+      fallbackUsed,
+      formats,
+      minimumFormats,
+      minimumMet,
+      preferredFormats,
+      preferredMet,
+      qualityProfile,
+      spectralVerdict,
+      verificationRequired,
+      verifiedLossless,
+    }),
+    fallbackUsed,
+    label: 'Below profile',
+    minimumMet,
+    preferredMet,
+    tone: 'danger',
+  };
+}
+
+function buildMatchQualityRows({
+  cutoffFormats,
+  cutoffMet,
+  fallbackUsed,
+  formats,
+  minimumFormats,
+  minimumMet,
+  preferredFormats,
+  preferredMet,
+  qualityProfile,
+  spectralVerdict,
+  verificationRequired,
+  verifiedLossless,
+}) {
+  return [
+    {
+      label: 'Observed',
+      tone: formats.length > 0 ? 'neutral' : 'warning',
+      value: formats.length > 0 ? formatFormatsLabel(formats) : 'No format evidence',
+    },
+    {
+      label: 'Preferred',
+      tone: preferredMet ? 'success' : 'warning',
+      value: preferredMet
+        ? `Matches ${formatFormatsLabel(preferredFormats)}`
+        : `Needs ${formatFormatsLabel(preferredFormats)}`,
+    },
+    {
+      label: 'Minimum',
+      tone: minimumMet ? 'success' : 'danger',
+      value: minimumMet
+        ? `Meets ${formatFormatsLabel(minimumFormats)}`
+        : `Below ${formatFormatsLabel(minimumFormats)}`,
+    },
+    {
+      label: 'Cutoff',
+      tone: cutoffMet ? 'success' : 'info',
+      value: cutoffMet
+        ? `At cutoff ${formatFormatsLabel(cutoffFormats)}`
+        : `Below cutoff ${formatFormatsLabel(cutoffFormats)}`,
+    },
+    {
+      label: 'Fallback',
+      tone: fallbackUsed && !qualityProfile?.fallbackAllowed ? 'warning' : 'neutral',
+      value: fallbackUsed
+        ? (qualityProfile?.fallbackAllowed ? 'Allowed by profile' : 'Needs approval')
+        : 'Not using fallback',
+    },
+    {
+      label: 'Audio check',
+      tone: verificationRequired && !verifiedLossless ? 'warning' : 'success',
+      value: verificationRequired
+        ? (verifiedLossless ? 'Verified lossless' : 'Required before automatic progress')
+        : 'Not required for this profile',
+    },
+    {
+      label: 'Spectral check',
+      tone: formatSpectralVerdictTone(spectralVerdict),
+      value: formatSpectralVerdictLabel(spectralVerdict),
+    },
+  ];
+}
+
+function formatSpectralVerdictLabel(verdict) {
+  switch (verdict) {
+    case 'authentic':
+      return 'Looks authentic';
+    case 'inconclusive':
+      return 'Inconclusive';
+    case 'suspicious':
+      return 'Suspicious lossless claim';
+    case 'transcoded':
+      return 'Likely transcoded';
+    default:
+      return 'No spectral evidence';
+  }
+}
+
+function formatSpectralVerdictTone(verdict) {
+  if (verdict === 'authentic') return 'success';
+  if (verdict === 'suspicious' || verdict === 'transcoded') return 'danger';
+  if (verdict === 'inconclusive') return 'warning';
+  return 'neutral';
 }
 
 function buildTrackCoverageLabel(trackMatchSummary, fileCount) {
@@ -241,6 +461,7 @@ function buildMatchCards(release) {
       matchId,
       isBest: index === 0,
       label: `Match ${index + 1}`,
+      qualityRows: qualityFit.detailRows,
       qualityFitLabel: qualityFit.label,
       qualityFitTone: qualityFit.tone,
       reason: buildMatchReason({ index, match, qualityFit, readiness }),
@@ -463,8 +684,18 @@ export function buildMusicQueueMatchReview(release) {
     qualityRows: [
       { label: 'Profile', value: qualitySummary.profileLabel },
       { label: 'Decision', value: qualitySummary.decisionLabel },
+      { label: 'Preferred', value: qualitySummary.preferredFormatsLabel },
+      { label: 'Minimum', value: qualitySummary.minimumFormatsLabel },
+      { label: 'Cutoff', value: qualitySummary.cutoffFormatsLabel },
+      { label: 'Fallback', value: qualitySummary.fallbackLabel },
+      { label: 'Upgrade search', value: qualitySummary.upgradeLabel },
       { label: 'Formats', value: qualitySummary.formatsLabel },
+      { label: 'Bitrate', value: qualitySummary.bitrateLabel },
       { label: 'Verification', value: qualitySummary.verifiedLabel },
+      { label: 'Audio check', value: qualitySummary.verificationRequirementLabel },
+      { label: 'Download gate', value: qualitySummary.autoDownloadLabel },
+      { label: 'Library gate', value: qualitySummary.autoAddLabel },
     ],
+    qualityGuidance: qualitySummary.reviewGuidance,
   };
 }

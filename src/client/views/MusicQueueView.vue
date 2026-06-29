@@ -289,6 +289,14 @@ async function handleRejectMatch(match) {
                     <dd>{{ match.healthLabel }}</dd>
                   </div>
                 </dl>
+                <dl v-if="match.qualityRows?.length" class="music-queue-match-quality-grid" aria-label="Match quality details">
+                  <template v-for="row in match.qualityRows" :key="row.label">
+                    <dt>{{ row.label }}</dt>
+                    <dd>
+                      <span class="hx-pill" :data-tone="row.tone">{{ row.value }}</span>
+                    </dd>
+                  </template>
+                </dl>
                 <div v-if="match.canUseMatch || match.canRejectMatch" class="music-queue-match-actions">
                   <button
                     v-if="match.canUseMatch"
@@ -327,6 +335,9 @@ async function handleRejectMatch(match) {
 
           <section class="music-queue-review-section">
             <h3>Quality</h3>
+            <p v-if="matchReview.qualityGuidance" class="music-queue-quality-guidance" role="status">
+              {{ matchReview.qualityGuidance }}
+            </p>
             <dl class="music-queue-detail-grid">
               <template v-for="row in matchReview.qualityRows" :key="row.label">
                 <dt>{{ row.label }}</dt>
@@ -609,6 +620,36 @@ async function handleRejectMatch(match) {
 
 .music-queue-match-grid dd {
   margin: 0;
+}
+
+.music-queue-match-quality-grid {
+  border-top: 1px solid var(--hx-border);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(96px, auto) 1fr;
+  margin: 0;
+  padding-top: 12px;
+}
+
+.music-queue-match-quality-grid dt {
+  color: var(--hx-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.music-queue-match-quality-grid dd {
+  margin: 0;
+  text-align: right;
+}
+
+.music-queue-quality-guidance {
+  background: var(--hx-bg-surface-muted);
+  border: 1px solid var(--hx-border);
+  border-radius: 8px;
+  color: var(--hx-text-muted);
+  padding: 12px;
 }
 
 .music-queue-review-actions {

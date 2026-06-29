@@ -43,3 +43,42 @@ export function formatQualityDecisionLabel(decisionCode) {
       return 'Quality unknown';
   }
 }
+
+function normalizeFormatToken(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+export function formatQualityFormatList(formats) {
+  const normalizedFormats = Array.isArray(formats)
+    ? [...new Set(formats.map(normalizeFormatToken).filter(Boolean))]
+    : [];
+
+  return normalizedFormats.length > 0
+    ? normalizedFormats.join(', ').toUpperCase()
+    : 'Not set';
+}
+
+export function formatQualityFallbackLabel(profile) {
+  return profile?.fallbackAllowed
+    ? 'Fallback allowed'
+    : 'Fallback blocked';
+}
+
+export function formatQualityUpgradeLabel(profile) {
+  return profile?.upgradeAllowed
+    ? 'Keeps looking for upgrades'
+    : 'Stops after accepted quality';
+}
+
+export function formatQualityVerificationRequirement(profile) {
+  return profile?.requiresVerification
+    ? 'Audio check required'
+    : 'Audio check optional';
+}
+
+export function formatQualityBitrateLabel(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0
+    ? `${Math.round(parsed)} kbps`
+    : 'No bitrate evidence';
+}
