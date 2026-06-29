@@ -161,6 +161,97 @@ test('import candidate recovery skips below-profile matches before promoting nex
   }]);
 });
 
+test('import candidate recovery fails quality-blocked downloads and promotes the next scoped match', async (t) => {
+  const markImportCandidateQualityFailed = t.mock.fn(async ({ importCandidateId }) => ({
+    candidate: {
+      id: importCandidateId,
+      downloadAttemptCount: 0,
+      normalizedPayload: {
+        musicQueue: {
+          profileCode: 'lossless_archive',
+        },
+        requestOwnership: {
+          metadataReleaseId: 'release-1',
+        },
+      },
+      sourceSearchId: 'search-1',
+    },
+  }));
+  const incrementImportCandidateDownloadAttemptCountFn = t.mock.fn(async () => ({
+    id: 'failed-candidate',
+    downloadAttemptCount: 1,
+    normalizedPayload: {
+      musicQueue: {
+        profileCode: 'lossless_archive',
+      },
+      requestOwnership: {
+        metadataReleaseId: 'release-1',
+      },
+    },
+    sourceSearchId: 'search-1',
+  }));
+  const findNextCandidateForRecoveryFn = t.mock.fn(async () => ({
+    id: 'next-candidate',
+    normalizedPayload: {
+      extensions: ['flac'],
+    },
+  }));
+  const promoteImportCandidateForRecoveryFn = t.mock.fn(async ({ importCandidateId }) => ({
+    id: importCandidateId,
+  }));
+  const createRecoveryExecutionRun = t.mock.fn(async ({ summary }) => ({
+    id: 'quality-recovery-run-1',
+    summary,
+  }));
+  const service = createImportCandidateRecoveryService({
+    createRecoveryExecutionRun,
+    findNextCandidateForRecoveryFn,
+    getImportCandidate: async () => ({
+      id: 'failed-candidate',
+      normalizedPayload: {
+        musicQueue: {
+          profileCode: 'lossless_archive',
+        },
+        requestOwnership: {
+          metadataReleaseId: 'release-1',
+        },
+      },
+      sourceSearchId: 'search-1',
+    }),
+    incrementImportCandidateDownloadAttemptCountFn,
+    markImportCandidateQualityFailed,
+    promoteImportCandidateForRecoveryFn,
+    qualityPolicyService: {
+      evaluateQualityEvidence: () => ({ autoDownloadEligible: true, code: 'accepted', formats: ['flac'] }),
+    },
+  });
+
+  const result = await service.handleImportCandidateQualityFailure({
+    failedCandidateId: 'failed-candidate',
+    failureReason: '1 file did not pass verified lossless checks before automatic add.',
+    operationRunId: 'apply-run-1',
+    scheduleFollowUpRun: true,
+  });
+
+  assert.deepEqual(markImportCandidateQualityFailed.mock.calls[0].arguments[0], {
+    importCandidateId: 'failed-candidate',
+    qualityLabel: 'quality_blocked',
+    qualityWeight: 0,
+    reason: '1 file did not pass verified lossless checks before automatic add.',
+  });
+  assert.deepEqual(findNextCandidateForRecoveryFn.mock.calls[0].arguments[0], {
+    excludeCandidateId: 'failed-candidate',
+    maxDownloadAttemptCount: 3,
+    metadataReleaseId: 'release-1',
+    sourceSearchId: 'search-1',
+  });
+  assert.equal(createRecoveryExecutionRun.mock.calls[0].arguments[0].summary.recoveryCascade.reason, 'quality_stop_recovery_cascade');
+  assert.equal(createRecoveryExecutionRun.mock.calls[0].arguments[0].summary.recoveryCascade.sourceOperationRunId, 'apply-run-1');
+  assert.equal(result.recovered, true);
+  assert.equal(result.nextCandidateId, 'next-candidate');
+  assert.equal(result.recoveryRunId, 'quality-recovery-run-1');
+});
+
 test('import candidate recovery reports exhaustion when no scoped candidate remains', async (t) => {
   const createRecoveryExecutionRun = t.mock.fn(async () => ({
     id: 'unexpected-run',

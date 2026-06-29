@@ -61,6 +61,49 @@ test('deriveMusicQueueStatus surfaces safe-auto quality blocks before ready-to-a
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE);
 });
 
+test('deriveMusicQueueStatus lets a promoted next match override stale quality-block evidence', () => {
+  const status = deriveMusicQueueStatus({
+    add: {
+      latestOutcome: 'quality_blocked',
+      message: '1 file did not pass verified lossless checks before automatic add.',
+      qualityBlockedCount: 1,
+    },
+    match: {
+      statusCounts: {
+        failed: 1,
+        selected: 1,
+      },
+      totalCount: 2,
+    },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.CHECKING_MATCHES);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
+});
+
+test('deriveMusicQueueStatus shows trying next match when quality recovery leaves pending options', () => {
+  const status = deriveMusicQueueStatus({
+    add: {
+      latestOutcome: 'quality_blocked',
+      message: '1 file did not pass verified lossless checks before automatic add.',
+      qualityBlockedCount: 1,
+    },
+    match: {
+      pendingCount: 2,
+      statusCounts: {
+        failed: 1,
+        pending: 2,
+      },
+      totalCount: 3,
+    },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
+});
+
 test('deriveMusicQueueStatus asks users to pick a match for ambiguous evidence', () => {
   const status = deriveMusicQueueStatus({
     match: {

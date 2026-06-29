@@ -204,6 +204,7 @@ export function createImportCandidateApplyWorker({
   markRunCancelled,
   markRunFailed,
   markRunStarted,
+  handleImportCandidateQualityFailure = null,
   safeAutoAddQualityGateService = createImportCandidateSafeAutoAddQualityGateService(),
   previewImportCandidateApply = async () => ({
     files: [],
@@ -223,6 +224,24 @@ export function createImportCandidateApplyWorker({
   updateImportApplyRunItem = async () => null,
 } = {}) {
   const activeRunIds = new Set();
+
+  function buildQualityRecoverySummary(qualityRecoveries) {
+    if (!Array.isArray(qualityRecoveries) || qualityRecoveries.length === 0) {
+      return {};
+    }
+
+    return {
+      qualityRecoveryExhaustedCount: qualityRecoveries
+        .filter((recovery) => recovery?.recovered !== true && recovery?.rediscovery?.scheduled !== true)
+        .length,
+      qualityRecoveryRediscoveryCount: qualityRecoveries
+        .filter((recovery) => recovery?.rediscovery?.scheduled === true)
+        .length,
+      qualityRecoveryStartedCount: qualityRecoveries
+        .filter((recovery) => recovery?.recovered === true)
+        .length,
+    };
+  }
 
   async function runApply({
     applySafetyMode = 'manual',
@@ -268,6 +287,7 @@ export function createImportCandidateApplyWorker({
         qualityBlocked: 0,
       };
       const postApplyReleaseHints = [];
+      const qualityRecoveries = [];
 
       for (const summaryCandidate of runnableCandidates) {
         await throwIfOperationRunCancellationRequested({ isCancellationRequested, runId });
@@ -325,6 +345,25 @@ export function createImportCandidateApplyWorker({
                   runId,
                   summaryCandidate,
                 })).catch(() => {});
+              }
+              if (typeof handleImportCandidateQualityFailure === 'function') {
+                try {
+                  qualityRecoveries.push(await handleImportCandidateQualityFailure({
+                    failedCandidateId: summaryCandidate.id,
+                    failureReason: qualityGate.message,
+                    operationRunId: runId,
+                    profileCode: qualityGate.profileCode,
+                    qualityLabel: qualityGate.status ?? 'quality_blocked',
+                    qualityWeight: 0,
+                    scheduleFollowUpRun: true,
+                  }));
+                } catch (error) {
+                  qualityRecoveries.push({
+                    failedCandidateId: summaryCandidate.id,
+                    reason: error?.code ?? 'quality_recovery_failed',
+                    recovered: false,
+                  });
+                }
               }
               continue;
             }
@@ -493,6 +532,7 @@ export function createImportCandidateApplyWorker({
           readyWithWarningsCount: importPendingSummary.counts?.readyWithWarnings ?? 0,
           requestedCandidateCount,
           ...(counts.qualityBlocked > 0 ? { qualityBlockedCount: counts.qualityBlocked } : {}),
+          ...buildQualityRecoverySummary(qualityRecoveries),
           ...buildApplyTriggerSummary({ applySafetyMode, triggerSource }),
           ...buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applySafetyMode),
           totalImportPending: importPendingSummary.counts?.totalImportPending ?? runItems.length,

@@ -829,6 +829,12 @@ test('createImportCandidateService marks download workflow transitions with shar
   await service.retryImportCandidateDownload({ importCandidateId: 'candidate-1', reason: 'Remote peer rejected the transfer' });
   await service.markImportCandidateImportPending({ importCandidateId: 'candidate-1', reason: 'Completed' });
   await service.markImportCandidateApplied({ importCandidateId: 'candidate-1', reason: 'Imported cleanly' });
+  await service.markImportCandidateQualityFailed({
+    importCandidateId: 'candidate-1',
+    qualityLabel: 'blocked',
+    qualityWeight: 0,
+    reason: 'Verified quality failed',
+  });
   await service.markImportCandidateDownloadFailed({ importCandidateId: 'candidate-1', reason: 'Remote transfer failed' });
 
   assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[0].arguments, [{
@@ -852,6 +858,11 @@ test('createImportCandidateService marks download workflow transitions with shar
     toStatus: 'applied',
   }, client]);
   assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[4].arguments, [{
+    fromStatuses: ['import_pending'],
+    importCandidateId: 'candidate-1',
+    toStatus: 'failed',
+  }, client]);
+  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[5].arguments, [{
     fromStatuses: ['selected', 'downloading'],
     importCandidateId: 'candidate-1',
     toStatus: 'failed',
@@ -860,7 +871,8 @@ test('createImportCandidateService marks download workflow transitions with shar
   assert.equal(insertImportCandidateEventFn.mock.calls[1].arguments[0].eventType, 'import_candidate_download_retry_scheduled');
   assert.equal(insertImportCandidateEventFn.mock.calls[2].arguments[0].eventType, 'import_candidate_import_pending');
   assert.equal(insertImportCandidateEventFn.mock.calls[3].arguments[0].eventType, 'import_candidate_applied');
-  assert.equal(insertImportCandidateEventFn.mock.calls[4].arguments[0].eventType, 'import_candidate_download_failed');
+  assert.equal(insertImportCandidateEventFn.mock.calls[4].arguments[0].eventType, 'import_candidate_quality_failed');
+  assert.equal(insertImportCandidateEventFn.mock.calls[5].arguments[0].eventType, 'import_candidate_download_failed');
   assert.deepEqual(recordSourceUserOutcomeEvidenceFn.mock.calls.map((call) => call.arguments[0]), [
     {
       actorUserId: null,
@@ -870,6 +882,16 @@ test('createImportCandidateService marks download workflow transitions with shar
       qualityLabel: null,
       qualityWeight: 1,
       reason: 'Imported cleanly',
+      username: 'source-user',
+    },
+    {
+      actorUserId: null,
+      eventType: 'import_candidate_quality_failed',
+      occurredAt: '2026-04-30T14:00:00.000Z',
+      outcome: 'failure',
+      qualityLabel: 'blocked',
+      qualityWeight: 0,
+      reason: 'Verified quality failed',
       username: 'source-user',
     },
     {

@@ -932,12 +932,14 @@ Acceptance:
 ### Phase 4 - Verified Audio Quality And Safe Library Add
 
 Status: **In progress.** The safe automatic add-to-library handoff, first
-verified-quality gate, cached pre-add spectral proof, and first Music
-Queue/Activity surfacing slice are implemented; see
+verified-quality gate, cached pre-add spectral proof, first Music
+Queue/Activity surfacing slice, and quality-stop recovery automation are
+implemented; see
 `MUSIC_QUEUE_PHASE_4_SAFE_AUTO_ADD_HANDOFF_DESIGN.md` and
 `MUSIC_QUEUE_PHASE_4_VERIFIED_QUALITY_AUTO_ADD_GATE_DESIGN.md`, and
 `MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md` and
-`MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md`.
+`MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md` and
+`MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`.
 
 Goal: make `FLAC` and other quality choices truthful before Harmoniarr claims a
 release is complete.
@@ -959,6 +961,8 @@ release is complete.
   safe policy slice.
 - [x] Surface strict-quality safe-auto stops in Music Queue and Activity with a
   release review deep link.
+- [x] Block strict-quality failed downloaded matches and automatically promote
+  the next quality-eligible match when one exists.
 - [ ] Route collisions, lossy decisions, suspicious FLAC, probe failures, and
   unsafe import plans to `needs help`.
 - [ ] Add `Add to library` for manual safe adds.
@@ -1049,6 +1053,8 @@ failure and repair paths, in browser and local Docker walkthrough conditions.
   analysis stops before library add.
 - [ ] Browser proof: failed match is blocked, next acceptable match starts, and
   Activity records the fallback in plain language.
+- [ ] Browser proof: downloaded strict-quality failure blocks the bad match,
+  promotes the next quality-eligible match, and keeps Music Queue moving.
 - [ ] Browser proof: completed download moves to `Ready to add` and then
   `In library`.
 - [ ] Browser proof: Activity history loads as timeline/event history and links

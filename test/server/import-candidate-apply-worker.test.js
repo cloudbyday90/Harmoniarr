@@ -298,6 +298,12 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
     },
   }));
   const markImportCandidateApplied = t.mock.fn(async () => ({}));
+  const handleImportCandidateQualityFailure = t.mock.fn(async () => ({
+    failedCandidateId: 'candidate-fake-flac',
+    nextCandidateId: 'candidate-next-flac',
+    recovered: true,
+    recoveryRunId: 'quality-recovery-run-1',
+  }));
   const activityEvents = [];
   const updateImportApplyRunItem = t.mock.fn(async () => null);
   let resolveCompleted;
@@ -326,6 +332,7 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
         },
       })],
     }),
+    handleImportCandidateQualityFailure,
     markImportCandidateApplied,
     markRunCompleted,
     markRunFailed: async () => {},
@@ -374,6 +381,15 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
 
   assert.equal(applyImportCandidatePreview.mock.callCount(), 0);
   assert.equal(markImportCandidateApplied.mock.callCount(), 0);
+  assert.deepEqual(handleImportCandidateQualityFailure.mock.calls[0].arguments[0], {
+    failedCandidateId: 'candidate-fake-flac',
+    failureReason: '1 file did not pass verified lossless checks before automatic add.',
+    operationRunId: 'run-safe-auto-quality-block',
+    profileCode: 'lossless_archive',
+    qualityLabel: 'blocked',
+    qualityWeight: 0,
+    scheduleFollowUpRun: true,
+  });
   assert.equal(activityEvents.length, 1);
   assert.equal(activityEvents[0].eventType, 'music_queue_quality_blocked');
   assert.equal(activityEvents[0].entityId, 'wanted-1');
@@ -395,6 +411,9 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
       executionMode: 'move',
       processedCandidateCount: 1,
       qualityBlockedCount: 1,
+      qualityRecoveryExhaustedCount: 0,
+      qualityRecoveryRediscoveryCount: 0,
+      qualityRecoveryStartedCount: 1,
       readyCount: 1,
       readyWithWarningsCount: 0,
       requestedCandidateCount: 1,

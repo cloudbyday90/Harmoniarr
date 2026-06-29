@@ -201,6 +201,21 @@ export function deriveMusicQueueStatus({
     });
   }
 
+  if (hasAnyStatus(match.statusCounts, ['failed', 'rejected']) && getCount(match.pendingCount) > 0) {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW,
+      progressStep: 'download',
+    });
+  }
+
+  const selectedCount = getCount(match.statusCounts?.selected) + getCount(match.statusCounts?.held);
+  if (selectedCount > 0) {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.CHECKING_MATCHES, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW,
+      progressStep: 'match',
+    });
+  }
+
   if (getCount(add.qualityBlockedCount) > 0 || add.latestOutcome === 'quality_blocked') {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.QUALITY_CHOICE_NEEDED, {
       detail: add.message ?? add.qualityGate?.message ?? 'Downloaded files did not pass the selected audio quality check.',
@@ -234,26 +249,11 @@ export function deriveMusicQueueStatus({
     });
   }
 
-  if (hasAnyStatus(match.statusCounts, ['failed', 'rejected']) && getCount(match.pendingCount) > 0) {
-    return buildStatus(MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH, {
-      nextAction: MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW,
-      progressStep: 'download',
-    });
-  }
-
   if (getCount(match.totalCount) > 0) {
     if (['ambiguous', 'low_confidence', 'not_reviewable', 'unscored'].includes(match.readiness?.code)) {
       return buildStatus(MUSIC_QUEUE_STATUS_CODES.PICK_MATCH, {
         detail: match.readiness.message ?? null,
         nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_MATCHES,
-        progressStep: 'match',
-      });
-    }
-
-    const selectedCount = getCount(match.statusCounts?.selected) + getCount(match.statusCounts?.held);
-    if (selectedCount > 0) {
-      return buildStatus(MUSIC_QUEUE_STATUS_CODES.CHECKING_MATCHES, {
-        nextAction: MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW,
         progressStep: 'match',
       });
     }

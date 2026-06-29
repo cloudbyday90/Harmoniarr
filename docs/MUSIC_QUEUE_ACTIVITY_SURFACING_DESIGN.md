@@ -114,12 +114,19 @@ Behavior:
 
 ---
 
-## 6. Follow-Up
+## 6. Follow-Up Outcome
 
-The next high-value item is quality-stop recovery automation:
+Quality-stop recovery automation is implemented in
+`MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`:
 
-1. block the failed-quality match for that wanted release
-2. automatically try the next acceptable match when one exists
-3. keep `Quality choice needed` only when no acceptable automated path remains
-4. show the fallback/try-again choice in Music Queue for the remaining stopped
-   cases
+- failed-quality downloaded matches are marked failed
+- the next quality-eligible match is promoted when one exists
+- Music Queue shows forward motion when the next match is selected or queued
+- `Quality choice needed` remains the stopped state when no safe next path
+  exists
+
+Remaining follow-up:
+
+1. add browser/Docker proof for the full quality-stop recovery path
+2. add lower-noise Activity events for successful audio checks and warnings
+3. keep manual fallback controls for stopped releases with no safe next match

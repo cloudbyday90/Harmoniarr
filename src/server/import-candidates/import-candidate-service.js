@@ -842,6 +842,42 @@ export function createImportCandidateService({
     });
   }
 
+  function markImportCandidateQualityFailed({
+    actorUserId = null,
+    importCandidateId,
+    qualityLabel = 'quality_blocked',
+    qualityWeight = 0,
+    reason = null,
+    requestMetadata = null,
+  }) {
+    return transitionCandidateReviewStatus({
+      actorUserId,
+      eventType: 'import_candidate_quality_failed',
+      fromStatuses: ['import_pending'],
+      importCandidateId,
+      reason,
+      requestMetadata,
+      summary: 'Import candidate failed quality verification',
+      toStatus: 'failed',
+    }).then(async (transitionResult) => {
+      try {
+        await recordSourceUserOutcomeEvidenceFn({
+          actorUserId,
+          eventType: 'import_candidate_quality_failed',
+          occurredAt: transitionResult?.candidate?.updatedAt ?? null,
+          outcome: 'failure',
+          qualityLabel,
+          qualityWeight,
+          reason,
+          username: transitionResult?.candidate?.username,
+        });
+      } catch {
+        // Trust evidence must not block the core status transition.
+      }
+      return transitionResult;
+    });
+  }
+
   function rejectImportCandidate({
     actorUserId = null,
     importCandidateId,
@@ -1037,6 +1073,7 @@ export function createImportCandidateService({
     listImportCandidates,
     listImportCandidatesBySourceMediaRequestIds,
     markImportCandidateDownloadFailed,
+    markImportCandidateQualityFailed,
     markImportCandidateDownloading,
     markImportCandidateApplied,
     markImportCandidateImportPending,

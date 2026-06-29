@@ -131,6 +131,6 @@ The first Music Queue/Activity surfacing slice is implemented in
 
 Remaining follow-up:
 
-1. add lower-noise Activity events for successful audio checks and warnings
-2. automatically block failed-quality matches and try the next acceptable match
+1. add browser/Docker proof for the full quality-stop recovery path
+2. add lower-noise Activity events for successful audio checks and warnings
 3. keep manual fallback controls for stopped releases with no safe next match

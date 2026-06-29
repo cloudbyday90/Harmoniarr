@@ -125,6 +125,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   `music_queue_quality_blocked` Activity event, and deep-link Activity back to
   the selected Music Queue release review. See
   `MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md`.
+- Music Queue quality-stop recovery automation: downloaded matches that fail
+  strict safe-auto quality verification are now marked as quality failures,
+  excluded from the recovery cascade, and followed by the next quality-eligible
+  match when one exists. Music Queue now lets selected or queued next-match
+  progress override stale quality-block evidence. See
+  `MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

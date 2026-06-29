@@ -117,6 +117,7 @@ export function createImportCandidateRecoveryService({
   getImportCandidate = async () => null,
   incrementImportCandidateDownloadAttemptCountFn = incrementImportCandidateDownloadAttemptCount,
   markImportCandidateDownloadFailed = async () => null,
+  markImportCandidateQualityFailed = async () => null,
   maxCandidateDownloadAttempts = MAX_CANDIDATE_DOWNLOAD_ATTEMPTS,
   promoteImportCandidateForRecoveryFn = promoteImportCandidateForRecovery,
   qualityPolicyService = null,
@@ -165,6 +166,7 @@ export function createImportCandidateRecoveryService({
     operationRunId = null,
     profileCode = null,
     qualityOverride = null,
+    recoverySummaryReason = 'transfer_recovery_cascade',
     scheduleFollowUpRun = false,
   } = {}) {
     const sourceSearchId = normalizeOptionalString(failedCandidate.sourceSearchId);
@@ -271,6 +273,7 @@ export function createImportCandidateRecoveryService({
     const recoveryRun = await scheduleRecoveryExecutionRun({
       nextCandidate: promotedCandidate,
       operationRunId,
+      summaryReason: recoverySummaryReason,
       scheduleFollowUpRun,
       triggeredByFailedCandidateId: failedCandidateId,
     });
@@ -313,6 +316,48 @@ export function createImportCandidateRecoveryService({
       operationRunId,
       profileCode,
       qualityOverride,
+      scheduleFollowUpRun,
+    });
+  }
+
+  async function handleImportCandidateQualityFailure({
+    failedCandidateId,
+    failureReason = null,
+    operationRunId = null,
+    profileCode = null,
+    qualityLabel = 'quality_blocked',
+    qualityOverride = null,
+    qualityWeight = 0,
+    scheduleFollowUpRun = true,
+  } = {}) {
+    const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
+    if (!failedBeforeAttempt) {
+      return buildRecoveryResult({
+        failedCandidate: null,
+        reason: 'failed_candidate_not_found',
+        recovered: false,
+      });
+    }
+
+    const transitionResult = await markImportCandidateQualityFailed({
+      importCandidateId: failedCandidateId,
+      qualityLabel,
+      qualityWeight,
+      reason: failureReason,
+    });
+    const failedAfterTransition = transitionResult?.candidate ?? failedBeforeAttempt;
+    const failedCandidate = await incrementImportCandidateDownloadAttemptCountFn({
+      importCandidateId: failedCandidateId,
+    }) ?? failedAfterTransition;
+
+    return promoteNextRecoveryCandidate({
+      failedCandidate,
+      failedCandidateId,
+      failureReason,
+      operationRunId,
+      profileCode,
+      qualityOverride,
+      recoverySummaryReason: 'quality_stop_recovery_cascade',
       scheduleFollowUpRun,
     });
   }
@@ -384,6 +429,7 @@ export function createImportCandidateRecoveryService({
 
   return {
     handleImportCandidateDownloadFailure,
+    handleImportCandidateQualityFailure,
     handleImportCandidateRejectedTransfer,
   };
 }
