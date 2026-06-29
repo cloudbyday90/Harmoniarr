@@ -250,6 +250,23 @@ test('getActivityEventLabel formats download_completed', () => {
   assert.equal(getActivityEventLabel(event), 'Download completed: Amber by Autechre');
 });
 
+test('getActivityEventLabel and detail format music_queue_quality_blocked', () => {
+  const event = {
+    eventType: 'music_queue_quality_blocked',
+    entityTitle: 'Amber',
+    entityArtist: 'Autechre',
+    extraPayload: {
+      blockers: [{
+        message: 'Spectral analysis does not verify this lossless file.',
+      }],
+      message: '1 file did not pass verified lossless checks before automatic add.',
+    },
+  };
+
+  assert.equal(getActivityEventLabel(event), 'Quality choice needed: Amber by Autechre');
+  assert.equal(getActivityEventDetail(event), 'Spectral analysis does not verify this lossless file.');
+});
+
 test('getActivityEventDetail returns detail for multi-release release_added', () => {
   const event = normalizeActivityEvent(makeReleaseAddedEvent({
     entityTitle: '2 releases',
@@ -292,6 +309,7 @@ test('getActivityEventIcon returns correct icon keys for each event type', () =>
   assert.equal(getActivityEventIcon('release_added'), 'release-added');
   assert.equal(getActivityEventIcon('request_fulfilled'), 'checkmark');
   assert.equal(getActivityEventIcon('download_completed'), 'download');
+  assert.equal(getActivityEventIcon('music_queue_quality_blocked'), 'audio-check');
   assert.equal(getActivityEventIcon('unknown_type'), 'activity');
   assert.equal(getActivityEventIcon(null), 'activity');
 });

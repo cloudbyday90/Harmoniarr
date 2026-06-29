@@ -120,6 +120,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   measurements for threshold reclassification, and blocks safe-auto add when
   proof is suspicious, transcoded, inconclusive, unavailable, or failed. See
   `MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md`.
+- Music Queue and Activity surfacing: strict-quality safe-auto add stops now
+  project back into Music Queue as `Quality choice needed`, record a sanitized
+  `music_queue_quality_blocked` Activity event, and deep-link Activity back to
+  the selected Music Queue release review. See
+  `MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

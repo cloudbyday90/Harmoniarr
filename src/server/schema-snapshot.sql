@@ -5931,3 +5931,65 @@ SET migration_key = EXCLUDED.migration_key,
     error_message = NULL,
     application_version = NULL,
     updated_at = NOW();
+
+-- Migration: 20260630_050000_add_music_queue_quality_blocked_activity_event.sql
+-- Checksum: 4350e1f223ef8d39ae8a004ea6bfab745fbd2212dd49865e5cc8240d7b71365d
+/*
+ * Harmoniarr - Soulseek-native music library management
+ * Copyright (C) 2026 Harmoniarr Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+ALTER TABLE activity_events
+  DROP CONSTRAINT IF EXISTS activity_events_event_type_check;
+
+ALTER TABLE activity_events
+  ADD CONSTRAINT activity_events_event_type_check
+  CHECK (event_type IN (
+    'request_created',
+    'download_completed',
+    'release_added',
+    'request_fulfilled',
+    'artist_monitored',
+    'artist_policy_saved',
+    'quality_fallback_allowed',
+    'music_queue_quality_blocked'
+  ));
+
+INSERT INTO schema_migrations (
+  migration_key,
+  filename,
+  description,
+  checksum,
+  status
+)
+VALUES (
+  '20260630_050000',
+  '20260630_050000_add_music_queue_quality_blocked_activity_event.sql',
+  'add_music_queue_quality_blocked_activity_event',
+  '4350e1f223ef8d39ae8a004ea6bfab745fbd2212dd49865e5cc8240d7b71365d',
+  'applied'
+)
+ON CONFLICT (filename) DO UPDATE
+SET migration_key = EXCLUDED.migration_key,
+    description = EXCLUDED.description,
+    checksum = EXCLUDED.checksum,
+    status = EXCLUDED.status,
+    started_at = NULL,
+    finished_at = NULL,
+    duration_ms = NULL,
+    error_message = NULL,
+    application_version = NULL,
+    updated_at = NOW();

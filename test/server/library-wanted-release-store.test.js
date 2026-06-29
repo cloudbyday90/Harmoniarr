@@ -72,6 +72,27 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             import_execution_item_total_count: 2,
             import_execution_latest_item_status: 'queued',
             import_execution_latest_updated_at: '2026-06-27T21:12:00.000Z',
+            import_apply_item_status_counts: {
+              blocked: 1,
+            },
+            import_apply_item_total_count: 1,
+            import_apply_latest_item_status: 'blocked',
+            import_apply_latest_outcome: 'quality_blocked',
+            import_apply_latest_quality_blocked_message: '1 file did not pass verified lossless checks before automatic add.',
+            import_apply_latest_quality_gate: {
+              blockers: [{
+                code: 'safe_auto_spectral_transcoded',
+                fileId: 'file-1',
+                filename: '01 Fake.flac',
+                message: 'Spectral analysis does not verify this lossless file.',
+              }],
+              checkedFileCount: 12,
+              message: '1 file did not pass verified lossless checks before automatic add.',
+              profileCode: 'lossless_archive',
+              status: 'blocked',
+            },
+            import_apply_latest_updated_at: '2026-06-27T21:15:00.000Z',
+            import_apply_quality_blocked_count: 1,
             last_reconciled_at: '2026-05-31T14:00:00.000Z',
             matched_track_count: 0,
             metadata_artist_id: 'artist-1',
@@ -105,7 +126,9 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   assert.match(observedSql, /import_match_drilldown\.matches AS import_candidate_matches/);
   assert.match(observedSql, /LIMIT 5/);
   assert.match(observedSql, /FROM import_execution_run_items iei/);
+  assert.match(observedSql, /FROM import_apply_run_items iai/);
   assert.match(observedSql, /jsonb_array_length\(latest_item\.planning_snapshot #> '\{execution,enqueuedTransfers\}'\)/);
+  assert.match(observedSql, /latest_items\.apply_snapshot #>> '\{apply,outcome\}' = 'quality_blocked'/);
   assert.match(observedSql, /lwr\.app_user_id = \$1/);
   assert.deepEqual(observedParams, ['user-1', 25]);
   assert.equal(releases[0].appUserId, 'user-1');
@@ -175,6 +198,29 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
         latestItemStatus: 'queued',
         latestUpdatedAt: '2026-06-27T21:12:00.000Z',
         totalItemCount: 2,
+      },
+      libraryAddSummary: {
+        itemStatusCounts: {
+          blocked: 1,
+        },
+        latestItemStatus: 'blocked',
+        latestOutcome: 'quality_blocked',
+        latestQualityBlockedMessage: '1 file did not pass verified lossless checks before automatic add.',
+        latestQualityGate: {
+          blockers: [{
+            code: 'safe_auto_spectral_transcoded',
+            fileId: 'file-1',
+            filename: '01 Fake.flac',
+            message: 'Spectral analysis does not verify this lossless file.',
+          }],
+          checkedFileCount: 12,
+          message: '1 file did not pass verified lossless checks before automatic add.',
+          profileCode: 'lossless_archive',
+          status: 'blocked',
+        },
+        latestUpdatedAt: '2026-06-27T21:15:00.000Z',
+        qualityBlockedCount: 1,
+        totalItemCount: 1,
       },
     },
     lastSearchAt: '2026-05-31T14:30:00.000Z',

@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import {
   buildMusicQueueMatchReview,
   buildMusicQueueReleaseTypeFilters,
@@ -44,10 +45,12 @@ const {
   useMatch,
 } = useMusicQueue();
 
+const route = useRoute();
+const router = useRouter();
 const query = ref('');
 const selectedState = ref('all');
 const selectedReleaseType = ref('all');
-const selectedReleaseId = ref(null);
+const selectedReleaseId = ref(typeof route.params.wantedReleaseId === 'string' ? route.params.wantedReleaseId : null);
 
 const releaseTypeFilters = computed(() => buildMusicQueueReleaseTypeFilters(releases.value));
 const filteredReleases = computed(() => filterMusicQueueReleases(releases.value, {
@@ -64,10 +67,16 @@ const matchReview = computed(() => buildMusicQueueMatchReview(selectedRelease.va
 
 function openReview(release) {
   selectedReleaseId.value = release.id;
+  if (route.name !== 'music-queue-release' || route.params.wantedReleaseId !== release.id) {
+    void router.replace({ name: 'music-queue-release', params: { wantedReleaseId: release.id } });
+  }
 }
 
 function closeReview() {
   selectedReleaseId.value = null;
+  if (route.name === 'music-queue-release') {
+    void router.replace({ name: 'music-queue' });
+  }
 }
 
 function getMatchActionKey(match, action) {
@@ -107,6 +116,13 @@ async function handleAllowFallbackQuality() {
     wantedReleaseId: selectedRelease.value?.id,
   });
 }
+
+watch(
+  () => route.params.wantedReleaseId,
+  (wantedReleaseId) => {
+    selectedReleaseId.value = typeof wantedReleaseId === 'string' ? wantedReleaseId : null;
+  },
+);
 </script>
 
 <template>

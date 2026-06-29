@@ -298,6 +298,7 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
     },
   }));
   const markImportCandidateApplied = t.mock.fn(async () => ({}));
+  const activityEvents = [];
   const updateImportApplyRunItem = t.mock.fn(async () => null);
   let resolveCompleted;
   const completed = new Promise((resolve) => {
@@ -317,6 +318,11 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
         musicQueueContext: {
           profileCode: 'lossless_archive',
           qualityOverride: null,
+          wantedReleaseId: 'wanted-1',
+        },
+        releaseIdentity: {
+          artistName: 'Artist',
+          releaseTitle: 'Album',
         },
       })],
     }),
@@ -348,6 +354,9 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
       }],
       summary: { status: 'ready' },
     }),
+    recordActivityEventFn: async (payload) => {
+      activityEvents.push(payload);
+    },
     releaseLease: async () => {},
     replaceImportApplyRunItems: async () => [],
     updateImportApplyRunItem,
@@ -365,6 +374,12 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
 
   assert.equal(applyImportCandidatePreview.mock.callCount(), 0);
   assert.equal(markImportCandidateApplied.mock.callCount(), 0);
+  assert.equal(activityEvents.length, 1);
+  assert.equal(activityEvents[0].eventType, 'music_queue_quality_blocked');
+  assert.equal(activityEvents[0].entityId, 'wanted-1');
+  assert.equal(activityEvents[0].entityTitle, 'Album');
+  assert.equal(activityEvents[0].entityArtist, 'Artist');
+  assert.equal(activityEvents[0].extraPayload.blockers[0].filename, '01 Fake.flac');
   assert.equal(updateImportApplyRunItem.mock.callCount(), 1);
   assert.equal(updateImportApplyRunItem.mock.calls[0].arguments[0].itemStatus, 'blocked');
   assert.match(updateImportApplyRunItem.mock.calls[0].arguments[0].statusMessage, /verified lossless checks/);

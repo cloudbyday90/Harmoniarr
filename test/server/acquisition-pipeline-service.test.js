@@ -224,6 +224,49 @@ test('requestMusicQueueReleaseRediscovery verifies release scope before queuing 
   }]);
 });
 
+test('listMusicQueueReleases maps quality-blocked add evidence to a quality choice stop', async () => {
+  const release = createRelease({ status: 'import_pending' });
+  release.discoveryRequest.importReviewSummary.downloadExecutionSummary = {
+    itemStatusCounts: { completed: 1 },
+    totalItemCount: 1,
+  };
+  release.discoveryRequest.importReviewSummary.libraryAddSummary = {
+    latestItemStatus: 'blocked',
+    latestOutcome: 'quality_blocked',
+    latestQualityBlockedMessage: '1 file did not pass verified lossless checks before automatic add.',
+    latestQualityGate: {
+      blockers: [{
+        filename: '01 Fake.flac',
+        message: 'Spectral analysis does not verify this lossless file.',
+      }],
+      message: '1 file did not pass verified lossless checks before automatic add.',
+      profileCode: 'lossless_archive',
+      status: 'blocked',
+    },
+    qualityBlockedCount: 1,
+    totalItemCount: 1,
+  };
+  const service = createAcquisitionPipelineService({
+    acquisitionPipelineStore: {
+      listWantedReleaseEvidence: async () => ({
+        checkedAt: '2026-06-29T12:00:00.000Z',
+        pagination: { limit: 100, offset: 0, total: 1 },
+        releases: [release],
+      }),
+    },
+    qualityPolicyService,
+  });
+
+  const result = await service.listMusicQueueReleases({ appUserId: 'user-1' });
+
+  assert.equal(result.releases[0].status.code, 'quality_choice_needed');
+  assert.equal(
+    result.releases[0].status.detail,
+    '1 file did not pass verified lossless checks before automatic add.',
+  );
+  assert.equal(result.summary.counts.quality_choice_needed, 1);
+});
+
 test('requestMusicQueueReleaseRediscovery succeeds when discovery dispatch is already active', async () => {
   const service = createService({
     startLibraryDiscoveryRun: async () => {

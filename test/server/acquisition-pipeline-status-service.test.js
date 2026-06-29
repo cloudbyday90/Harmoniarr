@@ -45,6 +45,22 @@ test('deriveMusicQueueStatus treats completed downloads as ready to add', () => 
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.ADD_TO_LIBRARY);
 });
 
+test('deriveMusicQueueStatus surfaces safe-auto quality blocks before ready-to-add', () => {
+  const status = deriveMusicQueueStatus({
+    add: {
+      latestOutcome: 'quality_blocked',
+      message: '1 file did not pass verified lossless checks before automatic add.',
+      qualityBlockedCount: 1,
+    },
+    match: { executionStatusCounts: { completed: 1 }, latestStatus: 'import_pending' },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.QUALITY_CHOICE_NEEDED);
+  assert.equal(status.detail, '1 file did not pass verified lossless checks before automatic add.');
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE);
+});
+
 test('deriveMusicQueueStatus asks users to pick a match for ambiguous evidence', () => {
   const status = deriveMusicQueueStatus({
     match: {

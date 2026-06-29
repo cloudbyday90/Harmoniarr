@@ -932,10 +932,12 @@ Acceptance:
 ### Phase 4 - Verified Audio Quality And Safe Library Add
 
 Status: **In progress.** The safe automatic add-to-library handoff, first
-verified-quality gate, and cached pre-add spectral proof are implemented; see
+verified-quality gate, cached pre-add spectral proof, and first Music
+Queue/Activity surfacing slice are implemented; see
 `MUSIC_QUEUE_PHASE_4_SAFE_AUTO_ADD_HANDOFF_DESIGN.md` and
 `MUSIC_QUEUE_PHASE_4_VERIFIED_QUALITY_AUTO_ADD_GATE_DESIGN.md`, and
-`MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md`.
+`MUSIC_QUEUE_PHASE_4_CACHED_SPECTRAL_PRE_ADD_PROOF_DESIGN.md` and
+`MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md`.
 
 Goal: make `FLAC` and other quality choices truthful before Harmoniarr claims a
 release is complete.
@@ -955,6 +957,8 @@ release is complete.
   transcoded, probe-failed, or unverified beyond policy.
 - [x] Auto-start add-to-library/apply for ready matches that meet the first
   safe policy slice.
+- [x] Surface strict-quality safe-auto stops in Music Queue and Activity with a
+  release review deep link.
 - [ ] Route collisions, lossy decisions, suspicious FLAC, probe failures, and
   unsafe import plans to `needs help`.
 - [ ] Add `Add to library` for manual safe adds.
@@ -981,6 +985,8 @@ right repair surface.
   next, no matches left, download started, download completed, audio checked,
   audio warning, audio failed, suspicious FLAC, added to library, and request
   fulfilled.
+- [x] Emit the first strict-quality stop Activity event and link it to Music
+  Queue release review.
 - [ ] Add repair handoffs from Activity to Music Queue, Downloader, Library,
   Artist Detail, Settings, and advanced diagnostics.
 - [ ] Move current candidate/import/apply/runway controls behind operator-only

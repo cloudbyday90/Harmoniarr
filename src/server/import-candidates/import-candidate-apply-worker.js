@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { buildMusicQueueQualityBlockedActivityEvent } from '../activity/music-queue-quality-activity-presentation-service.js';
 import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
 import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-quality.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
@@ -318,6 +319,13 @@ export function createImportCandidateApplyWorker({
                 operationRunId: runId,
                 statusMessage: qualityGate.message,
               });
+              if (typeof recordActivityEventFn === 'function') {
+                void recordActivityEventFn(buildMusicQueueQualityBlockedActivityEvent({
+                  qualityGate,
+                  runId,
+                  summaryCandidate,
+                })).catch(() => {});
+              }
               continue;
             }
           }

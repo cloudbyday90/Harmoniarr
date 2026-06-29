@@ -90,6 +90,24 @@ function buildMatchEvidence(release) {
   };
 }
 
+function buildAddEvidence(release) {
+  const importReviewSummary = release.discoveryRequest?.importReviewSummary ?? {};
+  const addSummary = importReviewSummary.libraryAddSummary ?? {};
+  const qualityGate = addSummary.latestQualityGate && typeof addSummary.latestQualityGate === 'object'
+    ? addSummary.latestQualityGate
+    : null;
+  return {
+    itemStatusCounts: addSummary.itemStatusCounts ?? {},
+    latestOutcome: addSummary.latestOutcome ?? null,
+    latestStatus: addSummary.latestItemStatus ?? null,
+    latestUpdatedAt: addSummary.latestUpdatedAt ?? null,
+    message: addSummary.latestQualityBlockedMessage ?? qualityGate?.message ?? null,
+    qualityBlockedCount: getCount(addSummary.qualityBlockedCount),
+    qualityGate,
+    totalItemCount: getCount(addSummary.totalItemCount),
+  };
+}
+
 function buildSearchEvidence(release) {
   const discoveryRequest = release.discoveryRequest ?? {};
   return {
@@ -125,6 +143,7 @@ function buildQualityEvidence(release, qualityPolicyService) {
 function projectRelease(release, { qualityPolicyService, statusService }) {
   const quality = buildQualityEvidence(release, qualityPolicyService);
   const evidence = {
+    add: buildAddEvidence(release),
     match: buildMatchEvidence(release),
     quality,
     release: buildReleaseEvidence(release),

@@ -125,6 +125,12 @@ export function getActivityEventLabel(event, currentUserId = null) {
         : 'a file';
       return `Download completed: ${releaseDesc}`;
     }
+    case 'music_queue_quality_blocked': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Quality choice needed: ${releaseDesc}`;
+    }
     default:
       return event.eventType ?? 'Activity';
   }
@@ -137,6 +143,12 @@ export function getActivityEventDetail(event) {
 
   if (event.eventType === 'artist_policy_saved') {
     return formatArtistPolicyActivityDetail(event.extraPayload ?? {});
+  }
+
+  if (event.eventType === 'music_queue_quality_blocked') {
+    const payload = event.extraPayload ?? {};
+    const blocker = Array.isArray(payload.blockers) ? payload.blockers[0] : null;
+    return blocker?.message ?? payload.message ?? 'Downloaded files need a quality review before Harmoniarr adds them.';
   }
 
   if (event.eventType !== 'release_added') {
@@ -174,6 +186,8 @@ export function getActivityEventIcon(eventType) {
       return 'checkmark';
     case 'download_completed':
       return 'download';
+    case 'music_queue_quality_blocked':
+      return 'audio-check';
     default:
       return 'activity';
   }

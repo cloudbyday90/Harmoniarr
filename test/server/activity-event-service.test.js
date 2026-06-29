@@ -99,6 +99,7 @@ test('recordActivityEvent: handles each allowed event type without throwing', as
     'release_added',
     'artist_monitored',
     'artist_policy_saved',
+    'music_queue_quality_blocked',
     'quality_fallback_allowed',
     'request_fulfilled',
   ];

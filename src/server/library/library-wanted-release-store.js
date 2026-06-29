@@ -68,6 +68,45 @@ function normalizeMatchRows(value) {
     }));
 }
 
+function normalizeQualityGate(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  return {
+    blockers: Array.isArray(value.blockers)
+      ? value.blockers.map((blocker) => ({
+          code: blocker?.code ?? null,
+          fileId: blocker?.fileId ?? null,
+          filename: blocker?.filename ?? null,
+          message: blocker?.message ?? null,
+        }))
+      : [],
+    checkedFileCount: toInteger(value.checkedFileCount),
+    message: value.message ?? null,
+    profileCode: value.profileCode ?? null,
+    status: value.status ?? null,
+  };
+}
+
+function buildLibraryAddSummary(row) {
+  const totalItemCount = toInteger(row.import_apply_item_total_count);
+  if (totalItemCount < 1) {
+    return null;
+  }
+
+  return {
+    itemStatusCounts: normalizeStatusCounts(row.import_apply_item_status_counts),
+    latestItemStatus: row.import_apply_latest_item_status ?? null,
+    latestOutcome: row.import_apply_latest_outcome ?? null,
+    latestQualityBlockedMessage: row.import_apply_latest_quality_blocked_message ?? null,
+    latestQualityGate: normalizeQualityGate(row.import_apply_latest_quality_gate),
+    latestUpdatedAt: row.import_apply_latest_updated_at ?? null,
+    qualityBlockedCount: toInteger(row.import_apply_quality_blocked_count),
+    totalItemCount,
+  };
+}
+
 function buildImportReviewSummary(row) {
   const totalCount = toInteger(row.import_candidate_total_count);
   if (totalCount < 1) {
@@ -103,6 +142,11 @@ function buildImportReviewSummary(row) {
       latestUpdatedAt: row.import_execution_latest_updated_at ?? null,
       totalItemCount: executionItemCount,
     };
+  }
+
+  const libraryAddSummary = buildLibraryAddSummary(row);
+  if (libraryAddSummary) {
+    summary.libraryAddSummary = libraryAddSummary;
   }
 
   return summary;
@@ -323,7 +367,15 @@ export function createLibraryWantedReleaseStore({
           import_execution_summary.latest_item_status AS import_execution_latest_item_status,
           import_execution_summary.latest_updated_at AS import_execution_latest_updated_at,
           import_execution_summary.enqueued_transfer_count AS import_execution_enqueued_transfer_count,
-          import_execution_summary.failed_filename_count AS import_execution_failed_filename_count
+          import_execution_summary.failed_filename_count AS import_execution_failed_filename_count,
+          import_apply_summary.total_item_count AS import_apply_item_total_count,
+          import_apply_summary.item_status_counts AS import_apply_item_status_counts,
+          import_apply_summary.latest_item_status AS import_apply_latest_item_status,
+          import_apply_summary.latest_outcome AS import_apply_latest_outcome,
+          import_apply_summary.latest_updated_at AS import_apply_latest_updated_at,
+          import_apply_summary.quality_blocked_count AS import_apply_quality_blocked_count,
+          import_apply_summary.latest_quality_blocked_message AS import_apply_latest_quality_blocked_message,
+          import_apply_summary.latest_quality_gate AS import_apply_latest_quality_gate
         FROM library_wanted_releases lwr
         JOIN metadata_artists ma ON ma.id = lwr.metadata_artist_id
         JOIN metadata_release_groups mrg ON mrg.id = lwr.metadata_release_group_id
@@ -524,6 +576,67 @@ export function createLibraryWantedReleaseStore({
             GROUP BY latest_item.item_status
           ) item_summary
         ) import_execution_summary ON TRUE
+        LEFT JOIN LATERAL (
+          WITH latest_items AS (
+            SELECT DISTINCT ON (iai.import_candidate_id)
+              iai.import_candidate_id,
+              iai.item_status,
+              iai.status_message,
+              iai.apply_snapshot,
+              iai.updated_at
+            FROM import_apply_run_items iai
+            JOIN import_candidates ic
+              ON ic.id = iai.import_candidate_id
+            WHERE ic.source_search_id = NULLIF(ldr.evidence->>'lastSearchId', '')
+            ORDER BY iai.import_candidate_id, iai.updated_at DESC, iai.created_at DESC
+          )
+          SELECT
+            COUNT(*)::integer AS total_item_count,
+            COALESCE(
+              (
+                SELECT jsonb_object_agg(status_summary.item_status, status_summary.item_count)
+                FROM (
+                  SELECT
+                    latest_items.item_status,
+                    COUNT(*)::integer AS item_count
+                  FROM latest_items
+                  GROUP BY latest_items.item_status
+                ) status_summary
+              ),
+              '{}'::jsonb
+            ) AS item_status_counts,
+            (
+              SELECT latest_items.item_status
+              FROM latest_items
+              ORDER BY latest_items.updated_at DESC, latest_items.item_status ASC
+              LIMIT 1
+            ) AS latest_item_status,
+            (
+              SELECT latest_items.apply_snapshot #>> '{apply,outcome}'
+              FROM latest_items
+              ORDER BY latest_items.updated_at DESC, latest_items.item_status ASC
+              LIMIT 1
+            ) AS latest_outcome,
+            MAX(latest_items.updated_at) AS latest_updated_at,
+            COUNT(*) FILTER (
+              WHERE latest_items.apply_snapshot #>> '{apply,outcome}' = 'quality_blocked'
+            )::integer AS quality_blocked_count,
+            (
+              SELECT latest_items.status_message
+              FROM latest_items
+              WHERE latest_items.apply_snapshot #>> '{apply,outcome}' = 'quality_blocked'
+              ORDER BY latest_items.updated_at DESC, latest_items.item_status ASC
+              LIMIT 1
+            ) AS latest_quality_blocked_message,
+            (
+              SELECT latest_items.apply_snapshot #> '{apply,qualityGate}'
+              FROM latest_items
+              WHERE latest_items.apply_snapshot #>> '{apply,outcome}' = 'quality_blocked'
+              ORDER BY latest_items.updated_at DESC, latest_items.item_status ASC
+              LIMIT 1
+            ) AS latest_quality_gate
+          FROM latest_items
+        ) import_apply_summary ON TRUE
         ${whereClause}
         ORDER BY ma.sort_name ASC NULLS LAST, ma.name ASC, mrg.first_release_date ASC NULLS LAST, mr.release_date ASC NULLS LAST
         ${limitClause}

@@ -163,6 +163,7 @@ function getSetupAction(setup) {
 }
 
 export function deriveMusicQueueStatus({
+  add = {},
   library = {},
   match = {},
   quality = {},
@@ -197,6 +198,14 @@ export function deriveMusicQueueStatus({
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.DOWNLOADING, {
       nextAction: MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER,
       progressStep: 'download',
+    });
+  }
+
+  if (getCount(add.qualityBlockedCount) > 0 || add.latestOutcome === 'quality_blocked') {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.QUALITY_CHOICE_NEEDED, {
+      detail: add.message ?? add.qualityGate?.message ?? 'Downloaded files did not pass the selected audio quality check.',
+      nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE,
+      progressStep: 'quality',
     });
   }
 

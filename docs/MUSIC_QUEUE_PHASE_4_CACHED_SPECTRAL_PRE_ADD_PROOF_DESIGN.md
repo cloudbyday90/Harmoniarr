@@ -117,15 +117,20 @@ Behavior:
 
 ---
 
-## 6. Remaining Phase 4 Follow-Up
+## 6. Music Queue/Activity Surfacing Outcome
 
-The next high-value item is Music Queue/Activity surfacing for strict-quality
-stops:
+The first Music Queue/Activity surfacing slice is implemented in
+`MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md`:
 
-1. map `quality_blocked` safe-auto apply evidence into Music Queue
-   `Quality choice needed`
-2. show the file-level reason in plain language
-3. add Activity timeline events for `Audio checked`, `Audio check warning`, and
-   `Suspicious FLAC found`
-4. link those events back to Music Queue review rather than raw diagnostics
+- `quality_blocked` safe-auto apply evidence now maps to Music Queue
+  `Quality choice needed`.
+- The release detail uses the quality-gate failure message where available.
+- Activity records `music_queue_quality_blocked` with sanitized blocker detail.
+- Activity links quality stops back to Music Queue release review instead of
+  raw diagnostics.
 
+Remaining follow-up:
+
+1. add lower-noise Activity events for successful audio checks and warnings
+2. automatically block failed-quality matches and try the next acceptable match
+3. keep manual fallback controls for stopped releases with no safe next match

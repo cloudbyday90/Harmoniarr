@@ -51,6 +51,36 @@ test('buildActivityEventLinkTarget returns null for non-release_added events', (
   assert.equal(buildActivityEventLinkTarget(), null);
 });
 
+test('buildActivityEventLinkTarget resolves quality blocks to Music Queue review', () => {
+  const target = buildActivityEventLinkTarget({
+    entityId: 'wanted-1',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_quality_blocked',
+    extraPayload: {
+      wantedReleaseId: 'wanted-1',
+    },
+  });
+
+  assert.deepEqual(target, {
+    label: 'Review quality choice',
+    to: {
+      name: 'music-queue-release',
+      params: { wantedReleaseId: 'wanted-1' },
+    },
+  });
+});
+
+test('buildActivityEventLinkTarget does not treat import candidate ids as Music Queue release ids', () => {
+  const target = buildActivityEventLinkTarget({
+    entityId: 'candidate-1',
+    entityType: 'import_candidate',
+    eventType: 'music_queue_quality_blocked',
+    extraPayload: {},
+  });
+
+  assert.equal(target, null);
+});
+
 test('buildActivityEventLinkTarget resolves library_organize_apply drillthrough from presentation source', () => {
   const event = makeReleaseAddedEvent();
   const target = buildActivityEventLinkTarget(event);
