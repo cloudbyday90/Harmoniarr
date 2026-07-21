@@ -48,7 +48,7 @@ services:
       - /run/postgresql:size=32m,mode=0770,uid=${PUID:-1000},gid=${PGID:-1000}
 
   slskd:
-    image: slskd/slskd:0.25.1
+    image: slskd/slskd:0.26.0
     restart: unless-stopped
     ports:
       - "${SLSKD_WEB_PORT:-5030}:5030"
