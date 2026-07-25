@@ -162,7 +162,10 @@ New Activity role:
 
 Activity overhaul target:
 
-1. Collapse Activity into a readable timeline first.
+1. [x] Collapse Activity into a readable timeline first. Implemented with the
+   bounded `/app/activity/feed` timeline, outcome filters, and a compact
+   `Advanced diagnostics` disclosure. See
+   `docs/ACTIVITY_TIMELINE_NAVIGATION_DESIGN.md`.
 2. Keep `Operations`/advanced diagnostics behind an operator-only diagnostics
    section.
 3. Move wanted progress and match/download/add-to-library state to Music Queue.

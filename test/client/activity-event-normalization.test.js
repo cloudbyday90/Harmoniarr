@@ -267,6 +267,20 @@ test('getActivityEventLabel and detail format music_queue_quality_blocked', () =
   assert.equal(getActivityEventDetail(event), 'Spectral analysis does not verify this lossless file.');
 });
 
+test('getActivityEventLabel and detail format quality_fallback_allowed', () => {
+  const event = {
+    eventType: 'quality_fallback_allowed',
+    entityTitle: 'Amber',
+    entityArtist: 'Autechre',
+  };
+
+  assert.equal(getActivityEventLabel(event), 'Quality fallback allowed: Amber by Autechre');
+  assert.equal(
+    getActivityEventDetail(event),
+    'Harmoniarr will continue searching with the updated quality choice.',
+  );
+});
+
 test('getActivityEventDetail returns detail for multi-release release_added', () => {
   const event = normalizeActivityEvent(makeReleaseAddedEvent({
     entityTitle: '2 releases',
@@ -310,6 +324,7 @@ test('getActivityEventIcon returns correct icon keys for each event type', () =>
   assert.equal(getActivityEventIcon('request_fulfilled'), 'checkmark');
   assert.equal(getActivityEventIcon('download_completed'), 'download');
   assert.equal(getActivityEventIcon('music_queue_quality_blocked'), 'audio-check');
+  assert.equal(getActivityEventIcon('quality_fallback_allowed'), 'audio-check');
   assert.equal(getActivityEventIcon('unknown_type'), 'activity');
   assert.equal(getActivityEventIcon(null), 'activity');
 });

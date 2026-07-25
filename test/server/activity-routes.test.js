@@ -150,7 +150,7 @@ test('activity feed route forwards eventType query param to buildActivityFeed', 
   });
 });
 
-test('activity feed route passes undefined limit when query param is absent', async (t) => {
+test('activity feed route uses the documented default limit when query param is absent', async (t) => {
   const buildActivityFeed = t.mock.fn(async () => ({
     checkedAt: '2026-06-01T12:00:00.000Z',
     events: [],
@@ -162,8 +162,25 @@ test('activity feed route passes undefined limit when query param is absent', as
     await fetch(`${baseUrl}/api/v1/activity/feed`);
 
     const [args] = buildActivityFeed.mock.calls[0].arguments;
-    assert.equal(args.limit, 10);
+    assert.equal(args.limit, 50);
     assert.equal(args.eventType, null);
+  });
+});
+
+test('activity feed route permits the documented 200-event timeline bound', async (t) => {
+  const buildActivityFeed = t.mock.fn(async () => ({
+    checkedAt: '2026-06-01T12:00:00.000Z',
+    events: [],
+    total: 0,
+  }));
+  const app = createActivityRouteTestApp({ buildActivityFeed });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/activity/feed?limit=999`);
+    assert.equal(response.status, 200);
+
+    const [args] = buildActivityFeed.mock.calls[0].arguments;
+    assert.equal(args.limit, 200);
   });
 });
 

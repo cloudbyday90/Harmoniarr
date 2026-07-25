@@ -60,14 +60,14 @@ suite('browser operator workflow smoke coverage', () => {
       });
 
       await navigateWithinApp(page, {
-        heading: 'Background Jobs',
+        heading: 'Recent activity',
         linkName: 'Activity',
-        urlPattern: /\/app\/activity(?:\/operations)?(?:\?.*)?(?:#.*)?$/,
+        urlPattern: /\/app\/activity(?:\/feed)?(?:\?.*)?(?:#.*)?$/,
       });
-
+      await page.getByText('Advanced diagnostics', { exact: true }).click();
       await navigateWithinApp(page, {
-        heading: 'Download candidates',
-        linkName: 'Candidates',
+        heading: 'Match diagnostics',
+        linkName: 'Match diagnostics',
         urlPattern: /\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/,
       });
 
@@ -180,12 +180,14 @@ suite('browser operator workflow smoke coverage', () => {
       assert.match(await releaseArtwork.getAttribute('src') ?? '', /^data:image\/svg\+xml;base64,/);
 
       await navigateWithinApp(page, {
+        heading: 'Recent activity',
         linkName: 'Activity',
-        urlPattern: /\/app\/activity(?:\/operations)?(?:\?.*)?(?:#.*)?$/,
+        urlPattern: /\/app\/activity(?:\/feed)?(?:\?.*)?(?:#.*)?$/,
       });
+      await page.getByText('Advanced diagnostics', { exact: true }).click();
       await navigateWithinApp(page, {
-        heading: 'Download candidates',
-        linkName: 'Candidates',
+        heading: 'Match diagnostics',
+        linkName: 'Match diagnostics',
         urlPattern: /\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/,
       });
       await page.getByRole('heading', { name: 'Inspect selected candidate media' }).waitFor();

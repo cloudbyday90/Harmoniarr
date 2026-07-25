@@ -126,11 +126,11 @@ const router = createRouter({
           path: 'activity',
           component: ActivityWorkspaceView,
           children: [
-            { path: '', name: 'activity', redirect: { name: 'activity-operations' } },
+            { path: '', name: 'activity', redirect: { name: 'activity-feed' } },
             { path: 'operations', name: 'activity-operations', component: OperationsView },
             { path: 'candidates', name: 'activity-candidates', component: ImportReviewView },
             { path: 'requests', name: 'activity-requests', component: RequestMusicView },
-            { path: 'queue', name: 'activity-queue', redirect: { name: 'activity-operations' } },
+            { path: 'queue', name: 'activity-queue', redirect: { name: 'activity-feed' } },
             { path: 'wanted', name: 'activity-wanted', component: ActivityWantedView },
             { path: 'imports', name: 'activity-imports', component: ActivityImportsView },
             { path: 'releases', name: 'activity-releases', component: ActivityReleasesView },

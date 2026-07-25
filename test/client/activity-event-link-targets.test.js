@@ -42,13 +42,30 @@ function makeReleaseAddedEvent(overrides = {}) {
   };
 }
 
-test('buildActivityEventLinkTarget returns null for non-release_added events', () => {
+test('buildActivityEventLinkTarget returns null for activity events without a supported handoff', () => {
   assert.equal(buildActivityEventLinkTarget({ eventType: 'request_created' }), null);
   assert.equal(buildActivityEventLinkTarget({ eventType: 'artist_monitored' }), null);
   assert.equal(buildActivityEventLinkTarget({ eventType: 'download_completed' }), null);
   assert.equal(buildActivityEventLinkTarget({ eventType: 'request_fulfilled' }), null);
   assert.equal(buildActivityEventLinkTarget({}), null);
   assert.equal(buildActivityEventLinkTarget(), null);
+});
+
+test('buildActivityEventLinkTarget resolves allowed quality fallback to Music Queue', () => {
+  const target = buildActivityEventLinkTarget({
+    entityId: 'wanted-1',
+    entityType: 'wanted_release',
+    eventType: 'quality_fallback_allowed',
+    extraPayload: { wantedReleaseId: 'wanted-1' },
+  });
+
+  assert.deepEqual(target, {
+    label: 'Open Music Queue',
+    to: {
+      name: 'music-queue-release',
+      params: { wantedReleaseId: 'wanted-1' },
+    },
+  });
 });
 
 test('buildActivityEventLinkTarget resolves quality blocks to Music Queue review', () => {

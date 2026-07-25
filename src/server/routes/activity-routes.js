@@ -72,7 +72,7 @@ export function registerActivityRoutes(app, {
   app.get('/api/v1/activity/feed', asyncRoute(async (request, response) => {
     await requireSession(request);
 
-    const limit = sanitizePageLimit(request.query.limit, { default: 10, max: 25 });
+    const limit = sanitizePageLimit(request.query.limit, { default: 50, max: 200 });
 
     const eventType = typeof request.query.eventType === 'string'
       ? request.query.eventType

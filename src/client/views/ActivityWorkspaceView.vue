@@ -17,56 +17,100 @@
 -->
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
-import { useTabbarOverflow } from '../composables/useTabbarOverflow.js';
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 
-const tabs = [
-  { name: 'activity-operations', label: 'Operations', implemented: true },
-  { name: 'activity-candidates', label: 'Diagnostics', implemented: true },
-  { name: 'activity-requests', label: 'Requests', implemented: true },
-  { name: 'activity-wanted', label: 'Wanted', implemented: true },
-  { name: 'activity-imports', label: 'Imports', implemented: true },
-  { name: 'activity-releases', label: 'Releases', implemented: true },
-  { name: 'activity-users', label: 'Users', implemented: true },
-  { name: 'activity-history', label: 'History', implemented: true },
-  { name: 'activity-blocklist', label: 'Blocklist', implemented: true },
-  { name: 'activity-ignored', label: 'Ignored', implemented: true },
-  { name: 'activity-failed', label: 'Failed', implemented: true },
-  { name: 'activity-monitored-artists', label: 'Artists', implemented: true },
-];
+const route = useRoute();
 
-const tabbarRef = ref(null);
-const { hasOverflowStart, hasOverflowEnd, attach, cleanup } = useTabbarOverflow();
-onMounted(() => attach(tabbarRef.value));
-onUnmounted(cleanup);
+const diagnosticLinks = Object.freeze([
+  { name: 'activity-operations', label: 'Background jobs' },
+  { name: 'activity-candidates', label: 'Match diagnostics' },
+  { name: 'activity-wanted', label: 'Wanted releases' },
+  { name: 'activity-imports', label: 'Library adds' },
+  { name: 'activity-requests', label: 'Request records' },
+  { name: 'activity-users', label: 'Source users' },
+  { name: 'activity-blocklist', label: 'Source blocklist' },
+  { name: 'activity-ignored', label: 'Ignored source users' },
+  { name: 'activity-failed', label: 'Failed library adds' },
+  { name: 'activity-monitored-artists', label: 'Monitored artists' },
+  { name: 'activity-history', label: 'System history' },
+]);
+
+const isTimelineRoute = computed(() => route.name === 'activity-feed');
 </script>
 
 <template>
-  <section class="hx-page">
+  <section class="hx-page activity-workspace">
     <header class="hx-page-header">
       <div>
         <h1 class="hx-page-title">Activity</h1>
-        <p class="hx-page-subtitle">Timeline, history, failures, and advanced diagnostics. Use Music Queue for release progress.</p>
+        <p class="hx-page-subtitle">What Harmoniarr has done, and anything that needs your attention.</p>
       </div>
     </header>
 
-    <div
-      class="hx-tabbar-wrap"
-      :class="{ 'has-overflow-start': hasOverflowStart, 'has-overflow-end': hasOverflowEnd }"
-    >
-      <nav class="hx-tabbar" ref="tabbarRef" aria-label="Activity sections">
-        <RouterLink
-          v-for="tab in tabs"
-          :key="tab.name"
-          :to="{ name: tab.name }"
-          class="hx-tab"
-        >
-          {{ tab.label }}
-          <span v-if="!tab.implemented" class="hx-tab-count" title="Coming soon">soon</span>
-        </RouterLink>
-      </nav>
-    </div>
+    <details class="activity-diagnostics" :open="!isTimelineRoute">
+      <summary>Advanced diagnostics</summary>
+      <div class="activity-diagnostics-body">
+        <p>Background jobs, match details, and system records for troubleshooting.</p>
+        <nav class="activity-diagnostics-links" aria-label="Advanced Activity diagnostics">
+          <RouterLink
+            v-for="link in diagnosticLinks"
+            :key="link.name"
+            :to="{ name: link.name }"
+            class="hx-btn"
+            data-variant="ghost"
+          >
+            {{ link.label }}
+          </RouterLink>
+        </nav>
+      </div>
+    </details>
 
     <RouterView />
   </section>
 </template>
+
+<style scoped>
+.activity-workspace {
+  display: grid;
+  gap: var(--hx-space-4);
+}
+
+.activity-diagnostics {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-surface);
+}
+
+.activity-diagnostics summary {
+  padding: var(--hx-space-3) var(--hx-space-4);
+  color: var(--hx-text-strong);
+  cursor: pointer;
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+}
+
+.activity-diagnostics-body {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding: 0 var(--hx-space-4) var(--hx-space-4);
+}
+
+.activity-diagnostics-body p {
+  margin: 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+}
+
+.activity-diagnostics-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+
+@media (max-width: 640px) {
+  .activity-diagnostics-links > * {
+    flex: 1 1 calc(50% - var(--hx-space-2));
+  }
+}
+</style>

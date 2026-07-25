@@ -131,6 +131,12 @@ export function getActivityEventLabel(event, currentUserId = null) {
         : 'a release';
       return `Quality choice needed: ${releaseDesc}`;
     }
+    case 'quality_fallback_allowed': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Quality fallback allowed: ${releaseDesc}`;
+    }
     default:
       return event.eventType ?? 'Activity';
   }
@@ -149,6 +155,10 @@ export function getActivityEventDetail(event) {
     const payload = event.extraPayload ?? {};
     const blocker = Array.isArray(payload.blockers) ? payload.blockers[0] : null;
     return blocker?.message ?? payload.message ?? 'Downloaded files need a quality review before Harmoniarr adds them.';
+  }
+
+  if (event.eventType === 'quality_fallback_allowed') {
+    return 'Harmoniarr will continue searching with the updated quality choice.';
   }
 
   if (event.eventType !== 'release_added') {
@@ -187,6 +197,8 @@ export function getActivityEventIcon(eventType) {
     case 'download_completed':
       return 'download';
     case 'music_queue_quality_blocked':
+      return 'audio-check';
+    case 'quality_fallback_allowed':
       return 'audio-check';
     default:
       return 'activity';

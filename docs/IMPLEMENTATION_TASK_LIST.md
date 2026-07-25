@@ -125,6 +125,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   `music_queue_quality_blocked` Activity event, and deep-link Activity back to
   the selected Music Queue release review. See
   `MUSIC_QUEUE_ACTIVITY_SURFACING_DESIGN.md`.
+- Activity timeline navigation: `/app/activity` now opens a readable bounded
+  event timeline with outcome filters, polite refresh/filter status, and clear
+  Music Queue quality handoffs. The former twelve-tab workbench is preserved
+  behind one `Advanced diagnostics` disclosure, without breaking diagnostic
+  deep links. See `ACTIVITY_TIMELINE_NAVIGATION_DESIGN.md`.
 - Music Queue quality-stop recovery automation: downloaded matches that fail
   strict safe-auto quality verification are now marked as quality failures,
   excluded from the recovery cascade, and followed by the next quality-eligible

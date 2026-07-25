@@ -17,19 +17,24 @@
 -->
 
 <script setup>
-import { onBeforeUnmount, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import EmptyState from '../components/EmptyState.vue';
 import { useActivityFeed } from '../composables/useActivityFeed.js';
 import {
   formatActivityEventTime,
   getActivityEventDetail,
-  getActivityEventIcon,
   getActivityEventLabel,
 } from '../lib/activity-event-normalization.js';
 import { buildActivityEventLinkTarget } from '../lib/activity-event-link-targets.js';
+import {
+  ACTIVITY_TIMELINE_FILTERS,
+  filterActivityTimelineEvents,
+  getActivityTimelineEventPresentation,
+} from '../lib/activity-timeline-presentation.js';
 import { sessionStore } from '../state/session.js';
 
+const selectedFilter = ref('all');
 const {
   events,
   isLoading,
@@ -48,6 +53,21 @@ const {
 });
 
 const currentUserId = sessionStore.state.user?.id ?? null;
+const visibleEvents = computed(() => filterActivityTimelineEvents(events.value, selectedFilter.value));
+const visibleEventCount = computed(() => visibleEvents.value.length);
+const hasVisibleEvents = computed(() => visibleEventCount.value > 0);
+
+function selectFilter(filter) {
+  selectedFilter.value = filter;
+}
+
+function getFilterLabel(filter) {
+  return ACTIVITY_TIMELINE_FILTERS.find((item) => item.value === filter)?.label ?? 'Activity';
+}
+
+function getEventLinkTarget(event) {
+  return buildActivityEventLinkTarget(event);
+}
 
 onMounted(() => {
   attachVisibilityListener();
@@ -60,179 +80,268 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="hx-page activity-feed-view">
-
-    <header class="hx-page-header">
+  <section class="activity-feed-view" aria-labelledby="activity-timeline-title">
+    <header class="activity-feed-header">
       <div>
-        <h1 class="hx-page-title">Household Activity</h1>
-        <p class="hx-page-subtitle">
-          Recent music requests, monitoring changes, and library additions.
-        </p>
+        <h2 id="activity-timeline-title" class="activity-feed-title">Recent activity</h2>
+        <p>Progress, changes, and the few things that need help.</p>
       </div>
+      <button type="button" class="hx-btn" :disabled="isLoading || isRevalidating" @click="load()">
+        {{ isLoading || isRevalidating ? 'Refreshing...' : 'Refresh' }}
+      </button>
     </header>
 
-    <!-- Loading -->
-    <p
-      v-if="isLoading"
-      class="activity-feed-loading"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      Loading activity…
+    <div class="activity-filter-bar" role="group" aria-label="Filter activity">
+      <button
+        v-for="filter in ACTIVITY_TIMELINE_FILTERS"
+        :key="filter.value"
+        type="button"
+        class="activity-filter"
+        :aria-pressed="selectedFilter === filter.value"
+        @click="selectFilter(filter.value)"
+      >
+        {{ filter.label }}
+      </button>
+    </div>
+
+    <p class="activity-feed-status" role="status" aria-live="polite">
+      <template v-if="isLoading">Loading recent activity...</template>
+      <template v-else-if="hasEvents">Showing {{ visibleEventCount }} {{ visibleEventCount === 1 ? 'event' : 'events' }} in {{ getFilterLabel(selectedFilter).toLowerCase() }}.</template>
     </p>
 
-    <!-- Error -->
     <EmptyState
-      v-else-if="errorMessage"
+      v-if="errorMessage"
       :title="errorMessage"
-      body="Check your connection and try refreshing the page."
+      body="Check your connection and refresh the timeline."
     />
 
-    <!-- Empty -->
     <EmptyState
       v-else-if="isEmpty"
-      title="No activity yet"
-      body="Household activity appears here as music requests are submitted, artists are monitored, and releases are added to the library."
+      title="Nothing to show yet"
+      body="Progress will appear here as Harmoniarr searches, downloads, checks audio, and adds music to your library."
     />
 
-    <!-- Event list -->
-    <ul
-      v-else-if="hasEvents"
-      class="activity-feed-list"
-      aria-label="Activity events"
-    >
-      <li
-        v-for="event in events"
-        :key="event.id"
-        class="activity-feed-item"
-        :data-event-type="event.eventType"
-      >
-        <span
-          class="activity-feed-icon"
-          :aria-label="getActivityEventIcon(event.eventType)"
-        />
-        <span class="activity-feed-label-wrap">
-          <span class="activity-feed-label">
-            {{ getActivityEventLabel(event, currentUserId) }}
-          </span>
-          <span v-if="getActivityEventDetail(event)" class="activity-feed-detail">
-            {{ getActivityEventDetail(event) }}
-          </span>
-          <RouterLink
-            v-if="buildActivityEventLinkTarget(event)"
-            class="activity-feed-link"
-            :to="buildActivityEventLinkTarget(event).to"
-          >
-            {{ buildActivityEventLinkTarget(event).label }}
-          </RouterLink>
-        </span>
-        <time
-          v-if="event.occurredAt"
-          :datetime="event.occurredAt"
-          class="activity-feed-time"
+    <EmptyState
+      v-else-if="!isLoading && !hasVisibleEvents"
+      :title="`No ${getFilterLabel(selectedFilter).toLowerCase()} yet`"
+      body="Try another filter to see more recent activity."
+    />
+
+    <ol v-else class="activity-timeline" aria-label="Activity timeline">
+      <li v-for="event in visibleEvents" :key="event.id" class="activity-timeline-item">
+        <article
+          class="activity-timeline-entry"
+          :data-event-type="event.eventType"
+          :data-tone="getActivityTimelineEventPresentation(event).tone"
         >
-          {{ formatActivityEventTime(event.occurredAt) }}
-        </time>
+          <span class="activity-timeline-marker" aria-hidden="true" />
+          <div class="activity-timeline-content">
+            <div class="activity-timeline-meta">
+              <span class="hx-pill" :data-tone="getActivityTimelineEventPresentation(event).tone">
+                {{ getActivityTimelineEventPresentation(event).categoryLabel }}
+              </span>
+              <time v-if="event.occurredAt" :datetime="event.occurredAt">
+                {{ formatActivityEventTime(event.occurredAt) }}
+              </time>
+            </div>
+            <h3>{{ getActivityEventLabel(event, currentUserId) }}</h3>
+            <p v-if="getActivityEventDetail(event)">{{ getActivityEventDetail(event) }}</p>
+            <RouterLink
+              v-if="getEventLinkTarget(event)"
+              class="activity-timeline-link"
+              :to="getEventLinkTarget(event).to"
+            >
+              {{ getEventLinkTarget(event).label }}
+            </RouterLink>
+          </div>
+        </article>
       </li>
-    </ul>
+    </ol>
 
-    <p
-      v-if="checkedAt && !isLoading"
-      class="activity-feed-checked-at"
-      aria-live="polite"
-    >
-      <span v-if="isRevalidating" class="activity-feed-revalidating" aria-label="Refreshing">↻</span>
-      Last checked: {{ formatActivityEventTime(checkedAt) }}
+    <p v-if="checkedAt && !isLoading" class="activity-feed-checked-at" aria-live="polite">
+      <span v-if="isRevalidating" aria-hidden="true">Refreshing. </span>
+      Last checked {{ formatActivityEventTime(checkedAt) }}.
     </p>
-
   </section>
 </template>
 
 <style scoped>
 .activity-feed-view {
-  container-type: inline-size;
+  display: grid;
+  gap: var(--hx-space-4);
 }
 
-.activity-feed-loading {
-  color: var(--hx-text-muted, #888);
-  padding: 1.5rem 0;
+.activity-feed-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
 }
 
-.activity-feed-list {
+.activity-feed-title,
+.activity-timeline-entry h3 {
+  margin: 0;
+  color: var(--hx-text-strong);
+}
+
+.activity-feed-title {
+  font-size: var(--hx-text-xl);
+}
+
+.activity-feed-header p,
+.activity-timeline-entry p,
+.activity-feed-status,
+.activity-feed-checked-at {
+  margin: var(--hx-space-1) 0 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+}
+
+.activity-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+
+.activity-filter {
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-pill);
+  background: transparent;
+  color: var(--hx-text-muted);
+  cursor: pointer;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+
+.activity-filter:hover,
+.activity-filter:focus-visible,
+.activity-filter[aria-pressed='true'] {
+  border-color: var(--hx-accent);
+  background: var(--hx-accent-soft);
+  color: var(--hx-text-strong);
+}
+
+.activity-feed-status {
+  min-height: 1.25rem;
+  margin: 0;
+}
+
+.activity-timeline {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
 }
 
-.activity-feed-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  background: var(--hx-surface-raised, #1e1e1e);
+.activity-timeline-item {
+  position: relative;
+  padding: 0 0 var(--hx-space-4) var(--hx-space-5);
 }
 
-.activity-feed-icon {
-  flex-shrink: 0;
-  width: 0.5rem;
-  height: 0.5rem;
+.activity-timeline-item::before {
+  position: absolute;
+  top: 1.1rem;
+  bottom: 0;
+  left: 7px;
+  width: 1px;
+  background: var(--hx-border-subtle);
+  content: '';
+}
+
+.activity-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.activity-timeline-item:last-child::before {
+  display: none;
+}
+
+.activity-timeline-entry {
+  position: relative;
+  display: grid;
+  gap: var(--hx-space-3);
+  border-bottom: 1px solid var(--hx-border-subtle);
+  padding: 0 0 var(--hx-space-4);
+}
+
+.activity-timeline-item:last-child .activity-timeline-entry {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.activity-timeline-marker {
+  position: absolute;
+  top: 0.55rem;
+  left: calc(-1 * var(--hx-space-5));
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--hx-bg-canvas);
   border-radius: 50%;
-  background: var(--hx-accent, #6ea8fe);
-  align-self: center;
+  background: var(--hx-info);
 }
 
-.activity-feed-label-wrap {
-  flex: 1;
+.activity-timeline-entry[data-tone='success'] .activity-timeline-marker {
+  background: var(--hx-success);
+}
+
+.activity-timeline-entry[data-tone='warning'] .activity-timeline-marker {
+  background: var(--hx-warning);
+}
+
+.activity-timeline-content {
+  min-width: 0;
+}
+
+.activity-timeline-meta {
   display: flex;
-  flex-direction: column;
-  gap: var(--hx-space-1);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+  margin-bottom: var(--hx-space-2);
 }
 
-.activity-feed-label {
-  font-size: 0.9rem;
+.activity-timeline-meta time {
+  color: var(--hx-text-faint);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
 }
 
-.activity-feed-detail {
-  color: var(--hx-text-muted, #888);
-  font-size: 0.8rem;
+.activity-timeline-entry h3 {
+  font-size: var(--hx-text-base);
 }
 
-.activity-feed-link {
-  align-self: flex-start;
-  color: var(--hx-accent-strong, var(--hx-accent, #6ea8fe));
-  font-size: var(--hx-text-sm, 0.82rem);
+.activity-timeline-link {
+  display: inline-flex;
+  margin-top: var(--hx-space-2);
+  color: var(--hx-accent);
+  font-size: var(--hx-text-sm);
   font-weight: 600;
   text-decoration: none;
 }
 
-.activity-feed-link:hover,
-.activity-feed-link:focus-visible {
+.activity-timeline-link:hover,
+.activity-timeline-link:focus-visible {
   text-decoration: underline;
 }
 
-.activity-feed-time {
-  flex-shrink: 0;
-  font-size: 0.8rem;
-  color: var(--hx-text-muted, #888);
-  white-space: nowrap;
-}
-
 .activity-feed-checked-at {
-  margin-top: 1.5rem;
-  font-size: 0.75rem;
-  color: var(--hx-text-muted, #888);
+  margin: 0;
 }
 
-.activity-feed-revalidating {
-  display: inline-block;
-  animation: hx-spin 1s linear infinite;
-}
+@media (max-width: 640px) {
+  .activity-feed-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
 
-@keyframes hx-spin {
-  to { transform: rotate(360deg); }
+  .activity-feed-header .hx-btn {
+    align-self: start;
+  }
+
+  .activity-timeline-meta {
+    align-items: start;
+    flex-direction: column-reverse;
+    gap: var(--hx-space-1);
+  }
 }
 </style>

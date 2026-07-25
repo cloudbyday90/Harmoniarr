@@ -25,12 +25,14 @@ export function buildActivityEventLinkTarget(event = {}) {
     return getArtistPolicyActivityRouteTarget(event.extraPayload ?? {});
   }
 
-  if (event.eventType === 'music_queue_quality_blocked') {
+  if (event.eventType === 'music_queue_quality_blocked' || event.eventType === 'quality_fallback_allowed') {
     const wantedReleaseId = event.extraPayload?.wantedReleaseId
       ?? (event.entityType === 'wanted_release' ? event.entityId : null);
     return wantedReleaseId
       ? {
-          label: 'Review quality choice',
+          label: event.eventType === 'music_queue_quality_blocked'
+            ? 'Review quality choice'
+            : 'Open Music Queue',
           to: {
             name: 'music-queue-release',
             params: { wantedReleaseId },

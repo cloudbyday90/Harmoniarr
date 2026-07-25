@@ -93,7 +93,8 @@ suite('Artist Policy Activity trail browser verification', () => {
       await page.getByText('Saved', { exact: true }).waitFor();
 
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Household Activity' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Activity' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Recent activity' }).waitFor();
 
       const policyEvent = page.getByRole('listitem').filter({
         hasText: 'Artist policy saved for Boards of Canada',

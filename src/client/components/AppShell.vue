@@ -189,7 +189,7 @@ async function openNotificationTarget(notification) {
     await router.push({ name: 'activity-operations', query: { runId } });
     return;
   }
-  await router.push({ name: 'activity-history' });
+  await router.push({ name: 'activity-feed' });
 }
 
 const userMenuOpen = ref(false);
