@@ -130,6 +130,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   Music Queue quality handoffs. The former twelve-tab workbench is preserved
   behind one `Advanced diagnostics` disclosure, without breaking diagnostic
   deep links. See `ACTIVITY_TIMELINE_NAVIGATION_DESIGN.md`.
+- Music Queue Activity lifecycle: release-scoped history now shows a saved
+  search-again action, retrying the same download, trying the next safe match,
+  no-matches-left rediscovery, and terminal failures. Events use a bounded
+  sanitized contract, stay under the Downloads filter, and link to Music Queue
+  instead of exposing candidate or provider details. See
+  `MUSIC_QUEUE_ACTIVITY_LIFECYCLE_DESIGN.md`.
 - Music Queue quality-stop recovery automation: downloaded matches that fail
   strict safe-auto quality verification are now marked as quality failures,
   excluded from the recovery cascade, and followed by the next quality-eligible

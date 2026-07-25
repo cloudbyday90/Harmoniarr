@@ -279,6 +279,7 @@ test('import execution worker cascades all-failed enqueue results to the next re
       });
   const markImportCandidateDownloadFailed = t.mock.fn(async () => ({}));
   const markImportCandidateDownloading = t.mock.fn(async () => ({}));
+  const recordActivityEventFn = t.mock.fn(async () => {});
   const updateImportExecutionRunItem = t.mock.fn(async () => null);
   const upsertImportExecutionRunItem = t.mock.fn(async () => null);
   let resolveCompleted;
@@ -315,6 +316,7 @@ test('import execution worker cascades all-failed enqueue results to the next re
     markRunCompleted,
     markRunFailed: async () => {},
     markRunStarted: async () => {},
+    recordActivityEventFn,
     releaseLease: async () => {},
     replaceImportExecutionRunItems: async () => [],
     updateImportExecutionRunItem,
@@ -332,6 +334,8 @@ test('import execution worker cascades all-failed enqueue results to the next re
   assert.equal(enqueueDownloads.mock.calls[0].arguments[0].username, 'source-user');
   assert.equal(enqueueDownloads.mock.calls[1].arguments[0].username, 'recovery-user');
   assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 1);
+  assert.equal(recordActivityEventFn.mock.callCount(), 1);
+  assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].eventType, 'music_queue_match_retrying');
   assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
   assert.equal(markImportCandidateDownloading.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
   assert.equal(upsertImportExecutionRunItem.mock.callCount(), 1);

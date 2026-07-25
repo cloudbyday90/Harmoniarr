@@ -194,8 +194,10 @@ test('requestMusicQueueReleaseRediscovery verifies release scope before queuing 
     metadataReleaseId: 'release-1',
     requestStatus: 'ready',
   }));
+  const recordActivityEventFn = t.mock.fn(async () => {});
   const startLibraryDiscoveryRun = t.mock.fn(async () => ({ accepted: true, run: { id: 'run-1' } }));
   const service = createService({
+    recordActivityEventFn,
     requestMusicQueueRediscovery,
     startLibraryDiscoveryRun,
     statusService: stoppedStatusService,
@@ -221,6 +223,21 @@ test('requestMusicQueueReleaseRediscovery verifies release scope before queuing 
     requestMetadata: { ipAddress: '127.0.0.1' },
     triggerSource: 'music_queue_try_again',
     triggeredByUserId: 'user-1',
+  }]);
+  assert.deepEqual(recordActivityEventFn.mock.calls[0].arguments, [{
+    actorUserId: 'user-1',
+    entityArtist: 'Forest Frank',
+    entityId: 'wanted-1',
+    entityTitle: 'Child of God',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_search_queued',
+    extraPayload: {
+      schemaVersion: 1,
+      wantedReleaseId: 'wanted-1',
+      discoveryRunId: 'run-1',
+      dispatchAlreadyActive: false,
+      nextSearchAfter: null,
+    },
   }]);
 });
 

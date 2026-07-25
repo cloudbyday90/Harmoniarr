@@ -281,6 +281,34 @@ test('getActivityEventLabel and detail format quality_fallback_allowed', () => {
   );
 });
 
+test('getActivityEventLabel and detail make Music Queue recovery understandable without raw diagnostics', () => {
+  const retrying = {
+    eventType: 'music_queue_match_retrying',
+    entityTitle: 'Music Has the Right to Children',
+    entityArtist: 'Boards of Canada',
+  };
+  const exhausted = {
+    eventType: 'music_queue_no_matches_left',
+    entityTitle: 'Geogaddi',
+    entityArtist: 'Boards of Canada',
+    extraPayload: { rediscoveryScheduled: true },
+  };
+
+  assert.equal(
+    getActivityEventLabel(retrying),
+    'Trying the next best match: Music Has the Right to Children by Boards of Canada',
+  );
+  assert.equal(
+    getActivityEventDetail(retrying),
+    'A download failed. Harmoniarr is trying the next best match.',
+  );
+  assert.equal(
+    getActivityEventLabel(exhausted),
+    'No good matches left: Geogaddi by Boards of Canada',
+  );
+  assert.equal(getActivityEventDetail(exhausted), 'Harmoniarr will search again later.');
+});
+
 test('getActivityEventDetail returns detail for multi-release release_added', () => {
   const event = normalizeActivityEvent(makeReleaseAddedEvent({
     entityTitle: '2 releases',

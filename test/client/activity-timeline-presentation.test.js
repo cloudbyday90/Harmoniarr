@@ -26,6 +26,9 @@ import {
 
 const events = [
   { id: 'download', eventType: 'download_completed' },
+  { id: 'retrying', eventType: 'music_queue_match_retrying' },
+  { id: 'no-matches', eventType: 'music_queue_no_matches_left' },
+  { id: 'download-failed', eventType: 'music_queue_download_failed' },
   { id: 'quality-stop', eventType: 'music_queue_quality_blocked' },
   { id: 'library', eventType: 'release_added' },
   { id: 'request', eventType: 'request_created' },
@@ -39,8 +42,8 @@ test('Activity timeline exposes compact outcome filters', () => {
   );
 });
 
-test('Activity timeline presents a quality stop as the only attention event', () => {
-  assert.deepEqual(getActivityTimelineEventPresentation(events[1]), {
+test('Activity timeline presents terminal stops as attention without treating automatic recovery as a stop', () => {
+  assert.deepEqual(getActivityTimelineEventPresentation(events[4]), {
     category: 'audio_checks',
     categoryLabel: 'Audio check',
     requiresAttention: true,
@@ -48,12 +51,27 @@ test('Activity timeline presents a quality stop as the only attention event', ()
   });
   assert.deepEqual(
     filterActivityTimelineEvents(events, 'needs_attention').map((event) => event.id),
-    ['quality-stop'],
+    ['download-failed', 'quality-stop'],
   );
+  assert.deepEqual(getActivityTimelineEventPresentation(events[1]), {
+    category: 'downloads',
+    categoryLabel: 'Download',
+    requiresAttention: false,
+    tone: 'info',
+  });
+  assert.deepEqual(getActivityTimelineEventPresentation(events[2]), {
+    category: 'downloads',
+    categoryLabel: 'Download',
+    requiresAttention: false,
+    tone: 'warning',
+  });
 });
 
 test('Activity timeline groups normal events without hiding unknown activity', () => {
-  assert.deepEqual(filterActivityTimelineEvents(events, 'downloads').map((event) => event.id), ['download']);
+  assert.deepEqual(
+    filterActivityTimelineEvents(events, 'downloads').map((event) => event.id),
+    ['download', 'retrying', 'no-matches', 'download-failed'],
+  );
   assert.deepEqual(filterActivityTimelineEvents(events, 'library').map((event) => event.id), ['library']);
   assert.deepEqual(filterActivityTimelineEvents(events, 'requests').map((event) => event.id), ['request']);
   assert.deepEqual(filterActivityTimelineEvents([{ id: 'unknown', eventType: 'future_event' }], 'all').map((event) => event.id), ['unknown']);

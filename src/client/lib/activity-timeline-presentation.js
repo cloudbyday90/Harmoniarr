@@ -31,6 +31,11 @@ const knownFilterValues = new Set(ACTIVITY_TIMELINE_FILTERS.map((filter) => filt
 function getTimelineCategory(eventType) {
   switch (eventType) {
     case 'download_completed':
+    case 'music_queue_search_queued':
+    case 'music_queue_download_retrying':
+    case 'music_queue_match_retrying':
+    case 'music_queue_no_matches_left':
+    case 'music_queue_download_failed':
       return { category: 'downloads', categoryLabel: 'Download' };
     case 'music_queue_quality_blocked':
     case 'quality_fallback_allowed':
@@ -58,9 +63,14 @@ function getTimelineCategory(eventType) {
 export function getActivityTimelineEventPresentation(event = {}) {
   const eventType = event?.eventType ?? null;
   const category = getTimelineCategory(eventType);
-  const requiresAttention = eventType === 'music_queue_quality_blocked';
+  const requiresAttention = eventType === 'music_queue_quality_blocked'
+    || eventType === 'music_queue_download_failed';
 
   if (requiresAttention) {
+    return { ...category, requiresAttention, tone: 'warning' };
+  }
+
+  if (eventType === 'music_queue_no_matches_left') {
     return { ...category, requiresAttention, tone: 'warning' };
   }
 

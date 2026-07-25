@@ -137,6 +137,36 @@ export function getActivityEventLabel(event, currentUserId = null) {
         : 'a release';
       return `Quality fallback allowed: ${releaseDesc}`;
     }
+    case 'music_queue_search_queued': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Search queued: ${releaseDesc}`;
+    }
+    case 'music_queue_download_retrying': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Retrying download: ${releaseDesc}`;
+    }
+    case 'music_queue_match_retrying': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Trying the next best match: ${releaseDesc}`;
+    }
+    case 'music_queue_no_matches_left': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `No good matches left: ${releaseDesc}`;
+    }
+    case 'music_queue_download_failed': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Download needs attention: ${releaseDesc}`;
+    }
     default:
       return event.eventType ?? 'Activity';
   }
@@ -159,6 +189,28 @@ export function getActivityEventDetail(event) {
 
   if (event.eventType === 'quality_fallback_allowed') {
     return 'Harmoniarr will continue searching with the updated quality choice.';
+  }
+
+  if (event.eventType === 'music_queue_search_queued') {
+    return 'Harmoniarr will look for another safe match.';
+  }
+
+  if (event.eventType === 'music_queue_download_retrying') {
+    return 'The source rejected the transfer. Harmoniarr will try this download again.';
+  }
+
+  if (event.eventType === 'music_queue_match_retrying') {
+    return 'A download failed. Harmoniarr is trying the next best match.';
+  }
+
+  if (event.eventType === 'music_queue_no_matches_left') {
+    return event.extraPayload?.rediscoveryScheduled === true
+      ? 'Harmoniarr will search again later.'
+      : 'Harmoniarr could not find another safe match.';
+  }
+
+  if (event.eventType === 'music_queue_download_failed') {
+    return 'Harmoniarr could not choose another safe match. Open Music Queue to review what happened.';
   }
 
   if (event.eventType !== 'release_added') {
@@ -200,6 +252,14 @@ export function getActivityEventIcon(eventType) {
       return 'audio-check';
     case 'quality_fallback_allowed':
       return 'audio-check';
+    case 'music_queue_search_queued':
+      return 'search';
+    case 'music_queue_download_retrying':
+    case 'music_queue_match_retrying':
+      return 'download';
+    case 'music_queue_no_matches_left':
+    case 'music_queue_download_failed':
+      return 'alert';
     default:
       return 'activity';
   }

@@ -87,6 +87,23 @@ test('buildActivityEventLinkTarget resolves quality blocks to Music Queue review
   });
 });
 
+test('buildActivityEventLinkTarget resolves Music Queue lifecycle events to the release', () => {
+  const target = buildActivityEventLinkTarget({
+    entityId: 'wanted-1',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_match_retrying',
+    extraPayload: { wantedReleaseId: 'wanted-1' },
+  });
+
+  assert.deepEqual(target, {
+    label: 'Open Music Queue',
+    to: {
+      name: 'music-queue-release',
+      params: { wantedReleaseId: 'wanted-1' },
+    },
+  });
+});
+
 test('buildActivityEventLinkTarget does not treat import candidate ids as Music Queue release ids', () => {
   const target = buildActivityEventLinkTarget({
     entityId: 'candidate-1',

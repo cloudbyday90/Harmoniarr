@@ -27,6 +27,10 @@ import {
   buildNoUnlockedFilesDiagnostic,
   buildPlanningBlockedDiagnostic,
 } from './import-candidate-execution-diagnostics.js';
+import {
+  buildMusicQueueRecoveryActivityEvent,
+  recordActivityEventSafely,
+} from '../activity/music-queue-lifecycle-activity-event-service.js';
 
 function normalizeRemoteFilename(file) {
   const rawFilename = typeof file?.rawPayload?.filename === 'string'
@@ -99,6 +103,7 @@ export function createImportCandidateExecutionWorker({
   markRunCancelled,
   markRunFailed,
   markRunStarted,
+  recordActivityEventFn = null,
   releaseLease,
   renewLease,
   replaceImportExecutionRunItems = async () => [],
@@ -360,6 +365,14 @@ export function createImportCandidateExecutionWorker({
             operationRunId: runId,
             scheduleFollowUpRun: false,
           });
+          recordActivityEventSafely(
+            recordActivityEventFn,
+            buildMusicQueueRecoveryActivityEvent({
+              candidate: summaryCandidate,
+              operationRunId: runId,
+              recovery: recoveryResult,
+            }),
+          );
           if (recoveryResult?.recovered) {
             const recoveryMessage = `Recovery cascade promoted candidate ${recoveryResult.nextCandidateId}.`;
             await updateImportExecutionRunItem({

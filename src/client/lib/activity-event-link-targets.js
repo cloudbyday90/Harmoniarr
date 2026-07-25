@@ -25,7 +25,15 @@ export function buildActivityEventLinkTarget(event = {}) {
     return getArtistPolicyActivityRouteTarget(event.extraPayload ?? {});
   }
 
-  if (event.eventType === 'music_queue_quality_blocked' || event.eventType === 'quality_fallback_allowed') {
+  if ([
+    'music_queue_quality_blocked',
+    'quality_fallback_allowed',
+    'music_queue_search_queued',
+    'music_queue_download_retrying',
+    'music_queue_match_retrying',
+    'music_queue_no_matches_left',
+    'music_queue_download_failed',
+  ].includes(event.eventType)) {
     const wantedReleaseId = event.extraPayload?.wantedReleaseId
       ?? (event.entityType === 'wanted_release' ? event.entityId : null);
     return wantedReleaseId

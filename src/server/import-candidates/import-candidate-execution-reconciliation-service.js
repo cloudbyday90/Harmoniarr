@@ -20,6 +20,10 @@ import {
   buildPersistedExecutionMissingTransferState,
   buildPersistedExecutionTransferSnapshot,
 } from './import-candidate-execution-transfer-snapshot.js';
+import {
+  buildMusicQueueRecoveryActivityEvent,
+  recordActivityEventSafely,
+} from '../activity/music-queue-lifecycle-activity-event-service.js';
 
 function resolveTargetStatus(item) {
   switch (item?.liveTransferSummary?.status) {
@@ -180,6 +184,14 @@ export function createImportCandidateExecutionReconciliationService({
         } else if (result?.rediscovery?.scheduled) {
           rediscoveries.push(result.rediscovery);
         }
+        recordActivityEventSafely(
+          recordActivityEventFn,
+          buildMusicQueueRecoveryActivityEvent({
+            candidate,
+            operationRunId: run?.id ?? null,
+            recovery: result,
+          }),
+        );
       } else if (targetStatus === 'import_pending') {
         result = await markImportCandidateImportPending({
           actorUserId,
@@ -196,14 +208,14 @@ export function createImportCandidateExecutionReconciliationService({
           }).catch(() => {});
         }
 
-        if (typeof recordActivityEventFn === 'function' && result?.candidate) {
-          void recordActivityEventFn({
+        if (result?.candidate) {
+          recordActivityEventSafely(recordActivityEventFn, {
             actorUserId: null,
             entityId: importCandidateId,
             entityTitle: result.candidate.folderPath ?? null,
             entityType: 'import_candidate',
             eventType: 'download_completed',
-          }).catch(() => {});
+          });
         }
 
         if (typeof startSafeApplyRunAfterDownloadCompleted === 'function' && result?.candidate) {
@@ -230,6 +242,14 @@ export function createImportCandidateExecutionReconciliationService({
         } else if (recovery?.rediscovery?.scheduled) {
           rediscoveries.push(recovery.rediscovery);
         }
+        recordActivityEventSafely(
+          recordActivityEventFn,
+          buildMusicQueueRecoveryActivityEvent({
+            candidate,
+            operationRunId: run?.id ?? null,
+            recovery,
+          }),
+        );
       }
 
       if (result?.candidate) {

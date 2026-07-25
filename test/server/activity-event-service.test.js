@@ -101,6 +101,11 @@ test('recordActivityEvent: handles each allowed event type without throwing', as
     'artist_policy_saved',
     'music_queue_quality_blocked',
     'quality_fallback_allowed',
+    'music_queue_search_queued',
+    'music_queue_download_retrying',
+    'music_queue_match_retrying',
+    'music_queue_no_matches_left',
+    'music_queue_download_failed',
     'request_fulfilled',
   ];
 

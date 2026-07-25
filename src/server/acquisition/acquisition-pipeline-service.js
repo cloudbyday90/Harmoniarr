@@ -22,6 +22,10 @@ import {
   QUALITY_DECISION_CODES,
 } from './acquisition-quality-policy-service.js';
 import { createAcquisitionPipelineStatusService } from './acquisition-pipeline-status-service.js';
+import {
+  buildMusicQueueSearchQueuedActivityEvent,
+  recordActivityEventSafely,
+} from '../activity/music-queue-lifecycle-activity-event-service.js';
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -312,6 +316,18 @@ export function createAcquisitionPipelineService({
       requestMetadata,
       triggerSource: 'music_queue_try_again',
     });
+
+    recordActivityEventSafely(
+      recordActivityEventFn,
+      buildMusicQueueSearchQueuedActivityEvent({
+        actorUserId,
+        discoveryRunId: run?.id ?? null,
+        dispatchAlreadyActive,
+        rediscovery,
+        release,
+        wantedReleaseId: scopedWantedReleaseId,
+      }),
+    );
 
     const refreshed = await getMusicQueueRelease({
       appUserId: scopedAppUserId,

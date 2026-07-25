@@ -984,14 +984,17 @@ Goal: make Activity a readable history, not the place users go to run the
 system. Move old workbenches into diagnostics and link timeline events to the
 right repair surface.
 
-- [ ] Collapse Activity default view into a timeline/event-history first
-  experience.
-- [ ] Add timeline filters: all, downloads, audio checks, library adds,
-  requests, artist policy, setup, failures.
-- [ ] Emit Activity events for searched, match selected, match failed/trying
-  next, no matches left, download started, download completed, audio checked,
-  audio warning, audio failed, suspicious FLAC, added to library, and request
-  fulfilled.
+- [x] Collapse Activity default view into a timeline/event-history first
+  experience. See `ACTIVITY_TIMELINE_NAVIGATION_DESIGN.md`.
+- [x] Add compact timeline filters for all activity, downloads, audio checks,
+  library, requests, artist policy, and terminal attention states.
+- [x] Emit the first Music Queue lifecycle set for search queued, retrying a
+  download, trying the next match, no matches left with rediscovery scheduled,
+  and terminal download failure. See
+  `MUSIC_QUEUE_ACTIVITY_LIFECYCLE_DESIGN.md`.
+- [ ] Extend Activity events for match selected, download started, audio
+  checked/warning/failed, suspicious FLAC, added-to-library, and request
+  fulfilled as those lifecycle states become release-centered.
 - [x] Emit the first strict-quality stop Activity event and link it to Music
   Queue release review.
 - [ ] Add repair handoffs from Activity to Music Queue, Downloader, Library,

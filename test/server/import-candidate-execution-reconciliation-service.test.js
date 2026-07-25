@@ -305,6 +305,7 @@ test('reconcileImportCandidateExecutionState reports rediscovery scheduled after
       scheduled: true,
     },
   }));
+  const recordActivityEventFn = t.mock.fn(async () => {});
   const service = createImportCandidateExecutionReconciliationService({
     buildImportCandidateExecutionSummary: async () => ({
       currentRun: {
@@ -323,10 +324,16 @@ test('reconcileImportCandidateExecutionState reports rediscovery scheduled after
     }),
     getImportCandidate: async ({ importCandidateId }) => ({
       id: importCandidateId,
+      normalizedPayload: {
+        requestOwnership: {
+          wantedReleaseId: 'wanted-1',
+        },
+      },
       status: 'downloading',
     }),
     handleImportCandidateDownloadFailure,
     markImportCandidateDownloadFailed,
+    recordActivityEventFn,
     updateImportExecutionRunItem: async () => null,
   });
 
@@ -336,6 +343,10 @@ test('reconcileImportCandidateExecutionState reports rediscovery scheduled after
   assert.equal(handleImportCandidateDownloadFailure.mock.callCount(), 1);
   assert.equal(result.summary.rediscovered, 1);
   assert.equal(result.summary.recovered, 0);
+  assert.equal(recordActivityEventFn.mock.callCount(), 1);
+  assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].eventType, 'music_queue_no_matches_left');
+  assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].entityId, 'wanted-1');
+  assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].extraPayload.rediscoveryScheduled, true);
   assert.deepEqual(result.rediscoveries, [{
     discoveryRunId: 'discovery-run-1',
     metadataReleaseId: 'release-1',

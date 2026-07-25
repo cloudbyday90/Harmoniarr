@@ -209,6 +209,7 @@ export function createImportCandidateModule({
     markRunFailed: importCandidateExecutionRunStore.markRunFailed,
     markRunPaused: importCandidateExecutionRunStore.markRunPaused,
     markRunStarted: importCandidateExecutionRunStore.markRunStarted,
+    recordActivityEventFn,
     releaseLease: importCandidateExecutionRunStore.releaseLease,
     renewLease: importCandidateExecutionRunStore.renewLease,
     replaceImportExecutionRunItems,
