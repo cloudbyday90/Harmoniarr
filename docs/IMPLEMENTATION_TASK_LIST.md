@@ -219,6 +219,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   timeline. Desktop and mobile browser verification confirms the reduced
   hierarchy and retained repair filter. See
   `ACTIVITY_INFORMATION_HIERARCHY_DESIGN.md`.
+- Music Queue release-row hierarchy: normal release rows now use one explicit
+  state, release identity, bounded progress and quality facts, and one primary
+  action. Quality verification stops remain visible without turning routine
+  automatic progress into a chip-heavy diagnostics row. Desktop and mobile
+  browser verification confirms the review handoff and no horizontal overflow.
+  See `MUSIC_QUEUE_RELEASE_ROW_HIERARCHY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

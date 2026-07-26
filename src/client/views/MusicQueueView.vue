@@ -21,6 +21,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
 import MusicQueueProviderRecoveryVisibility from '../components/music-queue/MusicQueueProviderRecoveryVisibility.vue';
+import MusicQueueReleaseRow from '../components/music-queue/MusicQueueReleaseRow.vue';
 import {
   buildMusicQueueMatchReview,
   buildMusicQueueReleaseTypeFilters,
@@ -263,57 +264,13 @@ watch(
         </div>
 
         <div v-else class="music-queue-list" role="list">
-          <article
+          <MusicQueueReleaseRow
             v-for="release in filteredReleases"
             :key="release.id"
-            class="music-queue-row"
-            :class="{ 'is-selected': selectedReleaseId === release.id }"
-            role="listitem"
-          >
-            <div class="music-queue-row-main">
-              <span class="review-status-pill" :class="release.statusClass">{{ release.status.label }}</span>
-              <div>
-                <h3>{{ release.releaseTitle }}</h3>
-                <p>
-                  {{ release.artistName }}
-                  <span aria-hidden="true">·</span>
-                  {{ release.releaseTypeLabel }}<template v-if="release.releaseYear"> · {{ release.releaseYear }}</template>
-                </p>
-              </div>
-              <div class="music-queue-chip-row" aria-label="Release progress">
-                <span v-for="chip in release.progressChips" :key="chip" class="hx-pill">{{ chip }}</span>
-              </div>
-            </div>
-
-            <div class="music-queue-row-detail">
-              <strong>{{ release.detailText }}</strong>
-              <span>Last activity: {{ release.lastActivityLabel }}</span>
-              <span>{{ release.qualityDecisionLabel }}</span>
-              <div class="music-queue-row-actions">
-                <button
-                  v-if="release.action.type === 'review'"
-                  type="button"
-                  class="hx-btn"
-                  data-variant="primary"
-                  :aria-expanded="selectedReleaseId === release.id"
-                  @click="openReview(release)"
-                >
-                  {{ release.action.label }}
-                </button>
-                <RouterLink
-                  v-else
-                  class="hx-btn"
-                  data-variant="primary"
-                  :to="{ name: release.action.routeName }"
-                >
-                  {{ release.action.label }}
-                </RouterLink>
-                <button type="button" class="hx-btn" data-variant="ghost" @click="openReview(release)">
-                  Details
-                </button>
-              </div>
-            </div>
-          </article>
+            :release="release"
+            :selected="selectedReleaseId === release.id"
+            @open-review="openReview"
+          />
         </div>
       </div>
 
@@ -486,8 +443,7 @@ watch(
   padding: 32px clamp(18px, 4vw, 48px);
 }
 
-.music-queue-header,
-.music-queue-row {
+.music-queue-header {
   align-items: center;
   display: flex;
   gap: 16px;
@@ -500,8 +456,6 @@ watch(
 
 .music-queue-copy,
 .music-queue-panel-header span,
-.music-queue-row p,
-.music-queue-row-detail span,
 .music-queue-empty p {
   color: var(--hx-text-muted);
 }
@@ -584,46 +538,11 @@ watch(
   display: grid;
 }
 
-.music-queue-row {
-  border-top: 1px solid var(--hx-border);
-  padding: 18px 0;
-}
-
-.music-queue-row.is-selected {
-  background: var(--hx-accent-soft);
-  margin-inline: -12px;
-  padding-inline: 12px;
-}
-
-.music-queue-row:first-child {
-  border-top: 0;
-}
-
-.music-queue-row-main {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.music-queue-row-main h3,
-.music-queue-row-main p {
-  margin: 0;
-}
-
-.music-queue-chip-row,
 .music-queue-match-actions,
-.music-queue-row-actions,
 .music-queue-review-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.music-queue-row-detail {
-  display: grid;
-  gap: 6px;
-  max-width: 360px;
-  text-align: right;
 }
 
 .music-queue-empty,
@@ -774,15 +693,9 @@ watch(
 
 @media (max-width: 720px) {
   .music-queue-header,
-  .music-queue-panel-header,
-  .music-queue-row {
+  .music-queue-panel-header {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .music-queue-row-detail {
-    max-width: none;
-    text-align: left;
   }
 
   .music-queue-layout {
