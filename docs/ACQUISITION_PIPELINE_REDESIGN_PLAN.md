@@ -224,6 +224,15 @@ This means the main workflow is:
 The user should not have to understand candidate IDs, source search IDs, run IDs,
 or selected queues for the normal path.
 
+### File-Backed Runtime Acceptance
+
+The safe automatic add boundary has an additional Docker-backed proof. It
+creates deterministic local fixtures inside the production image, reconciles a
+completed transfer through the persisted queue, and proves both a verified FLAC
+add and an MP3-derived FLAC quality stop with durable Activity evidence. This
+avoids treating public Soulseek peers as a release-test dependency. See
+`MUSIC_QUEUE_FILE_BACKED_DOCKER_ACCEPTANCE_DESIGN.md`.
+
 ---
 
 ## 6. Candidate Role And Simplification Boundary

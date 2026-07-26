@@ -153,6 +153,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   match when one exists. Music Queue now lets selected or queued next-match
   progress override stale quality-block evidence. See
   `MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`.
+- Music Queue file-backed Docker acceptance: a disposable production runtime
+  now generates real lossless and MP3-derived FLAC fixtures, reconciles their
+  completed transfers through persisted safe auto-add, and proves the genuine
+  file is added while the disguised file is quality-blocked with Activity
+  evidence. See `MUSIC_QUEUE_FILE_BACKED_DOCKER_ACCEPTANCE_DESIGN.md`.
 - Music Queue Activity repair handoffs: Activity now records release-scoped
   match selection, accepted transfer, audio inspection, download completion,
   library-add, and request-fulfillment milestones. Rows use one clear Music
