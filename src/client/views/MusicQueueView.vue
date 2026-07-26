@@ -19,6 +19,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import MusicQueueEmptyState from '../components/music-queue/MusicQueueEmptyState.vue';
 import MusicQueueOverview from '../components/music-queue/MusicQueueOverview.vue';
 import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
 import MusicQueueProviderRecoveryVisibility from '../components/music-queue/MusicQueueProviderRecoveryVisibility.vue';
@@ -221,10 +222,7 @@ watch(
       Loading Music Queue...
     </div>
 
-    <div v-else-if="!releases.length" class="music-queue-panel music-queue-empty">
-      <h2>Nothing is queued right now</h2>
-      <p>Monitored artists and requested releases will appear here when Harmoniarr has music to look for.</p>
-    </div>
+    <MusicQueueEmptyState v-else-if="!releases.length" />
 
     <div v-else class="music-queue-layout">
       <div class="music-queue-panel">
@@ -329,8 +327,7 @@ watch(
 }
 
 .music-queue-copy,
-.music-queue-panel-header span,
-.music-queue-empty p {
+.music-queue-panel-header span {
   color: var(--hx-text-muted);
 }
 
@@ -405,7 +402,6 @@ watch(
   display: grid;
 }
 
-.music-queue-empty,
 .music-queue-empty-inline {
   padding: 48px 20px;
   text-align: center;

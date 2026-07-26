@@ -44,7 +44,7 @@ function toOverviewFact(card) {
  * available to filters and diagnostics but do not compete with active work.
  *
  * @param {Array<{key: string, label: string, value: number}>} cards
- * @returns {{ detail: string, facts: Array<{key: string, label: string, tone: string, value: number}>, headline: string, isVisible: boolean }}
+ * @returns {{ detail: string, eyebrow: string, facts: Array<{key: string, label: string, tone: string, value: number}>, headline: string, isVisible: boolean, state: string }}
  */
 export function buildMusicQueueOverviewPresentation(cards = []) {
   const normalizedCards = Array.isArray(cards) ? cards.map(toOverviewFact) : [];
@@ -59,9 +59,11 @@ export function buildMusicQueueOverviewPresentation(cards = []) {
   if (attentionCount > 0) {
     return {
       detail: 'Harmoniarr needs your help before it can continue with these releases.',
+      eyebrow: 'Needs attention',
       facts,
       headline: `${pluralizeRelease(attentionCount)} need${attentionCount === 1 ? 's' : ''} attention`,
       isVisible: true,
+      state: 'attention',
     };
   }
 
@@ -70,25 +72,31 @@ export function buildMusicQueueOverviewPresentation(cards = []) {
       detail: waitingCount > 0
         ? `${pluralizeRelease(waitingCount)} ${waitingCount === 1 ? 'is' : 'are'} waiting to search.`
         : 'Harmoniarr is continuing automatically.',
+      eyebrow: 'Automatic progress',
       facts,
       headline: `Harmoniarr is working on ${pluralizeRelease(progressCount)}`,
       isVisible: true,
+      state: 'progress',
     };
   }
 
   if (waitingCount > 0) {
     return {
-      detail: 'Harmoniarr will search automatically when each release is due.',
+      detail: 'No action is needed. Harmoniarr will search automatically when each release is due.',
+      eyebrow: 'Automatic search',
       facts: [waitingFact],
-      headline: `${pluralizeRelease(waitingCount)} waiting to search`,
+      headline: `${pluralizeRelease(waitingCount)} waiting for automatic search`,
       isVisible: true,
+      state: 'waiting',
     };
   }
 
   return {
     detail: '',
+    eyebrow: '',
     facts: [],
     headline: '',
     isVisible: false,
+    state: 'idle',
   };
 }

@@ -49,6 +49,7 @@ const CARDS = [{
 test('Music Queue overview shows active work and leaves zero states out of the default scan path', () => {
   assert.deepEqual(buildMusicQueueOverviewPresentation(CARDS), {
     detail: '5 releases are waiting to search.',
+    eyebrow: 'Automatic progress',
     facts: [{
       key: 'downloading',
       label: 'Downloading',
@@ -62,6 +63,7 @@ test('Music Queue overview shows active work and leaves zero states out of the d
     }],
     headline: 'Harmoniarr is working on 3 releases',
     isVisible: true,
+    state: 'progress',
   });
 });
 
@@ -72,6 +74,8 @@ test('Music Queue overview prioritizes attention over routine automatic work', (
 
   assert.equal(presentation.headline, '1 release needs attention');
   assert.equal(presentation.detail, 'Harmoniarr needs your help before it can continue with these releases.');
+  assert.equal(presentation.eyebrow, 'Needs attention');
+  assert.equal(presentation.state, 'attention');
   assert.deepEqual(presentation.facts.map((fact) => fact.key), [
     'needs-help',
     'downloading',
@@ -87,14 +91,16 @@ test('Music Queue overview only shows waiting work when no release is otherwise 
   })));
 
   assert.deepEqual(presentation, {
-    detail: 'Harmoniarr will search automatically when each release is due.',
+    detail: 'No action is needed. Harmoniarr will search automatically when each release is due.',
+    eyebrow: 'Automatic search',
     facts: [{
       key: 'waiting',
       label: 'Waiting',
       tone: 'neutral',
       value: 1,
     }],
-    headline: '1 release waiting to search',
+    headline: '1 release waiting for automatic search',
     isVisible: true,
+    state: 'waiting',
   });
 });

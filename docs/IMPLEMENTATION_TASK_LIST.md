@@ -231,6 +231,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   Type remain available behind an accessible Filters disclosure. Browser proof
   confirms the first release remains visible in the initial mobile viewport.
   See `MUSIC_QUEUE_SUMMARY_FILTER_HIERARCHY_DESIGN.md`.
+- Music Queue waiting and empty-state hierarchy: provider repair remains the
+  one setup handoff, scheduled work explicitly says that no action is needed,
+  and a truly clear queue offers a calm explanation plus an optional Discover
+  path. Desktop and mobile browser proof verifies these states remain distinct.
+  See `MUSIC_QUEUE_WAITING_EMPTY_STATE_DESIGN.md`.
 - Music Queue selected-review hierarchy: the release detail panel now leads
   with current status and the next decision, keeps only actionable matches in
   the normal path, and moves aggregate match/quality evidence behind an

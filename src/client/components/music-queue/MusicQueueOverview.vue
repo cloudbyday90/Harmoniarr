@@ -34,11 +34,13 @@ const presentation = computed(() => buildMusicQueueOverviewPresentation(props.su
   <section
     v-if="presentation.isVisible"
     class="music-queue-overview"
-    :class="{ 'has-attention': presentation.facts.some((fact) => fact.tone === 'warning') }"
+    :class="{
+      'has-attention': presentation.facts.some((fact) => fact.tone === 'warning'),
+    }"
     aria-label="Music Queue overview"
   >
     <div>
-      <p class="hx-eyebrow">Queue overview</p>
+      <p class="hx-eyebrow">{{ presentation.eyebrow }}</p>
       <h2>{{ presentation.headline }}</h2>
       <p>{{ presentation.detail }}</p>
     </div>

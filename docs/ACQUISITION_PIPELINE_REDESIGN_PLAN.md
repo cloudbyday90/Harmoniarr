@@ -851,6 +851,9 @@ automation changes.
   prioritizes attention and active work; keep State and Type as progressive
   filters beside always-visible name search. See
   `MUSIC_QUEUE_SUMMARY_FILTER_HIERARCHY_DESIGN.md`.
+- [x] Separate provider/setup repair, automatic waiting, and a truly clear
+  queue without reintroducing dashboard cards. See
+  `MUSIC_QUEUE_WAITING_EMPTY_STATE_DESIGN.md`.
 - [x] Add release-centered rows/cards with artist, release, year/type, state,
   why, next action, last activity, progress, quality profile, and match
   attempt summary.
