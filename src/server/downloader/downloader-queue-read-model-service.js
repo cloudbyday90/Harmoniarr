@@ -238,18 +238,25 @@ function buildEnabledProviderState(providerStatus = {}) {
     status: 'enabled',
     apiKeySource: normalizeString(providerStatus.apiKeySource),
     apiKeyUpdatedAt: normalizeTimestamp(providerStatus.apiKeyUpdatedAt),
+    mode: normalizeString(providerStatus.providerMode) ?? 'external',
   };
 }
 
 function buildDisabledProviderState(providerStatus = {}) {
+  const disabledBySetting = providerStatus.providerMode === 'disabled';
   return {
     enabled: false,
     configured: false,
-    message: 'Configure Soulseek (slskd) in Settings to enable downloads.',
-    reason: providerStatus.apiKeyConfigured === false ? 'missing_api_key' : 'not_configured',
+    message: disabledBySetting
+      ? 'Soulseek downloads are turned off in Settings.'
+      : 'Configure Soulseek (slskd) in Settings to enable downloads.',
+    reason: disabledBySetting
+      ? 'disabled_by_setting'
+      : providerStatus.apiKeyConfigured === false ? 'missing_api_key' : 'not_configured',
     status: 'disabled',
     apiKeySource: normalizeString(providerStatus.apiKeySource),
     apiKeyUpdatedAt: normalizeTimestamp(providerStatus.apiKeyUpdatedAt),
+    mode: normalizeString(providerStatus.providerMode) ?? 'external',
   };
 }
 
@@ -269,7 +276,9 @@ export function buildDisabledDownloaderQueueReadModel({
     queueHealth: {
       averageSpeed: 0,
       counts,
-      message: 'Downloads are disabled until Soulseek (slskd) is configured.',
+      message: providerStatus.providerMode === 'disabled'
+        ? 'Soulseek downloads are turned off in Settings.'
+        : 'Downloads are disabled until Soulseek (slskd) is configured.',
       progress: {
         bytesTransferred: null,
         percentComplete: null,
@@ -331,7 +340,7 @@ export function createDownloaderQueueReadModelService({
       ? await getDownloaderProviderStatus()
       : null;
 
-    if (providerStatus && providerStatus.apiKeyConfigured !== true) {
+    if (providerStatus && (providerStatus.providerMode === 'disabled' || providerStatus.apiKeyConfigured !== true)) {
       return buildDisabledDownloaderQueueReadModel({
         includeRemoved: normalizedIncludeRemoved,
         now,

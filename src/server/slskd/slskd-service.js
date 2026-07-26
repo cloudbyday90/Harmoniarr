@@ -302,30 +302,86 @@ function normalizeSearchState(payload) {
   };
 }
 
+function buildUnavailableProviderError(config = {}) {
+  const error = config.providerModeError ?? {};
+  return createApiError(
+    503,
+    error.code ?? 'slskd_disabled',
+    error.message ?? 'Soulseek downloads are unavailable in the current provider mode.',
+  );
+}
+
+function buildUnavailableProviderStatus(config = {}) {
+  const providerMode = config.providerMode?.mode ?? 'external';
+  const error = config.providerModeError ?? {};
+  const disabled = providerMode === 'disabled';
+
+  return {
+    provider: 'slskd',
+    status: disabled ? 'disabled' : 'misconfigured',
+    code: error.code ?? (disabled ? 'slskd_disabled' : 'slskd_managed_deployment_missing'),
+    message: error.message ?? (disabled
+      ? 'Soulseek downloads are turned off in Settings.'
+      : 'Managed Soulseek requires the Harmoniarr managed Docker overlay.'),
+    details: {
+      providerMode,
+    },
+  };
+}
+
 export function createSlskdService({
   createSlskdClientFn = createSlskdClient,
   getClientConfig = async () => ({}),
   providerHealthRecorder = null,
   slskdClient = null,
 } = {}) {
+  async function getRuntimeConfig() {
+    return getClientConfig();
+  }
+
   async function withClient(operation) {
-    const client = slskdClient ?? createSlskdClientFn(await getClientConfig());
+    const config = await getRuntimeConfig();
+    if (config?.enabled === false) {
+      throw buildUnavailableProviderError(config);
+    }
+
+    const client = slskdClient ?? createSlskdClientFn(config);
     return operation(client);
   }
 
   async function getConnectionStatus() {
+    const config = await getRuntimeConfig();
+    if (config?.enabled === false) {
+      return buildUnavailableProviderStatus(config);
+    }
+
     const payload = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => withClient((client) => client.getApplicationState()),
+      () => {
+        const client = slskdClient ?? createSlskdClientFn(config);
+        return client.getApplicationState();
+      },
     );
 
     return normalizeServerState(payload);
   }
 
   async function validateAuthentication() {
+    const config = await getRuntimeConfig();
+    if (config?.enabled === false) {
+      return {
+        isValid: false,
+        provider: 'slskd',
+        status: buildUnavailableProviderStatus(config).status,
+      };
+    }
+
     const isValid = await observeSlskdProviderCall(
       providerHealthRecorder,
-      () => withClient((client) => client.isAuthenticationValid()),
+      () => {
+        const client = slskdClient ?? createSlskdClientFn(config);
+        return client.isAuthenticationValid();
+      },
     );
 
     return {

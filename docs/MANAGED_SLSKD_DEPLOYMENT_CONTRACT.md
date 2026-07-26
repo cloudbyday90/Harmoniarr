@@ -169,6 +169,6 @@ This foundation is covered by:
 - existing Compose image-tag enforcement.
 
 See [Managed slskd Docker Smoke Design](MANAGED_SLSKD_DOCKER_SMOKE_DESIGN.md)
-for the executed evidence and replay command. The next implementation slice is
-provider-mode onboarding so managed, external, and disabled setups are explicit
-in Settings.
+for the executed evidence and replay command. Settings now makes Managed,
+External, and Disabled provider modes explicit; see [Soulseek Provider-Mode
+Onboarding Design](SLSKD_PROVIDER_MODE_ONBOARDING_DESIGN.md).

@@ -25,6 +25,17 @@ test('SettingsConnectionsView exposes a saved-provider connection test action', 
   assert.match(source, /toast\.error\(`Connection test failed: \$\{providerHealthError\.value\}`\)/);
 });
 
+test('SettingsConnectionsView exposes explicit managed, external, and disabled provider modes', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /Soulseek provider mode/);
+  assert.match(source, /value="managed"/);
+  assert.match(source, /value="external"/);
+  assert.match(source, /value="disabled"/);
+  assert.match(source, /v-if="isExternalSoulseek"/);
+  assert.match(source, /:disabled="isTestingProviderHealth \|\| isSoulseekDisabled"/);
+});
+
 test('SettingsConnectionsView keeps optional service setup and timing controls behind named disclosures', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 

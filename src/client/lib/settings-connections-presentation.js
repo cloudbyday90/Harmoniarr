@@ -33,7 +33,19 @@
  * @returns {string}
  */
 export function buildSlskdConnectionSubtitle() {
-  return 'Configure the address and API key for the Soulseek download service.';
+  return 'Choose whether Harmoniarr manages Soulseek, connects to your existing service, or keeps downloads off.';
+}
+
+export function formatSlskdProviderModeLabel(slskdStatus) {
+  switch (slskdStatus?.providerMode) {
+    case 'managed':
+      return 'Managed';
+    case 'disabled':
+      return 'Downloads off';
+    case 'external':
+    default:
+      return 'External';
+  }
 }
 
 /**

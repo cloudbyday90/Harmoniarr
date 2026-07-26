@@ -54,10 +54,19 @@ http://127.0.0.1:47956
 
 The one-shot `walkthrough-bootstrap` helper exits successfully after creating the walkthrough admin. That is expected. Running it through `docker compose run --rm` keeps the normal walkthrough stack clean instead of leaving an exited helper container behind.
 
-After configuring Soulseek in Settings > Connections, use the Provider health
-`Test connection` button to refresh the saved connection status. The API key is
-write-only: the field intentionally stays blank after save, and leaving it blank
-keeps the stored key.
+In Settings > Connections, choose the provider mode before configuring
+Soulseek:
+
+- **External** is the walkthrough default. Enter the address and API key for
+  the separately run provider, then use `Test Soulseek` to refresh its saved
+  connection status.
+- **Managed** is for the managed Compose overlay described below. Its address
+  and API key come from deployment secrets rather than Settings.
+- **Disabled** pauses Soulseek searches/downloads and prevents Downloader
+  polling. It preserves an existing external API key for later reuse.
+
+The external API key is write-only: the field intentionally stays blank after
+save, and leaving it blank keeps the stored key.
 
 ## Managed slskd Deployment
 

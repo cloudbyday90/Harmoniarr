@@ -24,6 +24,7 @@ import {
   resolveAllowedOutboundHosts,
   resolveAllowedOutboundHostSuffixes,
 } from '../../outbound-url-policy.js';
+import { resolveSlskdProviderMode } from './slskd-provider-mode.js';
 
 export const defaultSlskdBaseUrl = 'http://slskd:5030';
 export const defaultSlskdRequestTimeoutMs = 10000;
@@ -145,11 +146,40 @@ export function hasConfiguredSlskdApiKey(env = process.env, options = {}) {
 
 export function buildSlskdRuntimeConfig({ apiKey = null, env = process.env, settings = {} } = {}) {
   const slskdSettings = settings.slskd ?? {};
+  const providerMode = resolveSlskdProviderMode({
+    env,
+    providerMode: slskdSettings.providerMode,
+  });
+
+  if (providerMode.state === 'disabled') {
+    return {
+      enabled: false,
+      providerMode,
+      providerModeError: {
+        code: 'slskd_disabled',
+        message: 'Soulseek downloads are turned off in Settings.',
+      },
+    };
+  }
+
+  if (providerMode.state === 'managed_deployment_missing') {
+    return {
+      enabled: false,
+      providerMode,
+      providerModeError: {
+        code: 'slskd_managed_deployment_missing',
+        message: 'Managed Soulseek requires the Harmoniarr managed Docker overlay.',
+      },
+    };
+  }
+
   const environmentApiKey = resolveSlskdEnvironmentApiKey(env);
 
   return {
     apiKey: apiKey ?? environmentApiKey?.value ?? undefined,
     baseUrl: slskdSettings.baseUrl || resolveSlskdBaseUrlDefault(env),
+    enabled: true,
+    providerMode,
     requestTimeoutMs: slskdSettings.requestTimeoutMs ?? resolveSlskdRequestTimeoutDefault(env),
   };
 }

@@ -117,6 +117,7 @@ export function useSettingsForm({
       apiKey: '',
       baseUrl: 'http://slskd:5030',
       clearApiKey: false,
+      providerMode: 'external',
       requestTimeoutMs: 10000,
     },
     providers: {

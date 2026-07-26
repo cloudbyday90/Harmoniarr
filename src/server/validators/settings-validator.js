@@ -31,6 +31,10 @@ import {
   resolveSlskdBaseUrlDefault,
   resolveSlskdRequestTimeoutDefault,
 } from '../integrations/slskd/slskd-config.js';
+import {
+  normalizeSlskdProviderMode,
+  resolveSlskdProviderModeDefault,
+} from '../integrations/slskd/slskd-provider-mode.js';
 import { normalizeDownloadPathMappings } from '../paths/download-path-mapping-service.js';
 import { normalizeUserMusicRoots } from '../paths/user-music-root-service.js';
 
@@ -259,6 +263,16 @@ const settingDefinitions = {
     },
   },
   slskd: {
+    providerMode: {
+      defaultValue: resolveSlskdProviderModeDefault(),
+      normalize(value) {
+        try {
+          return normalizeSlskdProviderMode(value);
+        } catch (error) {
+          throw createSettingsValidationError(error.message);
+        }
+      },
+    },
     baseUrl: {
       defaultValue: resolveSlskdBaseUrlDefault(),
       normalize(value) {

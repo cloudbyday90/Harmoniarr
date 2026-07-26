@@ -77,6 +77,7 @@ export function normalizeUserMusicRoots(value) {
 }
 
 export function buildSettingsUpdatePayload(form) {
+  const slskdProviderMode = form.slskd.providerMode ?? 'external';
   const payload = {
     artwork: {
       captureEmbedded: form.artwork.captureEmbedded,
@@ -110,10 +111,14 @@ export function buildSettingsUpdatePayload(form) {
     fidelity: { ...form.fidelity },
     naming: { ...form.naming },
     slskd: {
-      baseUrl: form.slskd.baseUrl,
-      requestTimeoutMs: form.slskd.requestTimeoutMs,
+      providerMode: slskdProviderMode,
     },
   };
+
+  if (slskdProviderMode === 'external') {
+    payload.slskd.baseUrl = form.slskd.baseUrl;
+    payload.slskd.requestTimeoutMs = form.slskd.requestTimeoutMs;
+  }
 
   if (form.providers) {
     payload.providers = {
@@ -187,11 +192,13 @@ export function buildSettingsUpdatePayload(form) {
     }
   }
 
-  const apiKey = typeof form.slskd.apiKey === 'string' ? form.slskd.apiKey.trim() : '';
-  if (form.slskd.clearApiKey) {
-    payload.slskd.clearApiKey = true;
-  } else if (apiKey) {
-    payload.slskd.apiKey = apiKey;
+  if (slskdProviderMode === 'external') {
+    const apiKey = typeof form.slskd.apiKey === 'string' ? form.slskd.apiKey.trim() : '';
+    if (form.slskd.clearApiKey) {
+      payload.slskd.clearApiKey = true;
+    } else if (apiKey) {
+      payload.slskd.apiKey = apiKey;
+    }
   }
 
   return payload;

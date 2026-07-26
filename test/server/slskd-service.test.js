@@ -14,6 +14,36 @@ function createProviderError() {
   return error;
 }
 
+test('createSlskdService does not create a client when Settings disables Soulseek', async (t) => {
+  const createSlskdClientFn = t.mock.fn(() => {
+    throw new Error('slskd client should not be created');
+  });
+  const service = createSlskdService({
+    createSlskdClientFn,
+    getClientConfig: async () => ({
+      enabled: false,
+      providerMode: { mode: 'disabled' },
+      providerModeError: {
+        code: 'slskd_disabled',
+        message: 'Soulseek downloads are turned off in Settings.',
+      },
+    }),
+  });
+
+  assert.deepEqual(await service.getConnectionStatus(), {
+    provider: 'slskd',
+    status: 'disabled',
+    code: 'slskd_disabled',
+    message: 'Soulseek downloads are turned off in Settings.',
+    details: { providerMode: 'disabled' },
+  });
+  assert.equal(createSlskdClientFn.mock.callCount(), 0);
+  await assert.rejects(
+    service.getDownloads(),
+    (error) => error?.status === 503 && error?.code === 'slskd_disabled',
+  );
+});
+
 test('createSlskdService normalizes connection status from application state', async (t) => {
   const getApplicationState = t.mock.fn(async () => ({
     version: {

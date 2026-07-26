@@ -999,6 +999,10 @@ right repair surface.
   disclosure so routine connections, folders, and library behavior stay clear
   while specialist tuning remains available on request. See
   `SETTINGS_PROGRESSIVE_DISCLOSURE_DESIGN.md`.
+- [x] Make Soulseek provider ownership explicit in Settings through Managed,
+  External, and Disabled modes. Disabled mode prevents provider polling, while
+  managed Compose secrets remain deployment-owned. See
+  `SLSKD_PROVIDER_MODE_ONBOARDING_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See

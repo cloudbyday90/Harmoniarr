@@ -46,11 +46,11 @@ function buildSoulseekStep(dependencies, healthError) {
 
   if (health?.status === 'disabled') {
     return {
-      copy: health.message || 'Add a Soulseek address and API key to enable downloads.',
-      label: 'Set up Soulseek',
+      copy: health.message || 'Soulseek downloads are turned off. Choose a provider mode when you are ready to download music.',
+      label: 'Choose provider mode',
       routeName: 'settings-connections',
-      status: 'Not connected',
-      tone: 'warning',
+      status: 'Optional',
+      tone: 'info',
     };
   }
 

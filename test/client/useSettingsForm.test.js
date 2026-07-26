@@ -217,6 +217,7 @@ test('useSettingsForm initial state has correct defaults', () => {
   assert.equal(form.system.logLevel, 'info');
   assert.equal(form.library.autoStartDownloadsAfterSelection, true);
   assert.equal(form.slskd.baseUrl, 'http://slskd:5030');
+  assert.equal(form.slskd.providerMode, 'external');
   assert.equal(form.artwork.derivativeFormat, 'webp');
   assert.equal(form.providers.playlistExpansionPolicy, 'bounded');
 });

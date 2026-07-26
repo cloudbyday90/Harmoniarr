@@ -2,6 +2,27 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getDefaultSettings, normalizeSettingsPatch } from '../../src/server/validators/settings-validator.js';
 
+test('normalizeSettingsPatch accepts explicit Soulseek provider modes', () => {
+  assert.deepEqual(normalizeSettingsPatch({
+    slskd: {
+      providerMode: 'disabled',
+    },
+  }), [{
+    namespace: 'slskd',
+    settingKey: 'providerMode',
+    value: 'disabled',
+  }]);
+});
+
+test('normalizeSettingsPatch rejects an unknown Soulseek provider mode', () => {
+  assert.throws(
+    () => normalizeSettingsPatch({ slskd: { providerMode: 'automatic' } }),
+    (error) => error?.status === 400
+      && error?.code === 'validation_error'
+      && error?.message === 'slskd.providerMode must be one of managed, external, disabled',
+  );
+});
+
 test('normalizeSettingsPatch accepts artwork worker configuration settings', () => {
   const updates = normalizeSettingsPatch({
     artwork: {

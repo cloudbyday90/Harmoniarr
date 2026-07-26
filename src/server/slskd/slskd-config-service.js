@@ -22,6 +22,7 @@ import {
   buildSlskdRuntimeConfig,
   resolveSlskdEnvironmentApiKey,
 } from '../integrations/slskd/slskd-config.js';
+import { resolveSlskdProviderMode } from '../integrations/slskd/slskd-provider-mode.js';
 import { loadSettings } from '../settings.js';
 
 const slskdApiKeySecretType = 'integration_credential';
@@ -30,6 +31,7 @@ const slskdApiKeySecretName = 'slskd.apiKey';
 function createNoopSecretMutation(patch) {
   return {
     apply: async () => {},
+    assertAllowed: () => {},
     sanitizedPatch: patch,
     updatedKeys: [],
   };
@@ -41,6 +43,11 @@ export function createSlskdConfigService({
   loadSettingsFn = loadSettings,
 } = {}) {
   async function buildSecretStatus(queryable) {
+    const settings = await loadSettingsFn(queryable);
+    const providerMode = resolveSlskdProviderMode({
+      env,
+      providerMode: settings?.slskd?.providerMode,
+    });
     const storedSecret = await encryptedSecretService.getSecretMetadata({
       name: slskdApiKeySecretName,
       queryable,
@@ -61,10 +68,14 @@ export function createSlskdConfigService({
           ? 'stored'
           : environmentSecret?.source ?? 'unset',
       apiKeyUpdatedAt: storedSecret.updatedAt ?? null,
+      managedDeploymentDetected: providerMode.managedDeploymentDetected,
+      providerMode: providerMode.mode,
+      providerModeLocked: providerMode.modeLocked,
+      providerModeState: providerMode.state,
     };
   }
 
-  function buildSecretMutation(patch) {
+  function buildSecretMutation(patch, { currentSettings = null } = {}) {
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
       return createNoopSecretMutation(patch);
     }
@@ -102,6 +113,22 @@ export function createSlskdConfigService({
       throw createApiError(400, 'validation_error', 'slskd.apiKey cannot be set and cleared in the same request');
     }
 
+    function assertAllowed(settings = currentSettings) {
+      if (!nextApiKey && !clearApiKey) return;
+
+      const providerMode = resolveSlskdProviderMode({
+        env,
+        providerMode: slskdPatch.providerMode ?? settings?.slskd?.providerMode,
+      });
+      if (providerMode.mode !== 'external') {
+        throw createApiError(
+          400,
+          'validation_error',
+          'slskd.apiKey can only be changed while the External provider mode is selected',
+        );
+      }
+    }
+
     delete sanitizedSlskdPatch.apiKey;
     delete sanitizedSlskdPatch.clearApiKey;
 
@@ -110,6 +137,7 @@ export function createSlskdConfigService({
     }
 
     return {
+      assertAllowed,
       sanitizedPatch,
       updatedKeys: clearApiKey || nextApiKey ? ['slskd.apiKey'] : [],
       apply: async (queryable) => {
@@ -137,6 +165,15 @@ export function createSlskdConfigService({
 
   async function buildRuntimeConfig(queryable) {
     const settings = await loadSettingsFn(queryable);
+    const providerMode = resolveSlskdProviderMode({
+      env,
+      providerMode: settings?.slskd?.providerMode,
+    });
+
+    if (providerMode.state !== 'ready') {
+      return buildSlskdRuntimeConfig({ env, settings });
+    }
+
     const storedApiKey = await encryptedSecretService.getSecretValue({
       name: slskdApiKeySecretName,
       queryable,

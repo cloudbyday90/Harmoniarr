@@ -174,6 +174,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   the primary flow, and moves specialist timing, provider, quality, retention,
   naming, security, and artwork controls behind accessible named disclosures.
   See `SETTINGS_PROGRESSIVE_DISCLOSURE_DESIGN.md`.
+- Soulseek provider-mode onboarding: Settings > Connections now makes Managed,
+  External, and Disabled explicit. Managed deployments remain Compose-owned,
+  external Unraid/VPN setups retain their URL and encrypted write-only key, and
+  Disabled blocks provider clients and Downloader polling while preserving
+  external credentials. See `SLSKD_PROVIDER_MODE_ONBOARDING_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

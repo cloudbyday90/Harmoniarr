@@ -53,6 +53,10 @@ export function useConnections({
   const settingsForm = useSettingsFormFn({
     extraApply: (payload) => {
       secretStatus.value = payload.secretStatus ?? null;
+      const slskdStatus = secretStatus.value?.slskd;
+      if (slskdStatus?.providerModeLocked && settingsForm.form.slskd.providerMode !== 'disabled') {
+        settingsForm.form.slskd.providerMode = slskdStatus.providerMode;
+      }
     },
     onSaveSuccess,
   });

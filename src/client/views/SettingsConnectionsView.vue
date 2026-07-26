@@ -17,14 +17,14 @@
 -->
 
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import {
   buildSlskdConnectionSubtitle,
   formatDependencyProviderLabel,
   formatDependencyStatusLabel,
   formatOAuthStatusLabel,
   formatProviderSecretStatusLabel,
-  formatSlskdApiKeyStatusLabel,
+  formatSlskdProviderModeLabel,
   getDependencyStatusClass,
 } from '../lib/settings-connections-presentation.js';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
@@ -64,7 +64,17 @@ const {
   },
 });
 
+const isManagedDeployment = computed(() => secretStatus.value?.slskd?.managedDeploymentDetected === true);
+const isSoulseekDisabled = computed(() => form.slskd.providerMode === 'disabled');
+const isExternalSoulseek = computed(() => form.slskd.providerMode === 'external');
+const isManagedSoulseek = computed(() => form.slskd.providerMode === 'managed');
+
 async function testProviderConnection() {
+  if (isSoulseekDisabled.value) {
+    toast.info('Soulseek downloads are turned off. Choose Managed or External to test a connection.');
+    return;
+  }
+
   await loadDependencyHealth();
 
   if (providerHealthError.value) {
@@ -126,19 +136,46 @@ onMounted(() => {
               <h3 class="hx-card-title">Soulseek connection</h3>
               <p class="hx-card-subtitle">{{ buildSlskdConnectionSubtitle() }}</p>
             </div>
-            <span class="review-status-pill" :class="secretStatus?.slskd?.apiKeyConfigured ? 'review-status-selected' : 'review-status-held'">
-              {{ formatSlskdApiKeyStatusLabel(secretStatus?.slskd) }}
+            <span class="review-status-pill" :class="isSoulseekDisabled ? 'review-status-held' : 'review-status-selected'">
+              {{ formatSlskdProviderModeLabel(secretStatus?.slskd ?? { providerMode: form.slskd.providerMode }) }}
             </span>
           </header>
           <div class="hx-card-body">
             <div class="cfg-group" style="padding-top: 0; border-top: none">
+              <fieldset class="settings-connections__provider-modes">
+                <legend class="hx-field-label">Soulseek provider mode</legend>
+                <label class="settings-connections__provider-mode" :class="{ 'is-selected': isManagedSoulseek }">
+                  <input v-model="form.slskd.providerMode" type="radio" value="managed" />
+                  <span>
+                    <strong>Managed</strong>
+                    <small>Use Harmoniarr's Docker sidecar and deployment-provided secrets.</small>
+                  </span>
+                </label>
+                <label class="settings-connections__provider-mode" :class="{ 'is-selected': isExternalSoulseek }">
+                  <input v-model="form.slskd.providerMode" type="radio" value="external" :disabled="isManagedDeployment" />
+                  <span>
+                    <strong>External</strong>
+                    <small>Connect to an slskd service you run separately, including an Unraid or VPN setup.</small>
+                  </span>
+                </label>
+                <label class="settings-connections__provider-mode" :class="{ 'is-selected': isSoulseekDisabled }">
+                  <input v-model="form.slskd.providerMode" type="radio" value="disabled" />
+                  <span>
+                    <strong>Disabled</strong>
+                    <small>Do not search or download through Soulseek. Existing external credentials remain saved.</small>
+                  </span>
+                </label>
+              </fieldset>
+              <p v-if="isManagedDeployment" class="cfg-field-hint">This deployment supplies the managed provider address and API key. Select Disabled to pause Soulseek without changing deployment secrets.</p>
+            </div>
+            <div v-if="isExternalSoulseek" class="cfg-group">
               <div class="hx-field">
                 <label class="hx-field-label">Service address</label>
                 <input class="hx-input" v-model="form.slskd.baseUrl" placeholder="http://slskd:5030" />
               </div>
-              <p class="cfg-field-hint">The address the download service is running on. The default (<code>http://slskd:5030</code>) works with the standard Docker Compose setup.</p>
+              <p class="cfg-field-hint">The address of the separately managed download service. Use an address reachable from Harmoniarr.</p>
             </div>
-            <div class="cfg-group">
+            <div v-if="isExternalSoulseek" class="cfg-group">
               <p class="cfg-group-title">API key</p>
               <div class="hx-field">
                 <label class="hx-field-label">API key</label>
@@ -150,6 +187,14 @@ onMounted(() => {
                 <span>Remove the stored API key on save</span>
               </label>
             </div>
+            <div v-else-if="isManagedSoulseek" class="cfg-group">
+              <p class="cfg-group-title">Managed by deployment</p>
+              <p class="cfg-field-hint">Harmoniarr reads the API key from the managed Docker secret file. Change managed credentials in the deployment, not in Settings.</p>
+            </div>
+            <div v-else class="cfg-group">
+              <p class="cfg-group-title">Downloads are off</p>
+              <p class="cfg-field-hint">Harmoniarr will not contact Soulseek, queue downloads, or poll the download service until you select Managed or External.</p>
+            </div>
           </div>
         </article>
 
@@ -160,8 +205,8 @@ onMounted(() => {
               <h3 class="hx-card-title">Provider health</h3>
               <p class="hx-card-subtitle">Operational status of connected services, updated from the server heartbeat.</p>
             </div>
-            <button type="button" class="hx-btn" @click="testProviderConnection" :disabled="isTestingProviderHealth">
-              {{ isTestingProviderHealth ? 'Testing Soulseek…' : 'Test Soulseek' }}
+            <button type="button" class="hx-btn" @click="testProviderConnection" :disabled="isTestingProviderHealth || isSoulseekDisabled">
+              {{ isSoulseekDisabled ? 'Soulseek is off' : isTestingProviderHealth ? 'Testing Soulseek…' : 'Test Soulseek' }}
             </button>
           </header>
           <div class="hx-card-body">
@@ -409,6 +454,46 @@ onMounted(() => {
   display: grid;
   gap: var(--hx-space-4);
   margin-top: var(--hx-space-4);
+}
+
+.settings-connections__provider-modes {
+  border: 0;
+  display: grid;
+  gap: var(--hx-space-2);
+  margin: 0;
+  padding: 0;
+}
+
+.settings-connections__provider-mode {
+  align-items: flex-start;
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-sm);
+  cursor: pointer;
+  display: grid;
+  gap: var(--hx-space-2);
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: var(--hx-space-3);
+}
+
+.settings-connections__provider-mode:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.settings-connections__provider-mode.is-selected {
+  background: var(--hx-accent-soft);
+  border-color: var(--hx-accent);
+}
+
+.settings-connections__provider-mode strong,
+.settings-connections__provider-mode small {
+  display: block;
+}
+
+.settings-connections__provider-mode small {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  margin-top: var(--hx-space-1);
 }
 
 .cfg-health-list {

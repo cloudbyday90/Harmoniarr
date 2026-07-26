@@ -9,6 +9,7 @@ function createBaseSettings() {
   return {
     slskd: {
       baseUrl: 'http://slskd.internal:5030',
+      providerMode: 'external',
       requestTimeoutMs: 15000,
     },
   };
@@ -28,6 +29,10 @@ test('createSlskdConfigService reports stored secrets ahead of environment fallb
     apiKeyConfigured: true,
     apiKeySource: 'stored',
     apiKeyUpdatedAt: '2026-05-01T12:00:00.000Z',
+    managedDeploymentDetected: false,
+    providerMode: 'external',
+    providerModeLocked: false,
+    providerModeState: 'ready',
   });
 });
 
@@ -44,6 +49,14 @@ test('createSlskdConfigService builds runtime config from stored secrets and per
   assert.deepEqual(await service.buildRuntimeConfig(), {
     apiKey: 'stored-api-key',
     baseUrl: 'http://slskd.internal:5030',
+    enabled: true,
+    providerMode: {
+      managedDeploymentDetected: false,
+      mode: 'external',
+      modeLocked: false,
+      requestedMode: 'external',
+      state: 'ready',
+    },
     requestTimeoutMs: 15000,
   });
 });
@@ -104,6 +117,27 @@ test('createSlskdConfigService clears stored secrets when requested explicitly',
   assert.equal(encryptedSecretService.setSecretValue.mock.callCount(), 0);
 });
 
+test('createSlskdConfigService only permits API-key mutations in External mode', () => {
+  const service = createSlskdConfigService({
+    encryptedSecretService: {},
+    loadSettingsFn: async () => createBaseSettings(),
+  });
+
+  for (const providerMode of ['disabled', 'managed']) {
+    assert.throws(
+      () => service.buildSecretMutation({
+        slskd: {
+          apiKey: 'new-api-key',
+          providerMode,
+        },
+      }).assertAllowed({ slskd: { providerMode } }),
+      (error) => error?.status === 400
+        && error?.code === 'validation_error'
+        && error?.message === 'slskd.apiKey can only be changed while the External provider mode is selected',
+    );
+  }
+});
+
 test('createSlskdConfigService gives a managed secret file precedence over a previously stored key', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'harmoniarr-slskd-secret-'));
   const apiKeyPath = join(directory, 'slskd_api_key');
@@ -126,6 +160,37 @@ test('createSlskdConfigService gives a managed secret file precedence over a pre
     apiKeyConfigured: true,
     apiKeySource: 'managed_file',
     apiKeyUpdatedAt: '2026-06-01T12:00:00.000Z',
+    managedDeploymentDetected: true,
+    providerMode: 'managed',
+    providerModeLocked: true,
+    providerModeState: 'ready',
   });
   assert.equal((await service.buildRuntimeConfig()).apiKey, 'managed-api-key');
+});
+
+test('createSlskdConfigService disables runtime provider access without reading a stored API key', async (t) => {
+  const encryptedSecretService = {
+    getSecretMetadata: async () => ({ configured: true, updatedAt: null }),
+    getSecretValue: t.mock.fn(async () => 'stored-api-key'),
+  };
+  const service = createSlskdConfigService({
+    encryptedSecretService,
+    loadSettingsFn: async () => ({ slskd: { providerMode: 'disabled' } }),
+  });
+
+  assert.deepEqual(await service.buildRuntimeConfig(), {
+    enabled: false,
+    providerMode: {
+      managedDeploymentDetected: false,
+      mode: 'disabled',
+      modeLocked: false,
+      requestedMode: 'disabled',
+      state: 'disabled',
+    },
+    providerModeError: {
+      code: 'slskd_disabled',
+      message: 'Soulseek downloads are turned off in Settings.',
+    },
+  });
+  assert.equal(encryptedSecretService.getSecretValue.mock.callCount(), 0);
 });

@@ -62,10 +62,10 @@ test('Settings setup makes a disabled Soulseek provider actionable', () => {
     dependencies: [{ provider: 'slskd', status: 'disabled' }],
   });
 
-  assert.equal(soulseek.label, 'Set up Soulseek');
+  assert.equal(soulseek.label, 'Choose provider mode');
   assert.equal(soulseek.routeName, 'settings-connections');
-  assert.equal(soulseek.status, 'Not connected');
-  assert.equal(soulseek.tone, 'warning');
+  assert.equal(soulseek.status, 'Optional');
+  assert.equal(soulseek.tone, 'info');
 });
 
 test('Settings workspace keeps common setup in primary navigation and reveals specialist routes explicitly', async () => {

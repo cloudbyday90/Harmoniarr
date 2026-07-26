@@ -77,6 +77,12 @@ suite('Settings progressive disclosure browser verification', () => {
 
       await page.goto(`${baseUrl}/app/settings/connections`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: 'Test Soulseek' }).waitFor();
+      await page.getByRole('group', { name: 'Soulseek provider mode' }).waitFor();
+      assert.equal(await page.getByRole('radio', { name: /Managed/ }).count(), 1);
+      assert.equal(await page.getByRole('radio', { name: /External/ }).count(), 1);
+      await page.getByRole('radio', { name: /Disabled/ }).check();
+      assert.equal(await page.getByLabel('Service address').count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Soulseek is off' }).isDisabled(), true);
       const optionalSources = page.getByRole('button', { name: 'Set up optional services' });
       await optionalSources.click();
       await page.getByRole('heading', { name: 'Spotify' }).waitFor();

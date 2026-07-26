@@ -139,6 +139,24 @@ function resolveBinaryName(value, fallback) {
 
 async function getSlskdDependencyStatus({ slskdConfigService, slskdService }) {
   const providerStatus = await slskdConfigService.buildSecretStatus();
+  if (providerStatus.providerMode === 'disabled') {
+    return {
+      provider: 'slskd',
+      status: 'disabled',
+      code: 'slskd_disabled',
+      message: 'Soulseek downloads are turned off in Settings.',
+    };
+  }
+
+  if (providerStatus.providerModeState === 'managed_deployment_missing') {
+    return {
+      provider: 'slskd',
+      status: 'misconfigured',
+      code: 'slskd_managed_deployment_missing',
+      message: 'Managed Soulseek requires the Harmoniarr managed Docker overlay.',
+    };
+  }
+
   if (providerStatus.apiKeyConfigured !== true) {
     return {
       provider: 'slskd',

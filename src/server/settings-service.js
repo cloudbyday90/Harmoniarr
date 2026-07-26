@@ -78,9 +78,12 @@ export function createSettingsService({
 
   async function updateSettings({ patch, actorUserId, requestMetadata }) {
     const providerSecretMutation = providerCredentialsService.buildSecretMutation(patch);
-    const slskdSecretMutation = slskdConfigService.buildSecretMutation(providerSecretMutation.sanitizedPatch ?? patch);
+    const slskdSecretMutation = slskdConfigService.buildSecretMutation(
+      providerSecretMutation.sanitizedPatch ?? patch,
+    );
     const updates = normalizeSettingsPatch(slskdSecretMutation.sanitizedPatch ?? providerSecretMutation.sanitizedPatch ?? patch);
     const currentSettings = await loadSettingsFn();
+    slskdSecretMutation.assertAllowed?.(currentSettings);
     const nextSettings = applySettingsUpdates(currentSettings, updates);
 
     validateDownloadMappingsFn({

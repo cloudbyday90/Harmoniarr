@@ -116,6 +116,7 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
       apiKey: '   ',
       baseUrl: 'http://slskd.internal:5030',
       clearApiKey: false,
+      providerMode: 'external',
       requestTimeoutMs: 15000,
     },
   });
@@ -199,6 +200,7 @@ test('buildSettingsUpdatePayload preserves the existing slskd api key when the f
     },
     slskd: {
       baseUrl: 'http://slskd.internal:5030',
+      providerMode: 'external',
       requestTimeoutMs: 15000,
     },
   });
@@ -274,6 +276,43 @@ test('normalizeUserMusicRoots keeps only string mapping values', () => {
     relativeRoot: '',
     userId: 'user-1',
   }]);
+});
+
+test('buildSettingsUpdatePayload keeps external connection details out of disabled and managed mode updates', () => {
+  const baseForm = {
+    artwork: createArtworkForm(),
+    library: createLibraryForm(),
+    security: {
+      csrfProtectionMode: 'disabled',
+      enforceHttps: false,
+      secureCookies: false,
+      strictTransportSecurity: false,
+    },
+    system: { baseUrl: '', logLevel: 'info' },
+    paths: {
+      downloadMappings: [],
+      downloads: '/data/downloads',
+      music: '/data/music',
+      staging: '/data/staging',
+      transcodeTemp: '/data/transcode-temp',
+      userMusicRoots: [],
+    },
+  };
+
+  for (const providerMode of ['disabled', 'managed']) {
+    const payload = buildSettingsUpdatePayload({
+      ...baseForm,
+      slskd: {
+        apiKey: 'do-not-send',
+        baseUrl: 'http://external-slskd:5030',
+        clearApiKey: true,
+        providerMode,
+        requestTimeoutMs: 15000,
+      },
+    });
+
+    assert.deepEqual(payload.slskd, { providerMode });
+  }
 });
 
 test('buildSettingsUpdatePayload includes provider intake settings and secret mutations when present', () => {

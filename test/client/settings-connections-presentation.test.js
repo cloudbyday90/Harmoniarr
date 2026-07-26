@@ -25,6 +25,7 @@ import {
   formatOAuthStatusLabel,
   formatProviderSecretStatusLabel,
   formatSlskdApiKeyStatusLabel,
+  formatSlskdProviderModeLabel,
   getDependencyStatusClass,
 } from '../../src/client/lib/settings-connections-presentation.js';
 
@@ -104,6 +105,18 @@ describe('formatSlskdApiKeyStatusLabel', () => {
     for (const label of labels) {
       assert.ok(!label.toLowerCase().includes('slskd'), `slskd exposed in: ${label}`);
     }
+  });
+});
+
+describe('formatSlskdProviderModeLabel', () => {
+  it('labels each supported provider mode for a home user', () => {
+    assert.equal(formatSlskdProviderModeLabel({ providerMode: 'managed' }), 'Managed');
+    assert.equal(formatSlskdProviderModeLabel({ providerMode: 'external' }), 'External');
+    assert.equal(formatSlskdProviderModeLabel({ providerMode: 'disabled' }), 'Downloads off');
+  });
+
+  it('uses External when no saved mode is available', () => {
+    assert.equal(formatSlskdProviderModeLabel(null), 'External');
   });
 });
 

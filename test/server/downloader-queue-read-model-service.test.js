@@ -64,6 +64,7 @@ test('buildDownloaderQueueReadModelFromDownloads normalizes transfers, counts, p
     status: 'enabled',
     apiKeySource: null,
     apiKeyUpdatedAt: null,
+    mode: 'external',
   });
   assert.equal(result.observedAt, observedAt);
   assert.equal(result.includeRemoved, true);
@@ -236,6 +237,7 @@ test('buildDisabledDownloaderQueueReadModel reports static setup state', () => {
     status: 'disabled',
     apiKeySource: 'unset',
     apiKeyUpdatedAt: null,
+    mode: 'external',
   });
   assert.equal(result.queueHealth.status, 'disabled');
   assert.equal(result.queueHealth.message, 'Downloads are disabled until Soulseek (slskd) is configured.');
@@ -282,8 +284,31 @@ test('createDownloaderQueueReadModelService delegates to getDownloads and normal
     status: 'enabled',
     apiKeySource: 'stored',
     apiKeyUpdatedAt: '2026-06-01T12:00:00.000Z',
+    mode: 'external',
   });
   assert.equal(result.transfers.length, 3);
+});
+
+test('createDownloaderQueueReadModelService does not poll when Soulseek is disabled in Settings', async (t) => {
+  const getDownloads = t.mock.fn(async () => {
+    throw new Error('slskd should not be called');
+  });
+  const service = createDownloaderQueueReadModelService({
+    getDownloads,
+    getDownloaderProviderStatus: async () => ({
+      apiKeyConfigured: true,
+      apiKeySource: 'stored',
+      providerMode: 'disabled',
+    }),
+    now: () => observedAt,
+  });
+
+  const result = await service.buildDownloaderQueue();
+
+  assert.equal(getDownloads.mock.callCount(), 0);
+  assert.equal(result.providerState.reason, 'disabled_by_setting');
+  assert.equal(result.providerState.message, 'Soulseek downloads are turned off in Settings.');
+  assert.equal(result.queueHealth.message, 'Soulseek downloads are turned off in Settings.');
 });
 
 test('createDownloaderQueueReadModelService enriches downloads with import-candidate linkage', async (t) => {
