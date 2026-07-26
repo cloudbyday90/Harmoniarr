@@ -1153,8 +1153,9 @@ failure and repair paths, in browser and local Docker walkthrough conditions.
   analysis stops before library add.
 - [ ] Browser proof: failed match is blocked, next acceptable match starts, and
   Activity records the fallback in plain language.
-- [ ] Browser proof: downloaded strict-quality failure blocks the bad match,
-  promotes the next quality-eligible match, and keeps Music Queue moving.
+- [x] Browser proof: downloaded strict-quality failure blocks the bad match,
+  promotes the next quality-eligible match, and keeps Music Queue moving. See
+  `MUSIC_QUEUE_STRICT_QUALITY_RECOVERY_BROWSER_VERIFICATION_DESIGN.md`.
 - [x] Browser proof: completed download moves through `Ready to add`,
   `Adding to library`, and `In library` without a diagnostic handoff; the
   completion, download, and verified-audio events are one compact release
@@ -1329,17 +1330,30 @@ Completed release-progress browser acceptance slice:
 - The design, sources, security boundary, and validation contract are recorded
   in [MUSIC_QUEUE_RELEASE_PROGRESS_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_RELEASE_PROGRESS_BROWSER_ACCEPTANCE_DESIGN.md).
 
+Completed strict-quality recovery browser acceptance slice:
+
+- A focused server contract now proves a strict-quality failure creates no
+  follow-up execution run when no quality-eligible successor remains, keeping
+  the release at a clear safe stop.
+- A Docker-backed browser contract now proves the normal release view moves
+  from `Trying another match` to `Downloading` after recovery, without manual
+  candidate selection or diagnostic navigation.
+- The same contract proves the exhausted branch remains `Quality choice needed`
+  with only `Review quality choice`, no Downloader handoff, and release-scoped
+  Activity links back to Music Queue.
+- The design, sources, security boundary, and validation contract are recorded
+  in [MUSIC_QUEUE_STRICT_QUALITY_RECOVERY_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_STRICT_QUALITY_RECOVERY_BROWSER_VERIFICATION_DESIGN.md).
+
 Recommended next slice:
 
-1. add the browser proof for strict-quality recovery: a failed downloaded match
-   is blocked, the next quality-eligible match is promoted, and Music Queue
-   visibly returns to `Searching` or `Downloading` without manual candidate
-   work;
-2. preserve a clear terminal `Quality choice needed` state when no safe
-   successor exists;
-3. assert the resulting Activity story is release-scoped and uses a Music
+1. add the Activity-history browser proof that initial and direct-route loads
+   populate the timeline without manual refresh;
+2. verify Activity filters retain release context and each event hands off to
+   Music Queue, Downloader, Library, or Settings rather than a workbench;
+3. keep the history concise by asserting release stories use a Music
    Queue handoff rather than raw match diagnostics.
 
-Reason: the normal release journey and real file/worker boundary are now proven.
-The remaining high-value risk is whether automatic quality recovery visibly
-continues with the next safe match while retaining a clear terminal stop.
+Reason: the normal release journey, strict-quality recovery, and real
+file/worker boundary are now proven. The remaining high-value risk is whether
+Activity history reliably populates on first and direct-route loads while
+preserving clear release-level handoffs.

@@ -252,6 +252,69 @@ test('import candidate recovery fails quality-blocked downloads and promotes the
   assert.equal(result.recoveryRunId, 'quality-recovery-run-1');
 });
 
+test('import candidate quality recovery keeps the release stopped when no quality-eligible successor remains', async (t) => {
+  const markImportCandidateQualityFailed = t.mock.fn(async ({ importCandidateId }) => ({
+    candidate: {
+      id: importCandidateId,
+      downloadAttemptCount: 0,
+      normalizedPayload: {
+        musicQueue: { profileCode: 'lossless_archive' },
+        requestOwnership: { metadataReleaseId: 'release-1' },
+      },
+      sourceSearchId: 'search-1',
+    },
+  }));
+  const incrementImportCandidateDownloadAttemptCountFn = t.mock.fn(async () => ({
+    id: 'failed-candidate',
+    downloadAttemptCount: 1,
+    normalizedPayload: {
+      musicQueue: { profileCode: 'lossless_archive' },
+      requestOwnership: { metadataReleaseId: 'release-1' },
+    },
+    sourceSearchId: 'search-1',
+  }));
+  const createRecoveryExecutionRun = t.mock.fn(async () => ({ id: 'unexpected-recovery-run' }));
+  const service = createImportCandidateRecoveryService({
+    createRecoveryExecutionRun,
+    findNextCandidateForRecoveryFn: async () => null,
+    getImportCandidate: async () => ({
+      id: 'failed-candidate',
+      normalizedPayload: {
+        musicQueue: { profileCode: 'lossless_archive' },
+        requestOwnership: { metadataReleaseId: 'release-1' },
+      },
+      sourceSearchId: 'search-1',
+    }),
+    incrementImportCandidateDownloadAttemptCountFn,
+    markImportCandidateQualityFailed,
+  });
+
+  const result = await service.handleImportCandidateQualityFailure({
+    failedCandidateId: 'failed-candidate',
+    failureReason: 'Downloaded audio did not pass verified lossless checks.',
+    operationRunId: 'apply-run-1',
+  });
+
+  assert.deepEqual(markImportCandidateQualityFailed.mock.calls[0].arguments[0], {
+    importCandidateId: 'failed-candidate',
+    qualityLabel: 'quality_blocked',
+    qualityWeight: 0,
+    reason: 'Downloaded audio did not pass verified lossless checks.',
+  });
+  assert.equal(createRecoveryExecutionRun.mock.callCount(), 0);
+  assert.deepEqual(result, {
+    attemptedCandidateId: null,
+    failedAttemptCount: 1,
+    failedCandidateId: 'failed-candidate',
+    metadataReleaseId: 'release-1',
+    nextCandidateId: null,
+    reason: 'no_recovery_candidate_available',
+    recovered: false,
+    recoveryRunId: null,
+    sourceSearchId: 'search-1',
+  });
+});
+
 test('import candidate recovery reports exhaustion when no scoped candidate remains', async (t) => {
   const createRecoveryExecutionRun = t.mock.fn(async () => ({
     id: 'unexpected-run',

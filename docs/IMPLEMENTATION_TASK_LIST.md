@@ -166,6 +166,14 @@ Database model source: `docs/DATABASE_MODEL.md`
   deliberately expanded. Shared configured-provider browser fixtures remove
   duplicate health-route mocks from the focused Music Queue suites. See
   `MUSIC_QUEUE_RELEASE_PROGRESS_BROWSER_ACCEPTANCE_DESIGN.md`.
+- Music Queue strict-quality recovery browser verification: a server recovery
+  contract now proves an exhausted strict-quality failure creates no follow-up
+  execution run, while a Docker-backed browser contract proves a failed match
+  continues through `Trying another match` to `Downloading` when a safe next
+  match exists. The exhausted branch remains `Quality choice needed` with a
+  single review action, no Downloader handoff, and a release-scoped Activity
+  link instead of raw candidate diagnostics. See
+  `MUSIC_QUEUE_STRICT_QUALITY_RECOVERY_BROWSER_VERIFICATION_DESIGN.md`.
 - Music Queue Activity repair handoffs: Activity now records release-scoped
   match selection, accepted transfer, audio inspection, download completion,
   library-add, and request-fulfillment milestones. Rows use one clear Music
