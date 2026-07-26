@@ -17,6 +17,7 @@
 -->
 <script setup>
 import { computed, onMounted } from 'vue';
+import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
 
 const SCORING_WEIGHT_DEFAULTS = {
@@ -141,19 +142,19 @@ onMounted(() => { void loadSettings(); });
               <input type="checkbox" v-model="form.library.autoStartDownloadsAfterSelection" />
               <span>Automatically start download runs for high-confidence selections</span>
             </label>
-            <p class="cfg-field-hint">When discovery finds one unambiguous high-confidence candidate, Harmoniarr selects it and starts the existing Import Review download run. Ambiguous or low-confidence candidates still require review.</p>
+            <p class="cfg-field-hint">When discovery finds one unambiguous high-confidence match, Harmoniarr selects it and starts the download. Ambiguous or low-confidence matches still need review.</p>
           </div>
         </div>
       </article>
 
-      <article class="hx-card">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Acquisition policy</h3>
-            <p class="hx-card-subtitle">Control how Harmoniarr handles source users with poor delivery records. When enabled, peers flagged by the reputation heuristic are added to the ignore list automatically.</p>
-          </div>
-        </header>
-        <div class="hx-card-body">
+      <div class="settings-library__advanced-stack">
+        <SettingsDisclosure
+          panel-id="settings-library-source-safety"
+          title="Source safety"
+          subtitle="Control how Harmoniarr responds to repeatedly unreliable music sources."
+          show-label="Show source safety"
+          hide-label="Hide source safety"
+        >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <label class="cfg-check">
               <input type="checkbox" v-model="form.acquisition.autoIgnoreEnabled" />
@@ -166,17 +167,15 @@ onMounted(() => { void loadSettings(); });
               <p class="cfg-field-hint">Minimum hours between auto-ignore evaluations for the same peer. A longer cooldown reduces noise but delays ignoring problematic peers. Default is 24 hours. Range: 0–8760 (1 year).</p>
             </div>
           </div>
-        </div>
-      </article>
+        </SettingsDisclosure>
 
-      <article class="hx-card">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Retention</h3>
-            <p class="hx-card-subtitle">Control how long Harmoniarr retains historical operation data. Reducing these values will permanently delete older records on the next cleanup cycle.</p>
-          </div>
-        </header>
-        <div class="hx-card-body">
+        <SettingsDisclosure
+          panel-id="settings-library-retention"
+          title="History retention"
+          subtitle="Changing these limits can permanently remove older history on the next cleanup cycle."
+          show-label="Show history retention"
+          hide-label="Hide history retention"
+        >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <p class="cfg-group-title">Operation runs</p>
             <div class="hx-form-row">
@@ -200,23 +199,21 @@ onMounted(() => { void loadSettings(); });
               <p class="cfg-field-hint">Delivery outcome events older than this are eligible for cleanup. Default is 180 days. Range: 30–3650.</p>
             </div>
           </div>
-        </div>
-      </article>
+        </SettingsDisclosure>
 
-      <article class="hx-card">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Download scoring weights <span class="hx-pill" data-tone="info" style="font-size: var(--hx-text-xs); vertical-align: middle; margin-left: 6px">advanced</span></h3>
-            <p class="hx-card-subtitle">Control how much each quality factor contributes to a candidate's overall score. Weights determine which downloads Harmoniarr prioritizes.</p>
-          </div>
-        </header>
-        <div class="hx-card-body">
+        <SettingsDisclosure
+          panel-id="settings-library-match-ranking"
+          title="How matches are ranked"
+          subtitle="Tune weighting only when you need to change how Harmoniarr chooses between otherwise acceptable matches."
+          show-label="Show match ranking"
+          hide-label="Hide match ranking"
+        >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <p class="cfg-group-title">Format and match quality</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Format tier</label>
-                <input class="hx-input" v-model.number="form.scoring.weightFormatTier" type="number" min="0.01" max="1" step="0.01" />
+                <label class="hx-field-label" for="settings-library-weight-format-tier">Format tier</label>
+                <input id="settings-library-weight-format-tier" class="hx-input" v-model.number="form.scoring.weightFormatTier" type="number" min="0.01" max="1" step="0.01" />
                 <p class="cfg-field-hint">How much the file format (FLAC vs MP3) matters. Default is 0.25.</p>
               </div>
               <div class="hx-field">
@@ -285,17 +282,15 @@ onMounted(() => { void loadSettings(); });
               </div>
             </div>
           </div>
-        </div>
-      </article>
+        </SettingsDisclosure>
 
-      <article class="hx-card">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Fidelity thresholds <span class="hx-pill" data-tone="info" style="font-size: var(--hx-text-xs); vertical-align: middle; margin-left: 6px">advanced</span></h3>
-            <p class="hx-card-subtitle">Control how Harmoniarr evaluates audio quality and source reliability. Spectral analysis detects transcoded or degraded files. Source trust tracks peer reputation over time.</p>
-          </div>
-        </header>
-        <div class="hx-card-body">
+        <SettingsDisclosure
+          panel-id="settings-library-audio-verification"
+          title="Audio verification thresholds"
+          subtitle="Tune spectral and source-trust thresholds only when you need stricter or looser quality checks."
+          show-label="Show audio verification thresholds"
+          hide-label="Hide audio verification thresholds"
+        >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <p class="cfg-group-title">Spectral analysis</p>
             <p class="hx-text-muted">Frequency cutoffs determine how spectral fingerprints classify audio quality. Higher cutoffs are stricter — fewer files pass as authentic. The minimum sample rate filters out low-resolution sources entirely.</p>
@@ -368,17 +363,15 @@ onMounted(() => { void loadSettings(); });
               </div>
             </div>
           </div>
-        </div>
-      </article>
+        </SettingsDisclosure>
 
-      <article class="hx-card">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Naming templates <span class="hx-pill" data-tone="info" style="font-size: var(--hx-text-xs); vertical-align: middle; margin-left: 6px">advanced</span></h3>
-            <p class="hx-card-subtitle">Customize how Harmoniarr names artist folders, album folders, and track files when organizing your library. Changing these after files have been organized will trigger renames on the next organize cycle.</p>
-          </div>
-        </header>
-        <div class="hx-card-body">
+        <SettingsDisclosure
+          panel-id="settings-library-naming"
+          title="File naming"
+          subtitle="Change these only when you want future organize runs to use a different folder or track-file format."
+          show-label="Show file naming"
+          hide-label="Hide file naming"
+        >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <p class="cfg-group-title">Folder naming</p>
             <p class="hx-text-muted">Templates for artist and album folder names. These produce a single path segment each — path separators are not allowed.</p>
@@ -427,8 +420,8 @@ onMounted(() => { void loadSettings(); });
               </div>
             </div>
           </div>
-        </div>
-      </article>
+        </SettingsDisclosure>
+      </div>
 
       <div class="cfg-save-bar">
         <span class="cfg-save-msg is-error" v-if="errorMessage">{{ errorMessage }}</span>
@@ -440,3 +433,11 @@ onMounted(() => { void loadSettings(); });
     </form>
   </div>
 </template>
+
+<style scoped>
+.settings-library__advanced-stack {
+  display: grid;
+  gap: var(--hx-space-4);
+  margin-top: var(--hx-space-4);
+}
+</style>

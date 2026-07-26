@@ -27,6 +27,7 @@ import {
   formatSlskdApiKeyStatusLabel,
   getDependencyStatusClass,
 } from '../lib/settings-connections-presentation.js';
+import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import { useConnections } from '../composables/useConnections.js';
 import { useDependencyHealth } from '../composables/useDependencyHealth.js';
 import { useToast } from '../composables/useToast.js';
@@ -136,11 +137,6 @@ onMounted(() => {
                 <input class="hx-input" v-model="form.slskd.baseUrl" placeholder="http://slskd:5030" />
               </div>
               <p class="cfg-field-hint">The address the download service is running on. The default (<code>http://slskd:5030</code>) works with the standard Docker Compose setup.</p>
-              <div class="hx-field" style="margin-top: var(--hx-space-3)">
-                <label class="hx-field-label">Request timeout (seconds)</label>
-                <input class="hx-input" v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />
-              </div>
-              <p class="cfg-field-hint">Leave at the default (10,000 ms) unless you're getting frequent timeout errors.</p>
             </div>
             <div class="cfg-group">
               <p class="cfg-group-title">API key</p>
@@ -165,7 +161,7 @@ onMounted(() => {
               <p class="hx-card-subtitle">Operational status of connected services, updated from the server heartbeat.</p>
             </div>
             <button type="button" class="hx-btn" @click="testProviderConnection" :disabled="isTestingProviderHealth">
-              {{ isTestingProviderHealth ? 'Testing…' : 'Test connection' }}
+              {{ isTestingProviderHealth ? 'Testing Soulseek…' : 'Test Soulseek' }}
             </button>
           </header>
           <div class="hx-card-body">
@@ -183,45 +179,49 @@ onMounted(() => {
           </div>
         </article>
 
-        <!-- How playlist requests work -->
-        <article class="hx-card">
-          <header class="hx-card-header">
-            <div>
-              <h3 class="hx-card-title">How playlist requests work</h3>
-              <p class="hx-card-subtitle">Controls how Harmoniarr turns a playlist link into music search work.</p>
-            </div>
-          </header>
-          <div class="hx-card-body">
-            <div class="cfg-group" style="padding-top: 0; border-top: none">
-              <div class="hx-field">
-                <label class="hx-field-label">Playlist discovery mode</label>
-                <select class="hx-select" v-model="form.providers.playlistExpansionPolicy">
-                  <option value="bounded">Bounded — only albums in the playlist</option>
-                  <option value="artist_discovery">Artist discovery — include other albums by those artists</option>
-                </select>
-              </div>
-              <p class="cfg-field-hint"><strong>Bounded</strong> searches only for the albums listed in the playlist. <strong>Artist discovery</strong> also searches for other albums by those same artists — useful for building out a collection, but creates more download work.</p>
-            </div>
-            <div class="cfg-group">
-              <div class="hx-field">
-                <label class="hx-field-label">Provider request timeout (ms)</label>
-                <input class="hx-input" v-model.number="form.providers.requestTimeoutMs" type="number" min="1000" max="60000" step="1000" />
-              </div>
-              <p class="cfg-field-hint">How long to wait for playlist data from Spotify, YouTube, or Apple Music. Leave at the default (15,000 ms).</p>
-            </div>
-          </div>
-        </article>
       </div>
 
-      <!-- Provider credentials -->
-      <article class="hx-card" style="margin-top: var(--hx-space-4)">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Streaming service connections</h3>
-            <p class="hx-card-subtitle">Connect Spotify, YouTube, or Apple Music so users can submit playlist links. Secrets are write-only — leave blank to keep the current value.</p>
+      <div class="settings-connections__advanced-stack">
+        <SettingsDisclosure
+          panel-id="settings-connection-behavior"
+          title="Connection timing and playlist behavior"
+          subtitle="Change these only when a provider requires different behavior."
+          show-label="Show connection behavior"
+          hide-label="Hide connection behavior"
+        >
+          <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <div class="hx-field">
+              <label class="hx-field-label">Soulseek request timeout (milliseconds)</label>
+              <input class="hx-input" v-model.number="form.slskd.requestTimeoutMs" type="number" min="1000" max="120000" step="1000" />
+            </div>
+            <p class="cfg-field-hint">Leave at the default (10,000 ms) unless you are troubleshooting repeated timeout errors.</p>
           </div>
-        </header>
-        <div class="hx-card-body">
+          <div class="cfg-group">
+            <div class="hx-field">
+              <label class="hx-field-label">Playlist discovery mode</label>
+              <select class="hx-select" v-model="form.providers.playlistExpansionPolicy">
+                <option value="bounded">Bounded — only albums in the playlist</option>
+                <option value="artist_discovery">Artist discovery — include other albums by those artists</option>
+              </select>
+            </div>
+            <p class="cfg-field-hint"><strong>Bounded</strong> searches only for albums in the playlist. <strong>Artist discovery</strong> adds other albums by those artists and creates more Music Queue work.</p>
+          </div>
+          <div class="cfg-group">
+            <div class="hx-field">
+              <label class="hx-field-label">Playlist provider timeout (milliseconds)</label>
+              <input class="hx-input" v-model.number="form.providers.requestTimeoutMs" type="number" min="1000" max="60000" step="1000" />
+            </div>
+            <p class="cfg-field-hint">Leave at the default (15,000 ms) unless playlist providers are timing out consistently.</p>
+          </div>
+        </SettingsDisclosure>
+
+        <SettingsDisclosure
+          panel-id="settings-optional-music-sources"
+          title="Optional music-source connections"
+          subtitle="Add playlist and artwork services only when you plan to use them. Secrets remain write-only."
+          show-label="Set up optional services"
+          hide-label="Hide optional services"
+        >
           <div class="cfg-provider-list">
 
             <!-- Spotify -->
@@ -390,8 +390,8 @@ onMounted(() => {
             </div>
 
           </div>
-        </div>
-      </article>
+        </SettingsDisclosure>
+      </div>
 
       <div class="cfg-save-bar">
         <span class="cfg-save-msg is-error" v-if="errorMessage">{{ errorMessage }}</span>
@@ -405,6 +405,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.settings-connections__advanced-stack {
+  display: grid;
+  gap: var(--hx-space-4);
+  margin-top: var(--hx-space-4);
+}
+
 .cfg-health-list {
   display: grid;
   gap: var(--hx-space-3);
@@ -425,5 +431,13 @@ onMounted(() => {
 .cfg-health-provider {
   font-weight: 600;
   min-width: 140px;
+}
+
+@media (max-width: 640px) {
+  .cfg-health-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--hx-space-1);
+  }
 }
 </style>

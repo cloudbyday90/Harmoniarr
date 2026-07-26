@@ -18,6 +18,7 @@
 
 <script setup>
 import { onMounted } from 'vue';
+import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
 
 const {
@@ -51,15 +52,14 @@ onMounted(() => { void loadSettings(); });
     </article>
 
     <form @submit.prevent="saveSettings" v-else>
-      <div class="cfg-2col">
-        <article class="hx-card">
-          <header class="hx-card-header">
-            <div>
-              <h3 class="hx-card-title">Security</h3>
-              <p class="hx-card-subtitle">Leave everything here off unless Harmoniarr is accessible over HTTPS from outside your network.</p>
-            </div>
-          </header>
-          <div class="hx-card-body">
+      <div class="settings-general__advanced-stack">
+        <SettingsDisclosure
+          panel-id="settings-security-controls"
+          title="Security and HTTPS"
+          subtitle="Leave these at their local-install defaults unless Harmoniarr is safely available over HTTPS."
+          show-label="Show security controls"
+          hide-label="Hide security controls"
+        >
             <div class="cfg-group" style="padding-top: 0; border-top: none">
               <p class="cfg-group-title">Cookie security</p>
               <label class="cfg-check">
@@ -92,17 +92,15 @@ onMounted(() => { void loadSettings(); });
               </div>
               <p class="cfg-field-hint">Prevents other websites from quietly sending requests to Harmoniarr on your behalf. Leave disabled for local use.</p>
             </div>
-          </div>
-        </article>
+        </SettingsDisclosure>
 
-        <article class="hx-card">
-          <header class="hx-card-header">
-            <div>
-              <h3 class="hx-card-title">System</h3>
-              <p class="hx-card-subtitle">Base address and log verbosity. Leave at defaults for most installs.</p>
-            </div>
-          </header>
-          <div class="hx-card-body">
+        <SettingsDisclosure
+          panel-id="settings-system-controls"
+          title="System address and logs"
+          subtitle="Most local installs can keep these defaults."
+          show-label="Show system controls"
+          hide-label="Hide system controls"
+        >
             <div class="cfg-group" style="padding-top: 0; border-top: none">
               <div class="hx-field">
                 <label class="hx-field-label">Base URL</label>
@@ -122,8 +120,7 @@ onMounted(() => { void loadSettings(); });
               </div>
               <p class="cfg-field-hint"><code>info</code> is recommended for normal use. Switch to <code>debug</code> temporarily if you need to trace a problem.</p>
             </div>
-          </div>
-        </article>
+        </SettingsDisclosure>
       </div>
 
       <div class="cfg-save-bar">
@@ -136,3 +133,10 @@ onMounted(() => { void loadSettings(); });
     </form>
   </div>
 </template>
+
+<style scoped>
+.settings-general__advanced-stack {
+  display: grid;
+  gap: var(--hx-space-4);
+}
+</style>

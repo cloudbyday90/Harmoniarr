@@ -995,6 +995,10 @@ right repair surface.
 - [x] Add compact Music Queue release progress to Home and monitored Artist
   Detail, with scoped review/setup handoffs and no duplicate workflow controls.
   See `MUSIC_QUEUE_PROGRESS_STRIP_DESIGN.md`.
+- [x] Simplify Settings with a setup-first landing page and progressive
+  disclosure so routine connections, folders, and library behavior stay clear
+  while specialist tuning remains available on request. See
+  `SETTINGS_PROGRESSIVE_DISCLOSURE_DESIGN.md`.
 - [ ] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered.

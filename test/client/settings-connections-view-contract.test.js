@@ -20,9 +20,18 @@ test('SettingsConnectionsView exposes a saved-provider connection test action', 
   assert.match(source, /import \{ useToast \} from '\.\.\/composables\/useToast\.js'/);
   assert.match(source, /const toast = useToast\(\);/);
   assert.match(source, /@click="testProviderConnection"/);
-  assert.match(source, /isTestingProviderHealth \? 'Testing…' : 'Test connection'/);
+  assert.match(source, /isTestingProviderHealth \? 'Testing Soulseek…' : 'Test Soulseek'/);
   assert.match(source, /toast\.success\(slskdStatus\.message \?\? 'Soulseek connection is healthy\.'\)/);
   assert.match(source, /toast\.error\(`Connection test failed: \$\{providerHealthError\.value\}`\)/);
+});
+
+test('SettingsConnectionsView keeps optional service setup and timing controls behind named disclosures', async () => {
+  const source = await readFile(VIEW_PATH, 'utf8');
+
+  assert.match(source, /import SettingsDisclosure from '\.\.\/components\/settings\/SettingsDisclosure\.vue'/);
+  assert.match(source, /title="Connection timing and playlist behavior"/);
+  assert.match(source, /title="Optional music-source connections"/);
+  assert.match(source, /panel-id="settings-optional-music-sources"/);
 });
 
 test('SettingsConnectionsView refreshes provider health after saved connection changes', async () => {

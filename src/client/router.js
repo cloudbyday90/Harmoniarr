@@ -57,6 +57,7 @@ const SettingsGeneralView = () => import('./views/SettingsGeneralView.vue');
 const SettingsLibraryView = () => import('./views/SettingsLibraryView.vue');
 const SettingsMediaStorageView = () => import('./views/SettingsMediaStorageView.vue');
 const SettingsNotificationsView = () => import('./views/SettingsNotificationsView.vue');
+const SettingsSetupView = () => import('./views/SettingsSetupView.vue');
 const SettingsUsersView = () => import('./views/SettingsUsersView.vue');
 const SettingsWorkspaceView = () => import('./views/SettingsWorkspaceView.vue');
 const UserDetailView = () => import('./views/UserDetailView.vue');
@@ -148,10 +149,11 @@ const router = createRouter({
           path: 'settings',
           component: SettingsWorkspaceView,
           children: [
-            { path: '', name: 'settings', component: SettingsGeneralView },
+            { path: '', name: 'settings', component: SettingsSetupView },
             { path: 'connections', name: 'settings-connections', component: SettingsConnectionsView },
             { path: 'library', name: 'settings-library', component: SettingsLibraryView },
             { path: 'media-storage', name: 'settings-media-storage', component: SettingsMediaStorageView },
+            { path: 'system', name: 'settings-general', component: SettingsGeneralView },
             { path: 'users', name: 'settings-users', component: SettingsUsersView },
             { path: 'users/:userId', name: 'settings-user-detail', component: UserDetailView },
             { path: 'notifications', name: 'settings-notifications', component: SettingsNotificationsView },

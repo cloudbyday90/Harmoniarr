@@ -147,6 +147,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   match when one exists. Music Queue now lets selected or queued next-match
   progress override stale quality-block evidence. See
   `MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`.
+- Settings progressive disclosure: Settings now starts with a concise setup
+  checklist, keeps Soulseek health, folder locations, and library behavior in
+  the primary flow, and moves specialist timing, provider, quality, retention,
+  naming, security, and artwork controls behind accessible named disclosures.
+  See `SETTINGS_PROGRESSIVE_DISCLOSURE_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

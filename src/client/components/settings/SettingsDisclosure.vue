@@ -1,0 +1,126 @@
+<!--
+  Harmoniarr - Soulseek-native music library management
+  Copyright (C) 2026 Harmoniarr Contributors
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<script setup>
+import { ref } from 'vue';
+
+const props = defineProps({
+  hideLabel: {
+    default: 'Hide options',
+    type: String,
+  },
+  panelId: {
+    required: true,
+    type: String,
+  },
+  showLabel: {
+    default: 'Show options',
+    type: String,
+  },
+  startOpen: {
+    default: false,
+    type: Boolean,
+  },
+  subtitle: {
+    default: '',
+    type: String,
+  },
+  title: {
+    required: true,
+    type: String,
+  },
+});
+
+const isOpen = ref(props.startOpen);
+const headingId = `${props.panelId}-heading`;
+
+function toggle() {
+  isOpen.value = !isOpen.value;
+}
+</script>
+
+<template>
+  <section class="settings-disclosure">
+    <div class="settings-disclosure__header">
+      <div>
+        <h2 :id="headingId" class="settings-disclosure__title">{{ title }}</h2>
+        <p v-if="subtitle" class="settings-disclosure__subtitle">{{ subtitle }}</p>
+      </div>
+      <button
+        type="button"
+        class="hx-btn"
+        :aria-controls="panelId"
+        :aria-expanded="isOpen"
+        @click="toggle"
+      >
+        {{ isOpen ? hideLabel : showLabel }}
+      </button>
+    </div>
+
+    <div
+      v-show="isOpen"
+      :id="panelId"
+      class="settings-disclosure__content"
+      role="region"
+      :aria-labelledby="headingId"
+    >
+      <slot />
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.settings-disclosure {
+  background: var(--hx-bg-surface);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-md);
+  overflow: clip;
+}
+
+.settings-disclosure__header {
+  align-items: center;
+  display: flex;
+  gap: var(--hx-space-4);
+  justify-content: space-between;
+  padding: var(--hx-space-4);
+}
+
+.settings-disclosure__title {
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-md);
+  margin: 0;
+}
+
+.settings-disclosure__subtitle {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  margin: var(--hx-space-1) 0 0;
+}
+
+.settings-disclosure__content {
+  border-top: 1px solid var(--hx-border-subtle);
+  padding: var(--hx-space-4);
+}
+
+@media (max-width: 640px) {
+  .settings-disclosure__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+</style>

@@ -54,7 +54,7 @@ test('SettingsLibraryView wires discovery fields and automation toggle to form.l
   assert.match(source, /v-model\.number="form\.library\.discoveryBatchSize"/);
   assert.match(source, /v-model\.number="form\.library\.maxSearchAttempts"/);
   assert.match(source, /Automatically start download runs for high-confidence selections/);
-  assert.match(source, /Ambiguous or low-confidence candidates still require review/);
+  assert.match(source, /Ambiguous or low-confidence matches still need review/);
 });
 
 test('SettingsLibraryView constrains inputs to validator ranges', async () => {
@@ -92,11 +92,12 @@ test('SettingsLibraryView renders loading state before settings are fetched', as
   assert.match(source, /Loading settings\.\.\./);
 });
 
-test('SettingsLibraryView renders the Acquisition policy card in the default branch', async () => {
+test('SettingsLibraryView presents source safety as an optional advanced section', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /<h3 class="hx-card-title">Acquisition policy<\/h3>/);
-  assert.match(source, /Control how Harmoniarr handles source users/);
+  assert.match(source, /import SettingsDisclosure from '\.\.\/components\/settings\/SettingsDisclosure\.vue'/);
+  assert.match(source, /title="Source safety"/);
+  assert.match(source, /show-label="Show source safety"/);
 });
 
 test('SettingsLibraryView wires the auto-ignore toggle to form.acquisition.autoIgnoreEnabled', async () => {
@@ -124,11 +125,11 @@ test('SettingsLibraryView labels the acquisition cooldown field with hx-field-la
   assert.match(source, /<label class="hx-field-label">Cooldown \(hours\)<\/label>/);
 });
 
-test('SettingsLibraryView renders the Retention card in the default branch', async () => {
+test('SettingsLibraryView presents retention behind an explicit destructive-history disclosure', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /<h3 class="hx-card-title">Retention<\/h3>/);
-  assert.match(source, /Reducing these values will permanently delete older records/);
+  assert.match(source, /title="History retention"/);
+  assert.match(source, /permanently remove older history/);
 });
 
 test('SettingsLibraryView wires all three retention fields to form.retention.*', async () => {
@@ -150,7 +151,7 @@ test('SettingsLibraryView constrains retention inputs to validator ranges', asyn
 test('SettingsLibraryView includes a data deletion warning in the Retention card', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /permanently delete older records on the next cleanup cycle/);
+  assert.match(source, /permanently remove older history on the next cleanup cycle/);
 });
 
 test('SettingsLibraryView labels retention fields with hx-field-label', async () => {
@@ -160,11 +161,11 @@ test('SettingsLibraryView labels retention fields with hx-field-label', async ()
   assert.match(source, /<label class="hx-field-label">Retain count per type<\/label>/);
 });
 
-test('SettingsLibraryView renders the Download scoring weights card', async () => {
+test('SettingsLibraryView presents scoring weights behind the match-ranking disclosure', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /Download scoring weights/);
-  assert.match(source, /Control how much each quality factor contributes/);
+  assert.match(source, /title="How matches are ranked"/);
+  assert.match(source, /show-label="Show match ranking"/);
 });
 
 test('SettingsLibraryView wires all eight scoring fields to form.scoring.*', async () => {
@@ -200,10 +201,11 @@ test('SettingsLibraryView includes a reset to defaults button for scoring', asyn
   assert.match(source, /Reset to defaults/);
 });
 
-test('SettingsLibraryView labels all eight scoring fields with hx-field-label', async () => {
+test('SettingsLibraryView labels scoring fields and associates the browser-verified format control', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /<label class="hx-field-label">Format tier<\/label>/);
+  assert.match(source, /<label class="hx-field-label" for="settings-library-weight-format-tier">Format tier<\/label>/);
+  assert.match(source, /<input id="settings-library-weight-format-tier" class="hx-input" v-model\.number="form\.scoring\.weightFormatTier"/);
   assert.match(source, /<label class="hx-field-label">Track match<\/label>/);
   assert.match(source, /<label class="hx-field-label">Audio depth<\/label>/);
   assert.match(source, /<label class="hx-field-label">Duration<\/label>/);
@@ -213,11 +215,11 @@ test('SettingsLibraryView labels all eight scoring fields with hx-field-label', 
   assert.match(source, /<label class="hx-field-label">Uploader reputation<\/label>/);
 });
 
-test('SettingsLibraryView renders the Fidelity thresholds card', async () => {
+test('SettingsLibraryView presents fidelity thresholds behind the audio-verification disclosure', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /<h3 class="hx-card-title">Fidelity thresholds/);
-  assert.match(source, /Control how Harmoniarr evaluates audio quality and source reliability/);
+  assert.match(source, /title="Audio verification thresholds"/);
+  assert.match(source, /show-label="Show audio verification thresholds"/);
 });
 
 test('SettingsLibraryView wires all nine fidelity fields to form.fidelity.*', async () => {
@@ -269,11 +271,11 @@ test('SettingsLibraryView includes a reset to defaults button for fidelity', asy
   assert.match(source, /FIDELITY_DEFAULTS/);
 });
 
-test('SettingsLibraryView renders the Naming templates card', async () => {
+test('SettingsLibraryView presents naming templates behind the file-naming disclosure', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /<h3 class="hx-card-title">Naming templates/);
-  assert.match(source, /Customize how Harmoniarr names artist folders/);
+  assert.match(source, /title="File naming"/);
+  assert.match(source, /show-label="Show file naming"/);
 });
 
 test('SettingsLibraryView wires all four naming template fields to form.naming.*', async () => {

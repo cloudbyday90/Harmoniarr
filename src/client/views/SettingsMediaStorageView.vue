@@ -42,6 +42,7 @@ import {
   formatUserRootLabel,
 } from '../lib/settings-media-storage-presentation.js';
 import FolderBrowserModal from '../components/FolderBrowserModal.vue';
+import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import { useArtworkQuota } from '../composables/useArtworkQuota.js';
 import { useQuotaHistory } from '../composables/useQuotaHistory.js';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
@@ -142,15 +143,13 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
     <form @submit.prevent="saveSettings" v-else>
       <div class="cfg-2col">
 
-        <!-- Cover art -->
-        <article class="hx-card">
-          <header class="hx-card-header">
-            <div>
-              <h3 class="hx-card-title">Cover art</h3>
-              <p class="hx-card-subtitle">How Harmoniarr finds and stores album artwork.</p>
-            </div>
-          </header>
-          <div class="hx-card-body">
+        <SettingsDisclosure
+          panel-id="settings-cover-art"
+          title="Cover art"
+          subtitle="Artwork is optional. Configure it when you want Harmoniarr to find and cache album images."
+          show-label="Show cover art settings"
+          hide-label="Hide cover art settings"
+        >
 
             <div class="cfg-group">
               <p class="cfg-group-title">Finding art</p>
@@ -257,8 +256,7 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
               <p class="cfg-field-hint" v-if="form.artwork.refetchMissingAutomatically">Harmoniarr will periodically retry albums that don't have any artwork yet.</p>
             </div>
 
-          </div>
-        </article>
+        </SettingsDisclosure>
 
         <!-- Folder locations -->
         <article class="hx-card">
