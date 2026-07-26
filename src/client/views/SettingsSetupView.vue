@@ -20,6 +20,7 @@
 import { computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useDependencyHealth } from '../composables/useDependencyHealth.js';
+import { useSettingsSetupProgress } from '../composables/useSettingsSetupProgress.js';
 import { buildSettingsSetupSteps } from '../lib/settings-setup-presentation.js';
 
 const {
@@ -29,13 +30,32 @@ const {
   loadError,
 } = useDependencyHealth();
 
+const {
+  isLoading: isLoadingSetupProgress,
+  loadSetupProgress,
+  progress: setupProgress,
+} = useSettingsSetupProgress();
+
+const isCheckingSetup = computed(() => isLoading.value || isLoadingSetupProgress.value);
+
 const setupSteps = computed(() => buildSettingsSetupSteps({
   dependencies: dependencies.value,
   healthError: loadError.value,
+  setupProgress: setupProgress.value,
 }));
+
+const setupStatusMessage = computed(() => {
+  if (isCheckingSetup.value) return 'Checking setup progress.';
+
+  const soulseekStep = setupSteps.value.find((step) => step.id === 'soulseek');
+  return soulseekStep
+    ? `Soulseek: ${soulseekStep.status}. ${soulseekStep.copy}`
+    : 'Setup progress updated.';
+});
 
 onMounted(() => {
   void loadDependencyHealth();
+  void loadSetupProgress();
 });
 </script>
 
@@ -46,8 +66,9 @@ onMounted(() => {
         <h2 id="settings-setup-title">Get Harmoniarr ready</h2>
         <p>Complete these steps once. After that, Harmoniarr handles normal music progress automatically.</p>
       </div>
-      <span v-if="isLoading" class="hx-pill" data-tone="info">Checking services</span>
+      <span v-if="isCheckingSetup" class="hx-pill" data-tone="info">Checking setup</span>
     </header>
+    <p class="settings-setup__status" role="status" aria-atomic="true">{{ setupStatusMessage }}</p>
 
     <ol class="settings-setup__steps">
       <li v-for="(step, index) in setupSteps" :key="step.id" class="settings-setup__step">
@@ -90,6 +111,17 @@ onMounted(() => {
 
 .settings-setup__header h2 {
   font-size: var(--hx-text-lg);
+}
+
+.settings-setup__status {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .settings-setup__header p,

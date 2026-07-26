@@ -184,6 +184,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   External mode links directly to Media & storage so completed-download mounts
   and path translations are configured in their existing home. See
   `SLSKD_PROVIDER_MODE_RECOVERY_GUIDANCE_DESIGN.md`.
+- Soulseek provider-mode setup progress: the default Settings setup checklist
+  now identifies a missing Managed overlay as an explicit deployment step and
+  hands off only to Connections, while retaining generic runtime health states
+  for every other provider condition. See
+  `SLSKD_PROVIDER_MODE_SETUP_PROGRESS_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

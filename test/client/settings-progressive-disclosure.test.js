@@ -68,6 +68,29 @@ test('Settings setup makes a disabled Soulseek provider actionable', () => {
   assert.equal(soulseek.tone, 'info');
 });
 
+test('Settings setup prioritizes a missing Managed deployment over generic dependency health', () => {
+  const [soulseek] = buildSettingsSetupSteps({
+    dependencies: [{
+      message: 'Soulseek is connected and ready for downloads.',
+      provider: 'slskd',
+      status: 'healthy',
+    }],
+    setupProgress: {
+      soulseek: { managedDeploymentMissing: true },
+    },
+  });
+
+  assert.deepEqual(soulseek, {
+    copy: 'Managed Soulseek is selected, but the Harmoniarr managed Docker overlay is not available yet. Finish the managed setup before downloads can start.',
+    id: 'soulseek',
+    label: 'Finish managed setup',
+    routeName: 'settings-connections',
+    status: 'Managed setup required',
+    title: 'Connect Soulseek',
+    tone: 'warning',
+  });
+});
+
 test('Settings workspace keeps common setup in primary navigation and reveals specialist routes explicitly', async () => {
   const source = await readFile(WORKSPACE_PATH, 'utf8');
 
@@ -86,4 +109,13 @@ test('Settings default route opens the setup overview and retains a direct syste
   assert.match(source, /const SettingsSetupView = \(\) => import\('\.\/views\/SettingsSetupView\.vue'\)/);
   assert.match(source, /\{ path: '', name: 'settings', component: SettingsSetupView \}/);
   assert.match(source, /\{ path: 'system', name: 'settings-general', component: SettingsGeneralView \}/);
+});
+
+test('Settings setup loads provider-mode progress and announces its update accessibly', async () => {
+  const source = await readFile(new URL('../../src/client/views/SettingsSetupView.vue', import.meta.url), 'utf8');
+
+  assert.match(source, /useSettingsSetupProgress/);
+  assert.match(source, /void loadSetupProgress\(\)/);
+  assert.match(source, /role="status"/);
+  assert.match(source, /aria-atomic="true"/);
 });

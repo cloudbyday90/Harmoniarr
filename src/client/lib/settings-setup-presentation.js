@@ -22,7 +22,17 @@ function findSoulseekHealth(dependencies) {
     : null;
 }
 
-function buildSoulseekStep(dependencies, healthError) {
+function buildSoulseekStep(dependencies, healthError, setupProgress) {
+  if (setupProgress?.soulseek?.managedDeploymentMissing) {
+    return {
+      copy: 'Managed Soulseek is selected, but the Harmoniarr managed Docker overlay is not available yet. Finish the managed setup before downloads can start.',
+      label: 'Finish managed setup',
+      routeName: 'settings-connections',
+      status: 'Managed setup required',
+      tone: 'warning',
+    };
+  }
+
   if (healthError) {
     return {
       copy: 'Check the address and API key before Harmoniarr can start downloads.',
@@ -77,10 +87,10 @@ function buildSoulseekStep(dependencies, healthError) {
  * Builds a short, non-sensitive setup sequence. It deliberately exposes only
  * actionable provider state and never returns connection addresses or secrets.
  */
-export function buildSettingsSetupSteps({ dependencies, healthError } = {}) {
+export function buildSettingsSetupSteps({ dependencies, healthError, setupProgress } = {}) {
   return [
     {
-      ...buildSoulseekStep(dependencies, healthError),
+      ...buildSoulseekStep(dependencies, healthError, setupProgress),
       id: 'soulseek',
       title: 'Connect Soulseek',
     },

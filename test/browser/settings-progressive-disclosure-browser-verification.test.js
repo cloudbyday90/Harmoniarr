@@ -86,6 +86,8 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.goto(`${baseUrl}/app/settings`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Get Harmoniarr ready' }).waitFor();
       await page.getByText('Connect Soulseek', { exact: true }).waitFor();
+      await page.getByText('Managed setup required', { exact: true }).waitFor();
+      await page.getByRole('link', { name: 'Finish managed setup' }).waitFor();
       await page.getByRole('link', { name: 'Set folders' }).waitFor();
       assert.equal(await page.getByRole('link', { name: 'System & security' }).count(), 0);
 

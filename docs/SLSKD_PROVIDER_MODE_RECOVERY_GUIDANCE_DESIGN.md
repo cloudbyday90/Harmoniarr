@@ -68,9 +68,9 @@ cover the Connections provider-mode controls. Existing Settings form and
 provider-mode server tests continue to cover persistence, secret preservation,
 and no-poll enforcement.
 
-## Next Item
+## Follow-Up
 
-The next high-value item is **mode-aware setup progress on the Settings landing
-page**: distinguish "Managed overlay required" from a generic unavailable
-connection while keeping one link to Connections. That gives Home/Setup users
-the same recovery clarity without adding another control surface.
+Mode-aware setup progress is now implemented on the Settings landing page. It
+distinguishes a missing Managed overlay from generic connection health and
+keeps one handoff to Connections. See [Soulseek Provider-Mode Setup
+Progress](SLSKD_PROVIDER_MODE_SETUP_PROGRESS_DESIGN.md).

@@ -1007,6 +1007,10 @@ right repair surface.
   documented Compose command and required secret filenames when its overlay is
   absent; External mode hands off to Media & storage for folder visibility and
   path translations. See `SLSKD_PROVIDER_MODE_RECOVERY_GUIDANCE_DESIGN.md`.
+- [x] Add mode-aware Settings setup progress: a missing Managed overlay is
+  described as a deployment step, not a generic unavailable connection, with
+  one bounded handoff to Connections. See
+  `SLSKD_PROVIDER_MODE_SETUP_PROGRESS_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See
