@@ -223,7 +223,7 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
                 </div>
                 <div class="hx-field">
                   <label class="hx-field-label">Ignore images wider than this (px)</label>
-                  <input class="hx-input" v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="64" />
+                  <input class="hx-input" v-model.number="form.artwork.maxOriginalDimensionPixels" type="number" min="256" max="8192" step="1" />
                   <p class="cfg-field-hint">Leave this at the default (4,000 px). Same idea — album art isn't that wide.</p>
                 </div>
               </div>
@@ -270,33 +270,33 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
 
             <div class="cfg-group" style="padding-top: 0; border-top: none">
               <div class="hx-field">
-                <label class="hx-field-label">Downloads folder</label>
+                <label class="hx-field-label" for="settings-downloads-folder">Downloads folder</label>
                 <div class="hx-field-with-browse">
-                  <input class="hx-input" v-model="form.paths.downloads" />
+                  <input id="settings-downloads-folder" class="hx-input" v-model="form.paths.downloads" />
                   <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Downloads folder', form.paths.downloads, v => form.paths.downloads = v)">Browse…</button>
                 </div>
                 <p class="cfg-field-hint">{{ buildDownloadsPathHint() }}</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Music library</label>
+                <label class="hx-field-label" for="settings-music-library">Music library</label>
                 <div class="hx-field-with-browse">
-                  <input class="hx-input" v-model="form.paths.music" />
+                  <input id="settings-music-library" class="hx-input" v-model="form.paths.music" />
                   <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Music library', form.paths.music, v => form.paths.music = v)">Browse…</button>
                 </div>
                 <p class="cfg-field-hint">Your organized music collection. Accepted imports are moved here.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Staging area</label>
+                <label class="hx-field-label" for="settings-staging-area">Staging area</label>
                 <div class="hx-field-with-browse">
-                  <input class="hx-input" v-model="form.paths.staging" />
+                  <input id="settings-staging-area" class="hx-input" v-model="form.paths.staging" />
                   <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Staging area', form.paths.staging, v => form.paths.staging = v)">Browse…</button>
                 </div>
                 <p class="cfg-field-hint">A holding area where files wait while an import is being reviewed.</p>
               </div>
               <div class="hx-field">
-                <label class="hx-field-label">Transcode workspace</label>
+                <label class="hx-field-label" for="settings-transcode-workspace">Transcode workspace</label>
                 <div class="hx-field-with-browse">
-                  <input class="hx-input" v-model="form.paths.transcodeTemp" />
+                  <input id="settings-transcode-workspace" class="hx-input" v-model="form.paths.transcodeTemp" />
                   <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Transcode workspace', form.paths.transcodeTemp, v => form.paths.transcodeTemp = v)">Browse…</button>
                 </div>
                 <p class="cfg-field-hint">Temporary space used when converting audio formats. Can point to fast storage.</p>
@@ -478,7 +478,7 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
 
       <div class="cfg-save-bar">
         <span class="cfg-save-msg is-error" v-if="errorMessage">{{ errorMessage }}</span>
-        <span class="cfg-save-msg is-success" v-else-if="successMessage">{{ successMessage }}</span>
+        <span class="cfg-save-msg is-success" v-else-if="successMessage" role="status" aria-atomic="true">{{ successMessage }}</span>
         <button type="submit" class="hx-btn" data-variant="primary" :disabled="isSaving">
           {{ isSaving ? 'Saving…' : 'Save settings' }}
         </button>

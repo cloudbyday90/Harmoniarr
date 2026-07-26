@@ -1261,16 +1261,21 @@ Completed follow-up reliability slice:
   untouched.
 - The recovery design and security boundary are documented in
   [MUSIC_QUEUE_FOLDER_SETUP_RECOVERY_DESIGN.md](MUSIC_QUEUE_FOLDER_SETUP_RECOVERY_DESIGN.md).
+- Media & storage now confirms a successful bounded recovery in its existing
+  save area and browser coverage proves `Set up folders` -> validated save ->
+  automatic search without candidate work. The confirmation design and browser
+  contract are documented in
+  [MUSIC_QUEUE_FOLDER_SETUP_RECOVERY_CONFIRMATION_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_FOLDER_SETUP_RECOVERY_CONFIRMATION_BROWSER_VERIFICATION_DESIGN.md).
 
 Recommended next slice:
 
-1. show a compact Settings save confirmation when the recovery releases Music
-   Queue work, using release count only;
-2. add Docker-backed browser proof for `Set up folders` -> validated save -> a
-   release returning to automatic search without manual candidate work;
-3. prove an unrelated Settings save, quality stop, exhausted search, provider
-   pause, and download-recovery request remain untouched.
+1. extend the automatic search lifecycle proof from validated folder recovery
+   through policy-compliant match selection and Downloader handoff;
+2. prove an unacceptable lossless/quality result remains stopped rather than
+   being selected automatically;
+3. prove unavailable-provider handling keeps the release safe and provides one
+   concise repair path.
 
-Reason: automatic recovery now exists but is invisible. A terse confirmation
-and an end-to-end walkthrough prove the friendly recovery behavior without
-turning Settings or Activity into a diagnostics surface.
+Reason: recovery is now visible and browser-tested. The next confidence gap is
+the automation path immediately after search resumes, where quality and
+provider safeguards must remain as clear as the folder gate.

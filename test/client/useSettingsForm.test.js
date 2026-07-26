@@ -141,6 +141,30 @@ test('useSettingsForm saveSettings updates and applies response', async () => {
   assert.ok(savedPayload);
 });
 
+test('useSettingsForm saveSettings surfaces bounded Music Queue folder recovery', async () => {
+  const updatedPayload = createSettingsPayload({
+    musicQueueRecovery: {
+      dispatchAlreadyActive: false,
+      dispatchDeferred: false,
+      releasedCount: 2,
+      runStarted: true,
+    },
+  });
+
+  const { loadSettings, saveSettings, successMessage } = useSettingsForm({
+    fetchSettingsFn: async () => createSettingsPayload(),
+    updateSettingsFn: async () => updatedPayload,
+  });
+
+  await loadSettings();
+  await saveSettings();
+
+  assert.equal(
+    successMessage.value,
+    'Settings saved. Music Queue is searching for 2 releases automatically.',
+  );
+});
+
 test('useSettingsForm saveSettings sets error on failure', async () => {
   const { errorMessage, loadSettings, saveSettings } = useSettingsForm({
     fetchSettingsFn: async () => createSettingsPayload(),

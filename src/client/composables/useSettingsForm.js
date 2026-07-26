@@ -21,6 +21,7 @@ import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchSettings as defaultFetchSettings, updateSettings as defaultUpdateSettings } from '../lib/settings-api.js';
 import { buildSettingsUpdatePayload, normalizeDownloadMappings, normalizeUserMusicRoots } from '../lib/settings-form.js';
 import { formatCommaSeparatedList } from '../lib/settings-media-storage-presentation.js';
+import { buildSettingsSaveSuccessMessage } from '../lib/settings-save-presentation.js';
 
 export function useSettingsForm({
   fetchSettingsFn = defaultFetchSettings,
@@ -220,7 +221,7 @@ export function useSettingsForm({
     try {
       const payload = await updateSettingsFn(buildSettingsUpdatePayload(form));
       applySettings(payload);
-      successMessage.value = 'Settings saved.';
+      successMessage.value = buildSettingsSaveSuccessMessage(payload);
       if (onSaveSuccess) onSaveSuccess(payload);
     } catch (error) {
       errorMessage.value = getErrorMessage(error, 'Settings save failed');
