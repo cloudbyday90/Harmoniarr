@@ -88,34 +88,39 @@ onBeforeUnmount(() => {
 <template>
   <section class="activity-feed-view" aria-labelledby="activity-timeline-title">
     <header class="activity-feed-header">
-      <div>
-        <h2 id="activity-timeline-title" class="activity-feed-title">Recent activity</h2>
-        <p>Progress, changes, and the few things that need help.</p>
+      <h2 id="activity-timeline-title" class="activity-feed-title">Recent activity</h2>
+      <div class="activity-feed-actions">
+        <time v-if="checkedAt && !isLoading" class="activity-feed-freshness" :datetime="checkedAt">
+          Updated {{ formatActivityEventTime(checkedAt) }}
+        </time>
+        <button type="button" class="hx-btn" :disabled="isLoading || isRevalidating" @click="load()">
+          {{ isLoading || isRevalidating ? 'Refreshing...' : 'Refresh' }}
+        </button>
       </div>
-      <button type="button" class="hx-btn" :disabled="isLoading || isRevalidating" @click="load()">
-        {{ isLoading || isRevalidating ? 'Refreshing...' : 'Refresh' }}
-      </button>
     </header>
 
-    <div class="activity-filter-bar" role="group" aria-label="Filter activity">
-      <button
-        v-for="filter in ACTIVITY_TIMELINE_FILTERS"
-        :key="filter.value"
-        type="button"
-        class="activity-filter"
-        :aria-pressed="selectedFilter === filter.value"
-        @click="selectFilter(filter.value)"
-      >
-        {{ filter.label }}
-      </button>
-    </div>
+    <div class="activity-feed-toolbar">
+      <div class="activity-filter-field">
+        <label for="activity-filter">Show activity</label>
+        <select
+          id="activity-filter"
+          class="hx-select activity-filter-select"
+          :value="selectedFilter"
+          @change="selectFilter($event.target.value)"
+        >
+          <option v-for="filter in ACTIVITY_TIMELINE_FILTERS" :key="filter.value" :value="filter.value">
+            {{ filter.label }}
+          </option>
+        </select>
+      </div>
 
-    <p class="activity-feed-status" role="status" aria-live="polite">
-      <template v-if="isLoading">Loading recent activity...</template>
-      <template v-else-if="hasEvents">
-        Showing {{ visibleEntryCount }} {{ visibleEntryCount === 1 ? 'timeline item' : 'timeline items' }} from {{ visibleEventCount }} {{ visibleEventCount === 1 ? 'event' : 'events' }} in {{ getFilterLabel(selectedFilter).toLowerCase() }}.
-      </template>
-    </p>
+      <p class="activity-feed-status" role="status" aria-live="polite">
+        <template v-if="isLoading">Loading recent activity...</template>
+        <template v-else-if="hasEvents">
+          Showing {{ visibleEntryCount }} {{ visibleEntryCount === 1 ? 'timeline item' : 'timeline items' }} from {{ visibleEventCount }} {{ visibleEventCount === 1 ? 'event' : 'events' }} in {{ getFilterLabel(selectedFilter).toLowerCase() }}.
+        </template>
+      </p>
+    </div>
 
     <EmptyState
       v-if="errorMessage"
@@ -145,8 +150,12 @@ onBeforeUnmount(() => {
           <span class="activity-timeline-marker" aria-hidden="true" />
           <div class="activity-timeline-content">
             <div class="activity-timeline-meta">
-              <span class="hx-pill" :data-tone="getActivityTimelineEventPresentation(entry.event).tone">
-                {{ getActivityTimelineEventPresentation(entry.event).categoryLabel }}
+              <span
+                v-if="getActivityTimelineEventPresentation(entry.event).requiresAttention"
+                class="hx-pill"
+                data-tone="warning"
+              >
+                Needs attention
               </span>
               <time v-if="entry.event.occurredAt" :datetime="entry.event.occurredAt">
                 {{ formatActivityEventTime(entry.event.occurredAt) }}
@@ -177,10 +186,6 @@ onBeforeUnmount(() => {
       </li>
     </ol>
 
-    <p v-if="checkedAt && !isLoading" class="activity-feed-checked-at" aria-live="polite">
-      <span v-if="isRevalidating" aria-hidden="true">Refreshing. </span>
-      Last checked {{ formatActivityEventTime(checkedAt) }}.
-    </p>
   </section>
 </template>
 
@@ -192,7 +197,7 @@ onBeforeUnmount(() => {
 
 .activity-feed-header {
   display: flex;
-  align-items: start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--hx-space-4);
 }
@@ -207,38 +212,40 @@ onBeforeUnmount(() => {
   font-size: var(--hx-text-xl);
 }
 
-.activity-feed-header p,
 .activity-timeline-entry p,
 .activity-feed-status,
-.activity-feed-checked-at {
+.activity-feed-freshness {
   margin: var(--hx-space-1) 0 0;
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
 }
 
-.activity-filter-bar {
+.activity-feed-actions,
+.activity-feed-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--hx-space-2);
 }
 
-.activity-filter {
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-pill);
-  background: transparent;
-  color: var(--hx-text-muted);
-  cursor: pointer;
-  padding: 6px 10px;
-  font: inherit;
-  font-size: var(--hx-text-sm);
+.activity-feed-toolbar {
+  flex-wrap: wrap;
+  gap: var(--hx-space-3);
 }
 
-.activity-filter:hover,
-.activity-filter:focus-visible,
-.activity-filter[aria-pressed='true'] {
-  border-color: var(--hx-accent);
-  background: var(--hx-accent-soft);
-  color: var(--hx-text-strong);
+.activity-filter-field {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+}
+
+.activity-filter-select {
+  min-height: 36px;
+  margin: 0;
+  min-width: 10rem;
 }
 
 .activity-feed-status {
@@ -278,7 +285,7 @@ onBeforeUnmount(() => {
 .activity-timeline-entry {
   position: relative;
   display: grid;
-  gap: var(--hx-space-3);
+  gap: var(--hx-space-2);
   border-bottom: 1px solid var(--hx-border-subtle);
   padding: 0 0 var(--hx-space-4);
 }
@@ -314,12 +321,12 @@ onBeforeUnmount(() => {
 .activity-timeline-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--hx-space-3);
   margin-bottom: var(--hx-space-2);
 }
 
 .activity-timeline-meta time {
+  margin-left: auto;
   color: var(--hx-text-faint);
   font-size: var(--hx-text-sm);
   white-space: nowrap;
@@ -384,24 +391,32 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.activity-feed-checked-at {
-  margin: 0;
-}
-
 @media (max-width: 640px) {
   .activity-feed-header {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .activity-feed-header .hx-btn {
-    align-self: start;
+  .activity-feed-actions {
+    justify-content: flex-start;
+  }
+
+  .activity-feed-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-filter-field {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-filter-select {
+    width: 100%;
   }
 
   .activity-timeline-meta {
-    align-items: start;
-    flex-direction: column-reverse;
-    gap: var(--hx-space-1);
+    align-items: center;
   }
 }
 </style>

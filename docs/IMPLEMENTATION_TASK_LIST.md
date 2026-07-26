@@ -213,6 +213,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   attention states, retries, and explicit user actions remain visible, while
   raw durable events remain available to diagnostics. See
   `MUSIC_QUEUE_ACTIVITY_EVENT_COALESCING_DESIGN.md`.
+- Activity information hierarchy: the normal Activity timeline now uses a
+  labeled native filter select, a single header freshness cue, attention-only
+  row badges, and a secondary Advanced diagnostics disclosure after the
+  timeline. Desktop and mobile browser verification confirms the reduced
+  hierarchy and retained repair filter. See
+  `ACTIVITY_INFORMATION_HIERARCHY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

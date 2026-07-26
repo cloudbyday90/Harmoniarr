@@ -48,7 +48,7 @@ const isTimelineRoute = computed(() => route.name === 'activity-feed');
       </div>
     </header>
 
-    <details class="activity-diagnostics" :open="!isTimelineRoute">
+    <details class="activity-diagnostics" :class="{ 'is-secondary': isTimelineRoute }" :open="!isTimelineRoute">
       <summary>Advanced diagnostics</summary>
       <div class="activity-diagnostics-body">
         <p>Background jobs, match details, and system records for troubleshooting.</p>
@@ -66,7 +66,9 @@ const isTimelineRoute = computed(() => route.name === 'activity-feed');
       </div>
     </details>
 
-    <RouterView />
+    <div class="activity-workspace-content">
+      <RouterView />
+    </div>
   </section>
 </template>
 
@@ -77,9 +79,19 @@ const isTimelineRoute = computed(() => route.name === 'activity-feed');
 }
 
 .activity-diagnostics {
+  order: 1;
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-sm);
   background: var(--hx-bg-surface);
+}
+
+.activity-diagnostics.is-secondary {
+  order: 3;
+}
+
+.activity-workspace-content {
+  min-width: 0;
+  order: 2;
 }
 
 .activity-diagnostics summary {

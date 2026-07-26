@@ -108,11 +108,11 @@ suite('Activity Music Queue lifecycle browser verification', () => {
       await page.getByText('No good matches left: Geogaddi by Boards of Canada').waitFor();
       await page.getByText('Harmoniarr will search again later.').waitFor();
 
-      await page.getByRole('button', { name: 'Needs attention' }).click();
+      await page.getByLabel('Show activity').selectOption('needs_attention');
       await page.getByText('Download needs attention: The Campfire Headphase by Boards of Canada').waitFor();
       await page.getByText('Trying the next best match: Music Has the Right to Children by Boards of Canada').waitFor({ state: 'hidden' });
 
-      await page.getByRole('button', { name: 'Downloads' }).click();
+      await page.getByLabel('Show activity').selectOption('downloads');
       const recovery = page.getByRole('listitem').filter({
         hasText: 'Trying the next best match: Music Has the Right to Children by Boards of Canada',
       });
@@ -207,7 +207,7 @@ suite('Activity Music Queue lifecycle browser verification', () => {
       await story.getByText('Match selected: Music Has the Right to Children by Boards of Canada').waitFor();
       await story.getByText('Download started: Music Has the Right to Children by Boards of Canada').waitFor();
 
-      await page.getByRole('button', { name: 'Downloads' }).click();
+      await page.getByLabel('Show activity').selectOption('downloads');
       await page.locator('.activity-timeline > .activity-timeline-item').waitFor();
       assert.equal(
         (await page.locator('.activity-feed-status').textContent()).replace(/\s+/g, ' ').trim(),

@@ -1033,6 +1033,12 @@ right repair surface.
   release-centered Activity stories while retaining durable raw events,
   explicit-action/retry boundaries, final outcomes, and safe handoffs. See
   `MUSIC_QUEUE_ACTIVITY_EVENT_COALESCING_DESIGN.md`.
+- [x] Reduce normal Activity visual noise without changing the event contract:
+  replace the seven-pill filter bar with a labeled native select, reserve row
+  badges for repair states, place freshness beside Refresh, and render
+  Advanced diagnostics after the normal timeline. Desktop and mobile browser
+  verification covers the resulting hierarchy. See
+  `ACTIVITY_INFORMATION_HIERARCHY_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See
