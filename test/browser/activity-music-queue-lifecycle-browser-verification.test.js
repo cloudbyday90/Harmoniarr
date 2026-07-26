@@ -122,4 +122,99 @@ suite('Activity Music Queue lifecycle browser verification', () => {
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'activity_music_queue_lifecycle' });
   });
+
+  test('routine Music Queue progress is one expandable release story', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      page.on('pageerror', (error) => {
+        pageErrors.push(error.message);
+      });
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/activity\/feed(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify({
+            checkedAt: '2026-07-26T12:05:00.000Z',
+            ok: true,
+            total: 5,
+            events: [{
+              id: 'release-added',
+              eventType: 'release_added',
+              entityArtist: 'Boards of Canada',
+              entityId: 'wanted-1',
+              entityTitle: 'Music Has the Right to Children',
+              entityType: 'wanted_release',
+              extraPayload: { wantedReleaseId: 'wanted-1' },
+              occurredAt: '2026-07-26T12:04:00.000Z',
+            }, {
+              id: 'download-started',
+              eventType: 'music_queue_download_started',
+              entityArtist: 'Boards of Canada',
+              entityId: 'wanted-1',
+              entityTitle: 'Music Has the Right to Children',
+              entityType: 'wanted_release',
+              extraPayload: { queuedFileCount: 8, wantedReleaseId: 'wanted-1' },
+              occurredAt: '2026-07-26T12:03:00.000Z',
+            }, {
+              id: 'match-selected',
+              eventType: 'music_queue_match_selected',
+              entityArtist: 'Boards of Canada',
+              entityId: 'wanted-1',
+              entityTitle: 'Music Has the Right to Children',
+              entityType: 'wanted_release',
+              extraPayload: { selectionMode: 'automatic', wantedReleaseId: 'wanted-1' },
+              occurredAt: '2026-07-26T12:02:00.000Z',
+            }, {
+              id: 'search-started',
+              eventType: 'music_queue_search_started',
+              entityArtist: 'Boards of Canada',
+              entityId: 'wanted-1',
+              entityTitle: 'Music Has the Right to Children',
+              entityType: 'wanted_release',
+              extraPayload: { wantedReleaseId: 'wanted-1' },
+              occurredAt: '2026-07-26T12:01:00.000Z',
+            }, {
+              id: 'artist-monitored',
+              eventType: 'artist_monitored',
+              entityTitle: 'Autechre',
+              occurredAt: '2026-07-26T12:00:00.000Z',
+            }],
+          }),
+        });
+      });
+
+      await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { exact: true, name: 'Recent activity' }).waitFor();
+
+      const story = page.locator('.activity-timeline-item').filter({
+        hasText: 'Music Has the Right to Children',
+      });
+      await story.getByRole('link', { name: 'Open Library' }).waitFor();
+      assert.equal(
+        (await page.locator('.activity-feed-status').textContent()).replace(/\s+/g, ' ').trim(),
+        'Showing 2 timeline items from 5 events in all activity.',
+      );
+      assert.equal(await page.locator('.activity-timeline > .activity-timeline-item').count(), 2);
+      await story.locator('summary').click();
+      await story.getByText('Searching again: Music Has the Right to Children by Boards of Canada').waitFor();
+      await story.getByText('Match selected: Music Has the Right to Children by Boards of Canada').waitFor();
+      await story.getByText('Download started: Music Has the Right to Children by Boards of Canada').waitFor();
+
+      await page.getByRole('button', { name: 'Downloads' }).click();
+      await page.locator('.activity-timeline > .activity-timeline-item').waitFor();
+      assert.equal(
+        (await page.locator('.activity-feed-status').textContent()).replace(/\s+/g, ' ').trim(),
+        'Showing 1 timeline item from 3 events in downloads.',
+      );
+      assert.equal(await page.locator('.activity-timeline > .activity-timeline-item').count(), 1);
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+    }, { scenarioName: 'activity_music_queue_release_story' });
+  });
 });

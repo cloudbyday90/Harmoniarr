@@ -32,6 +32,10 @@ import {
   filterActivityTimelineEvents,
   getActivityTimelineEventPresentation,
 } from '../lib/activity-timeline-presentation.js';
+import {
+  buildActivityTimelineStoryEntries,
+  getActivityTimelineStoryDisclosureLabel,
+} from '../lib/activity-timeline-story-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const selectedFilter = ref('all');
@@ -55,7 +59,9 @@ const {
 const currentUserId = sessionStore.state.user?.id ?? null;
 const visibleEvents = computed(() => filterActivityTimelineEvents(events.value, selectedFilter.value));
 const visibleEventCount = computed(() => visibleEvents.value.length);
-const hasVisibleEvents = computed(() => visibleEventCount.value > 0);
+const visibleEntries = computed(() => buildActivityTimelineStoryEntries(visibleEvents.value));
+const visibleEntryCount = computed(() => visibleEntries.value.length);
+const hasVisibleEntries = computed(() => visibleEntryCount.value > 0);
 
 function selectFilter(filter) {
   selectedFilter.value = filter;
@@ -106,7 +112,9 @@ onBeforeUnmount(() => {
 
     <p class="activity-feed-status" role="status" aria-live="polite">
       <template v-if="isLoading">Loading recent activity...</template>
-      <template v-else-if="hasEvents">Showing {{ visibleEventCount }} {{ visibleEventCount === 1 ? 'event' : 'events' }} in {{ getFilterLabel(selectedFilter).toLowerCase() }}.</template>
+      <template v-else-if="hasEvents">
+        Showing {{ visibleEntryCount }} {{ visibleEntryCount === 1 ? 'timeline item' : 'timeline items' }} from {{ visibleEventCount }} {{ visibleEventCount === 1 ? 'event' : 'events' }} in {{ getFilterLabel(selectedFilter).toLowerCase() }}.
+      </template>
     </p>
 
     <EmptyState
@@ -122,36 +130,47 @@ onBeforeUnmount(() => {
     />
 
     <EmptyState
-      v-else-if="!isLoading && !hasVisibleEvents"
+      v-else-if="!isLoading && !hasVisibleEntries"
       :title="`No ${getFilterLabel(selectedFilter).toLowerCase()} yet`"
       body="Try another filter to see more recent activity."
     />
 
     <ol v-else class="activity-timeline" aria-label="Activity timeline">
-      <li v-for="event in visibleEvents" :key="event.id" class="activity-timeline-item">
+      <li v-for="entry in visibleEntries" :key="entry.id" class="activity-timeline-item">
         <article
           class="activity-timeline-entry"
-          :data-event-type="event.eventType"
-          :data-tone="getActivityTimelineEventPresentation(event).tone"
+          :data-event-type="entry.event.eventType"
+          :data-tone="getActivityTimelineEventPresentation(entry.event).tone"
         >
           <span class="activity-timeline-marker" aria-hidden="true" />
           <div class="activity-timeline-content">
             <div class="activity-timeline-meta">
-              <span class="hx-pill" :data-tone="getActivityTimelineEventPresentation(event).tone">
-                {{ getActivityTimelineEventPresentation(event).categoryLabel }}
+              <span class="hx-pill" :data-tone="getActivityTimelineEventPresentation(entry.event).tone">
+                {{ getActivityTimelineEventPresentation(entry.event).categoryLabel }}
               </span>
-              <time v-if="event.occurredAt" :datetime="event.occurredAt">
-                {{ formatActivityEventTime(event.occurredAt) }}
+              <time v-if="entry.event.occurredAt" :datetime="entry.event.occurredAt">
+                {{ formatActivityEventTime(entry.event.occurredAt) }}
               </time>
             </div>
-            <h3>{{ getActivityEventLabel(event, currentUserId) }}</h3>
-            <p v-if="getActivityEventDetail(event)">{{ getActivityEventDetail(event) }}</p>
+            <h3>{{ getActivityEventLabel(entry.event, currentUserId) }}</h3>
+            <p v-if="getActivityEventDetail(entry.event)">{{ getActivityEventDetail(entry.event) }}</p>
+            <details v-if="entry.isCoalesced" class="activity-timeline-story-details">
+              <summary>{{ getActivityTimelineStoryDisclosureLabel(entry) }}</summary>
+              <ol aria-label="Release activity updates">
+                <li v-for="milestone in entry.milestoneEvents" :key="milestone.id">
+                  <span>{{ getActivityEventLabel(milestone, currentUserId) }}</span>
+                  <time v-if="milestone.occurredAt" :datetime="milestone.occurredAt">
+                    {{ formatActivityEventTime(milestone.occurredAt) }}
+                  </time>
+                </li>
+              </ol>
+            </details>
             <RouterLink
-              v-if="getEventLinkTarget(event)"
+              v-if="getEventLinkTarget(entry.event)"
               class="activity-timeline-link"
-              :to="getEventLinkTarget(event).to"
+              :to="getEventLinkTarget(entry.event).to"
             >
-              {{ getEventLinkTarget(event).label }}
+              {{ getEventLinkTarget(entry.event).label }}
             </RouterLink>
           </div>
         </article>
@@ -322,6 +341,47 @@ onBeforeUnmount(() => {
 .activity-timeline-link:hover,
 .activity-timeline-link:focus-visible {
   text-decoration: underline;
+}
+
+.activity-timeline-story-details {
+  margin-top: var(--hx-space-2);
+}
+
+.activity-timeline-story-details summary {
+  color: var(--hx-accent);
+  cursor: pointer;
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+}
+
+.activity-timeline-story-details summary:focus-visible {
+  border-radius: var(--hx-radius-xs);
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
+.activity-timeline-story-details ol {
+  display: grid;
+  gap: var(--hx-space-2);
+  margin: var(--hx-space-3) 0 0;
+  padding: var(--hx-space-3);
+  border-left: 2px solid var(--hx-border);
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  list-style: none;
+}
+
+.activity-timeline-story-details li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+}
+
+.activity-timeline-story-details time {
+  color: var(--hx-text-faint);
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
 }
 
 .activity-feed-checked-at {

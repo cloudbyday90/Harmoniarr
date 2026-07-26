@@ -1029,6 +1029,10 @@ right repair surface.
   per-release marker survives restarts, is consumed only after provider search
   acceptance, and exposes no provider diagnostics. See
   `MUSIC_QUEUE_NORMAL_CYCLE_ACTIVITY_VISIBILITY_DESIGN.md`.
+- [x] Coalesce normal automatic Music Queue milestones into bounded,
+  release-centered Activity stories while retaining durable raw events,
+  explicit-action/retry boundaries, final outcomes, and safe handoffs. See
+  `MUSIC_QUEUE_ACTIVITY_EVENT_COALESCING_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See

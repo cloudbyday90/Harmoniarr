@@ -207,6 +207,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   needs setup. Once Soulseek accepts its resumed search, Harmoniarr consumes
   that marker and records one sanitized release event under Downloads. See
   `MUSIC_QUEUE_NORMAL_CYCLE_ACTIVITY_VISIBILITY_DESIGN.md`.
+- Music Queue Activity event coalescing: the normal Activity timeline now
+  condenses routine automatic search, match, download, and audio milestones
+  into a bounded release story with a semantic disclosure. Final outcomes,
+  attention states, retries, and explicit user actions remain visible, while
+  raw durable events remain available to diagnostics. See
+  `MUSIC_QUEUE_ACTIVITY_EVENT_COALESCING_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release
