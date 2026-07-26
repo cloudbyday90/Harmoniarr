@@ -83,7 +83,7 @@ suite('Discovery dispatch handoff browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=candidate-discovery-dispatch`, {
         waitUntil: 'domcontentloaded',
       });
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       await page.getByText('1 matching candidates', { exact: true }).waitFor();
       await page.getByText('healthy-slskd-peer', { exact: true }).first().waitFor();
       await page.getByText('/private/staging/Autechre/Amber', { exact: true }).first().waitFor();

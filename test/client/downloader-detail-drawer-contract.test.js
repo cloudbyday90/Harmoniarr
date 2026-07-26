@@ -35,7 +35,7 @@ test('DownloaderTransferDetailDrawer exposes import candidate drill-through when
   const source = await readFile(drawerPath, 'utf8');
 
   assert.match(source, /buildDownloaderImportCandidateLocation/);
-  assert.match(source, /Open Import Review candidate/);
+  assert.match(source, /Open advanced diagnostics/);
   assert.match(source, /diagnostics\.importLinkage\?\.summary/);
 });
 
@@ -53,7 +53,7 @@ test('DownloaderView exposes import candidate drill-through links for linked tra
 
   assert.match(source, /buildDownloaderImportCandidateLocation/);
   assert.match(source, /importCandidateLocation\(file\)/);
-  assert.match(source, /Open candidate/);
+  assert.match(source, /Open advanced diagnostics/);
 });
 
 test('DownloaderView wires operator controls to downloader mutation APIs', async () => {

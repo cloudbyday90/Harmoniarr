@@ -67,14 +67,14 @@ test('buildWantedDiscoveryCandidateLocation returns null when the source search 
   assert.equal(hasWantedDiscoveryCandidates(release), false);
 });
 
-test('buildWantedDiscoveryCandidateLocation builds a sanitized Import Review route', () => {
+test('buildWantedDiscoveryCandidateLocation builds a sanitized match-diagnostics route', () => {
   const release = buildRelease();
 
   assert.equal(getWantedDiscoveryCandidateSearchId(release), 'search-discovery-1');
   assert.equal(hasWantedDiscoveryCandidates(release), true);
   assert.deepEqual(buildWantedDiscoveryCandidateLocation(release), {
     hash: '#import-review-selection-stage',
-    name: 'activity-candidates',
+    name: 'activity-diagnostics-matches',
     query: {
       sourceSearchId: 'search-discovery-1',
       status: 'all',

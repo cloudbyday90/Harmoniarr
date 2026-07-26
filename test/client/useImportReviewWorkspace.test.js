@@ -159,7 +159,7 @@ test('useImportReviewWorkspace syncs route filters, candidate detail, preview, a
   assert.equal(workspace.selectedSummaryCounts.value.totalSelected, 1);
   assert.equal(workspace.importPendingSummaryCounts.value.totalImportPending, 0);
   assert.deepEqual(replaceRoute.mock.calls.at(-1).arguments, [{
-    name: 'review-queue',
+    name: 'activity-diagnostics-matches',
     query: {
       candidate: 'candidate-1',
       folderPath: 'Amber',
@@ -342,7 +342,7 @@ test('useImportReviewWorkspace clears diagnostic file focus when selecting a dif
 
   assert.deepEqual(replaceRoute.mock.calls.at(-1).arguments[0], {
     hash: '#import-review-selection-stage',
-    name: 'review-queue',
+    name: 'activity-diagnostics-matches',
     query: {
       candidate: 'candidate-2',
       mediaInspectionRunId: 'media-run-1',

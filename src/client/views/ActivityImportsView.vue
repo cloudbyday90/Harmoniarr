@@ -37,10 +37,10 @@ import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const props = defineProps({
   status: { type: String, default: 'import_pending' },
-  title: { type: String, default: 'Imports' },
-  subtitle: { type: String, default: 'Completed downloads waiting for ingestion.' },
-  emptyTitle: { type: String, default: 'No import-pending candidates' },
-  emptyCopy: { type: String, default: 'Imports awaiting ingestion will appear here once downloads complete.' },
+  title: { type: String, default: 'Library-add diagnostics' },
+  subtitle: { type: String, default: 'Completed downloads that need deeper review before they can be added safely.' },
+  emptyTitle: { type: String, default: 'No library adds need review' },
+  emptyCopy: { type: String, default: 'Downloads that need manual library-add review will appear here.' },
 });
 
 const isImportPendingRoute = computed(() => props.status === 'import_pending');
@@ -130,7 +130,7 @@ function importStatusLabel(code) {
 function buildImportReviewLocation(candidate) {
   return {
     hash: '#import-review-selection-stage',
-    name: 'activity-candidates',
+    name: 'activity-diagnostics-matches',
     query: {
       candidate: candidate.id,
       status: 'import_pending',
@@ -163,8 +163,8 @@ function buildImportReviewLocation(candidate) {
           <RouterLink class="hx-btn" :to="{ name: 'settings-media-storage' }">
             Check path mappings
           </RouterLink>
-          <RouterLink class="hx-btn" data-variant="primary" :to="{ name: 'activity-candidates', query: { status: 'import_pending' } }">
-            Open Import Review
+          <RouterLink class="hx-btn" data-variant="primary" :to="{ name: 'activity-diagnostics-matches', query: { status: 'import_pending' } }">
+            Open advanced diagnostics
           </RouterLink>
         </div>
       </div>
@@ -246,7 +246,7 @@ function buildImportReviewLocation(candidate) {
                 <td>{{ formatTimestamp(candidate.importPendingAt) }}</td>
                 <td>
                   <RouterLink class="hx-btn" :to="buildImportReviewLocation(candidate)">
-                    Review import
+                    Open diagnostics
                   </RouterLink>
                 </td>
               </tr>

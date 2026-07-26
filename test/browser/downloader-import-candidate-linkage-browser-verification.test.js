@@ -65,11 +65,11 @@ async function seedLinkedCandidateWorkspace(page) {
 async function assertCandidateRouteSelected(page) {
   await page.waitForFunction(() => {
     const url = new URL(globalThis.location.href);
-    return url.pathname === '/app/activity/candidates'
+    return url.pathname === '/app/activity/diagnostics/matches'
       && url.searchParams.get('candidate') === 'candidate-downloader-linked'
       && url.searchParams.get('status') === 'all';
   });
-  await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+  await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
   await page.getByText('/private/staging/Autechre/Amber', { exact: true }).first().waitFor();
   await page.getByText('healthy-slskd-peer', { exact: true }).first().waitFor();
 }
@@ -125,7 +125,7 @@ suite('Downloader import-candidate linkage browser verification', () => {
       await page.getByRole('progressbar').waitFor();
       const linkedTransferRow = page.getByRole('row').filter({ hasText: '01 Foil.flac' });
 
-      const rowLink = linkedTransferRow.getByRole('link', { name: 'Open candidate' });
+      const rowLink = linkedTransferRow.getByRole('link', { name: 'Open advanced diagnostics' });
       await rowLink.waitFor();
       await rowLink.click();
       await assertCandidateRouteSelected(page);
@@ -136,7 +136,7 @@ suite('Downloader import-candidate linkage browser verification', () => {
       const dialog = page.locator('.downloader-detail-drawer');
       await dialog.waitFor();
       await dialog.getByText('Linked to Import Review candidate.', { exact: true }).waitFor();
-      const drawerLink = dialog.getByRole('link', { name: 'Open Import Review candidate' });
+      const drawerLink = dialog.getByRole('link', { name: 'Open advanced diagnostics' });
       await drawerLink.waitFor();
       await drawerLink.click();
       await assertCandidateRouteSelected(page);

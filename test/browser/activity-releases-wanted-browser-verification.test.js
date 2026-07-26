@@ -137,8 +137,8 @@ suite('Activity releases/wanted browser verification', () => {
       await wantedTable.getByText('Music Has the Right to Children').first().waitFor();
       await wantedTable.getByText('Kid A').first().waitFor();
       await amberRow.getByText('1 candidate', { exact: true }).waitFor();
-      await amberRow.getByText('Last search produced Import Review candidates.', { exact: true }).waitFor();
-      await amberRow.getByRole('link', { name: 'Open candidates' }).waitFor();
+      await amberRow.getByText('Last search found matching downloads.', { exact: true }).waitFor();
+      await amberRow.getByRole('link', { name: 'Open match diagnostics' }).waitFor();
       await amberRow.getByText('Queued in Downloader', { exact: true }).waitFor();
       await amberRow.getByText('1 Downloader transfer accepted.', { exact: true }).waitFor();
       await wantedTable.getByText('No candidates', { exact: true }).waitFor();
@@ -158,14 +158,14 @@ suite('Activity releases/wanted browser verification', () => {
       const retryRequests = await page.evaluate(() => globalThis.__harmoniarrWantedRetryRequests);
       assert.deepEqual(retryRequests, ['metadata-release-mhtrtc']);
 
-      await amberRow.getByRole('link', { name: 'Open candidates' }).click();
+      await amberRow.getByRole('link', { name: 'Open match diagnostics' }).click();
       await page.waitForFunction(() => {
         const url = new URL(globalThis.location.href);
-        return url.pathname === '/app/activity/candidates'
+        return url.pathname === '/app/activity/diagnostics/matches'
           && url.searchParams.get('sourceSearchId') === 'search-discovery-dispatch-amber'
           && url.searchParams.get('status') === 'all';
       });
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       await page.getByText('1 matching candidates', { exact: true }).waitFor();
       await page.getByText('healthy-slskd-peer', { exact: true }).first().waitFor();
       await page.getByText('/private/staging/Autechre/Amber', { exact: true }).first().waitFor();

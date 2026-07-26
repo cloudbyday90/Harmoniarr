@@ -175,7 +175,7 @@ const importStatusLabel = computed(() => candidateStatusLabel(importCandidateSta
 const importStatusTone = computed(() => candidateStatusTone(importCandidateStatus.value));
 const importReviewLink = computed(() => {
   if (!importCandidateId.value) return null;
-  return { name: 'activity-candidates', query: { candidate: importCandidateId.value } };
+  return { name: 'activity-diagnostics-matches', query: { candidate: importCandidateId.value } };
 });
 
 const hasPipeline = computed(() => pipelineCandidates.value.length > 0);
@@ -379,10 +379,10 @@ function formatTimestamp(ts) {
                   </dl>
                   <router-link
                     v-if="canOpenImportReview && candidate.id"
-                    :to="{ name: 'activity-candidates', query: { candidate: candidate.id } }"
+                    :to="{ name: 'activity-diagnostics-matches', query: { candidate: candidate.id } }"
                     class="hx-btn rdl-candidate-link"
                     data-variant="ghost"
-                  >Open in import review</router-link>
+                  >Open advanced diagnostics</router-link>
                 </div>
               </details>
             </li>

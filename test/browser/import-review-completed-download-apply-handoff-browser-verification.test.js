@@ -260,7 +260,7 @@ suite('Import Review completed-download apply handoff browser verification', () 
         `${baseUrl}/app/activity/candidates?candidate=${candidate.id}&status=import_pending&executionRunId=${executionRun.id}#import-execution-run-panel`,
         { waitUntil: 'domcontentloaded' },
       );
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
 
       const executionPanel = getRunwayPanel(page, 'Queue selected for download');
       await executionPanel.getByText('1 transfer completed.', { exact: true }).waitFor();
@@ -331,7 +331,7 @@ suite('Import Review completed-download apply handoff browser verification', () 
         `${baseUrl}/app/activity/candidates?candidate=${candidate.id}&status=applied&applyRunId=${applyRun.id}#import-apply-run-panel`,
         { waitUntil: 'domcontentloaded' },
       );
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
 
       const applyPanel = getRunwayPanel(page, 'Move downloads to library');
       await applyPanel.getByText('Run apply-run-tomorrows-harvest-completed', { exact: true }).waitFor();

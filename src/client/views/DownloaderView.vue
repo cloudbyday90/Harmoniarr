@@ -406,7 +406,7 @@ async function clearCompletedTransfers() {
                       class="downloader-import-review-link"
                       :to="importCandidateLocation(file)"
                     >
-                      Open candidate
+                      Open advanced diagnostics
                     </RouterLink>
                   </div>
                 </td>

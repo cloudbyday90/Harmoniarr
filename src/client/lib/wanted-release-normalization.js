@@ -150,7 +150,7 @@ export function buildDownloadRecoveryNotice(release) {
 
   return {
     details,
-    message: 'Automatic download recovery has stopped for this release. Review import candidates or start a manual search before retrying acquisition.',
+    message: 'Automatic download recovery has stopped for this release. Review advanced diagnostics or search again before retrying.',
     title: 'Download recovery needs review',
   };
 }
@@ -396,14 +396,14 @@ export function buildImportReviewWorkflowResult(release) {
       return {
         details,
         label: 'Ready to import',
-        message: `${candidateLabel} waiting for import apply.`,
+        message: `${candidateLabel} waiting for a safe library add.`,
         tone: 'info',
       };
     case 'selected':
       return {
         details,
         label: 'Selected for download',
-        message: `${candidateLabel} selected in Import Review.`,
+        message: `${candidateLabel} selected for download.`,
         tone: 'info',
       };
     case 'failed':
@@ -417,14 +417,14 @@ export function buildImportReviewWorkflowResult(release) {
       return {
         details,
         label: 'Held for review',
-        message: `${candidateLabel} intentionally held in Import Review.`,
+        message: `${candidateLabel} intentionally held for review.`,
         tone: 'warning',
       };
     case 'pending':
       return {
         details,
         label: 'Pending review',
-        message: `${candidateLabel} waiting for Import Review.`,
+        message: `${candidateLabel} waiting for review.`,
         tone: 'info',
       };
     case 'applied':
@@ -438,14 +438,14 @@ export function buildImportReviewWorkflowResult(release) {
       return {
         details,
         label: 'Rejected',
-        message: `${candidateLabel} rejected in Import Review.`,
+        message: `${candidateLabel} rejected during review.`,
         tone: 'danger',
       };
     default:
       return {
         details,
-        label: 'Import Review',
-        message: `${formatCandidateCount(totalCount)} ${totalCount === 1 ? 'has' : 'have'} Import Review workflow state.`,
+        label: 'Match diagnostics',
+        message: `${formatCandidateCount(totalCount)} ${totalCount === 1 ? 'has' : 'have'} diagnostic workflow state.`,
         tone: 'info',
       };
   }
@@ -494,7 +494,7 @@ export function buildImportExecutionReadinessGuidance(release) {
   const discoveryRequest = release?.discoveryRequest ?? null;
   if (!discoveryRequest) {
     return buildReadinessGuidance({
-      message: 'Run discovery to search for candidates before Import Review or Downloader can start.',
+      message: 'Search again before Downloader can start.',
       title: 'Run discovery',
     });
   }
@@ -509,8 +509,8 @@ export function buildImportExecutionReadinessGuidance(release) {
 
   if (candidateCount > 0 && totalCount < 1) {
     return buildReadinessGuidance({
-      message: 'Open the candidate results and select one before starting a download run.',
-      title: 'Open Import Review candidates',
+      message: 'Open advanced diagnostics to inspect matching options before a download can start.',
+      title: 'Open match diagnostics',
     });
   }
 
@@ -526,7 +526,7 @@ export function buildImportExecutionReadinessGuidance(release) {
 
   if (enqueuedTransferCount > 0) {
     return buildReadinessGuidance({
-      message: 'Open Downloader or sync transfer state in Import Review to track provider progress.',
+      message: 'Open Downloader to track provider progress.',
       title: 'Watch Downloader',
       tone: 'success',
     });
@@ -534,7 +534,7 @@ export function buildImportExecutionReadinessGuidance(release) {
 
   if (queueFailedCount > 0 || blockedCount > 0) {
     return buildReadinessGuidance({
-      message: 'Open Import Review and read the download acceptance diagnostic before retrying.',
+      message: 'Open advanced diagnostics and read the download diagnostic before retrying.',
       title: 'Review the download diagnostic',
       tone: queueFailedCount > 0 ? 'danger' : 'warning',
     });
@@ -543,44 +543,44 @@ export function buildImportExecutionReadinessGuidance(release) {
   switch (primaryStatus) {
     case 'selected':
       return buildReadinessGuidance({
-        message: 'A candidate is selected. Open Import Review and click Start download run to send it to Downloader.',
-        title: 'Start the download run',
+        message: 'A match is selected. Open advanced diagnostics only if the download does not begin automatically.',
+        title: 'Review download diagnostics',
       });
     case 'pending':
     case 'held':
       return buildReadinessGuidance({
-        message: 'Open Import Review and select the candidate you want before starting a download run.',
-        title: 'Select a candidate',
+        message: 'Open advanced diagnostics to inspect matching options when automatic selection needs help.',
+        title: 'Review matching options',
       });
     case 'downloading':
       return buildReadinessGuidance({
-        message: 'Open Downloader or sync transfer state in Import Review to track provider progress.',
+        message: 'Open Downloader to track provider progress.',
         title: 'Watch Downloader',
         tone: 'success',
       });
     case 'import_pending':
       return buildReadinessGuidance({
-        message: 'Open Import Review and start the import apply run for the completed download.',
-        title: 'Apply the completed download',
+        message: 'The completed download is waiting for a safe library add. Open advanced diagnostics only if it stays blocked.',
+        title: 'Review library-add diagnostics',
       });
     case 'failed':
       return buildReadinessGuidance({
-        message: 'Open Import Review, inspect the failed candidate, and choose a retry or replacement.',
-        title: 'Review failed candidate',
+        message: 'Open advanced diagnostics to inspect the failed match and choose a retry or replacement.',
+        title: 'Review failed match',
         tone: 'danger',
       });
     case 'rejected':
       return buildReadinessGuidance({
-        message: 'Run discovery again or pick another candidate source before trying the download handoff.',
-        title: 'Find another candidate',
+        message: 'Search again or inspect matching options before retrying the download.',
+        title: 'Find another match',
         tone: 'warning',
       });
     case 'applied':
       return null;
     default:
       return buildReadinessGuidance({
-        message: 'Open Import Review to inspect the current candidate workflow state.',
-        title: 'Check Import Review',
+        message: 'Open advanced diagnostics to inspect the current match workflow state.',
+        title: 'Check match diagnostics',
       });
   }
 }
@@ -722,7 +722,7 @@ export function buildDiscoveryDispatchResult(release) {
       return {
         details,
         label: `${candidateCount} ${pluralize(candidateCount, 'candidate')}`,
-        message: 'Last search produced Import Review candidates.',
+        message: 'Last search found matching downloads.',
         tone: 'success',
       };
     }

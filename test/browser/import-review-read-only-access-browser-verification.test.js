@@ -159,7 +159,7 @@ suite('Import Review requester/non-admin read-only access browser verification',
       assert.equal(new URL(page.url()).pathname, '/app');
       assert.equal(await page.getByRole('heading', {
         exact: true,
-        name: 'Download candidates',
+        name: 'Match diagnostics',
       }).count(), 0);
       assert.deepEqual(importCandidateRequests, []);
 
@@ -209,7 +209,7 @@ suite('Import Review requester/non-admin read-only access browser verification',
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=${candidate.id}`, {
         waitUntil: 'domcontentloaded',
       });
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       await page.getByText(
         'You can inspect candidates assigned to your account. Admin-only controls remain available for review state changes and background runs.',
         { exact: true },

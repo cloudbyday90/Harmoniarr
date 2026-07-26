@@ -410,7 +410,7 @@ watch(
             >
               {{ matchReview.action.label }}
             </RouterLink>
-            <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'activity-candidates' }">
+            <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'activity-diagnostics-matches' }">
               Advanced diagnostics
             </RouterLink>
           </div>

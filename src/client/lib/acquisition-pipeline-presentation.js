@@ -483,7 +483,7 @@ function buildMatchCards(release) {
 export function buildMusicQueueAction(status) {
   switch (status?.nextAction) {
     case 'add_to_library':
-      return { code: 'add_to_library', label: 'Review add plan', type: 'route', routeName: 'activity-imports' };
+      return { code: 'add_to_library', label: 'Review add plan', type: 'route', routeName: 'activity-diagnostics-library-adds' };
     case 'configure_provider':
       return { code: 'configure_provider', label: 'Test Soulseek', type: 'route', routeName: 'settings-connections' };
     case 'download_now':
@@ -493,7 +493,7 @@ export function buildMusicQueueAction(status) {
     case 'open_in_library':
       return { code: 'open_in_library', label: 'Open Library', type: 'route', routeName: 'library' };
     case 'review_add_plan':
-      return { code: 'review_add_plan', label: 'Review add plan', type: 'route', routeName: 'activity-imports' };
+      return { code: 'review_add_plan', label: 'Review add plan', type: 'route', routeName: 'activity-diagnostics-library-adds' };
     case 'review_matches':
       return { code: 'review_matches', label: 'Review matches', type: 'review' };
     case 'review_quality_choice':

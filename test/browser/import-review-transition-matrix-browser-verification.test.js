@@ -51,7 +51,7 @@ async function openCandidateInImportReview({
   await page.goto(`${baseUrl}/app/activity/candidates?candidate=${candidate.id}`, {
     waitUntil: 'domcontentloaded',
   });
-  await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+  await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
   await page.getByRole('heading', { exact: true, name: 'Files and actions' }).waitFor();
 }
 

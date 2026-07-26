@@ -130,6 +130,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   Music Queue quality handoffs. The former twelve-tab workbench is preserved
   behind one `Advanced diagnostics` disclosure, without breaking diagnostic
   deep links. See `ACTIVITY_TIMELINE_NAVIGATION_DESIGN.md`.
+- Activity advanced diagnostics boundary: match, library-add, and failed-add
+  workbenches now use canonical `/app/activity/diagnostics/...` routes behind
+  the Activity disclosure. Legacy candidate/import URLs redirect with their
+  query and hash state intact, while Music Queue, Downloader, request detail,
+  and notifications use friendly advanced-diagnostics or normal workflow
+  handoffs. See `ACTIVITY_ADVANCED_DIAGNOSTICS_BOUNDARY_DESIGN.md`.
 - Music Queue Activity lifecycle: release-scoped history now shows a saved
   search-again action, retrying the same download, trying the next safe match,
   no-matches-left rediscovery, and terminal failures. Events use a bounded

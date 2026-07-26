@@ -47,7 +47,7 @@ export function buildWantedDiscoveryCandidateLocation(release) {
 
   return {
     hash: '#import-review-selection-stage',
-    name: 'activity-candidates',
+    name: 'activity-diagnostics-matches',
     query: buildImportReviewRouteQuery({
       sourceSearchId,
       status: '',

@@ -153,8 +153,8 @@ function buildRecommendedNextAction(state) {
     case 'completed':
       return {
         code: 'review_import',
-        description: 'Review import workflow status when this transfer is tied to a request or candidate.',
-        label: 'Review import',
+        description: 'Check whether the completed download can be added safely to the library.',
+        label: 'Check library add',
         tone: 'success',
       };
     case 'failed':

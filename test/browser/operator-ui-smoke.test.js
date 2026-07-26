@@ -68,7 +68,7 @@ suite('browser operator workflow smoke coverage', () => {
       await navigateWithinApp(page, {
         heading: 'Match diagnostics',
         linkName: 'Match diagnostics',
-        urlPattern: /\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/,
+        urlPattern: /\/app\/activity\/diagnostics\/matches(?:\?.*)?(?:#.*)?$/,
       });
 
       await navigateWithinApp(page, {

@@ -27,7 +27,7 @@ test('buildAuditActivityLinkTarget links import execution and apply audit events
     label: 'View download run',
     to: {
       hash: '#import-execution-run-panel',
-      name: 'review-queue',
+      name: 'activity-diagnostics-matches',
       query: {
         executionRunId: 'execution-run-22',
       },
@@ -42,7 +42,7 @@ test('buildAuditActivityLinkTarget links import execution and apply audit events
     label: 'View library import',
     to: {
       hash: '#import-apply-run-panel',
-      name: 'review-queue',
+      name: 'activity-diagnostics-matches',
       query: {
         applyRunId: 'apply-run-9',
       },

@@ -261,7 +261,7 @@ onBeforeUnmount(() => {
                       data-variant="ghost"
                       :to="item.candidateLocation"
                     >
-                      Open candidates
+                      Open match diagnostics
                     </RouterLink>
                     <div v-if="item.workflowResult" class="wanted-candidate-workflow">
                       <span class="hx-pill" :data-tone="item.workflowResult.tone">

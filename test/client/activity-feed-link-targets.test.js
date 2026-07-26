@@ -57,7 +57,7 @@ test('activity feed link targets fall back to metadata artist and operation-even
     label: 'View download run',
     to: {
       hash: '#import-execution-run-panel',
-      name: 'review-queue',
+      name: 'activity-diagnostics-matches',
       query: {
         executionRunId: 'run-44',
       },

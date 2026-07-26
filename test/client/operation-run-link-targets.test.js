@@ -52,7 +52,7 @@ test('operation run link targets resolve shared descriptors by started event typ
     label: 'View download run',
     to: {
       hash: '#import-execution-run-panel',
-      name: 'review-queue',
+      name: 'activity-diagnostics-matches',
       query: {
         executionRunId: 'run-44',
       },
@@ -91,7 +91,7 @@ test('operation run link targets resolve release presentation source metadata', 
     label: 'View library import',
     to: {
       hash: '#import-apply-run-panel',
-      name: 'review-queue',
+      name: 'activity-diagnostics-matches',
       query: {
         applyRunId: 'apply-run-1',
       },

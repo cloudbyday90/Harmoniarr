@@ -169,9 +169,9 @@ suite('Request Detail failed-import recovery handoff browser verification', () =
       await assertLocatorFocused(importReviewLink, 'Import Review handoff link should be keyboard focusable');
       await importReviewLink.press('Enter');
 
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       const currentUrl = new URL(page.url());
-      assert.equal(currentUrl.pathname, '/app/activity/candidates');
+      assert.equal(currentUrl.pathname, '/app/activity/diagnostics/matches');
       assert.equal(currentUrl.searchParams.get('candidate'), 'candidate-private');
 
       await page.getByText('0 matching candidates', { exact: true }).waitFor();

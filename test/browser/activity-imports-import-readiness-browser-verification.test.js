@@ -86,7 +86,7 @@ suite('Activity Imports import-readiness browser verification', () => {
     timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs,
   });
 
-  test('admins can see blocked import readiness and open the candidate repair workspace', {
+  test('admins can see blocked library-add diagnostics and open the match repair workspace', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -106,7 +106,8 @@ suite('Activity Imports import-readiness browser verification', () => {
       await seedMetadataImportReviewWorkspace(page, workspace);
 
       await page.goto(`${baseUrl}/app/activity/imports`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Imports' }).waitFor();
+      await page.waitForFunction(() => globalThis.location.pathname === '/app/activity/diagnostics/library-adds');
+      await page.getByRole('heading', { exact: true, name: 'Library-add diagnostics' }).waitFor();
       await page.getByRole('heading', { exact: true, name: 'Import readiness' }).waitFor();
       await page.getByText(
         '1 completed download candidate is blocked and needs operator attention before import apply can proceed.',
@@ -122,17 +123,17 @@ suite('Activity Imports import-readiness browser verification', () => {
       }).waitFor();
       await page.getByRole('link', { name: 'Check path mappings' }).waitFor();
 
-      await page.getByRole('link', { name: 'Review import' }).click();
+      await page.getByRole('link', { name: 'Open diagnostics' }).click();
       await page.waitForFunction((candidateId) => {
         const url = new URL(globalThis.location.href);
-        return url.pathname === '/app/activity/candidates'
+        return url.pathname === '/app/activity/diagnostics/matches'
           && url.searchParams.get('candidate') === candidateId
           && url.searchParams.get('status') === 'import_pending'
           && url.hash === '#import-review-selection-stage';
       }, candidate.id);
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       await page.getByText(candidate.folderPath, { exact: true }).first().waitFor();
-      await page.getByText('Review details and exceptions', { exact: true }).waitFor();
+      await page.getByText('Match details and exceptions', { exact: true }).waitFor();
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       await page.goto('about:blank', { waitUntil: 'load' });

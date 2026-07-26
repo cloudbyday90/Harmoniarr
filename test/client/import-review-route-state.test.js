@@ -119,7 +119,7 @@ test('normalizeImportReviewRouteState preserves downloading and import-pending s
 test('import review route helpers build execution and apply run drill-down locations', () => {
   assert.deepEqual(buildImportReviewExecutionRunLocation('execution-run-22'), {
     hash: '#import-execution-run-panel',
-    name: 'review-queue',
+    name: 'activity-diagnostics-matches',
     query: {
       executionRunId: 'execution-run-22',
     },
@@ -127,7 +127,7 @@ test('import review route helpers build execution and apply run drill-down locat
 
   assert.deepEqual(buildImportReviewApplyRunLocation('apply-run-9'), {
     hash: '#import-apply-run-panel',
-    name: 'review-queue',
+    name: 'activity-diagnostics-matches',
     query: {
       applyRunId: 'apply-run-9',
     },
@@ -135,7 +135,7 @@ test('import review route helpers build execution and apply run drill-down locat
 
   assert.deepEqual(buildImportReviewMediaInspectionRunLocation('inspection-run-4'), {
     hash: '#import-media-inspection-run-panel',
-    name: 'review-queue',
+    name: 'activity-diagnostics-matches',
     query: {
       mediaInspectionRunId: 'inspection-run-4',
     },

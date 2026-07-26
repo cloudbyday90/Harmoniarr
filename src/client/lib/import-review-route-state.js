@@ -143,7 +143,7 @@ export function getImportReviewRouteStateKey(state) {
 export function buildImportReviewExecutionRunLocation(runId) {
   return {
     hash: '#import-execution-run-panel',
-    name: 'review-queue',
+    name: 'activity-diagnostics-matches',
     query: buildImportReviewRouteQuery({
       executionRunId: runId,
     }),
@@ -153,7 +153,7 @@ export function buildImportReviewExecutionRunLocation(runId) {
 export function buildImportReviewApplyRunLocation(runId) {
   return {
     hash: '#import-apply-run-panel',
-    name: 'review-queue',
+    name: 'activity-diagnostics-matches',
     query: buildImportReviewRouteQuery({
       applyRunId: runId,
     }),
@@ -163,7 +163,7 @@ export function buildImportReviewApplyRunLocation(runId) {
 export function buildImportReviewMediaInspectionRunLocation(runId) {
   return {
     hash: '#import-media-inspection-run-panel',
-    name: 'review-queue',
+    name: 'activity-diagnostics-matches',
     query: buildImportReviewRouteQuery({
       mediaInspectionRunId: runId,
     }),

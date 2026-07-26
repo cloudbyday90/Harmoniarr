@@ -217,7 +217,7 @@ onBeforeUnmount(() => {
                 :to="importCandidateLocation"
                 @click="closeDrawer"
               >
-                Open Import Review candidate
+                Open advanced diagnostics
               </RouterLink>
             </dd>
           </div>

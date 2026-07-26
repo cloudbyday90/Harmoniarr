@@ -242,7 +242,7 @@ suite('Import Review Downloader transfer handoff browser verification', () => {
         `${baseUrl}/app/activity/candidates?executionRunId=${executionRun.id}#import-execution-run-panel`,
         { waitUntil: 'domcontentloaded' },
       );
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       const executionPanel = getRunwayPanel(page, 'Queue selected for download');
       await executionPanel.getByText(`Run ${executionRun.id}`, { exact: true }).waitFor();
       await executionPanel.getByText('Autechre\\Amber\\01 Foil.flac', { exact: true }).waitFor();
@@ -281,7 +281,7 @@ suite('Import Review Downloader transfer handoff browser verification', () => {
         `${baseUrl}/app/activity/candidates?executionRunId=${executionRun.id}#import-execution-run-panel`,
         { waitUntil: 'domcontentloaded' },
       );
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       const executionPanel = getRunwayPanel(page, 'Queue selected for download');
       await executionPanel.getByText(`Run ${executionRun.id}`, { exact: true }).waitFor();
       await executionPanel.getByText('1 transfer completed.', { exact: true }).waitFor();

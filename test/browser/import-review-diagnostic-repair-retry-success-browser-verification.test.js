@@ -65,7 +65,7 @@ async function openImportReviewForAdmin({
   await page.goto(`${baseUrl}/app/activity/candidates${urlSuffix}`, {
     waitUntil: 'domcontentloaded',
   });
-  await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+  await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
   await page.getByText('Operator runway', { exact: true }).waitFor();
 }
 

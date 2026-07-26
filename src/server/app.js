@@ -354,7 +354,7 @@ export function createApp({
       payload: {
         body: `Download from "${username}" completed: ${folderPath}`,
         title: 'Download completed',
-        url: '/app/activity/imports',
+        url: '/app/downloader',
       },
     }),
     onReleaseAddedFn: ({ artistName, folderPath, releaseTitle, username }) => broadcastHouseholdNotification({
@@ -376,7 +376,7 @@ export function createApp({
             : `${releaseTitle} was added to the library`
           : `Release from "${username}" added to library: ${folderPath}`,
         title: 'Release added',
-        url: '/app/activity/imports',
+        url: '/app/library',
       },
     }),
     sendFulfillmentNotificationFn: async ({ userId }) => {

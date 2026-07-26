@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildDownloaderImportCandidateLocation } from '../../src/client/lib/downloader-import-review-link.js';
 
-test('buildDownloaderImportCandidateLocation links downloader rows to Import Review candidates', () => {
+test('buildDownloaderImportCandidateLocation links downloader rows to advanced match diagnostics', () => {
   assert.deepEqual(buildDownloaderImportCandidateLocation({
     diagnostics: {
       importLinkage: {
@@ -10,7 +10,7 @@ test('buildDownloaderImportCandidateLocation links downloader rows to Import Rev
       },
     },
   }), {
-    name: 'activity-candidates',
+    name: 'activity-diagnostics-matches',
     query: {
       candidate: 'candidate-1',
       status: 'all',

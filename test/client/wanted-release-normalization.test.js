@@ -640,7 +640,7 @@ test('buildDiscoveryDispatchResult reports successful candidate-producing search
 
   assert.equal(result.label, '2 candidates');
   assert.equal(result.tone, 'success');
-  assert.equal(result.message, 'Last search produced Import Review candidates.');
+  assert.equal(result.message, 'Last search found matching downloads.');
   assert.ok(result.details.some((detail) => detail.label === 'Search' && detail.value === 'search-1...'));
   assert.ok(result.details.some((detail) => detail.label === 'Files' && detail.value === '17'));
 });
@@ -782,7 +782,7 @@ test('buildImportReviewWorkflowResult reports selected candidates', () => {
 
   assert.equal(result.label, 'Selected for download');
   assert.equal(result.tone, 'info');
-  assert.equal(result.message, '2 candidates selected in Import Review.');
+  assert.equal(result.message, '2 candidates selected for download.');
   assert.deepEqual(result.details.slice(0, 3), [
     { label: 'Candidates', value: '3' },
     { label: 'Pending', value: '1' },
@@ -995,7 +995,7 @@ test('buildImportExecutionReadinessGuidance prompts discovery before candidates 
   });
 
   assert.equal(result.title, 'Run discovery');
-  assert.equal(result.message, 'Run discovery to search for candidates before Import Review or Downloader can start.');
+  assert.equal(result.message, 'Search again before Downloader can start.');
   assert.equal(result.tone, 'info');
 });
 
@@ -1013,8 +1013,8 @@ test('buildImportExecutionReadinessGuidance prompts candidate review after searc
     },
   });
 
-  assert.equal(result.title, 'Open Import Review candidates');
-  assert.equal(result.message, 'Open the candidate results and select one before starting a download run.');
+  assert.equal(result.title, 'Open match diagnostics');
+  assert.equal(result.message, 'Open advanced diagnostics to inspect matching options before a download can start.');
 });
 
 test('buildImportExecutionReadinessGuidance prompts selection for pending candidates', () => {
@@ -1030,8 +1030,8 @@ test('buildImportExecutionReadinessGuidance prompts selection for pending candid
     },
   });
 
-  assert.equal(result.title, 'Select a candidate');
-  assert.equal(result.message, 'Open Import Review and select the candidate you want before starting a download run.');
+  assert.equal(result.title, 'Review matching options');
+  assert.equal(result.message, 'Open advanced diagnostics to inspect matching options when automatic selection needs help.');
 });
 
 test('buildImportExecutionReadinessGuidance prompts download run after candidate selection', () => {
@@ -1047,8 +1047,8 @@ test('buildImportExecutionReadinessGuidance prompts download run after candidate
     },
   });
 
-  assert.equal(result.title, 'Start the download run');
-  assert.equal(result.message, 'A candidate is selected. Open Import Review and click Start download run to send it to Downloader.');
+  assert.equal(result.title, 'Review download diagnostics');
+  assert.equal(result.message, 'A match is selected. Open advanced diagnostics only if the download does not begin automatically.');
 });
 
 test('buildImportExecutionReadinessGuidance points accepted transfers to Downloader', () => {

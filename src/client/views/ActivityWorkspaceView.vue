@@ -24,14 +24,14 @@ const route = useRoute();
 
 const diagnosticLinks = Object.freeze([
   { name: 'activity-operations', label: 'Background jobs' },
-  { name: 'activity-candidates', label: 'Match diagnostics' },
+  { name: 'activity-diagnostics-matches', label: 'Match diagnostics' },
   { name: 'activity-wanted', label: 'Wanted releases' },
-  { name: 'activity-imports', label: 'Library adds' },
+  { name: 'activity-diagnostics-library-adds', label: 'Library-add diagnostics' },
   { name: 'activity-requests', label: 'Request records' },
   { name: 'activity-users', label: 'Source users' },
   { name: 'activity-blocklist', label: 'Source blocklist' },
   { name: 'activity-ignored', label: 'Ignored source users' },
-  { name: 'activity-failed', label: 'Failed library adds' },
+  { name: 'activity-diagnostics-failed-library-adds', label: 'Failed library adds' },
   { name: 'activity-monitored-artists', label: 'Monitored artists' },
   { name: 'activity-history', label: 'System history' },
 ]);

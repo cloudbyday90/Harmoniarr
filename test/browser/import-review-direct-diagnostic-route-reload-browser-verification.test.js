@@ -64,7 +64,7 @@ async function openImportReviewForAdmin({
   await page.goto(`${baseUrl}/app/activity/candidates${urlSuffix}`, {
     waitUntil: 'domcontentloaded',
   });
-  await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+  await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
   await page.getByText('Operator runway', { exact: true }).waitFor();
 }
 
@@ -151,7 +151,7 @@ suite('Import Review direct diagnostic route reload browser verification', () =>
       await assertDirectDiagnosticRouteHydrated({ page, workspace });
 
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       await assertDirectDiagnosticRouteHydrated({ page, workspace });
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);

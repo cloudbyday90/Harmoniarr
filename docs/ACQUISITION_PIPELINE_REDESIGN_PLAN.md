@@ -1008,10 +1008,13 @@ right repair surface.
 - [x] Add the first repair handoffs from Activity to Music Queue, Library,
   Request Detail, and Settings Connections. See
   `MUSIC_QUEUE_ACTIVITY_REPAIR_HANDOFFS_DESIGN.md`.
-- [ ] Move current candidate/import/apply/runway controls behind operator-only
-  advanced diagnostics.
-- [ ] Route old candidate links into Music Queue with release/match context, or
-  preserve old route as diagnostics.
+- [x] Move current candidate/import/apply/runway controls behind operator-only
+  advanced diagnostics. Canonical diagnostics routes now make the boundary
+  explicit while legacy URLs redirect with preserved diagnostic state. See
+  `ACTIVITY_ADVANCED_DIAGNOSTICS_BOUNDARY_DESIGN.md`.
+- [x] Preserve old candidate/import links as diagnostics routes while normal
+  Activity, Music Queue, Downloader, Library, and notification handoffs use
+  release-oriented destinations and language.
 - [ ] Remove Music Queue from the normal Activity tab mental model; Activity
   should link to Music Queue when a timeline item needs that context.
 - [ ] Update product copy so Activity never presents itself as the primary

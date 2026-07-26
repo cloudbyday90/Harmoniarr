@@ -183,7 +183,7 @@ suite('Operator Request Detail pipeline diagnostics browser verification', () =>
       await importReviewLink.focus();
       await assertLocatorFocused(importReviewLink, 'Import review drill-through link should be keyboard focusable');
       await importReviewLink.press('Enter');
-      await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
       assert.equal(new URL(page.url()).searchParams.get('candidate'), 'candidate-private');
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);

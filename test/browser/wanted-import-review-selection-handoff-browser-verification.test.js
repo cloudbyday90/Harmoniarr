@@ -52,19 +52,19 @@ async function openSelectionReadyWantedCandidates({ baseUrl, page }) {
   ).waitFor();
   await selectionRow.getByText('Select a candidate', { exact: true }).waitFor();
   await selectionRow.getByText(
-    'Open Import Review and select the candidate you want before starting a download run.',
+    'Open advanced diagnostics to inspect matching options when automatic selection needs help.',
     { exact: true },
   ).waitFor();
 
-  await selectionRow.getByRole('link', { name: 'Open candidates' }).click();
+  await selectionRow.getByRole('link', { name: 'Open match diagnostics' }).click();
   await page.waitForFunction(() => {
     const url = new URL(globalThis.location.href);
-    return url.pathname === '/app/activity/candidates'
+    return url.pathname === '/app/activity/diagnostics/matches'
       && url.searchParams.get('sourceSearchId') === 'search-selection-ready-saw'
       && url.searchParams.get('status') === 'all';
   });
 
-  await page.getByRole('heading', { exact: true, name: 'Download candidates' }).waitFor();
+  await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
   await page.getByText('2 matching candidates', { exact: true }).waitFor();
 }
 
@@ -169,7 +169,7 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
       }).waitFor();
       await refreshedSelectionRow.getByText('Start the download run', { exact: true }).waitFor();
       await refreshedSelectionRow.getByText(
-        'A candidate is selected. Open Import Review and click Start download run to send it to Downloader.',
+        'A match is selected. Open advanced diagnostics only if the download does not begin automatically.',
         { exact: true },
       ).waitFor();
 

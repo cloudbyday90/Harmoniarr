@@ -180,7 +180,7 @@ export function useImportReviewWorkspace({
 
     await replaceResolvedRoute({
       ...(resolvedRoute.hash ? { hash: resolvedRoute.hash } : {}),
-      name: 'review-queue',
+      name: 'activity-diagnostics-matches',
       query: nextQuery,
     });
   }

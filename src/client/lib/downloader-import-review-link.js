@@ -30,7 +30,7 @@ export function buildDownloaderImportCandidateLocation(transfer) {
   }
 
   return {
-    name: 'activity-candidates',
+    name: 'activity-diagnostics-matches',
     query: buildImportReviewRouteQuery({
       candidateId,
       status: '',
