@@ -857,6 +857,9 @@ automation changes.
 - [x] Reduce the normal release row to one state, bounded progress and quality
   facts, and one primary action; keep raw match evidence in the selected review
   panel. See `MUSIC_QUEUE_RELEASE_ROW_HIERARCHY_DESIGN.md`.
+- [x] Rework the selected-release panel into current outcome, only the decision
+  that can continue the release, and an accessible matching-and-quality
+  disclosure. See `MUSIC_QUEUE_REVIEW_HIERARCHY_DESIGN.md`.
 - [x] Add filters for artist/search text, state, and release type. Reason and
   last-activity filters remain follow-up work once release-scoped match events
   are present.

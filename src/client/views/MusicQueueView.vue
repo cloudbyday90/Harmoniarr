@@ -22,6 +22,7 @@ import { useRoute, useRouter } from 'vue-router';
 import MusicQueueOverview from '../components/music-queue/MusicQueueOverview.vue';
 import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
 import MusicQueueProviderRecoveryVisibility from '../components/music-queue/MusicQueueProviderRecoveryVisibility.vue';
+import MusicQueueReviewPanel from '../components/music-queue/MusicQueueReviewPanel.vue';
 import MusicQueueReleaseRow from '../components/music-queue/MusicQueueReleaseRow.vue';
 import {
   buildMusicQueueMatchReview,
@@ -119,18 +120,6 @@ function clearFilters() {
   selectedState.value = 'all';
   selectedReleaseType.value = 'all';
   filtersExpanded.value = false;
-}
-
-function getMatchActionKey(match, action) {
-  return `${selectedRelease.value?.id}:${match.matchId}:${action}`;
-}
-
-function isMatchActionRunning(match, action) {
-  return activeMatchActionKey.value === getMatchActionKey(match, action);
-}
-
-function isReleaseActionRunning(action) {
-  return activeReleaseActionKey.value === `${selectedRelease.value?.id}:${action}`;
 }
 
 async function handleUseMatch(match) {
@@ -307,164 +296,16 @@ watch(
         </div>
       </div>
 
-      <aside class="music-queue-review" aria-label="Music Queue details">
-        <div v-if="!matchReview" class="music-queue-review-empty">
-          <h2>Select a release</h2>
-          <p>Open details to see why Harmoniarr stopped, which matches were found, and how the quality profile was evaluated.</p>
-        </div>
-        <div v-else>
-          <div class="music-queue-review-header">
-            <div>
-              <p class="hx-eyebrow">Review</p>
-              <h2>{{ matchReview.heading }}</h2>
-            </div>
-            <button type="button" class="hx-btn" data-variant="ghost" @click="closeReview">Close</button>
-          </div>
-
-          <section class="music-queue-review-section">
-            <h3>Why it stopped</h3>
-            <p>{{ matchReview.reason }}</p>
-            <span class="review-status-pill" :class="selectedRelease.statusClass">{{ matchReview.statusLabel }}</span>
-          </section>
-
-          <section class="music-queue-review-section">
-            <h3>Available matches</h3>
-            <div v-if="!matchReview.matchCards.length" class="music-queue-review-note">
-              No individual matches are available yet. Harmoniarr will show them here after the next search returns usable results.
-            </div>
-            <div v-else class="music-queue-match-list" role="list">
-              <article v-for="match in matchReview.matchCards" :key="match.id" class="music-queue-match-card" role="listitem">
-                <div class="music-queue-match-card-header">
-                  <div>
-                    <h4>{{ match.label }}<span v-if="match.isBest"> · Best ranked</span></h4>
-                    <p>{{ match.reason }}</p>
-                  </div>
-                  <span class="hx-pill" :data-tone="match.statusTone">{{ match.statusLabel }}</span>
-                </div>
-                <dl class="music-queue-match-grid">
-                  <div>
-                    <dt>Score</dt>
-                    <dd>{{ match.scoreLabel }}</dd>
-                  </div>
-                  <div>
-                    <dt>Quality</dt>
-                    <dd>
-                      <span class="hx-pill" :data-tone="match.qualityFitTone">{{ match.qualityFitLabel }}</span>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Format</dt>
-                    <dd>{{ match.formatLabel }}</dd>
-                  </div>
-                  <div>
-                    <dt>Tracks</dt>
-                    <dd>{{ match.trackCoverageLabel }}</dd>
-                  </div>
-                  <div>
-                    <dt>Files</dt>
-                    <dd>{{ match.fileLabel }}</dd>
-                  </div>
-                  <div>
-                    <dt>Size</dt>
-                    <dd>{{ match.sizeLabel }}</dd>
-                  </div>
-                  <div>
-                    <dt>Source health</dt>
-                    <dd>{{ match.healthLabel }}</dd>
-                  </div>
-                </dl>
-                <dl v-if="match.qualityRows?.length" class="music-queue-match-quality-grid" aria-label="Match quality details">
-                  <template v-for="row in match.qualityRows" :key="row.label">
-                    <dt>{{ row.label }}</dt>
-                    <dd>
-                      <span class="hx-pill" :data-tone="row.tone">{{ row.value }}</span>
-                    </dd>
-                  </template>
-                </dl>
-                <div v-if="match.canUseMatch || match.canRejectMatch" class="music-queue-match-actions">
-                  <button
-                    v-if="match.canUseMatch"
-                    type="button"
-                    class="hx-btn"
-                    data-variant="primary"
-                    :disabled="Boolean(activeMatchActionKey)"
-                    @click="handleUseMatch(match)"
-                  >
-                    {{ isMatchActionRunning(match, 'use') ? 'Selecting...' : 'Use this match' }}
-                  </button>
-                  <button
-                    v-if="match.canRejectMatch"
-                    type="button"
-                    class="hx-btn"
-                    data-variant="ghost"
-                    :disabled="Boolean(activeMatchActionKey)"
-                    @click="handleRejectMatch(match)"
-                  >
-                    {{ isMatchActionRunning(match, 'reject') ? 'Rejecting...' : 'Reject match' }}
-                  </button>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section class="music-queue-review-section">
-            <h3>Match summary</h3>
-            <dl class="music-queue-detail-grid">
-              <template v-for="row in matchReview.matchRows" :key="row.label">
-                <dt>{{ row.label }}</dt>
-                <dd>{{ row.value }}</dd>
-              </template>
-            </dl>
-          </section>
-
-          <section class="music-queue-review-section">
-            <h3>Quality</h3>
-            <p v-if="matchReview.qualityGuidance" class="music-queue-quality-guidance" role="status">
-              {{ matchReview.qualityGuidance }}
-            </p>
-            <dl class="music-queue-detail-grid">
-              <template v-for="row in matchReview.qualityRows" :key="row.label">
-                <dt>{{ row.label }}</dt>
-                <dd>{{ row.value }}</dd>
-              </template>
-            </dl>
-          </section>
-
-          <div class="music-queue-review-actions">
-            <button
-              v-if="matchReview.canAllowFallbackQuality"
-              type="button"
-              class="hx-btn"
-              data-variant="primary"
-              :disabled="Boolean(activeReleaseActionKey)"
-              @click="handleAllowFallbackQuality"
-            >
-              {{ isReleaseActionRunning('allow-fallback-quality') ? 'Saving...' : matchReview.fallbackQualityLabel }}
-            </button>
-            <button
-              v-if="matchReview.canSearchAgain"
-              type="button"
-              class="hx-btn"
-              :data-variant="matchReview.canAllowFallbackQuality ? 'ghost' : 'primary'"
-              :disabled="Boolean(activeReleaseActionKey)"
-              @click="handleSearchAgain"
-            >
-              {{ isReleaseActionRunning('search-again') ? 'Queuing...' : matchReview.searchAgainLabel }}
-            </button>
-            <RouterLink
-              v-if="matchReview.action?.type === 'route'"
-              class="hx-btn"
-              data-variant="primary"
-              :to="{ name: matchReview.action.routeName }"
-            >
-              {{ matchReview.action.label }}
-            </RouterLink>
-            <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'activity-diagnostics-matches' }">
-              Advanced diagnostics
-            </RouterLink>
-          </div>
-        </div>
-      </aside>
+      <MusicQueueReviewPanel
+        :active-match-action-key="activeMatchActionKey"
+        :active-release-action-key="activeReleaseActionKey"
+        :review="matchReview"
+        @allow-fallback-quality="handleAllowFallbackQuality"
+        @close="closeReview"
+        @reject-match="handleRejectMatch"
+        @search-again="handleSearchAgain"
+        @use-match="handleUseMatch"
+      />
     </div>
   </section>
 </template>
@@ -517,8 +358,7 @@ watch(
   justify-content: space-between;
 }
 
-.music-queue-panel-header h2,
-.music-queue-review-header h2 {
+.music-queue-panel-header h2 {
   margin: 0;
 }
 
@@ -565,157 +405,10 @@ watch(
   display: grid;
 }
 
-.music-queue-match-actions,
-.music-queue-review-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .music-queue-empty,
-.music-queue-empty-inline,
-.music-queue-review-empty {
+.music-queue-empty-inline {
   padding: 48px 20px;
   text-align: center;
-}
-
-.music-queue-review {
-  background: var(--hx-bg-surface);
-  border: 1px solid var(--hx-border);
-  border-radius: 8px;
-  padding: 20px;
-  position: sticky;
-  top: 76px;
-}
-
-.music-queue-review-header {
-  align-items: start;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-}
-
-.music-queue-review-section {
-  border-top: 1px solid var(--hx-border);
-  display: grid;
-  gap: 10px;
-  margin-top: 18px;
-  padding-top: 18px;
-}
-
-.music-queue-review-section h3,
-.music-queue-review-section p {
-  margin: 0;
-}
-
-.music-queue-detail-grid {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(120px, auto) 1fr;
-  margin: 0;
-}
-
-.music-queue-detail-grid dt {
-  color: var(--hx-text-muted);
-}
-
-.music-queue-detail-grid dd {
-  margin: 0;
-  text-align: right;
-}
-
-.music-queue-review-note {
-  color: var(--hx-text-muted);
-}
-
-.music-queue-match-list {
-  display: grid;
-  gap: 12px;
-}
-
-.music-queue-match-card {
-  background: var(--hx-bg-surface-muted);
-  border: 1px solid var(--hx-border);
-  border-radius: 8px;
-  display: grid;
-  gap: 12px;
-  padding: 14px;
-}
-
-.music-queue-match-card-header {
-  align-items: start;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-}
-
-.music-queue-match-card h4,
-.music-queue-match-card p,
-.music-queue-match-grid {
-  margin: 0;
-}
-
-.music-queue-match-card p,
-.music-queue-match-grid dt {
-  color: var(--hx-text-muted);
-}
-
-.music-queue-match-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.music-queue-match-grid div {
-  display: grid;
-  gap: 4px;
-}
-
-.music-queue-match-grid dt {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.music-queue-match-grid dd {
-  margin: 0;
-}
-
-.music-queue-match-quality-grid {
-  border-top: 1px solid var(--hx-border);
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(96px, auto) 1fr;
-  margin: 0;
-  padding-top: 12px;
-}
-
-.music-queue-match-quality-grid dt {
-  color: var(--hx-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.music-queue-match-quality-grid dd {
-  margin: 0;
-  text-align: right;
-}
-
-.music-queue-quality-guidance {
-  background: var(--hx-bg-surface-muted);
-  border: 1px solid var(--hx-border);
-  border-radius: 8px;
-  color: var(--hx-text-muted);
-  padding: 12px;
-}
-
-.music-queue-review-actions {
-  border-top: 1px solid var(--hx-border);
-  margin-top: 18px;
-  padding-top: 18px;
 }
 
 @media (max-width: 720px) {
@@ -727,10 +420,6 @@ watch(
 
   .music-queue-layout {
     grid-template-columns: 1fr;
-  }
-
-  .music-queue-review {
-    position: static;
   }
 }
 </style>

@@ -695,7 +695,9 @@ export function buildMusicQueueMatchReview(release) {
       { label: 'Score gap', value: matchSummary.scoreGap == null ? 'Not available' : String(matchSummary.scoreGap) },
     ],
     reason: release.detailText,
+    releaseId: release.id,
     statusLabel: release.status?.label ?? 'Queued',
+    statusTone: release.status?.tone ?? 'neutral',
     qualityRows: [
       { label: 'Profile', value: qualitySummary.profileLabel },
       { label: 'Decision', value: qualitySummary.decisionLabel },

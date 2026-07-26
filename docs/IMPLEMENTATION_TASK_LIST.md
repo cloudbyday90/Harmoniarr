@@ -231,6 +231,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   Type remain available behind an accessible Filters disclosure. Browser proof
   confirms the first release remains visible in the initial mobile viewport.
   See `MUSIC_QUEUE_SUMMARY_FILTER_HIERARCHY_DESIGN.md`.
+- Music Queue selected-review hierarchy: the release detail panel now leads
+  with current status and the next decision, keeps only actionable matches in
+  the normal path, and moves aggregate match/quality evidence behind an
+  accessible disclosure. Browser proof covers collapsed, expanded, desktop,
+  and mobile states. See `MUSIC_QUEUE_REVIEW_HIERARCHY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

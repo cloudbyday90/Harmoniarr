@@ -208,11 +208,55 @@ suite('Music Queue release row hierarchy browser verification', () => {
         surface: 'music-queue-release-list',
       });
 
+      await page.setViewportSize({ height: 1000, width: 1440 });
       await qualityRow.getByRole('button', { name: 'Review quality choice' }).click();
-      await page.getByRole('heading', { name: /Geogaddi by Boards of Canada/ }).waitFor();
+      const reviewPanel = page.locator('.music-queue-review');
+      await reviewPanel.getByRole('heading', { name: /Geogaddi by Boards of Canada/ }).waitFor();
+      await reviewPanel.getByText('Current status', { exact: true }).waitFor();
+      await reviewPanel.getByRole('heading', { name: 'Quality choice needed' }).waitFor();
+      await reviewPanel.getByText('Next step:', { exact: false }).waitFor();
+      await reviewPanel.getByRole('button', { name: 'Search again' }).waitFor();
+      const evidenceToggle = reviewPanel.locator('[aria-controls="music-queue-review-evidence"]');
+      await evidenceToggle.scrollIntoViewIfNeeded();
+      await evidenceToggle.getByText('Show matching and quality details', { exact: true }).waitFor();
+      assert.equal(await evidenceToggle.getAttribute('aria-expanded'), 'false');
+      assert.equal(await reviewPanel.getByRole('heading', { name: 'Quality details' }).isVisible(), false);
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'A stopped release foregrounds its status and the single next decision before diagnostic detail.',
+        name: 'desktop-review-outcome',
+        surface: 'music-queue-review',
+      });
+
+      await evidenceToggle.click();
+      assert.equal(await evidenceToggle.getAttribute('aria-expanded'), 'true');
+      await reviewPanel.getByRole('heading', { name: 'Match summary' }).waitFor();
+      await reviewPanel.getByRole('heading', { name: 'Quality details' }).waitFor();
+      await reviewPanel.getByRole('link', { name: 'Advanced diagnostics' }).waitFor();
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'Matching and quality evidence remains available only after an intentional disclosure.',
+        name: 'desktop-review-evidence',
+        surface: 'music-queue-review',
+      });
+
+      await page.setViewportSize({ height: 844, width: 390 });
+      await reviewPanel.getByRole('heading', { name: 'Quality details' }).waitFor();
+      await reviewPanel.scrollIntoViewIfNeeded();
+      assert.equal(
+        await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth),
+        true,
+        'The expanded review evidence should not create horizontal overflow on mobile.',
+      );
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'Expanded release evidence remains readable without horizontal overflow on mobile.',
+        name: 'mobile-review-evidence',
+        surface: 'music-queue-review',
+      });
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       const manifest = await evidence.writeManifest();
-      assert.equal(manifest.captureCount, 3);
+      assert.equal(manifest.captureCount, 6);
     }, { scenarioName: 'music_queue_release_row_hierarchy' });
   });
 });
