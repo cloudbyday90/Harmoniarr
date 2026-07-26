@@ -101,7 +101,34 @@ test('deriveMusicQueueStatus shows trying next match when quality recovery leave
   });
 
   assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH);
-  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+});
+
+test('deriveMusicQueueStatus keeps scheduled cooldown retries automatic', () => {
+  const status = deriveMusicQueueStatus({
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+    search: {
+      nextSearchAfter: '2026-07-27T12:00:00.000Z',
+      searchAttemptCount: 2,
+      status: 'cooldown',
+    },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.RETRYING_SEARCH);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY);
+});
+
+test('deriveMusicQueueStatus stops at no matches left only after recovery is exhausted', () => {
+  const status = deriveMusicQueueStatus({
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+    search: {
+      searchAttemptCount: 3,
+      status: 'blocked',
+    },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN);
 });
 
 test('deriveMusicQueueStatus asks users to pick a match for ambiguous evidence', () => {

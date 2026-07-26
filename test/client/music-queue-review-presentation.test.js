@@ -71,3 +71,17 @@ test('Music Queue review keeps an automatic release calm while retaining evidenc
   assert.equal(presentation.hasEvidence, true);
   assert.match(presentation.decisionCopy, /continue automatically/i);
 });
+
+test('Music Queue review explains automatic recovery without adding a decision', () => {
+  const presentation = buildMusicQueueReviewPresentation({
+    ...BASE_REVIEW,
+    matchCards: [],
+    recovery: {
+      kind: 'automatic',
+      nextStep: 'No action is needed. Harmoniarr will continue this release automatically.',
+    },
+  });
+
+  assert.equal(presentation.hasDecision, false);
+  assert.match(presentation.decisionCopy, /No action is needed/i);
+});

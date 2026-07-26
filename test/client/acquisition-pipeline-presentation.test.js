@@ -65,11 +65,12 @@ test('buildMusicQueueSummaryCards groups statuses into home-user buckets', () =>
       needs_setup: 1,
       queued_for_search: 4,
       ready_to_add: 2,
+      retrying_search: 1,
     },
   });
 
   assert.deepEqual(cards.map((card) => [card.key, card.value]), [
-    ['waiting', 4],
+    ['waiting', 5],
     ['searching', 2],
     ['downloading', 1],
     ['ready-to-add', 2],
@@ -114,6 +115,26 @@ test('buildMusicQueueAction maps setup and review actions to user outcomes', () 
     buildMusicQueueAction({ nextAction: 'show_advanced_diagnostics' }),
     { code: 'show_advanced_diagnostics', label: 'Set up media tools', routeName: 'settings-media-storage', type: 'route' },
   );
+  assert.deepEqual(
+    buildMusicQueueAction({ nextAction: 'view_recovery' }),
+    { code: 'view_recovery', label: 'View recovery', type: 'review' },
+  );
+});
+
+test('normalizeMusicQueueRelease makes automatic recovery calm and keeps stopped recovery actionable', () => {
+  const automatic = normalizeMusicQueueRelease({
+    releaseTitle: 'Child of God',
+    status: { code: 'retrying_search', label: 'Searching again automatically', tone: 'info' },
+  });
+  const stopped = normalizeMusicQueueRelease({
+    releaseTitle: 'How Can It Be',
+    status: { code: 'no_matches_left', label: 'No matches left', tone: 'warning' },
+  });
+
+  assert.deepEqual(automatic.action, { code: 'view_recovery', label: 'View recovery', type: 'review' });
+  assert.match(automatic.detailText, /try again automatically/i);
+  assert.equal(stopped.action.label, 'Review recovery');
+  assert.equal(buildMusicQueueMatchReview(stopped).searchAgainLabel, 'Search again');
 });
 
 test('buildMusicQueueMatchReview returns match and quality rows for the details panel', () => {

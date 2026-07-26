@@ -97,6 +97,7 @@ function openReview() {
         {{ release.action.label }}
       </RouterLink>
       <button
+        v-if="release.action.type !== 'review'"
         type="button"
         class="hx-btn"
         data-variant="ghost"

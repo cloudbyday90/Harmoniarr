@@ -29,8 +29,9 @@ const STATUS_PRIORITY = Object.freeze({
   searching: 9,
   checking_matches: 10,
   pick_match: 11,
-  queued_for_search: 12,
-  in_library: 13,
+  retrying_search: 12,
+  queued_for_search: 13,
+  in_library: 14,
 });
 
 const ATTENTION_STATUSES = new Set([

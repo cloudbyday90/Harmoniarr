@@ -488,6 +488,7 @@ Final Phase 0 contract:
 | `quality_choice_needed` | Matches or downloaded files do not satisfy the quality profile for automatic progress. | Top candidates miss minimum/preferred quality, fallback requires confirmation, or media verification failed. |
 | `downloading` | A match was selected and accepted by Downloader. | Selected/downloading candidate or execution item with accepted transfer evidence. |
 | `trying_next_match` | The previous match failed and Harmoniarr is trying the next acceptable match. | Failed/blocked candidate exists and another acceptable candidate is available. |
+| `retrying_search` | Harmoniarr has a scheduled automatic search retry. | A prior search has a bounded attempt count and a valid `ready` or `cooldown` retry schedule. |
 | `ready_to_add` | Download completed and Harmoniarr can see safe files. | `import_pending` candidate with add-to-library preview status ready or ready-with-warnings accepted by policy. |
 | `needs_help_adding` | Download completed but library-add plan needs human decision. | `import_pending` candidate blocked/warning due to folder, collision, lossy derivative, media issue, or file decision. |
 | `adding_to_library` | Library-add run is pending/running. | Active import apply operation run. |
@@ -873,6 +874,10 @@ automation changes.
 - [x] Add release-scoped `Review quality choice` details.
 - [x] Add release-scoped `Search again` / `Try again` action for stopped
   releases.
+- [x] Distinguish automatic next-match and scheduled-search recovery from
+  stopped no-match or failed-search recovery, with one focused retry action
+  only for a stopped release. See
+  `MUSIC_QUEUE_STOPPED_RELEASE_RECOVERY_DESIGN.md`.
 - [x] Add release-scoped quality fallback action.
 - [x] Show why automation did or did not choose a match at aggregate release
   level and in simplified per-match cards.
@@ -926,6 +931,10 @@ and rediscovery.
   automatic recovery.
 - [x] On failed download execution, keep the failed match terminal and attempt
   the next acceptable match automatically.
+- [x] Surface automatic next-match and scheduled-search recovery separately
+  from stopped releases, without exposing a retry control while Harmoniarr is
+  still progressing automatically. See
+  `MUSIC_QUEUE_STOPPED_RELEASE_RECOVERY_DESIGN.md`.
 - [x] Persist bounded trigger evidence for match selected, match failed,
   skipped-by-quality, trying next, exhausted, and rediscovery queued in existing
   discovery/execution evidence.

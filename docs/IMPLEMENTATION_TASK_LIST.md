@@ -236,6 +236,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   and a truly clear queue offers a calm explanation plus an optional Discover
   path. Desktop and mobile browser proof verifies these states remain distinct.
   See `MUSIC_QUEUE_WAITING_EMPTY_STATE_DESIGN.md`.
+- Music Queue stopped-release recovery hierarchy: next-match and scheduled
+  rediscovery states now explicitly continue automatically, while exhausted or
+  failed searches open one focused recovery panel with a single retry action.
+  The normal row does not duplicate the review action, and browser proof covers
+  desktop and mobile recovery states. See
+  `MUSIC_QUEUE_STOPPED_RELEASE_RECOVERY_DESIGN.md`.
 - Music Queue selected-review hierarchy: the release detail panel now leads
   with current status and the next decision, keeps only actionable matches in
   the normal path, and moves aggregate match/quality evidence behind an

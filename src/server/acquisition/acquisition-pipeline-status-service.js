@@ -32,6 +32,7 @@ export const MUSIC_QUEUE_STATUS_CODES = Object.freeze({
   QUALITY_CHOICE_NEEDED: 'quality_choice_needed',
   QUEUED_FOR_SEARCH: 'queued_for_search',
   READY_TO_ADD: 'ready_to_add',
+  RETRYING_SEARCH: 'retrying_search',
   SEARCHING: 'searching',
   TRYING_NEXT_MATCH: 'trying_next_match',
 });
@@ -52,6 +53,7 @@ export const MUSIC_QUEUE_ACTION_CODES = Object.freeze({
   SHOW_ADVANCED_DIAGNOSTICS: 'show_advanced_diagnostics',
   TRY_AGAIN: 'try_again',
   USE_MATCH: 'use_match',
+  VIEW_RECOVERY: 'view_recovery',
 });
 
 const STATUS_PRESENTATION = Object.freeze({
@@ -71,9 +73,9 @@ const STATUS_PRESENTATION = Object.freeze({
     message: 'A selected match is downloading.',
   }),
   [MUSIC_QUEUE_STATUS_CODES.FAILED]: Object.freeze({
-    label: 'Failed',
+    label: 'Search needs help',
     tone: 'danger',
-    message: 'The latest attempt failed and needs another retry or setup check.',
+    message: 'The latest search did not finish. Review it before trying again.',
   }),
   [MUSIC_QUEUE_STATUS_CODES.IGNORED]: Object.freeze({
     label: 'Ignored',
@@ -98,7 +100,7 @@ const STATUS_PRESENTATION = Object.freeze({
   [MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT]: Object.freeze({
     label: 'No matches left',
     tone: 'warning',
-    message: 'All known matches have been tried or rejected.',
+    message: 'Harmoniarr has tried every acceptable match and stopped automatic recovery.',
   }),
   [MUSIC_QUEUE_STATUS_CODES.PICK_MATCH]: Object.freeze({
     label: 'Pick a match',
@@ -120,15 +122,20 @@ const STATUS_PRESENTATION = Object.freeze({
     tone: 'success',
     message: 'Files are ready to be added to the library.',
   }),
+  [MUSIC_QUEUE_STATUS_CODES.RETRYING_SEARCH]: Object.freeze({
+    label: 'Searching again automatically',
+    tone: 'info',
+    message: 'No acceptable match was found in the last search. Harmoniarr will try again automatically.',
+  }),
   [MUSIC_QUEUE_STATUS_CODES.SEARCHING]: Object.freeze({
     label: 'Searching',
     tone: 'info',
     message: 'Harmoniarr is looking for matching files.',
   }),
   [MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH]: Object.freeze({
-    label: 'Trying next match',
+    label: 'Trying another match',
     tone: 'info',
-    message: 'The previous match failed, so the next ranked match can be tried.',
+    message: 'A previous match did not work. Harmoniarr is moving to the next eligible match automatically.',
   }),
 });
 
@@ -160,6 +167,14 @@ function getSetupAction(setup) {
   if (setup?.folderBlocked) return MUSIC_QUEUE_ACTION_CODES.SET_UP_FOLDERS;
   if (setup?.providerBlocked) return MUSIC_QUEUE_ACTION_CODES.CONFIGURE_PROVIDER;
   return MUSIC_QUEUE_ACTION_CODES.SHOW_ADVANCED_DIAGNOSTICS;
+}
+
+function hasScheduledAutomaticSearch(search) {
+  if (!['cooldown', 'ready'].includes(search?.status)) return false;
+  if (getCount(search?.searchAttemptCount) === 0) return false;
+
+  const nextSearchAfter = Date.parse(search?.nextSearchAfter ?? '');
+  return Number.isFinite(nextSearchAfter);
 }
 
 export function deriveMusicQueueStatus({
@@ -203,7 +218,7 @@ export function deriveMusicQueueStatus({
 
   if (hasAnyStatus(match.statusCounts, ['failed', 'rejected']) && getCount(match.pendingCount) > 0) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH, {
-      nextAction: MUSIC_QUEUE_ACTION_CODES.DOWNLOAD_NOW,
+      nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY,
       progressStep: 'download',
     });
   }
@@ -278,6 +293,13 @@ export function deriveMusicQueueStatus({
     });
   }
 
+  if (hasScheduledAutomaticSearch(search)) {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.RETRYING_SEARCH, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY,
+      progressStep: 'search',
+    });
+  }
+
   if (search.status === 'failed') {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.FAILED, {
       detail: search.blockedReason ?? null,
@@ -288,7 +310,14 @@ export function deriveMusicQueueStatus({
 
   if (search.status === 'completed' && getCount(search.searchAttemptCount) > 0) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT, {
-      nextAction: MUSIC_QUEUE_ACTION_CODES.SEARCH_NOW,
+      nextAction: MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN,
+      progressStep: 'search',
+    });
+  }
+
+  if (search.status === 'blocked' && getCount(search.searchAttemptCount) > 0) {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.NO_MATCHES_LEFT, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.TRY_AGAIN,
       progressStep: 'search',
     });
   }

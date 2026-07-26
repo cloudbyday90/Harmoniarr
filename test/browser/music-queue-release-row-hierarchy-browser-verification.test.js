@@ -85,6 +85,65 @@ function buildMusicQueuePayload() {
   };
 }
 
+function buildRecoveryPayload() {
+  const releases = [{
+    artistName: 'Forest Frank',
+    expectedTrackCount: 12,
+    id: 'wanted-next-match',
+    matchedTrackCount: 4,
+    missingTrackCount: 8,
+    quality: { code: 'accepted', profile: { code: 'lossless_archive' }, tone: 'success' },
+    releaseGroupType: 'Album',
+    releaseTitle: 'Child of God',
+    status: {
+      code: 'trying_next_match',
+      label: 'Trying another match',
+      nextAction: 'view_recovery',
+      tone: 'info',
+    },
+  }, {
+    artistName: 'Lauren Daigle',
+    expectedTrackCount: 12,
+    id: 'wanted-retrying-search',
+    matchedTrackCount: 0,
+    missingTrackCount: 12,
+    quality: { code: 'accepted', profile: { code: 'lossless_archive' }, tone: 'success' },
+    releaseGroupType: 'Album',
+    releaseTitle: 'How Can It Be',
+    status: {
+      code: 'retrying_search',
+      label: 'Searching again automatically',
+      nextAction: 'view_recovery',
+      tone: 'info',
+    },
+  }, {
+    artistName: 'Boards of Canada',
+    expectedTrackCount: 10,
+    id: 'wanted-exhausted-search',
+    matchedTrackCount: 0,
+    missingTrackCount: 10,
+    quality: { code: 'accepted', profile: { code: 'lossless_archive' }, tone: 'success' },
+    releaseGroupType: 'Album',
+    releaseTitle: 'Geogaddi',
+    status: {
+      code: 'no_matches_left',
+      label: 'No matches left',
+      nextAction: 'try_again',
+      tone: 'warning',
+    },
+  }];
+
+  return {
+    checkedAt: '2026-07-26T12:00:00.000Z',
+    pagination: { limit: 100, offset: 0, total: releases.length },
+    releases,
+    summary: {
+      counts: { no_matches_left: 1, retrying_search: 1, trying_next_match: 1 },
+      total: releases.length,
+    },
+  };
+}
+
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
@@ -258,5 +317,108 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const manifest = await evidence.writeManifest();
       assert.equal(manifest.captureCount, 6);
     }, { scenarioName: 'music_queue_release_row_hierarchy' });
+  });
+
+  test('separates automatic recovery from stopped-release decisions without duplicate actions', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const evidence = createBrowserVisualEvidenceRecorder({
+        scenarioName: 'music_queue_stopped_release_recovery',
+      });
+      const pageErrors = [];
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify(buildRecoveryPayload()),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route('**/api/v1/system/overview', async (route) => {
+        await route.fulfill({
+          body: JSON.stringify({ dependencies: [{ provider: 'slskd', status: 'healthy' }] }),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route('**/api/v1/settings', async (route) => {
+        const response = await route.fetch();
+        const payload = await response.json();
+        payload.secretStatus ??= {};
+        payload.secretStatus.slskd = {
+          ...(payload.secretStatus.slskd ?? {}),
+          providerMode: 'external',
+          providerModeState: 'configured',
+        };
+        await route.fulfill({ body: JSON.stringify(payload), contentType: 'application/json', response });
+      });
+
+      await page.setViewportSize({ height: 1000, width: 1440 });
+      const settingsResponse = page.waitForResponse((response) => response.url().includes('/api/v1/settings'));
+      await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      await settingsResponse;
+      await page.getByRole('heading', { exact: true, name: 'Queued music' }).waitFor();
+
+      const rows = page.locator('.music-queue-release-row');
+      const nextMatchRow = rows.filter({ hasText: 'Child of God' });
+      const retryingSearchRow = rows.filter({ hasText: 'How Can It Be' });
+      const exhaustedRow = rows.filter({ hasText: 'Geogaddi' });
+      await nextMatchRow.getByText('Trying another match', { exact: true }).waitFor();
+      await retryingSearchRow.getByText('Searching again automatically', { exact: true }).waitFor();
+      await exhaustedRow.getByText('No matches left', { exact: true }).waitFor();
+      await nextMatchRow.getByText('moving to the next eligible match automatically', { exact: false }).waitFor();
+      await retryingSearchRow.getByText('try again automatically', { exact: false }).waitFor();
+      await exhaustedRow.getByText('stopped automatic recovery', { exact: false }).waitFor();
+      assert.equal(await nextMatchRow.getByRole('button', { name: 'Details' }).count(), 0);
+      assert.equal(await retryingSearchRow.getByRole('button', { name: 'Details' }).count(), 0);
+      assert.equal(await exhaustedRow.getByRole('button', { name: 'Details' }).count(), 0);
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'Music Queue identifies automatic recovery separately from a stopped release that needs one decision.',
+        name: 'desktop-recovery-rows',
+        surface: 'music-queue-release-list',
+      });
+
+      await nextMatchRow.getByRole('button', { name: 'View recovery' }).click();
+      const reviewPanel = page.locator('.music-queue-review');
+      await reviewPanel.getByRole('heading', { name: 'Child of God by Forest Frank' }).waitFor();
+      await reviewPanel.getByText('No action is needed. Harmoniarr will continue this release automatically.').waitFor();
+      assert.equal(await reviewPanel.getByRole('button', { name: 'Try again' }).count(), 0);
+      assert.equal(await reviewPanel.getByRole('button', { name: 'Search again' }).count(), 0);
+
+      await exhaustedRow.getByRole('button', { name: 'Review recovery' }).click();
+      await reviewPanel.getByRole('heading', { name: 'Geogaddi by Boards of Canada' }).waitFor();
+      await reviewPanel.getByText('Review the result, then choose Search again to begin a new search.').waitFor();
+      await reviewPanel.getByRole('button', { name: 'Search again' }).waitFor();
+      assert.equal(await reviewPanel.getByRole('button', { name: 'Try again' }).count(), 0);
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'A stopped release provides a single clear recovery action before optional diagnostics.',
+        name: 'desktop-stopped-recovery',
+        surface: 'music-queue-review',
+      });
+
+      await page.setViewportSize({ height: 844, width: 390 });
+      await reviewPanel.scrollIntoViewIfNeeded();
+      assert.equal(
+        await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth),
+        true,
+        'Recovery rows and their focused action should not create mobile horizontal overflow.',
+      );
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'The stopped-release recovery action remains readable on a narrow viewport.',
+        name: 'mobile-stopped-recovery',
+        surface: 'music-queue-review',
+      });
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+      const manifest = await evidence.writeManifest();
+      assert.equal(manifest.captureCount, 3);
+    }, { scenarioName: 'music_queue_stopped_release_recovery' });
   });
 });

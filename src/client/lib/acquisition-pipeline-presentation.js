@@ -27,6 +27,7 @@ import {
   formatQualityVerificationRequirement,
 } from './acquisition-quality-presentation.js';
 import { formatBytes } from './import-candidate-presentation.js';
+import { buildMusicQueueRecoveryPresentation } from './music-queue-recovery-presentation.js';
 
 const DEFAULT_STATUS = Object.freeze({
   code: 'queued_for_search',
@@ -481,7 +482,15 @@ function buildMatchCards(release) {
   });
 }
 
-export function buildMusicQueueAction(status) {
+export function buildMusicQueueAction(status, recovery = null) {
+  if (recovery?.kind === 'automatic') {
+    return { code: 'view_recovery', label: 'View recovery', type: 'review' };
+  }
+
+  if (recovery?.kind === 'action_required') {
+    return { code: 'review_recovery', label: 'Review recovery', type: 'review' };
+  }
+
   switch (status?.nextAction) {
     case 'add_to_library':
       return { code: 'add_to_library', label: 'Review add plan', type: 'route', routeName: 'activity-diagnostics-library-adds' };
@@ -500,13 +509,15 @@ export function buildMusicQueueAction(status) {
     case 'review_quality_choice':
       return { code: 'review_quality_choice', label: 'Review quality choice', type: 'review' };
     case 'search_now':
-      return { code: 'search_now', label: 'Open wanted releases', type: 'route', routeName: 'activity-wanted' };
+      return { code: 'search_now', label: 'View details', type: 'review' };
     case 'set_up_folders':
       return { code: 'set_up_folders', label: 'Set up folders', type: 'route', routeName: 'settings-media-storage' };
     case 'show_advanced_diagnostics':
       return { code: 'show_advanced_diagnostics', label: 'Set up media tools', type: 'route', routeName: 'settings-media-storage' };
     case 'try_again':
-      return { code: 'try_again', label: 'Review retry', type: 'route', routeName: 'activity-wanted' };
+      return { code: 'try_again', label: 'Review retry', type: 'review' };
+    case 'view_recovery':
+      return { code: 'view_recovery', label: 'View recovery', type: 'review' };
     default:
       return { code: 'show_details', label: 'View details', type: 'review' };
   }
@@ -530,13 +541,14 @@ export function normalizeMusicQueueRelease(release) {
   const qualitySummary = buildQualitySummary(release);
   const releaseTypeLabel = formatReleaseType(release?.releaseGroupType);
   const releaseYear = getReleaseYear(release?.releaseDate);
-  const action = buildMusicQueueAction(status);
+  const recovery = buildMusicQueueRecoveryPresentation(status);
+  const action = buildMusicQueueAction(status, recovery);
 
   return {
     artistName: release?.artistName ?? 'Unknown artist',
     action,
     coverageLabel: `${getCount(release?.matchedTrackCount)} of ${getCount(release?.expectedTrackCount)} tracks`,
-    detailText: status.detail ?? matchSummary.readiness?.message ?? quality.explanation ?? status.message,
+    detailText: recovery?.detail ?? status.detail ?? matchSummary.readiness?.message ?? quality.explanation ?? status.message,
     expectedTrackCount: getCount(release?.expectedTrackCount),
     id: release?.id,
     lastActivityAt,
@@ -559,6 +571,7 @@ export function normalizeMusicQueueRelease(release) {
     releaseTitle: release?.releaseTitle ?? release?.releaseGroupTitle ?? 'Unknown release',
     releaseTypeLabel,
     releaseYear,
+    recovery,
     searchableText: [
       release?.artistName,
       release?.releaseTitle,
@@ -567,6 +580,7 @@ export function normalizeMusicQueueRelease(release) {
       status.label,
       status.message,
       status.detail,
+      recovery?.detail,
       matchSummary.message,
       qualitySummary.explanation,
     ].filter(Boolean).join(' ').toLowerCase(),
@@ -582,7 +596,7 @@ export function buildMusicQueueSummaryCards(summary = {}) {
     {
       key: 'waiting',
       label: 'Waiting',
-      value: getCount(counts.queued_for_search),
+      value: getCount(counts.queued_for_search) + getCount(counts.retrying_search),
     },
     {
       key: 'searching',
@@ -627,7 +641,7 @@ export const MUSIC_QUEUE_STATE_FILTERS = Object.freeze([
 ]);
 
 export function getMusicQueueFilterState(statusCode) {
-  if (statusCode === 'queued_for_search') return 'waiting';
+  if (['queued_for_search', 'retrying_search'].includes(statusCode)) return 'waiting';
   if (['searching', 'checking_matches', 'pick_match'].includes(statusCode)) return 'searching';
   if (['downloading', 'trying_next_match'].includes(statusCode)) return 'downloading';
   if (['ready_to_add', 'adding_to_library'].includes(statusCode)) return 'ready_to_add';
@@ -677,7 +691,9 @@ export function buildMusicQueueMatchReview(release) {
   const qualitySummary = release.qualitySummary ?? {};
   const canAllowFallbackQuality = release.statusCode === 'quality_choice_needed'
     && qualitySummary.canAllowFallbackQuality;
-  const canSearchAgain = ['failed', 'no_matches_left', 'quality_choice_needed'].includes(release.statusCode);
+  const recovery = release.recovery ?? null;
+  const canSearchAgain = recovery?.canSearchAgain
+    ?? ['failed', 'no_matches_left', 'quality_choice_needed'].includes(release.statusCode);
 
   return {
     action: release.action,
@@ -715,6 +731,7 @@ export function buildMusicQueueMatchReview(release) {
       { label: 'Library gate', value: qualitySummary.autoAddLabel },
     ],
     qualityGuidance: qualitySummary.reviewGuidance,
-    searchAgainLabel: release.statusCode === 'quality_choice_needed' ? 'Search again' : 'Try again',
+    recovery,
+    searchAgainLabel: recovery?.retryLabel ?? (release.statusCode === 'quality_choice_needed' ? 'Search again' : 'Try again'),
   };
 }

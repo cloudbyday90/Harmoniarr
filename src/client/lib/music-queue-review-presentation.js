@@ -18,7 +18,9 @@
 
 const PRIMARY_QUALITY_ROW_LABELS = new Set(['Profile', 'Decision', 'Verification']);
 
-function getDecisionCopy({ hasMatchChoices, hasQualityChoice, hasRouteAction }) {
+function getDecisionCopy({ hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }) {
+  if (recovery?.nextStep) return recovery.nextStep;
+
   if (hasMatchChoices) {
     return 'Choose a match only when Harmoniarr needs your decision. The selected match becomes the next download step.';
   }
@@ -42,10 +44,11 @@ export function buildMusicQueueReviewPresentation(review) {
   const hasMatchChoices = decisionMatchCards.length > 0;
   const hasQualityChoice = Boolean(review.canAllowFallbackQuality || review.canSearchAgain);
   const hasRouteAction = review.action?.type === 'route';
+  const recovery = review.recovery ?? null;
   const qualityRows = Array.isArray(review.qualityRows) ? review.qualityRows : [];
 
   return {
-    decisionCopy: getDecisionCopy({ hasMatchChoices, hasQualityChoice, hasRouteAction }),
+    decisionCopy: getDecisionCopy({ hasMatchChoices, hasQualityChoice, hasRouteAction, recovery }),
     decisionMatchCards,
     evidenceMatchCards: hasMatchChoices ? [] : matchCards,
     hasDecision: hasMatchChoices || hasQualityChoice || hasRouteAction,
@@ -53,5 +56,6 @@ export function buildMusicQueueReviewPresentation(review) {
     hasMatchChoices,
     hasQualityChoice,
     primaryQualityRows: qualityRows.filter((row) => PRIMARY_QUALITY_ROW_LABELS.has(row.label)),
+    recovery,
   };
 }
