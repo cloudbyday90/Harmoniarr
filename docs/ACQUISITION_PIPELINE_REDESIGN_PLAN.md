@@ -1003,6 +1003,10 @@ right repair surface.
   External, and Disabled modes. Disabled mode prevents provider polling, while
   managed Compose secrets remain deployment-owned. See
   `SLSKD_PROVIDER_MODE_ONBOARDING_DESIGN.md`.
+- [x] Add mode-aware provider recovery guidance: Managed setup shows only the
+  documented Compose command and required secret filenames when its overlay is
+  absent; External mode hands off to Media & storage for folder visibility and
+  path translations. See `SLSKD_PROVIDER_MODE_RECOVERY_GUIDANCE_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See

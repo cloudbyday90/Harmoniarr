@@ -64,6 +64,24 @@ suite('Settings progressive disclosure browser verification', () => {
           contentType: 'application/json',
         });
       });
+      await browserContext.route('**/api/v1/settings', async (route) => {
+        const response = await route.fetch();
+        const payload = await response.json();
+        payload.settings.slskd.providerMode = 'managed';
+        payload.secretStatus ??= {};
+        payload.secretStatus.slskd = {
+          ...(payload.secretStatus.slskd ?? {}),
+          managedDeploymentDetected: false,
+          providerMode: 'managed',
+          providerModeLocked: false,
+          providerModeState: 'managed_deployment_missing',
+        };
+        await route.fulfill({
+          body: JSON.stringify(payload),
+          contentType: 'application/json',
+          response,
+        });
+      });
 
       await page.goto(`${baseUrl}/app/settings`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Get Harmoniarr ready' }).waitFor();
@@ -80,6 +98,12 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.getByRole('group', { name: 'Soulseek provider mode' }).waitFor();
       assert.equal(await page.getByRole('radio', { name: /Managed/ }).count(), 1);
       assert.equal(await page.getByRole('radio', { name: /External/ }).count(), 1);
+      await page.getByRole('heading', { name: 'Finish managed setup' }).waitFor();
+      await page.getByText('slskd_api_key', { exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Copy command' }).waitFor();
+      await page.getByRole('radio', { name: /External/ }).check();
+      await page.getByRole('heading', { name: 'Make completed downloads available' }).waitFor();
+      await page.getByRole('link', { name: 'Set up folders' }).waitFor();
       await page.getByRole('radio', { name: /Disabled/ }).check();
       assert.equal(await page.getByLabel('Service address').count(), 0);
       assert.equal(await page.getByRole('button', { name: 'Soulseek is off' }).isDisabled(), true);

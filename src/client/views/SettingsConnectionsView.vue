@@ -28,6 +28,7 @@ import {
   getDependencyStatusClass,
 } from '../lib/settings-connections-presentation.js';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
+import SoulseekProviderModeGuidance from '../components/settings/SoulseekProviderModeGuidance.vue';
 import { useConnections } from '../composables/useConnections.js';
 import { useDependencyHealth } from '../composables/useDependencyHealth.js';
 import { useToast } from '../composables/useToast.js';
@@ -195,6 +196,10 @@ onMounted(() => {
               <p class="cfg-group-title">Downloads are off</p>
               <p class="cfg-field-hint">Harmoniarr will not contact Soulseek, queue downloads, or poll the download service until you select Managed or External.</p>
             </div>
+            <SoulseekProviderModeGuidance
+              :managed-deployment-detected="isManagedDeployment"
+              :provider-mode="form.slskd.providerMode"
+            />
           </div>
         </article>
 

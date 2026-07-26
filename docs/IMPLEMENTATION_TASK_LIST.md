@@ -179,6 +179,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   external Unraid/VPN setups retain their URL and encrypted write-only key, and
   Disabled blocks provider clients and Downloader polling while preserving
   external credentials. See `SLSKD_PROVIDER_MODE_ONBOARDING_DESIGN.md`.
+- Soulseek provider-mode recovery guidance: a missing Managed overlay now has
+  a concise secret-filename checklist and the checked-in Compose start command;
+  External mode links directly to Media & storage so completed-download mounts
+  and path translations are configured in their existing home. See
+  `SLSKD_PROVIDER_MODE_RECOVERY_GUIDANCE_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

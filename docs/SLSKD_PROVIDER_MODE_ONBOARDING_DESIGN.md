@@ -85,8 +85,8 @@ controls in the existing Settings progressive-disclosure flow.
 
 ## Follow-Up
 
-The next high-value item is a **mode-aware deployment helper**: show a concise
-Managed Compose command and required-secret checklist only when Managed is
-selected without its overlay, while External links to the existing folder/path
-mapping guidance. That closes the recovery loop without making Settings control
-Docker or a VPN container.
+Mode-aware setup recovery is now implemented. Settings displays the managed
+Compose command and secret-file checklist only when needed, while External
+mode links to Media & storage for the existing folder/path-translation flow.
+See [Soulseek Provider-Mode Recovery
+Guidance](SLSKD_PROVIDER_MODE_RECOVERY_GUIDANCE_DESIGN.md).

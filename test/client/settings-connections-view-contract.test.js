@@ -34,6 +34,7 @@ test('SettingsConnectionsView exposes explicit managed, external, and disabled p
   assert.match(source, /value="disabled"/);
   assert.match(source, /v-if="isExternalSoulseek"/);
   assert.match(source, /:disabled="isTestingProviderHealth \|\| isSoulseekDisabled"/);
+  assert.match(source, /SoulseekProviderModeGuidance/);
 });
 
 test('SettingsConnectionsView keeps optional service setup and timing controls behind named disclosures', async () => {
