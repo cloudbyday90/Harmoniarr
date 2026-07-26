@@ -1,7 +1,7 @@
 # Activity Information Hierarchy Design
 
-**Status:** Implemented 2026-07-26  
-**Scope:** Activity workspace and normal timeline presentation  
+**Status:** Implemented 2026-07-26
+**Scope:** Activity workspace and normal timeline presentation
 **Decision:** Make Activity a quiet, scan-first history surface. Show controls
 and semantic emphasis only where they change the next decision.
 
@@ -46,38 +46,38 @@ normally only scan for a completed release or a clear item needing help.
 
 ### Keep the pill-heavy layout
 
-**Pros:** Every category is always visible; no implementation change.  
+**Pros:** Every category is always visible; no implementation change.
 **Cons:** Repeated category labels compete with event titles and make the page
-feel like a control panel.  
+feel like a control panel.
 **Decision:** Reject.
 
 ### Replace the filter pills with custom tabs or a toolbar
 
-**Pros:** Could offer keyboard shortcuts and visible categories.  
+**Pros:** Could offer keyboard shortcuts and visible categories.
 **Cons:** Introduces custom interaction semantics for an infrequently used
-filter and still consumes horizontal space on mobile.  
+filter and still consumes horizontal space on mobile.
 **Decision:** Reject.
 
 ### Use a labeled native select with attention-only row emphasis
 
 **Pros:** Familiar, compact, keyboard-accessible, responsive, and preserves
 every existing filter. Event titles carry normal context; the one colored pill
-is reserved for a repair state.  
-**Cons:** Categories are not all visible simultaneously.  
+is reserved for a repair state.
+**Cons:** Categories are not all visible simultaneously.
 **Decision:** Adopt.
 
 ### Remove timestamps from the timeline
 
-**Pros:** Fewer repeated labels.  
-**Cons:** Removes critical chronology from history.  
+**Pros:** Fewer repeated labels.
+**Cons:** Removes critical chronology from history.
 **Decision:** Reject. Keep one timestamp per top-level row; disclose detailed
 step timestamps only when a release story is expanded.
 
 ### Remove Advanced diagnostics from Activity
 
-**Pros:** Simplest normal path.  
+**Pros:** Simplest normal path.
 **Cons:** Breaks the operator troubleshooting boundary and existing diagnostic
-routes.  
+routes.
 **Decision:** Reject. On the normal timeline route, move the collapsed
 disclosure below the timeline; keep it ahead of the selected diagnostic view.
 
