@@ -929,6 +929,11 @@ and rediscovery.
 - [x] Block auto-download before provider enqueue when folder setup is missing.
 - [x] After validated folder setup is saved, release only the bounded automatic
   requests stopped by that folder gate and start one ordinary discovery run.
+- [x] Prove in a Docker-backed browser that a resumed automatic search reaches
+  a policy-compliant downloading release and Downloader without candidate
+  navigation, while strict quality and disabled-provider stops keep that
+  handoff unavailable. See
+  `MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_HANDOFF_BROWSER_VERIFICATION_DESIGN.md`.
 - [x] Exclude matches blocked by failed download or operator rejection from
   automatic recovery.
 - [x] On failed download execution, keep the failed match terminal and attempt
@@ -1267,15 +1272,26 @@ Completed follow-up reliability slice:
   contract are documented in
   [MUSIC_QUEUE_FOLDER_SETUP_RECOVERY_CONFIRMATION_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_FOLDER_SETUP_RECOVERY_CONFIRMATION_BROWSER_VERIFICATION_DESIGN.md).
 
+Completed automatic handoff confidence slice:
+
+- A Docker-backed browser contract now proves Music Queue moves from
+  `Searching` to `Downloading` after a policy-compliant selection and hands the
+  user to a visible live Downloader transfer without diagnostic navigation.
+- The same contract proves a strict lossless quality stop and a disabled
+  provider remain out of Downloader and show one clear user-facing action.
+- The detailed design and validation boundary are documented in
+  [MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
+
 Recommended next slice:
 
-1. extend the automatic search lifecycle proof from validated folder recovery
-   through policy-compliant match selection and Downloader handoff;
-2. prove an unacceptable lossless/quality result remains stopped rather than
-   being selected automatically;
-3. prove unavailable-provider handling keeps the release safe and provides one
-   concise repair path.
+1. prove the post-transfer path from a completed eligible download through
+   media inspection, safe automatic library add, and a concise Activity event;
+2. prove one unsafe media result stops at the correct release with one repair
+   action and no library add;
+3. keep this acceptance proof deterministic in the Docker walkthrough rather
+   than relying on a public Soulseek peer.
 
-Reason: recovery is now visible and browser-tested. The next confidence gap is
-the automation path immediately after search resumes, where quality and
-provider safeguards must remain as clear as the folder gate.
+Reason: folder recovery, automatic selection, strict quality policy, provider
+gating, and Downloader handoff now have clear browser coverage. The remaining
+high-value user journey is the successful and unsafe completion path after a
+transfer finishes.
