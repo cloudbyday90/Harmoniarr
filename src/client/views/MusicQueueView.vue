@@ -17,9 +17,10 @@
 -->
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
+import MusicQueueProviderRecoveryVisibility from '../components/music-queue/MusicQueueProviderRecoveryVisibility.vue';
 import {
   buildMusicQueueMatchReview,
   buildMusicQueueReleaseTypeFilters,
@@ -29,7 +30,16 @@ import {
 import { useMusicQueue } from '../composables/useMusicQueue.js';
 import { useMusicQueueProviderRepairContext } from '../composables/useMusicQueueProviderRepairContext.js';
 import { hasMusicQueueProviderDependentWork } from '../lib/music-queue-provider-repair-presentation.js';
+import {
+  buildMusicQueueProviderRecoveryVisibility,
+  isMusicQueueProviderReadyRecoveryContext,
+  omitMusicQueueProviderReadyRecoveryQuery,
+} from '../lib/music-queue-provider-recovery-visibility-presentation.js';
 import { sessionStore } from '../state/session.js';
+
+const route = useRoute();
+const router = useRouter();
+const isProviderReadyRecoveryReturn = isMusicQueueProviderReadyRecoveryContext(route.query.recovery);
 
 const {
   actionErrorMessage,
@@ -47,7 +57,7 @@ const {
   summaryCards,
   totalCount,
   useMatch,
-} = useMusicQueue();
+} = useMusicQueue({ immediate: !isProviderReadyRecoveryReturn });
 
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
 const hasProviderDependentMusicQueueWork = computed(() =>
@@ -63,12 +73,11 @@ const {
   enabled: shouldCheckProviderRepair,
 });
 
-const route = useRoute();
-const router = useRouter();
 const query = ref('');
 const selectedState = ref('all');
 const selectedReleaseType = ref('all');
 const selectedReleaseId = ref(typeof route.params.wantedReleaseId === 'string' ? route.params.wantedReleaseId : null);
+const providerRecoveryVisibility = ref(null);
 
 const releaseTypeFilters = computed(() => buildMusicQueueReleaseTypeFilters(releases.value));
 const filteredReleases = computed(() => filterMusicQueueReleases(releases.value, {
@@ -140,6 +149,25 @@ async function refreshMusicQueue() {
   await refreshProviderRepairContext();
 }
 
+async function consumeProviderReadyRecoveryReturn() {
+  if (!isProviderReadyRecoveryReturn) return;
+
+  await refreshMusicQueue();
+  providerRecoveryVisibility.value = buildMusicQueueProviderRecoveryVisibility({
+    refreshFailed: Boolean(errorMessage.value),
+    releases: releases.value,
+  });
+
+  await router.replace({
+    name: 'music-queue',
+    query: omitMusicQueueProviderReadyRecoveryQuery(route.query),
+  });
+}
+
+onMounted(() => {
+  void consumeProviderReadyRecoveryReturn();
+});
+
 watch(
   () => route.params.wantedReleaseId,
   (wantedReleaseId) => {
@@ -168,6 +196,8 @@ watch(
       :notice="musicQueueProviderRepairNotice"
       return-context="music_queue"
     />
+
+    <MusicQueueProviderRecoveryVisibility :visibility="providerRecoveryVisibility" />
 
     <div class="music-queue-summary">
       <article v-for="card in summaryCards" :key="card.key" class="music-queue-summary-card">

@@ -17,6 +17,7 @@
  */
 
 import { buildMusicQueueProviderRepairNotice } from './music-queue-provider-repair-presentation.js';
+import { MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT } from './music-queue-provider-recovery-visibility-presentation.js';
 
 export const MUSIC_QUEUE_PROVIDER_REPAIR_RETURN_CONTEXT = 'music_queue';
 
@@ -103,6 +104,7 @@ export function buildMusicQueueProviderRepairRecoveryConfirmation({
   return buildConfirmation({
     action: {
       label: 'Return to Music Queue',
+      query: { recovery: MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT },
       routeName: 'music-queue',
     },
     copy: 'Music Queue can continue its normal checks. Harmoniarr has not started a download yet.',

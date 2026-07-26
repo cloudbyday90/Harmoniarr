@@ -46,7 +46,7 @@ the Music Queue return context.
 
 | Result | Meaning | Action |
 | --- | --- | --- |
-| Soulseek is ready | Music Queue can continue normal checks; no download has started. | Return to Music Queue |
+| Soulseek is ready | Music Queue can continue normal checks; no download has started. | Return to Music Queue with one bounded queue refresh |
 | Downloads still off | Provider mode is still Disabled. | Keep the operator in Connections. |
 | Managed setup still required | The managed deployment remains unavailable. | Keep the operator in Connections. |
 | Soulseek still needs setup or attention | External configuration or reachability remains unresolved. | Keep the operator in Connections. |
@@ -71,9 +71,7 @@ unverified outcomes. Browser verification follows the Music Queue handoff,
 saves Connections, proves the bounded ready message and return link, and
 checks for browser errors.
 
-## Next Item
+## Follow-On
 
-The next high-value item is **Music Queue recovery visibility**: after the
-operator returns, refresh the queue once and show the earliest eligible release
-as waiting for its next normal check, without introducing a manual dispatch
-button.
+The bounded return refresh and waiting-release status are implemented in
+[MUSIC_QUEUE_PROVIDER_RECOVERY_VISIBILITY_DESIGN.md](MUSIC_QUEUE_PROVIDER_RECOVERY_VISIBILITY_DESIGN.md).

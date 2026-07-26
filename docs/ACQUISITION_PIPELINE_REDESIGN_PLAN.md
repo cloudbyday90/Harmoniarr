@@ -1019,6 +1019,11 @@ right repair surface.
   from Music Queue. The safe, bounded result states eligibility to continue and
   offers a return link only after a verified healthy check. See
   `MUSIC_QUEUE_PROVIDER_REPAIR_RECOVERY_CONFIRMATION_DESIGN.md`.
+- [x] Surface bounded Music Queue recovery visibility after a verified provider
+  repair. The fixed return token triggers one queue refresh, reports only the
+  first release already waiting for the normal search cycle, and is consumed
+  from the URL without dispatching work. See
+  `MUSIC_QUEUE_PROVIDER_RECOVERY_VISIBILITY_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See

@@ -197,6 +197,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   from Music Queue now refreshes bounded provider health, reports eligibility
   without claiming a transfer, and uses only an allow-listed return context.
   See `MUSIC_QUEUE_PROVIDER_REPAIR_RECOVERY_CONFIRMATION_DESIGN.md`.
+- Music Queue provider recovery visibility: returning after a verified
+  Connections repair now performs one queue refresh, names only the first
+  release already waiting for its normal search check, consumes the fixed
+  return token, and does not dispatch a search or download. See
+  `MUSIC_QUEUE_PROVIDER_RECOVERY_VISIBILITY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

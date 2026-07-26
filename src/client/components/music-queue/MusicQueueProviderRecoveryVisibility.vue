@@ -18,87 +18,73 @@
 
 <script setup>
 import { computed } from 'vue';
-import { RouterLink } from 'vue-router';
 
 const props = defineProps({
-  confirmation: {
+  visibility: {
     default: null,
     type: Object,
   },
 });
 
-const headingId = computed(() => `music-queue-provider-recovery-${props.confirmation?.outcome ?? 'status'}`);
+const headingId = computed(() => `music-queue-provider-recovery-visibility-${props.visibility?.outcome ?? 'status'}`);
 const statusMessage = computed(() => (
-  props.confirmation ? `${props.confirmation.title}. ${props.confirmation.copy}` : ''
+  props.visibility ? `${props.visibility.title}. ${props.visibility.copy}` : ''
 ));
 </script>
 
 <template>
-  <p class="music-queue-provider-recovery__status" role="status" aria-atomic="true">
+  <p class="music-queue-provider-recovery-visibility__status" role="status" aria-atomic="true">
     {{ statusMessage }}
   </p>
 
   <section
-    v-if="confirmation"
-    class="music-queue-provider-recovery"
+    v-if="visibility"
+    class="music-queue-provider-recovery-visibility"
     :aria-labelledby="headingId"
-    :data-tone="confirmation.tone"
+    :data-tone="visibility.tone"
   >
     <div>
-      <h2 :id="headingId">{{ confirmation.title }}</h2>
-      <p>{{ confirmation.copy }}</p>
+      <h2 :id="headingId">{{ visibility.title }}</h2>
+      <p>{{ visibility.copy }}</p>
     </div>
-    <RouterLink
-      v-if="confirmation.action"
-      class="hx-btn"
-      data-variant="ghost"
-      :to="{ name: confirmation.action.routeName, query: confirmation.action.query }"
-    >
-      {{ confirmation.action.label }}
-    </RouterLink>
   </section>
 </template>
 
 <style scoped>
-.music-queue-provider-recovery {
-  align-items: center;
+.music-queue-provider-recovery-visibility {
   background: var(--hx-bg-surface-muted);
   border: 1px solid var(--hx-border);
   border-radius: var(--hx-radius-sm);
-  display: flex;
-  gap: var(--hx-space-4);
-  justify-content: space-between;
-  margin-top: var(--hx-space-4);
   padding: var(--hx-space-3) var(--hx-space-4);
 }
 
-.music-queue-provider-recovery[data-tone='success'] {
+.music-queue-provider-recovery-visibility[data-tone='success'] {
   background: var(--hx-success-soft);
   border-color: var(--hx-success);
 }
 
-.music-queue-provider-recovery[data-tone='warning'] {
+.music-queue-provider-recovery-visibility[data-tone='warning'] {
   background: var(--hx-warning-soft);
   border-color: var(--hx-warning);
 }
 
-.music-queue-provider-recovery h2,
-.music-queue-provider-recovery p {
+.music-queue-provider-recovery-visibility h2,
+.music-queue-provider-recovery-visibility p {
   margin: 0;
 }
 
-.music-queue-provider-recovery h2 {
+.music-queue-provider-recovery-visibility h2 {
   color: var(--hx-text-strong);
   font-size: var(--hx-text-md);
 }
 
-.music-queue-provider-recovery p {
+.music-queue-provider-recovery-visibility p {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
   margin-top: var(--hx-space-1);
 }
 
-.music-queue-provider-recovery__status {
+.music-queue-provider-recovery-visibility__status {
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   height: 1px;
@@ -107,12 +93,5 @@ const statusMessage = computed(() => (
   position: absolute;
   white-space: nowrap;
   width: 1px;
-}
-
-@media (max-width: 640px) {
-  .music-queue-provider-recovery {
-    align-items: flex-start;
-    flex-direction: column;
-  }
 }
 </style>

@@ -34,14 +34,14 @@ function buildMusicQueuePayload() {
       releaseGroupType: 'Album',
       releaseTitle: 'Music Has the Right to Children',
       status: {
-        code: 'searching',
-        detail: 'Harmoniarr is looking for an acceptable match.',
-        label: 'Searching',
-        nextAction: 'review_matches',
-        tone: 'info',
+        code: 'queued_for_search',
+        detail: 'This release is waiting for the next search pass.',
+        label: 'Queued for search',
+        nextAction: 'search_now',
+        tone: 'neutral',
       },
     }],
-    summary: { counts: { searching: 1 }, total: 1 },
+    summary: { counts: { queued_for_search: 1 }, total: 1 },
   };
 }
 
@@ -74,10 +74,12 @@ suite('Music Queue provider repair recovery confirmation browser verification', 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
       const pageErrors = [];
       let soulseekIsHealthy = false;
+      let musicQueueReadCount = 0;
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
       await bootstrapAdminThroughUi(page, { baseUrl });
       await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+        musicQueueReadCount += 1;
         await route.fulfill({
           body: JSON.stringify(buildMusicQueuePayload()),
           contentType: 'application/json',
@@ -111,8 +113,17 @@ suite('Music Queue provider repair recovery confirmation browser verification', 
       await confirmation.getByText('Music Queue can continue its normal checks. Harmoniarr has not started a download yet.').waitFor();
       assert.equal(
         await confirmation.getByRole('link', { name: 'Return to Music Queue' }).getAttribute('href'),
-        '/app/music-queue',
+        '/app/music-queue?recovery=provider_ready',
       );
+
+      const queueReadCountBeforeReturn = musicQueueReadCount;
+      await confirmation.getByRole('link', { name: 'Return to Music Queue' }).click();
+
+      const recoveryVisibility = page.locator('.music-queue-provider-recovery-visibility');
+      await recoveryVisibility.getByRole('heading', { name: 'Music Queue is ready' }).waitFor();
+      await recoveryVisibility.getByText('Music Has the Right to Children by Boards of Canada is waiting for its next normal search check. Harmoniarr has not started a download yet.').waitFor();
+      await page.waitForURL(/\/app\/music-queue$/);
+      assert.equal(musicQueueReadCount, queueReadCountBeforeReturn + 1);
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'music_queue_provider_repair_recovery_confirmation' });
   });

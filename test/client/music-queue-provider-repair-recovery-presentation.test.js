@@ -23,6 +23,7 @@ import {
   isMusicQueueProviderRepairReturnContext,
   MUSIC_QUEUE_PROVIDER_REPAIR_RETURN_CONTEXT,
 } from '../../src/client/lib/music-queue-provider-repair-recovery-presentation.js';
+import { MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT } from '../../src/client/lib/music-queue-provider-recovery-visibility-presentation.js';
 
 function buildSetupProgress({
   managedDeploymentMissing = false,
@@ -47,7 +48,11 @@ test('Music Queue provider recovery confirms readiness without claiming a downlo
   });
 
   assert.deepEqual(confirmation, {
-    action: { label: 'Return to Music Queue', routeName: 'music-queue' },
+    action: {
+      label: 'Return to Music Queue',
+      query: { recovery: MUSIC_QUEUE_PROVIDER_READY_RECOVERY_CONTEXT },
+      routeName: 'music-queue',
+    },
     copy: 'Music Queue can continue its normal checks. Harmoniarr has not started a download yet.',
     outcome: 'ready',
     title: 'Soulseek is ready',
