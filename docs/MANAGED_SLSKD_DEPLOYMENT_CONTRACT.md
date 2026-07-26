@@ -1,6 +1,6 @@
 # Managed slskd Deployment Contract
 
-Status: **Implemented deployment foundation.**
+Status: **Implemented and Docker-smoke validated.**
 
 This document defines the supported managed slskd deployment shape. It replaces
 the former standalone example with an optional Docker Compose overlay while
@@ -67,7 +67,13 @@ The overlay defines three services:
    requirement.
 3. `slskd`: the pinned `slskd/slskd:0.26.0` provider. It starts only after the
    renderer succeeds, persists `/app`, and has no default host mapping for its
-   admin API or web UI.
+   admin API or web UI. Its single-file .NET bundle extracts into `/app/.net`,
+   a persistent directory writable only by the configured container user.
+
+Managed slskd binds its private API to `0.0.0.0` only. Do not add `[::]` to
+this binding: a dual IPv4/IPv6 Kestrel bind can collide on port `5030` in the
+container runtime. Docker service networking remains available to Harmoniarr
+over the internal IPv4 bridge.
 
 The provider API is private on the internal `harmoniarr-provider` bridge. The
 Harmoniarr and slskd egress networks are intentionally separate, so the app
@@ -157,8 +163,12 @@ This foundation is covered by:
   output;
 - Compose contract tests proving private API exposure, persistent configuration,
   pinning, and least-secret access;
+- a Docker-backed managed-provider smoke that uses disposable secret files,
+  blocks slskd external egress, checks generated config permissions, and
+  authenticates to the real private API from Harmoniarr;
 - existing Compose image-tag enforcement.
 
-The next implementation slice must add a Docker-backed managed-slskd smoke
-test with disposable credentials, then add provider-mode onboarding so managed,
-external, and disabled setups are explicit in Settings.
+See [Managed slskd Docker Smoke Design](MANAGED_SLSKD_DOCKER_SMOKE_DESIGN.md)
+for the executed evidence and replay command. The next implementation slice is
+provider-mode onboarding so managed, external, and disabled setups are explicit
+in Settings.

@@ -57,6 +57,7 @@ test('renderManagedSlskdConfig produces a headless, immutable, path-aligned conf
   assert.match(config, /^headless: true$/mu);
   assert.match(config, /^remote_configuration: false$/mu);
   assert.match(config, /^remote_file_management: false$/mu);
+  assert.match(config, /^\s{2}ip_address: "0\.0\.0\.0"$/mu);
   assert.match(config, /^\s{2}downloads: "\/data\/downloads"$/mu);
   assert.match(config, /^\s{2}incomplete: "\/data\/incomplete"$/mu);
   assert.match(config, /^\s{8}role: readwrite$/mu);

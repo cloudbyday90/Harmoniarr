@@ -21,6 +21,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const COMPOSE_PATH = new URL('../../compose.slskd-example.yaml', import.meta.url);
+const SMOKE_COMPOSE_PATH = new URL('../../compose.slskd-smoke.yaml', import.meta.url);
 
 test('managed slskd Compose overlay keeps the API private and persists generated configuration', async () => {
   const source = await readFile(COMPOSE_PATH, 'utf8');
@@ -30,6 +31,7 @@ test('managed slskd Compose overlay keeps the API private and persists generated
   assert.match(source, /SLSKD_API_KEY_FILE: \/run\/secrets\/slskd_api_key/u);
   assert.match(source, /HARMONIARR_SLSKD_APPDATA[^\n]*:\/app/u);
   assert.match(source, /HARMONIARR_DOWNLOADS[^\n]*:\/data\/downloads/u);
+  assert.match(source, /DOTNET_BUNDLE_EXTRACT_BASE_DIR: \/app\/.net/u);
   assert.match(source, /harmoniarr-provider:[\s\S]*?internal: true/u);
   assert.match(source, /expose:\n\s+- "5030"/u);
   assert.doesNotMatch(source, /SLSKD_WEB_PORT/u);
@@ -50,4 +52,11 @@ test('managed slskd Compose overlay grants secrets only to the services that nee
   assert.match(configService, /network_mode: none/u);
   assert.match(providerService, /SLSKD_CONFIG: \/app\/slskd\.yml/u);
   assert.doesNotMatch(providerService, /secrets:/u);
+});
+
+test('managed slskd smoke overlay removes provider internet egress', async () => {
+  const source = await readFile(SMOKE_COMPOSE_PATH, 'utf8');
+
+  assert.match(source, /slskd-egress:/u);
+  assert.match(source, /internal: true/u);
 });

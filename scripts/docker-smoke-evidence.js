@@ -65,6 +65,45 @@ function assertDockerProviderAcceptanceValidationResult(validationResult, valida
   }
 }
 
+function assertManagedSlskdValidationResult(validationResult, validationKind) {
+  assertObjectSection(validationResult.config, `${validationKind}.config`);
+  assertObjectSection(validationResult.harmoniarr, `${validationKind}.harmoniarr`);
+  assertObjectSection(validationResult.provider, `${validationKind}.provider`);
+  assertStringField(validationResult.projectName, `${validationKind}.projectName`);
+
+  if (validationResult.config.rendererExitCode !== 0) {
+    throw new Error(`${validationKind}.config.rendererExitCode must equal 0`);
+  }
+
+  if (validationResult.config.fileMode !== '600') {
+    throw new Error(`${validationKind}.config.fileMode must equal 600`);
+  }
+
+  if (validationResult.config.remoteConfigurationDisabled !== true) {
+    throw new Error(`${validationKind}.config.remoteConfigurationDisabled must equal true`);
+  }
+
+  if (validationResult.harmoniarr.healthCheckOk !== true) {
+    throw new Error(`${validationKind}.harmoniarr.healthCheckOk must equal true`);
+  }
+
+  if (validationResult.provider.apiPortPublished !== false) {
+    throw new Error(`${validationKind}.provider.apiPortPublished must equal false`);
+  }
+
+  if (validationResult.provider.apiProbeStatus !== 200) {
+    throw new Error(`${validationKind}.provider.apiProbeStatus must equal 200`);
+  }
+
+  if (validationResult.provider.egressIsolated !== true) {
+    throw new Error(`${validationKind}.provider.egressIsolated must equal true`);
+  }
+
+  if (validationResult.provider.healthStatus !== 'healthy') {
+    throw new Error(`${validationKind}.provider.healthStatus must equal healthy`);
+  }
+}
+
 export function assertDockerSmokeValidationResultContract({
   validationKind,
   validationResult,
@@ -81,6 +120,9 @@ export function assertDockerSmokeValidationResultContract({
       break;
     case 'docker-provider-acceptance':
       assertDockerProviderAcceptanceValidationResult(normalizedValidationResult, validationKind);
+      break;
+    case 'managed-slskd':
+      assertManagedSlskdValidationResult(normalizedValidationResult, validationKind);
       break;
     default:
       break;

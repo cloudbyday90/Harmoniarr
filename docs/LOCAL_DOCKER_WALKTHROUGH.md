@@ -68,6 +68,19 @@ provider network, renders `slskd.yml` from Docker secret files, and aligns
 completed downloads at `/data/downloads` without a normal-case path mapping.
 See [Managed slskd Deployment Contract](MANAGED_SLSKD_DEPLOYMENT_CONTRACT.md).
 
+To replay the account-free managed provider startup proof on a Docker-capable
+machine, run:
+
+```powershell
+npm run validate:managed-slskd-smoke
+```
+
+It creates and removes a separate temporary project, uses disposable secrets,
+and intentionally blocks the provider's external network access. It proves
+configuration rendering and private API access only; it does not test a real
+Soulseek login, search, or download. See [Managed slskd Docker Smoke
+Design](MANAGED_SLSKD_DOCKER_SMOKE_DESIGN.md).
+
 If slskd is running outside the walkthrough Compose stack, Harmoniarr also needs
 container-visible access to the folder where slskd writes completed downloads.
 A Windows or Unraid host path such as `Y:\` is not visible inside the

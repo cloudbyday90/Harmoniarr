@@ -1,0 +1,9 @@
+# Managed slskd smoke-test isolation overlay
+#
+# This file is consumed only by validate:managed-slskd-smoke. It prevents the
+# disposable provider from reaching the public Soulseek network while retaining
+# the private harmoniarr-provider network required for the API probe.
+
+networks:
+  slskd-egress:
+    internal: true

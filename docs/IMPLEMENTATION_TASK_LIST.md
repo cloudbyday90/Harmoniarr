@@ -157,8 +157,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   now an optional Compose overlay with a one-shot configuration renderer,
   persistent app/download mounts, private provider networking, file-mounted
   API credentials, pinned provider image, and an external-provider escape hatch
-  for existing Unraid/VPN deployments. See
-  `MANAGED_SLSKD_DEPLOYMENT_CONTRACT.md`.
+  for existing Unraid/VPN deployments. A dedicated Docker smoke now proves the
+  renderer, secure bundle extraction, IPv4-only provider bind, private
+  authenticated API access, generated-config permissions, and cleanup with
+  disposable credentials. See
+  [Managed slskd Docker Smoke Design](MANAGED_SLSKD_DOCKER_SMOKE_DESIGN.md)
+  and [Managed slskd Deployment Contract](MANAGED_SLSKD_DEPLOYMENT_CONTRACT.md).
 - Settings progressive disclosure: Settings now starts with a concise setup
   checklist, keeps Soulseek health, folder locations, and library behavior in
   the primary flow, and moves specialist timing, provider, quality, retention,

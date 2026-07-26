@@ -65,6 +65,7 @@ services:
         condition: service_completed_successfully
     environment:
       APP_DIR: /app
+      DOTNET_BUNDLE_EXTRACT_BASE_DIR: /app/.net
       SLSKD_CONFIG: /app/slskd.yml
       SLSKD_UMASK: "${UMASK:-0022}"
     expose:
