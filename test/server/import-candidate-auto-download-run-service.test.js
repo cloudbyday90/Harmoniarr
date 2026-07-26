@@ -18,6 +18,7 @@ test('startDownloadRunAfterAutoSelection starts a download run for healthy high-
     },
   }));
   const service = createImportCandidateAutoDownloadRunService({
+    getAutomaticDownloadFolderReadiness: t.mock.fn(async () => ({ ready: true })),
     getProviderStatus: t.mock.fn(async () => ({ provider: 'slskd', status: 'healthy' })),
     loadSettingsFn: t.mock.fn(async () => ({
       library: {
@@ -59,6 +60,7 @@ test('startDownloadRunAfterAutoSelection skips when library automation is disabl
     throw new Error('download run should not start');
   });
   const service = createImportCandidateAutoDownloadRunService({
+    getAutomaticDownloadFolderReadiness: t.mock.fn(async () => ({ ready: true })),
     getProviderStatus: t.mock.fn(async () => ({ provider: 'slskd', status: 'healthy' })),
     loadSettingsFn: t.mock.fn(async () => ({
       library: {
@@ -82,6 +84,7 @@ test('startDownloadRunAfterAutoSelection skips when slskd is not healthy', async
     throw new Error('download run should not start');
   });
   const service = createImportCandidateAutoDownloadRunService({
+    getAutomaticDownloadFolderReadiness: t.mock.fn(async () => ({ ready: true })),
     getProviderStatus: t.mock.fn(async () => ({
       message: 'Configure Soulseek (slskd) in Settings to enable downloads and discovery searches.',
       provider: 'slskd',
@@ -105,6 +108,7 @@ test('startDownloadRunAfterAutoSelection reports active-run conflicts without th
   const conflict = new Error('An import execution planning run is already running or queued');
   conflict.code = 'import_candidate_execution_in_progress';
   const service = createImportCandidateAutoDownloadRunService({
+    getAutomaticDownloadFolderReadiness: async () => ({ ready: true }),
     getProviderStatus: async () => ({ provider: 'slskd', status: 'healthy' }),
     loadSettingsFn: async () => ({ library: {} }),
     startImportCandidateExecutionRun: async () => {
@@ -119,4 +123,29 @@ test('startDownloadRunAfterAutoSelection reports active-run conflicts without th
   assert.equal(result.started, false);
   assert.equal(result.errorCode, 'import_candidate_execution_in_progress');
   assert.equal(result.skippedReason, 'import_candidate_execution_in_progress');
+});
+
+test('startDownloadRunAfterAutoSelection blocks provider enqueue when managed folders are not ready', async (t) => {
+  const getProviderStatus = t.mock.fn(async () => ({ provider: 'slskd', status: 'healthy' }));
+  const startImportCandidateExecutionRun = t.mock.fn(async () => ({ run: { id: 'run-1' } }));
+  const service = createImportCandidateAutoDownloadRunService({
+    getAutomaticDownloadFolderReadiness: t.mock.fn(async () => ({
+      message: 'Finish folder setup before Harmoniarr can start downloads automatically.',
+      ready: false,
+      reason: 'missing_download_folder',
+    })),
+    getProviderStatus,
+    loadSettingsFn: t.mock.fn(async () => ({ library: {} })),
+    startImportCandidateExecutionRun,
+  });
+
+  const result = await service.startDownloadRunAfterAutoSelection({
+    autoSelectionResult: selectedAutoSelection,
+  });
+
+  assert.equal(result.started, false);
+  assert.equal(result.setupReason, 'missing_download_folder');
+  assert.equal(result.skippedReason, 'missing_download_folder');
+  assert.equal(getProviderStatus.mock.callCount(), 0);
+  assert.equal(startImportCandidateExecutionRun.mock.callCount(), 0);
 });

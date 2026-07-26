@@ -255,6 +255,22 @@ export function createLibraryDiscoveryDispatchService({
     }
   }
 
+  async function checkAutomaticDownloadReadiness() {
+    if (typeof importCandidateAutoDownloadRunService?.checkAutomaticDownloadReadiness !== 'function') {
+      return null;
+    }
+
+    try {
+      return await importCandidateAutoDownloadRunService.checkAutomaticDownloadReadiness();
+    } catch {
+      return {
+        message: 'Harmoniarr could not verify folder setup before starting a download.',
+        ready: false,
+        setupReason: 'download_folder_unavailable',
+      };
+    }
+  }
+
   async function dispatchTrackFallbackSearches({
     actorUserId,
     claimedRequest,
@@ -308,7 +324,10 @@ export function createLibraryDiscoveryDispatchService({
           requestMetadata,
           searchId: search.id,
         });
-        const autoSelectionResult = ingestionResult.candidateCount > 0
+        const autoDownloadReadiness = ingestionResult.candidateCount > 0
+          ? await checkAutomaticDownloadReadiness()
+          : null;
+        const autoSelectionResult = ingestionResult.candidateCount > 0 && autoDownloadReadiness?.ready !== false
           ? await selectHighConfidenceCandidateAfterIngestion({
             actorUserId,
             ...qualityContext,
@@ -338,6 +357,9 @@ export function createLibraryDiscoveryDispatchService({
         };
         if (autoSelectionResult) {
           dispatchedSearch.autoSelection = autoSelectionResult;
+        }
+        if (autoDownloadReadiness) {
+          dispatchedSearch.autoDownloadReadiness = autoDownloadReadiness;
         }
         if (autoDownloadStartResult) {
           dispatchedSearch.autoDownloadStart = autoDownloadStartResult;
@@ -484,7 +506,10 @@ export function createLibraryDiscoveryDispatchService({
           requestMetadata,
           searchId: search.id,
         });
-        const autoSelectionResult = ingestionResult.candidateCount > 0
+        const autoDownloadReadiness = ingestionResult.candidateCount > 0
+          ? await checkAutomaticDownloadReadiness()
+          : null;
+        const autoSelectionResult = ingestionResult.candidateCount > 0 && autoDownloadReadiness?.ready !== false
           ? await selectHighConfidenceCandidateAfterIngestion({
             actorUserId,
             ...qualityContext,
@@ -521,6 +546,9 @@ export function createLibraryDiscoveryDispatchService({
         if (autoSelectionResult) {
           dispatchedSearch.autoSelection = autoSelectionResult;
         }
+        if (autoDownloadReadiness) {
+          dispatchedSearch.autoDownloadReadiness = autoDownloadReadiness;
+        }
         if (autoDownloadStartResult) {
           dispatchedSearch.autoDownloadStart = autoDownloadStartResult;
         }
@@ -538,6 +566,9 @@ export function createLibraryDiscoveryDispatchService({
         }
         if (autoSelectionResult) {
           successPayload.autoSelection = autoSelectionResult;
+        }
+        if (autoDownloadReadiness) {
+          successPayload.autoDownloadReadiness = autoDownloadReadiness;
         }
         if (autoDownloadStartResult) {
           successPayload.autoDownloadStart = autoDownloadStartResult;

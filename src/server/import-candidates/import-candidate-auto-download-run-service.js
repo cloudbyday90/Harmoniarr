@@ -17,6 +17,7 @@
  */
 
 import { loadSettings } from '../settings.js';
+import { createAutomaticDownloadFolderReadinessService } from '../paths/automatic-download-folder-readiness-service.js';
 
 export const AUTO_DOWNLOAD_RUN_TRIGGER_SOURCE = 'auto_selection';
 
@@ -40,10 +41,53 @@ function resolveAutoStartEnabled(settings) {
 }
 
 export function createImportCandidateAutoDownloadRunService({
+  getAutomaticDownloadFolderReadiness = createAutomaticDownloadFolderReadinessService().getAutomaticDownloadFolderReadiness,
   getProviderStatus = null,
   loadSettingsFn = loadSettings,
   startImportCandidateExecutionRun = null,
 } = {}) {
+  async function checkAutomaticDownloadReadiness({ settings = null } = {}) {
+    let effectiveSettings = settings;
+    if (!effectiveSettings) {
+      try {
+        effectiveSettings = await loadSettingsFn();
+      } catch {
+        return {
+          message: 'Harmoniarr could not verify folder setup before starting a download.',
+          ready: false,
+          setupReason: 'download_folder_unavailable',
+        };
+      }
+    }
+
+    if (typeof getAutomaticDownloadFolderReadiness !== 'function') {
+      return {
+        message: 'Harmoniarr could not verify folder setup before starting a download.',
+        ready: false,
+        setupReason: 'download_folder_unavailable',
+      };
+    }
+
+    try {
+      const folderReadiness = await getAutomaticDownloadFolderReadiness({ settings: effectiveSettings });
+      if (folderReadiness?.ready === true) {
+        return { ready: true };
+      }
+
+      return {
+        message: folderReadiness?.message ?? 'Harmoniarr could not verify folder setup before starting a download.',
+        ready: false,
+        setupReason: folderReadiness?.reason ?? 'download_folder_unavailable',
+      };
+    } catch {
+      return {
+        message: 'Harmoniarr could not verify folder setup before starting a download.',
+        ready: false,
+        setupReason: 'download_folder_unavailable',
+      };
+    }
+  }
+
   async function startDownloadRunAfterAutoSelection({
     actorUserId = null,
     autoSelectionResult = null,
@@ -79,6 +123,17 @@ export function createImportCandidateAutoDownloadRunService({
       return buildSkippedResult({
         selectedCandidateId: normalizedSelectedCandidateId,
         skippedReason: 'automatic_download_start_disabled',
+        sourceSearchId: normalizedSourceSearchId,
+      });
+    }
+
+    const readiness = await checkAutomaticDownloadReadiness({ settings });
+    if (!readiness.ready) {
+      return buildSkippedResult({
+        message: readiness.message,
+        selectedCandidateId: normalizedSelectedCandidateId,
+        setupReason: readiness.setupReason,
+        skippedReason: readiness.setupReason,
         sourceSearchId: normalizedSourceSearchId,
       });
     }
@@ -152,6 +207,7 @@ export function createImportCandidateAutoDownloadRunService({
   }
 
   return {
+    checkAutomaticDownloadReadiness,
     startDownloadRunAfterAutoSelection,
   };
 }

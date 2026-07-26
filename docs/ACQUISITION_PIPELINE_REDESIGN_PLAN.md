@@ -1238,21 +1238,29 @@ Work this document in order, without continuing to patch Issue #4:
 
 ---
 
-## 18. Recommended Next Slice
+## 18. Current Slice And Next Step
 
-Move to **Phase 2 - Music Queue UX And Match Drilldowns**.
+Completed follow-up reliability slice:
 
-Recommended first slice:
+- Automatic download folder readiness now runs before automatic match selection
+  and again before execution-run creation. It requires validated download,
+  staging, and library roots plus an explicit reachable slskd path mapping.
+- Folder failures keep discovered matches as evidence, prevent selected or
+  enqueued transfer state, and project as the existing `Needs setup` / `Set up
+  folders` release action without exposing raw infrastructure details.
+- The detailed design and validation contract is
+  [MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_FOLDER_READINESS_DESIGN.md](MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_FOLDER_READINESS_DESIGN.md).
 
-1. replace the visible `Activity > Candidates` primary copy with Music
-   Queue-oriented language and handoffs
-2. add the Music Queue match-review drilldown behind `Review matches`
-3. show setup blockers, quality blockers, auto-select readiness, and selected
-   download handoff on the release row
-4. keep raw Import Review/candidate controls available as advanced diagnostics
-5. add browser proof for a monitored artist flowing from wanted release to Music
-   Queue match state
+Recommended next slice:
 
-Reason: Phase 1 now gives us a read-only status contract and top-level route.
-The next high-value work is making the actual user workflow stop centering on
-raw candidates.
+1. after a successful Settings folder-validation save, identify only releases
+   stopped by `missing_download_folder` or `download_folder_unavailable`;
+2. schedule one bounded rediscovery pass for those eligible releases;
+3. keep normal search cooldowns, quality stops, terminal match exhaustion, and
+   provider-disabled work untouched;
+4. add browser proof showing `Set up folders` -> validated settings -> a
+   release returning to automatic search without manual candidate work.
+
+Reason: the new gate prevents unsafe or confusing automatic work. The next
+user-visible improvement is immediate, bounded self-recovery once the user has
+fixed the one blocker Harmoniarr identified.

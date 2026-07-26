@@ -433,6 +433,65 @@ test('dispatchReadyDiscoveryRequests starts download run after high-confidence a
   assert.equal(result.dispatchedSearches[0].autoDownloadStart.runId, 'run-1');
 });
 
+test('dispatchReadyDiscoveryRequests preserves candidates but defers automatic selection until folders are ready', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {},
+    metadataReleaseId: 'release-1',
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+  }];
+  const selectHighConfidenceCandidate = t.mock.fn(async () => {
+    throw new Error('automatic selection must wait for folder setup');
+  });
+  const startDownloadRunAfterAutoSelection = t.mock.fn(async () => {
+    throw new Error('automatic download start must wait for folder setup');
+  });
+  const recordDiscoverySearchSuccess = t.mock.fn(async () => {});
+  const readiness = {
+    message: 'Finish folder setup before Harmoniarr can start downloads automatically.',
+    ready: false,
+    setupReason: 'missing_download_folder',
+  };
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    importCandidateAutoDownloadRunService: {
+      checkAutomaticDownloadReadiness: t.mock.fn(async () => readiness),
+      startDownloadRunAfterAutoSelection,
+    },
+    importCandidateAutoSelectionService: { selectHighConfidenceCandidate },
+    importCandidateService: {
+      ingestSlskdSearchResponses: t.mock.fn(async () => ({
+        candidateCount: 2,
+        fileCount: 5,
+      })),
+    },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess,
+    },
+    slskdService: {
+      startSearch: t.mock.fn(async () => ({ id: 'search-1' })),
+    },
+  });
+
+  const result = await service.dispatchReadyDiscoveryRequests();
+
+  assert.equal(selectHighConfidenceCandidate.mock.callCount(), 0);
+  assert.equal(startDownloadRunAfterAutoSelection.mock.callCount(), 0);
+  assert.deepEqual(recordDiscoverySearchSuccess.mock.calls[0].arguments[0], {
+    autoDownloadReadiness: readiness,
+    candidateCount: 2,
+    fileCount: 5,
+    metadataReleaseId: 'release-1',
+    searchId: 'search-1',
+    searchQuery: 'Autechre Confield 2001',
+  });
+  assert.deepEqual(result.dispatchedSearches[0].autoDownloadReadiness, readiness);
+});
+
 test('dispatchReadyDiscoveryRequests threads release tracklist expectations into ingestion', async (t) => {
   const claimedRequests = [{
     metadataReleaseId: 'release-9',

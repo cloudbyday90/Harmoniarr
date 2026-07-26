@@ -284,6 +284,36 @@ test('listMusicQueueReleases maps quality-blocked add evidence to a quality choi
   assert.equal(result.summary.counts.quality_choice_needed, 1);
 });
 
+test('listMusicQueueReleases renders automatic folder readiness as a safe setup stop', async () => {
+  const release = createRelease();
+  release.discoveryRequest.evidence = {
+    lastSearchResult: {
+      autoDownloadReadiness: {
+        message: 'EACCES /private/downloads',
+        ready: false,
+        setupReason: 'download_folder_unavailable',
+      },
+    },
+  };
+  const service = createAcquisitionPipelineService({
+    acquisitionPipelineStore: {
+      listWantedReleaseEvidence: async () => ({
+        checkedAt: '2026-07-26T12:00:00.000Z',
+        pagination: { limit: 100, offset: 0, total: 1 },
+        releases: [release],
+      }),
+    },
+    qualityPolicyService,
+  });
+
+  const result = await service.listMusicQueueReleases({ appUserId: 'user-1' });
+
+  assert.equal(result.releases[0].status.code, 'needs_setup');
+  assert.equal(result.releases[0].status.nextAction, 'set_up_folders');
+  assert.equal(result.releases[0].status.detail, 'Harmoniarr cannot reach a required download or library folder.');
+  assert.doesNotMatch(JSON.stringify(result.releases[0].status), /private|EACCES/i);
+});
+
 test('listMusicQueueReleases forwards an optional artist filter to the scoped evidence store', async (t) => {
   const listWantedReleaseEvidence = t.mock.fn(async () => ({
     checkedAt: '2026-06-29T12:00:00.000Z',

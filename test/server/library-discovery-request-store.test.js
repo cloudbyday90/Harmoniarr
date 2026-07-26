@@ -81,6 +81,7 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
     assert.match(sql, /'lastSearchId', \$1::text/);
     assert.match(sql, /'lastSearchQuery', \$2::text/);
     assert.match(sql, /'candidateCount', \$3::integer/);
+    assert.match(sql, /'autoDownloadReadiness', \$10::jsonb/);
     assert.match(sql, /'autoSelection', \$9::jsonb/);
     assert.match(sql, /'fileCount', \$4::integer/);
     assert.match(sql, /'ingestionDiagnostics', \$8::jsonb/);
@@ -102,6 +103,7 @@ test('recordDiscoverySearchSuccess persists fallback scheduling metadata', async
         selected: false,
         skippedReason: 'no_candidates',
       }),
+      null,
     ]);
     return { rows: [] };
   });

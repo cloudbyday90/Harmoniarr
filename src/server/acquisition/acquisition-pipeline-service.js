@@ -68,10 +68,24 @@ function getStatusCount(statusCounts, status) {
 function buildSetupEvidence(release) {
   const discoveryRequest = release.discoveryRequest ?? {};
   const blockedReason = normalizeString(discoveryRequest.blockedReason);
+  const automaticDownloadReadiness = discoveryRequest?.evidence?.lastSearchResult?.autoDownloadReadiness;
+  const setupReason = normalizeString(automaticDownloadReadiness?.setupReason);
+  const folderBlocked = [
+    'missing_download_folder',
+    'download_folder_unavailable',
+  ].includes(setupReason) || [
+    'missing_download_folder',
+    'download_folder_unavailable',
+  ].includes(blockedReason);
+  const message = folderBlocked
+    ? (setupReason === 'missing_download_folder' || blockedReason === 'missing_download_folder'
+      ? 'Finish folder setup before Harmoniarr can start downloads automatically.'
+      : 'Harmoniarr cannot reach a required download or library folder.')
+    : (blockedReason || null);
   return {
-    folderBlocked: blockedReason === 'missing_download_folder' || blockedReason === 'download_folder_unavailable',
+    folderBlocked,
     mediaToolingBlocked: blockedReason === 'media_tooling_unavailable',
-    message: blockedReason || null,
+    message,
     providerBlocked: blockedReason === 'slskd_not_configured' || blockedReason === 'provider_unavailable',
   };
 }
