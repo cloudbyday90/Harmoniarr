@@ -74,11 +74,13 @@ COPY --from=server-builder /build/dist/server ./server-dist/
 COPY src/shared ./shared/
 COPY docker/entrypoint.sh /usr/local/bin/harmoniarr-entrypoint
 COPY docker/harmoniarrctl /usr/local/bin/harmoniarrctl
+COPY docker/managed-slskd-config.js /usr/local/bin/harmoniarr-managed-slskd-config.js
 COPY docker/walkthrough-bootstrap.js /usr/local/bin/harmoniarr-walkthrough-bootstrap.js
 
 RUN chmod 0755 \
     /usr/local/bin/harmoniarr-entrypoint \
     /usr/local/bin/harmoniarrctl \
+    /usr/local/bin/harmoniarr-managed-slskd-config.js \
     /usr/local/bin/harmoniarr-walkthrough-bootstrap.js
 
 USER harmoniarr

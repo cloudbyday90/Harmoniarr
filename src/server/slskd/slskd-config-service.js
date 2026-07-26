@@ -18,7 +18,10 @@
 
 import { createApiError } from '../auth.js';
 import { createEncryptedSecretService } from '../encrypted-secret-service.js';
-import { hasConfiguredSlskdApiKey, buildSlskdRuntimeConfig } from '../integrations/slskd/slskd-config.js';
+import {
+  buildSlskdRuntimeConfig,
+  resolveSlskdEnvironmentApiKey,
+} from '../integrations/slskd/slskd-config.js';
 import { loadSettings } from '../settings.js';
 
 const slskdApiKeySecretType = 'integration_credential';
@@ -43,15 +46,20 @@ export function createSlskdConfigService({
       queryable,
       secretType: slskdApiKeySecretType,
     });
-    const environmentSecretConfigured = hasConfiguredSlskdApiKey(env);
+    let environmentSecret = null;
+    try {
+      environmentSecret = resolveSlskdEnvironmentApiKey(env);
+    } catch {
+      // Connection health exposes the malformed deployment setting safely.
+    }
 
     return {
-      apiKeyConfigured: storedSecret.configured || environmentSecretConfigured,
-      apiKeySource: storedSecret.configured
-        ? 'stored'
-        : environmentSecretConfigured
-          ? 'environment'
-          : 'unset',
+      apiKeyConfigured: storedSecret.configured || environmentSecret !== null,
+      apiKeySource: environmentSecret?.source === 'managed_file'
+        ? 'managed_file'
+        : storedSecret.configured
+          ? 'stored'
+          : environmentSecret?.source ?? 'unset',
       apiKeyUpdatedAt: storedSecret.updatedAt ?? null,
     };
   }
@@ -135,8 +143,12 @@ export function createSlskdConfigService({
       secretType: slskdApiKeySecretType,
     });
 
+    const environmentApiKey = resolveSlskdEnvironmentApiKey(env);
+
     return buildSlskdRuntimeConfig({
-      apiKey: storedApiKey,
+      apiKey: environmentApiKey?.source === 'managed_file'
+        ? environmentApiKey.value
+        : storedApiKey,
       env,
       settings,
     });

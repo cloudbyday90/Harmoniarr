@@ -1,60 +1,118 @@
-# Harmoniarr + slskd example stack
+# Harmoniarr managed slskd deployment overlay
 #
-# This example keeps the download path aligned at /data/downloads in both
-# containers. Adjust slskd-specific settings for the exact image version and
-# configuration model you run, but keep the shared download mount identical.
-
-name: harmoniarr-slskd
+# Start it with:
+#   docker compose -f compose.yaml -f compose.slskd-example.yaml up -d --build
+#
+# This is a managed sidecar, not a second process inside Harmoniarr. The
+# slskd API stays on a private Docker network; only the Soulseek listener is
+# published. Existing Unraid/VPN-managed slskd instances should continue to use
+# the external-provider path instead of combining their lifecycle with this one.
 
 services:
   harmoniarr:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    depends_on:
+      slskd:
+        condition: service_healthy
+        restart: true
+    environment:
+      SLSKD_API_KEY_FILE: /run/secrets/slskd_api_key
+      SLSKD_BASE_URL: http://slskd:5030
+    networks:
+      - harmoniarr-egress
+      - harmoniarr-provider
+    secrets:
+      - slskd_api_key
+
+  slskd-config:
     image: "${HARMONIARR_IMAGE:-ghcr.io/cloudbyday90/harmoniarr:0.1.0-beta}"
-    restart: unless-stopped
-    init: true
-    stop_grace_period: 60s
+    restart: "no"
     user: "${PUID:-1000}:${PGID:-1000}"
     read_only: true
-    depends_on:
-      - slskd
+    network_mode: none
+    entrypoint:
+      - node
+      - /usr/local/bin/harmoniarr-managed-slskd-config.js
+    command: []
     environment:
-      TZ: ${TZ:-UTC}
-      UMASK: ${UMASK:-0022}
-      APP_PORT: ${APP_PORT:-3000}
-      HARMONIARR_BASE_URL: ${HARMONIARR_BASE_URL:-}
-      HARMONIARR_CONTACT_URL: ${HARMONIARR_CONTACT_URL:-https://github.com/cloudbyday90/harmoniarr}
-      HARMONIARR_CONTACT_EMAIL: ${HARMONIARR_CONTACT_EMAIL:-}
-      HARMONIARR_LOG_LEVEL: ${HARMONIARR_LOG_LEVEL:-info}
-      VAPID_CONTACT: "${VAPID_CONTACT:?Set VAPID_CONTACT before starting Harmoniarr}"
-      VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:?Set VAPID_PRIVATE_KEY by running npm run generate:vapid-keys}"
-      VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:?Set VAPID_PUBLIC_KEY by running npm run generate:vapid-keys}"
-      SLSKD_BASE_URL: ${SLSKD_BASE_URL:-http://slskd:5030}
-    ports:
-      - "${HARMONIARR_PORT:-47956}:${APP_PORT:-3000}"
+      HARMONIARR_SLSKD_CONFIG_PATH: /app/slskd.yml
+      HARMONIARR_SLSKD_DOWNLOADS_DIRECTORY: /data/downloads
+      HARMONIARR_SLSKD_INCOMPLETE_DIRECTORY: /data/incomplete
+      HARMONIARR_SLSKD_LISTEN_PORT: "${HARMONIARR_SLSKD_LISTEN_PORT:-50300}"
+      HARMONIARR_SLSKD_SECRET_DIRECTORY: /run/secrets
     volumes:
-      - "${HARMONIARR_APPDATA:-/srv/harmoniarr}:/app/data"
-      - "${HARMONIARR_DOWNLOADS:-/srv/slskd/downloads}:/data/downloads"
-      - "${HARMONIARR_MUSIC:-/srv/media/music}:/data/music"
-      - "${HARMONIARR_STAGING:-/srv/harmoniarr/staging}:/data/staging"
-      - "${HARMONIARR_TRANSCODE_TEMP:-/srv/harmoniarr/transcode-temp}:/data/transcode-temp"
+      - "${HARMONIARR_SLSKD_APPDATA:-/srv/harmoniarr/slskd}:/app"
+    secrets:
+      - slskd_api_key
+      - slskd_jwt_key
+      - slskd_soulseek_password
+      - slskd_soulseek_username
+      - slskd_web_password
+      - slskd_web_username
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
     tmpfs:
-      - /tmp:size=256m,mode=1777
-      - /run/postgresql:size=32m,mode=0770,uid=${PUID:-1000},gid=${PGID:-1000}
+      - /tmp:size=32m,mode=1777
 
   slskd:
-    image: slskd/slskd:0.25.1
+    image: slskd/slskd:0.26.0
     restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    depends_on:
+      slskd-config:
+        condition: service_completed_successfully
+    environment:
+      APP_DIR: /app
+      SLSKD_CONFIG: /app/slskd.yml
+      SLSKD_UMASK: "${UMASK:-0022}"
+    expose:
+      - "5030"
     ports:
-      - "${SLSKD_WEB_PORT:-5030}:5030"
+      - target: 50300
+        published: "${HARMONIARR_SLSKD_LISTEN_PORT:-50300}"
+        protocol: tcp
+        mode: host
     volumes:
-      - "${SLSKD_APPDATA:-/srv/slskd/config}:/app"
+      - "${HARMONIARR_SLSKD_APPDATA:-/srv/harmoniarr/slskd}:/app"
+      - "${HARMONIARR_SLSKD_INCOMPLETE:-/srv/harmoniarr/slskd-incomplete}:/data/incomplete"
       - "${HARMONIARR_DOWNLOADS:-/srv/slskd/downloads}:/data/downloads"
+    networks:
+      - harmoniarr-provider
+      - slskd-egress
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/5030'"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
 
-# Keep /data/downloads the same in both containers.
-# Harmoniarr should read completed downloads from /data/downloads/completed.
+networks:
+  harmoniarr-egress:
+    driver: bridge
+  harmoniarr-provider:
+    driver: bridge
+    internal: true
+  slskd-egress:
+    driver: bridge
+
+secrets:
+  slskd_api_key:
+    file: "${HARMONIARR_SLSKD_SECRETS_DIR:?Set HARMONIARR_SLSKD_SECRETS_DIR}/slskd_api_key"
+  slskd_jwt_key:
+    file: "${HARMONIARR_SLSKD_SECRETS_DIR:?Set HARMONIARR_SLSKD_SECRETS_DIR}/slskd_jwt_key"
+  slskd_soulseek_password:
+    file: "${HARMONIARR_SLSKD_SECRETS_DIR:?Set HARMONIARR_SLSKD_SECRETS_DIR}/slskd_soulseek_password"
+  slskd_soulseek_username:
+    file: "${HARMONIARR_SLSKD_SECRETS_DIR:?Set HARMONIARR_SLSKD_SECRETS_DIR}/slskd_soulseek_username"
+  slskd_web_password:
+    file: "${HARMONIARR_SLSKD_SECRETS_DIR:?Set HARMONIARR_SLSKD_SECRETS_DIR}/slskd_web_password"
+  slskd_web_username:
+    file: "${HARMONIARR_SLSKD_SECRETS_DIR:?Set HARMONIARR_SLSKD_SECRETS_DIR}/slskd_web_username"

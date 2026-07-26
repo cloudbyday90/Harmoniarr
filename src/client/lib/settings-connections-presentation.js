@@ -41,14 +41,20 @@ export function buildSlskdConnectionSubtitle() {
  *
  * @param {object|null|undefined} slskdStatus - The `secretStatus.slskd` object.
  * @param {boolean} [slskdStatus.apiKeyConfigured]
- * @param {'stored'|'environment'|string} [slskdStatus.apiKeySource]
+ * @param {'managed_file'|'stored'|'environment'|string} [slskdStatus.apiKeySource]
  * @returns {string}
  */
 export function formatSlskdApiKeyStatusLabel(slskdStatus) {
   if (!slskdStatus?.apiKeyConfigured) return 'No API key configured';
-  return slskdStatus.apiKeySource === 'stored'
-    ? 'Stored in Harmoniarr'
-    : 'Environment-provided key';
+  if (slskdStatus.apiKeySource === 'stored') {
+    return 'Stored in Harmoniarr';
+  }
+
+  if (slskdStatus.apiKeySource === 'managed_file') {
+    return 'Managed deployment key';
+  }
+
+  return 'Environment-provided key';
 }
 
 // ── Provider secret status ────────────────────────────────────────────────────

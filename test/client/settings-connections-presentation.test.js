@@ -81,6 +81,13 @@ describe('formatSlskdApiKeyStatusLabel', () => {
     );
   });
 
+  it('returns "Managed deployment key" when the managed Compose secret is active', () => {
+    assert.equal(
+      formatSlskdApiKeyStatusLabel({ apiKeyConfigured: true, apiKeySource: 'managed_file' }),
+      'Managed deployment key',
+    );
+  });
+
   it('returns "Environment-provided key" for any non-stored source', () => {
     assert.equal(
       formatSlskdApiKeyStatusLabel({ apiKeyConfigured: true, apiKeySource: 'vault' }),

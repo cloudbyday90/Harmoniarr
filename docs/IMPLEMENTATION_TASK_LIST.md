@@ -153,6 +153,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   Queue, Connections, Library, or Request Detail handoff and do not expose
   source users, paths, or raw provider diagnostics. See
   `MUSIC_QUEUE_ACTIVITY_REPAIR_HANDOFFS_DESIGN.md`.
+- Managed slskd deployment foundation: the former standalone slskd example is
+  now an optional Compose overlay with a one-shot configuration renderer,
+  persistent app/download mounts, private provider networking, file-mounted
+  API credentials, pinned provider image, and an external-provider escape hatch
+  for existing Unraid/VPN deployments. See
+  `MANAGED_SLSKD_DEPLOYMENT_CONTRACT.md`.
 - Settings progressive disclosure: Settings now starts with a concise setup
   checklist, keeps Soulseek health, folder locations, and library behavior in
   the primary flow, and moves specialist timing, provider, quality, retention,

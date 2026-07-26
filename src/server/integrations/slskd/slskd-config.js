@@ -16,6 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { readFileSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+
 import {
   normalizeOutboundBaseUrl,
   resolveAllowedOutboundHosts,
@@ -97,15 +100,55 @@ export function resolveSlskdRequestTimeoutDefault(env = process.env) {
   }
 }
 
-export function hasConfiguredSlskdApiKey(env = process.env) {
-  return typeof env.SLSKD_API_KEY === 'string' && env.SLSKD_API_KEY.trim().length > 0;
+function normalizeSlskdApiKey(value) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+export function resolveSlskdEnvironmentApiKey(env = process.env, {
+  readFileSyncFn = readFileSync,
+} = {}) {
+  const apiKeyFile = typeof env.SLSKD_API_KEY_FILE === 'string' ? env.SLSKD_API_KEY_FILE.trim() : '';
+  if (apiKeyFile) {
+    if (!isAbsolute(apiKeyFile)) {
+      throw new Error('SLSKD_API_KEY_FILE must be an absolute path');
+    }
+
+    const fileApiKey = normalizeSlskdApiKey(readFileSyncFn(apiKeyFile, 'utf8'));
+    if (!fileApiKey) {
+      throw new Error('SLSKD_API_KEY_FILE must contain a non-empty API key');
+    }
+
+    return {
+      source: 'managed_file',
+      value: fileApiKey,
+    };
+  }
+
+  const directApiKey = normalizeSlskdApiKey(env.SLSKD_API_KEY);
+  if (!directApiKey) {
+    return null;
+  }
+
+  return {
+    source: 'environment',
+    value: directApiKey,
+  };
+}
+
+export function hasConfiguredSlskdApiKey(env = process.env, options = {}) {
+  try {
+    return resolveSlskdEnvironmentApiKey(env, options) !== null;
+  } catch {
+    return false;
+  }
 }
 
 export function buildSlskdRuntimeConfig({ apiKey = null, env = process.env, settings = {} } = {}) {
   const slskdSettings = settings.slskd ?? {};
+  const environmentApiKey = resolveSlskdEnvironmentApiKey(env);
 
   return {
-    apiKey: apiKey ?? (hasConfiguredSlskdApiKey(env) ? env.SLSKD_API_KEY : undefined),
+    apiKey: apiKey ?? environmentApiKey?.value ?? undefined,
     baseUrl: slskdSettings.baseUrl || resolveSlskdBaseUrlDefault(env),
     requestTimeoutMs: slskdSettings.requestTimeoutMs ?? resolveSlskdRequestTimeoutDefault(env),
   };

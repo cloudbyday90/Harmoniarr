@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import { createSlskdConfigService } from '../../src/server/slskd/slskd-config-service.js';
 
@@ -99,4 +102,30 @@ test('createSlskdConfigService clears stored secrets when requested explicitly',
 
   assert.equal(encryptedSecretService.clearSecretValue.mock.callCount(), 1);
   assert.equal(encryptedSecretService.setSecretValue.mock.callCount(), 0);
+});
+
+test('createSlskdConfigService gives a managed secret file precedence over a previously stored key', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'harmoniarr-slskd-secret-'));
+  const apiKeyPath = join(directory, 'slskd_api_key');
+  await writeFile(apiKeyPath, 'managed-api-key\n', 'utf8');
+  t.after(() => rm(directory, { force: true, recursive: true }));
+
+  const service = createSlskdConfigService({
+    env: {
+      SLSKD_API_KEY: 'stale-environment-api-key',
+      SLSKD_API_KEY_FILE: apiKeyPath,
+    },
+    encryptedSecretService: {
+      getSecretMetadata: async () => ({ configured: true, updatedAt: '2026-06-01T12:00:00.000Z' }),
+      getSecretValue: async () => 'stale-stored-api-key',
+    },
+    loadSettingsFn: async () => createBaseSettings(),
+  });
+
+  assert.deepEqual(await service.buildSecretStatus(), {
+    apiKeyConfigured: true,
+    apiKeySource: 'managed_file',
+    apiKeyUpdatedAt: '2026-06-01T12:00:00.000Z',
+  });
+  assert.equal((await service.buildRuntimeConfig()).apiKey, 'managed-api-key');
 });

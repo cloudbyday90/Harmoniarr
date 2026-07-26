@@ -59,6 +59,15 @@ After configuring Soulseek in Settings > Connections, use the Provider health
 write-only: the field intentionally stays blank after save, and leaving it blank
 keeps the stored key.
 
+## Managed slskd Deployment
+
+The walkthrough intentionally keeps slskd external so it remains disposable.
+For a persistent managed provider deployment, use `compose.yaml` with
+`compose.slskd-example.yaml` instead. The managed overlay creates a private
+provider network, renders `slskd.yml` from Docker secret files, and aligns
+completed downloads at `/data/downloads` without a normal-case path mapping.
+See [Managed slskd Deployment Contract](MANAGED_SLSKD_DEPLOYMENT_CONTRACT.md).
+
 If slskd is running outside the walkthrough Compose stack, Harmoniarr also needs
 container-visible access to the folder where slskd writes completed downloads.
 A Windows or Unraid host path such as `Y:\` is not visible inside the
