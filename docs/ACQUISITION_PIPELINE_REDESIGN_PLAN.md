@@ -1315,17 +1315,31 @@ Completed post-transfer confidence slice:
   documented in
   [MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md).
 
+Completed release-progress browser acceptance slice:
+
+- A Docker-backed browser contract now proves one release progresses from
+  `Searching` through `Downloading`, `Ready to add`, `Adding to library`, and
+  `In library` without candidate-first navigation.
+- The normal row and release details use release-level language and safe
+  handoffs. Candidate terminology and the diagnostics route remain absent until
+  the operator deliberately expands matching and quality details.
+- The provider-health fixture shared by Music Queue browser suites now lives in
+  one modular helper, eliminating repeated route mocks while preserving the
+  existing focused handoff and post-transfer checks.
+- The design, sources, security boundary, and validation contract are recorded
+  in [MUSIC_QUEUE_RELEASE_PROGRESS_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_RELEASE_PROGRESS_BROWSER_ACCEPTANCE_DESIGN.md).
+
 Recommended next slice:
 
-1. add a file-backed Docker integration proof that runs the persisted
-   reconciliation and safe-auto apply workers against a locally generated
-   lossless fixture;
-2. pair it with a deliberately mislabeled/lossy fixture to prove the actual
-   ffprobe and spectral gate prevents the add;
-3. record the resulting release Activity story from persisted events, without a
-   public Soulseek peer or user-managed candidate work.
+1. add the browser proof for strict-quality recovery: a failed downloaded match
+   is blocked, the next quality-eligible match is promoted, and Music Queue
+   visibly returns to `Searching` or `Downloading` without manual candidate
+   work;
+2. preserve a clear terminal `Quality choice needed` state when no safe
+   successor exists;
+3. assert the resulting Activity story is release-scoped and uses a Music
+   Queue handoff rather than raw match diagnostics.
 
-Reason: the browser contract now proves the user-facing success and stop states
-deterministically. The remaining high-value risk is the real file and worker
-boundary between completed transfer reconciliation, quality inspection, and
-library mutation.
+Reason: the normal release journey and real file/worker boundary are now proven.
+The remaining high-value risk is whether automatic quality recovery visibly
+continues with the next safe match while retaining a clear terminal stop.

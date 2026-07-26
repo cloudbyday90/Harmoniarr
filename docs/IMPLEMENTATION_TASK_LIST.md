@@ -158,6 +158,14 @@ Database model source: `docs/DATABASE_MODEL.md`
   completed transfers through persisted safe auto-add, and proves the genuine
   file is added while the disguised file is quality-blocked with Activity
   evidence. See `MUSIC_QUEUE_FILE_BACKED_DOCKER_ACCEPTANCE_DESIGN.md`.
+- Music Queue release-progress browser acceptance: a deterministic browser
+  scenario now proves one release moves from `Searching` through `Downloading`,
+  `Ready to add`, `Adding to library`, and `In library` using only normal
+  Music Queue and Downloader/Library handoffs. Candidate wording and the
+  diagnostics route remain hidden until matching and quality details are
+  deliberately expanded. Shared configured-provider browser fixtures remove
+  duplicate health-route mocks from the focused Music Queue suites. See
+  `MUSIC_QUEUE_RELEASE_PROGRESS_BROWSER_ACCEPTANCE_DESIGN.md`.
 - Music Queue Activity repair handoffs: Activity now records release-scoped
   match selection, accepted transfer, audio inspection, download completion,
   library-add, and request-fulfillment milestones. Rows use one clear Music

@@ -24,6 +24,7 @@ import {
   toBrowserRuntimeUnavailableReason,
 } from '../../testing/browser/playwright-smoke-runtime.js';
 import { installDownloaderBrowserFixtures } from '../../testing/browser/downloader-browser-fixtures.js';
+import { installConfiguredMusicQueueProviderFixtures } from '../../testing/browser/music-queue-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
@@ -123,26 +124,6 @@ function buildProviderStoppedPayload() {
   };
 }
 
-async function installConfiguredProviderFixtures(browserContext) {
-  await browserContext.route('**/api/v1/system/overview', async (route) => {
-    await route.fulfill({
-      body: JSON.stringify({ dependencies: [{ provider: 'slskd', status: 'healthy' }] }),
-      contentType: 'application/json',
-    });
-  });
-  await browserContext.route('**/api/v1/settings', async (route) => {
-    const response = await route.fetch();
-    const payload = await response.json();
-    payload.secretStatus ??= {};
-    payload.secretStatus.slskd = {
-      ...(payload.secretStatus.slskd ?? {}),
-      providerMode: 'external',
-      providerModeState: 'configured',
-    };
-    await route.fulfill({ body: JSON.stringify(payload), contentType: 'application/json', response });
-  });
-}
-
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
@@ -179,7 +160,7 @@ suite('Music Queue automatic download handoff browser verification', () => {
 
       await installDownloaderBrowserFixtures(browserContext);
       await bootstrapAdminThroughUi(page, { baseUrl });
-      await installConfiguredProviderFixtures(browserContext);
+      await installConfiguredMusicQueueProviderFixtures(browserContext);
       await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
         queueReadCount += 1;
         const state = queueReadCount > 1 ? 'downloading' : 'searching';
@@ -227,7 +208,7 @@ suite('Music Queue automatic download handoff browser verification', () => {
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
       await bootstrapAdminThroughUi(page, { baseUrl });
-      await installConfiguredProviderFixtures(browserContext);
+      await installConfiguredMusicQueueProviderFixtures(browserContext);
       await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
         await route.fulfill({
           body: JSON.stringify(buildQualityStoppedPayload()),
