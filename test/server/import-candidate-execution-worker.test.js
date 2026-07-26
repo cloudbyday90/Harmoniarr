@@ -334,8 +334,9 @@ test('import execution worker cascades all-failed enqueue results to the next re
   assert.equal(enqueueDownloads.mock.calls[0].arguments[0].username, 'source-user');
   assert.equal(enqueueDownloads.mock.calls[1].arguments[0].username, 'recovery-user');
   assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 1);
-  assert.equal(recordActivityEventFn.mock.callCount(), 1);
+  assert.equal(recordActivityEventFn.mock.callCount(), 2);
   assert.equal(recordActivityEventFn.mock.calls[0].arguments[0].eventType, 'music_queue_match_retrying');
+  assert.equal(recordActivityEventFn.mock.calls[1].arguments[0].eventType, 'music_queue_download_started');
   assert.equal(markImportCandidateDownloading.mock.callCount(), 1);
   assert.equal(markImportCandidateDownloading.mock.calls[0].arguments[0].importCandidateId, 'candidate-2');
   assert.equal(upsertImportExecutionRunItem.mock.callCount(), 1);

@@ -24,6 +24,7 @@ import {
   buildMusicQueueRecoveryActivityEvent,
   recordActivityEventSafely,
 } from '../activity/music-queue-lifecycle-activity-event-service.js';
+import { buildMusicQueueDownloadCompletedActivityEvent } from '../activity/music-queue-milestone-activity-event-service.js';
 
 function resolveTargetStatus(item) {
   switch (item?.liveTransferSummary?.status) {
@@ -208,15 +209,13 @@ export function createImportCandidateExecutionReconciliationService({
           }).catch(() => {});
         }
 
-        if (result?.candidate) {
-          recordActivityEventSafely(recordActivityEventFn, {
-            actorUserId: null,
-            entityId: importCandidateId,
-            entityTitle: result.candidate.folderPath ?? null,
-            entityType: 'import_candidate',
-            eventType: 'download_completed',
-          });
-        }
+        recordActivityEventSafely(
+          recordActivityEventFn,
+          buildMusicQueueDownloadCompletedActivityEvent({
+            candidate: result?.candidate ?? candidate,
+            operationRunId: run?.id ?? null,
+          }),
+        );
 
         if (typeof startSafeApplyRunAfterDownloadCompleted === 'function' && result?.candidate) {
           autoApplyRuns.push(await startSafeApplyRunAfterDownloadCompleted({

@@ -31,6 +31,7 @@ import {
   buildMusicQueueRecoveryActivityEvent,
   recordActivityEventSafely,
 } from '../activity/music-queue-lifecycle-activity-event-service.js';
+import { buildMusicQueueDownloadStartedActivityEvent } from '../activity/music-queue-milestone-activity-event-service.js';
 
 function normalizeRemoteFilename(file) {
   const rawFilename = typeof file?.rawPayload?.filename === 'string'
@@ -402,6 +403,15 @@ export function createImportCandidateExecutionWorker({
             importCandidateId: summaryCandidate.id,
             reason: statusMessage,
           });
+          recordActivityEventSafely(
+            recordActivityEventFn,
+            buildMusicQueueDownloadStartedActivityEvent({
+              candidate: summaryCandidate,
+              operationRunId: runId,
+              queuedFileCount: enqueuedCount,
+              queuedWithWarnings: itemStatus === 'queued_with_warnings',
+            }),
+          );
         }
       }
 

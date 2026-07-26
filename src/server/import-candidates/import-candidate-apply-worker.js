@@ -18,6 +18,7 @@
 
 import { buildMusicQueueQualityBlockedActivityEvent } from '../activity/music-queue-quality-activity-presentation-service.js';
 import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
+import { buildRequestFulfilledActivityEvent } from '../activity/request-fulfillment-activity-event-service.js';
 import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-quality.js';
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
@@ -488,15 +489,10 @@ export function createImportCandidateApplyWorker({
             }
 
             if (notifyUserId && typeof recordActivityEventFn === 'function') {
-              void recordActivityEventFn({
-                actorUserId: null,
-                entityArtist: summaryCandidate.releaseIdentity?.artistName ?? null,
-                entityId: summaryCandidate.id,
-                entityTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? summaryCandidate.folderPath ?? null,
-                entityType: 'import_candidate',
-                eventType: 'request_fulfilled',
-                extraPayload: { requestedForUserId: notifyUserId },
-              }).catch(() => {});
+              const requestFulfilledEvent = buildRequestFulfilledActivityEvent({ candidate: summaryCandidate });
+              if (requestFulfilledEvent) {
+                void recordActivityEventFn(requestFulfilledEvent).catch(() => {});
+              }
             }
           }
         } catch (error) {

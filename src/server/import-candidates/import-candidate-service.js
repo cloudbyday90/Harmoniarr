@@ -137,14 +137,18 @@ function normalizeMusicQueueContext(value) {
   const qualityOverride = value.qualityOverride && typeof value.qualityOverride === 'object'
     ? value.qualityOverride
     : null;
+  const wantedReleaseId = typeof value.wantedReleaseId === 'string' && value.wantedReleaseId.trim()
+    ? value.wantedReleaseId.trim()
+    : null;
 
-  if (!profileCode && !qualityOverride) {
+  if (!profileCode && !qualityOverride && !wantedReleaseId) {
     return null;
   }
 
   return {
     profileCode,
     qualityOverride,
+    ...(wantedReleaseId ? { wantedReleaseId } : {}),
   };
 }
 

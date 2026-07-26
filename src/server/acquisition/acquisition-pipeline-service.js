@@ -26,6 +26,7 @@ import {
   buildMusicQueueSearchQueuedActivityEvent,
   recordActivityEventSafely,
 } from '../activity/music-queue-lifecycle-activity-event-service.js';
+import { buildMusicQueueMatchSelectedActivityEvent } from '../activity/music-queue-milestone-activity-event-service.js';
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -465,6 +466,23 @@ export function createAcquisitionPipelineService({
       reason,
       requestMetadata,
     });
+    if (actionCode === 'use_match') {
+      recordActivityEventSafely(
+        recordActivityEventFn,
+        buildMusicQueueMatchSelectedActivityEvent({
+          actorUserId,
+          candidate: {
+            id: scoped.matchId,
+            releaseIdentity: {
+              artistName: scoped.release.artistName,
+              releaseTitle: scoped.release.releaseTitle ?? scoped.release.releaseGroupTitle,
+            },
+            wantedReleaseId: scoped.wantedReleaseId,
+          },
+          selectionMode: 'manual',
+        }),
+      );
+    }
     const refreshed = await getMusicQueueRelease({
       appUserId: scoped.appUserId,
       wantedReleaseId: scoped.wantedReleaseId,

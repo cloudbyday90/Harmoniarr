@@ -38,7 +38,8 @@ export function buildMusicQueueQualityBlockedActivityEvent({
 } = {}) {
   const musicQueueContext = summaryCandidate.musicQueueContext ?? {};
   const releaseIdentity = summaryCandidate.releaseIdentity ?? {};
-  const wantedReleaseId = normalizeString(musicQueueContext.wantedReleaseId);
+  const wantedReleaseId = normalizeString(musicQueueContext.wantedReleaseId)
+    ?? normalizeString(musicQueueContext.qualityOverride?.wantedReleaseId);
   const releaseTitle = normalizeString(releaseIdentity.releaseTitle) ?? 'Downloaded files';
   const artistName = normalizeString(releaseIdentity.artistName);
 

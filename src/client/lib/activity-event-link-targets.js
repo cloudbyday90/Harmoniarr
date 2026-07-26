@@ -16,9 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { normalizeReleaseActivityPresentation } from '../../shared/release-activity-presentation.js';
 import { getArtistPolicyActivityRouteTarget } from './artist-policy-activity-presentation.js';
-import { buildOperationRunLinkTargetFromReleasePresentation } from './operation-run-link-targets.js';
 
 export function buildActivityEventLinkTarget(event = {}) {
   if (event.eventType === 'artist_policy_saved') {
@@ -28,17 +26,23 @@ export function buildActivityEventLinkTarget(event = {}) {
   if ([
     'music_queue_quality_blocked',
     'quality_fallback_allowed',
+    'music_queue_match_selected',
+    'music_queue_download_started',
+    'music_queue_audio_checked',
+    'music_queue_audio_warning',
     'music_queue_search_queued',
     'music_queue_download_retrying',
     'music_queue_match_retrying',
     'music_queue_no_matches_left',
     'music_queue_download_failed',
+    'download_completed',
   ].includes(event.eventType)) {
     const wantedReleaseId = event.extraPayload?.wantedReleaseId
       ?? (event.entityType === 'wanted_release' ? event.entityId : null);
     return wantedReleaseId
       ? {
           label: event.eventType === 'music_queue_quality_blocked'
+            || event.eventType === 'music_queue_audio_warning'
             ? 'Review quality choice'
             : 'Open Music Queue',
           to: {
@@ -49,16 +53,31 @@ export function buildActivityEventLinkTarget(event = {}) {
       : null;
   }
 
-  if (event.eventType !== 'release_added') {
-    return null;
+  if (event.eventType === 'music_queue_audio_check_failed') {
+    return {
+      label: 'Check connections',
+      to: { name: 'settings-connections' },
+    };
   }
 
-  return buildOperationRunLinkTargetFromReleasePresentation(
-    event.releasePresentation
-    ?? normalizeReleaseActivityPresentation({
-      entityArtist: event.entityArtist ?? null,
-      entityTitle: event.entityTitle ?? null,
-      extraPayload: event.extraPayload ?? null,
-    }),
-  );
+  if (event.eventType === 'release_added') {
+    return {
+      label: 'Open Library',
+      to: { name: 'library' },
+    };
+  }
+
+  const requestId = event.extraPayload?.sourceMediaRequestId
+    ?? (event.entityType === 'media_request' ? event.entityId : null);
+  if (event.eventType === 'request_fulfilled' && typeof requestId === 'string' && requestId.trim()) {
+    return {
+      label: 'Open request',
+      to: {
+        name: 'request-detail',
+        params: { id: requestId.trim() },
+      },
+    };
+  }
+
+  return null;
 }

@@ -151,9 +151,14 @@ export function createLibraryDiscoveryDispatchService({
   }
 
   function buildAutoSelectionQualityContext({ claimedRequest, userPreferences } = {}) {
+    const qualityOverride = claimedRequest?.evidence?.musicQueueQualityOverride ?? null;
+    const wantedReleaseId = qualityOverride?.wantedReleaseId
+      ?? claimedRequest?.evidence?.musicQueueRediscovery?.wantedReleaseId
+      ?? null;
     return {
       profileCode: resolveQualityProfileCode({ claimedRequest, userPreferences }),
-      qualityOverride: claimedRequest?.evidence?.musicQueueQualityOverride ?? null,
+      qualityOverride,
+      ...(wantedReleaseId ? { wantedReleaseId } : {}),
     };
   }
 

@@ -58,14 +58,20 @@ function buildMusicQueueContext(candidate) {
   const qualityOverride = context.qualityOverride && typeof context.qualityOverride === 'object'
     ? context.qualityOverride
     : null;
+  const wantedReleaseId = typeof context.wantedReleaseId === 'string' && context.wantedReleaseId.trim()
+    ? context.wantedReleaseId.trim()
+    : typeof qualityOverride?.wantedReleaseId === 'string' && qualityOverride.wantedReleaseId.trim()
+      ? qualityOverride.wantedReleaseId.trim()
+      : null;
 
-  if (!profileCode && !qualityOverride) {
+  if (!profileCode && !qualityOverride && !wantedReleaseId) {
     return null;
   }
 
   return {
     profileCode,
     qualityOverride,
+    ...(wantedReleaseId ? { wantedReleaseId } : {}),
   };
 }
 

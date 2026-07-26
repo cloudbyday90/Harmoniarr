@@ -26,6 +26,8 @@ import {
   buildMediaInspectionDiagnostics,
   MAX_MEDIA_INSPECTION_DIAGNOSTICS,
 } from './import-candidate-media-inspection-diagnostics.js';
+import { buildMusicQueueAudioInspectionActivityEvent } from '../activity/music-queue-milestone-activity-event-service.js';
+import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
 
 function summarizeInspection(files = []) {
   const inspectionWarnings = files.flatMap((file) => file?.inspection?.warnings ?? []);
@@ -53,6 +55,7 @@ export function createImportCandidateMediaInspectionWorker({
   markRunFailed,
   markRunStarted,
   previewImportCandidateApply = async () => ({ files: [] }),
+  recordActivityEventFn = null,
   releaseLease,
   renewLease,
 } = {}) {
@@ -111,6 +114,15 @@ export function createImportCandidateMediaInspectionWorker({
         counters.inspectionUnavailableCount += inspectionSummary.inspectionUnavailableCount;
         counters.warningCount += inspectionSummary.warningCount;
         inspectionDiagnostics.push(...candidateDiagnostics);
+        recordActivityEventSafely(
+          recordActivityEventFn,
+          buildMusicQueueAudioInspectionActivityEvent({
+            candidate,
+            inspectionUnavailableCount: inspectionSummary.inspectionUnavailableCount,
+            operationRunId: runId,
+            warningCount: inspectionSummary.warningCount,
+          }),
+        );
       }
 
       await markRunCompleted({

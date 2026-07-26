@@ -999,13 +999,15 @@ right repair surface.
   disclosure so routine connections, folders, and library behavior stay clear
   while specialist tuning remains available on request. See
   `SETTINGS_PROGRESSIVE_DISCLOSURE_DESIGN.md`.
-- [ ] Extend Activity events for match selected, download started, audio
+- [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
-  fulfilled as those lifecycle states become release-centered.
+  fulfilled as those lifecycle states become release-centered. See
+  `MUSIC_QUEUE_ACTIVITY_REPAIR_HANDOFFS_DESIGN.md`.
 - [x] Emit the first strict-quality stop Activity event and link it to Music
   Queue release review.
-- [ ] Add repair handoffs from Activity to Music Queue, Downloader, Library,
-  Artist Detail, Settings, and advanced diagnostics.
+- [x] Add the first repair handoffs from Activity to Music Queue, Library,
+  Request Detail, and Settings Connections. See
+  `MUSIC_QUEUE_ACTIVITY_REPAIR_HANDOFFS_DESIGN.md`.
 - [ ] Move current candidate/import/apply/runway controls behind operator-only
   advanced diagnostics.
 - [ ] Route old candidate links into Music Queue with release/match context, or

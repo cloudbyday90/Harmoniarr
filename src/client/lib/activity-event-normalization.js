@@ -86,7 +86,7 @@ function formatFallbackReleaseSubject(event) {
 export function getActivityEventLabel(event, currentUserId = null) {
   const title = event.entityTitle ?? null;
   const artist = event.entityArtist ?? null;
-  const actorId = event.actorUserId ?? null;
+  const requestedForUserId = event.extraPayload?.requestedForUserId ?? event.actorUserId ?? null;
 
   switch (event.eventType) {
     case 'request_created': {
@@ -114,7 +114,7 @@ export function getActivityEventLabel(event, currentUserId = null) {
       const releaseDesc = title
         ? (artist ? `${title} by ${artist}` : title)
         : 'a release';
-      if (currentUserId && actorId === currentUserId) {
+      if (currentUserId && requestedForUserId === currentUserId) {
         return `Your request for ${releaseDesc} is ready`;
       }
       return `${releaseDesc} added to library`;
@@ -124,6 +124,36 @@ export function getActivityEventLabel(event, currentUserId = null) {
         ? (artist ? `${title} by ${artist}` : title)
         : 'a file';
       return `Download completed: ${releaseDesc}`;
+    }
+    case 'music_queue_match_selected': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Match selected: ${releaseDesc}`;
+    }
+    case 'music_queue_download_started': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Download started: ${releaseDesc}`;
+    }
+    case 'music_queue_audio_checked': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Audio checked: ${releaseDesc}`;
+    }
+    case 'music_queue_audio_warning': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Audio check needs review: ${releaseDesc}`;
+    }
+    case 'music_queue_audio_check_failed': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Audio check could not run: ${releaseDesc}`;
     }
     case 'music_queue_quality_blocked': {
       const releaseDesc = title
@@ -187,6 +217,31 @@ export function getActivityEventDetail(event) {
     return blocker?.message ?? payload.message ?? 'Downloaded files need a quality review before Harmoniarr adds them.';
   }
 
+  if (event.eventType === 'music_queue_match_selected') {
+    return event.extraPayload?.selectionMode === 'manual'
+      ? 'You selected this match. Harmoniarr will continue the download automatically.'
+      : 'Harmoniarr selected the best available match and will continue automatically.';
+  }
+
+  if (event.eventType === 'music_queue_download_started') {
+    const queuedFileCount = Number(event.extraPayload?.queuedFileCount);
+    return Number.isInteger(queuedFileCount) && queuedFileCount > 0
+      ? `${queuedFileCount} file${queuedFileCount === 1 ? '' : 's'} accepted for download.`
+      : 'The download provider accepted this release.';
+  }
+
+  if (event.eventType === 'music_queue_audio_checked') {
+    return 'Harmoniarr checked the downloaded audio before adding it to the library.';
+  }
+
+  if (event.eventType === 'music_queue_audio_warning') {
+    return 'Harmoniarr found an audio warning before adding this release automatically.';
+  }
+
+  if (event.eventType === 'music_queue_audio_check_failed') {
+    return 'Harmoniarr could not inspect the downloaded audio. Check the media tooling connection.';
+  }
+
   if (event.eventType === 'quality_fallback_allowed') {
     return 'Harmoniarr will continue searching with the updated quality choice.';
   }
@@ -248,6 +303,13 @@ export function getActivityEventIcon(eventType) {
       return 'checkmark';
     case 'download_completed':
       return 'download';
+    case 'music_queue_match_selected':
+      return 'checkmark';
+    case 'music_queue_download_started':
+      return 'download';
+    case 'music_queue_audio_checked':
+    case 'music_queue_audio_warning':
+    case 'music_queue_audio_check_failed':
     case 'music_queue_quality_blocked':
       return 'audio-check';
     case 'quality_fallback_allowed':

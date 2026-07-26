@@ -20,6 +20,10 @@ import {
   DEFAULT_SELECTION_READINESS_POLICY,
   buildImportCandidateSelectionReadiness,
 } from './import-candidate-selection-readiness.js';
+import {
+  buildMusicQueueMatchSelectedActivityEvent,
+} from '../activity/music-queue-milestone-activity-event-service.js';
+import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
 
 export const DEFAULT_AUTO_SELECTION_REASON = 'High-confidence automatic selection';
 const REVIEWABLE_STATUSES = new Set(['pending', 'held']);
@@ -183,6 +187,7 @@ export function createImportCandidateAutoSelectionService({
   listImportCandidates,
   policy = DEFAULT_SELECTION_READINESS_POLICY,
   qualityPolicyService = null,
+  recordActivityEventFn = null,
   selectImportCandidate,
   selectionReason = DEFAULT_AUTO_SELECTION_REASON,
 } = {}) {
@@ -271,6 +276,13 @@ export function createImportCandidateAutoSelectionService({
       reason: selectionReason,
       requestMetadata,
     });
+    recordActivityEventSafely(
+      recordActivityEventFn,
+      buildMusicQueueMatchSelectedActivityEvent({
+        actorUserId,
+        candidate: bestCandidate,
+      }),
+    );
 
     return {
       attempted: true,

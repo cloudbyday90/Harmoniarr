@@ -77,3 +77,18 @@ test('Activity timeline groups normal events without hiding unknown activity', (
   assert.deepEqual(filterActivityTimelineEvents([{ id: 'unknown', eventType: 'future_event' }], 'all').map((event) => event.id), ['unknown']);
   assert.deepEqual(filterActivityTimelineEvents(events, 'unknown-filter'), events);
 });
+
+test('Activity timeline categorizes lifecycle milestones and reserves attention for actionable audio outcomes', () => {
+  assert.deepEqual(getActivityTimelineEventPresentation({ eventType: 'music_queue_match_selected' }), {
+    category: 'downloads',
+    categoryLabel: 'Download',
+    requiresAttention: false,
+    tone: 'info',
+  });
+  assert.deepEqual(getActivityTimelineEventPresentation({ eventType: 'music_queue_audio_warning' }), {
+    category: 'audio_checks',
+    categoryLabel: 'Audio check',
+    requiresAttention: true,
+    tone: 'warning',
+  });
+});

@@ -250,6 +250,40 @@ test('getActivityEventLabel formats download_completed', () => {
   assert.equal(getActivityEventLabel(event), 'Download completed: Amber by Autechre');
 });
 
+test('getActivityEventLabel and detail present Music Queue milestones without source diagnostics', () => {
+  const started = {
+    eventType: 'music_queue_download_started',
+    entityArtist: 'Autechre',
+    entityTitle: 'Amber',
+    extraPayload: { queuedFileCount: 12 },
+  };
+  const audioFailure = {
+    eventType: 'music_queue_audio_check_failed',
+    entityArtist: 'Autechre',
+    entityTitle: 'Amber',
+  };
+
+  assert.equal(getActivityEventLabel(started), 'Download started: Amber by Autechre');
+  assert.equal(getActivityEventDetail(started), '12 files accepted for download.');
+  assert.equal(getActivityEventLabel(audioFailure), 'Audio check could not run: Amber by Autechre');
+  assert.equal(
+    getActivityEventDetail(audioFailure),
+    'Harmoniarr could not inspect the downloaded audio. Check the media tooling connection.',
+  );
+});
+
+test('getActivityEventLabel identifies request fulfillment from its payload owner', () => {
+  const event = {
+    eventType: 'request_fulfilled',
+    entityTitle: 'Amber',
+    entityArtist: 'Autechre',
+    actorUserId: null,
+    extraPayload: { requestedForUserId: 'requester-1' },
+  };
+
+  assert.equal(getActivityEventLabel(event, 'requester-1'), 'Your request for Amber by Autechre is ready');
+});
+
 test('getActivityEventLabel and detail format music_queue_quality_blocked', () => {
   const event = {
     eventType: 'music_queue_quality_blocked',

@@ -147,6 +147,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   match when one exists. Music Queue now lets selected or queued next-match
   progress override stale quality-block evidence. See
   `MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`.
+- Music Queue Activity repair handoffs: Activity now records release-scoped
+  match selection, accepted transfer, audio inspection, download completion,
+  library-add, and request-fulfillment milestones. Rows use one clear Music
+  Queue, Connections, Library, or Request Detail handoff and do not expose
+  source users, paths, or raw provider diagnostics. See
+  `MUSIC_QUEUE_ACTIVITY_REPAIR_HANDOFFS_DESIGN.md`.
 - Settings progressive disclosure: Settings now starts with a concise setup
   checklist, keeps Soulseek health, folder locations, and library behavior in
   the primary flow, and moves specialist timing, provider, quality, retention,

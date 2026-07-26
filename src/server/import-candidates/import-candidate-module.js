@@ -264,6 +264,7 @@ export function createImportCandidateModule({
     markRunPaused: importCandidateMediaInspectionRunStore.markRunPaused,
     markRunStarted: importCandidateMediaInspectionRunStore.markRunStarted,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
+    recordActivityEventFn,
     releaseLease: importCandidateMediaInspectionRunStore.releaseLease,
     renewLease: importCandidateMediaInspectionRunStore.renewLease,
   }),
@@ -332,6 +333,7 @@ export function createImportCandidateModule({
   importCandidateAutoSelectionService = createImportCandidateAutoSelectionService({
     listImportCandidates: importCandidateService.listImportCandidates,
     qualityPolicyService: createAcquisitionQualityPolicyService(),
+    recordActivityEventFn,
     selectImportCandidate: importCandidateService.selectImportCandidate,
   }),
   importCandidateAutoDownloadRunService = createImportCandidateAutoDownloadRunService({
