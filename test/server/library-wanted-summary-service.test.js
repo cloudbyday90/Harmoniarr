@@ -118,6 +118,25 @@ test('buildLibraryWantedReleases includes discovery request details for admin pr
   assert.equal('appUserId' in result.wantedReleases[0], false);
 });
 
+test('buildLibraryWantedReleases forwards a scoped artist filter to the store', async (t) => {
+  const listWantedReleasesWithMetadata = t.mock.fn(async () => []);
+  const service = createLibraryWantedSummaryService({
+    libraryWantedReleaseStore: { listWantedReleasesWithMetadata },
+  });
+
+  await service.buildLibraryWantedReleases({
+    appUserId: 'user-1',
+    metadataArtistId: 'artist-1',
+  });
+
+  assert.deepEqual(listWantedReleasesWithMetadata.mock.calls[0].arguments[0], {
+    appUserId: 'user-1',
+    limit: 500,
+    metadataArtistId: 'artist-1',
+    wantedStatus: null,
+  });
+});
+
 test('buildLibraryWantedSummary rejects missing appUserId', async () => {
   const service = createLibraryWantedSummaryService();
 

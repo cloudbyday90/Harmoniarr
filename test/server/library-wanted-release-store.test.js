@@ -231,6 +231,30 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   });
 });
 
+test('listWantedReleasesWithMetadata keeps artist filtering parameterized and user-scoped', async () => {
+  let observedParams = [];
+  let observedSql = '';
+  const store = createLibraryWantedReleaseStore({
+    getPoolFn: () => ({
+      query: async (sql, params) => {
+        observedSql = sql;
+        observedParams = params;
+        return { rows: [] };
+      },
+    }),
+  });
+
+  await store.listWantedReleasesWithMetadata({
+    appUserId: 'user-1',
+    limit: 4,
+    metadataArtistId: 'artist-1',
+  });
+
+  assert.match(observedSql, /lwr\.app_user_id = \$1/);
+  assert.match(observedSql, /lwr\.metadata_artist_id = \$2/);
+  assert.deepEqual(observedParams, ['user-1', 'artist-1', 4]);
+});
+
 test('listWantedReleasesWithMetadata returns null discoveryRequest when none exists', async () => {
   const store = createLibraryWantedReleaseStore({
     getPoolFn: () => ({

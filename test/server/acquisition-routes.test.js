@@ -17,10 +17,10 @@ function createAcquisitionRouteTestApp(overrides = {}) {
       }),
       limitMusicQueueMutation: (_request, _response, next) => next(),
       limitMusicQueueRead: (_request, _response, next) => next(),
-      listMusicQueueReleases: async ({ appUserId, limit, offset }) => ({
+      listMusicQueueReleases: async ({ appUserId, limit, metadataArtistId, offset }) => ({
         checkedAt: '2026-06-28T12:00:00.000Z',
         pagination: { limit, offset, total: 1 },
-        releases: [{ artistName: 'Forest Frank', id: 'wanted-1', scopedTo: appUserId }],
+        releases: [{ artistName: 'Forest Frank', id: 'wanted-1', metadataArtistId, scopedTo: appUserId }],
         summary: { counts: { queued_for_search: 1 }, total: 1 },
       }),
       rejectMusicQueueMatch: async ({ matchId, wantedReleaseId }) => ({
@@ -45,10 +45,10 @@ function createAcquisitionRouteTestApp(overrides = {}) {
 
 test('music queue releases route requires session and delegates scoped list read', async (t) => {
   const requireSession = t.mock.fn(async () => ({ appUserId: 'user-1' }));
-  const listMusicQueueReleases = t.mock.fn(async ({ appUserId, limit, offset }) => ({
+  const listMusicQueueReleases = t.mock.fn(async ({ appUserId, limit, metadataArtistId, offset }) => ({
     checkedAt: '2026-06-28T12:00:00.000Z',
     pagination: { limit, offset, total: 1 },
-    releases: [{ id: 'wanted-1', scopedTo: appUserId }],
+    releases: [{ id: 'wanted-1', metadataArtistId, scopedTo: appUserId }],
     summary: { counts: { queued_for_search: 1 }, total: 1 },
   }));
   const app = createAcquisitionRouteTestApp({ listMusicQueueReleases, requireSession });
@@ -62,9 +62,34 @@ test('music queue releases route requires session and delegates scoped list read
     assert.deepEqual(listMusicQueueReleases.mock.calls[0].arguments, [{
       appUserId: 'user-1',
       limit: 25,
+      metadataArtistId: null,
       offset: 5,
     }]);
     assert.equal(payload.releases[0].id, 'wanted-1');
+  });
+});
+
+test('music queue releases route forwards an optional artist scope through the session-scoped read', async (t) => {
+  const listMusicQueueReleases = t.mock.fn(async ({ metadataArtistId }) => ({
+    checkedAt: '2026-06-28T12:00:00.000Z',
+    pagination: { limit: 25, offset: 0, total: 1 },
+    releases: [{ id: 'wanted-1', metadataArtistId }],
+    summary: { counts: { queued_for_search: 1 }, total: 1 },
+  }));
+  const app = createAcquisitionRouteTestApp({ listMusicQueueReleases });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/acquisition/releases?metadataArtistId=artist-1&limit=25`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(listMusicQueueReleases.mock.calls[0].arguments, [{
+      appUserId: 'user-1',
+      limit: 25,
+      metadataArtistId: 'artist-1',
+      offset: 0,
+    }]);
+    assert.equal(payload.releases[0].metadataArtistId, 'artist-1');
   });
 });
 

@@ -480,11 +480,12 @@ export function createAcquisitionPipelineService({
     };
   }
 
-  async function listMusicQueueReleases({ appUserId, limit, offset } = {}) {
+  async function listMusicQueueReleases({ appUserId, limit, metadataArtistId = null, offset } = {}) {
     const scopedAppUserId = normalizeRequiredAppUserId(appUserId, 'listMusicQueueReleases');
     const payload = await acquisitionPipelineStore.listWantedReleaseEvidence({
       appUserId: scopedAppUserId,
       limit,
+      metadataArtistId: normalizeString(metadataArtistId) || null,
       offset,
     });
     const releases = payload.releases.map((release) => projectRelease(release, {

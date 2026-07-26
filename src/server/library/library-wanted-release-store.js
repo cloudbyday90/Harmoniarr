@@ -304,13 +304,23 @@ export function createLibraryWantedReleaseStore({
     }
   }
 
-  async function listWantedReleasesWithMetadata({ appUserId = null, wantedStatus = null, limit = 500 } = {}) {
+  async function listWantedReleasesWithMetadata({
+    appUserId = null,
+    metadataArtistId = null,
+    wantedStatus = null,
+    limit = 500,
+  } = {}) {
     const params = [];
     const conditions = [];
 
     if (typeof appUserId === 'string' && appUserId.trim().length > 0) {
       params.push(appUserId.trim());
       conditions.push(`lwr.app_user_id = $${params.length}`);
+    }
+
+    if (typeof metadataArtistId === 'string' && metadataArtistId.trim().length > 0) {
+      params.push(metadataArtistId.trim());
+      conditions.push(`lwr.metadata_artist_id = $${params.length}`);
     }
 
     if (wantedStatus === 'missing' || wantedStatus === 'partial') {

@@ -40,12 +40,13 @@ export function createAcquisitionPipelineStore({
 } = {}) {
   const listWantedReleases = normalizeRequiredFunction(buildLibraryWantedReleases, 'buildLibraryWantedReleases');
 
-  async function listWantedReleaseEvidence({ appUserId, limit, offset } = {}) {
+  async function listWantedReleaseEvidence({ appUserId, limit, metadataArtistId = null, offset } = {}) {
     const pagination = normalizePagination({ limit, offset });
     const payload = await listWantedReleases({
       appUserId,
       includeDiscoveryRequestDetails: true,
       limit: pagination.limit + pagination.offset,
+      metadataArtistId,
     });
     const releases = Array.isArray(payload?.wantedReleases) ? payload.wantedReleases : [];
     const page = releases.slice(pagination.offset, pagination.offset + pagination.limit);

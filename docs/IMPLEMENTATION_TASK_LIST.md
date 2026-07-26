@@ -136,6 +136,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   sanitized contract, stay under the Downloads filter, and link to Music Queue
   instead of exposing candidate or provider details. See
   `MUSIC_QUEUE_ACTIVITY_LIFECYCLE_DESIGN.md`.
+- Music Queue progress strip: Home now surfaces active automated release work
+  without an empty all-clear panel, while monitored Artist Detail provides a
+  filtered per-artist status strip. Both use bounded rows and safe handoffs to
+  Music Queue or setup, never raw provider details or inline mutations. See
+  `MUSIC_QUEUE_PROGRESS_STRIP_DESIGN.md`.
 - Music Queue quality-stop recovery automation: downloaded matches that fail
   strict safe-auto quality verification are now marked as quality failures,
   excluded from the recovery cascade, and followed by the next quality-eligible

@@ -21,11 +21,13 @@ import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 import { RouterLink } from 'vue-router';
 import EmptyState from '../EmptyState.vue';
 import GridControls from '../GridControls.vue';
+import MusicQueueProgressStrip from '../music-queue/MusicQueueProgressStrip.vue';
 import OperatorArtistCard from './OperatorArtistCard.vue';
 import { useDiscoverArtistArtwork } from '../../composables/useDiscoverArtistArtwork.js';
 import { useArtworkGridRoving } from '../../composables/useArtworkGridRoving.js';
 import { useGridState } from '../../composables/useGridState.js';
 import { useOperatorMonitoredArtists } from '../../composables/useOperatorMonitoredArtists.js';
+import { useMusicQueue } from '../../composables/useMusicQueue.js';
 import {
   buildOperatorHomeStats,
   calculateOperatorArtistCoveragePercent,
@@ -84,6 +86,22 @@ const {
 });
 
 const statCards = computed(() => buildOperatorHomeStats(artists.value));
+
+const {
+  errorMessage: musicQueueErrorMessage,
+  isLoading: isMusicQueueLoading,
+  releases: musicQueueReleases,
+  totalCount: musicQueueTotalCount,
+} = useMusicQueue({
+  limit: 100,
+  pollIntervalMs: 30000,
+});
+
+const shouldShowMusicQueueProgress = computed(() =>
+  isMusicQueueLoading.value
+  || musicQueueTotalCount.value > 0
+  || Boolean(musicQueueErrorMessage.value),
+);
 
 const sortedArtists = computed(() => {
   const field = filterState.value?.sort?.field ?? 'name';
@@ -197,6 +215,13 @@ onBeforeUnmount(() => {
           <span class="hx-stat-meta">{{ card.meta }}</span>
         </article>
       </section>
+
+      <MusicQueueProgressStrip
+        v-if="shouldShowMusicQueueProgress"
+        :error-message="musicQueueErrorMessage"
+        :is-loading="isMusicQueueLoading"
+        :releases="musicQueueReleases"
+      />
 
       <article class="hx-card operator-home__artists-card">
         <header class="hx-card-header">

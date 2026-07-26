@@ -18,8 +18,8 @@
 
 import { apiRequest, buildQueryString } from './api.js';
 
-export function fetchMusicQueueReleases({ limit = 100, offset = 0 } = {}) {
-  return apiRequest(`/api/v1/acquisition/releases${buildQueryString({ limit, offset })}`);
+export function fetchMusicQueueReleases({ limit = 100, metadataArtistId = null, offset = 0 } = {}) {
+  return apiRequest(`/api/v1/acquisition/releases${buildQueryString({ limit, metadataArtistId, offset })}`);
 }
 
 export function fetchMusicQueueRelease(wantedReleaseId) {

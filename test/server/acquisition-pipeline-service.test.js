@@ -284,6 +284,33 @@ test('listMusicQueueReleases maps quality-blocked add evidence to a quality choi
   assert.equal(result.summary.counts.quality_choice_needed, 1);
 });
 
+test('listMusicQueueReleases forwards an optional artist filter to the scoped evidence store', async (t) => {
+  const listWantedReleaseEvidence = t.mock.fn(async () => ({
+    checkedAt: '2026-06-29T12:00:00.000Z',
+    pagination: { limit: 10, offset: 0, total: 1 },
+    releases: [createRelease()],
+  }));
+  const service = createAcquisitionPipelineService({
+    acquisitionPipelineStore: { listWantedReleaseEvidence },
+    qualityPolicyService,
+    statusService,
+  });
+
+  await service.listMusicQueueReleases({
+    appUserId: 'user-1',
+    limit: 10,
+    metadataArtistId: 'artist-1',
+    offset: 0,
+  });
+
+  assert.deepEqual(listWantedReleaseEvidence.mock.calls[0].arguments, [{
+    appUserId: 'user-1',
+    limit: 10,
+    metadataArtistId: 'artist-1',
+    offset: 0,
+  }]);
+});
+
 test('requestMusicQueueReleaseRediscovery succeeds when discovery dispatch is already active', async () => {
   const service = createService({
     startLibraryDiscoveryRun: async () => {

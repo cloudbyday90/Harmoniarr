@@ -29,6 +29,18 @@ test('acquisition-api fetchMusicQueueReleases sends bounded query params', async
   assert.equal(globalThis.fetch.mock.calls[0].arguments[0], '/api/v1/acquisition/releases?limit=25&offset=10');
 });
 
+test('acquisition-api fetchMusicQueueReleases sends an optional artist scope', async (t) => {
+  globalThis.document = { cookie: '' };
+  globalThis.fetch = t.mock.fn(async () => createJsonResponse());
+
+  await fetchMusicQueueReleases({ limit: 25, metadataArtistId: 'artist/1', offset: 10 });
+
+  assert.equal(
+    globalThis.fetch.mock.calls[0].arguments[0],
+    '/api/v1/acquisition/releases?limit=25&metadataArtistId=artist%2F1&offset=10',
+  );
+});
+
 test('acquisition-api fetchMusicQueueRelease encodes wanted release id', async (t) => {
   globalThis.document = { cookie: '' };
   globalThis.fetch = t.mock.fn(async () => createJsonResponse());

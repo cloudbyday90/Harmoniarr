@@ -992,6 +992,9 @@ right repair surface.
   download, trying the next match, no matches left with rediscovery scheduled,
   and terminal download failure. See
   `MUSIC_QUEUE_ACTIVITY_LIFECYCLE_DESIGN.md`.
+- [x] Add compact Music Queue release progress to Home and monitored Artist
+  Detail, with scoped review/setup handoffs and no duplicate workflow controls.
+  See `MUSIC_QUEUE_PROGRESS_STRIP_DESIGN.md`.
 - [ ] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered.

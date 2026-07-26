@@ -41,6 +41,9 @@ export function registerAcquisitionRoutes(app, {
     const payload = await listMusicQueueReleases({
       appUserId: session.user?.id ?? session.appUserId,
       limit: sanitizePageLimit(request.query.limit, { default: 100, max: 500 }),
+      metadataArtistId: typeof request.query.metadataArtistId === 'string'
+        ? request.query.metadataArtistId.trim() || null
+        : null,
       offset: sanitizePageOffset(request.query.offset),
     });
     response.json(payload);

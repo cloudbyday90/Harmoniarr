@@ -25,9 +25,11 @@ import ReleaseDetailModal from '../components/media/ReleaseDetailModal.vue';
 import ArtistDetailRelatedArtistCard from '../components/media/ArtistDetailRelatedArtistCard.vue';
 import ArtistReleaseSectionGrid from '../components/media/ArtistReleaseSectionGrid.vue';
 import EmptyState from '../components/EmptyState.vue';
+import MusicQueueProgressStrip from '../components/music-queue/MusicQueueProgressStrip.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import { useArtistDetail } from '../composables/useArtistDetail.js';
 import { useArtistDetailArtwork } from '../composables/useArtistDetailArtwork.js';
+import { useMusicQueue } from '../composables/useMusicQueue.js';
 import { useReleaseRequest } from '../composables/useReleaseRequest.js';
 import { useRequestUsers } from '../composables/useRequestUsers.js';
 import {
@@ -220,6 +222,7 @@ const isPolicyFormValid = computed(() =>
 const operatorCoverage = computed(() => operator.value?.coverage ?? {});
 const operatorOverview = computed(() => operator.value?.overview ?? {});
 const operatorReconciliation = computed(() => operator.value?.reconciliation ?? {});
+const musicQueueMetadataArtistId = computed(() => projection.value?.artist?.id ?? null);
 const coveragePercent = computed(() => calculateOperatorArtistCoveragePercent(operatorCoverage.value));
 const bulkSelectionConfirmationOpen = computed(() => pendingBulkSelectionOperation.value !== null);
 const canRetryOperatorReconciliation = computed(() =>
@@ -230,6 +233,16 @@ const canRetryOperatorReconciliation = computed(() =>
   && !operatorReconciliation.value?.runningRun
   && !isRetryingReconciliation.value,
 );
+
+const {
+  errorMessage: musicQueueErrorMessage,
+  isLoading: isMusicQueueLoading,
+  releases: musicQueueReleases,
+} = useMusicQueue({
+  limit: 100,
+  metadataArtistId: musicQueueMetadataArtistId,
+  pollIntervalMs: 30000,
+});
 
 const discographySections = computed(() =>
   groupReleaseGroupsByType(releaseGroups.value).map((section) => ({
@@ -618,6 +631,15 @@ watch(projection, () => {
           </section>
         </div>
       </article>
+
+      <MusicQueueProgressStrip
+        v-if="isArtistMonitored"
+        heading="Music Queue for this artist"
+        :error-message="musicQueueErrorMessage"
+        :is-loading="isMusicQueueLoading"
+        :releases="musicQueueReleases"
+        show-empty
+      />
 
       <p v-if="artistError" class="artist-detail-soft-error" role="alert">
         {{ formatArtistDetailError(artistError) }}

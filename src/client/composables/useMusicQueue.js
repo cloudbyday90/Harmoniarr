@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, readonly, ref } from 'vue';
+import { computed, readonly, ref, toValue, watch } from 'vue';
 import { useAsyncResource } from './useAsyncResource.js';
 import {
   allowMusicQueueFallbackQuality as defaultAllowMusicQueueFallbackQuality,
@@ -31,7 +31,9 @@ import { getErrorMessage } from '../lib/error-utils.js';
 export function useMusicQueue({
   allowMusicQueueFallbackQuality = defaultAllowMusicQueueFallbackQuality,
   fetchMusicQueueReleases = defaultFetchMusicQueueReleases,
+  immediate = true,
   limit = 100,
+  metadataArtistId = null,
   pollIntervalMs = 30000,
   rejectMusicQueueMatch = defaultRejectMusicQueueMatch,
   searchMusicQueueReleaseAgain = defaultSearchMusicQueueReleaseAgain,
@@ -41,11 +43,23 @@ export function useMusicQueue({
   const actionMessage = ref('');
   const activeMatchActionKey = ref('');
   const activeReleaseActionKey = ref('');
+  const hasArtistScope = metadataArtistId !== null;
+
+  function getMetadataArtistId() {
+    const value = toValue(metadataArtistId);
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  }
+
   const resource = useAsyncResource({
     fallbackErrorMessage: 'Music Queue failed to load',
-    fetcher: () => fetchMusicQueueReleases({ limit }),
+    fetcher: () => fetchMusicQueueReleases({
+      limit,
+      metadataArtistId: getMetadataArtistId(),
+    }),
+    immediate: hasArtistScope ? false : immediate,
     initialData: { pagination: { total: 0 }, releases: [], summary: { counts: {}, total: 0 } },
     pollIntervalMs,
+    pollWhile: () => !hasArtistScope || Boolean(getMetadataArtistId()),
     project: (payload) => ({
       checkedAt: payload?.checkedAt ?? null,
       pagination: payload?.pagination ?? { total: 0 },
@@ -54,6 +68,19 @@ export function useMusicQueue({
     }),
     revalidateOnFocus: true,
   });
+
+  if (hasArtistScope) {
+    watch(getMetadataArtistId, (nextMetadataArtistId, previousMetadataArtistId) => {
+      if (nextMetadataArtistId === previousMetadataArtistId && previousMetadataArtistId !== undefined) {
+        return;
+      }
+
+      resource.reset();
+      if (nextMetadataArtistId) {
+        void resource.load();
+      }
+    }, { immediate: true });
+  }
 
   const releases = computed(() => resource.data.value.releases ?? []);
   const summaryCards = computed(() => buildMusicQueueSummaryCards(resource.data.value.summary));

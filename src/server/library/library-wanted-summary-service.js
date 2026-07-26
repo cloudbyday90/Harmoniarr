@@ -70,6 +70,7 @@ export function createLibraryWantedSummaryService({
     appUserId,
     includeDiscoveryRequestDetails = false,
     limit = 500,
+    metadataArtistId = null,
     wantedStatus = null,
   } = {}) {
     const scopedAppUserId = normalizeRequiredAppUserId(appUserId, 'buildLibraryWantedReleases');
@@ -77,6 +78,7 @@ export function createLibraryWantedSummaryService({
     const releases = await libraryWantedReleaseStore.listWantedReleasesWithMetadata({
       appUserId: scopedAppUserId,
       limit,
+      metadataArtistId,
       wantedStatus,
     });
 
