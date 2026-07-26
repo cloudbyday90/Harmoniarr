@@ -285,6 +285,63 @@ test('import apply worker safe-auto mode skips warning and blocked candidates', 
   }]);
 });
 
+test('import apply worker keeps the Music Queue release correlation when it records a library add', async (t) => {
+  const activityEvents = [];
+  let resolveCompleted;
+  const completed = new Promise((resolve) => {
+    resolveCompleted = resolve;
+  });
+  const markRunCompleted = t.mock.fn(async () => {
+    resolveCompleted();
+  });
+  const worker = createImportCandidateApplyWorker({
+    acquireLease: async () => {},
+    applyImportCandidatePreview: async () => ({
+      executionMode: 'move',
+      fileOperations: [{ status: 'applied' }],
+      summary: {
+        appliedFileCount: 1,
+        failedFileCount: 0,
+        notAttemptedCount: 0,
+        stagedFromSourceCount: 1,
+        totalFiles: 1,
+      },
+    }),
+    buildImportPendingCandidateSummary: async () => ({
+      counts: { blocked: 0, ready: 1, readyWithWarnings: 0, totalImportPending: 1 },
+      importPendingCandidates: [createReadyImportCandidate({
+        id: 'candidate-forest-frank',
+        musicQueueContext: { wantedReleaseId: 'wanted-forest-frank' },
+        releaseIdentity: { artistName: 'Forest Frank', releaseTitle: 'Child of God' },
+      })],
+    }),
+    markImportCandidateApplied: async () => ({}),
+    markRunCompleted,
+    markRunFailed: async () => {},
+    markRunStarted: async () => {},
+    previewImportCandidateApply: async () => createVerifiedApplyPreview(),
+    recordActivityEventFn: async (payload) => {
+      activityEvents.push(payload);
+    },
+    releaseLease: async () => {},
+    replaceImportApplyRunItems: async () => [],
+    updateImportApplyRunItem: async () => null,
+  });
+
+  await worker.startWorkerRun({
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId: 'run-forest-frank-library-add',
+  });
+
+  await completed;
+
+  assert.equal(activityEvents.length, 1);
+  assert.equal(activityEvents[0].eventType, 'release_added');
+  assert.equal(activityEvents[0].entityId, 'candidate-forest-frank');
+  assert.equal(activityEvents[0].extraPayload.wantedReleaseId, 'wanted-forest-frank');
+});
+
 test('import apply worker safe-auto mode blocks strict lossless candidates without verified quality evidence', async (t) => {
   const applyImportCandidatePreview = t.mock.fn(async () => ({
     executionMode: 'move',

@@ -493,7 +493,7 @@ export function buildMusicQueueAction(status, recovery = null) {
 
   switch (status?.nextAction) {
     case 'add_to_library':
-      return { code: 'add_to_library', label: 'Review add plan', type: 'route', routeName: 'activity-diagnostics-library-adds' };
+      return { code: 'add_to_library', label: 'View details', type: 'review' };
     case 'configure_provider':
       return { code: 'configure_provider', label: 'Test Soulseek', type: 'route', routeName: 'settings-connections' };
     case 'download_now':

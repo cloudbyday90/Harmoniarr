@@ -485,6 +485,7 @@ export function createImportCandidateApplyWorker({
                 operationType: 'import_candidate_apply',
                 releaseTitle: summaryCandidate.releaseIdentity?.releaseTitle ?? null,
                 runId,
+                wantedReleaseId: summaryCandidate.musicQueueContext?.wantedReleaseId ?? null,
               })).catch(() => {});
             }
 

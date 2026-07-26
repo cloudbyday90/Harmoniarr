@@ -22,6 +22,15 @@ import {
   getReleaseActivityEntityTitle,
 } from '../../shared/release-activity-presentation.js';
 
+function normalizeOptionalString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue.length > 0 ? normalizedValue : null;
+}
+
 export function buildReleaseAddedActivityEvent({
   artistName = null,
   entityId = null,
@@ -33,6 +42,7 @@ export function buildReleaseAddedActivityEvent({
   releases = [],
   releaseTitle = null,
   runId = null,
+  wantedReleaseId = null,
 } = {}) {
   const presentation = buildReleaseActivityPresentation({
     artistName,
@@ -45,6 +55,7 @@ export function buildReleaseAddedActivityEvent({
       runId,
     },
   });
+  const normalizedWantedReleaseId = normalizeOptionalString(wantedReleaseId);
 
   return {
     actorUserId: null,
@@ -53,6 +64,9 @@ export function buildReleaseAddedActivityEvent({
     entityTitle: getReleaseActivityEntityTitle(presentation) ?? fallbackEntityTitle,
     entityType,
     eventType: 'release_added',
-    extraPayload: presentation,
+    extraPayload: {
+      ...presentation,
+      ...(normalizedWantedReleaseId ? { wantedReleaseId: normalizedWantedReleaseId } : {}),
+    },
   };
 }

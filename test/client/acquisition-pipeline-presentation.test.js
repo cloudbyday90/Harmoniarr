@@ -112,6 +112,10 @@ test('buildMusicQueueAction maps setup and review actions to user outcomes', () 
     { code: 'review_matches', label: 'Review matches', type: 'review' },
   );
   assert.deepEqual(
+    buildMusicQueueAction({ nextAction: 'add_to_library' }),
+    { code: 'add_to_library', label: 'View details', type: 'review' },
+  );
+  assert.deepEqual(
     buildMusicQueueAction({ nextAction: 'show_advanced_diagnostics' }),
     { code: 'show_advanced_diagnostics', label: 'Set up media tools', routeName: 'settings-media-storage', type: 'route' },
   );

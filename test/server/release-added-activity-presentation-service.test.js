@@ -89,3 +89,16 @@ test('buildReleaseAddedActivityEvent keeps fallback entity title when no canonic
     releaseTitle: null,
   });
 });
+
+test('buildReleaseAddedActivityEvent preserves the bounded Music Queue release correlation', () => {
+  const event = buildReleaseAddedActivityEvent({
+    artistName: 'Forest Frank',
+    entityId: 'candidate-forest-frank',
+    entityType: 'import_candidate',
+    releaseTitle: 'Child of God',
+    wantedReleaseId: ' wanted-forest-frank ',
+  });
+
+  assert.equal(event.entityId, 'candidate-forest-frank');
+  assert.equal(event.extraPayload.wantedReleaseId, 'wanted-forest-frank');
+});

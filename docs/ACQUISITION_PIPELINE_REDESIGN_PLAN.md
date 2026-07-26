@@ -995,6 +995,10 @@ release is complete.
   release review deep link.
 - [x] Block strict-quality failed downloaded matches and automatically promote
   the next quality-eligible match when one exists.
+- [x] Preserve the durable wanted-release correlation when the safe apply worker
+  records a library add, so the final outcome joins the normal Music Queue
+  Activity story rather than becoming an unrelated candidate event. See
+  `MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md`.
 - [ ] Route collisions, lossy decisions, suspicious FLAC, probe failures, and
   unsafe import plans to `needs help`.
 - [ ] Add `Add to library` for manual safe adds.
@@ -1142,12 +1146,16 @@ failure and repair paths, in browser and local Docker walkthrough conditions.
   Activity records the fallback in plain language.
 - [ ] Browser proof: downloaded strict-quality failure blocks the bad match,
   promotes the next quality-eligible match, and keeps Music Queue moving.
-- [ ] Browser proof: completed download moves to `Ready to add` and then
-  `In library`.
+- [x] Browser proof: completed download moves through `Ready to add`,
+  `Adding to library`, and `In library` without a diagnostic handoff; the
+  completion, download, and verified-audio events are one compact release
+  story. See `MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md`.
 - [ ] Browser proof: Activity history loads as timeline/event history and links
   to Music Queue/Downloader/Library rather than requiring workbench navigation.
-- [ ] Browser proof: verified audio-quality events appear in Activity with clear
-  summaries and repair handoffs.
+- [x] Browser proof: verified audio-quality events appear in Activity with clear
+  summaries and repair handoffs, while an unsafe claimed-lossless result has no
+  library action and offers only release-scoped quality review. See
+  `MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md`.
 - [ ] Docker walkthrough proof: one monitored artist completes the full flow or
   stops at a known external-network reason with clear copy.
 - [ ] Focused server, client, integration, and browser tests are run for the
@@ -1282,16 +1290,33 @@ Completed automatic handoff confidence slice:
 - The detailed design and validation boundary are documented in
   [MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_HANDOFF_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_HANDOFF_BROWSER_VERIFICATION_DESIGN.md).
 
+Completed post-transfer confidence slice:
+
+- A Docker-backed browser contract now proves a verified completed transfer
+  moves from `Ready to add` through `Adding to library` to `In library` without
+  sending the user to Import Review diagnostics.
+- The safe apply worker now carries the durable wanted-release ID into its
+  bounded `release_added` event. Activity can therefore combine completion,
+  download, audio verification, and library add into one release story even
+  though the add worker operates on an import candidate.
+- The unsafe branch proves a claimed lossless file that cannot be verified stops
+  at the release, exposes `Review quality choice`, and never exposes an
+  `Open Library` action.
+- The detailed design, sources, security boundary, and validation contract are
+  documented in
+  [MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md).
+
 Recommended next slice:
 
-1. prove the post-transfer path from a completed eligible download through
-   media inspection, safe automatic library add, and a concise Activity event;
-2. prove one unsafe media result stops at the correct release with one repair
-   action and no library add;
-3. keep this acceptance proof deterministic in the Docker walkthrough rather
-   than relying on a public Soulseek peer.
+1. add a file-backed Docker integration proof that runs the persisted
+   reconciliation and safe-auto apply workers against a locally generated
+   lossless fixture;
+2. pair it with a deliberately mislabeled/lossy fixture to prove the actual
+   ffprobe and spectral gate prevents the add;
+3. record the resulting release Activity story from persisted events, without a
+   public Soulseek peer or user-managed candidate work.
 
-Reason: folder recovery, automatic selection, strict quality policy, provider
-gating, and Downloader handoff now have clear browser coverage. The remaining
-high-value user journey is the successful and unsafe completion path after a
-transfer finishes.
+Reason: the browser contract now proves the user-facing success and stop states
+deterministically. The remaining high-value risk is the real file and worker
+boundary between completed transfer reconciliation, quality inspection, and
+library mutation.
