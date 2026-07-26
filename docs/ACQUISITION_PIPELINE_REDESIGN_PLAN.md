@@ -847,6 +847,10 @@ automation changes.
   or both.
 - [x] Add summary cards: `Waiting`, `Searching`, `Downloading`, `Ready to add`,
   `Needs help`, `Needs setup`.
+- [x] Replace the inactive zero-state summary grid with a compact overview that
+  prioritizes attention and active work; keep State and Type as progressive
+  filters beside always-visible name search. See
+  `MUSIC_QUEUE_SUMMARY_FILTER_HIERARCHY_DESIGN.md`.
 - [x] Add release-centered rows/cards with artist, release, year/type, state,
   why, next action, last activity, progress, quality profile, and match
   attempt summary.
@@ -1187,7 +1191,6 @@ Deferred UI decisions:
 
 - match detail layout: route-backed page first, drawer or inline expansion can
   be decided during Phase 2
-- exact Music Queue summary cards
 - how long legacy Import Review runway remains visible by default
 - whether Wanted survives as a visible secondary page after Music Queue proves
   the workflow

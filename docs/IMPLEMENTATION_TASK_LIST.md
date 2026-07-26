@@ -225,6 +225,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   automatic progress into a chip-heavy diagnostics row. Desktop and mobile
   browser verification confirms the review handoff and no horizontal overflow.
   See `MUSIC_QUEUE_RELEASE_ROW_HIERARCHY_DESIGN.md`.
+- Music Queue summary and filter hierarchy: six zero-heavy summary cards are
+  replaced by one compact overview that prioritizes releases needing attention
+  and active automatic work. Search remains directly visible while State and
+  Type remain available behind an accessible Filters disclosure. Browser proof
+  confirms the first release remains visible in the initial mobile viewport.
+  See `MUSIC_QUEUE_SUMMARY_FILTER_HIERARCHY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

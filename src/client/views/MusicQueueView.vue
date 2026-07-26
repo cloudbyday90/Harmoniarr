@@ -19,6 +19,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import MusicQueueOverview from '../components/music-queue/MusicQueueOverview.vue';
 import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
 import MusicQueueProviderRecoveryVisibility from '../components/music-queue/MusicQueueProviderRecoveryVisibility.vue';
 import MusicQueueReleaseRow from '../components/music-queue/MusicQueueReleaseRow.vue';
@@ -75,6 +76,7 @@ const {
 });
 
 const query = ref('');
+const filtersExpanded = ref(false);
 const selectedState = ref('all');
 const selectedReleaseType = ref('all');
 const selectedReleaseId = ref(typeof route.params.wantedReleaseId === 'string' ? route.params.wantedReleaseId : null);
@@ -86,6 +88,11 @@ const filteredReleases = computed(() => filterMusicQueueReleases(releases.value,
   releaseType: selectedReleaseType.value,
   state: selectedState.value,
 }));
+const hasActiveFilters = computed(() => (
+  query.value.trim().length > 0
+  || selectedState.value !== 'all'
+  || selectedReleaseType.value !== 'all'
+));
 const selectedRelease = computed(() => (
   filteredReleases.value.find((release) => release.id === selectedReleaseId.value)
   ?? releases.value.find((release) => release.id === selectedReleaseId.value)
@@ -105,6 +112,13 @@ function closeReview() {
   if (route.name === 'music-queue-release') {
     void router.replace({ name: 'music-queue' });
   }
+}
+
+function clearFilters() {
+  query.value = '';
+  selectedState.value = 'all';
+  selectedReleaseType.value = 'all';
+  filtersExpanded.value = false;
 }
 
 function getMatchActionKey(match, action) {
@@ -200,12 +214,7 @@ watch(
 
     <MusicQueueProviderRecoveryVisibility :visibility="providerRecoveryVisibility" />
 
-    <div class="music-queue-summary">
-      <article v-for="card in summaryCards" :key="card.key" class="music-queue-summary-card">
-        <span>{{ card.label }}</span>
-        <strong>{{ card.value }}</strong>
-      </article>
-    </div>
+    <MusicQueueOverview :summary-cards="summaryCards" />
 
     <div v-if="errorMessage" class="hx-alert" data-tone="danger">
       {{ errorMessage }}
@@ -236,27 +245,51 @@ watch(
             <span>{{ filteredReleases.length }} of {{ totalCount }} release{{ totalCount === 1 ? '' : 's' }}</span>
           </div>
           <div class="music-queue-filters" aria-label="Music Queue filters">
-            <label class="music-queue-filter">
+            <label class="music-queue-filter music-queue-filter--search">
               <span>Search</span>
               <input v-model="query" class="hx-input" type="search" placeholder="Artist or release" />
             </label>
-            <label class="music-queue-filter">
-              <span>State</span>
-              <select v-model="selectedState" class="hx-select">
-                <option v-for="filter in MUSIC_QUEUE_STATE_FILTERS" :key="filter.value" :value="filter.value">
-                  {{ filter.label }}
-                </option>
-              </select>
-            </label>
-            <label class="music-queue-filter">
-              <span>Type</span>
-              <select v-model="selectedReleaseType" class="hx-select">
-                <option v-for="filter in releaseTypeFilters" :key="filter.value" :value="filter.value">
-                  {{ filter.label }}
-                </option>
-              </select>
-            </label>
+            <div class="music-queue-filter-actions">
+              <button
+                type="button"
+                class="hx-btn"
+                data-variant="ghost"
+                aria-controls="music-queue-secondary-filters"
+                :aria-expanded="filtersExpanded"
+                @click="filtersExpanded = !filtersExpanded"
+              >
+                {{ hasActiveFilters ? 'Filters active' : 'Filters' }}
+              </button>
+              <button
+                v-if="hasActiveFilters"
+                type="button"
+                class="hx-btn"
+                data-variant="ghost"
+                @click="clearFilters"
+              >
+                Clear
+              </button>
+            </div>
           </div>
+        </div>
+
+        <div v-show="filtersExpanded" id="music-queue-secondary-filters" class="music-queue-secondary-filters">
+          <label class="music-queue-filter">
+            <span>State</span>
+            <select v-model="selectedState" class="hx-select">
+              <option v-for="filter in MUSIC_QUEUE_STATE_FILTERS" :key="filter.value" :value="filter.value">
+                {{ filter.label }}
+              </option>
+            </select>
+          </label>
+          <label class="music-queue-filter">
+            <span>Type</span>
+            <select v-model="selectedReleaseType" class="hx-select">
+              <option v-for="filter in releaseTypeFilters" :key="filter.value" :value="filter.value">
+                {{ filter.label }}
+              </option>
+            </select>
+          </label>
         </div>
 
         <div v-if="!filteredReleases.length" class="music-queue-empty-inline">
@@ -460,34 +493,10 @@ watch(
   color: var(--hx-text-muted);
 }
 
-.music-queue-summary {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.music-queue-summary-card,
 .music-queue-panel {
   background: var(--hx-bg-surface);
   border: 1px solid var(--hx-border);
   border-radius: 8px;
-}
-
-.music-queue-summary-card {
-  display: grid;
-  gap: 10px;
-  padding: 18px;
-}
-
-.music-queue-summary-card span {
-  color: var(--hx-text-muted);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.music-queue-summary-card strong {
-  font-size: 32px;
 }
 
 .music-queue-layout {
@@ -521,6 +530,20 @@ watch(
   justify-content: flex-end;
 }
 
+.music-queue-filter-actions,
+.music-queue-secondary-filters {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+
+.music-queue-secondary-filters {
+  border-top: 1px solid var(--hx-border);
+  margin-top: var(--hx-space-3);
+  padding-top: var(--hx-space-3);
+}
+
 .music-queue-filter {
   display: grid;
   gap: 4px;
@@ -532,6 +555,10 @@ watch(
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.music-queue-filter--search {
+  min-width: min(100%, 220px);
 }
 
 .music-queue-list {

@@ -105,7 +105,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('uses one state, compact facts, and an explicit quality stop at desktop and mobile widths', {
+  test('keeps active queue context compact while preserving clear release rows at desktop and mobile widths', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -153,6 +153,16 @@ suite('Music Queue release row hierarchy browser verification', () => {
       await page.setViewportSize({ height: 1000, width: 1440 });
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { exact: true, name: 'Queued music' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: '1 release needs attention' }).waitFor();
+      assert.equal(await page.locator('.music-queue-summary-card').count(), 0);
+      const secondaryFilters = page.locator('#music-queue-secondary-filters');
+      assert.equal(await secondaryFilters.isHidden(), true);
+      await page.getByRole('button', { exact: true, name: 'Filters' }).click();
+      assert.equal(await secondaryFilters.isVisible(), true);
+      await secondaryFilters.getByLabel('State').selectOption('needs_help');
+      await page.getByRole('button', { exact: true, name: 'Filters active' }).waitFor();
+      await page.getByRole('button', { exact: true, name: 'Clear' }).click();
+      assert.equal(await secondaryFilters.isHidden(), true);
 
       const rows = page.locator('.music-queue-release-row');
       const downloadingRow = rows.filter({ hasText: 'Child of God' });
@@ -170,14 +180,27 @@ suite('Music Queue release row hierarchy browser verification', () => {
         surface: 'music-queue-release-list',
       });
 
+      await page.evaluate(() => globalThis.document.documentElement.setAttribute('data-theme', 'dark'));
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'The compact queue overview and release rows retain hierarchy in dark mode.',
+        name: 'dark-release-rows',
+        surface: 'music-queue-release-list',
+      });
+      await page.evaluate(() => globalThis.document.documentElement.removeAttribute('data-theme'));
+
       await page.setViewportSize({ height: 844, width: 390 });
       await qualityRow.getByRole('button', { name: 'Review quality choice' }).waitFor();
-      await qualityRow.scrollIntoViewIfNeeded();
       await stabilizeVisualEvidencePage(page);
       assert.equal(
         await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth),
         true,
         'The mobile release row should not create horizontal overflow.',
+      );
+      assert.equal(
+        await downloadingRow.evaluate((row) => row.getBoundingClientRect().top < globalThis.innerHeight),
+        true,
+        'The first queued release should remain visible in the initial mobile viewport.',
       );
       await evidence.capture(page, {
         description: 'Release-row context and actions remain readable without horizontal scrolling on mobile.',
@@ -189,7 +212,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
       await page.getByRole('heading', { name: /Geogaddi by Boards of Canada/ }).waitFor();
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       const manifest = await evidence.writeManifest();
-      assert.equal(manifest.captureCount, 2);
+      assert.equal(manifest.captureCount, 3);
     }, { scenarioName: 'music_queue_release_row_hierarchy' });
   });
 });
