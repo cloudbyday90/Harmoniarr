@@ -46,11 +46,14 @@ test('SettingsConnectionsView keeps optional service setup and timing controls b
   assert.match(source, /panel-id="settings-optional-music-sources"/);
 });
 
-test('SettingsConnectionsView refreshes provider health after saved connection changes', async () => {
+test('SettingsConnectionsView confirms the Music Queue recovery state after saved connection changes', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /useConnections\(\{\s*onSaveSuccess:/);
-  assert.match(source, /void loadDependencyHealth\(\);/);
+  assert.match(source, /@submit\.prevent="handleSaveSettings"/);
+  assert.match(source, /await refreshProviderRepairConfirmation\(\);/);
+  assert.match(source, /buildMusicQueueProviderRepairRecoveryConfirmation/);
+  assert.match(source, /isMusicQueueProviderRepairReturnContext\(route\.query\.repair\)/);
+  assert.match(source, /MusicQueueProviderRepairRecoveryConfirmation/);
 });
 
 test('SettingsConnectionsView renders provider health load failures in the health card', async () => {

@@ -1015,6 +1015,10 @@ right repair surface.
   provider-dependent music cannot advance. The shared notice gives one concise
   cause and Connections handoff without surfacing configuration controls. See
   `MUSIC_QUEUE_PROVIDER_REPAIR_CONTEXT_DESIGN.md`.
+- [x] Confirm provider repair recovery after a Connections save that originated
+  from Music Queue. The safe, bounded result states eligibility to continue and
+  offers a return link only after a verified healthy check. See
+  `MUSIC_QUEUE_PROVIDER_REPAIR_RECOVERY_CONFIRMATION_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See

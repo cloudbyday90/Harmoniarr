@@ -166,6 +166,7 @@ watch(
     <MusicQueueProviderRepairNotice
       v-if="!isRequester"
       :notice="musicQueueProviderRepairNotice"
+      return-context="music_queue"
     />
 
     <div class="music-queue-summary">

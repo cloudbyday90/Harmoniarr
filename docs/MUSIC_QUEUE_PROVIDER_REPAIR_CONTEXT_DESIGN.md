@@ -75,9 +75,10 @@ queues stay quiet. Browser verification intercepts the existing health and
 Settings reads, proves Home and Music Queue show the same bounded Managed
 setup notice, and verifies their Connections links.
 
-## Next Item
+## Follow-Up
 
-The next high-value item is **provider repair recovery confirmation**: after a
-user saves or completes the relevant Connections change, refresh the originating
-Music Queue context and show whether automation is eligible to resume, without
-claiming a download has already started.
+Provider repair recovery confirmation is now implemented. Saving a relevant
+Connections change refreshes bounded provider health and shows whether Music
+Queue is eligible to continue, without claiming that a download has started.
+See [Music Queue Provider Repair Recovery
+Confirmation](MUSIC_QUEUE_PROVIDER_REPAIR_RECOVERY_CONFIRMATION_DESIGN.md).

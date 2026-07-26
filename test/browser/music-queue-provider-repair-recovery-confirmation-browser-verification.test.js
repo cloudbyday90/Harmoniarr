@@ -13,10 +13,6 @@ import {
   isSkippableBrowserRuntimeError,
   toBrowserRuntimeUnavailableReason,
 } from '../../testing/browser/playwright-smoke-runtime.js';
-import {
-  installMetadataBrowserFixtures,
-  markBoardsOfCanadaAddedInMetadataBrowserFixture,
-} from '../../testing/browser/metadata-browser-fixtures.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
@@ -27,7 +23,7 @@ let runtimeUnavailableReason = null;
 
 function buildMusicQueuePayload() {
   return {
-    checkedAt: '2026-07-26T12:00:00.000Z',
+    checkedAt: '2026-07-26T13:00:00.000Z',
     pagination: { limit: 100, offset: 0, total: 1 },
     releases: [{
       artistName: 'Boards of Canada',
@@ -49,7 +45,7 @@ function buildMusicQueuePayload() {
   };
 }
 
-suite('Music Queue provider repair context browser verification', () => {
+suite('Music Queue provider repair recovery confirmation browser verification', () => {
   before(async () => {
     try {
       browserRuntime = await createBrowserSmokeRuntime({ config: integrationRuntimeConfig });
@@ -67,7 +63,7 @@ suite('Music Queue provider repair context browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('Home and Music Queue show one bounded managed setup handoff for active queue work', {
+  test('a saved Connections repair confirms readiness before returning to Music Queue', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -77,11 +73,10 @@ suite('Music Queue provider repair context browser verification', () => {
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
       const pageErrors = [];
+      let soulseekIsHealthy = false;
       page.on('pageerror', (error) => pageErrors.push(error.message));
 
-      await installMetadataBrowserFixtures(browserContext);
       await bootstrapAdminThroughUi(page, { baseUrl });
-      await markBoardsOfCanadaAddedInMetadataBrowserFixture(page);
       await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
         await route.fulfill({
           body: JSON.stringify(buildMusicQueuePayload()),
@@ -92,48 +87,33 @@ suite('Music Queue provider repair context browser verification', () => {
         await route.fulfill({
           body: JSON.stringify({
             dependencies: [{
-              message: 'Soulseek is connected and ready for downloads.',
               provider: 'slskd',
-              status: 'healthy',
+              status: soulseekIsHealthy ? 'healthy' : 'disabled',
             }],
           }),
           contentType: 'application/json',
         });
       });
-      await browserContext.route('**/api/v1/settings', async (route) => {
-        const response = await route.fetch();
-        const payload = await response.json();
-        payload.secretStatus ??= {};
-        payload.secretStatus.slskd = {
-          ...(payload.secretStatus.slskd ?? {}),
-          providerMode: 'managed',
-          providerModeState: 'managed_deployment_missing',
-        };
-        await route.fulfill({
-          body: JSON.stringify(payload),
-          contentType: 'application/json',
-          response,
-        });
-      });
-
-      await page.goto(`${baseUrl}/app`, { waitUntil: 'domcontentloaded' });
-      const homeNotice = page.locator('.music-queue-provider-repair');
-      await homeNotice.getByRole('heading', { name: 'Managed setup required' }).waitFor();
-      await homeNotice.getByText('Finish the managed setup before queued music can continue.').waitFor();
-      assert.equal(
-        await homeNotice.getByRole('link', { name: 'Finish managed setup' }).getAttribute('href'),
-        '/app/settings/connections?repair=music_queue',
-      );
 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
-      const queueNotice = page.locator('.music-queue-provider-repair');
-      await queueNotice.getByRole('heading', { name: 'Managed setup required' }).waitFor();
-      assert.equal(await queueNotice.count(), 1);
+      const repairNotice = page.locator('.music-queue-provider-repair');
+      await repairNotice.getByRole('heading', { name: 'Soulseek needs setup' }).waitFor();
+      await Promise.all([
+        page.waitForURL(/\/app\/settings\/connections\?repair=music_queue$/),
+        repairNotice.getByRole('link', { name: 'Set up Soulseek' }).click(),
+      ]);
+
+      soulseekIsHealthy = true;
+      await page.getByRole('button', { name: 'Save settings' }).click();
+
+      const confirmation = page.locator('.music-queue-provider-recovery');
+      await confirmation.getByRole('heading', { name: 'Soulseek is ready' }).waitFor();
+      await confirmation.getByText('Music Queue can continue its normal checks. Harmoniarr has not started a download yet.').waitFor();
       assert.equal(
-        await queueNotice.getByRole('link', { name: 'Finish managed setup' }).getAttribute('href'),
-        '/app/settings/connections?repair=music_queue',
+        await confirmation.getByRole('link', { name: 'Return to Music Queue' }).getAttribute('href'),
+        '/app/music-queue',
       );
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
-    }, { scenarioName: 'music_queue_provider_repair_context' });
+    }, { scenarioName: 'music_queue_provider_repair_recovery_confirmation' });
   });
 });

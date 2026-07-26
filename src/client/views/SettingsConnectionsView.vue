@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   buildSlskdConnectionSubtitle,
   formatDependencyProviderLabel,
@@ -29,11 +30,15 @@ import {
 } from '../lib/settings-connections-presentation.js';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import SoulseekProviderModeGuidance from '../components/settings/SoulseekProviderModeGuidance.vue';
+import MusicQueueProviderRepairRecoveryConfirmation from '../components/music-queue/MusicQueueProviderRepairRecoveryConfirmation.vue';
 import { useConnections } from '../composables/useConnections.js';
 import { useDependencyHealth } from '../composables/useDependencyHealth.js';
 import { useToast } from '../composables/useToast.js';
+import { buildMusicQueueProviderRepairRecoveryConfirmation, isMusicQueueProviderRepairReturnContext } from '../lib/music-queue-provider-repair-recovery-presentation.js';
+import { buildSettingsSetupProgress } from '../lib/settings-setup-progress.js';
 
 const toast = useToast();
+const route = useRoute();
 
 const {
   dependencies: providerHealth,
@@ -59,16 +64,43 @@ const {
   saveSettings,
   secretStatus,
   successMessage,
-} = useConnections({
-  onSaveSuccess: () => {
-    void loadDependencyHealth();
-  },
-});
+} = useConnections();
 
 const isManagedDeployment = computed(() => secretStatus.value?.slskd?.managedDeploymentDetected === true);
 const isSoulseekDisabled = computed(() => form.slskd.providerMode === 'disabled');
 const isExternalSoulseek = computed(() => form.slskd.providerMode === 'external');
 const isManagedSoulseek = computed(() => form.slskd.providerMode === 'managed');
+const isMusicQueueProviderRepairReturn = computed(() =>
+  isMusicQueueProviderRepairReturnContext(route.query.repair),
+);
+const providerRepairConfirmation = ref(null);
+const safeSetupProgress = computed(() => buildSettingsSetupProgress({
+  secretStatus: {
+    slskd: {
+      providerMode: form.slskd.providerMode,
+      providerModeState: secretStatus.value?.slskd?.providerModeState,
+    },
+  },
+}));
+
+async function refreshProviderRepairConfirmation() {
+  await loadDependencyHealth();
+  if (!isMusicQueueProviderRepairReturn.value) return;
+
+  providerRepairConfirmation.value = buildMusicQueueProviderRepairRecoveryConfirmation({
+    dependencies: providerHealth.value,
+    healthLoadFailed: Boolean(providerHealthError.value),
+    setupProgress: safeSetupProgress.value,
+  });
+}
+
+async function handleSaveSettings() {
+  providerRepairConfirmation.value = null;
+  await saveSettings();
+  if (!isMusicQueueProviderRepairReturn.value || errorMessage.value || !successMessage.value) return;
+
+  await refreshProviderRepairConfirmation();
+}
 
 async function testProviderConnection() {
   if (isSoulseekDisabled.value) {
@@ -76,7 +108,7 @@ async function testProviderConnection() {
     return;
   }
 
-  await loadDependencyHealth();
+  await refreshProviderRepairConfirmation();
 
   if (providerHealthError.value) {
     toast.error(`Connection test failed: ${providerHealthError.value}`);
@@ -104,6 +136,18 @@ async function testProviderConnection() {
   toast.error(message);
 }
 
+watch(
+  () => [
+    form.slskd.apiKey,
+    form.slskd.baseUrl,
+    form.slskd.clearApiKey,
+    form.slskd.providerMode,
+  ],
+  () => {
+    providerRepairConfirmation.value = null;
+  },
+);
+
 onMounted(() => {
   void loadSettings();
   void loadDependencyHealth();
@@ -127,7 +171,7 @@ onMounted(() => {
       </div>
     </article>
 
-    <form @submit.prevent="saveSettings" v-else>
+    <form @submit.prevent="handleSaveSettings" v-else>
       <div class="cfg-2col">
 
         <!-- Soulseek connection -->
@@ -230,6 +274,11 @@ onMounted(() => {
         </article>
 
       </div>
+
+      <MusicQueueProviderRepairRecoveryConfirmation
+        v-if="isMusicQueueProviderRepairReturn"
+        :confirmation="providerRepairConfirmation"
+      />
 
       <div class="settings-connections__advanced-stack">
         <SettingsDisclosure

@@ -21,76 +21,84 @@ import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 
 const props = defineProps({
-  notice: {
+  confirmation: {
     default: null,
     type: Object,
   },
-  returnContext: {
-    default: null,
-    type: String,
-  },
 });
 
-const headingId = computed(() => `music-queue-provider-repair-${props.notice?.code ?? 'status'}`);
-const settingsLocation = computed(() => ({
-  name: props.notice?.actionRouteName,
-  query: props.returnContext ? { repair: props.returnContext } : undefined,
-}));
+const headingId = computed(() => `music-queue-provider-recovery-${props.confirmation?.outcome ?? 'status'}`);
 const statusMessage = computed(() => (
-  props.notice ? `${props.notice.title}. ${props.notice.copy}` : ''
+  props.confirmation ? `${props.confirmation.title}. ${props.confirmation.copy}` : ''
 ));
 </script>
 
 <template>
-  <p class="music-queue-provider-repair__status" role="status" aria-atomic="true">
+  <p class="music-queue-provider-recovery__status" role="status" aria-atomic="true">
     {{ statusMessage }}
   </p>
 
   <section
-    v-if="notice"
-    class="music-queue-provider-repair"
+    v-if="confirmation"
+    class="music-queue-provider-recovery"
     :aria-labelledby="headingId"
-    :data-tone="notice.tone"
+    :data-tone="confirmation.tone"
   >
     <div>
-      <h2 :id="headingId">{{ notice.title }}</h2>
-      <p>{{ notice.copy }}</p>
+      <h2 :id="headingId">{{ confirmation.title }}</h2>
+      <p>{{ confirmation.copy }}</p>
     </div>
-    <RouterLink class="hx-btn" data-variant="ghost" :to="settingsLocation">
-      {{ notice.label }}
+    <RouterLink
+      v-if="confirmation.action"
+      class="hx-btn"
+      data-variant="ghost"
+      :to="{ name: confirmation.action.routeName }"
+    >
+      {{ confirmation.action.label }}
     </RouterLink>
   </section>
 </template>
 
 <style scoped>
-.music-queue-provider-repair {
+.music-queue-provider-recovery {
   align-items: center;
-  background: var(--hx-warning-soft);
-  border: 1px solid var(--hx-warning);
+  background: var(--hx-bg-surface-muted);
+  border: 1px solid var(--hx-border);
   border-radius: var(--hx-radius-sm);
   display: flex;
   gap: var(--hx-space-4);
   justify-content: space-between;
+  margin-top: var(--hx-space-4);
   padding: var(--hx-space-3) var(--hx-space-4);
 }
 
-.music-queue-provider-repair h2,
-.music-queue-provider-repair p {
+.music-queue-provider-recovery[data-tone='success'] {
+  background: var(--hx-success-soft);
+  border-color: var(--hx-success);
+}
+
+.music-queue-provider-recovery[data-tone='warning'] {
+  background: var(--hx-warning-soft);
+  border-color: var(--hx-warning);
+}
+
+.music-queue-provider-recovery h2,
+.music-queue-provider-recovery p {
   margin: 0;
 }
 
-.music-queue-provider-repair h2 {
+.music-queue-provider-recovery h2 {
   color: var(--hx-text-strong);
   font-size: var(--hx-text-md);
 }
 
-.music-queue-provider-repair p {
+.music-queue-provider-recovery p {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
   margin-top: var(--hx-space-1);
 }
 
-.music-queue-provider-repair__status {
+.music-queue-provider-recovery__status {
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   height: 1px;
@@ -102,7 +110,7 @@ const statusMessage = computed(() => (
 }
 
 @media (max-width: 640px) {
-  .music-queue-provider-repair {
+  .music-queue-provider-recovery {
     align-items: flex-start;
     flex-direction: column;
   }

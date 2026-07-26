@@ -193,6 +193,10 @@ Database model source: `docs/DATABASE_MODEL.md`
   compact Connections handoff only when provider-dependent queued music is
   blocked by Disabled mode, incomplete Managed setup, External setup, or
   provider reachability. See `MUSIC_QUEUE_PROVIDER_REPAIR_CONTEXT_DESIGN.md`.
+- Music Queue provider repair recovery confirmation: a Connections save reached
+  from Music Queue now refreshes bounded provider health, reports eligibility
+  without claiming a transfer, and uses only an allow-listed return context.
+  See `MUSIC_QUEUE_PROVIDER_REPAIR_RECOVERY_CONFIRMATION_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

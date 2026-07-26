@@ -237,6 +237,7 @@ onBeforeUnmount(() => {
 
       <MusicQueueProviderRepairNotice
         :notice="musicQueueProviderRepairNotice"
+        return-context="music_queue"
       />
 
       <MusicQueueProgressStrip
