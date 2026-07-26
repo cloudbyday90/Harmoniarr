@@ -238,8 +238,21 @@ export function createApp({
   const deploymentSecurityService = buildDeploymentSecurityService({ loadSettingsFn: loadSettings });
   const slskdConfigService = buildSlskdConfigService();
   const providerModule = buildProviderModule();
+  let libraryModule = null;
   const settingsService = buildSettingsService({
     deploymentSecurityService,
+    onAutomaticDownloadFoldersReady: async (payload) => {
+      if (!libraryModule?.libraryDiscoveryFolderSetupRecoveryService) {
+        return {
+          dispatchAlreadyActive: false,
+          dispatchDeferred: true,
+          releasedCount: 0,
+          runStarted: false,
+        };
+      }
+
+      return libraryModule.libraryDiscoveryFolderSetupRecoveryService.recoverAfterValidatedFolderSetup(payload);
+    },
     plexOwnerLinkService: providerModule.plexOwnerLinkService,
     slskdConfigService,
     spotifyOAuthService: providerModule.spotifyOAuthService,
@@ -355,7 +368,6 @@ export function createApp({
     }),
   });
   const plexDirectSignInService = createPlexDirectSignInService();
-  let libraryModule = null;
   const importCandidateModule = buildImportCandidateModule({
     getAppUserById: appUserModule.appUserService.getAppUserById,
     getMediaToolingStatus: mediaToolingStatusService.getStatus,

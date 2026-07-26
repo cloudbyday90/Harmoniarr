@@ -49,6 +49,34 @@ test('listDiscoveryRequestsByMetadataReleaseIds returns current request state fo
   }]);
 });
 
+test('releaseFolderSetupBlockedAutomaticDiscoveryRequests only requeues bounded automatic folder-gated cooldowns', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /search_mode = 'automatic'/);
+    assert.match(sql, /request_status = 'cooldown'/);
+    assert.match(sql, /blocked_reason = 'automatic_cooldown'/);
+    assert.match(sql, /autoDownloadReadiness'->>'setupReason' = ANY\(\$2::text\[\]\)/);
+    assert.match(sql, /downloadRecoveryRediscovery' IS NULL/);
+    assert.match(sql, /FOR UPDATE SKIP LOCKED/);
+    assert.match(sql, /LIMIT \$3::integer/);
+    assert.match(sql, /#- '\{lastSearchResult,autoDownloadReadiness\}'/);
+    assert.deepEqual(params, [
+      '2026-07-26T15:00:00.000Z',
+      ['missing_download_folder', 'download_folder_unavailable'],
+      5,
+    ]);
+    return { rows: [{ released_count: 2 }] };
+  });
+  const store = createLibraryDiscoveryRequestStore({ getPoolFn: () => ({ query }) });
+
+  const releasedCount = await store.releaseFolderSetupBlockedAutomaticDiscoveryRequests({
+    limit: 5,
+    releasedAt: '2026-07-26T15:00:00.000Z',
+  });
+
+  assert.equal(releasedCount, 2);
+  assert.equal(query.mock.callCount(), 1);
+});
+
 test('recordDiscoverySearchFailure casts JSON evidence parameters for PostgreSQL inference', async (t) => {
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /'code', \$1::text/);

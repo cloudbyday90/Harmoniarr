@@ -19,6 +19,7 @@
 import { recordAuditEvent } from './audit.js';
 import { getPool } from './database.js';
 import { createPathValidationService } from './paths/path-validation-service.js';
+import { createAutomaticDownloadFolderReadinessService } from './paths/automatic-download-folder-readiness-service.js';
 import { normalizeUserMusicRoots } from './paths/user-music-root-service.js';
 import { loadSettings, persistSettings } from './settings.js';
 import { createSlskdConfigService } from './slskd/slskd-config-service.js';
@@ -39,13 +40,20 @@ function applySettingsUpdates(settings, updates) {
   return nextSettings;
 }
 
+function updatesAutomaticDownloadFolderSetup(updates) {
+  const relevantKeys = new Set(['downloads', 'downloadMappings', 'music', 'staging']);
+  return updates.some((update) => update.namespace === 'paths' && relevantKeys.has(update.settingKey));
+}
+
 export function createSettingsService({
+  automaticDownloadFolderReadinessService = createAutomaticDownloadFolderReadinessService(),
   deploymentSecurityService = null,
   getPoolFn = getPool,
   loadSettingsFn = loadSettings,
   pathValidationService = createPathValidationService(),
   plexOwnerLinkService = createPlexOwnerLinkService({ loadSettingsFn }),
   persistSettingsFn = persistSettings,
+  onAutomaticDownloadFoldersReady = null,
   providerCredentialsService = createProviderCredentialsService(),
   recordAuditEventFn = recordAuditEvent,
   slskdConfigService = createSlskdConfigService({ loadSettingsFn }),
@@ -112,6 +120,30 @@ export function createSettingsService({
 
     deploymentSecurityService?.applySettings(nextSettings);
 
+    let musicQueueRecovery = null;
+    if (updatesAutomaticDownloadFolderSetup(updates)) {
+      const readiness = await automaticDownloadFolderReadinessService.getAutomaticDownloadFolderReadiness({
+        settings: nextSettings,
+      });
+
+      if (readiness.ready && typeof onAutomaticDownloadFoldersReady === 'function') {
+        try {
+          musicQueueRecovery = await onAutomaticDownloadFoldersReady({
+            actorUserId,
+            requestMetadata,
+            settings: nextSettings,
+          });
+        } catch {
+          musicQueueRecovery = {
+            dispatchAlreadyActive: false,
+            dispatchDeferred: true,
+            releasedCount: 0,
+            runStarted: false,
+          };
+        }
+      }
+    }
+
     await recordAuditEventFn({
       actorUserId,
       actorType: 'user',
@@ -131,6 +163,7 @@ export function createSettingsService({
 
     return {
       ...(await buildSettingsPayload()),
+      musicQueueRecovery,
       updates,
     };
   }

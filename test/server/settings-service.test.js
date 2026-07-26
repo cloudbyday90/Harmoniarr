@@ -230,6 +230,101 @@ test('createSettingsService includes shared path validation in read and update p
   assert.equal(updatePayload.pathValidation.summary.message, 'Validated debug');
 });
 
+test('createSettingsService schedules bounded Music Queue recovery only after changed folder setup validates', async (t) => {
+  const { pool } = createPool(t);
+  const settings = createBaseSettings();
+  const persistedSettings = {
+    ...settings,
+    paths: {
+      ...settings.paths,
+      downloads: '/data/downloads-ready',
+    },
+  };
+  const loadSettingsFn = t.mock.fn(async () => (
+    loadSettingsFn.mock.callCount() > 1 ? persistedSettings : settings
+  ));
+  const automaticDownloadFolderReadinessService = {
+    getAutomaticDownloadFolderReadiness: t.mock.fn(async () => ({ ready: true })),
+  };
+  const onAutomaticDownloadFoldersReady = t.mock.fn(async () => ({
+    dispatchAlreadyActive: false,
+    dispatchDeferred: false,
+    releasedCount: 2,
+    runStarted: true,
+  }));
+  const settingsService = createSettingsService({
+    automaticDownloadFolderReadinessService,
+    getPoolFn: () => pool,
+    loadSettingsFn,
+    onAutomaticDownloadFoldersReady,
+    pathValidationService: {
+      validateSettingsPaths: async () => ({ summary: { message: 'Folders ready', status: 'healthy' } }),
+    },
+    persistSettingsFn: async () => persistedSettings,
+    providerCredentialsService: createNoopProviderCredentialsService(),
+    recordAuditEventFn: t.mock.fn(async () => {}),
+    slskdConfigService: {
+      buildSecretMutation: () => ({ sanitizedPatch: null, updatedKeys: [], apply: async () => {} }),
+      buildSecretStatus: async () => ({ apiKeyConfigured: false, apiKeySource: null, apiKeyUpdatedAt: null }),
+    },
+  });
+
+  const result = await settingsService.updateSettings({
+    patch: { paths: { downloads: '/data/downloads-ready' } },
+    actorUserId: 'admin-1',
+    requestMetadata: { ipAddress: '203.0.113.20', userAgent: 'FolderSetupTest/1.0' },
+  });
+
+  assert.deepEqual(automaticDownloadFolderReadinessService.getAutomaticDownloadFolderReadiness.mock.calls[0].arguments[0], {
+    settings: persistedSettings,
+  });
+  assert.deepEqual(onAutomaticDownloadFoldersReady.mock.calls[0].arguments[0], {
+    actorUserId: 'admin-1',
+    requestMetadata: { ipAddress: '203.0.113.20', userAgent: 'FolderSetupTest/1.0' },
+    settings: persistedSettings,
+  });
+  assert.equal(result.musicQueueRecovery.releasedCount, 2);
+  assert.equal(result.musicQueueRecovery.runStarted, true);
+});
+
+test('createSettingsService leaves Music Queue recovery untouched when changed folder setup is not ready', async (t) => {
+  const { pool } = createPool(t);
+  const settings = createBaseSettings();
+  const automaticDownloadFolderReadinessService = {
+    getAutomaticDownloadFolderReadiness: t.mock.fn(async () => ({
+      ready: false,
+      reason: 'download_folder_unavailable',
+    })),
+  };
+  const onAutomaticDownloadFoldersReady = t.mock.fn(async () => ({}));
+  const settingsService = createSettingsService({
+    automaticDownloadFolderReadinessService,
+    getPoolFn: () => pool,
+    loadSettingsFn: async () => settings,
+    onAutomaticDownloadFoldersReady,
+    pathValidationService: {
+      validateSettingsPaths: async () => ({ summary: { message: 'Unavailable', status: 'degraded' } }),
+    },
+    persistSettingsFn: async () => settings,
+    providerCredentialsService: createNoopProviderCredentialsService(),
+    recordAuditEventFn: t.mock.fn(async () => {}),
+    slskdConfigService: {
+      buildSecretMutation: () => ({ sanitizedPatch: null, updatedKeys: [], apply: async () => {} }),
+      buildSecretStatus: async () => ({ apiKeyConfigured: false, apiKeySource: null, apiKeyUpdatedAt: null }),
+    },
+  });
+
+  const result = await settingsService.updateSettings({
+    patch: { paths: { downloads: '/data/downloads' } },
+    actorUserId: 'admin-1',
+    requestMetadata: { ipAddress: '203.0.113.20', userAgent: 'FolderSetupTest/1.0' },
+  });
+
+  assert.equal(automaticDownloadFolderReadinessService.getAutomaticDownloadFolderReadiness.mock.callCount(), 1);
+  assert.equal(onAutomaticDownloadFoldersReady.mock.callCount(), 0);
+  assert.equal(result.musicQueueRecovery, null);
+});
+
 test('createSettingsService applies slskd secret mutations and records them in audit metadata', async (t) => {
   const { client, pool } = createPool(t);
   const settings = createBaseSettings();

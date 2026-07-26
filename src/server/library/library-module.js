@@ -35,6 +35,7 @@ import { createLibraryDiscoveryDispatchService } from './library-discovery-dispa
 import { buildReleaseTracklistExpectations } from './candidate-track-matcher.js';
 import { listMetadataTracksByReleaseId } from '../metadata/metadata-repository.js';
 import { createLibraryDiscoveryRediscoveryService } from './library-discovery-rediscovery-service.js';
+import { createLibraryDiscoveryFolderSetupRecoveryService } from './library-discovery-folder-setup-recovery-service.js';
 import { createLibraryDiscoveryRecoveryRetryService } from './library-discovery-recovery-retry-service.js';
 import { createLibraryDiscoveryRunService } from './library-discovery-run-service.js';
 import { createLibraryDiscoveryRunStore } from './library-discovery-run-store.js';
@@ -309,6 +310,10 @@ export function createLibraryModule({
     libraryDiscoveryRequestStore,
     onDownloadRecoveryExhaustedFn,
   }),
+  libraryDiscoveryFolderSetupRecoveryService = createLibraryDiscoveryFolderSetupRecoveryService({
+    libraryDiscoveryRequestStore,
+    startLibraryDiscoveryRun: libraryDiscoveryRunService.startLibraryDiscoveryRun,
+  }),
   libraryDiscoveryRecoveryRetryService = createLibraryDiscoveryRecoveryRetryService({
     assertMaintenanceWriteAllowed: () => maintenanceLockWriteGuardService.assertNoActiveWriteLocks({
       operationLabel: 'library discovery recovery retry',
@@ -387,6 +392,7 @@ export function createLibraryModule({
   return {
     libraryCatalogStore,
     libraryDiscoveryDispatchService,
+    libraryDiscoveryFolderSetupRecoveryService,
     libraryDiscoveryHeartbeatState,
     libraryDiscoveryRunService,
     libraryDiscoveryRunStore,

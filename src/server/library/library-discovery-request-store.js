@@ -70,6 +70,11 @@ function mapDiscoveryRequestStateRow(row) {
   };
 }
 
+const FOLDER_SETUP_RECOVERY_REASONS = Object.freeze([
+  'missing_download_folder',
+  'download_folder_unavailable',
+]);
+
 export function createLibraryDiscoveryRequestStore({
   getPoolFn = getPool,
 } = {}) {
@@ -210,6 +215,57 @@ export function createLibraryDiscoveryRequestStore({
     );
 
     return mapDiscoveryDispatchRow(result.rows[0]);
+  }
+
+  async function releaseFolderSetupBlockedAutomaticDiscoveryRequests({
+    limit,
+    releasedAt,
+  }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        WITH eligible AS (
+          SELECT id
+          FROM library_discovery_requests
+          WHERE search_mode = 'automatic'
+            AND request_status = 'cooldown'
+            AND blocked_reason = 'automatic_cooldown'
+            AND evidence->'lastSearchResult'->'autoDownloadReadiness'->>'setupReason' = ANY($2::text[])
+            AND evidence->'downloadRecoveryRediscovery' IS NULL
+          ORDER BY
+            release_date ASC NULLS LAST,
+            metadata_release_id ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT $3::integer
+        ),
+        released AS (
+          UPDATE library_discovery_requests
+          SET
+            request_status = 'ready',
+            blocked_reason = NULL,
+            next_search_after = $1::timestamptz,
+            evidence = (
+              COALESCE(library_discovery_requests.evidence, '{}'::jsonb)
+              #- '{lastSearchResult,autoDownloadReadiness}'
+            ) || jsonb_build_object(
+              'folderSetupRecovery', jsonb_build_object(
+                'schemaVersion', 1,
+                'releasedAt', $1::timestamptz,
+                'trigger', 'settings_folder_validation'
+              )
+            ),
+            updated_at = NOW()
+          FROM eligible
+          WHERE library_discovery_requests.id = eligible.id
+          RETURNING library_discovery_requests.id
+        )
+        SELECT COUNT(*)::integer AS released_count
+        FROM released
+      `,
+      [releasedAt, FOLDER_SETUP_RECOVERY_REASONS, limit],
+    );
+
+    return Number.parseInt(String(result.rows[0]?.released_count ?? 0), 10) || 0;
   }
 
   async function markDueAutomaticDiscoveryRequestsProviderPaused({
@@ -879,6 +935,7 @@ export function createLibraryDiscoveryRequestStore({
     markDiscoveryRequestExhausted,
     recordDiscoverySearchFailure,
     recordDiscoverySearchSuccess,
+    releaseFolderSetupBlockedAutomaticDiscoveryRequests,
     requestMusicQueueRediscovery,
     resetDownloadRecoveryExhaustion,
     scheduleDownloadRecoveryRediscovery,

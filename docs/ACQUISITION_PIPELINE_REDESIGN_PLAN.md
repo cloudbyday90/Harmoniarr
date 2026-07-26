@@ -926,7 +926,9 @@ and rediscovery.
 - [x] Keep shared selected-queue execution for advanced/manual batch use.
 - [x] Auto-download high-confidence releases using the candidate-scoped path.
 - [x] Auto-download only matches that satisfy quality policy.
-- [ ] Block auto-download before provider enqueue when folder setup is missing.
+- [x] Block auto-download before provider enqueue when folder setup is missing.
+- [x] After validated folder setup is saved, release only the bounded automatic
+  requests stopped by that folder gate and start one ordinary discovery run.
 - [x] Exclude matches blocked by failed download or operator rejection from
   automatic recovery.
 - [x] On failed download execution, keep the failed match terminal and attempt
@@ -1250,17 +1252,25 @@ Completed follow-up reliability slice:
   folders` release action without exposing raw infrastructure details.
 - The detailed design and validation contract is
   [MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_FOLDER_READINESS_DESIGN.md](MUSIC_QUEUE_AUTOMATIC_DOWNLOAD_FOLDER_READINESS_DESIGN.md).
+- A successful, relevant folder-settings save now rechecks that same
+  server-side readiness contract and requeues only a bounded batch of
+  automatic requests carrying `missing_download_folder` or
+  `download_folder_unavailable`. It removes only that stale evidence and
+  starts one ordinary discovery run, while quality stops, terminal search
+  exhaustion, provider recovery, manual work, and download-recovery work stay
+  untouched.
+- The recovery design and security boundary are documented in
+  [MUSIC_QUEUE_FOLDER_SETUP_RECOVERY_DESIGN.md](MUSIC_QUEUE_FOLDER_SETUP_RECOVERY_DESIGN.md).
 
 Recommended next slice:
 
-1. after a successful Settings folder-validation save, identify only releases
-   stopped by `missing_download_folder` or `download_folder_unavailable`;
-2. schedule one bounded rediscovery pass for those eligible releases;
-3. keep normal search cooldowns, quality stops, terminal match exhaustion, and
-   provider-disabled work untouched;
-4. add browser proof showing `Set up folders` -> validated settings -> a
-   release returning to automatic search without manual candidate work.
+1. show a compact Settings save confirmation when the recovery releases Music
+   Queue work, using release count only;
+2. add Docker-backed browser proof for `Set up folders` -> validated save -> a
+   release returning to automatic search without manual candidate work;
+3. prove an unrelated Settings save, quality stop, exhausted search, provider
+   pause, and download-recovery request remain untouched.
 
-Reason: the new gate prevents unsafe or confusing automatic work. The next
-user-visible improvement is immediate, bounded self-recovery once the user has
-fixed the one blocker Harmoniarr identified.
+Reason: automatic recovery now exists but is invisible. A terse confirmation
+and an end-to-end walkthrough prove the friendly recovery behavior without
+turning Settings or Activity into a diagnostics surface.

@@ -40,6 +40,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   const retryDownloadRecoveryDiscoveryRequest = () => {};
   const libraryDiscoveryRecoveryRetryService = { retryDownloadRecoveryDiscoveryRequest };
   const libraryDiscoveryRediscoveryService = {};
+  const libraryDiscoveryFolderSetupRecoveryService = {};
   const libraryDiscoverySummaryService = { buildLibraryDiscoveryRunDetail, buildLibraryDiscoverySummary };
   const libraryDiscoverySummaryStore = {};
   const libraryDiscoveryWorker = {};
@@ -97,6 +98,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
     libraryDiscoveryRequestStore,
     libraryDiscoveryRecoveryRetryService,
     libraryDiscoveryRediscoveryService,
+    libraryDiscoveryFolderSetupRecoveryService,
     libraryDiscoverySummaryService,
     libraryDiscoverySummaryStore,
     libraryDiscoveryWorker,
@@ -149,6 +151,7 @@ test('createLibraryModule exposes the shared summary services and scan route dep
   assert.equal(libraryModule.libraryDiscoveryRequestStore, libraryDiscoveryRequestStore);
   assert.equal(libraryModule.libraryDiscoveryRecoveryRetryService, libraryDiscoveryRecoveryRetryService);
   assert.equal(libraryModule.libraryDiscoveryRediscoveryService, libraryDiscoveryRediscoveryService);
+  assert.equal(libraryModule.libraryDiscoveryFolderSetupRecoveryService, libraryDiscoveryFolderSetupRecoveryService);
   assert.equal(libraryModule.libraryDiscoverySummaryService, libraryDiscoverySummaryService);
   assert.equal(libraryModule.libraryDiscoverySummaryStore, libraryDiscoverySummaryStore);
   assert.equal(libraryModule.libraryDiscoveryWorker, libraryDiscoveryWorker);
@@ -237,6 +240,7 @@ test('createLibraryModule initializes the default discovery worker after pause s
     },
     libraryDiscoveryRequestStore: {},
     libraryDiscoveryRediscoveryService: {},
+    libraryDiscoveryFolderSetupRecoveryService: {},
     libraryDiscoveryRunService: {
       startLibraryDiscoveryRun: () => {},
     },
