@@ -202,6 +202,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   release already waiting for its normal search check, consumes the fixed
   return token, and does not dispatch a search or download. See
   `MUSIC_QUEUE_PROVIDER_RECOVERY_VISIBILITY_DESIGN.md`.
+- Music Queue normal-cycle Activity visibility: a due automatic release now
+  keeps a durable internal recovery marker while Soulseek is unavailable or
+  needs setup. Once Soulseek accepts its resumed search, Harmoniarr consumes
+  that marker and records one sanitized release event under Downloads. See
+  `MUSIC_QUEUE_NORMAL_CYCLE_ACTIVITY_VISIBILITY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

@@ -79,6 +79,12 @@ test('Activity timeline groups normal events without hiding unknown activity', (
 });
 
 test('Activity timeline categorizes lifecycle milestones and reserves attention for actionable audio outcomes', () => {
+  assert.deepEqual(getActivityTimelineEventPresentation({ eventType: 'music_queue_search_started' }), {
+    category: 'downloads',
+    categoryLabel: 'Download',
+    requiresAttention: false,
+    tone: 'info',
+  });
   assert.deepEqual(getActivityTimelineEventPresentation({ eventType: 'music_queue_match_selected' }), {
     category: 'downloads',
     categoryLabel: 'Download',

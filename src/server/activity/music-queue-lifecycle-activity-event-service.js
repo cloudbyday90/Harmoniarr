@@ -169,6 +169,33 @@ export function buildMusicQueueSearchQueuedActivityEvent({
 }
 
 /**
+ * Builds one release-scoped event after Soulseek has accepted the first normal
+ * search that was waiting for provider recovery. The recovery marker itself is
+ * deliberately not exposed because Activity is not a provider diagnostics log.
+ */
+export function buildMusicQueueProviderRecoverySearchStartedActivityEvent({
+  claimedRequest = null,
+} = {}) {
+  const wantedReleaseId = normalizeOptionalString(claimedRequest?.wantedReleaseId);
+  if (!wantedReleaseId) {
+    return null;
+  }
+
+  return {
+    entityArtist: normalizeOptionalString(claimedRequest?.artistName),
+    entityId: wantedReleaseId,
+    entityTitle: normalizeOptionalString(claimedRequest?.releaseTitle)
+      ?? normalizeOptionalString(claimedRequest?.releaseGroupTitle),
+    entityType: 'wanted_release',
+    eventType: 'music_queue_search_started',
+    extraPayload: {
+      schemaVersion: MUSIC_QUEUE_ACTIVITY_SCHEMA_VERSION,
+      wantedReleaseId,
+    },
+  };
+}
+
+/**
  * Records diagnostic Activity without turning its persistence into a workflow
  * failure. This also absorbs a synchronous mock or adapter failure.
  */

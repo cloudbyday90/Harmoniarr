@@ -118,6 +118,7 @@ export function createLibraryModule({
     libraryDiscoveryRequestStore,
     loadSettingsFn: loadSettings,
     onDiscoveryRequestExhaustedFn,
+    recordActivityEventFn,
     slskdService,
   }),
   libraryReleaseAvailabilityStore = createLibraryReleaseAvailabilityStore(),

@@ -110,10 +110,31 @@ export function createLibraryDiscoveryHeartbeat({
   intervalMs = defaultHeartbeatIntervalMs,
   libraryDiscoveryHeartbeatState = createLibraryDiscoveryHeartbeatState(),
   libraryDiscoveryDispatchPolicyService = createLibraryDiscoveryDispatchPolicyService(),
+  markDueAutomaticDiscoveryRequestsProviderPaused = null,
   onError = () => {},
   setIntervalFn = setInterval,
   startLibraryDiscoveryRun = async () => ({ accepted: true }),
 } = {}) {
+  async function markProviderRecoveryPending({ occurredAt, dispatchReadiness }) {
+    if (
+      dispatchReadiness?.provider !== 'slskd'
+      || typeof markDueAutomaticDiscoveryRequestsProviderPaused !== 'function'
+    ) {
+      return;
+    }
+
+    try {
+      await markDueAutomaticDiscoveryRequestsProviderPaused({
+        markedAt: occurredAt,
+        pauseCode: dispatchReadiness.pauseCode ?? 'slskd_unavailable',
+        provider: 'slskd',
+      });
+    } catch {
+      // Recovery history is supplementary. A marker write must not turn a
+      // configured provider pause into a heartbeat failure.
+    }
+  }
+
   async function runTick() {
     const occurredAt = getNow().toISOString();
 
@@ -145,6 +166,8 @@ export function createLibraryDiscoveryHeartbeat({
         dependencyStatuses,
       });
       if (!dispatchReadiness.allowed) {
+        await markProviderRecoveryPending({ occurredAt, dispatchReadiness });
+
         if (dispatchReadiness.reason === 'setup_required') {
           libraryDiscoveryHeartbeatState.recordHeartbeatOutcome({
             occurredAt,

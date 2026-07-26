@@ -124,6 +124,9 @@ export async function startServerRuntime({
     ?? (async () => []);
   const libraryDiscoveryHeartbeatConfig = buildLibraryDiscoveryHeartbeatConfig();
   const libraryDiscoveryDispatchPolicyService = buildLibraryDiscoveryDispatchPolicyService();
+  const markDueAutomaticDiscoveryRequestsProviderPaused = libraryModule
+    ?.libraryDiscoveryRequestStore
+    ?.markDueAutomaticDiscoveryRequestsProviderPaused;
   const libraryDiscoveryHeartbeat = buildLibraryDiscoveryHeartbeat({
     getActiveRun: libraryModule.libraryDiscoveryRunStore.getActiveRun,
     getDependencyHealth,
@@ -132,6 +135,7 @@ export async function startServerRuntime({
     intervalMs: libraryDiscoveryHeartbeatConfig.intervalMs,
     libraryDiscoveryDispatchPolicyService,
     libraryDiscoveryHeartbeatState: libraryModule.libraryDiscoveryHeartbeatState,
+    markDueAutomaticDiscoveryRequestsProviderPaused,
     onError: (error) => {
       runtimeReporter.writeError(error, { label: 'discovery heartbeat failed' });
     },

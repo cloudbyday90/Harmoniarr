@@ -160,6 +160,78 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
   });
 });
 
+test('dispatchReadyDiscoveryRequests records one Activity event after a provider-recovery search is accepted', async (t) => {
+  const callOrder = [];
+  const claimedRequests = [{
+    artistName: 'Boards of Canada',
+    discoveryRequestId: 'discovery-request-1',
+    evidence: {
+      providerRecoveryPending: {
+        pauseCode: 'slskd_unavailable',
+        provider: 'slskd',
+      },
+    },
+    metadataReleaseId: 'release-1',
+    releaseDate: '2002-02-18',
+    releaseGroupTitle: 'Geogaddi',
+    releaseTitle: 'Geogaddi',
+    wantedReleaseId: 'wanted-1',
+  }];
+  const recordActivityEventFn = t.mock.fn(async (event) => {
+    callOrder.push('activity');
+    assert.equal(event.eventType, 'music_queue_search_started');
+  });
+  const consumeProviderRecoveryPending = t.mock.fn(async ({ discoveryRequestId }) => {
+    callOrder.push('consume');
+    assert.equal(discoveryRequestId, 'discovery-request-1');
+    return {
+      markedAt: '2026-07-26T12:00:00.000Z',
+      pauseCode: 'slskd_unavailable',
+      provider: 'slskd',
+      schemaVersion: 1,
+    };
+  });
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    getNow: () => new Date('2026-07-26T12:05:00.000Z'),
+    importCandidateService: {
+      ingestSlskdSearchResponses: t.mock.fn(async () => ({ candidateCount: 1, fileCount: 4 })),
+    },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      consumeProviderRecoveryPending,
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    recordActivityEventFn,
+    slskdService: {
+      startSearch: t.mock.fn(async () => {
+        callOrder.push('search');
+        return { id: 'search-1' };
+      }),
+    },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+
+  assert.deepEqual(callOrder, ['search', 'consume', 'activity']);
+  assert.equal(recordActivityEventFn.mock.callCount(), 1);
+  assert.deepEqual(recordActivityEventFn.mock.calls[0].arguments[0], {
+    entityArtist: 'Boards of Canada',
+    entityId: 'wanted-1',
+    entityTitle: 'Geogaddi',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_search_started',
+    extraPayload: {
+      schemaVersion: 1,
+      wantedReleaseId: 'wanted-1',
+    },
+  });
+});
+
 test('dispatchReadyDiscoveryRequests auto-selects high-confidence ingested candidates', async (t) => {
   const claimedRequests = [{
     artistName: 'Autechre',

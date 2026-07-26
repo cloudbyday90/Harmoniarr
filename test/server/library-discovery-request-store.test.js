@@ -158,6 +158,57 @@ test('markDiscoveryRequestExhausted blocks automatic discovery retries', async (
   assert.equal(query.mock.callCount(), 1);
 });
 
+test('markDueAutomaticDiscoveryRequestsProviderPaused marks due automatic work without raw provider errors', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /request_status = 'ready'/);
+    assert.match(sql, /COALESCE\(next_search_after, \$1::timestamptz\) <= \$1::timestamptz/);
+    assert.match(sql, /'providerRecoveryPending'/);
+    assert.deepEqual(params, [
+      '2026-07-26T12:00:00.000Z',
+      'slskd',
+      'slskd_unavailable',
+    ]);
+    return { rowCount: 2, rows: [] };
+  });
+  const store = createLibraryDiscoveryRequestStore({ getPoolFn: () => ({ query }) });
+
+  const markedCount = await store.markDueAutomaticDiscoveryRequestsProviderPaused({
+    markedAt: '2026-07-26T12:00:00.000Z',
+    pauseCode: 'slskd_unavailable',
+  });
+
+  assert.equal(markedCount, 2);
+});
+
+test('consumeProviderRecoveryPending atomically clears one durable provider-recovery marker', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /- 'providerRecoveryPending'/);
+    assert.match(sql, /WHERE id = \$1::uuid/);
+    assert.deepEqual(params, ['discovery-request-1']);
+    return {
+      rows: [{
+        provider_recovery: {
+          markedAt: '2026-07-26T12:00:00.000Z',
+          pauseCode: 'slskd_unavailable',
+          provider: 'slskd',
+          schemaVersion: 1,
+        },
+      }],
+    };
+  });
+  const store = createLibraryDiscoveryRequestStore({ getPoolFn: () => ({ query }) });
+
+  const marker = await store.consumeProviderRecoveryPending({ discoveryRequestId: ' discovery-request-1 ' });
+
+  assert.deepEqual(marker, {
+    markedAt: '2026-07-26T12:00:00.000Z',
+    pauseCode: 'slskd_unavailable',
+    provider: 'slskd',
+    schemaVersion: 1,
+  });
+  assert.equal(await store.consumeProviderRecoveryPending({ discoveryRequestId: null }), null);
+});
+
 test('requestMusicQueueRediscovery resets one release into ready automatic search state', async (t) => {
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /request_status = 'ready'/);

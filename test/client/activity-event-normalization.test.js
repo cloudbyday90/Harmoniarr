@@ -343,6 +343,22 @@ test('getActivityEventLabel and detail make Music Queue recovery understandable 
   assert.equal(getActivityEventDetail(exhausted), 'Harmoniarr will search again later.');
 });
 
+test('getActivityEventLabel and detail describe a recovered provider search without diagnostics', () => {
+  const event = {
+    eventType: 'music_queue_search_started',
+    entityArtist: 'Boards of Canada',
+    entityTitle: 'Geogaddi',
+    extraPayload: { wantedReleaseId: 'wanted-1' },
+  };
+
+  assert.equal(getActivityEventLabel(event), 'Searching again: Geogaddi by Boards of Canada');
+  assert.equal(
+    getActivityEventDetail(event),
+    'Soulseek is available again. Harmoniarr started checking for a safe match.',
+  );
+  assert.equal(getActivityEventIcon(event.eventType), 'search');
+});
+
 test('getActivityEventDetail returns detail for multi-release release_added', () => {
   const event = normalizeActivityEvent(makeReleaseAddedEvent({
     entityTitle: '2 releases',

@@ -241,6 +241,28 @@ test('createLibraryDiscoveryHeartbeat records setup-required when slskd is not c
   });
 });
 
+test('createLibraryDiscoveryHeartbeat marks only due automatic requests for a later provider-recovery event', async (t) => {
+  const markDueAutomaticDiscoveryRequestsProviderPaused = t.mock.fn(async () => 2);
+  const heartbeat = createLibraryDiscoveryHeartbeat({
+    getDependencyHealth: async () => [{
+      code: 'slskd_unavailable',
+      message: 'Soulseek (slskd) is temporarily unavailable.',
+      provider: 'slskd',
+      status: 'unavailable',
+    }],
+    getNow: () => new Date('2026-07-26T12:00:00.000Z'),
+    markDueAutomaticDiscoveryRequestsProviderPaused,
+  });
+
+  await heartbeat.tick();
+
+  assert.deepEqual(markDueAutomaticDiscoveryRequestsProviderPaused.mock.calls[0].arguments[0], {
+    markedAt: '2026-07-26T12:00:00.000Z',
+    pauseCode: 'slskd_unavailable',
+    provider: 'slskd',
+  });
+});
+
 test('createLibraryDiscoveryHeartbeat swallows concurrent-run conflicts and surfaces other errors through onError', async () => {
   const errors = [];
   const conflictState = createLibraryDiscoveryHeartbeatState();

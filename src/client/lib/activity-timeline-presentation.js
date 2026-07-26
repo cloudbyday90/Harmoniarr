@@ -34,6 +34,7 @@ function getTimelineCategory(eventType) {
     case 'music_queue_match_selected':
     case 'music_queue_download_started':
     case 'music_queue_search_queued':
+    case 'music_queue_search_started':
     case 'music_queue_download_retrying':
     case 'music_queue_match_retrying':
     case 'music_queue_no_matches_left':

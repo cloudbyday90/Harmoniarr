@@ -1024,6 +1024,11 @@ right repair surface.
   first release already waiting for the normal search cycle, and is consumed
   from the URL without dispatching work. See
   `MUSIC_QUEUE_PROVIDER_RECOVERY_VISIBILITY_DESIGN.md`.
+- [x] Record one Music Queue Activity row when a release that was waiting on
+  Soulseek actually starts searching again after provider recovery. The durable
+  per-release marker survives restarts, is consumed only after provider search
+  acceptance, and exposes no provider diagnostics. See
+  `MUSIC_QUEUE_NORMAL_CYCLE_ACTIVITY_VISIBILITY_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See

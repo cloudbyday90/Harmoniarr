@@ -26,6 +26,7 @@ function mapDiscoveryDispatchRow(row) {
 
   return {
     artistName: row.artist_name ?? null,
+    discoveryRequestId: row.discovery_request_id ?? null,
     evidence: row.evidence ?? {},
     lastSearchAt: row.last_search_at ?? null,
     metadataArtistId: row.metadata_artist_id,
@@ -39,6 +40,7 @@ function mapDiscoveryDispatchRow(row) {
     requestStatus: row.request_status ?? null,
     searchAttemptCount: Number.parseInt(String(row.search_attempt_count ?? 0), 10) || 0,
     searchMode: row.search_mode ?? null,
+    wantedReleaseId: row.wanted_release_id ?? null,
     wantedStatus: row.wanted_status ?? null,
   };
 }
@@ -138,7 +140,8 @@ export function createLibraryDiscoveryRequestStore({
             library_discovery_requests.evidence,
             metadata_artists.name AS artist_name,
             metadata_release_groups.title AS release_group_title,
-            metadata_releases.title AS release_title
+            metadata_releases.title AS release_title,
+            library_wanted_releases.id AS wanted_release_id
           FROM library_discovery_requests
           JOIN metadata_artists
             ON metadata_artists.id = library_discovery_requests.metadata_artist_id
@@ -146,6 +149,15 @@ export function createLibraryDiscoveryRequestStore({
             ON metadata_release_groups.id = library_discovery_requests.metadata_release_group_id
           JOIN metadata_releases
             ON metadata_releases.id = library_discovery_requests.metadata_release_id
+          LEFT JOIN LATERAL (
+            SELECT id
+            FROM library_wanted_releases
+            WHERE metadata_release_id = library_discovery_requests.metadata_release_id
+              AND wanted_status IN ('missing', 'partial')
+            ORDER BY last_reconciled_at DESC NULLS LAST, id ASC
+            LIMIT 1
+          ) AS library_wanted_releases
+            ON TRUE
           WHERE library_discovery_requests.search_mode = 'automatic'
             AND library_discovery_requests.request_status = 'ready'
             AND COALESCE(library_discovery_requests.next_search_after, $1::timestamptz) <= $1::timestamptz
@@ -173,6 +185,7 @@ export function createLibraryDiscoveryRequestStore({
           RETURNING library_discovery_requests.*
         )
         SELECT
+          claimed.id AS discovery_request_id,
           claimed.metadata_artist_id,
           claimed.metadata_release_group_id,
           claimed.metadata_release_id,
@@ -187,7 +200,8 @@ export function createLibraryDiscoveryRequestStore({
           claimed.evidence,
           candidate.artist_name,
           candidate.release_group_title,
-          candidate.release_title
+          candidate.release_title,
+          candidate.wanted_release_id
         FROM claimed
         JOIN candidate
           ON candidate.id = claimed.id
@@ -196,6 +210,62 @@ export function createLibraryDiscoveryRequestStore({
     );
 
     return mapDiscoveryDispatchRow(result.rows[0]);
+  }
+
+  async function markDueAutomaticDiscoveryRequestsProviderPaused({
+    markedAt,
+    pauseCode,
+    provider = 'slskd',
+  }) {
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        UPDATE library_discovery_requests
+        SET
+          evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
+            'providerRecoveryPending', jsonb_build_object(
+              'schemaVersion', 1,
+              'provider', $2::text,
+              'pauseCode', $3::text,
+              'markedAt', $1::timestamptz
+            )
+          ),
+          updated_at = NOW()
+        WHERE search_mode = 'automatic'
+          AND request_status = 'ready'
+          AND COALESCE(next_search_after, $1::timestamptz) <= $1::timestamptz
+          AND (
+            evidence->'providerRecoveryPending' IS NULL
+            OR evidence->'providerRecoveryPending'->>'provider' IS DISTINCT FROM $2::text
+            OR evidence->'providerRecoveryPending'->>'pauseCode' IS DISTINCT FROM $3::text
+          )
+      `,
+      [markedAt, provider, pauseCode],
+    );
+
+    return result.rowCount ?? 0;
+  }
+
+  async function consumeProviderRecoveryPending({ discoveryRequestId }) {
+    if (typeof discoveryRequestId !== 'string' || !discoveryRequestId.trim()) {
+      return null;
+    }
+
+    const pool = getPoolFn();
+    const result = await pool.query(
+      `
+        UPDATE library_discovery_requests
+        SET
+          evidence = COALESCE(evidence, '{}'::jsonb) - 'providerRecoveryPending',
+          updated_at = NOW()
+        WHERE id = $1::uuid
+          AND evidence ? 'providerRecoveryPending'
+        RETURNING evidence->'providerRecoveryPending' AS provider_recovery
+      `,
+      [discoveryRequestId.trim()],
+    );
+
+    return result.rows[0]?.provider_recovery ?? null;
   }
 
   async function recordDiscoverySearchFailure({
@@ -798,8 +868,10 @@ export function createLibraryDiscoveryRequestStore({
   return {
     allowMusicQueueFallbackQuality,
     claimNextReadyAutomaticDiscoveryRequest,
+    consumeProviderRecoveryPending,
     getDownloadRecoveryRediscoveryState,
     listDiscoveryRequestsByMetadataReleaseIds,
+    markDueAutomaticDiscoveryRequestsProviderPaused,
     markDownloadRecoveryRediscoveryExhausted,
     markDiscoveryRequestExhausted,
     recordDiscoverySearchFailure,

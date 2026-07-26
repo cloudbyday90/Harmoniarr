@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildMusicQueueRecoveryActivityEvent,
+  buildMusicQueueProviderRecoverySearchStartedActivityEvent,
   buildMusicQueueSearchQueuedActivityEvent,
   recordActivityEventSafely,
 } from '../../src/server/activity/music-queue-lifecycle-activity-event-service.js';
@@ -125,6 +126,36 @@ test('Music Queue search activity is release-scoped and records only safe schedu
     'schemaVersion',
     'wantedReleaseId',
   ]);
+});
+
+test('Music Queue provider recovery search activity is release-scoped and excludes provider diagnostics', () => {
+  const event = buildMusicQueueProviderRecoverySearchStartedActivityEvent({
+    claimedRequest: {
+      artistName: 'Boards of Canada',
+      evidence: {
+        providerRecoveryPending: {
+          pauseCode: 'slskd_unavailable',
+          provider: 'slskd',
+        },
+      },
+      releaseTitle: 'Geogaddi',
+      wantedReleaseId: 'wanted-2',
+    },
+  });
+
+  assert.deepEqual(event, {
+    entityArtist: 'Boards of Canada',
+    entityId: 'wanted-2',
+    entityTitle: 'Geogaddi',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_search_started',
+    extraPayload: {
+      schemaVersion: 1,
+      wantedReleaseId: 'wanted-2',
+    },
+  });
+  assert.equal(JSON.stringify(event).includes('slskd_unavailable'), false);
+  assert.equal(JSON.stringify(event).includes('providerRecoveryPending'), false);
 });
 
 test('recordActivityEventSafely absorbs a synchronous diagnostic writer failure', () => {

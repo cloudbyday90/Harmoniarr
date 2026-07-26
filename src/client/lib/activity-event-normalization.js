@@ -173,6 +173,12 @@ export function getActivityEventLabel(event, currentUserId = null) {
         : 'a release';
       return `Search queued: ${releaseDesc}`;
     }
+    case 'music_queue_search_started': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Searching again: ${releaseDesc}`;
+    }
     case 'music_queue_download_retrying': {
       const releaseDesc = title
         ? (artist ? `${title} by ${artist}` : title)
@@ -250,6 +256,10 @@ export function getActivityEventDetail(event) {
     return 'Harmoniarr will look for another safe match.';
   }
 
+  if (event.eventType === 'music_queue_search_started') {
+    return 'Soulseek is available again. Harmoniarr started checking for a safe match.';
+  }
+
   if (event.eventType === 'music_queue_download_retrying') {
     return 'The source rejected the transfer. Harmoniarr will try this download again.';
   }
@@ -315,6 +325,7 @@ export function getActivityEventIcon(eventType) {
     case 'quality_fallback_allowed':
       return 'audio-check';
     case 'music_queue_search_queued':
+    case 'music_queue_search_started':
       return 'search';
     case 'music_queue_download_retrying':
     case 'music_queue_match_retrying':

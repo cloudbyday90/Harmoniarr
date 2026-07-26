@@ -24,6 +24,10 @@ import {
   MAX_TRACK_FALLBACK_QUERIES,
   buildPerTrackDiscoveryQueries,
 } from './library-discovery-track-fallback-query.js';
+import {
+  buildMusicQueueProviderRecoverySearchStartedActivityEvent,
+  recordActivityEventSafely,
+} from '../activity/music-queue-lifecycle-activity-event-service.js';
 import { loadSettings } from '../settings.js';
 
 export const DEFAULT_DISCOVERY_SETTINGS = Object.freeze({
@@ -70,6 +74,7 @@ export function createLibraryDiscoveryDispatchService({
   libraryDiscoveryRequestStore = createLibraryDiscoveryRequestStore(),
   loadSettingsFn = loadSettings,
   onDiscoveryRequestExhaustedFn = null,
+  recordActivityEventFn = null,
   slskdService = null,
   trackFallbackMaxQueries = MAX_TRACK_FALLBACK_QUERIES,
 } = {}) {
@@ -160,6 +165,34 @@ export function createLibraryDiscoveryDispatchService({
       qualityOverride,
       ...(wantedReleaseId ? { wantedReleaseId } : {}),
     };
+  }
+
+  async function recordProviderRecoverySearchStarted({ claimedRequest }) {
+    if (
+      !claimedRequest?.discoveryRequestId
+      || !claimedRequest?.evidence?.providerRecoveryPending
+      || typeof libraryDiscoveryRequestStore.consumeProviderRecoveryPending !== 'function'
+    ) {
+      return;
+    }
+
+    let providerRecovery;
+    try {
+      providerRecovery = await libraryDiscoveryRequestStore.consumeProviderRecoveryPending({
+        discoveryRequestId: claimedRequest.discoveryRequestId,
+      });
+    } catch {
+      return;
+    }
+
+    if (!providerRecovery) {
+      return;
+    }
+
+    recordActivityEventSafely(
+      recordActivityEventFn,
+      buildMusicQueueProviderRecoverySearchStartedActivityEvent({ claimedRequest }),
+    );
   }
 
   async function selectHighConfidenceCandidateAfterIngestion({
@@ -416,6 +449,7 @@ export function createLibraryDiscoveryDispatchService({
         const search = await slskdService.startSearch({
           query: searchQuery,
         });
+        await recordProviderRecoverySearchStarted({ claimedRequest });
         const requestOwnership = ownership;
 
         let tracklistExpectations = null;
