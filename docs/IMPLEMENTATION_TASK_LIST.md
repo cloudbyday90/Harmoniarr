@@ -189,6 +189,10 @@ Database model source: `docs/DATABASE_MODEL.md`
   hands off only to Connections, while retaining generic runtime health states
   for every other provider condition. See
   `SLSKD_PROVIDER_MODE_SETUP_PROGRESS_DESIGN.md`.
+- Music Queue provider repair context: Home and Music Queue now show one
+  compact Connections handoff only when provider-dependent queued music is
+  blocked by Disabled mode, incomplete Managed setup, External setup, or
+  provider reachability. See `MUSIC_QUEUE_PROVIDER_REPAIR_CONTEXT_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

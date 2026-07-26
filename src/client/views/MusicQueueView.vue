@@ -19,6 +19,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
 import {
   buildMusicQueueMatchReview,
   buildMusicQueueReleaseTypeFilters,
@@ -26,6 +27,9 @@ import {
   MUSIC_QUEUE_STATE_FILTERS,
 } from '../lib/acquisition-pipeline-presentation.js';
 import { useMusicQueue } from '../composables/useMusicQueue.js';
+import { useMusicQueueProviderRepairContext } from '../composables/useMusicQueueProviderRepairContext.js';
+import { hasMusicQueueProviderDependentWork } from '../lib/music-queue-provider-repair-presentation.js';
+import { sessionStore } from '../state/session.js';
 
 const {
   actionErrorMessage,
@@ -44,6 +48,20 @@ const {
   totalCount,
   useMatch,
 } = useMusicQueue();
+
+const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
+const hasProviderDependentMusicQueueWork = computed(() =>
+  hasMusicQueueProviderDependentWork(releases.value),
+);
+const shouldCheckProviderRepair = computed(() =>
+  !isRequester.value && hasProviderDependentMusicQueueWork.value,
+);
+const {
+  notice: musicQueueProviderRepairNotice,
+  refreshProviderRepairContext,
+} = useMusicQueueProviderRepairContext({
+  enabled: shouldCheckProviderRepair,
+});
 
 const route = useRoute();
 const router = useRouter();
@@ -117,6 +135,11 @@ async function handleAllowFallbackQuality() {
   });
 }
 
+async function refreshMusicQueue() {
+  await load();
+  await refreshProviderRepairContext();
+}
+
 watch(
   () => route.params.wantedReleaseId,
   (wantedReleaseId) => {
@@ -135,10 +158,15 @@ watch(
           Releases Harmoniarr is searching, downloading, checking, and adding to your library. If automation stops, the row explains why and shows the next action.
         </p>
       </div>
-      <button type="button" class="hx-btn" :disabled="isRevalidating" @click="load">
+      <button type="button" class="hx-btn" :disabled="isRevalidating" @click="refreshMusicQueue">
         {{ isRevalidating ? 'Refreshing...' : 'Refresh' }}
       </button>
     </header>
+
+    <MusicQueueProviderRepairNotice
+      v-if="!isRequester"
+      :notice="musicQueueProviderRepairNotice"
+    />
 
     <div class="music-queue-summary">
       <article v-for="card in summaryCards" :key="card.key" class="music-queue-summary-card">

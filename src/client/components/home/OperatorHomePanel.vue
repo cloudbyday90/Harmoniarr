@@ -21,6 +21,7 @@ import { computed, onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 import { RouterLink } from 'vue-router';
 import EmptyState from '../EmptyState.vue';
 import GridControls from '../GridControls.vue';
+import MusicQueueProviderRepairNotice from '../music-queue/MusicQueueProviderRepairNotice.vue';
 import MusicQueueProgressStrip from '../music-queue/MusicQueueProgressStrip.vue';
 import OperatorArtistCard from './OperatorArtistCard.vue';
 import { useDiscoverArtistArtwork } from '../../composables/useDiscoverArtistArtwork.js';
@@ -28,10 +29,12 @@ import { useArtworkGridRoving } from '../../composables/useArtworkGridRoving.js'
 import { useGridState } from '../../composables/useGridState.js';
 import { useOperatorMonitoredArtists } from '../../composables/useOperatorMonitoredArtists.js';
 import { useMusicQueue } from '../../composables/useMusicQueue.js';
+import { useMusicQueueProviderRepairContext } from '../../composables/useMusicQueueProviderRepairContext.js';
 import {
   buildOperatorHomeStats,
   calculateOperatorArtistCoveragePercent,
 } from '../../lib/operator-artist-card-presentation.js';
+import { hasMusicQueueProviderDependentWork } from '../../lib/music-queue-provider-repair-presentation.js';
 
 const SORT_OPTIONS = [
   { value: 'name', label: 'Name' },
@@ -90,11 +93,23 @@ const statCards = computed(() => buildOperatorHomeStats(artists.value));
 const {
   errorMessage: musicQueueErrorMessage,
   isLoading: isMusicQueueLoading,
+  load: loadMusicQueue,
   releases: musicQueueReleases,
   totalCount: musicQueueTotalCount,
 } = useMusicQueue({
   limit: 100,
   pollIntervalMs: 30000,
+});
+
+const hasProviderDependentMusicQueueWork = computed(() =>
+  hasMusicQueueProviderDependentWork(musicQueueReleases.value),
+);
+
+const {
+  notice: musicQueueProviderRepairNotice,
+  refreshProviderRepairContext,
+} = useMusicQueueProviderRepairContext({
+  enabled: hasProviderDependentMusicQueueWork,
 });
 
 const shouldShowMusicQueueProgress = computed(() =>
@@ -143,8 +158,12 @@ useArtworkGridRoving(() => artistsGridEl.value, {
   count: () => sortedArtists.value.length,
 });
 
-function refreshAll() {
-  void loadOperatorMonitoredArtists();
+async function refreshAll() {
+  await Promise.all([
+    loadOperatorMonitoredArtists(),
+    loadMusicQueue(),
+  ]);
+  await refreshProviderRepairContext();
 }
 
 onMounted(() => {
@@ -215,6 +234,10 @@ onBeforeUnmount(() => {
           <span class="hx-stat-meta">{{ card.meta }}</span>
         </article>
       </section>
+
+      <MusicQueueProviderRepairNotice
+        :notice="musicQueueProviderRepairNotice"
+      />
 
       <MusicQueueProgressStrip
         v-if="shouldShowMusicQueueProgress"

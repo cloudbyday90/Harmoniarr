@@ -21,11 +21,19 @@
  * Setup landing page. This intentionally excludes URLs, secret metadata for
  * unrelated providers, and all editable settings.
  */
+const providerModes = new Set(['disabled', 'external', 'managed']);
+
+function normalizeProviderMode(value) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return providerModes.has(normalized) ? normalized : null;
+}
+
 export function buildSettingsSetupProgress(settingsPayload) {
   return {
     soulseek: {
       managedDeploymentMissing:
         settingsPayload?.secretStatus?.slskd?.providerModeState === 'managed_deployment_missing',
+      providerMode: normalizeProviderMode(settingsPayload?.secretStatus?.slskd?.providerMode),
     },
   };
 }

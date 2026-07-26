@@ -21,7 +21,7 @@ import test from 'node:test';
 import { useSettingsSetupProgress } from '../../src/client/composables/useSettingsSetupProgress.js';
 import { buildSettingsSetupProgress } from '../../src/client/lib/settings-setup-progress.js';
 
-test('settings setup progress retains only the managed deployment signal', () => {
+test('settings setup progress retains only the safe provider mode and managed deployment signal', () => {
   const progress = buildSettingsSetupProgress({
     secretStatus: {
       providers: {
@@ -30,6 +30,7 @@ test('settings setup progress retains only the managed deployment signal', () =>
       slskd: {
         apiKeyConfigured: true,
         baseUrl: 'http://must-not-reach-setup.example',
+        providerMode: 'managed',
         providerModeState: 'managed_deployment_missing',
       },
     },
@@ -37,7 +38,10 @@ test('settings setup progress retains only the managed deployment signal', () =>
   });
 
   assert.deepEqual(progress, {
-    soulseek: { managedDeploymentMissing: true },
+    soulseek: {
+      managedDeploymentMissing: true,
+      providerMode: 'managed',
+    },
   });
   assert.doesNotMatch(JSON.stringify(progress), /base.?url|api.?key|secret|spotify/i);
 });
@@ -45,7 +49,10 @@ test('settings setup progress retains only the managed deployment signal', () =>
 test('useSettingsSetupProgress loads the reduced setup state', async (t) => {
   const fetchSettingsFn = t.mock.fn(async () => ({
     secretStatus: {
-      slskd: { providerModeState: 'managed_deployment_missing' },
+      slskd: {
+        providerMode: 'managed',
+        providerModeState: 'managed_deployment_missing',
+      },
     },
   }));
   const { isLoading, loadError, loadSetupProgress, progress } = useSettingsSetupProgress({ fetchSettingsFn });
@@ -56,7 +63,10 @@ test('useSettingsSetupProgress loads the reduced setup state', async (t) => {
   assert.equal(isLoading.value, false);
   assert.equal(loadError.value, '');
   assert.deepEqual(progress.value, {
-    soulseek: { managedDeploymentMissing: true },
+    soulseek: {
+      managedDeploymentMissing: true,
+      providerMode: 'managed',
+    },
   });
 });
 
@@ -70,6 +80,9 @@ test('useSettingsSetupProgress keeps the safe default when Settings cannot load'
   assert.equal(isLoading.value, false);
   assert.equal(loadError.value, 'Settings request failed');
   assert.deepEqual(progress.value, {
-    soulseek: { managedDeploymentMissing: false },
+    soulseek: {
+      managedDeploymentMissing: false,
+      providerMode: null,
+    },
   });
 });

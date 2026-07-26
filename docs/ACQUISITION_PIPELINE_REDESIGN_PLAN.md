@@ -1011,6 +1011,10 @@ right repair surface.
   described as a deployment step, not a generic unavailable connection, with
   one bounded handoff to Connections. See
   `SLSKD_PROVIDER_MODE_SETUP_PROGRESS_DESIGN.md`.
+- [x] Add mode-aware provider repair context to Home and Music Queue when
+  provider-dependent music cannot advance. The shared notice gives one concise
+  cause and Connections handoff without surfacing configuration controls. See
+  `MUSIC_QUEUE_PROVIDER_REPAIR_CONTEXT_DESIGN.md`.
 - [x] Extend Activity events for match selected, download started, audio
   checked/warning/failed, suspicious FLAC, added-to-library, and request
   fulfilled as those lifecycle states become release-centered. See

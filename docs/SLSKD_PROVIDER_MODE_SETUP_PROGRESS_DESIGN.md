@@ -72,10 +72,9 @@ health fallbacks. Composable tests prove payload reduction and fetch failure
 containment. Browser verification opens Settings > Setup with managed mode
 missing its overlay and proves the exact status and Connections handoff.
 
-## Next Item
+## Follow-Up
 
-The next high-value item is **mode-aware Home and Music Queue repair context**:
-when a release cannot progress because Soulseek is Disabled, Managed setup is
-incomplete, or an External provider is unreachable, show one concise cause and
-the relevant Settings handoff without turning those pages into configuration
-workbenches.
+Mode-aware repair context is now implemented on operator Home and Music Queue.
+It appears only when queued music needs the provider and keeps one Connections
+handoff without adding configuration controls. See [Music Queue Provider Repair
+Context](MUSIC_QUEUE_PROVIDER_REPAIR_CONTEXT_DESIGN.md).
