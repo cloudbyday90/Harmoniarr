@@ -1400,3 +1400,13 @@ high-ranked match remains failed, the next eligible match is promoted, and the
 fallback completes download, verification, and safe automatic library add with
 no candidate-first navigation. This protects the default Music Queue promise
 while keeping bounded same-match retry behavior for rejected transfers.
+
+### Terminal Transfer Recovery Visibility
+
+Implemented in
+[MUSIC_QUEUE_TRANSFER_RECOVERY_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_TRANSFER_RECOVERY_BROWSER_VERIFICATION_DESIGN.md).
+Music Queue now revalidates only releases in active automatic progress states,
+so a terminal transfer recovery visibly advances from `Trying another match` to
+`Downloading` without a manual refresh. The browser contract keeps the normal
+experience release-centered and verifies Activity offers only the focused Music
+Queue handoff.

@@ -108,7 +108,12 @@ contract test and the full Docker execution path.
 
 ## Next Step
 
-The next high-value slice is browser acceptance for the normal Music Queue
-release row through a failed transfer and automatic fallback. It should show
-`Trying another match` and then `Downloading`, without surfacing candidate
-controls or requiring the user to visit Activity.
+Completed by
+[MUSIC_QUEUE_TRANSFER_RECOVERY_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_TRANSFER_RECOVERY_BROWSER_VERIFICATION_DESIGN.md).
+The normal Music Queue row now visibly advances from `Trying another match` to
+`Downloading` through bounded background revalidation, without a manual refresh
+or candidate controls.
+
+The next high-value slice is a compact Home progress surface limited to active
+or action-required releases. It should reuse the active-progress policy and
+link directly to the release detail without turning Home into Activity.

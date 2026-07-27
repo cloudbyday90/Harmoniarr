@@ -28,13 +28,36 @@ import {
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
 
+export const MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES = Object.freeze([
+  'adding_to_library',
+  'checking_matches',
+  'downloading',
+  'ready_to_add',
+  'searching',
+  'trying_next_match',
+]);
+
+const activeProgressStatusSet = new Set(MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES);
+
+/**
+ * Keeps short-lived automatic work visible without continuously polling stable
+ * releases that require no background UI update.
+ *
+ * @param {{ releases?: Array<{ status?: { code?: string }, statusCode?: string }> } | null | undefined} payload
+ * @returns {boolean}
+ */
+export function hasActiveMusicQueueProgress(payload) {
+  const releases = Array.isArray(payload?.releases) ? payload.releases : [];
+  return releases.some((release) => activeProgressStatusSet.has(release?.statusCode ?? release?.status?.code));
+}
+
 export function useMusicQueue({
   allowMusicQueueFallbackQuality = defaultAllowMusicQueueFallbackQuality,
   fetchMusicQueueReleases = defaultFetchMusicQueueReleases,
   immediate = true,
   limit = 100,
   metadataArtistId = null,
-  pollIntervalMs = 30000,
+  pollIntervalMs = 10000,
   rejectMusicQueueMatch = defaultRejectMusicQueueMatch,
   searchMusicQueueReleaseAgain = defaultSearchMusicQueueReleaseAgain,
   useMusicQueueMatch = defaultUseMusicQueueMatch,
@@ -59,7 +82,10 @@ export function useMusicQueue({
     immediate: hasArtistScope ? false : immediate,
     initialData: { pagination: { total: 0 }, releases: [], summary: { counts: {}, total: 0 } },
     pollIntervalMs,
-    pollWhile: () => !hasArtistScope || Boolean(getMetadataArtistId()),
+    pollWhile: (payload) => (
+      (!hasArtistScope || Boolean(getMetadataArtistId()))
+      && hasActiveMusicQueueProgress(payload)
+    ),
     project: (payload) => ({
       checkedAt: payload?.checkedAt ?? null,
       pagination: payload?.pagination ?? { total: 0 },
