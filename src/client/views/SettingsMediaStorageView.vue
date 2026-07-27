@@ -33,6 +33,7 @@ import {
 import {
   buildDownloadMappingSourceLabel,
   buildDownloadsPathHint,
+  buildPathTranslationSetupPrompt,
   buildPathTranslationsDescription,
   buildPathTranslationsEmptyState,
   formatMappingLabel,
@@ -97,7 +98,12 @@ const maxOriginalFileSizeMb = computed({
   set: (mb) => { form.artwork.maxOriginalFileSizeBytes = Math.round(mb) * 1048576; },
 });
 
-function addDownloadMapping() { form.paths.downloadMappings.push(createEmptyDownloadMapping()); }
+function addDownloadMapping() {
+  form.paths.downloadMappings.push({
+    ...createEmptyDownloadMapping(),
+    harmoniarrPrefix: form.paths.downloads,
+  });
+}
 function removeDownloadMapping(index) { form.paths.downloadMappings.splice(index, 1); }
 function addUserMusicRoot() { form.paths.userMusicRoots.push(createEmptyUserMusicRoot()); }
 function removeUserMusicRoot(index) { form.paths.userMusicRoots.splice(index, 1); }
@@ -113,6 +119,11 @@ const providerSparklines = computed(() => {
   }
   return result;
 });
+
+const pathTranslationSetupPrompt = computed(() => buildPathTranslationSetupPrompt({
+  downloadMappingCount: form.paths.downloadMappings.length,
+  providerMode: form.slskd.providerMode,
+}));
 
 onMounted(() => { void loadSettings(); });
 onMounted(() => { void artworkQuota.loadQuota(); });
@@ -305,6 +316,15 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
 
             <!-- Path translations -->
             <div class="cfg-group">
+              <div v-if="pathTranslationSetupPrompt" class="cfg-download-setup" role="status">
+                <div>
+                  <strong>{{ pathTranslationSetupPrompt.title }}</strong>
+                  <p>{{ pathTranslationSetupPrompt.description }}</p>
+                </div>
+                <button type="button" class="hx-btn" data-variant="primary" @click="addDownloadMapping">
+                  {{ pathTranslationSetupPrompt.actionLabel }}
+                </button>
+              </div>
               <div class="cfg-subsection-header">
                 <div>
                   <p class="cfg-group-title">Path translations</p>

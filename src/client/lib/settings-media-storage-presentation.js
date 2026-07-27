@@ -129,6 +129,29 @@ export function buildPathTranslationsEmptyState() {
 }
 
 /**
+ * Builds the setup prompt shown when an enabled download provider has no
+ * explicit path translation. Automatic file handling is intentionally gated
+ * until the operator confirms both views of the completed-download folder.
+ *
+ * @param {{ downloadMappingCount?: number, providerMode?: string }=} options
+ * @returns {{ actionLabel: string, description: string, title: string }|null}
+ */
+export function buildPathTranslationSetupPrompt({
+  downloadMappingCount = 0,
+  providerMode = 'external',
+} = {}) {
+  if (providerMode === 'disabled' || Number(downloadMappingCount) > 0) {
+    return null;
+  }
+
+  return {
+    actionLabel: 'Add path translation',
+    description: 'Make the completed-download folder available to Harmoniarr, then enter the download client path and the Harmoniarr path for that same folder.',
+    title: 'Finish automatic download setup',
+  };
+}
+
+/**
  * Returns the field label for the download client side of a path mapping.
  * Uses "Download client path" rather than "slskd sees this path".
  *

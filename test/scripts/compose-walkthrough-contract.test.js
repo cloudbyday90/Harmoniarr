@@ -22,3 +22,14 @@ test('walkthrough Compose provides a disposable local secret encryption key fall
   assert.ok(match, 'walkthrough Compose must set HARMONIARR_SECRET_ENCRYPTION_KEY with a 32-byte hex fallback');
   assert.notEqual(match[1], '0'.repeat(64), 'walkthrough fallback key must not be the all-zero key');
 });
+
+test('walkthrough Compose allows the completed-download host path to be overridden', async () => {
+  const source = await readFile(COMPOSE_PATH, 'utf8');
+
+  assert.match(
+    source,
+    /source:\s*\$\{HARMONIARR_WALKTHROUGH_DOWNLOADS_HOST_PATH:-\.\/\.data\/walkthrough\/downloads\}/u,
+    'walkthrough Compose must permit a host-visible completed-download folder without committing one machine path',
+  );
+  assert.match(source, /target:\s*\/data\/downloads/u);
+});

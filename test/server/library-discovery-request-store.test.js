@@ -49,6 +49,44 @@ test('listDiscoveryRequestsByMetadataReleaseIds returns current request state fo
   }]);
 });
 
+test('claimNextReadyAutomaticDiscoveryRequest locks only the discovery request when wanted-release projection is optional', async (t) => {
+  const query = t.mock.fn(async (sql, params) => {
+    assert.match(sql, /LEFT JOIN LATERAL/u);
+    assert.match(sql, /FOR UPDATE OF library_discovery_requests SKIP LOCKED/u);
+    assert.doesNotMatch(sql, /FOR UPDATE SKIP LOCKED/u);
+    assert.deepEqual(params, [
+      '2026-07-26T15:00:00.000Z',
+      '2026-07-26T21:00:00.000Z',
+    ]);
+    return {
+      rows: [{
+        artist_name: 'Autechre',
+        discovery_request_id: 'request-1',
+        evidence: {},
+        metadata_artist_id: 'artist-1',
+        metadata_release_group_id: 'group-1',
+        metadata_release_id: 'release-1',
+        release_group_title: 'Amber',
+        release_title: 'Amber',
+        request_status: 'cooldown',
+        search_mode: 'automatic',
+        wanted_release_id: null,
+        wanted_status: 'missing',
+      }],
+    };
+  });
+  const store = createLibraryDiscoveryRequestStore({ getPoolFn: () => ({ query }) });
+
+  const request = await store.claimNextReadyAutomaticDiscoveryRequest({
+    dispatchedAt: '2026-07-26T15:00:00.000Z',
+    nextSearchAfter: '2026-07-26T21:00:00.000Z',
+  });
+
+  assert.equal(request.discoveryRequestId, 'request-1');
+  assert.equal(request.artistName, 'Autechre');
+  assert.equal(request.wantedReleaseId, null);
+});
+
 test('releaseFolderSetupBlockedAutomaticDiscoveryRequests only requeues bounded automatic folder-gated cooldowns', async (t) => {
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /search_mode = 'automatic'/);

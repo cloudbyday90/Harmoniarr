@@ -170,7 +170,7 @@ export function createLibraryDiscoveryRequestStore({
             library_discovery_requests.next_search_after ASC NULLS FIRST,
             library_discovery_requests.release_date ASC NULLS LAST,
             library_discovery_requests.metadata_release_id ASC
-          FOR UPDATE SKIP LOCKED
+          FOR UPDATE OF library_discovery_requests SKIP LOCKED
           LIMIT 1
         ),
         claimed AS (

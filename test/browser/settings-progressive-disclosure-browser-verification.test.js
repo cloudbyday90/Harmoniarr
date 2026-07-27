@@ -113,6 +113,11 @@ suite('Settings progressive disclosure browser verification', () => {
       await optionalSources.click();
       await page.getByRole('heading', { name: 'Spotify' }).waitFor();
 
+      await page.goto(`${baseUrl}/app/settings/media-storage`, { waitUntil: 'domcontentloaded' });
+      await page.getByText('Finish automatic download setup', { exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Add path translation', exact: true }).click();
+      assert.equal(await page.getByPlaceholder('/data/downloads/complete').inputValue(), '/data/downloads');
+
       await page.goto(`${baseUrl}/app/settings/library`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Discovery scheduling' }).waitFor();
       const matchRanking = page.getByRole('button', { name: 'Show match ranking' });

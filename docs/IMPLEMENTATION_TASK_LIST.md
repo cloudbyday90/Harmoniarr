@@ -450,6 +450,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   evidence, durable Import Review download acceptance diagnostics, and the
   browser-visible diagnostic panel without serializing provider secrets. See
   `DOCKER_PROVIDER_ACCEPTANCE_EVIDENCE_DESIGN.md`.
+- External download-path readiness: the walkthrough now permits a shell-only
+  host-path override for completed downloads, while Media & storage presents a
+  focused translation setup action whenever downloads are enabled without a
+  saved source-to-Harmoniarr path mapping. Automatic file work remains
+  fail-closed until the mapping validates. See
+  `EXTERNAL_DOWNLOAD_PATH_READINESS_DESIGN.md`.
 - Docker-backed schema generation and validation: database-backed schema
   commands now use disposable Testcontainers PostgreSQL instances instead of an
   ambient local database. `update:schema-snapshot`, `db:dump-schema`,

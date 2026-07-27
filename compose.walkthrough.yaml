@@ -39,7 +39,7 @@ services:
         source: ./.data/walkthrough/appdata
         target: /app/data
       - type: bind
-        source: ./.data/walkthrough/downloads
+        source: ${HARMONIARR_WALKTHROUGH_DOWNLOADS_HOST_PATH:-./.data/walkthrough/downloads}
         target: /data/downloads
       - type: bind
         source: ./.data/walkthrough/music

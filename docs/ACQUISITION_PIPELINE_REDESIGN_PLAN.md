@@ -1167,8 +1167,11 @@ failure and repair paths, in browser and local Docker walkthrough conditions.
   summaries and repair handoffs, while an unsafe claimed-lossless result has no
   library action and offers only release-scoped quality review. See
   `MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md`.
-- [ ] Docker walkthrough proof: one monitored artist completes the full flow or
-  stops at a known external-network reason with clear copy.
+- [x] Docker walkthrough proof: one monitored artist completes the full flow or
+  stops at a known external-network reason with clear copy. A connected external
+  provider dispatched five automatic searches and produced the bounded Music
+  Queue retry state when no acceptable result was ingested. See
+  `EXTERNAL_DOWNLOAD_PATH_READINESS_DESIGN.md`.
 - [ ] Focused server, client, integration, and browser tests are run for the
   changed surfaces.
 - [ ] Broader validation is run before commit when code changes are substantial.
@@ -1357,16 +1360,34 @@ Completed Activity-history initial-load browser acceptance slice:
 - The design, sources, security boundary, and validation contract are recorded
   in [ACTIVITY_HISTORY_INITIAL_LOAD_BROWSER_VERIFICATION_DESIGN.md](ACTIVITY_HISTORY_INITIAL_LOAD_BROWSER_VERIFICATION_DESIGN.md).
 
+Completed external download-path readiness slice:
+
+- Live walkthrough validation distinguished a healthy external provider from
+  import readiness: no saved source-to-Harmoniarr translation means automatic
+  file work stops safely before provider paths are read locally.
+- The same acceptance run found and corrected a PostgreSQL claim-lock defect
+  that stopped automatic discovery before it could search the connected
+  provider; the scoped lock preserves concurrent worker safety.
+- The walkthrough now accepts a shell-only completed-download host-path
+  override while preserving its disposable local default, and Media & storage
+  gives the operator one focused setup action with Harmoniarr's path prefilled.
+- The design, security boundary, portable deployment guidance, and safe
+  file-backed validation strategy are recorded in
+  [EXTERNAL_DOWNLOAD_PATH_READINESS_DESIGN.md](EXTERNAL_DOWNLOAD_PATH_READINESS_DESIGN.md).
+
 Recommended next slice:
 
-1. execute the local Docker walkthrough against a configured provider and
-   mounted completed-download path, beginning with one monitored artist;
-2. capture whether the release reaches the automatic download/add path or
-   stops at a clear external dependency or quality boundary;
-3. add targeted automation only where the walkthrough reveals a real gap,
-   while keeping normal Activity as the release-level explanation surface.
+1. supply the external provider's completed-download host mount and matching
+   source prefix through the documented walkthrough override and path
+   translation;
+2. capture one provider-acceptance evidence record for a normal Music Queue
+   release, without requiring a real download as a test fixture;
+3. use the deterministic Docker file-backed Music Queue validator to prove
+   quality verification and safe library add, then automate only the specific
+   gap the live acceptance evidence exposes.
 
 Reason: the normal release journey, strict-quality recovery, file/worker
-boundary, and Activity-history read path are now covered. The remaining
-high-value risk is live walkthrough behavior across provider configuration,
-mounted paths, external search results, and automatic release progression.
+boundary, Activity-history read path, and external-path setup guidance are now
+covered. The remaining high-value risk is live provider acceptance across the
+operator's mounted path and external search results, not unbounded candidate
+or import workbench behavior.

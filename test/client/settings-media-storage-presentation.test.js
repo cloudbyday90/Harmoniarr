@@ -21,6 +21,7 @@ import assert from 'node:assert/strict';
 import {
   buildDownloadMappingSourceLabel,
   buildDownloadsPathHint,
+  buildPathTranslationSetupPrompt,
   buildPathTranslationsDescription,
   buildPathTranslationsEmptyState,
   formatCommaSeparatedList,
@@ -287,6 +288,50 @@ describe('buildPathTranslationsEmptyState', () => {
 
   it('mentions download client', () => {
     assert.match(buildPathTranslationsEmptyState(), /download client/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildPathTranslationSetupPrompt
+// ---------------------------------------------------------------------------
+describe('buildPathTranslationSetupPrompt', () => {
+  it('prompts for a translation while an external provider is enabled without mappings', () => {
+    const prompt = buildPathTranslationSetupPrompt({
+      downloadMappingCount: 0,
+      providerMode: 'external',
+    });
+
+    assert.deepEqual(prompt, {
+      actionLabel: 'Add path translation',
+      description: 'Make the completed-download folder available to Harmoniarr, then enter the download client path and the Harmoniarr path for that same folder.',
+      title: 'Finish automatic download setup',
+    });
+  });
+
+  it('keeps the prompt available for managed providers without mappings', () => {
+    assert.ok(buildPathTranslationSetupPrompt({
+      downloadMappingCount: 0,
+      providerMode: 'managed',
+    }));
+  });
+
+  it('does not prompt once a mapping exists', () => {
+    assert.equal(buildPathTranslationSetupPrompt({
+      downloadMappingCount: 1,
+      providerMode: 'external',
+    }), null);
+  });
+
+  it('does not prompt while downloads are disabled', () => {
+    assert.equal(buildPathTranslationSetupPrompt({
+      downloadMappingCount: 0,
+      providerMode: 'disabled',
+    }), null);
+  });
+
+  it('uses only user-facing language', () => {
+    const prompt = buildPathTranslationSetupPrompt();
+    assert.doesNotMatch(`${prompt.title} ${prompt.description}`, /slskd|candidate|container/i);
   });
 });
 

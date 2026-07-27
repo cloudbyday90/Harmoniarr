@@ -97,21 +97,25 @@ Harmoniarr container by itself. Bind-mount that folder, or the completed music
 subfolder, into Harmoniarr and then add a Settings > Media & storage path
 mapping from the slskd container path to the Harmoniarr container path.
 
-Example for a local Windows drive:
+The walkthrough uses its repo-local downloads folder by default. To bind a
+different completed-download host folder without editing Compose or committing
+your machine path, set this shell-only override before starting the stack:
 
-```yaml
-services:
-  harmoniarr:
-    volumes:
-      - type: bind
-        source: Y:/Complete/Music
-        target: /data/downloads/complete
+```powershell
+$env:HARMONIARR_WALKTHROUGH_DOWNLOADS_HOST_PATH = "Y:\"
+docker compose -f compose.walkthrough.yaml up -d --wait --no-build harmoniarr
 ```
 
-Then configure the path mapping using the path slskd reports for completed
-files, for example `/downloads/complete/Music`, mapped to
-`/data/downloads/complete`. Do not map to `Y:\` inside Harmoniarr; that is a
-host path, not a container path.
+The folder is mounted inside Harmoniarr as `/data/downloads`. Then open
+**Settings > Media & storage**, select **Add path translation**, and enter the
+path the download client reports alongside Harmoniarr's mounted path. For
+example, map `/downloads/Complete/Music` to `/data/downloads`. Do not enter
+`Y:\` in Harmoniarr's path field: that is a host path, not a path available
+inside the container.
+
+The setup prompt in Media & storage appears whenever downloads are enabled but
+no translation is saved. A translation confirms how two applications view the
+same folder; it does not mount a host folder by itself.
 
 ## Verifying Provider Download Acceptance
 
