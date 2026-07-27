@@ -39,6 +39,7 @@ import {
 import { sessionStore } from '../state/session.js';
 
 const selectedFilter = ref('all');
+const isInitialLoadPending = ref(true);
 const {
   events,
   isLoading,
@@ -77,7 +78,9 @@ function getEventLinkTarget(event) {
 
 onMounted(() => {
   attachVisibilityListener();
-  void load();
+  void load().finally(() => {
+    isInitialLoadPending.value = false;
+  });
 });
 
 onBeforeUnmount(() => {
@@ -115,7 +118,7 @@ onBeforeUnmount(() => {
       </div>
 
       <p class="activity-feed-status" role="status" aria-live="polite">
-        <template v-if="isLoading">Loading recent activity...</template>
+        <template v-if="isLoading || isInitialLoadPending">Loading recent activity...</template>
         <template v-else-if="hasEvents">
           Showing {{ visibleEntryCount }} {{ visibleEntryCount === 1 ? 'timeline item' : 'timeline items' }} from {{ visibleEventCount }} {{ visibleEventCount === 1 ? 'event' : 'events' }} in {{ getFilterLabel(selectedFilter).toLowerCase() }}.
         </template>
@@ -127,6 +130,14 @@ onBeforeUnmount(() => {
       :title="errorMessage"
       body="Check your connection and refresh the timeline."
     />
+
+    <div v-else-if="isLoading || isInitialLoadPending" class="activity-feed-loading" aria-hidden="true">
+      <div class="hx-skeleton-stack">
+        <span class="hx-skeleton" data-size="lg" />
+        <span class="hx-skeleton" />
+        <span class="hx-skeleton" />
+      </div>
+    </div>
 
     <EmptyState
       v-else-if="isEmpty"
@@ -257,6 +268,10 @@ onBeforeUnmount(() => {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.activity-feed-loading {
+  padding: var(--hx-space-2) 0;
 }
 
 .activity-timeline-item {

@@ -1160,8 +1160,9 @@ failure and repair paths, in browser and local Docker walkthrough conditions.
   `Adding to library`, and `In library` without a diagnostic handoff; the
   completion, download, and verified-audio events are one compact release
   story. See `MUSIC_QUEUE_POST_TRANSFER_LIBRARY_ADD_BROWSER_VERIFICATION_DESIGN.md`.
-- [ ] Browser proof: Activity history loads as timeline/event history and links
+- [x] Browser proof: Activity history loads as timeline/event history and links
   to Music Queue/Downloader/Library rather than requiring workbench navigation.
+  See `ACTIVITY_HISTORY_INITIAL_LOAD_BROWSER_VERIFICATION_DESIGN.md`.
 - [x] Browser proof: verified audio-quality events appear in Activity with clear
   summaries and repair handoffs, while an unsafe claimed-lossless result has no
   library action and offers only release-scoped quality review. See
@@ -1344,16 +1345,28 @@ Completed strict-quality recovery browser acceptance slice:
 - The design, sources, security boundary, and validation contract are recorded
   in [MUSIC_QUEUE_STRICT_QUALITY_RECOVERY_BROWSER_VERIFICATION_DESIGN.md](MUSIC_QUEUE_STRICT_QUALITY_RECOVERY_BROWSER_VERIFICATION_DESIGN.md).
 
+Completed Activity-history initial-load browser acceptance slice:
+
+- Direct `/app/activity` navigation and reload now retain a truthful first-load
+  state: the timeline shows loading until its first bounded request settles,
+  instead of briefly claiming there is no history.
+- Advanced System history applies the same first-load protection and its direct
+  route/reload is covered alongside the normal timeline.
+- Browser coverage proves the normal filtered handoffs stay on Music Queue,
+  Connections, Library, and Request Detail rather than candidate diagnostics.
+- The design, sources, security boundary, and validation contract are recorded
+  in [ACTIVITY_HISTORY_INITIAL_LOAD_BROWSER_VERIFICATION_DESIGN.md](ACTIVITY_HISTORY_INITIAL_LOAD_BROWSER_VERIFICATION_DESIGN.md).
+
 Recommended next slice:
 
-1. add the Activity-history browser proof that initial and direct-route loads
-   populate the timeline without manual refresh;
-2. verify Activity filters retain release context and each event hands off to
-   Music Queue, Downloader, Library, or Settings rather than a workbench;
-3. keep the history concise by asserting release stories use a Music
-   Queue handoff rather than raw match diagnostics.
+1. execute the local Docker walkthrough against a configured provider and
+   mounted completed-download path, beginning with one monitored artist;
+2. capture whether the release reaches the automatic download/add path or
+   stops at a clear external dependency or quality boundary;
+3. add targeted automation only where the walkthrough reveals a real gap,
+   while keeping normal Activity as the release-level explanation surface.
 
-Reason: the normal release journey, strict-quality recovery, and real
-file/worker boundary are now proven. The remaining high-value risk is whether
-Activity history reliably populates on first and direct-route loads while
-preserving clear release-level handoffs.
+Reason: the normal release journey, strict-quality recovery, file/worker
+boundary, and Activity-history read path are now covered. The remaining
+high-value risk is live walkthrough behavior across provider configuration,
+mounted paths, external search results, and automatic release progression.

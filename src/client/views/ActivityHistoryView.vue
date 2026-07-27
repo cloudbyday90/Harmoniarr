@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import {
   formatActivityEntryCountLabel,
   formatActivityEntryStatusLabel,
@@ -40,8 +40,12 @@ const {
   revalidateOnFocus: true,
 });
 
+const isInitialLoadPending = ref(true);
+
 onMounted(() => {
-  void load();
+  void load().finally(() => {
+    isInitialLoadPending.value = false;
+  });
 });
 </script>
 
@@ -70,7 +74,7 @@ onMounted(() => {
 
     <article class="hx-card">
       <div class="hx-card-body is-flush">
-        <div v-if="isLoading && !entryCount" class="hx-card-body">
+        <div v-if="(isLoading || isInitialLoadPending) && !entryCount" class="hx-card-body">
           <div class="hx-skeleton-stack">
             <span class="hx-skeleton" data-size="lg"></span>
             <span class="hx-skeleton"></span>

@@ -180,6 +180,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   Queue, Connections, Library, or Request Detail handoff and do not expose
   source users, paths, or raw provider diagnostics. See
   `MUSIC_QUEUE_ACTIVITY_REPAIR_HANDOFFS_DESIGN.md`.
+- Activity history initial-load browser verification: normal Activity and
+  advanced System history now keep first-load state distinct from a genuine
+  empty result, avoiding a false empty-history message on direct navigation or
+  reload. Browser coverage proves fresh requests on reload plus filtered,
+  release-scoped handoffs to Music Queue, Connections, Library, and Request
+  Detail without diagnostic navigation. See
+  `ACTIVITY_HISTORY_INITIAL_LOAD_BROWSER_VERIFICATION_DESIGN.md`.
 - Managed slskd deployment foundation: the former standalone slskd example is
   now an optional Compose overlay with a one-shot configuration renderer,
   persistent app/download mounts, private provider networking, file-mounted
