@@ -14,6 +14,7 @@ import { basename, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import {
+  buildControlledProviderFixtureFilename,
   buildControlledProviderRemoteFilename,
   findControlledProviderFixtureBySearchText,
 } from './controlled-provider-fixture-catalog.mjs';
@@ -40,30 +41,42 @@ function isAuthorized(request) {
   return !apiKey || request.headers['x-api-key'] === apiKey;
 }
 
-function buildResponse(fixture) {
-  if (!fixture || fixture.scenario === 'no_response') return [];
-  const file = {
+function buildProviderFile(fixture, { variant = 'primary' } = {}) {
+  return {
     bitDepth: ['flac', 'alac', 'wav'].includes(fixture.format) ? 24 : null,
     bitRate: ['mp3', 'aac', 'opus', 'ogg'].includes(fixture.format) ? 320 : 1000,
     extension: fixture.format,
-    filename: buildControlledProviderRemoteFilename(fixture),
+    filename: buildControlledProviderRemoteFilename(fixture, { variant }),
     isLocked: false,
     length: 3,
     sampleRate: 44100,
     size: 65536,
   };
+}
+
+function buildResponse(fixture) {
+  if (!fixture || fixture.scenario === 'no_response') return [];
+  const file = buildProviderFile(fixture);
   const lockedFiles = fixture.scenario === 'locked_extra_file'
     ? [{ ...file, filename: `${file.filename}.locked`, isLocked: true }]
     : [];
-  return [{
+  const primaryResponse = {
     fileCount: 1,
     files: [file],
     hasFreeUploadSlot: true,
     lockedFileCount: lockedFiles.length,
     lockedFiles,
     queueLength: 0,
-    uploadSpeed: 1_000_000,
+    uploadSpeed: fixture.scenario === 'recovery_fallback' ? 2_000_000 : 1_000_000,
     username: `controlled-${fixture.id}`,
+  };
+  if (fixture.scenario !== 'recovery_fallback') return [primaryResponse];
+
+  return [primaryResponse, {
+    ...primaryResponse,
+    files: [buildProviderFile(fixture, { variant: 'fallback' })],
+    uploadSpeed: 500_000,
+    username: `controlled-${fixture.id}-fallback`,
   }];
 }
 
@@ -100,25 +113,35 @@ async function enqueueTransfers(username, files) {
   for (const file of files) {
     const remoteFilename = typeof file?.filename === 'string' ? file.filename : '';
     const fixture = [...searches.values()].map((search) => search.fixture).find((entry) => (
-      entry && buildControlledProviderRemoteFilename(entry) === remoteFilename
+      entry && [
+        buildControlledProviderRemoteFilename(entry),
+        buildControlledProviderRemoteFilename(entry, { variant: 'fallback' }),
+      ].includes(remoteFilename)
     ));
     if (!fixture) continue;
-    const destinationDirectory = resolve(downloadsRoot, 'complete', fixture.id);
-    await mkdir(destinationDirectory, { recursive: true });
-    await copyFile(
-      resolve(downloadsRoot, 'controlled-provider-fixtures', fixture.filename),
-      resolve(destinationDirectory, fixture.filename),
-    );
+    const variant = remoteFilename === buildControlledProviderRemoteFilename(fixture, { variant: 'fallback' })
+      ? 'fallback'
+      : 'primary';
+    const transferFailed = fixture.scenario === 'recovery_fallback' && variant === 'primary';
+    const destinationDirectory = resolve(downloadsRoot, 'complete', `${fixture.id}-${variant}`);
+    if (!transferFailed) {
+      await mkdir(destinationDirectory, { recursive: true });
+      await copyFile(
+        resolve(downloadsRoot, 'controlled-provider-fixtures', buildControlledProviderFixtureFilename(fixture, { variant })),
+        resolve(destinationDirectory, buildControlledProviderFixtureFilename(fixture, { variant })),
+      );
+    }
     accepted.push({
       averageSpeed: 1_000_000,
       bytesTransferred: file.size ?? 65536,
-      directory: `\\data\\downloads\\complete\\${fixture.id}`,
+      directory: `\\data\\downloads\\complete\\${fixture.id}-${variant}`,
       endedAt: new Date().toISOString(),
       filename: remoteFilename,
       id: randomUUID(),
       size: file.size ?? 65536,
       startedAt: new Date().toISOString(),
-      state: 'Completed, Succeeded',
+      exception: transferFailed ? 'Controlled provider transfer failure' : null,
+      state: transferFailed ? 'Completed, Errored' : 'Completed, Succeeded',
       username,
     });
   }

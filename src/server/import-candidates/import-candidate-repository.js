@@ -295,8 +295,8 @@ export async function promoteImportCandidateForRecovery({
             'recoveryCascade',
             jsonb_build_object(
               'promotedAt', NOW(),
-              'reason', $3,
-              'triggeredByFailedCandidateId', $2
+              'reason', $3::text,
+              'triggeredByFailedCandidateId', $2::text
             )
           ),
           updated_at = NOW()

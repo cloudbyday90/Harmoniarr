@@ -313,6 +313,8 @@ test('promoteImportCandidateForRecovery selects a recovery candidate with observ
   assert.match(sql, /selection_reason = 'recovery_cascade'/);
   assert.match(sql, /status IN \('pending', 'held'\)/);
   assert.match(sql, /download_attempt_count < \$4/);
+  assert.match(sql, /'reason', \$3::text/);
+  assert.match(sql, /'triggeredByFailedCandidateId', \$2::text/);
   assert.deepEqual(values, ['candidate-2', 'candidate-1', 'Download enqueue failed.', 3]);
   assert.equal(candidate.status, 'selected');
   assert.equal(candidate.selectionReason, 'recovery_cascade');

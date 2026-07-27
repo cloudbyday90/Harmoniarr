@@ -43,7 +43,7 @@ export const controlledProviderFixtureCatalog = Object.freeze([
   createFixture(8, { format: 'ogg', popularityTier: 'established', scenario: 'high_quality_lossy' }),
   createFixture(9, { format: 'flac', popularityTier: 'established', scenario: 'transcoded_lossless_claim' }),
   createFixture(10, { format: 'flac', popularityTier: 'established', scenario: 'locked_extra_file' }),
-  createFixture(11, { format: 'flac', popularityTier: 'emerging', scenario: 'single_response' }),
+  createFixture(11, { format: 'flac', popularityTier: 'emerging', scenario: 'recovery_fallback' }),
   createFixture(12, { format: 'alac', popularityTier: 'emerging', scenario: 'single_response' }),
   createFixture(13, { format: 'wav', popularityTier: 'emerging', scenario: 'single_response' }),
   createFixture(14, { format: 'mp3', popularityTier: 'emerging', scenario: 'fallback_quality' }),
@@ -58,6 +58,15 @@ export function findControlledProviderFixtureBySearchText(searchText) {
   )) ?? null;
 }
 
-export function buildControlledProviderRemoteFilename(fixture) {
-  return `\\data\\downloads\\complete\\${fixture.id}\\${fixture.filename}`;
+export function buildControlledProviderFixtureFilename(fixture, { variant = 'primary' } = {}) {
+  if (variant === 'fallback') {
+    const extension = fixture.filename.split('.').at(-1);
+    return `${fixture.filename.slice(0, -(extension.length + 1))}-fallback.${extension}`;
+  }
+
+  return fixture.filename;
+}
+
+export function buildControlledProviderRemoteFilename(fixture, { variant = 'primary' } = {}) {
+  return `\\data\\downloads\\complete\\${fixture.id}-${variant}\\${buildControlledProviderFixtureFilename(fixture, { variant })}`;
 }

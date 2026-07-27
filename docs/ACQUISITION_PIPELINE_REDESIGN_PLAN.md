@@ -1394,3 +1394,9 @@ or import workbench behavior.
 ### Controlled Provider Acceptance Proof
 
 Implemented in [CONTROLLED_PROVIDER_PIPELINE_E2E_DESIGN.md](CONTROLLED_PROVIDER_PIPELINE_E2E_DESIGN.md). It covers real discovery, automatic selection, enqueue, transfer reconciliation, quality verification, library add, and cleanup without relying on live peer content.
+
+The same controlled proof now includes a terminal failed-transfer branch: the
+high-ranked match remains failed, the next eligible match is promoted, and the
+fallback completes download, verification, and safe automatic library add with
+no candidate-first navigation. This protects the default Music Queue promise
+while keeping bounded same-match retry behavior for rejected transfers.

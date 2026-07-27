@@ -106,6 +106,7 @@ async function generateFixtureAudio({ composeArgs, env }) {
     'set -eu',
     'mkdir -p /data/downloads/controlled-provider-fixtures',
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*1000*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-01.flac >/dev/null 2>&1",
+    "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*700*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-11-fallback.flac >/dev/null 2>&1",
   ].join('; ');
   await runCompose({ args: ['exec', '-T', 'harmoniarr', 'sh', '-ec', command], composeArgs, env, timeoutMs: 30_000 });
 }
@@ -124,7 +125,12 @@ async function copyAndRunVerifier({ composeArgs, env }) {
   const payload = result.stdout.trim().split(/\r?\n/u).filter(Boolean).at(-1);
   if (!payload) throw new Error('Controlled-provider verifier did not produce a result');
   const parsed = JSON.parse(payload);
-  if (parsed?.pipeline?.finalStatus !== 'applied' || parsed.catalogFixtures !== 15) throw new Error('Controlled-provider verifier returned incomplete evidence');
+  const recoveryVerified = parsed?.recovery?.primaryFinalStatus === 'failed'
+    && typeof parsed?.recovery?.fallbackApplyRunId === 'string'
+    && parsed.recovery.fallbackApplyRunId.length > 0;
+  if (parsed?.pipeline?.finalStatus !== 'applied' || parsed.catalogFixtures !== 15 || parsed.catalogCandidates !== 15 || !recoveryVerified) {
+    throw new Error('Controlled-provider verifier returned incomplete evidence');
+  }
   return parsed;
 }
 

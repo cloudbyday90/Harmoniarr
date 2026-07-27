@@ -16,7 +16,7 @@ import {
 
 await runDirectScriptTask(import.meta, {
   prefix: 'harmoniarr-validate-docker-controlled-provider-pipeline',
-  renderSuccessMessage: (result) => `Verified the controlled provider pipeline: ${result.catalogFixtures} synthetic fixtures, ${result.catalogCandidates} ingested candidates, and one verified library add.`,
+  renderSuccessMessage: (result) => `Verified the controlled provider pipeline: ${result.catalogFixtures} synthetic fixtures, ${result.catalogCandidates} ingested matches, two verified library adds, and failed-match fallback recovery.`,
   run: () => runDockerControlledProviderPipelineValidation(
     resolveDockerControlledProviderPipelineValidationInputs(),
   ),

@@ -119,6 +119,8 @@ async function runVerification() {
   ], null, pool);
 
   const [pipelineFixture, ...catalogFixtures] = controlledProviderFixtureCatalog;
+  const recoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'recovery_fallback');
+  const remainingCatalogFixtures = catalogFixtures.filter((fixture) => fixture.id !== recoveryFixture?.id);
   await seedDiscoveryRequest(pool, pipelineFixture);
   const dispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(dispatch.candidateCount, 1, `discovery must ingest one controlled candidate: ${JSON.stringify(dispatch)}`);
@@ -151,9 +153,59 @@ async function runVerification() {
   });
   await stat(appliedPreview.files[0]?.libraryTarget?.path);
 
-  let catalogCandidateCount = 1;
+  assert.ok(recoveryFixture, 'the controlled catalog must include a recovery fixture');
+  await seedDiscoveryRequest(pool, recoveryFixture);
+  const recoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
+  assert.equal(recoveryDispatch.candidateCount, 2, 'recovery fixture must ingest a primary and fallback candidate');
+  const failedDownloadRunId = recoveryDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
+  const primaryCandidateId = recoveryDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
+  assert.ok(failedDownloadRunId, 'primary recovery candidate must automatically enter download handoff');
+  const primaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: primaryCandidateId,
+  });
+  assert.equal(primaryCandidate.username, `controlled-${recoveryFixture.id}`, 'the higher-scored primary candidate must be attempted first');
+  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: failedDownloadRunId,
+    triggerSource: 'controlled_provider_failure_recovery',
+  });
+  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, failedDownloadRunId);
+  const failedExecutionSummary = await importCandidateModule.importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary();
+  const failedReconciliation = await importCandidateModule.importCandidateExecutionReconciliationService
+    .reconcileImportCandidateExecutionSummary({ executionSummary: failedExecutionSummary });
+  assert.equal(failedReconciliation.summary.recovered, 1, 'terminal provider failure must promote the next candidate');
+  const fallbackDownloadRunId = failedReconciliation.recoveries[0]?.recoveryRunId;
+  const fallbackCandidateId = failedReconciliation.recoveries[0]?.nextCandidateId;
+  assert.ok(fallbackDownloadRunId, 'recovery must schedule a follow-up download run');
+  assert.notEqual(fallbackCandidateId, primaryCandidateId, 'recovery must promote a different candidate');
+  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: fallbackDownloadRunId,
+    triggerSource: 'controlled_provider_failure_recovery',
+  });
+  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, fallbackDownloadRunId);
+  const fallbackExecutionSummary = await importCandidateModule.importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary();
+  const fallbackReconciliation = await importCandidateModule.importCandidateExecutionReconciliationService
+    .reconcileImportCandidateExecutionSummary({ executionSummary: fallbackExecutionSummary });
+  const fallbackApplyRunId = fallbackReconciliation.autoApplyRuns[0]?.runId;
+  assert.ok(fallbackApplyRunId, 'recovered transfer must continue into safe automatic add');
+  await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
+    applySafetyMode: 'safe_auto', executableCandidateCount: 1, requestedCandidateCount: 1, runId: fallbackApplyRunId, triggerSource: 'controlled_provider_failure_recovery',
+  });
+  const fallbackApplyRun = await waitForRun(importCandidateModule.importCandidateApplyRunStore, fallbackApplyRunId);
+  assert.equal(fallbackApplyRun.appliedCount, 1, 'recovery fallback must be added to the isolated library');
+  const finalPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: primaryCandidateId,
+  });
+  const finalFallbackCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: fallbackCandidateId,
+  });
+  assert.equal(finalPrimaryCandidate.status, 'failed', 'failed primary candidate must remain blocked from repeat selection');
+  assert.equal(finalFallbackCandidate.status, 'applied', 'promoted fallback candidate must complete the full pipeline');
+
+  let catalogCandidateCount = 3;
   let noResponseCount = 0;
-  for (const fixture of catalogFixtures) {
+  for (const fixture of remainingCatalogFixtures) {
     const search = await slskdService.startSearch({ query: fixture.searchKey });
     const result = await importCandidateModule.importCandidateService.ingestSlskdSearchResponses({
       albumTitle: fixture.releaseTitle,
@@ -178,6 +230,13 @@ async function runVerification() {
     catalogCandidates: catalogCandidateCount,
     noResponseFixtures: noResponseCount,
     pipeline: { applyRunId, downloadRunId, finalStatus: 'applied' },
+    recovery: {
+      fallbackApplyRunId,
+      fallbackCandidateId,
+      fallbackDownloadRunId,
+      primaryCandidateId,
+      primaryFinalStatus: finalPrimaryCandidate.status,
+    },
   };
 }
 

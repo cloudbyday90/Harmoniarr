@@ -59,9 +59,14 @@ The catalog has 15 explicitly synthetic artist/release records, divided across h
 | --- | ---: | --- | --- |
 | Headliner | 5 | FLAC, ALAC, WAV, MP3 | delayed lossless response, lossless preference, and high-quality fallback shapes |
 | Established | 5 | AAC, Opus, OGG, FLAC | lossy policy, claimed-lossless, and locked-file shapes |
-| Emerging | 5 | FLAC, ALAC, WAV, MP3 | normal response, fallback, and no-response diagnostics |
+| Emerging | 5 | FLAC, ALAC, WAV, MP3 | normal response, failed-primary fallback recovery, and no-response diagnostics |
 
-Only the first FLAC fixture is downloaded and added. The remaining catalog entries exercise real search-response normalization and ingestion without copying media. This limits run time and keeps the proof focused while still testing every fixture input.
+The first FLAC fixture and the recovery fallback fixture are downloaded and added.
+The recovery fixture returns two otherwise eligible matches: the higher-scored
+primary reports a terminal provider failure, while the lower-ranked fallback
+returns synthetic FLAC. The remaining catalog entries exercise real
+search-response normalization and ingestion without copying media. This limits
+run time and keeps the proof focused while still testing every fixture input.
 
 ## Quality Handoff Decision
 
@@ -83,3 +88,22 @@ The new validation proves this production path:
 `discovery request -> provider search -> delayed response polling -> candidate ingestion -> automatic quality-aware selection -> enqueue -> completed transfer reconciliation -> media inspection -> safe automatic library add`
 
 It also verifies a no-response case produces bounded ingestion diagnostics instead of a candidate.
+
+## Transfer Failure Recovery Outcome
+
+Implemented on 2026-07-27. The controlled provider now reports a terminal
+failure for the higher-ranked match of one synthetic release. The validation
+proves the failed match remains `failed`, Harmoniarr promotes the next eligible
+match, creates a follow-up download run, and safely adds that fallback file to
+the isolated library without a candidate-review action.
+
+The exercise also found a live PostgreSQL contract defect: nullable recovery
+metadata inside `jsonb_build_object` left PostgreSQL unable to infer a bind
+parameter type. `promoteImportCandidateForRecovery` now casts those optional
+values to `text`, preserving parameterized SQL and deterministic recovery audit
+metadata. Focused repository coverage asserts the typed placeholders and the
+Docker proof executes the real query.
+
+Rejected transfers retain their existing bounded same-match retry policy. This
+slice is intentionally limited to a terminal transfer failure, where reusing
+the same match is not useful and the next eligible match should be tried.
