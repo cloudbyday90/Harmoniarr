@@ -22,6 +22,10 @@ import { RouterLink } from 'vue-router';
 import { buildMusicQueueProgressStrip } from '../../lib/music-queue-progress-presentation.js';
 
 const props = defineProps({
+  activeOrAttentionOnly: {
+    type: Boolean,
+    default: false,
+  },
   errorMessage: {
     type: String,
     default: '',
@@ -38,13 +42,20 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  releaseDetailsOnly: {
+    type: Boolean,
+    default: false,
+  },
   showEmpty: {
     type: Boolean,
     default: false,
   },
 });
 
-const progress = computed(() => buildMusicQueueProgressStrip(props.releases));
+const progress = computed(() => buildMusicQueueProgressStrip(props.releases, {
+  activeOrAttentionOnly: props.activeOrAttentionOnly,
+  releaseDetailsOnly: props.releaseDetailsOnly,
+}));
 const headingId = computed(() => `music-queue-progress-${props.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
 </script>
 

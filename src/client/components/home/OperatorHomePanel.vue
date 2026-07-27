@@ -35,6 +35,7 @@ import {
   calculateOperatorArtistCoveragePercent,
 } from '../../lib/operator-artist-card-presentation.js';
 import { hasMusicQueueProviderDependentWork } from '../../lib/music-queue-provider-repair-presentation.js';
+import { hasMusicQueueHomeProgress } from '../../lib/music-queue-progress-state.js';
 
 const SORT_OPTIONS = [
   { value: 'name', label: 'Name' },
@@ -95,7 +96,6 @@ const {
   isLoading: isMusicQueueLoading,
   load: loadMusicQueue,
   releases: musicQueueReleases,
-  totalCount: musicQueueTotalCount,
 } = useMusicQueue({
   limit: 100,
   pollIntervalMs: 30000,
@@ -114,7 +114,7 @@ const {
 
 const shouldShowMusicQueueProgress = computed(() =>
   isMusicQueueLoading.value
-  || musicQueueTotalCount.value > 0
+  || hasMusicQueueHomeProgress(musicQueueReleases.value)
   || Boolean(musicQueueErrorMessage.value),
 );
 
@@ -242,9 +242,11 @@ onBeforeUnmount(() => {
 
       <MusicQueueProgressStrip
         v-if="shouldShowMusicQueueProgress"
+        active-or-attention-only
         :error-message="musicQueueErrorMessage"
         :is-loading="isMusicQueueLoading"
         :releases="musicQueueReleases"
+        release-details-only
       />
 
       <article class="hx-card operator-home__artists-card">

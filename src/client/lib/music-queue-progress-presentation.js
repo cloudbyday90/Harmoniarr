@@ -19,28 +19,25 @@
 const STATUS_PRIORITY = Object.freeze({
   needs_setup: 0,
   quality_choice_needed: 1,
-  needs_help_adding: 2,
-  failed: 3,
-  no_matches_left: 4,
-  ready_to_add: 5,
-  adding_to_library: 6,
-  downloading: 7,
-  trying_next_match: 8,
-  searching: 9,
-  checking_matches: 10,
-  pick_match: 11,
+  pick_match: 2,
+  needs_help_adding: 3,
+  failed: 4,
+  no_matches_left: 5,
+  ready_to_add: 6,
+  adding_to_library: 7,
+  downloading: 8,
+  trying_next_match: 9,
+  searching: 10,
+  checking_matches: 11,
   retrying_search: 12,
   queued_for_search: 13,
   in_library: 14,
 });
 
-const ATTENTION_STATUSES = new Set([
-  'failed',
-  'needs_help_adding',
-  'needs_setup',
-  'no_matches_left',
-  'quality_choice_needed',
-]);
+import {
+  isMusicQueueAttentionRelease,
+  isMusicQueueHomeProgressRelease,
+} from './music-queue-progress-state.js';
 
 function getPriority(release) {
   return STATUS_PRIORITY[release?.statusCode] ?? Number.MAX_SAFE_INTEGER;
@@ -58,7 +55,17 @@ function compareProgressReleases(left, right) {
   return String(left?.releaseTitle ?? '').localeCompare(String(right?.releaseTitle ?? ''));
 }
 
-function buildRowAction(release) {
+function buildRowAction(release, { releaseDetailsOnly }) {
+  if (releaseDetailsOnly) {
+    return {
+      label: 'View details',
+      to: {
+        name: 'music-queue-release',
+        params: { wantedReleaseId: release?.id },
+      },
+    };
+  }
+
   if (release?.statusCode === 'needs_setup' && release?.action?.type === 'route') {
     return {
       label: release.action.label,
@@ -67,7 +74,7 @@ function buildRowAction(release) {
   }
 
   return {
-    label: ATTENTION_STATUSES.has(release?.statusCode) ? 'Review' : 'Open Music Queue',
+    label: isMusicQueueAttentionRelease(release) ? 'Review' : 'Open Music Queue',
     to: {
       name: 'music-queue-release',
       params: { wantedReleaseId: release?.id },
@@ -75,13 +82,17 @@ function buildRowAction(release) {
   };
 }
 
-function buildSummary({ attentionCount, totalCount }) {
+function buildSummary({ activeCount, attentionCount, totalCount }) {
   if (totalCount === 0) {
     return 'Nothing is waiting in Music Queue right now.';
   }
 
+  if (attentionCount > 0 && activeCount > 0) {
+    return `${attentionCount} release${attentionCount === 1 ? ' needs' : 's need'} your attention. ${activeCount} ${activeCount === 1 ? 'is' : 'are'} still moving automatically.`;
+  }
+
   if (attentionCount > 0) {
-    return `${attentionCount} release${attentionCount === 1 ? ' needs' : 's need'} your attention. Everything else continues automatically.`;
+    return `${attentionCount} release${attentionCount === 1 ? ' needs' : 's need'} your attention.`;
   }
 
   return `${totalCount} release${totalCount === 1 ? ' is' : 's are'} moving through Music Queue automatically.`;
@@ -92,16 +103,23 @@ function buildSummary({ attentionCount, totalCount }) {
  * Music Queue. It deliberately offers navigation only; workflow mutations
  * remain on the release detail where scope and confirmation are visible.
  */
-export function buildMusicQueueProgressStrip(releases, { limit = 3 } = {}) {
+export function buildMusicQueueProgressStrip(releases, {
+  activeOrAttentionOnly = false,
+  limit = 3,
+  releaseDetailsOnly = false,
+} = {}) {
   const normalizedReleases = Array.isArray(releases) ? releases.filter(Boolean) : [];
   const normalizedLimit = Math.max(1, Math.min(Number(limit) || 3, 6));
-  const attentionCount = normalizedReleases.filter((release) =>
-    ATTENTION_STATUSES.has(release?.statusCode)).length;
-  const rows = [...normalizedReleases]
+  const visibleReleases = activeOrAttentionOnly
+    ? normalizedReleases.filter(isMusicQueueHomeProgressRelease)
+    : normalizedReleases;
+  const attentionCount = visibleReleases.filter(isMusicQueueAttentionRelease).length;
+  const activeCount = visibleReleases.length - attentionCount;
+  const rows = [...visibleReleases]
     .sort(compareProgressReleases)
     .slice(0, normalizedLimit)
     .map((release) => ({
-      action: buildRowAction(release),
+      action: buildRowAction(release, { releaseDetailsOnly }),
       detail: release.detailText || 'Harmoniarr is preparing the next step for this release.',
       id: release.id,
       statusLabel: release.status?.label ?? 'In progress',
@@ -110,9 +128,10 @@ export function buildMusicQueueProgressStrip(releases, { limit = 3 } = {}) {
     }));
 
   return {
+    activeCount,
     attentionCount,
     rows,
-    summary: buildSummary({ attentionCount, totalCount: normalizedReleases.length }),
-    totalCount: normalizedReleases.length,
+    summary: buildSummary({ activeCount, attentionCount, totalCount: visibleReleases.length }),
+    totalCount: visibleReleases.length,
   };
 }

@@ -27,17 +27,12 @@ import {
 } from '../lib/acquisition-api.js';
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import {
+  isMusicQueueActiveProgressRelease,
+  MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES,
+} from '../lib/music-queue-progress-state.js';
 
-export const MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES = Object.freeze([
-  'adding_to_library',
-  'checking_matches',
-  'downloading',
-  'ready_to_add',
-  'searching',
-  'trying_next_match',
-]);
-
-const activeProgressStatusSet = new Set(MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES);
+export { MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES };
 
 /**
  * Keeps short-lived automatic work visible without continuously polling stable
@@ -48,7 +43,7 @@ const activeProgressStatusSet = new Set(MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES);
  */
 export function hasActiveMusicQueueProgress(payload) {
   const releases = Array.isArray(payload?.releases) ? payload.releases : [];
-  return releases.some((release) => activeProgressStatusSet.has(release?.statusCode ?? release?.status?.code));
+  return releases.some(isMusicQueueActiveProgressRelease);
 }
 
 export function useMusicQueue({

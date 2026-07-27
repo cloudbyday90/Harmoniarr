@@ -84,3 +84,28 @@ test('Music Queue progress describes an empty scoped queue without a false compl
   assert.deepEqual(result.rows, []);
   assert.equal(result.summary, 'Nothing is waiting in Music Queue right now.');
 });
+
+test('Home progress omits idle releases and sends active or attention states to release detail', () => {
+  const result = buildMusicQueueProgressStrip([
+    createRelease({ id: 'in-library', statusCode: 'in_library', statusLabel: 'In library' }),
+    createRelease({ id: 'queued', statusCode: 'queued_for_search', statusLabel: 'Waiting' }),
+    createRelease({ id: 'searching', statusCode: 'searching', statusLabel: 'Searching' }),
+    createRelease({ id: 'match', statusCode: 'pick_match', statusLabel: 'Choose a match', statusTone: 'warning' }),
+  ], {
+    activeOrAttentionOnly: true,
+    releaseDetailsOnly: true,
+  });
+
+  assert.equal(result.activeCount, 1);
+  assert.equal(result.attentionCount, 1);
+  assert.equal(result.totalCount, 2);
+  assert.deepEqual(result.rows.map((row) => row.id), ['match', 'searching']);
+  assert.match(result.summary, /1 release needs your attention\. 1 is still moving automatically\./);
+  assert.deepEqual(result.rows[0].action, {
+    label: 'View details',
+    to: {
+      name: 'music-queue-release',
+      params: { wantedReleaseId: 'match' },
+    },
+  });
+});

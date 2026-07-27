@@ -1,6 +1,6 @@
 # Music Queue Progress Strip Design
 
-Status: Implemented on 2026-07-25
+Status: Superseded for Home focus on 2026-07-27
 
 ## Purpose
 
@@ -50,14 +50,16 @@ navigation and makes the product appear manual-first.
    always retains the calling user's ownership predicate.
 3. Normalize and prioritize at most three rows in a pure client presentation
    helper: setup and recoverable attention first, then active automatic work.
-4. Render the reusable `MusicQueueProgressStrip` on Home only when queue work
-   or a refresh error exists. This avoids an extra all-clear dashboard card.
+4. Render the reusable `MusicQueueProgressStrip` on Home only when active or
+   attention work, or a refresh error, exists. This avoids an extra all-clear
+   dashboard card and prevents idle queue state from competing with real work.
 5. Render it for monitored Artist Detail with a small empty state, so an
    artist-specific page explains that nothing is currently waiting without
    claiming a library completion state it cannot prove.
-6. Offer only explicit navigation: `Review`, a dedicated setup route, or
-   `Open Music Queue`. Mutating operations remain in release detail behind
-   session, CSRF, ownership, and status checks.
+6. Offer only explicit navigation. Home uses one `View details` handoff to the
+   release; Artist Detail retains scoped review/setup handoffs. Mutating
+   operations remain in release detail behind session, CSRF, ownership, and
+   status checks.
 
 ## Security And Data Boundary
 
@@ -77,8 +79,8 @@ navigation and makes the product appear manual-first.
   compact accessible presentation.
 - `useMusicQueue` now supports a reactive artist scope without briefly showing
   a prior artist's data while the scope changes.
-- Home receives active global progress; Artist Detail receives the parameterized
-  artist scope.
+- Home receives active or attention global progress; Artist Detail receives the
+  parameterized artist scope.
 - The existing `GET /api/v1/acquisition/releases` route carries an optional
   `metadataArtistId` filter through the scoped library wanted-release query.
 
@@ -90,10 +92,4 @@ navigation and makes the product appear manual-first.
 - Build and browser verification cover the rendered Home and Artist Detail
   surfaces after the production client bundle is rebuilt.
 
-## Next High-Value Item
-
-Rework Settings into progressive sections: keep routine setup and provider
-health concise, move advanced tuning behind explicit disclosures, and provide
-one clear provider setup/test/recovery path per connection. This follows the
-same principle as the progress strip: show the current state and next safe
-action without presenting every operational control at once.
+For the Home refinement, see `MUSIC_QUEUE_HOME_PROGRESS_FOCUS_DESIGN.md`.

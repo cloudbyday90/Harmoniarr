@@ -62,11 +62,28 @@ function buildMusicQueuePayload({ metadataArtistId = null } = {}) {
       },
     };
 
+  const idleRelease = {
+    artistName: 'Boards of Canada',
+    expectedTrackCount: 12,
+    id: 'wanted-boards-idle',
+    missingTrackCount: 0,
+    releaseGroupTitle: 'The Campfire Headphase',
+    releaseGroupType: 'Album',
+    releaseTitle: 'The Campfire Headphase',
+    status: {
+      code: 'in_library',
+      detail: 'This release is already in your library.',
+      label: 'In library',
+      nextAction: null,
+      tone: 'success',
+    },
+  };
+
   return {
     checkedAt: '2026-07-25T23:00:00.000Z',
     pagination: { limit: 100, offset: 0, total: 1 },
-    releases: [release],
-    summary: { counts: { [release.status.code]: 1 }, total: 1 },
+    releases: isArtistScoped ? [release] : [idleRelease, release],
+    summary: { counts: { [release.status.code]: 1, in_library: isArtistScoped ? 0 : 1 }, total: isArtistScoped ? 1 : 2 },
   };
 }
 
@@ -88,7 +105,7 @@ suite('Music Queue progress strip browser verification', () => {
     await browserRuntime?.cleanup();
   }, { timeout: integrationRuntimeConfig.suiteTeardownTimeoutMs });
 
-  test('Home and Artist Detail surface concise release progress with scoped handoffs', {
+  test('Home focuses active work while Artist Detail retains scoped release progress', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -120,7 +137,11 @@ suite('Music Queue progress strip browser verification', () => {
       await homeProgress.getByText('Music Has the Right to Children by Boards of Canada').waitFor();
       await homeProgress.getByText('Harmoniarr is looking for an acceptable match.').waitFor();
       assert.equal(
-        await homeProgress.getByRole('link', { name: 'Open Music Queue' }).getAttribute('href'),
+        await homeProgress.getByText('The Campfire Headphase by Boards of Canada').count(),
+        0,
+      );
+      assert.equal(
+        await homeProgress.getByRole('link', { name: 'View details' }).getAttribute('href'),
         '/app/music-queue/wanted-boards-search',
       );
 

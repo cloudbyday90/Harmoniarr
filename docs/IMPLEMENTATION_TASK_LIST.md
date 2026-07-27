@@ -147,6 +147,10 @@ Database model source: `docs/DATABASE_MODEL.md`
   filtered per-artist status strip. Both use bounded rows and safe handoffs to
   Music Queue or setup, never raw provider details or inline mutations. See
   `MUSIC_QUEUE_PROGRESS_STRIP_DESIGN.md`.
+- Music Queue Home focus: Home now shows only active automatic progress and
+  releases that need help, omits idle and completed rows, and gives each row
+  one direct `View details` handoff. See
+  `MUSIC_QUEUE_HOME_PROGRESS_FOCUS_DESIGN.md`.
 - Music Queue quality-stop recovery automation: downloaded matches that fail
   strict safe-auto quality verification are now marked as quality failures,
   excluded from the recovery cascade, and followed by the next quality-eligible
