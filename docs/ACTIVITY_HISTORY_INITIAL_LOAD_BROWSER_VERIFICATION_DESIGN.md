@@ -134,6 +134,16 @@ docker compose -f compose.walkthrough.yaml --profile bootstrap run --rm --no-dep
 The recreated `harmoniarr` service reported healthy and the bootstrap confirmed
 that the walkthrough administrator already existed.
 
+Deployment security follow-up:
+
+- The uncached runtime dependency audit reported three pre-existing advisories:
+  two high findings (`sharp` below `0.35.0` and transitive `postcss`) and one
+  low finding through Express's `body-parser` dependency.
+- `npm audit fix --package-lock-only --dry-run` did not provide a contained
+  automatic remediation; it expands into unrelated transitive package updates.
+  Keep that dependency upgrade as a dedicated, compatibility-tested security
+  change rather than mixing broad lockfile churn into Activity behavior.
+
 ---
 
 ## 6. Next High-Value Item
