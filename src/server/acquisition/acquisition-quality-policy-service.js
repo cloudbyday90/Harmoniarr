@@ -241,10 +241,13 @@ export function evaluateQualityEvidence({
   if (needsLosslessVerification) {
     return {
       autoAddEligible: false,
-      autoDownloadEligible: false,
+      // A provider's advertised codec is sufficient to try a lossless download,
+      // but never sufficient to add it to the library. The post-download media
+      // inspection and spectral proof gate remain the authority for auto-add.
+      autoDownloadEligible: true,
       bitrateKbps,
       code: QUALITY_DECISION_CODES.NEEDS_VERIFICATION,
-      explanation: 'Lossless preference needs verified media evidence before automatic download or import.',
+      explanation: 'Lossless format is advertised. Harmoniarr can download it, then verifies the audio before adding it to your library.',
       formats,
       fallbackOverride,
       fallbackOverrideActive: Boolean(fallbackOverride),

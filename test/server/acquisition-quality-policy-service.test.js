@@ -39,14 +39,15 @@ test('lossless archive accepts verified FLAC evidence', () => {
   assert.equal(decision.preferredMet, true);
 });
 
-test('lossless archive requires verification for claimed FLAC evidence', () => {
+test('lossless archive downloads claimed FLAC but requires verification before automatic add', () => {
   const decision = evaluateQualityEvidence({
     candidate: { normalizedPayload: { codec: 'flac' } },
     profileCode: QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE,
   });
 
   assert.equal(decision.code, QUALITY_DECISION_CODES.NEEDS_VERIFICATION);
-  assert.equal(decision.autoDownloadEligible, false);
+  assert.equal(decision.autoDownloadEligible, true);
+  assert.equal(decision.autoAddEligible, false);
 });
 
 test('quality evaluation reads normalized extension arrays from candidates', () => {
@@ -94,7 +95,7 @@ test('release fallback override accepts high-quality lossy evidence without chan
   assert.deepEqual(decision.profile.cutoffFormats, ['flac', 'alac', 'wav']);
 });
 
-test('release fallback override still requires verification for lossless claims', () => {
+test('release fallback override still requires verification before automatically adding lossless claims', () => {
   const decision = evaluateQualityEvidence({
     candidate: { normalizedPayload: { codec: 'flac' } },
     profileCode: QUALITY_PROFILE_CODES.LOSSLESS_ARCHIVE,
@@ -102,5 +103,6 @@ test('release fallback override still requires verification for lossless claims'
   });
 
   assert.equal(decision.code, QUALITY_DECISION_CODES.NEEDS_VERIFICATION);
-  assert.equal(decision.autoDownloadEligible, false);
+  assert.equal(decision.autoDownloadEligible, true);
+  assert.equal(decision.autoAddEligible, false);
 });

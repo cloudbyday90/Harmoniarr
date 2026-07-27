@@ -65,6 +65,7 @@
     "validate:docker-fresh-install": "node scripts/validate-docker-fresh-install.js",
     "validate:docker-deployment-path": "node scripts/validate-docker-deployment-path.js",
     "validate:docker-file-backed-music-queue": "node scripts/validate-docker-file-backed-music-queue.js",
+    "validate:docker-controlled-provider-pipeline": "node scripts/validate-docker-controlled-provider-pipeline.js",
     "validate:docker-provider-acceptance": "node scripts/validate-docker-provider-acceptance.js",
     "validate:managed-slskd-smoke": "node scripts/validate-managed-slskd-smoke.js",
     "validate:docker-upgrade": "node scripts/validate-docker-upgrade.js",

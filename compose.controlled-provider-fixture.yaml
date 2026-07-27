@@ -1,0 +1,25 @@
+services:
+  harmoniarr:
+    environment:
+      CONTROLLED_PROVIDER_API_KEY: ${CONTROLLED_PROVIDER_API_KEY:?Set CONTROLLED_PROVIDER_API_KEY for the controlled provider test}
+
+  controlled-provider:
+    image: node:25.4.0-alpine
+    init: true
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    environment:
+      CONTROLLED_PROVIDER_API_KEY: ${CONTROLLED_PROVIDER_API_KEY:?Set CONTROLLED_PROVIDER_API_KEY for the controlled provider test}
+      CONTROLLED_PROVIDER_DOWNLOADS_ROOT: /data/downloads
+      PORT: 5030
+    volumes:
+      - "${HARMONIARR_DOWNLOADS:-/srv/slskd/downloads}:/data/downloads"
+      - "./testing/docker/controlled-provider-fixture-catalog.mjs:/fixture/controlled-provider-fixture-catalog.mjs:ro"
+      - "./testing/docker/controlled-provider-fixture-server.mjs:/fixture/controlled-provider-fixture-server.mjs:ro"
+    command: ["node", "/fixture/controlled-provider-fixture-server.mjs"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=32m,mode=1777

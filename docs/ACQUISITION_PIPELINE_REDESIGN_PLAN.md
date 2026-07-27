@@ -1391,3 +1391,6 @@ boundary, Activity-history read path, and external-path setup guidance are now
 covered. The remaining high-value risk is live provider acceptance across the
 operator's mounted path and external search results, not unbounded candidate
 or import workbench behavior.
+### Controlled Provider Acceptance Proof
+
+Implemented in [CONTROLLED_PROVIDER_PIPELINE_E2E_DESIGN.md](CONTROLLED_PROVIDER_PIPELINE_E2E_DESIGN.md). It covers real discovery, automatic selection, enqueue, transfer reconciliation, quality verification, library add, and cleanup without relying on live peer content.

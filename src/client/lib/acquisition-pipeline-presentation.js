@@ -139,7 +139,9 @@ function buildQualityReviewGuidance(quality = {}) {
     case 'below_minimum':
       return 'These matches are below the selected profile. Use a better match, search again, or change the profile before Harmoniarr downloads automatically.';
     case 'needs_verification':
-      return 'Harmoniarr needs real audio evidence before treating this as lossless.';
+      return quality.autoDownloadEligible
+        ? 'Harmoniarr will verify this advertised lossless download before adding it to your library.'
+        : 'Harmoniarr needs real audio evidence before treating this as lossless.';
     case 'no_evidence':
       return 'No usable quality evidence has been collected yet.';
     default:
