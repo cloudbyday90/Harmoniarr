@@ -44,6 +44,11 @@ const props = defineProps({
     required: true,
     type: String,
   },
+  variant: {
+    default: 'card',
+    type: String,
+    validator: (value) => ['card', 'inline'].includes(value),
+  },
 });
 
 const isOpen = ref(props.startOpen);
@@ -55,7 +60,7 @@ function toggle() {
 </script>
 
 <template>
-  <section class="settings-disclosure">
+  <section class="settings-disclosure" :class="{ 'settings-disclosure--inline': variant === 'inline' }">
     <div class="settings-disclosure__header">
       <div>
         <h2 :id="headingId" class="settings-disclosure__title">{{ title }}</h2>
@@ -115,6 +120,23 @@ function toggle() {
 .settings-disclosure__content {
   border-top: 1px solid var(--hx-border-subtle);
   padding: var(--hx-space-4);
+}
+
+.settings-disclosure--inline {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--hx-border-subtle);
+  border-radius: 0;
+  margin-top: var(--hx-space-2);
+}
+
+.settings-disclosure--inline .settings-disclosure__header {
+  padding: var(--hx-space-3) 0 0;
+}
+
+.settings-disclosure--inline .settings-disclosure__content {
+  border-top: 0;
+  padding: var(--hx-space-3) 0 0;
 }
 
 @media (max-width: 640px) {

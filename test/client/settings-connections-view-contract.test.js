@@ -12,15 +12,16 @@ import test from 'node:test';
 
 const VIEW_PATH = new URL('../../src/client/views/SettingsConnectionsView.vue', import.meta.url);
 
-test('SettingsConnectionsView exposes a saved-provider connection test action', async () => {
+test('SettingsConnectionsView keeps saved provider status beside the Soulseek setup controls', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
   assert.match(source, /isLoading: isTestingProviderHealth/);
   assert.match(source, /loadError: providerHealthError/);
   assert.match(source, /import \{ useToast \} from '\.\.\/composables\/useToast\.js'/);
   assert.match(source, /const toast = useToast\(\);/);
-  assert.match(source, /@click="testProviderConnection"/);
-  assert.match(source, /isTestingProviderHealth \? 'Testing Soulseek…' : 'Test Soulseek'/);
+  assert.match(source, /import SettingsProviderHealthSummary from '\.\.\/components\/settings\/SettingsProviderHealthSummary\.vue'/);
+  assert.match(source, /<SettingsProviderHealthSummary/);
+  assert.match(source, /@test="testProviderConnection"/);
   assert.match(source, /toast\.success\(slskdStatus\.message \?\? 'Soulseek connection is healthy\.'\)/);
   assert.match(source, /toast\.error\(`Connection test failed: \$\{providerHealthError\.value\}`\)/);
 });
@@ -33,7 +34,6 @@ test('SettingsConnectionsView exposes explicit managed, external, and disabled p
   assert.match(source, /value="external"/);
   assert.match(source, /value="disabled"/);
   assert.match(source, /v-if="isExternalSoulseek"/);
-  assert.match(source, /:disabled="isTestingProviderHealth \|\| isSoulseekDisabled"/);
   assert.match(source, /SoulseekProviderModeGuidance/);
 });
 
@@ -56,9 +56,9 @@ test('SettingsConnectionsView confirms the Music Queue recovery state after save
   assert.match(source, /MusicQueueProviderRepairRecoveryConfirmation/);
 });
 
-test('SettingsConnectionsView renders provider health load failures in the health card', async () => {
+test('SettingsConnectionsView passes provider health failure states to the local status component', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /v-if="providerHealth\.length \|\| providerHealthError"/);
-  assert.match(source, /v-if="providerHealthError">\{\{ providerHealthError \}\}/);
+  assert.match(source, /:dependencies="providerHealth"/);
+  assert.match(source, /:load-error="providerHealthError"/);
 });

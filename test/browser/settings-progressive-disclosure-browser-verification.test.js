@@ -59,6 +59,14 @@ suite('Settings progressive disclosure browser verification', () => {
               message: 'Soulseek is connected and ready for downloads.',
               provider: 'slskd',
               status: 'healthy',
+            }, {
+              message: 'MusicBrainz lookups are reachable.',
+              provider: 'musicbrainz',
+              status: 'healthy',
+            }, {
+              message: 'Media inspection tooling is available.',
+              provider: 'media_tooling',
+              status: 'healthy',
             }],
           }),
           contentType: 'application/json',
@@ -96,7 +104,13 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.getByRole('link', { name: 'System & security' }).waitFor();
 
       await page.goto(`${baseUrl}/app/settings/connections`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('button', { name: 'Test Soulseek' }).waitFor();
+      await page.getByRole('button', { name: 'Test saved connection' }).waitFor();
+      await page.getByRole('heading', { name: 'Saved connection status' }).waitFor();
+      await page.getByText('Soulseek is connected and ready for downloads.', { exact: true }).waitFor();
+      const otherServiceStatus = page.getByRole('button', { name: 'Show other service status' });
+      await otherServiceStatus.click();
+      await page.getByText('MusicBrainz lookups are reachable.', { exact: true }).waitFor();
+      await page.getByText('Media inspection tooling is available.', { exact: true }).waitFor();
       await page.getByRole('group', { name: 'Soulseek provider mode' }).waitFor();
       assert.equal(await page.getByRole('radio', { name: /Managed/ }).count(), 1);
       assert.equal(await page.getByRole('radio', { name: /External/ }).count(), 1);

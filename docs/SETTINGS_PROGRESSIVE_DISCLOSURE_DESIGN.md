@@ -55,9 +55,10 @@ controls.
 2. Keep `Connections`, `Media & storage`, `Library`, and `Notifications` in
    the primary navigation; put system, access, account, recovery, and metadata
    tooling under an explicit `More settings` disclosure.
-3. Keep Soulseek address/key fields and provider health visible in Connections.
-   Hide optional source integrations, timeouts, and playlist expansion behind
-   named disclosures.
+3. Keep the Soulseek ownership decision, address/key fields, saved connection
+   result, and its test action together in Connections. Keep supporting service
+   health and optional source integrations, timeouts, and playlist expansion
+   behind named disclosures. See `SETTINGS_CONNECTIONS_HIERARCHY_DESIGN.md`.
 4. Keep library scheduling and automatic-download preference visible. Hide
    source policy, retention, scoring, audio thresholds, and naming templates
    until requested.

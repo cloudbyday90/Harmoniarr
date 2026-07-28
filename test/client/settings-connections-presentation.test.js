@@ -19,6 +19,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  buildSoulseekConnectionHealthSummary,
   buildSlskdConnectionSubtitle,
   formatDependencyProviderLabel,
   formatDependencyStatusLabel,
@@ -27,6 +28,7 @@ import {
   formatSlskdApiKeyStatusLabel,
   formatSlskdProviderModeLabel,
   getDependencyStatusClass,
+  getSupportingProviderHealth,
 } from '../../src/client/lib/settings-connections-presentation.js';
 
 // ── buildSlskdConnectionSubtitle ──────────────────────────────────────────────
@@ -332,5 +334,67 @@ describe('getDependencyStatusClass', () => {
 
   it('returns empty string for unknown status', () => {
     assert.equal(getDependencyStatusClass('custom'), '');
+  });
+});
+
+describe('buildSoulseekConnectionHealthSummary', () => {
+  it('summarizes the saved Soulseek status without exposing implementation detail', () => {
+    assert.deepEqual(
+      buildSoulseekConnectionHealthSummary([{
+        details: { observedAt: '2026-07-28T12:00:00.000Z' },
+        message: 'Soulseek is connected and ready for downloads.',
+        provider: 'slskd',
+        status: 'healthy',
+      }]),
+      {
+        message: 'Soulseek is connected and ready for downloads.',
+        observedAt: '2026-07-28T12:00:00.000Z',
+        status: 'healthy',
+        statusClass: 'review-status-selected',
+        statusLabel: 'Healthy',
+      },
+    );
+  });
+
+  it('keeps a refresh failure actionable instead of implying a failed provider', () => {
+    assert.deepEqual(
+      buildSoulseekConnectionHealthSummary([], 'Request failed'),
+      {
+        message: 'Harmoniarr could not refresh the saved connection status.',
+        observedAt: null,
+        status: 'unknown',
+        statusClass: '',
+        statusLabel: 'Unable to check',
+      },
+    );
+  });
+
+  it('makes an unavailable status clear when no health snapshot is present', () => {
+    assert.deepEqual(
+      buildSoulseekConnectionHealthSummary(),
+      {
+        message: 'No saved connection status is available yet.',
+        observedAt: null,
+        status: 'unknown',
+        statusClass: '',
+        statusLabel: 'Not checked',
+      },
+    );
+  });
+});
+
+describe('getSupportingProviderHealth', () => {
+  it('keeps supporting diagnostics out of the primary Soulseek status', () => {
+    const dependencies = [
+      { provider: 'slskd', status: 'healthy' },
+      { provider: 'musicbrainz', status: 'healthy' },
+      { provider: 'media_tooling', status: 'healthy' },
+    ];
+
+    assert.deepEqual(getSupportingProviderHealth(dependencies), dependencies.slice(1));
+  });
+
+  it('returns an empty list when no supporting services have been checked', () => {
+    assert.deepEqual(getSupportingProviderHealth(), []);
   });
 });

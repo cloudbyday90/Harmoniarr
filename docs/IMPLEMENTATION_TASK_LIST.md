@@ -214,6 +214,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   the primary flow, and moves specialist timing, provider, quality, retention,
   naming, security, and artwork controls behind accessible named disclosures.
   See `SETTINGS_PROGRESSIVE_DISCLOSURE_DESIGN.md`.
+- Settings Connections hierarchy: Managed, External, and Disabled provider
+  modes, their required configuration, saved Soulseek connection state, and
+  `Test saved connection` now share one primary surface. MusicBrainz and media
+  tooling remain available through a named supporting-service disclosure, so
+  diagnostics do not compete with routine setup. See
+  `SETTINGS_CONNECTIONS_HIERARCHY_DESIGN.md`.
 - Soulseek provider-mode onboarding: Settings > Connections now makes Managed,
   External, and Disabled explicit. Managed deployments remain Compose-owned,
   external Unraid/VPN setups retain their URL and encrypted write-only key, and

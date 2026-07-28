@@ -21,14 +21,13 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   buildSlskdConnectionSubtitle,
-  formatDependencyProviderLabel,
   formatDependencyStatusLabel,
   formatOAuthStatusLabel,
   formatProviderSecretStatusLabel,
   formatSlskdProviderModeLabel,
-  getDependencyStatusClass,
 } from '../lib/settings-connections-presentation.js';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
+import SettingsProviderHealthSummary from '../components/settings/SettingsProviderHealthSummary.vue';
 import SoulseekProviderModeGuidance from '../components/settings/SoulseekProviderModeGuidance.vue';
 import MusicQueueProviderRepairRecoveryConfirmation from '../components/music-queue/MusicQueueProviderRepairRecoveryConfirmation.vue';
 import { useConnections } from '../composables/useConnections.js';
@@ -172,13 +171,11 @@ onMounted(() => {
     </article>
 
     <form @submit.prevent="handleSaveSettings" v-else>
-      <div class="cfg-2col">
-
-        <!-- Soulseek connection -->
+      <div class="settings-connections__primary">
         <article class="hx-card">
           <header class="hx-card-header">
             <div>
-              <h3 class="hx-card-title">Soulseek connection</h3>
+              <h3 class="hx-card-title">Soulseek downloads</h3>
               <p class="hx-card-subtitle">{{ buildSlskdConnectionSubtitle() }}</p>
             </div>
             <span class="review-status-pill" :class="isSoulseekDisabled ? 'review-status-held' : 'review-status-selected'">
@@ -244,35 +241,15 @@ onMounted(() => {
               :managed-deployment-detected="isManagedDeployment"
               :provider-mode="form.slskd.providerMode"
             />
+            <SettingsProviderHealthSummary
+              :dependencies="providerHealth"
+              :is-disabled="isSoulseekDisabled"
+              :is-testing="isTestingProviderHealth"
+              :load-error="providerHealthError"
+              @test="testProviderConnection"
+            />
           </div>
         </article>
-
-        <!-- Provider operational health -->
-        <article class="hx-card" v-if="providerHealth.length || providerHealthError">
-          <header class="hx-card-header">
-            <div>
-              <h3 class="hx-card-title">Provider health</h3>
-              <p class="hx-card-subtitle">Operational status of connected services, updated from the server heartbeat.</p>
-            </div>
-            <button type="button" class="hx-btn" @click="testProviderConnection" :disabled="isTestingProviderHealth || isSoulseekDisabled">
-              {{ isSoulseekDisabled ? 'Soulseek is off' : isTestingProviderHealth ? 'Testing Soulseek…' : 'Test Soulseek' }}
-            </button>
-          </header>
-          <div class="hx-card-body">
-            <p class="cfg-save-msg is-error" v-if="providerHealthError">{{ providerHealthError }}</p>
-            <div class="cfg-health-list">
-              <div class="cfg-health-row" v-for="dep in providerHealth" :key="dep.provider">
-                <span class="cfg-health-provider">{{ formatDependencyProviderLabel(dep.provider) }}</span>
-                <span class="review-status-pill" :class="getDependencyStatusClass(dep.status)">
-                  {{ formatDependencyStatusLabel(dep.status) }}
-                </span>
-                <span class="hx-text-muted" v-if="dep.message">{{ dep.message }}</span>
-                <span class="hx-text-muted" v-if="dep.details?.observedAt">Last checked {{ new Date(dep.details.observedAt).toLocaleString() }}</span>
-              </div>
-            </div>
-          </div>
-        </article>
-
       </div>
 
       <MusicQueueProviderRepairRecoveryConfirmation
@@ -510,6 +487,10 @@ onMounted(() => {
   margin-top: var(--hx-space-4);
 }
 
+.settings-connections__primary {
+  width: 100%;
+}
+
 .settings-connections__provider-modes {
   border: 0;
   display: grid;
@@ -550,33 +531,4 @@ onMounted(() => {
   margin-top: var(--hx-space-1);
 }
 
-.cfg-health-list {
-  display: grid;
-  gap: var(--hx-space-3);
-}
-
-.cfg-health-row {
-  display: flex;
-  align-items: center;
-  gap: var(--hx-space-3);
-  padding: var(--hx-space-2) 0;
-  border-bottom: 1px solid var(--hx-border-subtle);
-}
-
-.cfg-health-row:last-child {
-  border-bottom: none;
-}
-
-.cfg-health-provider {
-  font-weight: 600;
-  min-width: 140px;
-}
-
-@media (max-width: 640px) {
-  .cfg-health-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: var(--hx-space-1);
-  }
-}
 </style>
