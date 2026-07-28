@@ -1043,6 +1043,9 @@ right repair surface.
 - [x] Focus the full Music Queue on current work by default, retain an explicit
   all-releases scope, and hand long-lived records to Activity History. See
   `MUSIC_QUEUE_CURRENT_WORK_FOCUS_DESIGN.md`.
+- [x] Consolidate Music Queue status into its current-work header, suppress
+  zero-value summary detail, and keep scheduled automatic searches secondary
+  with an explicit handoff. See `MUSIC_QUEUE_STATUS_HIERARCHY_DESIGN.md`.
 - [x] Simplify Settings with a setup-first landing page and progressive
   disclosure so routine connections, folders, and library behavior stay clear
   while specialist tuning remains available on request. See

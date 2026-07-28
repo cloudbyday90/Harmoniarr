@@ -20,7 +20,6 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MusicQueueEmptyState from '../components/music-queue/MusicQueueEmptyState.vue';
-import MusicQueueOverview from '../components/music-queue/MusicQueueOverview.vue';
 import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
 import MusicQueueProviderRecoveryVisibility from '../components/music-queue/MusicQueueProviderRecoveryVisibility.vue';
 import MusicQueueReviewPanel from '../components/music-queue/MusicQueueReviewPanel.vue';
@@ -35,6 +34,7 @@ import {
 import { useMusicQueue } from '../composables/useMusicQueue.js';
 import { useMusicQueueProviderRepairContext } from '../composables/useMusicQueueProviderRepairContext.js';
 import { hasMusicQueueProviderDependentWork } from '../lib/music-queue-provider-repair-presentation.js';
+import { buildMusicQueueStatusPresentation } from '../lib/music-queue-status-presentation.js';
 import {
   buildMusicQueueProviderRecoveryVisibility,
   isMusicQueueProviderReadyRecoveryContext,
@@ -95,9 +95,34 @@ const filteredReleases = computed(() => filterMusicQueueReleases(releases.value,
 const scopedReleaseCount = computed(() => filterMusicQueueReleases(releases.value, {
   scope: selectedScope.value,
 }).length);
+const musicQueueStatus = computed(() => buildMusicQueueStatusPresentation(summaryCards.value));
 const isCurrentWorkScope = computed(() => selectedScope.value === 'current');
 const queueListHeading = computed(() => (
   isCurrentWorkScope.value ? 'Current work' : 'All releases'
+));
+const hasNarrowingFilters = computed(() => (
+  query.value.trim().length > 0
+  || selectedState.value !== 'all'
+  || selectedReleaseType.value !== 'all'
+));
+const queueListStatus = computed(() => {
+  if (!isCurrentWorkScope.value || hasNarrowingFilters.value) {
+    return `${filteredReleases.value.length} of ${scopedReleaseCount.value} release${scopedReleaseCount.value === 1 ? '' : 's'} ${
+      isCurrentWorkScope.value ? 'matching the current filters' : 'being tracked'
+    }`;
+  }
+
+  return musicQueueStatus.value.primaryHeadline;
+});
+const queueListDetail = computed(() => (
+  isCurrentWorkScope.value && !hasNarrowingFilters.value && filteredReleases.value.length > 0
+    ? musicQueueStatus.value.primaryDetail
+    : ''
+));
+const scheduledSearchDetail = computed(() => (
+  isCurrentWorkScope.value && !hasNarrowingFilters.value && filteredReleases.value.length > 0
+    ? musicQueueStatus.value.scheduledSearchDetail
+    : ''
 ));
 const hasActiveFilters = computed(() => (
   query.value.trim().length > 0
@@ -132,6 +157,16 @@ function clearFilters() {
   selectedState.value = 'all';
   selectedReleaseType.value = 'all';
   filtersExpanded.value = false;
+}
+
+function showScheduledReleases() {
+  selectedScope.value = 'all';
+  selectedState.value = 'waiting';
+  filtersExpanded.value = true;
+}
+
+function showAllReleases() {
+  selectedScope.value = 'all';
 }
 
 async function handleUseMatch(match) {
@@ -215,8 +250,6 @@ watch(
 
     <MusicQueueProviderRecoveryVisibility :visibility="providerRecoveryVisibility" />
 
-    <MusicQueueOverview :summary-cards="summaryCards" />
-
     <div v-if="errorMessage" class="hx-alert" data-tone="danger">
       {{ errorMessage }}
     </div>
@@ -240,10 +273,14 @@ watch(
         <div class="music-queue-panel-header">
           <div>
             <h2>{{ queueListHeading }}</h2>
-            <span>
-              {{ filteredReleases.length }} of {{ scopedReleaseCount }} release{{ scopedReleaseCount === 1 ? '' : 's' }}
-              {{ isCurrentWorkScope ? 'moving automatically or needing help' : 'being tracked' }}
-            </span>
+            <p class="music-queue-panel-status" role="status" aria-atomic="true">{{ queueListStatus }}</p>
+            <p v-if="queueListDetail" class="music-queue-panel-detail">{{ queueListDetail }}</p>
+            <p v-if="scheduledSearchDetail" class="music-queue-scheduled-search">
+              <span>{{ scheduledSearchDetail }}</span>
+              <button type="button" class="hx-btn" data-variant="ghost" @click="showScheduledReleases">
+                View scheduled releases
+              </button>
+            </p>
           </div>
           <div class="music-queue-filters" aria-label="Music Queue filters">
             <label class="music-queue-filter">
@@ -306,10 +343,16 @@ watch(
 
         <div v-if="!filteredReleases.length" class="music-queue-empty-inline">
           <template v-if="isCurrentWorkScope && !hasActiveFilters">
-            <p>Nothing is moving or needs help right now.</p>
-            <p>Waiting and completed releases are still available when you need them.</p>
-            <button type="button" class="hx-btn" data-variant="ghost" @click="selectedScope = 'all'">
-              View all releases
+            <p>No current action is needed.</p>
+            <p v-if="musicQueueStatus.scheduledSearchDetail">{{ musicQueueStatus.scheduledSearchDetail }}</p>
+            <p v-else>Completed and waiting releases are still available when you need them.</p>
+            <button
+              type="button"
+              class="hx-btn"
+              data-variant="ghost"
+              @click="musicQueueStatus.scheduledSearchCount ? showScheduledReleases() : showAllReleases()"
+            >
+              {{ musicQueueStatus.scheduledSearchCount ? 'View scheduled releases' : 'View all releases' }}
             </button>
           </template>
           <template v-else>
@@ -361,7 +404,9 @@ watch(
 }
 
 .music-queue-copy,
-.music-queue-panel-header span {
+.music-queue-panel-status,
+.music-queue-panel-detail,
+.music-queue-scheduled-search {
   color: var(--hx-text-muted);
 }
 
@@ -391,6 +436,29 @@ watch(
 
 .music-queue-panel-header h2 {
   margin: 0;
+}
+
+.music-queue-panel-status,
+.music-queue-panel-detail,
+.music-queue-scheduled-search {
+  font-size: var(--hx-text-sm);
+  margin: var(--hx-space-1) 0 0;
+}
+
+.music-queue-panel-status {
+  color: var(--hx-text);
+  font-weight: 700;
+}
+
+.music-queue-scheduled-search {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-1);
+}
+
+.music-queue-scheduled-search .hx-btn {
+  margin: calc(var(--hx-space-1) * -1) 0;
 }
 
 .music-queue-filters {

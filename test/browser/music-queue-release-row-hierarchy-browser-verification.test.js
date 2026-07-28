@@ -212,7 +212,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
       await page.setViewportSize({ height: 1000, width: 1440 });
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
-      await page.getByRole('heading', { exact: true, name: '1 release needs attention' }).waitFor();
+      await page.locator('.music-queue-panel-status').filter({ hasText: '1 release needs attention' }).waitFor();
       assert.equal(await page.locator('.music-queue-summary-card').count(), 0);
       const secondaryFilters = page.locator('#music-queue-secondary-filters');
       assert.equal(await secondaryFilters.isHidden(), true);

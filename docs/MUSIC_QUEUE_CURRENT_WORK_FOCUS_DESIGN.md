@@ -2,6 +2,10 @@
 
 Status: Implemented on 2026-07-28
 
+Follow-up: the standalone summary was consolidated into the Music Queue header
+and scheduled search became secondary context on 2026-07-28. See
+`MUSIC_QUEUE_STATUS_HIERARCHY_DESIGN.md`.
+
 ## Purpose
 
 Music Queue is the normal place to understand what Harmoniarr is doing. Its
@@ -68,9 +72,8 @@ Official sources reviewed against the requested June 2026 baseline:
 - Browser coverage proves the default mixed-state list, History handoff, and
   explicit all-releases scope without depending on a real provider.
 
-## Next High-Value Item
+## Follow-Up Outcome
 
-Consolidate Music Queue's summary and filter language around the same
-`Current work` model: reduce zero-value summary detail, make scheduled automatic
-search a secondary status, and verify the page visually at desktop and mobile
-widths with a mixed real-world queue fixture.
+The next item above is complete. The header now provides the one concise status
+line for current work, while scheduled searches have an explicit secondary
+handoff. See `MUSIC_QUEUE_STATUS_HIERARCHY_DESIGN.md`.

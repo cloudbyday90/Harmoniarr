@@ -14,6 +14,10 @@ import {
   toBrowserRuntimeUnavailableReason,
 } from '../../testing/browser/playwright-smoke-runtime.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
+import {
+  createBrowserVisualEvidenceRecorder,
+  stabilizeVisualEvidencePage,
+} from '../../testing/browser/visual-evidence.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
@@ -112,6 +116,9 @@ suite('Music Queue current-work browser verification', () => {
     }
 
     await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const evidence = createBrowserVisualEvidenceRecorder({
+        scenarioName: 'music_queue_current_work',
+      });
       const pageErrors = [];
       page.on('pageerror', (error) => pageErrors.push(error.message));
       await bootstrapAdminThroughUi(page, { baseUrl });
@@ -139,23 +146,55 @@ suite('Music Queue current-work browser verification', () => {
         await route.fulfill({ body: JSON.stringify(payload), contentType: 'application/json', response });
       });
 
+      await page.setViewportSize({ height: 1000, width: 1440 });
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
       await page.getByText('Child of God', { exact: true }).waitFor();
       await page.getByText('Golden Hour', { exact: true }).waitFor();
       assert.equal(await page.getByText('Geogaddi', { exact: true }).count(), 0);
       assert.equal(await page.getByText('Look Up Child', { exact: true }).count(), 0);
+      await page.getByText('1 release needs attention', { exact: true }).waitFor();
+      await page.getByText('Harmoniarr is also working on 1 release.', { exact: true }).waitFor();
+      await page.getByText('1 release is scheduled for automatic search.', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('Show').inputValue(), 'current');
       assert.equal(
         await page.getByRole('link', { name: 'History' }).getAttribute('href'),
         '/app/activity/history',
       );
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'Current work keeps the decision, active progress, and a compact scheduled-search handoff in one scan path.',
+        name: 'desktop-current-work',
+        surface: 'music-queue',
+      });
+
+      await page.getByRole('button', { name: 'View scheduled releases' }).click();
+      assert.equal(await page.getByLabel('Show').inputValue(), 'all');
+      assert.equal(await page.getByLabel('State').inputValue(), 'waiting');
+      await page.getByText('Look Up Child', { exact: true }).waitFor();
+      await page.getByRole('button', { exact: true, name: 'Clear' }).click();
 
       await page.getByLabel('Show').selectOption('all');
       await page.getByRole('heading', { exact: true, name: 'All releases' }).waitFor();
       await page.getByText('Geogaddi', { exact: true }).waitFor();
       await page.getByText('Look Up Child', { exact: true }).waitFor();
+      await page.getByLabel('Show').selectOption('current');
+      await page.setViewportSize({ height: 844, width: 390 });
+      await page.getByText('Child of God', { exact: true }).waitFor();
+      assert.equal(
+        await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth),
+        true,
+        'The compact current-work hierarchy should not create horizontal overflow on mobile.',
+      );
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'Current work preserves its priority and compact scheduled-search handoff on mobile.',
+        name: 'mobile-current-work',
+        surface: 'music-queue',
+      });
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+      const manifest = await evidence.writeManifest();
+      assert.equal(manifest.captureCount, 2);
     }, { scenarioName: 'music_queue_current_work' });
   });
 });

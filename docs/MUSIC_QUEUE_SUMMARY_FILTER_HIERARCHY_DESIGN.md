@@ -1,6 +1,10 @@
 # Music Queue Summary And Filter Hierarchy Design
 
-Status: **Implemented 2026-07-26.**
+Status: **Implemented 2026-07-26; superseded by the header-based status hierarchy on 2026-07-28.**
+
+The compact standalone overview described below was a transitional improvement.
+`MUSIC_QUEUE_STATUS_HIERARCHY_DESIGN.md` replaces it with one status line in the
+queue header and a secondary scheduled-search handoff.
 
 ## Purpose
 
@@ -54,8 +58,9 @@ because these controls refine the list rather than progress music.
 
 ## Decision
 
-Adopt a `MusicQueueOverview` component backed by the pure
-`music-queue-overview-presentation.js` module.
+The initial implementation adopted a `MusicQueueOverview` component backed by
+`music-queue-overview-presentation.js`. The later status-hierarchy refinement
+replaced both with `music-queue-status-presentation.js` and queue-header copy.
 
 Priority order:
 
@@ -89,7 +94,7 @@ sequence.
 
 - `npm run lint:client`
 - `npm run lint:test`
-- `node --test test/client/music-queue-overview-presentation.test.js`
+- `node --test test/client/music-queue-status-presentation.test.js`
 - `npm run build:client`
 - `node --test --test-concurrency=1 test/browser/music-queue-release-row-hierarchy-browser-verification.test.js`
 

@@ -64,14 +64,12 @@ Adopt the layered state model.
 | Condition | Presentation | User action |
 | --- | --- | --- |
 | Provider disabled, incomplete, unreachable, or unhealthy while work is queued | Existing `MusicQueueProviderRepairNotice` | Use the one Connections setup/repair handoff. |
-| Releases are `queued_for_search` and nothing is otherwise active or blocked | `MusicQueueOverview` shows `Automatic search` and says no action is needed | Wait for Harmoniarr's normal search schedule. |
+| Releases are `queued_for_search` and nothing is otherwise active or blocked | The Current work empty state says no action is needed and gives one `View scheduled releases` handoff | Wait for Harmoniarr's normal search schedule or inspect scheduled releases intentionally. |
 | No release exists in Music Queue | `MusicQueueEmptyState` shows `Queue is clear` and `Nothing needs your attention` | Optionally open Discover to monitor another artist. |
 
-`music-queue-overview-presentation.js` remains the pure state-priority module.
-It now exposes an eyebrow and semantic state beside its headline, detail, and
-facts. `MusicQueueEmptyState.vue` owns only the clear-queue display and a
-normal router link; `MusicQueueView.vue` selects it only when there are no
-release rows.
+`music-queue-status-presentation.js` is the pure state-priority module.
+`MusicQueueEmptyState.vue` owns only the clear-queue display and a normal router
+link; `MusicQueueView.vue` selects it only when there are no release rows.
 
 No polling, dispatch, provider call, route parameter, or mutation was added.
 
@@ -93,7 +91,7 @@ No polling, dispatch, provider call, route parameter, or mutation was added.
 
 - `npm run lint:client`
 - `npm run lint:test`
-- `node --test test/client/music-queue-overview-presentation.test.js`
+- `node --test test/client/music-queue-status-presentation.test.js`
 - `npm run build:client`
 - `node --test --test-concurrency=1 test/browser/music-queue-waiting-empty-state-browser-verification.test.js`
 - `node --test --test-concurrency=1 test/browser/music-queue-provider-repair-context-browser-verification.test.js`

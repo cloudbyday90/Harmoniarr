@@ -155,6 +155,10 @@ Database model source: `docs/DATABASE_MODEL.md`
   moving automatically or needing help, keeps an explicit `All releases`
   option for stable records, and links to Activity History. See
   `MUSIC_QUEUE_CURRENT_WORK_FOCUS_DESIGN.md`.
+- Music Queue status hierarchy: the list header now owns one concise current
+  status, omits zero-value dashboard detail, and treats scheduled automatic
+  search as a secondary `View scheduled releases` handoff. See
+  `MUSIC_QUEUE_STATUS_HIERARCHY_DESIGN.md`.
 - Music Queue quality-stop recovery automation: downloaded matches that fail
   strict safe-auto quality verification are now marked as quality failures,
   excluded from the recovery cascade, and followed by the next quality-eligible

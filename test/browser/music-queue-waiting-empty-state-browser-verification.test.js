@@ -141,17 +141,20 @@ suite('Music Queue waiting and empty-state browser verification', () => {
 
       await page.setViewportSize({ height: 900, width: 1440 });
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
-      const overview = page.locator('.music-queue-overview');
-      await overview.getByText('Automatic search', { exact: true }).waitFor();
-      await overview.getByRole('heading', { name: '2 releases waiting for automatic search' }).waitFor();
-      await overview.getByText('No action is needed. Harmoniarr will search automatically when each release is due.').waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
+      await page.getByText('No current action is needed.', { exact: true }).waitFor();
+      await page.getByText('2 releases are scheduled for automatic search.', { exact: true }).waitFor();
       assert.equal(await page.getByRole('heading', { name: 'Nothing needs your attention' }).count(), 0);
       await stabilizeVisualEvidencePage(page);
       await evidence.capture(page, {
-        description: 'Waiting releases explicitly state that Harmoniarr will continue automatically.',
+        description: 'Scheduled releases remain a compact secondary status rather than crowding the current-work list.',
         name: 'desktop-automatic-waiting',
         surface: 'music-queue',
       });
+      await page.getByRole('button', { name: 'View scheduled releases' }).click();
+      assert.equal(await page.getByLabel('Show').inputValue(), 'all');
+      assert.equal(await page.getByLabel('State').inputValue(), 'waiting');
+      await page.getByText('Golden Hour', { exact: true }).waitFor();
 
       queuePayload = buildEmptyPayload();
       await page.reload({ waitUntil: 'domcontentloaded' });
