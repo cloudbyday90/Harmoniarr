@@ -7,6 +7,7 @@ import {
   buildMusicQueueSummaryCards,
   filterMusicQueueReleases,
   getMusicQueueStatusClass,
+  MUSIC_QUEUE_SCOPE_FILTERS,
   normalizeMusicQueueRelease,
 } from '../../src/client/lib/acquisition-pipeline-presentation.js';
 
@@ -100,6 +101,41 @@ test('filterMusicQueueReleases filters by state, release type, and search text',
       .map((release) => release.artistName),
     ['Forest Frank'],
   );
+});
+
+test('filterMusicQueueReleases keeps the default current scope focused on active and attention work', () => {
+  const releases = [
+    normalizeMusicQueueRelease({
+      artistName: 'Boards of Canada',
+      releaseTitle: 'Geogaddi',
+      status: { code: 'in_library', label: 'In library', tone: 'success' },
+    }),
+    normalizeMusicQueueRelease({
+      artistName: 'Lauren Daigle',
+      releaseTitle: 'Look Up Child',
+      status: { code: 'queued_for_search', label: 'Waiting to search', tone: 'neutral' },
+    }),
+    normalizeMusicQueueRelease({
+      artistName: 'Forest Frank',
+      releaseTitle: 'Child of God',
+      status: { code: 'downloading', label: 'Downloading', tone: 'info' },
+    }),
+    normalizeMusicQueueRelease({
+      artistName: 'Kacey Musgraves',
+      releaseTitle: 'Golden Hour',
+      status: { code: 'quality_choice_needed', label: 'Quality choice needed', tone: 'warning' },
+    }),
+  ];
+
+  assert.deepEqual(MUSIC_QUEUE_SCOPE_FILTERS, [
+    { label: 'Current work', value: 'current' },
+    { label: 'All releases', value: 'all' },
+  ]);
+  assert.deepEqual(
+    filterMusicQueueReleases(releases, { scope: 'current' }).map((release) => release.releaseTitle),
+    ['Child of God', 'Golden Hour'],
+  );
+  assert.equal(filterMusicQueueReleases(releases, { scope: 'all' }).length, 4);
 });
 
 test('buildMusicQueueAction maps setup and review actions to user outcomes', () => {

@@ -211,7 +211,7 @@ suite('Music Queue release row hierarchy browser verification', () => {
 
       await page.setViewportSize({ height: 1000, width: 1440 });
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Queued music' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
       await page.getByRole('heading', { exact: true, name: '1 release needs attention' }).waitFor();
       assert.equal(await page.locator('.music-queue-summary-card').count(), 0);
       const secondaryFilters = page.locator('#music-queue-secondary-filters');
@@ -362,7 +362,9 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const settingsResponse = page.waitForResponse((response) => response.url().includes('/api/v1/settings'));
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       await settingsResponse;
-      await page.getByRole('heading', { exact: true, name: 'Queued music' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Current work' }).waitFor();
+      await page.getByLabel('Show').selectOption('all');
+      await page.getByRole('heading', { exact: true, name: 'All releases' }).waitFor();
 
       const rows = page.locator('.music-queue-release-row');
       const nextMatchRow = rows.filter({ hasText: 'Child of God' });

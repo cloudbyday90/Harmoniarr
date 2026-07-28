@@ -28,6 +28,7 @@ import {
 } from './acquisition-quality-presentation.js';
 import { formatBytes } from './import-candidate-presentation.js';
 import { buildMusicQueueRecoveryPresentation } from './music-queue-recovery-presentation.js';
+import { isMusicQueueHomeProgressRelease } from './music-queue-progress-state.js';
 
 const DEFAULT_STATUS = Object.freeze({
   code: 'queued_for_search',
@@ -642,6 +643,11 @@ export const MUSIC_QUEUE_STATE_FILTERS = Object.freeze([
   Object.freeze({ label: 'In library', value: 'in_library' }),
 ]);
 
+export const MUSIC_QUEUE_SCOPE_FILTERS = Object.freeze([
+  Object.freeze({ label: 'Current work', value: 'current' }),
+  Object.freeze({ label: 'All releases', value: 'all' }),
+]);
+
 export function getMusicQueueFilterState(statusCode) {
   if (['queued_for_search', 'retrying_search'].includes(statusCode)) return 'waiting';
   if (['searching', 'checking_matches', 'pick_match'].includes(statusCode)) return 'searching';
@@ -656,13 +662,19 @@ export function getMusicQueueFilterState(statusCode) {
 export function filterMusicQueueReleases(releases, {
   query = '',
   releaseType = 'all',
+  scope = 'all',
   state = 'all',
 } = {}) {
   const normalizedQuery = normalizeToken(query);
   const normalizedReleaseType = normalizeToken(releaseType);
+  const normalizedScope = normalizeToken(scope);
   const normalizedState = normalizeToken(state);
 
   return releases.filter((release) => {
+    if (normalizedScope === 'current' && !isMusicQueueHomeProgressRelease(release)) {
+      return false;
+    }
+
     if (normalizedQuery && !release.searchableText.includes(normalizedQuery)) {
       return false;
     }

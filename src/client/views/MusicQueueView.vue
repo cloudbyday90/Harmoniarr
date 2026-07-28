@@ -29,6 +29,7 @@ import {
   buildMusicQueueMatchReview,
   buildMusicQueueReleaseTypeFilters,
   filterMusicQueueReleases,
+  MUSIC_QUEUE_SCOPE_FILTERS,
   MUSIC_QUEUE_STATE_FILTERS,
 } from '../lib/acquisition-pipeline-presentation.js';
 import { useMusicQueue } from '../composables/useMusicQueue.js';
@@ -59,7 +60,6 @@ const {
   releases,
   searchAgain,
   summaryCards,
-  totalCount,
   useMatch,
 } = useMusicQueue({ immediate: !isProviderReadyRecoveryReturn });
 
@@ -79,6 +79,7 @@ const {
 
 const query = ref('');
 const filtersExpanded = ref(false);
+const selectedScope = ref('current');
 const selectedState = ref('all');
 const selectedReleaseType = ref('all');
 const selectedReleaseId = ref(typeof route.params.wantedReleaseId === 'string' ? route.params.wantedReleaseId : null);
@@ -88,10 +89,19 @@ const releaseTypeFilters = computed(() => buildMusicQueueReleaseTypeFilters(rele
 const filteredReleases = computed(() => filterMusicQueueReleases(releases.value, {
   query: query.value,
   releaseType: selectedReleaseType.value,
+  scope: selectedScope.value,
   state: selectedState.value,
 }));
+const scopedReleaseCount = computed(() => filterMusicQueueReleases(releases.value, {
+  scope: selectedScope.value,
+}).length);
+const isCurrentWorkScope = computed(() => selectedScope.value === 'current');
+const queueListHeading = computed(() => (
+  isCurrentWorkScope.value ? 'Current work' : 'All releases'
+));
 const hasActiveFilters = computed(() => (
   query.value.trim().length > 0
+  || selectedScope.value !== 'current'
   || selectedState.value !== 'all'
   || selectedReleaseType.value !== 'all'
 ));
@@ -118,6 +128,7 @@ function closeReview() {
 
 function clearFilters() {
   query.value = '';
+  selectedScope.value = 'current';
   selectedState.value = 'all';
   selectedReleaseType.value = 'all';
   filtersExpanded.value = false;
@@ -228,15 +239,29 @@ watch(
       <div class="music-queue-panel">
         <div class="music-queue-panel-header">
           <div>
-            <h2>Queued music</h2>
-            <span>{{ filteredReleases.length }} of {{ totalCount }} release{{ totalCount === 1 ? '' : 's' }}</span>
+            <h2>{{ queueListHeading }}</h2>
+            <span>
+              {{ filteredReleases.length }} of {{ scopedReleaseCount }} release{{ scopedReleaseCount === 1 ? '' : 's' }}
+              {{ isCurrentWorkScope ? 'moving automatically or needing help' : 'being tracked' }}
+            </span>
           </div>
           <div class="music-queue-filters" aria-label="Music Queue filters">
+            <label class="music-queue-filter">
+              <span>Show</span>
+              <select v-model="selectedScope" class="hx-select">
+                <option v-for="filter in MUSIC_QUEUE_SCOPE_FILTERS" :key="filter.value" :value="filter.value">
+                  {{ filter.label }}
+                </option>
+              </select>
+            </label>
             <label class="music-queue-filter music-queue-filter--search">
               <span>Search</span>
               <input v-model="query" class="hx-input" type="search" placeholder="Artist or release" />
             </label>
             <div class="music-queue-filter-actions">
+              <RouterLink class="hx-btn" data-variant="ghost" :to="{ name: 'activity-history' }">
+                History
+              </RouterLink>
               <button
                 type="button"
                 class="hx-btn"
@@ -280,7 +305,16 @@ watch(
         </div>
 
         <div v-if="!filteredReleases.length" class="music-queue-empty-inline">
-          No releases match these filters.
+          <template v-if="isCurrentWorkScope && !hasActiveFilters">
+            <p>Nothing is moving or needs help right now.</p>
+            <p>Waiting and completed releases are still available when you need them.</p>
+            <button type="button" class="hx-btn" data-variant="ghost" @click="selectedScope = 'all'">
+              View all releases
+            </button>
+          </template>
+          <template v-else>
+            No releases match these filters.
+          </template>
         </div>
 
         <div v-else class="music-queue-list" role="list">
@@ -403,8 +437,19 @@ watch(
 }
 
 .music-queue-empty-inline {
+  display: grid;
+  justify-items: center;
+  gap: var(--hx-space-2);
   padding: 48px 20px;
   text-align: center;
+}
+
+.music-queue-empty-inline p {
+  margin: 0;
+}
+
+.music-queue-empty-inline p + p {
+  color: var(--hx-text-muted);
 }
 
 @media (max-width: 720px) {
