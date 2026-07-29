@@ -170,6 +170,14 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.getByRole('button', { name: 'Change request preferences' }).click();
       await page.getByLabel('Preferred format').waitFor();
 
+      await page.goto(`${baseUrl}/app/settings/recovery`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Recovery status' }).waitFor();
+      await page.getByRole('heading', { name: 'Recovery tasks' }).waitFor();
+      await page.getByRole('button', { name: 'Review backups' }).click();
+      await page.getByRole('button', { name: 'Restore a backup' }).click();
+      await page.getByRole('button', { name: 'Review maintenance' }).click();
+      await page.getByRole('button', { name: 'Open diagnostics' }).click();
+
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'settings_progressive_disclosure' });
   });

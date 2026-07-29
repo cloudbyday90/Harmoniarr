@@ -108,6 +108,20 @@ test('Account leads with current sign-in posture and scopes security and prefere
   assert.ok(source.indexOf('>Account safety<') < source.indexOf('title="Signed-in devices"'));
 });
 
+test('Backup and restore leads with recovery posture and scopes destructive work by task', async () => {
+  const source = await readFile(new URL('../../src/client/views/RecoveryWorkspaceView.vue', import.meta.url), 'utf8');
+
+  assert.match(source, /buildSettingsRecoveryPosture/);
+  assert.match(source, />Recovery status</);
+  assert.match(source, />Recovery tasks</);
+  assert.match(source, /title="Review backup history"/);
+  assert.match(source, /title="Restore a backup"/);
+  assert.match(source, /title="Recovery maintenance"/);
+  assert.match(source, /title="Recovery diagnostics"/);
+  assert.match(source, /title="Backup file actions"/);
+  assert.ok(source.indexOf('>Recovery status<') < source.indexOf('title="Restore a backup"'));
+});
+
 test('Folder readiness presents saved checks before optional validation detail', async () => {
   const source = await readFile(new URL('../../src/client/components/settings/SettingsFolderReadiness.vue', import.meta.url), 'utf8');
 

@@ -82,6 +82,10 @@ controls.
 9. Preserve the existing routes, server-side validation, CSRF requirements,
    write-only secret behavior, and generic error handling. This is a UI
    information-architecture change, not a relaxation of security controls.
+10. Keep the latest server-reported recovery posture visible in Backup &
+    restore. Separate backup history, restore preview/apply, maintenance locks,
+    diagnostics, and destructive file actions into explicit recovery tasks.
+    See `docs/SETTINGS_BACKUP_RESTORE_HIERARCHY_DESIGN.md`.
 
 ## Component Contract
 
