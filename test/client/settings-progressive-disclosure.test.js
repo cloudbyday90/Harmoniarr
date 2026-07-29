@@ -19,7 +19,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { buildSettingsSetupSteps } from '../../src/client/lib/settings-setup-presentation.js';
+import { buildSettingsSetupOverview, buildSettingsSetupSteps } from '../../src/client/lib/settings-setup-presentation.js';
 
 const DISCLOSURE_PATH = new URL('../../src/client/components/settings/SettingsDisclosure.vue', import.meta.url);
 const WORKSPACE_PATH = new URL('../../src/client/views/SettingsWorkspaceView.vue', import.meta.url);
@@ -186,6 +186,22 @@ test('Settings setup prioritizes a missing Managed deployment over generic depen
   });
 });
 
+test('Settings setup treats healthy folder validation as a core readiness prerequisite', () => {
+  const overview = buildSettingsSetupOverview({
+    dependencies: [{ provider: 'slskd', status: 'healthy' }],
+    setupProgress: {
+      folders: {
+        downloadsConfigured: true,
+        musicConfigured: true,
+        validationStatus: 'healthy',
+      },
+    },
+  });
+
+  assert.equal(overview.coreSteps.find((step) => step.id === 'folders').status, 'Ready');
+  assert.equal(overview.optionalSteps[0].title, 'Choose library behavior');
+});
+
 test('Settings workspace keeps common setup in primary navigation and reveals specialist routes explicitly', async () => {
   const source = await readFile(WORKSPACE_PATH, 'utf8');
 
@@ -206,11 +222,16 @@ test('Settings default route opens the setup overview and retains a direct syste
   assert.match(source, /\{ path: 'system', name: 'settings-general', component: SettingsGeneralView \}/);
 });
 
-test('Settings setup loads provider-mode progress and announces its update accessibly', async () => {
+test('Settings setup loads safe readiness progress and keeps optional configuration disclosed', async () => {
   const source = await readFile(new URL('../../src/client/views/SettingsSetupView.vue', import.meta.url), 'utf8');
 
   assert.match(source, /useSettingsSetupProgress/);
+  assert.match(source, /buildSettingsSetupOverview/);
+  assert.match(source, /setupProgressError/);
   assert.match(source, /void loadSetupProgress\(\)/);
   assert.match(source, /role="status"/);
   assert.match(source, /aria-atomic="true"/);
+  assert.match(source, /aria-label="Required setup tasks"/);
+  assert.match(source, /title="Optional setup"/);
+  assert.match(source, /show-label="Review optional setup"/);
 });

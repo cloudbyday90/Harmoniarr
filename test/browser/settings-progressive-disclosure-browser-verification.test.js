@@ -84,6 +84,17 @@ suite('Settings progressive disclosure browser verification', () => {
           providerModeLocked: false,
           providerModeState: 'managed_deployment_missing',
         };
+        payload.settings.paths = {
+          ...(payload.settings.paths ?? {}),
+          downloads: '/data/downloads',
+          music: '/data/music',
+        };
+        payload.pathValidation = {
+          ...(payload.pathValidation ?? {}),
+          summary: {
+            status: 'healthy',
+          },
+        };
         await route.fulfill({
           body: JSON.stringify(payload),
           contentType: 'application/json',
@@ -92,11 +103,14 @@ suite('Settings progressive disclosure browser verification', () => {
       });
 
       await page.goto(`${baseUrl}/app/settings`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { name: 'Get Harmoniarr ready' }).waitFor();
+      await page.getByRole('heading', { name: 'Setup readiness' }).waitFor();
       await page.getByText('Connect Soulseek', { exact: true }).waitFor();
       await page.getByText('Managed setup required', { exact: true }).waitFor();
       await page.getByRole('link', { name: 'Finish managed setup' }).waitFor();
-      await page.getByRole('link', { name: 'Set folders' }).waitFor();
+      await page.getByRole('link', { name: 'Manage folders' }).waitFor();
+      assert.equal(await page.getByText('Choose library behavior', { exact: true }).isVisible(), false);
+      await page.getByRole('button', { name: 'Review optional setup' }).click();
+      await page.getByText('Choose library behavior', { exact: true }).waitFor();
       assert.equal(await page.getByRole('link', { name: 'System & security' }).count(), 0);
 
       const moreSettings = page.getByRole('button', { name: 'More settings' });

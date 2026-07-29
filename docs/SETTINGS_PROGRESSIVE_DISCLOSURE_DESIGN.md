@@ -86,6 +86,11 @@ controls.
     restore. Separate backup history, restore preview/apply, maintenance locks,
     diagnostics, and destructive file actions into explicit recovery tasks.
     See `docs/SETTINGS_BACKUP_RESTORE_HIERARCHY_DESIGN.md`.
+11. Keep Settings setup compact: show only the Soulseek connection and media
+    folders as required readiness tasks, and disclose library timing and safe
+    automatic-download choices as optional setup. The summary must use a
+    reduced state that excludes raw paths, endpoint URLs, and secrets. See
+    `docs/SETTINGS_SETUP_READINESS_DESIGN.md`.
 
 ## Component Contract
 
@@ -107,14 +112,14 @@ not lose unsaved input while scanning the page.
 
 ## Outcome
 
-Settings now leads with the actions a local operator needs to complete first:
-connect the download service, set folders, and choose library behavior. The
-remaining capabilities retain direct routes but no longer compete for attention
-with those tasks.
+Settings now leads with the two actions a local operator needs to complete
+first: connect the download service and set folders. Library behavior is
+available as an explicit optional follow-up. The remaining capabilities retain
+direct routes but no longer compete for attention with those tasks.
 
 ## Next High-Value Item
 
-Extend Activity repair handoffs for the remaining common Music Queue lifecycle
-events: match selected, download started, audio check outcomes, library add, and
-request fulfillment. The UI structure is now ready to link each event to its
-single appropriate repair surface instead of exposing a workbench.
+Refine the Activity timeline into a compact task-first operational view:
+group low-value routine lifecycle events, foreground actionable failures and
+repair links, and keep diagnostic detail behind the existing Advanced
+diagnostics boundary.

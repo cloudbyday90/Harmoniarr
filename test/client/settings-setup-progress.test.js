@@ -21,7 +21,7 @@ import test from 'node:test';
 import { useSettingsSetupProgress } from '../../src/client/composables/useSettingsSetupProgress.js';
 import { buildSettingsSetupProgress } from '../../src/client/lib/settings-setup-progress.js';
 
-test('settings setup progress retains only the safe provider mode and managed deployment signal', () => {
+test('settings setup progress retains only safe provider, folder-presence, and validation signals', () => {
   const progress = buildSettingsSetupProgress({
     secretStatus: {
       providers: {
@@ -34,7 +34,19 @@ test('settings setup progress retains only the safe provider mode and managed de
         providerModeState: 'managed_deployment_missing',
       },
     },
-    settings: { slskd: { baseUrl: 'http://must-not-reach-setup.example' } },
+    settings: {
+      paths: {
+        downloads: '/data/downloads',
+        music: '/data/music',
+      },
+      slskd: { baseUrl: 'http://must-not-reach-setup.example' },
+    },
+    pathValidation: {
+      summary: {
+        message: 'Paths at /data/downloads and /data/music are ready.',
+        status: 'healthy',
+      },
+    },
   });
 
   assert.deepEqual(progress, {
@@ -42,8 +54,13 @@ test('settings setup progress retains only the safe provider mode and managed de
       managedDeploymentMissing: true,
       providerMode: 'managed',
     },
+    folders: {
+      downloadsConfigured: true,
+      musicConfigured: true,
+      validationStatus: 'healthy',
+    },
   });
-  assert.doesNotMatch(JSON.stringify(progress), /base.?url|api.?key|secret|spotify/i);
+  assert.doesNotMatch(JSON.stringify(progress), /base.?url|api.?key|secret|spotify|\/data\/downloads|\/data\/music/i);
 });
 
 test('useSettingsSetupProgress loads the reduced setup state', async (t) => {
@@ -67,6 +84,11 @@ test('useSettingsSetupProgress loads the reduced setup state', async (t) => {
       managedDeploymentMissing: true,
       providerMode: 'managed',
     },
+    folders: {
+      downloadsConfigured: false,
+      musicConfigured: false,
+      validationStatus: null,
+    },
   });
 });
 
@@ -83,6 +105,11 @@ test('useSettingsSetupProgress keeps the safe default when Settings cannot load'
     soulseek: {
       managedDeploymentMissing: false,
       providerMode: null,
+    },
+    folders: {
+      downloadsConfigured: false,
+      musicConfigured: false,
+      validationStatus: null,
     },
   });
 });

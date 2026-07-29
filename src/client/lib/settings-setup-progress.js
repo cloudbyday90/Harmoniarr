@@ -17,15 +17,25 @@
  */
 
 /**
- * Reduce the Settings payload to the one deployment-state signal needed by the
- * Setup landing page. This intentionally excludes URLs, secret metadata for
- * unrelated providers, and all editable settings.
+ * Reduce the Settings payload to the safe deployment and folder-readiness
+ * signals needed by the Setup landing page. This intentionally excludes URLs,
+ * raw paths, secret metadata for unrelated providers, and editable settings.
  */
 const providerModes = new Set(['disabled', 'external', 'managed']);
+const pathValidationStatuses = new Set(['healthy', 'degraded', 'unavailable']);
 
 function normalizeProviderMode(value) {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
   return providerModes.has(normalized) ? normalized : null;
+}
+
+function hasConfiguredPath(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function normalizePathValidationStatus(value) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return pathValidationStatuses.has(normalized) ? normalized : null;
 }
 
 export function buildSettingsSetupProgress(settingsPayload) {
@@ -34,6 +44,11 @@ export function buildSettingsSetupProgress(settingsPayload) {
       managedDeploymentMissing:
         settingsPayload?.secretStatus?.slskd?.providerModeState === 'managed_deployment_missing',
       providerMode: normalizeProviderMode(settingsPayload?.secretStatus?.slskd?.providerMode),
+    },
+    folders: {
+      downloadsConfigured: hasConfiguredPath(settingsPayload?.settings?.paths?.downloads),
+      musicConfigured: hasConfiguredPath(settingsPayload?.settings?.paths?.music),
+      validationStatus: normalizePathValidationStatus(settingsPayload?.pathValidation?.summary?.status),
     },
   };
 }

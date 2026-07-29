@@ -19,9 +19,10 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
+import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import { useDependencyHealth } from '../composables/useDependencyHealth.js';
 import { useSettingsSetupProgress } from '../composables/useSettingsSetupProgress.js';
-import { buildSettingsSetupSteps } from '../lib/settings-setup-presentation.js';
+import { buildSettingsSetupOverview } from '../lib/settings-setup-presentation.js';
 
 const {
   dependencies,
@@ -32,25 +33,24 @@ const {
 
 const {
   isLoading: isLoadingSetupProgress,
+  loadError: setupProgressError,
   loadSetupProgress,
   progress: setupProgress,
 } = useSettingsSetupProgress();
 
 const isCheckingSetup = computed(() => isLoading.value || isLoadingSetupProgress.value);
 
-const setupSteps = computed(() => buildSettingsSetupSteps({
+const setupOverview = computed(() => buildSettingsSetupOverview({
   dependencies: dependencies.value,
   healthError: loadError.value,
   setupProgress: setupProgress.value,
+  setupProgressError: setupProgressError.value,
 }));
 
 const setupStatusMessage = computed(() => {
   if (isCheckingSetup.value) return 'Checking setup progress.';
 
-  const soulseekStep = setupSteps.value.find((step) => step.id === 'soulseek');
-  return soulseekStep
-    ? `Soulseek: ${soulseekStep.status}. ${soulseekStep.copy}`
-    : 'Setup progress updated.';
+  return `Setup readiness: ${setupOverview.value.readiness.label}. ${setupOverview.value.readiness.copy}`;
 });
 
 onMounted(() => {
@@ -63,16 +63,17 @@ onMounted(() => {
   <section class="settings-setup" aria-labelledby="settings-setup-title">
     <header class="settings-setup__header">
       <div>
-        <h2 id="settings-setup-title">Get Harmoniarr ready</h2>
-        <p>Complete these steps once. After that, Harmoniarr handles normal music progress automatically.</p>
+        <h2 id="settings-setup-title">Setup readiness</h2>
+        <p>Complete these two prerequisites once. Harmoniarr handles normal music progress after that.</p>
       </div>
       <span v-if="isCheckingSetup" class="hx-pill" data-tone="info">Checking setup</span>
+      <span v-else class="hx-pill" :data-tone="setupOverview.readiness.tone">{{ setupOverview.readiness.label }}</span>
     </header>
     <p class="settings-setup__status" role="status" aria-atomic="true">{{ setupStatusMessage }}</p>
+    <p class="settings-setup__readiness">{{ setupOverview.readiness.copy }}</p>
 
-    <ol class="settings-setup__steps">
-      <li v-for="(step, index) in setupSteps" :key="step.id" class="settings-setup__step">
-        <span class="settings-setup__number" aria-hidden="true">{{ index + 1 }}</span>
+    <ol class="settings-setup__steps" aria-label="Required setup tasks">
+      <li v-for="step in setupOverview.coreSteps" :key="step.id" class="settings-setup__step">
         <div class="settings-setup__content">
           <div class="settings-setup__heading">
             <h3>{{ step.title }}</h3>
@@ -85,6 +86,31 @@ onMounted(() => {
         </div>
       </li>
     </ol>
+
+    <SettingsDisclosure
+      heading-level="3"
+      hide-label="Hide optional setup"
+      panel-id="settings-setup-optional"
+      show-label="Review optional setup"
+      subtitle="Tailor search timing and safe automatic downloads when you are ready."
+      title="Optional setup"
+      variant="inline"
+    >
+      <ul class="settings-setup__optional-list">
+        <li v-for="step in setupOverview.optionalSteps" :key="step.id" class="settings-setup__optional-step">
+          <div>
+            <div class="settings-setup__heading">
+              <h4>{{ step.title }}</h4>
+              <span class="hx-pill" :data-tone="step.tone">{{ step.status }}</span>
+            </div>
+            <p>{{ step.copy }}</p>
+          </div>
+          <RouterLink class="hx-btn" :to="{ name: step.routeName }">
+            {{ step.label }}
+          </RouterLink>
+        </li>
+      </ul>
+    </SettingsDisclosure>
   </section>
 </template>
 
@@ -104,7 +130,8 @@ onMounted(() => {
 }
 
 .settings-setup__header h2,
-.settings-setup__heading h3 {
+.settings-setup__heading h3,
+.settings-setup__heading h4 {
   color: var(--hx-text-strong);
   margin: 0;
 }
@@ -125,7 +152,9 @@ onMounted(() => {
 }
 
 .settings-setup__header p,
-.settings-setup__content p {
+.settings-setup__content p,
+.settings-setup__optional-step p,
+.settings-setup__readiness {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
   margin: var(--hx-space-1) 0 0;
@@ -135,30 +164,15 @@ onMounted(() => {
   display: grid;
   gap: var(--hx-space-3);
   list-style: none;
-  margin: var(--hx-space-5) 0 0;
+  margin: var(--hx-space-4) 0 0;
   padding: 0;
 }
 
 .settings-setup__step {
-  align-items: flex-start;
-  border-top: 1px solid var(--hx-border-subtle);
-  display: grid;
-  gap: var(--hx-space-3);
-  grid-template-columns: 28px minmax(0, 1fr);
-  padding-top: var(--hx-space-3);
-}
-
-.settings-setup__number {
   align-items: center;
-  background: var(--hx-accent-soft);
-  border-radius: var(--hx-radius-pill);
-  color: var(--hx-accent-strong);
-  display: inline-flex;
-  font-size: var(--hx-text-sm);
-  font-weight: 700;
-  height: 28px;
-  justify-content: center;
-  width: 28px;
+  border-top: 1px solid var(--hx-border-subtle);
+  display: block;
+  padding-top: var(--hx-space-3);
 }
 
 .settings-setup__content {
@@ -180,5 +194,36 @@ onMounted(() => {
 
 .settings-setup__content .hx-btn {
   justify-self: start;
+}
+
+.settings-setup__optional-list {
+  display: grid;
+  gap: var(--hx-space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-setup__optional-step {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--hx-space-3);
+  justify-content: space-between;
+}
+
+.settings-setup__optional-step p {
+  margin: var(--hx-space-1) 0 0;
+}
+
+.settings-setup__optional-step .hx-btn {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .settings-setup__header,
+  .settings-setup__optional-step {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

@@ -83,34 +83,116 @@ function buildSoulseekStep(dependencies, healthError, setupProgress) {
   };
 }
 
+function buildFoldersStep(setupProgress, setupProgressError) {
+  const folders = setupProgress?.folders;
+  const hasRequiredFolders = Boolean(folders?.downloadsConfigured && folders?.musicConfigured);
+
+  if (setupProgressError) {
+    return {
+      copy: 'Harmoniarr could not confirm the saved media folders. Open Media & storage to review them.',
+      label: 'Review folders',
+      routeName: 'settings-media-storage',
+      status: 'Needs a check',
+      tone: 'warning',
+    };
+  }
+
+  if (!hasRequiredFolders) {
+    return {
+      copy: 'Choose the completed-download and music-library folders Harmoniarr can use.',
+      label: 'Set folders',
+      routeName: 'settings-media-storage',
+      status: 'Folders needed',
+      tone: 'warning',
+    };
+  }
+
+  if (folders?.validationStatus === 'healthy') {
+    return {
+      copy: 'Completed downloads and the music library are available to Harmoniarr.',
+      label: 'Manage folders',
+      routeName: 'settings-media-storage',
+      status: 'Ready',
+      tone: 'success',
+    };
+  }
+
+  return {
+    copy: 'Saved media folders need attention before Harmoniarr can safely use them.',
+    label: 'Review folders',
+    routeName: 'settings-media-storage',
+    status: 'Needs attention',
+    tone: folders?.validationStatus === 'degraded' ? 'warning' : 'danger',
+  };
+}
+
+function buildLibraryStep() {
+  return {
+    copy: 'Choose how often Harmoniarr looks for music and whether safe matches download automatically.',
+    id: 'library',
+    label: 'Review library behavior',
+    routeName: 'settings-library',
+    status: 'Optional',
+    title: 'Choose library behavior',
+    tone: 'info',
+  };
+}
+
+function buildReadinessStatus(coreSteps) {
+  const completedCoreSteps = coreSteps.filter((step) => step.tone === 'success').length;
+  const remainingCoreSteps = coreSteps.length - completedCoreSteps;
+
+  if (remainingCoreSteps === 0) {
+    return {
+      copy: 'Soulseek and your media folders are ready for normal download and library work.',
+      label: 'Ready for downloads',
+      tone: 'success',
+    };
+  }
+
+  return {
+    copy: `${remainingCoreSteps} required setup ${remainingCoreSteps === 1 ? 'task remains' : 'tasks remain'} before Harmoniarr can download music.`,
+    label: `${completedCoreSteps} of ${coreSteps.length} ready`,
+    tone: 'warning',
+  };
+}
+
 /**
- * Builds a short, non-sensitive setup sequence. It deliberately exposes only
- * actionable provider state and never returns connection addresses or secrets.
+ * Builds a compact, non-sensitive setup overview. Core readiness deliberately
+ * includes only the connection and media prerequisites; library tuning remains
+ * available as an optional follow-up instead of competing for attention.
  */
-export function buildSettingsSetupSteps({ dependencies, healthError, setupProgress } = {}) {
-  return [
+export function buildSettingsSetupOverview({
+  dependencies,
+  healthError,
+  setupProgress,
+  setupProgressError,
+} = {}) {
+  const coreSteps = [
     {
       ...buildSoulseekStep(dependencies, healthError, setupProgress),
       id: 'soulseek',
       title: 'Connect Soulseek',
     },
     {
-      copy: 'Choose the completed-download and music-library folders Harmoniarr can use.',
+      ...buildFoldersStep(setupProgress, setupProgressError),
       id: 'folders',
-      label: 'Set folders',
-      routeName: 'settings-media-storage',
-      status: 'Required for downloads',
       title: 'Set your folders',
-      tone: 'info',
-    },
-    {
-      copy: 'Choose how often Harmoniarr looks for music and whether safe matches download automatically.',
-      id: 'library',
-      label: 'Review library behavior',
-      routeName: 'settings-library',
-      status: 'Recommended',
-      title: 'Choose library behavior',
-      tone: 'info',
     },
   ];
+
+  return {
+    coreSteps,
+    optionalSteps: [buildLibraryStep()],
+    readiness: buildReadinessStatus(coreSteps),
+  };
+}
+
+/**
+ * Builds a short, non-sensitive setup sequence. It deliberately exposes only
+ * actionable provider state and never returns connection addresses or secrets.
+ */
+export function buildSettingsSetupSteps({ dependencies, healthError, setupProgress } = {}) {
+  const overview = buildSettingsSetupOverview({ dependencies, healthError, setupProgress });
+  return [...overview.coreSteps, ...overview.optionalSteps];
 }
