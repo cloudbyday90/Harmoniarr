@@ -143,6 +143,12 @@ suite('Settings progressive disclosure browser verification', () => {
       await matchRanking.click();
       await page.getByLabel('Format tier').waitFor();
 
+      await page.goto(`${baseUrl}/app/settings/system`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Security configuration' }).waitFor();
+      await page.getByRole('heading', { name: 'Remote access protections' }).waitFor();
+      await page.getByRole('button', { name: 'Show advanced system controls' }).click();
+      await page.getByLabel('Base URL').waitFor();
+
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'settings_progressive_disclosure' });
   });

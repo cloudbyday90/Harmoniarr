@@ -67,7 +67,11 @@ controls.
    translation as a direct setup action, and place translation details,
    optional folders, artwork, and usage telemetry behind named disclosures.
    See `docs/SETTINGS_MEDIA_STORAGE_HIERARCHY_DESIGN.md`.
-6. Preserve the existing routes, server-side validation, CSRF requirements,
+6. Keep saved security configuration and remote-access protections readable
+   before advanced URL and logging controls. Do not claim live proxy or
+   certificate health from browser settings. See
+   `docs/SETTINGS_SYSTEM_SECURITY_HIERARCHY_DESIGN.md`.
+7. Preserve the existing routes, server-side validation, CSRF requirements,
    write-only secret behavior, and generic error handling. This is a UI
    information-architecture change, not a relaxation of security controls.
 

@@ -68,6 +68,18 @@ test('Settings disclosures allow nested sections to use a logical heading level'
   assert.match(source, /<component :is="headingTag"/);
 });
 
+test('System and security leads with saved posture and isolates routine system controls', async () => {
+  const source = await readFile(new URL('../../src/client/views/SettingsGeneralView.vue', import.meta.url), 'utf8');
+
+  assert.match(source, /buildSecurityConfigurationPosture/);
+  assert.match(source, />Security configuration</);
+  assert.match(source, /Saved deployment settings only/);
+  assert.match(source, />Remote access protections</);
+  assert.match(source, /title="Advanced system controls"/);
+  assert.match(source, /show-label="Show advanced system controls"/);
+  assert.ok(source.indexOf('>Security configuration<') < source.indexOf('title="Advanced system controls"'));
+});
+
 test('Folder readiness presents saved checks before optional validation detail', async () => {
   const source = await readFile(new URL('../../src/client/components/settings/SettingsFolderReadiness.vue', import.meta.url), 'utf8');
 
