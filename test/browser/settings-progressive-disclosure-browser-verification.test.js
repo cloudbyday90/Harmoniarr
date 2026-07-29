@@ -149,6 +149,14 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.getByRole('button', { name: 'Show advanced system controls' }).click();
       await page.getByLabel('Base URL').waitFor();
 
+      await page.goto(`${baseUrl}/app/settings/users`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Account access' }).waitFor();
+      await page.getByRole('heading', { name: 'People' }).waitFor();
+      await page.getByRole('button', { name: 'Add user' }).click();
+      await page.getByLabel('Username').waitFor();
+      await page.getByRole('button', { name: 'Manage Plex accounts' }).click();
+      await page.getByRole('button', { name: 'Refresh linked-account preview' }).waitFor();
+
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'settings_progressive_disclosure' });
   });

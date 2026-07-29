@@ -71,7 +71,11 @@ controls.
    before advanced URL and logging controls. Do not claim live proxy or
    certificate health from browser settings. See
    `docs/SETTINGS_SYSTEM_SECURITY_HIERARCHY_DESIGN.md`.
-7. Preserve the existing routes, server-side validation, CSRF requirements,
+7. Keep account-access posture, adding people, and person review readable;
+   place role/folder edits, sign-in recovery, Plex maintenance, and role
+   reference in explicit task disclosures. See
+   `docs/SETTINGS_USERS_ACCESS_HIERARCHY_DESIGN.md`.
+8. Preserve the existing routes, server-side validation, CSRF requirements,
    write-only secret behavior, and generic error handling. This is a UI
    information-architecture change, not a relaxation of security controls.
 

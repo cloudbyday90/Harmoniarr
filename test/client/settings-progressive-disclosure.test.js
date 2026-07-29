@@ -80,6 +80,19 @@ test('System and security leads with saved posture and isolates routine system c
   assert.ok(source.indexOf('>Security configuration<') < source.indexOf('title="Advanced system controls"'));
 });
 
+test('Users and access leads with account posture and scopes maintenance by task', async () => {
+  const source = await readFile(new URL('../../src/client/views/SettingsUsersView.vue', import.meta.url), 'utf8');
+
+  assert.match(source, /buildUsersAccessPosture/);
+  assert.match(source, />Account access</);
+  assert.match(source, /title="Add a user"/);
+  assert.match(source, /title="Manage access"/);
+  assert.match(source, /title="Sign-in recovery"/);
+  assert.match(source, /title="Plex account maintenance"/);
+  assert.match(source, /loadPlexUserImportPreview,/);
+  assert.ok(source.indexOf('>Account access<') < source.indexOf('title="Plex account maintenance"'));
+});
+
 test('Folder readiness presents saved checks before optional validation detail', async () => {
   const source = await readFile(new URL('../../src/client/components/settings/SettingsFolderReadiness.vue', import.meta.url), 'utf8');
 

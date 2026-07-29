@@ -18,9 +18,11 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
+import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import { usePlexLinkedAccounts } from '../composables/usePlexLinkedAccounts.js';
 import { useAdminUserList } from '../composables/useAdminUserList.js';
 import { useSettingsUserMutations } from '../composables/useSettingsUserMutations.js';
+import { buildUsersAccessPosture } from '../lib/settings-users-access-presentation.js';
 import {
   buildUsersEmptyStateBody,
   describePlexLibraryAccessPolicy,
@@ -86,6 +88,7 @@ const {
   isPlexLinkedAccountActionPending,
   isStartingPlexLink,
   issueManagedUserClaimCode,
+  loadPlexUserImportPreview,
   newUserForm,
   provisionManagedUserLibraryRoot,
   relinkPlexConflict,
@@ -111,6 +114,13 @@ watch(() => userList.users.value, (rawUsers) => {
 
 const plexOwnerLinked = computed(() => plexLinkedAccountsOverview.value.ownerLink?.linked === true);
 const plexRepairQueueActive = computed(() => hasPlexRepairQueue(plexLinkedAccountsOverview.value));
+const accessPosture = computed(() => buildUsersAccessPosture({
+  isFiltered: Boolean(searchQuery.value || userRoleFilter.value || userStatusFilter.value),
+  isLoading: isUsersLoading.value,
+  plexOwnerLinked: plexOwnerLinked.value,
+  totalCount: userList.totalCount.value,
+  users: users.value,
+}));
 
 async function loadMoreUsers() {
   await userList.loadMore();
@@ -124,18 +134,46 @@ onMounted(() => {
 <template>
   <div class="cfg-page">
 
+    <article class="hx-card settings-users__posture">
+      <header class="hx-card-header">
+        <div>
+          <h2 class="hx-card-title">Account access</h2>
+          <p class="hx-card-subtitle">Saved account and integration state. Role and sign-in changes are enforced by the server.</p>
+        </div>
+        <span class="hx-pill" :data-tone="accessPosture.tone">{{ accessPosture.statusLabel }}</span>
+      </header>
+      <div class="hx-card-body">
+        <p class="settings-users__posture-message" role="status" aria-atomic="true">{{ accessPosture.message }}</p>
+        <div v-if="accessPosture.checks.length" class="settings-users__posture-checks">
+          <div v-for="check in accessPosture.checks" :key="check.label" class="settings-users__posture-check">
+            <span>{{ check.label }}</span>
+            <span class="hx-pill" :data-tone="check.tone">{{ check.statusLabel }}</span>
+          </div>
+        </div>
+      </div>
+    </article>
+
     <!-- Plex linked accounts -->
     <article class="hx-card">
       <header class="hx-card-header">
         <div>
-          <h3 class="hx-card-title">Plex connected accounts</h3>
-          <p class="hx-card-subtitle">Manage the Plex owner connection, linked Harmoniarr users, and relink conflicts from one repair-oriented workspace.</p>
+          <h2 class="hx-card-title">Plex account</h2>
+          <p class="hx-card-subtitle">Optional sign-in and household-account connection.</p>
         </div>
         <span class="hx-pill" :data-tone="formatPlexOwnerLinkTone(plexLinkedAccountsOverview.ownerLink)">
           {{ formatPlexOwnerLinkLabel(plexLinkedAccountsOverview.ownerLink) }}
         </span>
       </header>
       <div class="hx-card-body">
+        <SettingsDisclosure
+          panel-id="settings-plex-account-maintenance"
+          :heading-level="3"
+          title="Plex account maintenance"
+          subtitle="Connect the owner account, review linked people, and resolve import or relink issues."
+          show-label="Manage Plex accounts"
+          hide-label="Hide Plex account maintenance"
+          variant="inline"
+        >
         <div class="hx-card-actions" style="margin-bottom: var(--hx-space-3)">
           <button type="button" class="hx-btn" @click="connectPlexLink" :disabled="isStartingPlexLink">
             {{ isStartingPlexLink ? 'Starting…' : 'Connect Plex owner account' }}
@@ -291,72 +329,68 @@ onMounted(() => {
             </div>
           </div>
         </template>
+        </SettingsDisclosure>
       </div>
     </article>
 
-    <!-- Create user + role guide -->
-    <div class="cfg-2col">
-      <article class="hx-card">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Create user</h3>
-            <p class="hx-card-subtitle">New users get a temporary password they must change on first login.</p>
+    <div class="settings-users__support">
+      <SettingsDisclosure
+        panel-id="settings-add-user"
+        title="Add a user"
+        subtitle="Create a sign-in for a household member or operator. New users must change their temporary password on first login."
+        show-label="Add user"
+        hide-label="Hide add user"
+      >
+        <form @submit.prevent="saveNewUser">
+          <div class="hx-field">
+            <label class="hx-field-label" for="settings-new-user-username">Username</label>
+            <input id="settings-new-user-username" class="hx-input" v-model="newUserForm.username" placeholder="listener" />
           </div>
-        </header>
-        <div class="hx-card-body">
-          <form @submit.prevent="saveNewUser">
-            <div class="hx-field">
-              <label class="hx-field-label">Username</label>
-              <input class="hx-input" v-model="newUserForm.username" placeholder="listener" />
-            </div>
-            <div class="hx-field">
-              <label class="hx-field-label">Temporary password</label>
-              <input class="hx-input" v-model="newUserForm.password" type="password" autocomplete="new-password" placeholder="At least 10 characters" />
-            </div>
-            <div class="hx-field">
-              <label class="hx-field-label">Personal library folder</label>
-              <input class="hx-input" v-model="newUserForm.managedLibraryRelativeRoot" placeholder="household/listener" />
-              <p class="cfg-field-hint">A subfolder inside the music library that belongs to this user. Their imports go here instead of the shared library root. Leave blank to use the shared root. Example: <code>family/alice</code></p>
-            </div>
-            <div class="hx-field">
-              <label class="hx-field-label">Role</label>
-              <select class="hx-select" v-model="newUserForm.role">
-                <option v-for="roleOption in roleOptions" :key="roleOption" :value="roleOption">{{ roleOption }}</option>
-              </select>
-            </div>
-            <div class="hx-card-actions" style="margin-top: var(--hx-space-3)">
-              <button type="submit" class="hx-btn" data-variant="primary" :disabled="isCreatingUser">
-                {{ isCreatingUser ? 'Creating…' : 'Create user' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </article>
+          <div class="hx-field">
+            <label class="hx-field-label" for="settings-new-user-password">Temporary password</label>
+            <input id="settings-new-user-password" class="hx-input" v-model="newUserForm.password" type="password" autocomplete="new-password" placeholder="At least 10 characters" />
+          </div>
+          <div class="hx-field">
+            <label class="hx-field-label" for="settings-new-user-library-folder">Personal library folder</label>
+            <input id="settings-new-user-library-folder" class="hx-input" v-model="newUserForm.managedLibraryRelativeRoot" placeholder="household/listener" />
+            <p class="cfg-field-hint">A subfolder inside the music library that belongs to this user. Their imports go here instead of the shared library root. Leave blank to use the shared root. Example: <code>family/alice</code></p>
+          </div>
+          <div class="hx-field">
+            <label class="hx-field-label" for="settings-new-user-role">Role</label>
+            <select id="settings-new-user-role" class="hx-select" v-model="newUserForm.role">
+              <option v-for="roleOption in roleOptions" :key="roleOption" :value="roleOption">{{ formatUserRole(roleOption) }}</option>
+            </select>
+          </div>
+          <div class="hx-card-actions" style="margin-top: var(--hx-space-3)">
+            <button type="submit" class="hx-btn" data-variant="primary" :disabled="isCreatingUser">
+              {{ isCreatingUser ? 'Creating…' : 'Create user' }}
+            </button>
+          </div>
+        </form>
+      </SettingsDisclosure>
 
-      <article class="hx-card">
-        <header class="hx-card-header">
+      <SettingsDisclosure
+        panel-id="settings-user-role-reference"
+        title="About roles"
+        subtitle="Check the scope of a role before assigning it. Permissions remain enforced on every server request."
+        show-label="Show role guide"
+        hide-label="Hide role guide"
+      >
+        <dl class="review-meta-grid">
           <div>
-            <h3 class="hx-card-title">Role reference</h3>
-            <p class="hx-card-subtitle">What each role can and can't do.</p>
+            <dt>Admin</dt>
+            <dd>Full control of settings, people, imports, and the library.</dd>
           </div>
-        </header>
-        <div class="hx-card-body">
-          <dl class="review-meta-grid">
-            <div>
-              <dt>admin</dt>
-              <dd>Full control — settings, users, imports, library management, everything.</dd>
-            </div>
-            <div>
-              <dt>operator</dt>
-              <dd>Can review and run imports, trigger library scans. Cannot change settings or manage users.</dd>
-            </div>
-            <div>
-              <dt>requester</dt>
-              <dd>Can submit music requests through the Request Music screen. Cannot see or manage other users' content.</dd>
-            </div>
-          </dl>
-        </div>
-      </article>
+          <div>
+            <dt>Operator</dt>
+            <dd>Can review and run imports and trigger library scans. Cannot change settings or manage people.</dd>
+          </div>
+          <div>
+            <dt>Requester</dt>
+            <dd>Can request music. Cannot view or manage other people’s content.</dd>
+          </div>
+        </dl>
+      </SettingsDisclosure>
     </div>
 
     <!-- Status message -->
@@ -365,15 +399,21 @@ onMounted(() => {
       <span style="font-size: var(--hx-text-sm); color: var(--hx-success)" v-else-if="successMessage">{{ successMessage }}</span>
     </div>
 
-    <!-- User list filters -->
     <div class="hx-card">
+      <header class="hx-card-header">
+        <div>
+          <h2 class="hx-card-title">People</h2>
+          <p class="hx-card-subtitle">Review access at a glance, then open a specific task only when you need to change an account.</p>
+        </div>
+        <span class="hx-pill" data-tone="info">{{ userList.totalCount.value }} total</span>
+      </header>
       <div class="hx-card-body suf-bar">
-        <input class="hx-input suf-search" v-model="searchQuery" type="search" placeholder="Search users…" @input="void loadUsers()" />
-        <select class="hx-select" v-model="userRoleFilter" @change="void loadUsers()">
+        <input class="hx-input suf-search" v-model="searchQuery" type="search" placeholder="Search users…" aria-label="Search users" @input="void loadUsers()" />
+        <select class="hx-select" v-model="userRoleFilter" aria-label="Filter people by role" @change="void loadUsers()">
           <option value="">All roles</option>
           <option v-for="opt in roleOptions" :key="opt" :value="opt">{{ formatUserRole(opt) }}</option>
         </select>
-        <select class="hx-select" v-model="userStatusFilter" @change="void loadUsers()">
+        <select class="hx-select" v-model="userStatusFilter" aria-label="Filter people by status" @change="void loadUsers()">
           <option value="">All statuses</option>
           <option value="false">Enabled</option>
           <option value="true">Disabled</option>
@@ -410,30 +450,11 @@ onMounted(() => {
           </span>
         </header>
         <div class="hx-card-body">
-          <div class="hx-form-row">
-            <div class="hx-field">
-              <label class="hx-field-label">Role</label>
-              <select class="hx-select" v-model="user.pendingRole">
-                <option v-for="roleOption in roleOptions" :key="`${user.id}-${roleOption}`" :value="roleOption">{{ roleOption }}</option>
-              </select>
-            </div>
-            <div class="hx-field">
-              <label class="hx-field-label">Personal library folder</label>
-              <input class="hx-input" v-model="user.pendingManagedLibraryRelativeRoot" placeholder="household/listener" />
-            </div>
+          <div class="settings-users__user-summary">
+            <p><span>Sign-in</span><strong>{{ formatAuthProvider(user.authProvider) }}</strong></p>
+            <p><span>Library folder</span><strong>{{ user.managedLibraryRelativeRoot || 'Shared library' }}</strong></p>
+            <p><span>Access</span><strong>{{ user.isDisabled ? 'Disabled' : 'Enabled' }}</strong></p>
           </div>
-          <div class="hx-form-row">
-            <div class="hx-field">
-              <label class="hx-field-label">Temporary password</label>
-              <input class="hx-input" v-model="user.pendingPasswordReset" type="password" autocomplete="new-password" placeholder="Set a temporary password" />
-            </div>
-          </div>
-          <label class="cfg-check">
-            <input type="checkbox" v-model="user.pendingIsDisabled" />
-            <span>Disable user access</span>
-          </label>
-          <p class="hx-text-muted" v-if="user.managedLibraryRelativeRoot" style="margin-top: var(--hx-space-2)">Personal library folder: {{ user.managedLibraryRelativeRoot }}</p>
-          <p class="hx-text-muted" v-else style="margin-top: var(--hx-space-2)">No personal library folder — imports go to the shared library root.</p>
           <template v-if="user.plexProfile">
             <p class="hx-text-muted">
               Plex access:
@@ -441,29 +462,87 @@ onMounted(() => {
             </p>
             <p class="hx-text-muted">{{ describePlexLibraryAccessPolicy(user.plexProfile.accessPolicy) }}</p>
           </template>
-          <p class="hx-text-muted" v-if="hasPendingManagedLibraryRootChanges(user)">Save the personal library folder change before provisioning the folder.</p>
-          <p class="hx-text-muted" v-if="user.authProvider === 'plex'">You can set a temporary password to give this user a local sign-in option without removing their Plex link.</p>
-          <p class="hx-text-muted" v-if="user.authProvider === 'plex'">{{ describePlexLocalAuthStatus(user) }}</p>
-          <p class="hx-text-muted" v-if="user.claimCode">Current claim code: {{ user.claimCode }}</p>
-          <p class="hx-text-muted" v-if="user.claimCodeExpiresAt">Claim code expires {{ new Date(user.claimCodeExpiresAt).toLocaleString() }}. The user can complete setup at /claim-account using username {{ user.username }}.</p>
           <div class="hx-card-actions" style="margin-top: var(--hx-space-3)">
-            <router-link :to="{ name: 'settings-user-detail', params: { userId: user.id } }" class="hx-btn" data-variant="ghost">View detail</router-link>
-            <button type="button" class="hx-btn" data-variant="primary" @click="saveManagedUser(user)" :disabled="user.saving">
-              {{ user.saving ? 'Saving…' : 'Save user' }}
-            </button>
-            <button type="button" class="hx-btn" @click="provisionManagedUserLibraryRoot(user)" :disabled="user.provisioning || !user.managedLibraryRelativeRoot || hasPendingManagedLibraryRootChanges(user)">
-              {{ user.provisioning ? 'Provisioning…' : 'Provision folder' }}
-            </button>
-            <button type="button" class="hx-btn" @click="resetManagedUserPassword(user)" :disabled="user.resettingPassword || !user.pendingPasswordReset">
-              {{ user.resettingPassword ? 'Setting password…' : 'Set temporary password' }}
-            </button>
-            <button type="button" class="hx-btn" @click="issueManagedUserClaimCode(user)" :disabled="user.issuingClaimCode">
-              {{ user.issuingClaimCode ? 'Issuing claim code…' : 'Issue claim code' }}
-            </button>
-            <button v-if="user.authProvider === 'plex'" type="button" class="hx-btn" @click="unlinkManagedPlexUser(user)" :disabled="user.unlinkingPlex || !user.localAuth?.unlinkPlexReady">
+            <router-link :to="{ name: 'settings-user-detail', params: { userId: user.id } }" class="hx-btn" data-variant="ghost">View user details</router-link>
+          </div>
+
+          <SettingsDisclosure
+            :panel-id="`settings-user-${user.id}-access`"
+            :heading-level="4"
+            title="Manage access"
+            subtitle="Change the role, account availability, or personal library folder."
+            show-label="Manage access"
+            hide-label="Hide access controls"
+            variant="inline"
+          >
+            <div class="hx-form-row">
+              <div class="hx-field">
+                <label class="hx-field-label" :for="`settings-user-${user.id}-role`">Role</label>
+                <select :id="`settings-user-${user.id}-role`" class="hx-select" v-model="user.pendingRole">
+                  <option v-for="roleOption in roleOptions" :key="`${user.id}-${roleOption}`" :value="roleOption">{{ formatUserRole(roleOption) }}</option>
+                </select>
+              </div>
+              <div class="hx-field">
+                <label class="hx-field-label" :for="`settings-user-${user.id}-library-folder`">Personal library folder</label>
+                <input :id="`settings-user-${user.id}-library-folder`" class="hx-input" v-model="user.pendingManagedLibraryRelativeRoot" placeholder="household/listener" />
+              </div>
+            </div>
+            <label class="cfg-check">
+              <input type="checkbox" v-model="user.pendingIsDisabled" />
+              <span>Disable user access</span>
+            </label>
+            <p class="hx-text-muted" v-if="hasPendingManagedLibraryRootChanges(user)">Save the personal library folder change before provisioning the folder.</p>
+            <div class="hx-card-actions" style="margin-top: var(--hx-space-3)">
+              <button type="button" class="hx-btn" data-variant="primary" @click="saveManagedUser(user)" :disabled="user.saving">
+                {{ user.saving ? 'Saving…' : 'Save access changes' }}
+              </button>
+              <button type="button" class="hx-btn" @click="provisionManagedUserLibraryRoot(user)" :disabled="user.provisioning || !user.managedLibraryRelativeRoot || hasPendingManagedLibraryRootChanges(user)">
+                {{ user.provisioning ? 'Provisioning…' : 'Provision folder' }}
+              </button>
+            </div>
+          </SettingsDisclosure>
+
+          <SettingsDisclosure
+            :panel-id="`settings-user-${user.id}-recovery`"
+            :heading-level="4"
+            title="Sign-in recovery"
+            subtitle="Set a temporary password or issue a time-limited claim code when this person cannot sign in."
+            show-label="Open sign-in recovery"
+            hide-label="Hide sign-in recovery"
+            variant="inline"
+          >
+            <div class="hx-field">
+              <label class="hx-field-label" :for="`settings-user-${user.id}-temporary-password`">Temporary password</label>
+              <input :id="`settings-user-${user.id}-temporary-password`" class="hx-input" v-model="user.pendingPasswordReset" type="password" autocomplete="new-password" placeholder="Set a temporary password" />
+            </div>
+            <p class="hx-text-muted" v-if="user.authProvider === 'plex'">You can set a temporary password to give this person a password sign-in without removing their Plex link.</p>
+            <p class="hx-text-muted" v-if="user.claimCode">Current claim code: {{ user.claimCode }}</p>
+            <p class="hx-text-muted" v-if="user.claimCodeExpiresAt">Claim code expires {{ new Date(user.claimCodeExpiresAt).toLocaleString() }}. The person completes setup at /claim-account using username {{ user.username }}.</p>
+            <div class="hx-card-actions" style="margin-top: var(--hx-space-3)">
+              <button type="button" class="hx-btn" @click="resetManagedUserPassword(user)" :disabled="user.resettingPassword || !user.pendingPasswordReset">
+                {{ user.resettingPassword ? 'Setting password…' : 'Set temporary password' }}
+              </button>
+              <button type="button" class="hx-btn" @click="issueManagedUserClaimCode(user)" :disabled="user.issuingClaimCode">
+                {{ user.issuingClaimCode ? 'Issuing claim code…' : 'Issue claim code' }}
+              </button>
+            </div>
+          </SettingsDisclosure>
+
+          <SettingsDisclosure
+            v-if="user.authProvider === 'plex'"
+            :panel-id="`settings-user-${user.id}-plex-link`"
+            :heading-level="4"
+            title="Plex link"
+            subtitle="Remove the Plex sign-in only after a password sign-in is ready."
+            show-label="Manage Plex link"
+            hide-label="Hide Plex link controls"
+            variant="inline"
+          >
+            <p class="hx-text-muted">{{ describePlexLocalAuthStatus(user) }}</p>
+            <button type="button" class="hx-btn" data-variant="danger" @click="unlinkManagedPlexUser(user)" :disabled="user.unlinkingPlex || !user.localAuth?.unlinkPlexReady">
               {{ user.unlinkingPlex ? 'Removing Plex link…' : 'Unlink Plex account' }}
             </button>
-          </div>
+          </SettingsDisclosure>
         </div>
       </article>
     </div>
@@ -480,10 +559,62 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.settings-users__posture,
+.settings-users__support {
+  margin-bottom: var(--hx-space-4);
+}
+
+.settings-users__posture-message {
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+  margin: 0 0 var(--hx-space-3);
+}
+
+.settings-users__posture-checks {
+  display: grid;
+  gap: var(--hx-space-2);
+}
+
+.settings-users__posture-check {
+  align-items: center;
+  border-top: 1px solid var(--hx-border-subtle);
+  color: var(--hx-text-muted);
+  display: flex;
+  font-size: var(--hx-text-sm);
+  justify-content: space-between;
+  padding-top: var(--hx-space-2);
+}
+
+.settings-users__support {
+  display: grid;
+  gap: var(--hx-space-4);
+}
+
+.settings-users__user-summary {
+  display: grid;
+  gap: var(--hx-space-2);
+}
+
+.settings-users__user-summary p {
+  align-items: baseline;
+  color: var(--hx-text-muted);
+  display: flex;
+  font-size: var(--hx-text-sm);
+  gap: var(--hx-space-2);
+  justify-content: space-between;
+  margin: 0;
+}
+
+.settings-users__user-summary strong {
+  color: var(--hx-text);
+  font-weight: 600;
+  text-align: right;
+}
+
 .suf-bar {
+  align-items: center;
   display: flex;
   gap: var(--hx-space-3);
-  align-items: center;
   flex-wrap: wrap;
 }
 
