@@ -8,6 +8,20 @@
 
 import { seedMetadataImportReviewWorkspace } from './metadata-browser-fixtures.js';
 
+export async function openImportReviewMatchFinder(page) {
+  const disclosure = page.locator('details.import-review-match-finder');
+  await disclosure.waitFor();
+
+  const isOpen = await disclosure.evaluate((element) => element.open);
+  if (!isOpen) {
+    await disclosure.locator('summary').click();
+  }
+
+  await page.waitForFunction(() =>
+    globalThis.document.querySelector('details.import-review-match-finder')?.open === true,
+  );
+}
+
 export async function openImportReviewRunHistory(page) {
   const disclosure = page.locator('details.import-review-runway');
   await disclosure.waitFor();

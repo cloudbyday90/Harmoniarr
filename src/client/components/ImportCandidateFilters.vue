@@ -18,10 +18,6 @@
 
 <script setup>
 defineProps({
-  activeFilterCount: {
-    type: Number,
-    default: 0,
-  },
   folderPath: {
     type: String,
     default: '',
@@ -59,66 +55,56 @@ function updateField(event, eventName) {
 </script>
 
 <template>
-  <article class="panel-light">
-    <div class="section-header">
-      <div>
-        <p class="eyebrow">Filter candidates</p>
-        <h3>Candidate filters</h3>
-      </div>
-      <p class="review-filter-summary">{{ activeFilterCount }} active {{ activeFilterCount === 1 ? 'filter' : 'filters' }}</p>
+  <form class="review-filter-grid import-candidate-filters" @submit.prevent="$emit('apply-filters')">
+    <label>
+      Status
+      <select :value="status" @change="updateField($event, 'update:status')">
+        <option value="">All statuses</option>
+        <option value="pending">Pending</option>
+        <option value="held">Paused</option>
+        <option value="rejected">Not using</option>
+        <option value="selected">Selected</option>
+        <option value="downloading">Downloading</option>
+        <option value="import_pending">Ready to add</option>
+        <option value="applied">In library</option>
+        <option value="failed">Needs attention</option>
+      </select>
+    </label>
+
+    <label>
+      Search reference
+      <input
+        :value="sourceSearchId"
+        placeholder="search-123"
+        @input="updateField($event, 'update:source-search-id')"
+      />
+    </label>
+
+    <label>
+      Source user
+      <input
+        :value="username"
+        placeholder="source-user"
+        @input="updateField($event, 'update:username')"
+      />
+    </label>
+
+    <label>
+      Folder path
+      <input
+        :value="folderPath"
+        placeholder="Autechre\\Amber"
+        @input="updateField($event, 'update:folder-path')"
+      />
+    </label>
+
+    <div class="review-filter-actions">
+      <button type="submit" :disabled="isLoadingQueue">
+        {{ isLoadingQueue ? 'Refreshing...' : 'Find matches' }}
+      </button>
+      <button type="button" class="secondary-button review-reset-button" @click="$emit('reset-filters')">
+        Clear
+      </button>
     </div>
-
-    <form class="review-filter-grid" @submit.prevent="$emit('apply-filters')">
-      <label>
-        Status
-        <select :value="status" @change="updateField($event, 'update:status')">
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="held">Held</option>
-          <option value="rejected">Rejected</option>
-          <option value="selected">Selected</option>
-          <option value="downloading">Downloading</option>
-          <option value="import_pending">Import pending</option>
-          <option value="applied">Applied</option>
-          <option value="failed">Failed</option>
-        </select>
-      </label>
-
-      <label>
-        Source search ID
-        <input
-          :value="sourceSearchId"
-          placeholder="search-123"
-          @input="updateField($event, 'update:source-search-id')"
-        />
-      </label>
-
-      <label>
-        Username
-        <input
-          :value="username"
-          placeholder="source-user"
-          @input="updateField($event, 'update:username')"
-        />
-      </label>
-
-      <label>
-        Folder path
-        <input
-          :value="folderPath"
-          placeholder="Autechre\\Amber"
-          @input="updateField($event, 'update:folder-path')"
-        />
-      </label>
-
-      <div class="review-filter-actions">
-        <button type="submit" :disabled="isLoadingQueue">
-          {{ isLoadingQueue ? 'Refreshing...' : 'Apply filters' }}
-        </button>
-        <button type="button" class="secondary-button review-reset-button" @click="$emit('reset-filters')">
-          Reset
-        </button>
-      </div>
-    </form>
-  </article>
+  </form>
 </template>

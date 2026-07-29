@@ -111,8 +111,9 @@ candidate-run dashboard to determine what should happen next.
 
 ## Next High-Value Item
 
-Reduce the remaining raw match queue/filter rail inside Match diagnostics to a
-compact, disclosed `Find a match` diagnostic tool while preserving direct
-candidate and file recovery links. Run-history controls are now separately
-collapsed and documented in
-[Match Diagnostics Run History Controls Design](MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md).
+Move the remaining selected-match and pending-library status summary cards out
+of the default Match diagnostics workspace and into a compact `Current
+automation` disclosure or Music Queue handoff. The selected-match recovery
+card should remain the only always-visible operational block on this route.
+The result finder is now separately collapsed and documented in
+[Match Diagnostics Find Match Tool Design](MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md).

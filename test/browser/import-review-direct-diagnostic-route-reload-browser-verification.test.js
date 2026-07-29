@@ -102,6 +102,12 @@ async function assertDirectDiagnosticRouteHydrated({
     'A direct media-check diagnostic link should open its run history disclosure.',
   );
 
+  assert.equal(
+    await page.locator('details.import-review-match-finder').evaluate((element) => element.open),
+    false,
+    'A direct match or file link should keep Find a match collapsed while the recovery target stays visible.',
+  );
+
   const mediaPanel = getRunwayPanel(page, 'Check selected matches');
   await mediaPanel.getByText(`Run ${workspace.run.id}`, { exact: true }).waitFor();
   const selectedRunRow = mediaPanel.locator('tbody tr').filter({ hasText: workspace.run.id });

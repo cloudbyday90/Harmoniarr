@@ -24,8 +24,7 @@ import ImportCandidateExecutionPanel from '../components/ImportCandidateExecutio
 import ImportCandidateMediaInspectionPanel from '../components/ImportCandidateMediaInspectionPanel.vue';
 import ImportCandidateDetailPanel from '../components/ImportCandidateDetailPanel.vue';
 import ImportCandidateRecoveryPanel from '../components/ImportCandidateRecoveryPanel.vue';
-import ImportCandidateFilters from '../components/ImportCandidateFilters.vue';
-import ImportCandidateQueueList from '../components/ImportCandidateQueueList.vue';
+import ImportReviewMatchFinder from '../components/ImportReviewMatchFinder.vue';
 import ImportPendingCandidateStatusPanel from '../components/ImportPendingCandidateStatusPanel.vue';
 import SelectedImportCandidateStatusPanel from '../components/SelectedImportCandidateStatusPanel.vue';
 import { useImportReviewWorkspace } from '../composables/useImportReviewWorkspace.js';
@@ -188,6 +187,12 @@ async function openDiagnosticCandidate(target) {
   await scrollPanelIntoView(IMPORT_REVIEW_SELECTION_STAGE_ID, { focus: true });
 }
 
+async function openMatchFinderResult(candidateId) {
+  await openCandidate(candidateId);
+  await nextTick();
+  await scrollPanelIntoView(IMPORT_REVIEW_SELECTION_STAGE_ID, { focus: true });
+}
+
 onMounted(() => {
   if (!isAdmin.value && !route.query.status) {
     void adminWorkflow.replaceImportReviewRouteState({ status: '' });
@@ -222,34 +227,28 @@ onBeforeUnmount(() => {
     </article>
 
     <section class="import-review-layout">
-      <div class="import-review-layout__rail">
-        <ImportCandidateFilters
+      <ImportReviewMatchFinder
           v-if="isAdmin"
           :active-filter-count="activeFilterCount"
+          :candidates="candidates"
           :folder-path="folderPathFilter"
           :is-loading-queue="isLoadingQueue"
+          :last-loaded-at="lastLoadedAt"
+          :list-error="listError"
+          :selected-candidate-id="selectedCandidateId"
           :source-search-id="sourceSearchIdFilter"
           :status="statusFilter"
+          :total-candidates="pagination.total"
           :username="usernameFilter"
           @apply-filters="applyFilters"
+          @refresh="refreshQueue"
           @reset-filters="resetQueueFilters"
+          @select-match="openMatchFinderResult"
           @update:folder-path="folderPathFilter = $event"
           @update:source-search-id="sourceSearchIdFilter = $event"
           @update:status="statusFilter = $event"
           @update:username="usernameFilter = $event"
         />
-
-        <ImportCandidateQueueList
-          :candidates="candidates"
-          :is-loading-queue="isLoadingQueue"
-          :last-loaded-at="lastLoadedAt"
-          :list-error="listError"
-          :selected-candidate-id="selectedCandidateId"
-          :total-candidates="pagination.total"
-          @refresh="refreshQueue"
-          @select-candidate="openCandidate"
-        />
-      </div>
 
       <div class="import-review-layout__workspace">
         <section :id="IMPORT_REVIEW_SELECTION_STAGE_ID" class="import-review-workspace-card" tabindex="-1">
@@ -336,13 +335,13 @@ onBeforeUnmount(() => {
       @toggle="isRunHistoryOpen = $event.currentTarget.open"
     >
       <summary class="import-review-runway__summary">
-        <div>
+        <hgroup class="import-review-runway__heading">
           <p class="import-review-workspace-card__eyebrow">Advanced diagnostics</p>
           <h2 class="import-review-workspace-card__title">Run history and controls <span v-if="isAnyRunRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h2>
           <p class="import-review-workspace-card__copy">
             Check media, send selected matches to downloads, or add completed downloads to the library when a release needs operator attention.
           </p>
-        </div>
+        </hgroup>
         <span class="import-review-runway__summary-state">{{ isRunHistoryOpen ? 'Hide' : 'Show' }}</span>
       </summary>
 
@@ -524,12 +523,10 @@ onBeforeUnmount(() => {
 
 .import-review-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 0.95fr) minmax(0, 1.4fr);
   gap: var(--hx-space-4);
   align-items: start;
 }
 
-.import-review-layout__rail,
 .import-review-layout__workspace,
 .import-review-runway__stack,
 .import-review-runway__content {
@@ -595,6 +592,10 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+.import-review-runway__heading {
+  margin: 0;
+}
+
 .import-review-runway__summary:focus-visible {
   border-radius: var(--hx-radius-sm);
   outline: 2px solid var(--hx-accent);
@@ -620,7 +621,6 @@ onBeforeUnmount(() => {
   line-height: 1.5;
 }
 
-:deep(.import-review-layout__rail > .panel-light),
 :deep(.import-review-layout__workspace .review-panel),
 :deep(.import-review-status-grid .review-panel),
 :deep(.import-review-runway__stack .review-panel) {
@@ -655,10 +655,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1180px) {
-  .import-review-layout {
-    grid-template-columns: 1fr;
-  }
-
   .import-review-status-grid {
     grid-template-columns: 1fr;
   }

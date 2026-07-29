@@ -1432,3 +1432,12 @@ The remaining media-check, download, and add-to-library run workbenches are
 collapsed behind `Run history and controls`; direct run links expand that
 boundary, and visible diagnostic language no longer presents candidate/import
 worker terminology as the operator's primary task.
+
+### Match Diagnostics Find Match Boundary
+
+Implemented in
+[MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md](MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md).
+The fixed queue/filter rail is now one optional `Find a match` disclosure.
+Direct candidate and file recovery routes continue to select and focus their
+target without expanding an unrelated result list, while choosing an
+alternative match closes the finder and returns to recovery.

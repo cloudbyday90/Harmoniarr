@@ -6,7 +6,10 @@
  * See LICENSE file for details.
  */
 
-import { openImportReviewRunHistory } from '../../testing/browser/import-review-browser-helpers.js';
+import {
+  openImportReviewMatchFinder,
+  openImportReviewRunHistory,
+} from '../../testing/browser/import-review-browser-helpers.js';
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import {
@@ -172,6 +175,7 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
       await selectedRunRow.getByRole('button', { name: 'Selected' }).waitFor();
       assert.equal(await selectedRunRow.getAttribute('aria-selected'), 'true');
 
+      await openImportReviewMatchFinder(page);
       await page
         .locator('.review-list-item')
         .filter({ hasText: workspace.comparisonCandidate.folderPath })
@@ -183,6 +187,11 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
         .locator(`#${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageId}`)
         .getByRole('heading', { exact: true, name: 'This match is ready to use' })
         .waitFor();
+      assert.equal(
+        await page.locator('details.import-review-match-finder').evaluate((element) => element.open),
+        false,
+        'Choosing a different match should return the operator to the recovery workspace.',
+      );
       assert.equal(await page.locator('[data-focused="true"]').count(), 0);
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);

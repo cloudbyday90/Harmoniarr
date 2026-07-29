@@ -115,8 +115,15 @@ open that disclosure automatically, and visible labels use match/download/
 library language. See
 [Match Diagnostics Run History Controls Design](MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md).
 
+The saved-match filter and result rail is now a full-width `Find a match`
+disclosure. Direct candidate and file links leave it closed because the
+recovery target is already selected and visible; manually choosing another
+result closes the finder and returns focus to the recovery card. See
+[Match Diagnostics Find Match Tool Design](MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md).
+
 ## Next High-Value Item
 
-Reduce the remaining raw match queue/filter rail inside Match diagnostics to a
-compact, disclosed `Find a match` diagnostic tool while preserving direct
-candidate and file recovery links.
+Move the remaining selected-match and pending-library status summary cards out
+of the default Match diagnostics workspace and into a compact `Current
+automation` disclosure or Music Queue handoff. The selected-match recovery
+card should remain the only always-visible operational block on this route.
