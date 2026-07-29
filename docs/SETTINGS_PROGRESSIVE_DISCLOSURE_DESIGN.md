@@ -75,7 +75,11 @@ controls.
    place role/folder edits, sign-in recovery, Plex maintenance, and role
    reference in explicit task disclosures. See
    `docs/SETTINGS_USERS_ACCESS_HIERARCHY_DESIGN.md`.
-8. Preserve the existing routes, server-side validation, CSRF requirements,
+8. Keep the current sign-in posture visible in Account, then disclose password,
+   signed-in device, security-history, and personal-preference tasks separately.
+   Do not imply live account safety from browser state. See
+   `docs/SETTINGS_ACCOUNT_SECURITY_HIERARCHY_DESIGN.md`.
+9. Preserve the existing routes, server-side validation, CSRF requirements,
    write-only secret behavior, and generic error handling. This is a UI
    information-architecture change, not a relaxation of security controls.
 

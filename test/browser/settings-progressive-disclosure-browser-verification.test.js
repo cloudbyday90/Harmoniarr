@@ -157,6 +157,19 @@ suite('Settings progressive disclosure browser verification', () => {
       await page.getByRole('button', { name: 'Manage Plex accounts' }).click();
       await page.getByRole('button', { name: 'Refresh linked-account preview' }).waitFor();
 
+      await page.goto(`${baseUrl}/app/settings/account`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('heading', { name: 'Account safety' }).waitFor();
+      await page.getByRole('heading', { name: 'Security tasks' }).waitFor();
+      assert.equal(await page.getByLabel('Current password').isVisible(), false);
+      await page.getByRole('button', { name: 'Change password' }).click();
+      await page.getByLabel('Current password').waitFor();
+      await page.getByRole('button', { name: 'Review devices' }).click();
+      await page.getByRole('button', { name: 'Refresh devices' }).waitFor();
+      await page.getByRole('button', { name: 'Review activity' }).click();
+      await page.getByRole('button', { name: 'Refresh activity' }).waitFor();
+      await page.getByRole('button', { name: 'Change request preferences' }).click();
+      await page.getByLabel('Preferred format').waitFor();
+
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'settings_progressive_disclosure' });
   });

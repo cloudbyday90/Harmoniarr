@@ -93,6 +93,21 @@ test('Users and access leads with account posture and scopes maintenance by task
   assert.ok(source.indexOf('>Account access<') < source.indexOf('title="Plex account maintenance"'));
 });
 
+test('Account leads with current sign-in posture and scopes security and preferences by task', async () => {
+  const source = await readFile(new URL('../../src/client/views/AccountSecurityView.vue', import.meta.url), 'utf8');
+
+  assert.match(source, /buildAccountSecurityPosture/);
+  assert.match(source, />Account safety</);
+  assert.match(source, />Security tasks</);
+  assert.match(source, /title="Change password"/);
+  assert.match(source, /title="Signed-in devices"/);
+  assert.match(source, /title="Recent security activity"/);
+  assert.match(source, />Preferences</);
+  assert.match(source, /title="Appearance"/);
+  assert.match(source, /title="Notifications"/);
+  assert.ok(source.indexOf('>Account safety<') < source.indexOf('title="Signed-in devices"'));
+});
+
 test('Folder readiness presents saved checks before optional validation detail', async () => {
   const source = await readFile(new URL('../../src/client/components/settings/SettingsFolderReadiness.vue', import.meta.url), 'utf8');
 
