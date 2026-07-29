@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ImportCandidateApplyPanel from '../components/ImportCandidateApplyPanel.vue';
 import ImportCandidateExecutionPanel from '../components/ImportCandidateExecutionPanel.vue';
@@ -39,11 +39,14 @@ import {
   useImportReviewAdminWorkflow,
 } from '../composables/useImportReviewAdminWorkflow.js';
 import { normalizeImportReviewRouteState } from '../lib/import-review-route-state.js';
+import { shouldOpenRunHistoryControls } from '../lib/import-review-runway-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const IMPORT_REVIEW_SELECTION_STAGE_ID = 'import-review-selection-stage';
+const isEvidenceOpen = ref(false);
+const isRunHistoryOpen = ref(false);
 
 const {
   actionError,
@@ -98,12 +101,16 @@ const {
   isLoadingSelectedSummary,
 } = useImportReviewWorkspace({ pollIntervalMs: 15000, revalidateOnFocus: true });
 
-function scrollPanelIntoView(panelId, { focus = false } = {}) {
+async function scrollPanelIntoView(panelId, { focus = false } = {}) {
   if (typeof document === 'undefined') {
     return;
   }
 
   const panel = document.getElementById(panelId);
+  if (panel?.closest('.import-review-runway')) {
+    isRunHistoryOpen.value = true;
+    await nextTick();
+  }
   panel?.scrollIntoView({
     behavior: 'smooth',
     block: 'start',
@@ -124,7 +131,7 @@ const adminWorkflow = useImportReviewAdminWorkflow({
   isAdmin,
   mediaInspectionSummaryWorkflow,
   onPanelNavigate: async (panelId) => {
-    scrollPanelIntoView(panelId);
+    await scrollPanelIntoView(panelId);
   },
   refreshQueue,
   selectedCandidateCount: computed(() => selectedSummaryCounts.value.totalSelected),
@@ -139,6 +146,19 @@ const isAnyRunRevalidating = computed(() =>
 const focusedCandidateFileId = computed(() =>
   normalizeImportReviewRouteState(route.query).candidateFileId,
 );
+const importReviewRouteState = computed(() => normalizeImportReviewRouteState(route.query));
+
+watch(focusedCandidateFileId, (fileId) => {
+  if (fileId) {
+    isEvidenceOpen.value = true;
+  }
+}, { immediate: true });
+
+watch(importReviewRouteState, (nextRouteState) => {
+  if (shouldOpenRunHistoryControls(nextRouteState)) {
+    isRunHistoryOpen.value = true;
+  }
+}, { immediate: true });
 
 function normalizeDiagnosticCandidateTarget(target) {
   if (typeof target === 'string') {
@@ -165,7 +185,7 @@ async function openDiagnosticCandidate(target) {
     { hash: `#${IMPORT_REVIEW_SELECTION_STAGE_ID}` },
   );
   await nextTick();
-  scrollPanelIntoView(IMPORT_REVIEW_SELECTION_STAGE_ID, { focus: true });
+  await scrollPanelIntoView(IMPORT_REVIEW_SELECTION_STAGE_ID, { focus: true });
 }
 
 onMounted(() => {
@@ -258,7 +278,11 @@ onBeforeUnmount(() => {
             @select="runSelectCandidate"
           />
 
-          <details class="import-review-evidence" :open="Boolean(focusedCandidateFileId)">
+          <details
+            class="import-review-evidence"
+            :open="isEvidenceOpen"
+            @toggle="isEvidenceOpen = $event.currentTarget.open"
+          >
             <summary>View match and file evidence</summary>
             <p>
               Source paths, file rows, collision checks, and exceptional file decisions are shown here for diagnosis only.
@@ -305,73 +329,84 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <section class="import-review-runway" v-if="isAdmin">
-      <div class="import-review-runway__header">
+    <details
+      class="import-review-runway"
+      v-if="isAdmin"
+      :open="isRunHistoryOpen"
+      @toggle="isRunHistoryOpen = $event.currentTarget.open"
+    >
+      <summary class="import-review-runway__summary">
         <div>
-          <p class="import-review-workspace-card__eyebrow">Operator runway</p>
-          <h2 class="import-review-workspace-card__title">Advance the workflow in controlled stages <span v-if="isAnyRunRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h2>
+          <p class="import-review-workspace-card__eyebrow">Advanced diagnostics</p>
+          <h2 class="import-review-workspace-card__title">Run history and controls <span v-if="isAnyRunRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h2>
           <p class="import-review-workspace-card__copy">
-            Each run below consumes the state prepared above. Inspection validates files, download execution hands work to slskd, and apply commits safe results into the library.
+            Check media, send selected matches to downloads, or add completed downloads to the library when a release needs operator attention.
           </p>
         </div>
+        <span class="import-review-runway__summary-state">{{ isRunHistoryOpen ? 'Hide' : 'Show' }}</span>
+      </summary>
+
+      <div class="import-review-runway__content">
+        <p class="import-review-runway__notice">
+          Music Queue handles normal progress. These controls preserve detailed run history and manual recovery for exceptional cases.
+        </p>
+        <div class="import-review-runway__stack">
+          <ImportCandidateMediaInspectionPanel
+            :id="IMPORT_REVIEW_MEDIA_INSPECTION_PANEL_ID"
+            :action-error-message="adminWorkflow.mediaInspection.actionErrorMessage?.value"
+            :current-run="adminWorkflow.mediaInspection.currentRun?.value"
+            :error-message="adminWorkflow.mediaInspection.errorMessage?.value"
+            :is-loading="adminWorkflow.mediaInspection.isLoading?.value"
+            :is-starting="adminWorkflow.mediaInspection.isStarting?.value"
+            :recent-runs="adminWorkflow.mediaInspection.recentRuns?.value"
+            :run-detail-error-message="adminWorkflow.mediaInspection.runDetailErrorMessage?.value"
+            :selected-candidate-count="selectedSummaryCounts.totalSelected"
+            :selected-run-id="adminWorkflow.mediaInspection.selectedRunId?.value"
+            :summary="adminWorkflow.mediaInspection.summary?.value"
+            @refresh="adminWorkflow.mediaInspection.handleRefresh"
+            @open-candidate="openDiagnosticCandidate"
+            @select-run="adminWorkflow.mediaInspection.handleSelectRun"
+            @start="adminWorkflow.mediaInspection.handleStartRun"
+          />
+
+          <ImportCandidateExecutionPanel
+            :id="IMPORT_REVIEW_EXECUTION_PANEL_ID"
+            :action-error-message="adminWorkflow.execution.actionErrorMessage?.value"
+            :current-run="adminWorkflow.execution.currentRun?.value"
+            :error-message="adminWorkflow.execution.errorMessage?.value"
+            :is-loading="adminWorkflow.execution.isLoading?.value"
+            :is-reconciling="adminWorkflow.execution.isReconciling?.value"
+            :is-starting="adminWorkflow.execution.isStarting?.value"
+            :recent-runs="adminWorkflow.execution.recentRuns?.value"
+            :run-detail-error-message="adminWorkflow.execution.runDetailErrorMessage?.value"
+            :selected-candidate-count="selectedSummaryCounts.totalSelected"
+            :selected-run-id="adminWorkflow.execution.selectedRunId?.value"
+            :summary="adminWorkflow.execution.summary?.value"
+            @reconcile="adminWorkflow.execution.handleReconcile"
+            @refresh="adminWorkflow.execution.handleRefresh"
+            @select-run="adminWorkflow.execution.handleSelectRun"
+            @start="adminWorkflow.execution.handleStartRun"
+          />
+
+          <ImportCandidateApplyPanel
+            :id="IMPORT_REVIEW_APPLY_PANEL_ID"
+            :action-error-message="adminWorkflow.apply.actionErrorMessage?.value"
+            :current-run="adminWorkflow.apply.currentRun?.value"
+            :error-message="adminWorkflow.apply.errorMessage?.value"
+            :import-pending-candidate-count="importPendingSummaryCounts.totalImportPending"
+            :is-loading="adminWorkflow.apply.isLoading?.value"
+            :is-starting="adminWorkflow.apply.isStarting?.value"
+            :recent-runs="adminWorkflow.apply.recentRuns?.value"
+            :run-detail-error-message="adminWorkflow.apply.runDetailErrorMessage?.value"
+            :selected-run-id="adminWorkflow.apply.selectedRunId?.value"
+            :summary="adminWorkflow.apply.summary?.value"
+            @refresh="adminWorkflow.apply.handleRefresh"
+            @select-run="adminWorkflow.apply.handleSelectRun"
+            @start="adminWorkflow.apply.handleStartRun"
+          />
+        </div>
       </div>
-
-      <div class="import-review-runway__stack">
-        <ImportCandidateMediaInspectionPanel
-          :id="IMPORT_REVIEW_MEDIA_INSPECTION_PANEL_ID"
-          :action-error-message="adminWorkflow.mediaInspection.actionErrorMessage?.value"
-          :current-run="adminWorkflow.mediaInspection.currentRun?.value"
-          :error-message="adminWorkflow.mediaInspection.errorMessage?.value"
-          :is-loading="adminWorkflow.mediaInspection.isLoading?.value"
-          :is-starting="adminWorkflow.mediaInspection.isStarting?.value"
-          :recent-runs="adminWorkflow.mediaInspection.recentRuns?.value"
-          :run-detail-error-message="adminWorkflow.mediaInspection.runDetailErrorMessage?.value"
-          :selected-candidate-count="selectedSummaryCounts.totalSelected"
-          :selected-run-id="adminWorkflow.mediaInspection.selectedRunId?.value"
-          :summary="adminWorkflow.mediaInspection.summary?.value"
-          @refresh="adminWorkflow.mediaInspection.handleRefresh"
-          @open-candidate="openDiagnosticCandidate"
-          @select-run="adminWorkflow.mediaInspection.handleSelectRun"
-          @start="adminWorkflow.mediaInspection.handleStartRun"
-        />
-
-        <ImportCandidateExecutionPanel
-          :id="IMPORT_REVIEW_EXECUTION_PANEL_ID"
-          :action-error-message="adminWorkflow.execution.actionErrorMessage?.value"
-          :current-run="adminWorkflow.execution.currentRun?.value"
-          :error-message="adminWorkflow.execution.errorMessage?.value"
-          :is-loading="adminWorkflow.execution.isLoading?.value"
-          :is-reconciling="adminWorkflow.execution.isReconciling?.value"
-          :is-starting="adminWorkflow.execution.isStarting?.value"
-          :recent-runs="adminWorkflow.execution.recentRuns?.value"
-          :run-detail-error-message="adminWorkflow.execution.runDetailErrorMessage?.value"
-          :selected-candidate-count="selectedSummaryCounts.totalSelected"
-          :selected-run-id="adminWorkflow.execution.selectedRunId?.value"
-          :summary="adminWorkflow.execution.summary?.value"
-          @reconcile="adminWorkflow.execution.handleReconcile"
-          @refresh="adminWorkflow.execution.handleRefresh"
-          @select-run="adminWorkflow.execution.handleSelectRun"
-          @start="adminWorkflow.execution.handleStartRun"
-        />
-
-        <ImportCandidateApplyPanel
-          :id="IMPORT_REVIEW_APPLY_PANEL_ID"
-          :action-error-message="adminWorkflow.apply.actionErrorMessage?.value"
-          :current-run="adminWorkflow.apply.currentRun?.value"
-          :error-message="adminWorkflow.apply.errorMessage?.value"
-          :import-pending-candidate-count="importPendingSummaryCounts.totalImportPending"
-          :is-loading="adminWorkflow.apply.isLoading?.value"
-          :is-starting="adminWorkflow.apply.isStarting?.value"
-          :recent-runs="adminWorkflow.apply.recentRuns?.value"
-          :run-detail-error-message="adminWorkflow.apply.runDetailErrorMessage?.value"
-          :selected-run-id="adminWorkflow.apply.selectedRunId?.value"
-          :summary="adminWorkflow.apply.summary?.value"
-          @refresh="adminWorkflow.apply.handleRefresh"
-          @select-run="adminWorkflow.apply.handleSelectRun"
-          @start="adminWorkflow.apply.handleStartRun"
-        />
-      </div>
-    </section>
+    </details>
   </section>
 </template>
 
@@ -496,7 +531,8 @@ onBeforeUnmount(() => {
 
 .import-review-layout__rail,
 .import-review-layout__workspace,
-.import-review-runway__stack {
+.import-review-runway__stack,
+.import-review-runway__content {
   display: grid;
   gap: var(--hx-space-4);
 }
@@ -513,8 +549,7 @@ onBeforeUnmount(() => {
   outline-offset: 3px;
 }
 
-.import-review-workspace-card__header,
-.import-review-runway__header {
+.import-review-workspace-card__header {
   padding: var(--hx-space-4) var(--hx-space-4) 0;
   border: 1px solid var(--hx-border);
   border-radius: var(--hx-radius-md);
@@ -539,7 +574,50 @@ onBeforeUnmount(() => {
 }
 
 .import-review-runway {
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-surface);
+  box-shadow: var(--hx-shadow-sm);
   gap: var(--hx-space-3);
+}
+
+.import-review-runway__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-4);
+  cursor: pointer;
+  list-style: none;
+}
+
+.import-review-runway__summary::-webkit-details-marker {
+  display: none;
+}
+
+.import-review-runway__summary:focus-visible {
+  border-radius: var(--hx-radius-sm);
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -3px;
+}
+
+.import-review-runway__summary-state {
+  flex: 0 0 auto;
+  color: var(--hx-accent);
+  font-size: var(--hx-text-sm);
+  font-weight: 700;
+}
+
+.import-review-runway__content {
+  padding: 0 var(--hx-space-4) var(--hx-space-4);
+}
+
+.import-review-runway__notice {
+  max-width: 74ch;
+  margin: 0;
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
 }
 
 :deep(.import-review-layout__rail > .panel-light),
@@ -591,9 +669,12 @@ onBeforeUnmount(() => {
     gap: var(--hx-space-4);
   }
 
-  .import-review-workspace-card__header,
-  .import-review-runway__header {
+  .import-review-workspace-card__header {
     padding: var(--hx-space-4);
+  }
+
+  .import-review-runway__summary {
+    align-items: flex-start;
   }
 
   .import-review-page__header {

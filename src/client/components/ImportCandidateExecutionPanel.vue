@@ -116,8 +116,8 @@ function getDownloadAcceptanceDiagnostic(item) {
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Download run</p>
-        <h3>Queue selected for download</h3>
+        <p class="eyebrow">Downloads</p>
+        <h3>Send selected matches to downloads</h3>
       </div>
       <div class="review-filter-actions">
         <button
@@ -146,7 +146,7 @@ function getDownloadAcceptanceDiagnostic(item) {
       </div>
     </div>
 
-    <p class="review-summary-copy">Queues your selected candidates for download. Each file is sent to the download queue and the outcome is recorded so you can track progress.</p>
+    <p class="review-summary-copy">Sends selected matches to the download service. Each file is recorded so you can follow progress and recovery.</p>
     <p class="review-summary-copy" v-if="summary">{{ summary.message }}</p>
 
     <dl class="review-meta-grid review-meta-grid-wide" v-if="summary?.heartbeat">
@@ -195,7 +195,7 @@ function getDownloadAcceptanceDiagnostic(item) {
 
     <article class="panel-light review-empty-state" v-else-if="!currentRun">
       <h3>No download run yet</h3>
-      <p>Select candidates from the list above, then start a download run to queue them.</p>
+      <p>Select matches from the list above, then send them to downloads.</p>
     </article>
 
     <template v-else>
@@ -203,7 +203,7 @@ function getDownloadAcceptanceDiagnostic(item) {
         <div class="review-detail-header">
           <div>
             <p>Recent download history</p>
-            <strong>The last {{ recentRuns.length }} import execution run{{ recentRuns.length === 1 ? '' : 's' }}.</strong>
+            <strong>The last {{ recentRuns.length }} download run{{ recentRuns.length === 1 ? '' : 's' }}.</strong>
           </div>
         </div>
         <table class="hx-table execution-runs-subtable">
@@ -213,7 +213,7 @@ function getDownloadAcceptanceDiagnostic(item) {
               <th>Status</th>
               <th>Started</th>
               <th>Duration</th>
-              <th>Requested</th>
+              <th>Matches</th>
               <th>Queued</th>
               <th>Warnings</th>
               <th>Failed</th>
@@ -299,11 +299,11 @@ function getDownloadAcceptanceDiagnostic(item) {
           <dd>{{ formatTimestamp(currentRun.finishedAt) }}</dd>
         </div>
         <div>
-          <dt>Requested</dt>
+          <dt>Matches</dt>
           <dd>{{ currentRun.requestedCandidateCount ?? 0 }}</dd>
         </div>
         <div>
-          <dt>Processed</dt>
+          <dt>Prepared</dt>
           <dd>{{ currentRun.processedCandidateCount ?? 0 }}</dd>
         </div>
         <div>

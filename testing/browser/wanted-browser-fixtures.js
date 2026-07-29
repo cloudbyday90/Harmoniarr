@@ -386,6 +386,12 @@ export async function installWantedBrowserFixtures(browserContext) {
       }));
     }
 
+    function hasImportReviewWorkspace() {
+      const rawState = globalThis.sessionStorage.getItem(fixtureStateStorageKey);
+      const state = rawState ? JSON.parse(rawState) : {};
+      return Array.isArray(state.importReviewCandidates) && state.importReviewCandidates.length > 0;
+    }
+
     function countStatuses(items) {
       return items.reduce((counts, item) => ({
         ...counts,
@@ -486,7 +492,9 @@ export async function installWantedBrowserFixtures(browserContext) {
       };
     }
 
-    mergeImportReviewWorkspace(fixturePayload.dispatchImportReviewWorkspace);
+    if (!hasImportReviewWorkspace()) {
+      mergeImportReviewWorkspace(fixturePayload.dispatchImportReviewWorkspace);
+    }
 
     globalThis.fetch = async (input, init) => {
       const requestUrl = typeof input === 'string'

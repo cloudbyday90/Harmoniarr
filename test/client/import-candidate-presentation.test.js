@@ -696,8 +696,8 @@ describe('buildImportApplyReadinessNotice', () => {
       }),
       {
         tone: 'success',
-        title: '1 download is ready to import',
-        message: 'Start import apply to stage and commit this completed download into the library.',
+        title: '1 download is ready to add',
+        message: 'Use Add downloads to stage and commit this completed download into the library.',
       },
     );
   });
@@ -710,8 +710,8 @@ describe('buildImportApplyReadinessNotice', () => {
       }),
       {
         tone: 'warning',
-        title: '3 downloads are ready to import',
-        message: 'Start import apply to stage and commit these completed downloads into the library.',
+        title: '3 downloads are ready to add',
+        message: 'Use Add downloads to stage and commit these completed downloads into the library.',
       },
     );
   });
@@ -749,7 +749,7 @@ describe('buildImportApplyLibraryHandoffNotice', () => {
       {
         tone: 'success',
         title: '1 release is in the library',
-        message: 'Open Library to confirm the newly imported release in the complete library view.',
+        message: 'Open Library to confirm the newly added release in the complete library view.',
         location: {
           name: 'library',
           query: {
@@ -771,7 +771,7 @@ describe('buildImportApplyLibraryHandoffNotice', () => {
       {
         tone: 'warning',
         title: '3 releases are in the library',
-        message: 'Open Library to confirm the imported release and review any warning state after the next scan.',
+        message: 'Open Library to confirm the added release and review any warning state after the next scan.',
         location: {
           name: 'library',
           query: {
@@ -1220,7 +1220,7 @@ describe('buildImportExecutionRefreshNotice', () => {
         },
       }),
       {
-        message: 'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Import Review.',
+        message: 'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Match diagnostics.',
         title: 'Transfer progress current',
         tone: 'success',
       },
@@ -1250,7 +1250,7 @@ describe('buildImportExecutionRefreshNotice', () => {
         },
       }),
       {
-        message: 'Review the item diagnostics below before retrying or choosing another candidate.',
+        message: 'Review the item diagnostics below before retrying or choosing another match.',
         title: 'Review execution diagnostics',
         tone: 'danger',
       },

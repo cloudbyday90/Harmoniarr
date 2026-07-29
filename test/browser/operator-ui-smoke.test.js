@@ -11,6 +11,7 @@ import {
   navigateWithinApp,
   logoutThroughUi,
 } from '../../testing/browser/operator-browser-helpers.js';
+import { openImportReviewRunHistory } from '../../testing/browser/import-review-browser-helpers.js';
 import { installMetadataBrowserFixtures } from '../../testing/browser/metadata-browser-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
@@ -190,9 +191,13 @@ suite('browser operator workflow smoke coverage', () => {
         linkName: 'Match diagnostics',
         urlPattern: /\/app\/activity\/candidates(?:\?.*)?(?:#.*)?$/,
       });
-      await page.getByRole('heading', { name: 'Inspect selected candidate media' }).waitFor();
-      await page.getByRole('heading', { name: 'Queue selected for download' }).waitFor();
-      await page.getByRole('heading', { name: 'Move downloads to library' }).waitFor();
+      const runHistoryDisclosure = page.locator('details.import-review-runway');
+      await runHistoryDisclosure.waitFor();
+      assert.equal(await runHistoryDisclosure.evaluate((element) => element.open), false);
+      await openImportReviewRunHistory(page);
+      await page.getByRole('heading', { name: 'Check selected matches' }).waitFor();
+      await page.getByRole('heading', { name: 'Send selected matches to downloads' }).waitFor();
+      await page.getByRole('heading', { name: 'Add downloads to library' }).waitFor();
     }, {
       scenarioName: 'metadata_operator_ui_smoke',
     });

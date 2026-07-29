@@ -325,7 +325,7 @@ export function useImportReviewQueue({
     return transitionSelectedCandidate(
       selectCandidateForDownload,
       'Selecting the import candidate failed',
-      'Candidate selected for download.',
+      'Match selected for download.',
     );
   }
 

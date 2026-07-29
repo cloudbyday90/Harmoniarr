@@ -78,7 +78,7 @@ function executionStatusLabel(code) {
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Candidates selected for download</p>
+        <p class="eyebrow">Matches selected for download</p>
         <h3>Download readiness</h3>
       </div>
     </div>
@@ -110,13 +110,13 @@ function executionStatusLabel(code) {
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !selectedCandidates.length">
-      <h3>Loading selected candidates</h3>
-      <p>Loading selected candidates…</p>
+      <h3>Loading selected matches</h3>
+      <p>Loading selected matches…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!selectedCandidates.length">
-      <h3>No candidates selected yet</h3>
-      <p>Select candidates from the list above to see their download readiness here.</p>
+      <h3>No matches selected yet</h3>
+      <p>Select matches from the list above to see their download readiness here.</p>
     </article>
 
     <div class="review-queue-stack" v-else>

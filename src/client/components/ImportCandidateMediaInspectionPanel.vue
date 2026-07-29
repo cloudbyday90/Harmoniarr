@@ -80,8 +80,8 @@ defineEmits(['open-candidate', 'refresh', 'select-run', 'start']);
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Media inspection</p>
-        <h3>Inspect selected candidate media</h3>
+        <p class="eyebrow">Media checks</p>
+        <h3>Check selected matches</h3>
       </div>
       <div class="review-filter-actions">
         <button
@@ -102,7 +102,7 @@ defineEmits(['open-candidate', 'refresh', 'select-run', 'start']);
       </div>
     </div>
 
-    <p class="review-summary-copy">Inspects the media files for your selected candidates and records warnings before download and import decisions continue.</p>
+    <p class="review-summary-copy">Checks files for selected matches and records warnings before downloads or library additions continue.</p>
     <p class="review-summary-copy" v-if="summary">{{ summary.message }}</p>
 
     <article class="panel-light error-panel" v-if="errorMessage" role="alert">
@@ -120,7 +120,7 @@ defineEmits(['open-candidate', 'refresh', 'select-run', 'start']);
 
     <article class="panel-light review-empty-state" v-else-if="!currentRun">
       <h3>No media inspection run yet</h3>
-      <p>Select candidates from the list above, then start a media inspection run to validate their files.</p>
+      <p>Select matches from the list above, then start a media check to validate their files.</p>
     </article>
 
     <template v-else>
@@ -138,7 +138,7 @@ defineEmits(['open-candidate', 'refresh', 'select-run', 'start']);
               <th>Status</th>
               <th>Started</th>
               <th>Duration</th>
-              <th>Requested</th>
+              <th>Matches</th>
               <th>Files</th>
               <th>Warnings</th>
               <th>Unavailable</th>
@@ -203,11 +203,11 @@ defineEmits(['open-candidate', 'refresh', 'select-run', 'start']);
           <dd>{{ formatTimestamp(currentRun.finishedAt) }}</dd>
         </div>
         <div>
-          <dt>Requested</dt>
+          <dt>Matches</dt>
           <dd>{{ currentRun.requestedCandidateCount ?? 0 }}</dd>
         </div>
         <div>
-          <dt>Inspected candidates</dt>
+          <dt>Matches checked</dt>
           <dd>{{ currentRun.inspectedCandidateCount ?? 0 }}</dd>
         </div>
         <div>
@@ -223,7 +223,7 @@ defineEmits(['open-candidate', 'refresh', 'select-run', 'start']);
           <dd>{{ currentRun.inspectionUnavailableCount ?? 0 }}</dd>
         </div>
         <div>
-          <dt>Blocked candidates</dt>
+          <dt>Blocked matches</dt>
           <dd>{{ currentRun.blockedCandidateCount ?? 0 }}</dd>
         </div>
       </dl>

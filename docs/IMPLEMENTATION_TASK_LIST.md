@@ -141,6 +141,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   source paths, file rows, collision checks, and uncommon transitions are
   disclosed, while direct diagnostic-file links still expand and focus the
   affected evidence. See `MATCH_DIAGNOSTICS_RECOVERY_FIRST_DESIGN.md`.
+- Match diagnostics run-history controls: media checks, download dispatch, and
+  add-to-library run workbenches now sit behind a collapsed native disclosure;
+  direct run URLs expand it automatically, operator controls remain intact,
+  and visible labels use match/download/library wording. See
+  `MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md`.
 - Music Queue Activity lifecycle: release-scoped history now shows a saved
   search-again action, retrying the same download, trying the next safe match,
   no-matches-left rediscovery, and terminal failures. Events use a bounded

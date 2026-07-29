@@ -1700,17 +1700,17 @@ export async function installMetadataBrowserFixtures(browserContext) {
         apply: {
           action: 'apply-start',
           candidateCount: countImportReviewCandidatesByStatus('import_pending'),
-          currentStep: 'Import apply run queued from Import Review.',
+          currentStep: 'Add-to-library run queued from Match diagnostics.',
           idPrefix: 'apply-run',
           responseKey: 'importCandidateApply',
-          startedMessage: 'Import apply run {id} queued for {count} candidate{plural}.',
+          startedMessage: 'Add-to-library run {id} queued for {count} download{plural}.',
           stateKey: 'importReviewApplySummary',
           summaryStateName: 'ApplySummary',
         },
         execution: {
           action: 'execution-start',
           candidateCount: countImportReviewCandidatesByStatus('selected'),
-          currentStep: 'Download run queued from Import Review.',
+          currentStep: 'Download run queued from Match diagnostics.',
           heartbeat: {
             intervalLabel: 'Manual fixture',
             source: 'browser fixture',
@@ -1726,17 +1726,17 @@ export async function installMetadataBrowserFixtures(browserContext) {
             gracePeriodLabel: 'Manual fixture',
           },
           responseKey: 'importCandidateExecution',
-          startedMessage: 'Download run {id} queued for {count} selected candidate{plural}.',
+          startedMessage: 'Download run {id} queued for {count} selected match{plural}.',
           stateKey: 'importReviewExecutionSummary',
           summaryStateName: 'ExecutionSummary',
         },
         mediaInspection: {
           action: 'media-inspection-start',
           candidateCount: countImportReviewCandidatesByStatus('selected'),
-          currentStep: 'Media inspection run queued from Import Review.',
+          currentStep: 'Media check run queued from Match diagnostics.',
           idPrefix: 'media-inspection-run',
           responseKey: 'importCandidateMediaInspection',
-          startedMessage: 'Media inspection run {id} queued for {count} selected candidate{plural}.',
+          startedMessage: 'Media check run {id} queued for {count} selected match{plural}.',
           stateKey: 'importReviewMediaInspectionSummary',
           summaryStateName: 'MediaInspectionSummary',
         },
@@ -1957,15 +1957,15 @@ export async function installMetadataBrowserFixtures(browserContext) {
           ...candidate,
           executionStatus: candidate.executionStatus ?? {
             code: 'ready',
-            message: 'Candidate is ready for download.',
+            message: 'Match is ready for download.',
           },
           planning: candidate.planning ?? {},
           selectedAt: candidate.selectedAt ?? candidate.updatedAt ?? candidate.discoveredAt ?? null,
         })),
         summary: {
           message: candidates.length
-            ? `${candidates.length} selected candidate${candidates.length === 1 ? '' : 's'} ready for download.`
-            : 'No candidates selected yet.',
+            ? `${candidates.length} selected match${candidates.length === 1 ? '' : 'es'} ready for download.`
+            : 'No matches selected yet.',
         },
       };
     }
@@ -1997,16 +1997,16 @@ export async function installMetadataBrowserFixtures(browserContext) {
           importPendingAt: candidate.importPendingAt ?? candidate.updatedAt ?? candidate.discoveredAt ?? null,
           importStatus: candidate.importStatus ?? {
             code: 'ready',
-            message: 'Download is ready to import.',
+            message: 'Download is ready to add.',
           },
           planning: candidate.planning ?? {},
         })),
         summary: {
           message: counts.blocked > 0
-            ? `${counts.blocked} completed download candidate${counts.blocked === 1 ? ' is' : 's are'} blocked and ${counts.blocked === 1 ? 'needs' : 'need'} operator attention before import apply can proceed.`
+            ? `${counts.blocked} completed download${counts.blocked === 1 ? ' is' : 's are'} blocked and ${counts.blocked === 1 ? 'needs' : 'need'} operator attention before library addition can proceed.`
             : candidates.length
-              ? `${candidates.length} candidate${candidates.length === 1 ? '' : 's'} waiting for import.`
-              : 'No downloads ready to import.',
+              ? `${candidates.length} download${candidates.length === 1 ? ' is' : 's are'} waiting to add.`
+              : 'No downloads ready to add.',
         },
       };
     }

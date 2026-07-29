@@ -22,6 +22,7 @@ import {
 import {
   buildImportReviewCandidate,
   buildImportReviewPreview,
+  openImportReviewRunHistory,
   seedImportReviewCandidateWorkspace,
 } from '../../testing/browser/import-review-browser-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
@@ -55,7 +56,7 @@ async function openImportReviewForAdmin({
     waitUntil: 'domcontentloaded',
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByText('Operator runway', { exact: true }).waitFor();
+  await page.getByText('Run history and controls', { exact: true }).waitFor();
 }
 
 suite('Import Review operator runway controls browser verification', () => {
@@ -103,12 +104,16 @@ suite('Import Review operator runway controls browser verification', () => {
         workspace: { candidates: [] },
       });
 
-      const mediaInspectionPanel = getRunwayPanel(page, 'Inspect selected candidate media');
-      const executionPanel = getRunwayPanel(page, 'Queue selected for download');
-      const applyPanel = getRunwayPanel(page, 'Move downloads to library');
+      const runwayDisclosure = page.locator('details.import-review-runway');
+      assert.equal(await runwayDisclosure.evaluate((element) => element.open), false);
+      await openImportReviewRunHistory(page);
 
-      await page.getByText('No candidates selected yet.', { exact: true }).waitFor();
-      await page.getByText('No downloads ready to import.', { exact: true }).waitFor();
+      const mediaInspectionPanel = getRunwayPanel(page, 'Check selected matches');
+      const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
+      const applyPanel = getRunwayPanel(page, 'Add downloads to library');
+
+      await page.getByText('No matches selected yet.', { exact: true }).waitFor();
+      await page.getByText('No downloads ready to add.', { exact: true }).waitFor();
       assert.equal(
         await mediaInspectionPanel.getByRole('button', { name: 'Start media inspection' }).isDisabled(),
         true,
@@ -118,7 +123,7 @@ suite('Import Review operator runway controls browser verification', () => {
         true,
       );
       assert.equal(
-        await applyPanel.getByRole('button', { name: 'Start import apply' }).isDisabled(),
+        await applyPanel.getByRole('button', { name: 'Add downloads' }).isDisabled(),
         true,
       );
 
@@ -130,7 +135,8 @@ suite('Import Review operator runway controls browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=${selectedCandidate.id}`, {
         waitUntil: 'domcontentloaded',
       });
-      await page.getByText('1 selected candidate ready for download.', { exact: true }).waitFor();
+      await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
+      await openImportReviewRunHistory(page);
 
       const mediaStart = mediaInspectionPanel.getByRole('button', { name: 'Start media inspection' });
       assert.equal(await mediaStart.isEnabled(), true);
@@ -138,7 +144,7 @@ suite('Import Review operator runway controls browser verification', () => {
       await waitForHash(page, '#import-media-inspection-run-panel');
       await mediaInspectionPanel.getByText('Run media-inspection-run-1', { exact: true }).waitFor();
       await mediaInspectionPanel.getByText(
-        'Media inspection run media-inspection-run-1 queued for 1 selected candidate.',
+        'Media check run media-inspection-run-1 queued for 1 selected match.',
         { exact: true },
       ).waitFor();
       assert.equal(await mediaStart.isDisabled(), true);
@@ -149,7 +155,7 @@ suite('Import Review operator runway controls browser verification', () => {
       await waitForHash(page, '#import-execution-run-panel');
       await executionPanel.getByText('Run execution-run-1', { exact: true }).waitFor();
       await executionPanel.getByText(
-        'Download run execution-run-1 queued for 1 selected candidate.',
+        'Download run execution-run-1 queued for 1 selected match.',
         { exact: true },
       ).waitFor();
       assert.equal(await executionStart.isDisabled(), true);
@@ -206,26 +212,28 @@ suite('Import Review operator runway controls browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=${importPendingCandidate.id}&status=import_pending`, {
         waitUntil: 'domcontentloaded',
       });
-      await page.getByText('1 candidate waiting for import.', { exact: true }).waitFor();
+      await page.getByText('1 download is waiting to add.', { exact: true }).waitFor();
 
-      const applyPanel = getRunwayPanel(page, 'Move downloads to library');
-      const applyStart = applyPanel.getByRole('button', { name: 'Start import apply' });
+      await openImportReviewRunHistory(page);
+
+      const applyPanel = getRunwayPanel(page, 'Add downloads to library');
+      const applyStart = applyPanel.getByRole('button', { name: 'Add downloads' });
       assert.equal(await applyStart.isEnabled(), true);
       await applyStart.click();
 
-      const applyDialog = page.getByRole('alertdialog', { name: 'Start import apply?' });
+      const applyDialog = page.getByRole('alertdialog', { name: 'Add downloads to library?' });
       await applyDialog.waitFor();
       const confirmButton = applyDialog.getByRole('button', { name: 'Confirm' });
       assert.equal(await confirmButton.isDisabled(), true);
       await applyDialog.getByLabel(
         'I understand this will move files from staging into the music library. This cannot be undone.',
       ).check();
-      await applyDialog.getByRole('textbox').fill('start import apply');
+      await applyDialog.getByRole('textbox').fill('add downloads');
       assert.equal(await confirmButton.isEnabled(), true);
       await confirmButton.click();
       await waitForHash(page, '#import-apply-run-panel');
       await applyPanel.getByText('Run apply-run-1', { exact: true }).waitFor();
-      await applyPanel.getByText('Import apply run apply-run-1 queued for 1 candidate.', {
+      await applyPanel.getByText('Add-to-library run apply-run-1 queued for 1 download.', {
         exact: true,
       }).waitFor();
       const applyStartedState = await readMetadataBrowserFixtureState(page);
@@ -251,9 +259,11 @@ suite('Import Review operator runway controls browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=${selectedCandidate.id}`, {
         waitUntil: 'domcontentloaded',
       });
-      await page.getByText('1 selected candidate ready for download.', { exact: true }).waitFor();
+      await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
 
-      const executionPanel = getRunwayPanel(page, 'Queue selected for download');
+      await openImportReviewRunHistory(page);
+
+      const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
       await executionPanel.getByRole('button', { name: 'Start download run' }).click();
       await waitForHash(page, '#import-execution-run-panel');
       await page.getByRole('alert').filter({

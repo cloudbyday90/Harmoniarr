@@ -22,6 +22,7 @@ import {
   buildImportReviewExecutionRun,
   buildImportReviewMediaInspectionRun,
   buildImportReviewRunSummary,
+  openImportReviewRunHistory,
 } from '../../testing/browser/import-review-browser-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
@@ -55,7 +56,7 @@ async function openImportReviewForAdmin({
     waitUntil: 'domcontentloaded',
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByText('Operator runway', { exact: true }).waitFor();
+  await page.getByText('Run history and controls', { exact: true }).waitFor();
 }
 
 function buildFailedExecutionItem() {
@@ -318,21 +319,23 @@ suite('Import Review run-detail failure diagnostics browser verification', () =>
       });
 
       await waitForHash(page, '#import-media-inspection-run-panel');
-      const mediaPanel = getRunwayPanel(page, 'Inspect selected candidate media');
+      await openImportReviewRunHistory(page);
+      const mediaPanel = getRunwayPanel(page, 'Check selected matches');
       await mediaPanel.getByText(`Run ${workspace.runs.mediaFailed.id}`, { exact: true }).waitFor();
       await mediaPanel.getByText('Media inspection failed while probing candidate files.', { exact: true }).waitFor();
       await mediaPanel.getByRole('status').filter({
         hasText: 'ffprobe is unavailable in the worker runtime.',
       }).waitFor();
       await mediaPanel.getByText('Inspection unavailable', { exact: true }).waitFor();
-      await mediaPanel.getByText('Blocked candidates', { exact: true }).waitFor();
+      await mediaPanel.getByText('Blocked matches', { exact: true }).waitFor();
 
       await page.goto(
         `${baseUrl}/app/activity/candidates?executionRunId=${workspace.runs.executionFailed.id}#import-execution-run-panel`,
         { waitUntil: 'domcontentloaded' },
       );
       await waitForHash(page, '#import-execution-run-panel');
-      const executionPanel = getRunwayPanel(page, 'Queue selected for download');
+      await openImportReviewRunHistory(page);
+      const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
       await executionPanel.getByText(`Run ${workspace.runs.executionFailed.id}`, { exact: true }).waitFor();
       await executionPanel.getByRole('status').filter({
         hasText: 'slskd transfer snapshot could not be loaded.',
@@ -355,7 +358,8 @@ suite('Import Review run-detail failure diagnostics browser verification', () =>
         { waitUntil: 'domcontentloaded' },
       );
       await waitForHash(page, '#import-apply-run-panel');
-      const applyPanel = getRunwayPanel(page, 'Move downloads to library');
+      await openImportReviewRunHistory(page);
+      const applyPanel = getRunwayPanel(page, 'Add downloads to library');
       await applyPanel.getByText(`Run ${workspace.runs.applyFailed.id}`, { exact: true }).waitFor();
       await applyPanel.getByRole('status').filter({
         hasText: 'Library move failed and rollback completed.',

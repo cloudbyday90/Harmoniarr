@@ -8,6 +8,20 @@
 
 import { seedMetadataImportReviewWorkspace } from './metadata-browser-fixtures.js';
 
+export async function openImportReviewRunHistory(page) {
+  const disclosure = page.locator('details.import-review-runway');
+  await disclosure.waitFor();
+
+  const isOpen = await disclosure.evaluate((element) => element.open);
+  if (!isOpen) {
+    await disclosure.locator('summary').click();
+  }
+
+  await page.waitForFunction(() =>
+    globalThis.document.querySelector('details.import-review-runway')?.open === true,
+  );
+}
+
 export function buildImportReviewCandidate(overrides = {}) {
   const candidateId = overrides.id ?? 'candidate-private';
   const folderPath = overrides.folderPath

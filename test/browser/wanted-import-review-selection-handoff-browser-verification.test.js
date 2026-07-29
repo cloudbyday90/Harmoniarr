@@ -6,6 +6,7 @@
  * See LICENSE file for details.
  */
 
+import { openImportReviewRunHistory } from '../../testing/browser/import-review-browser-helpers.js';
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import {
@@ -50,7 +51,6 @@ async function openSelectionReadyWantedCandidates({ baseUrl, page }) {
     'Best score 91 meets the 85 threshold. Select it in Import Review to start download handoff.',
     { exact: true },
   ).waitFor();
-  await selectionRow.getByText('Select a candidate', { exact: true }).waitFor();
   await selectionRow.getByText(
     'Open advanced diagnostics to inspect matching options when automatic selection needs help.',
     { exact: true },
@@ -73,17 +73,17 @@ async function selectHighConfidenceCandidate(page) {
     hasText: 'high-confidence-peer',
   }).first();
   await highConfidenceCandidate.click();
-  await page.getByRole('heading', { exact: true, name: 'Files and actions' }).waitFor();
-  await page.getByText('high-confidence-peer', { exact: true }).first().waitFor();
-
-  const selectButton = page.getByRole('button', { exact: true, name: 'Select' });
+  await page.getByRole('heading', { exact: true, name: 'Current state and recovery' }).waitFor();
+  await page.getByText('This match is ready to use', { exact: true }).waitFor();
+  const selectButton = page.getByRole('button', { exact: true, name: 'Use this match' });
   await selectButton.click();
-  await page.getByRole('status').filter({ hasText: 'Candidate selected for download.' }).waitFor();
-  await page.getByText('1 selected candidate ready for download.', { exact: true }).waitFor();
+  await page.getByRole('status').filter({ hasText: 'Match selected for download.' }).waitFor();
+  await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
 }
 
 async function startSelectionReadyDownloadRun(page) {
-  const executionPanel = getRunwayPanel(page, 'Queue selected for download');
+  await openImportReviewRunHistory(page);
+  const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
   const startDownloadRun = executionPanel.getByRole('button', { name: 'Start download run' });
   await startDownloadRun.click();
   await page.waitForFunction(() => globalThis.location.hash === '#import-execution-run-panel');
@@ -157,17 +157,17 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
       );
       assert.equal(selectedCandidate?.status, 'selected');
 
-      await page.getByRole('link', { exact: true, name: 'Wanted' }).click();
+      await page.goto(`${baseUrl}/app/activity/wanted`, { waitUntil: 'domcontentloaded' });
       await page.waitForURL('**/app/activity/wanted');
       const refreshedWantedTable = page.getByRole('table', { name: 'Wanted releases' });
       const refreshedSelectionRow = refreshedWantedTable.getByRole('row').filter({
         hasText: 'Selected Ambient Works 85-92',
       }).first();
       await refreshedSelectionRow.getByText('Selected for download', { exact: true }).waitFor();
-      await refreshedSelectionRow.getByText('1 candidate selected in Import Review.', {
+      await refreshedSelectionRow.getByText('1 candidate selected for download.', {
         exact: true,
       }).waitFor();
-      await refreshedSelectionRow.getByText('Start the download run', { exact: true }).waitFor();
+      await refreshedSelectionRow.getByText('Review download diagnostics', { exact: true }).waitFor();
       await refreshedSelectionRow.getByText(
         'A match is selected. Open advanced diagnostics only if the download does not begin automatically.',
         { exact: true },
@@ -203,7 +203,7 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
 
       const { executionPanel, startDownloadRun } = await startSelectionReadyDownloadRun(page);
       await executionPanel.getByText(
-        'Download run execution-run-1 queued for 1 selected candidate.',
+        'Download run execution-run-1 queued for 1 selected match.',
         { exact: true },
       ).waitFor();
       await executionPanel.locator('.review-detail-header').getByText('Pending', { exact: true }).waitFor();
@@ -270,7 +270,7 @@ suite('Wanted to Import Review selection handoff browser verification', () => {
       await executionPanel.locator('.review-detail-header').getByText('Running', { exact: true }).waitFor();
       await executionPanel.getByText('Transfer progress current', { exact: true }).waitFor();
       await executionPanel.getByText(
-        'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Import Review.',
+        'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Match diagnostics.',
         { exact: true },
       ).waitFor();
       await executionPanel.getByText('Queued in Downloader and actively progressing.', { exact: true }).waitFor();

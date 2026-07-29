@@ -22,6 +22,7 @@ import {
   buildImportReviewExecutionRun,
   buildImportReviewPreview,
   buildImportReviewRunSummary,
+  openImportReviewRunHistory,
 } from '../../testing/browser/import-review-browser-helpers.js';
 import {
   installMetadataBrowserFixtures,
@@ -243,7 +244,8 @@ suite('Import Review Downloader transfer handoff browser verification', () => {
         { waitUntil: 'domcontentloaded' },
       );
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-      const executionPanel = getRunwayPanel(page, 'Queue selected for download');
+      await openImportReviewRunHistory(page);
+      const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
       await executionPanel.getByText(`Run ${executionRun.id}`, { exact: true }).waitFor();
       await executionPanel.getByText('Autechre\\Amber\\01 Foil.flac', { exact: true }).waitFor();
       await executionPanel.getByText('1 transfer is actively progressing.', { exact: true }).waitFor();
@@ -282,7 +284,8 @@ suite('Import Review Downloader transfer handoff browser verification', () => {
         { waitUntil: 'domcontentloaded' },
       );
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-      const executionPanel = getRunwayPanel(page, 'Queue selected for download');
+      await openImportReviewRunHistory(page);
+      const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
       await executionPanel.getByText(`Run ${executionRun.id}`, { exact: true }).waitFor();
       await executionPanel.getByText('1 transfer completed.', { exact: true }).waitFor();
       await executionPanel.getByText('Transfer completed in Downloader', { exact: true }).waitFor();

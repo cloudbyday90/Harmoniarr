@@ -113,8 +113,8 @@ function onApplyConfirm() {
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Library import</p>
-        <h3>Move downloads to library</h3>
+        <p class="eyebrow">Add to library</p>
+        <h3>Add downloads to library</h3>
       </div>
       <div class="review-filter-actions">
         <button
@@ -130,7 +130,7 @@ function onApplyConfirm() {
           :disabled="!canStartApplyRun(currentRun, importPendingCandidateCount) || isStarting"
           @click="openConfirm"
         >
-          {{ isStarting ? 'Starting...' : 'Start import apply' }}
+          {{ isStarting ? 'Starting...' : 'Add downloads' }}
         </button>
       </div>
     </div>
@@ -166,7 +166,7 @@ function onApplyConfirm() {
     </article>
 
     <article class="panel-light error-panel" v-if="errorMessage" role="alert">
-      <h3>Import run unavailable</h3>
+      <h3>Add-to-library run unavailable</h3>
       <p>{{ errorMessage }}</p>
     </article>
 
@@ -174,21 +174,21 @@ function onApplyConfirm() {
     <p class="error-copy" role="alert" v-if="actionErrorMessage">{{ actionErrorMessage }}</p>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !currentRun">
-      <h3>Loading import run</h3>
-      <p>Loading import run…</p>
+      <h3>Loading add-to-library run</h3>
+      <p>Loading add-to-library run…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!currentRun">
-      <h3>No import run yet</h3>
-      <p>Downloads ready to import will appear above. Start an import run to move them into your library.</p>
+      <h3>No add-to-library run yet</h3>
+      <p>Downloads ready to add will appear above. Add downloads to move them into your library.</p>
     </article>
 
     <template v-else>
       <article class="onboarding-step-card" v-if="recentRuns.length">
         <div class="review-detail-header">
           <div>
-            <p>Recent apply history</p>
-            <strong>The last {{ recentRuns.length }} import apply run{{ recentRuns.length === 1 ? '' : 's' }}.</strong>
+            <p>Recent library additions</p>
+            <strong>The last {{ recentRuns.length }} add-to-library run{{ recentRuns.length === 1 ? '' : 's' }}.</strong>
           </div>
         </div>
         <table class="hx-table apply-runs-subtable">
@@ -198,8 +198,8 @@ function onApplyConfirm() {
               <th>Status</th>
               <th>Started</th>
               <th>Duration</th>
-              <th>Requested</th>
-              <th>Applied</th>
+              <th>Downloads</th>
+              <th>Added</th>
               <th>Warnings</th>
               <th>Failed</th>
               <th>Detail</th>
@@ -263,23 +263,23 @@ function onApplyConfirm() {
           <dd>{{ formatTimestamp(currentRun.finishedAt) }}</dd>
         </div>
         <div>
-          <dt>Requested</dt>
+          <dt>Downloads</dt>
           <dd>{{ currentRun.requestedCandidateCount ?? 0 }}</dd>
         </div>
         <div>
-          <dt>Processed</dt>
+          <dt>Prepared</dt>
           <dd>{{ currentRun.processedCandidateCount ?? 0 }}</dd>
         </div>
         <div>
-          <dt>Applied</dt>
+          <dt>Added</dt>
           <dd>{{ currentRun.appliedCount ?? 0 }}</dd>
         </div>
         <div>
-          <dt>Applied with warnings</dt>
+          <dt>Added with warnings</dt>
           <dd>{{ currentRun.appliedWithWarningsCount ?? 0 }}</dd>
         </div>
         <div>
-          <dt>Apply failed</dt>
+          <dt>Adding failed</dt>
           <dd>{{ currentRun.applyFailedCount ?? 0 }}</dd>
         </div>
         <div>
@@ -386,7 +386,7 @@ function onApplyConfirm() {
         </article>
       </div>
       <article class="panel-light review-empty-state" v-else>
-        <h3>No import items yet</h3>
+        <h3>No files added yet</h3>
         <p>No items have been recorded for this run yet.</p>
       </article>
     </template>
@@ -397,15 +397,15 @@ function onApplyConfirm() {
     :is-confirming="true"
     :is-executing="false"
     :is-done="false"
-    :title="'Start import apply?'"
+    :title="'Add downloads to library?'"
     :confirm-level="'type_to_confirm'"
-    :confirm-text="'start import apply'"
+    :confirm-text="'add downloads'"
     :gate-label="'I understand this will move files from staging into the music library. This cannot be undone.'"
     :typed="applyTyped"
     :acknowledged="applyAcknowledged"
-    :matches="applyTyped === 'start import apply'"
-    :can-confirm="applyAcknowledged && applyTyped === 'start import apply'"
-    :button-enabled="applyAcknowledged && applyTyped === 'start import apply'"
+    :matches="applyTyped === 'add downloads'"
+    :can-confirm="applyAcknowledged && applyTyped === 'add downloads'"
+    :button-enabled="applyAcknowledged && applyTyped === 'add downloads'"
     :error="''"
     @close="confirmOpen = false"
     @execute="onApplyConfirm"

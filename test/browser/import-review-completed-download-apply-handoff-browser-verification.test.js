@@ -25,6 +25,7 @@ import {
   buildImportReviewExecutionRun,
   buildImportReviewPreview,
   buildImportReviewRunSummary,
+  openImportReviewRunHistory,
 } from '../../testing/browser/import-review-browser-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
@@ -51,7 +52,7 @@ function buildCompletedDownloadApplyWorkspace() {
     importPendingAt: '2026-06-27T21:36:00.000Z',
     importStatus: {
       code: 'ready',
-      message: 'Completed download is ready to import.',
+      message: 'Completed download is ready to add.',
     },
     planning: {
       libraryFolderPath: 'Music/Autechre/Amber',
@@ -262,34 +263,34 @@ suite('Import Review completed-download apply handoff browser verification', () 
       );
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
 
-      const executionPanel = getRunwayPanel(page, 'Queue selected for download');
+      await openImportReviewRunHistory(page);
+
+      const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
       await executionPanel.getByText('1 transfer completed.', { exact: true }).waitFor();
       await executionPanel.getByText('Transfer completed in Downloader', { exact: true }).waitFor();
 
-      await page.getByText('1 candidate waiting for import.', { exact: true }).waitFor();
-      await page.getByText('Completed download is ready to import.', { exact: true }).waitFor();
+      await page.getByText('1 download is waiting to add.', { exact: true }).waitFor();
+      await page.getByText('Completed download is ready to add.', { exact: true }).waitFor();
 
-      const applyPanel = getRunwayPanel(page, 'Move downloads to library');
-      await applyPanel.getByText('1 download is ready to import', { exact: true }).waitFor();
-      await applyPanel.getByText(
-        'Start import apply to stage and commit this completed download into the library.',
-        { exact: true },
-      ).waitFor();
-      const applyStart = applyPanel.getByRole('button', { name: 'Start import apply' });
+      await openImportReviewRunHistory(page);
+
+      const applyPanel = getRunwayPanel(page, 'Add downloads to library');
+      await applyPanel.getByText('1 download is ready to add', { exact: true }).waitFor();
+      const applyStart = applyPanel.getByRole('button', { name: 'Add downloads' });
       assert.equal(await applyStart.isEnabled(), true);
 
       await applyStart.click();
-      const applyDialog = page.getByRole('alertdialog', { name: 'Start import apply?' });
+      const applyDialog = page.getByRole('alertdialog', { name: 'Add downloads to library?' });
       await applyDialog.waitFor();
       await applyDialog.getByLabel(
         'I understand this will move files from staging into the music library. This cannot be undone.',
       ).check();
-      await applyDialog.getByRole('textbox').fill('start import apply');
+      await applyDialog.getByRole('textbox').fill('add downloads');
       await applyDialog.getByRole('button', { name: 'Confirm' }).click();
 
       await waitForHash(page, '#import-apply-run-panel');
       await applyPanel.getByText('Run apply-run-1', { exact: true }).waitFor();
-      await applyPanel.getByText('Import apply run apply-run-1 queued for 1 candidate.', {
+      await applyPanel.getByText('Add-to-library run apply-run-1 queued for 1 download.', {
         exact: true,
       }).waitFor();
 
@@ -333,11 +334,13 @@ suite('Import Review completed-download apply handoff browser verification', () 
       );
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
 
-      const applyPanel = getRunwayPanel(page, 'Move downloads to library');
+      await openImportReviewRunHistory(page);
+
+      const applyPanel = getRunwayPanel(page, 'Add downloads to library');
       await applyPanel.getByText('Run apply-run-tomorrows-harvest-completed', { exact: true }).waitFor();
       await applyPanel.getByText('1 release is in the library', { exact: true }).waitFor();
       await applyPanel.getByText(
-        'Open Library to confirm the newly imported release in the complete library view.',
+        'Open Library to confirm the newly added release in the complete library view.',
         { exact: true },
       ).waitFor();
 

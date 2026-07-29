@@ -22,6 +22,7 @@ import {
   buildImportReviewExecutionRun,
   buildImportReviewMediaInspectionRun,
   buildImportReviewRunSummary,
+  openImportReviewRunHistory,
 } from '../../testing/browser/import-review-browser-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
@@ -62,7 +63,7 @@ async function openImportReviewForAdmin({
     waitUntil: 'domcontentloaded',
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByText('Operator runway', { exact: true }).waitFor();
+  await page.getByText('Run history and controls', { exact: true }).waitFor();
 }
 
 function buildHistoricalRunWorkspace() {
@@ -216,9 +217,14 @@ suite('Import Review selected-run deep-link browser verification', () => {
       });
 
       await waitForHash(page, '#import-media-inspection-run-panel');
+      assert.equal(
+        await page.locator('details.import-review-runway').evaluate((element) => element.open),
+        true,
+        'A direct media-check run link should open its run history disclosure.',
+      );
       await assertSelectedRunDetail({
         page,
-        panelHeading: 'Inspect selected candidate media',
+        panelHeading: 'Check selected matches',
         run: workspace.runs.mediaHistorical,
       });
       await waitForSearchParam(page, 'mediaInspectionRunId', workspace.runs.mediaHistorical.id);
@@ -228,9 +234,14 @@ suite('Import Review selected-run deep-link browser verification', () => {
         { waitUntil: 'domcontentloaded' },
       );
       await waitForHash(page, '#import-execution-run-panel');
+      assert.equal(
+        await page.locator('details.import-review-runway').evaluate((element) => element.open),
+        true,
+        'A direct download run link should open its run history disclosure.',
+      );
       await assertSelectedRunDetail({
         page,
-        panelHeading: 'Queue selected for download',
+        panelHeading: 'Send selected matches to downloads',
         run: workspace.runs.executionHistorical,
       });
       await waitForSearchParam(page, 'executionRunId', workspace.runs.executionHistorical.id);
@@ -240,9 +251,14 @@ suite('Import Review selected-run deep-link browser verification', () => {
         { waitUntil: 'domcontentloaded' },
       );
       await waitForHash(page, '#import-apply-run-panel');
+      assert.equal(
+        await page.locator('details.import-review-runway').evaluate((element) => element.open),
+        true,
+        'A direct add-to-library run link should open its run history disclosure.',
+      );
       await assertSelectedRunDetail({
         page,
-        panelHeading: 'Move downloads to library',
+        panelHeading: 'Add downloads to library',
         run: workspace.runs.applyHistorical,
       });
       await waitForSearchParam(page, 'applyRunId', workspace.runs.applyHistorical.id);
@@ -276,7 +292,9 @@ suite('Import Review selected-run deep-link browser verification', () => {
         workspace,
       });
 
-      const mediaPanel = getRunwayPanel(page, 'Inspect selected candidate media');
+      await openImportReviewRunHistory(page);
+
+      const mediaPanel = getRunwayPanel(page, 'Check selected matches');
       await mediaPanel.getByText(`Run ${workspace.runs.mediaCurrent.id}`, { exact: true }).waitFor();
       await mediaPanel
         .locator('tbody tr')
@@ -287,18 +305,20 @@ suite('Import Review selected-run deep-link browser verification', () => {
       await waitForSearchParam(page, 'mediaInspectionRunId', workspace.runs.mediaHistorical.id);
       await assertSelectedRunDetail({
         page,
-        panelHeading: 'Inspect selected candidate media',
+        panelHeading: 'Check selected matches',
         run: workspace.runs.mediaHistorical,
       });
 
       await mediaPanel.getByRole('button', { name: 'Refresh' }).click();
       await assertSelectedRunDetail({
         page,
-        panelHeading: 'Inspect selected candidate media',
+        panelHeading: 'Check selected matches',
         run: workspace.runs.mediaHistorical,
       });
 
-      const executionPanel = getRunwayPanel(page, 'Queue selected for download');
+      await openImportReviewRunHistory(page);
+
+      const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
       await executionPanel
         .locator('tbody tr')
         .filter({ hasText: workspace.runs.executionHistorical.id })
@@ -308,11 +328,13 @@ suite('Import Review selected-run deep-link browser verification', () => {
       await waitForSearchParam(page, 'executionRunId', workspace.runs.executionHistorical.id);
       await assertSelectedRunDetail({
         page,
-        panelHeading: 'Queue selected for download',
+        panelHeading: 'Send selected matches to downloads',
         run: workspace.runs.executionHistorical,
       });
 
-      const applyPanel = getRunwayPanel(page, 'Move downloads to library');
+      await openImportReviewRunHistory(page);
+
+      const applyPanel = getRunwayPanel(page, 'Add downloads to library');
       await applyPanel
         .locator('tbody tr')
         .filter({ hasText: workspace.runs.applyHistorical.id })
@@ -322,7 +344,7 @@ suite('Import Review selected-run deep-link browser verification', () => {
       await waitForSearchParam(page, 'applyRunId', workspace.runs.applyHistorical.id);
       await assertSelectedRunDetail({
         page,
-        panelHeading: 'Move downloads to library',
+        panelHeading: 'Add downloads to library',
         run: workspace.runs.applyHistorical,
       });
 

@@ -109,9 +109,14 @@ with the selected match's automatic state and one available repair, while raw
 paths, file rows, and collision evidence remain disclosed. See
 [Match Diagnostics Recovery-First Design](MATCH_DIAGNOSTICS_RECOVERY_FIRST_DESIGN.md).
 
+Its specialist media-check, download, and add-to-library run workbenches are
+now behind a separate `Run history and controls` disclosure. Direct run links
+open that disclosure automatically, and visible labels use match/download/
+library language. See
+[Match Diagnostics Run History Controls Design](MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md).
+
 ## Next High-Value Item
 
-Move the remaining Match diagnostics runway panels behind a `Run history and
-controls` disclosure and translate their visible labels from candidate/import
-jargon to match/download/add-to-library language, while preserving direct run
-links and operator-only controls.
+Reduce the remaining raw match queue/filter rail inside Match diagnostics to a
+compact, disclosed `Find a match` diagnostic tool while preserving direct
+candidate and file recovery links.

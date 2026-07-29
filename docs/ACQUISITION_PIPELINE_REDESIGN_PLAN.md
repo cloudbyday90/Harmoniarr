@@ -1423,3 +1423,12 @@ so a terminal transfer recovery visibly advances from `Trying another match` to
 `Downloading` without a manual refresh. The browser contract keeps the normal
 experience release-centered and verifies Activity offers only the focused Music
 Queue handoff.
+
+### Match Diagnostics Run History Boundary
+
+Implemented in
+[MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md](MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md).
+The remaining media-check, download, and add-to-library run workbenches are
+collapsed behind `Run history and controls`; direct run links expand that
+boundary, and visible diagnostic language no longer presents candidate/import
+worker terminology as the operator's primary task.

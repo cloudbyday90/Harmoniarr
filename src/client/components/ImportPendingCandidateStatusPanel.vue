@@ -78,8 +78,8 @@ function importStatusLabel(code) {
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Ready to import</p>
-        <h3>Downloads awaiting import</h3>
+        <p class="eyebrow">Ready to add</p>
+        <h3>Downloads awaiting library addition</h3>
       </div>
     </div>
 
@@ -87,7 +87,7 @@ function importStatusLabel(code) {
 
     <div class="pill-row" v-if="counts.totalImportPending">
       <div class="pill">
-        <span>Import pending</span>
+        <span>Ready to add</span>
         <strong>{{ counts.totalImportPending }}</strong>
       </div>
       <div class="pill">
@@ -105,17 +105,17 @@ function importStatusLabel(code) {
     </div>
 
     <article class="panel-light error-panel" v-if="errorMessage">
-      <h3>Import-pending summary unavailable</h3>
+      <h3>Add-to-library summary unavailable</h3>
       <p>{{ errorMessage }}</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !importPendingCandidates.length">
-      <h3>Loading downloads ready for import</h3>
-      <p>Loading downloads ready for import…</p>
+      <h3>Loading downloads ready to add</h3>
+      <p>Loading downloads ready to add…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!importPendingCandidates.length">
-      <h3>No downloads ready to import</h3>
+      <h3>No downloads ready to add</h3>
       <p>Completed downloads will appear here once they're confirmed received.</p>
     </article>
 
@@ -135,7 +135,7 @@ function importStatusLabel(code) {
 
         <dl class="review-meta-grid review-meta-grid-wide">
           <div>
-            <dt>Ready for import at</dt>
+            <dt>Ready to add at</dt>
             <dd>{{ formatTimestamp(candidate.importPendingAt) }}</dd>
           </div>
           <div>

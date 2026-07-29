@@ -432,8 +432,8 @@ export function buildImportApplyReadinessNotice({
 
   return {
     tone: currentRun?.status === 'failed' ? 'warning' : 'success',
-    title: `${count} ${candidateLabel} ready to import`,
-    message: `Start import apply to stage and commit ${startLabel} into the library.`,
+    title: `${count} ${candidateLabel} ready to add`,
+    message: `Use Add downloads to stage and commit ${startLabel} into the library.`,
   };
 }
 
@@ -464,8 +464,8 @@ export function buildImportApplyLibraryHandoffNotice(currentRun) {
     tone: hasWarnings ? 'warning' : 'success',
     title: `${totalAppliedCount} ${releaseLabel} ${verbLabel} in the library`,
     message: hasWarnings
-      ? 'Open Library to confirm the imported release and review any warning state after the next scan.'
-      : 'Open Library to confirm the newly imported release in the complete library view.',
+      ? 'Open Library to confirm the added release and review any warning state after the next scan.'
+      : 'Open Library to confirm the newly added release in the complete library view.',
     location: {
       name: 'library',
       query: {
@@ -740,7 +740,7 @@ export function buildImportExecutionRefreshNotice({
   const acceptedTransferCount = getExecutionAcceptedTransferCount(currentRun);
   if (currentRun.status === 'running' && acceptedTransferCount > 0) {
     return {
-      message: 'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Import Review.',
+      message: 'Downloader transfer evidence is visible here. Use Sync transfer state to refresh provider progress without leaving Match diagnostics.',
       title: 'Transfer progress current',
       tone: 'success',
     };
@@ -749,7 +749,7 @@ export function buildImportExecutionRefreshNotice({
   const failureCount = getExecutionFailureCount(currentRun);
   if ((currentRun.status === 'failed' || failureCount > 0) && hasExecutionItems(currentRun)) {
     return {
-      message: 'Review the item diagnostics below before retrying or choosing another candidate.',
+      message: 'Review the item diagnostics below before retrying or choosing another match.',
       title: 'Review execution diagnostics',
       tone: 'danger',
     };
@@ -765,7 +765,7 @@ export function buildImportExecutionRefreshNotice({
 
   if (currentRun.status === 'completed') {
     return {
-      message: summary?.message ?? 'The selected download run has completed. Continue with import apply when completed downloads are available.',
+      message: summary?.message ?? 'The selected download run has completed. Continue with Add downloads when completed downloads are available.',
       title: 'Download run complete',
       tone: 'success',
     };

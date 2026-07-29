@@ -139,9 +139,9 @@ suite('Import Review review-state transition matrix browser verification', () =>
       await selectButton.focus();
       await selectButton.press('Enter');
 
-      await assertActionStatusFocused(page, 'Candidate selected for download.');
+      await assertActionStatusFocused(page, 'Match selected for download.');
       await assertCandidateStatus(page, 'Needs attention');
-      await page.getByText('1 selected candidate ready for download.', { exact: true }).waitFor();
+      await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Reopen for review' }).waitFor();
       await page.getByRole('button', { name: 'Do not use this match' }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Resume this match' }).count(), 0);
@@ -182,7 +182,7 @@ suite('Import Review review-state transition matrix browser verification', () =>
 
       await page.getByText('0 matching candidates', { exact: true }).waitFor();
       await assertCandidateStatus(page, 'Needs attention');
-      await page.getByText('1 selected candidate ready for download.', { exact: true }).waitFor();
+      await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
 
       await expandOtherMatchActions(page);
       const rejectButton = page.getByRole('button', { name: 'Do not use this match' });
@@ -204,7 +204,7 @@ suite('Import Review review-state transition matrix browser verification', () =>
       await assertActionStatusFocused(page, 'Candidate rejected.');
       await assertCandidateStatus(page, 'Rejected');
       await page.getByText('0 matching candidates', { exact: true }).waitFor();
-      await page.getByText('No candidates selected yet.', { exact: true }).waitFor();
+      await page.getByText('No matches selected yet.', { exact: true }).waitFor();
       const reopenButton = page.getByRole('button', { name: 'Try this match again' });
       await reopenButton.waitFor();
       assert.equal(await page.getByRole('button', { name: 'Do not use this match' }).count(), 0);

@@ -232,7 +232,7 @@ suite('Import Review requester/non-admin read-only access browser verification',
       assert.equal(await page.getByRole('button', { name: 'Do not use this match' }).count(), 0);
       assert.equal(await page.getByRole('button', { name: 'Try this match again' }).count(), 0);
       assert.equal(await page.getByRole('button', { name: 'Apply filters' }).count(), 0);
-      assert.equal(await page.getByRole('heading', { name: 'Operator runway' }).count(), 0);
+      assert.equal(await page.getByRole('heading', { name: 'Run history and controls' }).count(), 0);
       assert.deepEqual(transitionRequests, []);
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);

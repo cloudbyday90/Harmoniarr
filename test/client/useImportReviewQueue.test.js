@@ -208,7 +208,7 @@ test('useImportReviewQueue selects a candidate for download planning through the
   assert.deepEqual(selectCandidateForDownload.mock.calls[0].arguments, ['candidate-1', 'Queue this candidate']);
   assert.equal(workflow.selectedCandidate.value.status, 'selected');
   assert.equal(workflow.actionError.value, '');
-  assert.equal(workflow.actionStatus.value, 'Candidate selected for download.');
+  assert.equal(workflow.actionStatus.value, 'Match selected for download.');
 });
 
 test('useImportReviewQueue trims filter input through the shared setter', async (t) => {

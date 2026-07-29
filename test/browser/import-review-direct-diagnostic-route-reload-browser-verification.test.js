@@ -65,7 +65,7 @@ async function openImportReviewForAdmin({
     waitUntil: 'domcontentloaded',
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByText('Operator runway', { exact: true }).waitFor();
+  await page.getByText('Run history and controls', { exact: true }).waitFor();
 }
 
 async function assertDirectDiagnosticRouteHydrated({
@@ -96,7 +96,13 @@ async function assertDirectDiagnosticRouteHydrated({
   await assertLocatorFocused(focusedFile, 'Direct diagnostic route should focus the affected file row');
   await assertVisibleFocusOutline(focusedFile, 'Direct diagnostic route should expose a visible file focus ring');
 
-  const mediaPanel = getRunwayPanel(page, 'Inspect selected candidate media');
+  assert.equal(
+    await page.locator('details.import-review-runway').evaluate((element) => element.open),
+    true,
+    'A direct media-check diagnostic link should open its run history disclosure.',
+  );
+
+  const mediaPanel = getRunwayPanel(page, 'Check selected matches');
   await mediaPanel.getByText(`Run ${workspace.run.id}`, { exact: true }).waitFor();
   const selectedRunRow = mediaPanel.locator('tbody tr').filter({ hasText: workspace.run.id });
   await selectedRunRow.getByRole('button', { name: 'Selected' }).waitFor();

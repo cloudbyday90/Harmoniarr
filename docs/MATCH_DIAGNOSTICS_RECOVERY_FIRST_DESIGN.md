@@ -111,7 +111,8 @@ candidate-run dashboard to determine what should happen next.
 
 ## Next High-Value Item
 
-Move the remaining diagnostic runway panels behind a single `Run history and
-controls` disclosure and translate their visible labels from candidate/import
-jargon to match/download/add-to-library language, while preserving direct run
-links and operator-only controls.
+Reduce the remaining raw match queue/filter rail inside Match diagnostics to a
+compact, disclosed `Find a match` diagnostic tool while preserving direct
+candidate and file recovery links. Run-history controls are now separately
+collapsed and documented in
+[Match Diagnostics Run History Controls Design](MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md).

@@ -6,6 +6,7 @@
  * See LICENSE file for details.
  */
 
+import { openImportReviewRunHistory } from '../../testing/browser/import-review-browser-helpers.js';
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import {
@@ -65,7 +66,7 @@ async function openImportReviewForAdmin({
     waitUntil: 'domcontentloaded',
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByText('Operator runway', { exact: true }).waitFor();
+  await page.getByText('Run history and controls', { exact: true }).waitFor();
 }
 
 suite('Import Review diagnostic repair failure-state browser verification', () => {
@@ -115,7 +116,9 @@ suite('Import Review diagnostic repair failure-state browser verification', () =
         urlSuffix: buildDiagnosticRunPanelRouteSuffix(workspace),
       });
 
-      const mediaPanel = getRunwayPanel(page, 'Inspect selected candidate media');
+      await openImportReviewRunHistory(page);
+
+      const mediaPanel = getRunwayPanel(page, 'Check selected matches');
       await mediaPanel.getByText(`Run ${workspace.run.id}`, { exact: true }).waitFor();
       const diagnosticsTable = mediaPanel.getByRole('table', {
         name: 'Media inspection file diagnostics',
