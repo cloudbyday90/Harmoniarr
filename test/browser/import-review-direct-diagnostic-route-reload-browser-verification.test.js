@@ -78,11 +78,15 @@ async function assertDirectDiagnosticRouteHydrated({
   await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
 
   const selectionStage = page.locator(`#${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageId}`);
-  await selectionStage.getByRole('heading', { exact: true, name: 'Files and actions' }).waitFor();
+  await selectionStage.getByRole('heading', { exact: true, name: 'Current state and recovery' }).waitFor();
+  await selectionStage.getByRole('heading', { exact: true, name: 'This match needs attention' }).waitFor();
+  await selectionStage.getByRole('button', { exact: true, name: 'Reopen for review' }).waitFor();
+  const evidence = selectionStage.locator('.import-review-evidence');
+  assert.equal(await evidence.getAttribute('open'), '');
+  await selectionStage.getByRole('heading', { exact: true, name: 'Files, paths, and checks' }).waitFor();
   await selectionStage.getByRole('heading', { exact: true, name: workspace.diagnosticCandidate.folderPath }).waitFor();
   await selectionStage.getByText(workspace.diagnosticCandidate.username, { exact: true }).waitFor();
   await selectionStage.getByText(IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFilename, { exact: true }).waitFor();
-  await selectionStage.getByRole('button', { exact: true, name: 'Reopen' }).waitFor();
 
   const focusedFile = selectionStage.locator(
     `[data-import-candidate-file-id="${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId}"]`,

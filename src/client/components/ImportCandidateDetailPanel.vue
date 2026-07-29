@@ -17,7 +17,7 @@
 -->
 
 <script setup>
-import { nextTick, ref, watch } from 'vue';
+import { nextTick, watch } from 'vue';
 import {
   candidateStatusLabel,
   formatBytes,
@@ -29,21 +29,8 @@ import {
   formatUploaderReputationEvidence,
 } from '../lib/import-candidate-presentation.js';
 import { formatFileDuration } from '../lib/track-duration.js';
-import ConfirmDialog from './ConfirmDialog.vue';
 
 const props = defineProps({
-  actionError: {
-    type: String,
-    default: '',
-  },
-  actionReason: {
-    type: String,
-    default: '',
-  },
-  actionStatus: {
-    type: String,
-    default: '',
-  },
   applyPreview: {
     type: Object,
     default: null,
@@ -106,59 +93,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits([
-  'hold',
-  'reject',
-  'reopen',
-  'clear-file-decision',
-  'select',
-  'skip-file',
-  'update:action-reason',
-]);
-
-function updateActionReason(event) {
-  emit('update:action-reason', event.target.value);
-}
-
-const rejectConfirmOpen = ref(false);
-const rejectAcknowledged = ref(false);
-const actionStatusRef = ref(null);
-const holdButtonRef = ref(null);
-const rejectButtonRef = ref(null);
-const reopenButtonRef = ref(null);
-const selectButtonRef = ref(null);
 const fileItemRefs = new Map();
-
-function openRejectConfirm() {
-  rejectAcknowledged.value = false;
-  rejectConfirmOpen.value = true;
-}
-
-function onRejectConfirm() {
-  rejectConfirmOpen.value = false;
-  emit('reject');
-}
-
-function canHold(candidate) {
-  return candidate?.status === 'pending';
-}
-
-function canSelect(candidate) {
-  return candidate?.status === 'pending' || candidate?.status === 'held';
-}
-
-function canReject(candidate) {
-  return candidate?.status === 'pending'
-    || candidate?.status === 'held'
-    || candidate?.status === 'selected';
-}
-
-function canReopen(candidate) {
-  return candidate?.status === 'held'
-    || candidate?.status === 'rejected'
-    || candidate?.status === 'failed'
-    || candidate?.status === 'selected';
-}
 
 function applyFileStatusClass(code) {
   switch (code) {
@@ -241,45 +176,6 @@ async function focusCandidateFile(fileId) {
   fileItem?.focus({ preventScroll: true });
 }
 
-function focusPreferredActionButton() {
-  const candidate = props.candidate;
-  const preferredButton = canReopen(candidate)
-    ? reopenButtonRef.value
-    : canSelect(candidate)
-      ? selectButtonRef.value
-      : canHold(candidate)
-        ? holdButtonRef.value
-        : canReject(candidate)
-          ? rejectButtonRef.value
-          : null;
-
-  preferredButton?.focus();
-}
-
-watch(
-  () => props.actionStatus,
-  async (nextStatus) => {
-    if (!nextStatus) {
-      return;
-    }
-
-    await nextTick();
-    actionStatusRef.value?.focus();
-  },
-);
-
-watch(
-  () => props.actionError,
-  async (nextError) => {
-    if (!nextError) {
-      return;
-    }
-
-    await nextTick();
-    focusPreferredActionButton();
-  },
-);
-
 watch(
   () => [
     props.focusedFileId,
@@ -298,8 +194,8 @@ watch(
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Match detail</p>
-        <h3>Files and actions</h3>
+        <p class="eyebrow">Match evidence</p>
+        <h3>Files, paths, and checks</h3>
       </div>
       <span
         v-if="candidate"
@@ -362,69 +258,6 @@ watch(
           <dd>{{ formatUploaderReputationEvidence(candidate.uploaderReputation) }}</dd>
         </div>
       </dl>
-
-      <article class="review-action-panel" v-if="canManageCandidates">
-        <label>
-          Review note
-          <textarea
-            rows="3"
-            :value="actionReason"
-            placeholder="Capture why the candidate is being held, selected, rejected, or reopened"
-            @input="updateActionReason"
-          />
-        </label>
-
-        <div class="review-action-row">
-          <button
-            v-if="canSelect(candidate)"
-            ref="selectButtonRef"
-            type="button"
-            :disabled="isTransitionPending"
-            @click="$emit('select')"
-          >
-            {{ isTransitionPending ? 'Saving...' : 'Select' }}
-          </button>
-          <button
-            v-if="canHold(candidate)"
-            ref="holdButtonRef"
-            type="button"
-            class="secondary-button"
-            :disabled="isTransitionPending"
-            @click="$emit('hold')"
-          >
-            {{ isTransitionPending ? 'Saving...' : 'Hold' }}
-          </button>
-          <button
-            v-if="canReject(candidate)"
-            ref="rejectButtonRef"
-            type="button"
-            class="danger-button"
-            :disabled="isTransitionPending"
-            @click="openRejectConfirm"
-          >
-            {{ isTransitionPending ? 'Saving...' : 'Reject' }}
-          </button>
-          <button
-            v-if="canReopen(candidate)"
-            ref="reopenButtonRef"
-            type="button"
-            :disabled="isTransitionPending"
-            @click="$emit('reopen')"
-          >
-            {{ isTransitionPending ? 'Saving...' : 'Reopen' }}
-          </button>
-        </div>
-
-        <p
-          v-if="actionStatus"
-          ref="actionStatusRef"
-          class="review-summary-copy review-action-status"
-          role="status"
-          aria-live="polite"
-          tabindex="-1"
-        >{{ actionStatus }}</p>
-        <p class="error-copy" role="alert" v-if="actionError">{{ actionError }}</p>
-      </article>
 
       <article class="panel-light review-preview-panel">
         <div class="section-header">
@@ -675,40 +508,9 @@ watch(
     </template>
   </article>
 
-  <ConfirmDialog
-    :is-open="rejectConfirmOpen"
-    :is-confirming="true"
-    :is-executing="false"
-    :is-done="false"
-    :title="'Reject candidate?'"
-    :confirm-level="'checkbox'"
-    :confirm-text="''"
-    :gate-label="'I understand rejecting this candidate will remove it from the review queue and it will need to be re-discovered to re-enter the workflow.'"
-    :typed="''"
-    :acknowledged="rejectAcknowledged"
-    :matches="true"
-    :can-confirm="rejectAcknowledged"
-    :button-enabled="rejectAcknowledged"
-    :error="''"
-    @close="rejectConfirmOpen = false"
-    @execute="onRejectConfirm"
-    @update:typed="() => {}"
-    @update:acknowledged="rejectAcknowledged = $event"
-  />
 </template>
 
 <style scoped>
-.review-action-status:focus-visible {
-  border-radius: var(--hx-radius-sm);
-  outline: 2px solid var(--hx-accent);
-  outline-offset: 2px;
-}
-
-.review-action-row button:focus-visible {
-  outline: 2px solid var(--hx-accent);
-  outline-offset: 2px;
-}
-
 .review-file-item[data-focused='true'] {
   border-color: rgba(94, 173, 255, 0.5);
   background:

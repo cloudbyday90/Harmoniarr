@@ -33,10 +33,8 @@ const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
-function getDetailPanel(page) {
-  return page.locator('.review-panel').filter({
-    has: page.getByRole('heading', { exact: true, name: 'Files and actions' }),
-  });
+function getRecoveryPanel(page) {
+  return page.locator('.import-candidate-recovery');
 }
 
 async function openCandidateInImportReview({
@@ -52,12 +50,12 @@ async function openCandidateInImportReview({
     waitUntil: 'domcontentloaded',
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByRole('heading', { exact: true, name: 'Files and actions' }).waitFor();
+  await page.getByRole('heading', { exact: true, name: 'Current state and recovery' }).waitFor();
 }
 
 async function assertCandidateStatus(page, statusLabel) {
-  const detailPanel = getDetailPanel(page);
-  await detailPanel.getByText(statusLabel, { exact: true }).first().waitFor();
+  const recoveryPanel = getRecoveryPanel(page);
+  await recoveryPanel.getByText(statusLabel, { exact: true }).first().waitFor();
 }
 
 async function assertActionStatusFocused(page, message) {
@@ -65,6 +63,14 @@ async function assertActionStatusFocused(page, message) {
   await actionStatus.waitFor();
   await assertLocatorFocused(actionStatus, `${message} should receive focus`);
   await assertVisibleFocusOutline(actionStatus, `${message} focus ring should be visible`);
+}
+
+async function expandOtherMatchActions(page) {
+  const disclosure = page.locator('.import-candidate-recovery__more');
+  const isOpen = await disclosure.evaluate((element) => element.open);
+  if (!isOpen) {
+    await disclosure.getByText('Other match actions', { exact: true }).click();
+  }
 }
 
 suite('Import Review review-state transition matrix browser verification', () => {
@@ -112,31 +118,33 @@ suite('Import Review review-state transition matrix browser verification', () =>
       await openCandidateInImportReview({ baseUrl, browserContext, candidate, page });
 
       await page.getByText('1 matching candidates', { exact: true }).waitFor();
-      await assertCandidateStatus(page, 'Pending');
+      await assertCandidateStatus(page, 'Available');
 
-      const holdButton = page.getByRole('button', { name: 'Hold' });
+      await expandOtherMatchActions(page);
+      const holdButton = page.getByRole('button', { name: 'Pause this match' });
       await holdButton.focus();
       await assertLocatorFocused(holdButton, 'Hold should be keyboard focusable before transition');
       await holdButton.press('Enter');
 
       await assertActionStatusFocused(page, 'Candidate held for review.');
-      await assertCandidateStatus(page, 'Held');
+      await assertCandidateStatus(page, 'Paused');
       await page.getByText('0 matching candidates', { exact: true }).waitFor();
-      await page.getByRole('button', { name: 'Select' }).waitFor();
-      await page.getByRole('button', { name: 'Reopen' }).waitFor();
-      await page.getByRole('button', { name: 'Reject' }).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Hold' }).count(), 0);
+      await page.getByRole('button', { name: 'Resume this match' }).waitFor();
+      await expandOtherMatchActions(page);
+      await page.getByRole('button', { name: 'Reopen for review' }).waitFor();
+      await page.getByRole('button', { name: 'Do not use this match' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Pause this match' }).count(), 0);
 
-      const selectButton = page.getByRole('button', { name: 'Select' });
+      const selectButton = page.getByRole('button', { name: 'Resume this match' });
       await selectButton.focus();
       await selectButton.press('Enter');
 
       await assertActionStatusFocused(page, 'Candidate selected for download.');
-      await assertCandidateStatus(page, 'Selected');
+      await assertCandidateStatus(page, 'Needs attention');
       await page.getByText('1 selected candidate ready for download.', { exact: true }).waitFor();
-      await page.getByRole('button', { name: 'Reopen' }).waitFor();
-      await page.getByRole('button', { name: 'Reject' }).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Select' }).count(), 0);
+      await page.getByRole('button', { name: 'Reopen for review' }).waitFor();
+      await page.getByRole('button', { name: 'Do not use this match' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Resume this match' }).count(), 0);
       assert.equal(new URL(page.url()).searchParams.get('candidate'), candidate.id);
 
       const fixtureState = await readMetadataBrowserFixtureState(page);
@@ -173,21 +181,22 @@ suite('Import Review review-state transition matrix browser verification', () =>
       await openCandidateInImportReview({ baseUrl, browserContext, candidate, page });
 
       await page.getByText('0 matching candidates', { exact: true }).waitFor();
-      await assertCandidateStatus(page, 'Selected');
+      await assertCandidateStatus(page, 'Needs attention');
       await page.getByText('1 selected candidate ready for download.', { exact: true }).waitFor();
 
-      const rejectButton = page.getByRole('button', { name: 'Reject' });
+      await expandOtherMatchActions(page);
+      const rejectButton = page.getByRole('button', { name: 'Do not use this match' });
       await rejectButton.focus();
       await rejectButton.press('Enter');
 
-      const rejectDialog = page.getByRole('alertdialog', { name: 'Reject candidate?' });
+      const rejectDialog = page.getByRole('alertdialog', { name: 'Do not use this match?' });
       await rejectDialog.waitFor();
       const confirmButton = rejectDialog.getByRole('button', { name: 'Confirm' });
       await confirmButton.waitFor();
       assert.equal(await confirmButton.isDisabled(), true);
 
       await rejectDialog.getByLabel(
-        'I understand rejecting this candidate will remove it from the review queue and it will need to be re-discovered to re-enter the workflow.',
+        'I understand this match will be removed from review and must be found again before it can be used.',
       ).check();
       assert.equal(await confirmButton.isEnabled(), true);
       await confirmButton.press('Enter');
@@ -196,20 +205,21 @@ suite('Import Review review-state transition matrix browser verification', () =>
       await assertCandidateStatus(page, 'Rejected');
       await page.getByText('0 matching candidates', { exact: true }).waitFor();
       await page.getByText('No candidates selected yet.', { exact: true }).waitFor();
-      const reopenButton = page.getByRole('button', { name: 'Reopen' });
+      const reopenButton = page.getByRole('button', { name: 'Try this match again' });
       await reopenButton.waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Reject' }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Do not use this match' }).count(), 0);
 
       await reopenButton.focus();
       await reopenButton.press('Enter');
 
       await assertActionStatusFocused(page, 'Candidate reopened for review.');
-      await assertCandidateStatus(page, 'Pending');
+      await assertCandidateStatus(page, 'Available');
       await page.getByText('1 matching candidates', { exact: true }).waitFor();
-      await page.getByRole('button', { name: 'Select' }).waitFor();
-      await page.getByRole('button', { name: 'Hold' }).waitFor();
-      await page.getByRole('button', { name: 'Reject' }).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Reopen' }).count(), 0);
+      await page.getByRole('button', { name: 'Use this match' }).waitFor();
+      await expandOtherMatchActions(page);
+      await page.getByRole('button', { name: 'Pause this match' }).waitFor();
+      await page.getByRole('button', { name: 'Do not use this match' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Try this match again' }).count(), 0);
       assert.equal(new URL(page.url()).searchParams.get('candidate'), candidate.id);
 
       const fixtureState = await readMetadataBrowserFixtureState(page);

@@ -110,7 +110,7 @@ is currently active.
 
 Focused validation:
 
-- `node --test test/client/import-candidate-presentation.test.js test/client/import-review-workspace-presentation.test.js`
+- `node --test test/client/import-candidate-presentation.test.js test/client/import-candidate-recovery-presentation.test.js`
 - `npm run build:client`
 - `node --test --test-concurrency=1 test/browser/import-review-completed-download-apply-handoff-browser-verification.test.js`
 - `npm run lint:client`

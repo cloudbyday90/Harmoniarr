@@ -38,7 +38,7 @@ async function openFailedCandidateInImportReview({ baseUrl, browserContext, page
     waitUntil: 'domcontentloaded',
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByRole('heading', { exact: true, name: 'Files and actions' }).waitFor();
+  await page.getByRole('heading', { exact: true, name: 'Current state and recovery' }).waitFor();
 }
 
 suite('Import Review failed-candidate recovery action browser verification', () => {
@@ -82,8 +82,8 @@ suite('Import Review failed-candidate recovery action browser verification', () 
       await openFailedCandidateInImportReview({ baseUrl, browserContext, page });
 
       await page.getByText('0 matching candidates', { exact: true }).waitFor();
-      await page.getByText('Failed', { exact: true }).first().waitFor();
-      const reopenButton = page.getByRole('button', { name: 'Reopen' });
+      await page.getByRole('heading', { exact: true, name: 'This match needs a retry' }).waitFor();
+      const reopenButton = page.getByRole('button', { name: 'Try this match again' });
       await reopenButton.focus();
       await assertLocatorFocused(reopenButton, 'Reopen should be keyboard focusable before recovery');
       await assertVisibleFocusOutline(reopenButton, 'Reopen focus ring should be visible before recovery');
@@ -96,11 +96,12 @@ suite('Import Review failed-candidate recovery action browser verification', () 
       await assertLocatorFocused(actionStatus, 'Successful recovery should move focus to the status message');
       await assertVisibleFocusOutline(actionStatus, 'Recovery status focus ring should be visible');
       await page.getByText('1 matching candidates', { exact: true }).waitFor();
-      await page.getByText('Pending', { exact: true }).first().waitFor();
-      await page.getByRole('button', { name: 'Select' }).waitFor();
-      await page.getByRole('button', { name: 'Hold' }).waitFor();
-      await page.getByRole('button', { name: 'Reject' }).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Reopen' }).count(), 0);
+      await page.getByText('Available', { exact: true }).first().waitFor();
+      await page.getByRole('button', { name: 'Use this match' }).waitFor();
+      await page.getByText('Other match actions', { exact: true }).click();
+      await page.getByRole('button', { name: 'Pause this match' }).waitFor();
+      await page.getByRole('button', { name: 'Do not use this match' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Try this match again' }).count(), 0);
       assert.equal(new URL(page.url()).searchParams.get('candidate'), 'candidate-private');
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
@@ -132,7 +133,7 @@ suite('Import Review failed-candidate recovery action browser verification', () 
         status: 409,
       });
 
-      const reopenButton = page.getByRole('button', { name: 'Reopen' });
+      const reopenButton = page.getByRole('button', { name: 'Try this match again' });
       await reopenButton.focus();
       await assertLocatorFocused(reopenButton, 'Reopen should be keyboard focusable before failed recovery');
       await reopenButton.press('Enter');
@@ -141,7 +142,7 @@ suite('Import Review failed-candidate recovery action browser verification', () 
         hasText: 'Recovery is temporarily locked. Try again after the current import run finishes.',
       });
       await alert.waitFor();
-      await page.getByText('Failed', { exact: true }).first().waitFor();
+      await page.getByRole('heading', { exact: true, name: 'This match needs a retry' }).waitFor();
       await page.getByText('0 matching candidates', { exact: true }).waitFor();
       await reopenButton.waitFor();
       await assertLocatorFocused(reopenButton, 'Failed recovery should leave the retry action focused');

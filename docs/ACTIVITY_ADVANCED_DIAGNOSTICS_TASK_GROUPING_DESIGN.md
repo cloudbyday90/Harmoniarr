@@ -104,9 +104,14 @@ Advanced diagnostics now behaves like a compact troubleshooting index. It
 starts with recovery, keeps specialist match tools secondary, and separates
 record/source investigation without making Activity another control center.
 
+The Match diagnostics entry screen now follows that same hierarchy: it leads
+with the selected match's automatic state and one available repair, while raw
+paths, file rows, and collision evidence remain disclosed. See
+[Match Diagnostics Recovery-First Design](MATCH_DIAGNOSTICS_RECOVERY_FIRST_DESIGN.md).
+
 ## Next High-Value Item
 
-Redesign the Match diagnostics entry screen around actionable recovery states:
-show the selected release, its current automatic status, and the one available
-repair before raw match and file evidence. Keep raw evidence disclosed for
-operators who need it.
+Move the remaining Match diagnostics runway panels behind a `Run history and
+controls` disclosure and translate their visible labels from candidate/import
+jargon to match/download/add-to-library language, while preserving direct run
+links and operator-only controls.

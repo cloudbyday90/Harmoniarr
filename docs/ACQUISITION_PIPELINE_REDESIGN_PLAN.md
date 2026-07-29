@@ -1106,6 +1106,10 @@ right repair surface.
 - [x] Preserve old candidate/import links as diagnostics routes while normal
   Activity, Music Queue, Downloader, Library, and notification handoffs use
   release-oriented destinations and language.
+- [x] Refocus Match diagnostics on one current recovery state and one safe
+  repair, with raw paths, file rows, and collision evidence behind a native
+  disclosure. Direct diagnostic-file routes still open and focus the relevant
+  evidence row. See `MATCH_DIAGNOSTICS_RECOVERY_FIRST_DESIGN.md`.
 - [ ] Remove Music Queue from the normal Activity tab mental model; Activity
   should link to Music Queue when a timeline item needs that context.
 - [ ] Update product copy so Activity never presents itself as the primary

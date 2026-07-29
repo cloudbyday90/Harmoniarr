@@ -146,7 +146,7 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
       await focusedFile.waitFor();
       await assertLocatorFocused(focusedFile, 'Diagnostic file should receive focus before repair');
 
-      const reopenButton = page.getByRole('button', { name: 'Reopen' });
+      const reopenButton = page.getByRole('button', { name: 'Reopen for review' });
       await reopenButton.focus();
       await reopenButton.press('Enter');
 
@@ -156,9 +156,10 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
       await actionStatus.waitFor();
       await assertLocatorFocused(actionStatus, 'Successful diagnostic repair should focus the status message');
       await assertVisibleFocusOutline(actionStatus, 'Successful diagnostic repair status should have a visible focus ring');
-      await page.getByText('Pending', { exact: true }).first().waitFor();
-      await page.getByRole('button', { exact: true, name: 'Hold' }).waitFor();
-      await page.getByRole('button', { exact: true, name: 'Select' }).waitFor();
+      await page.getByText('Available', { exact: true }).first().waitFor();
+      await page.getByRole('button', { exact: true, name: 'Use this match' }).waitFor();
+      await page.getByText('Other match actions', { exact: true }).click();
+      await page.getByRole('button', { exact: true, name: 'Pause this match' }).waitFor();
       assert.equal(await focusedFile.getAttribute('data-focused'), 'true');
       await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);
       await waitForSearchParam(page, 'candidateFile', IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.primaryDiagnosticFileId);
@@ -177,7 +178,7 @@ suite('Import Review diagnostic-driven repair-state browser verification', () =>
       await waitForSearchParam(page, 'mediaInspectionRunId', workspace.run.id);
       await page
         .locator(`#${IMPORT_REVIEW_DIAGNOSTIC_FIXTURE.selectionStageId}`)
-        .getByRole('heading', { exact: true, name: workspace.comparisonCandidate.folderPath })
+        .getByRole('heading', { exact: true, name: 'This match is ready to use' })
         .waitFor();
       assert.equal(await page.locator('[data-focused="true"]').count(), 0);
 

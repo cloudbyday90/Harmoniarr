@@ -144,7 +144,7 @@ suite('Import Review diagnostic repair retry-success browser verification', () =
         status: 409,
       });
 
-      const reopenButton = selectionStage.getByRole('button', { exact: true, name: 'Reopen' });
+      const reopenButton = selectionStage.getByRole('button', { exact: true, name: 'Reopen for review' });
       await reopenButton.focus();
       await reopenButton.press('Enter');
 
@@ -162,9 +162,10 @@ suite('Import Review diagnostic repair retry-success browser verification', () =
       await actionStatus.waitFor();
       await assertLocatorFocused(actionStatus, 'Successful retry should move focus to the status message');
       await assertVisibleFocusOutline(actionStatus, 'Successful retry status should expose a visible focus ring');
-      await selectionStage.getByText('Pending', { exact: true }).first().waitFor();
-      await selectionStage.getByRole('button', { exact: true, name: 'Hold' }).waitFor();
-      await selectionStage.getByRole('button', { exact: true, name: 'Select' }).waitFor();
+      await selectionStage.getByText('Available', { exact: true }).first().waitFor();
+      await selectionStage.getByRole('button', { exact: true, name: 'Use this match' }).waitFor();
+      await selectionStage.getByText('Other match actions', { exact: true }).click();
+      await selectionStage.getByRole('button', { exact: true, name: 'Pause this match' }).waitFor();
       assert.equal(await alert.count(), 0);
       assert.equal(await focusedFile.getAttribute('data-focused'), 'true');
       await waitForSearchParam(page, 'candidate', workspace.diagnosticCandidate.id);

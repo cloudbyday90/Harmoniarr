@@ -146,7 +146,7 @@ suite('Import Review diagnostic repair failure-state browser verification', () =
         status: 409,
       });
 
-      const reopenButton = selectionStage.getByRole('button', { exact: true, name: 'Reopen' });
+      const reopenButton = selectionStage.getByRole('button', { exact: true, name: 'Reopen for review' });
       await reopenButton.focus();
       await assertLocatorFocused(reopenButton, 'Diagnostic repair action should be keyboard focusable');
       await reopenButton.press('Enter');

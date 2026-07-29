@@ -23,6 +23,7 @@ import ImportCandidateApplyPanel from '../components/ImportCandidateApplyPanel.v
 import ImportCandidateExecutionPanel from '../components/ImportCandidateExecutionPanel.vue';
 import ImportCandidateMediaInspectionPanel from '../components/ImportCandidateMediaInspectionPanel.vue';
 import ImportCandidateDetailPanel from '../components/ImportCandidateDetailPanel.vue';
+import ImportCandidateRecoveryPanel from '../components/ImportCandidateRecoveryPanel.vue';
 import ImportCandidateFilters from '../components/ImportCandidateFilters.vue';
 import ImportCandidateQueueList from '../components/ImportCandidateQueueList.vue';
 import ImportPendingCandidateStatusPanel from '../components/ImportPendingCandidateStatusPanel.vue';
@@ -37,10 +38,6 @@ import {
   IMPORT_REVIEW_MEDIA_INSPECTION_PANEL_ID,
   useImportReviewAdminWorkflow,
 } from '../composables/useImportReviewAdminWorkflow.js';
-import {
-  buildImportReviewOverviewCards,
-  buildImportReviewWorkflowStages,
-} from '../lib/import-review-workspace-presentation.js';
 import { normalizeImportReviewRouteState } from '../lib/import-review-route-state.js';
 import { sessionStore } from '../state/session.js';
 
@@ -50,7 +47,6 @@ const IMPORT_REVIEW_SELECTION_STAGE_ID = 'import-review-selection-stage';
 
 const {
   actionError,
-  actionReason,
   actionStatus,
   activeFilterCount,
   applyPreview,
@@ -134,15 +130,6 @@ const adminWorkflow = useImportReviewAdminWorkflow({
   selectedCandidateCount: computed(() => selectedSummaryCounts.value.totalSelected),
 });
 
-const overviewCards = computed(() => buildImportReviewOverviewCards({
-  activeFilterCount: activeFilterCount.value,
-  importPendingCounts: importPendingSummaryCounts.value,
-  isAdmin: isAdmin.value,
-  pagination: pagination.value,
-  selectedCounts: selectedSummaryCounts.value,
-  statusFilter: statusFilter.value,
-}));
-
 const isAnyRunRevalidating = computed(() =>
   adminWorkflow.apply.isRevalidating?.value
   || adminWorkflow.execution.isRevalidating?.value
@@ -152,17 +139,6 @@ const isAnyRunRevalidating = computed(() =>
 const focusedCandidateFileId = computed(() =>
   normalizeImportReviewRouteState(route.query).candidateFileId,
 );
-
-const workflowStages = computed(() => buildImportReviewWorkflowStages({
-  applyCurrentRun: adminWorkflow.apply.currentRun?.value,
-  applySummary: adminWorkflow.apply.summary?.value,
-  executionCurrentRun: adminWorkflow.execution.currentRun?.value,
-  executionSummary: adminWorkflow.execution.summary?.value,
-  importPendingCounts: importPendingSummaryCounts.value,
-  mediaInspectionCurrentRun: adminWorkflow.mediaInspection.currentRun?.value,
-  mediaInspectionSummary: adminWorkflow.mediaInspection.summary?.value,
-  selectedCounts: selectedSummaryCounts.value,
-}));
 
 function normalizeDiagnosticCandidateTarget(target) {
   if (typeof target === 'string') {
@@ -208,67 +184,22 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="hx-page import-review-page">
-    <article class="hx-card import-review-stage">
-      <div class="import-review-stage__wash" aria-hidden="true"></div>
-      <div class="import-review-stage__body">
-        <div class="import-review-stage__intro">
-          <div>
-            <p class="import-review-stage__eyebrow">Advanced diagnostics</p>
-            <h1 class="import-review-stage__title">Match diagnostics <span v-if="isRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h1>
-            <p class="import-review-stage__copy" v-if="isAdmin">
-              Review each match, pressure-test the files, queue the download run, and only then apply completed downloads into the library.
-            </p>
-            <p class="import-review-stage__copy" v-else>
-              Inspect raw match evidence, exception details, and download/import handoffs when Music Queue needs help.
-            </p>
-          </div>
-
-          <div class="import-review-stage__signals">
-            <div class="import-review-stage__signal" v-for="pill in summaryPills" :key="pill.label">
-              <span>{{ pill.label }}</span>
-              <strong>{{ pill.value }}</strong>
-            </div>
-          </div>
-        </div>
-
-        <div class="import-review-stage__cards">
-          <article
-            v-for="card in overviewCards"
-            :key="card.id"
-            class="import-review-overview-card"
-            :data-tone="card.tone"
-          >
-            <span class="import-review-overview-card__label">{{ card.label }}</span>
-            <strong class="import-review-overview-card__value">{{ card.value }}</strong>
-            <p class="import-review-overview-card__detail">{{ card.detail }}</p>
-          </article>
-        </div>
+    <header class="import-review-page__header">
+      <div>
+        <p class="import-review-page__eyebrow">Advanced diagnostics</p>
+        <h1>Match diagnostics <span v-if="isRevalidating" class="import-review-revalidating" aria-label="Refreshing">↻</span></h1>
+        <p>
+          Music Queue handles normal progress. Use this page only when a match needs a closer look or a safe recovery action.
+        </p>
       </div>
-    </article>
+      <span class="import-review-page__count">{{ summaryPills[0]?.value ?? '0' }} visible matches</span>
+    </header>
 
     <article class="hx-card import-review-access-card" v-if="!isAdmin">
       <p>
         Music Queue handles the normal workflow. This diagnostics page exposes raw match details and admin-only recovery controls when a release needs deeper inspection.
       </p>
     </article>
-
-    <section class="import-review-flow" aria-label="Import review workflow">
-      <a
-        v-for="stage in workflowStages"
-        :key="stage.id"
-        class="import-review-flow__stage"
-        :data-tone="stage.tone"
-        :href="`#${stage.targetId}`"
-      >
-        <span class="import-review-flow__eyebrow">{{ stage.eyebrow }}</span>
-        <strong class="import-review-flow__title">{{ stage.title }}</strong>
-        <p class="import-review-flow__body">{{ stage.body }}</p>
-        <div class="import-review-flow__metric">
-          <span>{{ stage.metric.label }}</span>
-          <strong>{{ stage.metric.value }}</strong>
-        </div>
-      </a>
-    </section>
 
     <section class="import-review-layout">
       <div class="import-review-layout__rail">
@@ -304,41 +235,54 @@ onBeforeUnmount(() => {
         <section :id="IMPORT_REVIEW_SELECTION_STAGE_ID" class="import-review-workspace-card" tabindex="-1">
           <div class="import-review-workspace-card__header">
             <div>
-              <p class="import-review-workspace-card__eyebrow">Selection workspace</p>
-              <h2 class="import-review-workspace-card__title">Match details and exceptions</h2>
+              <p class="import-review-workspace-card__eyebrow">Selected match</p>
+              <h2 class="import-review-workspace-card__title">Current state and recovery</h2>
               <p class="import-review-workspace-card__copy">
-                Use this workspace to inspect file paths, collision risks, and operator notes when Music Queue cannot safely continue.
+                Start with the current automatic state. Detailed source and file evidence is available only when it is needed.
               </p>
             </div>
           </div>
 
-          <ImportCandidateDetailPanel
+          <ImportCandidateRecoveryPanel
             :action-error="actionError"
-            :action-reason="actionReason"
             :action-status="actionStatus"
-            :apply-preview="applyPreview"
-            :apply-preview-error="applyPreviewError"
             :candidate="selectedCandidate"
             :can-manage-candidates="isAdmin"
             :detail-error="detailError"
-            :file-decision-error="decisionError"
-            :focused-file-id="focusedCandidateFileId"
-            :is-loading-apply-preview="isLoadingApplyPreview"
-            :is-loading-candidate="isLoadingCandidate"
-            :is-loading-preview="isLoadingPreview"
+            :is-loading="isLoadingCandidate"
             :is-transition-pending="isTransitionPending"
-            :is-updating-file-decision="isUpdatingFileDecision"
-            :pending-file-decision-id="pendingFileDecisionId"
             :preview="preview"
-            :preview-error="previewError"
-            @clear-file-decision="runClearCandidateFileDecision"
             @hold="runHoldCandidate"
             @reject="runRejectCandidate"
             @reopen="runReopenCandidate"
             @select="runSelectCandidate"
-            @skip-file="runSkipCandidateFile"
-            @update:action-reason="actionReason = $event"
           />
+
+          <details class="import-review-evidence" :open="Boolean(focusedCandidateFileId)">
+            <summary>View match and file evidence</summary>
+            <p>
+              Source paths, file rows, collision checks, and exceptional file decisions are shown here for diagnosis only.
+            </p>
+            <ImportCandidateDetailPanel
+              :apply-preview="applyPreview"
+              :apply-preview-error="applyPreviewError"
+              :candidate="selectedCandidate"
+              :can-manage-candidates="isAdmin"
+              :detail-error="detailError"
+              :file-decision-error="decisionError"
+              :focused-file-id="focusedCandidateFileId"
+              :is-loading-apply-preview="isLoadingApplyPreview"
+              :is-loading-candidate="isLoadingCandidate"
+              :is-loading-preview="isLoadingPreview"
+              :is-transition-pending="isTransitionPending"
+              :is-updating-file-decision="isUpdatingFileDecision"
+              :pending-file-decision-id="pendingFileDecisionId"
+              :preview="preview"
+              :preview-error="previewError"
+              @clear-file-decision="runClearCandidateFileDecision"
+              @skip-file="runSkipCandidateFile"
+            />
+          </details>
         </section>
 
         <div class="import-review-status-grid">
@@ -437,62 +381,83 @@ onBeforeUnmount(() => {
   gap: var(--hx-space-5);
 }
 
-.import-review-stage {
-  position: relative;
-  overflow: hidden;
-  border-color: rgba(94, 173, 255, 0.2);
-  background:
-    radial-gradient(circle at top right, rgba(94, 173, 255, 0.18), transparent 36%),
-    linear-gradient(145deg, rgba(20, 32, 42, 0.96), rgba(15, 24, 32, 0.9));
-  color: var(--hx-text-on-dark);
-}
-
-.import-review-stage__wash {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.05), transparent 40%),
-    repeating-linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.03) 0,
-      rgba(255, 255, 255, 0.03) 10px,
-      transparent 10px,
-      transparent 20px
-    );
-  pointer-events: none;
-}
-
-.import-review-stage__body {
-  position: relative;
-  display: grid;
-  gap: var(--hx-space-5);
-  padding: var(--hx-space-6);
-}
-
-.import-review-stage__intro {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
-  gap: var(--hx-space-5);
+.import-review-page__header {
+  display: flex;
   align-items: end;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+  padding-bottom: var(--hx-space-4);
+  border-bottom: 1px solid var(--hx-border);
 }
 
-.import-review-stage__eyebrow,
+.import-review-page__eyebrow {
+  margin: 0 0 var(--hx-space-2);
+  color: var(--hx-text-faint);
+  font-size: var(--hx-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.import-review-page__header h1 {
+  margin: 0;
+  color: var(--hx-text-strong);
+  font-size: var(--hx-text-2xl);
+}
+
+.import-review-page__header p:not(.import-review-page__eyebrow) {
+  max-width: 72ch;
+  margin: var(--hx-space-2) 0 0;
+  color: var(--hx-text-muted);
+  line-height: 1.55;
+}
+
+.import-review-page__count {
+  flex: 0 0 auto;
+  color: var(--hx-text-faint);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+}
+
+.import-review-evidence {
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-surface-sunken);
+}
+
+.import-review-evidence > summary {
+  padding: var(--hx-space-4);
+  color: var(--hx-text-strong);
+  cursor: pointer;
+  font-size: var(--hx-text-sm);
+  font-weight: 700;
+}
+
+.import-review-evidence > summary:focus-visible {
+  border-radius: var(--hx-radius-sm);
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
+.import-review-evidence > p {
+  max-width: 74ch;
+  margin: 0;
+  padding: 0 var(--hx-space-4) var(--hx-space-4);
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+
+.import-review-evidence :deep(.review-panel) {
+  margin: 0 var(--hx-space-3) var(--hx-space-3);
+}
+
 .import-review-workspace-card__eyebrow {
   margin: 0 0 var(--hx-space-2);
   font-size: var(--hx-text-xs);
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-}
-
-.import-review-stage__eyebrow {
-  color: var(--hx-text-on-dark-faint);
-}
-
-.import-review-stage__title {
-  margin: 0;
-  font-size: clamp(1.8rem, 2vw + 1rem, 3rem);
-  line-height: 1.02;
 }
 
 .import-review-revalidating {
@@ -506,93 +471,11 @@ onBeforeUnmount(() => {
   to { transform: rotate(360deg); }
 }
 
-.import-review-stage__copy,
 .import-review-workspace-card__copy {
   margin: var(--hx-space-3) 0 0;
   max-width: 70ch;
   color: var(--hx-text-muted);
   line-height: 1.6;
-}
-
-.import-review-stage__copy {
-  color: var(--hx-text-on-dark-muted);
-}
-
-.import-review-stage__signals {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: var(--hx-space-3);
-}
-
-.import-review-stage__signal,
-.import-review-overview-card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--hx-radius-md);
-  background: rgba(7, 11, 15, 0.24);
-  backdrop-filter: blur(8px);
-}
-
-.import-review-stage__signal {
-  display: grid;
-  gap: var(--hx-space-1);
-  min-height: 84px;
-  padding: var(--hx-space-3);
-}
-
-.import-review-stage__signal span {
-  color: var(--hx-text-on-dark-faint);
-  font-size: var(--hx-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.import-review-stage__signal strong {
-  font-size: var(--hx-text-lg);
-}
-
-.import-review-stage__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--hx-space-3);
-}
-
-.import-review-overview-card {
-  display: grid;
-  gap: var(--hx-space-2);
-  min-height: 148px;
-  padding: var(--hx-space-4);
-  color: var(--hx-text-on-dark);
-}
-
-.import-review-overview-card[data-tone='success'] {
-  border-color: rgba(47, 158, 107, 0.4);
-}
-
-.import-review-overview-card[data-tone='warning'] {
-  border-color: rgba(192, 138, 22, 0.4);
-}
-
-.import-review-overview-card[data-tone='danger'] {
-  border-color: rgba(197, 69, 69, 0.42);
-}
-
-.import-review-overview-card__label {
-  color: var(--hx-text-on-dark-faint);
-  font-size: var(--hx-text-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.import-review-overview-card__value {
-  font-size: clamp(1.7rem, 1vw + 1.4rem, 2.5rem);
-  line-height: 1;
-}
-
-.import-review-overview-card__detail {
-  margin: 0;
-  color: var(--hx-text-on-dark-muted);
-  line-height: 1.5;
 }
 
 .import-review-access-card {
@@ -602,94 +485,6 @@ onBeforeUnmount(() => {
 .import-review-access-card p {
   margin: 0;
   color: var(--hx-text-muted);
-}
-
-.import-review-flow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--hx-space-3);
-}
-
-.import-review-flow__stage {
-  display: grid;
-  gap: var(--hx-space-2);
-  min-height: 168px;
-  padding: var(--hx-space-4);
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-md);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent), var(--hx-bg-surface);
-  color: inherit;
-  text-decoration: none;
-  box-shadow: var(--hx-shadow-sm);
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.import-review-flow__stage:hover,
-.import-review-flow__stage:focus-visible {
-  transform: translateY(-2px);
-  border-color: rgba(94, 173, 255, 0.32);
-  box-shadow: var(--hx-shadow-md);
-}
-
-.import-review-flow__stage[data-tone='success'] {
-  background:
-    linear-gradient(180deg, rgba(47, 158, 107, 0.08), transparent 55%),
-    var(--hx-bg-surface);
-}
-
-.import-review-flow__stage[data-tone='warning'] {
-  background:
-    linear-gradient(180deg, rgba(192, 138, 22, 0.08), transparent 55%),
-    var(--hx-bg-surface);
-}
-
-.import-review-flow__stage[data-tone='danger'] {
-  background:
-    linear-gradient(180deg, rgba(197, 69, 69, 0.08), transparent 55%),
-    var(--hx-bg-surface);
-}
-
-.import-review-flow__stage[data-tone='info'] {
-  background:
-    linear-gradient(180deg, rgba(94, 173, 255, 0.1), transparent 55%),
-    var(--hx-bg-surface);
-}
-
-.import-review-flow__eyebrow {
-  color: var(--hx-text-faint);
-  font-size: var(--hx-text-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.import-review-flow__title {
-  font-size: var(--hx-text-lg);
-  line-height: 1.2;
-}
-
-.import-review-flow__body {
-  margin: 0;
-  color: var(--hx-text-muted);
-  line-height: 1.5;
-}
-
-.import-review-flow__metric {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: auto;
-  padding-top: var(--hx-space-2);
-  border-top: 1px solid var(--hx-border-subtle);
-  color: var(--hx-text-faint);
-}
-
-.import-review-flow__metric strong {
-  color: var(--hx-text-strong);
-  font-size: var(--hx-text-lg);
 }
 
 .import-review-layout {
@@ -782,10 +577,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1180px) {
-  .import-review-flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .import-review-layout {
     grid-template-columns: 1fr;
   }
@@ -795,29 +586,23 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 960px) {
-  .import-review-stage__intro {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 640px) {
   .import-review-page {
     gap: var(--hx-space-4);
   }
 
-  .import-review-stage__body,
   .import-review-workspace-card__header,
   .import-review-runway__header {
     padding: var(--hx-space-4);
   }
 
-  .import-review-flow {
-    grid-template-columns: 1fr;
+  .import-review-page__header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  .import-review-flow__stage {
-    min-height: 0;
+  .import-review-page__count {
+    white-space: normal;
   }
 }
 </style>

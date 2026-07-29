@@ -136,6 +136,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   query and hash state intact, while Music Queue, Downloader, request detail,
   and notifications use friendly advanced-diagnostics or normal workflow
   handoffs. See `ACTIVITY_ADVANCED_DIAGNOSTICS_BOUNDARY_DESIGN.md`.
+- Match diagnostics recovery-first entry: the advanced match workspace now
+  leads with the selected match's automatic state and one safe repair. Raw
+  source paths, file rows, collision checks, and uncommon transitions are
+  disclosed, while direct diagnostic-file links still expand and focus the
+  affected evidence. See `MATCH_DIAGNOSTICS_RECOVERY_FIRST_DESIGN.md`.
 - Music Queue Activity lifecycle: release-scoped history now shows a saved
   search-again action, retrying the same download, trying the next safe match,
   no-matches-left rediscovery, and terminal failures. Events use a bounded
