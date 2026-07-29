@@ -197,7 +197,7 @@ suite('Music Queue strict-quality recovery browser verification', () => {
       assert.equal(await releaseRow.getByRole('button', { name: 'Review quality choice' }).count(), 0);
 
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Recent activity' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
       const recoveryStory = page.locator('.activity-timeline-item').filter({
         hasText: 'Trying the next best match: Child of God by Forest Frank',
       });

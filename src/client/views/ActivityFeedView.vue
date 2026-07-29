@@ -31,6 +31,7 @@ import {
   ACTIVITY_TIMELINE_FILTERS,
   filterActivityTimelineEvents,
   getActivityTimelineEventPresentation,
+  partitionActivityTimelineEvents,
 } from '../lib/activity-timeline-presentation.js';
 import {
   buildActivityTimelineStoryEntries,
@@ -58,11 +59,36 @@ const {
 });
 
 const currentUserId = sessionStore.state.user?.id ?? null;
-const visibleEvents = computed(() => filterActivityTimelineEvents(events.value, selectedFilter.value));
-const visibleEventCount = computed(() => visibleEvents.value.length);
-const visibleEntries = computed(() => buildActivityTimelineStoryEntries(visibleEvents.value));
-const visibleEntryCount = computed(() => visibleEntries.value.length);
+const filteredEvents = computed(() => filterActivityTimelineEvents(events.value, selectedFilter.value));
+const visibleEventCount = computed(() => filteredEvents.value.length);
+const eventPartition = computed(() => partitionActivityTimelineEvents(filteredEvents.value));
+const attentionEntries = computed(() => buildActivityTimelineStoryEntries(eventPartition.value.attentionEvents));
+const routineEntries = computed(() => buildActivityTimelineStoryEntries(eventPartition.value.routineEvents));
+const visibleEntryCount = computed(() => attentionEntries.value.length + routineEntries.value.length);
 const hasVisibleEntries = computed(() => visibleEntryCount.value > 0);
+const timelineSections = computed(() => {
+  const sections = [];
+
+  if (attentionEntries.value.length > 0) {
+    sections.push({
+      description: 'Harmoniarr paused automatic progress for these items. Choose the linked action to continue.',
+      entries: attentionEntries.value,
+      id: 'attention',
+      title: 'Needs attention',
+    });
+  }
+
+  if (routineEntries.value.length > 0) {
+    sections.push({
+      description: '',
+      entries: routineEntries.value,
+      id: 'routine',
+      title: 'Recent activity',
+    });
+  }
+
+  return sections;
+});
 
 function selectFilter(filter) {
   selectedFilter.value = filter;
@@ -91,7 +117,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="activity-feed-view" aria-labelledby="activity-timeline-title">
     <header class="activity-feed-header">
-      <h2 id="activity-timeline-title" class="activity-feed-title">Recent activity</h2>
+      <h2 id="activity-timeline-title" class="activity-feed-title">Activity timeline</h2>
       <div class="activity-feed-actions">
         <time v-if="checkedAt && !isLoading" class="activity-feed-freshness" :datetime="checkedAt">
           Updated {{ formatActivityEventTime(checkedAt) }}
@@ -151,51 +177,68 @@ onBeforeUnmount(() => {
       body="Try another filter to see more recent activity."
     />
 
-    <ol v-else class="activity-timeline" aria-label="Activity timeline">
-      <li v-for="entry in visibleEntries" :key="entry.id" class="activity-timeline-item">
-        <article
-          class="activity-timeline-entry"
-          :data-event-type="entry.event.eventType"
-          :data-tone="getActivityTimelineEventPresentation(entry.event).tone"
-        >
-          <span class="activity-timeline-marker" aria-hidden="true" />
-          <div class="activity-timeline-content">
-            <div class="activity-timeline-meta">
-              <span
-                v-if="getActivityTimelineEventPresentation(entry.event).requiresAttention"
-                class="hx-pill"
-                data-tone="warning"
-              >
-                Needs attention
-              </span>
-              <time v-if="entry.event.occurredAt" :datetime="entry.event.occurredAt">
-                {{ formatActivityEventTime(entry.event.occurredAt) }}
-              </time>
-            </div>
-            <h3>{{ getActivityEventLabel(entry.event, currentUserId) }}</h3>
-            <p v-if="getActivityEventDetail(entry.event)">{{ getActivityEventDetail(entry.event) }}</p>
-            <details v-if="entry.isCoalesced" class="activity-timeline-story-details">
-              <summary>{{ getActivityTimelineStoryDisclosureLabel(entry) }}</summary>
-              <ol aria-label="Release activity updates">
-                <li v-for="milestone in entry.milestoneEvents" :key="milestone.id">
-                  <span>{{ getActivityEventLabel(milestone, currentUserId) }}</span>
-                  <time v-if="milestone.occurredAt" :datetime="milestone.occurredAt">
-                    {{ formatActivityEventTime(milestone.occurredAt) }}
-                  </time>
-                </li>
-              </ol>
-            </details>
-            <RouterLink
-              v-if="getEventLinkTarget(entry.event)"
-              class="activity-timeline-link"
-              :to="getEventLinkTarget(entry.event).to"
-            >
-              {{ getEventLinkTarget(entry.event).label }}
-            </RouterLink>
+    <div v-else class="activity-timeline-sections">
+      <section
+        v-for="section in timelineSections"
+        :key="section.id"
+        class="activity-timeline-section"
+        :class="{ 'activity-timeline-section--attention': section.id === 'attention' }"
+        :aria-labelledby="section.title ? `activity-${section.id}-title` : undefined"
+      >
+        <header v-if="section.title" class="activity-timeline-section-header">
+          <div>
+            <h3 :id="`activity-${section.id}-title`">{{ section.title }}</h3>
+            <p v-if="section.description">{{ section.description }}</p>
           </div>
-        </article>
-      </li>
-    </ol>
+          <span v-if="section.id === 'attention'" class="hx-pill" data-tone="warning">
+            {{ section.entries.length }} {{ section.entries.length === 1 ? 'item' : 'items' }}
+          </span>
+        </header>
+
+        <ol
+          class="activity-timeline"
+          :aria-busy="isLoading || isRevalidating"
+          :aria-label="section.title"
+        >
+          <li v-for="entry in section.entries" :key="entry.id" class="activity-timeline-item">
+            <article
+              class="activity-timeline-entry"
+              :data-event-type="entry.event.eventType"
+              :data-tone="getActivityTimelineEventPresentation(entry.event).tone"
+            >
+              <span class="activity-timeline-marker" aria-hidden="true" />
+              <div class="activity-timeline-content">
+                <div class="activity-timeline-meta">
+                  <time v-if="entry.event.occurredAt" :datetime="entry.event.occurredAt">
+                    {{ formatActivityEventTime(entry.event.occurredAt) }}
+                  </time>
+                </div>
+                <h4>{{ getActivityEventLabel(entry.event, currentUserId) }}</h4>
+                <p v-if="getActivityEventDetail(entry.event)">{{ getActivityEventDetail(entry.event) }}</p>
+                <details v-if="entry.isCoalesced" class="activity-timeline-story-details">
+                  <summary>{{ getActivityTimelineStoryDisclosureLabel(entry) }}</summary>
+                  <ol aria-label="Release activity updates">
+                    <li v-for="milestone in entry.milestoneEvents" :key="milestone.id">
+                      <span>{{ getActivityEventLabel(milestone, currentUserId) }}</span>
+                      <time v-if="milestone.occurredAt" :datetime="milestone.occurredAt">
+                        {{ formatActivityEventTime(milestone.occurredAt) }}
+                      </time>
+                    </li>
+                  </ol>
+                </details>
+                <RouterLink
+                  v-if="getEventLinkTarget(entry.event)"
+                  class="activity-timeline-link"
+                  :to="getEventLinkTarget(entry.event).to"
+                >
+                  {{ getEventLinkTarget(entry.event).label }}
+                </RouterLink>
+              </div>
+            </article>
+          </li>
+        </ol>
+      </section>
+    </div>
 
   </section>
 </template>
@@ -213,10 +256,15 @@ onBeforeUnmount(() => {
   gap: var(--hx-space-4);
 }
 
-.activity-feed-title,
-.activity-timeline-entry h3 {
+.activity-feed-title {
   margin: 0;
   color: var(--hx-text-strong);
+}
+
+.activity-timeline-entry h4,
+.activity-timeline-section h3 {
+  color: var(--hx-text-strong);
+  margin: 0;
 }
 
 .activity-feed-title {
@@ -268,6 +316,38 @@ onBeforeUnmount(() => {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.activity-timeline-sections {
+  display: grid;
+  gap: var(--hx-space-5);
+}
+
+.activity-timeline-section {
+  min-width: 0;
+}
+
+.activity-timeline-section--attention {
+  border-left: 3px solid var(--hx-warning);
+  padding-left: var(--hx-space-3);
+}
+
+.activity-timeline-section-header {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--hx-space-3);
+  justify-content: space-between;
+  margin-bottom: var(--hx-space-4);
+}
+
+.activity-timeline-section-header h3 {
+  font-size: var(--hx-text-md);
+}
+
+.activity-timeline-section-header p {
+  color: var(--hx-text-muted);
+  font-size: var(--hx-text-sm);
+  margin: var(--hx-space-1) 0 0;
 }
 
 .activity-feed-loading {
@@ -347,7 +427,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.activity-timeline-entry h3 {
+.activity-timeline-entry h4 {
   font-size: var(--hx-text-base);
 }
 

@@ -60,7 +60,7 @@ suite('browser operator workflow smoke coverage', () => {
       });
 
       await navigateWithinApp(page, {
-        heading: 'Recent activity',
+        heading: 'Activity timeline',
         linkName: 'Activity',
         urlPattern: /\/app\/activity(?:\/feed)?(?:\?.*)?(?:#.*)?$/,
       });
@@ -180,7 +180,7 @@ suite('browser operator workflow smoke coverage', () => {
       assert.match(await releaseArtwork.getAttribute('src') ?? '', /^data:image\/svg\+xml;base64,/);
 
       await navigateWithinApp(page, {
-        heading: 'Recent activity',
+        heading: 'Activity timeline',
         linkName: 'Activity',
         urlPattern: /\/app\/activity(?:\/feed)?(?:\?.*)?(?:#.*)?$/,
       });

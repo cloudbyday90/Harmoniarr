@@ -148,17 +148,19 @@ suite('Activity information hierarchy browser verification', () => {
 
       await page.setViewportSize({ height: 1000, width: 1440 });
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Recent activity' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
       await page.getByLabel('Show activity').waitFor();
       await page.getByText(/Music Has the Right to Children.*added to library/).first().waitFor();
       await page.getByText('Quality choice needed: Geogaddi by Boards of Canada').waitFor();
-      assert.deepEqual(
-        (await page.locator('.activity-timeline-meta > .hx-pill').allTextContents()).map((text) => text.trim()),
-        ['Needs attention'],
-      );
+      const attentionSection = page.locator('.activity-timeline-section--attention');
+      await attentionSection.getByRole('heading', { exact: true, name: 'Needs attention' }).waitFor();
+      await attentionSection.getByText('Quality choice needed: Geogaddi by Boards of Canada').waitFor();
+      await attentionSection.getByRole('link', { name: 'Review quality choice' }).waitFor();
+      assert.equal(await attentionSection.getByText('Music Has the Right to Children', { exact: false }).count(), 0);
+      assert.equal(await page.locator('.activity-timeline-section').count(), 2);
       await stabilizeVisualEvidencePage(page);
       await evidence.capture(page, {
-        description: 'The default timeline presents release outcomes before secondary diagnostics.',
+        description: 'Actionable release stops appear before quiet routine history and secondary diagnostics.',
         name: 'desktop-default-timeline',
         surface: 'activity-timeline',
       });

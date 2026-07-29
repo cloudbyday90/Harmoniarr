@@ -143,7 +143,7 @@ suite('Activity history initial-load browser verification', () => {
 
       await page.goto(`${baseUrl}/app/activity`, { waitUntil: 'domcontentloaded' });
       await page.waitForURL(/\/app\/activity\/feed$/);
-      await page.getByRole('heading', { exact: true, name: 'Recent activity' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
       await page.getByText('Loading recent activity...').waitFor();
       assert.equal(await page.getByText('Nothing to show yet').count(), 0);
 

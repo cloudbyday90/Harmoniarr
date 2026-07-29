@@ -56,6 +56,9 @@ The resulting design keeps Activity predictable and low-noise:
 4. Surface durable quality decisions with clear Music Queue handoffs.
 5. Continue the next slice with lifecycle coverage for searching, retrying the
    next match, download failure, and no-matches-left events.
+6. Render terminal repair work before routine history, while preserving one
+   compact routine timeline and the existing filter contract. See
+   `docs/ACTIVITY_TASK_FIRST_TIMELINE_DESIGN.md`.
 
 ## Security And Data Boundaries
 
@@ -70,5 +73,6 @@ authorized event.
 - Unit coverage proves filter categorization and quality handoff presentation.
 - Route coverage proves the Activity feed accepts the same bounded page size as
   its service contract.
-- Browser coverage proves `/app/activity` opens the timeline, filters do not
-  disrupt navigation, and diagnostics remain reachable.
+- Browser coverage proves `/app/activity` opens the timeline, terminal repair
+  work appears before routine history, filters do not disrupt navigation, and
+  diagnostics remain reachable.

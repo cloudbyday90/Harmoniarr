@@ -102,7 +102,7 @@ suite('Activity Music Queue lifecycle browser verification', () => {
       });
 
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Recent activity' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
       await page.getByText('Trying the next best match: Music Has the Right to Children by Boards of Canada').waitFor();
       await page.getByText('A download failed. Harmoniarr is trying the next best match.').waitFor();
       await page.getByText('No good matches left: Geogaddi by Boards of Canada').waitFor();
@@ -191,7 +191,7 @@ suite('Activity Music Queue lifecycle browser verification', () => {
       });
 
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Recent activity' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
 
       const story = page.locator('.activity-timeline-item').filter({
         hasText: 'Music Has the Right to Children',

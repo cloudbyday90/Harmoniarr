@@ -22,12 +22,14 @@ import {
   ACTIVITY_TIMELINE_FILTERS,
   filterActivityTimelineEvents,
   getActivityTimelineEventPresentation,
+  partitionActivityTimelineEvents,
+  requiresActivityTimelineAttention,
 } from '../../src/client/lib/activity-timeline-presentation.js';
 
 const events = [
   { id: 'download', eventType: 'download_completed' },
   { id: 'retrying', eventType: 'music_queue_match_retrying' },
-  { id: 'no-matches', eventType: 'music_queue_no_matches_left' },
+  { id: 'no-matches', eventType: 'music_queue_no_matches_left', extraPayload: { rediscoveryScheduled: true } },
   { id: 'download-failed', eventType: 'music_queue_download_failed' },
   { id: 'quality-stop', eventType: 'music_queue_quality_blocked' },
   { id: 'library', eventType: 'release_added' },
@@ -97,4 +99,26 @@ test('Activity timeline categorizes lifecycle milestones and reserves attention 
     requiresAttention: true,
     tone: 'warning',
   });
+});
+
+test('Activity timeline separates repair work from routine history without changing event order', () => {
+  assert.deepEqual(partitionActivityTimelineEvents(events), {
+    attentionEvents: [events[3], events[4]],
+    routineEvents: [events[0], events[1], events[2], events[5], events[6], events[7]],
+  });
+});
+
+test('Activity timeline promotes no-match stops only when automatic rediscovery is not scheduled', () => {
+  assert.equal(requiresActivityTimelineAttention({
+    eventType: 'music_queue_no_matches_left',
+    extraPayload: { rediscoveryScheduled: true },
+  }), false);
+  assert.equal(requiresActivityTimelineAttention({
+    eventType: 'music_queue_no_matches_left',
+    extraPayload: { rediscoveryScheduled: false },
+  }), true);
+  assert.equal(getActivityTimelineEventPresentation({
+    eventType: 'music_queue_no_matches_left',
+    extraPayload: { rediscoveryScheduled: false },
+  }).requiresAttention, true);
 });

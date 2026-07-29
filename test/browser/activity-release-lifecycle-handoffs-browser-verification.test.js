@@ -118,7 +118,7 @@ suite('Activity release lifecycle handoff browser verification', () => {
       });
 
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { exact: true, name: 'Recent activity' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Activity timeline' }).waitFor();
 
       const selected = page.getByRole('listitem').filter({ hasText: 'Match selected: Amber by Autechre' });
       await selected.getByRole('link', { name: 'Open Music Queue' }).waitFor();
@@ -131,10 +131,11 @@ suite('Activity release lifecycle handoff browser verification', () => {
       const request = page.getByRole('listitem').filter({ hasText: 'Amber by Autechre added to library' });
       await request.getByRole('link', { name: 'Open request' }).waitFor();
 
-      await page.getByRole('button', { name: 'Needs attention' }).click();
-      await warning.waitFor();
-      await unavailable.waitFor();
-      await selected.waitFor({ state: 'hidden' });
+      const attentionSection = page.locator('.activity-timeline-section--attention');
+      await attentionSection.getByRole('heading', { exact: true, name: 'Needs attention' }).waitFor();
+      await attentionSection.getByText('Audio check needs review: Amber by Autechre').waitFor();
+      await attentionSection.getByText('Audio check could not run: Tri Repetae by Autechre').waitFor();
+      await selected.waitFor();
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'activity_release_lifecycle_handoffs' });
   });

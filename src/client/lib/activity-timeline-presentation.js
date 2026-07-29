@@ -60,6 +60,25 @@ function getTimelineCategory(eventType) {
 }
 
 /**
+ * Returns whether a bounded Activity event represents a terminal state that
+ * needs a person to decide or repair something. Automatic retry and scheduled
+ * rediscovery remain routine progress rather than a false alarm.
+ */
+export function requiresActivityTimelineAttention(event = {}) {
+  switch (event?.eventType) {
+    case 'music_queue_quality_blocked':
+    case 'music_queue_download_failed':
+    case 'music_queue_audio_warning':
+    case 'music_queue_audio_check_failed':
+      return true;
+    case 'music_queue_no_matches_left':
+      return event.extraPayload?.rediscoveryScheduled !== true;
+    default:
+      return false;
+  }
+}
+
+/**
  * Produces the compact, user-facing categorization needed by the Activity
  * timeline. The raw event is retained by the caller for labels and links.
  *
@@ -69,10 +88,7 @@ function getTimelineCategory(eventType) {
 export function getActivityTimelineEventPresentation(event = {}) {
   const eventType = event?.eventType ?? null;
   const category = getTimelineCategory(eventType);
-  const requiresAttention = eventType === 'music_queue_quality_blocked'
-    || eventType === 'music_queue_download_failed'
-    || eventType === 'music_queue_audio_warning'
-    || eventType === 'music_queue_audio_check_failed';
+  const requiresAttention = requiresActivityTimelineAttention(event);
 
   if (requiresAttention) {
     return { ...category, requiresAttention, tone: 'warning' };
@@ -87,6 +103,27 @@ export function getActivityTimelineEventPresentation(event = {}) {
   }
 
   return { ...category, requiresAttention, tone: 'info' };
+}
+
+/**
+ * Separates an already-authorized, already-filtered Activity response into
+ * actions and routine history. It preserves event order and deliberately does
+ * not inspect or expose raw provider data.
+ */
+export function partitionActivityTimelineEvents(events) {
+  const sourceEvents = Array.isArray(events) ? events : [];
+
+  return sourceEvents.reduce((partition, event) => {
+    if (requiresActivityTimelineAttention(event)) {
+      partition.attentionEvents.push(event);
+    } else {
+      partition.routineEvents.push(event);
+    }
+    return partition;
+  }, {
+    attentionEvents: [],
+    routineEvents: [],
+  });
 }
 
 /**
