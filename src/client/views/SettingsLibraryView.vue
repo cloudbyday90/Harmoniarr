@@ -149,12 +149,21 @@ onMounted(() => { void loadSettings(); });
 
       <div class="settings-library__advanced-stack">
         <SettingsDisclosure
-          panel-id="settings-library-source-safety"
-          title="Source safety"
-          subtitle="Control how Harmoniarr responds to repeatedly unreliable music sources."
-          show-label="Show source safety"
-          hide-label="Hide source safety"
+          panel-id="settings-library-advanced"
+          title="Advanced library controls"
+          subtitle="Keep the recommended automation in place unless you need to tune source safety, history, matching, audio checks, or future file names."
+          show-label="Show advanced library controls"
+          hide-label="Hide advanced library controls"
         >
+          <SettingsDisclosure
+            panel-id="settings-library-source-safety"
+            title="Source safety"
+            subtitle="Control how Harmoniarr responds to repeatedly unreliable music sources."
+            show-label="Show source safety"
+            hide-label="Hide source safety"
+            variant="inline"
+            :heading-level="3"
+          >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <label class="cfg-check">
               <input type="checkbox" v-model="form.acquisition.autoIgnoreEnabled" />
@@ -175,6 +184,8 @@ onMounted(() => { void loadSettings(); });
           subtitle="Changing these limits can permanently remove older history on the next cleanup cycle."
           show-label="Show history retention"
           hide-label="Hide history retention"
+          variant="inline"
+          :heading-level="3"
         >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <p class="cfg-group-title">Operation runs</p>
@@ -207,6 +218,8 @@ onMounted(() => { void loadSettings(); });
           subtitle="Tune weighting only when you need to change how Harmoniarr chooses between otherwise acceptable matches."
           show-label="Show match ranking"
           hide-label="Hide match ranking"
+          variant="inline"
+          :heading-level="3"
         >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <p class="cfg-group-title">Format and match quality</p>
@@ -290,6 +303,8 @@ onMounted(() => { void loadSettings(); });
           subtitle="Tune spectral and source-trust thresholds only when you need stricter or looser quality checks."
           show-label="Show audio verification thresholds"
           hide-label="Hide audio verification thresholds"
+          variant="inline"
+          :heading-level="3"
         >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <p class="cfg-group-title">Spectral analysis</p>
@@ -371,6 +386,8 @@ onMounted(() => { void loadSettings(); });
           subtitle="Change these only when you want future organize runs to use a different folder or track-file format."
           show-label="Show file naming"
           hide-label="Hide file naming"
+          variant="inline"
+          :heading-level="3"
         >
           <div class="cfg-group" style="padding-top: 0; border-top: none">
             <p class="cfg-group-title">Folder naming</p>
@@ -420,6 +437,7 @@ onMounted(() => { void loadSettings(); });
               </div>
             </div>
           </div>
+        </SettingsDisclosure>
         </SettingsDisclosure>
       </div>
 

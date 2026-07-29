@@ -20,6 +20,11 @@
 import { computed, ref } from 'vue';
 
 const props = defineProps({
+  headingLevel: {
+    default: 2,
+    type: Number,
+    validator: (value) => Number.isInteger(value) && value >= 1 && value <= 6,
+  },
   hideLabel: {
     default: 'Hide options',
     type: String,
@@ -58,6 +63,7 @@ const props = defineProps({
 const emit = defineEmits(['update:open']);
 const internalOpen = ref(props.startOpen);
 const headingId = `${props.panelId}-heading`;
+const headingTag = computed(() => `h${props.headingLevel}`);
 const isControlled = computed(() => typeof props.open === 'boolean');
 const isOpen = computed(() => isControlled.value ? props.open : internalOpen.value);
 
@@ -76,7 +82,7 @@ function toggle() {
   <section class="settings-disclosure" :class="{ 'settings-disclosure--inline': variant === 'inline' }">
     <div class="settings-disclosure__header">
       <div>
-        <h2 :id="headingId" class="settings-disclosure__title">{{ title }}</h2>
+        <component :is="headingTag" :id="headingId" class="settings-disclosure__title">{{ title }}</component>
         <p v-if="subtitle" class="settings-disclosure__subtitle">{{ subtitle }}</p>
       </div>
       <button

@@ -59,9 +59,10 @@ controls.
    result, and its test action together in Connections. Keep supporting service
    health and optional source integrations, timeouts, and playlist expansion
    behind named disclosures. See `SETTINGS_CONNECTIONS_HIERARCHY_DESIGN.md`.
-4. Keep library scheduling and automatic-download preference visible. Hide
+4. Keep library scheduling and automatic-download preference visible. Place
    source policy, retention, scoring, audio thresholds, and naming templates
-   until requested.
+   behind one Advanced library controls boundary, then expose each as a named
+   inline disclosure. See `docs/SETTINGS_LIBRARY_HIERARCHY_DESIGN.md`.
 5. Keep Media folders and folder readiness visible; keep a missing path
    translation as a direct setup action, and place translation details,
    optional folders, artwork, and usage telemetry behind named disclosures.

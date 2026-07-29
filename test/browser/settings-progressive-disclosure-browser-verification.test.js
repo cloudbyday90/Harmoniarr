@@ -137,6 +137,8 @@ suite('Settings progressive disclosure browser verification', () => {
 
       await page.goto(`${baseUrl}/app/settings/library`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'Discovery scheduling' }).waitFor();
+      const advancedLibraryControls = page.getByRole('button', { name: 'Show advanced library controls' });
+      await advancedLibraryControls.click();
       const matchRanking = page.getByRole('button', { name: 'Show match ranking' });
       await matchRanking.click();
       await page.getByLabel('Format tier').waitFor();

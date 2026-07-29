@@ -50,6 +50,24 @@ test('Media and storage leads with required folders and keeps supporting control
   assert.match(source, /isPathTranslationsOpen\.value = true/);
 });
 
+test('Library groups specialist tuning behind a single advanced boundary with nested headings', async () => {
+  const source = await readFile(new URL('../../src/client/views/SettingsLibraryView.vue', import.meta.url), 'utf8');
+
+  assert.match(source, /title="Advanced library controls"/);
+  assert.match(source, /show-label="Show advanced library controls"/);
+  assert.match(source, /panel-id="settings-library-match-ranking"[\s\S]*?:heading-level="3"/);
+  assert.match(source, /panel-id="settings-library-audio-verification"[\s\S]*?:heading-level="3"/);
+  assert.ok(source.indexOf('title="Advanced library controls"') < source.indexOf('panel-id="settings-library-source-safety"'));
+});
+
+test('Settings disclosures allow nested sections to use a logical heading level', async () => {
+  const source = await readFile(DISCLOSURE_PATH, 'utf8');
+
+  assert.match(source, /headingLevel/);
+  assert.match(source, /const headingTag = computed\(\(\) => `h\$\{props\.headingLevel\}`\)/);
+  assert.match(source, /<component :is="headingTag"/);
+});
+
 test('Folder readiness presents saved checks before optional validation detail', async () => {
   const source = await readFile(new URL('../../src/client/components/settings/SettingsFolderReadiness.vue', import.meta.url), 'utf8');
 
