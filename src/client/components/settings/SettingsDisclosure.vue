@@ -17,12 +17,16 @@
 -->
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
   hideLabel: {
     default: 'Hide options',
     type: String,
+  },
+  open: {
+    default: undefined,
+    type: Boolean,
   },
   panelId: {
     required: true,
@@ -51,11 +55,20 @@ const props = defineProps({
   },
 });
 
-const isOpen = ref(props.startOpen);
+const emit = defineEmits(['update:open']);
+const internalOpen = ref(props.startOpen);
 const headingId = `${props.panelId}-heading`;
+const isControlled = computed(() => typeof props.open === 'boolean');
+const isOpen = computed(() => isControlled.value ? props.open : internalOpen.value);
 
 function toggle() {
-  isOpen.value = !isOpen.value;
+  const nextValue = !isOpen.value;
+  if (isControlled.value) {
+    emit('update:open', nextValue);
+    return;
+  }
+
+  internalOpen.value = nextValue;
 }
 </script>
 

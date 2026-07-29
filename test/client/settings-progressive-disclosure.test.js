@@ -34,6 +34,29 @@ test('SettingsDisclosure uses a semantic disclosure button and preserves hidden 
   assert.match(source, /v-show="isOpen"/);
   assert.match(source, /role="region"/);
   assert.match(source, /<slot \/>/);
+  assert.match(source, /defineEmits\(\['update:open'\]\)/);
+  assert.match(source, /const isControlled = computed\(\(\) => typeof props\.open === 'boolean'\)/);
+  assert.match(source, /emit\('update:open', nextValue\)/);
+});
+
+test('Media and storage leads with required folders and keeps supporting controls disclosed', async () => {
+  const source = await readFile(new URL('../../src/client/views/SettingsMediaStorageView.vue', import.meta.url), 'utf8');
+
+  assert.ok(source.indexOf('>Media folders<') < source.indexOf('title="Cover art"'));
+  assert.match(source, /<SettingsFolderReadiness :validation="pathValidation" \/>/);
+  assert.match(source, /v-model:open="isPathTranslationsOpen"/);
+  assert.match(source, /title="Additional folder options"/);
+  assert.match(source, /title="Artwork provider usage"/);
+  assert.match(source, /isPathTranslationsOpen\.value = true/);
+});
+
+test('Folder readiness presents saved checks before optional validation detail', async () => {
+  const source = await readFile(new URL('../../src/client/components/settings/SettingsFolderReadiness.vue', import.meta.url), 'utf8');
+
+  assert.match(source, />Folder readiness</);
+  assert.match(source, /role="status"/);
+  assert.match(source, /title="Folder validation details"/);
+  assert.match(source, /formatPathValidationNote\(validation\?\.notes\?\.remoteSlskdValidation\)/);
 });
 
 test('Settings setup prioritizes a healthy Soulseek connection without exposing connection secrets', () => {

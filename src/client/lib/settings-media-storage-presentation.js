@@ -160,3 +160,50 @@ export function buildPathTranslationSetupPrompt({
 export function buildDownloadMappingSourceLabel() {
   return 'Download client path';
 }
+
+/**
+ * Builds the concise folder-readiness state shown next to the saved folder
+ * settings. The result intentionally distinguishes an absent validation from
+ * a failing validation so a first visit never looks like a broken setup.
+ *
+ * @param {object|null|undefined} validation
+ * @returns {{message: string, status: string, statusLabel: string, tone: 'success'|'danger'|'warning'}}
+ */
+export function buildFolderReadinessSummary(validation) {
+  if (!validation?.summary) {
+    return {
+      message: 'Save folder changes to check that Harmoniarr can use them.',
+      status: 'not_checked',
+      statusLabel: 'Not checked',
+      tone: 'warning',
+    };
+  }
+
+  const status = validation.summary.status;
+  return {
+    message: validation.summary.message ?? 'Folder readiness was checked.',
+    status,
+    statusLabel: formatPathStatusLabel(status),
+    tone: formatPathStatusTone(status),
+  };
+}
+
+/**
+ * Returns all non-healthy validation entries that may require a closer look.
+ * The raw entries remain server-sanitized settings data; this helper only
+ * shapes their display grouping.
+ *
+ * @param {object|null|undefined} validation
+ * @returns {object[]}
+ */
+export function getFolderReadinessAttention(validation) {
+  const groups = [
+    validation?.roots,
+    validation?.downloadMappings,
+    validation?.userMusicRoots,
+  ];
+
+  return groups
+    .flatMap((entries) => Array.isArray(entries) ? entries : [])
+    .filter((entry) => entry?.status && entry.status !== 'healthy');
+}

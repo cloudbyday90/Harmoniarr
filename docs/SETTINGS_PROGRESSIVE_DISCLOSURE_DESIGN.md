@@ -62,8 +62,10 @@ controls.
 4. Keep library scheduling and automatic-download preference visible. Hide
    source policy, retention, scoring, audio thresholds, and naming templates
    until requested.
-5. Keep folder locations and validation visible; place optional artwork and
-   path translation details behind named disclosures.
+5. Keep Media folders and folder readiness visible; keep a missing path
+   translation as a direct setup action, and place translation details,
+   optional folders, artwork, and usage telemetry behind named disclosures.
+   See `docs/SETTINGS_MEDIA_STORAGE_HIERARCHY_DESIGN.md`.
 6. Preserve the existing routes, server-side validation, CSRF requirements,
    write-only secret behavior, and generic error handling. This is a UI
    information-architecture change, not a relaxation of security controls.

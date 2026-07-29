@@ -21,6 +21,7 @@ import assert from 'node:assert/strict';
 import {
   buildDownloadMappingSourceLabel,
   buildDownloadsPathHint,
+  buildFolderReadinessSummary,
   buildPathTranslationSetupPrompt,
   buildPathTranslationsDescription,
   buildPathTranslationsEmptyState,
@@ -30,6 +31,7 @@ import {
   formatPathStatusTone,
   formatPathValidationNote,
   formatUserRootLabel,
+  getFolderReadinessAttention,
 } from '../../src/client/lib/settings-media-storage-presentation.js';
 
 // ---------------------------------------------------------------------------
@@ -349,5 +351,46 @@ describe('buildDownloadMappingSourceLabel', () => {
 
   it('uses plain language for the field label', () => {
     assert.match(buildDownloadMappingSourceLabel(), /download client/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// folder readiness
+// ---------------------------------------------------------------------------
+describe('buildFolderReadinessSummary', () => {
+  it('distinguishes an unvalidated first visit from a failed folder check', () => {
+    assert.deepEqual(buildFolderReadinessSummary(null), {
+      message: 'Save folder changes to check that Harmoniarr can use them.',
+      status: 'not_checked',
+      statusLabel: 'Not checked',
+      tone: 'warning',
+    });
+  });
+
+  it('uses the saved validation summary without exposing a raw status value', () => {
+    assert.deepEqual(buildFolderReadinessSummary({
+      summary: { message: 'Your folders are ready for automatic downloads.', status: 'healthy' },
+    }), {
+      message: 'Your folders are ready for automatic downloads.',
+      status: 'healthy',
+      statusLabel: 'Healthy',
+      tone: 'success',
+    });
+  });
+});
+
+describe('getFolderReadinessAttention', () => {
+  it('returns only non-healthy checks across folders, translations, and personal folders', () => {
+    const attention = getFolderReadinessAttention({
+      downloadMappings: [{ key: 'mapping', status: 'unavailable' }],
+      roots: [{ key: 'downloads', status: 'healthy' }, { key: 'music', status: 'warning' }],
+      userMusicRoots: [{ key: 'household', status: 'healthy' }],
+    });
+
+    assert.deepEqual(attention.map((entry) => entry.key), ['music', 'mapping']);
+  });
+
+  it('is safe when validation has not been returned yet', () => {
+    assert.deepEqual(getFolderReadinessAttention(undefined), []);
   });
 });

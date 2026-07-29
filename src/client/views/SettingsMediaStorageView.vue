@@ -36,14 +36,10 @@ import {
   buildPathTranslationSetupPrompt,
   buildPathTranslationsDescription,
   buildPathTranslationsEmptyState,
-  formatMappingLabel,
-  formatPathStatusLabel,
-  formatPathStatusTone,
-  formatPathValidationNote,
-  formatUserRootLabel,
 } from '../lib/settings-media-storage-presentation.js';
 import FolderBrowserModal from '../components/FolderBrowserModal.vue';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
+import SettingsFolderReadiness from '../components/settings/SettingsFolderReadiness.vue';
 import { useArtworkQuota } from '../composables/useArtworkQuota.js';
 import { useQuotaHistory } from '../composables/useQuotaHistory.js';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
@@ -74,6 +70,7 @@ const browseTarget = ref(null);
 const browseInitial = ref('/');
 const browseLabel = ref('Select a folder');
 const browseOpen = ref(false);
+const isPathTranslationsOpen = ref(false);
 
 function openBrowse(label, currentValue, callback) {
   browseLabel.value = label;
@@ -103,6 +100,7 @@ function addDownloadMapping() {
     ...createEmptyDownloadMapping(),
     harmoniarrPrefix: form.paths.downloads,
   });
+  isPathTranslationsOpen.value = true;
 }
 function removeDownloadMapping(index) { form.paths.downloadMappings.splice(index, 1); }
 function addUserMusicRoot() { form.paths.userMusicRoots.push(createEmptyUserMusicRoot()); }
@@ -152,7 +150,134 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
     </article>
 
     <form @submit.prevent="saveSettings" v-else>
-      <div class="cfg-2col">
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h3 class="hx-card-title">Media folders</h3>
+            <p class="hx-card-subtitle">Choose the folders Harmoniarr needs to receive, prepare, and organize music.</p>
+          </div>
+        </header>
+        <div class="hx-card-body">
+          <div class="cfg-group" style="padding-top: 0; border-top: none">
+            <div class="hx-field">
+              <label class="hx-field-label" for="settings-downloads-folder">Downloads folder</label>
+              <div class="hx-field-with-browse">
+                <input id="settings-downloads-folder" class="hx-input" v-model="form.paths.downloads" />
+                <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Downloads folder', form.paths.downloads, v => form.paths.downloads = v)">Browse…</button>
+              </div>
+              <p class="cfg-field-hint">{{ buildDownloadsPathHint() }}</p>
+            </div>
+            <div class="hx-field">
+              <label class="hx-field-label" for="settings-music-library">Music library</label>
+              <div class="hx-field-with-browse">
+                <input id="settings-music-library" class="hx-input" v-model="form.paths.music" />
+                <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Music library', form.paths.music, v => form.paths.music = v)">Browse…</button>
+              </div>
+              <p class="cfg-field-hint">Your organized music collection. Accepted imports are moved here.</p>
+            </div>
+            <div class="hx-field">
+              <label class="hx-field-label" for="settings-staging-area">Staging area</label>
+              <div class="hx-field-with-browse">
+                <input id="settings-staging-area" class="hx-input" v-model="form.paths.staging" />
+                <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Staging area', form.paths.staging, v => form.paths.staging = v)">Browse…</button>
+              </div>
+              <p class="cfg-field-hint">A holding area where files wait while Harmoniarr prepares an import.</p>
+            </div>
+          </div>
+
+          <SettingsFolderReadiness :validation="pathValidation" />
+
+          <div v-if="pathTranslationSetupPrompt" class="cfg-download-setup" role="status">
+            <div>
+              <strong>{{ pathTranslationSetupPrompt.title }}</strong>
+              <p>{{ pathTranslationSetupPrompt.description }}</p>
+            </div>
+            <button type="button" class="hx-btn" data-variant="primary" @click="addDownloadMapping">
+              {{ pathTranslationSetupPrompt.actionLabel }}
+            </button>
+          </div>
+
+          <SettingsDisclosure
+            v-model:open="isPathTranslationsOpen"
+            panel-id="settings-path-translations"
+            title="Path translations"
+            :subtitle="buildPathTranslationsDescription()"
+            show-label="Show path translations"
+            hide-label="Hide path translations"
+            variant="inline"
+          >
+            <div class="cfg-subsection-header">
+              <p class="cfg-group-title">Path translations</p>
+              <button type="button" class="hx-btn" @click="addDownloadMapping">Add path translation</button>
+            </div>
+            <div class="hx-empty" v-if="!form.paths.downloadMappings.length">
+              <p class="hx-empty-copy">{{ buildPathTranslationsEmptyState() }}</p>
+            </div>
+            <div class="cfg-mapping-list" v-else>
+              <div class="cfg-mapping-card" v-for="(mapping, index) in form.paths.downloadMappings" :key="index">
+                <div class="hx-form-row">
+                  <div class="hx-field">
+                    <label class="hx-field-label">{{ buildDownloadMappingSourceLabel() }}</label>
+                    <input class="hx-input" v-model="mapping.slskdPrefix" placeholder="/downloads/complete" />
+                  </div>
+                  <div class="hx-field">
+                    <label class="hx-field-label">Harmoniarr sees it as</label>
+                    <input class="hx-input" v-model="mapping.harmoniarrPrefix" placeholder="/data/downloads/complete" />
+                  </div>
+                </div>
+                <button type="button" class="hx-btn" data-variant="ghost" @click="removeDownloadMapping(index)">Remove</button>
+              </div>
+            </div>
+          </SettingsDisclosure>
+
+          <SettingsDisclosure
+            panel-id="settings-additional-folder-options"
+            title="Additional folder options"
+            subtitle="Use these only for audio conversion workspace or separate household library folders."
+            show-label="Show additional folder options"
+            hide-label="Hide additional folder options"
+            variant="inline"
+          >
+            <div class="hx-field">
+              <label class="hx-field-label" for="settings-transcode-workspace">Transcode workspace</label>
+              <div class="hx-field-with-browse">
+                <input id="settings-transcode-workspace" class="hx-input" v-model="form.paths.transcodeTemp" />
+                <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Transcode workspace', form.paths.transcodeTemp, v => form.paths.transcodeTemp = v)">Browse…</button>
+              </div>
+              <p class="cfg-field-hint">Temporary space used when converting audio formats. It can point to fast storage.</p>
+            </div>
+            <div class="cfg-group">
+              <div class="cfg-subsection-header">
+                <div>
+                  <p class="cfg-group-title">Per-user library folders</p>
+                  <p class="hx-text-muted">Give each user a subfolder inside the music library instead of using the shared root.</p>
+                </div>
+                <button type="button" class="hx-btn" @click="addUserMusicRoot">Add folder</button>
+              </div>
+              <div class="hx-empty" v-if="!form.paths.userMusicRoots.length">
+                <p class="hx-empty-copy">Without a personal folder, everyone's imports land in the shared library root.</p>
+              </div>
+              <div class="cfg-mapping-list" v-else>
+                <div class="cfg-mapping-card" v-for="(userMusicRoot, index) in form.paths.userMusicRoots" :key="`user-music-root-${index}`">
+                  <div class="hx-form-row">
+                    <div class="hx-field">
+                      <label class="hx-field-label">User</label>
+                      <input class="hx-input" v-model="userMusicRoot.userId" placeholder="alice" />
+                    </div>
+                    <div class="hx-field">
+                      <label class="hx-field-label">Subfolder</label>
+                      <input class="hx-input" v-model="userMusicRoot.relativeRoot" placeholder="household/alice" />
+                    </div>
+                  </div>
+                  <button type="button" class="hx-btn" data-variant="ghost" @click="removeUserMusicRoot(index)">Remove</button>
+                </div>
+              </div>
+            </div>
+          </SettingsDisclosure>
+        </div>
+      </article>
+
+      <div class="settings-media-storage__artwork-stack">
 
         <SettingsDisclosure
           panel-id="settings-cover-art"
@@ -269,134 +394,22 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
 
         </SettingsDisclosure>
 
-        <!-- Folder locations -->
-        <article class="hx-card">
-          <header class="hx-card-header">
-            <div>
-              <h3 class="hx-card-title">Folder locations</h3>
-              <p class="hx-card-subtitle">Tell Harmoniarr where your files live on disk.</p>
-            </div>
-          </header>
-          <div class="hx-card-body">
-
-            <div class="cfg-group" style="padding-top: 0; border-top: none">
-              <div class="hx-field">
-                <label class="hx-field-label" for="settings-downloads-folder">Downloads folder</label>
-                <div class="hx-field-with-browse">
-                  <input id="settings-downloads-folder" class="hx-input" v-model="form.paths.downloads" />
-                  <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Downloads folder', form.paths.downloads, v => form.paths.downloads = v)">Browse…</button>
-                </div>
-                <p class="cfg-field-hint">{{ buildDownloadsPathHint() }}</p>
-              </div>
-              <div class="hx-field">
-                <label class="hx-field-label" for="settings-music-library">Music library</label>
-                <div class="hx-field-with-browse">
-                  <input id="settings-music-library" class="hx-input" v-model="form.paths.music" />
-                  <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Music library', form.paths.music, v => form.paths.music = v)">Browse…</button>
-                </div>
-                <p class="cfg-field-hint">Your organized music collection. Accepted imports are moved here.</p>
-              </div>
-              <div class="hx-field">
-                <label class="hx-field-label" for="settings-staging-area">Staging area</label>
-                <div class="hx-field-with-browse">
-                  <input id="settings-staging-area" class="hx-input" v-model="form.paths.staging" />
-                  <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Staging area', form.paths.staging, v => form.paths.staging = v)">Browse…</button>
-                </div>
-                <p class="cfg-field-hint">A holding area where files wait while an import is being reviewed.</p>
-              </div>
-              <div class="hx-field">
-                <label class="hx-field-label" for="settings-transcode-workspace">Transcode workspace</label>
-                <div class="hx-field-with-browse">
-                  <input id="settings-transcode-workspace" class="hx-input" v-model="form.paths.transcodeTemp" />
-                  <button type="button" class="hx-btn fb-trigger" @click="openBrowse('Transcode workspace', form.paths.transcodeTemp, v => form.paths.transcodeTemp = v)">Browse…</button>
-                </div>
-                <p class="cfg-field-hint">Temporary space used when converting audio formats. Can point to fast storage.</p>
-              </div>
-            </div>
-
-            <!-- Path translations -->
-            <div class="cfg-group">
-              <div v-if="pathTranslationSetupPrompt" class="cfg-download-setup" role="status">
-                <div>
-                  <strong>{{ pathTranslationSetupPrompt.title }}</strong>
-                  <p>{{ pathTranslationSetupPrompt.description }}</p>
-                </div>
-                <button type="button" class="hx-btn" data-variant="primary" @click="addDownloadMapping">
-                  {{ pathTranslationSetupPrompt.actionLabel }}
-                </button>
-              </div>
-              <div class="cfg-subsection-header">
-                <div>
-                  <p class="cfg-group-title">Path translations</p>
-                  <p class="hx-text-muted">{{ buildPathTranslationsDescription() }}</p>
-                </div>
-                <button type="button" class="hx-btn" @click="addDownloadMapping">Add</button>
-              </div>
-              <div class="hx-empty" v-if="!form.paths.downloadMappings.length">
-                <p class="hx-empty-copy">{{ buildPathTranslationsEmptyState() }}</p>
-              </div>
-              <div class="cfg-mapping-list" v-else>
-                <div class="cfg-mapping-card" v-for="(mapping, index) in form.paths.downloadMappings" :key="index">
-                  <div class="hx-form-row">
-                    <div class="hx-field">
-                      <label class="hx-field-label">{{ buildDownloadMappingSourceLabel() }}</label>
-                      <input class="hx-input" v-model="mapping.slskdPrefix" placeholder="/downloads/complete" />
-                    </div>
-                    <div class="hx-field">
-                      <label class="hx-field-label">Harmoniarr sees it as</label>
-                      <input class="hx-input" v-model="mapping.harmoniarrPrefix" placeholder="/data/downloads/complete" />
-                    </div>
-                  </div>
-                  <button type="button" class="hx-btn" data-variant="ghost" @click="removeDownloadMapping(index)">Remove</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Per-user library folders -->
-            <div class="cfg-group">
-              <div class="cfg-subsection-header">
-                <div>
-                  <p class="cfg-group-title">Per-user library folders</p>
-                  <p class="hx-text-muted">Give each user their own subfolder inside the music library. Their imports go into that folder instead of the shared root.</p>
-                </div>
-                <button type="button" class="hx-btn" @click="addUserMusicRoot">Add</button>
-              </div>
-              <div class="hx-empty" v-if="!form.paths.userMusicRoots.length">
-                <p class="hx-empty-copy">Without a personal folder, everyone's imports land in the shared library root.</p>
-              </div>
-              <div class="cfg-mapping-list" v-else>
-                <div class="cfg-mapping-card" v-for="(userMusicRoot, index) in form.paths.userMusicRoots" :key="`user-music-root-${index}`">
-                  <div class="hx-form-row">
-                    <div class="hx-field">
-                      <label class="hx-field-label">User</label>
-                      <input class="hx-input" v-model="userMusicRoot.userId" placeholder="alice" />
-                    </div>
-                    <div class="hx-field">
-                      <label class="hx-field-label">Subfolder</label>
-                      <input class="hx-input" v-model="userMusicRoot.relativeRoot" placeholder="household/alice" />
-                    </div>
-                  </div>
-                  <button type="button" class="hx-btn" data-variant="ghost" @click="removeUserMusicRoot(index)">Remove</button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </article>
       </div>
 
-      <!-- Artwork provider quota -->
-      <article class="hx-card" style="margin-top: var(--hx-space-4)" v-if="artworkQuota.quota.value">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Artwork provider quota</h3>
-            <p class="hx-card-subtitle">Daily request usage for external artwork providers. Resets at midnight UTC.</p>
-          </div>
+      <SettingsDisclosure
+        v-if="artworkQuota.quota.value"
+        panel-id="settings-artwork-provider-usage"
+        title="Artwork provider usage"
+        subtitle="Daily request usage for external artwork providers. Resets at midnight UTC."
+        show-label="Show artwork provider usage"
+        hide-label="Hide artwork provider usage"
+      >
+        <div class="settings-media-storage__quota-status" role="status" aria-atomic="true">
           <span class="hx-pill" :data-tone="artworkQuota.anyExceeded.value ? 'danger' : 'success'">
             {{ artworkQuota.anyExceeded.value ? 'Limit reached' : 'Within limits' }}
           </span>
-        </header>
-        <div class="hx-card-body">
+          <span class="hx-text-muted">{{ artworkQuota.anyExceeded.value ? 'Artwork requests will resume after the next daily reset.' : 'Artwork requests are within the daily limit.' }}</span>
+        </div>
           <div class="cfg-quota-grid">
             <div class="cfg-quota-card" v-for="provider in artworkQuota.providers.value" :key="provider.provider">
               <div class="cfg-quota-header">
@@ -430,71 +443,7 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
               </div>
             </div>
           </div>
-        </div>
-      </article>
-
-      <!-- Path validation (read-only, shown post-save) -->
-      <article class="hx-card" style="margin-top: var(--hx-space-4)" v-if="pathValidation">
-        <header class="hx-card-header">
-          <div>
-            <h3 class="hx-card-title">Path validation</h3>
-            <p class="hx-card-subtitle">{{ pathValidation.summary.message }}</p>
-          </div>
-          <span class="hx-pill" :data-tone="formatPathStatusTone(pathValidation.summary.status)">
-            {{ formatPathStatusLabel(pathValidation.summary.status) }}
-          </span>
-        </header>
-        <div class="hx-card-body" v-if="pathValidation.roots?.length">
-          <div class="dependency-grid">
-            <article class="dependency-card" :class="`dependency-card-${root.status}`" v-for="root in pathValidation.roots" :key="root.key">
-              <div class="dependency-card-header">
-                <div>
-                  <p>{{ root.label }}</p>
-                  <strong>{{ root.path }}</strong>
-                </div>
-                <span class="dependency-status-dot" />
-              </div>
-              <p class="dependency-message">{{ root.message }}</p>
-              <p class="dependency-observed" v-if="root.resolvedPath && root.resolvedPath !== root.path">Resolved {{ root.resolvedPath }}</p>
-            </article>
-          </div>
-        </div>
-        <div class="hx-card-body" v-if="pathValidation.downloadMappings?.length">
-          <div class="cfg-mapping-list">
-            <div class="cfg-mapping-card" v-for="mapping in pathValidation.downloadMappings" :key="mapping.index">
-              <div class="cfg-provider-header">
-                <span>
-                  <strong>{{ formatMappingLabel(mapping.index) }}</strong>
-                  <span class="hx-text-muted"> — {{ mapping.slskdPrefix }} → {{ mapping.harmoniarrPrefix }}</span>
-                </span>
-                <span class="hx-pill" :data-tone="formatPathStatusTone(mapping.status)">{{ formatPathStatusLabel(mapping.status) }}</span>
-              </div>
-              <p class="hx-text-muted">{{ mapping.message }}</p>
-              <dl class="review-meta-grid review-meta-grid-wide">
-                <div><dt>Example source</dt><dd>{{ mapping.exampleSourcePath }}</dd></div>
-                <div><dt>Example translated</dt><dd>{{ mapping.exampleTranslatedPath }}</dd></div>
-              </dl>
-            </div>
-          </div>
-        </div>
-        <div class="hx-card-body" v-if="pathValidation.userMusicRoots?.length">
-          <div class="cfg-mapping-list">
-            <div class="cfg-mapping-card" v-for="userMusicRoot in pathValidation.userMusicRoots" :key="`validated-user-root-${userMusicRoot.index}`">
-              <div class="cfg-provider-header">
-                <span>
-                  <strong>{{ formatUserRootLabel(userMusicRoot.index) }}</strong>
-                  <span class="hx-text-muted"> — {{ userMusicRoot.userId }} → {{ userMusicRoot.relativeRoot }}</span>
-                </span>
-                <span class="hx-pill" :data-tone="formatPathStatusTone(userMusicRoot.status)">{{ formatPathStatusLabel(userMusicRoot.status) }}</span>
-              </div>
-              <p class="hx-text-muted">{{ userMusicRoot.message }}</p>
-            </div>
-          </div>
-        </div>
-        <div class="hx-card-body" v-if="!pathValidation.downloadMappings?.length && !pathValidation.userMusicRoots?.length && formatPathValidationNote(pathValidation.notes?.remoteSlskdValidation)">
-          <p class="hx-text-muted">{{ formatPathValidationNote(pathValidation.notes?.remoteSlskdValidation) }}</p>
-        </div>
-      </article>
+      </SettingsDisclosure>
 
       <div class="cfg-save-bar">
         <span class="cfg-save-msg is-error" v-if="errorMessage">{{ errorMessage }}</span>
@@ -516,6 +465,20 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
 </template>
 
 <style scoped>
+.settings-media-storage__artwork-stack {
+  display: grid;
+  gap: var(--hx-space-4);
+  margin-top: var(--hx-space-4);
+}
+
+.settings-media-storage__quota-status {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin-bottom: var(--hx-space-3);
+}
+
 .cfg-quota-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

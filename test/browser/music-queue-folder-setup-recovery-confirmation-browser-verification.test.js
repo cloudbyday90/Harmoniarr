@@ -152,7 +152,8 @@ suite('Music Queue folder setup recovery confirmation browser verification', () 
         stoppedRelease.getByRole('link', { name: 'Set up folders' }).click(),
       ]);
 
-      await page.getByRole('heading', { name: 'Folder locations' }).waitFor();
+      await page.getByRole('heading', { name: 'Media folders' }).waitFor();
+      await page.getByRole('heading', { name: 'Folder readiness' }).waitFor();
       await page.getByLabel('Downloads folder').fill('/data/downloads');
       await page.getByLabel('Music library').fill('/data/music');
       await page.getByLabel('Staging area').fill('/data/staging');
@@ -166,7 +167,9 @@ suite('Music Queue folder setup recovery confirmation browser verification', () 
         page.getByRole('button', { name: 'Save settings' }).click(),
       ]);
 
-      const confirmation = page.getByRole('status');
+      const confirmation = page.getByRole('status').filter({
+        hasText: 'Settings saved. Music Queue is searching for 1 release automatically.',
+      });
       await confirmation.getByText('Settings saved. Music Queue is searching for 1 release automatically.').waitFor();
       assert.equal(await confirmation.getAttribute('aria-atomic'), 'true');
       assert.equal(savedSettingsPayload.paths.downloads, '/data/downloads');
