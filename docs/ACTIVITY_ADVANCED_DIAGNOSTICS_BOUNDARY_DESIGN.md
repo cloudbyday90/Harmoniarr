@@ -88,3 +88,6 @@ Import Review route-state normalizer remains the allowlist for that state.
 3. Use Activity for events and minimal repair handoffs.
 4. Keep match/import/apply controls under `Advanced diagnostics` until their
    release-level replacements are proven end to end.
+5. Group diagnostic links by operator task, put recovery first, and keep DOM
+   order aligned with visual order. See
+   `docs/ACTIVITY_ADVANCED_DIAGNOSTICS_TASK_GROUPING_DESIGN.md`.

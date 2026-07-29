@@ -19,22 +19,9 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import ActivityDiagnosticsDisclosure from '../components/activity/ActivityDiagnosticsDisclosure.vue';
 
 const route = useRoute();
-
-const diagnosticLinks = Object.freeze([
-  { name: 'activity-operations', label: 'Background jobs' },
-  { name: 'activity-diagnostics-matches', label: 'Match diagnostics' },
-  { name: 'activity-wanted', label: 'Wanted releases' },
-  { name: 'activity-diagnostics-library-adds', label: 'Library-add diagnostics' },
-  { name: 'activity-requests', label: 'Request records' },
-  { name: 'activity-users', label: 'Source users' },
-  { name: 'activity-blocklist', label: 'Source blocklist' },
-  { name: 'activity-ignored', label: 'Ignored source users' },
-  { name: 'activity-diagnostics-failed-library-adds', label: 'Failed library adds' },
-  { name: 'activity-monitored-artists', label: 'Monitored artists' },
-  { name: 'activity-history', label: 'System history' },
-]);
 
 const isTimelineRoute = computed(() => route.name === 'activity-feed');
 </script>
@@ -48,27 +35,13 @@ const isTimelineRoute = computed(() => route.name === 'activity-feed');
       </div>
     </header>
 
-    <details class="activity-diagnostics" :class="{ 'is-secondary': isTimelineRoute }" :open="!isTimelineRoute">
-      <summary>Advanced diagnostics</summary>
-      <div class="activity-diagnostics-body">
-        <p>Background jobs, match details, and system records for troubleshooting.</p>
-        <nav class="activity-diagnostics-links" aria-label="Advanced Activity diagnostics">
-          <RouterLink
-            v-for="link in diagnosticLinks"
-            :key="link.name"
-            :to="{ name: link.name }"
-            class="hx-btn"
-            data-variant="ghost"
-          >
-            {{ link.label }}
-          </RouterLink>
-        </nav>
-      </div>
-    </details>
+    <ActivityDiagnosticsDisclosure v-if="!isTimelineRoute" :open="true" />
 
     <div class="activity-workspace-content">
       <RouterView />
     </div>
+
+    <ActivityDiagnosticsDisclosure v-if="isTimelineRoute" />
   </section>
 </template>
 
@@ -78,51 +51,7 @@ const isTimelineRoute = computed(() => route.name === 'activity-feed');
   gap: var(--hx-space-4);
 }
 
-.activity-diagnostics {
-  order: 1;
-  border: 1px solid var(--hx-border-subtle);
-  border-radius: var(--hx-radius-sm);
-  background: var(--hx-bg-surface);
-}
-
-.activity-diagnostics.is-secondary {
-  order: 3;
-}
-
 .activity-workspace-content {
   min-width: 0;
-  order: 2;
-}
-
-.activity-diagnostics summary {
-  padding: var(--hx-space-3) var(--hx-space-4);
-  color: var(--hx-text-strong);
-  cursor: pointer;
-  font-size: var(--hx-text-sm);
-  font-weight: 600;
-}
-
-.activity-diagnostics-body {
-  display: grid;
-  gap: var(--hx-space-3);
-  padding: 0 var(--hx-space-4) var(--hx-space-4);
-}
-
-.activity-diagnostics-body p {
-  margin: 0;
-  color: var(--hx-text-muted);
-  font-size: var(--hx-text-sm);
-}
-
-.activity-diagnostics-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hx-space-2);
-}
-
-@media (max-width: 640px) {
-  .activity-diagnostics-links > * {
-    flex: 1 1 calc(50% - var(--hx-space-2));
-  }
 }
 </style>

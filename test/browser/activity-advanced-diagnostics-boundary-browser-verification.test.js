@@ -76,12 +76,41 @@ suite('Activity advanced diagnostics boundary browser verification', () => {
       assert.equal(await diagnostics.evaluate((element) => element.open), false);
 
       await diagnostics.getByText('Advanced diagnostics', { exact: true }).click();
+      await diagnostics.getByRole('heading', { name: 'Diagnostic tasks', exact: true }).waitFor();
+      await diagnostics.getByRole('heading', { name: 'Resolve an issue', exact: true }).waitFor();
+      await diagnostics.getByText('Start here when background work is stalled, paused, or could not add music.').waitFor();
+      await diagnostics.getByRole('link', { name: 'Background jobs' }).waitFor();
+      await diagnostics.getByRole('link', { name: 'Failed library adds' }).waitFor();
+      await diagnostics.getByRole('heading', { name: 'Inspect music', exact: true }).waitFor();
       await diagnostics.getByRole('link', { name: 'Match diagnostics' }).waitFor();
       await diagnostics.getByRole('link', { name: 'Library-add diagnostics' }).waitFor();
+      assert.equal(await diagnostics.locator('.activity-diagnostic-group').count(), 4);
+      assert.equal(await diagnostics.getByText(/candidate(?:s)?/i).count(), 0);
+
+      const timelineOrder = await page.locator('.activity-workspace').evaluate((workspace) => [
+        ...workspace.children,
+      ].filter((child) => child.classList.contains('activity-workspace-content') || child.matches('details'))
+        .map((child) => child.classList.contains('activity-workspace-content') ? 'content' : 'diagnostics'));
+      assert.deepEqual(timelineOrder, ['content', 'diagnostics']);
+
+      await page.setViewportSize({ height: 844, width: 390 });
+      const mobileDiagnostics = await diagnostics.evaluate((element) => ({
+        minimumLinkHeight: Math.min(...[...element.querySelectorAll('.activity-diagnostic-group a')]
+          .map((link) => link.getBoundingClientRect().height)),
+        scrollWidth: globalThis.document.documentElement.scrollWidth,
+        viewportWidth: globalThis.innerWidth,
+      }));
+      assert.ok(mobileDiagnostics.minimumLinkHeight >= 44, 'Diagnostic links should keep a usable mobile target.');
+      assert.ok(mobileDiagnostics.scrollWidth <= mobileDiagnostics.viewportWidth, 'Diagnostic groups should not overflow mobile width.');
 
       await diagnostics.getByRole('link', { name: 'Match diagnostics' }).click();
       await page.waitForFunction(() => globalThis.location.pathname === '/app/activity/diagnostics/matches');
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
+      const directDiagnosticOrder = await page.locator('.activity-workspace').evaluate((workspace) => [
+        ...workspace.children,
+      ].filter((child) => child.classList.contains('activity-workspace-content') || child.matches('details'))
+        .map((child) => child.classList.contains('activity-workspace-content') ? 'content' : 'diagnostics'));
+      assert.deepEqual(directDiagnosticOrder, ['diagnostics', 'content']);
 
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=legacy-candidate#import-review-selection-stage`, {
         waitUntil: 'domcontentloaded',

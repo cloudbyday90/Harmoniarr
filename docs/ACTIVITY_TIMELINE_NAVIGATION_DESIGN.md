@@ -59,6 +59,9 @@ The resulting design keeps Activity predictable and low-noise:
 6. Render terminal repair work before routine history, while preserving one
    compact routine timeline and the existing filter contract. See
    `docs/ACTIVITY_TASK_FIRST_TIMELINE_DESIGN.md`.
+7. Group the retained specialist links by troubleshooting task and make
+   recovery discoverable before source/history records. See
+   `docs/ACTIVITY_ADVANCED_DIAGNOSTICS_TASK_GROUPING_DESIGN.md`.
 
 ## Security And Data Boundaries
 
