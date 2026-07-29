@@ -18,6 +18,7 @@ import {
   seedMetadataImportReviewWorkspace,
 } from '../../testing/browser/metadata-browser-fixtures.js';
 import {
+  openImportReviewCurrentAutomation,
   buildImportReviewCandidate,
   buildImportReviewPreview,
 } from '../../testing/browser/import-review-browser-helpers.js';
@@ -110,7 +111,7 @@ suite('Activity Imports import-readiness browser verification', () => {
       await page.getByRole('heading', { exact: true, name: 'Library-add diagnostics' }).waitFor();
       await page.getByRole('heading', { exact: true, name: 'Import readiness' }).waitFor();
       await page.getByText(
-        '1 completed download candidate is blocked and needs operator attention before import apply can proceed.',
+        '1 completed download is blocked and needs operator attention before library addition can proceed.',
         { exact: true },
       ).waitFor();
       await page.getByText('Import pending').waitFor();
@@ -132,8 +133,49 @@ suite('Activity Imports import-readiness browser verification', () => {
           && url.hash === '#import-review-selection-stage';
       }, candidate.id);
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-      await page.getByText(candidate.folderPath, { exact: true }).first().waitFor();
-      await page.getByText('Match details and exceptions', { exact: true }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Current state and recovery' }).waitFor();
+      await page.getByRole('heading', { exact: true, name: 'Waiting to add to library' }).waitFor();
+      await page.locator('.import-candidate-recovery').getByText('Ready to add', { exact: true }).waitFor();
+      assert.equal(
+        await page.locator('details.import-review-current-automation').evaluate((element) => element.open),
+        false,
+        'A direct candidate handoff should keep Current automation collapsed while recovery is already focused.',
+      );
+
+      await page.goto(`${baseUrl}/app/activity/diagnostics/matches?status=import_pending`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
+      await page.getByText('Download and library progress', { exact: true }).waitFor();
+      assert.equal(
+        await page.locator('details.import-review-current-automation').evaluate((element) => element.open),
+        true,
+        'A status-only library-add handoff should expand its relevant automation context.',
+      );
+      await page.getByText('1 download waiting to add · 1 item blocked', { exact: true }).waitFor();
+      await page.getByRole('link', { name: 'Open Music Queue' }).waitFor();
+
+      await page.locator('details.import-review-current-automation summary').click();
+      await openImportReviewCurrentAutomation(page);
+      await page.getByText('Downloads awaiting library addition', { exact: true }).waitFor();
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      const overflowingAutomationElements = await page.locator('details.import-review-current-automation *').evaluateAll((elements) =>
+        elements
+          .filter((element) => element.getClientRects().length > 0 && element.scrollWidth > element.clientWidth + 1)
+          .map((element) => ({
+            className: element.className,
+            scrollWidth: element.scrollWidth,
+            tagName: element.tagName,
+            text: element.textContent?.trim().slice(0, 80),
+            width: element.clientWidth,
+          })),
+      );
+      assert.deepEqual(
+        overflowingAutomationElements,
+        [],
+        `Current automation must reflow completed-download diagnostics on narrow screens: ${JSON.stringify(overflowingAutomationElements)}`,
+      );
 
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
       await page.goto('about:blank', { waitUntil: 'load' });

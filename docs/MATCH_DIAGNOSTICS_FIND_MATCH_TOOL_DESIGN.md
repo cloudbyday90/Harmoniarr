@@ -73,7 +73,8 @@ match. That cost is appropriate for an exception action.
 - `ImportReviewMatchFinder.vue` owns the native disclosure, its compact state
   summary, and result-selection collapse behavior.
 - `ImportReviewView.vue` now has a single-column recovery layout: the optional
-  finder, then the selected-match recovery workspace and status summaries.
+  finder, then the selected-match recovery workspace. Background status
+  summaries are in the separate Current automation disclosure.
 - `ImportCandidateFilters.vue` is a compact form inside the finder instead of
   a nested panel. `ImportCandidateQueueList.vue` is a labelled results section
   with match-oriented copy and no outer panel of its own.
@@ -107,7 +108,10 @@ only when an alternative match is needed.
 
 ## Next High-Value Item
 
-Move the remaining selected-match and pending-library status summary cards out
-of the default Match diagnostics workspace and into a compact `Current
-automation` disclosure or Music Queue handoff. The selected-match recovery
-card should remain the only always-visible operational block on this route.
+The selected-match and pending-library status summaries now live in a compact
+`Current automation` disclosure with a Music Queue handoff. See
+[Match Diagnostics Current Automation Design](MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md).
+
+Next, replace the Match diagnostics header `visible matches` counter with an
+intent-specific recovery summary and keep result counts entirely inside `Find a
+match`.

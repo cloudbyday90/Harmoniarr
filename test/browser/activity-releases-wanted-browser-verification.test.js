@@ -16,6 +16,7 @@ import {
 import { installMetadataBrowserFixtures } from '../../testing/browser/metadata-browser-fixtures.js';
 import { installReleaseRadarBrowserFixtures } from '../../testing/browser/release-radar-browser-fixtures.js';
 import { installWantedBrowserFixtures } from '../../testing/browser/wanted-browser-fixtures.js';
+import { openImportReviewMatchFinder } from '../../testing/browser/import-review-browser-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import {
   assertLocatorFocused,
@@ -166,7 +167,8 @@ suite('Activity releases/wanted browser verification', () => {
           && url.searchParams.get('status') === 'all';
       });
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-      await page.getByText('1 matching candidates', { exact: true }).waitFor();
+      await openImportReviewMatchFinder(page);
+      await page.getByText('1 matching result', { exact: true }).waitFor();
       await page.getByText('healthy-slskd-peer', { exact: true }).first().waitFor();
       await page.getByText('/private/staging/Autechre/Amber', { exact: true }).first().waitFor();
 

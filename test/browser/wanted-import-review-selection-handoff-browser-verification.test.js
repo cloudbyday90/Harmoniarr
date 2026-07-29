@@ -6,7 +6,10 @@
  * See LICENSE file for details.
  */
 
-import { openImportReviewRunHistory } from '../../testing/browser/import-review-browser-helpers.js';
+import {
+  openImportReviewMatchFinder,
+  openImportReviewRunHistory,
+} from '../../testing/browser/import-review-browser-helpers.js';
 import assert from 'node:assert/strict';
 import { after, before, suite, test } from 'node:test';
 import {
@@ -65,7 +68,8 @@ async function openSelectionReadyWantedCandidates({ baseUrl, page }) {
   });
 
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
-  await page.getByText('2 matching candidates', { exact: true }).waitFor();
+  await openImportReviewMatchFinder(page);
+  await page.getByText('2 matching results', { exact: true }).waitFor();
 }
 
 async function selectHighConfidenceCandidate(page) {
@@ -78,7 +82,7 @@ async function selectHighConfidenceCandidate(page) {
   const selectButton = page.getByRole('button', { exact: true, name: 'Use this match' });
   await selectButton.click();
   await page.getByRole('status').filter({ hasText: 'Match selected for download.' }).waitFor();
-  await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
+  await page.getByText('1 match selected', { exact: true }).waitFor();
 }
 
 async function startSelectionReadyDownloadRun(page) {

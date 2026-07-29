@@ -107,6 +107,11 @@ async function assertDirectDiagnosticRouteHydrated({
     false,
     'A direct match or file link should keep Find a match collapsed while the recovery target stays visible.',
   );
+  assert.equal(
+    await page.locator('details.import-review-current-automation').evaluate((element) => element.open),
+    false,
+    'A direct match or file link should keep Current automation collapsed while the recovery target stays visible.',
+  );
 
   const mediaPanel = getRunwayPanel(page, 'Check selected matches');
   await mediaPanel.getByText(`Run ${workspace.run.id}`, { exact: true }).waitFor();

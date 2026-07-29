@@ -151,6 +151,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   links keep their already-visible recovery target focused, while manually
   selecting another match closes the finder and returns focus to that recovery
   card. See `MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md`.
+- Match diagnostics current automation: selected-match and pending-library
+  summaries now live in a closed native `Current automation` disclosure with
+  a Music Queue handoff. Status-only selected or pending-library links open it
+  when useful; direct candidate/file links keep recovery focused. See
+  `MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md`.
 - Music Queue Activity lifecycle: release-scoped history now shows a saved
   search-again action, retrying the same download, trying the next safe match,
   no-matches-left rediscovery, and terminal failures. Events use a bounded

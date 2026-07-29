@@ -1441,3 +1441,16 @@ The fixed queue/filter rail is now one optional `Find a match` disclosure.
 Direct candidate and file recovery routes continue to select and focus their
 target without expanding an unrelated result list, while choosing an
 alternative match closes the finder and returns to recovery.
+
+### Match Diagnostics Current Automation Boundary
+
+Implemented in
+[MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md](MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md).
+Selected-match and pending-library summaries now sit behind a closed native
+`Current automation` disclosure with a Music Queue handoff. Status-only
+selected and pending-library routes open that context, while direct
+candidate/file routes retain the recovery-first view.
+
+Recommended next slice: replace the Match diagnostics header `visible matches`
+counter with an intent-specific recovery summary, and keep result counts inside
+`Find a match` so default diagnostics has no residual queue-total language.

@@ -21,7 +21,10 @@ import {
   seedMetadataMediaRequestPipeline,
   updateMetadataMediaRequest,
 } from '../../testing/browser/metadata-browser-fixtures.js';
-import { seedFailedImportReviewWorkspace } from '../../testing/browser/import-review-browser-helpers.js';
+import {
+  openImportReviewMatchFinder,
+  seedFailedImportReviewWorkspace,
+} from '../../testing/browser/import-review-browser-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import {
   openRequestConfirmationFromCard,
@@ -164,7 +167,7 @@ suite('Request Detail failed-import recovery handoff browser verification', () =
       }).waitFor();
       await candidateSummary.press('Enter');
 
-      const importReviewLink = candidate.getByRole('link', { name: 'Open in import review' });
+      const importReviewLink = candidate.getByRole('link', { name: 'Open advanced diagnostics' });
       await importReviewLink.focus();
       await assertLocatorFocused(importReviewLink, 'Import Review handoff link should be keyboard focusable');
       await importReviewLink.press('Enter');
@@ -174,8 +177,10 @@ suite('Request Detail failed-import recovery handoff browser verification', () =
       assert.equal(currentUrl.pathname, '/app/activity/diagnostics/matches');
       assert.equal(currentUrl.searchParams.get('candidate'), 'candidate-private');
 
-      await page.getByText('0 matching candidates', { exact: true }).waitFor();
-      await page.getByRole('heading', { exact: true, name: 'Files and actions' }).waitFor();
+      await openImportReviewMatchFinder(page);
+      await page.getByText('0 matching results', { exact: true }).waitFor();
+      await page.getByText('View match and file evidence', { exact: true }).click();
+      await page.getByRole('heading', { exact: true, name: 'Files, paths, and checks' }).waitFor();
       await page.getByText('Failed', { exact: true }).first().waitFor();
       await page.getByText('remote-peer', { exact: true }).first().waitFor();
       await page.getByText('/private/staging/Boards of Canada/Music Has the Right to Children', {
@@ -186,7 +191,7 @@ suite('Request Detail failed-import recovery handoff browser verification', () =
       }).waitFor();
       await page.getByText('private-track.flac', { exact: true }).first().waitFor();
 
-      const reopenButton = page.getByRole('button', { name: 'Reopen' });
+      const reopenButton = page.getByRole('button', { name: 'Try this match again' });
       await reopenButton.waitFor();
       await reopenButton.focus();
       await assertLocatorFocused(reopenButton, 'Failed candidate recovery action should be keyboard focusable');

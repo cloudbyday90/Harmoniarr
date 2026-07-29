@@ -81,7 +81,6 @@ suite('Import Review failed-candidate recovery action browser verification', () 
 
       await openFailedCandidateInImportReview({ baseUrl, browserContext, page });
 
-      await page.getByText('0 matching candidates', { exact: true }).waitFor();
       await page.getByRole('heading', { exact: true, name: 'This match needs a retry' }).waitFor();
       const reopenButton = page.getByRole('button', { name: 'Try this match again' });
       await reopenButton.focus();
@@ -95,7 +94,6 @@ suite('Import Review failed-candidate recovery action browser verification', () 
       await actionStatus.waitFor();
       await assertLocatorFocused(actionStatus, 'Successful recovery should move focus to the status message');
       await assertVisibleFocusOutline(actionStatus, 'Recovery status focus ring should be visible');
-      await page.getByText('1 matching candidates', { exact: true }).waitFor();
       await page.getByText('Available', { exact: true }).first().waitFor();
       await page.getByRole('button', { name: 'Use this match' }).waitFor();
       await page.getByText('Other match actions', { exact: true }).click();
@@ -143,7 +141,6 @@ suite('Import Review failed-candidate recovery action browser verification', () 
       });
       await alert.waitFor();
       await page.getByRole('heading', { exact: true, name: 'This match needs a retry' }).waitFor();
-      await page.getByText('0 matching candidates', { exact: true }).waitFor();
       await reopenButton.waitFor();
       await assertLocatorFocused(reopenButton, 'Failed recovery should leave the retry action focused');
       assert.equal(await page.getByRole('status').filter({

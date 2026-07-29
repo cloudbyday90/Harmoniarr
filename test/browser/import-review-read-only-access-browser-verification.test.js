@@ -214,13 +214,13 @@ suite('Import Review requester/non-admin read-only access browser verification',
         'Music Queue handles the normal workflow. This diagnostics page exposes raw match details and admin-only recovery controls when a release needs deeper inspection.',
         { exact: true },
       ).waitFor();
-      await page.getByText('1 matching candidates', { exact: true }).waitFor();
+      await page.getByText('1 visible matches', { exact: true }).waitFor();
       await page.getByRole('heading', { exact: true, name: 'Current state and recovery' }).waitFor();
-      await page.getByText('Pending', { exact: true }).first().waitFor();
       const evidence = page.locator('.import-review-evidence');
       assert.equal(await evidence.isVisible(), true);
       assert.equal(await evidence.getAttribute('open'), null);
       await evidence.getByText('View match and file evidence', { exact: true }).click();
+      await page.getByText('Pending', { exact: true }).first().waitFor();
       await page.getByText('remote-peer', { exact: true }).first().waitFor();
       await page.getByText('/private/staging/Boards of Canada/Music Has the Right to Children', {
         exact: true,

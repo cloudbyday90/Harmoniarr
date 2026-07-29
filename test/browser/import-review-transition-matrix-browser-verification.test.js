@@ -23,6 +23,7 @@ import {
 } from '../../testing/browser/metadata-browser-fixtures.js';
 import {
   buildImportReviewCandidate,
+  openImportReviewMatchFinder,
   seedImportReviewCandidateWorkspace,
 } from '../../testing/browser/import-review-browser-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
@@ -51,6 +52,7 @@ async function openCandidateInImportReview({
   });
   await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
   await page.getByRole('heading', { exact: true, name: 'Current state and recovery' }).waitFor();
+  await openImportReviewMatchFinder(page);
 }
 
 async function assertCandidateStatus(page, statusLabel) {
@@ -117,7 +119,7 @@ suite('Import Review review-state transition matrix browser verification', () =>
       });
       await openCandidateInImportReview({ baseUrl, browserContext, candidate, page });
 
-      await page.getByText('1 matching candidates', { exact: true }).waitFor();
+      await page.getByText('1 matching result', { exact: true }).waitFor();
       await assertCandidateStatus(page, 'Available');
 
       await expandOtherMatchActions(page);
@@ -128,7 +130,7 @@ suite('Import Review review-state transition matrix browser verification', () =>
 
       await assertActionStatusFocused(page, 'Candidate held for review.');
       await assertCandidateStatus(page, 'Paused');
-      await page.getByText('0 matching candidates', { exact: true }).waitFor();
+      await page.getByText('0 matching results', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Resume this match' }).waitFor();
       await expandOtherMatchActions(page);
       await page.getByRole('button', { name: 'Reopen for review' }).waitFor();
@@ -141,7 +143,7 @@ suite('Import Review review-state transition matrix browser verification', () =>
 
       await assertActionStatusFocused(page, 'Match selected for download.');
       await assertCandidateStatus(page, 'Needs attention');
-      await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
+      await page.getByText('1 match selected', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Reopen for review' }).waitFor();
       await page.getByRole('button', { name: 'Do not use this match' }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Resume this match' }).count(), 0);
@@ -180,9 +182,9 @@ suite('Import Review review-state transition matrix browser verification', () =>
       });
       await openCandidateInImportReview({ baseUrl, browserContext, candidate, page });
 
-      await page.getByText('0 matching candidates', { exact: true }).waitFor();
+      await page.getByText('0 matching results', { exact: true }).waitFor();
       await assertCandidateStatus(page, 'Needs attention');
-      await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
+      await page.getByText('1 match selected', { exact: true }).waitFor();
 
       await expandOtherMatchActions(page);
       const rejectButton = page.getByRole('button', { name: 'Do not use this match' });
@@ -203,8 +205,8 @@ suite('Import Review review-state transition matrix browser verification', () =>
 
       await assertActionStatusFocused(page, 'Candidate rejected.');
       await assertCandidateStatus(page, 'Rejected');
-      await page.getByText('0 matching candidates', { exact: true }).waitFor();
-      await page.getByText('No matches selected yet.', { exact: true }).waitFor();
+      await page.getByText('0 matching results', { exact: true }).waitFor();
+      await page.getByText('Nothing waiting to download or add', { exact: true }).waitFor();
       const reopenButton = page.getByRole('button', { name: 'Try this match again' });
       await reopenButton.waitFor();
       assert.equal(await page.getByRole('button', { name: 'Do not use this match' }).count(), 0);
@@ -214,7 +216,7 @@ suite('Import Review review-state transition matrix browser verification', () =>
 
       await assertActionStatusFocused(page, 'Candidate reopened for review.');
       await assertCandidateStatus(page, 'Available');
-      await page.getByText('1 matching candidates', { exact: true }).waitFor();
+      await page.getByText('1 matching result', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Use this match' }).waitFor();
       await expandOtherMatchActions(page);
       await page.getByRole('button', { name: 'Pause this match' }).waitFor();

@@ -121,9 +121,15 @@ recovery target is already selected and visible; manually choosing another
 result closes the finder and returns focus to the recovery card. See
 [Match Diagnostics Find Match Tool Design](MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md).
 
+Selected-match and pending-library summaries now sit in a compact `Current
+automation` disclosure after recovery. Status-only links open it when that
+context is relevant, direct candidate/file links keep it closed, and the
+expanded block hands normal monitoring back to Music Queue. See
+[Match Diagnostics Current Automation Design](MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md).
+
 ## Next High-Value Item
 
-Move the remaining selected-match and pending-library status summary cards out
-of the default Match diagnostics workspace and into a compact `Current
-automation` disclosure or Music Queue handoff. The selected-match recovery
-card should remain the only always-visible operational block on this route.
+Replace the Match diagnostics header `visible matches` counter with an
+intent-specific recovery summary, and keep result counts entirely inside the
+`Find a match` disclosure. That removes the final queue-total language from the
+default diagnostics screen.

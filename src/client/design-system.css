@@ -3193,3 +3193,19 @@ body {
   50%  { box-shadow: 0 0 0 5px rgba(197, 69, 69, 0); }
   100% { box-shadow: 0 0 0 0 rgba(197, 69, 69, 0); }
 }
+
+/* Keep diagnostic file paths readable within compact, nested panels. */
+.review-panel :is(.review-file-header > div, .path-card, .review-meta-grid > div) {
+  min-width: 0;
+}
+
+.review-panel :is(.path-card strong, .path-card span, .review-file-header strong, .review-meta-grid dd) {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .review-panel .metadata-card-grid,
+  .review-panel .review-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

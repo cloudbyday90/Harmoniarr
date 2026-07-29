@@ -22,6 +22,20 @@ export async function openImportReviewMatchFinder(page) {
   );
 }
 
+export async function openImportReviewCurrentAutomation(page) {
+  const disclosure = page.locator('details.import-review-current-automation');
+  await disclosure.waitFor();
+
+  const isOpen = await disclosure.evaluate((element) => element.open);
+  if (!isOpen) {
+    await disclosure.locator('summary').click();
+  }
+
+  await page.waitForFunction(() =>
+    globalThis.document.querySelector('details.import-review-current-automation')?.open === true,
+  );
+}
+
 export async function openImportReviewRunHistory(page) {
   const disclosure = page.locator('details.import-review-runway');
   await disclosure.waitFor();

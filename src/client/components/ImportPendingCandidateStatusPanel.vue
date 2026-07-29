@@ -78,7 +78,7 @@ function importStatusLabel(code) {
   <article class="panel-light review-panel">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Ready to add</p>
+        <p class="eyebrow">Library step</p>
         <h3>Downloads awaiting library addition</h3>
       </div>
     </div>
@@ -87,7 +87,7 @@ function importStatusLabel(code) {
 
     <div class="pill-row" v-if="counts.totalImportPending">
       <div class="pill">
-        <span>Ready to add</span>
+        <span>Completed</span>
         <strong>{{ counts.totalImportPending }}</strong>
       </div>
       <div class="pill">
@@ -110,12 +110,12 @@ function importStatusLabel(code) {
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="isLoading && !importPendingCandidates.length">
-      <h3>Loading downloads ready to add</h3>
-      <p>Loading downloads ready to add…</p>
+      <h3>Loading completed downloads</h3>
+      <p>Loading completed downloads…</p>
     </article>
 
     <article class="panel-light review-empty-state" v-else-if="!importPendingCandidates.length">
-      <h3>No downloads ready to add</h3>
+      <h3>No completed downloads waiting</h3>
       <p>Completed downloads will appear here once they're confirmed received.</p>
     </article>
 

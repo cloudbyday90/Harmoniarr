@@ -111,9 +111,11 @@ candidate-run dashboard to determine what should happen next.
 
 ## Next High-Value Item
 
-Move the remaining selected-match and pending-library status summary cards out
-of the default Match diagnostics workspace and into a compact `Current
-automation` disclosure or Music Queue handoff. The selected-match recovery
-card should remain the only always-visible operational block on this route.
-The result finder is now separately collapsed and documented in
-[Match Diagnostics Find Match Tool Design](MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md).
+The selected-match and pending-library status summaries now live in a compact
+`Current automation` disclosure with a Music Queue handoff. Direct
+candidate/file routes keep it closed so recovery remains the focus. See
+[Match Diagnostics Current Automation Design](MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md).
+
+Next, replace the Match diagnostics header `visible matches` counter with an
+intent-specific recovery summary and keep result counts entirely inside `Find a
+match`.

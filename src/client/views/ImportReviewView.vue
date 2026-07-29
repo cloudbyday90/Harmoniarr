@@ -25,8 +25,7 @@ import ImportCandidateMediaInspectionPanel from '../components/ImportCandidateMe
 import ImportCandidateDetailPanel from '../components/ImportCandidateDetailPanel.vue';
 import ImportCandidateRecoveryPanel from '../components/ImportCandidateRecoveryPanel.vue';
 import ImportReviewMatchFinder from '../components/ImportReviewMatchFinder.vue';
-import ImportPendingCandidateStatusPanel from '../components/ImportPendingCandidateStatusPanel.vue';
-import SelectedImportCandidateStatusPanel from '../components/SelectedImportCandidateStatusPanel.vue';
+import ImportReviewCurrentAutomation from '../components/ImportReviewCurrentAutomation.vue';
 import { useImportReviewWorkspace } from '../composables/useImportReviewWorkspace.js';
 import { useImportCandidateApplySummary } from '../composables/useImportCandidateApplySummary.js';
 import { useImportCandidateExecutionSummary } from '../composables/useImportCandidateExecutionSummary.js';
@@ -38,12 +37,14 @@ import {
   useImportReviewAdminWorkflow,
 } from '../composables/useImportReviewAdminWorkflow.js';
 import { normalizeImportReviewRouteState } from '../lib/import-review-route-state.js';
+import { shouldOpenCurrentAutomationForRoute } from '../lib/import-review-current-automation-presentation.js';
 import { shouldOpenRunHistoryControls } from '../lib/import-review-runway-presentation.js';
 import { sessionStore } from '../state/session.js';
 
 const route = useRoute();
 const isAdmin = computed(() => sessionStore.state.user?.role === 'admin');
 const IMPORT_REVIEW_SELECTION_STAGE_ID = 'import-review-selection-stage';
+const isCurrentAutomationOpen = ref(false);
 const isEvidenceOpen = ref(false);
 const isRunHistoryOpen = ref(false);
 
@@ -154,6 +155,10 @@ watch(focusedCandidateFileId, (fileId) => {
 }, { immediate: true });
 
 watch(importReviewRouteState, (nextRouteState) => {
+  if (shouldOpenCurrentAutomationForRoute(nextRouteState)) {
+    isCurrentAutomationOpen.value = true;
+  }
+
   if (shouldOpenRunHistoryControls(nextRouteState)) {
     isRunHistoryOpen.value = true;
   }
@@ -308,23 +313,20 @@ onBeforeUnmount(() => {
           </details>
         </section>
 
-        <div class="import-review-status-grid">
-          <SelectedImportCandidateStatusPanel
-            :counts="selectedSummaryCounts"
-            :error-message="selectedSummaryError"
-            :is-loading="isLoadingSelectedSummary"
-            :selected-candidates="selectedCandidates"
-            :summary="selectedSummary"
-          />
-
-          <ImportPendingCandidateStatusPanel
-            :counts="importPendingSummaryCounts"
-            :error-message="importPendingSummaryError"
-            :import-pending-candidates="importPendingCandidates"
-            :is-loading="isLoadingImportPendingSummary"
-            :summary="importPendingSummary"
-          />
-        </div>
+        <ImportReviewCurrentAutomation
+          :import-pending-candidates="importPendingCandidates"
+          :import-pending-counts="importPendingSummaryCounts"
+          :import-pending-error="importPendingSummaryError"
+          :import-pending-summary="importPendingSummary"
+          :is-loading-import-pending="isLoadingImportPendingSummary"
+          :is-loading-selected="isLoadingSelectedSummary"
+          :is-open="isCurrentAutomationOpen"
+          :selected-candidates="selectedCandidates"
+          :selected-counts="selectedSummaryCounts"
+          :selected-error="selectedSummaryError"
+          :selected-summary="selectedSummary"
+          @update:is-open="isCurrentAutomationOpen = $event"
+        />
       </div>
     </section>
 
@@ -564,12 +566,6 @@ onBeforeUnmount(() => {
   line-height: 1.15;
 }
 
-.import-review-status-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--hx-space-4);
-}
-
 .import-review-runway {
   border: 1px solid var(--hx-border);
   border-radius: var(--hx-radius-md);
@@ -622,7 +618,7 @@ onBeforeUnmount(() => {
 }
 
 :deep(.import-review-layout__workspace .review-panel),
-:deep(.import-review-status-grid .review-panel),
+:deep(.import-review-current-automation__details .review-panel),
 :deep(.import-review-runway__stack .review-panel) {
   border: 1px solid var(--hx-border);
   border-radius: var(--hx-radius-md);
@@ -631,33 +627,27 @@ onBeforeUnmount(() => {
 }
 
 :deep(.import-review-layout__workspace .review-panel),
-:deep(.import-review-status-grid .review-panel),
+:deep(.import-review-current-automation__details .review-panel),
 :deep(.import-review-runway__stack .review-panel) {
   overflow: hidden;
 }
 
 :deep(.import-review-layout__workspace .review-panel > .section-header),
-:deep(.import-review-status-grid .review-panel > .section-header),
+:deep(.import-review-current-automation__details .review-panel > .section-header),
 :deep(.import-review-runway__stack .review-panel > .section-header) {
   padding: var(--hx-space-4) var(--hx-space-4) 0;
 }
 
 :deep(.import-review-layout__workspace .review-panel > .review-summary-copy),
-:deep(.import-review-status-grid .review-panel > .review-summary-copy),
+:deep(.import-review-current-automation__details .review-panel > .review-summary-copy),
 :deep(.import-review-runway__stack .review-panel > .review-summary-copy) {
   padding-inline: var(--hx-space-4);
 }
 
 :deep(.import-review-layout__workspace .review-panel > *:last-child),
-:deep(.import-review-status-grid .review-panel > *:last-child),
+:deep(.import-review-current-automation__details .review-panel > *:last-child),
 :deep(.import-review-runway__stack .review-panel > *:last-child) {
   margin-bottom: 0;
-}
-
-@media (max-width: 1180px) {
-  .import-review-status-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 640px) {

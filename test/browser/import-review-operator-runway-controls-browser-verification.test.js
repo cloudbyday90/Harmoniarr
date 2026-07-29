@@ -112,8 +112,7 @@ suite('Import Review operator runway controls browser verification', () => {
       const executionPanel = getRunwayPanel(page, 'Send selected matches to downloads');
       const applyPanel = getRunwayPanel(page, 'Add downloads to library');
 
-      await page.getByText('No matches selected yet.', { exact: true }).waitFor();
-      await page.getByText('No downloads ready to add.', { exact: true }).waitFor();
+      await page.getByText('Nothing waiting to download or add', { exact: true }).waitFor();
       assert.equal(
         await mediaInspectionPanel.getByRole('button', { name: 'Start media inspection' }).isDisabled(),
         true,
@@ -135,7 +134,7 @@ suite('Import Review operator runway controls browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=${selectedCandidate.id}`, {
         waitUntil: 'domcontentloaded',
       });
-      await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
+      await page.getByText('1 match selected', { exact: true }).waitFor();
       await openImportReviewRunHistory(page);
 
       const mediaStart = mediaInspectionPanel.getByRole('button', { name: 'Start media inspection' });
@@ -212,7 +211,7 @@ suite('Import Review operator runway controls browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=${importPendingCandidate.id}&status=import_pending`, {
         waitUntil: 'domcontentloaded',
       });
-      await page.getByText('1 download is waiting to add.', { exact: true }).waitFor();
+      await page.getByText('1 download waiting to add', { exact: true }).waitFor();
 
       await openImportReviewRunHistory(page);
 
@@ -259,7 +258,7 @@ suite('Import Review operator runway controls browser verification', () => {
       await page.goto(`${baseUrl}/app/activity/candidates?candidate=${selectedCandidate.id}`, {
         waitUntil: 'domcontentloaded',
       });
-      await page.getByText('1 selected match ready for download.', { exact: true }).waitFor();
+      await page.getByText('1 match selected', { exact: true }).waitFor();
 
       await openImportReviewRunHistory(page);
 
