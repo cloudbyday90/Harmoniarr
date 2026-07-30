@@ -141,8 +141,15 @@ latest-event projection as real SQL rather than only a mocked store query.
 
 ## Follow-up
 
-The next high-value implementation slice is a deterministic browser acceptance
-test for this full terminal-outcome matrix: timeout fallback, source-disappeared
-fallback, strict-quality stop, and collision stop. It should prove the normal
-Music Queue row and Activity handoffs without relying on live peers or exposing
+Implemented in
+[MUSIC_QUEUE_TERMINAL_RECOVERY_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_TERMINAL_RECOVERY_BROWSER_ACCEPTANCE_DESIGN.md).
+The deterministic browser matrix now proves timeout fallback,
+source-disappeared fallback, strict-quality exhaustion, and collision stop
+through the normal Music Queue and Activity handoffs. It uses isolated,
+first-party read-model fixtures and never contacts live peers or exposes
 advanced diagnostics by default.
+
+The next high-value implementation slice is a Docker-backed controlled-provider
+evidence case for a completed source that disappears before library add. It
+should exercise real reconciliation and safe next-match promotion with only
+disposable local fixture files.

@@ -1520,7 +1520,17 @@ blocks stay at a durable `Needs help adding` stop with a focused add-plan
 handoff. The implementation also keeps local blockers out of source-user
 reputation evidence.
 
-Recommended next slice: add a deterministic browser acceptance matrix for
-timeout fallback, disappeared-source fallback, strict-quality exhaustion, and
-collision stop, proving normal Music Queue and Activity handoffs without
-candidate-first navigation.
+### Terminal Recovery Browser Acceptance
+
+Implemented in
+[MUSIC_QUEUE_TERMINAL_RECOVERY_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_TERMINAL_RECOVERY_BROWSER_ACCEPTANCE_DESIGN.md).
+One deterministic ESM fixture pack now verifies timeout fallback,
+disappeared-source fallback, strict-quality exhaustion, and collision stops in
+isolated Docker-backed browser scenarios. Normal Music Queue and Activity
+handoffs stay release-centered, and no path requires candidate-first
+navigation.
+
+Recommended next slice: add a Docker-backed controlled-provider evidence case
+for completed-source disappearance, using only disposable local fixture files.
+It should prove actual worker reconciliation and safe next-match promotion
+without relying on public peer content.
