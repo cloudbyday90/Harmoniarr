@@ -31,6 +31,7 @@ const events = [
   { id: 'retrying', eventType: 'music_queue_match_retrying' },
   { id: 'no-matches', eventType: 'music_queue_no_matches_left', extraPayload: { rediscoveryScheduled: true } },
   { id: 'download-failed', eventType: 'music_queue_download_failed' },
+  { id: 'import-blocked', eventType: 'music_queue_import_blocked' },
   { id: 'quality-stop', eventType: 'music_queue_quality_blocked' },
   { id: 'library', eventType: 'release_added' },
   { id: 'request', eventType: 'request_created' },
@@ -45,7 +46,9 @@ test('Activity timeline exposes compact outcome filters', () => {
 });
 
 test('Activity timeline presents terminal stops as attention without treating automatic recovery as a stop', () => {
-  assert.deepEqual(getActivityTimelineEventPresentation(events[4]), {
+  const qualityStop = events.find((event) => event.id === 'quality-stop');
+
+  assert.deepEqual(getActivityTimelineEventPresentation(qualityStop), {
     category: 'audio_checks',
     categoryLabel: 'Audio check',
     requiresAttention: true,
@@ -53,7 +56,7 @@ test('Activity timeline presents terminal stops as attention without treating au
   });
   assert.deepEqual(
     filterActivityTimelineEvents(events, 'needs_attention').map((event) => event.id),
-    ['download-failed', 'quality-stop'],
+    ['download-failed', 'import-blocked', 'quality-stop'],
   );
   assert.deepEqual(getActivityTimelineEventPresentation(events[1]), {
     category: 'downloads',
@@ -74,7 +77,7 @@ test('Activity timeline groups normal events without hiding unknown activity', (
     filterActivityTimelineEvents(events, 'downloads').map((event) => event.id),
     ['download', 'retrying', 'no-matches', 'download-failed'],
   );
-  assert.deepEqual(filterActivityTimelineEvents(events, 'library').map((event) => event.id), ['library']);
+  assert.deepEqual(filterActivityTimelineEvents(events, 'library').map((event) => event.id), ['import-blocked', 'library']);
   assert.deepEqual(filterActivityTimelineEvents(events, 'requests').map((event) => event.id), ['request']);
   assert.deepEqual(filterActivityTimelineEvents([{ id: 'unknown', eventType: 'future_event' }], 'all').map((event) => event.id), ['unknown']);
   assert.deepEqual(filterActivityTimelineEvents(events, 'unknown-filter'), events);
@@ -103,8 +106,8 @@ test('Activity timeline categorizes lifecycle milestones and reserves attention 
 
 test('Activity timeline separates repair work from routine history without changing event order', () => {
   assert.deepEqual(partitionActivityTimelineEvents(events), {
-    attentionEvents: [events[3], events[4]],
-    routineEvents: [events[0], events[1], events[2], events[5], events[6], events[7]],
+    attentionEvents: [events[3], events[4], events[5]],
+    routineEvents: [events[0], events[1], events[2], events[6], events[7], events[8]],
   });
 });
 

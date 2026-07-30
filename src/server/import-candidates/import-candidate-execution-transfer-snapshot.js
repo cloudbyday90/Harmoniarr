@@ -60,6 +60,7 @@ export function buildPersistedExecutionTransferSnapshot({
       queued: liveTransferSummary.queued ?? 0,
       rejected: liveTransferSummary.rejected ?? 0,
       status: liveTransferSummary.status ?? null,
+      terminalOutcome: liveTransferSummary.terminalOutcome ?? null,
       total: liveTransferSummary.total ?? transfers.length,
       totalBytes: liveTransferSummary.totalBytes ?? 0,
     } : null,

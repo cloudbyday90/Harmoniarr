@@ -40,6 +40,8 @@ function getTimelineCategory(eventType) {
     case 'music_queue_no_matches_left':
     case 'music_queue_download_failed':
       return { category: 'downloads', categoryLabel: 'Download' };
+    case 'music_queue_import_blocked':
+      return { category: 'library', categoryLabel: 'Library' };
     case 'music_queue_quality_blocked':
     case 'music_queue_audio_checked':
     case 'music_queue_audio_warning':
@@ -68,6 +70,7 @@ export function requiresActivityTimelineAttention(event = {}) {
   switch (event?.eventType) {
     case 'music_queue_quality_blocked':
     case 'music_queue_download_failed':
+    case 'music_queue_import_blocked':
     case 'music_queue_audio_warning':
     case 'music_queue_audio_check_failed':
       return true;

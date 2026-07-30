@@ -61,6 +61,37 @@ test('deriveMusicQueueStatus surfaces safe-auto quality blocks before ready-to-a
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE);
 });
 
+test('deriveMusicQueueStatus surfaces blocked library add work before ready-to-add', () => {
+  const status = deriveMusicQueueStatus({
+    add: {
+      itemStatusCounts: { blocked: 1 },
+      latestOutcome: 'blocked',
+    },
+    match: { latestStatus: 'import_pending' },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
+});
+
+test('deriveMusicQueueStatus surfaces a recorded import blocker before generic match states', () => {
+  const result = deriveMusicQueueStatus({
+    match: {
+      latestEventType: 'import_candidate_import_blocked',
+      statusCounts: { failed: 1, pending: 1 },
+    },
+    release: {
+      missingTrackCount: 8,
+      wantedStatus: 'missing',
+    },
+  });
+
+  assert.equal(result.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.equal(result.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
+  assert.equal(result.progressStep, 'add');
+});
+
 test('deriveMusicQueueStatus lets a promoted next match override stale quality-block evidence', () => {
   const status = deriveMusicQueueStatus({
     add: {

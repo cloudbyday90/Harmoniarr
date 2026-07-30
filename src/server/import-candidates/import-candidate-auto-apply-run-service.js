@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { evaluateImportBlockerRecovery } from './import-candidate-terminal-recovery-policy.js';
+
 const skippedReasonByErrorCode = Object.freeze({
   import_candidate_apply_in_progress: 'apply_run_already_active',
   import_candidate_apply_not_ready: 'no_safe_import_pending_candidate',
@@ -39,14 +41,63 @@ function normalizeSkippedApplyRunResult({ error, importCandidateId }) {
 }
 
 export function createImportCandidateAutoApplyRunService({
+  handleImportCandidateImportBlocker = null,
+  previewImportCandidateApply = null,
   startImportCandidateApplyRun = async () => {
     throw new Error('startImportCandidateApplyRun dependency is required');
   },
 } = {}) {
+  async function recoverImportBlocker({ importCandidateId }) {
+    if (typeof previewImportCandidateApply !== 'function'
+      || typeof handleImportCandidateImportBlocker !== 'function') {
+      return null;
+    }
+
+    let applyPreview;
+    try {
+      applyPreview = await previewImportCandidateApply({ importCandidateId });
+    } catch {
+      return null;
+    }
+
+    const policy = evaluateImportBlockerRecovery(applyPreview);
+    if (!policy.outcomeCode) {
+      return null;
+    }
+
+    const recovery = await handleImportCandidateImportBlocker({
+      canRecover: policy.canRecover,
+      failedCandidateId: importCandidateId,
+      failureReason: applyPreview?.summary?.message ?? null,
+      scheduleFollowUpRun: true,
+    });
+
+    return {
+      policy,
+      recovery,
+    };
+  }
+
   async function startSafeApplyRunAfterDownloadCompleted({
     importCandidateId,
     requestMetadata = null,
   } = {}) {
+    const importBlockerRecovery = await recoverImportBlocker({
+      importCandidateId,
+    });
+    if (importBlockerRecovery) {
+      return {
+        attempted: true,
+        importCandidateId,
+        recovery: importBlockerRecovery.recovery,
+        skippedReason: importBlockerRecovery.policy.canRecover
+          ? 'completed_source_unavailable'
+          : 'import_blocker_requires_operator',
+        started: false,
+        triggerSource: 'download_completed',
+      };
+    }
+
     try {
       const result = await startImportCandidateApplyRun({
         applySafetyMode: 'safe_auto',

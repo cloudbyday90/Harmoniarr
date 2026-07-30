@@ -802,7 +802,7 @@ test('createImportCandidateService rejects and reopens selected candidates with 
   assert.equal(insertImportCandidateEventFn.mock.calls[1].arguments[0].eventType, 'import_candidate_reopened');
 });
 
-test('createImportCandidateService marks download workflow transitions with shared status guards', async (t) => {
+test('createImportCandidateService marks download and import-blocker transitions with shared status guards', async (t) => {
   const { client, pool } = createPool(t);
   const getImportCandidateByIdFn = t.mock.fn(async () => createStoredCandidate({ status: 'selected' }));
   const transitionImportCandidateStatusFn = t.mock.fn(async ({ toStatus }) => createStoredCandidate({ status: toStatus }));
@@ -836,6 +836,15 @@ test('createImportCandidateService marks download workflow transitions with shar
     reason: 'Verified quality failed',
   });
   await service.markImportCandidateDownloadFailed({ importCandidateId: 'candidate-1', reason: 'Remote transfer failed' });
+  await service.markImportCandidateImportBlocked({
+    importCandidateId: 'candidate-1',
+    reason: 'A library collision needs a manual decision',
+  });
+  await service.markImportCandidateImportBlocked({
+    importCandidateId: 'candidate-1',
+    recordSourceFailure: true,
+    reason: 'Completed source disappeared before add',
+  });
 
   assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[0].arguments, [{
     fromStatuses: ['selected'],
@@ -867,12 +876,24 @@ test('createImportCandidateService marks download workflow transitions with shar
     importCandidateId: 'candidate-1',
     toStatus: 'failed',
   }, client]);
+  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[6].arguments, [{
+    fromStatuses: ['import_pending'],
+    importCandidateId: 'candidate-1',
+    toStatus: 'failed',
+  }, client]);
+  assert.deepEqual(transitionImportCandidateStatusFn.mock.calls[7].arguments, [{
+    fromStatuses: ['import_pending'],
+    importCandidateId: 'candidate-1',
+    toStatus: 'failed',
+  }, client]);
   assert.equal(insertImportCandidateEventFn.mock.calls[0].arguments[0].eventType, 'import_candidate_downloading');
   assert.equal(insertImportCandidateEventFn.mock.calls[1].arguments[0].eventType, 'import_candidate_download_retry_scheduled');
   assert.equal(insertImportCandidateEventFn.mock.calls[2].arguments[0].eventType, 'import_candidate_import_pending');
   assert.equal(insertImportCandidateEventFn.mock.calls[3].arguments[0].eventType, 'import_candidate_applied');
   assert.equal(insertImportCandidateEventFn.mock.calls[4].arguments[0].eventType, 'import_candidate_quality_failed');
   assert.equal(insertImportCandidateEventFn.mock.calls[5].arguments[0].eventType, 'import_candidate_download_failed');
+  assert.equal(insertImportCandidateEventFn.mock.calls[6].arguments[0].eventType, 'import_candidate_import_blocked');
+  assert.equal(insertImportCandidateEventFn.mock.calls[7].arguments[0].eventType, 'import_candidate_import_blocked');
   assert.deepEqual(recordSourceUserOutcomeEvidenceFn.mock.calls.map((call) => call.arguments[0]), [
     {
       actorUserId: null,
@@ -900,6 +921,14 @@ test('createImportCandidateService marks download workflow transitions with shar
       occurredAt: '2026-04-30T14:00:00.000Z',
       outcome: 'failure',
       reason: 'Remote transfer failed',
+      username: 'source-user',
+    },
+    {
+      actorUserId: null,
+      eventType: 'import_candidate_import_blocked',
+      occurredAt: '2026-04-30T14:00:00.000Z',
+      outcome: 'failure',
+      reason: 'Completed source disappeared before add',
       username: 'source-user',
     },
   ]);

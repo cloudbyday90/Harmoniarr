@@ -216,6 +216,14 @@ export function deriveMusicQueueStatus({
     });
   }
 
+  if (match.latestEventType === 'import_candidate_import_blocked') {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
+      detail: 'The completed download needs a safe library-add decision.',
+      nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
+      progressStep: 'add',
+    });
+  }
+
   if (hasAnyStatus(match.statusCounts, ['failed', 'rejected']) && getCount(match.pendingCount) > 0) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.TRYING_NEXT_MATCH, {
       nextAction: MUSIC_QUEUE_ACTION_CODES.VIEW_RECOVERY,
@@ -236,6 +244,14 @@ export function deriveMusicQueueStatus({
       detail: add.message ?? add.qualityGate?.message ?? 'Downloaded files did not pass the selected audio quality check.',
       nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE,
       progressStep: 'quality',
+    });
+  }
+
+  if (hasAnyStatus(add.itemStatusCounts, ['blocked', 'apply_failed'])
+    || ['apply_failed', 'blocked'].includes(add.latestOutcome)) {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
+      progressStep: 'add',
     });
   }
 

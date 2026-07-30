@@ -23,6 +23,7 @@ import { createImportCandidateExecutionHeartbeatState } from './import-candidate
 import { createImportCandidateExecutionRunStore } from './import-candidate-execution-run-store.js';
 import { createImportCandidateRunSummaryService } from './import-candidate-run-summary-service.js';
 import { classifySlskdTransferState } from './import-candidate-transfer-state-policy.js';
+import { deriveTerminalTransferOutcome } from './import-candidate-terminal-recovery-policy.js';
 import { createSlskdTransferSnapshotService } from '../slskd/slskd-transfer-snapshot-service.js';
 
 function isSlskdError(error) {
@@ -118,6 +119,13 @@ function buildLiveTransferSummary(transfers, { item, missingTransferConfig, now 
     queued,
     rejected,
     status,
+    terminalOutcome: deriveTerminalTransferOutcome({
+      liveTransferSummary: {
+        missingTransfer,
+        status,
+      },
+      liveTransfers: transfers,
+    }),
     total,
     totalBytes,
   };

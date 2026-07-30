@@ -104,6 +104,17 @@ test('Activity timeline groups routine milestones beneath a visible attention ou
   ]);
 });
 
+test('Activity timeline keeps an import safety stop as the visible release outcome', () => {
+  const entries = buildActivityTimelineStoryEntries([
+    createEvent({ id: 'import-blocked', eventType: 'music_queue_import_blocked', occurredAt: '2026-07-26T12:03:00.000Z' }),
+    createEvent({ id: 'completed', eventType: 'download_completed', occurredAt: '2026-07-26T12:01:00.000Z' }),
+  ]);
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].event.id, 'import-blocked');
+  assert.deepEqual(entries[0].milestoneEvents.map((event) => event.id), ['completed', 'import-blocked']);
+});
+
 test('Activity timeline never merges unknown identities, invalid timestamps, or separate-day runs', () => {
   const entries = buildActivityTimelineStoryEntries([
     createEvent({ id: 'new-download', eventType: 'music_queue_download_started', occurredAt: '2026-07-26T12:00:00.000Z' }),

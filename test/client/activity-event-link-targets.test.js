@@ -104,6 +104,23 @@ test('buildActivityEventLinkTarget resolves Music Queue lifecycle events to the 
   });
 });
 
+test('buildActivityEventLinkTarget resolves import safety stops to the library add plan', () => {
+  const target = buildActivityEventLinkTarget({
+    entityId: 'wanted-1',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_import_blocked',
+    extraPayload: { wantedReleaseId: 'wanted-1' },
+  });
+
+  assert.deepEqual(target, {
+    label: 'Review library add plan',
+    to: {
+      name: 'music-queue-release',
+      params: { wantedReleaseId: 'wanted-1' },
+    },
+  });
+});
+
 test('buildActivityEventLinkTarget resolves a recovered provider search to Music Queue', () => {
   const target = buildActivityEventLinkTarget({
     entityId: 'wanted-1',

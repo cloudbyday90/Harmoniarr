@@ -21,6 +21,7 @@ import {
   incrementImportCandidateDownloadAttemptCount,
   promoteImportCandidateForRecovery,
 } from './import-candidate-repository.js';
+import { TERMINAL_MATCH_OUTCOME_CODES } from './import-candidate-terminal-recovery-policy.js';
 
 export const MAX_CANDIDATE_DOWNLOAD_ATTEMPTS = 3;
 export const RETRY_REJECTED_TRANSFER_DELAY_MS = 10 * 60 * 1000;
@@ -84,7 +85,9 @@ function buildRecoveryResult({
   recoveryRun = null,
   recovered,
   rediscovery = null,
+  requiresOperator = false,
   skippedCandidates = [],
+  terminalOutcome = null,
 }) {
   const result = {
     attemptedCandidateId: attemptedCandidate?.id ?? null,
@@ -97,6 +100,14 @@ function buildRecoveryResult({
     recoveryRunId: recoveryRun?.id ?? null,
     sourceSearchId: failedCandidate?.sourceSearchId ?? null,
   };
+
+  if (terminalOutcome) {
+    result.terminalOutcome = terminalOutcome;
+  }
+
+  if (requiresOperator) {
+    result.requiresOperator = true;
+  }
 
   if (skippedCandidates.length > 0) {
     result.skippedCandidateCount = skippedCandidates.length;
@@ -117,6 +128,7 @@ export function createImportCandidateRecoveryService({
   getImportCandidate = async () => null,
   incrementImportCandidateDownloadAttemptCountFn = incrementImportCandidateDownloadAttemptCount,
   markImportCandidateDownloadFailed = async () => null,
+  markImportCandidateImportBlocked = async () => null,
   markImportCandidateQualityFailed = async () => null,
   maxCandidateDownloadAttempts = MAX_CANDIDATE_DOWNLOAD_ATTEMPTS,
   promoteImportCandidateForRecoveryFn = promoteImportCandidateForRecovery,
@@ -168,6 +180,7 @@ export function createImportCandidateRecoveryService({
     qualityOverride = null,
     recoverySummaryReason = 'transfer_recovery_cascade',
     scheduleFollowUpRun = false,
+    terminalOutcome = null,
   } = {}) {
     const sourceSearchId = normalizeOptionalString(failedCandidate.sourceSearchId);
     const metadataReleaseId = resolveMetadataReleaseId(failedCandidate);
@@ -181,6 +194,7 @@ export function createImportCandidateRecoveryService({
         failedCandidate,
         reason: 'recovery_scope_unavailable',
         recovered: false,
+        terminalOutcome,
       });
     }
 
@@ -239,6 +253,7 @@ export function createImportCandidateRecoveryService({
           recovered: false,
           rediscovery,
           skippedCandidates,
+          terminalOutcome,
         });
       }
 
@@ -250,6 +265,7 @@ export function createImportCandidateRecoveryService({
         recovered: false,
         rediscovery,
         skippedCandidates,
+        terminalOutcome,
       });
     }
 
@@ -267,6 +283,7 @@ export function createImportCandidateRecoveryService({
         reason: 'recovery_candidate_no_longer_selectable',
         recovered: false,
         skippedCandidates,
+        terminalOutcome,
       });
     }
 
@@ -285,6 +302,7 @@ export function createImportCandidateRecoveryService({
       recoveryRun,
       recovered: true,
       skippedCandidates,
+      terminalOutcome,
     });
   }
 
@@ -295,6 +313,7 @@ export function createImportCandidateRecoveryService({
     profileCode = null,
     qualityOverride = null,
     scheduleFollowUpRun = false,
+    terminalOutcome = TERMINAL_MATCH_OUTCOME_CODES.DOWNLOAD_FAILED,
   } = {}) {
     const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
     if (!failedBeforeAttempt) {
@@ -302,6 +321,7 @@ export function createImportCandidateRecoveryService({
         failedCandidate: null,
         reason: 'failed_candidate_not_found',
         recovered: false,
+        terminalOutcome,
       });
     }
 
@@ -317,6 +337,7 @@ export function createImportCandidateRecoveryService({
       profileCode,
       qualityOverride,
       scheduleFollowUpRun,
+      terminalOutcome,
     });
   }
 
@@ -336,6 +357,7 @@ export function createImportCandidateRecoveryService({
         failedCandidate: null,
         reason: 'failed_candidate_not_found',
         recovered: false,
+        terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.QUALITY_FAILED,
       });
     }
 
@@ -359,6 +381,60 @@ export function createImportCandidateRecoveryService({
       qualityOverride,
       recoverySummaryReason: 'quality_stop_recovery_cascade',
       scheduleFollowUpRun,
+      terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.QUALITY_FAILED,
+    });
+  }
+
+  async function handleImportCandidateImportBlocker({
+    canRecover = false,
+    failedCandidateId,
+    failureReason = null,
+    operationRunId = null,
+    profileCode = null,
+    qualityOverride = null,
+    scheduleFollowUpRun = true,
+  } = {}) {
+    const failedBeforeAttempt = await getImportCandidate({ importCandidateId: failedCandidateId });
+    if (!failedBeforeAttempt) {
+      return buildRecoveryResult({
+        failedCandidate: null,
+        reason: 'failed_candidate_not_found',
+        recovered: false,
+        terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.IMPORT_BLOCKED,
+      });
+    }
+
+    const transitionResult = await markImportCandidateImportBlocked({
+      importCandidateId: failedCandidateId,
+      recordSourceFailure: canRecover,
+      reason: failureReason,
+    });
+    const failedAfterTransition = transitionResult?.candidate ?? failedBeforeAttempt;
+
+    if (!canRecover) {
+      return buildRecoveryResult({
+        failedCandidate: failedAfterTransition,
+        reason: 'import_blocker_requires_operator',
+        recovered: false,
+        requiresOperator: true,
+        terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.IMPORT_BLOCKED,
+      });
+    }
+
+    const failedCandidate = await incrementImportCandidateDownloadAttemptCountFn({
+      importCandidateId: failedCandidateId,
+    }) ?? failedAfterTransition;
+
+    return promoteNextRecoveryCandidate({
+      failedCandidate,
+      failedCandidateId,
+      failureReason,
+      operationRunId,
+      profileCode,
+      qualityOverride,
+      recoverySummaryReason: 'import_blocker_recovery_cascade',
+      scheduleFollowUpRun,
+      terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.SOURCE_DISAPPEARED,
     });
   }
 
@@ -376,6 +452,7 @@ export function createImportCandidateRecoveryService({
         failedCandidate: null,
         reason: 'failed_candidate_not_found',
         recovered: false,
+        terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.DOWNLOAD_FAILED,
       });
     }
 
@@ -405,6 +482,7 @@ export function createImportCandidateRecoveryService({
           reason: 'candidate_retry_scheduled',
           recoveryRun: retryRun,
           recovered: true,
+          terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.DOWNLOAD_FAILED,
         }),
         retryAt,
         retrySameCandidate: true,
@@ -424,11 +502,13 @@ export function createImportCandidateRecoveryService({
       profileCode,
       qualityOverride,
       scheduleFollowUpRun,
+      terminalOutcome: TERMINAL_MATCH_OUTCOME_CODES.DOWNLOAD_FAILED,
     });
   }
 
   return {
     handleImportCandidateDownloadFailure,
+    handleImportCandidateImportBlocker,
     handleImportCandidateQualityFailure,
     handleImportCandidateRejectedTransfer,
   };

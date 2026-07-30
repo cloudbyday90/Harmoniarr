@@ -343,6 +343,21 @@ test('getActivityEventLabel and detail make Music Queue recovery understandable 
   assert.equal(getActivityEventDetail(exhausted), 'Harmoniarr will search again later.');
 });
 
+test('getActivityEventLabel and detail make blocked library adds actionable without provider diagnostics', () => {
+  const event = {
+    entityArtist: 'Autechre',
+    entityTitle: 'Amber',
+    eventType: 'music_queue_import_blocked',
+  };
+
+  assert.equal(getActivityEventLabel(event), 'Library add needs help: Amber by Autechre');
+  assert.equal(
+    getActivityEventDetail(event),
+    'Harmoniarr stopped before changing the library. Review the library add plan to resolve the safety check.',
+  );
+  assert.equal(getActivityEventIcon(event.eventType), 'alert');
+});
+
 test('getActivityEventLabel and detail describe a recovered provider search without diagnostics', () => {
   const event = {
     eventType: 'music_queue_search_started',

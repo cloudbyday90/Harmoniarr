@@ -882,6 +882,45 @@ export function createImportCandidateService({
     });
   }
 
+  function markImportCandidateImportBlocked({
+    actorUserId = null,
+    importCandidateId,
+    recordSourceFailure = false,
+    reason = null,
+    requestMetadata = null,
+  }) {
+    return transitionCandidateReviewStatus({
+      actorUserId,
+      eventType: 'import_candidate_import_blocked',
+      fromStatuses: ['import_pending'],
+      importCandidateId,
+      reason,
+      requestMetadata,
+      summary: recordSourceFailure
+        ? 'Completed download source was unavailable before library add'
+        : 'Import candidate requires a safe library-add decision',
+      toStatus: 'failed',
+    }).then(async (transitionResult) => {
+      if (!recordSourceFailure) {
+        return transitionResult;
+      }
+
+      try {
+        await recordSourceUserOutcomeEvidenceFn({
+          actorUserId,
+          eventType: 'import_candidate_import_blocked',
+          occurredAt: transitionResult?.candidate?.updatedAt ?? null,
+          outcome: 'failure',
+          reason,
+          username: transitionResult?.candidate?.username,
+        });
+      } catch {
+        // Trust evidence must not block the core status transition.
+      }
+      return transitionResult;
+    });
+  }
+
   function rejectImportCandidate({
     actorUserId = null,
     importCandidateId,
@@ -1077,6 +1116,7 @@ export function createImportCandidateService({
     listImportCandidates,
     listImportCandidatesBySourceMediaRequestIds,
     markImportCandidateDownloadFailed,
+    markImportCandidateImportBlocked,
     markImportCandidateQualityFailed,
     markImportCandidateDownloading,
     markImportCandidateApplied,

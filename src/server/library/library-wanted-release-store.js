@@ -121,6 +121,11 @@ function buildImportReviewSummary(row) {
     totalCount,
   };
 
+  if (typeof row.import_candidate_latest_event_type === 'string'
+    && row.import_candidate_latest_event_type.length > 0) {
+    summary.latestEventType = row.import_candidate_latest_event_type;
+  }
+
   const selectionReadiness = buildImportCandidateSelectionReadiness({
     bestCompositeScore: row.import_candidate_best_composite_score,
     scoredCandidateCount: row.import_candidate_scored_count,
@@ -368,6 +373,7 @@ export function createLibraryWantedReleaseStore({
           import_review_summary.status_counts AS import_candidate_status_counts,
           import_review_summary.latest_status AS import_candidate_latest_status,
           import_review_summary.latest_updated_at AS import_candidate_latest_updated_at,
+          import_review_summary.latest_event_type AS import_candidate_latest_event_type,
           import_review_summary.best_composite_score AS import_candidate_best_composite_score,
           import_review_summary.second_best_composite_score AS import_candidate_second_best_composite_score,
           import_review_summary.scored_candidate_count AS import_candidate_scored_count,
@@ -394,6 +400,7 @@ export function createLibraryWantedReleaseStore({
         LEFT JOIN LATERAL (
           WITH candidate_rows AS (
             SELECT
+              ic.id,
               ic.status,
               ic.updated_at,
               CASE
@@ -426,6 +433,13 @@ export function createLibraryWantedReleaseStore({
               LIMIT 1
             ) AS latest_status,
             (SELECT MAX(candidate_rows.updated_at) FROM candidate_rows) AS latest_updated_at,
+            (
+              SELECT ice.event_type
+              FROM import_candidate_events ice
+              JOIN candidate_rows ON candidate_rows.id = ice.import_candidate_id
+              ORDER BY ice.occurred_at DESC, ice.created_at DESC, ice.id DESC
+              LIMIT 1
+            ) AS latest_event_type,
             (
               SELECT candidate_rows.composite_score
               FROM candidate_rows

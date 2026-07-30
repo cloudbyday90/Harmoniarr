@@ -32,6 +32,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
             expected_track_count: 10,
             id: 'wanted-1',
             import_candidate_latest_status: 'selected',
+            import_candidate_latest_event_type: 'import_candidate_selected',
             import_candidate_latest_updated_at: '2026-06-27T21:10:00.000Z',
             import_candidate_best_composite_score: 91,
             import_candidate_matches: [{
@@ -123,6 +124,8 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
   assert.match(observedSql, /ic\.source_search_id = NULLIF\(ldr\.evidence->>'lastSearchId', ''\)/);
   assert.match(observedSql, /jsonb_typeof\(ic\.normalized_payload->'compositeScore'\)/);
   assert.match(observedSql, /second_best_composite_score/);
+  assert.match(observedSql, /latest_event_type/);
+  assert.match(observedSql, /FROM import_candidate_events ice/);
   assert.match(observedSql, /import_match_drilldown\.matches AS import_candidate_matches/);
   assert.match(observedSql, /LIMIT 5/);
   assert.match(observedSql, /FROM import_execution_run_items iei/);
@@ -143,6 +146,7 @@ test('listWantedReleasesWithMetadata maps discovery request recovery evidence', 
       },
     },
     importReviewSummary: {
+      latestEventType: 'import_candidate_selected',
       latestStatus: 'selected',
       latestUpdatedAt: '2026-06-27T21:10:00.000Z',
       matches: [{

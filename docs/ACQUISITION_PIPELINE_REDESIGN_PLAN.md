@@ -1508,7 +1508,19 @@ can see the scheduled handoff after closing the review without opening
 diagnostics. Unknown, complete, and attention states do not receive inferred
 automation messaging.
 
-Recommended next slice: extend terminal match recovery to timeout,
-disappeared-source, failed-quality-verification, and import-blocker outcomes,
-promoting the next eligible match only when quality and import safety policy
-allow it.
+### Terminal Match Recovery
+
+Implemented in
+[MUSIC_QUEUE_TERMINAL_MATCH_RECOVERY_DESIGN.md](MUSIC_QUEUE_TERMINAL_MATCH_RECOVERY_DESIGN.md).
+Terminal failed and timed-out transfers, vanished provider records after their
+grace period, strict-quality failures, and completed-source disappearance now
+use one recovery policy. Only remote failures and a vanished completed source
+may promote a quality-eligible next match. Collision, lossy, and validation
+blocks stay at a durable `Needs help adding` stop with a focused add-plan
+handoff. The implementation also keeps local blockers out of source-user
+reputation evidence.
+
+Recommended next slice: add a deterministic browser acceptance matrix for
+timeout fallback, disappeared-source fallback, strict-quality exhaustion, and
+collision stop, proving normal Music Queue and Activity handoffs without
+candidate-first navigation.

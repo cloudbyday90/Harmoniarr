@@ -71,6 +71,7 @@ test('import candidate recovery promotes the next scoped candidate and records a
     recovered: true,
     recoveryRunId: 'recovery-run-1',
     sourceSearchId: 'search-1',
+    terminalOutcome: 'download_failed',
   });
 });
 
@@ -312,6 +313,121 @@ test('import candidate quality recovery keeps the release stopped when no qualit
     recovered: false,
     recoveryRunId: null,
     sourceSearchId: 'search-1',
+    terminalOutcome: 'quality_failed',
+  });
+});
+
+test('import candidate recovery records a terminal timeout while promoting the next quality-eligible match', async (t) => {
+  const promoteImportCandidateForRecoveryFn = t.mock.fn(async ({ importCandidateId }) => ({ id: importCandidateId }));
+  const service = createImportCandidateRecoveryService({
+    findNextCandidateForRecoveryFn: async () => ({ id: 'candidate-next' }),
+    getImportCandidate: async () => ({ id: 'candidate-timeout', sourceSearchId: 'search-1' }),
+    incrementImportCandidateDownloadAttemptCountFn: async () => ({
+      downloadAttemptCount: 1,
+      id: 'candidate-timeout',
+      sourceSearchId: 'search-1',
+    }),
+    promoteImportCandidateForRecoveryFn,
+  });
+
+  const result = await service.handleImportCandidateDownloadFailure({
+    failedCandidateId: 'candidate-timeout',
+    failureReason: 'The download did not progress before the timeout.',
+    terminalOutcome: 'download_timed_out',
+  });
+
+  assert.equal(promoteImportCandidateForRecoveryFn.mock.callCount(), 1);
+  assert.equal(result.recovered, true);
+  assert.equal(result.terminalOutcome, 'download_timed_out');
+});
+
+test('import candidate recovery promotes another match when a completed candidate source disappears', async (t) => {
+  const markImportCandidateImportBlocked = t.mock.fn(async () => ({
+    candidate: {
+      downloadAttemptCount: 0,
+      id: 'candidate-missing-source',
+      sourceSearchId: 'search-1',
+      status: 'failed',
+    },
+  }));
+  const promoteImportCandidateForRecoveryFn = t.mock.fn(async ({ importCandidateId }) => ({ id: importCandidateId }));
+  const service = createImportCandidateRecoveryService({
+    findNextCandidateForRecoveryFn: async () => ({ id: 'candidate-next' }),
+    getImportCandidate: async () => ({
+      id: 'candidate-missing-source',
+      sourceSearchId: 'search-1',
+      status: 'import_pending',
+    }),
+    incrementImportCandidateDownloadAttemptCountFn: async () => ({
+      downloadAttemptCount: 1,
+      id: 'candidate-missing-source',
+      sourceSearchId: 'search-1',
+      status: 'failed',
+    }),
+    markImportCandidateImportBlocked,
+    promoteImportCandidateForRecoveryFn,
+  });
+
+  const result = await service.handleImportCandidateImportBlocker({
+    canRecover: true,
+    failedCandidateId: 'candidate-missing-source',
+    failureReason: 'The expected source file is not reachable from the resolved download path.',
+  });
+
+  assert.deepEqual(markImportCandidateImportBlocked.mock.calls[0].arguments[0], {
+    importCandidateId: 'candidate-missing-source',
+    recordSourceFailure: true,
+    reason: 'The expected source file is not reachable from the resolved download path.',
+  });
+  assert.equal(promoteImportCandidateForRecoveryFn.mock.callCount(), 1);
+  assert.equal(result.recovered, true);
+  assert.equal(result.terminalOutcome, 'source_disappeared');
+});
+
+test('import candidate recovery keeps import collisions available for a manual safe-add decision', async (t) => {
+  const markImportCandidateImportBlocked = t.mock.fn(async () => ({
+    candidate: {
+      id: 'candidate-collision',
+      sourceSearchId: 'search-1',
+      status: 'failed',
+    },
+  }));
+  const findNextCandidateForRecoveryFn = t.mock.fn(async () => {
+    throw new Error('a collision must not trigger automatic match selection');
+  });
+  const service = createImportCandidateRecoveryService({
+    findNextCandidateForRecoveryFn,
+    getImportCandidate: async () => ({
+      id: 'candidate-collision',
+      sourceSearchId: 'search-1',
+      status: 'import_pending',
+    }),
+    markImportCandidateImportBlocked,
+  });
+
+  const result = await service.handleImportCandidateImportBlocker({
+    canRecover: false,
+    failedCandidateId: 'candidate-collision',
+  });
+
+  assert.deepEqual(markImportCandidateImportBlocked.mock.calls[0].arguments[0], {
+    importCandidateId: 'candidate-collision',
+    recordSourceFailure: false,
+    reason: null,
+  });
+  assert.equal(findNextCandidateForRecoveryFn.mock.callCount(), 0);
+  assert.deepEqual(result, {
+    attemptedCandidateId: null,
+    failedAttemptCount: null,
+    failedCandidateId: 'candidate-collision',
+    metadataReleaseId: null,
+    nextCandidateId: null,
+    reason: 'import_blocker_requires_operator',
+    recovered: false,
+    recoveryRunId: null,
+    requiresOperator: true,
+    sourceSearchId: 'search-1',
+    terminalOutcome: 'import_blocked',
   });
 });
 

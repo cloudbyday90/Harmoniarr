@@ -34,6 +34,7 @@ const allowedEventTypes = new Set([
   'music_queue_match_retrying',
   'music_queue_no_matches_left',
   'music_queue_download_failed',
+  'music_queue_import_blocked',
   'music_queue_match_selected',
   'music_queue_download_started',
   'music_queue_audio_checked',

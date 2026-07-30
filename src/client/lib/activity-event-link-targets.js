@@ -36,6 +36,7 @@ export function buildActivityEventLinkTarget(event = {}) {
     'music_queue_match_retrying',
     'music_queue_no_matches_left',
     'music_queue_download_failed',
+    'music_queue_import_blocked',
     'download_completed',
   ].includes(event.eventType)) {
     const wantedReleaseId = event.extraPayload?.wantedReleaseId
@@ -45,6 +46,8 @@ export function buildActivityEventLinkTarget(event = {}) {
           label: event.eventType === 'music_queue_quality_blocked'
             || event.eventType === 'music_queue_audio_warning'
             ? 'Review quality choice'
+            : event.eventType === 'music_queue_import_blocked'
+              ? 'Review library add plan'
             : 'Open Music Queue',
           to: {
             name: 'music-queue-release',

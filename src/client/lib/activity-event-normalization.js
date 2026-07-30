@@ -203,6 +203,12 @@ export function getActivityEventLabel(event, currentUserId = null) {
         : 'a release';
       return `Download needs attention: ${releaseDesc}`;
     }
+    case 'music_queue_import_blocked': {
+      const releaseDesc = title
+        ? (artist ? `${title} by ${artist}` : title)
+        : 'a release';
+      return `Library add needs help: ${releaseDesc}`;
+    }
     default:
       return event.eventType ?? 'Activity';
   }
@@ -278,6 +284,10 @@ export function getActivityEventDetail(event) {
     return 'Harmoniarr could not choose another safe match. Open Music Queue to review what happened.';
   }
 
+  if (event.eventType === 'music_queue_import_blocked') {
+    return 'Harmoniarr stopped before changing the library. Review the library add plan to resolve the safety check.';
+  }
+
   if (event.eventType !== 'release_added') {
     return '';
   }
@@ -332,6 +342,7 @@ export function getActivityEventIcon(eventType) {
       return 'download';
     case 'music_queue_no_matches_left':
     case 'music_queue_download_failed':
+    case 'music_queue_import_blocked':
       return 'alert';
     default:
       return 'activity';

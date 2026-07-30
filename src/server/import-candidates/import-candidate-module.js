@@ -181,6 +181,7 @@ export function createImportCandidateModule({
     createRecoveryExecutionRun: importCandidateExecutionRunStore.createOperationRun,
     getImportCandidate: importCandidateService.getImportCandidate,
     markImportCandidateDownloadFailed: importCandidateService.markImportCandidateDownloadFailed,
+    markImportCandidateImportBlocked: importCandidateService.markImportCandidateImportBlocked,
     markImportCandidateQualityFailed: importCandidateService.markImportCandidateQualityFailed,
     qualityPolicyService: createAcquisitionQualityPolicyService(),
     retryImportCandidateDownload: importCandidateService.retryImportCandidateDownload,
@@ -305,6 +306,8 @@ export function createImportCandidateModule({
     getActiveRun: importCandidateApplyRunStore.getActiveRun,
   }),
   importCandidateAutoApplyRunService = createImportCandidateAutoApplyRunService({
+    handleImportCandidateImportBlocker: importCandidateRecoveryService.handleImportCandidateImportBlocker,
+    previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
     startImportCandidateApplyRun: importCandidateApplyService.startImportCandidateApplyRun,
   }),
   importCandidateMediaInspectionService = createImportCandidateMediaInspectionService({

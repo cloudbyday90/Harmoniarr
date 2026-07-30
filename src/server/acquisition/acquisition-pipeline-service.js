@@ -97,6 +97,7 @@ function buildMatchEvidence(release) {
   return {
     bestCompositeScore: importReviewSummary.bestCompositeScore ?? null,
     executionStatusCounts: executionSummary.itemStatusCounts ?? {},
+    latestEventType: importReviewSummary.latestEventType ?? null,
     latestStatus: importReviewSummary.latestStatus ?? null,
     latestUpdatedAt: importReviewSummary.latestUpdatedAt ?? executionSummary.latestUpdatedAt ?? null,
     matches: Array.isArray(importReviewSummary.matches) ? importReviewSummary.matches : [],

@@ -218,10 +218,28 @@ export function createImportCandidateExecutionReconciliationService({
         );
 
         if (typeof startSafeApplyRunAfterDownloadCompleted === 'function' && result?.candidate) {
-          autoApplyRuns.push(await startSafeApplyRunAfterDownloadCompleted({
+          const autoApplyRun = await startSafeApplyRunAfterDownloadCompleted({
             importCandidateId,
             requestMetadata,
-          }));
+          });
+          autoApplyRuns.push(autoApplyRun);
+
+          if (autoApplyRun?.recovery?.recovered) {
+            recoveries.push(autoApplyRun.recovery);
+          } else if (autoApplyRun?.recovery?.rediscovery?.scheduled) {
+            rediscoveries.push(autoApplyRun.recovery.rediscovery);
+          }
+
+          if (autoApplyRun?.recovery) {
+            recordActivityEventSafely(
+              recordActivityEventFn,
+              buildMusicQueueRecoveryActivityEvent({
+                candidate: result.candidate,
+                operationRunId: run?.id ?? null,
+                recovery: autoApplyRun.recovery,
+              }),
+            );
+          }
         }
       } else if (targetStatus === 'failed') {
         result = await markImportCandidateDownloadFailed({
@@ -235,6 +253,7 @@ export function createImportCandidateExecutionReconciliationService({
           failureReason: reason,
           operationRunId: run?.id ?? null,
           scheduleFollowUpRun: run?.status !== 'pending' && run?.status !== 'running',
+          terminalOutcome: item.liveTransferSummary?.terminalOutcome ?? undefined,
         });
         if (recovery?.recovered) {
           recoveries.push(recovery);

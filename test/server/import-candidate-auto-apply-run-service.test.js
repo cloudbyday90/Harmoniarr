@@ -53,6 +53,83 @@ test('startSafeApplyRunAfterDownloadCompleted reports known skipped cases', asyn
   });
 });
 
+test('startSafeApplyRunAfterDownloadCompleted promotes another match when completed source files disappeared', async (t) => {
+  const handleImportCandidateImportBlocker = t.mock.fn(async () => ({
+    recovered: true,
+    terminalOutcome: 'source_disappeared',
+  }));
+  const startImportCandidateApplyRun = t.mock.fn(async () => {
+    throw new Error('safe auto add should not start for a missing source');
+  });
+  const service = createImportCandidateAutoApplyRunService({
+    handleImportCandidateImportBlocker,
+    previewImportCandidateApply: async () => ({
+      counts: {
+        collisionCount: 0,
+        lossyDecisionRequiredCount: 0,
+        missingSourceCount: 1,
+      },
+      preview: { validation: { blockers: [] } },
+      summary: {
+        message: 'The expected source file is not reachable from the resolved download path.',
+        status: 'blocked',
+      },
+    }),
+    startImportCandidateApplyRun,
+  });
+
+  const result = await service.startSafeApplyRunAfterDownloadCompleted({
+    importCandidateId: 'candidate-missing-source',
+  });
+
+  assert.deepEqual(handleImportCandidateImportBlocker.mock.calls[0].arguments[0], {
+    canRecover: true,
+    failedCandidateId: 'candidate-missing-source',
+    failureReason: 'The expected source file is not reachable from the resolved download path.',
+    scheduleFollowUpRun: true,
+  });
+  assert.equal(startImportCandidateApplyRun.mock.callCount(), 0);
+  assert.equal(result.skippedReason, 'completed_source_unavailable');
+  assert.equal(result.recovery.recovered, true);
+});
+
+test('startSafeApplyRunAfterDownloadCompleted stops collisions before any automatic fallback', async (t) => {
+  const handleImportCandidateImportBlocker = t.mock.fn(async () => ({
+    reason: 'import_blocker_requires_operator',
+    recovered: false,
+    requiresOperator: true,
+    terminalOutcome: 'import_blocked',
+  }));
+  const startImportCandidateApplyRun = t.mock.fn(async () => {
+    throw new Error('safe auto add should not start for a collision');
+  });
+  const service = createImportCandidateAutoApplyRunService({
+    handleImportCandidateImportBlocker,
+    previewImportCandidateApply: async () => ({
+      counts: {
+        collisionCount: 1,
+        lossyDecisionRequiredCount: 0,
+        missingSourceCount: 0,
+      },
+      preview: { validation: { blockers: [] } },
+      summary: {
+        message: 'A target library path already exists.',
+        status: 'blocked',
+      },
+    }),
+    startImportCandidateApplyRun,
+  });
+
+  const result = await service.startSafeApplyRunAfterDownloadCompleted({
+    importCandidateId: 'candidate-collision',
+  });
+
+  assert.equal(handleImportCandidateImportBlocker.mock.calls[0].arguments[0].canRecover, false);
+  assert.equal(startImportCandidateApplyRun.mock.callCount(), 0);
+  assert.equal(result.skippedReason, 'import_blocker_requires_operator');
+  assert.equal(result.recovery.requiresOperator, true);
+});
+
 test('startSafeApplyRunAfterDownloadCompleted rethrows unexpected errors', async () => {
   const service = createImportCandidateAutoApplyRunService({
     startImportCandidateApplyRun: async () => {

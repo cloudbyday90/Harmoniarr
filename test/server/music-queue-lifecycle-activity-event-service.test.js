@@ -104,6 +104,23 @@ test('Music Queue recovery activity distinguishes retry, rediscovery, and termin
   assert.equal(terminalFailure.eventType, 'music_queue_download_failed');
 });
 
+test('Music Queue recovery activity records a safe library-add stop without provider diagnostics', () => {
+  const event = buildMusicQueueRecoveryActivityEvent({
+    candidate,
+    recovery: {
+      reason: 'import_blocker_requires_operator',
+      recovered: false,
+      requiresOperator: true,
+      terminalOutcome: 'import_blocked',
+    },
+  });
+
+  assert.equal(event.eventType, 'music_queue_import_blocked');
+  assert.equal(event.extraPayload.terminalOutcome, 'import_blocked');
+  assert.equal(JSON.stringify(event).includes('source-user'), false);
+  assert.equal(JSON.stringify(event).includes('/data/downloads'), false);
+});
+
 test('Music Queue search activity is release-scoped and records only safe scheduling evidence', () => {
   const event = buildMusicQueueSearchQueuedActivityEvent({
     actorUserId: 'user-1',

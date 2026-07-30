@@ -78,8 +78,9 @@ function buildRecoveryPayload({
   const rediscovery = recovery?.rediscovery && typeof recovery.rediscovery === 'object'
     ? recovery.rediscovery
     : null;
+  const terminalOutcome = normalizeOptionalString(recovery?.terminalOutcome);
 
-  return {
+  const payload = {
     schemaVersion: MUSIC_QUEUE_ACTIVITY_SCHEMA_VERSION,
     wantedReleaseId,
     recoveryCode: normalizeOptionalString(recovery?.reason),
@@ -89,6 +90,12 @@ function buildRecoveryPayload({
     rediscoveryScheduled: rediscovery?.scheduled === true,
     skippedCandidateCount: normalizeNonNegativeInteger(recovery?.skippedCandidateCount),
   };
+
+  if (terminalOutcome) {
+    payload.terminalOutcome = terminalOutcome;
+  }
+
+  return payload;
 }
 
 /**
@@ -113,7 +120,10 @@ export function buildMusicQueueRecoveryActivityEvent({
 
   const { wantedReleaseId, ...activityEntity } = entity;
 
-  let eventType = 'music_queue_download_failed';
+  let eventType = recovery.requiresOperator === true
+    && recovery.terminalOutcome === 'import_blocked'
+    ? 'music_queue_import_blocked'
+    : 'music_queue_download_failed';
   if (recovery.recovered === true) {
     eventType = recovery.retrySameCandidate === true
       ? 'music_queue_download_retrying'
