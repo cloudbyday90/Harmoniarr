@@ -7,7 +7,7 @@ Implemented on 2026-07-29.
 ## Problem
 
 The Match diagnostics header still displayed `N visible matches` even after the
-candidate list moved behind the optional **Find a match** disclosure. That
+candidate list moved behind the optional **Search saved matches** disclosure. That
 number described an internal result set instead of the reason an operator had
 opened the page. It also made the default advanced screen look like a queue
 browser when its primary job is to explain and repair an exceptional match.
@@ -45,7 +45,7 @@ Pros: explains why the current diagnostic route was opened, keeps direct
 candidate and file handoffs meaningful, and removes the last default
 candidate-queue signal.
 
-Cons: operators must open **Find a match** to see the exact result count; that
+Cons: operators must open **Search saved matches** to see the exact result count; that
 is intentional because the count only helps while inspecting alternatives.
 
 ### Remove all header context
@@ -66,7 +66,7 @@ library-add recovery links.
 3. Use plain labels such as `Fix a file issue`, `Review selected match`, and
    `Review library add` rather than internal candidate terminology.
 4. Keep the existing total result text in `ImportCandidateQueueList`, which is
-   rendered only after **Find a match** is expanded.
+   rendered only after **Search saved matches** is expanded.
 5. Remove the now-unused queue-summary projection from the workspace
    composable rather than carrying unused count state through the page.
 6. Retain all existing routes, browser focus behavior, authorization, provider
@@ -98,7 +98,7 @@ contains match evidence.
   status-filter, and default recovery labels.
 - Browser coverage proves the default header has a recovery focus instead of a
   visible-match counter and that an exact result count appears only after
-  **Find a match** is open.
+  **Search saved matches** is open.
 - Client lint, test lint, ESM checks, production build, focused browser
   verification, and a no-cache local Docker walkthrough rebuild are release
   gates.
@@ -111,6 +111,10 @@ the exact result volume remains available at the point where it is useful.
 
 ## Next High-Value Item
 
-Unify the remaining advanced match-finder filters into one human-readable
-`Search saved matches` form, hiding raw search-reference and source-user
-filters until an operator explicitly expands a secondary filter group.
+The saved-match search now uses a short status-and-folder form and keeps raw
+provider-search references and source users behind `More filters`. See
+[Match Diagnostics Filter Hierarchy Design](MATCH_DIAGNOSTICS_FILTER_HIERARCHY_DESIGN.md).
+
+Next, reduce the Music Queue selected-release review hierarchy so routine
+release progress stays focused on one safe next step and detailed match
+evidence remains explicitly advanced.

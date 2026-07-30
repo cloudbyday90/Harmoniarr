@@ -103,9 +103,9 @@ function selectMatch(matchId) {
     <summary class="import-review-match-finder__summary">
       <hgroup class="import-review-match-finder__heading">
         <p class="import-review-match-finder__eyebrow">Advanced diagnostics</p>
-        <h2 class="import-review-match-finder__title">Find a match</h2>
+        <h2 class="import-review-match-finder__title">Search saved matches</h2>
         <p class="import-review-match-finder__copy">
-          Search the saved match results only when the current recovery needs a different source or closer inspection.
+          Use this only when the current recovery needs a different saved match or a closer look at its source details.
         </p>
       </hgroup>
       <div class="import-review-match-finder__state">

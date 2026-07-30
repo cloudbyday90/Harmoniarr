@@ -174,6 +174,18 @@ suite('Activity releases/wanted browser verification', () => {
         'Saved-match totals should stay inside the collapsed finder until an operator opens it.',
       );
       await openImportReviewMatchFinder(page);
+      await page.getByRole('heading', { exact: true, name: 'Search saved matches' }).waitFor();
+      const advancedFilters = page.locator('details.import-candidate-filters__advanced');
+      assert.equal(
+        await advancedFilters.evaluate((element) => element.open),
+        true,
+        'A source-search deep link should expose the active recorded-search restriction when the finder opens.',
+      );
+      await page.getByLabel('Saved search reference', { exact: true }).waitFor();
+      assert.equal(
+        await page.getByLabel('Saved search reference', { exact: true }).inputValue(),
+        'search-discovery-dispatch-amber',
+      );
       await page.getByText('1 matching result', { exact: true }).waitFor();
       await page.getByText('healthy-slskd-peer', { exact: true }).first().waitFor();
       await page.getByText('/private/staging/Autechre/Amber', { exact: true }).first().waitFor();

@@ -1437,7 +1437,7 @@ worker terminology as the operator's primary task.
 
 Implemented in
 [MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md](MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md).
-The fixed queue/filter rail is now one optional `Find a match` disclosure.
+The fixed queue/filter rail is now one optional `Search saved matches` disclosure.
 Direct candidate and file recovery routes continue to select and focus their
 target without expanding an unrelated result list, while choosing an
 alternative match closes the finder and returns to recovery.
@@ -1457,9 +1457,18 @@ Implemented in
 [MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md](MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md).
 The Match diagnostics header now communicates a compact route-aware recovery
 focus instead of a visible-match total. Exact result counts remain inside the
-optional `Find a match` disclosure, leaving recovery as the default diagnostic
-context.
+optional saved-match search disclosure, leaving recovery as the default
+diagnostic context.
 
-Recommended next slice: unify advanced match-finder filters into one
-human-readable `Search saved matches` form, hiding raw search-reference and
-source-user filters behind a secondary disclosure.
+### Match Diagnostics Filter Hierarchy
+
+Implemented in
+[MATCH_DIAGNOSTICS_FILTER_HIERARCHY_DESIGN.md](MATCH_DIAGNOSTICS_FILTER_HIERARCHY_DESIGN.md).
+The saved-match search now keeps status and folder text in its primary form,
+while raw saved-search references and source users live behind `More filters`.
+Deep links with either source filter automatically reveal that active
+restriction.
+
+Recommended next slice: reduce the Music Queue selected-release review
+hierarchy so normal release progress has one clear next step and deep match
+evidence stays explicitly advanced.

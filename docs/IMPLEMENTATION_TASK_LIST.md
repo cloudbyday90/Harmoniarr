@@ -147,7 +147,7 @@ Database model source: `docs/DATABASE_MODEL.md`
   and visible labels use match/download/library wording. See
   `MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md`.
 - Match diagnostics match finder: the previous fixed queue/filter rail is now
-  one compact native `Find a match` disclosure. Direct candidate and file
+  one compact native `Search saved matches` disclosure. Direct candidate and file
   links keep their already-visible recovery target focused, while manually
   selecting another match closes the finder and returns focus to that recovery
   card. See `MATCH_DIAGNOSTICS_FIND_MATCH_TOOL_DESIGN.md`.
@@ -158,9 +158,14 @@ Database model source: `docs/DATABASE_MODEL.md`
   `MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md`.
 - Match diagnostics recovery focus: the default header now names the active
   recovery purpose instead of a visible-match count. Exact result totals remain
-  within the optional `Find a match` disclosure, where they describe the saved
+  within the optional `Search saved matches` disclosure, where they describe the saved
   result list being inspected. See
   `MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md`.
+- Match diagnostics saved-match search: status and folder text now form the
+  short primary search, while recorded search references and source users are
+  under `More filters`. Existing deep links reveal active source-detail
+  filters automatically without changing route or API behavior. See
+  `MATCH_DIAGNOSTICS_FILTER_HIERARCHY_DESIGN.md`.
 - Music Queue Activity lifecycle: release-scoped history now shows a saved
   search-again action, retrying the same download, trying the next safe match,
   no-matches-left rediscovery, and terminal failures. Events use a bounded

@@ -26,6 +26,7 @@ import {
   buildImportReviewDiagnosticFixturePack,
   IMPORT_REVIEW_DIAGNOSTIC_FIXTURE,
 } from '../../testing/browser/import-review-diagnostic-fixtures.js';
+import { openImportReviewMatchFinder } from '../../testing/browser/import-review-browser-helpers.js';
 import { bootstrapAdminThroughUi } from '../../testing/browser/operator-browser-helpers.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
@@ -120,6 +121,61 @@ async function assertDirectDiagnosticRouteHydrated({
   assert.equal(await selectedRunRow.getAttribute('aria-selected'), 'true');
 }
 
+async function assertSavedMatchSearchStartsSimple(page) {
+  await openImportReviewMatchFinder(page);
+  await page.getByRole('heading', { exact: true, name: 'Search saved matches' }).waitFor();
+
+  const searchForm = page.getByRole('search', { name: 'Search saved matches' });
+  await searchForm.getByText('Filter saved matches', { exact: true }).waitFor();
+  await searchForm.getByLabel('Show', { exact: true }).waitFor();
+  const folderFilter = searchForm.getByLabel('Folder contains', { exact: true });
+  await folderFilter.waitFor();
+  await searchForm.getByRole('button', { exact: true, name: 'Search saved matches' }).waitFor();
+  await searchForm.getByRole('button', { exact: true, name: 'Clear search' }).waitFor();
+
+  const advancedFilters = searchForm.locator('details.import-candidate-filters__advanced');
+  assert.equal(
+    await advancedFilters.evaluate((element) => element.open),
+    false,
+    'A regular recovery visit should keep recorded provider identifiers out of the primary search form.',
+  );
+  assert.equal(await searchForm.getByLabel('Saved search reference', { exact: true }).isVisible(), false);
+  assert.equal(await searchForm.getByLabel('Source user', { exact: true }).isVisible(), false);
+
+  await folderFilter.focus();
+  await folderFilter.press('Tab');
+  assert.equal(
+    await advancedFilters.locator('summary').evaluate((element) => globalThis.document.activeElement === element),
+    true,
+    'Keyboard focus should reach More filters after the primary fields.',
+  );
+
+  await advancedFilters.locator('summary').press('Space');
+  await page.waitForFunction(() =>
+    globalThis.document.querySelector('details.import-candidate-filters__advanced')?.open === true,
+  );
+  await searchForm.getByLabel('Saved search reference', { exact: true }).waitFor();
+  await searchForm.getByLabel('Source user', { exact: true }).waitFor();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const overflowingFilterElements = await searchForm.locator('*').evaluateAll((elements) =>
+    elements
+      .filter((element) => element.getClientRects().length > 0 && element.scrollWidth > element.clientWidth + 1)
+      .map((element) => ({
+        className: element.className,
+        scrollWidth: element.scrollWidth,
+        tagName: element.tagName,
+        text: element.textContent?.trim().slice(0, 80),
+        width: element.clientWidth,
+      })),
+  );
+  assert.deepEqual(
+    overflowingFilterElements,
+    [],
+    `Saved-match filters must reflow without horizontal overflow: ${JSON.stringify(overflowingFilterElements)}`,
+  );
+}
+
 suite('Import Review direct diagnostic route reload browser verification', () => {
   before(async () => {
     try {
@@ -170,6 +226,7 @@ suite('Import Review direct diagnostic route reload browser verification', () =>
       });
 
       await assertDirectDiagnosticRouteHydrated({ page, workspace });
+      await assertSavedMatchSearchStartsSimple(page);
 
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();

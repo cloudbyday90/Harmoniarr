@@ -14,7 +14,7 @@ export async function openImportReviewMatchFinder(page) {
 
   const isOpen = await disclosure.evaluate((element) => element.open);
   if (!isOpen) {
-    await disclosure.locator('summary').click();
+    await disclosure.locator(':scope > summary').click();
   }
 
   await page.waitForFunction(() =>

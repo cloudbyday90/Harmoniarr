@@ -115,7 +115,7 @@ open that disclosure automatically, and visible labels use match/download/
 library language. See
 [Match Diagnostics Run History Controls Design](MATCH_DIAGNOSTICS_RUN_HISTORY_CONTROLS_DESIGN.md).
 
-The saved-match filter and result rail is now a full-width `Find a match`
+The saved-match filter and result rail is now a full-width `Search saved matches`
 disclosure. Direct candidate and file links leave it closed because the
 recovery target is already selected and visible; manually choosing another
 result closes the finder and returns focus to the recovery card. See
@@ -129,11 +129,17 @@ expanded block hands normal monitoring back to Music Queue. See
 
 The final default queue-total signal is now removed from the Match diagnostics
 header. A compact route-aware recovery focus explains why the page is open,
-while exact saved-match totals remain inside `Find a match`. See
+while exact saved-match totals remain inside the saved-match search. See
 [Match Diagnostics Recovery Focus Design](MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md).
+
+The optional saved-match search now keeps its common status and folder search
+in one primary form. Raw provider-search references and source-user filters
+are intentionally behind `More filters`, which opens automatically for an
+identifier-bearing deep link. See
+[Match Diagnostics Filter Hierarchy Design](MATCH_DIAGNOSTICS_FILTER_HIERARCHY_DESIGN.md).
 
 ## Next High-Value Item
 
-Unify the remaining advanced match-finder filters into one human-readable
-`Search saved matches` form, hiding raw search-reference and source-user
-filters until an operator explicitly expands a secondary filter group.
+Reduce the Music Queue selected-release review hierarchy. This is the denser
+remaining normal-path surface: keep the one relevant repair action visible and
+move deep saved-match evidence behind an explicit advanced boundary.
