@@ -67,8 +67,11 @@ The service validates:
   model after success.
 - `acquisition-pipeline-presentation.js` decides which match cards can render
   `Use this match` or `Reject match`.
-- `MusicQueueView.vue` renders accessible success/error feedback and disables
-  match buttons while a mutation is running.
+- `MusicQueueView.vue` owns the selected review and its action-busy state.
+  `MusicQueueReviewPanel.vue` renders the local, accessible action result;
+  `MusicQueueReviewMatchCard.vue` uses guarded `aria-disabled` controls to
+  prevent duplicate actions without losing keyboard focus. See
+  `MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md`.
 
 ### Security
 

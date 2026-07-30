@@ -10,11 +10,43 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createRenderer, h } from 'vue';
 
 import {
   hasActiveMusicQueueProgress,
   MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES,
+  useMusicQueue,
 } from '../../src/client/composables/useMusicQueue.js';
+
+function createNoopRenderer() {
+  return createRenderer({
+    createComment: (text) => ({ text }),
+    createElement: (type) => ({ children: [], type }),
+    createText: (text) => ({ text }),
+    insert: (child, parent) => { parent.children.push(child); },
+    nextSibling: () => null,
+    parentNode: () => null,
+    patchProp: (node, key, _previousValue, nextValue) => { node[key] = nextValue; },
+    remove: () => {},
+    setElementText: (node, text) => { node.text = text; },
+    setText: (node, text) => { node.text = text; },
+  });
+}
+
+function mountMusicQueue(options) {
+  const { createApp } = createNoopRenderer();
+  const root = { children: [] };
+  let musicQueue;
+  const app = createApp({
+    setup() {
+      musicQueue = useMusicQueue({ immediate: false, pollIntervalMs: 0, ...options });
+      return () => h('div');
+    },
+  });
+
+  app.mount(root);
+  return { app, musicQueue };
+}
 
 test('Music Queue polls only while release progress can advance automatically', () => {
   assert.equal(hasActiveMusicQueueProgress({
@@ -42,4 +74,61 @@ test('Music Queue active progress statuses cover automatic search, recovery, dow
     'searching',
     'trying_next_match',
   ]);
+});
+
+test('Music Queue keeps working, success, and failure feedback scoped to the release action', async (t) => {
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    addEventListener() {},
+    hidden: false,
+    removeEventListener() {},
+  };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  const fetchMusicQueueReleases = t.mock.fn(async () => ({
+    pagination: { total: 0 },
+    releases: [],
+    summary: { counts: {}, total: 0 },
+  }));
+  const useMusicQueueMatch = t.mock.fn(async () => ({ ok: true }));
+  const { app, musicQueue } = mountMusicQueue({ fetchMusicQueueReleases, useMusicQueueMatch });
+
+  const action = musicQueue.useMatch({ matchId: 'match-1', wantedReleaseId: 'wanted-1' });
+  assert.deepEqual(musicQueue.actionFeedback.value, {
+    actionKey: 'wanted-1:match-1:use',
+    message: 'Using this match...',
+    phase: 'working',
+    wantedReleaseId: 'wanted-1',
+  });
+
+  await action;
+  assert.deepEqual(musicQueue.actionFeedback.value, {
+    actionKey: 'wanted-1:match-1:use',
+    message: 'Match selected. Harmoniarr will use it for the next download step.',
+    phase: 'success',
+    wantedReleaseId: 'wanted-1',
+  });
+  assert.equal(fetchMusicQueueReleases.mock.callCount(), 1);
+
+  const rejectedMusicQueueMatch = t.mock.fn(async () => {
+    throw new Error('That match is no longer available.');
+  });
+  const { app: failingApp, musicQueue: failingMusicQueue } = mountMusicQueue({
+    fetchMusicQueueReleases,
+    rejectMusicQueueMatch: rejectedMusicQueueMatch,
+  });
+
+  await failingMusicQueue.rejectMatch({ matchId: 'match-2', wantedReleaseId: 'wanted-2' });
+  assert.deepEqual(failingMusicQueue.actionFeedback.value, {
+    actionKey: 'wanted-2:match-2:reject',
+    message: 'That match is no longer available.',
+    phase: 'error',
+    wantedReleaseId: 'wanted-2',
+  });
+  assert.equal(fetchMusicQueueReleases.mock.callCount(), 1);
+
+  app.unmount();
+  failingApp.unmount();
 });

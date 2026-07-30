@@ -131,6 +131,10 @@ routine decisions now expose only selection facts before the existing actions,
 while full source and quality evidence remains available through `Match
 details`.
 
-The next high-value UI slice is **release-scoped Music Queue action feedback**:
-show a bounded success or failure result beside the selected release action
-instead of emitting every mutation result above the entire queue.
+[MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md](MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md)
+implements local action feedback: a bounded working, success, or failure
+result now remains in the selected release review rather than above the queue.
+
+The next high-value UI slice is **release-row transition clarity**: after a
+successful action, make the scheduled automatic step immediately visible on
+the release row without requiring people to reopen the review.

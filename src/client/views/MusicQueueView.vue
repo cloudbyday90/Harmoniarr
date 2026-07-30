@@ -47,8 +47,7 @@ const router = useRouter();
 const isProviderReadyRecoveryReturn = isMusicQueueProviderReadyRecoveryContext(route.query.recovery);
 
 const {
-  actionErrorMessage,
-  actionMessage,
+  actionFeedback,
   activeMatchActionKey,
   activeReleaseActionKey,
   allowFallbackQuality,
@@ -254,14 +253,6 @@ watch(
       {{ errorMessage }}
     </div>
 
-    <div v-if="actionMessage" class="hx-alert" data-tone="success" role="status">
-      {{ actionMessage }}
-    </div>
-
-    <div v-if="actionErrorMessage" class="hx-alert" data-tone="danger" role="alert">
-      {{ actionErrorMessage }}
-    </div>
-
     <div v-if="isLoading" class="music-queue-panel">
       Loading Music Queue...
     </div>
@@ -372,6 +363,7 @@ watch(
       </div>
 
       <MusicQueueReviewPanel
+        :action-feedback="actionFeedback"
         :active-match-action-key="activeMatchActionKey"
         :active-release-action-key="activeReleaseActionKey"
         :review="matchReview"

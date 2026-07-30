@@ -85,6 +85,7 @@ export async function createBrowserSmokeRuntime({
             page,
           });
         } finally {
+          await browserContext.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
           await browserContext.close().catch(() => {});
           await browser.close().catch(() => {});
         }

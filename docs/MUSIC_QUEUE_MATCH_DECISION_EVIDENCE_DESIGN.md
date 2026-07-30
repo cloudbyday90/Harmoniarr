@@ -119,6 +119,10 @@ component update:
 
 ## Follow-up
 
-Assess release-scoped action feedback in Music Queue. Current mutation success
-and failure messages are emitted above the entire queue, which can separate
-feedback from the selected release action that caused it.
+[MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md](MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md)
+implements local action feedback: each selected release now retains one
+bounded working, success, or failure result beside the action that caused it.
+
+The next high-value slice is release-row transition clarity, so successful
+actions make their scheduled automatic step obvious without reopening the
+review.

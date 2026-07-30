@@ -18,10 +18,15 @@
 
 <script setup>
 import { computed, ref } from 'vue';
+import { buildMusicQueueReleaseActionFeedback } from '../../lib/music-queue-action-feedback-presentation.js';
 import { buildMusicQueueReviewPresentation } from '../../lib/music-queue-review-presentation.js';
 import MusicQueueReviewMatchCard from './MusicQueueReviewMatchCard.vue';
 
 const props = defineProps({
+  actionFeedback: {
+    default: null,
+    type: Object,
+  },
   activeMatchActionKey: {
     default: '',
     type: String,
@@ -46,6 +51,10 @@ const emit = defineEmits([
 
 const detailsExpanded = ref(false);
 const presentation = computed(() => buildMusicQueueReviewPresentation(props.review));
+const releaseActionFeedback = computed(() => buildMusicQueueReleaseActionFeedback(
+  props.actionFeedback,
+  props.review?.releaseId,
+));
 
 function getMatchActionState(match) {
   const activeAction = props.activeMatchActionKey;
@@ -79,6 +88,28 @@ function isReleaseActionRunning(action) {
         <h3 id="music-queue-review-status" :data-tone="review.statusTone">{{ review.statusLabel }}</h3>
         <p>{{ review.reason }}</p>
         <p class="music-queue-review__next-step"><strong>Next step:</strong> {{ presentation.decisionCopy }}</p>
+        <div class="music-queue-review__feedback-live-region" aria-atomic="true" aria-live="polite">
+          <p
+            v-if="releaseActionFeedback && releaseActionFeedback.role === 'status'"
+            class="music-queue-review__action-feedback"
+            :data-tone="releaseActionFeedback.tone"
+            role="status"
+          >
+            <strong>{{ releaseActionFeedback.label }}</strong>
+            <span>{{ releaseActionFeedback.message }}</span>
+          </p>
+        </div>
+        <div class="music-queue-review__feedback-live-region" aria-atomic="true" aria-live="assertive">
+          <p
+            v-if="releaseActionFeedback && releaseActionFeedback.role === 'alert'"
+            class="music-queue-review__action-feedback"
+            :data-tone="releaseActionFeedback.tone"
+            role="alert"
+          >
+            <strong>{{ releaseActionFeedback.label }}</strong>
+            <span>{{ releaseActionFeedback.message }}</span>
+          </p>
+        </div>
       </section>
 
       <section v-if="presentation.hasMatchChoices" class="music-queue-review__section" aria-labelledby="music-queue-review-match-choice">
@@ -269,6 +300,37 @@ function isReleaseActionRunning(action) {
 
 .music-queue-review__next-step strong {
   color: var(--hx-text);
+}
+
+.music-queue-review__feedback-live-region {
+  display: grid;
+}
+
+.music-queue-review__feedback-live-region:empty {
+  display: none;
+}
+
+.music-queue-review__action-feedback {
+  display: grid;
+  gap: var(--hx-space-1);
+  margin: 0;
+  padding: var(--hx-space-3);
+  border-left: 3px solid var(--hx-accent);
+  background: var(--hx-bg-surface-muted);
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
+}
+
+.music-queue-review__action-feedback[data-tone='success'] {
+  border-color: var(--hx-success);
+}
+
+.music-queue-review__action-feedback[data-tone='danger'] {
+  border-color: var(--hx-danger);
+}
+
+.music-queue-review__action-feedback strong {
+  color: var(--hx-text-strong);
 }
 
 .music-queue-review__match-list,

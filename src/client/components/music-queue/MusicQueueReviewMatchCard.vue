@@ -35,7 +35,7 @@ const props = defineProps({
   },
 });
 
-defineEmits(['reject-match', 'use-match']);
+const emit = defineEmits(['reject-match', 'use-match']);
 
 const detailsExpanded = ref(false);
 const presentation = computed(() => buildMusicQueueMatchCardPresentation(props.match, {
@@ -48,6 +48,16 @@ watch(
     detailsExpanded.value = false;
   },
 );
+
+function useMatch() {
+  if (props.actionRunning) return;
+  emit('use-match', props.match);
+}
+
+function rejectMatch() {
+  if (props.actionRunning) return;
+  emit('reject-match', props.match);
+}
 </script>
 
 <template>
@@ -78,8 +88,8 @@ watch(
         type="button"
         class="hx-btn"
         data-variant="primary"
-        :disabled="Boolean(actionRunning)"
-        @click="$emit('use-match', match)"
+        :aria-disabled="Boolean(actionRunning)"
+        @click="useMatch"
       >
         {{ actionRunning === 'use' ? 'Selecting...' : 'Use this match' }}
       </button>
@@ -88,8 +98,8 @@ watch(
         type="button"
         class="hx-btn"
         data-variant="ghost"
-        :disabled="Boolean(actionRunning)"
-        @click="$emit('reject-match', match)"
+        :aria-disabled="Boolean(actionRunning)"
+        @click="rejectMatch"
       >
         {{ actionRunning === 'reject' ? 'Rejecting...' : 'Reject match' }}
       </button>
@@ -204,6 +214,11 @@ watch(
   display: flex;
   flex-wrap: wrap;
   gap: var(--hx-space-2);
+}
+
+.music-queue-review-match__actions button[aria-disabled='true'] {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .music-queue-review-match__details {

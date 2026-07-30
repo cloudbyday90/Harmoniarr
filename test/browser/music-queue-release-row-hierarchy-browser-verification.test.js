@@ -230,6 +230,15 @@ function buildMatchChoicePayload() {
   };
 }
 
+function createDeferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
+
 let browserRuntime;
 let runtimeUnavailableReason = null;
 
@@ -591,5 +600,108 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const manifest = await evidence.writeManifest();
       assert.equal(manifest.captureCount, 2);
     }, { scenarioName: 'music_queue_match_decision_evidence' });
+  });
+
+  test('keeps action feedback inside the selected release review through progress, success, and failure', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const evidence = createBrowserVisualEvidenceRecorder({
+        scenarioName: 'music_queue_release_action_feedback',
+      });
+      const pageErrors = [];
+      const useMatchResponse = createDeferred();
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify(buildMatchChoicePayload()),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases\/wanted-match-choice\/matches\/match-choice-best\/use$/, async (route) => {
+        await useMatchResponse.promise;
+        await route.fulfill({
+          body: JSON.stringify({ ok: true }),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases\/wanted-match-choice\/matches\/match-choice-best\/reject$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify({
+            error: {
+              code: 'match_unavailable',
+              message: 'That match is no longer available. Choose another match or search again.',
+            },
+          }),
+          contentType: 'application/json',
+          status: 409,
+        });
+      });
+      await installConfiguredMusicQueueProviderFixtures(browserContext);
+
+      await page.setViewportSize({ height: 1000, width: 1440 });
+      await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
+      await releaseRow.getByRole('button', { name: 'Review matches' }).click();
+
+      const reviewPanel = page.locator('.music-queue-review');
+      const decisionCard = reviewPanel.locator('.music-queue-review-match').filter({ hasText: 'Match 1' });
+      const useButton = decisionCard.getByRole('button', { name: 'Use this match' });
+      const useButtonFocusTarget = decisionCard.locator('.music-queue-review-match__actions button').first();
+      const rejectButton = decisionCard.getByRole('button', { name: 'Reject match' });
+      const statusFeedback = reviewPanel.locator('.music-queue-review__action-feedback[role="status"]');
+      const errorFeedback = reviewPanel.locator('.music-queue-review__action-feedback[role="alert"]');
+      const useMatchRequest = page.waitForRequest((request) => request.url().endsWith(
+        '/api/v1/acquisition/releases/wanted-match-choice/matches/match-choice-best/use',
+      ));
+
+      await useButton.focus();
+      await useButton.press('Enter');
+      await useMatchRequest;
+      await statusFeedback.getByText('Working', { exact: true }).waitFor();
+      await statusFeedback.getByText('Using this match...', { exact: true }).waitFor();
+      assert.equal(await useButtonFocusTarget.evaluate((element) => globalThis.document.activeElement === element), true);
+      assert.equal(await page.locator('.music-queue-view > .hx-alert').filter({ hasText: 'Using this match...' }).count(), 0);
+
+      useMatchResponse.resolve();
+      await statusFeedback.getByText('Updated', { exact: true }).waitFor();
+      await statusFeedback.getByText('Match selected. Harmoniarr will use it for the next download step.', { exact: true }).waitFor();
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'A successful match action is announced inside the selected release review, not above the queue.',
+        name: 'desktop-release-action-success',
+        surface: 'music-queue-review',
+      });
+
+      await rejectButton.focus();
+      await rejectButton.press('Enter');
+      await errorFeedback.getByText('Could not continue', { exact: true }).waitFor();
+      await errorFeedback.getByText('That match is no longer available. Choose another match or search again.', { exact: true }).waitFor();
+      assert.equal(await rejectButton.evaluate((element) => globalThis.document.activeElement === element), true);
+      assert.equal(await page.locator('.music-queue-view > .hx-alert').filter({ hasText: 'That match is no longer available.' }).count(), 0);
+
+      await page.setViewportSize({ height: 844, width: 390 });
+      await errorFeedback.scrollIntoViewIfNeeded();
+      assert.equal(
+        await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth),
+        true,
+        'Release action feedback should not create horizontal overflow on mobile.',
+      );
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'A failed action remains attached to the selected release and readable on a narrow viewport.',
+        name: 'mobile-release-action-failure',
+        surface: 'music-queue-review',
+      });
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+      const manifest = await evidence.writeManifest();
+      assert.equal(manifest.captureCount, 2);
+    }, { scenarioName: 'music_queue_release_action_feedback' });
   });
 });

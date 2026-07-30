@@ -27,6 +27,7 @@ import {
 } from '../lib/acquisition-api.js';
 import { buildMusicQueueSummaryCards, normalizeMusicQueueRelease } from '../lib/acquisition-pipeline-presentation.js';
 import { getErrorMessage } from '../lib/error-utils.js';
+import { createMusicQueueActionFeedback } from '../lib/music-queue-action-feedback-presentation.js';
 import {
   isMusicQueueActiveProgressRelease,
   MUSIC_QUEUE_ACTIVE_PROGRESS_STATUSES,
@@ -57,8 +58,7 @@ export function useMusicQueue({
   searchMusicQueueReleaseAgain = defaultSearchMusicQueueReleaseAgain,
   useMusicQueueMatch = defaultUseMusicQueueMatch,
 } = {}) {
-  const actionErrorMessage = ref('');
-  const actionMessage = ref('');
+  const actionFeedback = ref(null);
   const activeMatchActionKey = ref('');
   const activeReleaseActionKey = ref('');
   const hasArtistScope = metadataArtistId !== null;
@@ -107,29 +107,42 @@ export function useMusicQueue({
   const summaryCards = computed(() => buildMusicQueueSummaryCards(resource.data.value.summary));
   const totalCount = computed(() => resource.data.value.pagination?.total ?? releases.value.length);
 
+  function setActionFeedback({ actionKey, message, phase, wantedReleaseId }) {
+    actionFeedback.value = createMusicQueueActionFeedback({
+      actionKey,
+      message,
+      phase,
+      wantedReleaseId,
+    });
+  }
+
   async function runMatchAction({
     actionKey,
     apiFn,
     matchId,
+    pendingMessage,
     successMessage,
     wantedReleaseId,
   }) {
     if (!wantedReleaseId || !matchId) {
-      actionErrorMessage.value = 'This match is missing the release context needed to update it.';
       return null;
     }
 
     activeMatchActionKey.value = actionKey;
-    actionErrorMessage.value = '';
-    actionMessage.value = '';
+    setActionFeedback({ actionKey, message: pendingMessage, phase: 'working', wantedReleaseId });
 
     try {
       const payload = await apiFn({ matchId, wantedReleaseId });
-      actionMessage.value = successMessage;
+      setActionFeedback({ actionKey, message: successMessage, phase: 'success', wantedReleaseId });
       await resource.load();
       return payload;
     } catch (error) {
-      actionErrorMessage.value = getErrorMessage(error, 'Music Queue match action failed.');
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Music Queue match action failed.') || 'Music Queue match action failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
       return null;
     } finally {
       activeMatchActionKey.value = '';
@@ -141,6 +154,7 @@ export function useMusicQueue({
       actionKey: `${wantedReleaseId}:${matchId}:use`,
       apiFn: useMusicQueueMatch,
       matchId,
+      pendingMessage: 'Using this match...',
       successMessage: 'Match selected. Harmoniarr will use it for the next download step.',
       wantedReleaseId,
     });
@@ -151,6 +165,7 @@ export function useMusicQueue({
       actionKey: `${wantedReleaseId}:${matchId}:reject`,
       apiFn: rejectMusicQueueMatch,
       matchId,
+      pendingMessage: 'Rejecting this match...',
       successMessage: 'Match rejected. Harmoniarr will not choose it for this release.',
       wantedReleaseId,
     });
@@ -158,23 +173,37 @@ export function useMusicQueue({
 
   async function searchAgain({ wantedReleaseId } = {}) {
     if (!wantedReleaseId) {
-      actionErrorMessage.value = 'This release is missing the context needed to search again.';
       return null;
     }
 
-    activeReleaseActionKey.value = `${wantedReleaseId}:search-again`;
-    actionErrorMessage.value = '';
-    actionMessage.value = '';
+    const actionKey = `${wantedReleaseId}:search-again`;
+    activeReleaseActionKey.value = actionKey;
+    setActionFeedback({
+      actionKey,
+      message: 'Queuing another search...',
+      phase: 'working',
+      wantedReleaseId,
+    });
 
     try {
       const payload = await searchMusicQueueReleaseAgain({ wantedReleaseId });
-      actionMessage.value = payload?.action?.dispatchAlreadyActive
-        ? 'Search queued. Discovery is already running and will pick this up.'
-        : 'Search queued. Harmoniarr will look for this release again.';
+      setActionFeedback({
+        actionKey,
+        message: payload?.action?.dispatchAlreadyActive
+          ? 'Search queued. Discovery is already running and will pick this up.'
+          : 'Search queued. Harmoniarr will look for this release again.',
+        phase: 'success',
+        wantedReleaseId,
+      });
       await resource.load();
       return payload;
     } catch (error) {
-      actionErrorMessage.value = getErrorMessage(error, 'Music Queue search retry failed.');
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Music Queue search retry failed.') || 'Music Queue search retry failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
       return null;
     } finally {
       activeReleaseActionKey.value = '';
@@ -183,23 +212,37 @@ export function useMusicQueue({
 
   async function allowFallbackQuality({ wantedReleaseId } = {}) {
     if (!wantedReleaseId) {
-      actionErrorMessage.value = 'This release is missing the context needed to allow fallback quality.';
       return null;
     }
 
-    activeReleaseActionKey.value = `${wantedReleaseId}:allow-fallback-quality`;
-    actionErrorMessage.value = '';
-    actionMessage.value = '';
+    const actionKey = `${wantedReleaseId}:allow-fallback-quality`;
+    activeReleaseActionKey.value = actionKey;
+    setActionFeedback({
+      actionKey,
+      message: 'Saving the fallback-quality choice...',
+      phase: 'working',
+      wantedReleaseId,
+    });
 
     try {
       const payload = await allowMusicQueueFallbackQuality({ wantedReleaseId });
-      actionMessage.value = payload?.action?.dispatchAlreadyActive
-        ? 'Fallback quality allowed. Discovery is already running and will pick this up.'
-        : 'Fallback quality allowed. Harmoniarr will look for an acceptable match.';
+      setActionFeedback({
+        actionKey,
+        message: payload?.action?.dispatchAlreadyActive
+          ? 'Fallback quality allowed. Discovery is already running and will pick this up.'
+          : 'Fallback quality allowed. Harmoniarr will look for an acceptable match.',
+        phase: 'success',
+        wantedReleaseId,
+      });
       await resource.load();
       return payload;
     } catch (error) {
-      actionErrorMessage.value = getErrorMessage(error, 'Music Queue fallback quality update failed.');
+      setActionFeedback({
+        actionKey,
+        message: getErrorMessage(error, 'Music Queue fallback quality update failed.') || 'Music Queue fallback quality update failed.',
+        phase: 'error',
+        wantedReleaseId,
+      });
       return null;
     } finally {
       activeReleaseActionKey.value = '';
@@ -208,8 +251,7 @@ export function useMusicQueue({
 
   return {
     ...resource,
-    actionErrorMessage: readonly(actionErrorMessage),
-    actionMessage: readonly(actionMessage),
+    actionFeedback: readonly(actionFeedback),
     activeMatchActionKey: readonly(activeMatchActionKey),
     activeReleaseActionKey: readonly(activeReleaseActionKey),
     allowFallbackQuality,

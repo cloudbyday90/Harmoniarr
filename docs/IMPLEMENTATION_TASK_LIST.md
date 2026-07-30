@@ -330,6 +330,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   outer advanced-evidence surface retains its full card content. Browser proof
   covers keyboard activation and mobile overflow. See
   `MUSIC_QUEUE_MATCH_DECISION_EVIDENCE_DESIGN.md`.
+- Music Queue release action feedback: match, retry, and fallback-quality
+  results now remain inside the selected release review instead of becoming
+  page-wide banners. One bounded release-keyed record announces working and
+  successful actions politely, announces failures assertively, and leaves
+  focus on the initiating control. See
+  `MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

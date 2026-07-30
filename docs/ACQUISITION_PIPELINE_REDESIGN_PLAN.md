@@ -888,6 +888,9 @@ automation changes.
   only for a stopped release. See
   `MUSIC_QUEUE_STOPPED_RELEASE_RECOVERY_DESIGN.md`.
 - [x] Add release-scoped quality fallback action.
+- [x] Keep Music Queue mutation feedback local to the selected release review,
+  while reserving page-level feedback for Music Queue read failures. See
+  `MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md`.
 - [x] Show why automation did or did not choose a match at aggregate release
   level and in simplified per-match cards.
 - [x] Show quality profile fit for each release: profile, decision, format
@@ -1480,6 +1483,16 @@ controls. Score, transfer, source-health, and detailed quality evidence remain
 on the same card through a native `Match details` disclosure. Evidence cards
 inside the already-advanced outer disclosure retain their complete facts.
 
-Recommended next slice: localize Music Queue mutation feedback to the release
-action that produced it, keeping page-level feedback for page-load failures
-only.
+### Music Queue Release Action Feedback
+
+Implemented in
+[MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md](MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md).
+Music Queue now retains a single bounded action result next to the selected
+release review instead of emitting mutation banners above the whole queue.
+Working and success results use polite status semantics; failures use an alert
+without moving keyboard focus. Page-level feedback remains reserved for queue
+read failures.
+
+Recommended next slice: make post-action state transitions visible at the
+release-row level, so the next automatic step is immediately clear without
+reopening the review or advanced diagnostics.
