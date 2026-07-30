@@ -63,15 +63,24 @@ function buildMusicQueueContext(candidate) {
     : typeof qualityOverride?.wantedReleaseId === 'string' && qualityOverride.wantedReleaseId.trim()
       ? qualityOverride.wantedReleaseId.trim()
       : null;
+  const wantedReleaseIds = Array.isArray(context.wantedReleaseIds)
+    ? [...new Set(context.wantedReleaseIds
+      .filter((id) => typeof id === 'string' && id.trim())
+      .map((id) => id.trim()))]
+    : [];
+  if (wantedReleaseId && !wantedReleaseIds.includes(wantedReleaseId)) {
+    wantedReleaseIds.unshift(wantedReleaseId);
+  }
 
-  if (!profileCode && !qualityOverride && !wantedReleaseId) {
+  if (!profileCode && !qualityOverride && wantedReleaseIds.length === 0) {
     return null;
   }
 
   return {
     profileCode,
     qualityOverride,
-    ...(wantedReleaseId ? { wantedReleaseId } : {}),
+    ...(wantedReleaseIds[0] ? { wantedReleaseId: wantedReleaseIds[0] } : {}),
+    ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}),
   };
 }
 

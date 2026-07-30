@@ -315,7 +315,7 @@ test('listWantedReleasesWithMetadata returns null discoveryRequest when none exi
   assert.equal(releases[0].discoveryRequest, null);
 });
 
-test('replaceLibraryWantedReleases writes operator-scoped wanted rows', async (t) => {
+test('replaceLibraryWantedReleases preserves operator row identities and synchronizes discovery links', async (t) => {
   const queries = [];
   const client = {
     query: t.mock.fn(async (sql, params) => {
@@ -324,10 +324,12 @@ test('replaceLibraryWantedReleases writes operator-scoped wanted rows', async (t
     }),
     release: t.mock.fn(),
   };
+  const syncActiveWantedReleaseLinks = t.mock.fn(async () => {});
   const store = createLibraryWantedReleaseStore({
     getPoolFn: () => ({
       connect: async () => client,
     }),
+    libraryDiscoveryRequestWantedReleaseLinkStore: { syncActiveWantedReleaseLinks },
   });
 
   await store.replaceLibraryWantedReleases({
@@ -347,7 +349,11 @@ test('replaceLibraryWantedReleases writes operator-scoped wanted rows', async (t
   });
 
   const insertQuery = queries.find((entry) => entry.sql.includes('INSERT INTO library_wanted_releases'));
+  const staleCleanupQuery = queries.find((entry) => entry.sql.includes('DELETE FROM library_wanted_releases'));
+  assert.match(staleCleanupQuery.sql, /UNNEST\(\$1::uuid\[\], \$2::uuid\[\]\)/u);
+  assert.deepEqual(staleCleanupQuery.params, [['user-1'], ['release-1']]);
   assert.match(insertQuery.sql, /app_user_id/);
+  assert.match(insertQuery.sql, /ON CONFLICT \(app_user_id, metadata_release_id\) DO UPDATE/u);
   assert.deepEqual(insertQuery.params, [
     'user-1',
     'artist-1',
@@ -361,6 +367,7 @@ test('replaceLibraryWantedReleases writes operator-scoped wanted rows', async (t
     'Official',
     '{"strategy":"monitored_release_absent"}',
   ]);
+  assert.equal(syncActiveWantedReleaseLinks.mock.callCount(), 1);
   assert.equal(client.release.mock.callCount(), 1);
 });
 

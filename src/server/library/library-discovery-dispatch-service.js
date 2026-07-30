@@ -37,6 +37,69 @@ export const DEFAULT_DISCOVERY_SETTINGS = Object.freeze({
   maxSearchAttempts: 3,
 });
 
+const QUALITY_PROFILE_PRIORITY = Object.freeze({
+  any_available: 0,
+  high_quality: 1,
+  lossless_archive: 2,
+});
+
+function normalizeOptionalString(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeOperatorLinks(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const wantedReleaseIds = new Set();
+  return value.flatMap((link) => {
+    const appUserId = normalizeOptionalString(link?.appUserId);
+    const wantedReleaseId = normalizeOptionalString(link?.wantedReleaseId);
+    if (!appUserId || !wantedReleaseId || wantedReleaseIds.has(wantedReleaseId)) {
+      return [];
+    }
+
+    wantedReleaseIds.add(wantedReleaseId);
+    return [{
+      appUserId,
+      qualityOverride: link.qualityOverride && typeof link.qualityOverride === 'object'
+        ? link.qualityOverride
+        : null,
+      wantedReleaseId,
+    }];
+  });
+}
+
+function resolveSharedProfileCode(profileCodes) {
+  return profileCodes.reduce((selectedProfileCode, profileCode) => {
+    const selectedPriority = QUALITY_PROFILE_PRIORITY[selectedProfileCode] ?? -1;
+    const candidatePriority = QUALITY_PROFILE_PRIORITY[profileCode] ?? -1;
+    return candidatePriority > selectedPriority ? profileCode : selectedProfileCode;
+  }, 'any_available');
+}
+
+function buildSharedFormatPreferences(profileCode) {
+  if (profileCode === 'lossless_archive') {
+    return {
+      minimumQuality: 'lossless',
+      preferredFormat: 'flac',
+    };
+  }
+
+  if (profileCode === 'high_quality') {
+    return {
+      minimumQuality: 'high',
+      preferredFormat: 'any',
+    };
+  }
+
+  return {
+    minimumQuality: 'any',
+    preferredFormat: 'any',
+  };
+}
+
 export { buildDiscoverySearchQuery };
 
 export function resolveDiscoverySettings(settings) {
@@ -156,15 +219,94 @@ export function createLibraryDiscoveryDispatchService({
   }
 
   function buildAutoSelectionQualityContext({ claimedRequest, userPreferences } = {}) {
-    const qualityOverride = claimedRequest?.evidence?.musicQueueQualityOverride ?? null;
-    const wantedReleaseId = claimedRequest?.wantedReleaseId
+    const operatorLinks = normalizeOperatorLinks(claimedRequest?.operatorLinks);
+    const profileCodes = operatorLinks.length > 0
+      ? operatorLinks.map(() => resolveQualityProfileCode({ claimedRequest, userPreferences }))
+      : [resolveQualityProfileCode({ claimedRequest, userPreferences })];
+    const sharedProfileCode = resolveSharedProfileCode(profileCodes);
+    const qualityOverride = operatorLinks.length === 1
+      ? operatorLinks[0].qualityOverride
+      : operatorLinks.length === 0
+        ? claimedRequest?.evidence?.musicQueueQualityOverride ?? null
+        : null;
+    const wantedReleaseIds = operatorLinks.map((link) => link.wantedReleaseId);
+    const wantedReleaseId = wantedReleaseIds[0]
+      ?? claimedRequest?.wantedReleaseId
       ?? qualityOverride?.wantedReleaseId
       ?? claimedRequest?.evidence?.musicQueueRediscovery?.wantedReleaseId
       ?? null;
     return {
-      profileCode: resolveQualityProfileCode({ claimedRequest, userPreferences }),
+      profileCode: sharedProfileCode,
       qualityOverride,
       ...(wantedReleaseId ? { wantedReleaseId } : {}),
+      ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}),
+    };
+  }
+
+  async function resolveSharedDiscoveryQualityContext(claimedRequest) {
+    const operatorLinks = normalizeOperatorLinks(claimedRequest?.operatorLinks);
+    if (operatorLinks.length === 0) {
+      let userPreferences = null;
+      const sourceRequestedForUserId = claimedRequest?.evidence?.sourceRequestedForUserId
+        ?? claimedRequest?.evidence?.sourceRequestedByUserId
+        ?? null;
+      if (sourceRequestedForUserId && typeof getUserPreferencesFn === 'function') {
+        try {
+          userPreferences = await getUserPreferencesFn({ userId: sourceRequestedForUserId });
+        } catch {
+          userPreferences = null;
+        }
+      }
+
+      const qualityContext = buildAutoSelectionQualityContext({ claimedRequest, userPreferences });
+      return {
+        ...qualityContext,
+        formatPreferences: userPreferences ? {
+          minimumQuality: userPreferences.minimumQuality,
+          preferredFormat: userPreferences.preferredFormat,
+        } : null,
+        preferredFormat: userPreferences?.preferredFormat ?? null,
+        sharedOperatorDiscovery: false,
+      };
+    }
+
+    if (typeof getUserPreferencesFn !== 'function') {
+      const qualityContext = buildAutoSelectionQualityContext({ claimedRequest });
+      return {
+        ...qualityContext,
+        formatPreferences: buildSharedFormatPreferences(qualityContext.profileCode),
+        preferredFormat: qualityContext.profileCode === 'lossless_archive' ? 'flac' : 'any',
+        sharedOperatorDiscovery: true,
+      };
+    }
+
+    const preferencesByUserId = new Map();
+    await Promise.all(operatorLinks.map(async ({ appUserId }) => {
+      try {
+        preferencesByUserId.set(appUserId, await getUserPreferencesFn({ userId: appUserId }));
+      } catch {
+        preferencesByUserId.set(appUserId, null);
+      }
+    }));
+
+    const profileCodes = operatorLinks.map((link) => resolveQualityProfileCode({
+      claimedRequest,
+      userPreferences: preferencesByUserId.get(link.appUserId) ?? null,
+    }));
+    const sharedProfileCode = resolveSharedProfileCode(profileCodes);
+    const wantedReleaseIds = operatorLinks.map((link) => link.wantedReleaseId);
+    const qualityOverride = operatorLinks.length === 1
+      ? operatorLinks[0].qualityOverride
+      : null;
+
+    return {
+      formatPreferences: buildSharedFormatPreferences(sharedProfileCode),
+      preferredFormat: sharedProfileCode === 'lossless_archive' ? 'flac' : 'any',
+      profileCode: sharedProfileCode,
+      qualityOverride,
+      sharedOperatorDiscovery: true,
+      wantedReleaseId: wantedReleaseIds[0],
+      ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}),
     };
   }
 
@@ -276,10 +418,11 @@ export function createLibraryDiscoveryDispatchService({
     actorUserId,
     claimedRequest,
     formatPreferences,
+    qualityContext,
+    preferredFormat,
     requestMetadata,
     requestOwnership,
     tracklistExpectations,
-    userPreferences,
   }) {
     const summary = {
       candidateCount: 0,
@@ -295,7 +438,7 @@ export function createLibraryDiscoveryDispatchService({
     const trackQueries = buildPerTrackDiscoveryQueries({
       artistName: claimedRequest.artistName,
       expectedTrackTitles: tracklistExpectations?.expectedTrackTitles ?? null,
-      preferredFormat: userPreferences?.preferredFormat,
+      preferredFormat,
       maxQueries: trackFallbackMaxQueries,
     });
 
@@ -309,10 +452,6 @@ export function createLibraryDiscoveryDispatchService({
       summary.queryCount += 1;
       try {
         const search = await slskdService.startSearch({ query });
-        const qualityContext = buildAutoSelectionQualityContext({
-          claimedRequest,
-          userPreferences,
-        });
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
           actorUserId,
           albumTitle,
@@ -424,18 +563,17 @@ export function createLibraryDiscoveryDispatchService({
       attemptedCount += 1;
 
       const ownership = buildRequestOwnershipContext(claimedRequest);
-      let userPreferences = null;
-      if (getUserPreferencesFn && ownership?.sourceRequestedForUserId) {
-        try {
-          userPreferences = await getUserPreferencesFn({ userId: ownership.sourceRequestedForUserId });
-        } catch {
-          userPreferences = null;
-        }
-      }
+      const sharedQualityContext = await resolveSharedDiscoveryQualityContext(claimedRequest);
+      const {
+        formatPreferences,
+        preferredFormat,
+        sharedOperatorDiscovery,
+        ...qualityContext
+      } = sharedQualityContext;
 
       const searchQuery = buildDiscoverySearchQuery({
         ...claimedRequest,
-        preferredFormat: userPreferences?.preferredFormat,
+        preferredFormat,
       });
       if (!searchQuery) {
         const terminalSearchAttemptCount = Math.max(
@@ -486,14 +624,8 @@ export function createLibraryDiscoveryDispatchService({
           }
         }
 
-        const formatPreferences = userPreferences ? {
-          minimumQuality: userPreferences.minimumQuality,
-          preferredFormat: userPreferences.preferredFormat,
-        } : null;
-        const qualityContext = buildAutoSelectionQualityContext({
-          claimedRequest,
-          userPreferences,
-        });
+        const effectiveFormatPreferences = formatPreferences
+          ?? (sharedOperatorDiscovery ? buildSharedFormatPreferences(qualityContext.profileCode) : null);
 
         const ingestionResult = await importCandidateService.ingestSlskdSearchResponses({
           actorUserId,
@@ -501,7 +633,7 @@ export function createLibraryDiscoveryDispatchService({
           expectedTrackTitles: tracklistExpectations?.expectedTrackTitles ?? null,
           expectedTrackCount: tracklistExpectations?.expectedTrackCount ?? null,
           expectedDurationSeconds: tracklistExpectations?.expectedDurationSeconds ?? null,
-          formatPreferences,
+          formatPreferences: effectiveFormatPreferences,
           musicQueueContext: qualityContext,
           requestOwnership,
           requestMetadata,
@@ -585,11 +717,12 @@ export function createLibraryDiscoveryDispatchService({
           const trackFallbackSummary = await dispatchTrackFallbackSearches({
             actorUserId,
             claimedRequest,
-            formatPreferences,
+            formatPreferences: effectiveFormatPreferences,
+            qualityContext,
+            preferredFormat,
             requestMetadata,
             requestOwnership,
             tracklistExpectations,
-            userPreferences,
           });
 
           if (trackFallbackSummary.queryCount > 0) {

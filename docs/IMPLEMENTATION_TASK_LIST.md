@@ -202,6 +202,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   queued execution item no longer hides the quality stop, while a genuinely
   downloading fallback still takes precedence. See
   `MUSIC_QUEUE_STRICT_QUALITY_RELEASE_PROJECTION_DOCKER_EVIDENCE_DESIGN.md`.
+- Music Queue shared-discovery correlation fan-out: a single metadata-release
+  discovery request now links every active operator wanted release through a
+  durable junction table. Request and wanted reconciliation preserve stable
+  IDs with upserts, shared selection takes the strictest linked profile, and
+  lifecycle Activity writes fan out safely to every linked release without
+  storing account or per-operator policy data on candidates. See
+  `OPERATOR_SHARED_DISCOVERY_CORRELATION_FANOUT_DESIGN.md`.
 - Music Queue file-backed Docker acceptance: a disposable production runtime
   now generates real lossless and MP3-derived FLAC fixtures, reconciles their
   completed transfers through persisted safe auto-add, and proves the genuine

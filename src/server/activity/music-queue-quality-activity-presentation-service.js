@@ -16,6 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  addMusicQueueActivityFanoutScope,
+  resolveMusicQueueWantedReleaseIds,
+} from './music-queue-activity-fanout-service.js';
+
 function normalizeString(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
@@ -38,12 +43,14 @@ export function buildMusicQueueQualityBlockedActivityEvent({
 } = {}) {
   const musicQueueContext = summaryCandidate.musicQueueContext ?? {};
   const releaseIdentity = summaryCandidate.releaseIdentity ?? {};
-  const wantedReleaseId = normalizeString(musicQueueContext.wantedReleaseId)
+  const wantedReleaseIds = resolveMusicQueueWantedReleaseIds(summaryCandidate);
+  const wantedReleaseId = wantedReleaseIds[0]
+    ?? normalizeString(musicQueueContext.wantedReleaseId)
     ?? normalizeString(musicQueueContext.qualityOverride?.wantedReleaseId);
   const releaseTitle = normalizeString(releaseIdentity.releaseTitle) ?? 'Downloaded files';
   const artistName = normalizeString(releaseIdentity.artistName);
 
-  return {
+  return addMusicQueueActivityFanoutScope({
     actorUserId: null,
     entityArtist: artistName,
     entityId: wantedReleaseId ?? normalizeString(summaryCandidate.id),
@@ -69,5 +76,5 @@ export function buildMusicQueueQualityBlockedActivityEvent({
       status: normalizeString(qualityGate.status),
       wantedReleaseId,
     },
-  };
+  }, { wantedReleaseIds });
 }

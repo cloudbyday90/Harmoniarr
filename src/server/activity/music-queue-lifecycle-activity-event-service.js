@@ -16,6 +16,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  addMusicQueueActivityFanoutScope,
+  fanOutMusicQueueActivityEvent,
+  resolveMusicQueueWantedReleaseIds,
+} from './music-queue-activity-fanout-service.js';
+
 const MUSIC_QUEUE_ACTIVITY_SCHEMA_VERSION = 1;
 
 function normalizeOptionalString(value) {
@@ -52,6 +58,7 @@ function resolveReleaseIdentity(candidate) {
     releaseTitle: normalizeOptionalString(releaseIdentity.releaseTitle)
       ?? normalizeOptionalString(requestOwnership.releaseTitle)
       ?? normalizeOptionalString(requestOwnership.releaseGroupTitle),
+    wantedReleaseIds: resolveMusicQueueWantedReleaseIds(candidate),
     wantedReleaseId: normalizeOptionalString(candidate?.wantedReleaseId)
       ?? normalizeOptionalString(requestOwnership.wantedReleaseId),
   };
@@ -60,13 +67,15 @@ function resolveReleaseIdentity(candidate) {
 function buildMusicQueueEntity(candidate) {
   const identity = resolveReleaseIdentity(candidate);
   const importCandidateId = normalizeOptionalString(candidate?.id);
+  const wantedReleaseId = identity.wantedReleaseIds[0] ?? identity.wantedReleaseId;
 
   return {
     entityArtist: identity.artistName,
-    entityId: identity.wantedReleaseId ?? importCandidateId,
+    entityId: wantedReleaseId ?? importCandidateId,
     entityTitle: identity.releaseTitle,
-    entityType: identity.wantedReleaseId ? 'wanted_release' : 'import_candidate',
-    wantedReleaseId: identity.wantedReleaseId,
+    entityType: wantedReleaseId ? 'wanted_release' : 'import_candidate',
+    wantedReleaseId,
+    wantedReleaseIds: identity.wantedReleaseIds,
   };
 }
 
@@ -118,7 +127,7 @@ export function buildMusicQueueRecoveryActivityEvent({
     return null;
   }
 
-  const { wantedReleaseId, ...activityEntity } = entity;
+  const { wantedReleaseId, wantedReleaseIds, ...activityEntity } = entity;
 
   let eventType = recovery.requiresOperator === true
     && recovery.terminalOutcome === 'import_blocked'
@@ -132,7 +141,7 @@ export function buildMusicQueueRecoveryActivityEvent({
     eventType = 'music_queue_no_matches_left';
   }
 
-  return {
+  return addMusicQueueActivityFanoutScope({
     ...activityEntity,
     eventType,
     extraPayload: buildRecoveryPayload({
@@ -140,7 +149,7 @@ export function buildMusicQueueRecoveryActivityEvent({
       recovery,
       wantedReleaseId,
     }),
-  };
+  }, { wantedReleaseIds });
 }
 
 /**
@@ -186,12 +195,13 @@ export function buildMusicQueueSearchQueuedActivityEvent({
 export function buildMusicQueueProviderRecoverySearchStartedActivityEvent({
   claimedRequest = null,
 } = {}) {
-  const wantedReleaseId = normalizeOptionalString(claimedRequest?.wantedReleaseId);
+  const wantedReleaseIds = resolveMusicQueueWantedReleaseIds(claimedRequest);
+  const wantedReleaseId = wantedReleaseIds[0] ?? normalizeOptionalString(claimedRequest?.wantedReleaseId);
   if (!wantedReleaseId) {
     return null;
   }
 
-  return {
+  return addMusicQueueActivityFanoutScope({
     entityArtist: normalizeOptionalString(claimedRequest?.artistName),
     entityId: wantedReleaseId,
     entityTitle: normalizeOptionalString(claimedRequest?.releaseTitle)
@@ -202,7 +212,7 @@ export function buildMusicQueueProviderRecoverySearchStartedActivityEvent({
       schemaVersion: MUSIC_QUEUE_ACTIVITY_SCHEMA_VERSION,
       wantedReleaseId,
     },
-  };
+  }, { wantedReleaseIds });
 }
 
 /**
@@ -215,7 +225,9 @@ export function recordActivityEventSafely(recordActivityEventFn, event) {
   }
 
   try {
-    Promise.resolve(recordActivityEventFn(event)).catch(() => {});
+    for (const scopedEvent of fanOutMusicQueueActivityEvent(event)) {
+      Promise.resolve(recordActivityEventFn(scopedEvent)).catch(() => {});
+    }
   } catch {
     // Activity cannot interrupt an already-persisted queue transition.
   }

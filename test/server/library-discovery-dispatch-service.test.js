@@ -197,6 +197,82 @@ test('dispatchReadyDiscoveryRequests carries the claimed wanted release into aut
   });
 });
 
+test('dispatchReadyDiscoveryRequests shares one conservative discovery search across linked operator releases', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {},
+    metadataReleaseId: 'release-1',
+    operatorLinks: [
+      { appUserId: 'operator-any', wantedReleaseId: 'wanted-any' },
+      {
+        appUserId: 'operator-lossless',
+        qualityOverride: {
+          mode: 'allow_fallback_quality',
+          wantedReleaseId: 'wanted-lossless',
+        },
+        wantedReleaseId: 'wanted-lossless',
+      },
+    ],
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+    wantedReleaseId: 'wanted-any',
+    wantedReleaseIds: ['wanted-any', 'wanted-lossless'],
+  }];
+  const getUserPreferencesFn = t.mock.fn(async ({ userId }) => (
+    userId === 'operator-lossless'
+      ? { minimumQuality: 'lossless', preferredFormat: 'flac' }
+      : { minimumQuality: 'any', preferredFormat: 'any' }
+  ));
+  const ingestSlskdSearchResponses = t.mock.fn(async () => ({
+    candidateCount: 1,
+    fileCount: 4,
+  }));
+  const selectHighConfidenceCandidate = t.mock.fn(async () => ({
+    attempted: true,
+    selected: false,
+    skippedReason: 'not_auto_selectable',
+  }));
+  const startSearch = t.mock.fn(async () => ({ id: 'search-1' }));
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    getUserPreferencesFn,
+    importCandidateAutoSelectionService: { selectHighConfidenceCandidate },
+    importCandidateService: { ingestSlskdSearchResponses },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      markDiscoveryRequestExhausted: t.mock.fn(async () => {}),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    slskdService: { startSearch },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+
+  assert.deepEqual(startSearch.mock.calls[0].arguments[0], {
+    query: 'Autechre Confield 2001 FLAC',
+  });
+  assert.equal(getUserPreferencesFn.mock.callCount(), 2);
+  assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0].formatPreferences, {
+    minimumQuality: 'lossless',
+    preferredFormat: 'flac',
+  });
+  assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0].musicQueueContext, {
+    profileCode: 'lossless_archive',
+    qualityOverride: null,
+    wantedReleaseId: 'wanted-any',
+    wantedReleaseIds: ['wanted-any', 'wanted-lossless'],
+  });
+  assert.deepEqual(selectHighConfidenceCandidate.mock.calls[0].arguments[0], {
+    actorUserId: null,
+    profileCode: 'lossless_archive',
+    qualityOverride: null,
+    requestMetadata: null,
+    sourceSearchId: 'search-1',
+  });
+});
+
 test('dispatchReadyDiscoveryRequests records one Activity event after a provider-recovery search is accepted', async (t) => {
   const callOrder = [];
   const claimedRequests = [{

@@ -140,15 +140,24 @@ function normalizeMusicQueueContext(value) {
   const wantedReleaseId = typeof value.wantedReleaseId === 'string' && value.wantedReleaseId.trim()
     ? value.wantedReleaseId.trim()
     : null;
+  const wantedReleaseIds = Array.isArray(value.wantedReleaseIds)
+    ? [...new Set(value.wantedReleaseIds
+      .filter((id) => typeof id === 'string' && id.trim())
+      .map((id) => id.trim()))]
+    : [];
+  if (wantedReleaseId && !wantedReleaseIds.includes(wantedReleaseId)) {
+    wantedReleaseIds.unshift(wantedReleaseId);
+  }
 
-  if (!profileCode && !qualityOverride && !wantedReleaseId) {
+  if (!profileCode && !qualityOverride && wantedReleaseIds.length === 0) {
     return null;
   }
 
   return {
     profileCode,
     qualityOverride,
-    ...(wantedReleaseId ? { wantedReleaseId } : {}),
+    ...(wantedReleaseIds[0] ? { wantedReleaseId: wantedReleaseIds[0] } : {}),
+    ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}),
   };
 }
 

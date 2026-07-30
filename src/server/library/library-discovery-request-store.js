@@ -18,6 +18,43 @@
 
 import { getPool } from '../database.js';
 import { normalizeMetadataReleaseDateForDateColumn } from '../metadata/metadata-release-date-normalization.js';
+import { createLibraryDiscoveryRequestWantedReleaseLinkStore } from './library-discovery-request-wanted-release-link-store.js';
+
+function normalizeLinkedWantedReleaseIds(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim()))];
+}
+
+function normalizeOperatorLinks(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const linkedWantedReleaseIds = new Set();
+  return value.flatMap((link) => {
+    const wantedReleaseId = typeof link?.wantedReleaseId === 'string' && link.wantedReleaseId.trim()
+      ? link.wantedReleaseId.trim()
+      : null;
+    const appUserId = typeof link?.appUserId === 'string' && link.appUserId.trim()
+      ? link.appUserId.trim()
+      : null;
+    if (!wantedReleaseId || !appUserId || linkedWantedReleaseIds.has(wantedReleaseId)) {
+      return [];
+    }
+
+    linkedWantedReleaseIds.add(wantedReleaseId);
+    return [{
+      appUserId,
+      qualityOverride: link.qualityOverride && typeof link.qualityOverride === 'object'
+        ? link.qualityOverride
+        : null,
+      wantedReleaseId,
+    }];
+  });
+}
 
 function mapDiscoveryDispatchRow(row) {
   if (!row) {
@@ -40,6 +77,8 @@ function mapDiscoveryDispatchRow(row) {
     requestStatus: row.request_status ?? null,
     searchAttemptCount: Number.parseInt(String(row.search_attempt_count ?? 0), 10) || 0,
     searchMode: row.search_mode ?? null,
+    operatorLinks: normalizeOperatorLinks(row.operator_links),
+    wantedReleaseIds: normalizeLinkedWantedReleaseIds(row.wanted_release_ids),
     wantedReleaseId: row.wanted_release_id ?? null,
     wantedStatus: row.wanted_status ?? null,
   };
@@ -77,6 +116,7 @@ const FOLDER_SETUP_RECOVERY_REASONS = Object.freeze([
 
 export function createLibraryDiscoveryRequestStore({
   getPoolFn = getPool,
+  libraryDiscoveryRequestWantedReleaseLinkStore = createLibraryDiscoveryRequestWantedReleaseLinkStore(),
 } = {}) {
   async function listDiscoveryRequestsByMetadataReleaseIds({ metadataReleaseIds } = {}) {
     if (!Array.isArray(metadataReleaseIds) || metadataReleaseIds.length < 1) {
@@ -146,7 +186,8 @@ export function createLibraryDiscoveryRequestStore({
             metadata_artists.name AS artist_name,
             metadata_release_groups.title AS release_group_title,
             metadata_releases.title AS release_title,
-            library_wanted_releases.id AS wanted_release_id
+            operator_wanted_releases.wanted_release_ids,
+            operator_wanted_releases.operator_links
           FROM library_discovery_requests
           JOIN metadata_artists
             ON metadata_artists.id = library_discovery_requests.metadata_artist_id
@@ -155,13 +196,23 @@ export function createLibraryDiscoveryRequestStore({
           JOIN metadata_releases
             ON metadata_releases.id = library_discovery_requests.metadata_release_id
           LEFT JOIN LATERAL (
-            SELECT id
-            FROM library_wanted_releases
-            WHERE metadata_release_id = library_discovery_requests.metadata_release_id
-              AND wanted_status IN ('missing', 'partial')
-            ORDER BY last_reconciled_at DESC NULLS LAST, id ASC
-            LIMIT 1
-          ) AS library_wanted_releases
+            SELECT
+              ARRAY_AGG(library_wanted_releases.id ORDER BY library_wanted_releases.app_user_id ASC, library_wanted_releases.id ASC)
+                AS wanted_release_ids,
+              JSONB_AGG(
+                JSONB_BUILD_OBJECT(
+                  'appUserId', library_wanted_releases.app_user_id,
+                  'qualityOverride', library_discovery_request_wanted_release_links.evidence->'musicQueueQualityOverride',
+                  'wantedReleaseId', library_wanted_releases.id
+                )
+                ORDER BY library_wanted_releases.app_user_id ASC, library_wanted_releases.id ASC
+              ) AS operator_links
+            FROM library_discovery_request_wanted_release_links
+            JOIN library_wanted_releases
+              ON library_wanted_releases.id = library_discovery_request_wanted_release_links.wanted_release_id
+            WHERE library_discovery_request_wanted_release_links.discovery_request_id = library_discovery_requests.id
+              AND library_wanted_releases.wanted_status IN ('missing', 'partial')
+          ) AS operator_wanted_releases
             ON TRUE
           WHERE library_discovery_requests.search_mode = 'automatic'
             AND library_discovery_requests.request_status = 'ready'
@@ -206,7 +257,9 @@ export function createLibraryDiscoveryRequestStore({
           candidate.artist_name,
           candidate.release_group_title,
           candidate.release_title,
-          candidate.wanted_release_id
+          candidate.wanted_release_ids,
+          candidate.operator_links,
+          candidate.wanted_release_ids[1] AS wanted_release_id
         FROM claimed
         JOIN candidate
           ON candidate.id = claimed.id
@@ -690,15 +743,31 @@ export function createLibraryDiscoveryRequestStore({
                 'priorRequestStatus', request_status,
                 'priorSearchAttemptCount', search_attempt_count,
                 'reasonCode', $3::text,
-                'requestedAt', $2::timestamptz,
-                'requestedByUserId', $4::text,
-                'wantedReleaseId', $5::text
+                'requestedAt', $2::timestamptz
               )
             ),
             updated_at = NOW()
           WHERE metadata_release_id = $1
             AND search_mode = 'automatic'
           RETURNING *
+        ),
+        link_intent AS (
+          UPDATE library_discovery_request_wanted_release_links
+          SET
+            evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
+              'musicQueueRediscovery',
+              jsonb_build_object(
+                'reasonCode', $3::text,
+                'requestedAt', $2::timestamptz,
+                'requestedByUserId', $4::text,
+                'wantedReleaseId', $5::text
+              )
+            ),
+            updated_at = NOW()
+          FROM reset
+          WHERE library_discovery_request_wanted_release_links.discovery_request_id = reset.id
+            AND library_discovery_request_wanted_release_links.wanted_release_id = $5::uuid
+          RETURNING library_discovery_request_wanted_release_links.wanted_release_id
         )
         SELECT
           reset.metadata_artist_id,
@@ -754,6 +823,24 @@ export function createLibraryDiscoveryRequestStore({
               COALESCE(evidence, '{}'::jsonb)
                 - 'searchExhausted'
             ) || jsonb_build_object(
+              'musicQueueRediscovery',
+              jsonb_build_object(
+                'priorBlockedReason', blocked_reason,
+                'priorRequestStatus', request_status,
+                'priorSearchAttemptCount', search_attempt_count,
+                'reasonCode', 'quality_fallback_search_again',
+                'requestedAt', $2::timestamptz
+              )
+            ),
+            updated_at = NOW()
+          WHERE metadata_release_id = $1
+            AND search_mode = 'automatic'
+          RETURNING *
+        ),
+        link_intent AS (
+          UPDATE library_discovery_request_wanted_release_links
+          SET
+            evidence = COALESCE(evidence, '{}'::jsonb) || jsonb_build_object(
               'musicQueueQualityOverride',
               jsonb_build_object(
                 'allowedAt', $2::timestamptz,
@@ -765,9 +852,6 @@ export function createLibraryDiscoveryRequestStore({
               ),
               'musicQueueRediscovery',
               jsonb_build_object(
-                'priorBlockedReason', blocked_reason,
-                'priorRequestStatus', request_status,
-                'priorSearchAttemptCount', search_attempt_count,
                 'reasonCode', 'quality_fallback_search_again',
                 'requestedAt', $2::timestamptz,
                 'requestedByUserId', $3::text,
@@ -775,9 +859,10 @@ export function createLibraryDiscoveryRequestStore({
               )
             ),
             updated_at = NOW()
-          WHERE metadata_release_id = $1
-            AND search_mode = 'automatic'
-          RETURNING *
+          FROM updated
+          WHERE library_discovery_request_wanted_release_links.discovery_request_id = updated.id
+            AND library_discovery_request_wanted_release_links.wanted_release_id = $4::uuid
+          RETURNING library_discovery_request_wanted_release_links.wanted_release_id
         )
         SELECT
           updated.metadata_artist_id,
@@ -854,7 +939,22 @@ export function createLibraryDiscoveryRequestStore({
 
     try {
       await client.query('BEGIN');
-      await client.query('DELETE FROM library_discovery_requests');
+
+      const metadataReleaseIds = discoveryRequests
+        .map((discoveryRequest) => discoveryRequest.metadataReleaseId)
+        .filter((metadataReleaseId) => typeof metadataReleaseId === 'string' && metadataReleaseId.trim());
+
+      if (metadataReleaseIds.length > 0) {
+        await client.query(
+          `
+            DELETE FROM library_discovery_requests
+            WHERE NOT (metadata_release_id = ANY($1::uuid[]))
+          `,
+          [metadataReleaseIds],
+        );
+      } else {
+        await client.query('DELETE FROM library_discovery_requests');
+      }
 
       for (const discoveryRequest of discoveryRequests) {
         await client.query(
@@ -895,6 +995,23 @@ export function createLibraryDiscoveryRequestStore({
               NOW(),
               NOW()
             )
+            ON CONFLICT (metadata_release_id) DO UPDATE
+            SET
+              metadata_artist_id = EXCLUDED.metadata_artist_id,
+              metadata_release_group_id = EXCLUDED.metadata_release_group_id,
+              wanted_status = EXCLUDED.wanted_status,
+              search_mode = EXCLUDED.search_mode,
+              request_status = EXCLUDED.request_status,
+              blocked_reason = EXCLUDED.blocked_reason,
+              release_date = EXCLUDED.release_date,
+              last_search_at = EXCLUDED.last_search_at,
+              next_search_after = EXCLUDED.next_search_after,
+              manual_requested_at = EXCLUDED.manual_requested_at,
+              search_attempt_count = EXCLUDED.search_attempt_count,
+              research_attempt_count = EXCLUDED.research_attempt_count,
+              evidence = EXCLUDED.evidence,
+              last_evaluated_at = EXCLUDED.last_evaluated_at,
+              updated_at = EXCLUDED.updated_at
           `,
           [
             discoveryRequest.metadataArtistId,
@@ -914,6 +1031,8 @@ export function createLibraryDiscoveryRequestStore({
           ],
         );
       }
+
+      await libraryDiscoveryRequestWantedReleaseLinkStore.syncActiveWantedReleaseLinks({ client });
 
       await client.query('COMMIT');
     } catch (error) {

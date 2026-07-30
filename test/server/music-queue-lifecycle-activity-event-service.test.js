@@ -181,3 +181,34 @@ test('recordActivityEventSafely absorbs a synchronous diagnostic writer failure'
     { eventType: 'music_queue_download_failed' },
   ));
 });
+
+test('recordActivityEventSafely fans one shared lifecycle result into release-scoped Activity rows', () => {
+  const recordedEvents = [];
+  recordActivityEventSafely((event) => {
+    recordedEvents.push(event);
+  }, {
+    entityId: 'wanted-1',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_download_started',
+    extraPayload: {
+      wantedReleaseId: 'wanted-1',
+      wantedReleaseIds: ['wanted-1', 'wanted-2'],
+    },
+  });
+
+  assert.deepEqual(recordedEvents, [{
+    entityId: 'wanted-1',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_download_started',
+    extraPayload: {
+      wantedReleaseId: 'wanted-1',
+    },
+  }, {
+    entityId: 'wanted-2',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_download_started',
+    extraPayload: {
+      wantedReleaseId: 'wanted-2',
+    },
+  }]);
+});

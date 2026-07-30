@@ -1573,3 +1573,20 @@ Recommended next slice: design operator-scoped shared-discovery correlation
 fan-out. One provider search should serve shared release metadata and transfer
 work, while each operator who wants the release retains isolated Music Queue
 status, Activity visibility, and policy outcome.
+
+### Operator Shared-Discovery Correlation Fan-Out
+
+Implemented in
+[OPERATOR_SHARED_DISCOVERY_CORRELATION_FANOUT_DESIGN.md](OPERATOR_SHARED_DISCOVERY_CORRELATION_FANOUT_DESIGN.md).
+One metadata release now retains one global discovery request and provider
+search while a durable junction table preserves every active operator wanted
+release. Reconciliation upserts stable request and wanted IDs before syncing
+links. Candidate context holds only a shared conservative quality profile and
+the correlated wanted-release IDs; local fallback intent stays on its own link.
+Shared lifecycle milestones fan out into safe release-scoped Activity rows, and
+Music Queue remains protected by its existing per-operator release read.
+
+Recommended next slice: add a controlled-provider Docker acceptance scenario
+for two operators sharing one release. It should prove one search/transfer,
+two scoped Music Queue outcomes, independent 404 read boundaries, and no
+operator policy data in candidate or Activity payloads.

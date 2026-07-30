@@ -49,9 +49,10 @@ test('listDiscoveryRequestsByMetadataReleaseIds returns current request state fo
   }]);
 });
 
-test('claimNextReadyAutomaticDiscoveryRequest locks only the discovery request when wanted-release projection is optional', async (t) => {
+test('claimNextReadyAutomaticDiscoveryRequest locks only the discovery request and projects all linked wanted releases', async (t) => {
   const query = t.mock.fn(async (sql, params) => {
     assert.match(sql, /LEFT JOIN LATERAL/u);
+    assert.match(sql, /library_discovery_request_wanted_release_links/u);
     assert.match(sql, /FOR UPDATE OF library_discovery_requests SKIP LOCKED/u);
     assert.doesNotMatch(sql, /FOR UPDATE SKIP LOCKED/u);
     assert.deepEqual(params, [
@@ -70,7 +71,12 @@ test('claimNextReadyAutomaticDiscoveryRequest locks only the discovery request w
         release_title: 'Amber',
         request_status: 'cooldown',
         search_mode: 'automatic',
-        wanted_release_id: null,
+        operator_links: [
+          { appUserId: 'operator-1', wantedReleaseId: 'wanted-1' },
+          { appUserId: 'operator-2', wantedReleaseId: 'wanted-2' },
+        ],
+        wanted_release_id: 'wanted-1',
+        wanted_release_ids: ['wanted-1', 'wanted-2'],
         wanted_status: 'missing',
       }],
     };
@@ -84,7 +90,12 @@ test('claimNextReadyAutomaticDiscoveryRequest locks only the discovery request w
 
   assert.equal(request.discoveryRequestId, 'request-1');
   assert.equal(request.artistName, 'Autechre');
-  assert.equal(request.wantedReleaseId, null);
+  assert.equal(request.wantedReleaseId, 'wanted-1');
+  assert.deepEqual(request.wantedReleaseIds, ['wanted-1', 'wanted-2']);
+  assert.deepEqual(request.operatorLinks, [
+    { appUserId: 'operator-1', qualityOverride: null, wantedReleaseId: 'wanted-1' },
+    { appUserId: 'operator-2', qualityOverride: null, wantedReleaseId: 'wanted-2' },
+  ]);
 });
 
 test('releaseFolderSetupBlockedAutomaticDiscoveryRequests only requeues bounded automatic folder-gated cooldowns', async (t) => {
@@ -619,7 +630,7 @@ test('resetDownloadRecoveryExhaustion clears exhausted state and records manual 
   assert.equal(result.evidence.manualDownloadRecoveryRetry.resetByUserId, 'admin-1');
 });
 
-test('replaceLibraryDiscoveryRequests normalizes partial release dates before insert', async (t) => {
+test('replaceLibraryDiscoveryRequests upserts stable requests, normalizes dates, and synchronizes links', async (t) => {
   const queries = [];
   const client = {
     query: t.mock.fn(async (sql, params) => {
@@ -628,10 +639,12 @@ test('replaceLibraryDiscoveryRequests normalizes partial release dates before in
     }),
     release: t.mock.fn(),
   };
+  const syncActiveWantedReleaseLinks = t.mock.fn(async () => {});
   const store = createLibraryDiscoveryRequestStore({
     getPoolFn: () => ({
       connect: async () => client,
     }),
+    libraryDiscoveryRequestWantedReleaseLinkStore: { syncActiveWantedReleaseLinks },
   });
 
   await store.replaceLibraryDiscoveryRequests({
@@ -654,5 +667,7 @@ test('replaceLibraryDiscoveryRequests normalizes partial release dates before in
 
   const insertQuery = queries.find((entry) => entry.sql.includes('INSERT INTO library_discovery_requests'));
   assert.equal(insertQuery.params[7], '2000-01-01');
+  assert.match(insertQuery.sql, /ON CONFLICT \(metadata_release_id\) DO UPDATE/u);
+  assert.equal(syncActiveWantedReleaseLinks.mock.callCount(), 1);
   assert.equal(client.release.mock.callCount(), 1);
 });

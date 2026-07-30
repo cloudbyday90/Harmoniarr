@@ -16,6 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  addMusicQueueActivityFanoutScope,
+  resolveMusicQueueWantedReleaseIds,
+} from './music-queue-activity-fanout-service.js';
+
 const ACTIVITY_SCHEMA_VERSION = 1;
 
 function normalizeOptionalString(value) {
@@ -58,6 +63,7 @@ function resolveReleaseIdentity(candidate) {
     ? candidate.releaseIdentity
     : {};
   const musicQueueContext = resolveMusicQueueContext(candidate);
+  const wantedReleaseIds = resolveMusicQueueWantedReleaseIds(candidate);
 
   return {
     artistName: normalizeOptionalString(releaseIdentity.artistName)
@@ -66,6 +72,7 @@ function resolveReleaseIdentity(candidate) {
     releaseTitle: normalizeOptionalString(releaseIdentity.releaseTitle)
       ?? normalizeOptionalString(requestOwnership.releaseTitle)
       ?? normalizeOptionalString(requestOwnership.releaseGroupTitle),
+    wantedReleaseIds,
     wantedReleaseId: normalizeOptionalString(candidate?.wantedReleaseId)
       ?? normalizeOptionalString(musicQueueContext.wantedReleaseId)
       ?? normalizeOptionalString(musicQueueContext.qualityOverride?.wantedReleaseId)
@@ -75,7 +82,8 @@ function resolveReleaseIdentity(candidate) {
 
 function buildEntity(candidate) {
   const identity = resolveReleaseIdentity(candidate);
-  const entityId = identity.wantedReleaseId ?? identity.importCandidateId;
+  const wantedReleaseId = identity.wantedReleaseIds[0] ?? identity.wantedReleaseId;
+  const entityId = wantedReleaseId ?? identity.importCandidateId;
   if (!entityId) {
     return null;
   }
@@ -84,9 +92,10 @@ function buildEntity(candidate) {
     entityArtist: identity.artistName,
     entityId,
     entityTitle: identity.releaseTitle,
-    entityType: identity.wantedReleaseId ? 'wanted_release' : 'import_candidate',
+    entityType: wantedReleaseId ? 'wanted_release' : 'import_candidate',
     importCandidateId: identity.importCandidateId,
-    wantedReleaseId: identity.wantedReleaseId,
+    wantedReleaseId,
+    wantedReleaseIds: identity.wantedReleaseIds,
   };
 }
 
@@ -105,13 +114,13 @@ function toActivityEvent({ actorUserId = null, candidate, eventType, payload }) 
     return null;
   }
 
-  const { importCandidateId, wantedReleaseId, ...activityEntity } = entity;
-  return {
+  const { importCandidateId, wantedReleaseId, wantedReleaseIds, ...activityEntity } = entity;
+  return addMusicQueueActivityFanoutScope({
     actorUserId: normalizeOptionalString(actorUserId),
     ...activityEntity,
     eventType,
     extraPayload: buildPayload({ importCandidateId, wantedReleaseId }, payload),
-  };
+  }, { wantedReleaseIds });
 }
 
 /**

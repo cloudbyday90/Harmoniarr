@@ -17,6 +17,7 @@
  */
 
 import { buildMusicQueueQualityBlockedActivityEvent } from '../activity/music-queue-quality-activity-presentation-service.js';
+import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
 import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
 import { buildRequestFulfilledActivityEvent } from '../activity/request-fulfillment-activity-event-service.js';
 import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-quality.js';
@@ -341,11 +342,11 @@ export function createImportCandidateApplyWorker({
                 statusMessage: qualityGate.message,
               });
               if (typeof recordActivityEventFn === 'function') {
-                void recordActivityEventFn(buildMusicQueueQualityBlockedActivityEvent({
+                recordActivityEventSafely(recordActivityEventFn, buildMusicQueueQualityBlockedActivityEvent({
                   qualityGate,
                   runId,
                   summaryCandidate,
-                })).catch(() => {});
+                }));
               }
               if (typeof handleImportCandidateQualityFailure === 'function') {
                 try {
