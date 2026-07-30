@@ -167,6 +167,12 @@ suite('Activity releases/wanted browser verification', () => {
           && url.searchParams.get('status') === 'all';
       });
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
+      await page.getByText('Review selected match', { exact: true }).waitFor();
+      assert.equal(
+        await page.getByText('1 matching result', { exact: true }).isVisible(),
+        false,
+        'Saved-match totals should stay inside the collapsed finder until an operator opens it.',
+      );
       await openImportReviewMatchFinder(page);
       await page.getByText('1 matching result', { exact: true }).waitFor();
       await page.getByText('healthy-slskd-peer', { exact: true }).first().waitFor();

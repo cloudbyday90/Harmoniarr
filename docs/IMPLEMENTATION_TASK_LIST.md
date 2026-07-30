@@ -156,6 +156,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   a Music Queue handoff. Status-only selected or pending-library links open it
   when useful; direct candidate/file links keep recovery focused. See
   `MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md`.
+- Match diagnostics recovery focus: the default header now names the active
+  recovery purpose instead of a visible-match count. Exact result totals remain
+  within the optional `Find a match` disclosure, where they describe the saved
+  result list being inspected. See
+  `MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md`.
 - Music Queue Activity lifecycle: release-scoped history now shows a saved
   search-again action, retrying the same download, trying the next safe match,
   no-matches-left rediscovery, and terminal failures. Events use a bounded

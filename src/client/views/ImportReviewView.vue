@@ -38,6 +38,7 @@ import {
 } from '../composables/useImportReviewAdminWorkflow.js';
 import { normalizeImportReviewRouteState } from '../lib/import-review-route-state.js';
 import { shouldOpenCurrentAutomationForRoute } from '../lib/import-review-current-automation-presentation.js';
+import { buildImportReviewRecoveryFocus } from '../lib/import-review-recovery-focus-presentation.js';
 import { shouldOpenRunHistoryControls } from '../lib/import-review-runway-presentation.js';
 import { sessionStore } from '../state/session.js';
 
@@ -96,7 +97,6 @@ const {
   selectedSummaryError,
   sourceSearchIdFilter,
   statusFilter,
-  summaryPills,
   usernameFilter,
   isLoadingSelectedSummary,
 } = useImportReviewWorkspace({ pollIntervalMs: 15000, revalidateOnFocus: true });
@@ -147,6 +147,7 @@ const focusedCandidateFileId = computed(() =>
   normalizeImportReviewRouteState(route.query).candidateFileId,
 );
 const importReviewRouteState = computed(() => normalizeImportReviewRouteState(route.query));
+const recoveryFocus = computed(() => buildImportReviewRecoveryFocus(importReviewRouteState.value));
 
 watch(focusedCandidateFileId, (fileId) => {
   if (fileId) {
@@ -222,7 +223,10 @@ onBeforeUnmount(() => {
           Music Queue handles normal progress. Use this page only when a match needs a closer look or a safe recovery action.
         </p>
       </div>
-      <span class="import-review-page__count">{{ summaryPills[0]?.value ?? '0' }} visible matches</span>
+      <aside class="import-review-page__recovery-focus" aria-label="Recovery focus">
+        <span>Recovery focus</span>
+        <strong>{{ recoveryFocus }}</strong>
+      </aside>
     </header>
 
     <article class="hx-card import-review-access-card" v-if="!isAdmin">
@@ -448,11 +452,25 @@ onBeforeUnmount(() => {
   line-height: 1.55;
 }
 
-.import-review-page__count {
+.import-review-page__recovery-focus {
+  display: grid;
   flex: 0 0 auto;
-  color: var(--hx-text-faint);
-  font-size: var(--hx-text-sm);
+  gap: var(--hx-space-1);
+  text-align: right;
   white-space: nowrap;
+}
+
+.import-review-page__recovery-focus span {
+  color: var(--hx-text-faint);
+  font-size: var(--hx-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.import-review-page__recovery-focus strong {
+  color: var(--hx-text);
+  font-size: var(--hx-text-sm);
 }
 
 .import-review-evidence {
@@ -668,7 +686,8 @@ onBeforeUnmount(() => {
     flex-direction: column;
   }
 
-  .import-review-page__count {
+  .import-review-page__recovery-focus {
+    text-align: left;
     white-space: normal;
   }
 }

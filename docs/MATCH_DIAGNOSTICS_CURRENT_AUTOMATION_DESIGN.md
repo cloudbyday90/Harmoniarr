@@ -132,7 +132,11 @@ library state when needed, while Music Queue remains the ordinary workflow.
 
 ## Next High-Value Item
 
-Replace the Match diagnostics header `visible matches` counter with an
-intent-specific recovery summary, and keep result counts entirely inside the
-`Find a match` disclosure. That removes the final queue-total language from the
-default diagnostics screen.
+The default Match diagnostics header now names its route-specific recovery
+focus instead of showing a queue total; exact result counts remain in `Find a
+match`. See
+[Match Diagnostics Recovery Focus Design](MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md).
+
+Next, unify advanced match-finder filters behind a human-readable `Search
+saved matches` form and keep raw search-reference/source-user filters behind a
+secondary disclosure.

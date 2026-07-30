@@ -146,6 +146,7 @@ suite('Activity Imports import-readiness browser verification', () => {
         waitUntil: 'domcontentloaded',
       });
       await page.getByRole('heading', { exact: true, name: 'Match diagnostics' }).waitFor();
+      await page.getByText('Review library add', { exact: true }).waitFor();
       await page.getByText('Download and library progress', { exact: true }).waitFor();
       assert.equal(
         await page.locator('details.import-review-current-automation').evaluate((element) => element.open),

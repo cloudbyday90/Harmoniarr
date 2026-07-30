@@ -1451,6 +1451,15 @@ Selected-match and pending-library summaries now sit behind a closed native
 selected and pending-library routes open that context, while direct
 candidate/file routes retain the recovery-first view.
 
-Recommended next slice: replace the Match diagnostics header `visible matches`
-counter with an intent-specific recovery summary, and keep result counts inside
-`Find a match` so default diagnostics has no residual queue-total language.
+### Match Diagnostics Recovery Focus
+
+Implemented in
+[MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md](MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md).
+The Match diagnostics header now communicates a compact route-aware recovery
+focus instead of a visible-match total. Exact result counts remain inside the
+optional `Find a match` disclosure, leaving recovery as the default diagnostic
+context.
+
+Recommended next slice: unify advanced match-finder filters into one
+human-readable `Search saved matches` form, hiding raw search-reference and
+source-user filters behind a secondary disclosure.

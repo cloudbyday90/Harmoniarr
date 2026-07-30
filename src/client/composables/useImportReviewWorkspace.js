@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { computed, watch } from 'vue';
+import { watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useImportCandidateApplyPreview } from './useImportCandidateApplyPreview.js';
 import { useImportCandidateFileDecision } from './useImportCandidateFileDecision.js';
@@ -145,12 +145,6 @@ export function useImportReviewWorkspace({
     statusFilter,
     usernameFilter,
   } = queueWorkflow;
-
-  const summaryPills = computed(() => ([
-    { label: 'Visible', value: String(candidates.value.length) },
-    { label: 'Matching total', value: String(pagination.value.total ?? 0) },
-    { label: 'Default status', value: statusFilter.value || 'All' },
-  ]).filter((pill) => pill.value));
 
   function currentRouteState(overrides = {}) {
     const routeState = normalizeImportReviewRouteState(resolvedRoute.query);
@@ -377,7 +371,6 @@ export function useImportReviewWorkspace({
     selectedSummaryError,
     sourceSearchIdFilter,
     statusFilter,
-    summaryPills,
     syncFromRoute,
     isLoadingSelectedSummary,
     usernameFilter,

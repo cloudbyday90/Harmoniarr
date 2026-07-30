@@ -127,9 +127,13 @@ context is relevant, direct candidate/file links keep it closed, and the
 expanded block hands normal monitoring back to Music Queue. See
 [Match Diagnostics Current Automation Design](MATCH_DIAGNOSTICS_CURRENT_AUTOMATION_DESIGN.md).
 
+The final default queue-total signal is now removed from the Match diagnostics
+header. A compact route-aware recovery focus explains why the page is open,
+while exact saved-match totals remain inside `Find a match`. See
+[Match Diagnostics Recovery Focus Design](MATCH_DIAGNOSTICS_RECOVERY_FOCUS_DESIGN.md).
+
 ## Next High-Value Item
 
-Replace the Match diagnostics header `visible matches` counter with an
-intent-specific recovery summary, and keep result counts entirely inside the
-`Find a match` disclosure. That removes the final queue-total language from the
-default diagnostics screen.
+Unify the remaining advanced match-finder filters into one human-readable
+`Search saved matches` form, hiding raw search-reference and source-user
+filters until an operator explicitly expands a secondary filter group.

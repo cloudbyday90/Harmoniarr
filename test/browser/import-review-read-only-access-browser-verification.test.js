@@ -214,7 +214,8 @@ suite('Import Review requester/non-admin read-only access browser verification',
         'Music Queue handles the normal workflow. This diagnostics page exposes raw match details and admin-only recovery controls when a release needs deeper inspection.',
         { exact: true },
       ).waitFor();
-      await page.getByText('1 visible matches', { exact: true }).waitFor();
+      await page.getByText('Review selected match', { exact: true }).waitFor();
+      assert.equal(await page.getByText('1 visible matches', { exact: true }).count(), 0);
       await page.getByRole('heading', { exact: true, name: 'Current state and recovery' }).waitFor();
       const evidence = page.locator('.import-review-evidence');
       assert.equal(await evidence.isVisible(), true);
