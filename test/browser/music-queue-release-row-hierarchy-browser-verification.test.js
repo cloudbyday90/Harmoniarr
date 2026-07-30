@@ -28,6 +28,7 @@ import {
   createBrowserVisualEvidenceRecorder,
   stabilizeVisualEvidencePage,
 } from '../../testing/browser/visual-evidence.js';
+import { installConfiguredMusicQueueProviderFixtures } from '../../testing/browser/music-queue-browser-fixtures.js';
 import { resolveIntegrationTestRuntimeConfig } from '../../testing/integration/runtime-config.js';
 
 const integrationRuntimeConfig = resolveIntegrationTestRuntimeConfig();
@@ -141,6 +142,91 @@ function buildRecoveryPayload() {
       counts: { no_matches_left: 1, retrying_search: 1, trying_next_match: 1 },
       total: releases.length,
     },
+  };
+}
+
+function buildMatchChoicePayload() {
+  const release = {
+    artistName: 'Forest Frank',
+    evidence: {
+      match: {
+        bestCompositeScore: 91,
+        matches: [{
+          fileCount: 12,
+          formats: ['flac'],
+          hasFreeUploadSlot: true,
+          lockedFileCount: 0,
+          matchId: 'match-choice-best',
+          queueLength: 0,
+          score: 91,
+          status: 'pending',
+          totalSizeBytes: 123456789,
+          trackMatchSummary: {
+            expectedTrackCount: 12,
+            matchedTrackCount: 12,
+          },
+          uploadSpeed: 1048576,
+        }, {
+          fileCount: 12,
+          formats: ['flac'],
+          hasFreeUploadSlot: false,
+          lockedFileCount: 0,
+          matchId: 'match-choice-alternate',
+          queueLength: 4,
+          score: 88,
+          status: 'pending',
+          totalSizeBytes: 120000000,
+          trackMatchSummary: {
+            expectedTrackCount: 12,
+            matchedTrackCount: 12,
+          },
+          uploadSpeed: 524288,
+        }],
+        pendingCount: 2,
+        readiness: {
+          code: 'ambiguous',
+          message: 'Two close matches need a choice before Harmoniarr continues.',
+          scoreGap: 3,
+        },
+        statusCounts: { pending: 2 },
+        totalCount: 2,
+      },
+    },
+    expectedTrackCount: 12,
+    id: 'wanted-match-choice',
+    matchedTrackCount: 0,
+    missingTrackCount: 12,
+    quality: {
+      code: 'accepted',
+      formats: ['flac'],
+      profile: {
+        code: 'lossless_archive',
+        cutoffFormats: ['flac', 'alac', 'wav'],
+        fallbackAllowed: false,
+        minimumFormats: ['flac', 'alac', 'wav'],
+        preferredFormats: ['flac'],
+        requiresVerification: true,
+        upgradeAllowed: false,
+      },
+      verifiedLossless: true,
+    },
+    releaseDate: '2024-01-01T00:00:00.000Z',
+    releaseGroupType: 'Album',
+    releaseTitle: 'Child of God',
+    status: {
+      code: 'pick_match',
+      detail: 'Two close matches need a choice before Harmoniarr continues.',
+      label: 'Pick a match',
+      nextAction: 'review_matches',
+      tone: 'warning',
+    },
+  };
+
+  return {
+    checkedAt: '2026-07-29T12:00:00.000Z',
+    pagination: { limit: 100, offset: 0, total: 1 },
+    releases: [release],
+    summary: { counts: { pick_match: 1 }, total: 1 },
   };
 }
 
@@ -422,5 +508,88 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const manifest = await evidence.writeManifest();
       assert.equal(manifest.captureCount, 3);
     }, { scenarioName: 'music_queue_stopped_release_recovery' });
+  });
+
+  test('keeps actionable match evidence optional while preserving keyboard and mobile access', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const evidence = createBrowserVisualEvidenceRecorder({
+        scenarioName: 'music_queue_match_decision_evidence',
+      });
+      const pageErrors = [];
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify(buildMatchChoicePayload()),
+          contentType: 'application/json',
+        });
+      });
+      await installConfiguredMusicQueueProviderFixtures(browserContext);
+
+      await page.setViewportSize({ height: 1000, width: 1440 });
+      await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
+      await releaseRow.getByRole('button', { name: 'Review matches' }).click();
+
+      const reviewPanel = page.locator('.music-queue-review');
+      const decisionCard = reviewPanel.locator('.music-queue-review-match').filter({ hasText: 'Match 1' });
+      await decisionCard.getByRole('button', { name: 'Use this match' }).waitFor();
+      await decisionCard.getByRole('button', { name: 'Reject match' }).waitFor();
+      await decisionCard.getByText('Quality', { exact: true }).waitFor();
+      await decisionCard.getByText('Format', { exact: true }).waitFor();
+      await decisionCard.getByText('Tracks', { exact: true }).waitFor();
+      assert.equal(await decisionCard.getByText('Score', { exact: true }).isVisible(), false);
+      assert.equal(await decisionCard.getByText('Source health', { exact: true }).isVisible(), false);
+
+      const matchDetails = decisionCard.locator('details.music-queue-review-match__details');
+      assert.equal(await matchDetails.evaluate((element) => element.open), false);
+      await decisionCard.getByRole('button', { name: 'Use this match' }).focus();
+      await decisionCard.getByRole('button', { name: 'Use this match' }).press('Tab');
+      await decisionCard.getByRole('button', { name: 'Reject match' }).press('Tab');
+      assert.equal(
+        await matchDetails.locator('summary').evaluate((element) => globalThis.document.activeElement === element),
+        true,
+        'Keyboard focus should reach match evidence after the action controls.',
+      );
+      await matchDetails.locator('summary').press('Space');
+      await page.waitForFunction(() =>
+        globalThis.document.querySelector('details.music-queue-review-match__details')?.open === true,
+      );
+      await decisionCard.getByText('Score', { exact: true }).waitFor();
+      await decisionCard.getByText('Files', { exact: true }).waitFor();
+      await decisionCard.getByText('Size', { exact: true }).waitFor();
+      await decisionCard.getByText('Source health', { exact: true }).waitFor();
+      await decisionCard.getByText('Observed', { exact: true }).waitFor();
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'Actionable match cards lead with selection facts and actions; complete evidence appears only after an intentional expansion.',
+        name: 'desktop-match-decision-details',
+        surface: 'music-queue-review',
+      });
+
+      await page.setViewportSize({ height: 844, width: 390 });
+      await decisionCard.scrollIntoViewIfNeeded();
+      assert.equal(
+        await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth),
+        true,
+        'Expanded match evidence should not create horizontal overflow on mobile.',
+      );
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'The actionable match and optional evidence remain readable on a narrow viewport.',
+        name: 'mobile-match-decision-details',
+        surface: 'music-queue-review',
+      });
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+      const manifest = await evidence.writeManifest();
+      assert.equal(manifest.captureCount, 2);
+    }, { scenarioName: 'music_queue_match_decision_evidence' });
   });
 });

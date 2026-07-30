@@ -124,7 +124,13 @@ the expanded evidence remains within the mobile viewport.
 
 ## Follow-up
 
-The next high-value UI slice is **Music Queue waiting and empty-state
-hierarchy**: distinguish automatic waiting, provider/setup blockers, and a
-truly empty queue without adding another dashboard or requiring the Activity
-workspace for interpretation.
+The waiting and empty-state hierarchy is complete. The resulting actionable
+match-card density gap is implemented in
+[MUSIC_QUEUE_MATCH_DECISION_EVIDENCE_DESIGN.md](MUSIC_QUEUE_MATCH_DECISION_EVIDENCE_DESIGN.md):
+routine decisions now expose only selection facts before the existing actions,
+while full source and quality evidence remains available through `Match
+details`.
+
+The next high-value UI slice is **release-scoped Music Queue action feedback**:
+show a bounded success or failure result beside the selected release action
+instead of emitting every mutation result above the entire queue.

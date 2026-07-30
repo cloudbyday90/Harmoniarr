@@ -323,6 +323,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   the normal path, and moves aggregate match/quality evidence behind an
   accessible disclosure. Browser proof covers collapsed, expanded, desktop,
   and mobile states. See `MUSIC_QUEUE_REVIEW_HIERARCHY_DESIGN.md`.
+- Music Queue match decision evidence: actionable match cards now show
+  quality, format, and track coverage before their existing actions. Score,
+  file count, transfer size, source health, and detailed quality evidence stay
+  available through a per-card native `Match details` disclosure, while the
+  outer advanced-evidence surface retains its full card content. Browser proof
+  covers keyboard activation and mobile overflow. See
+  `MUSIC_QUEUE_MATCH_DECISION_EVIDENCE_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

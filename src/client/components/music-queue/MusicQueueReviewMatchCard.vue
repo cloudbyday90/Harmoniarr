@@ -17,7 +17,10 @@
 -->
 
 <script setup>
-defineProps({
+import { computed, ref, watch } from 'vue';
+import { buildMusicQueueMatchCardPresentation } from '../../lib/music-queue-match-card-presentation.js';
+
+const props = defineProps({
   actionRunning: {
     default: '',
     type: String,
@@ -33,6 +36,18 @@ defineProps({
 });
 
 defineEmits(['reject-match', 'use-match']);
+
+const detailsExpanded = ref(false);
+const presentation = computed(() => buildMusicQueueMatchCardPresentation(props.match, {
+  isDecision: props.showActions,
+}));
+
+watch(
+  () => [props.match?.id, props.showActions],
+  () => {
+    detailsExpanded.value = false;
+  },
+);
 </script>
 
 <template>
@@ -46,40 +61,14 @@ defineEmits(['reject-match', 'use-match']);
     </div>
 
     <dl class="music-queue-review-match__facts">
-      <div>
-        <dt>Score</dt>
-        <dd>{{ match.scoreLabel }}</dd>
-      </div>
-      <div>
-        <dt>Quality</dt>
-        <dd><span class="hx-pill" :data-tone="match.qualityFitTone">{{ match.qualityFitLabel }}</span></dd>
-      </div>
-      <div>
-        <dt>Format</dt>
-        <dd>{{ match.formatLabel }}</dd>
-      </div>
-      <div>
-        <dt>Tracks</dt>
-        <dd>{{ match.trackCoverageLabel }}</dd>
-      </div>
-      <div>
-        <dt>Files</dt>
-        <dd>{{ match.fileLabel }}</dd>
-      </div>
-      <div>
-        <dt>Size</dt>
-        <dd>{{ match.sizeLabel }}</dd>
-      </div>
-      <div>
-        <dt>Source health</dt>
-        <dd>{{ match.healthLabel }}</dd>
-      </div>
-    </dl>
-
-    <dl v-if="match.qualityRows?.length" class="music-queue-review-match__quality" aria-label="Match quality details">
-      <template v-for="row in match.qualityRows" :key="row.label">
-        <dt>{{ row.label }}</dt>
-        <dd><span class="hx-pill" :data-tone="row.tone">{{ row.value }}</span></dd>
+      <template v-for="fact in presentation.visibleFacts" :key="fact.label">
+        <div>
+          <dt>{{ fact.label }}</dt>
+          <dd>
+            <span v-if="fact.tone" class="hx-pill" :data-tone="fact.tone">{{ fact.value }}</span>
+            <template v-else>{{ fact.value }}</template>
+          </dd>
+        </div>
       </template>
     </dl>
 
@@ -105,6 +94,40 @@ defineEmits(['reject-match', 'use-match']);
         {{ actionRunning === 'reject' ? 'Rejecting...' : 'Reject match' }}
       </button>
     </div>
+
+    <details
+      v-if="presentation.hasDetails"
+      class="music-queue-review-match__details"
+      :open="detailsExpanded"
+      @toggle="detailsExpanded = $event.currentTarget.open"
+    >
+      <summary>Match details</summary>
+      <div class="music-queue-review-match__details-content">
+        <dl class="music-queue-review-match__quality" aria-label="Match details">
+          <template v-for="fact in presentation.detailFacts" :key="fact.label">
+            <dt>{{ fact.label }}</dt>
+            <dd>{{ fact.value }}</dd>
+          </template>
+        </dl>
+        <dl
+          v-if="presentation.detailQualityRows.length"
+          class="music-queue-review-match__quality"
+          aria-label="Match quality details"
+        >
+          <template v-for="row in presentation.detailQualityRows" :key="row.label">
+            <dt>{{ row.label }}</dt>
+            <dd><span class="hx-pill" :data-tone="row.tone">{{ row.value }}</span></dd>
+          </template>
+        </dl>
+      </div>
+    </details>
+
+    <dl v-if="presentation.qualityRows.length" class="music-queue-review-match__quality" aria-label="Match quality details">
+      <template v-for="row in presentation.qualityRows" :key="row.label">
+        <dt>{{ row.label }}</dt>
+        <dd><span class="hx-pill" :data-tone="row.tone">{{ row.value }}</span></dd>
+      </template>
+    </dl>
   </article>
 </template>
 
@@ -183,9 +206,38 @@ defineEmits(['reject-match', 'use-match']);
   gap: var(--hx-space-2);
 }
 
+.music-queue-review-match__details {
+  padding-top: var(--hx-space-3);
+  border-top: 1px solid var(--hx-border);
+}
+
+.music-queue-review-match__details summary {
+  min-height: 40px;
+  color: var(--hx-accent);
+  cursor: pointer;
+  font-size: var(--hx-text-sm);
+  font-weight: 700;
+}
+
+.music-queue-review-match__details summary:focus-visible {
+  border-radius: var(--hx-radius-xs);
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 3px;
+}
+
+.music-queue-review-match__details-content {
+  display: grid;
+  gap: var(--hx-space-3);
+  margin-top: var(--hx-space-3);
+}
+
 @media (max-width: 440px) {
   .music-queue-review-match__header {
     flex-direction: column;
+  }
+
+  .music-queue-review-match__facts {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

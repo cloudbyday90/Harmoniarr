@@ -1469,6 +1469,17 @@ while raw saved-search references and source users live behind `More filters`.
 Deep links with either source filter automatically reveal that active
 restriction.
 
-Recommended next slice: reduce the Music Queue selected-release review
-hierarchy so normal release progress has one clear next step and deep match
-evidence stays explicitly advanced.
+### Music Queue Match Decision Evidence
+
+Implemented in
+[MUSIC_QUEUE_MATCH_DECISION_EVIDENCE_DESIGN.md](MUSIC_QUEUE_MATCH_DECISION_EVIDENCE_DESIGN.md).
+The previously shipped selected-review hierarchy keeps the release outcome and
+next decision clear; actionable match cards now complete that hierarchy by
+showing only quality, format, and track coverage before their existing action
+controls. Score, transfer, source-health, and detailed quality evidence remain
+on the same card through a native `Match details` disclosure. Evidence cards
+inside the already-advanced outer disclosure retain their complete facts.
+
+Recommended next slice: localize Music Queue mutation feedback to the release
+action that produced it, keeping page-level feedback for page-load failures
+only.
