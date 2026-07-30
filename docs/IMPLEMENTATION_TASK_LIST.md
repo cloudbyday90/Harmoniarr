@@ -209,6 +209,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   lifecycle Activity writes fan out safely to every linked release without
   storing account or per-operator policy data on candidates. See
   `OPERATOR_SHARED_DISCOVERY_CORRELATION_FANOUT_DESIGN.md`.
+- Music Queue shared-discovery browser acceptance: selected release deep links
+  now resolve through the scoped direct endpoint and return a generic normal
+  unavailable state instead of an empty detail pane when the release is not
+  visible to that session. A two-context browser journey proves separate
+  operator sessions receive the same shared status, only their own Activity
+  handoff, and reciprocal copied URLs disclose neither sibling IDs nor private
+  policy markers. See `MUSIC_QUEUE_SHARED_DISCOVERY_BROWSER_ACCEPTANCE_DESIGN.md`.
 - Music Queue file-backed Docker acceptance: a disposable production runtime
   now generates real lossless and MP3-derived FLAC fixtures, reconciles their
   completed transfers through persisted safe auto-add, and proves the genuine

@@ -22,6 +22,7 @@ import { useRoute, useRouter } from 'vue-router';
 import MusicQueueEmptyState from '../components/music-queue/MusicQueueEmptyState.vue';
 import MusicQueueProviderRepairNotice from '../components/music-queue/MusicQueueProviderRepairNotice.vue';
 import MusicQueueProviderRecoveryVisibility from '../components/music-queue/MusicQueueProviderRecoveryVisibility.vue';
+import MusicQueueReleaseUnavailable from '../components/music-queue/MusicQueueReleaseUnavailable.vue';
 import MusicQueueReviewPanel from '../components/music-queue/MusicQueueReviewPanel.vue';
 import MusicQueueReleaseRow from '../components/music-queue/MusicQueueReleaseRow.vue';
 import {
@@ -32,6 +33,7 @@ import {
   MUSIC_QUEUE_STATE_FILTERS,
 } from '../lib/acquisition-pipeline-presentation.js';
 import { useMusicQueue } from '../composables/useMusicQueue.js';
+import { useMusicQueueReleaseDetail } from '../composables/useMusicQueueReleaseDetail.js';
 import { useMusicQueueProviderRepairContext } from '../composables/useMusicQueueProviderRepairContext.js';
 import { hasMusicQueueProviderDependentWork } from '../lib/music-queue-provider-repair-presentation.js';
 import { buildMusicQueueStatusPresentation } from '../lib/music-queue-status-presentation.js';
@@ -45,6 +47,9 @@ import { sessionStore } from '../state/session.js';
 const route = useRoute();
 const router = useRouter();
 const isProviderReadyRecoveryReturn = isMusicQueueProviderReadyRecoveryContext(route.query.recovery);
+const requestedReleaseId = computed(() => (
+  typeof route.params.wantedReleaseId === 'string' ? route.params.wantedReleaseId : null
+));
 
 const {
   actionFeedback,
@@ -61,6 +66,13 @@ const {
   summaryCards,
   useMatch,
 } = useMusicQueue({ immediate: !isProviderReadyRecoveryReturn });
+const {
+  errorMessage: releaseDetailErrorMessage,
+  isLoading: isReleaseDetailLoading,
+  isNotFound: isReleaseDetailNotFound,
+  load: loadReleaseDetail,
+  release: releaseDetail,
+} = useMusicQueueReleaseDetail({ wantedReleaseId: requestedReleaseId });
 
 const isRequester = computed(() => sessionStore.state.user?.role === 'requester');
 const hasProviderDependentMusicQueueWork = computed(() =>
@@ -81,7 +93,7 @@ const filtersExpanded = ref(false);
 const selectedScope = ref('current');
 const selectedState = ref('all');
 const selectedReleaseType = ref('all');
-const selectedReleaseId = ref(typeof route.params.wantedReleaseId === 'string' ? route.params.wantedReleaseId : null);
+const selectedReleaseId = ref(requestedReleaseId.value);
 const providerRecoveryVisibility = ref(null);
 
 const releaseTypeFilters = computed(() => buildMusicQueueReleaseTypeFilters(releases.value));
@@ -130,11 +142,13 @@ const hasActiveFilters = computed(() => (
   || selectedReleaseType.value !== 'all'
 ));
 const selectedRelease = computed(() => (
-  filteredReleases.value.find((release) => release.id === selectedReleaseId.value)
+  releaseDetail.value
+  ?? filteredReleases.value.find((release) => release.id === selectedReleaseId.value)
   ?? releases.value.find((release) => release.id === selectedReleaseId.value)
   ?? null
 ));
 const matchReview = computed(() => buildMusicQueueMatchReview(selectedRelease.value));
+const musicQueueErrorMessage = computed(() => errorMessage.value || releaseDetailErrorMessage.value);
 
 function openReview(release) {
   selectedReleaseId.value = release.id;
@@ -195,7 +209,7 @@ async function handleAllowFallbackQuality() {
 }
 
 async function refreshMusicQueue() {
-  await load();
+  await Promise.all([load(), loadReleaseDetail()]);
   await refreshProviderRepairContext();
 }
 
@@ -219,9 +233,9 @@ onMounted(() => {
 });
 
 watch(
-  () => route.params.wantedReleaseId,
+  requestedReleaseId,
   (wantedReleaseId) => {
-    selectedReleaseId.value = typeof wantedReleaseId === 'string' ? wantedReleaseId : null;
+    selectedReleaseId.value = wantedReleaseId;
   },
 );
 </script>
@@ -249,13 +263,15 @@ watch(
 
     <MusicQueueProviderRecoveryVisibility :visibility="providerRecoveryVisibility" />
 
-    <div v-if="errorMessage" class="hx-alert" data-tone="danger">
-      {{ errorMessage }}
+    <div v-if="musicQueueErrorMessage" class="hx-alert" data-tone="danger">
+      {{ musicQueueErrorMessage }}
     </div>
 
-    <div v-if="isLoading" class="music-queue-panel">
+    <div v-if="isLoading || isReleaseDetailLoading" class="music-queue-panel">
       Loading Music Queue...
     </div>
+
+    <MusicQueueReleaseUnavailable v-else-if="isReleaseDetailNotFound" />
 
     <MusicQueueEmptyState v-else-if="!releases.length" />
 

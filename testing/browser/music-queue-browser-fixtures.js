@@ -48,3 +48,81 @@ export async function installConfiguredMusicQueueProviderFixtures(browserContext
     });
   });
 }
+
+/**
+ * Installs the scoped list, direct-detail, and Activity reads used by the
+ * shared-discovery browser journey. A copied ID intentionally receives the
+ * same generic 404 contract as the production scoped service.
+ *
+ * @param {import('playwright').BrowserContext} browserContext
+ * @param {{ activityEvents?: Array<object>, release: object }} options
+ * @returns {Promise<void>}
+ */
+export async function installScopedMusicQueueReadModelFixtures(browserContext, {
+  activityEvents = [],
+  release,
+} = {}) {
+  if (!release?.id) {
+    throw new TypeError('installScopedMusicQueueReadModelFixtures requires a release with an id');
+  }
+
+  await installConfiguredMusicQueueProviderFixtures(browserContext);
+
+  await browserContext.route('**/api/v1/acquisition/releases**', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+
+    const requestUrl = new URL(route.request().url());
+    const listPath = '/api/v1/acquisition/releases';
+    const releasePath = `${listPath}/${encodeURIComponent(release.id)}`;
+
+    if (requestUrl.pathname === listPath) {
+      await route.fulfill({
+        body: JSON.stringify({
+          checkedAt: '2026-07-30T20:00:00.000Z',
+          pagination: { limit: 100, offset: 0, total: 1 },
+          releases: [release],
+          summary: { counts: { [release.status?.code ?? 'queued_for_search']: 1 }, total: 1 },
+        }),
+        contentType: 'application/json',
+      });
+      return;
+    }
+
+    if (requestUrl.pathname === releasePath) {
+      await route.fulfill({
+        body: JSON.stringify({
+          checkedAt: '2026-07-30T20:00:00.000Z',
+          release,
+        }),
+        contentType: 'application/json',
+      });
+      return;
+    }
+
+    await route.fulfill({
+      body: JSON.stringify({
+        error: {
+          code: 'music_queue_release_not_found',
+          message: 'Music Queue release was not found',
+        },
+      }),
+      contentType: 'application/json',
+      status: 404,
+    });
+  });
+
+  await browserContext.route('**/api/v1/activity/feed**', async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({
+        checkedAt: '2026-07-30T20:00:00.000Z',
+        events: activityEvents,
+        ok: true,
+        total: activityEvents.length,
+      }),
+      contentType: 'application/json',
+    });
+  });
+}

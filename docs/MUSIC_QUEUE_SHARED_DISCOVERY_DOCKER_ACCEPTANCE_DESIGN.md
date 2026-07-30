@@ -137,9 +137,8 @@ npm run validate:docker-controlled-provider-pipeline -- --no-cache
 
 ## Next High-Value Item
 
-Add a two-session browser acceptance journey for a shared Music Queue release.
-It should sign in as each operator separately, verify that both normal Music
-Queue views receive the shared status and own Activity handoff, and verify that
-a copied release-detail URL returns the normal not-found state for the other
-operator. This closes the remaining UI and route-layer gap after the packaged
-provider/runtime proof.
+The complementary two-session browser proof is now implemented in
+[MUSIC_QUEUE_SHARED_DISCOVERY_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_DISCOVERY_BROWSER_ACCEPTANCE_DESIGN.md).
+Next, add a shared-release recovery acceptance journey proving that one failed
+selected match remains one provider retry chain while each operator receives
+only their own recovery and Activity projection.
