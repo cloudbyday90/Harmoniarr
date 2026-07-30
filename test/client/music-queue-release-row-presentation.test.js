@@ -46,6 +46,10 @@ test('Music Queue release rows keep accepted quality compact', () => {
     ],
     qualityNeedsAttention: false,
     statusTone: 'info',
+    transition: {
+      label: 'Up next',
+      message: 'Harmoniarr will automatically check the files, then add them to the library.',
+    },
     updatedLabel: 'Not updated yet',
   });
 });
@@ -71,8 +75,29 @@ test('Music Queue release rows elevate a quality stop without exposing match evi
 
   assert.equal(presentation.qualityNeedsAttention, true);
   assert.equal(presentation.statusTone, 'warning');
+  assert.equal(presentation.transition, null);
   assert.deepEqual(presentation.facts, [
     { key: 'progress', label: 'All 10 tracks matched', tone: 'neutral' },
     { key: 'quality', label: 'Quality: Needs verification', tone: 'warning' },
   ]);
+});
+
+test('Music Queue release rows describe only recognized automatic handoffs', () => {
+  const release = normalizeMusicQueueRelease({
+    expectedTrackCount: 12,
+    missingTrackCount: 12,
+    quality: { code: 'accepted', profile: { code: 'lossless_archive' } },
+    releaseTitle: 'Child of God',
+    status: {
+      code: 'checking_matches',
+      label: 'Checking matches',
+      tone: 'info',
+    },
+  });
+
+  assert.deepEqual(buildMusicQueueReleaseRowPresentation(release).transition, {
+    label: 'Up next',
+    message: 'Harmoniarr will automatically queue the selected match for download when its checks finish.',
+  });
+  assert.equal(buildMusicQueueReleaseRowPresentation({ statusCode: 'unknown_future_status' }).transition, null);
 });

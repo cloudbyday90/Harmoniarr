@@ -48,6 +48,36 @@ function mountMusicQueue(options) {
   return { app, musicQueue };
 }
 
+function createDeferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
+
+function createMusicQueueRelease({
+  id = 'wanted-1',
+  status = {
+    code: 'pick_match',
+    label: 'Pick a match',
+    nextAction: 'review_matches',
+    tone: 'warning',
+  },
+} = {}) {
+  return {
+    artistName: 'Forest Frank',
+    expectedTrackCount: 12,
+    id,
+    matchedTrackCount: 0,
+    missingTrackCount: 12,
+    quality: { code: 'accepted', profile: { code: 'lossless_archive' } },
+    releaseTitle: 'Child of God',
+    status,
+  };
+}
+
 test('Music Queue polls only while release progress can advance automatically', () => {
   assert.equal(hasActiveMusicQueueProgress({
     releases: [{ statusCode: 'trying_next_match' }],
@@ -131,4 +161,53 @@ test('Music Queue keeps working, success, and failure feedback scoped to the rel
 
   app.unmount();
   failingApp.unmount();
+});
+
+test('Music Queue applies an authoritative mutation release before its list revalidation finishes', async (t) => {
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    addEventListener() {},
+    hidden: false,
+    removeEventListener() {},
+  };
+  t.after(() => {
+    globalThis.document = originalDocument;
+  });
+
+  const listRefresh = createDeferred();
+  const priorRelease = createMusicQueueRelease();
+  const updatedRelease = createMusicQueueRelease({
+    status: {
+      code: 'checking_matches',
+      label: 'Checking matches',
+      nextAction: 'download_now',
+      tone: 'info',
+    },
+  });
+  const fetchMusicQueueReleases = t.mock.fn(() => listRefresh.promise);
+  const useMusicQueueMatch = t.mock.fn(async () => ({ ok: true, release: updatedRelease }));
+  const { app, musicQueue } = mountMusicQueue({ fetchMusicQueueReleases, useMusicQueueMatch });
+  musicQueue.data.value = {
+    pagination: { total: 1 },
+    releases: [priorRelease],
+    summary: { counts: { pick_match: 1 }, total: 1 },
+  };
+
+  const action = musicQueue.useMatch({ matchId: 'match-1', wantedReleaseId: 'wanted-1' });
+  while (fetchMusicQueueReleases.mock.callCount() === 0) {
+    await new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+  }
+
+  assert.equal(musicQueue.releases.value[0].statusCode, 'checking_matches');
+  assert.deepEqual(musicQueue.releases.value[0].status, updatedRelease.status);
+
+  listRefresh.resolve({
+    pagination: { total: 1 },
+    releases: [updatedRelease],
+    summary: { counts: { checking_matches: 1 }, total: 1 },
+  });
+  await action;
+  app.unmount();
 });

@@ -230,6 +230,24 @@ function buildMatchChoicePayload() {
   };
 }
 
+function buildSelectedMatchPayload() {
+  const payload = buildMatchChoicePayload();
+  const release = payload.releases[0];
+  release.evidence.match.matches[0].status = 'selected';
+  release.evidence.match.matches[1].status = 'rejected';
+  release.evidence.match.pendingCount = 0;
+  release.evidence.match.statusCounts = { rejected: 1, selected: 1 };
+  release.status = {
+    code: 'checking_matches',
+    detail: 'Harmoniarr is preparing the selected match for download.',
+    label: 'Checking matches',
+    nextAction: 'download_now',
+    tone: 'info',
+  };
+  payload.summary = { counts: { checking_matches: 1 }, total: 1 };
+  return payload;
+}
+
 function createDeferred() {
   let resolve;
   const promise = new Promise((resolvePromise) => {
@@ -703,5 +721,80 @@ suite('Music Queue release row hierarchy browser verification', () => {
       const manifest = await evidence.writeManifest();
       assert.equal(manifest.captureCount, 2);
     }, { scenarioName: 'music_queue_release_action_feedback' });
+  });
+
+  test('shows the scheduled automatic handoff in the release row after a successful match selection', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const evidence = createBrowserVisualEvidenceRecorder({
+        scenarioName: 'music_queue_release_row_transition_clarity',
+      });
+      const pageErrors = [];
+      let payload = buildMatchChoicePayload();
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify(payload),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route('**/api/v1/acquisition/releases/wanted-match-choice/matches/match-choice-best/use', async (route) => {
+        payload = buildSelectedMatchPayload();
+        await route.fulfill({
+          body: JSON.stringify({ ok: true, release: payload.releases[0] }),
+          contentType: 'application/json',
+        });
+      });
+      await installConfiguredMusicQueueProviderFixtures(browserContext);
+
+      await page.setViewportSize({ height: 1000, width: 1440 });
+      await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
+      const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
+      await releaseRow.getByRole('button', { name: 'Review matches' }).click();
+
+      const reviewPanel = page.locator('.music-queue-review');
+      const selectedMatchCard = reviewPanel.locator('.music-queue-review-match').filter({ hasText: 'Match 1' });
+      await selectedMatchCard.getByRole('button', { name: 'Use this match' }).click();
+      await releaseRow.getByText('Checking matches', { exact: true }).waitFor();
+      await releaseRow.getByText('Up next', { exact: true }).waitFor();
+      await releaseRow.getByText(
+        'Harmoniarr will automatically queue the selected match for download when its checks finish.',
+        { exact: true },
+      ).waitFor();
+      await reviewPanel.getByRole('button', { name: 'Close' }).click();
+      await reviewPanel.getByRole('heading', { name: 'Select a release' }).waitFor();
+      await releaseRow.getByText('Checking matches', { exact: true }).waitFor();
+      await releaseRow.getByText('Up next', { exact: true }).waitFor();
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'A successful match choice updates the release row with its now-scheduled automatic download handoff without reopening details.',
+        name: 'desktop-release-row-transition',
+        surface: 'music-queue-release-list',
+      });
+
+      await page.setViewportSize({ height: 844, width: 390 });
+      await releaseRow.scrollIntoViewIfNeeded();
+      assert.equal(
+        await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth),
+        true,
+        'The release-row automatic handoff should not create horizontal overflow on mobile.',
+      );
+      await stabilizeVisualEvidencePage(page);
+      await evidence.capture(page, {
+        description: 'The compact automatic handoff remains readable in a narrow Music Queue release row.',
+        name: 'mobile-release-row-transition',
+        surface: 'music-queue-release-list',
+      });
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+      const manifest = await evidence.writeManifest();
+      assert.equal(manifest.captureCount, 2);
+    }, { scenarioName: 'music_queue_release_row_transition_clarity' });
   });
 });

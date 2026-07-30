@@ -336,6 +336,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   successful actions politely, announces failures assertively, and leaves
   focus on the initiating control. See
   `MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md`.
+- Music Queue release-row transition clarity: successful scoped mutations now
+  apply their authoritative returned release projection before the bounded list
+  refresh. Recognized automatic states show one compact `Up next` explanation
+  in the release row, while attention, complete, and unknown states do not
+  receive inferred automation copy. See
+  `MUSIC_QUEUE_RELEASE_ROW_TRANSITION_CLARITY_DESIGN.md`.
 - Local Docker system alert hardening: repeated operator alerts on mostly
   unconfigured walkthrough stacks now collapse by root cause, metadata refresh
   operation retries can reacquire released job leases safely, and wanted-release

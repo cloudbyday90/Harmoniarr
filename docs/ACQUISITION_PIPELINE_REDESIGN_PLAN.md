@@ -891,6 +891,10 @@ automation changes.
 - [x] Keep Music Queue mutation feedback local to the selected release review,
   while reserving page-level feedback for Music Queue read failures. See
   `MUSIC_QUEUE_RELEASE_ACTION_FEEDBACK_DESIGN.md`.
+- [x] Apply an authoritative release projection immediately after a successful
+  Music Queue mutation and show one compact `Up next` statement for known
+  automatic transitions while the normal queue refresh reconciles totals. See
+  `MUSIC_QUEUE_RELEASE_ROW_TRANSITION_CLARITY_DESIGN.md`.
 - [x] Show why automation did or did not choose a match at aggregate release
   level and in simplified per-match cards.
 - [x] Show quality profile fit for each release: profile, decision, format
@@ -1493,6 +1497,18 @@ Working and success results use polite status semantics; failures use an alert
 without moving keyboard focus. Page-level feedback remains reserved for queue
 read failures.
 
-Recommended next slice: make post-action state transitions visible at the
-release-row level, so the next automatic step is immediately clear without
-reopening the review or advanced diagnostics.
+### Music Queue Release-Row Transition Clarity
+
+Implemented in
+[MUSIC_QUEUE_RELEASE_ROW_TRANSITION_CLARITY_DESIGN.md](MUSIC_QUEUE_RELEASE_ROW_TRANSITION_CLARITY_DESIGN.md).
+Successful Music Queue mutations now apply their authoritative returned release
+projection before the existing bounded list revalidation. Recognized automatic
+states display one compact `Up next` statement in the release row, so a person
+can see the scheduled handoff after closing the review without opening
+diagnostics. Unknown, complete, and attention states do not receive inferred
+automation messaging.
+
+Recommended next slice: extend terminal match recovery to timeout,
+disappeared-source, failed-quality-verification, and import-blocker outcomes,
+promoting the next eligible match only when quality and import safety policy
+allow it.

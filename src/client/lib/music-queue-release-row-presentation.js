@@ -16,6 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { buildMusicQueueReleaseTransitionPresentation } from './music-queue-release-transition-presentation.js';
+
 const QUALITY_ATTENTION_CODES = new Set([
   'below_minimum',
   'needs_verification',
@@ -52,7 +54,7 @@ function formatTrackProgress(release = {}) {
  * panel, so normal queue scanning never exposes provider diagnostics.
  *
  * @param {object} release
- * @returns {{ facts: Array<{key: string, label: string, tone: string}>, qualityNeedsAttention: boolean, statusTone: string, updatedLabel: string }}
+ * @returns {{ facts: Array<{key: string, label: string, tone: string}>, qualityNeedsAttention: boolean, statusTone: string, transition: { label: string, message: string } | null, updatedLabel: string }}
  */
 export function buildMusicQueueReleaseRowPresentation(release = {}) {
   const quality = release.qualitySummary ?? {};
@@ -74,6 +76,7 @@ export function buildMusicQueueReleaseRowPresentation(release = {}) {
     ],
     qualityNeedsAttention,
     statusTone: release.status?.tone ?? 'neutral',
+    transition: buildMusicQueueReleaseTransitionPresentation(release),
     updatedLabel: release.lastActivityLabel === 'No activity yet'
       ? 'Not updated yet'
       : `Updated ${release.lastActivityLabel}`,

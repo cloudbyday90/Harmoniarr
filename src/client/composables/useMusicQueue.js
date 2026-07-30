@@ -107,6 +107,27 @@ export function useMusicQueue({
   const summaryCards = computed(() => buildMusicQueueSummaryCards(resource.data.value.summary));
   const totalCount = computed(() => resource.data.value.pagination?.total ?? releases.value.length);
 
+  function applyMutationRelease(payload) {
+    const updatedRelease = normalizeMusicQueueRelease(payload?.release);
+    if (!updatedRelease?.id || !Array.isArray(resource.data.value.releases)) {
+      return;
+    }
+
+    let didReplace = false;
+    const nextReleases = resource.data.value.releases.map((release) => {
+      if (release.id !== updatedRelease.id) return release;
+      didReplace = true;
+      return updatedRelease;
+    });
+
+    if (didReplace) {
+      resource.data.value = {
+        ...resource.data.value,
+        releases: nextReleases,
+      };
+    }
+  }
+
   function setActionFeedback({ actionKey, message, phase, wantedReleaseId }) {
     actionFeedback.value = createMusicQueueActionFeedback({
       actionKey,
@@ -133,6 +154,7 @@ export function useMusicQueue({
 
     try {
       const payload = await apiFn({ matchId, wantedReleaseId });
+      applyMutationRelease(payload);
       setActionFeedback({ actionKey, message: successMessage, phase: 'success', wantedReleaseId });
       await resource.load();
       return payload;
@@ -187,6 +209,7 @@ export function useMusicQueue({
 
     try {
       const payload = await searchMusicQueueReleaseAgain({ wantedReleaseId });
+      applyMutationRelease(payload);
       setActionFeedback({
         actionKey,
         message: payload?.action?.dispatchAlreadyActive
@@ -226,6 +249,7 @@ export function useMusicQueue({
 
     try {
       const payload = await allowMusicQueueFallbackQuality({ wantedReleaseId });
+      applyMutationRelease(payload);
       setActionFeedback({
         actionKey,
         message: payload?.action?.dispatchAlreadyActive
