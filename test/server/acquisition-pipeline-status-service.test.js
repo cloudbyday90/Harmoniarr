@@ -61,6 +61,40 @@ test('deriveMusicQueueStatus surfaces safe-auto quality blocks before ready-to-a
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE);
 });
 
+test('deriveMusicQueueStatus surfaces an exhausted quality stop over a stale queued execution item', () => {
+  const status = deriveMusicQueueStatus({
+    add: {
+      latestOutcome: 'quality_blocked',
+      qualityBlockedCount: 1,
+    },
+    match: {
+      executionStatusCounts: { queued: 1 },
+      statusCounts: { failed: 1 },
+    },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.QUALITY_CHOICE_NEEDED);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE);
+});
+
+test('deriveMusicQueueStatus keeps a real active fallback download ahead of historical quality evidence', () => {
+  const status = deriveMusicQueueStatus({
+    add: {
+      latestOutcome: 'quality_blocked',
+      qualityBlockedCount: 1,
+    },
+    match: {
+      executionStatusCounts: { queued: 2 },
+      statusCounts: { downloading: 1, failed: 1 },
+    },
+    release: { missingTrackCount: 10, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.DOWNLOADING);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER);
+});
+
 test('deriveMusicQueueStatus surfaces blocked library add work before ready-to-add', () => {
   const status = deriveMusicQueueStatus({
     add: {

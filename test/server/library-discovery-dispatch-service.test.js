@@ -160,6 +160,43 @@ test('dispatchReadyDiscoveryRequests claims ready automatic requests, starts sea
   });
 });
 
+test('dispatchReadyDiscoveryRequests carries the claimed wanted release into automatic candidate context', async (t) => {
+  const claimedRequests = [{
+    artistName: 'Autechre',
+    evidence: {},
+    metadataReleaseId: 'release-1',
+    releaseDate: '2001-04-30',
+    releaseGroupTitle: 'Confield',
+    releaseTitle: 'Confield',
+    wantedReleaseId: 'wanted-1',
+  }];
+  const ingestSlskdSearchResponses = t.mock.fn(async () => ({
+    candidateCount: 1,
+    fileCount: 4,
+  }));
+  const service = createLibraryDiscoveryDispatchService({
+    dispatchBatchSize: 1,
+    importCandidateService: { ingestSlskdSearchResponses },
+    libraryDiscoveryRequestStore: {
+      claimNextReadyAutomaticDiscoveryRequest: t.mock.fn(async () => claimedRequests.shift() ?? null),
+      markDiscoveryRequestExhausted: t.mock.fn(async () => {}),
+      recordDiscoverySearchFailure: t.mock.fn(async () => {}),
+      recordDiscoverySearchSuccess: t.mock.fn(async () => {}),
+    },
+    slskdService: {
+      startSearch: t.mock.fn(async () => ({ id: 'search-1' })),
+    },
+  });
+
+  await service.dispatchReadyDiscoveryRequests();
+
+  assert.deepEqual(ingestSlskdSearchResponses.mock.calls[0].arguments[0].musicQueueContext, {
+    profileCode: 'lossless_archive',
+    qualityOverride: null,
+    wantedReleaseId: 'wanted-1',
+  });
+});
+
 test('dispatchReadyDiscoveryRequests records one Activity event after a provider-recovery search is accepted', async (t) => {
   const callOrder = [];
   const claimedRequests = [{

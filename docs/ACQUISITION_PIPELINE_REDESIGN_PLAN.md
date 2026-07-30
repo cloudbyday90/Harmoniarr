@@ -1556,7 +1556,20 @@ other records strict-quality exhaustion, starts no unsafe follow-up download,
 and leaves the library unchanged. The run-store read model now retains the
 quality recovery counters written by the worker.
 
-Recommended next slice: add a wanted release to the controlled strict-quality
-exhaustion fixture and assert its actual Music Queue release projection and
-release-scoped Activity handoff, not only the existing browser fixture's
-presentation contract.
+### Strict-Quality Release Projection Docker Evidence
+
+Implemented in
+[MUSIC_QUEUE_STRICT_QUALITY_RELEASE_PROJECTION_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_STRICT_QUALITY_RELEASE_PROJECTION_DOCKER_EVIDENCE_DESIGN.md).
+The controlled-provider strict-quality exhaustion fixture now seeds a persisted
+wanted release for an isolated operator. It proves that the actual Music Queue
+list and detail read model return `Quality choice needed` and the one focused
+review action after the safe-add gate rejects the file. Activity uses the same
+wanted-release ID to provide a safe route handoff without provider paths or
+source-user data. The status resolver now distinguishes an active fallback
+candidate from a stale queued execution item, so normal progress remains
+truthful while a terminal quality stop is visible.
+
+Recommended next slice: design operator-scoped shared-discovery correlation
+fan-out. One provider search should serve shared release metadata and transfer
+work, while each operator who wants the release retains isolated Music Queue
+status, Activity visibility, and policy outcome.

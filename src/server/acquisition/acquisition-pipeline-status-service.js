@@ -209,7 +209,7 @@ export function deriveMusicQueueStatus({
   }
 
   const executionStatusCounts = match.executionStatusCounts ?? {};
-  if (hasAnyStatus(executionStatusCounts, ['running', 'pending', 'queued'])) {
+  if (hasAnyStatus(match.statusCounts, ['downloading'])) {
     return buildStatus(MUSIC_QUEUE_STATUS_CODES.DOWNLOADING, {
       nextAction: MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER,
       progressStep: 'download',
@@ -244,6 +244,13 @@ export function deriveMusicQueueStatus({
       detail: add.message ?? add.qualityGate?.message ?? 'Downloaded files did not pass the selected audio quality check.',
       nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE,
       progressStep: 'quality',
+    });
+  }
+
+  if (hasAnyStatus(executionStatusCounts, ['running', 'pending', 'queued'])) {
+    return buildStatus(MUSIC_QUEUE_STATUS_CODES.DOWNLOADING, {
+      nextAction: MUSIC_QUEUE_ACTION_CODES.OPEN_DOWNLOADER,
+      progressStep: 'download',
     });
   }
 

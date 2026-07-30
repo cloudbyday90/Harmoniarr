@@ -142,7 +142,12 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     && parsed?.qualityExhaustion?.primaryFilename?.endsWith('.flac')
     && parsed.qualityExhaustion.qualityRecoveryExhaustedCount === 1
     && parsed.qualityExhaustion.followUpRunId === null
-    && parsed.qualityExhaustion.libraryFileCountBefore === parsed.qualityExhaustion.libraryFileCountAfter;
+    && parsed.qualityExhaustion.libraryFileCountBefore === parsed.qualityExhaustion.libraryFileCountAfter
+    && parsed.qualityExhaustion.musicQueueStatus === 'quality_choice_needed'
+    && parsed.qualityExhaustion.musicQueueNextAction === 'review_quality_choice'
+    && parsed.qualityExhaustion.activityEntityId === parsed.qualityExhaustion.wantedReleaseId
+    && parsed.qualityExhaustion.activityRoute?.name === 'music-queue-release'
+    && parsed.qualityExhaustion.activityRoute?.params?.wantedReleaseId === parsed.qualityExhaustion.wantedReleaseId;
   if (parsed?.pipeline?.finalStatus !== 'applied'
     || parsed.catalogFixtures !== 15
     || parsed.catalogCandidates !== 17

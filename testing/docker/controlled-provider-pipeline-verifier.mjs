@@ -18,6 +18,7 @@ import {
   buildControlledProviderFixtureFilename,
   controlledProviderFixtureCatalog,
 } from './controlled-provider-fixture-catalog.mjs';
+import { createAcquisitionModule } from '/app/server-dist/acquisition/acquisition-module.js';
 import { createActivityModule } from '/app/server-dist/activity/activity-module.js';
 import { closePool, getPool } from '/app/server-dist/database.js';
 import { createImportCandidateModule } from '/app/server-dist/import-candidates/import-candidate-module.js';
@@ -69,7 +70,16 @@ function buildDownloadedFixturePath(fixture, { variant = 'primary' } = {}) {
   );
 }
 
-async function seedDiscoveryRequest(pool, fixture) {
+async function seedAppUser(pool) {
+  const user = await pool.query(
+    `INSERT INTO app_users (username, password_hash, role, must_change_password)
+     VALUES ($1, $2, 'admin', FALSE) RETURNING id`,
+    [`controlled-provider-${randomUUID()}`, `controlled-provider-${randomUUID()}`],
+  );
+  return user.rows[0].id;
+}
+
+async function seedDiscoveryRequest(pool, fixture, { appUserId = null } = {}) {
   const artist = await pool.query(
     `INSERT INTO metadata_artists (source_provider, source_artist_id, musicbrainz_artist_id, name, sort_name)
      VALUES ('controlled_fixture', $1, $2, $3, $3) RETURNING id`,
@@ -106,12 +116,37 @@ async function seedDiscoveryRequest(pool, fixture) {
     ) VALUES ($1, $2, 1, '1', $3, 3000, $4)`,
     [medium.rows[0].id, recording.rows[0].id, fixture.trackTitle, fixture.artistName],
   );
+  const wantedRelease = appUserId
+    ? await pool.query(
+      `INSERT INTO library_wanted_releases (
+        app_user_id, metadata_artist_id, metadata_release_group_id, metadata_release_id,
+        wanted_status, expected_track_count, matched_track_count, missing_track_count,
+        release_date, release_status, evidence
+      ) VALUES ($1, $2, $3, $4, 'missing', 1, 0, 1, '2026-01-01', 'Official', $5::jsonb)
+      RETURNING id`,
+      [
+        appUserId,
+        artist.rows[0].id,
+        releaseGroup.rows[0].id,
+        release.rows[0].id,
+        JSON.stringify({ qualityProfile: 'lossless_archive', source: 'controlled_provider_e2e' }),
+      ],
+    )
+    : null;
   await pool.query(
     `INSERT INTO library_discovery_requests (
       metadata_artist_id, metadata_release_group_id, metadata_release_id, wanted_status, search_mode, request_status, evidence
     ) VALUES ($1, $2, $3, 'missing', 'automatic', 'ready', $4::jsonb)`,
     [artist.rows[0].id, releaseGroup.rows[0].id, release.rows[0].id, JSON.stringify({ qualityProfile: 'lossless_archive' })],
   );
+
+  return {
+    appUserId,
+    metadataArtistId: artist.rows[0].id,
+    metadataReleaseGroupId: releaseGroup.rows[0].id,
+    metadataReleaseId: release.rows[0].id,
+    wantedReleaseId: wantedRelease?.rows[0]?.id ?? null,
+  };
 }
 
 async function executeDownloadAndReconcile({
@@ -156,6 +191,17 @@ async function getSelectedCandidateForSearch(importCandidateModule, sourceSearch
   return selected.candidates[0];
 }
 
+async function waitForActivityEvent(activityEventService, { entityId, eventType }) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const feed = await activityEventService.buildActivityFeed({ eventType, limit: 20 });
+    const event = feed.events.find((entry) => entry.entityId === entityId);
+    if (event) return event;
+    await delay(25);
+  }
+  throw new Error(`Timed out waiting for ${eventType} Activity evidence for ${entityId}`);
+}
+
 async function runVerification() {
   assert.ok(providerApiKey, 'controlled provider API key is required');
   const pool = getPool();
@@ -181,6 +227,9 @@ async function runVerification() {
     importCandidateService: importCandidateModule.importCandidateService,
     recordActivityEventFn: activityModule.activityEventService.recordActivityEvent,
     slskdService,
+  });
+  const acquisitionModule = createAcquisitionModule({
+    buildLibraryWantedReleases: libraryModule.routeDependencies.buildLibraryWantedReleases,
   });
 
   await persistSettings([
@@ -460,7 +509,11 @@ async function runVerification() {
 
   assert.ok(qualityExhaustionFixture, 'the controlled catalog must include a strict-quality exhaustion fixture');
   const libraryFilesBeforeQualityExhaustion = await listFiles(musicRoot);
-  await seedDiscoveryRequest(pool, qualityExhaustionFixture);
+  const qualityExhaustionAppUserId = await seedAppUser(pool);
+  const qualityExhaustionSeed = await seedDiscoveryRequest(pool, qualityExhaustionFixture, {
+    appUserId: qualityExhaustionAppUserId,
+  });
+  assert.ok(qualityExhaustionSeed.wantedReleaseId, 'strict-quality exhaustion must have a persisted wanted release');
   const qualityExhaustionDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(qualityExhaustionDispatch.candidateCount, 1, 'strict-quality exhaustion must ingest only the spectrally limited primary');
   const qualityExhaustionDownloadRunId = qualityExhaustionDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
@@ -507,6 +560,42 @@ async function runVerification() {
     libraryFilesBeforeQualityExhaustion,
     'strict-quality exhaustion must make no library write',
   );
+  const qualityExhaustionQueue = await acquisitionModule.acquisitionPipelineService.listMusicQueueReleases({
+    appUserId: qualityExhaustionAppUserId,
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(qualityExhaustionQueue.pagination.total, 1, 'the operator must see its persisted wanted release in Music Queue');
+  assert.equal(qualityExhaustionQueue.summary.counts.quality_choice_needed, 1, 'strict-quality exhaustion must project one release-centred quality decision');
+  const qualityExhaustionMusicQueueRelease = qualityExhaustionQueue.releases[0];
+  assert.equal(qualityExhaustionMusicQueueRelease.id, qualityExhaustionSeed.wantedReleaseId, 'Music Queue must preserve the persisted wanted release ID');
+  assert.equal(qualityExhaustionMusicQueueRelease.status.code, 'quality_choice_needed', 'strict-quality exhaustion must project Quality choice needed');
+  assert.equal(qualityExhaustionMusicQueueRelease.status.nextAction, 'review_quality_choice', 'the projected quality stop must lead to release review');
+  const qualityExhaustionReleaseDetail = await acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+    appUserId: qualityExhaustionAppUserId,
+    wantedReleaseId: qualityExhaustionSeed.wantedReleaseId,
+  });
+  assert.equal(qualityExhaustionReleaseDetail.release.status.code, 'quality_choice_needed', 'the direct Music Queue release read must retain the quality stop');
+  await assert.rejects(
+    () => acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+      appUserId: randomUUID(),
+      wantedReleaseId: qualityExhaustionSeed.wantedReleaseId,
+    }),
+    (error) => error?.status === 404 && error?.code === 'music_queue_release_not_found',
+    'Music Queue must not expose a wanted release outside its operator scope',
+  );
+  const qualityExhaustionActivity = await waitForActivityEvent(activityModule.activityEventService, {
+    entityId: qualityExhaustionSeed.wantedReleaseId,
+    eventType: 'music_queue_quality_blocked',
+  });
+  assert.equal(qualityExhaustionActivity.entityType, 'wanted_release', 'quality Activity must be correlated to the persisted wanted release');
+  assert.equal(qualityExhaustionActivity.extraPayload?.wantedReleaseId, qualityExhaustionSeed.wantedReleaseId, 'quality Activity must retain the release handoff ID');
+  assert.deepEqual(qualityExhaustionActivity.extraPayload?.route, {
+    name: 'music-queue-release',
+    params: { wantedReleaseId: qualityExhaustionSeed.wantedReleaseId },
+  }, 'quality Activity must hand the operator back to the release-centred Music Queue detail');
+  assert.equal(Object.hasOwn(qualityExhaustionActivity.extraPayload ?? {}, 'folderPath'), false, 'Activity must not expose a provider folder path');
+  assert.equal(Object.hasOwn(qualityExhaustionActivity.extraPayload ?? {}, 'username'), false, 'Activity must not expose the provider username');
 
   let catalogCandidateCount = 8;
   let noResponseCount = 0;
@@ -567,6 +656,11 @@ async function runVerification() {
       primaryFilename: qualityExhaustionPrimaryPreview.files[0]?.filename ?? null,
       primaryFinalStatus: qualityExhaustionPrimaryFinalCandidate.status,
       qualityRecoveryExhaustedCount: qualityExhaustionApplyRun.qualityRecoveryExhaustedCount,
+      activityEntityId: qualityExhaustionActivity.entityId,
+      activityRoute: qualityExhaustionActivity.extraPayload?.route ?? null,
+      musicQueueNextAction: qualityExhaustionMusicQueueRelease.status.nextAction,
+      musicQueueStatus: qualityExhaustionMusicQueueRelease.status.code,
+      wantedReleaseId: qualityExhaustionSeed.wantedReleaseId,
     },
   };
 }

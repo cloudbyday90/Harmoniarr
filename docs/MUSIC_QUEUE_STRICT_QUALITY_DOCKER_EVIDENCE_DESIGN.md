@@ -6,6 +6,8 @@ Date: 2026-07-30.
 
 This document completes the controlled-provider follow-up from
 [MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md).
+Its persisted release-projection follow-up is recorded in
+[MUSIC_QUEUE_STRICT_QUALITY_RELEASE_PROJECTION_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_STRICT_QUALITY_RELEASE_PROJECTION_DOCKER_EVIDENCE_DESIGN.md).
 
 ## Problem
 
@@ -80,9 +82,13 @@ available.
 additional library file.
 5. Repeat with no fallback. Require `qualityRecoveryExhaustedCount: 1`, no
 active follow-up download run, a failed primary, and an unchanged library.
-6. Keep detailed candidate evidence in the verifier and normal user language
-in Music Queue. The existing browser contract owns `Quality choice needed` and
-the focused release handoff.
+6. Seed a disposable persisted wanted release for strict-quality exhaustion and
+read the real Music Queue list/detail and Activity services after the worker
+completes.
+7. Keep detailed candidate evidence in the verifier and normal user language
+in Music Queue. A stale execution row must not hide a terminal quality stop;
+a genuinely downloading fallback candidate remains the only higher-priority
+automatic state.
 
 ## Implementation
 
@@ -93,8 +99,12 @@ the focused release handoff.
 - The provider fixture exposes both candidates using the existing slskd
   response contract. It copies only generated files from the disposable mount.
 - The verifier asserts that ffprobe reports `flac`, then uses the actual
-  safe-add worker counters to verify quality block, recovery start, exhaustion,
-  candidate final state, and isolated-library file counts.
+safe-add worker counters to verify quality block, recovery start, exhaustion,
+candidate final state, and isolated-library file counts.
+- Strict-quality exhaustion also seeds one scoped wanted release and asserts
+that the real Music Queue list/detail read returns `Quality choice needed` with
+`Review quality choice`. Its Activity event uses that wanted-release ID and an
+allow-listed Music Queue route, without provider path or username fields.
 - `import-candidate-apply-run-store` now exposes the already-persisted
   `qualityBlockedCount`, `qualityRecoveryStartedCount`,
   `qualityRecoveryRediscoveryCount`, and `qualityRecoveryExhaustedCount` to
@@ -121,7 +131,9 @@ the focused release handoff.
 
 ```text
 node --test test/server/import-candidate-apply-run-store.test.js \
-  test/scripts/docker-controlled-provider-pipeline-validation.test.js
+  test/scripts/docker-controlled-provider-pipeline-validation.test.js \
+  test/server/acquisition-pipeline-status-service.test.js \
+  test/server/library-discovery-dispatch-service.test.js
 npm run lint:server
 npm run lint:scripts
 npm run lint:test
@@ -135,8 +147,6 @@ write.
 
 ## Next High-Value Item
 
-Extend the controlled-provider harness with a persisted wanted-release and a
-real Music Queue read-model assertion for strict-quality exhaustion. That will
-prove the backend outcome becomes the user-facing `Quality choice needed`
-release state and release-scoped Activity handoff without relying only on a
-browser fixture projection.
+Design operator-scoped shared-discovery correlation fan-out. Shared discovery
+must retain one provider search and download lifecycle while preserving each
+relevant operator's release-level outcome and Activity visibility.

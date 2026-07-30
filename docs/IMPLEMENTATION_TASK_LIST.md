@@ -195,6 +195,13 @@ Database model source: `docs/DATABASE_MODEL.md`
   match when one exists. Music Queue now lets selected or queued next-match
   progress override stale quality-block evidence. See
   `MUSIC_QUEUE_QUALITY_STOP_RECOVERY_AUTOMATION_DESIGN.md`.
+- Music Queue strict-quality release projection: the controlled-provider
+  Docker proof now creates an operator-scoped wanted release, carries its
+  authoritative ID through automatic discovery, and reads the actual Music
+  Queue list/detail and Activity route after strict-quality exhaustion. A stale
+  queued execution item no longer hides the quality stop, while a genuinely
+  downloading fallback still takes precedence. See
+  `MUSIC_QUEUE_STRICT_QUALITY_RELEASE_PROJECTION_DOCKER_EVIDENCE_DESIGN.md`.
 - Music Queue file-backed Docker acceptance: a disposable production runtime
   now generates real lossless and MP3-derived FLAC fixtures, reconciles their
   completed transfers through persisted safe auto-add, and proves the genuine
