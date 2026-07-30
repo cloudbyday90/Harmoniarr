@@ -149,7 +149,13 @@ through the normal Music Queue and Activity handoffs. It uses isolated,
 first-party read-model fixtures and never contacts live peers or exposes
 advanced diagnostics by default.
 
-The next high-value implementation slice is a Docker-backed controlled-provider
-evidence case for a completed source that disappears before library add. It
-should exercise real reconciliation and safe next-match promotion with only
-disposable local fixture files.
+The completed-source Docker proof is implemented in
+[MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md).
+It proves real provider completion, source removal before safe-add planning,
+durable `source_disappeared` recovery, zero primary library writes, and safe
+promotion through a fresh fallback download.
+
+The next high-value implementation slice is a controlled-provider Docker proof
+for strict-quality rejection before library add. It should verify the real
+quality gate promotes only eligible fallback matches and that exhaustion ends
+at a release-centered quality decision without a library write.

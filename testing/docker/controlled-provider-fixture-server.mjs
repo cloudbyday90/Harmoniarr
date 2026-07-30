@@ -54,6 +54,10 @@ function buildProviderFile(fixture, { variant = 'primary' } = {}) {
   };
 }
 
+function hasFallbackResponse(fixture) {
+  return ['completed_source_disappears', 'recovery_fallback'].includes(fixture?.scenario);
+}
+
 function buildResponse(fixture) {
   if (!fixture || fixture.scenario === 'no_response') return [];
   const file = buildProviderFile(fixture);
@@ -70,7 +74,7 @@ function buildResponse(fixture) {
     uploadSpeed: fixture.scenario === 'recovery_fallback' ? 2_000_000 : 1_000_000,
     username: `controlled-${fixture.id}`,
   };
-  if (fixture.scenario !== 'recovery_fallback') return [primaryResponse];
+  if (!hasFallbackResponse(fixture)) return [primaryResponse];
 
   return [primaryResponse, {
     ...primaryResponse,

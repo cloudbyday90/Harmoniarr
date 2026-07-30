@@ -10,10 +10,14 @@
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { stat } from 'node:fs/promises';
+import { readdir, rm, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { controlledProviderFixtureCatalog } from './controlled-provider-fixture-catalog.mjs';
+import {
+  buildControlledProviderFixtureFilename,
+  controlledProviderFixtureCatalog,
+} from './controlled-provider-fixture-catalog.mjs';
 import { createActivityModule } from '/app/server-dist/activity/activity-module.js';
 import { closePool, getPool } from '/app/server-dist/database.js';
 import { createImportCandidateModule } from '/app/server-dist/import-candidates/import-candidate-module.js';
@@ -35,6 +39,24 @@ async function waitForRun(runStore, runId) {
     await delay(50);
   }
   throw new Error(`Timed out waiting for run ${runId}`);
+}
+
+async function listFiles(rootPath) {
+  const entries = await readdir(rootPath, { withFileTypes: true });
+  const files = await Promise.all(entries.map(async (entry) => {
+    const entryPath = resolve(rootPath, entry.name);
+    return entry.isDirectory() ? listFiles(entryPath) : [entryPath];
+  }));
+  return files.flat().sort();
+}
+
+function buildDownloadedFixturePath(fixture, { variant = 'primary' } = {}) {
+  return resolve(
+    downloadsRoot,
+    'complete',
+    `${fixture.id}-${variant}`,
+    buildControlledProviderFixtureFilename(fixture, { variant }),
+  );
 }
 
 async function seedDiscoveryRequest(pool, fixture) {
@@ -120,7 +142,10 @@ async function runVerification() {
 
   const [pipelineFixture, ...catalogFixtures] = controlledProviderFixtureCatalog;
   const recoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'recovery_fallback');
-  const remainingCatalogFixtures = catalogFixtures.filter((fixture) => fixture.id !== recoveryFixture?.id);
+  const sourceDisappearanceFixture = catalogFixtures.find((fixture) => fixture.scenario === 'completed_source_disappears');
+  const remainingCatalogFixtures = catalogFixtures.filter((fixture) => (
+    fixture.id !== recoveryFixture?.id && fixture.id !== sourceDisappearanceFixture?.id
+  ));
   await seedDiscoveryRequest(pool, pipelineFixture);
   const dispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(dispatch.candidateCount, 1, `discovery must ingest one controlled candidate: ${JSON.stringify(dispatch)}`);
@@ -203,7 +228,95 @@ async function runVerification() {
   assert.equal(finalPrimaryCandidate.status, 'failed', 'failed primary candidate must remain blocked from repeat selection');
   assert.equal(finalFallbackCandidate.status, 'applied', 'promoted fallback candidate must complete the full pipeline');
 
-  let catalogCandidateCount = 3;
+  assert.ok(sourceDisappearanceFixture, 'the controlled catalog must include a completed-source disappearance fixture');
+  const libraryFilesBeforeSourceDisappearance = await listFiles(musicRoot);
+  await seedDiscoveryRequest(pool, sourceDisappearanceFixture);
+  const sourceDisappearanceDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
+  assert.equal(sourceDisappearanceDispatch.candidateCount, 2, 'completed-source disappearance fixture must ingest a primary and fallback candidate');
+  const sourceDisappearanceDownloadRunId = sourceDisappearanceDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
+  const sourceDisappearancePrimaryCandidateId = sourceDisappearanceDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
+  assert.ok(sourceDisappearanceDownloadRunId, 'completed-source primary must automatically enter download handoff');
+  const sourceDisappearancePrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sourceDisappearancePrimaryCandidateId,
+  });
+  assert.equal(
+    sourceDisappearancePrimaryCandidate.username,
+    `controlled-${sourceDisappearanceFixture.id}`,
+    'the higher-scored completed-source primary candidate must be attempted first',
+  );
+  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: sourceDisappearanceDownloadRunId,
+    triggerSource: 'controlled_provider_completed_source_disappeared',
+  });
+  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, sourceDisappearanceDownloadRunId);
+  const disappearedSourcePath = buildDownloadedFixturePath(sourceDisappearanceFixture);
+  await stat(disappearedSourcePath);
+  await rm(disappearedSourcePath);
+  await assert.rejects(
+    () => stat(disappearedSourcePath),
+    { code: 'ENOENT' },
+    'the completed primary source must disappear before its safe-add preview',
+  );
+  const sourceDisappearanceExecutionSummary = await importCandidateModule.importCandidateExecutionSummaryService
+    .buildImportCandidateExecutionSummary();
+  const sourceDisappearanceReconciliation = await importCandidateModule.importCandidateExecutionReconciliationService
+    .reconcileImportCandidateExecutionSummary({ executionSummary: sourceDisappearanceExecutionSummary });
+  assert.equal(sourceDisappearanceReconciliation.summary.transitioned, 1, 'the completed transfer must become import pending before recovery');
+  assert.equal(sourceDisappearanceReconciliation.summary.autoApplyStarted, 0, 'a missing completed source must not start an apply run');
+  assert.equal(sourceDisappearanceReconciliation.summary.autoApplySkipped, 1, 'a missing completed source must be classified before library add');
+  assert.equal(sourceDisappearanceReconciliation.summary.recovered, 1, 'a missing completed source must promote its safe fallback');
+  const sourceDisappearanceRecovery = sourceDisappearanceReconciliation.recoveries[0];
+  const sourceDisappearanceFallbackDownloadRunId = sourceDisappearanceRecovery?.recoveryRunId;
+  const sourceDisappearanceFallbackCandidateId = sourceDisappearanceRecovery?.nextCandidateId;
+  assert.equal(sourceDisappearanceRecovery?.terminalOutcome, 'source_disappeared', 'the durable recovery outcome must not collapse into a generic failure');
+  assert.ok(sourceDisappearanceFallbackDownloadRunId, 'the missing source recovery must schedule a follow-up download run');
+  assert.notEqual(sourceDisappearanceFallbackCandidateId, sourceDisappearancePrimaryCandidateId, 'the missing source recovery must promote a different candidate');
+  const sourceDisappearancePrimaryFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sourceDisappearancePrimaryCandidateId,
+  });
+  assert.equal(sourceDisappearancePrimaryFinalCandidate.status, 'failed', 'the disappeared completed source must remain blocked from reselection');
+  assert.deepEqual(
+    await listFiles(musicRoot),
+    libraryFilesBeforeSourceDisappearance,
+    'the disappeared source must not write a file to the library before fallback',
+  );
+
+  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: sourceDisappearanceFallbackDownloadRunId,
+    triggerSource: 'controlled_provider_completed_source_disappeared',
+  });
+  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, sourceDisappearanceFallbackDownloadRunId);
+  const sourceDisappearanceFallbackExecutionSummary = await importCandidateModule.importCandidateExecutionSummaryService
+    .buildImportCandidateExecutionSummary();
+  const sourceDisappearanceFallbackReconciliation = await importCandidateModule.importCandidateExecutionReconciliationService
+    .reconcileImportCandidateExecutionSummary({ executionSummary: sourceDisappearanceFallbackExecutionSummary });
+  const sourceDisappearanceFallbackApplyRunId = sourceDisappearanceFallbackReconciliation.autoApplyRuns[0]?.runId;
+  assert.ok(sourceDisappearanceFallbackApplyRunId, 'the recovered completed source fallback must continue into safe automatic add');
+  await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
+    applySafetyMode: 'safe_auto', executableCandidateCount: 1, requestedCandidateCount: 1, runId: sourceDisappearanceFallbackApplyRunId, triggerSource: 'controlled_provider_completed_source_disappeared',
+  });
+  const sourceDisappearanceFallbackApplyRun = await waitForRun(
+    importCandidateModule.importCandidateApplyRunStore,
+    sourceDisappearanceFallbackApplyRunId,
+  );
+  assert.equal(sourceDisappearanceFallbackApplyRun.appliedCount, 1, 'the missing-source fallback must be added to the isolated library');
+  const sourceDisappearanceFallbackCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sourceDisappearanceFallbackCandidateId,
+  });
+  assert.equal(sourceDisappearanceFallbackCandidate.status, 'applied', 'the promoted missing-source fallback must complete the full pipeline');
+  const sourceDisappearanceFallbackPreview = await importCandidateModule.importCandidateApplyPreviewService.previewImportCandidateApply({
+    importCandidateId: sourceDisappearanceFallbackCandidateId,
+  });
+  await stat(sourceDisappearanceFallbackPreview.files[0]?.libraryTarget?.path);
+  assert.equal(
+    (await listFiles(musicRoot)).length,
+    libraryFilesBeforeSourceDisappearance.length + 1,
+    'only the recovered fallback may add one new library file',
+  );
+
+  let catalogCandidateCount = 5;
   let noResponseCount = 0;
   for (const fixture of remainingCatalogFixtures) {
     const search = await slskdService.startSearch({ query: fixture.searchKey });
@@ -236,6 +349,14 @@ async function runVerification() {
       fallbackDownloadRunId,
       primaryCandidateId,
       primaryFinalStatus: finalPrimaryCandidate.status,
+    },
+    sourceDisappearanceRecovery: {
+      fallbackApplyRunId: sourceDisappearanceFallbackApplyRunId,
+      fallbackCandidateId: sourceDisappearanceFallbackCandidateId,
+      fallbackDownloadRunId: sourceDisappearanceFallbackDownloadRunId,
+      primaryCandidateId: sourceDisappearancePrimaryCandidateId,
+      primaryFinalStatus: sourceDisappearancePrimaryFinalCandidate.status,
+      terminalOutcome: sourceDisappearanceRecovery.terminalOutcome,
     },
   };
 }

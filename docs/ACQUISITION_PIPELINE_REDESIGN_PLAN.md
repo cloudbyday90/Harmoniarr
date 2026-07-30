@@ -1530,7 +1530,17 @@ isolated Docker-backed browser scenarios. Normal Music Queue and Activity
 handoffs stay release-centered, and no path requires candidate-first
 navigation.
 
-Recommended next slice: add a Docker-backed controlled-provider evidence case
-for completed-source disappearance, using only disposable local fixture files.
-It should prove actual worker reconciliation and safe next-match promotion
-without relying on public peer content.
+### Completed-Source Disappearance Docker Evidence
+
+Implemented in
+[MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md).
+The controlled-provider harness now proves a provider-reported completed
+transfer whose generated local source disappears before safe-add planning. The
+primary persists as `source_disappeared`, writes no library file, and only a
+new safe fallback download may add one generated file to the isolated music
+root.
+
+Recommended next slice: add controlled-provider Docker evidence for
+strict-quality rejection before library add. It should prove actual media
+quality gating promotes only an eligible next match and that strict-quality
+exhaustion remains a release-centered stop with no unsafe library write.

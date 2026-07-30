@@ -44,7 +44,7 @@ export const controlledProviderFixtureCatalog = Object.freeze([
   createFixture(9, { format: 'flac', popularityTier: 'established', scenario: 'transcoded_lossless_claim' }),
   createFixture(10, { format: 'flac', popularityTier: 'established', scenario: 'locked_extra_file' }),
   createFixture(11, { format: 'flac', popularityTier: 'emerging', scenario: 'recovery_fallback' }),
-  createFixture(12, { format: 'alac', popularityTier: 'emerging', scenario: 'single_response' }),
+  createFixture(12, { format: 'flac', popularityTier: 'emerging', scenario: 'completed_source_disappears' }),
   createFixture(13, { format: 'wav', popularityTier: 'emerging', scenario: 'single_response' }),
   createFixture(14, { format: 'mp3', popularityTier: 'emerging', scenario: 'fallback_quality' }),
   createFixture(15, { format: 'flac', popularityTier: 'emerging', scenario: 'no_response' }),

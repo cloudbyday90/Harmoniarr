@@ -59,14 +59,18 @@ The catalog has 15 explicitly synthetic artist/release records, divided across h
 | --- | ---: | --- | --- |
 | Headliner | 5 | FLAC, ALAC, WAV, MP3 | delayed lossless response, lossless preference, and high-quality fallback shapes |
 | Established | 5 | AAC, Opus, OGG, FLAC | lossy policy, claimed-lossless, and locked-file shapes |
-| Emerging | 5 | FLAC, ALAC, WAV, MP3 | normal response, failed-primary fallback recovery, and no-response diagnostics |
+| Emerging | 5 | FLAC, WAV, MP3 | normal response, failed-primary fallback recovery, completed-source recovery, and no-response diagnostics |
 
-The first FLAC fixture and the recovery fallback fixture are downloaded and added.
-The recovery fixture returns two otherwise eligible matches: the higher-scored
-primary reports a terminal provider failure, while the lower-ranked fallback
-returns synthetic FLAC. The remaining catalog entries exercise real
-search-response normalization and ingestion without copying media. This limits
-run time and keeps the proof focused while still testing every fixture input.
+The first FLAC fixture, transfer-failure fallback fixture, and completed-source
+fallback fixture are downloaded and added. The transfer-failure fixture returns
+two otherwise eligible matches: the higher-scored primary reports a terminal
+provider failure, while the lower-ranked fallback returns synthetic FLAC. The
+completed-source fixture reports a successful higher-scored transfer, then the
+verifier removes only its generated source before safe-add planning; its
+lower-ranked fallback returns synthetic FLAC. The remaining catalog entries
+exercise real search-response normalization and ingestion without copying
+media. This limits run time and keeps the proof focused while still testing
+every fixture input.
 
 ## Quality Handoff Decision
 
@@ -89,7 +93,7 @@ The new validation proves this production path:
 
 It also verifies a no-response case produces bounded ingestion diagnostics instead of a candidate.
 
-## Transfer Failure Recovery Outcome
+## Terminal Recovery Outcomes
 
 Implemented on 2026-07-27. The controlled provider now reports a terminal
 failure for the higher-ranked match of one synthetic release. The validation
@@ -104,6 +108,18 @@ values to `text`, preserving parameterized SQL and deterministic recovery audit
 metadata. Focused repository coverage asserts the typed placeholders and the
 Docker proof executes the real query.
 
-Rejected transfers retain their existing bounded same-match retry policy. This
-slice is intentionally limited to a terminal transfer failure, where reusing
-the same match is not useful and the next eligible match should be tried.
+### Completed-Source Disappearance Recovery
+
+Implemented on 2026-07-30 in
+[MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md).
+The controlled provider completes the higher-scored transfer and writes its
+generated FLAC, then the verifier removes that exact file before real
+reconciliation begins. The evidence proves the normal auto-add preflight
+records `source_disappeared`, writes no primary file to the isolated library,
+blocks the primary candidate from reselection, schedules a different eligible
+match, and safely adds only the fallback file.
+
+Rejected transfers retain their existing bounded same-match retry policy. These
+terminal recovery slices are intentionally limited to conditions where reusing
+the current match is not useful and a fresh, quality-eligible match is safe to
+try.

@@ -113,7 +113,12 @@ Executed on 2026-07-30:
 
 ## Next High-Value Item
 
-Add a Docker-backed controlled-provider evidence case for the completed-source
-disappearance path. It should use disposable local fixture files to prove the
-real reconciliation and safe next-match promotion end to end, while the
-browser matrix remains deterministic and peer-free.
+Implemented in
+[MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_COMPLETED_SOURCE_DISAPPEARANCE_DOCKER_EVIDENCE_DESIGN.md).
+The controlled-provider harness now proves the real completed-source
+disappearance path with disposable generated FLAC files, durable recovery, no
+primary library write, and safe fallback promotion.
+
+The next high-value item is a controlled-provider Docker proof for
+strict-quality rejection before library add. It should complement this browser
+matrix by exercising the actual quality gate and its safe stop on exhaustion.
