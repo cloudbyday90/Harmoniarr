@@ -41,6 +41,16 @@ async function waitForRun(runStore, runId) {
   throw new Error(`Timed out waiting for run ${runId}`);
 }
 
+async function waitForActiveRun(runStore) {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const run = await runStore.getActiveRun();
+    if (run) return run;
+    await delay(50);
+  }
+  throw new Error('Timed out waiting for a recovery run');
+}
+
 async function listFiles(rootPath) {
   const entries = await readdir(rootPath, { withFileTypes: true });
   const files = await Promise.all(entries.map(async (entry) => {
@@ -104,6 +114,48 @@ async function seedDiscoveryRequest(pool, fixture) {
   );
 }
 
+async function executeDownloadAndReconcile({
+  importCandidateModule,
+  runId,
+  triggerSource,
+}) {
+  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId,
+    triggerSource,
+  });
+  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, runId);
+  const executionSummary = await importCandidateModule.importCandidateExecutionSummaryService
+    .buildImportCandidateExecutionSummary();
+  return importCandidateModule.importCandidateExecutionReconciliationService
+    .reconcileImportCandidateExecutionSummary({ executionSummary });
+}
+
+async function completeSafeAutoAdd({
+  importCandidateModule,
+  runId,
+  triggerSource,
+}) {
+  await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
+    applySafetyMode: 'safe_auto',
+    executableCandidateCount: 1,
+    requestedCandidateCount: 1,
+    runId,
+    triggerSource,
+  });
+  return waitForRun(importCandidateModule.importCandidateApplyRunStore, runId);
+}
+
+async function getSelectedCandidateForSearch(importCandidateModule, sourceSearchId) {
+  const selected = await importCandidateModule.importCandidateService.listImportCandidates({
+    limit: 10,
+    sourceSearchId,
+    status: 'selected',
+  });
+  assert.equal(selected.pagination.total, 1, 'recovery must select exactly one next match within its search scope');
+  return selected.candidates[0];
+}
+
 async function runVerification() {
   assert.ok(providerApiKey, 'controlled provider API key is required');
   const pool = getPool();
@@ -143,8 +195,13 @@ async function runVerification() {
   const [pipelineFixture, ...catalogFixtures] = controlledProviderFixtureCatalog;
   const recoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'recovery_fallback');
   const sourceDisappearanceFixture = catalogFixtures.find((fixture) => fixture.scenario === 'completed_source_disappears');
+  const qualityRecoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'quality_recovery');
+  const qualityExhaustionFixture = catalogFixtures.find((fixture) => fixture.scenario === 'quality_exhausted');
   const remainingCatalogFixtures = catalogFixtures.filter((fixture) => (
-    fixture.id !== recoveryFixture?.id && fixture.id !== sourceDisappearanceFixture?.id
+    fixture.id !== recoveryFixture?.id
+      && fixture.id !== sourceDisappearanceFixture?.id
+      && fixture.id !== qualityRecoveryFixture?.id
+      && fixture.id !== qualityExhaustionFixture?.id
   ));
   await seedDiscoveryRequest(pool, pipelineFixture);
   const dispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
@@ -152,25 +209,23 @@ async function runVerification() {
   const downloadRunId = dispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
   assert.ok(downloadRunId, `lossless candidate must automatically enter download handoff: ${JSON.stringify(dispatch)}`);
 
-  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
-    requestedCandidateCount: 1,
+  const reconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
     runId: downloadRunId,
     triggerSource: 'controlled_provider_e2e',
   });
-  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, downloadRunId);
-  const executionSummary = await importCandidateModule.importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary();
-  const reconciliation = await importCandidateModule.importCandidateExecutionReconciliationService.reconcileImportCandidateExecutionSummary({ executionSummary });
   assert.equal(
     reconciliation.summary.transitioned,
     1,
-    `completed controlled transfer must enter import processing: ${JSON.stringify({ executionSummary, reconciliation })}`,
+    `completed controlled transfer must enter import processing: ${JSON.stringify(reconciliation)}`,
   );
   const applyRunId = reconciliation.autoApplyRuns[0]?.runId;
   assert.ok(applyRunId, 'completed controlled transfer must start safe automatic add');
-  await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
-    applySafetyMode: 'safe_auto', executableCandidateCount: 1, requestedCandidateCount: 1, runId: applyRunId, triggerSource: 'controlled_provider_e2e',
+  const applyRun = await completeSafeAutoAdd({
+    importCandidateModule,
+    runId: applyRunId,
+    triggerSource: 'controlled_provider_e2e',
   });
-  const applyRun = await waitForRun(importCandidateModule.importCandidateApplyRunStore, applyRunId);
   assert.equal(applyRun.appliedCount, 1, 'verified generated FLAC must be added to the isolated music root');
   const pipelineCandidateId = dispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
   const appliedPreview = await importCandidateModule.importCandidateApplyPreviewService.previewImportCandidateApply({
@@ -189,35 +244,28 @@ async function runVerification() {
     importCandidateId: primaryCandidateId,
   });
   assert.equal(primaryCandidate.username, `controlled-${recoveryFixture.id}`, 'the higher-scored primary candidate must be attempted first');
-  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
-    requestedCandidateCount: 1,
+  const failedReconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
     runId: failedDownloadRunId,
     triggerSource: 'controlled_provider_failure_recovery',
   });
-  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, failedDownloadRunId);
-  const failedExecutionSummary = await importCandidateModule.importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary();
-  const failedReconciliation = await importCandidateModule.importCandidateExecutionReconciliationService
-    .reconcileImportCandidateExecutionSummary({ executionSummary: failedExecutionSummary });
   assert.equal(failedReconciliation.summary.recovered, 1, 'terminal provider failure must promote the next candidate');
   const fallbackDownloadRunId = failedReconciliation.recoveries[0]?.recoveryRunId;
   const fallbackCandidateId = failedReconciliation.recoveries[0]?.nextCandidateId;
   assert.ok(fallbackDownloadRunId, 'recovery must schedule a follow-up download run');
   assert.notEqual(fallbackCandidateId, primaryCandidateId, 'recovery must promote a different candidate');
-  await importCandidateModule.importCandidateExecutionWorker.startWorkerRun({
-    requestedCandidateCount: 1,
+  const fallbackReconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
     runId: fallbackDownloadRunId,
     triggerSource: 'controlled_provider_failure_recovery',
   });
-  await waitForRun(importCandidateModule.importCandidateExecutionRunStore, fallbackDownloadRunId);
-  const fallbackExecutionSummary = await importCandidateModule.importCandidateExecutionSummaryService.buildImportCandidateExecutionSummary();
-  const fallbackReconciliation = await importCandidateModule.importCandidateExecutionReconciliationService
-    .reconcileImportCandidateExecutionSummary({ executionSummary: fallbackExecutionSummary });
   const fallbackApplyRunId = fallbackReconciliation.autoApplyRuns[0]?.runId;
   assert.ok(fallbackApplyRunId, 'recovered transfer must continue into safe automatic add');
-  await importCandidateModule.importCandidateApplyWorker.startWorkerRun({
-    applySafetyMode: 'safe_auto', executableCandidateCount: 1, requestedCandidateCount: 1, runId: fallbackApplyRunId, triggerSource: 'controlled_provider_failure_recovery',
+  const fallbackApplyRun = await completeSafeAutoAdd({
+    importCandidateModule,
+    runId: fallbackApplyRunId,
+    triggerSource: 'controlled_provider_failure_recovery',
   });
-  const fallbackApplyRun = await waitForRun(importCandidateModule.importCandidateApplyRunStore, fallbackApplyRunId);
   assert.equal(fallbackApplyRun.appliedCount, 1, 'recovery fallback must be added to the isolated library');
   const finalPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
     importCandidateId: primaryCandidateId,
@@ -316,7 +364,151 @@ async function runVerification() {
     'only the recovered fallback may add one new library file',
   );
 
-  let catalogCandidateCount = 5;
+  assert.ok(qualityRecoveryFixture, 'the controlled catalog must include a strict-quality recovery fixture');
+  const libraryFilesBeforeQualityRecovery = await listFiles(musicRoot);
+  await seedDiscoveryRequest(pool, qualityRecoveryFixture);
+  const qualityRecoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
+  assert.equal(qualityRecoveryDispatch.candidateCount, 2, 'strict-quality recovery must ingest a primary and fallback match');
+  const qualityRecoveryDownloadRunId = qualityRecoveryDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
+  const qualityRecoveryPrimaryCandidateId = qualityRecoveryDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
+  assert.ok(qualityRecoveryDownloadRunId, 'the strict-quality primary must automatically enter download handoff');
+  const qualityRecoveryPrimaryCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: qualityRecoveryPrimaryCandidateId,
+  });
+  assert.equal(
+    qualityRecoveryPrimaryCandidate.username,
+    `controlled-${qualityRecoveryFixture.id}`,
+    'the higher-scored spectrally limited FLAC primary must be attempted before the fallback',
+  );
+  const qualityRecoveryReconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
+    runId: qualityRecoveryDownloadRunId,
+    triggerSource: 'controlled_provider_quality_recovery',
+  });
+  const qualityRecoveryApplyRunId = qualityRecoveryReconciliation.autoApplyRuns[0]?.runId;
+  assert.ok(qualityRecoveryApplyRunId, 'the spectrally limited FLAC primary must reach the actual safe-add quality gate');
+  const qualityRecoveryApplyRun = await completeSafeAutoAdd({
+    importCandidateModule,
+    runId: qualityRecoveryApplyRunId,
+    triggerSource: 'controlled_provider_quality_recovery',
+  });
+  assert.equal(qualityRecoveryApplyRun.appliedCount, 0, 'a spectrally limited FLAC primary must not be added to the library');
+  assert.equal(qualityRecoveryApplyRun.qualityBlockedCount, 1, 'the quality gate must record the blocked primary');
+  assert.equal(qualityRecoveryApplyRun.qualityRecoveryStartedCount, 1, 'the quality gate must start exactly one eligible fallback');
+  assert.equal(qualityRecoveryApplyRun.qualityRecoveryExhaustedCount, 0, 'an eligible fallback must avoid a terminal quality stop');
+  const qualityRecoveryPrimaryPreview = await importCandidateModule.importCandidateApplyPreviewService.previewImportCandidateApply({
+    importCandidateId: qualityRecoveryPrimaryCandidateId,
+  });
+  assert.equal(
+    qualityRecoveryPrimaryPreview.files[0]?.inspection?.metadata?.primaryAudioCodec,
+    'flac',
+    'the fixture must remain a genuine FLAC so strict quality proof, not extension mismatch, rejects it',
+  );
+  assert.match(
+    qualityRecoveryPrimaryPreview.files[0]?.filename ?? '',
+    /\.flac$/u,
+    'the quality fixture must be treated as a normal FLAC before spectral proof rejects it',
+  );
+  const qualityRecoveryPrimaryFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: qualityRecoveryPrimaryCandidateId,
+  });
+  assert.equal(qualityRecoveryPrimaryFinalCandidate.status, 'failed', 'the quality-failed primary must remain blocked from reselection');
+  assert.deepEqual(
+    await listFiles(musicRoot),
+    libraryFilesBeforeQualityRecovery,
+    'a quality-blocked primary must make no library write before fallback',
+  );
+  const qualityRecoveryFallbackDownloadRun = await waitForActiveRun(
+    importCandidateModule.importCandidateExecutionRunStore,
+  );
+  const qualityRecoveryFallbackCandidate = await getSelectedCandidateForSearch(
+    importCandidateModule,
+    qualityRecoveryPrimaryCandidate.sourceSearchId,
+  );
+  assert.notEqual(
+    qualityRecoveryFallbackCandidate.id,
+    qualityRecoveryPrimaryCandidateId,
+    'strict-quality recovery must select a different match',
+  );
+  assert.equal(
+    qualityRecoveryFallbackCandidate.username,
+    `controlled-${qualityRecoveryFixture.id}-fallback`,
+    'strict-quality recovery must select the lower-ranked genuine FLAC fallback',
+  );
+  const qualityRecoveryFallbackReconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
+    runId: qualityRecoveryFallbackDownloadRun.id,
+    triggerSource: 'controlled_provider_quality_recovery',
+  });
+  const qualityRecoveryFallbackApplyRunId = qualityRecoveryFallbackReconciliation.autoApplyRuns[0]?.runId;
+  assert.ok(qualityRecoveryFallbackApplyRunId, 'the quality-eligible fallback must continue into safe automatic add');
+  const qualityRecoveryFallbackApplyRun = await completeSafeAutoAdd({
+    importCandidateModule,
+    runId: qualityRecoveryFallbackApplyRunId,
+    triggerSource: 'controlled_provider_quality_recovery',
+  });
+  assert.equal(qualityRecoveryFallbackApplyRun.appliedCount, 1, 'the genuine FLAC fallback must be added to the isolated library');
+  const qualityRecoveryFallbackFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: qualityRecoveryFallbackCandidate.id,
+  });
+  assert.equal(qualityRecoveryFallbackFinalCandidate.status, 'applied', 'the selected quality fallback must complete the full pipeline');
+  assert.equal(
+    (await listFiles(musicRoot)).length,
+    libraryFilesBeforeQualityRecovery.length + 1,
+    'only the verified fallback may add a file after a quality stop',
+  );
+
+  assert.ok(qualityExhaustionFixture, 'the controlled catalog must include a strict-quality exhaustion fixture');
+  const libraryFilesBeforeQualityExhaustion = await listFiles(musicRoot);
+  await seedDiscoveryRequest(pool, qualityExhaustionFixture);
+  const qualityExhaustionDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
+  assert.equal(qualityExhaustionDispatch.candidateCount, 1, 'strict-quality exhaustion must ingest only the spectrally limited primary');
+  const qualityExhaustionDownloadRunId = qualityExhaustionDispatch.dispatchedSearches[0]?.autoDownloadStart?.runId;
+  const qualityExhaustionPrimaryCandidateId = qualityExhaustionDispatch.dispatchedSearches[0]?.autoSelection?.selectedCandidateId;
+  assert.ok(qualityExhaustionDownloadRunId, 'the strict-quality exhaustion primary must automatically enter download handoff');
+  const qualityExhaustionReconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
+    runId: qualityExhaustionDownloadRunId,
+    triggerSource: 'controlled_provider_quality_exhaustion',
+  });
+  const qualityExhaustionApplyRunId = qualityExhaustionReconciliation.autoApplyRuns[0]?.runId;
+  assert.ok(qualityExhaustionApplyRunId, 'the strict-quality exhaustion primary must reach the actual safe-add quality gate');
+  const qualityExhaustionApplyRun = await completeSafeAutoAdd({
+    importCandidateModule,
+    runId: qualityExhaustionApplyRunId,
+    triggerSource: 'controlled_provider_quality_exhaustion',
+  });
+  assert.equal(qualityExhaustionApplyRun.appliedCount, 0, 'strict-quality exhaustion must not add the spectrally limited FLAC');
+  assert.equal(qualityExhaustionApplyRun.qualityBlockedCount, 1, 'strict-quality exhaustion must record the quality block');
+  assert.equal(qualityExhaustionApplyRun.qualityRecoveryStartedCount, 0, 'strict-quality exhaustion must not invent a fallback run');
+  assert.equal(qualityExhaustionApplyRun.qualityRecoveryExhaustedCount, 1, 'strict-quality exhaustion must persist one durable quality stop');
+  const qualityExhaustionPrimaryPreview = await importCandidateModule.importCandidateApplyPreviewService.previewImportCandidateApply({
+    importCandidateId: qualityExhaustionPrimaryCandidateId,
+  });
+  assert.equal(
+    qualityExhaustionPrimaryPreview.files[0]?.inspection?.metadata?.primaryAudioCodec,
+    'flac',
+    'the exhausted fixture must remain a genuine FLAC so the strict spectral gate owns the rejection',
+  );
+  assert.match(
+    qualityExhaustionPrimaryPreview.files[0]?.filename ?? '',
+    /\.flac$/u,
+    'the exhausted fixture must enter as a normal FLAC before strict spectral proof rejects it',
+  );
+  const qualityExhaustionPrimaryFinalCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: qualityExhaustionPrimaryCandidateId,
+  });
+  assert.equal(qualityExhaustionPrimaryFinalCandidate.status, 'failed', 'a strict-quality exhausted primary must remain failed');
+  const qualityExhaustionFollowUpRun = await importCandidateModule.importCandidateExecutionRunStore.getActiveRun();
+  assert.equal(qualityExhaustionFollowUpRun, null, 'strict-quality exhaustion must not enqueue an unsafe fallback download');
+  const libraryFilesAfterQualityExhaustion = await listFiles(musicRoot);
+  assert.deepEqual(
+    libraryFilesAfterQualityExhaustion,
+    libraryFilesBeforeQualityExhaustion,
+    'strict-quality exhaustion must make no library write',
+  );
+
+  let catalogCandidateCount = 8;
   let noResponseCount = 0;
   for (const fixture of remainingCatalogFixtures) {
     const search = await slskdService.startSearch({ query: fixture.searchKey });
@@ -357,6 +549,24 @@ async function runVerification() {
       primaryCandidateId: sourceDisappearancePrimaryCandidateId,
       primaryFinalStatus: sourceDisappearancePrimaryFinalCandidate.status,
       terminalOutcome: sourceDisappearanceRecovery.terminalOutcome,
+    },
+    qualityRecovery: {
+      fallbackApplyRunId: qualityRecoveryFallbackApplyRunId,
+      fallbackFinalStatus: qualityRecoveryFallbackFinalCandidate.status,
+      primaryAudioCodec: qualityRecoveryPrimaryPreview.files[0]?.inspection?.metadata?.primaryAudioCodec ?? null,
+      primaryCandidateId: qualityRecoveryPrimaryCandidateId,
+      primaryFilename: qualityRecoveryPrimaryPreview.files[0]?.filename ?? null,
+      primaryFinalStatus: qualityRecoveryPrimaryFinalCandidate.status,
+    },
+    qualityExhaustion: {
+      followUpRunId: qualityExhaustionFollowUpRun?.id ?? null,
+      libraryFileCountAfter: libraryFilesAfterQualityExhaustion.length,
+      libraryFileCountBefore: libraryFilesBeforeQualityExhaustion.length,
+      primaryAudioCodec: qualityExhaustionPrimaryPreview.files[0]?.inspection?.metadata?.primaryAudioCodec ?? null,
+      primaryCandidateId: qualityExhaustionPrimaryCandidateId,
+      primaryFilename: qualityExhaustionPrimaryPreview.files[0]?.filename ?? null,
+      primaryFinalStatus: qualityExhaustionPrimaryFinalCandidate.status,
+      qualityRecoveryExhaustedCount: qualityExhaustionApplyRun.qualityRecoveryExhaustedCount,
     },
   };
 }

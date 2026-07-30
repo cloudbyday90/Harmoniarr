@@ -55,7 +55,7 @@ function buildProviderFile(fixture, { variant = 'primary' } = {}) {
 }
 
 function hasFallbackResponse(fixture) {
-  return ['completed_source_disappears', 'recovery_fallback'].includes(fixture?.scenario);
+  return ['completed_source_disappears', 'quality_recovery', 'recovery_fallback'].includes(fixture?.scenario);
 }
 
 function buildResponse(fixture) {

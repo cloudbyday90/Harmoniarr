@@ -2,6 +2,9 @@ services:
   harmoniarr:
     environment:
       CONTROLLED_PROVIDER_API_KEY: ${CONTROLLED_PROVIDER_API_KEY:?Set CONTROLLED_PROVIDER_API_KEY for the controlled provider test}
+    volumes:
+      - "./testing/docker/controlled-provider-fixture-catalog.mjs:/validation/controlled-provider-fixture-catalog.mjs:ro"
+      - "./testing/docker/controlled-provider-pipeline-verifier.mjs:/validation/controlled-provider-pipeline-verifier.mjs:ro"
 
   controlled-provider:
     image: node:25.4.0-alpine

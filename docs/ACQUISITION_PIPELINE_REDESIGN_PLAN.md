@@ -1544,3 +1544,19 @@ Recommended next slice: add controlled-provider Docker evidence for
 strict-quality rejection before library add. It should prove actual media
 quality gating promotes only an eligible next match and that strict-quality
 exhaustion remains a release-centered stop with no unsafe library write.
+
+### Strict-Quality Docker Evidence
+
+Implemented in
+[MUSIC_QUEUE_STRICT_QUALITY_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_STRICT_QUALITY_DOCKER_EVIDENCE_DESIGN.md).
+The controlled provider now uses two valid, spectrally limited FLAC fixtures
+to execute the real safe-add spectral gate. One branch proves only a
+full-spectrum eligible fallback progresses into the isolated library. The
+other records strict-quality exhaustion, starts no unsafe follow-up download,
+and leaves the library unchanged. The run-store read model now retains the
+quality recovery counters written by the worker.
+
+Recommended next slice: add a wanted release to the controlled strict-quality
+exhaustion fixture and assert its actual Music Queue release projection and
+release-scoped Activity handoff, not only the existing browser fixture's
+presentation contract.

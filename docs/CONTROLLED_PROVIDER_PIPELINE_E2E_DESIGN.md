@@ -59,10 +59,11 @@ The catalog has 15 explicitly synthetic artist/release records, divided across h
 | --- | ---: | --- | --- |
 | Headliner | 5 | FLAC, ALAC, WAV, MP3 | delayed lossless response, lossless preference, and high-quality fallback shapes |
 | Established | 5 | AAC, Opus, OGG, FLAC | lossy policy, claimed-lossless, and locked-file shapes |
-| Emerging | 5 | FLAC, WAV, MP3 | normal response, failed-primary fallback recovery, completed-source recovery, and no-response diagnostics |
+| Emerging | 5 | FLAC | failed-primary fallback recovery, completed-source recovery, strict-quality recovery, strict-quality exhaustion, and no-response diagnostics |
 
-The first FLAC fixture, transfer-failure fallback fixture, and completed-source
-fallback fixture are downloaded and added. The transfer-failure fixture returns
+The first FLAC fixture, transfer-failure fallback fixture, completed-source
+fallback fixture, and strict-quality fallback fixture are downloaded and added.
+The transfer-failure fixture returns
 two otherwise eligible matches: the higher-scored primary reports a terminal
 provider failure, while the lower-ranked fallback returns synthetic FLAC. The
 completed-source fixture reports a successful higher-scored transfer, then the
@@ -123,3 +124,15 @@ Rejected transfers retain their existing bounded same-match retry policy. These
 terminal recovery slices are intentionally limited to conditions where reusing
 the current match is not useful and a fresh, quality-eligible match is safe to
 try.
+
+### Strict-Quality Recovery And Exhaustion
+
+Implemented on 2026-07-30 in
+[MUSIC_QUEUE_STRICT_QUALITY_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_STRICT_QUALITY_DOCKER_EVIDENCE_DESIGN.md).
+Fixtures 13 and 14 are valid FLAC files with a deliberately limited 12 kHz
+frequency ceiling. They pass container inspection and reach the actual
+safe-add spectral proof, which rejects them before a library move. Fixture 13
+then proves a separately generated full-spectrum FLAC fallback is selected,
+downloaded, and added. Fixture 14 proves the exhausted branch creates no
+follow-up download run and makes no library write. The verifier also confirms
+the quality counters survive the apply-run store read boundary.

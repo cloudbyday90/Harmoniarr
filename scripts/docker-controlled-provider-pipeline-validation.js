@@ -8,7 +8,7 @@
  * (at your option) any later version.
  */
 
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { once } from 'node:events';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
@@ -22,8 +22,6 @@ import { runBufferedCommand } from './process-runtime.js';
 const rootDir = fileURLToPath(new URL('..', import.meta.url));
 const composeFilePath = resolve(rootDir, 'compose.yaml');
 const overlayFilePath = resolve(rootDir, 'compose.controlled-provider-fixture.yaml');
-const verifierPath = resolve(rootDir, 'testing/docker/controlled-provider-pipeline-verifier.mjs');
-const catalogPath = resolve(rootDir, 'testing/docker/controlled-provider-fixture-catalog.mjs');
 const defaultStartupTimeoutSeconds = 180;
 
 function createProjectName() {
@@ -109,21 +107,20 @@ async function generateFixtureAudio({ composeArgs, env }) {
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*700*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-11-fallback.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*500*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-12.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*300*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-12-fallback.flac >/dev/null 2>&1",
+    "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*12000*t)+0.2*sin(2*PI*900*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-13.flac >/dev/null 2>&1",
+    "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*1100*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-13-fallback.flac >/dev/null 2>&1",
+    "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*12000*t)+0.2*sin(2*PI*1200*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-14.flac >/dev/null 2>&1",
   ].join('; ');
   await runCompose({ args: ['exec', '-T', 'harmoniarr', 'sh', '-ec', command], composeArgs, env, timeoutMs: 30_000 });
 }
 
 async function copyAndRunVerifier({ composeArgs, env }) {
-  const [catalog, verifier] = await Promise.all([readFile(catalogPath), readFile(verifierPath)]);
-  const files = [
-    ['/tmp/controlled-provider-fixture-catalog.mjs', catalog],
-    ['/tmp/controlled-provider-pipeline-verifier.mjs', verifier],
-  ];
-  for (const [targetPath, contents] of files) {
-    const program = `import { writeFile } from 'node:fs/promises'; await writeFile('${targetPath}', Buffer.from('${contents.toString('base64')}', 'base64'), { mode: 0o600 });`;
-    await runCompose({ args: ['exec', '-T', 'harmoniarr', 'node', '--input-type=module', '--eval', program], composeArgs, env, timeoutMs: 20_000 });
-  }
-  const result = await runCompose({ args: ['exec', '-T', 'harmoniarr', 'node', '/tmp/controlled-provider-pipeline-verifier.mjs'], composeArgs, env, timeoutMs: 90_000 });
+  const result = await runCompose({
+    args: ['exec', '-T', 'harmoniarr', 'node', '/validation/controlled-provider-pipeline-verifier.mjs'],
+    composeArgs,
+    env,
+    timeoutMs: 90_000,
+  });
   const payload = result.stdout.trim().split(/\r?\n/u).filter(Boolean).at(-1);
   if (!payload) throw new Error('Controlled-provider verifier did not produce a result');
   const parsed = JSON.parse(payload);
@@ -134,11 +131,25 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     && typeof parsed?.sourceDisappearanceRecovery?.fallbackApplyRunId === 'string'
     && parsed.sourceDisappearanceRecovery.fallbackApplyRunId.length > 0
     && parsed.sourceDisappearanceRecovery.terminalOutcome === 'source_disappeared';
+  const qualityRecoveryVerified = parsed?.qualityRecovery?.primaryFinalStatus === 'failed'
+    && parsed?.qualityRecovery?.primaryAudioCodec === 'flac'
+    && parsed?.qualityRecovery?.primaryFilename?.endsWith('.flac')
+    && typeof parsed?.qualityRecovery?.fallbackApplyRunId === 'string'
+    && parsed.qualityRecovery.fallbackApplyRunId.length > 0
+    && parsed.qualityRecovery.fallbackFinalStatus === 'applied';
+  const qualityExhaustionVerified = parsed?.qualityExhaustion?.primaryFinalStatus === 'failed'
+    && parsed?.qualityExhaustion?.primaryAudioCodec === 'flac'
+    && parsed?.qualityExhaustion?.primaryFilename?.endsWith('.flac')
+    && parsed.qualityExhaustion.qualityRecoveryExhaustedCount === 1
+    && parsed.qualityExhaustion.followUpRunId === null
+    && parsed.qualityExhaustion.libraryFileCountBefore === parsed.qualityExhaustion.libraryFileCountAfter;
   if (parsed?.pipeline?.finalStatus !== 'applied'
     || parsed.catalogFixtures !== 15
-    || parsed.catalogCandidates !== 16
+    || parsed.catalogCandidates !== 17
     || !recoveryVerified
-    || !sourceDisappearanceRecoveryVerified) {
+    || !sourceDisappearanceRecoveryVerified
+    || !qualityRecoveryVerified
+    || !qualityExhaustionVerified) {
     throw new Error('Controlled-provider verifier returned incomplete evidence');
   }
   return parsed;

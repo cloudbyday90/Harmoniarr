@@ -146,8 +146,9 @@ and workspace even when an assertion fails.
 
 ## Next High-Value Item
 
-Extend the controlled-provider Docker matrix with a real strict-quality
-rejection before library add. It should use a generated, inspectable fixture
-that fails the quality gate, prove only an eligible fallback is considered,
-and prove strict-quality exhaustion stops at a release-centered quality choice
-without any unsafe library write.
+Completed in
+[MUSIC_QUEUE_STRICT_QUALITY_DOCKER_EVIDENCE_DESIGN.md](MUSIC_QUEUE_STRICT_QUALITY_DOCKER_EVIDENCE_DESIGN.md).
+
+Next, add a persisted wanted release to the strict-quality exhaustion fixture
+and assert its actual Music Queue release projection and release-scoped
+Activity handoff through the controlled-provider runtime.
