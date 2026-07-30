@@ -16,6 +16,7 @@ import { randomUUID } from 'node:crypto';
 import {
   buildControlledProviderFixtureFilename,
   buildControlledProviderRemoteFilename,
+  controlledProviderFixtureCatalog,
   findControlledProviderFixtureBySearchText,
 } from './controlled-provider-fixture-catalog.mjs';
 
@@ -112,6 +113,29 @@ function listTransfers(username) {
   }];
 }
 
+function buildFixtureEvidence(fixtureId) {
+  const fixture = controlledProviderFixtureCatalog.find((entry) => entry.id === fixtureId);
+  if (!fixture) {
+    return null;
+  }
+
+  const transferCount = Array.from(transfersByUsername.values())
+    .flat()
+    .filter((transfer) => [
+      buildControlledProviderRemoteFilename(fixture),
+      buildControlledProviderRemoteFilename(fixture, { variant: 'fallback' }),
+    ].includes(transfer.filename))
+    .length;
+
+  return {
+    fixtureId,
+    searchCount: Array.from(searches.values())
+      .filter((search) => search.fixture?.id === fixtureId)
+      .length,
+    transferCount,
+  };
+}
+
 async function enqueueTransfers(username, files) {
   const accepted = [];
   for (const file of files) {
@@ -160,6 +184,11 @@ const server = createServer(async (request, response) => {
 
     const url = new URL(request.url, 'http://fixture.local');
     const pathname = url.pathname;
+    if (request.method === 'GET' && pathname === '/_fixture/evidence') {
+      const evidence = buildFixtureEvidence(url.searchParams.get('fixtureId'));
+      if (!evidence) return writeJson(response, 404, { error: 'fixture_not_found' });
+      return writeJson(response, 200, evidence);
+    }
     if (request.method === 'GET' && pathname === '/api/v0/application') {
       return writeJson(response, 200, { server: { isConnected: true, isLoggedIn: true }, version: { current: 'controlled-fixture' } });
     }

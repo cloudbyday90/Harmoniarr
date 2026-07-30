@@ -132,6 +132,38 @@ test('import execution worker enqueues ready candidates and persists per-item ou
   }]);
 });
 
+test('import execution worker leaves a run untouched when another worker holds its lease', async (t) => {
+  const leaseUnavailable = Object.assign(
+    new Error('Operation run lease is currently held by another worker'),
+    { code: 'operation_run_lease_unavailable' },
+  );
+  const acquireLease = t.mock.fn(async () => {
+    throw leaseUnavailable;
+  });
+  const markRunFailed = t.mock.fn(async () => {});
+  const markRunStarted = t.mock.fn(async () => {});
+  const releaseLease = t.mock.fn(async () => {});
+  const worker = createImportCandidateExecutionWorker({
+    acquireLease,
+    markRunFailed,
+    markRunStarted,
+    releaseLease,
+  });
+
+  await worker.startWorkerRun({
+    requestedCandidateCount: 1,
+    runId: 'run-held-by-another-worker',
+  });
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
+  assert.equal(acquireLease.mock.callCount(), 1);
+  assert.equal(markRunStarted.mock.callCount(), 0);
+  assert.equal(markRunFailed.mock.callCount(), 0);
+  assert.equal(releaseLease.mock.callCount(), 0);
+});
+
 test('import execution worker requeues the run when a maintenance pause is requested', async (t) => {
   const acquireLease = t.mock.fn(async () => {});
   const enqueueDownloads = t.mock.fn(async () => ({

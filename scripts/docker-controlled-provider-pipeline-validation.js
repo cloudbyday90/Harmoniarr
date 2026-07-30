@@ -57,6 +57,20 @@ async function runCompose({ args, composeArgs, env, timeoutMs }) {
   return runBufferedCommand({ args: [...composeArgs, ...args], command: 'docker', cwd: rootDir, env, timeoutMs });
 }
 
+async function collectComposeLogs({ composeArgs, env }) {
+  try {
+    const result = await runCompose({
+      args: ['logs', '--no-color', '--tail', '200'],
+      composeArgs,
+      env,
+      timeoutMs: 30_000,
+    });
+    return result.stdout.trim();
+  } catch {
+    return '';
+  }
+}
+
 function buildEnvironment({ appPort, directories, imageRef, processEnv, providerApiKey, vapidKeys }) {
   const environment = { ...processEnv };
   delete environment.HARMONIARR_IMAGE;
@@ -104,6 +118,7 @@ async function generateFixtureAudio({ composeArgs, env }) {
     'set -eu',
     'mkdir -p /data/downloads/controlled-provider-fixtures',
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*1000*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-01.flac >/dev/null 2>&1",
+    "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*800*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-02.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*700*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-11-fallback.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*500*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-12.flac >/dev/null 2>&1",
     "ffmpeg -y -f lavfi -i 'aevalsrc=0.2*sin(2*PI*21000*t)+0.2*sin(2*PI*300*t):s=44100:d=3' -c:a flac /data/downloads/controlled-provider-fixtures/track-12-fallback.flac >/dev/null 2>&1",
@@ -148,13 +163,21 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     && parsed.qualityExhaustion.activityEntityId === parsed.qualityExhaustion.wantedReleaseId
     && parsed.qualityExhaustion.activityRoute?.name === 'music-queue-release'
     && parsed.qualityExhaustion.activityRoute?.params?.wantedReleaseId === parsed.qualityExhaustion.wantedReleaseId;
+  const sharedDiscoveryVerified = parsed?.sharedDiscovery?.providerSearchCount === 1
+    && parsed?.sharedDiscovery?.providerTransferCount === 1
+    && parsed.sharedDiscovery.operatorCount === 2
+    && parsed.sharedDiscovery.musicQueueOutcomeCount === 2
+    && parsed.sharedDiscovery.crossOperatorReadDenied === true
+    && parsed.sharedDiscovery.candidatePolicyRedacted === true
+    && parsed.sharedDiscovery.activityPolicyRedacted === true;
   if (parsed?.pipeline?.finalStatus !== 'applied'
     || parsed.catalogFixtures !== 15
     || parsed.catalogCandidates !== 17
     || !recoveryVerified
     || !sourceDisappearanceRecoveryVerified
     || !qualityRecoveryVerified
-    || !qualityExhaustionVerified) {
+    || !qualityExhaustionVerified
+    || !sharedDiscoveryVerified) {
     throw new Error('Controlled-provider verifier returned incomplete evidence');
   }
   return parsed;
@@ -184,8 +207,16 @@ export async function runDockerControlledProviderPipelineValidation({
     await runCompose({ args: ['up', buildImage ? '--no-build' : '--no-build', '--detach', '--wait', '--wait-timeout', String(startupTimeoutSeconds)], composeArgs, env, timeoutMs: (startupTimeoutSeconds + 30) * 1000 });
     await waitForHealth({ port: appPort, timeoutMs: startupTimeoutSeconds * 1000 });
     await generateFixtureAudio({ composeArgs, env });
-    const result = await copyAndRunVerifier({ composeArgs, env });
-    return { ...result, projectName };
+    try {
+      const result = await copyAndRunVerifier({ composeArgs, env });
+      return { ...result, projectName };
+    } catch (error) {
+      const logs = await collectComposeLogs({ composeArgs, env });
+      if (logs) {
+        error.message = `${error.message}\n\nCompose logs:\n${logs}`;
+      }
+      throw error;
+    }
   } finally {
     try {
       await runCompose({ args: ['down', '--volumes', '--remove-orphans'], composeArgs, env, timeoutMs: 60_000 });

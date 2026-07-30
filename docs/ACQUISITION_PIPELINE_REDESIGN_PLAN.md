@@ -1590,3 +1590,17 @@ Recommended next slice: add a controlled-provider Docker acceptance scenario
 for two operators sharing one release. It should prove one search/transfer,
 two scoped Music Queue outcomes, independent 404 read boundaries, and no
 operator policy data in candidate or Activity payloads.
+
+### Shared Discovery Docker Acceptance
+
+Implemented in
+[MUSIC_QUEUE_SHARED_DISCOVERY_DOCKER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_DISCOVERY_DOCKER_ACCEPTANCE_DESIGN.md).
+The isolated packaged-runtime controlled-provider scenario now seeds two
+operators who want the same metadata release. It proves one provider search
+and accepted transfer, two independently scoped `Ready to add` Music Queue
+outcomes, reciprocal cross-operator 404 reads, and candidate/Activity payloads
+without account IDs, sibling correlations, or private policy markers.
+
+Recommended next slice: add a two-session browser acceptance journey for this
+same shared Music Queue release. It should prove that normal UI and route
+layers retain the Docker-proven scope and redaction boundaries.

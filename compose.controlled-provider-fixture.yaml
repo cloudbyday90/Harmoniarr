@@ -20,6 +20,12 @@ services:
       - "./testing/docker/controlled-provider-fixture-catalog.mjs:/fixture/controlled-provider-fixture-catalog.mjs:ro"
       - "./testing/docker/controlled-provider-fixture-server.mjs:/fixture/controlled-provider-fixture-server.mjs:ro"
     command: ["node", "/fixture/controlled-provider-fixture-server.mjs"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5030/_fixture/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 2s
     security_opt:
       - no-new-privileges:true
     cap_drop:

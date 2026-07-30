@@ -30,13 +30,17 @@ const downloadsRoot = '/data/downloads';
 const musicRoot = '/data/music';
 const stagingRoot = '/data/staging';
 const providerApiKey = process.env.CONTROLLED_PROVIDER_API_KEY;
+const controlledProviderFixtureBaseUrl = 'http://controlled-provider:5030';
+const activityEvidenceTimeoutMs = 20_000;
 
 async function waitForRun(runStore, runId) {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     const run = await runStore.getRunById(runId);
     if (run?.status === 'completed') return run;
-    if (['cancelled', 'failed', 'paused'].includes(run?.status)) throw new Error(`Run ${runId} ended as ${run.status}`);
+    if (['cancelled', 'failed', 'paused'].includes(run?.status)) {
+      throw new Error(`Run ${runId} ended as ${run.status}: ${run.errorMessage ?? 'no error message recorded'}`);
+    }
     await delay(50);
   }
   throw new Error(`Timed out waiting for run ${runId}`);
@@ -133,19 +137,80 @@ async function seedDiscoveryRequest(pool, fixture, { appUserId = null } = {}) {
       ],
     )
     : null;
-  await pool.query(
+  const discoveryRequest = await pool.query(
     `INSERT INTO library_discovery_requests (
       metadata_artist_id, metadata_release_group_id, metadata_release_id, wanted_status, search_mode, request_status, evidence
-    ) VALUES ($1, $2, $3, 'missing', 'automatic', 'ready', $4::jsonb)`,
+    ) VALUES ($1, $2, $3, 'missing', 'automatic', 'ready', $4::jsonb)
+    RETURNING id`,
     [artist.rows[0].id, releaseGroup.rows[0].id, release.rows[0].id, JSON.stringify({ qualityProfile: 'lossless_archive' })],
   );
+  if (wantedRelease?.rows[0]?.id) {
+    await pool.query(
+      `INSERT INTO library_discovery_request_wanted_release_links (
+        discovery_request_id, wanted_release_id, evidence
+      ) VALUES ($1, $2, '{}'::jsonb)`,
+      [discoveryRequest.rows[0].id, wantedRelease.rows[0].id],
+    );
+  }
 
   return {
     appUserId,
+    discoveryRequestId: discoveryRequest.rows[0].id,
     metadataArtistId: artist.rows[0].id,
     metadataReleaseGroupId: releaseGroup.rows[0].id,
     metadataReleaseId: release.rows[0].id,
     wantedReleaseId: wantedRelease?.rows[0]?.id ?? null,
+  };
+}
+
+async function seedSharedOperatorDiscoveryRequest(pool, fixture) {
+  const discoverySeed = await seedDiscoveryRequest(pool, fixture);
+  const operatorIds = await Promise.all([seedAppUser(pool), seedAppUser(pool)]);
+  const privatePolicyMarkers = operatorIds.map((_, index) => `operator-${index + 1}-private-policy-${randomUUID()}`);
+  const wantedReleases = [];
+
+  for (const [index, appUserId] of operatorIds.entries()) {
+    const wantedRelease = await pool.query(
+      `INSERT INTO library_wanted_releases (
+        app_user_id, metadata_artist_id, metadata_release_group_id, metadata_release_id,
+        wanted_status, expected_track_count, matched_track_count, missing_track_count,
+        release_date, release_status, evidence
+      ) VALUES ($1, $2, $3, $4, 'missing', 1, 0, 1, '2026-01-01', 'Official', $5::jsonb)
+      RETURNING id`,
+      [
+        appUserId,
+        discoverySeed.metadataArtistId,
+        discoverySeed.metadataReleaseGroupId,
+        discoverySeed.metadataReleaseId,
+        JSON.stringify({
+          privatePolicyMarker: privatePolicyMarkers[index],
+          qualityProfile: index === 0 ? 'lossless_archive' : 'high_quality',
+          source: 'controlled_provider_shared_operator_e2e',
+        }),
+      ],
+    );
+    const wantedReleaseId = wantedRelease.rows[0].id;
+    wantedReleases.push({ appUserId, wantedReleaseId });
+    await pool.query(
+      `INSERT INTO library_discovery_request_wanted_release_links (
+        discovery_request_id, wanted_release_id, evidence
+      ) VALUES ($1, $2, $3::jsonb)`,
+      [
+        discoverySeed.discoveryRequestId,
+        wantedReleaseId,
+        JSON.stringify({
+          musicQueueQualityOverride: {
+            privatePolicyMarker: privatePolicyMarkers[index],
+          },
+        }),
+      ],
+    );
+  }
+
+  return {
+    ...discoverySeed,
+    privatePolicyMarkers,
+    wantedReleases,
   };
 }
 
@@ -160,10 +225,10 @@ async function executeDownloadAndReconcile({
     triggerSource,
   });
   await waitForRun(importCandidateModule.importCandidateExecutionRunStore, runId);
-  const executionSummary = await importCandidateModule.importCandidateExecutionSummaryService
-    .buildImportCandidateExecutionSummary();
+  const executionRunDetail = await importCandidateModule.importCandidateExecutionSummaryService
+    .buildImportCandidateExecutionRunDetail({ runId });
   return importCandidateModule.importCandidateExecutionReconciliationService
-    .reconcileImportCandidateExecutionSummary({ executionSummary });
+    .reconcileImportCandidateExecutionSummary({ executionSummary: { currentRun: executionRunDetail.run } });
 }
 
 async function completeSafeAutoAdd({
@@ -192,14 +257,43 @@ async function getSelectedCandidateForSearch(importCandidateModule, sourceSearch
 }
 
 async function waitForActivityEvent(activityEventService, { entityId, eventType }) {
-  const deadline = Date.now() + 5_000;
+  const deadline = Date.now() + activityEvidenceTimeoutMs;
+  let observedEvents = [];
   while (Date.now() < deadline) {
     const feed = await activityEventService.buildActivityFeed({ eventType, limit: 20 });
+    observedEvents = feed.events.map((entry) => ({
+      entityId: entry.entityId,
+      entityType: entry.entityType,
+      eventType: entry.eventType,
+    }));
     const event = feed.events.find((entry) => entry.entityId === entityId);
     if (event) return event;
     await delay(25);
   }
-  throw new Error(`Timed out waiting for ${eventType} Activity evidence for ${entityId}`);
+  throw new Error(`Timed out waiting for ${eventType} Activity evidence for ${entityId}; observed ${JSON.stringify(observedEvents)}`);
+}
+
+async function waitForActivityEvents(activityEventService, { entityIds, eventType }) {
+  const expectedEntityIds = [...new Set(entityIds)].sort();
+  const deadline = Date.now() + activityEvidenceTimeoutMs;
+  while (Date.now() < deadline) {
+    const feed = await activityEventService.buildActivityFeed({ eventType, limit: 50 });
+    const events = feed.events.filter((entry) => expectedEntityIds.includes(entry.entityId));
+    if (new Set(events.map((entry) => entry.entityId)).size === expectedEntityIds.length) {
+      return events;
+    }
+    await delay(25);
+  }
+  throw new Error(`Timed out waiting for ${eventType} Activity evidence for ${expectedEntityIds.join(', ')}`);
+}
+
+async function getControlledProviderFixtureEvidence(fixtureId) {
+  const response = await fetch(
+    `${controlledProviderFixtureBaseUrl}/_fixture/evidence?fixtureId=${encodeURIComponent(fixtureId)}`,
+    { headers: { 'X-API-Key': providerApiKey } },
+  );
+  assert.equal(response.status, 200, `controlled provider must expose fixture evidence for ${fixtureId}`);
+  return response.json();
 }
 
 async function runVerification() {
@@ -211,7 +305,7 @@ async function runVerification() {
       apiKey: providerApiKey,
       baseUrl: 'http://controlled-provider:5030/api/v0/',
       enabled: true,
-      requestTimeoutMs: 5000,
+      requestTimeoutMs: 20_000,
     }),
   });
   const importCandidateModule = createImportCandidateModule({
@@ -242,6 +336,7 @@ async function runVerification() {
   ], null, pool);
 
   const [pipelineFixture, ...catalogFixtures] = controlledProviderFixtureCatalog;
+  const sharedDiscoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'lossless');
   const recoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'recovery_fallback');
   const sourceDisappearanceFixture = catalogFixtures.find((fixture) => fixture.scenario === 'completed_source_disappears');
   const qualityRecoveryFixture = catalogFixtures.find((fixture) => fixture.scenario === 'quality_recovery');
@@ -252,6 +347,7 @@ async function runVerification() {
       && fixture.id !== qualityRecoveryFixture?.id
       && fixture.id !== qualityExhaustionFixture?.id
   ));
+
   await seedDiscoveryRequest(pool, pipelineFixture);
   const dispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
   assert.equal(dispatch.candidateCount, 1, `discovery must ingest one controlled candidate: ${JSON.stringify(dispatch)}`);
@@ -597,6 +693,106 @@ async function runVerification() {
   assert.equal(Object.hasOwn(qualityExhaustionActivity.extraPayload ?? {}, 'folderPath'), false, 'Activity must not expose a provider folder path');
   assert.equal(Object.hasOwn(qualityExhaustionActivity.extraPayload ?? {}, 'username'), false, 'Activity must not expose the provider username');
 
+  assert.ok(sharedDiscoveryFixture, 'the controlled catalog must include a shared-discovery fixture');
+  const sharedDiscoverySeed = await seedSharedOperatorDiscoveryRequest(pool, sharedDiscoveryFixture);
+  const sharedDiscoveryEvidenceBefore = await getControlledProviderFixtureEvidence(sharedDiscoveryFixture.id);
+  const sharedDiscoveryDispatch = await libraryModule.libraryDiscoveryDispatchService.dispatchReadyDiscoveryRequests();
+  assert.equal(
+    sharedDiscoveryDispatch.candidateCount,
+    1,
+    'one global discovery request linked to two operators must ingest one candidate',
+  );
+  const sharedDiscoverySearch = sharedDiscoveryDispatch.dispatchedSearches[0];
+  const sharedDiscoveryDownloadRunId = sharedDiscoverySearch?.autoDownloadStart?.runId;
+  const sharedDiscoveryCandidateId = sharedDiscoverySearch?.autoSelection?.selectedCandidateId;
+  assert.ok(sharedDiscoveryDownloadRunId, 'the shared discovery candidate must automatically enter download handoff');
+  assert.ok(sharedDiscoveryCandidateId, 'the shared discovery candidate must remain identifiable without an operator policy payload');
+
+  const sharedCandidate = await importCandidateModule.importCandidateService.getImportCandidate({
+    importCandidateId: sharedDiscoveryCandidateId,
+  });
+  const sharedWantedReleaseIds = sharedDiscoverySeed.wantedReleases.map(({ wantedReleaseId }) => wantedReleaseId);
+  assert.deepEqual(
+    sharedCandidate.normalizedPayload?.musicQueue,
+    {
+      profileCode: 'lossless_archive',
+      wantedReleaseId: sharedWantedReleaseIds[0],
+      wantedReleaseIds: sharedWantedReleaseIds,
+    },
+    'the shared candidate must retain only the common quality profile and release identities',
+  );
+  const sharedCandidatePayload = JSON.stringify(sharedCandidate);
+  for (const { appUserId } of sharedDiscoverySeed.wantedReleases) {
+    assert.equal(sharedCandidatePayload.includes(appUserId), false, 'candidate payloads must not expose operator identities');
+  }
+  for (const privatePolicyMarker of sharedDiscoverySeed.privatePolicyMarkers) {
+    assert.equal(sharedCandidatePayload.includes(privatePolicyMarker), false, 'candidate payloads must not expose operator policy details');
+  }
+
+  const sharedDiscoveryReconciliation = await executeDownloadAndReconcile({
+    importCandidateModule,
+    runId: sharedDiscoveryDownloadRunId,
+    triggerSource: 'controlled_provider_shared_discovery',
+  });
+  const sharedDiscoveryApplyRunId = sharedDiscoveryReconciliation.autoApplyRuns[0]?.runId;
+  assert.ok(sharedDiscoveryApplyRunId, 'a completed shared transfer must start one safe automatic add run');
+  const sharedDiscoveryEvidenceAfter = await getControlledProviderFixtureEvidence(sharedDiscoveryFixture.id);
+  assert.equal(
+    sharedDiscoveryEvidenceAfter.searchCount - sharedDiscoveryEvidenceBefore.searchCount,
+    1,
+    'two operator links must issue one provider search',
+  );
+  assert.equal(
+    sharedDiscoveryEvidenceAfter.transferCount - sharedDiscoveryEvidenceBefore.transferCount,
+    1,
+    'two operator links must queue one provider transfer',
+  );
+
+  const sharedMusicQueueOutcomes = await Promise.all(sharedDiscoverySeed.wantedReleases.map(async ({
+    appUserId,
+    wantedReleaseId,
+  }) => {
+    const detail = await acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+      appUserId,
+      wantedReleaseId,
+    });
+    assert.equal(detail.release.id, wantedReleaseId, 'each operator must retain its own wanted release detail');
+    assert.equal(detail.release.status.code, 'ready_to_add', 'each operator must see the shared download as ready to add');
+    assert.equal(detail.release.status.nextAction, 'add_to_library', 'each operator must receive the same next action');
+    return {
+      nextAction: detail.release.status.nextAction,
+      status: detail.release.status.code,
+      wantedReleaseId,
+    };
+  }));
+  await Promise.all(sharedDiscoverySeed.wantedReleases.map(async ({ appUserId, wantedReleaseId }, index) => {
+    const other = sharedDiscoverySeed.wantedReleases[(index + 1) % sharedDiscoverySeed.wantedReleases.length];
+    await assert.rejects(
+      () => acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
+        appUserId,
+        wantedReleaseId: other.wantedReleaseId,
+      }),
+      (error) => error?.status === 404 && error?.code === 'music_queue_release_not_found',
+      'an operator must not read another operator\'s shared-release detail',
+    );
+  }));
+
+  const sharedActivities = await waitForActivityEvents(activityModule.activityEventService, {
+    entityIds: sharedWantedReleaseIds,
+    eventType: 'music_queue_download_completed',
+  });
+  for (const activity of sharedActivities) {
+    const activityPayload = JSON.stringify(activity);
+    assert.equal(activity.entityType, 'wanted_release', 'shared Music Queue activity must stay release-centred');
+    assert.ok(sharedWantedReleaseIds.includes(activity.entityId), 'shared Music Queue activity must retain its own release identity');
+    for (const { appUserId } of sharedDiscoverySeed.wantedReleases) {
+      assert.equal(activityPayload.includes(appUserId), false, 'Activity must not expose operator identities');
+    }
+    for (const privatePolicyMarker of sharedDiscoverySeed.privatePolicyMarkers) {
+      assert.equal(activityPayload.includes(privatePolicyMarker), false, 'Activity must not expose operator policy details');
+    }
+  }
+
   let catalogCandidateCount = 8;
   let noResponseCount = 0;
   for (const fixture of remainingCatalogFixtures) {
@@ -661,6 +857,15 @@ async function runVerification() {
       musicQueueNextAction: qualityExhaustionMusicQueueRelease.status.nextAction,
       musicQueueStatus: qualityExhaustionMusicQueueRelease.status.code,
       wantedReleaseId: qualityExhaustionSeed.wantedReleaseId,
+    },
+    sharedDiscovery: {
+      activityPolicyRedacted: true,
+      candidatePolicyRedacted: true,
+      crossOperatorReadDenied: true,
+      musicQueueOutcomeCount: sharedMusicQueueOutcomes.length,
+      operatorCount: sharedDiscoverySeed.wantedReleases.length,
+      providerSearchCount: sharedDiscoveryEvidenceAfter.searchCount - sharedDiscoveryEvidenceBefore.searchCount,
+      providerTransferCount: sharedDiscoveryEvidenceAfter.transferCount - sharedDiscoveryEvidenceBefore.transferCount,
     },
   };
 }

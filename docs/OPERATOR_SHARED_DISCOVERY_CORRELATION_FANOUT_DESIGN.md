@@ -144,10 +144,18 @@ leak, and two release-scoped Activity writes. The Docker integration contract
 also applies the migration lineage and executes the claim query itself against
 two persisted operator links.
 
+## Docker Acceptance Evidence
+
+Implemented in
+[MUSIC_QUEUE_SHARED_DISCOVERY_DOCKER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_SHARED_DISCOVERY_DOCKER_ACCEPTANCE_DESIGN.md).
+The controlled-provider packaged-runtime verifier now proves that two
+operator-owned wanted releases linked to one metadata release create one
+provider search and one transfer, while each Music Queue detail projection is
+scoped independently. It also proves reciprocal cross-operator 404 responses
+and strips private operator policy markers from candidates and Activity.
+
 ## Next High-Value Item
 
-Add a controlled-provider Docker acceptance scenario with two operator accounts
-sharing one wanted metadata release. It should prove one search and one
-transfer are created, both scoped Music Queue projections receive the outcome,
-cross-operator release reads remain denied, and no user-specific policy fields
-appear in candidate or Activity payloads.
+Add a two-session browser acceptance journey for the shared Music Queue
+release. It should prove the normal operator views, route handling, and
+redacted Activity handoffs preserve the same boundaries proven by Docker.

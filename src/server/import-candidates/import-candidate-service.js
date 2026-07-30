@@ -155,7 +155,7 @@ function normalizeMusicQueueContext(value) {
 
   return {
     profileCode,
-    qualityOverride,
+    ...(qualityOverride ? { qualityOverride } : {}),
     ...(wantedReleaseIds[0] ? { wantedReleaseId: wantedReleaseIds[0] } : {}),
     ...(wantedReleaseIds.length > 1 ? { wantedReleaseIds } : {}),
   };

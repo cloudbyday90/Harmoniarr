@@ -869,6 +869,14 @@ describe('getExecutionItemStatusClass', () => {
     assert.equal(getExecutionItemStatusClass('queue_failed'), 'review-status-failed');
   });
 
+  it('returns failed class for a terminal provider failure', () => {
+    assert.equal(getExecutionItemStatusClass('failed'), 'review-status-failed');
+  });
+
+  it('returns applied class for a completed provider transfer', () => {
+    assert.equal(getExecutionItemStatusClass('completed'), 'review-status-applied');
+  });
+
   it('returns held class for "queued_with_warnings"', () => {
     assert.equal(getExecutionItemStatusClass('queued_with_warnings'), 'review-status-held');
   });
@@ -909,6 +917,14 @@ describe('getExecutionItemStatusLabel', () => {
 
   it('returns "Queued" for "queued"', () => {
     assert.equal(getExecutionItemStatusLabel('queued'), 'Queued');
+  });
+
+  it('returns a current provider transfer label for completed status', () => {
+    assert.equal(getExecutionItemStatusLabel('completed'), 'Completed');
+  });
+
+  it('returns a current provider transfer label for downloading status', () => {
+    assert.equal(getExecutionItemStatusLabel('downloading'), 'Downloading');
   });
 
   it('returns "Ready with warnings" for "ready_with_warnings"', () => {

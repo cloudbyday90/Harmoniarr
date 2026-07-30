@@ -485,11 +485,17 @@ export function buildImportApplyLibraryHandoffNotice(currentRun) {
 export function getExecutionItemStatusClass(status) {
   switch (status) {
     case 'blocked':
+    case 'failed':
     case 'queue_failed':
       return 'review-status-failed';
+    case 'completed':
+      return 'review-status-applied';
+    case 'missing':
+    case 'rejected':
     case 'queued_with_warnings':
     case 'ready_with_warnings':
       return 'review-status-held';
+    case 'downloading':
     case 'queued':
     default:
       return 'review-status-selected';
@@ -506,6 +512,14 @@ export function getExecutionItemStatusLabel(status) {
   switch (status) {
     case 'blocked':
       return 'Blocked';
+    case 'completed':
+      return 'Completed';
+    case 'downloading':
+      return 'Downloading';
+    case 'failed':
+      return 'Failed';
+    case 'missing':
+      return 'Transfer not found';
     case 'queue_failed':
       return 'Queue failed';
     case 'queued_with_warnings':
@@ -514,6 +528,8 @@ export function getExecutionItemStatusLabel(status) {
       return 'Queued';
     case 'ready_with_warnings':
       return 'Ready with warnings';
+    case 'rejected':
+      return 'Rejected by source';
     default:
       return 'Ready';
   }

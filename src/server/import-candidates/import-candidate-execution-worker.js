@@ -146,6 +146,7 @@ export function createImportCandidateExecutionWorker({
     triggerSource = null,
   }) {
     let finalLeaseStatus = 'completed';
+    let leaseAcquired = false;
     let leaseHeartbeat = null;
     const triggerSummary = buildRunTriggerSummary({
       selectedCandidateId,
@@ -155,6 +156,7 @@ export function createImportCandidateExecutionWorker({
 
     try {
       await acquireLease({ runId });
+      leaseAcquired = true;
       if (renewLease) {
         leaseHeartbeat = createOperationRunLeaseHeartbeatFn({ renewLease, runId });
         leaseHeartbeat.start();
@@ -434,6 +436,10 @@ export function createImportCandidateExecutionWorker({
         },
       });
     } catch (error) {
+      if (error?.code === 'operation_run_lease_unavailable') {
+        return;
+      }
+
       if (isOperationRunPauseError(error)) {
         finalLeaseStatus = 'paused';
         await markRunPaused({
@@ -480,7 +486,9 @@ export function createImportCandidateExecutionWorker({
     } finally {
       leaseHeartbeat?.stop();
       activeRunIds.delete(runId);
-      await releaseLease({ runId, status: finalLeaseStatus });
+      if (leaseAcquired) {
+        await releaseLease({ runId, status: finalLeaseStatus });
+      }
     }
   }
 

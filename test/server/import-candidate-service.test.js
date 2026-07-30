@@ -178,6 +178,32 @@ test('normalizeSlskdResponsesToImportCandidates carries bounded Music Queue qual
   assert.equal(candidates[0].rawPayload.musicQueue, undefined);
 });
 
+test('normalizeSlskdResponsesToImportCandidates omits an absent Music Queue override', () => {
+  const candidates = normalizeSlskdResponsesToImportCandidates({
+    discoveredAt: new Date('2026-07-30T14:00:00.000Z'),
+    musicQueueContext: {
+      profileCode: 'lossless_archive',
+      qualityOverride: null,
+      wantedReleaseId: 'wanted-1',
+      wantedReleaseIds: ['wanted-1', 'wanted-2'],
+    },
+    searchId: 'search-1',
+    responses: [{
+      username: 'source-user',
+      files: [{
+        filename: 'Artist\\Album\\01 Track.flac',
+        size: 100,
+      }],
+    }],
+  });
+
+  assert.deepEqual(candidates[0].normalizedPayload.musicQueue, {
+    profileCode: 'lossless_archive',
+    wantedReleaseId: 'wanted-1',
+    wantedReleaseIds: ['wanted-1', 'wanted-2'],
+  });
+});
+
 test('normalizeSlskdResponsesToImportCandidates omits formatMatchScore when formatPreferences is null', () => {
   const candidates = normalizeSlskdResponsesToImportCandidates({
     formatPreferences: null,

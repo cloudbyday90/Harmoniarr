@@ -50,6 +50,23 @@ function resolveTransferAction(item) {
   return resolveTargetStatus(item);
 }
 
+function resolvePersistedExecutionItemStatus(item) {
+  switch (item?.liveTransferSummary?.status) {
+    case 'active':
+      return 'downloading';
+    case 'completed':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    case 'rejected':
+      return 'rejected';
+    case 'not_found':
+      return 'missing';
+    default:
+      return item?.itemStatus ?? 'queued';
+  }
+}
+
 function canTransition(currentStatus, targetStatus) {
   switch (targetStatus) {
     case 'downloading':
@@ -144,7 +161,7 @@ export function createImportCandidateExecutionReconciliationService({
       if (run?.id && importCandidateId && shouldPersistExecutionState(item)) {
         await updateImportExecutionRunItem({
           importCandidateId,
-          itemStatus: item.itemStatus,
+          itemStatus: resolvePersistedExecutionItemStatus(item),
           operationRunId: run.id,
           planningSnapshot: buildUpdatedPlanningSnapshot(item, checkedAt),
           statusMessage: item.statusMessage,

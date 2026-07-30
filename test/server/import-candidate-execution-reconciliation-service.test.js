@@ -91,6 +91,11 @@ test('reconcileImportCandidateExecutionState persists workflow transitions from 
   assert.equal(markImportCandidateDownloadFailed.mock.callCount(), 1);
   assert.equal(updateImportExecutionRunItem.mock.callCount(), 3);
   assert.equal(updateImportExecutionRunItem.mock.calls[0].arguments[0].operationRunId, 'run-1');
+  assert.deepEqual(
+    updateImportExecutionRunItem.mock.calls.map((call) => call.arguments[0].itemStatus),
+    ['queued', 'completed', 'failed'],
+    'reconciliation must replace stale queue-planning statuses with live provider outcomes',
+  );
   assert.match(updateImportExecutionRunItem.mock.calls[0].arguments[0].planningSnapshot.execution.latestTransferSnapshot.lastSeenAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(
     updateImportExecutionRunItem.mock.calls[0].arguments[0].planningSnapshot.execution.latestTransferSnapshot.lastSeenAt,
