@@ -1674,7 +1674,14 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   diagnostics content, and offers only `Open Music Queue`. See
   [MUSIC_QUEUE_RELEASE_UNAVAILABLE_STATE_DESIGN.md](MUSIC_QUEUE_RELEASE_UNAVAILABLE_STATE_DESIGN.md).
 
-Recommended next slice: complete an **Activity resource-state consistency
-pass**. Consolidate loading, empty, unavailable, and retryable-failure
-presentations across normal Activity views so the everyday workspace provides
-clear next actions without exposing Advanced diagnostics by default.
+- [x] Complete an Activity resource-state consistency pass. Timeline, History,
+  Monitored Artists, and Releases now use one neutral loading, empty, and
+  retryable-failure contract; raw read errors are redacted, stale data remains
+  visible after a failed refresh, and no release-specific recovery control was
+  flattened into a generic retry. See
+  [ACTIVITY_RESOURCE_STATE_CONSISTENCY_DESIGN.md](ACTIVITY_RESOURCE_STATE_CONSISTENCY_DESIGN.md).
+
+Recommended next slice: complete a **Settings provider-state and recovery
+consistency pass**. Normalize Managed, External, and Disabled provider
+readiness, connection-test results, and setup guidance into one concise status
+and one context-safe next action per provider.

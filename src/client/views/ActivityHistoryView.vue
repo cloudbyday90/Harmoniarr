@@ -18,6 +18,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue';
+import ActivityResourceState from '../components/activity/ActivityResourceState.vue';
 import {
   formatActivityEntryCountLabel,
   formatActivityEntryStatusLabel,
@@ -66,27 +67,30 @@ onMounted(() => {
       </div>
     </header>
 
-    <article v-if="errorMessage" class="hx-card">
-      <div class="hx-card-body">
-        <span class="hx-pill" data-tone="danger">{{ errorMessage }}</span>
-      </div>
-    </article>
+    <ActivityResourceState
+      v-if="errorMessage"
+      state="error"
+      title="Could not load history"
+      description="History may be temporarily unavailable. Try again to refresh it."
+      action-label="Try again"
+      :compact="entryCount > 0"
+      @action="load"
+    />
 
-    <article class="hx-card">
+    <article v-if="!errorMessage || entryCount > 0" class="hx-card">
       <div class="hx-card-body is-flush">
-        <div v-if="(isLoading || isInitialLoadPending) && !entryCount" class="hx-card-body">
-          <div class="hx-skeleton-stack">
-            <span class="hx-skeleton" data-size="lg"></span>
-            <span class="hx-skeleton"></span>
-            <span class="hx-skeleton"></span>
-            <span class="hx-skeleton"></span>
-            <span class="hx-skeleton"></span>
-          </div>
-        </div>
-        <div v-else-if="!entryCount" class="hx-empty">
-          <p class="hx-empty-title">No recent activity</p>
-          <p class="hx-empty-copy">Activity events will appear here as the system performs work.</p>
-        </div>
+        <ActivityResourceState
+          v-if="(isLoading || isInitialLoadPending) && !entryCount"
+          state="loading"
+          title="Loading history..."
+          :skeleton-lines="5"
+        />
+        <ActivityResourceState
+          v-else-if="!entryCount"
+          state="empty"
+          title="No recent activity"
+          description="Activity events will appear here as the system performs work."
+        />
         <div v-else class="hx-table-scroll">
           <table class="hx-table">
             <thead>

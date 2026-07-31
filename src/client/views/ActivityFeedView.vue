@@ -19,7 +19,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
-import EmptyState from '../components/EmptyState.vue';
+import ActivityResourceState from '../components/activity/ActivityResourceState.vue';
 import { useActivityFeed } from '../composables/useActivityFeed.js';
 import {
   formatActivityEventTime,
@@ -143,102 +143,106 @@ onBeforeUnmount(() => {
         </select>
       </div>
 
-      <p class="activity-feed-status" role="status" aria-live="polite">
-        <template v-if="isLoading || isInitialLoadPending">Loading recent activity...</template>
-        <template v-else-if="hasEvents">
-          Showing {{ visibleEntryCount }} {{ visibleEntryCount === 1 ? 'timeline item' : 'timeline items' }} from {{ visibleEventCount }} {{ visibleEventCount === 1 ? 'event' : 'events' }} in {{ getFilterLabel(selectedFilter).toLowerCase() }}.
-        </template>
+      <p v-if="!isLoading && !isInitialLoadPending && hasEvents" class="activity-feed-status" role="status" aria-live="polite">
+        Showing {{ visibleEntryCount }} {{ visibleEntryCount === 1 ? 'timeline item' : 'timeline items' }} from {{ visibleEventCount }} {{ visibleEventCount === 1 ? 'event' : 'events' }} in {{ getFilterLabel(selectedFilter).toLowerCase() }}.
       </p>
     </div>
 
-    <EmptyState
+    <ActivityResourceState
       v-if="errorMessage"
-      :title="errorMessage"
-      body="Check your connection and refresh the timeline."
+      state="error"
+      title="Could not load activity"
+      description="Activity may be temporarily unavailable. Try again to refresh the timeline."
+      action-label="Try again"
+      :compact="hasEvents"
+      @action="load"
     />
 
-    <div v-else-if="isLoading || isInitialLoadPending" class="activity-feed-loading" aria-hidden="true">
-      <div class="hx-skeleton-stack">
-        <span class="hx-skeleton" data-size="lg" />
-        <span class="hx-skeleton" />
-        <span class="hx-skeleton" />
-      </div>
-    </div>
+    <template v-if="!errorMessage || hasEvents">
+      <ActivityResourceState
+        v-if="isLoading || isInitialLoadPending"
+        state="loading"
+        title="Loading recent activity..."
+        :skeleton-lines="3"
+      />
 
-    <EmptyState
-      v-else-if="isEmpty"
-      title="Nothing to show yet"
-      body="Progress will appear here as Harmoniarr searches, downloads, checks audio, and adds music to your library."
-    />
+      <ActivityResourceState
+        v-else-if="isEmpty"
+        state="empty"
+        title="Nothing to show yet"
+        description="Progress will appear here as Harmoniarr searches, downloads, checks audio, and adds music to your library."
+      />
 
-    <EmptyState
-      v-else-if="!isLoading && !hasVisibleEntries"
-      :title="`No ${getFilterLabel(selectedFilter).toLowerCase()} yet`"
-      body="Try another filter to see more recent activity."
-    />
+      <ActivityResourceState
+        v-else-if="!isLoading && !hasVisibleEntries"
+        state="empty"
+        :title="`No ${getFilterLabel(selectedFilter).toLowerCase()} yet`"
+        description="Try another filter to see more recent activity."
+      />
 
-    <div v-else class="activity-timeline-sections">
-      <section
-        v-for="section in timelineSections"
-        :key="section.id"
-        class="activity-timeline-section"
-        :class="{ 'activity-timeline-section--attention': section.id === 'attention' }"
-        :aria-labelledby="section.title ? `activity-${section.id}-title` : undefined"
-      >
-        <header v-if="section.title" class="activity-timeline-section-header">
-          <div>
-            <h3 :id="`activity-${section.id}-title`">{{ section.title }}</h3>
-            <p v-if="section.description">{{ section.description }}</p>
-          </div>
-          <span v-if="section.id === 'attention'" class="hx-pill" data-tone="warning">
-            {{ section.entries.length }} {{ section.entries.length === 1 ? 'item' : 'items' }}
-          </span>
-        </header>
-
-        <ol
-          class="activity-timeline"
-          :aria-busy="isLoading || isRevalidating"
-          :aria-label="section.title"
+      <div v-else class="activity-timeline-sections">
+        <section
+          v-for="section in timelineSections"
+          :key="section.id"
+          class="activity-timeline-section"
+          :class="{ 'activity-timeline-section--attention': section.id === 'attention' }"
+          :aria-labelledby="section.title ? `activity-${section.id}-title` : undefined"
         >
-          <li v-for="entry in section.entries" :key="entry.id" class="activity-timeline-item">
-            <article
-              class="activity-timeline-entry"
-              :data-event-type="entry.event.eventType"
-              :data-tone="getActivityTimelineEventPresentation(entry.event).tone"
-            >
-              <span class="activity-timeline-marker" aria-hidden="true" />
-              <div class="activity-timeline-content">
-                <div class="activity-timeline-meta">
-                  <time v-if="entry.event.occurredAt" :datetime="entry.event.occurredAt">
-                    {{ formatActivityEventTime(entry.event.occurredAt) }}
-                  </time>
+          <header v-if="section.title" class="activity-timeline-section-header">
+            <div>
+              <h3 :id="`activity-${section.id}-title`">{{ section.title }}</h3>
+              <p v-if="section.description">{{ section.description }}</p>
+            </div>
+            <span v-if="section.id === 'attention'" class="hx-pill" data-tone="warning">
+              {{ section.entries.length }} {{ section.entries.length === 1 ? 'item' : 'items' }}
+            </span>
+          </header>
+
+          <ol
+            class="activity-timeline"
+            :aria-busy="isLoading || isRevalidating"
+            :aria-label="section.title"
+          >
+            <li v-for="entry in section.entries" :key="entry.id" class="activity-timeline-item">
+              <article
+                class="activity-timeline-entry"
+                :data-event-type="entry.event.eventType"
+                :data-tone="getActivityTimelineEventPresentation(entry.event).tone"
+              >
+                <span class="activity-timeline-marker" aria-hidden="true" />
+                <div class="activity-timeline-content">
+                  <div class="activity-timeline-meta">
+                    <time v-if="entry.event.occurredAt" :datetime="entry.event.occurredAt">
+                      {{ formatActivityEventTime(entry.event.occurredAt) }}
+                    </time>
+                  </div>
+                  <h4>{{ getActivityEventLabel(entry.event, currentUserId) }}</h4>
+                  <p v-if="getActivityEventDetail(entry.event)">{{ getActivityEventDetail(entry.event) }}</p>
+                  <details v-if="entry.isCoalesced" class="activity-timeline-story-details">
+                    <summary>{{ getActivityTimelineStoryDisclosureLabel(entry) }}</summary>
+                    <ol aria-label="Release activity updates">
+                      <li v-for="milestone in entry.milestoneEvents" :key="milestone.id">
+                        <span>{{ getActivityEventLabel(milestone, currentUserId) }}</span>
+                        <time v-if="milestone.occurredAt" :datetime="milestone.occurredAt">
+                          {{ formatActivityEventTime(milestone.occurredAt) }}
+                        </time>
+                      </li>
+                    </ol>
+                  </details>
+                  <RouterLink
+                    v-if="getEventLinkTarget(entry.event)"
+                    class="activity-timeline-link"
+                    :to="getEventLinkTarget(entry.event).to"
+                  >
+                    {{ getEventLinkTarget(entry.event).label }}
+                  </RouterLink>
                 </div>
-                <h4>{{ getActivityEventLabel(entry.event, currentUserId) }}</h4>
-                <p v-if="getActivityEventDetail(entry.event)">{{ getActivityEventDetail(entry.event) }}</p>
-                <details v-if="entry.isCoalesced" class="activity-timeline-story-details">
-                  <summary>{{ getActivityTimelineStoryDisclosureLabel(entry) }}</summary>
-                  <ol aria-label="Release activity updates">
-                    <li v-for="milestone in entry.milestoneEvents" :key="milestone.id">
-                      <span>{{ getActivityEventLabel(milestone, currentUserId) }}</span>
-                      <time v-if="milestone.occurredAt" :datetime="milestone.occurredAt">
-                        {{ formatActivityEventTime(milestone.occurredAt) }}
-                      </time>
-                    </li>
-                  </ol>
-                </details>
-                <RouterLink
-                  v-if="getEventLinkTarget(entry.event)"
-                  class="activity-timeline-link"
-                  :to="getEventLinkTarget(entry.event).to"
-                >
-                  {{ getEventLinkTarget(entry.event).label }}
-                </RouterLink>
-              </div>
-            </article>
-          </li>
-        </ol>
-      </section>
-    </div>
+              </article>
+            </li>
+          </ol>
+        </section>
+      </div>
+    </template>
 
   </section>
 </template>
@@ -348,10 +352,6 @@ onBeforeUnmount(() => {
   color: var(--hx-text-muted);
   font-size: var(--hx-text-sm);
   margin: var(--hx-space-1) 0 0;
-}
-
-.activity-feed-loading {
-  padding: var(--hx-space-2) 0;
 }
 
 .activity-timeline-item {

@@ -17,7 +17,8 @@
 -->
 
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
+import ActivityResourceState from '../components/activity/ActivityResourceState.vue';
 import { useAdminMonitoredArtists } from '../composables/useAdminMonitoredArtists.js';
 
 const {
@@ -52,6 +53,8 @@ function formatReleaseTypes(types) {
   if (!Array.isArray(types) || types.length === 0) return 'album, ep';
   return types.join(', ');
 }
+
+const hasSearchQuery = computed(() => search.value.trim().length > 0);
 
 onMounted(() => {
   void load();
@@ -95,60 +98,67 @@ onMounted(() => {
       </select>
     </div>
 
-    <article v-if="errorMessage" class="hx-card">
-      <div class="hx-card-body">
-        <span class="hx-pill" data-tone="danger">{{ errorMessage }}</span>
-      </div>
-    </article>
+    <ActivityResourceState
+      v-if="errorMessage"
+      state="error"
+      title="Could not load monitored artists"
+      description="Monitored artists may be temporarily unavailable. Try again to refresh the list."
+      action-label="Try again"
+      :compact="artists.length > 0"
+      @action="load"
+    />
 
-    <div v-else-if="isLoading" class="hx-skeleton-stack">
-      <span class="hx-skeleton" style="width:100%;height:2.5rem"></span>
-      <span class="hx-skeleton" style="width:100%;height:2.5rem"></span>
-      <span class="hx-skeleton" style="width:100%;height:2.5rem"></span>
-    </div>
+    <template v-if="!errorMessage || artists.length > 0">
+      <ActivityResourceState
+        v-if="isLoading"
+        state="loading"
+        title="Loading monitored artists..."
+        :skeleton-lines="3"
+      />
 
-    <article v-else-if="artists.length === 0" class="hx-card">
-      <div class="hx-card-body">
-        <div class="hx-empty">
-          <p class="hx-empty-title">No monitored artists</p>
-          <p class="hx-empty-copy">Artists monitored for new releases will appear here.</p>
+      <ActivityResourceState
+        v-else-if="artists.length === 0"
+        state="empty"
+        :title="hasSearchQuery ? 'No matching monitored artists' : 'No monitored artists'"
+        :description="hasSearchQuery
+          ? 'Clear your search or try another artist name.'
+          : 'Artists monitored for new releases will appear here.'"
+      />
+
+      <article v-else class="hx-card">
+        <div class="hx-card-body is-flush">
+          <div class="hx-table-scroll">
+            <table class="hx-table">
+              <thead>
+                <tr>
+                  <th scope="col">Artist</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Country</th>
+                  <th scope="col">Monitored by</th>
+                  <th scope="col">Release types</th>
+                  <th scope="col">Last refreshed</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="artist in artists" :key="artist.localId">
+                  <td>
+                    <RouterLink :to="{ name: 'artist-detail', params: { mbid: artist.id } }" class="ama-artist-link">
+                      {{ artist.name }}
+                    </RouterLink>
+                    <span v-if="artist.disambiguation" class="ama-disambig">({{ artist.disambiguation }})</span>
+                  </td>
+                  <td>{{ artist.artistType }}</td>
+                  <td>{{ artist.country }}</td>
+                  <td>{{ artist.monitoredByUsername ?? '—' }}</td>
+                  <td>{{ formatReleaseTypes(artist.monitoredReleaseGroupTypes) }}</td>
+                  <td>{{ formatTimestamp(artist.lastRefreshedAt) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </article>
-
-    <article v-else class="hx-card">
-      <div class="hx-card-body is-flush">
-        <div class="hx-table-scroll">
-          <table class="hx-table">
-            <thead>
-              <tr>
-                <th scope="col">Artist</th>
-                <th scope="col">Type</th>
-                <th scope="col">Country</th>
-                <th scope="col">Monitored by</th>
-                <th scope="col">Release types</th>
-                <th scope="col">Last refreshed</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="artist in artists" :key="artist.localId">
-                <td>
-                  <RouterLink :to="{ name: 'artist-detail', params: { mbid: artist.id } }" class="ama-artist-link">
-                    {{ artist.name }}
-                  </RouterLink>
-                  <span v-if="artist.disambiguation" class="ama-disambig">({{ artist.disambiguation }})</span>
-                </td>
-                <td>{{ artist.artistType }}</td>
-                <td>{{ artist.country }}</td>
-                <td>{{ artist.monitoredByUsername ?? '—' }}</td>
-                <td>{{ formatReleaseTypes(artist.monitoredReleaseGroupTypes) }}</td>
-                <td>{{ formatTimestamp(artist.lastRefreshedAt) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </article>
+      </article>
+    </template>
   </section>
 </template>
 

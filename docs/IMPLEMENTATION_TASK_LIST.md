@@ -130,6 +130,11 @@ Database model source: `docs/DATABASE_MODEL.md`
   Music Queue quality handoffs. The former twelve-tab workbench is preserved
   behind one `Advanced diagnostics` disclosure, without breaking diagnostic
   deep links. See `ACTIVITY_TIMELINE_NAVIGATION_DESIGN.md`.
+- Activity resource-state consistency: Timeline, History, Monitored Artists,
+  and Releases now share accessible loading, empty, and retryable read-failure
+  states. Generic failures redact transport details, preserve stale data during
+  a failed refresh, and retain only the relevant recovery action. See
+  `ACTIVITY_RESOURCE_STATE_CONSISTENCY_DESIGN.md`.
 - Activity advanced diagnostics boundary: match, library-add, and failed-add
   workbenches now use canonical `/app/activity/diagnostics/...` routes behind
   the Activity disclosure. Legacy candidate/import URLs redirect with their

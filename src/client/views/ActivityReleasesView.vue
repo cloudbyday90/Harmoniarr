@@ -19,7 +19,7 @@
 <script setup>
 import { computed, onMounted, ref, useTemplateRef } from 'vue';
 import ConfirmRequestModal from '../components/media/ConfirmRequestModal.vue';
-import EmptyState from '../components/EmptyState.vue';
+import ActivityResourceState from '../components/activity/ActivityResourceState.vue';
 import ReleaseCard from '../components/media/ReleaseCard.vue';
 import RequestButton from '../components/media/RequestButton.vue';
 import { useArtworkGridRoving } from '../composables/useArtworkGridRoving.js';
@@ -103,6 +103,7 @@ const recentLabel = computed(() =>
 const upcomingLabel = computed(() =>
   getRadarWindowLabel('upcoming', radar.windows.value.upcomingDays),
 );
+const hasReleaseData = computed(() => radar.recent.value.length > 0 || radar.upcoming.value.length > 0);
 
 onMounted(() => radar.load());
 </script>
@@ -121,111 +122,111 @@ onMounted(() => radar.load());
       </div>
     </header>
 
-    <article v-if="radar.errorMessage.value" class="hx-card">
-      <div class="hx-card-body">
-        <span class="hx-pill" data-tone="danger">{{ radar.errorMessage.value }}</span>
-      </div>
-    </article>
+    <ActivityResourceState
+      v-if="radar.errorMessage.value"
+      state="error"
+      title="Could not load releases"
+      description="Release updates may be temporarily unavailable. Try again to refresh them."
+      action-label="Try again"
+      :compact="hasReleaseData"
+      @action="radar.load()"
+    />
 
-    <!-- Recent releases section -->
-    <article class="hx-card">
-      <header class="hx-card-header">
-        <div>
-          <h2 class="hx-card-title">{{ recentLabel }}</h2>
-          <p class="hx-card-subtitle">
-            {{ buildRecentReleasesCardSubtitle(radar.recent.value.length) }}
-          </p>
-        </div>
-      </header>
-
-      <div class="hx-card-body" v-if="radar.isLoading.value && radar.recent.value.length === 0">
-        <div class="hx-skeleton-stack">
-          <span class="hx-skeleton" v-for="i in 4" :key="i"></span>
-        </div>
-      </div>
-
-      <div class="hx-card-body" v-else-if="radar.recent.value.length === 0 && !radar.isLoading.value">
-        <EmptyState
+    <template v-if="!radar.errorMessage.value || hasReleaseData">
+      <!-- Recent releases section -->
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">{{ recentLabel }}</h2>
+            <p class="hx-card-subtitle">
+              {{ buildRecentReleasesCardSubtitle(radar.recent.value.length) }}
+            </p>
+          </div>
+        </header>
+        <ActivityResourceState
+          v-if="radar.isLoading.value && radar.recent.value.length === 0"
+          state="loading"
+          :title="`Loading ${recentLabel.toLowerCase()}...`"
+        />
+        <ActivityResourceState
+          v-else-if="radar.recent.value.length === 0 && !radar.isLoading.value"
+          state="empty"
           title="No new releases"
-          body="No releases from monitored artists have appeared in this window. Monitor more artists or adjust the window."
-          variant="default"
+          description="No releases from monitored artists have appeared in this window. Monitor more artists or adjust the window."
         />
-      </div>
 
-      <div v-else class="hx-card-body hx-card-body--flush">
-        <ul ref="recentGrid" class="hx-artwork-grid" role="list" aria-label="Recent releases">
-          <li v-for="(release, index) in radar.recent.value" :key="release.metadataReleaseGroupId ?? index">
-            <ReleaseCard
-              :release="release"
-              :requested="isRequested(release)"
-              :requesting="isRequesting(release)"
-              @request="openConfirmModal(release)"
-            >
-              <template #actions>
-                <RequestButton
-                  :requested="isRequested(release)"
-                  :loading="isRequesting(release)"
-                  :aria-label="isRequested(release)
-                    ? `${release.title ?? 'Release'} — already requested`
-                    : `Request ${release.title ?? 'this release'}`"
-                  @request="openConfirmModal(release)"
-                />
-              </template>
-            </ReleaseCard>
-          </li>
-        </ul>
-      </div>
-    </article>
-
-    <!-- Upcoming releases section -->
-    <article class="hx-card">
-      <header class="hx-card-header">
-        <div>
-          <h2 class="hx-card-title">{{ upcomingLabel }}</h2>
-          <p class="hx-card-subtitle">
-            {{ buildUpcomingReleasesCardSubtitle(radar.upcoming.value.length) }}
-          </p>
+        <div v-else class="hx-card-body hx-card-body--flush">
+          <ul ref="recentGrid" class="hx-artwork-grid" role="list" aria-label="Recent releases">
+            <li v-for="(release, index) in radar.recent.value" :key="release.metadataReleaseGroupId ?? index">
+              <ReleaseCard
+                :release="release"
+                :requested="isRequested(release)"
+                :requesting="isRequesting(release)"
+                @request="openConfirmModal(release)"
+              >
+                <template #actions>
+                  <RequestButton
+                    :requested="isRequested(release)"
+                    :loading="isRequesting(release)"
+                    :aria-label="isRequested(release)
+                      ? `${release.title ?? 'Release'} — already requested`
+                      : `Request ${release.title ?? 'this release'}`"
+                    @request="openConfirmModal(release)"
+                  />
+                </template>
+              </ReleaseCard>
+            </li>
+          </ul>
         </div>
-      </header>
+      </article>
 
-      <div class="hx-card-body" v-if="radar.isLoading.value && radar.upcoming.value.length === 0">
-        <div class="hx-skeleton-stack">
-          <span class="hx-skeleton" v-for="i in 4" :key="i"></span>
-        </div>
-      </div>
-
-      <div class="hx-card-body" v-else-if="radar.upcoming.value.length === 0 && !radar.isLoading.value">
-        <EmptyState
+      <!-- Upcoming releases section -->
+      <article class="hx-card">
+        <header class="hx-card-header">
+          <div>
+            <h2 class="hx-card-title">{{ upcomingLabel }}</h2>
+            <p class="hx-card-subtitle">
+              {{ buildUpcomingReleasesCardSubtitle(radar.upcoming.value.length) }}
+            </p>
+          </div>
+        </header>
+        <ActivityResourceState
+          v-if="radar.isLoading.value && radar.upcoming.value.length === 0"
+          state="loading"
+          :title="`Loading ${upcomingLabel.toLowerCase()}...`"
+        />
+        <ActivityResourceState
+          v-else-if="radar.upcoming.value.length === 0 && !radar.isLoading.value"
+          state="empty"
           title="No upcoming releases"
-          body="No releases from monitored artists are scheduled in this window."
-          variant="default"
+          description="No releases from monitored artists are scheduled in this window."
         />
-      </div>
 
-      <div v-else class="hx-card-body hx-card-body--flush">
-        <ul ref="upcomingGrid" class="hx-artwork-grid" role="list" aria-label="Upcoming releases">
-          <li v-for="(release, index) in radar.upcoming.value" :key="release.metadataReleaseGroupId ?? index">
-            <ReleaseCard
-              :release="release"
-              :requested="isRequested(release)"
-              :requesting="isRequesting(release)"
-              @request="openConfirmModal(release)"
-            >
-              <template #actions>
-                <RequestButton
-                  :requested="isRequested(release)"
-                  :loading="isRequesting(release)"
-                  :aria-label="isRequested(release)
-                    ? `${release.title ?? 'Release'} — already requested`
-                    : `Request ${release.title ?? 'this release'}`"
-                  @request="openConfirmModal(release)"
-                />
-              </template>
-            </ReleaseCard>
-          </li>
-        </ul>
-      </div>
-    </article>
+        <div v-else class="hx-card-body hx-card-body--flush">
+          <ul ref="upcomingGrid" class="hx-artwork-grid" role="list" aria-label="Upcoming releases">
+            <li v-for="(release, index) in radar.upcoming.value" :key="release.metadataReleaseGroupId ?? index">
+              <ReleaseCard
+                :release="release"
+                :requested="isRequested(release)"
+                :requesting="isRequesting(release)"
+                @request="openConfirmModal(release)"
+              >
+                <template #actions>
+                  <RequestButton
+                    :requested="isRequested(release)"
+                    :loading="isRequesting(release)"
+                    :aria-label="isRequested(release)
+                      ? `${release.title ?? 'Release'} — already requested`
+                      : `Request ${release.title ?? 'this release'}`"
+                    @request="openConfirmModal(release)"
+                  />
+                </template>
+              </ReleaseCard>
+            </li>
+          </ul>
+        </div>
+      </article>
+    </template>
   </section>
 
   <ConfirmRequestModal

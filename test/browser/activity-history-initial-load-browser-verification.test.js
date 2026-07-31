@@ -208,4 +208,81 @@ suite('Activity history initial-load browser verification', () => {
       assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
     }, { scenarioName: 'activity_history_initial_load' });
   });
+
+  test('uses generic retry states without hiding existing Activity data', {
+    timeout: integrationRuntimeConfig.scenarioTimeoutMs,
+  }, async (t) => {
+    if (runtimeUnavailableReason) {
+      t.skip(runtimeUnavailableReason);
+      return;
+    }
+
+    await browserRuntime.runScenario(async ({ baseUrl, browserContext, page }) => {
+      const pageErrors = [];
+      let historyRequestCount = 0;
+      let timelineRequestCount = 0;
+      page.on('pageerror', (error) => pageErrors.push(error.message));
+
+      await bootstrapAdminThroughUi(page, { baseUrl });
+      await browserContext.route(/\/api\/v1\/activity\/feed(?:\?.*)?$/, async (route) => {
+        timelineRequestCount += 1;
+        if (timelineRequestCount === 1 || timelineRequestCount === 3) {
+          await route.fulfill({
+            body: JSON.stringify({ error: { message: 'provider host path should not reach Activity' } }),
+            contentType: 'application/json',
+            status: 503,
+          });
+          return;
+        }
+
+        await route.fulfill({
+          body: JSON.stringify(buildTimelinePayload()),
+          contentType: 'application/json',
+        });
+      });
+      await browserContext.route(/\/api\/v1\/system\/activity-feed(?:\?.*)?$/, async (route) => {
+        historyRequestCount += 1;
+        if (historyRequestCount === 1) {
+          await route.fulfill({
+            body: JSON.stringify({ error: { message: 'database connection string should not reach History' } }),
+            contentType: 'application/json',
+            status: 503,
+          });
+          return;
+        }
+
+        await route.fulfill({
+          body: JSON.stringify(buildSystemHistoryPayload()),
+          contentType: 'application/json',
+        });
+      });
+
+      await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
+      const timelineFailure = page.getByRole('alert').filter({ hasText: 'Could not load activity' });
+      await timelineFailure.getByRole('heading', { name: 'Could not load activity' }).waitFor();
+      await timelineFailure.getByRole('button', { name: 'Try again' }).click();
+      await page.getByText('Download started: Amber by Autechre').waitFor();
+      assert.equal(await page.getByText('provider host path should not reach Activity').count(), 0);
+      assert.equal(timelineRequestCount, 2);
+
+      await page.getByRole('button', { name: 'Refresh' }).click();
+      await timelineFailure.getByRole('heading', { name: 'Could not load activity' }).waitFor();
+      await page.getByText('Download started: Amber by Autechre').waitFor();
+      assert.equal(await timelineFailure.evaluate((element) => element.classList.contains('activity-resource-state--compact')), true);
+      assert.equal(timelineRequestCount, 3);
+
+      await timelineFailure.getByRole('button', { name: 'Try again' }).click();
+      await page.getByText('Download started: Amber by Autechre').waitFor();
+      assert.equal(timelineRequestCount, 4);
+
+      await page.goto(`${baseUrl}/app/activity/history`, { waitUntil: 'domcontentloaded' });
+      const historyFailure = page.getByRole('alert').filter({ hasText: 'Could not load history' });
+      await historyFailure.getByRole('heading', { name: 'Could not load history' }).waitFor();
+      await historyFailure.getByRole('button', { name: 'Try again' }).click();
+      await page.getByRole('cell', { exact: true, name: 'Library scan' }).waitFor();
+      assert.equal(await page.getByText('database connection string should not reach History').count(), 0);
+      assert.equal(historyRequestCount, 2);
+      assert.deepEqual(pageErrors, [], `Unexpected page errors: ${pageErrors.join(' | ')}`);
+    }, { scenarioName: 'activity_resource_state_consistency' });
+  });
 });
