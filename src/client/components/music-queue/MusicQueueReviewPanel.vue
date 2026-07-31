@@ -144,7 +144,14 @@ function isReleaseActionRunning(action) {
           >
             {{ review.repair.settingsRouteLabel }}
           </RouterLink>
-          <RouterLink class="hx-btn" :data-variant="review.repair.settingsRouteName ? 'ghost' : 'primary'" :to="{ name: 'activity-diagnostics-library-adds' }">
+          <RouterLink
+            class="hx-btn"
+            :data-variant="review.repair.settingsRouteName ? 'ghost' : 'primary'"
+            :to="{
+              name: 'activity-diagnostics-library-adds',
+              query: { wantedReleaseId: review.releaseId },
+            }"
+          >
             Advanced diagnostics
           </RouterLink>
         </div>

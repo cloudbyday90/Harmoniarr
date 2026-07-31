@@ -6,6 +6,17 @@ function makeCandidates(...statuses) {
   return statuses.map((status, i) => ({ id: `cand-${i}`, status, username: `user${i}` }));
 }
 
+async function waitFor(predicate, { timeoutMs = 250, intervalMs = 10 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => { setTimeout(resolve, intervalMs); });
+  }
+
+  assert.fail('Timed out waiting for the expected state');
+}
+
 describe('useMediaRequestPipeline SWR', () => {
   test('isRevalidating is false initially and after first load', async () => {
     const fetchPipelineFn = async () => ({ candidates: makeCandidates('pending') });
@@ -87,11 +98,11 @@ describe('useMediaRequestPipeline SWR', () => {
 
     await pipeline.load({ mediaRequestId: 'req-1' });
 
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
-    const countAfterPoll = callCount;
+    await waitFor(() => callCount >= 3);
+    const countAfterTerminal = callCount;
 
     await new Promise((resolve) => { setTimeout(resolve, 100); });
-    assert.equal(callCount, countAfterPoll, 'polling stopped after candidates became terminal');
+    assert.equal(callCount, countAfterTerminal, 'polling stopped after candidates became terminal');
 
     pipeline.destroy();
   });

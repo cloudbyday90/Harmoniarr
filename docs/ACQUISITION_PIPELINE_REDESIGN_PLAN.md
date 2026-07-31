@@ -1652,6 +1652,15 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   candidate and import detail remain Advanced diagnostics. See
   [MUSIC_QUEUE_RELEASE_CENTRED_ADD_BLOCKER_RECOVERY_DESIGN.md](MUSIC_QUEUE_RELEASE_CENTRED_ADD_BLOCKER_RECOVERY_DESIGN.md).
 
-Recommended next slice: make advanced library-add diagnostics release scoped.
-The secondary handoff should carry the wanted-release identity, open the
-newest safe plan outcome first, and avoid unrelated candidate/run context.
+- [x] Make advanced library-add diagnostics release scoped. The secondary
+  handoff now carries the wanted-release identity, authorizes it for the
+  signed-in operator, opens the newest safe add outcome first, and omits
+  unrelated candidates, worker runs, paths, source users, and raw status
+  messages. See
+  [MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_DESIGN.md](MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_DESIGN.md).
+
+Recommended next slice: add **release-scoped advanced-diagnostics reload and
+cross-operator acceptance coverage**. Two isolated sessions should prove an
+owner can reload a copied diagnostic URL into the same release context, a
+sibling operator receives a generic 404, and no direct route silently falls
+back to the unscoped library-add worklist.

@@ -200,6 +200,7 @@ export const serverRouteInventory = Object.freeze([
   { method: 'POST', path: '/api/v1/import-candidates/execution-reconcile', access: 'admin', area: 'import-candidates', kind: 'mutation' },
   { method: 'GET', path: '/api/v1/import-candidates/selected-summary', access: 'authenticated', area: 'import-candidates', kind: 'read' },
   { method: 'GET', path: '/api/v1/import-candidates/import-pending-summary', access: 'authenticated', area: 'import-candidates', kind: 'read' },
+  { method: 'GET', path: '/api/v1/import-candidates/release-add-diagnostics', access: 'admin', area: 'import-candidates', kind: 'read' },
   { method: 'GET', path: '/api/v1/import-candidates/:importCandidateId', access: 'authenticated', area: 'import-candidates', kind: 'read' },
   { method: 'GET', path: '/api/v1/import-candidates/:importCandidateId/preview', access: 'admin', area: 'import-candidates', kind: 'read' },
   { method: 'GET', path: '/api/v1/import-candidates/:importCandidateId/apply-preview', access: 'admin', area: 'import-candidates', kind: 'read' },

@@ -1,0 +1,89 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createImportCandidateReleaseAddDiagnosticsService } from '../../src/server/import-candidates/import-candidate-release-add-diagnostics-service.js';
+
+const wantedReleaseId = '8f28e363-3187-48c1-bd48-0b1b613f6c9d';
+
+test('release add diagnostics returns the newest release-scoped safe outcome without raw diagnostic data', async (t) => {
+  const releaseAddDiagnosticRepository = {
+    getScopedWantedRelease: t.mock.fn(async () => ({
+      artistName: 'Forest Frank',
+      id: wantedReleaseId,
+      releaseTitle: 'Child of God',
+    })),
+    listLatestReleaseAddOutcomes: t.mock.fn(async () => [{
+      applySnapshot: {
+        apply: {
+          addBlockerCode: 'media_verification',
+          outcome: 'quality_blocked',
+          qualityGate: { hiddenPath: '/downloads/private/Child of God' },
+        },
+        candidate: {
+          username: 'private-source-user',
+        },
+      },
+      importCandidateId: 'candidate-latest',
+      itemStatus: 'blocked',
+      updatedAt: '2026-07-31T16:10:00.000Z',
+    }, {
+      applySnapshot: {
+        apply: {
+          outcome: 'applied',
+        },
+      },
+      importCandidateId: 'candidate-earlier',
+      itemStatus: 'applied',
+      updatedAt: '2026-07-31T15:50:00.000Z',
+    }]),
+  };
+  const service = createImportCandidateReleaseAddDiagnosticsService({ releaseAddDiagnosticRepository });
+
+  const diagnostics = await service.buildReleaseAddDiagnostics({
+    actorUserId: 'c5c86d81-f611-49f6-b55e-cf617f5a842f',
+    limit: 40,
+    wantedReleaseId,
+  });
+
+  assert.deepEqual(releaseAddDiagnosticRepository.getScopedWantedRelease.mock.calls[0].arguments, [{
+    appUserId: 'c5c86d81-f611-49f6-b55e-cf617f5a842f',
+    wantedReleaseId,
+  }]);
+  assert.deepEqual(releaseAddDiagnosticRepository.listLatestReleaseAddOutcomes.mock.calls[0].arguments, [{
+    limit: 25,
+    wantedReleaseId,
+  }]);
+  assert.equal(diagnostics.release.releaseTitle, 'Child of God');
+  assert.equal(diagnostics.latestOutcome.diagnosticCandidateId, 'candidate-latest');
+  assert.equal(diagnostics.latestOutcome.presentation.code, 'media_verification');
+  assert.equal(diagnostics.latestOutcome.presentation.label, 'Audio verification needs review');
+  assert.equal(diagnostics.outcomes[1].presentation.code, 'added_to_library');
+  assert.equal(JSON.stringify(diagnostics).includes('/downloads/private'), false);
+  assert.equal(JSON.stringify(diagnostics).includes('private-source-user'), false);
+  assert.equal(JSON.stringify(diagnostics).includes('qualityGate'), false);
+});
+
+test('release add diagnostics returns a generic not-found response for malformed or non-owned release IDs', async (t) => {
+  const releaseAddDiagnosticRepository = {
+    getScopedWantedRelease: t.mock.fn(async () => null),
+    listLatestReleaseAddOutcomes: t.mock.fn(async () => []),
+  };
+  const service = createImportCandidateReleaseAddDiagnosticsService({ releaseAddDiagnosticRepository });
+
+  await assert.rejects(
+    service.buildReleaseAddDiagnostics({
+      actorUserId: 'c5c86d81-f611-49f6-b55e-cf617f5a842f',
+      wantedReleaseId: 'not-a-release-id',
+    }),
+    { code: 'music_queue_release_not_found', status: 404 },
+  );
+  assert.equal(releaseAddDiagnosticRepository.getScopedWantedRelease.mock.callCount(), 0);
+
+  await assert.rejects(
+    service.buildReleaseAddDiagnostics({
+      actorUserId: 'c5c86d81-f611-49f6-b55e-cf617f5a842f',
+      wantedReleaseId,
+    }),
+    { code: 'music_queue_release_not_found', status: 404 },
+  );
+  assert.equal(releaseAddDiagnosticRepository.listLatestReleaseAddOutcomes.mock.callCount(), 0);
+});

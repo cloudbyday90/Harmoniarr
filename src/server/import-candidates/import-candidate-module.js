@@ -47,6 +47,7 @@ import { createImportCandidateAutoDownloadRunService } from './import-candidate-
 import { createImportCandidateAutoSelectionService } from './import-candidate-auto-selection-service.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
 import { createImportCandidateImportPendingSummaryService } from './import-candidate-import-pending-summary-service.js';
+import { createImportCandidateReleaseAddDiagnosticsService } from './import-candidate-release-add-diagnostics-service.js';
 import { listImportCandidateFileDecisions } from './import-candidate-file-decision-repository.js';
 import { replaceImportExecutionRunItems, updateImportExecutionRunItem, upsertImportExecutionRunItem } from './import-candidate-execution-repository.js';
 import { createImportCandidateReputationEnrichmentService } from './import-candidate-reputation-enrichment-service.js';
@@ -155,6 +156,7 @@ export function createImportCandidateModule({
     listImportCandidates: importCandidateService.listImportCandidates,
     previewImportCandidateApply: importCandidateApplyPreviewService.previewImportCandidateApply,
   }),
+  importCandidateReleaseAddDiagnosticsService = createImportCandidateReleaseAddDiagnosticsService(),
   importCandidateExecutionHeartbeatConfig = resolveImportCandidateExecutionHeartbeatConfig(),
   importCandidateExecutionHeartbeatState = createImportCandidateExecutionHeartbeatState(),
   maintenanceLockService = createMaintenanceLockService(),
@@ -397,6 +399,7 @@ export function createImportCandidateModule({
     importCandidateAutoDownloadRunService,
     importCandidateAutoSelectionService,
     importCandidateImportPendingSummaryService,
+    importCandidateReleaseAddDiagnosticsService,
     importCandidateApplyPreviewService,
     importCandidatePreviewService,
     postApplyScanService,
@@ -412,6 +415,7 @@ export function createImportCandidateModule({
       buildImportCandidateMediaInspectionSummary: importCandidateMediaInspectionSummaryService.buildImportCandidateMediaInspectionSummary,
       buildCandidateReputationSummary: importCandidateReputationEnrichmentService.buildCandidateReputationSummary,
       buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
+      buildReleaseAddDiagnostics: importCandidateReleaseAddDiagnosticsService.buildReleaseAddDiagnostics,
       buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
       bulkReviewImportCandidates: importCandidateBulkReviewService.bulkReviewImportCandidates,
       enrichCandidatesWithUploaderReputation: importCandidateReputationEnrichmentService.enrichCandidatesWithUploaderReputation,

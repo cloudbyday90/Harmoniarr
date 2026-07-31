@@ -70,6 +70,7 @@ export function registerImportCandidateRoutes(app, {
   buildImportCandidateMediaInspectionSummary,
   buildCandidateReputationSummary = () => ({}),
   buildImportPendingCandidateSummary,
+  buildReleaseAddDiagnostics = async () => ({}),
   buildSelectedImportCandidateSummary,
   bulkReviewImportCandidates,
   clearImportCandidateFileDecision,
@@ -295,6 +296,19 @@ export function registerImportCandidateRoutes(app, {
         actorUserRole: session.user?.role ?? null,
         limit: sanitizePageLimit(request.query.limit, { default: 25, max: 1000 }),
         targetUser: { id: session.appUserId },
+      }),
+    });
+  }));
+
+  app.get('/api/v1/import-candidates/release-add-diagnostics', importCandidateRoute(async (request, response) => {
+    const session = await requireAdminSessionFn(request);
+
+    response.json({
+      ok: true,
+      releaseAddDiagnostics: await buildReleaseAddDiagnostics({
+        actorUserId: session.appUserId,
+        limit: sanitizePageLimit(request.query.limit, { default: 10, max: 25 }),
+        wantedReleaseId: request.query.wantedReleaseId,
       }),
     });
   }));

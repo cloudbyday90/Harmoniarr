@@ -85,6 +85,16 @@ export function fetchImportPendingCandidateSummary({
   return apiRequest(`/api/v1/import-candidates/import-pending-summary${buildQueryString({ limit })}`);
 }
 
+export function fetchReleaseAddDiagnostics({
+  limit,
+  wantedReleaseId,
+} = {}) {
+  return apiRequest(`/api/v1/import-candidates/release-add-diagnostics${buildQueryString({
+    limit,
+    wantedReleaseId,
+  })}`);
+}
+
 export function fetchImportCandidateExecutionSummary() {
   return apiRequest('/api/v1/import-candidates/execution-summary');
 }

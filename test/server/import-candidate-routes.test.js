@@ -910,6 +910,54 @@ test('import candidate import-pending summary route returns completed-download i
   });
 });
 
+test('release-scoped add diagnostics require an administrator and forward only the owned release context', async (t) => {
+  const buildReleaseAddDiagnostics = t.mock.fn(async ({ wantedReleaseId }) => ({
+    latestOutcome: {
+      diagnosticCandidateId: 'candidate-1',
+      presentation: { code: 'media_verification' },
+    },
+    outcomes: [],
+    release: {
+      artistName: 'Forest Frank',
+      id: wantedReleaseId,
+      releaseTitle: 'Child of God',
+    },
+    summary: { status: 'warning' },
+  }));
+  const app = createImportCandidateRouteTestApp({ buildReleaseAddDiagnostics });
+  const wantedReleaseId = '8f28e363-3187-48c1-bd48-0b1b613f6c9d';
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/release-add-diagnostics?wantedReleaseId=${wantedReleaseId}&limit=100`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(buildReleaseAddDiagnostics.mock.calls[0].arguments, [{
+      actorUserId: 'user-1',
+      limit: 25,
+      wantedReleaseId,
+    }]);
+    assert.equal(payload.releaseAddDiagnostics.release.releaseTitle, 'Child of God');
+    assert.equal(payload.releaseAddDiagnostics.latestOutcome.diagnosticCandidateId, 'candidate-1');
+  });
+});
+
+test('release-scoped add diagnostics reject non-administrators', async () => {
+  const app = createImportCandidateRouteTestApp({
+    requireAdminSession: async () => {
+      throw createApiError(403, 'admin_required', 'Administrator access is required');
+    },
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/import-candidates/release-add-diagnostics?wantedReleaseId=8f28e363-3187-48c1-bd48-0b1b613f6c9d`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.equal(payload.error.code, 'admin_required');
+  });
+});
+
 test('import candidate execution summary route returns latest durable planning state', async (t) => {
   const buildImportCandidateExecutionSummary = t.mock.fn(async () => ({
     activeRun: null,

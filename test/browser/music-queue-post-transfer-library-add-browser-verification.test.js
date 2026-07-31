@@ -116,6 +116,36 @@ function buildQualityStopPayload() {
   };
 }
 
+function buildReleaseAddDiagnosticsPayload() {
+  const latestOutcome = {
+    diagnosticCandidateId: 'candidate-forest-frank-unsafe-media',
+    presentation: {
+      code: 'media_verification',
+      detail: 'Harmoniarr could not verify the downloaded audio safely, so it was not added to your library.',
+      label: 'Audio verification needs review',
+      nextStep: 'Review the release quality details before changing the quality choice or searching again.',
+      settingsRouteLabel: null,
+      settingsRouteName: null,
+      tone: 'warning',
+    },
+    updatedAt: '2026-07-26T18:06:00.000Z',
+  };
+
+  return {
+    latestOutcome,
+    outcomes: [latestOutcome],
+    release: {
+      artistName: 'Forest Frank',
+      id: 'wanted-forest-frank-unsafe-media',
+      releaseTitle: 'Child of God',
+    },
+    summary: {
+      message: latestOutcome.presentation.detail,
+      status: 'warning',
+    },
+  };
+}
+
 function buildActivityPayload({ unsafe = false } = {}) {
   if (unsafe) {
     return {
@@ -300,6 +330,17 @@ suite('Music Queue post-transfer library add browser verification', () => {
           contentType: 'application/json',
         });
       });
+      await browserContext.route(/\/api\/v1\/import-candidates\/release-add-diagnostics(?:\?.*)?$/, async (route) => {
+        const requestUrl = new URL(route.request().url());
+        assert.equal(requestUrl.searchParams.get('wantedReleaseId'), 'wanted-forest-frank-unsafe-media');
+        await route.fulfill({
+          body: JSON.stringify({
+            ok: true,
+            releaseAddDiagnostics: buildReleaseAddDiagnosticsPayload(),
+          }),
+          contentType: 'application/json',
+        });
+      });
 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
@@ -312,6 +353,15 @@ suite('Music Queue post-transfer library add browser verification', () => {
       await reviewPanel.getByRole('link', { name: 'Advanced diagnostics' }).waitFor();
       assert.equal(await reviewPanel.getByRole('button', { name: 'Allow fallback quality' }).count(), 0);
       assert.equal(await releaseRow.getByRole('link', { name: 'Open Library' }).count(), 0);
+
+      await reviewPanel.getByRole('link', { name: 'Advanced diagnostics' }).click();
+      await page.getByRole('heading', { name: 'Library-add details' }).waitFor();
+      await page.getByText('Recent safe library-add outcomes for Child of God by Forest Frank.').waitFor();
+      await page.getByRole('heading', { name: 'Audio verification needs review' }).waitFor();
+      await page.getByRole('link', { name: 'Open match diagnostics' }).first().waitFor();
+      assert.equal(new URL(page.url()).searchParams.get('wantedReleaseId'), 'wanted-forest-frank-unsafe-media');
+      assert.equal(await page.getByText('Source path').count(), 0);
+      assert.equal(await page.getByText('private-source-user').count(), 0);
 
       await browserContext.route(/\/api\/v1\/activity\/feed(?:\?.*)?$/, async (route) => {
         await route.fulfill({

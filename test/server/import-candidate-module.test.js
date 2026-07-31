@@ -72,6 +72,9 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   const importCandidateImportPendingSummaryService = {
     buildImportPendingCandidateSummary: () => {},
   };
+  const importCandidateReleaseAddDiagnosticsService = {
+    buildReleaseAddDiagnostics: () => {},
+  };
   const importCandidateExecutionRunStore = {};
   const importCandidateExecutionWorker = {};
   const importCandidateService = {
@@ -117,6 +120,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     importCandidateAutoDownloadRunService,
     importCandidateAutoSelectionService,
     importCandidateImportPendingSummaryService,
+    importCandidateReleaseAddDiagnosticsService,
     importCandidatePreviewService,
     importCandidateSelectionSummaryService,
     importCandidateService,
@@ -148,6 +152,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
   assert.equal(importCandidateModule.importCandidateAutoDownloadRunService, importCandidateAutoDownloadRunService);
   assert.equal(importCandidateModule.importCandidateAutoSelectionService, importCandidateAutoSelectionService);
   assert.equal(importCandidateModule.importCandidateImportPendingSummaryService, importCandidateImportPendingSummaryService);
+  assert.equal(importCandidateModule.importCandidateReleaseAddDiagnosticsService, importCandidateReleaseAddDiagnosticsService);
   assert.equal(importCandidateModule.importCandidateService, importCandidateService);
   assert.equal(importCandidateModule.importCandidatePreviewService, importCandidatePreviewService);
   assert.equal(importCandidateModule.importCandidateSelectionSummaryService, importCandidateSelectionSummaryService);
@@ -161,6 +166,7 @@ test('createImportCandidateModule exposes shared import candidate route dependen
     buildImportCandidateMediaInspectionSummary: importCandidateMediaInspectionSummaryService.buildImportCandidateMediaInspectionSummary,
     buildCandidateReputationSummary: importCandidateModule.importCandidateReputationEnrichmentService.buildCandidateReputationSummary,
     buildImportPendingCandidateSummary: importCandidateImportPendingSummaryService.buildImportPendingCandidateSummary,
+    buildReleaseAddDiagnostics: importCandidateReleaseAddDiagnosticsService.buildReleaseAddDiagnostics,
     buildSelectedImportCandidateSummary: importCandidateSelectionSummaryService.buildSelectedImportCandidateSummary,
     bulkReviewImportCandidates: importCandidateModule.importCandidateBulkReviewService.bulkReviewImportCandidates,
     enrichCandidatesWithUploaderReputation: importCandidateModule.importCandidateReputationEnrichmentService.enrichCandidatesWithUploaderReputation,
