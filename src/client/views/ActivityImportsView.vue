@@ -35,6 +35,7 @@ import {
   fetchImportPendingCandidateSummary,
   fetchReleaseAddDiagnostics,
 } from '../lib/import-candidate-api.js';
+import MusicQueueReleaseUnavailable from '../components/music-queue/MusicQueueReleaseUnavailable.vue';
 import { useAsyncResource } from '../composables/useAsyncResource.js';
 
 const props = defineProps({
@@ -109,6 +110,7 @@ function projectReleaseAddDiagnosticsPayload(payload) {
 
 const {
   data: importsPayload,
+  error: resourceError,
   errorMessage,
   isLoading,
   load,
@@ -138,12 +140,23 @@ const releaseAddOutcomes = computed(() => releaseAddDiagnostics.value?.outcomes 
 const releaseAddLatestOutcome = computed(() => releaseAddDiagnostics.value?.latestOutcome ?? null);
 const releaseAddRelease = computed(() => releaseAddDiagnostics.value?.release ?? null);
 const releaseAddSummary = computed(() => releaseAddDiagnostics.value?.summary ?? null);
+const isReleaseUnavailable = computed(() => (
+  isReleaseScopedDiagnostics.value
+  && resourceError.value?.status === 404
+  && resourceError.value?.code === 'music_queue_release_not_found'
+));
 const pageTitle = computed(() => (isReleaseScopedDiagnostics.value
-  ? 'Library-add details'
+  ? isReleaseUnavailable.value
+    ? 'Library-add details unavailable'
+    : 'Library-add details'
   : props.title));
 const pageSubtitle = computed(() => {
   if (!isReleaseScopedDiagnostics.value) {
     return `${props.subtitle} ${formatCandidateCountLabel(candidateCount.value)}.`;
+  }
+
+  if (isReleaseUnavailable.value) {
+    return 'This Music Queue link is not available.';
   }
 
   if (releaseAddRelease.value) {
@@ -200,13 +213,15 @@ watch(wantedReleaseId, (nextWantedReleaseId, previousWantedReleaseId) => {
         <p class="hx-page-subtitle">{{ pageSubtitle }}</p>
       </div>
       <div class="hx-page-actions">
-        <button type="button" class="hx-btn" @click="load" :disabled="isLoading">
+        <button v-if="!isReleaseUnavailable" type="button" class="hx-btn" @click="load" :disabled="isLoading">
           {{ isLoading ? 'Loading\u2026' : 'Refresh' }}
         </button>
       </div>
     </header>
 
-    <article v-if="isReleaseScopedDiagnostics" class="hx-card">
+    <MusicQueueReleaseUnavailable v-if="isReleaseUnavailable" />
+
+    <article v-else-if="isReleaseScopedDiagnostics" class="hx-card">
       <div class="hx-card-header">
         <div>
           <h3 class="hx-card-title">{{ releaseAddLatestOutcome?.presentation?.label ?? 'No library-add result yet' }}</h3>
@@ -288,13 +303,13 @@ watch(wantedReleaseId, (nextWantedReleaseId, previousWantedReleaseId) => {
       </div>
     </article>
 
-    <article v-if="errorMessage" class="hx-card">
+    <article v-if="errorMessage && !isReleaseUnavailable" class="hx-card" role="alert">
       <div class="hx-card-body">
         <span class="hx-pill" data-tone="danger">{{ errorMessage }}</span>
       </div>
     </article>
 
-    <article class="hx-card">
+    <article v-if="!isReleaseUnavailable" class="hx-card">
       <div class="hx-card-body is-flush">
         <div v-if="isLoading && !candidateCount" class="hx-card-body">
           <div class="hx-skeleton-stack">

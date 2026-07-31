@@ -111,17 +111,24 @@ Focused validation passed on 2026-07-31:
   sibling URL receives a generic 404, and the scoped page never falls back to
   the global library-add worklist. See
   [MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_BROWSER_ACCEPTANCE_DESIGN.md).
+- unavailable-state coverage also proves that this generic 404 renders the
+  shared Music Queue recovery state, hides the empty diagnostics panels and
+  raw server message, and exposes only `Open Music Queue`. See
+  [MUSIC_QUEUE_RELEASE_UNAVAILABLE_STATE_DESIGN.md](MUSIC_QUEUE_RELEASE_UNAVAILABLE_STATE_DESIGN.md).
 
 ## 6. Outcome
 
 Advanced library-add diagnostics are now release scoped. A user recovering a
 safe stop no longer has to reconstruct it from a global candidate list or an
 operation run. The normal Music Queue flow stays release centred; low-level
-file details require an intentional second handoff.
+file details require an intentional second handoff. Generic unavailable
+release URLs now use the same neutral recovery state as direct Music Queue
+links instead of contradicting the secure 404 with empty diagnostics content.
 
 ## 7. Follow-Up
 
-Reload and cross-operator acceptance coverage is complete. The next logical
-work should improve the scoped route's unavailable-state presentation so a
-generic 404 renders a dedicated release-unavailable state rather than a
-no-result card plus an error notice.
+Reload, cross-operator, and unavailable-state coverage is complete. The next
+logical UI slice is an Activity resource-state consistency pass: consolidate
+loading, empty, unavailable, and retryable-failure presentations across the
+normal Activity views without moving Advanced diagnostics back into the
+everyday workflow.

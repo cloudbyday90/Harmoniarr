@@ -39,7 +39,11 @@ test('ActivityImportsView imports every formatter used by the imports table temp
   assert.match(source, /useRoute/);
   assert.match(source, /wantedReleaseId/);
   assert.match(source, /isReleaseScopedDiagnostics/);
+  assert.match(source, /error: resourceError,/);
+  assert.match(source, /isReleaseUnavailable/);
+  assert.match(source, /MusicQueueReleaseUnavailable/);
   assert.match(source, /Library-add details/);
+  assert.match(source, /Library-add details unavailable/);
   assert.match(source, /Recent safe library-add outcomes/);
   assert.match(source, /Return to Music Queue/);
   assert.match(source, /Open match diagnostics/);

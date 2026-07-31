@@ -1668,7 +1668,13 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   identifier generator. See
   [MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_BROWSER_ACCEPTANCE_DESIGN.md](MUSIC_QUEUE_RELEASE_SCOPED_LIBRARY_ADD_DIAGNOSTICS_BROWSER_ACCEPTANCE_DESIGN.md).
 
-Recommended next slice: implement a **dedicated release-unavailable state for
-scoped library-add diagnostics**. A generic 404 should retain its secure
-semantics while replacing the mixed no-result/error presentation with one
-clear recovery action back to Music Queue.
+- [x] Render a dedicated release-unavailable state for scoped library-add
+  diagnostics. The generic 404 semantics remain intact; the view reuses the
+  neutral Music Queue recovery state, hides raw and contradictory empty
+  diagnostics content, and offers only `Open Music Queue`. See
+  [MUSIC_QUEUE_RELEASE_UNAVAILABLE_STATE_DESIGN.md](MUSIC_QUEUE_RELEASE_UNAVAILABLE_STATE_DESIGN.md).
+
+Recommended next slice: complete an **Activity resource-state consistency
+pass**. Consolidate loading, empty, unavailable, and retryable-failure
+presentations across normal Activity views so the everyday workspace provides
+clear next actions without exposing Advanced diagnostics by default.

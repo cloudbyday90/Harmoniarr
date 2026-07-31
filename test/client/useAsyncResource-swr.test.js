@@ -42,13 +42,17 @@ describe('useAsyncResource SWR', () => {
     const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
 
     let callCount = 0;
+    const failure = Object.assign(new Error('fail'), {
+      code: 'music_queue_release_not_found',
+      status: 404,
+    });
     const fetcher = async () => {
       callCount += 1;
       if (callCount === 1) return { items: [1, 2] };
-      throw new Error('fail');
+      throw failure;
     };
 
-    const { data, errorMessage, load } = useAsyncResource({
+    const { data, error: resourceError, errorMessage, load } = useAsyncResource({
       fetcher,
       immediate: false,
       project: (p) => p.items,
@@ -61,6 +65,9 @@ describe('useAsyncResource SWR', () => {
     await load();
     assert.deepEqual(data.value, [1, 2], 'stale data preserved');
     assert.equal(errorMessage.value, 'fail');
+    assert.equal(resourceError.value, failure);
+    assert.equal(resourceError.value.code, 'music_queue_release_not_found');
+    assert.equal(resourceError.value.status, 404);
   });
 
   test('pollWhile returns false when data has no active flag', async () => {
@@ -78,6 +85,33 @@ describe('useAsyncResource SWR', () => {
     assert.equal(data.value.active, false);
   });
 
+  test('clears a structured error after a successful retry', async () => {
+    const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
+
+    let shouldFail = true;
+    const failure = Object.assign(new Error('release unavailable'), {
+      code: 'music_queue_release_not_found',
+      status: 404,
+    });
+    const { data, error: resourceError, errorMessage, load } = useAsyncResource({
+      fetcher: async () => {
+        if (shouldFail) throw failure;
+        return { recovered: true };
+      },
+      immediate: false,
+    });
+
+    await load();
+    assert.equal(resourceError.value, failure);
+    assert.equal(errorMessage.value, 'release unavailable');
+
+    shouldFail = false;
+    await load();
+    assert.deepEqual(data.value, { recovered: true });
+    assert.equal(resourceError.value, null);
+    assert.equal(errorMessage.value, '');
+  });
+
   test('requires a fetcher function', async () => {
     const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
 
@@ -91,7 +125,7 @@ describe('useAsyncResource SWR', () => {
     const { useAsyncResource } = await import('../../src/client/composables/useAsyncResource.js');
 
     const fetcher = async () => ({ items: [1, 2] });
-    const { data, errorMessage, isLoading, isRevalidating, lastRefreshedAt, load, reset } = useAsyncResource({
+    const { data, error: resourceError, errorMessage, isLoading, isRevalidating, lastRefreshedAt, load, reset } = useAsyncResource({
       fetcher,
       immediate: false,
       project: (p) => p.items,
@@ -104,6 +138,7 @@ describe('useAsyncResource SWR', () => {
     reset();
 
     assert.deepEqual(data.value, null, 'data reset to initial');
+    assert.equal(resourceError.value, null);
     assert.equal(errorMessage.value, '');
     assert.equal(isLoading.value, false);
     assert.equal(isRevalidating.value, false);

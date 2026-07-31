@@ -21,7 +21,13 @@ import { RouterLink } from 'vue-router';
 </script>
 
 <template>
-  <section class="hx-empty" aria-labelledby="music-queue-release-unavailable-title">
+  <section
+    class="hx-empty"
+    aria-labelledby="music-queue-release-unavailable-title"
+    aria-live="polite"
+    aria-atomic="true"
+    role="status"
+  >
     <h2 id="music-queue-release-unavailable-title" class="hx-empty-title">Release not available</h2>
     <p class="hx-empty-copy">This Music Queue release is unavailable. Open your queue to continue.</p>
     <RouterLink class="hx-btn" data-variant="primary" :to="{ name: 'music-queue' }">

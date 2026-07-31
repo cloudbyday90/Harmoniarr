@@ -22,7 +22,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
  * Shared async-resource composable implementing stale-while-revalidate
  * semantics for read-only panels and list views.
  *
- * Owns the repeated `{ isLoading, isRevalidating, errorMessage, data, load() }`
+ * Owns the repeated `{ isLoading, isRevalidating, error, errorMessage, data, load() }`
  * pattern so individual views describe only how to fetch and how to project
  * the response.
  *
@@ -68,6 +68,7 @@ export function useAsyncResource({
 
   const isLoading = ref(immediate);
   const isRevalidating = ref(false);
+  const error = ref(null);
   const errorMessage = ref('');
   const data = ref(initialData);
   const lastRefreshedAt = ref(null);
@@ -84,6 +85,7 @@ export function useAsyncResource({
     } else {
       isLoading.value = true;
     }
+    error.value = null;
     errorMessage.value = '';
 
     try {
@@ -92,9 +94,10 @@ export function useAsyncResource({
       data.value = project(payload);
       lastRefreshedAt.value = new Date().toISOString();
       hasLoaded = true;
-    } catch (error) {
+    } catch (requestError) {
       if (unmounted) return;
-      errorMessage.value = error?.message ?? fallbackErrorMessage;
+      error.value = requestError;
+      errorMessage.value = requestError?.message ?? fallbackErrorMessage;
       if (!isRevalidation) {
         data.value = initialData;
       }
@@ -168,6 +171,7 @@ export function useAsyncResource({
   function reset() {
     clearPollTimer();
     data.value = initialData;
+    error.value = null;
     errorMessage.value = '';
     hasLoaded = false;
     isLoading.value = false;
@@ -178,6 +182,7 @@ export function useAsyncResource({
   return {
     data,
     destroy,
+    error,
     errorMessage,
     isLoading,
     isRevalidating,

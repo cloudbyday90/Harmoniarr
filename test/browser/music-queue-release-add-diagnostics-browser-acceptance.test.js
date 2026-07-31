@@ -54,12 +54,13 @@ async function waitForDiagnosticsResponse(page, { status, wantedReleaseId }) {
   });
 
   assert.equal(response.status(), status);
+  return response;
 }
 
 async function navigateToDiagnostics(page, { baseUrl, status, wantedReleaseId }) {
   const response = waitForDiagnosticsResponse(page, { status, wantedReleaseId });
   await page.goto(getDiagnosticsUrl(baseUrl, wantedReleaseId), { waitUntil: 'domcontentloaded' });
-  await response;
+  return response;
 }
 
 async function reloadDiagnostics(page, { status, wantedReleaseId }) {
@@ -94,8 +95,20 @@ async function assertCopiedDiagnosticsAreUnavailable({
   privateMarkers,
   wantedReleaseId,
 }) {
-  await navigateToDiagnostics(page, { baseUrl, status: 404, wantedReleaseId });
-  await page.getByText('Music Queue release not found').waitFor();
+  const response = await navigateToDiagnostics(page, { baseUrl, status: 404, wantedReleaseId });
+  const payload = await response.json();
+  assert.equal(payload.error?.code, 'music_queue_release_not_found');
+  const unavailableState = page.getByRole('status').filter({
+    hasText: 'This Music Queue release is unavailable. Open your queue to continue.',
+  });
+  await unavailableState.getByRole('heading', { name: 'Release not available' }).waitFor();
+  await unavailableState.getByText('This Music Queue release is unavailable. Open your queue to continue.').waitFor();
+  const returnToMusicQueue = page.getByRole('link', { name: 'Open Music Queue' });
+  assert.equal(await returnToMusicQueue.getAttribute('href'), '/app/music-queue');
+  assert.equal(await page.getByText('Music Queue release not found').count(), 0);
+  assert.equal(await page.getByText('No library-add result yet').count(), 0);
+  assert.equal(await page.getByText('No library-add history yet').count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Refresh' }).count(), 0);
   assert.equal(await page.getByRole('heading', { name: 'Audio verification needs review' }).count(), 0);
   assert.equal(await page.getByText('Import readiness').count(), 0);
   assert.equal(await page.locator('.hx-table').count(), 0);
