@@ -96,6 +96,7 @@ function buildMatchEvidence(release) {
   const statusCounts = importReviewSummary.statusCounts ?? {};
   return {
     bestCompositeScore: importReviewSummary.bestCompositeScore ?? null,
+    addBlockerCode: importReviewSummary.latestAddBlockerCode ?? null,
     executionStatusCounts: executionSummary.itemStatusCounts ?? {},
     latestEventType: importReviewSummary.latestEventType ?? null,
     latestStatus: importReviewSummary.latestStatus ?? null,
@@ -118,6 +119,7 @@ function buildAddEvidence(release) {
     ? addSummary.latestQualityGate
     : null;
   return {
+    blockerCode: addSummary.latestAddBlockerCode ?? null,
     itemStatusCounts: addSummary.itemStatusCounts ?? {},
     latestOutcome: addSummary.latestOutcome ?? null,
     latestStatus: addSummary.latestItemStatus ?? null,

@@ -363,9 +363,27 @@ test('getActivityEventLabel and detail make blocked library adds actionable with
   assert.equal(getActivityEventLabel(event), 'Library add needs help: Amber by Autechre');
   assert.equal(
     getActivityEventDetail(event),
-    'Harmoniarr stopped before changing the library. Review the library add plan to resolve the safety check.',
+    'Harmoniarr stopped before changing the library. Review the release to resolve the safety check.',
   );
   assert.equal(getActivityEventIcon(event.eventType), 'alert');
+});
+
+test('getActivityEventDetail gives a path blocker a safe, specific next step', () => {
+  const event = {
+    entityArtist: 'Autechre',
+    entityTitle: 'Amber',
+    eventType: 'music_queue_import_blocked',
+    extraPayload: {
+      addBlockerCode: 'source_path_unavailable',
+      sourcePath: '/data/downloads/Autechre/Amber',
+    },
+  };
+
+  assert.equal(
+    getActivityEventDetail(event),
+    'Harmoniarr cannot reach the completed download from its configured folders. Review the release to set up folders safely.',
+  );
+  assert.equal(getActivityEventDetail(event).includes('/data/downloads'), false);
 });
 
 test('getActivityEventLabel and detail describe a recovered provider search without diagnostics', () => {

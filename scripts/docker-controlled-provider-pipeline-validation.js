@@ -160,11 +160,10 @@ async function copyAndRunVerifier({ composeArgs, env }) {
     && parsed.qualityExhaustion.qualityRecoveryExhaustedCount === 1
     && parsed.qualityExhaustion.followUpRunId === null
     && parsed.qualityExhaustion.libraryFileCountBefore === parsed.qualityExhaustion.libraryFileCountAfter
-    && parsed.qualityExhaustion.musicQueueStatus === 'quality_choice_needed'
-    && parsed.qualityExhaustion.musicQueueNextAction === 'review_quality_choice'
+    && parsed.qualityExhaustion.musicQueueStatus === 'needs_help_adding'
+    && parsed.qualityExhaustion.musicQueueNextAction === 'review_add_plan'
     && parsed.qualityExhaustion.activityEntityId === parsed.qualityExhaustion.wantedReleaseId
-    && parsed.qualityExhaustion.activityRoute?.name === 'music-queue-release'
-    && parsed.qualityExhaustion.activityRoute?.params?.wantedReleaseId === parsed.qualityExhaustion.wantedReleaseId;
+    && parsed.qualityExhaustion.activityBlockerCode === 'media_verification';
   const sharedDiscoveryVerified = parsed?.sharedDiscovery?.providerSearchCount === 1
     && parsed?.sharedDiscovery?.providerTransferCount === 1
     && parsed.sharedDiscovery.operatorCount === 2

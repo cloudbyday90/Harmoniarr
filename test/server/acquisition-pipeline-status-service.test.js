@@ -45,7 +45,7 @@ test('deriveMusicQueueStatus treats completed downloads as ready to add', () => 
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.ADD_TO_LIBRARY);
 });
 
-test('deriveMusicQueueStatus surfaces safe-auto quality blocks before ready-to-add', () => {
+test('deriveMusicQueueStatus makes a post-download media verification stop release-centred', () => {
   const status = deriveMusicQueueStatus({
     add: {
       latestOutcome: 'quality_blocked',
@@ -56,12 +56,13 @@ test('deriveMusicQueueStatus surfaces safe-auto quality blocks before ready-to-a
     release: { missingTrackCount: 10, wantedStatus: 'missing' },
   });
 
-  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.QUALITY_CHOICE_NEEDED);
-  assert.equal(status.detail, '1 file did not pass verified lossless checks before automatic add.');
-  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE);
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.equal(status.detail, 'Harmoniarr could not verify the downloaded audio safely, so it was not added to your library.');
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
+  assert.equal(status.repair.code, 'media_verification');
 });
 
-test('deriveMusicQueueStatus surfaces an exhausted quality stop over a stale queued execution item', () => {
+test('deriveMusicQueueStatus keeps a terminal media verification stop ahead of stale queued execution', () => {
   const status = deriveMusicQueueStatus({
     add: {
       latestOutcome: 'quality_blocked',
@@ -74,8 +75,9 @@ test('deriveMusicQueueStatus surfaces an exhausted quality stop over a stale que
     release: { missingTrackCount: 10, wantedStatus: 'missing' },
   });
 
-  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.QUALITY_CHOICE_NEEDED);
-  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE);
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
+  assert.equal(status.repair.code, 'media_verification');
 });
 
 test('deriveMusicQueueStatus keeps a real active fallback download ahead of historical quality evidence', () => {
@@ -107,11 +109,13 @@ test('deriveMusicQueueStatus surfaces blocked library add work before ready-to-a
 
   assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
   assert.equal(status.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
+  assert.equal(status.repair.code, 'unsafe_add_plan');
 });
 
 test('deriveMusicQueueStatus surfaces a recorded import blocker before generic match states', () => {
   const result = deriveMusicQueueStatus({
     match: {
+      addBlockerCode: 'library_collision',
       latestEventType: 'import_candidate_import_blocked',
       statusCounts: { failed: 1, pending: 1 },
     },
@@ -124,6 +128,22 @@ test('deriveMusicQueueStatus surfaces a recorded import blocker before generic m
   assert.equal(result.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
   assert.equal(result.nextAction, MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN);
   assert.equal(result.progressStep, 'add');
+  assert.equal(result.repair.code, 'library_collision');
+  assert.equal(result.repair.settingsRouteName, undefined);
+});
+
+test('deriveMusicQueueStatus gives a folder repair only for a persisted source-path blocker', () => {
+  const status = deriveMusicQueueStatus({
+    match: {
+      addBlockerCode: 'source_path_unavailable',
+      latestEventType: 'import_candidate_import_blocked',
+    },
+    release: { missingTrackCount: 8, wantedStatus: 'missing' },
+  });
+
+  assert.equal(status.code, MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING);
+  assert.equal(status.repair.settingsRouteName, 'settings-media-storage');
+  assert.equal(status.repair.settingsRouteLabel, 'Set up folders');
 });
 
 test('deriveMusicQueueStatus keeps manually selected matches distinct from automatic recovery', () => {

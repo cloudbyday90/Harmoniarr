@@ -240,7 +240,7 @@ test('requestMusicQueueReleaseRediscovery verifies release scope before queuing 
   }]);
 });
 
-test('listMusicQueueReleases maps quality-blocked add evidence to a quality choice stop', async () => {
+test('listMusicQueueReleases maps quality-blocked add evidence to a release-centred add stop', async () => {
   const release = createRelease({ status: 'import_pending' });
   release.discoveryRequest.importReviewSummary.downloadExecutionSummary = {
     itemStatusCounts: { completed: 1 },
@@ -275,12 +275,13 @@ test('listMusicQueueReleases maps quality-blocked add evidence to a quality choi
 
   const result = await service.listMusicQueueReleases({ appUserId: 'user-1' });
 
-  assert.equal(result.releases[0].status.code, 'quality_choice_needed');
+  assert.equal(result.releases[0].status.code, 'needs_help_adding');
   assert.equal(
     result.releases[0].status.detail,
-    '1 file did not pass verified lossless checks before automatic add.',
+    'Harmoniarr could not verify the downloaded audio safely, so it was not added to your library.',
   );
-  assert.equal(result.summary.counts.quality_choice_needed, 1);
+  assert.equal(result.releases[0].status.repair.code, 'media_verification');
+  assert.equal(result.summary.counts.needs_help_adding, 1);
 });
 
 test('listMusicQueueReleases renders automatic folder readiness as a safe setup stop', async () => {

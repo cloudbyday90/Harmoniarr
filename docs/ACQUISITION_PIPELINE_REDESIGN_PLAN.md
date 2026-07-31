@@ -1646,7 +1646,12 @@ actor, and Music Queue Activity remains identity-redacted. Controlled Docker
 evidence proves one restart search and transfer, two scoped `Ready to add`
 outcomes, reciprocal 404 reads, and complete cleanup.
 
-Recommended next slice: make post-download add blockers release-centred. A
-release blocked by an unsafe import plan, collision, path visibility issue, or
-media-verification failure should expose one clear `Needs help adding` action
-and Activity handoff; candidate and import detail remain Advanced diagnostics.
+- [x] Make post-download add blockers release-centred. A release blocked by an
+  unsafe import plan, collision, path visibility issue, or media-verification
+  failure now exposes one `Needs help adding` action and Activity handoff;
+  candidate and import detail remain Advanced diagnostics. See
+  [MUSIC_QUEUE_RELEASE_CENTRED_ADD_BLOCKER_RECOVERY_DESIGN.md](MUSIC_QUEUE_RELEASE_CENTRED_ADD_BLOCKER_RECOVERY_DESIGN.md).
+
+Recommended next slice: make advanced library-add diagnostics release scoped.
+The secondary handoff should carry the wanted-release identity, open the
+newest safe plan outcome first, and avoid unrelated candidate/run context.

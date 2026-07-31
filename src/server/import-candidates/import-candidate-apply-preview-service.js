@@ -18,6 +18,7 @@
 
 import { stat } from 'node:fs/promises';
 import { createMediaLosslessRetentionPolicyService } from '../media/media-lossless-retention-policy-service.js';
+import { IMPORT_CANDIDATE_ADD_BLOCKER_CODES } from './import-candidate-add-blocker.js';
 
 function mapDecisionsByFileId(decisions) {
   return decisions.reduce((mapped, decision) => {
@@ -89,6 +90,7 @@ function buildFileStatus({ decision, libraryTarget, losslessPolicy, sourceFile }
 function buildSummary(counts, preview) {
   if ((preview?.validation?.blockers?.length ?? 0) > 0) {
     return {
+      blockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN,
       message: preview.validation.blockers[0].message,
       status: 'blocked',
     };
@@ -96,6 +98,7 @@ function buildSummary(counts, preview) {
 
   if (counts.missingSourceCount > 0) {
     return {
+      blockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.SOURCE_PATH_UNAVAILABLE,
       message: `${counts.missingSourceCount} file${counts.missingSourceCount === 1 ? ' is' : 's are'} missing from the resolved source path and block import apply.`,
       status: 'blocked',
     };
@@ -103,6 +106,7 @@ function buildSummary(counts, preview) {
 
   if (counts.collisionCount > 0) {
     return {
+      blockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.LIBRARY_COLLISION,
       message: `${counts.collisionCount} target file${counts.collisionCount === 1 ? '' : 's'} already exist in the library and require collision review before import apply.`,
       status: 'blocked',
     };
@@ -110,6 +114,7 @@ function buildSummary(counts, preview) {
 
   if (counts.lossyDecisionRequiredCount > 0) {
     return {
+      blockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN,
       message: `${counts.lossyDecisionRequiredCount} lossy transcode candidate file${counts.lossyDecisionRequiredCount === 1 ? ' requires' : 's require'} an explicit allow-lossy-derivative decision before import apply.`,
       status: 'blocked',
     };

@@ -23,6 +23,21 @@ import {
 } from '../../shared/release-activity-presentation.js';
 import { formatArtistPolicyActivityDetail } from './artist-policy-activity-presentation.js';
 
+function getMusicQueueAddBlockerDetail(addBlockerCode) {
+  switch (addBlockerCode) {
+    case 'source_path_unavailable':
+      return 'Harmoniarr cannot reach the completed download from its configured folders. Review the release to set up folders safely.';
+    case 'library_collision':
+      return 'A file for this release already exists in the library. Harmoniarr stopped before overwriting it.';
+    case 'media_verification':
+      return 'Harmoniarr could not verify the downloaded audio safely, so it was not added to the library.';
+    case 'add_failed':
+      return 'Harmoniarr stopped while adding this release. Review the release before trying anything else.';
+    default:
+      return 'Harmoniarr stopped before changing the library. Review the release to resolve the safety check.';
+  }
+}
+
 /**
  * Activity event normalization helpers.
  *
@@ -287,7 +302,7 @@ export function getActivityEventDetail(event) {
   }
 
   if (event.eventType === 'music_queue_import_blocked') {
-    return 'Harmoniarr stopped before changing the library. Review the library add plan to resolve the safety check.';
+    return getMusicQueueAddBlockerDetail(event.extraPayload?.addBlockerCode);
   }
 
   if (event.eventType !== 'release_added') {

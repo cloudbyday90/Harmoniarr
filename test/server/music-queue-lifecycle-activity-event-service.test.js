@@ -24,6 +24,7 @@ import {
   buildMusicQueueSearchQueuedActivityEvent,
   recordActivityEventSafely,
 } from '../../src/server/activity/music-queue-lifecycle-activity-event-service.js';
+import { buildMusicQueueAddBlockedActivityEvent } from '../../src/server/activity/music-queue-add-blocked-activity-event-service.js';
 
 const candidate = {
   id: 'candidate-1',
@@ -203,6 +204,36 @@ test('Music Queue recovery activity records a safe library-add stop without prov
   assert.equal(event.eventType, 'music_queue_import_blocked');
   assert.equal(event.extraPayload.terminalOutcome, 'import_blocked');
   assert.equal(JSON.stringify(event).includes('source-user'), false);
+  assert.equal(JSON.stringify(event).includes('/data/downloads'), false);
+});
+
+test('Music Queue add-blocked activity records only the release-scoped blocker category', () => {
+  const event = buildMusicQueueAddBlockedActivityEvent({
+    blockerCode: 'source_path_unavailable',
+    runId: 'apply-run-1',
+    summaryCandidate: {
+      id: 'candidate-1',
+      musicQueueContext: { wantedReleaseId: 'wanted-1' },
+      releaseIdentity: candidate.releaseIdentity,
+      sourcePath: '/data/downloads/Boards of Canada/Geogaddi',
+    },
+  });
+
+  assert.deepEqual(event, {
+    actorUserId: null,
+    entityArtist: 'Boards of Canada',
+    entityId: 'wanted-1',
+    entityTitle: 'Music Has the Right to Children',
+    entityType: 'wanted_release',
+    eventType: 'music_queue_import_blocked',
+    extraPayload: {
+      addBlockerCode: 'source_path_unavailable',
+      importCandidateId: 'candidate-1',
+      runId: 'apply-run-1',
+      schemaVersion: 1,
+      wantedReleaseId: 'wanted-1',
+    },
+  });
   assert.equal(JSON.stringify(event).includes('/data/downloads'), false);
 });
 

@@ -21,6 +21,7 @@ import {
   incrementImportCandidateDownloadAttemptCount,
   promoteImportCandidateForRecovery,
 } from './import-candidate-repository.js';
+import { normalizeImportCandidateAddBlockerCode } from './import-candidate-add-blocker.js';
 import { TERMINAL_MATCH_OUTCOME_CODES } from './import-candidate-terminal-recovery-policy.js';
 
 export const MAX_CANDIDATE_DOWNLOAD_ATTEMPTS = 3;
@@ -80,6 +81,7 @@ function resolveMetadataReleaseId(candidate) {
 }
 
 function buildRecoveryResult({
+  addBlockerCode = null,
   attemptedCandidate = null,
   failedCandidate,
   reason,
@@ -104,6 +106,11 @@ function buildRecoveryResult({
 
   if (terminalOutcome) {
     result.terminalOutcome = terminalOutcome;
+  }
+
+  const normalizedAddBlockerCode = normalizeImportCandidateAddBlockerCode(addBlockerCode);
+  if (normalizedAddBlockerCode) {
+    result.addBlockerCode = normalizedAddBlockerCode;
   }
 
   if (requiresOperator) {
@@ -389,6 +396,7 @@ export function createImportCandidateRecoveryService({
   }
 
   async function handleImportCandidateImportBlocker({
+    addBlockerCode = null,
     canRecover = false,
     failedCandidateId,
     failureReason = null,
@@ -407,15 +415,22 @@ export function createImportCandidateRecoveryService({
       });
     }
 
-    const transitionResult = await markImportCandidateImportBlocked({
+    const transitionInput = {
       importCandidateId: failedCandidateId,
       recordSourceFailure: canRecover,
       reason: failureReason,
-    });
+    };
+    const normalizedAddBlockerCode = normalizeImportCandidateAddBlockerCode(addBlockerCode);
+    if (normalizedAddBlockerCode) {
+      transitionInput.addBlockerCode = normalizedAddBlockerCode;
+    }
+
+    const transitionResult = await markImportCandidateImportBlocked(transitionInput);
     const failedAfterTransition = transitionResult?.candidate ?? failedBeforeAttempt;
 
     if (!canRecover) {
       return buildRecoveryResult({
+        addBlockerCode,
         failedCandidate: failedAfterTransition,
         reason: 'import_blocker_requires_operator',
         recovered: false,

@@ -55,6 +55,31 @@ test('previewImportCandidateApply reports ready, collision, and missing-source f
   assert.equal(preview.files[0].status.code, 'ready');
   assert.equal(preview.files[1].status.code, 'collision');
   assert.equal(preview.files[2].status.code, 'blocked');
+  assert.equal(preview.summary.blockerCode, 'source_path_unavailable');
+});
+
+test('previewImportCandidateApply classifies a collision without exposing its target path', async () => {
+  const service = createImportCandidateApplyPreviewService({
+    previewImportCandidate: async () => ({
+      naming: {
+        filePreviews: [{
+          fileId: 'file-collision',
+          filename: '02 Collision.flac',
+          libraryPath: '/data/music/Artist/Album/02 Collision.flac',
+          sourcePath: '/data/downloads/Artist/Album/02 Collision.flac',
+          stagingPath: '/data/staging/import-candidates/candidate-1/Artist/Album/02 Collision.flac',
+        }],
+      },
+      validation: { blockers: [], warnings: [] },
+    }),
+    statFn: async () => ({ isDirectory: () => false }),
+  });
+
+  const preview = await service.previewImportCandidateApply({ importCandidateId: 'candidate-1' });
+
+  assert.equal(preview.summary.status, 'blocked');
+  assert.equal(preview.summary.blockerCode, 'library_collision');
+  assert.equal(preview.summary.message.includes('/data/'), false);
 });
 
 test('previewImportCandidateApply treats saved skip decisions as warning-level skips', async () => {

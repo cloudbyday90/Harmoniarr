@@ -17,6 +17,10 @@
  */
 
 import { QUALITY_DECISION_CODES } from './acquisition-quality-policy-service.js';
+import {
+  IMPORT_CANDIDATE_ADD_BLOCKER_CODES,
+  normalizeImportCandidateAddBlockerCode,
+} from '../import-candidates/import-candidate-add-blocker.js';
 
 export const MUSIC_QUEUE_STATUS_CODES = Object.freeze({
   ADDING_TO_LIBRARY: 'adding_to_library',
@@ -139,13 +143,61 @@ const STATUS_PRESENTATION = Object.freeze({
   }),
 });
 
-function buildStatus(code, { detail = null, nextAction = null, progressStep = null } = {}) {
+const ADD_BLOCKER_REPAIRS = Object.freeze({
+  [IMPORT_CANDIDATE_ADD_BLOCKER_CODES.ADD_FAILED]: Object.freeze({
+    code: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.ADD_FAILED,
+    detail: 'Harmoniarr stopped while adding these files and left your library unchanged where it could not finish safely.',
+    nextStep: 'Review the release, then open Advanced diagnostics if you need the file-by-file result.',
+    title: 'Adding this release stopped safely',
+  }),
+  [IMPORT_CANDIDATE_ADD_BLOCKER_CODES.LIBRARY_COLLISION]: Object.freeze({
+    code: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.LIBRARY_COLLISION,
+    detail: 'A file for this release already exists in your library, so Harmoniarr stopped before overwriting it.',
+    nextStep: 'Review the release, then use Advanced diagnostics to decide how to handle the existing library file.',
+    title: 'Existing library files need review',
+  }),
+  [IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION]: Object.freeze({
+    code: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
+    detail: 'Harmoniarr could not verify the downloaded audio safely, so it was not added to your library.',
+    nextStep: 'Review the release quality details before changing the quality choice or searching again.',
+    title: 'Audio verification needs review',
+  }),
+  [IMPORT_CANDIDATE_ADD_BLOCKER_CODES.SOURCE_PATH_UNAVAILABLE]: Object.freeze({
+    code: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.SOURCE_PATH_UNAVAILABLE,
+    detail: 'Harmoniarr cannot reach the completed download from its configured folders.',
+    nextStep: 'Check the download and library folder setup. Harmoniarr will keep the library unchanged until the files are reachable.',
+    settingsRouteName: 'settings-media-storage',
+    settingsRouteLabel: 'Set up folders',
+    title: 'Completed files are not reachable',
+  }),
+  [IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN]: Object.freeze({
+    code: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN,
+    detail: 'Harmoniarr stopped before changing your library because the safe add plan needs review.',
+    nextStep: 'Review the release, then open Advanced diagnostics for the files or saved decisions that need attention.',
+    title: 'Safe add plan needs review',
+  }),
+});
+
+const DEFAULT_ADD_BLOCKER_REPAIR = Object.freeze({
+  code: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN,
+  detail: 'Harmoniarr stopped before changing your library because the completed download needs a safe add review.',
+  nextStep: 'Review the release, then open Advanced diagnostics if you need the detailed add plan.',
+  title: 'Adding this release needs review',
+});
+
+function buildStatus(code, {
+  detail = null,
+  nextAction = null,
+  progressStep = null,
+  repair = null,
+} = {}) {
   return {
     code,
     ...STATUS_PRESENTATION[code],
     detail,
     nextAction,
     progressStep,
+    repair,
   };
 }
 
@@ -180,6 +232,21 @@ function hasScheduledAutomaticSearch(search) {
 function hasTerminalSearchStop(search) {
   return search?.blockedReason === 'download_recovery_exhausted'
     || (search?.status === 'blocked' && getCount(search?.searchAttemptCount) > 0);
+}
+
+function buildAddBlockerRepair(blockerCode) {
+  const normalizedBlockerCode = normalizeImportCandidateAddBlockerCode(blockerCode);
+  return ADD_BLOCKER_REPAIRS[normalizedBlockerCode] ?? DEFAULT_ADD_BLOCKER_REPAIR;
+}
+
+function buildNeedsHelpAddingStatus({ blockerCode = null } = {}) {
+  const repair = buildAddBlockerRepair(blockerCode);
+  return buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
+    detail: repair.detail,
+    nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
+    progressStep: 'add',
+    repair,
+  });
 }
 
 export function deriveMusicQueueStatus({
@@ -223,11 +290,7 @@ export function deriveMusicQueueStatus({
   }
 
   if (match.latestEventType === 'import_candidate_import_blocked') {
-    return buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
-      detail: 'The completed download needs a safe library-add decision.',
-      nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
-      progressStep: 'add',
-    });
+    return buildNeedsHelpAddingStatus({ blockerCode: match.addBlockerCode });
   }
 
   const hasAutomaticRecoverySelection = getCount(match.recoverySelectedCount) > 0;
@@ -255,19 +318,14 @@ export function deriveMusicQueueStatus({
   }
 
   if (hasSafeAutoQualityStop) {
-    return buildStatus(MUSIC_QUEUE_STATUS_CODES.QUALITY_CHOICE_NEEDED, {
-      detail: add.message ?? add.qualityGate?.message ?? 'Downloaded files did not pass the selected audio quality check.',
-      nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_QUALITY_CHOICE,
-      progressStep: 'quality',
+    return buildNeedsHelpAddingStatus({
+      blockerCode: add.blockerCode ?? IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
     });
   }
 
   if (hasAnyStatus(add.itemStatusCounts, ['blocked', 'apply_failed'])
     || ['apply_failed', 'blocked'].includes(add.latestOutcome)) {
-    return buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
-      nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
-      progressStep: 'add',
-    });
+    return buildNeedsHelpAddingStatus({ blockerCode: add.blockerCode });
   }
 
   if (hasAnyStatus(executionStatusCounts, ['completed', 'complete']) || match.latestStatus === 'import_pending') {
@@ -278,10 +336,7 @@ export function deriveMusicQueueStatus({
   }
 
   if (hasAnyStatus(executionStatusCounts, ['blocked', 'apply_failed'])) {
-    return buildStatus(MUSIC_QUEUE_STATUS_CODES.NEEDS_HELP_ADDING, {
-      nextAction: MUSIC_QUEUE_ACTION_CODES.REVIEW_ADD_PLAN,
-      progressStep: 'add',
-    });
+    return buildNeedsHelpAddingStatus();
   }
 
   if (

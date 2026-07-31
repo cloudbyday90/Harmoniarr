@@ -49,6 +49,7 @@ function resolveImportStatus(applyPreview) {
   if (applyPreview?.summary?.status === 'blocked') {
     return {
       code: 'blocked',
+      blockerCode: applyPreview.summary.blockerCode ?? null,
       message: applyPreview.summary.message,
     };
   }

@@ -506,7 +506,7 @@ export function buildMusicQueueAction(status, recovery = null) {
     case 'open_in_library':
       return { code: 'open_in_library', label: 'Open Library', type: 'route', routeName: 'library' };
     case 'review_add_plan':
-      return { code: 'review_add_plan', label: 'Review add plan', type: 'route', routeName: 'activity-diagnostics-library-adds' };
+      return { code: 'review_add_plan', label: 'Review what needs fixing', type: 'review' };
     case 'review_matches':
       return { code: 'review_matches', label: 'Review matches', type: 'review' };
     case 'review_quality_choice':
@@ -575,6 +575,7 @@ export function normalizeMusicQueueRelease(release) {
     releaseTypeLabel,
     releaseYear,
     recovery,
+    repair: status.repair ?? null,
     searchableText: [
       release?.artistName,
       release?.releaseTitle,
@@ -746,6 +747,7 @@ export function buildMusicQueueMatchReview(release) {
     ],
     qualityGuidance: qualitySummary.reviewGuidance,
     recovery,
+    repair: release.repair,
     searchAgainLabel: recovery?.retryLabel ?? (release.statusCode === 'quality_choice_needed' ? 'Search again' : 'Try again'),
   };
 }

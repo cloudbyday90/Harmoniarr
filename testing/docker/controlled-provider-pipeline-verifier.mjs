@@ -816,16 +816,16 @@ async function runVerification() {
     offset: 0,
   });
   assert.equal(qualityExhaustionQueue.pagination.total, 1, 'the operator must see its persisted wanted release in Music Queue');
-  assert.equal(qualityExhaustionQueue.summary.counts.quality_choice_needed, 1, 'strict-quality exhaustion must project one release-centred quality decision');
+  assert.equal(qualityExhaustionQueue.summary.counts.needs_help_adding, 1, 'strict-quality exhaustion must project one release-centred add recovery');
   const qualityExhaustionMusicQueueRelease = qualityExhaustionQueue.releases[0];
   assert.equal(qualityExhaustionMusicQueueRelease.id, qualityExhaustionSeed.wantedReleaseId, 'Music Queue must preserve the persisted wanted release ID');
-  assert.equal(qualityExhaustionMusicQueueRelease.status.code, 'quality_choice_needed', 'strict-quality exhaustion must project Quality choice needed');
-  assert.equal(qualityExhaustionMusicQueueRelease.status.nextAction, 'review_quality_choice', 'the projected quality stop must lead to release review');
+  assert.equal(qualityExhaustionMusicQueueRelease.status.code, 'needs_help_adding', 'strict-quality exhaustion must project Needs help adding');
+  assert.equal(qualityExhaustionMusicQueueRelease.status.nextAction, 'review_add_plan', 'the projected add stop must lead to release recovery');
   const qualityExhaustionReleaseDetail = await acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
     appUserId: qualityExhaustionAppUserId,
     wantedReleaseId: qualityExhaustionSeed.wantedReleaseId,
   });
-  assert.equal(qualityExhaustionReleaseDetail.release.status.code, 'quality_choice_needed', 'the direct Music Queue release read must retain the quality stop');
+  assert.equal(qualityExhaustionReleaseDetail.release.status.code, 'needs_help_adding', 'the direct Music Queue release read must retain the add recovery');
   await assert.rejects(
     () => acquisitionModule.acquisitionPipelineService.getMusicQueueRelease({
       appUserId: randomUUID(),
@@ -836,14 +836,11 @@ async function runVerification() {
   );
   const qualityExhaustionActivity = await waitForActivityEvent(activityModule.activityEventService, {
     entityId: qualityExhaustionSeed.wantedReleaseId,
-    eventType: 'music_queue_quality_blocked',
+    eventType: 'music_queue_import_blocked',
   });
-  assert.equal(qualityExhaustionActivity.entityType, 'wanted_release', 'quality Activity must be correlated to the persisted wanted release');
-  assert.equal(qualityExhaustionActivity.extraPayload?.wantedReleaseId, qualityExhaustionSeed.wantedReleaseId, 'quality Activity must retain the release handoff ID');
-  assert.deepEqual(qualityExhaustionActivity.extraPayload?.route, {
-    name: 'music-queue-release',
-    params: { wantedReleaseId: qualityExhaustionSeed.wantedReleaseId },
-  }, 'quality Activity must hand the operator back to the release-centred Music Queue detail');
+  assert.equal(qualityExhaustionActivity.entityType, 'wanted_release', 'add-recovery Activity must be correlated to the persisted wanted release');
+  assert.equal(qualityExhaustionActivity.extraPayload?.wantedReleaseId, qualityExhaustionSeed.wantedReleaseId, 'add-recovery Activity must retain the release handoff ID');
+  assert.equal(qualityExhaustionActivity.extraPayload?.addBlockerCode, 'media_verification', 'add-recovery Activity must retain the safe blocker category');
   assert.equal(Object.hasOwn(qualityExhaustionActivity.extraPayload ?? {}, 'folderPath'), false, 'Activity must not expose a provider folder path');
   assert.equal(Object.hasOwn(qualityExhaustionActivity.extraPayload ?? {}, 'username'), false, 'Activity must not expose the provider username');
 
@@ -1465,7 +1462,7 @@ async function runVerification() {
       primaryFinalStatus: qualityExhaustionPrimaryFinalCandidate.status,
       qualityRecoveryExhaustedCount: qualityExhaustionApplyRun.qualityRecoveryExhaustedCount,
       activityEntityId: qualityExhaustionActivity.entityId,
-      activityRoute: qualityExhaustionActivity.extraPayload?.route ?? null,
+      activityBlockerCode: qualityExhaustionActivity.extraPayload?.addBlockerCode ?? null,
       musicQueueNextAction: qualityExhaustionMusicQueueRelease.status.nextAction,
       musicQueueStatus: qualityExhaustionMusicQueueRelease.status.code,
       wantedReleaseId: qualityExhaustionSeed.wantedReleaseId,

@@ -16,6 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import {
+  IMPORT_CANDIDATE_ADD_BLOCKER_CODES,
+  normalizeImportCandidateAddBlockerCode,
+} from './import-candidate-add-blocker.js';
+
 export const TERMINAL_MATCH_OUTCOME_CODES = Object.freeze({
   DOWNLOAD_FAILED: 'download_failed',
   DOWNLOAD_TIMED_OUT: 'download_timed_out',
@@ -74,6 +79,7 @@ export function deriveTerminalTransferOutcome({
 export function evaluateImportBlockerRecovery(applyPreview = {}) {
   if (applyPreview?.summary?.status !== 'blocked') {
     return {
+      addBlockerCode: null,
       canRecover: false,
       outcomeCode: null,
       requiresOperator: false,
@@ -92,6 +98,7 @@ export function evaluateImportBlockerRecovery(applyPreview = {}) {
 
   if (hasOnlyMissingSources) {
     return {
+      addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.SOURCE_PATH_UNAVAILABLE,
       canRecover: true,
       outcomeCode: TERMINAL_MATCH_OUTCOME_CODES.SOURCE_DISAPPEARED,
       requiresOperator: false,
@@ -99,6 +106,8 @@ export function evaluateImportBlockerRecovery(applyPreview = {}) {
   }
 
   return {
+    addBlockerCode: normalizeImportCandidateAddBlockerCode(applyPreview?.summary?.blockerCode)
+      ?? IMPORT_CANDIDATE_ADD_BLOCKER_CODES.UNSAFE_ADD_PLAN,
     canRecover: false,
     outcomeCode: TERMINAL_MATCH_OUTCOME_CODES.IMPORT_BLOCKED,
     requiresOperator: true,

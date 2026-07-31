@@ -21,6 +21,7 @@ import {
   fanOutMusicQueueActivityEvent,
   resolveMusicQueueWantedReleaseIds,
 } from './music-queue-activity-fanout-service.js';
+import { normalizeImportCandidateAddBlockerCode } from '../import-candidates/import-candidate-add-blocker.js';
 
 const MUSIC_QUEUE_ACTIVITY_SCHEMA_VERSION = 1;
 
@@ -88,6 +89,7 @@ function buildRecoveryPayload({
     ? recovery.rediscovery
     : null;
   const terminalOutcome = normalizeOptionalString(recovery?.terminalOutcome);
+  const addBlockerCode = normalizeImportCandidateAddBlockerCode(recovery?.addBlockerCode);
 
   const payload = {
     schemaVersion: MUSIC_QUEUE_ACTIVITY_SCHEMA_VERSION,
@@ -103,6 +105,10 @@ function buildRecoveryPayload({
 
   if (terminalOutcome) {
     payload.terminalOutcome = terminalOutcome;
+  }
+
+  if (addBlockerCode) {
+    payload.addBlockerCode = addBlockerCode;
   }
 
   return payload;

@@ -96,7 +96,7 @@ function buildLibraryAddSummary(row) {
     return null;
   }
 
-  return {
+  const summary = {
     itemStatusCounts: normalizeStatusCounts(row.import_apply_item_status_counts),
     latestItemStatus: row.import_apply_latest_item_status ?? null,
     latestOutcome: row.import_apply_latest_outcome ?? null,
@@ -106,6 +106,13 @@ function buildLibraryAddSummary(row) {
     qualityBlockedCount: toInteger(row.import_apply_quality_blocked_count),
     totalItemCount,
   };
+
+  if (typeof row.import_apply_latest_add_blocker_code === 'string'
+    && row.import_apply_latest_add_blocker_code.length > 0) {
+    summary.latestAddBlockerCode = row.import_apply_latest_add_blocker_code;
+  }
+
+  return summary;
 }
 
 function buildImportReviewSummary(row) {
@@ -125,6 +132,11 @@ function buildImportReviewSummary(row) {
   if (typeof row.import_candidate_latest_event_type === 'string'
     && row.import_candidate_latest_event_type.length > 0) {
     summary.latestEventType = row.import_candidate_latest_event_type;
+  }
+
+  if (typeof row.import_candidate_latest_add_blocker_code === 'string'
+    && row.import_candidate_latest_add_blocker_code.length > 0) {
+    summary.latestAddBlockerCode = row.import_candidate_latest_add_blocker_code;
   }
 
   const selectionReadiness = buildImportCandidateSelectionReadiness({
@@ -425,6 +437,7 @@ export function createLibraryWantedReleaseStore({
           import_review_summary.latest_status AS import_candidate_latest_status,
           import_review_summary.latest_updated_at AS import_candidate_latest_updated_at,
           import_review_summary.latest_event_type AS import_candidate_latest_event_type,
+          import_review_summary.latest_add_blocker_code AS import_candidate_latest_add_blocker_code,
           import_review_summary.best_composite_score AS import_candidate_best_composite_score,
           import_review_summary.second_best_composite_score AS import_candidate_second_best_composite_score,
           import_review_summary.scored_candidate_count AS import_candidate_scored_count,
@@ -439,6 +452,7 @@ export function createLibraryWantedReleaseStore({
           import_apply_summary.total_item_count AS import_apply_item_total_count,
           import_apply_summary.item_status_counts AS import_apply_item_status_counts,
           import_apply_summary.latest_item_status AS import_apply_latest_item_status,
+          import_apply_summary.latest_add_blocker_code AS import_apply_latest_add_blocker_code,
           import_apply_summary.latest_outcome AS import_apply_latest_outcome,
           import_apply_summary.latest_updated_at AS import_apply_latest_updated_at,
           import_apply_summary.quality_blocked_count AS import_apply_quality_blocked_count,
@@ -493,6 +507,14 @@ export function createLibraryWantedReleaseStore({
               ORDER BY ice.occurred_at DESC, ice.created_at DESC, ice.id DESC
               LIMIT 1
             ) AS latest_event_type,
+            (
+              SELECT NULLIF(ice.details->>'addBlockerCode', '')
+              FROM import_candidate_events ice
+              JOIN candidate_rows ON candidate_rows.id = ice.import_candidate_id
+              WHERE ice.event_type = 'import_candidate_import_blocked'
+              ORDER BY ice.occurred_at DESC, ice.created_at DESC, ice.id DESC
+              LIMIT 1
+            ) AS latest_add_blocker_code,
             (
               SELECT candidate_rows.composite_score
               FROM candidate_rows
@@ -694,6 +716,22 @@ export function createLibraryWantedReleaseStore({
               ORDER BY latest_items.updated_at DESC, latest_items.item_status ASC
               LIMIT 1
             ) AS latest_item_status,
+            (
+              SELECT CASE
+                WHEN latest_items.apply_snapshot #>> '{apply,outcome}' = 'quality_blocked'
+                  THEN 'media_verification'
+                WHEN NULLIF(latest_items.apply_snapshot #>> '{apply,addBlockerCode}', '') IS NOT NULL
+                  THEN latest_items.apply_snapshot #>> '{apply,addBlockerCode}'
+                WHEN latest_items.item_status = 'apply_failed'
+                  THEN 'add_failed'
+                WHEN latest_items.item_status = 'blocked'
+                  THEN 'unsafe_add_plan'
+                ELSE NULL
+              END
+              FROM latest_items
+              ORDER BY latest_items.updated_at DESC, latest_items.item_status ASC
+              LIMIT 1
+            ) AS latest_add_blocker_code,
             (
               SELECT latest_items.apply_snapshot #>> '{apply,outcome}'
               FROM latest_items

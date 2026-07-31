@@ -38,6 +38,7 @@ import {
   transitionImportCandidateStatus,
   upsertImportCandidate,
 } from './import-candidate-repository.js';
+import { normalizeImportCandidateAddBlockerCode } from './import-candidate-add-blocker.js';
 
 const candidateStatuses = new Set(['pending', 'held', 'rejected', 'selected', 'downloading', 'import_pending', 'applied', 'failed']);
 const DEFAULT_SLSKD_RESPONSE_POLL_ATTEMPTS = 15;
@@ -636,6 +637,7 @@ export function createImportCandidateService({
 
   async function transitionCandidateReviewStatus({
     actorUserId = null,
+    eventDetails = null,
     eventType,
     fromStatuses,
     importCandidateId,
@@ -675,6 +677,7 @@ export function createImportCandidateService({
         details: {
           sourceProvider: transitionedCandidate.sourceProvider,
           sourceSearchId: transitionedCandidate.sourceSearchId,
+          ...(eventDetails && typeof eventDetails === 'object' ? eventDetails : {}),
         },
         eventType,
         importCandidateId: transitionedCandidate.id,
@@ -703,6 +706,7 @@ export function createImportCandidateService({
         reason: normalizedReason,
         sourceProvider: transitionResult.candidate.sourceProvider,
         sourceSearchId: transitionResult.candidate.sourceSearchId,
+        ...(eventDetails && typeof eventDetails === 'object' ? eventDetails : {}),
       },
       ipAddress: requestMetadata?.ipAddress ?? null,
       userAgent: requestMetadata?.userAgent ?? null,
@@ -907,13 +911,17 @@ export function createImportCandidateService({
 
   function markImportCandidateImportBlocked({
     actorUserId = null,
+    addBlockerCode = null,
     importCandidateId,
     recordSourceFailure = false,
     reason = null,
     requestMetadata = null,
   }) {
+    const normalizedAddBlockerCode = normalizeImportCandidateAddBlockerCode(addBlockerCode);
+
     return transitionCandidateReviewStatus({
       actorUserId,
+      eventDetails: normalizedAddBlockerCode ? { addBlockerCode: normalizedAddBlockerCode } : null,
       eventType: 'import_candidate_import_blocked',
       fromStatuses: ['import_pending'],
       importCandidateId,

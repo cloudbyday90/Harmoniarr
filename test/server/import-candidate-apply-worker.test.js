@@ -448,11 +448,12 @@ test('import apply worker safe-auto mode blocks strict lossless candidates witho
     scheduleFollowUpRun: true,
   });
   assert.equal(activityEvents.length, 1);
-  assert.equal(activityEvents[0].eventType, 'music_queue_quality_blocked');
+  assert.equal(activityEvents[0].eventType, 'music_queue_import_blocked');
   assert.equal(activityEvents[0].entityId, 'wanted-1');
   assert.equal(activityEvents[0].entityTitle, 'Album');
   assert.equal(activityEvents[0].entityArtist, 'Artist');
-  assert.equal(activityEvents[0].extraPayload.blockers[0].filename, '01 Fake.flac');
+  assert.equal(activityEvents[0].extraPayload.addBlockerCode, 'media_verification');
+  assert.equal(Object.hasOwn(activityEvents[0].extraPayload, 'blockers'), false);
   assert.equal(updateImportApplyRunItem.mock.callCount(), 1);
   assert.equal(updateImportApplyRunItem.mock.calls[0].arguments[0].itemStatus, 'blocked');
   assert.match(updateImportApplyRunItem.mock.calls[0].arguments[0].statusMessage, /verified lossless checks/);

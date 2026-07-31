@@ -33,18 +33,21 @@ const wantedReleaseId = 'wanted-forest-frank-post-transfer';
 function buildRelease({ state }) {
   const states = {
     adding: {
+      code: 'adding_to_library',
       detail: 'Harmoniarr is adding verified files to your library.',
       label: 'Adding to library',
       nextAction: 'view_details',
       tone: 'info',
     },
     library: {
+      code: 'in_library',
       detail: 'Verified files are available in your library.',
       label: 'In library',
       nextAction: 'open_in_library',
       tone: 'success',
     },
     ready: {
+      code: 'ready_to_add',
       detail: 'Downloaded files passed the audio check and will be added automatically.',
       label: 'Ready to add',
       nextAction: 'add_to_library',
@@ -66,7 +69,7 @@ function buildRelease({ state }) {
     },
     releaseGroupType: 'Album',
     releaseTitle: 'Child of God',
-    status: { code: `${state}_state`, ...status },
+    status,
   };
 }
 
@@ -97,10 +100,15 @@ function buildQualityStopPayload() {
       releaseGroupType: 'Album',
       releaseTitle: 'Child of God',
       status: {
-        code: 'quality_choice_needed',
+        code: 'needs_help_adding',
         detail: 'Harmoniarr could not verify this claimed FLAC as lossless, so it was not added to your library.',
-        label: 'Quality choice needed',
-        nextAction: 'review_quality_choice',
+        label: 'Needs help adding',
+        nextAction: 'review_add_plan',
+        repair: {
+          code: 'media_verification',
+          nextStep: 'Check the audio result before choosing another file for this release.',
+          title: 'Audio check needs review',
+        },
         tone: 'warning',
       },
     }],
@@ -117,12 +125,9 @@ function buildActivityPayload({ unsafe = false } = {}) {
         entityId: 'wanted-forest-frank-unsafe-media',
         entityTitle: 'Child of God',
         entityType: 'wanted_release',
-        eventType: 'music_queue_quality_blocked',
+        eventType: 'music_queue_import_blocked',
         extraPayload: {
-          blockers: [{
-            code: 'lossless_not_verified',
-            message: 'Harmoniarr could not verify this claimed FLAC as lossless.',
-          }],
+          addBlockerCode: 'media_verification',
           wantedReleaseId: 'wanted-forest-frank-unsafe-media',
         },
         id: 'quality-blocked',
@@ -243,6 +248,7 @@ suite('Music Queue post-transfer library add browser verification', () => {
       await releaseRow.getByText('Adding to library', { exact: true }).waitFor();
       await releaseRow.getByText('Harmoniarr is adding verified files to your library.').waitFor();
 
+      await page.getByLabel('Show').selectOption('all');
       await page.getByRole('button', { name: 'Refresh' }).click();
       await releaseRow.getByText('In library', { exact: true }).waitFor();
       await releaseRow.getByRole('link', { name: 'Open Library' }).waitFor();
@@ -268,7 +274,7 @@ suite('Music Queue post-transfer library add browser verification', () => {
     }, { scenarioName: 'music_queue_post_transfer_library_add' });
   });
 
-  test('keeps unsafe media out of the library and offers only release-scoped quality repair', {
+  test('keeps unsafe media out of the library and offers one release-centred add recovery', {
     timeout: integrationRuntimeConfig.scenarioTimeoutMs,
   }, async (t) => {
     if (runtimeUnavailableReason) {
@@ -288,12 +294,23 @@ suite('Music Queue post-transfer library add browser verification', () => {
           contentType: 'application/json',
         });
       });
+      await browserContext.route(/\/api\/v1\/acquisition\/releases\/wanted-forest-frank-unsafe-media$/, async (route) => {
+        await route.fulfill({
+          body: JSON.stringify({ release: buildQualityStopPayload().releases[0] }),
+          contentType: 'application/json',
+        });
+      });
 
       await page.goto(`${baseUrl}/app/music-queue`, { waitUntil: 'domcontentloaded' });
       const releaseRow = page.locator('.music-queue-release-row').filter({ hasText: 'Child of God' });
-      await releaseRow.getByText('Quality choice needed', { exact: true }).waitFor();
+      await releaseRow.getByText('Needs help adding', { exact: true }).waitFor();
       await releaseRow.getByText('Harmoniarr could not verify this claimed FLAC as lossless, so it was not added to your library.').waitFor();
-      await releaseRow.getByRole('button', { name: 'Review quality choice' }).waitFor();
+      await releaseRow.getByRole('button', { name: 'Review what needs fixing' }).click();
+      const reviewPanel = page.locator('.music-queue-review');
+      await reviewPanel.getByRole('heading', { name: 'Audio check needs review' }).waitFor();
+      await reviewPanel.getByText('Check the audio result before choosing another file for this release.').waitFor();
+      await reviewPanel.getByRole('link', { name: 'Advanced diagnostics' }).waitFor();
+      assert.equal(await reviewPanel.getByRole('button', { name: 'Allow fallback quality' }).count(), 0);
       assert.equal(await releaseRow.getByRole('link', { name: 'Open Library' }).count(), 0);
 
       await browserContext.route(/\/api\/v1\/activity\/feed(?:\?.*)?$/, async (route) => {
@@ -304,9 +321,9 @@ suite('Music Queue post-transfer library add browser verification', () => {
       });
       await page.goto(`${baseUrl}/app/activity/feed`, { waitUntil: 'domcontentloaded' });
       const activity = page.locator('.activity-timeline-entry').filter({ hasText: 'Child of God' });
-      await activity.getByText('Quality choice needed: Child of God by Forest Frank').waitFor();
-      await activity.getByText('Harmoniarr could not verify this claimed FLAC as lossless.').waitFor();
-      await activity.getByRole('link', { name: 'Review quality choice' }).waitFor();
+      await activity.getByText('Library add needs help: Child of God by Forest Frank').waitFor();
+      await activity.getByText('Harmoniarr could not verify the downloaded audio safely, so it was not added to the library.').waitFor();
+      await activity.getByRole('link', { name: 'Review what needs fixing' }).waitFor();
       assert.equal(await activity.getByRole('link', { name: 'Open Library' }).count(), 0);
 
       await browserContext.unrouteAll({ behavior: 'ignoreErrors' });

@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { buildMusicQueueQualityBlockedActivityEvent } from '../activity/music-queue-quality-activity-presentation-service.js';
+import { buildMusicQueueAddBlockedActivityEvent } from '../activity/music-queue-add-blocked-activity-event-service.js';
 import { recordActivityEventSafely } from '../activity/music-queue-lifecycle-activity-event-service.js';
 import { buildReleaseAddedActivityEvent } from '../activity/release-added-activity-presentation-service.js';
 import { buildRequestFulfilledActivityEvent } from '../activity/request-fulfillment-activity-event-service.js';
@@ -24,6 +24,10 @@ import { classifyApplyOutcomeQuality } from '../activity/source-user-outcome-qua
 import { createOperationRunLeaseHeartbeat } from '../heartbeat/operation-run-lease-heartbeat.js';
 import { assessDeliveredQuality } from '../media/media-delivery-quality.js';
 import { createImportCandidateSafeAutoAddQualityGateService } from './import-candidate-safe-auto-add-quality-gate.js';
+import {
+  IMPORT_CANDIDATE_ADD_BLOCKER_CODES,
+  normalizeImportCandidateAddBlockerCode,
+} from './import-candidate-add-blocker.js';
 import {
   isOperationRunCancellationError,
   isOperationRunPauseError,
@@ -88,10 +92,13 @@ function buildSkippedUnsafeCandidateCount(importPendingSummary, runItems, applyS
 }
 
 function createBaseSnapshot(summaryCandidate) {
+  const addBlockerCode = normalizeImportCandidateAddBlockerCode(summaryCandidate?.importStatus?.blockerCode);
+
   return {
     apply: {
       executionMode: 'move',
       requestedAt: new Date().toISOString(),
+      ...(addBlockerCode ? { addBlockerCode } : {}),
     },
     candidate: {
       fileCount: summaryCandidate.fileCount,
@@ -310,6 +317,11 @@ export function createImportCandidateApplyWorker({
             operationRunId: runId,
             statusMessage: summaryCandidate.importStatus.message,
           });
+          recordActivityEventSafely(recordActivityEventFn, buildMusicQueueAddBlockedActivityEvent({
+            blockerCode: summaryCandidate.importStatus.blockerCode,
+            runId,
+            summaryCandidate,
+          }));
           continue;
         }
 
@@ -328,6 +340,7 @@ export function createImportCandidateApplyWorker({
                   ...baseSnapshot,
                   apply: {
                     ...baseSnapshot.apply,
+                    addBlockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
                     outcome: 'quality_blocked',
                     qualityGate,
                   },
@@ -342,8 +355,8 @@ export function createImportCandidateApplyWorker({
                 statusMessage: qualityGate.message,
               });
               if (typeof recordActivityEventFn === 'function') {
-                recordActivityEventSafely(recordActivityEventFn, buildMusicQueueQualityBlockedActivityEvent({
-                  qualityGate,
+                recordActivityEventSafely(recordActivityEventFn, buildMusicQueueAddBlockedActivityEvent({
+                  blockerCode: IMPORT_CANDIDATE_ADD_BLOCKER_CODES.MEDIA_VERIFICATION,
                   runId,
                   summaryCandidate,
                 }));

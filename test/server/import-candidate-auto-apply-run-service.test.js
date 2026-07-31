@@ -83,6 +83,7 @@ test('startSafeApplyRunAfterDownloadCompleted promotes another match when comple
   });
 
   assert.deepEqual(handleImportCandidateImportBlocker.mock.calls[0].arguments[0], {
+    addBlockerCode: 'source_path_unavailable',
     canRecover: true,
     failedCandidateId: 'candidate-missing-source',
     failureReason: 'The expected source file is not reachable from the resolved download path.',
@@ -113,6 +114,7 @@ test('startSafeApplyRunAfterDownloadCompleted stops collisions before any automa
       },
       preview: { validation: { blockers: [] } },
       summary: {
+        blockerCode: 'library_collision',
         message: 'A target library path already exists.',
         status: 'blocked',
       },
@@ -125,6 +127,7 @@ test('startSafeApplyRunAfterDownloadCompleted stops collisions before any automa
   });
 
   assert.equal(handleImportCandidateImportBlocker.mock.calls[0].arguments[0].canRecover, false);
+  assert.equal(handleImportCandidateImportBlocker.mock.calls[0].arguments[0].addBlockerCode, 'library_collision');
   assert.equal(startImportCandidateApplyRun.mock.callCount(), 0);
   assert.equal(result.skippedReason, 'import_blocker_requires_operator');
   assert.equal(result.recovery.requiresOperator, true);

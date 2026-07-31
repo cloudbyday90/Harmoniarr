@@ -47,7 +47,7 @@ export function buildActivityEventLinkTarget(event = {}) {
             || event.eventType === 'music_queue_audio_warning'
             ? 'Review quality choice'
             : event.eventType === 'music_queue_import_blocked'
-              ? 'Review library add plan'
+              ? 'Review what needs fixing'
             : 'Open Music Queue',
           to: {
             name: 'music-queue-release',

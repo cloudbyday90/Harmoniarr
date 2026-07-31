@@ -37,6 +37,7 @@ test('allows automatic fallback only when a completed candidate source disappear
   });
 
   assert.deepEqual(recovery, {
+    addBlockerCode: 'source_path_unavailable',
     canRecover: true,
     outcomeCode: TERMINAL_MATCH_OUTCOME_CODES.SOURCE_DISAPPEARED,
     requiresOperator: false,
@@ -51,7 +52,7 @@ test('keeps collisions and validation blockers behind a manual import repair', (
       missingSourceCount: 0,
     },
     preview: { validation: { blockers: [] } },
-    summary: { status: 'blocked' },
+    summary: { blockerCode: 'library_collision', status: 'blocked' },
   });
   const validationRecovery = evaluateImportBlockerRecovery({
     counts: {
@@ -64,9 +65,15 @@ test('keeps collisions and validation blockers behind a manual import repair', (
   });
 
   assert.deepEqual(collisionRecovery, {
+    addBlockerCode: 'library_collision',
     canRecover: false,
     outcomeCode: TERMINAL_MATCH_OUTCOME_CODES.IMPORT_BLOCKED,
     requiresOperator: true,
   });
-  assert.deepEqual(validationRecovery, collisionRecovery);
+  assert.deepEqual(validationRecovery, {
+    addBlockerCode: 'unsafe_add_plan',
+    canRecover: false,
+    outcomeCode: TERMINAL_MATCH_OUTCOME_CODES.IMPORT_BLOCKED,
+    requiresOperator: true,
+  });
 });

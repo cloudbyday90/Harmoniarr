@@ -104,7 +104,7 @@ test('buildActivityEventLinkTarget resolves Music Queue lifecycle events to the 
   });
 });
 
-test('buildActivityEventLinkTarget resolves import safety stops to the library add plan', () => {
+test('buildActivityEventLinkTarget resolves import safety stops to release-centred recovery', () => {
   const target = buildActivityEventLinkTarget({
     entityId: 'wanted-1',
     entityType: 'wanted_release',
@@ -113,7 +113,7 @@ test('buildActivityEventLinkTarget resolves import safety stops to the library a
   });
 
   assert.deepEqual(target, {
-    label: 'Review library add plan',
+    label: 'Review what needs fixing',
     to: {
       name: 'music-queue-release',
       params: { wantedReleaseId: 'wanted-1' },

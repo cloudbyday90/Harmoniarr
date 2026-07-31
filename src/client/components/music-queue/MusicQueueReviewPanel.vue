@@ -130,6 +130,26 @@ function isReleaseActionRunning(action) {
         </div>
       </section>
 
+      <section v-if="review.repair" class="music-queue-review__section" aria-labelledby="music-queue-review-repair">
+        <div>
+          <h3 id="music-queue-review-repair">{{ review.repair.title }}</h3>
+          <p>{{ review.repair.nextStep }}</p>
+        </div>
+        <div class="music-queue-review__actions">
+          <RouterLink
+            v-if="review.repair.settingsRouteName"
+            class="hx-btn"
+            data-variant="primary"
+            :to="{ name: review.repair.settingsRouteName }"
+          >
+            {{ review.repair.settingsRouteLabel }}
+          </RouterLink>
+          <RouterLink class="hx-btn" :data-variant="review.repair.settingsRouteName ? 'ghost' : 'primary'" :to="{ name: 'activity-diagnostics-library-adds' }">
+            Advanced diagnostics
+          </RouterLink>
+        </div>
+      </section>
+
       <section v-if="presentation.hasQualityChoice || review.action?.type === 'route'" class="music-queue-review__section" aria-labelledby="music-queue-review-continue">
         <div>
           <h3 id="music-queue-review-continue">Continue this release</h3>

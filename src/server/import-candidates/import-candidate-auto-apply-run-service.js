@@ -66,6 +66,7 @@ export function createImportCandidateAutoApplyRunService({
     }
 
     const recovery = await handleImportCandidateImportBlocker({
+      addBlockerCode: policy.addBlockerCode,
       canRecover: policy.canRecover,
       failedCandidateId: importCandidateId,
       failureReason: applyPreview?.summary?.message ?? null,
