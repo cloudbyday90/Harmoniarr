@@ -16,9 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { getErrorMessage } from '../lib/error-utils.js';
 import { fetchSettings as defaultFetchSettings, updateSettings as defaultUpdateSettings } from '../lib/settings-api.js';
+import { buildSettingsFormFingerprint } from '../lib/settings-form-fingerprint.js';
 import { buildSettingsUpdatePayload, normalizeDownloadMappings, normalizeUserMusicRoots } from '../lib/settings-form.js';
 import { formatCommaSeparatedList } from '../lib/settings-media-storage-presentation.js';
 import { buildSettingsSaveSuccessMessage } from '../lib/settings-save-presentation.js';
@@ -31,8 +32,12 @@ export function useSettingsForm({
 } = {}) {
   const isLoading = ref(true);
   const isSaving = ref(false);
+  const hasSaved = ref(false);
+  const loadErrorMessage = ref('');
+  const saveErrorMessage = ref('');
   const errorMessage = ref('');
   const successMessage = ref('');
+  const savedFingerprint = ref(null);
 
   const form = reactive({
     artwork: {
@@ -148,6 +153,11 @@ export function useSettingsForm({
     },
   });
 
+  const isDirty = computed(() => (
+    savedFingerprint.value !== null
+    && buildSettingsFormFingerprint(form) !== savedFingerprint.value
+  ));
+
   function applySettings(payload) {
     Object.assign(form.artwork, {
       ...payload.settings.artwork,
@@ -200,15 +210,32 @@ export function useSettingsForm({
       ...normalizeUserMusicRoots(payload.settings.paths?.userMusicRoots),
     );
     if (extraApply) extraApply(payload);
+    savedFingerprint.value = buildSettingsFormFingerprint(form);
   }
+
+  watch(form, () => {
+    if (isSaving.value || !isDirty.value) return;
+
+    if (errorMessage.value === saveErrorMessage.value) {
+      errorMessage.value = '';
+    }
+    saveErrorMessage.value = '';
+    successMessage.value = '';
+  }, { deep: true });
 
   async function loadSettings() {
     isLoading.value = true;
     errorMessage.value = '';
+    loadErrorMessage.value = '';
+    saveErrorMessage.value = '';
+    successMessage.value = '';
+    hasSaved.value = false;
     try {
       applySettings(await fetchSettingsFn());
     } catch (error) {
-      errorMessage.value = getErrorMessage(error, 'Settings load failed');
+      const message = getErrorMessage(error, 'Settings load failed');
+      errorMessage.value = message;
+      loadErrorMessage.value = message;
     } finally {
       isLoading.value = false;
     }
@@ -217,14 +244,20 @@ export function useSettingsForm({
   async function saveSettings() {
     isSaving.value = true;
     errorMessage.value = '';
+    saveErrorMessage.value = '';
     successMessage.value = '';
     try {
       const payload = await updateSettingsFn(buildSettingsUpdatePayload(form));
       applySettings(payload);
+      hasSaved.value = true;
       successMessage.value = buildSettingsSaveSuccessMessage(payload);
       if (onSaveSuccess) onSaveSuccess(payload);
+      return { ok: true, payload };
     } catch (error) {
-      errorMessage.value = getErrorMessage(error, 'Settings save failed');
+      const message = getErrorMessage(error, 'Settings save failed');
+      errorMessage.value = message;
+      saveErrorMessage.value = message;
+      return { ok: false };
     } finally {
       isSaving.value = false;
     }
@@ -234,9 +267,13 @@ export function useSettingsForm({
     applySettings,
     errorMessage,
     form,
+    hasSaved,
+    isDirty,
     isLoading,
     isSaving,
+    loadErrorMessage,
     loadSettings,
+    saveErrorMessage,
     saveSettings,
     successMessage,
   };

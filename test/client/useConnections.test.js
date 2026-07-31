@@ -60,7 +60,11 @@ test('useConnections connectSpotifyOAuth resets state and surfaces error on fail
 
   await connections.connectSpotifyOAuth();
 
-  assert.equal(connections.errorMessage.value, 'spotify start failed');
+  assert.equal(connections.errorMessage.value, 'Spotify authorization could not start. Try again.');
+  assert.deepEqual(connections.connectionActionFeedback.value, {
+    message: 'Spotify authorization could not start. Try again.',
+    tone: 'danger',
+  });
   assert.equal(connections.isStartingSpotifyOAuth.value, false);
 });
 
@@ -75,6 +79,10 @@ test('useConnections disconnectSpotifyOAuth updates secretStatus and success mes
 
   assert.equal(connections.secretStatus.value.providers.spotifyOAuth.linked, false);
   assert.equal(connections.successMessage.value, 'Spotify authorization cleared.');
+  assert.deepEqual(connections.connectionActionFeedback.value, {
+    message: 'Spotify authorization cleared.',
+    tone: 'success',
+  });
   assert.equal(connections.isClearingSpotifyOAuth.value, false);
 });
 
@@ -102,6 +110,23 @@ test('useConnections disconnectYouTubeOAuth updates secretStatus and surfaces cl
   await connections.disconnectYouTubeOAuth();
 
   assert.equal(connections.secretStatus.value.providers.youtubeOAuth.linked, true);
-  assert.equal(connections.errorMessage.value, 'youtube clear failed');
+  assert.equal(connections.errorMessage.value, 'YouTube authorization could not be cleared. Try again.');
+  assert.deepEqual(connections.connectionActionFeedback.value, {
+    message: 'YouTube authorization could not be cleared. Try again.',
+    tone: 'danger',
+  });
   assert.equal(connections.isClearingYouTubeOAuth.value, false);
+});
+
+test('useConnections clears stale connection action feedback before another settings action', async () => {
+  const connections = useConnections({
+    startSpotifyOAuthFn: async () => { throw new Error('not rendered'); },
+    useSettingsFormFn: createSettingsFormStub(),
+  });
+
+  await connections.connectSpotifyOAuth();
+  assert.notEqual(connections.connectionActionFeedback.value, null);
+  connections.clearConnectionActionFeedback();
+
+  assert.equal(connections.connectionActionFeedback.value, null);
 });

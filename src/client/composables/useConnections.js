@@ -35,6 +35,10 @@ function updateOAuthStatus(secretStatus, providerKey, status) {
   }
 }
 
+function buildOAuthActionFailureMessage(providerName, action) {
+  return `${providerName} authorization could not ${action}. Try again.`;
+}
+
 export function useConnections({
   clearSpotifyOAuthFn = clearSpotifyOAuth,
   clearYouTubeOAuthFn = clearYouTubeOAuth,
@@ -48,6 +52,7 @@ export function useConnections({
   const isClearingSpotifyOAuth = ref(false);
   const isStartingYouTubeOAuth = ref(false);
   const isClearingYouTubeOAuth = ref(false);
+  const connectionActionFeedback = ref(null);
   const secretStatus = ref(null);
 
   const settingsForm = useSettingsFormFn({
@@ -64,34 +69,49 @@ export function useConnections({
   const {
     errorMessage,
     form,
+    hasSaved,
+    isDirty,
     isLoading,
     isSaving,
+    loadErrorMessage,
     loadSettings,
+    saveErrorMessage,
     saveSettings,
     successMessage,
   } = settingsForm;
 
+  function clearConnectionActionFeedback() {
+    connectionActionFeedback.value = null;
+  }
+
   async function connectSpotifyOAuth() {
     isStartingSpotifyOAuth.value = true;
+    connectionActionFeedback.value = null;
     errorMessage.value = '';
     try {
       const payload = await startSpotifyOAuthFn();
       redirectToUrl(payload.authorizationUrl);
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'Spotify authorization start failed';
+    } catch {
+      const message = buildOAuthActionFailureMessage('Spotify', 'start');
+      errorMessage.value = message;
+      connectionActionFeedback.value = { message, tone: 'danger' };
       isStartingSpotifyOAuth.value = false;
     }
   }
 
   async function disconnectSpotifyOAuth() {
     isClearingSpotifyOAuth.value = true;
+    connectionActionFeedback.value = null;
     errorMessage.value = '';
     try {
       const payload = await clearSpotifyOAuthFn();
       updateOAuthStatus(secretStatus, 'spotifyOAuth', payload.status);
       successMessage.value = 'Spotify authorization cleared.';
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'Spotify authorization clear failed';
+      connectionActionFeedback.value = { message: successMessage.value, tone: 'success' };
+    } catch {
+      const message = buildOAuthActionFailureMessage('Spotify', 'be cleared');
+      errorMessage.value = message;
+      connectionActionFeedback.value = { message, tone: 'danger' };
     } finally {
       isClearingSpotifyOAuth.value = false;
     }
@@ -99,25 +119,32 @@ export function useConnections({
 
   async function connectYouTubeOAuth() {
     isStartingYouTubeOAuth.value = true;
+    connectionActionFeedback.value = null;
     errorMessage.value = '';
     try {
       const payload = await startYouTubeOAuthFn();
       redirectToUrl(payload.authorizationUrl);
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'YouTube authorization start failed';
+    } catch {
+      const message = buildOAuthActionFailureMessage('YouTube', 'start');
+      errorMessage.value = message;
+      connectionActionFeedback.value = { message, tone: 'danger' };
       isStartingYouTubeOAuth.value = false;
     }
   }
 
   async function disconnectYouTubeOAuth() {
     isClearingYouTubeOAuth.value = true;
+    connectionActionFeedback.value = null;
     errorMessage.value = '';
     try {
       const payload = await clearYouTubeOAuthFn();
       updateOAuthStatus(secretStatus, 'youtubeOAuth', payload.status);
       successMessage.value = 'YouTube authorization cleared.';
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'YouTube authorization clear failed';
+      connectionActionFeedback.value = { message: successMessage.value, tone: 'success' };
+    } catch {
+      const message = buildOAuthActionFailureMessage('YouTube', 'be cleared');
+      errorMessage.value = message;
+      connectionActionFeedback.value = { message, tone: 'danger' };
     } finally {
       isClearingYouTubeOAuth.value = false;
     }
@@ -126,17 +153,23 @@ export function useConnections({
   return {
     connectSpotifyOAuth,
     connectYouTubeOAuth,
+    clearConnectionActionFeedback,
+    connectionActionFeedback: readonly(connectionActionFeedback),
     disconnectSpotifyOAuth,
     disconnectYouTubeOAuth,
     errorMessage,
     form,
+    hasSaved,
     isClearingSpotifyOAuth: readonly(isClearingSpotifyOAuth),
     isClearingYouTubeOAuth: readonly(isClearingYouTubeOAuth),
+    isDirty,
     isLoading,
     isSaving,
     isStartingSpotifyOAuth: readonly(isStartingSpotifyOAuth),
     isStartingYouTubeOAuth: readonly(isStartingYouTubeOAuth),
+    loadErrorMessage,
     loadSettings,
+    saveErrorMessage,
     saveSettings,
     secretStatus: readonly(secretStatus),
     successMessage,

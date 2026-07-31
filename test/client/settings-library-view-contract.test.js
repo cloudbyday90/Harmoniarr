@@ -38,10 +38,10 @@ test('SettingsLibraryView renders the Discovery scheduling form in the default b
   assert.match(source, /Control how often Harmoniarr searches/);
 });
 
-test('SettingsLibraryView hides the form when in error state', async () => {
+test('SettingsLibraryView hides the form only when its initial load fails', async () => {
   const source = await readFile(VIEW_PATH, 'utf8');
 
-  assert.match(source, /v-else-if="errorMessage && !successMessage"/);
+  assert.match(source, /v-else-if="loadErrorMessage"/);
   assert.match(source, /<h3 class="hx-card-title">Settings unavailable<\/h3>/);
 });
 
@@ -71,7 +71,7 @@ test('SettingsLibraryView labels all fields with hx-field-label', async () => {
 
   assert.match(source, /<label class="hx-field-label">Automatic cooldown \(hours\)<\/label>/);
   assert.match(source, /<label class="hx-field-label">Fallback cooldown \(hours\)<\/label>/);
-  assert.match(source, /<label class="hx-field-label">Batch size<\/label>/);
+  assert.match(source, /<label class="hx-field-label" for="settings-library-discovery-batch-size">Batch size<\/label>/);
   assert.match(source, /<label class="hx-field-label">Max search attempts<\/label>/);
 });
 
@@ -79,10 +79,9 @@ test('SettingsLibraryView submits through saveSettings with save-state feedback'
   const source = await readFile(VIEW_PATH, 'utf8');
 
   assert.match(source, /@submit\.prevent="saveSettings"/);
-  assert.match(source, /:disabled="isSaving"/);
-  assert.match(source, /cfg-save-msg is-error/);
-  assert.match(source, /cfg-save-msg is-success/);
-  assert.match(source, /isSaving \? 'Saving\.\.\.' : 'Save settings'/);
+  assert.match(source, /import SettingsSaveBar from '\.\.\/components\/settings\/SettingsSaveBar\.vue'/);
+  assert.match(source, /buildSettingsSaveState/);
+  assert.match(source, /<SettingsSaveBar :save-state="settingsSaveState" \/>/);
 });
 
 test('SettingsLibraryView renders loading state before settings are fetched', async () => {

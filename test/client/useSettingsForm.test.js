@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { nextTick } from 'vue';
 import { useSettingsForm } from '../../src/client/composables/useSettingsForm.js';
 
 function createSettingsPayload(overrides = {}) {
@@ -95,14 +96,15 @@ test('useSettingsForm loadSettings fetches and applies settings', async () => {
   assert.equal(form.providers.spotifyEnabled, true);
 });
 
-test('useSettingsForm loadSettings sets error on failure', async () => {
-  const { errorMessage, isLoading, loadSettings } = useSettingsForm({
+test('useSettingsForm loadSettings sets a dedicated load error on failure', async () => {
+  const { errorMessage, isLoading, loadErrorMessage, loadSettings } = useSettingsForm({
     fetchSettingsFn: async () => { throw new Error('Network error'); },
   });
 
   await loadSettings();
 
   assert.equal(errorMessage.value, 'Network error');
+  assert.equal(loadErrorMessage.value, 'Network error');
   assert.equal(isLoading.value, false);
 });
 
@@ -165,16 +167,60 @@ test('useSettingsForm saveSettings surfaces bounded Music Queue folder recovery'
   );
 });
 
-test('useSettingsForm saveSettings sets error on failure', async () => {
-  const { errorMessage, loadSettings, saveSettings } = useSettingsForm({
+test('useSettingsForm saveSettings leaves a retryable save error without creating a load error', async () => {
+  const {
+    errorMessage,
+    form,
+    isDirty,
+    loadErrorMessage,
+    loadSettings,
+    saveErrorMessage,
+    saveSettings,
+  } = useSettingsForm({
     fetchSettingsFn: async () => createSettingsPayload(),
     updateSettingsFn: async () => { throw new Error('Save failed'); },
   });
 
   await loadSettings();
+  form.system.logLevel = 'warn';
   await saveSettings();
 
   assert.equal(errorMessage.value, 'Save failed');
+  assert.equal(saveErrorMessage.value, 'Save failed');
+  assert.equal(loadErrorMessage.value, '');
+  assert.equal(isDirty.value, true);
+
+  form.system.baseUrl = 'https://retry.example';
+  await nextTick();
+
+  assert.equal(saveErrorMessage.value, '');
+  assert.equal(errorMessage.value, '');
+});
+
+test('useSettingsForm tracks dirty state and resets it only after a successful save', async () => {
+  const payload = createSettingsPayload();
+  const {
+    form,
+    hasSaved,
+    isDirty,
+    loadSettings,
+    saveSettings,
+  } = useSettingsForm({
+    fetchSettingsFn: async () => createSettingsPayload(),
+    updateSettingsFn: async () => payload,
+  });
+
+  await loadSettings();
+  assert.equal(isDirty.value, false);
+  assert.equal(hasSaved.value, false);
+
+  form.library.discoveryBatchSize = 12;
+  assert.equal(isDirty.value, true);
+
+  const outcome = await saveSettings();
+  assert.equal(outcome.ok, true);
+  assert.equal(isDirty.value, false);
+  assert.equal(hasSaved.value, true);
 });
 
 test('useSettingsForm applySettings clears sensitive fields', async () => {

@@ -18,7 +18,9 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
+import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
+import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
 
 const SCORING_WEIGHT_DEFAULTS = {
   weightFormatTier: 0.25,
@@ -51,14 +53,25 @@ const NAMING_DEFAULTS = {
 };
 
 const {
-  errorMessage,
   form,
+  hasSaved,
+  isDirty,
   isLoading,
   isSaving,
+  loadErrorMessage,
   loadSettings,
+  saveErrorMessage,
   saveSettings,
   successMessage,
 } = useSettingsForm();
+
+const settingsSaveState = computed(() => buildSettingsSaveState({
+  hasSaved: hasSaved.value,
+  isDirty: isDirty.value,
+  isSaving: isSaving.value,
+  saveErrorMessage: saveErrorMessage.value,
+  successMessage: successMessage.value,
+}));
 
 const scoringSum = computed(() =>
   Object.values(form.scoring).reduce((sum, w) => sum + (typeof w === 'number' ? w : 0), 0),
@@ -87,11 +100,11 @@ onMounted(() => { void loadSettings(); });
       </div>
     </article>
 
-    <article class="hx-card" v-else-if="errorMessage && !successMessage">
+    <article class="hx-card" v-else-if="loadErrorMessage">
       <div class="hx-card-header">
         <div>
           <h3 class="hx-card-title">Settings unavailable</h3>
-          <p class="hx-card-subtitle">{{ errorMessage }}</p>
+          <p class="hx-card-subtitle">{{ loadErrorMessage }}</p>
         </div>
       </div>
     </article>
@@ -125,8 +138,8 @@ onMounted(() => { void loadSettings(); });
             <p class="cfg-group-title">Search limits</p>
             <div class="hx-form-row">
               <div class="hx-field">
-                <label class="hx-field-label">Batch size</label>
-                <input class="hx-input" v-model.number="form.library.discoveryBatchSize" type="number" min="1" max="50" step="1" />
+                <label class="hx-field-label" for="settings-library-discovery-batch-size">Batch size</label>
+                <input id="settings-library-discovery-batch-size" class="hx-input" v-model.number="form.library.discoveryBatchSize" type="number" min="1" max="50" step="1" />
                 <p class="cfg-field-hint">How many releases to search for in a single dispatch cycle. Default is 5.</p>
               </div>
               <div class="hx-field">
@@ -441,13 +454,7 @@ onMounted(() => { void loadSettings(); });
         </SettingsDisclosure>
       </div>
 
-      <div class="cfg-save-bar">
-        <span class="cfg-save-msg is-error" v-if="errorMessage">{{ errorMessage }}</span>
-        <span class="cfg-save-msg is-success" v-else-if="successMessage">{{ successMessage }}</span>
-        <button type="submit" class="hx-btn" data-variant="primary" :disabled="isSaving">
-          {{ isSaving ? 'Saving...' : 'Save settings' }}
-        </button>
-      </div>
+      <SettingsSaveBar :save-state="settingsSaveState" />
     </form>
   </div>
 </template>

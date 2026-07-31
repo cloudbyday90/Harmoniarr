@@ -1688,7 +1688,14 @@ outcomes, reciprocal 404 reads, and complete cleanup.
   cannot expose provider exception details. See
   [SETTINGS_PROVIDER_STATE_RECOVERY_CONSISTENCY_DESIGN.md](SETTINGS_PROVIDER_STATE_RECOVERY_CONSISTENCY_DESIGN.md).
 
-Recommended next slice: complete a **Settings save-state consistency pass**.
-Normalize saved, saving, saved-but-unverified, and retryable-save failure
-feedback across Connections, Media & storage, and Library so each primary
-Settings surface has one clear outcome and one safe next action.
+- [x] Complete a Settings save-state consistency pass. Connections, Media &
+  storage, and Library now share an accessible saved, saving, unsaved,
+  retryable-save failure, and saved-but-unverified contract. Initial load
+  failure remains separate from a save failure, and write-only secrets are
+  excluded from dirty-state baselines. See
+  [SETTINGS_SAVE_STATE_CONSISTENCY_DESIGN.md](SETTINGS_SAVE_STATE_CONSISTENCY_DESIGN.md).
+
+Recommended next slice: complete a **Settings information hierarchy pass**.
+Reduce repeated helper copy, normalize required and advanced section cadence,
+and establish a consistently scannable primary action path across General,
+Connections, Library, and Media & storage.

@@ -28,6 +28,10 @@ const props = defineProps({
     required: true,
     type: Object,
   },
+  showTestAction: {
+    default: true,
+    type: Boolean,
+  },
 });
 
 const emit = defineEmits(['test']);
@@ -53,12 +57,15 @@ const pillTone = computed(() => props.providerState?.tone ?? 'info');
       {{ providerState.message }}
     </p>
 
-    <div v-if="providerState.canTest" class="settings-provider-connection-status__actions">
+    <div v-if="providerState.canTest && showTestAction" class="settings-provider-connection-status__actions">
       <button type="button" class="hx-btn" :disabled="isTesting" @click="emit('test')">
         {{ isTesting ? 'Testing saved connection…' : providerState.actionLabel }}
       </button>
       <span class="settings-provider-connection-status__hint">Save changes before testing a new address or API key.</span>
     </div>
+    <p v-else-if="providerState.canTest" class="settings-provider-connection-status__next-action">
+      <strong>Next:</strong> Test the saved connection with the save control below.
+    </p>
     <p v-else class="settings-provider-connection-status__next-action">
       <strong>Next:</strong> {{ providerState.actionLabel }}
     </p>

@@ -135,6 +135,12 @@ Database model source: `docs/DATABASE_MODEL.md`
   states. Generic failures redact transport details, preserve stale data during
   a failed refresh, and retain only the relevant recovery action. See
   `ACTIVITY_RESOURCE_STATE_CONSISTENCY_DESIGN.md`.
+- Settings save-state consistency: Connections, Media & storage, and Library
+  now use one accessible save lifecycle that keeps save failures retryable in
+  place, distinguishes initial load failure, avoids persisting write-only
+  secrets in dirty tracking, and asks for an explicit provider test only after
+  saved Soulseek configuration changes. See
+  `SETTINGS_SAVE_STATE_CONSISTENCY_DESIGN.md`.
 - Activity advanced diagnostics boundary: match, library-add, and failed-add
   workbenches now use canonical `/app/activity/diagnostics/...` routes behind
   the Activity disclosure. Legacy candidate/import URLs redirect with their

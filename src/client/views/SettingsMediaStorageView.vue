@@ -40,9 +40,11 @@ import {
 import FolderBrowserModal from '../components/FolderBrowserModal.vue';
 import SettingsDisclosure from '../components/settings/SettingsDisclosure.vue';
 import SettingsFolderReadiness from '../components/settings/SettingsFolderReadiness.vue';
+import SettingsSaveBar from '../components/settings/SettingsSaveBar.vue';
 import { useArtworkQuota } from '../composables/useArtworkQuota.js';
 import { useQuotaHistory } from '../composables/useQuotaHistory.js';
 import { useSettingsForm } from '../composables/useSettingsForm.js';
+import { buildSettingsSaveState } from '../lib/settings-save-state-presentation.js';
 
 const pathValidation = ref(null);
 
@@ -51,11 +53,14 @@ const artworkQuota = useArtworkQuota();
 const quotaHistory = useQuotaHistory({ days: 30 });
 
 const {
-  errorMessage,
   form,
+  hasSaved,
+  isDirty,
   isLoading,
   isSaving,
+  loadErrorMessage,
   loadSettings,
+  saveErrorMessage,
   saveSettings,
   successMessage,
 } = useSettingsForm({
@@ -118,6 +123,14 @@ const providerSparklines = computed(() => {
   return result;
 });
 
+const settingsSaveState = computed(() => buildSettingsSaveState({
+  hasSaved: hasSaved.value,
+  isDirty: isDirty.value,
+  isSaving: isSaving.value,
+  saveErrorMessage: saveErrorMessage.value,
+  successMessage: successMessage.value,
+}));
+
 const pathTranslationSetupPrompt = computed(() => buildPathTranslationSetupPrompt({
   downloadMappingCount: form.paths.downloadMappings.length,
   providerMode: form.slskd.providerMode,
@@ -140,11 +153,11 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
       </div>
     </article>
 
-    <article class="hx-card" v-else-if="errorMessage && !successMessage">
+    <article class="hx-card" v-else-if="loadErrorMessage">
       <div class="hx-card-header">
         <div>
           <h3 class="hx-card-title">Settings unavailable</h3>
-          <p class="hx-card-subtitle">{{ errorMessage }}</p>
+          <p class="hx-card-subtitle">{{ loadErrorMessage }}</p>
         </div>
       </div>
     </article>
@@ -445,13 +458,7 @@ onBeforeUnmount(() => { quotaHistory.destroy(); });
           </div>
       </SettingsDisclosure>
 
-      <div class="cfg-save-bar">
-        <span class="cfg-save-msg is-error" v-if="errorMessage">{{ errorMessage }}</span>
-        <span class="cfg-save-msg is-success" v-else-if="successMessage" role="status" aria-atomic="true">{{ successMessage }}</span>
-        <button type="submit" class="hx-btn" data-variant="primary" :disabled="isSaving">
-          {{ isSaving ? 'Saving…' : 'Save settings' }}
-        </button>
-      </div>
+      <SettingsSaveBar :save-state="settingsSaveState" />
     </form>
 
     <FolderBrowserModal
